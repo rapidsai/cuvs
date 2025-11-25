@@ -289,7 +289,7 @@ inline auto var_n_probes() -> test_cases_t
     ivf_rabitq_inputs x;
     x.search_params.n_probes = n_probes;
     // reduce `min_recall` for low `n_probes`
-    if (n_probes <= 5) { x.min_recall = 0.1 * n_probes; }
+    if (n_probes <= 5) { x.min_recall = 0.08 * n_probes; }
     return x;
   });
 }

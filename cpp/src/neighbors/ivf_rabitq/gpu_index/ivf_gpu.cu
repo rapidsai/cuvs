@@ -1252,7 +1252,7 @@ void IVFGPU::search(
   // Create a device result pool. (k*nprobe for multiple use)
   DeviceResultPool** knn_array = new DeviceResultPool*[nprobe];
   for (size_t i = 0; i < nprobe; ++i) {
-    knn_array[i] = createDeviceResultPool(k);  // 每个都用 k 初始化
+    knn_array[i] = createDeviceResultPool(k, stream);  // 每个都用 k 初始化
   }
 
   // For each of the nprobe closest centroids, perform GPU search. and finally get TOPK *
@@ -1291,6 +1291,7 @@ void IVFGPU::search(
   //    Searcher searcher(d_query, D, EX_BITS, DQ);
 #endif
 
+  raft::resource::sync_stream(handle);
   // #pragma omp parallel for schedule(static)
   for (size_t i = 0; i < nprobe; ++i) {
     //        const int tid      = omp_get_thread_num();
@@ -1405,13 +1406,14 @@ void IVFGPU::MemOptimizedSearch(raft::resources const& handle,
   // Create a device result pool. (k*nprobe for multiple use)
   DeviceResultPool** knn_array = new DeviceResultPool*[nprobe];
   for (size_t i = 0; i < nprobe; ++i) {
-    knn_array[i] = createDeviceResultPool(k);  // 每个都用 k 初始化
+    knn_array[i] = createDeviceResultPool(k, stream);  // 每个都用 k 初始化
   }
 
   // For each of the nprobe closest centroids, perform GPU search. and finally get TOPK *
   // num_centroids results
   float* centroid_data = (float*)malloc(sizeof(float) * num_padded_dim * num_centroids);
 
+  raft::resource::sync_stream(handle);
   // #pragma omp parallel for schedule(static)
   for (size_t i = 0; i < nprobe; ++i) {
     //        const int tid      = omp_get_thread_num();
@@ -2751,7 +2753,7 @@ void IVFGPU::MemOptimizedSearchV2(raft::resources const& handle,
   // Create a device result pool. (k*nprobe for multiple use)
   DeviceResultPool** knn_array = new DeviceResultPool*[nprobe];
   for (size_t i = 0; i < nprobe; ++i) {
-    knn_array[i] = createDeviceResultPool(k);  // 每个都用 k 初始化
+    knn_array[i] = createDeviceResultPool(k, stream);  // 每个都用 k 初始化
   }
 
   // For each of the nprobe closest centroids, perform GPU search. and finally get TOPK *
@@ -2942,7 +2944,7 @@ void IVFGPU::CPUGPUCoSearchV2(raft::resources const& handle,
   DeviceResultPool** knn_array_gpu = new DeviceResultPool*[startpoint];
 
   for (size_t i = 0; i < startpoint; ++i)
-    knn_array_gpu[i] = createDeviceResultPool(k);
+    knn_array_gpu[i] = createDeviceResultPool(k, stream);
 
   BoundedKNN** knn_array = new BoundedKNN*[nprobe];
   for (size_t i = 0; i < nprobe; ++i)
@@ -3143,7 +3145,8 @@ void IVFGPU::search_with_time(raft::resources const& handle,
   cpu.start();
   DeviceResultPool** knn_array = new DeviceResultPool*[nprobe];
   for (size_t i = 0; i < nprobe; ++i)
-    knn_array[i] = createDeviceResultPool(k);
+    knn_array[i] = createDeviceResultPool(k, stream);
+  raft::resource::sync_stream(handle);
   stats.push_back({"alloc_pools", cpu.stop()});
 
   //------------------------------------------------------------------

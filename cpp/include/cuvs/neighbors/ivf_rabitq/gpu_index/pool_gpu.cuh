@@ -9,9 +9,12 @@
 
 #pragma once
 
+#include <cuvs/neighbors/ivf_rabitq/utils/utils_cuda.cuh>
+
+#include <raft/core/resources.hpp>
+
 #include <algorithm>
 #include <cstdint>
-#include <cuvs/neighbors/ivf_rabitq/utils/utils_cuda.cuh>
 #include <limits>
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
@@ -139,6 +142,8 @@ inline void freeDeviceResultPool(DeviceResultPool* pool, cudaStream_t stream = 0
  * @param d_pool        Pointer to the DeviceResultPool in device memory.
  * @param host_results  Host array (of size at least pool->size) where the IDs will be copied.
  */
-void copy_results_from_pool(const DeviceResultPool* d_pool, uint32_t* host_results);
+void copy_results_from_pool(raft::resources const& handle,
+                            const DeviceResultPool* d_pool,
+                            uint32_t* host_results);
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail
