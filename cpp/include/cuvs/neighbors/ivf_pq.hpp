@@ -1070,7 +1070,7 @@ void build(raft::resources const& handle,
 /**
  * @brief Build a view-type IVF-PQ index from device memory centroids and codebook.
  *
- * This function creates a non-owning index that references the provided device data directly.
+ * This function creates a non-owning index that stores a reference to the provided device data.
  * All parameters must be provided with correct extents. The caller is responsible for ensuring
  * the lifetime of the input data exceeds the lifetime of the returned index.
  *
