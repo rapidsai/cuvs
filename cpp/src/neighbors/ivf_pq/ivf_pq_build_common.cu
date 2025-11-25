@@ -306,7 +306,8 @@ void pad_centers_with_norms(
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
   raft::device_matrix_view<float, uint32_t, raft::row_major> padded_centers)
 {
-  detail::pad_centers_with_norms(res, centers, padded_centers);
+  detail::pad_centers_with_norms(
+    res, centers.data_handle(), centers.extent(0), centers.extent(1), padded_centers);
 }
 
 void pad_centers_with_norms(
@@ -314,7 +315,8 @@ void pad_centers_with_norms(
   raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
   raft::device_matrix_view<float, uint32_t, raft::row_major> padded_centers)
 {
-  detail::pad_centers_with_norms(res, centers, padded_centers);
+  detail::pad_centers_with_norms(
+    res, centers.data_handle(), centers.extent(0), centers.extent(1), padded_centers);
 }
 
 void rotate_padded_centers(

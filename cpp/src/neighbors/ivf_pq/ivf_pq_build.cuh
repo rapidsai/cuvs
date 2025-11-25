@@ -244,8 +244,7 @@ auto calculate_offsets_and_indices(IdxT n_rows,
   return max_cluster_size;
 }
 
-template <typename accessor>
-void pad_centers_with_norms(
+inline void pad_centers_with_norms(
   raft::resources const& res,
   raft::mdspan<const float, raft::matrix_extent<uint32_t>, raft::row_major, accessor> centers,
   raft::device_matrix_view<float, uint32_t, raft::row_major> padded_centers)
