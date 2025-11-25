@@ -9,13 +9,16 @@
 
 #pragma once
 
-#include <cstdint>
 #include <cuvs/neighbors/ivf_rabitq/defines.hpp>
+#include <cuvs/neighbors/ivf_rabitq/utils/utils_cuda.cuh>
+
+#include <raft/core/resource/cuda_stream.hpp>
+#include <raft/core/resources.hpp>
+
+#include <cstdint>
 #include <fstream>
 #include <string>
 #include <vector>
-// #include "index/Quantizer.hpp"  // For ExFactor, etc.
-#include <cuvs/neighbors/ivf_rabitq/utils/utils_cuda.cuh>
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
@@ -27,7 +30,10 @@ class InitializerGPU {
    * @param d dimension of vectors
    * @param k number of centroids
    */
-  explicit InitializerGPU(size_t d, size_t k) : D(d), K(k) {}
+  explicit InitializerGPU(raft::resources const& handle, size_t d, size_t k)
+    : D(d), K(k), stream_(raft::resource::get_cuda_stream(handle))
+  {
+  }
 
   virtual ~InitializerGPU() = default;
 
@@ -45,9 +51,9 @@ class InitializerGPU {
    *
    * @param cent pointer to centroids
    */
-  virtual void AddVectors(const float* cent) = 0;
+  virtual void AddVectors(raft::resources const& handle, const float* cent) = 0;
 
-  virtual void AddVectorsD2D(const float* cent) = 0;
+  virtual void AddVectorsD2D(raft::resources const& handle, const float* cent) = 0;
 
   /**
    * @brief Computes the distances from the query vector to each getCentroidbyId.
@@ -57,11 +63,11 @@ class InitializerGPU {
    * @param candidates Array of candidates.
    * @param num_candidates
    */
-  virtual void ComputeCentroidsDistances(const float* query,
+  virtual void ComputeCentroidsDistances(raft::resources const& handle,
+                                         const float* query,
                                          size_t nprobe,
                                          Candidate* candidates,
-                                         size_t num_candidates,
-                                         cudaStream_t stream) const = 0;
+                                         size_t num_candidates) const = 0;
 
   /**
    * @brief LoadCentroids centroids' information from files.
@@ -69,7 +75,9 @@ class InitializerGPU {
    * @param input
    * @param filename
    */
-  virtual void LoadCentroids(std::ifstream& input, const char* filename) = 0;
+  virtual void LoadCentroids(raft::resources const& handle,
+                             std::ifstream& input,
+                             const char* filename) = 0;
 
   /**
    * @brief SaveCentroids centroids' information from files.
@@ -77,47 +85,59 @@ class InitializerGPU {
    * @param save
    * @param filename
    */
-  virtual void SaveCentroids(std::ofstream& output, const char* filename) const = 0;
+  virtual void SaveCentroids(raft::resources const& handle,
+                             std::ofstream& output,
+                             const char* filename) const = 0;
 
  protected:
-  size_t D;  // Dimension
-  size_t K;  // Num of Centroids
+  size_t D;              // Dimension
+  size_t K;              // Num of Centroids
+  cudaStream_t stream_;  // CUDA stream
 };
 
 class FlatInitializerGPU : public InitializerGPU {
  public:
-  explicit FlatInitializerGPU(size_t d, size_t k);
+  explicit FlatInitializerGPU(raft::resources const& handle, size_t d, size_t k);
 
   ~FlatInitializerGPU() override;
 
   [[nodiscard]] __host__ __device__ float* GetCentroid(PID id) const override;
 
-  void AddVectors(const float* cent) override;
+  void AddVectors(raft::resources const& handle, const float* cent) override;
 
-  void ComputeCentroidsDistances(const float* query,
+  void ComputeCentroidsDistances(raft::resources const& handle,
+                                 const float* query,
                                  size_t nprobe,
                                  Candidate* candidates,
-                                 size_t num_candidates,
-                                 cudaStream_t stream) const override;
+                                 size_t num_candidates) const override;
 
-  void LoadCentroids(std::ifstream& input, const char* filename) override;
+  void LoadCentroids(raft::resources const& handle,
+                     std::ifstream& input,
+                     const char* filename) override;
 
-  void SaveCentroids(std::ofstream& output, const char* filename) const override;
+  void SaveCentroids(raft::resources const& handle,
+                     std::ofstream& output,
+                     const char* filename) const override;
 
   __host__ __device__ float* GetCentroidTranspose(PID id) const;
 
-  void AddVectorsTranspose(const float* cent);
+  void AddVectorsTranspose(raft::resources const& handle, const float* cent);
 
-  void AddVectorsD2D(const float* cent);
+  void AddVectorsD2D(raft::resources const& handle, const float* cent);
 
-  void ComputeCentroidsDistancesTranspose(const float* query,
+  void ComputeCentroidsDistancesTranspose(raft::resources const& handle,
+                                          const float* query,
                                           size_t nprobe,
                                           Candidate* candidates,
                                           size_t num_candidates) const;
 
-  void LoadCentroidsTranspose(std::ifstream& input, const char* filename);
+  void LoadCentroidsTranspose(raft::resources const& handle,
+                              std::ifstream& input,
+                              const char* filename);
 
-  void SaveCentroidsTranspose(std::ofstream& output, const char* filename) const;
+  void SaveCentroidsTranspose(raft::resources const& handle,
+                              std::ofstream& output,
+                              const char* filename) const;
 
  private:
   // D, K are inherited from parent

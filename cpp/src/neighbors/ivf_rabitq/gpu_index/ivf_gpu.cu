@@ -64,7 +64,7 @@ void IVFGPU::AllocateDeviceMemory(raft::resources const& handle)
 {
   std::cout << "Allocating device memory for IVFGPU..." << std::endl;
 
-  this->initializer = new FlatInitializerGPU(num_padded_dim, num_centroids);
+  this->initializer = new FlatInitializerGPU(handle, num_padded_dim, num_centroids);
   // if (num_centroids < 20000ul) {
   //     this->initer = new FlatInitializer(num_dimensions, num_centroids);
   // } else {
@@ -188,7 +188,7 @@ void IVFGPU::load(raft::resources const& handle, const char* filename, bool load
   // Allocate device memory based on the cluster sizes.
   AllocateDeviceMemory(handle);
   // Load initializer data (e.g., centroids) from file.
-  this->initializer->LoadCentroids(input, filename);
+  this->initializer->LoadCentroids(handle, input, filename);
   // Read raw arrays from file into device memory.
   auto read_into_device = [&](void* d_ptr, size_t n_bytes) {
     std::vector<std::uint8_t> h_buf(n_bytes);  // host staging buffer
@@ -265,7 +265,7 @@ void IVFGPU::load_transposed(raft::resources const& handle, const char* filename
   // Allocate device memory based on the cluster sizes.
   AllocateDeviceMemory(handle);
   // Load initializer data (e.g., centroids) from file.
-  this->initializer->LoadCentroids(input, filename);
+  this->initializer->LoadCentroids(handle, input, filename);
   // Read raw arrays from file into device memory.
   auto read_into_device = [&](void* d_ptr, size_t n_bytes) {
     std::vector<std::uint8_t> h_buf(n_bytes);  // host staging buffer
@@ -490,7 +490,7 @@ void IVFGPU::save(raft::resources const& handle, const char* filename, bool save
   this->Rota.save(output);
 
   // Save initializer data.
-  this->initializer->SaveCentroids(output, filename);
+  this->initializer->SaveCentroids(handle, output, filename);
 
   // Compute sizes for device arrays.
   size_t short_data_size = GetShortDataBytesSimple();
@@ -654,7 +654,7 @@ void IVFGPU::construct(raft::resources const& handle,
   }
 
   // After quantization, add the rotated centroids into the initializer.
-  initializer->AddVectorsD2D(d_rotated_centroids);
+  initializer->AddVectorsD2D(handle, d_rotated_centroids);
 
   // Clean up: free temporary device buffers.
   RAFT_CUDA_TRY(cudaFreeAsync(d_data, stream_));
@@ -1229,12 +1229,8 @@ void merge_knn_pools_with_stats(raft::resources const& handle,
   raft::resource::sync_stream(handle);
 }
 
-void IVFGPU::search(raft::resources const& handle,
-                    const float* d_query,
-                    size_t k,
-                    size_t nprobe,
-                    PID* results,
-                    cudaStream_t single_stream) const
+void IVFGPU::search(
+  raft::resources const& handle, const float* d_query, size_t k, size_t nprobe, PID* results) const
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   // Compute distances from query to centroids on GPU.
@@ -1242,8 +1238,7 @@ void IVFGPU::search(raft::resources const& handle,
   Candidate* d_centroid_candidates = nullptr;
   RAFT_CUDA_TRY(cudaMallocAsync(&d_centroid_candidates, nprobe * sizeof(Candidate), stream));
   raft::resource::sync_stream(handle);
-  initializer->ComputeCentroidsDistances(
-    d_query, nprobe, d_centroid_candidates, nprobe, single_stream);
+  initializer->ComputeCentroidsDistances(handle, d_query, nprobe, d_centroid_candidates, nprobe);
 
   // Copy only the top nprobe candidates to host.
   std::vector<Candidate> centroid_candidates(nprobe);
@@ -1396,7 +1391,7 @@ void IVFGPU::MemOptimizedSearch(raft::resources const& handle,
   Candidate* d_centroid_candidates = nullptr;
   RAFT_CUDA_TRY(cudaMallocAsync(&d_centroid_candidates, nprobe * sizeof(Candidate), stream));
   raft::resource::sync_stream(handle);
-  initializer->ComputeCentroidsDistances(d_query, nprobe, d_centroid_candidates, nprobe, nullptr);
+  initializer->ComputeCentroidsDistances(handle, d_query, nprobe, d_centroid_candidates, nprobe);
 
   // Copy only the top nprobe candidates to host.
   std::vector<Candidate> centroid_candidates(nprobe);
@@ -2601,7 +2596,7 @@ void IVFGPU::MultiClusterSearch(raft::resources const& handle,
 
   Candidate* d_centroid_candidates = nullptr;
   RAFT_CUDA_TRY(cudaMallocAsync(&d_centroid_candidates, nprobe * sizeof(Candidate), stream));
-  initializer->ComputeCentroidsDistances(d_query, nprobe, d_centroid_candidates, nprobe, stream);
+  initializer->ComputeCentroidsDistances(handle, d_query, nprobe, d_centroid_candidates, nprobe);
 
   // Copy only the top nprobe candidates to host.
   cudaEvent_t copyDone;
@@ -2742,7 +2737,7 @@ void IVFGPU::MemOptimizedSearchV2(raft::resources const& handle,
   Candidate* d_centroid_candidates = nullptr;
   RAFT_CUDA_TRY(cudaMallocAsync(&d_centroid_candidates, nprobe * sizeof(Candidate), stream));
   raft::resource::sync_stream(handle);
-  initializer->ComputeCentroidsDistances(d_query, nprobe, d_centroid_candidates, nprobe, nullptr);
+  initializer->ComputeCentroidsDistances(handle, d_query, nprobe, d_centroid_candidates, nprobe);
 
   // Copy only the top nprobe candidates to host.
   std::vector<Candidate> centroid_candidates(nprobe);
@@ -2832,7 +2827,7 @@ void IVFGPU::CPUGPUCoSearch(raft::resources const& handle,
   Candidate* d_centroid_candidates = nullptr;
   RAFT_CUDA_TRY(cudaMallocAsync(&d_centroid_candidates, nprobe * sizeof(Candidate), stream));
   raft::resource::sync_stream(handle);
-  initializer->ComputeCentroidsDistances(d_query, nprobe, d_centroid_candidates, nprobe, nullptr);
+  initializer->ComputeCentroidsDistances(handle, d_query, nprobe, d_centroid_candidates, nprobe);
 
   // Copy only the top nprobe candidates to host.
   std::vector<Candidate> centroid_candidates(nprobe);
@@ -2928,7 +2923,7 @@ void IVFGPU::CPUGPUCoSearchV2(raft::resources const& handle,
   Candidate* d_centroid_candidates = nullptr;
   RAFT_CUDA_TRY(cudaMallocAsync(&d_centroid_candidates, nprobe * sizeof(Candidate), stream));
   raft::resource::sync_stream(handle);
-  initializer->ComputeCentroidsDistances(d_query, nprobe, d_centroid_candidates, nprobe, nullptr);
+  initializer->ComputeCentroidsDistances(handle, d_query, nprobe, d_centroid_candidates, nprobe);
 
   // Copy only the top nprobe candidates to host.
   std::vector<Candidate> centroid_candidates(nprobe);
@@ -3125,7 +3120,7 @@ void IVFGPU::search_with_time(raft::resources const& handle,
   Candidate* d_centroid_candidates = nullptr;
   RAFT_CUDA_TRY(cudaMallocAsync(&d_centroid_candidates, nprobe * sizeof(Candidate), stream));
   raft::resource::sync_stream(handle);
-  initializer->ComputeCentroidsDistances(d_query, nprobe, d_centroid_candidates, nprobe, nullptr);
+  initializer->ComputeCentroidsDistances(handle, d_query, nprobe, d_centroid_candidates, nprobe);
   stats.push_back({"centroid_dist", gpu.stop(stream)});
 
   //------------------------------------------------------------------

@@ -229,8 +229,7 @@ class IVFGPU {
               const float* d_query,
               size_t k,
               size_t nprobe,
-              PID* results,
-              cudaStream_t single_stream = nullptr) const;
+              PID* results) const;
   //    void search(const float* host_query, float* results, size_t k, size_t nprobe) const;
   void search_with_time(raft::resources const& handle,
                         const float* d_query,
