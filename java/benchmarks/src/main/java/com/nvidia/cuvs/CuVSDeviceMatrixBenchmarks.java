@@ -12,6 +12,7 @@ import java.util.Random;
 import java.util.concurrent.*;
 
 @Fork(value = 1, warmups = 0)
+@Threads(1) // Sharing resources
 @State(Scope.Benchmark)
 public class CuVSDeviceMatrixBenchmarks {
 
@@ -85,16 +86,14 @@ public class CuVSDeviceMatrixBenchmarks {
 
   @Benchmark
   public void matrixDeviceBuilder() throws Throwable {
-    try (CuVSResources resources = CuVSResources.create()) {
-      var builder = CuVSMatrix.deviceBuilder(resources, size, dims, CuVSMatrix.DataType.FLOAT);
+    var builder = CuVSMatrix.deviceBuilder(resources, size, dims, CuVSMatrix.DataType.FLOAT);
 
-      for (int i = 0; i < size; ++i) {
-        var array = data[i];
-        builder.addVector(array);
-      }
-      CuVSDeviceMatrix matrix = builder.build();
-      matrix.close();
+    for (int i = 0; i < size; ++i) {
+      var array = data[i];
+      builder.addVector(array);
     }
+    CuVSDeviceMatrix matrix = builder.build();
+    matrix.close();
   }
 
   @Benchmark
