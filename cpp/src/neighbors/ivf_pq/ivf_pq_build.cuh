@@ -244,7 +244,7 @@ auto calculate_offsets_and_indices(IdxT n_rows,
   return max_cluster_size;
 }
 
-void pad_centers_with_norms(
+inline void pad_centers_with_norms(
   raft::resources const& res,
   const float* centers,
   uint32_t n_lists,
