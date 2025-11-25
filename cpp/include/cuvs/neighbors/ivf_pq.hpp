@@ -288,6 +288,7 @@ class index_iface {
 
   virtual cuvs::distance::DistanceType metric() const noexcept           = 0;
   virtual codebook_gen codebook_kind() const noexcept                    = 0;
+  virtual IdxT size() const noexcept                                     = 0;
   virtual uint32_t dim() const noexcept                                  = 0;
   virtual uint32_t dim_ext() const noexcept                              = 0;
   virtual uint32_t rot_dim() const noexcept                              = 0;
@@ -449,7 +450,7 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
   index(raft::resources const& handle, const index_params& params, uint32_t dim);
 
   /** Total length of the index. */
-  IdxT size() const noexcept;
+  IdxT size() const noexcept override;
 
   /** Dimensionality of the input data. */
   uint32_t dim() const noexcept override;
@@ -3051,10 +3052,25 @@ void make_rotation_matrix(raft::resources const& res,
  * @param[in] centers cluster centers [n_centers, dim]
  * @param[out] padded_centers padded centers with norms [n_centers, dim_ext]
  */
-template <typename MatrixViewType>
 void pad_centers_with_norms(
   raft::resources const& res,
-  MatrixViewType centers,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
+  raft::device_matrix_view<float, uint32_t, raft::row_major> padded_centers);
+
+/**
+ * @brief Pad cluster centers with their L2 norms for efficient GEMM operations.
+ *
+ * This function takes cluster centers and pads them with their L2 norms to create
+ * extended centers suitable for coarse search operations. The output has dimensions
+ * [n_centers, dim_ext] where dim_ext = round_up(dim + 1, 8).
+ *
+ * @param[in] res raft resource
+ * @param[in] centers cluster centers [n_centers, dim]
+ * @param[out] padded_centers padded centers with norms [n_centers, dim_ext]
+ */
+void pad_centers_with_norms(
+  raft::resources const& res,
+  raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
   raft::device_matrix_view<float, uint32_t, raft::row_major> padded_centers);
 
 /**

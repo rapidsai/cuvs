@@ -29,6 +29,7 @@ class index_impl : public index_iface<IdxT> {
 
   cuvs::distance::DistanceType metric() const noexcept override;
   codebook_gen codebook_kind() const noexcept override;
+  IdxT size() const noexcept override;
   uint32_t dim() const noexcept override;
   uint32_t dim_ext() const noexcept override;
   uint32_t rot_dim() const noexcept override;
@@ -77,18 +78,24 @@ class index_impl : public index_iface<IdxT> {
   uint32_t pq_dim_;
   bool conservative_memory_allocation_;
 
+  // Primary data members
   std::vector<std::shared_ptr<list_data<IdxT>>> lists_;
   raft::device_vector<uint32_t, uint32_t, raft::row_major> list_sizes_;
-  raft::device_vector<uint8_t*, uint32_t, raft::row_major> data_ptrs_;
-  raft::device_vector<IdxT*, uint32_t, raft::row_major> inds_ptrs_;
-  raft::host_vector<IdxT, uint32_t, raft::row_major> accum_sorted_sizes_;
 
+  // Lazy-initialized low-precision variants of index members - for low-precision coarse search.
+  // These are never serialized and not touched during build/extend.
   mutable std::optional<raft::device_matrix<int8_t, uint32_t, raft::row_major>> centers_int8_;
   mutable std::optional<raft::device_matrix<half, uint32_t, raft::row_major>> centers_half_;
   mutable std::optional<raft::device_matrix<int8_t, uint32_t, raft::row_major>>
     rotation_matrix_int8_;
   mutable std::optional<raft::device_matrix<half, uint32_t, raft::row_major>> rotation_matrix_half_;
 
+  // Computed members for accelerating search.
+  raft::device_vector<uint8_t*, uint32_t, raft::row_major> data_ptrs_;
+  raft::device_vector<IdxT*, uint32_t, raft::row_major> inds_ptrs_;
+  raft::host_vector<IdxT, uint32_t, raft::row_major> accum_sorted_sizes_;
+
+  /** Throw an error if the index content is inconsistent. */
   void check_consistency();
 };
 

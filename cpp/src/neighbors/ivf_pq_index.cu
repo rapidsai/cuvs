@@ -54,6 +54,12 @@ codebook_gen index_impl<IdxT>::codebook_kind() const noexcept
 }
 
 template <typename IdxT>
+IdxT index_impl<IdxT>::size() const noexcept
+{
+  return accum_sorted_sizes_(n_lists());
+}
+
+template <typename IdxT>
 uint32_t index_impl<IdxT>::dim() const noexcept
 {
   return dim_;
@@ -425,7 +431,7 @@ index<IdxT>::index(raft::resources const& handle, const index_params& params, ui
 template <typename IdxT>
 IdxT index<IdxT>::size() const noexcept
 {
-  return accum_sorted_sizes()(n_lists());
+  return impl_->size();
 }
 
 template <typename IdxT>
