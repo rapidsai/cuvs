@@ -128,7 +128,7 @@ void search_impl(raft::resources const& handle,
         distance_buffer_dev.data(),
         uint32_distances.data(),
         n_queries * index.n_lists(),
-        [] __device__(uint32_t val) { return static_cast<float>(val); },
+        raft::cast_op<float>{},
         stream);
     }
   } else {
