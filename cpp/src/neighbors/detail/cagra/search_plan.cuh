@@ -10,7 +10,6 @@
 #include "compute_distance-ext.cuh"
 #include <cuvs/neighbors/common.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-// #include "search_single_cta_inst.cuh"
 // #include "topk_for_cagra/topk.h"
 
 #include <raft/core/device_mdspan.hpp>
