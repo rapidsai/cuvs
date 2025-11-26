@@ -23,21 +23,16 @@ void train_pq_centers(
   const raft::resources& res,
   const cuvs::neighbors::vpq_params& params,
   const raft::device_matrix_view<const MathT, IdxT, raft::row_major> pq_trainset_view,
-  const raft::device_matrix_view<MathT, uint32_t, raft::row_major> pq_centers_view)
+  const raft::device_matrix_view<MathT, uint32_t, raft::row_major> pq_centers_view,
+  std::optional<raft::device_vector_view<uint32_t, IdxT>> sub_labels_view       = std::nullopt,
+  std::optional<raft::device_vector_view<uint32_t, IdxT>> pq_cluster_sizes_view = std::nullopt)
 {
   if (params.pq_kmeans_type == cuvs::cluster::kmeans::kmeans_type::KMeansBalanced) {
+    RAFT_EXPECTS(sub_labels_view.has_value(), "sub_labels_view is required");
+    RAFT_EXPECTS(pq_cluster_sizes_view.has_value(), "pq_cluster_sizes_view is required");
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
     kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
-    auto device_memory    = raft::resource::get_workspace_resource(res);
-    auto stream           = raft::resource::get_cuda_stream(res);
-    rmm::device_uvector<uint32_t> sub_labels(pq_trainset_view.extent(0), stream, device_memory);
-    rmm::device_uvector<uint32_t> pq_cluster_sizes(
-      pq_centers_view.extent(0), stream, device_memory);
-    auto sub_labels_view =
-      raft::make_device_vector_view<uint32_t, IdxT>(sub_labels.data(), pq_trainset_view.extent(0));
-    auto pq_cluster_sizes_view = raft::make_device_vector_view<uint32_t, IdxT>(
-      pq_cluster_sizes.data(), pq_centers_view.extent(0));
 
     cuvs::cluster::kmeans_balanced::helpers::build_clusters<
       MathT,
@@ -50,8 +45,8 @@ void train_pq_centers(
       kmeans_params,
       pq_trainset_view,
       pq_centers_view,
-      sub_labels_view,
-      pq_cluster_sizes_view,
+      sub_labels_view.value(),
+      pq_cluster_sizes_view.value(),
       cuvs::spatial::knn::detail::utils::mapping<MathT>{});
   } else {
     const auto pq_n_centers = pq_centers_view.extent(0);
@@ -118,6 +113,23 @@ auto train_pq_subspaces(
   auto pq_centers =
     raft::make_device_matrix<MathT, uint32_t, raft::row_major>(res, pq_dim * pq_n_centers, pq_len);
   auto trainset_ptr = pq_trainset ? pq_trainset.value().data_handle() : dataset.data_handle();
+  std::optional<rmm::device_uvector<uint32_t>> sub_labels_opt                       = std::nullopt;
+  std::optional<rmm::device_uvector<uint32_t>> pq_cluster_sizes_opt                 = std::nullopt;
+  std::optional<raft::device_vector_view<uint32_t, ix_t>> sub_labels_view_opt       = std::nullopt;
+  std::optional<raft::device_vector_view<uint32_t, ix_t>> pq_cluster_sizes_view_opt = std::nullopt;
+  auto device_memory = raft::resource::get_workspace_resource(res);
+  if (params.pq_kmeans_type == cuvs::cluster::kmeans::kmeans_type::KMeansBalanced) {
+    auto stream = raft::resource::get_cuda_stream(res);
+    sub_labels_opt =
+      std::make_optional(rmm::device_uvector<uint32_t>(n_rows_train, stream, device_memory));
+    pq_cluster_sizes_opt =
+      std::make_optional(rmm::device_uvector<uint32_t>(pq_n_centers, stream, device_memory));
+    sub_labels_view_opt = std::make_optional(
+      raft::make_device_vector_view<uint32_t, ix_t>(sub_labels_opt.value().data(), n_rows_train));
+    pq_cluster_sizes_view_opt = std::make_optional(raft::make_device_vector_view<uint32_t, ix_t>(
+      pq_cluster_sizes_opt.value().data(), pq_n_centers));
+  }
+
   for (ix_t m = 0; m < pq_dim; m++) {
     RAFT_CUDA_TRY(cudaMemcpy2DAsync(sub_dataset.data_handle(),
                                     sizeof(MathT) * pq_len,
@@ -129,10 +141,13 @@ auto train_pq_subspaces(
                                     raft::resource::get_cuda_stream(res)));
     auto pq_centers_subspace_view = raft::make_device_matrix_view<MathT, uint32_t, raft::row_major>(
       pq_centers.data_handle() + m * pq_n_centers * pq_len, pq_n_centers, pq_len);
-    train_pq_centers<MathT, ix_t>(
-      res, params, raft::make_const_mdspan(sub_dataset.view()), pq_centers_subspace_view);
+    train_pq_centers<MathT, ix_t>(res,
+                                  params,
+                                  raft::make_const_mdspan(sub_dataset.view()),
+                                  pq_centers_subspace_view,
+                                  sub_labels_view_opt,
+                                  pq_cluster_sizes_view_opt);
   }
-
   return pq_centers;
 }
 
@@ -144,7 +159,11 @@ quantizer<T> train(raft::resources const& res,
   auto n_rows = dataset.extent(0);
   auto dim    = dataset.extent(1);
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
-    "preprocessing::quantize::pq::train(%zu, %u)", size_t(n_rows), dim);
+    "preprocessing::quantize::pq::train(%zu, %u, %u, %u)",
+    size_t(n_rows),
+    dim,
+    params.pq_bits,
+    params.pq_dim);
 
   auto ps = cuvs::neighbors::detail::fill_missing_params_heuristics(params, dataset);
   std::optional<raft::device_matrix_view<const T, uint32_t, raft::row_major>>
