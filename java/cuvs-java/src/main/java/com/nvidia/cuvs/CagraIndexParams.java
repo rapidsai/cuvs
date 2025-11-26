@@ -24,6 +24,7 @@ public class CagraIndexParams {
   private final long nnDescentNiter;
   private final int numWriterThreads;
   private final CuVSIvfPqParams cuVSIvfPqParams;
+  private final CuVSAceParams cuVSAceParams;
   private final CagraCompressionParams cagraCompressionParams;
 
   /**
@@ -41,7 +42,12 @@ public class CagraIndexParams {
     /**
      * Experimental, use NN-Descent to build all-neighbors knn graph
      */
-    NN_DESCENT(2);
+    NN_DESCENT(2),
+    /**
+     * Experimental, use ACE (Augmented Core Extraction) to build graph for large datasets.
+     * 4 to be consistent with the other interfaces.
+     */
+    ACE(4);
 
     /**
      * The value for the enum choice.
@@ -329,6 +335,7 @@ public class CagraIndexParams {
       int writerThreads,
       CuvsDistanceType cuvsDistanceType,
       CuVSIvfPqParams cuVSIvfPqParams,
+      CuVSAceParams cuVSAceParams,
       CagraCompressionParams cagraCompressionParams) {
     this.intermediateGraphDegree = intermediateGraphDegree;
     this.graphDegree = graphDegree;
@@ -337,6 +344,7 @@ public class CagraIndexParams {
     this.numWriterThreads = writerThreads;
     this.cuvsDistanceType = cuvsDistanceType;
     this.cuVSIvfPqParams = cuVSIvfPqParams;
+    this.cuVSAceParams = cuVSAceParams;
     this.cagraCompressionParams = cagraCompressionParams;
   }
 
@@ -406,6 +414,13 @@ public class CagraIndexParams {
   }
 
   /**
+   * Gets the ACE parameters.
+   */
+  public CuVSAceParams getCuVSAceParams() {
+    return cuVSAceParams;
+  }
+
+  /**
    * Gets the CAGRA build algorithm.
    */
   public CagraGraphBuildAlgo getCuvsCagraGraphBuildAlgo() {
@@ -435,6 +450,8 @@ public class CagraIndexParams {
         + numWriterThreads
         + ", cuVSIvfPqParams="
         + cuVSIvfPqParams
+        + ", cuVSAceParams="
+        + cuVSAceParams
         + ", cagraCompressionParams="
         + cagraCompressionParams
         + "]";
@@ -452,6 +469,7 @@ public class CagraIndexParams {
     private long nnDescentNumIterations = 20;
     private int numWriterThreads = 2;
     private CuVSIvfPqParams cuVSIvfPqParams = new CuVSIvfPqParams.Builder().build();
+    private CuVSAceParams cuVSAceParams = new CuVSAceParams.Builder().build();
     private CagraCompressionParams cagraCompressionParams;
 
     public Builder() {}
@@ -536,6 +554,17 @@ public class CagraIndexParams {
     }
 
     /**
+     * Sets the ACE index parameters.
+     *
+     * @param cuVSAceParams the ACE index parameters
+     * @return an instance of Builder
+     */
+    public Builder withCuVSAceParams(CuVSAceParams cuVSAceParams) {
+      this.cuVSAceParams = cuVSAceParams;
+      return this;
+    }
+
+    /**
      * Registers an instance of configured {@link CagraCompressionParams} with this
      * Builder.
      *
@@ -561,6 +590,7 @@ public class CagraIndexParams {
           numWriterThreads,
           cuvsDistanceType,
           cuVSIvfPqParams,
+          cuVSAceParams,
           cagraCompressionParams);
     }
   }
