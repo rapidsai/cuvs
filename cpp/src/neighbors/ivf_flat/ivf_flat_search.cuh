@@ -124,12 +124,11 @@ void search_impl(raft::resources const& handle,
                                                              true);
 
       // Convert uint32_t distances to float for compatibility with rest of pipeline
-      raft::linalg::unaryOp(
-        distance_buffer_dev.data(),
-        uint32_distances.data(),
-        n_queries * index.n_lists(),
-        raft::cast_op<float>{},
-        stream);
+      raft::linalg::unaryOp(distance_buffer_dev.data(),
+                            uint32_distances.data(),
+                            n_queries * index.n_lists(),
+                            raft::cast_op<float>{},
+                            stream);
     }
   } else {
     float alpha = 1.0f;

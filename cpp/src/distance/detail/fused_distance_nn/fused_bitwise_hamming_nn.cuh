@@ -59,8 +59,20 @@ void fusedBitwiseHammingNN(OutT* min,
 
   dim3 grid = launchConfigGenerator<P>(m, n, shmemSize, kernel);
 
-  kernel<<<grid, blk, shmemSize, stream>>>(
-    min, x, y, nullptr, nullptr, m, n, k, maxVal, workspace, redOp, pairRedOp, distance_op, raft::identity_op{});
+  kernel<<<grid, blk, shmemSize, stream>>>(min,
+                                           x,
+                                           y,
+                                           nullptr,
+                                           nullptr,
+                                           m,
+                                           n,
+                                           k,
+                                           maxVal,
+                                           workspace,
+                                           redOp,
+                                           pairRedOp,
+                                           distance_op,
+                                           raft::identity_op{});
 
   RAFT_CUDA_TRY(cudaGetLastError());
 }
