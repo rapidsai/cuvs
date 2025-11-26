@@ -14,8 +14,8 @@
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/hnsw.hpp>
 
-#include <rmm/mr/device/device_memory_resource.hpp>
-#include <rmm/mr/device/pool_memory_resource.hpp>
+#include <rmm/mr/device_memory_resource.hpp>
+#include <rmm/mr/pool_memory_resource.hpp>
 
 #include "common.cuh"
 
