@@ -51,29 +51,7 @@ option(CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE "Include cuVS brute force knn in benc
 
 find_package(Threads REQUIRED)
 
-# ----- FAISS use in Benchmarks ----
-get_cmake_property(_variableNames VARIABLES)
-
-set(CUVS_ANN_BENCH_USE_FAISS OFF)
-message(STATUS "Checking for FAISS use in benchmarks...")
-foreach(_varName ${_variableNames})
-  if(_varName MATCHES "CUVS_ANN_BENCH_USE_FAISS.+")
-    if(${_varName})
-      set(CUVS_ANN_BENCH_USE_FAISS ON)
-      message(STATUS "${_varName} is detected as ON.")
-      break()
-    endif()
-  endif()
-endforeach()
-
-if(CUVS_ANN_BENCH_USE_FAISS)
-  message(STATUS "CUVS_ANN_BENCH_USE_FAISS is switched ON")
-else()
-  message(STATUS "CUVS_ANN_BENCH_USE_FAISS is switched OFF")
-endif()
-
-# ----------------------------------
-
+set(CUVS_ANN_BENCH_USE_FAISS ON)
 set(CUVS_FAISS_ENABLE_GPU ON)
 set(CUVS_USE_FAISS_STATIC ON)
 
