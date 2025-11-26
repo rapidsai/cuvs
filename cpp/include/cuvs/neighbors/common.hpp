@@ -6,6 +6,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/device_csr_matrix.hpp>
 #include <raft/core/device_mdarray.hpp>
@@ -29,6 +30,10 @@
 #endif
 
 namespace cuvs::neighbors {
+/**
+ * @addtogroup cagra_cpp_index_params
+ * @{
+ */
 
 /** Parameters for VPQ compression. */
 struct vpq_params {
@@ -65,7 +70,25 @@ struct vpq_params {
    * When zero, an optimal value is selected using a heuristic.
    */
   double pq_kmeans_trainset_fraction = 0;
+  /**
+   * Type of k-means algorithm for PQ training.
+   */
+  cuvs::cluster::kmeans::kmeans_type pq_kmeans_type =
+    cuvs::cluster::kmeans::kmeans_type::KMeansBalanced;
+  /**
+   * Whether to use vector quantization (VQ) before product quantization (PQ).
+   * When true, VQ is used before PQ.
+   */
+  bool use_vq = false;
+  /**
+   * Whether to use subspaces for product quantization (PQ).
+   * When true, one PQ codebook is used for each subspace. Otherwise, a single
+   * PQ codebook is used.
+   */
+  bool use_subspaces = true;
 };
+
+/** @} */  // end group cagra_cpp_index_params
 
 /**
  * @defgroup neighbors_index Approximate Nearest Neighbors Types

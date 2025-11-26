@@ -70,7 +70,7 @@ cdef class CompressionParams:
     vq_kmeans_trainset_fraction: float
         The fraction of data to use during iterative kmeans building (VQ
         phase). When zero, an optimal value is selected using a heuristic.
-    vq_kmeans_trainset_fraction: float
+    pq_kmeans_trainset_fraction: float
         The fraction of data to use during iterative kmeans building (PQ
         phase). When zero, an optimal value is selected using a heuristic.
     """

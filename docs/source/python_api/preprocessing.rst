@@ -5,9 +5,28 @@ Preprocessing
    :language: python
    :class: highlight
 
-Scalar Quantizer
+Binary Quantizer
 ################
 
+.. autofunction:: cuvs.preprocessing.quantize.binary.transform
+
+Product Quantizer
+#################
+
+.. autoclass:: cuvs.preprocessing.quantize.product.Quantizer
+    :members:
+
+.. autoclass:: cuvs.preprocessing.quantize.product.QuantizerParams
+    :members:
+
+.. autofunction:: cuvs.preprocessing.quantize.product.train
+
+.. autofunction:: cuvs.preprocessing.quantize.product.transform
+
+.. autofunction:: cuvs.preprocessing.quantize.product.inverse_transform
+
+Scalar Quantizer
+################
 
 .. autoclass:: cuvs.preprocessing.quantize.scalar.Quantizer
     :members:
