@@ -12,6 +12,7 @@
 #include <cuvs/neighbors/ivf_rabitq/defines.hpp>
 #include <cuvs/neighbors/ivf_rabitq/utils/utils_cuda.cuh>
 
+#include <raft/core/device_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 
@@ -53,8 +54,6 @@ class InitializerGPU {
    */
   virtual void AddVectors(const float* cent) = 0;
 
-  virtual void AddVectorsD2D(const float* cent) = 0;
-
   /**
    * @brief Computes the distances from the query vector to each getCentroidbyId.
    *
@@ -95,8 +94,6 @@ class FlatInitializerGPU : public InitializerGPU {
  public:
   explicit FlatInitializerGPU(raft::resources const& handle, size_t d, size_t k);
 
-  ~FlatInitializerGPU() override;
-
   [[nodiscard]] __host__ __device__ float* GetCentroid(PID id) const override;
 
   void AddVectors(const float* cent) override;
@@ -114,8 +111,6 @@ class FlatInitializerGPU : public InitializerGPU {
 
   void AddVectorsTranspose(const float* cent);
 
-  void AddVectorsD2D(const float* cent);
-
   void ComputeCentroidsDistancesTranspose(const float* query,
                                           size_t nprobe,
                                           Candidate* candidates,
@@ -128,13 +123,14 @@ class FlatInitializerGPU : public InitializerGPU {
  private:
   // D, K are inherited from parent
 
-  float* Centroids;  // Stored in GPU device memory. Points to the parent centroids' array (do we
-                     // really need a pointer?)
-  // For simplicity, we use a single distance function.
+  raft::device_matrix<float, uint32_t, raft::row_major>
+    centroids_;  // Stored in GPU device memory. Points to the parent centroids' array
 
+  // For simplicity, we use a single distance function.
   float (*dist_func)(const float* __restrict__, const float* __restrict__, size_t);
 
-  [[nodiscard]] size_t data_bytes() const { return sizeof(float) * K * D; }
+  [[nodiscard]] size_t data_bytes() const noexcept { return sizeof(float) * K * D; }
+  [[nodiscard]] size_t data_elements() const noexcept { return K * D; }
 };
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

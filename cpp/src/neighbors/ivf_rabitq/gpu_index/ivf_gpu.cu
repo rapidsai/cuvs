@@ -652,7 +652,7 @@ void IVFGPU::construct(const float* host_data,
   }
 
   // After quantization, add the rotated centroids into the initializer.
-  initializer->AddVectorsD2D(d_rotated_centroids);
+  initializer->AddVectors(d_rotated_centroids);
 
   // Clean up: free temporary device buffers.
   RAFT_CUDA_TRY(cudaFreeAsync(d_data, stream_));
