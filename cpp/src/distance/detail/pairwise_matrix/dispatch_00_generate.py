@@ -233,16 +233,24 @@ bitwise_hamming_instances = [
 ]
 
 for dt in bitwise_hamming_instances:
-    DataT, AccT, OutT, IdxT = (dt[k] for k in ["DataT", "AccT", "OutT", "IdxT"])
+    DataT, AccT, OutT, IdxT = (
+        dt[k] for k in ["DataT", "AccT", "OutT", "IdxT"]
+    )
     path = f"dispatch_bitwise_hamming_{DataT}_{AccT}_{OutT}_{IdxT}.cu"
     with open(path, "w") as f:
         f.write(header)
-        f.write("#include \"../distance_ops/bitwise_hamming.cuh\" // bitwise_hamming_distance_op\n")
+        f.write(
+            '#include "../distance_ops/bitwise_hamming.cuh" // bitwise_hamming_distance_op\n'
+        )
         f.write(arch_headers([60]))  # SM60 architecture
         f.write(macro)
 
         OpT = "cuvs::distance::detail::ops::bitwise_hamming_distance_op"
         FinOpT = "raft::identity_op"
-        f.write(f"\ninstantiate_raft_distance_detail_pairwise_matrix_dispatch({OpT}, {DataT}, {AccT}, {OutT}, {FinOpT}, {IdxT});\n")
-        f.write("\n#undef instantiate_raft_distance_detail_pairwise_matrix_dispatch\n")
+        f.write(
+            f"\ninstantiate_raft_distance_detail_pairwise_matrix_dispatch({OpT}, {DataT}, {AccT}, {OutT}, {FinOpT}, {IdxT});\n"
+        )
+        f.write(
+            "\n#undef instantiate_raft_distance_detail_pairwise_matrix_dispatch\n"
+        )
     print(f"src/distance/detail/pairwise_matrix/{path}")

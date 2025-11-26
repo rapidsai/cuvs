@@ -295,7 +295,7 @@ void extend(raft::resources const& handle,
         raft::linalg::map_offset(
           handle,
           expanded_centers_view,
-          utils::bitwise_decode_op<float, IdxT>(index->binary_centers().data_handle(), dim));
+          utils::bitwise_decode_op<float, IdxT>(index->binary_centers().data_handle()));
 
         vec_batches.reset();
         for (const auto& batch : vec_batches) {

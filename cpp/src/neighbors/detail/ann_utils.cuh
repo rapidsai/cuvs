@@ -201,22 +201,12 @@ HDI constexpr auto mapping<int8_t>::operator()(const float& x) const -> int8_t
 
 template <typename OutT, typename IdxT>
 struct bitwise_decode_op {
-  bitwise_decode_op(const uint8_t* const binary_vecs, IdxT compressed_dim)
-    : binary_vecs(binary_vecs), compressed_dim(compressed_dim)
-  {
-    uncompressed_dim = compressed_dim << 3;
-  }
+  bitwise_decode_op(const uint8_t* const binary_vecs) : binary_vecs(binary_vecs) {}
   const uint8_t* binary_vecs;
-  IdxT compressed_dim;
-  IdxT uncompressed_dim;
-
+  /// Returns 1 if the i-th bit is 1, otherwise return -1.
   HDI constexpr auto operator()(const IdxT& i) -> OutT
   {
-    IdxT row_id = i / uncompressed_dim;
-    IdxT col_id = i % uncompressed_dim;
-    return static_cast<OutT>(
-      -1 + 2 * static_cast<OutT>(
-                 (binary_vecs[row_id * compressed_dim + (col_id >> 3)] >> (col_id & 7)) & 1));
+    return static_cast<OutT>((binary_vecs[i / 8] >> (i % 8)) & 1 ? 1 : -1);
   };
 };
 

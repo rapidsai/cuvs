@@ -42,18 +42,25 @@ void fusedBitwiseHammingNN(OutT* min,
   typedef Policy P;
 
   dim3 blk(P::Nthreads);
-  constexpr auto maxVal = std::numeric_limits<DataT>::max();
-  using kv_pair_type = raft::KeyValuePair<IdxT, uint32_t>;
+  constexpr auto maxVal  = std::numeric_limits<DataT>::max();
+  using kv_pair_type     = raft::KeyValuePair<IdxT, uint32_t>;
   using distance_op_type = ops::bitwise_hamming_distance_op<DataT, uint32_t, IdxT>;
   distance_op_type distance_op{k};
-  auto kernel = fusedDistanceNNkernel<DataT, kv_pair_type, IdxT, P, ReduceOpT, KVPReduceOpT, distance_op_type, raft::identity_op>;
+  auto kernel = fusedDistanceNNkernel<DataT,
+                                      kv_pair_type,
+                                      IdxT,
+                                      P,
+                                      ReduceOpT,
+                                      KVPReduceOpT,
+                                      distance_op_type,
+                                      raft::identity_op>;
 
   constexpr size_t shmemSize = P::SmemSize;
 
   dim3 grid = launchConfigGenerator<P>(m, n, shmemSize, kernel);
 
   kernel<<<grid, blk, shmemSize, stream>>>(
-    min, x, y, nullptr, nullptr, m, n, k, maxVal, workspace, redOp, pairRedOp, distance_op, fin_op);
+    min, x, y, nullptr, nullptr, m, n, k, maxVal, workspace, redOp, pairRedOp, distance_op, raft::identity_op{});
 
   RAFT_CUDA_TRY(cudaGetLastError());
 }

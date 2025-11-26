@@ -73,8 +73,7 @@ auto make_bitwise_expanded_iterator(const uint8_t* packed_data, IdxT n_rows, Idx
 {
   IdxT packed_dim    = raft::div_rounding_up_safe<IdxT>(expanded_dim, IdxT{8});
   auto counting_iter = thrust::make_counting_iterator<IdxT>(0);
-  auto decoder =
-    cuvs::spatial::knn::detail::utils::bitwise_decode_op<uint8_t, IdxT>(packed_data, packed_dim);
+  auto decoder = cuvs::spatial::knn::detail::utils::bitwise_decode_op<uint8_t, IdxT>(packed_data);
   return thrust::make_transform_iterator(counting_iter, decoder);
 }
 
