@@ -21,7 +21,8 @@
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
 RotatorGPU::RotatorGPU(raft::resources const& handle, uint32_t dim)
-  : stream_(raft::resource::get_cuda_stream(handle))
+  : handle_(const_cast<raft::resources*>(&handle)),
+    stream_(raft::resource::get_cuda_stream(*handle_))
 {
   // keep track of cuda stream
   // Compute padded dimension
@@ -47,6 +48,7 @@ RotatorGPU& RotatorGPU::operator=(const RotatorGPU& other)
 {
   if (this != &other) {
     D       = other.D;
+    handle_ = other.handle_;
     stream_ = other.stream_;
     // Firstly free it in case not dimension not match
     if (d_P) { RAFT_CUDA_TRY(cudaFreeAsync(d_P, stream_)); }
@@ -54,7 +56,7 @@ RotatorGPU& RotatorGPU::operator=(const RotatorGPU& other)
     // Copy the rotation matrix from the other object.
     RAFT_CUDA_TRY(
       cudaMemcpyAsync(d_P, other.d_P, sizeof(float) * D * D, cudaMemcpyDeviceToDevice, stream_));
-    RAFT_CUDA_TRY(cudaStreamSynchronize(stream_));
+    raft::resource::sync_stream(*handle_);
   }
   return *this;
 }
@@ -69,7 +71,7 @@ void RotatorGPU::load(std::ifstream& input)
   }
   RAFT_CUDA_TRY(
     cudaMemcpyAsync(d_P, hostP, sizeof(float) * D * D, cudaMemcpyHostToDevice, stream_));
-  RAFT_CUDA_TRY(cudaStreamSynchronize(stream_));
+  raft::resource::sync_stream(*handle_);
   delete[] hostP;
 }
 
@@ -78,7 +80,7 @@ void RotatorGPU::save(std::ofstream& output) const
   float* hostP = new float[D * D];
   RAFT_CUDA_TRY(
     cudaMemcpyAsync(hostP, d_P, sizeof(float) * D * D, cudaMemcpyDeviceToHost, stream_));
-  RAFT_CUDA_TRY(cudaStreamSynchronize(stream_));
+  raft::resource::sync_stream(*handle_);
   for (size_t i = 0; i < D * D; ++i) {
     output.write(reinterpret_cast<char*>(&hostP[i]), sizeof(float));
   }
@@ -90,10 +92,7 @@ void RotatorGPU::save(std::ofstream& output) const
 // A is of size N x D and P is of size D x D, so the result is N x D.
 // This function uses cuBLAS to perform the matrix multiplication.
 // Do note that d_P is generated from Eigen, and it is column major!!!!!!!!??
-void RotatorGPU::rotate(raft::resources const& handle,
-                        const float* d_A,
-                        float* d_RAND_A,
-                        size_t N) const
+void RotatorGPU::rotate(const float* d_A, float* d_RAND_A, size_t N) const
 {
   //    cublasSetMathMode(handle, CUBLAS_PEDANTIC_MATH);
   // cuBLAS assumes column-major storage by default. Since our matrices are in row-major order,
@@ -103,11 +102,11 @@ void RotatorGPU::rotate(raft::resources const& handle,
   // Note that in Cublas it is RAND_A^T in column major, which is what we want in row-major
   // Here, we use the RAFT wrapper for gemm.
   raft::linalg::gemm(
-    handle,
+    *handle_,
     raft::make_device_matrix_view<float, int64_t, raft::col_major>(const_cast<float*>(d_P), D, D),
     raft::make_device_matrix_view<float, int64_t, raft::col_major>(const_cast<float*>(d_A), D, N),
     raft::make_device_matrix_view<float, int64_t, raft::col_major>(d_RAND_A, D, N));
-  raft::resource::sync_stream(handle);
+  raft::resource::sync_stream(*handle_);
 }
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

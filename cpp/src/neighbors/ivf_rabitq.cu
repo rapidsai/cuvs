@@ -111,8 +111,7 @@ void build(raft::resources const& handle,
   auto h_labels_array = raft::make_host_mdarray<uint32_t>(raft::make_extents<int64_t>(n_rows));
   raft::copy(h_labels_array.view().data_handle(), labels_view.data_handle(), n_rows, stream);
   // Call RaBitQ index construct
-  index->rabitq_index()->construct(handle,
-                                   h_dataset_ptr,
+  index->rabitq_index()->construct(h_dataset_ptr,
                                    h_centers_array.view().data_handle(),
                                    h_labels_array.view().data_handle(),
                                    params.fast_quantize_flag);
@@ -146,8 +145,7 @@ void search(raft::resources const& handle,
   auto rotated_queries = raft::make_device_matrix<T, int64_t>(handle, NQ, padded_dim);
 
   // TODO: replace RotatorGPU::rotate with cuVS/RAFT primitives
-  rabitq_idx->rotator().rotate(
-    handle, padded_queries.data_handle(), rotated_queries.data_handle(), NQ);
+  rabitq_idx->rotator().rotate(padded_queries.data_handle(), rotated_queries.data_handle(), NQ);
 
   auto search_mode_to_string = [](search_mode mode) -> std::string {
     switch (mode) {
@@ -183,8 +181,7 @@ void search(raft::resources const& handle,
   RAFT_CUDA_TRY(cudaMallocAsync(&d_final_ids, NQ * k * sizeof(uint32_t), stream));
 
   if (params.mode == search_mode::LUT32) {
-    rabitq_idx->BatchClusterSearch(handle,
-                                   rotated_queries.data_handle(),
+    rabitq_idx->BatchClusterSearch(rotated_queries.data_handle(),
                                    k,
                                    params.n_probes,
                                    &searcher,
@@ -195,8 +192,7 @@ void search(raft::resources const& handle,
                                    d_final_ids);
   } else if (params.mode == search_mode::LUT16) {
     // test v3 lut using fp16
-    rabitq_idx->BatchClusterSearchLUT16(handle,
-                                        rotated_queries.data_handle(),
+    rabitq_idx->BatchClusterSearchLUT16(rotated_queries.data_handle(),
                                         k,
                                         params.n_probes,
                                         &searcher,
@@ -206,8 +202,7 @@ void search(raft::resources const& handle,
                                         d_topk_ids,
                                         d_final_ids);
   } else if (params.mode == search_mode::QUANT8) {
-    rabitq_idx->BatchClusterSearchQuantizeQuery(handle,
-                                                rotated_queries.data_handle(),
+    rabitq_idx->BatchClusterSearchQuantizeQuery(rotated_queries.data_handle(),
                                                 k,
                                                 params.n_probes,
                                                 &searcher,
@@ -218,8 +213,7 @@ void search(raft::resources const& handle,
                                                 d_final_ids,
                                                 8);
   } else if (params.mode == search_mode::QUANT4) {
-    rabitq_idx->BatchClusterSearchQuantizeQuery(handle,
-                                                rotated_queries.data_handle(),
+    rabitq_idx->BatchClusterSearchQuantizeQuery(rotated_queries.data_handle(),
                                                 k,
                                                 params.n_probes,
                                                 &searcher,
@@ -246,7 +240,7 @@ template <typename IdxT>
 void serialize(raft::resources const& handle, const std::string& filename, index<IdxT>& index)
 {
   // Save the index to a file.
-  index.rabitq_index()->save(handle, filename.c_str(), /* save_batch_flag = */ true);
+  index.rabitq_index()->save(filename.c_str(), /* save_batch_flag = */ true);
 }
 
 template <typename IdxT>
@@ -254,7 +248,7 @@ void deserialize(raft::resources const& handle,
                  const std::string& filename,
                  cuvs::neighbors::ivf_rabitq::index<IdxT>* index)
 {
-  index->rabitq_index()->load_transposed(handle, filename.c_str());
+  index->rabitq_index()->load_transposed(filename.c_str());
 }
 
 }  // namespace detail

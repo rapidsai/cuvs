@@ -11,6 +11,8 @@
 
 #include <raft/core/resources.hpp>
 
+#include <rmm/cuda_stream_view.hpp>
+
 #include <cstdint>
 #include <cuvs/neighbors/ivf_rabitq/defines.hpp>
 #include <cuvs/neighbors/ivf_rabitq/utils/utils_cuda.cuh>
@@ -24,18 +26,19 @@ namespace cuvs::neighbors::ivf_rabitq::detail {
 // It is assumed that A and RAND_A reside in GPU memory.
 class RotatorGPU {
  private:
-  size_t D;              // Padded dimension
-  cudaStream_t stream_;  // CUDA stream
- public:                 /**
-                          * @brief Construct a new RotatorGPU object.
-                          * @param dim The original dimension; the padded dimension D is computed as
-                          * rd_up_to_multiple_of(dim, 64).
-                          *
-                          * The constructor generates a random rotation matrix on the CPU (using Eigen) and then
-                          * copies it into                    device memory in column-major order.
-                          */
+  size_t D;                  // Padded dimension
+  raft::resources* handle_;  // reusable resource handle (as pointer instead of const ref due to
+                             // presence of operator=)
+  rmm::cuda_stream_view stream_;  // CUDA stream obtained from handle_
+ public:                          /**
+                                   * @brief Construct a new RotatorGPU object.
+                                   * @param dim The original dimension; the padded dimension D is computed as
+                                   * rd_up_to_multiple_of(dim, 64).
+                                   *
+                                   * The constructor generates a random rotation matrix on the CPU (using Eigen) and then
+                                   * copies it into                    device memory in column-major order.
+                                   */
   explicit RotatorGPU(raft::resources const& handle, uint32_t dim);
-  explicit RotatorGPU() {}
 
   ~RotatorGPU();
 
@@ -66,7 +69,7 @@ class RotatorGPU {
   // Rotate matrix A and store the result in RAND_A.
   // A and RAND_A are device pointers representing matrices of size N x D.
   // This function computes: RAND_A = A * P using cuBLAS.
-  void rotate(raft::resources const& handle, const float* d_A, float* d_RAND_A, size_t N) const;
+  void rotate(const float* d_A, float* d_RAND_A, size_t N) const;
 
   float* d_P;  // Device pointer for the rotation matrix (stored in row-major order)
 };

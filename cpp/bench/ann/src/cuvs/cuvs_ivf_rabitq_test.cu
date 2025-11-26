@@ -78,14 +78,14 @@ int test_ivf_rabitq_construct_batch(raft::resources const& handle, int argc, cha
 
   // Construct the index (this function performs necessary host-to-device transfers internally).
   ivf.construct(
-    handle, data.data_handle(), centroids.data_handle(), cids.data_handle(), fast_quantize_flag);
+    data.data_handle(), centroids.data_handle(), cids.data_handle(), fast_quantize_flag);
 
   float minutes = stopw.getElapsedTimeMili() / 1000.0f / 60.0f;
   float seconds = stopw.getElapsedTimeMili() / 1000.0f;
   std::cout << "IVFGPU constructed\n";
 
   // Save the index to a file.
-  ivf.save(handle, ivf_file, true);
+  ivf.save(ivf_file, true);
 
   std::cout << "Indexing time: " << seconds << " seconds\n";
 
@@ -215,7 +215,7 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
 
   StopW stopw;
   IVFGPU ivf(handle);
-  ivf.load_transposed(handle, ivf_file);
+  ivf.load_transposed(ivf_file);
 
   std::vector<size_t> all_nprobes;
   // ssss
@@ -276,7 +276,7 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
   // The RotatorGPU::rotate function is defined as:
   //    void RotatorGPU::rotate(const float* d_A, float* d_RAND_A, size_t N) const;
   // where d_A is the input matrix (N x padded_dim) and d_RAND_A is the output.
-  ivf.rotator().rotate(handle, d_query, d_rotated_query, NQ);
+  ivf.rotator().rotate(d_query, d_rotated_query, NQ);
 
   float rotate_time = stopw.getElapsedTimeMicro();
 
@@ -336,8 +336,7 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
 
       if (searcher.mode == "lut32") {
         stopw.reset();
-        ivf.BatchClusterSearch(handle,
-                               d_rotated_query,
+        ivf.BatchClusterSearch(d_rotated_query,
                                TOPK,
                                nprobe,
                                &searcher,
@@ -352,8 +351,7 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
       } else if (searcher.mode == "lut16") {
         // test v3 lut using fp16
         stopw.reset();
-        ivf.BatchClusterSearchLUT16(handle,
-                                    d_rotated_query,
+        ivf.BatchClusterSearchLUT16(d_rotated_query,
                                     TOPK,
                                     nprobe,
                                     &searcher,
@@ -366,8 +364,7 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
         total_time += stopw.getElapsedTimeMicro();
       } else if (searcher.mode == "quant8") {
         stopw.reset();
-        ivf.BatchClusterSearchQuantizeQuery(handle,
-                                            d_rotated_query,
+        ivf.BatchClusterSearchQuantizeQuery(d_rotated_query,
                                             TOPK,
                                             nprobe,
                                             &searcher,
@@ -381,8 +378,7 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
         total_time += stopw.getElapsedTimeMicro();
       } else if (searcher.mode == "quant4") {
         stopw.reset();
-        ivf.BatchClusterSearchQuantizeQuery(handle,
-                                            d_rotated_query,
+        ivf.BatchClusterSearchQuantizeQuery(d_rotated_query,
                                             TOPK,
                                             nprobe,
                                             &searcher,

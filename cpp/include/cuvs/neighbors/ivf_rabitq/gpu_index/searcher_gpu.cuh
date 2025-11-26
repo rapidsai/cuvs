@@ -265,8 +265,8 @@ class SearcherGPU {
                                             bool use_4bit = false);
 
  private:
-  raft::resources handle_;  // reusable resource handle (non-owning)
-  rmm::cuda_stream_view stream_;
+  raft::resources const& handle_;  // reusable resource handle
+  rmm::cuda_stream_view stream_;   // CUDA stream obtained from handle_
   //    float* uint_q = nullptr;
   void destroy() noexcept;
 

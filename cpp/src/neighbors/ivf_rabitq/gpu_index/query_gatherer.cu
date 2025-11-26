@@ -9,6 +9,7 @@
 
 #include <cuvs/neighbors/ivf_rabitq/gpu_index/query_gatherer.cuh>
 
+#include <raft/core/resource/cuda_stream.hpp>
 #include <raft/util/cuda_rt_essentials.hpp>
 
 #include <cstdio>
@@ -69,14 +70,15 @@ __global__ void gather_queries_vectorized_kernel(const float* __restrict__ d_rot
 // BatchedQueryGatherer methods
 // ============================
 
-BatchedQueryGatherer::BatchedQueryGatherer(int dim,
+BatchedQueryGatherer::BatchedQueryGatherer(raft::resources const& handle,
+                                           int dim,
                                            int max_batch_size,
-                                           int max_clusters,
-                                           cudaStream_t stream_input)
+                                           int max_clusters)
   : D(dim),
     inner_batch_size(max_batch_size),
     max_clusters_per_batch(max_clusters),
-    stream_(stream_input)
+    handle_(handle),
+    stream_(raft::resource::get_cuda_stream(handle_))
 {
   // Allocate device memory
   RAFT_CUDA_TRY(cudaMallocAsync(
@@ -100,7 +102,7 @@ BatchedQueryGatherer::BatchedQueryGatherer(int dim,
   //    cudaStreamCreate(&stream);
 
   reset_batch();
-  RAFT_CUDA_TRY(cudaStreamSynchronize(stream_));
+  raft::resource::sync_stream(handle_);
 }
 
 BatchedQueryGatherer::~BatchedQueryGatherer()
@@ -175,7 +177,7 @@ void BatchedQueryGatherer::execute_batch(const float* d_rotated_queries, int bat
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // Ensure completion before handing buffers to the callback
-  RAFT_CUDA_TRY(cudaStreamSynchronize(stream_));
+  raft::resource::sync_stream(handle_);
 }
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail
