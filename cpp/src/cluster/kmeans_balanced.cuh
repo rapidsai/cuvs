@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -70,7 +70,8 @@ void fit(const raft::resources& handle,
          MappingOpT mapping_op                                               = raft::identity_op(),
          std::optional<raft::device_vector_view<const MathT, IndexT>> X_norm = std::nullopt)
 {
-  RAFT_EXPECTS(X.extent(1) == centroids.extent(1),
+  RAFT_EXPECTS(X.extent(1) == centroids.extent(1) ||
+                 (params.is_packed_binary && X.extent(1) * 8 == centroids.extent(1)),
                "Number of features in dataset and centroids are different");
   RAFT_EXPECTS(static_cast<uint64_t>(X.extent(0)) * static_cast<uint64_t>(X.extent(1)) <=
                  static_cast<uint64_t>(std::numeric_limits<IndexT>::max()),

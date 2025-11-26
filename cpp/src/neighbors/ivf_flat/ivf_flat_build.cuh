@@ -298,23 +298,27 @@ void extend(raft::resources const& handle,
 
         vec_batches.reset();
         for (const auto& batch : vec_batches) {
-          rmm::device_uvector<int8_t> decoded_batch(
-            batch.size() * dim * 8, stream, raft::resource::get_workspace_resource(handle));
-          auto decoded_batch_view = raft::make_device_matrix_view<int8_t, IdxT>(
-            decoded_batch.data(), batch.size(), dim * 8);
-          raft::linalg::map_offset(
-            handle, decoded_batch_view, utils::bitwise_decode_op<int8_t, IdxT>(batch.data(), dim));
-
           auto batch_labels_view = raft::make_device_vector_view<const LabelT, IdxT>(
             new_labels.data_handle() + batch.offset(), batch.size());
-          cuvs::cluster::kmeans_balanced::helpers::calc_centers_and_sizes(
-            handle,
-            raft::make_const_mdspan(decoded_batch_view),
-            batch_labels_view,
-            expanded_centers_view,
-            list_sizes_view,
-            false,
-            raft::identity_op{});
+
+          cuvs::cluster::kmeans::detail::calc_centers_and_sizes<
+            uint8_t,
+            float,
+            IdxT,
+            LabelT,
+            std::remove_pointer_t<decltype(list_sizes_ptr)>,
+            raft::identity_op>(handle,
+                               expanded_centers_view.data_handle(),
+                               list_sizes_view.data_handle(),
+                               n_lists,
+                               dim,
+                               batch.data(),
+                               batch.size(),
+                               batch_labels_view.data_handle(),
+                               false,
+                               raft::identity_op{},
+                               raft::resource::get_workspace_resource(handle),
+                               true);
         }
 
         // Convert updated centroids back to binary format
@@ -524,36 +528,21 @@ inline auto build(raft::resources const& handle,
     kmeans_params.n_iters = params.kmeans_n_iters;
     kmeans_params.metric =
       index.binary_index() ? cuvs::distance::DistanceType::L2Expanded : index.metric();
+    if (index.binary_index()) {
+      kmeans_params.is_packed_binary = true;  // Enable on-the-fly bit expansion
+    }
 
     if constexpr (std::is_same_v<T, uint8_t>) {
       if (index.binary_index()) {
-        // For binary data, we need to decode to expanded representation for clustering
-        rmm::device_uvector<int8_t> decoded_trainset(
-          n_rows_train * index.dim() * 8,
-          stream,
-          raft::resource::get_large_workspace_resource(handle));
-        auto decoded_trainset_view = raft::make_device_matrix_view<int8_t, IdxT>(
-          decoded_trainset.data(), n_rows_train, index.dim() * 8);
-
-        // Decode binary trainset to expanded representation
-        raft::linalg::map_offset(
-          handle,
-          decoded_trainset_view,
-          utils::bitwise_decode_op<int8_t, IdxT>(trainset.data(), index.dim()));
-
-        trainset.release();
-
+        // For binary data, use on-the-fly bit expansion during kmeans training
         rmm::device_uvector<float> decoded_centers(index.n_lists() * index.dim() * 8,
                                                    stream,
                                                    raft::resource::get_workspace_resource(handle));
         auto decoded_centers_view = raft::make_device_matrix_view<float, IdxT>(
           decoded_centers.data(), index.n_lists(), index.dim() * 8);
 
-        cuvs::cluster::kmeans_balanced::fit(handle,
-                                            kmeans_params,
-                                            raft::make_const_mdspan(decoded_trainset_view),
-                                            decoded_centers_view,
-                                            raft::cast_op<float>());
+        cuvs::cluster::kmeans_balanced::fit(
+          handle, kmeans_params, trainset_const_view, decoded_centers_view, raft::identity_op{});
 
         // Convert decoded centers back to binary format
         cuvs::preprocessing::quantize::binary::quantizer<float> temp_quantizer(handle);

@@ -123,6 +123,15 @@ struct balanced_params : base_params {
    * Number of training iterations
    */
   uint32_t n_iters = 20;
+
+  /**
+   * If true, treats uint8_t input data as bit-packed binary data where each byte contains 8 bits.
+   * Bits are expanded on-the-fly to {-1, +1} floats during training.
+   * When enabled:
+   *   - Input data dimension represents packed dimension (actual_dim / 8)
+   *   - Output centroids dimension is expanded (packed_dim * 8)
+   */
+  bool is_packed_binary = false;
 };
 
 /**

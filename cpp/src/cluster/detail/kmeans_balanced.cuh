@@ -42,6 +42,7 @@
 #include <thrust/iterator/transform_iterator.h>
 #include <thrust/transform.h>
 
+#include "../../neighbors/detail/ann_utils.cuh"
 #include <limits>
 #include <optional>
 #include <tuple>
@@ -50,6 +51,32 @@
 namespace cuvs::cluster::kmeans::detail {
 
 constexpr static inline float kAdjustCentersWeight = 7.0f;
+
+/**
+ * @brief Create a transform iterator for on-the-fly bit expansion
+ *
+ * This helper function creates a thrust transform iterator that expands packed
+ * uint8_t data into float values on-the-fly (bit 1 → +1.0f, bit 0 → -1.0f),
+ * avoiding the need to materialize the expanded data in memory.
+ *
+ * Uses the existing bitwise_decode_op from ann_utils.cuh.
+ *
+ * @tparam IdxT index type
+ *
+ * @param packed_data Pointer to packed uint8_t data [n_rows, packed_dim]
+ * @param n_rows Number of rows
+ * @param expanded_dim Dimension in expanded (bit) space
+ * @return A transform iterator that yields float values for each bit
+ */
+template <typename IdxT>
+auto make_bitwise_expanded_iterator(const uint8_t* packed_data, IdxT n_rows, IdxT expanded_dim)
+{
+  IdxT packed_dim    = raft::div_rounding_up_safe<IdxT>(expanded_dim, IdxT{8});
+  auto counting_iter = thrust::make_counting_iterator<IdxT>(0);
+  auto decoder =
+    cuvs::spatial::knn::detail::utils::bitwise_decode_op<uint8_t, IdxT>(packed_data, packed_dim);
+  return thrust::make_transform_iterator(counting_iter, decoder);
+}
 
 /**
  * @brief Predict labels for the dataset; floating-point types only.
@@ -337,6 +364,12 @@ constexpr auto calc_minibatch_size(IdxT n_clusters,
 /**
  * @brief Given the data and labels, calculate cluster centers and sizes in one sweep.
  *
+ * This function supports two modes:
+ * 1. Regular mode: Works with any data type T with optional type conversion via mapping_op
+ * 2. Packed binary mode: When T=uint8_t and is_packed_binary=true, treats data as bit-packed
+ *    and expands bits on-the-fly (bit 1 → +1, bit 0 → -1) into float centers.
+ *    In this mode, dim represents the packed dimension (dim_expanded / 8).
+ *
  * @note all pointers must be accessible on the device.
  *
  * @tparam T          element type
@@ -347,10 +380,10 @@ constexpr auto calc_minibatch_size(IdxT n_clusters,
  * @tparam MappingOpT type of the mapping operation
  *
  * @param[in] handle The raft handle.
- * @param[inout] centers Pointer to the output [n_clusters, dim]
+ * @param[inout] centers Pointer to the output [n_clusters, dim] or [n_clusters, dim*8] if packed
  * @param[inout] cluster_sizes Number of rows in each cluster [n_clusters]
  * @param[in] n_clusters Number of clusters/centers
- * @param[in] dim Dimensionality of the data
+ * @param[in] dim Dimensionality of the data (or packed dim if is_packed_binary=true)
  * @param[in] dataset Pointer to the data [n_rows, dim]
  * @param[in] n_rows Number of samples in the `dataset`
  * @param[in] labels Output predictions [n_rows]
@@ -359,6 +392,8 @@ constexpr auto calc_minibatch_size(IdxT n_clusters,
  *    the weighted average principle.
  * @param[in] mapping_op Mapping operation from T to MathT
  * @param[inout] mr (optional) Memory resource to use for temporary allocations on the device
+ * @param[in] is_packed_binary If true and T=uint8_t, treats data as bit-packed and expands
+ * on-the-fly
  */
 template <typename T,
           typename MathT,
@@ -376,11 +411,15 @@ void calc_centers_and_sizes(const raft::resources& handle,
                             const LabelT* labels,
                             bool reset_counters,
                             MappingOpT mapping_op,
-                            rmm::device_async_resource_ref mr)
+                            rmm::device_async_resource_ref mr,
+                            bool is_packed_binary = false)
 {
   auto stream = raft::resource::get_cuda_stream(handle);
 
-  auto centersView      = raft::make_device_matrix_view<MathT>(centers, n_clusters, dim);
+  // For packed binary, dim is packed dimension, centers are in expanded dimension (dim * 8)
+  IdxT centers_dim = is_packed_binary ? (dim * 8) : dim;
+
+  auto centersView      = raft::make_device_matrix_view<MathT>(centers, n_clusters, centers_dim);
   auto clusterSizesView = raft::make_device_vector_view<const CounterT>(cluster_sizes, n_clusters);
 
   if (!reset_counters) {
@@ -399,8 +438,27 @@ void calc_centers_and_sizes(const raft::resources& handle,
     temp_sizes = temp_cluster_sizes.data();
   }
 
+  // Handle packed binary data with on-the-fly bit expansion
+  if (is_packed_binary) {
+    if constexpr (std::is_same_v<T, uint8_t>) {
+      RAFT_EXPECTS(dim * 8 == centers_dim, "dim must be the packed dimension");
+      auto decoded_dataset_iter = make_bitwise_expanded_iterator(dataset, n_rows, centers_dim);
+      raft::linalg::reduce_rows_by_key(decoded_dataset_iter,
+                                       centers_dim,
+                                       labels,
+                                       nullptr,
+                                       n_rows,
+                                       centers_dim,
+                                       n_clusters,
+                                       centers,
+                                       stream,
+                                       reset_counters);
+    } else {
+      RAFT_FAIL("Packed binary mode is only supported for uint8_t data type");
+    }
+  }
   // Apply mapping only when the data and math types are different.
-  if constexpr (std::is_same_v<T, MathT>) {
+  else if constexpr (std::is_same_v<T, MathT>) {
     raft::linalg::reduce_rows_by_key(
       dataset, dim, labels, nullptr, n_rows, dim, n_clusters, centers, stream, reset_counters);
   } else {
@@ -820,7 +878,8 @@ void balancing_em_iters(const raft::resources& handle,
                            cluster_labels,
                            true,
                            mapping_op,
-                           device_memory);
+                           device_memory,
+                           params.is_packed_binary);
   }
 }
 
@@ -864,7 +923,8 @@ void build_clusters(const raft::resources& handle,
                          cluster_labels,
                          true,
                          mapping_op,
-                         device_memory);
+                         device_memory,
+                         params.is_packed_binary);
 
   // run EM
   balancing_em_iters(handle,
