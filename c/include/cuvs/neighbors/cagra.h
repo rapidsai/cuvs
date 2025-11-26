@@ -34,7 +34,14 @@ enum cuvsCagraGraphBuildAlgo {
   /* Experimental, use NN-Descent to build all-neighbors knn graph */
   NN_DESCENT = 2,
   /* Experimental, use iterative cagra search and optimize to build the knn graph */
-  ITERATIVE_CAGRA_SEARCH = 3
+  ITERATIVE_CAGRA_SEARCH = 3,
+  /**
+   * Experimental, use ACE (Augmented Core Extraction) to build the graph. ACE partitions the
+   * dataset into core and augmented partitions and builds a sub-index for each partition. This
+   * enables building indices for datasets too large to fit in GPU or host memory.
+   * See cuvsAceParams for more details about the ACE algorithm and its parameters.
+   */
+  ACE = 4
 };
 
 /**
@@ -119,6 +126,52 @@ struct cuvsIvfPqParams {
 typedef struct cuvsIvfPqParams* cuvsIvfPqParams_t;
 
 /**
+ * Parameters for ACE (Augmented Core Extraction) graph build.
+ * ACE enables building indices for datasets too large to fit in GPU memory by:
+ * 1. Partitioning the dataset in core (closest) and augmented (second-closest)
+ * partitions using balanced k-means.
+ * 2. Building sub-indices for each partition independently
+ * 3. Concatenating sub-graphs into a final unified index
+ */
+struct cuvsAceParams {
+  /**
+   * Number of partitions for ACE (Augmented Core Extraction) partitioned build.
+   *
+   * Small values might improve recall but potentially degrade performance and
+   * increase memory usage. Partitions should not be too small to prevent issues
+   * in KNN graph construction. 100k - 5M vectors per partition is recommended
+   * depending on the available host and GPU memory. The partition size is on
+   * average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because of the
+   * core and augmented vectors. Please account for imbalance in the partition
+   * sizes (up to 3x in our tests).
+   */
+  size_t npartitions;
+  /**
+   * The index quality for the ACE build.
+   *
+   * Bigger values increase the index quality. At some point, increasing this will no longer
+   * improve the quality.
+   */
+  size_t ef_construction;
+  /**
+   * Directory to store ACE build artifacts (e.g., KNN graph, optimized graph).
+   *
+   * Used when `use_disk` is true or when the graph does not fit in host and GPU
+   * memory. This should be the fastest disk in the system and hold enough space
+   * for twice the dataset, final graph, and label mapping.
+   */
+  const char* build_dir;
+  /**
+   * Whether to use disk-based storage for ACE build.
+   *
+   * When true, enables disk-based operations for memory-efficient graph construction.
+   */
+  bool use_disk;
+};
+
+typedef struct cuvsAceParams* cuvsAceParams_t;
+
+/**
  * @brief Supplemental parameters to build CAGRA Index
  *
  */
@@ -140,9 +193,12 @@ struct cuvsCagraIndexParams {
    */
   cuvsCagraCompressionParams_t compression;
   /**
-   * Optional: specify ivf pq params when `build_algo = IVF_PQ`
+   * Optional: specify graph build params based on build_algo
+   * - IVF_PQ: cuvsIvfPqParams_t
+   * - ACE: cuvsAceParams_t
+   * - Others: nullptr
    */
-  cuvsIvfPqParams_t graph_build_params;
+  void* graph_build_params;
 };
 
 typedef struct cuvsCagraIndexParams* cuvsCagraIndexParams_t;
@@ -178,6 +234,38 @@ cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionParams_t* param
  * @return cuvsError_t
  */
 cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t params);
+
+/**
+ * @brief Allocate ACE params, and populate with default values
+ *
+ * @param[in] params cuvsAceParams_t to allocate
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsAceParamsCreate(cuvsAceParams_t* params);
+
+/**
+ * @brief De-allocate ACE params
+ *
+ * @param[in] params
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsAceParamsDestroy(cuvsAceParams_t params);
+
+/**
+ * @brief Allocate ACE params, and populate with default values
+ *
+ * @param[in] params cuvsAceParams_t to allocate
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsAceParamsCreate(cuvsAceParams_t* params);
+
+/**
+ * @brief De-allocate ACE params
+ *
+ * @param[in] params
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsAceParamsDestroy(cuvsAceParams_t params);
 
 /**
  * @brief Create CAGRA index parameters similar to an HNSW index

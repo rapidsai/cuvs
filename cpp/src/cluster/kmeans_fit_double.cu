@@ -1,12 +1,43 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "kmeans.cuh"
+#include "kmeans_impl.cuh"
 #include <raft/core/resources.hpp>
 
 namespace cuvs::cluster::kmeans {
+
+#define INSTANTIATE_FIT_MAIN(DataT, IndexT)                       \
+  template void fit_main<DataT, IndexT>(                          \
+    raft::resources const& handle,                                \
+    const kmeans::params& params,                                 \
+    raft::device_matrix_view<const DataT, IndexT> X,              \
+    raft::device_vector_view<const DataT, IndexT> sample_weights, \
+    raft::device_matrix_view<DataT, IndexT> centroids,            \
+    raft::host_scalar_view<DataT> inertia,                        \
+    raft::host_scalar_view<IndexT> n_iter,                        \
+    rmm::device_uvector<char>& workspace);
+
+#define INSTANTIATE_FIT(DataT, IndexT)                                          \
+  template void fit<DataT, IndexT>(                                             \
+    raft::resources const& handle,                                              \
+    const kmeans::params& params,                                               \
+    raft::device_matrix_view<const DataT, IndexT> X,                            \
+    std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight, \
+    raft::device_matrix_view<DataT, IndexT> centroids,                          \
+    raft::host_scalar_view<DataT> inertia,                                      \
+    raft::host_scalar_view<IndexT> n_iter);
+
+INSTANTIATE_FIT_MAIN(double, int)
+INSTANTIATE_FIT_MAIN(double, int64_t)
+
+INSTANTIATE_FIT(double, int)
+INSTANTIATE_FIT(double, int64_t)
+
+#undef INSTANTIATE_FIT_MAIN
+#undef INSTANTIATE_FIT
 
 void fit(raft::resources const& handle,
          const cuvs::cluster::kmeans::params& params,
