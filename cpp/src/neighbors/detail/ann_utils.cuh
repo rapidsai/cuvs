@@ -199,6 +199,17 @@ HDI constexpr auto mapping<int8_t>::operator()(const float& x) const -> int8_t
   return static_cast<int8_t>(std::clamp<float>(x * 128.0f, -128.0f, 127.0f));
 }
 
+template <typename OutT, typename IdxT>
+struct bitwise_decode_op {
+  bitwise_decode_op(const uint8_t* const binary_vecs) : binary_vecs(binary_vecs) {}
+  const uint8_t* binary_vecs;
+  /// Returns 1 if the i-th bit is 1, otherwise return -1.
+  HDI constexpr auto operator()(const IdxT& i) -> OutT
+  {
+    return static_cast<OutT>((binary_vecs[i / 8] >> (i % 8)) & 1 ? 1 : -1);
+  };
+};
+
 /**
  * @brief Sets the first num bytes of the block of memory pointed by ptr to the specified value.
  *

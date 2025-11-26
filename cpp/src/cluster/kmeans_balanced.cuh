@@ -69,7 +69,8 @@ void fit(const raft::resources& handle,
          raft::device_matrix_view<MathT, IndexT> centroids,
          MappingOpT mapping_op = raft::identity_op())
 {
-  RAFT_EXPECTS(X.extent(1) == centroids.extent(1),
+  RAFT_EXPECTS(X.extent(1) == centroids.extent(1) ||
+                 (params.is_packed_binary && X.extent(1) * 8 == centroids.extent(1)),
                "Number of features in dataset and centroids are different");
   RAFT_EXPECTS(static_cast<uint64_t>(X.extent(0)) * static_cast<uint64_t>(X.extent(1)) <=
                  static_cast<uint64_t>(std::numeric_limits<IndexT>::max()),
