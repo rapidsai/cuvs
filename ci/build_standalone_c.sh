@@ -17,7 +17,26 @@ fi
 dnf install -y \
       patch \
       tar \
-      make
+      unzip \
+      wget
+
+if ! command -V ninja >/dev/null 2>&1; then
+    case "$(uname -m)" in
+        x86_64)
+            wget --no-hsts -q -O /tmp/ninja-linux.zip "https://github.com/ninja-build/ninja/releases/download/${NINJA_VERSION}/ninja-linux.zip";
+            ;;
+        aarch64)
+            wget --no-hsts -q -O /tmp/ninja-linux.zip "https://github.com/ninja-build/ninja/releases/download/${NINJA_VERSION}/ninja-linux-aarch64.zip";
+            ;;
+        *)
+            echo "Unrecognized platform '$(uname -m)'" >&2
+            exit 1
+            ;;
+    esac
+    unzip -d /usr/bin /tmp/ninja-linux.zip
+    chmod +x /usr/bin/ninja
+    rm /tmp/ninja-linux.zip
+fi
 
 # Fetch and install CMake.
 if [ ! -e "/usr/local/bin/cmake" ]; then
