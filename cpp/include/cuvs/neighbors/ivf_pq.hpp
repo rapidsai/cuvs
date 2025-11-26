@@ -1081,8 +1081,6 @@ void build(raft::resources const& handle,
  * - index_params.conservative_memory_allocation will be stored in the index
  * The function will verify consistency between index_params, dim, and the matrix extents.
  *
- * @tparam IdxT Type of indices (default: int64_t)
- *
  * @param[in] handle raft resources handle
  * @param[in] index_params configure the index (metric, codebook_kind, etc.). Must be consistent
  *   with the provided matrices.
@@ -1120,8 +1118,6 @@ auto build(raft::resources const& handle,
  * - index_params.metric will be stored in the index
  * - index_params.conservative_memory_allocation will be stored in the index
  * The function will verify consistency between index_params, dim, and the matrix extents.
- *
- * @tparam IdxT Type of indices (default: int64_t)
  *
  * @param[in] handle raft resources handle
  * @param[in] index_params configure the index (metric, codebook_kind, etc.). Must be consistent
