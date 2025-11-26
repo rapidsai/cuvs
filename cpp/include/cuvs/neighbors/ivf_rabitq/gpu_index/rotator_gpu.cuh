@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include <raft/core/device_mdarray.hpp>
+#include <raft/core/mdspan_types.hpp>
 #include <raft/core/resources.hpp>
 
 #include <rmm/cuda_stream_view.hpp>
@@ -25,21 +27,15 @@ namespace cuvs::neighbors::ivf_rabitq::detail {
 // The rotate() function uses cuBLAS to compute the product: RAND_A = A * P.
 // It is assumed that A and RAND_A reside in GPU memory.
 class RotatorGPU {
- private:
-  size_t D;                        // Padded dimension
-  raft::resources const& handle_;  // reusable resource handle
-  rmm::cuda_stream_view stream_;   // CUDA stream obtained from handle_
- public:                           /**
-                                    * @brief Construct a new RotatorGPU object.
-                                    * @param dim The original dimension; the padded dimension D is computed as
-                                    * rd_up_to_multiple_of(dim, 64).
-                                    *
-                                    * The constructor generates a random rotation matrix on the CPU (using Eigen) and then
-                                    * copies it into                    device memory in column-major order.
-                                    */
+ public: /**
+          * @brief Construct a new RotatorGPU object.
+          * @param dim The original dimension; the padded dimension D is computed as
+          * rd_up_to_multiple_of(dim, 64).
+          *
+          * The constructor generates a random rotation matrix on the CPU (using Eigen) and then
+          * copies it into                    device memory in column-major order.
+          */
   explicit RotatorGPU(raft::resources const& handle, uint32_t dim);
-
-  ~RotatorGPU();
 
   // Disable copy assignment
   RotatorGPU& operator=(const RotatorGPU& other) = delete;
@@ -70,7 +66,11 @@ class RotatorGPU {
   // This function computes: RAND_A = A * P using cuBLAS.
   void rotate(const float* d_A, float* d_RAND_A, size_t N) const;
 
-  float* d_P;  // Device pointer for the rotation matrix (stored in row-major order)
+ private:
+  raft::resources const& handle_;  // reusable resource handle
+  rmm::cuda_stream_view stream_;   // CUDA stream obtained from handle_
+  size_t D;                        // Padded dimension
+  raft::device_matrix<float, uint32_t, raft::row_major> rotation_matrix_;  // Rotation matrix P
 };
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail
