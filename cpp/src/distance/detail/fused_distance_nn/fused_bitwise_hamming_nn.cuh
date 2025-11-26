@@ -43,20 +43,10 @@ void fusedBitwiseHammingNN(OutT* min,
 
   dim3 blk(P::Nthreads);
   constexpr auto maxVal = std::numeric_limits<DataT>::max();
-  typedef ::raft::KeyValuePair<IdxT, OutT> KVPair;
-
-  ops::bitwise_hamming_distance_op<DataT, uint32_t, IdxT> distance_op{k};
-
-  ::raft::identity_op fin_op{};
-
-  auto kernel = fusedDistanceNNkernel<DataT,
-                                      OutT,
-                                      IdxT,
-                                      P,
-                                      ReduceOpT,
-                                      KVPReduceOpT,
-                                      decltype(distance_op),
-                                      decltype(fin_op)>;
+  using kv_pair_type = raft::KeyValuePair<IdxT, uint32_t>;
+  using distance_op_type = ops::bitwise_hamming_distance_op<DataT, uint32_t, IdxT>;
+  distance_op_type distance_op{k};
+  auto kernel = fusedDistanceNNkernel<DataT, kv_pair_type, IdxT, P, ReduceOpT, KVPReduceOpT, distance_op_type, raft::identity_op>;
 
   constexpr size_t shmemSize = P::SmemSize;
 
