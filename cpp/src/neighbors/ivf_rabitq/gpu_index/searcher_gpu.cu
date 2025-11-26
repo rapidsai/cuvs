@@ -1081,7 +1081,7 @@ void SearcherGPU::SearchCluster(const IVFGPU& cur_ivf,
 
   // Related information
   size_t num_vector_cluster = cur_cluster.num;
-  size_t num_dimensions     = cur_ivf.num_padded_dim;
+  size_t num_dimensions     = cur_ivf.get_num_padded_dim();
 
   float y = std::sqrt(sqr_y);
 
@@ -1135,7 +1135,7 @@ void SearcherGPU::SearchCluster(const IVFGPU& cur_ivf,
   //            quant_query_gpu,
   //            rabitq_codes_and_factor,
   //            num_dimensions,
-  //            cur_ivf.DQ.num_short_factors(),
+  //            cur_ivf.quantizer().num_short_factors(),
   //            num_vector_cluster,
   //            ip_results,
   //            est_dis,
@@ -1144,17 +1144,18 @@ void SearcherGPU::SearchCluster(const IVFGPU& cur_ivf,
   //            y,
   //            one_over_sqrtD
   //    );
-  compute_ip_kernel_fp32<<<grid, threadsPerBlock, 0, stream_>>>(unit_q_gpu,
-                                                                rabitq_codes_and_factor,
-                                                                num_dimensions,
-                                                                cur_ivf.DQ.num_short_factors(),
-                                                                num_vector_cluster,
-                                                                ip_results,
-                                                                est_dis,
-                                                                delta,
-                                                                sumq,
-                                                                y,
-                                                                one_over_sqrtD);
+  compute_ip_kernel_fp32<<<grid, threadsPerBlock, 0, stream_>>>(
+    unit_q_gpu,
+    rabitq_codes_and_factor,
+    num_dimensions,
+    cur_ivf.quantizer().num_short_factors(),
+    num_vector_cluster,
+    ip_results,
+    est_dis,
+    delta,
+    sumq,
+    y,
+    one_over_sqrtD);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
   //    RAFT_CUDA_TRY(cudaDeviceSynchronize());
 
@@ -1195,13 +1196,13 @@ void SearcherGPU::SearchCluster(const IVFGPU& cur_ivf,
   // debug - access llong code
   //    uint8_t temp;
   //    RAFT_CUDA_TRY(cudaMemcpy(&temp, cur_cluster.long_code(cur_ivf, 0,
-  //    cur_ivf.DQ.long_code_length()), sizeof(uint8_t), cudaMemcpyDeviceToHost)); printf("Cur
-  //    cluster start idx: %d, first exrabitq code block in uint8: %x \n", cur_cluster.start_index,
-  //    temp);
+  //    cur_ivf.quantizer().long_code_length()), sizeof(uint8_t), cudaMemcpyDeviceToHost));
+  //    printf("Cur cluster start idx: %d, first exrabitq code block in uint8: %x \n",
+  //    cur_cluster.start_index, temp);
   // access the whole block
   //    for (int i = 0; i < cur_cluster.num; i++) {
   //        RAFT_CUDA_TRY(cudaMemcpy(&temp, cur_cluster.long_code(cur_ivf, i,
-  //        cur_ivf.DQ.long_code_length()), sizeof(uint8_t), cudaMemcpyDeviceToHost));
+  //        cur_ivf.quantizer().long_code_length()), sizeof(uint8_t), cudaMemcpyDeviceToHost));
   //    }
 
   grid = (KM + warpsPerBlock - 1) / warpsPerBlock;
@@ -1210,9 +1211,9 @@ void SearcherGPU::SearchCluster(const IVFGPU& cur_ivf,
     d_top_idx,
     KM,
     D,
-    cur_ivf.ex_bits,
-    cur_cluster.long_code(cur_ivf, 0, cur_ivf.DQ.long_code_length()),
-    cur_ivf.DQ.long_code_length(),
+    cur_ivf.get_ex_bits(),
+    cur_cluster.long_code(cur_ivf, 0, cur_ivf.quantizer().long_code_length()),
+    cur_ivf.quantizer().long_code_length(),
     d_ip2);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
   //    RAFT_CUDA_TRY(cudaDeviceSynchronize());
@@ -1231,9 +1232,9 @@ void SearcherGPU::SearchCluster(const IVFGPU& cur_ivf,
     sumq,
     KM,
     cur_cluster.first_block(cur_ivf),
-    cur_ivf.DQ.short_code_length() + cur_ivf.DQ.num_short_factors(),
+    cur_ivf.quantizer().short_code_length() + cur_ivf.quantizer().num_short_factors(),
     cur_cluster.ex_factor(cur_ivf, 0),
-    cur_ivf.DQ.num_short_factors());
+    cur_ivf.quantizer().num_short_factors());
   RAFT_CUDA_TRY(cudaPeekAtLastError());
   //    RAFT_CUDA_TRY(cudaDeviceSynchronize());
 
@@ -1275,7 +1276,7 @@ void SearcherGPU::SearchClustershowingTime(const IVFGPU& cur_ivf,
   };
   std::vector<StepStat> stats;  // push in call order
   size_t num_vector_cluster         = cur_cluster.num;
-  size_t num_dimensions             = cur_ivf.num_padded_dim;
+  size_t num_dimensions             = cur_ivf.get_num_padded_dim();
   uint32_t* rabitq_codes_and_factor = cur_cluster.first_block(cur_ivf);
   PID* ids                          = cur_cluster.ids(cur_ivf);
 
@@ -1318,17 +1319,18 @@ void SearcherGPU::SearchClustershowingTime(const IVFGPU& cur_ivf,
   int threadsPerBlock = 256;  // must be a multiple of 32
   int warpsPerBlock   = threadsPerBlock / 32;
   int grid            = (num_vector_cluster + warpsPerBlock - 1) / warpsPerBlock;
-  compute_ip_kernel_fp32<<<grid, threadsPerBlock, 0, stream_>>>(unit_q_gpu,
-                                                                rabitq_codes_and_factor,
-                                                                num_dimensions,
-                                                                cur_ivf.DQ.num_short_factors(),
-                                                                num_vector_cluster,
-                                                                ip_results,
-                                                                est_dis,
-                                                                delta,
-                                                                sumq,
-                                                                y,
-                                                                one_over_sqrtD);
+  compute_ip_kernel_fp32<<<grid, threadsPerBlock, 0, stream_>>>(
+    unit_q_gpu,
+    rabitq_codes_and_factor,
+    num_dimensions,
+    cur_ivf.quantizer().num_short_factors(),
+    num_vector_cluster,
+    ip_results,
+    est_dis,
+    delta,
+    sumq,
+    y,
+    one_over_sqrtD);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
   stats.push_back({"kernel-ip", gt.stop(stream_)});
 
@@ -1374,9 +1376,9 @@ void SearcherGPU::SearchClustershowingTime(const IVFGPU& cur_ivf,
     d_top_idx,
     KM,
     D,
-    cur_ivf.ex_bits,
-    cur_cluster.long_code(cur_ivf, 0, cur_ivf.DQ.long_code_length()),
-    cur_ivf.DQ.long_code_length(),
+    cur_ivf.get_ex_bits(),
+    cur_cluster.long_code(cur_ivf, 0, cur_ivf.quantizer().long_code_length()),
+    cur_ivf.quantizer().long_code_length(),
     d_ip2);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
   stats.push_back({"kernel-long_ip", gt.stop(stream_)});
@@ -1397,9 +1399,9 @@ void SearcherGPU::SearchClustershowingTime(const IVFGPU& cur_ivf,
     sumq,
     KM,
     cur_cluster.first_block(cur_ivf),
-    cur_ivf.DQ.short_code_length() + cur_ivf.DQ.num_short_factors(),
+    cur_ivf.quantizer().short_code_length() + cur_ivf.quantizer().num_short_factors(),
     cur_cluster.ex_factor(cur_ivf, 0),
-    cur_ivf.DQ.num_short_factors());
+    cur_ivf.quantizer().num_short_factors());
   RAFT_CUDA_TRY(cudaPeekAtLastError());
   stats.push_back({"kernel-refine", gt.stop(stream_)});
 
@@ -2298,7 +2300,7 @@ void SearcherGPU::SearchClusterWithFilter(const IVFGPU& cur_ivf,
   std::vector<StepStat> stats;  // push in call order
 #endif
   size_t num_vector_cluster         = cur_cluster.num;
-  size_t num_dimensions             = cur_ivf.num_padded_dim;
+  size_t num_dimensions             = cur_ivf.get_num_padded_dim();
   uint32_t* rabitq_codes_and_factor = cur_cluster.first_block(cur_ivf);
   PID* ids                          = cur_cluster.ids(cur_ivf);
 
@@ -2346,17 +2348,18 @@ void SearcherGPU::SearchClusterWithFilter(const IVFGPU& cur_ivf,
   int threadsPerBlock = 256;  // must be a multiple of 32
   int warpsPerBlock   = threadsPerBlock / 32;
   int grid            = (num_vector_cluster + warpsPerBlock - 1) / warpsPerBlock;
-  compute_ip_kernel_fp32<<<grid, threadsPerBlock, 0, stream_>>>(unit_q_gpu,
-                                                                rabitq_codes_and_factor,
-                                                                num_dimensions,
-                                                                cur_ivf.DQ.num_short_factors(),
-                                                                num_vector_cluster,
-                                                                ip_results,
-                                                                est_dis,
-                                                                delta,
-                                                                sumq,
-                                                                y,
-                                                                one_over_sqrtD);
+  compute_ip_kernel_fp32<<<grid, threadsPerBlock, 0, stream_>>>(
+    unit_q_gpu,
+    rabitq_codes_and_factor,
+    num_dimensions,
+    cur_ivf.quantizer().num_short_factors(),
+    num_vector_cluster,
+    ip_results,
+    est_dis,
+    delta,
+    sumq,
+    y,
+    one_over_sqrtD);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 #ifdef COUNT_CLUSTER_TIME
   stats.push_back({"kernel-ip", gt.stop(stream_)});
@@ -2433,9 +2436,9 @@ void SearcherGPU::SearchClusterWithFilter(const IVFGPU& cur_ivf,
     d_top_idx,
     written,
     D,
-    cur_ivf.ex_bits,
-    cur_cluster.long_code(cur_ivf, 0, cur_ivf.DQ.long_code_length()),
-    cur_ivf.DQ.long_code_length(),
+    cur_ivf.get_ex_bits(),
+    cur_cluster.long_code(cur_ivf, 0, cur_ivf.quantizer().long_code_length()),
+    cur_ivf.quantizer().long_code_length(),
     d_ip2);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 #ifdef COUNT_CLUSTER_TIME
@@ -2459,9 +2462,9 @@ void SearcherGPU::SearchClusterWithFilter(const IVFGPU& cur_ivf,
     sumq,
     written,
     cur_cluster.first_block(cur_ivf),
-    cur_ivf.DQ.short_code_length() + cur_ivf.DQ.num_short_factors(),
+    cur_ivf.quantizer().short_code_length() + cur_ivf.quantizer().num_short_factors(),
     cur_cluster.ex_factor(cur_ivf, 0),
-    cur_ivf.DQ.num_short_factors());
+    cur_ivf.quantizer().num_short_factors());
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 #ifdef COUNT_CLUSTER_TIME
   stats.push_back({"kernel-refine", gt.stop(stream_)});
@@ -2568,7 +2571,7 @@ void SearcherGPU::SearchClusterWithFilterMemOptOffload(const IVFGPU& cur_ivf,
   std::vector<StepStat> stats;  // push in call order
 #endif
   size_t num_vector_cluster         = cur_cluster.num;
-  size_t num_dimensions             = cur_ivf.num_padded_dim;
+  size_t num_dimensions             = cur_ivf.get_num_padded_dim();
   uint32_t* rabitq_codes_and_factor = cur_cluster.first_block(cur_ivf);
   PID* ids                          = cur_cluster.ids(cur_ivf);
 
@@ -2611,17 +2614,18 @@ void SearcherGPU::SearchClusterWithFilterMemOptOffload(const IVFGPU& cur_ivf,
   int threadsPerBlock = 256;  // must be a multiple of 32
   int warpsPerBlock   = threadsPerBlock / 32;
   int grid            = (num_vector_cluster + warpsPerBlock - 1) / warpsPerBlock;
-  compute_ip_kernel_fp32<<<grid, threadsPerBlock, 0, stream_>>>(d_unit_q_gpu,
-                                                                rabitq_codes_and_factor,
-                                                                num_dimensions,
-                                                                cur_ivf.DQ.num_short_factors(),
-                                                                num_vector_cluster,
-                                                                d_ip_results,
-                                                                d_est_dis,
-                                                                delta,
-                                                                sumq,
-                                                                y,
-                                                                one_over_sqrtD);
+  compute_ip_kernel_fp32<<<grid, threadsPerBlock, 0, stream_>>>(
+    d_unit_q_gpu,
+    rabitq_codes_and_factor,
+    num_dimensions,
+    cur_ivf.quantizer().num_short_factors(),
+    num_vector_cluster,
+    d_ip_results,
+    d_est_dis,
+    delta,
+    sumq,
+    y,
+    one_over_sqrtD);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
 #ifdef COUNT_CLUSTER_TIME
@@ -2652,12 +2656,13 @@ void SearcherGPU::SearchClusterWithFilterMemOptOffload(const IVFGPU& cur_ivf,
   for (size_t i = 0; i < num_vector_cluster; ++i) {
     if (h_est_dis[i] < h_filter_distk) {
       // get long codes
-      auto long_code_bytes = cur_ivf.DQ.long_code_length();
+      auto long_code_bytes = cur_ivf.quantizer().long_code_length();
       const uint8_t* codes =
-        cur_cluster.long_code_host(cur_ivf, 0, cur_ivf.DQ.long_code_length()) + i * long_code_bytes;
+        cur_cluster.long_code_host(cur_ivf, 0, cur_ivf.quantizer().long_code_length()) +
+        i * long_code_bytes;
       float ip2 = 0.f;
       for (size_t j = 0; j < num_dimensions; ++j) {
-        uint32_t c = extract_code_cpu(codes, j, cur_ivf.ex_bits);
+        uint32_t c = extract_code_cpu(codes, j, cur_ivf.get_ex_bits());
         ip2 += float(c) * unit_q[j];
       }
 #ifdef COUNT_CLUSTER_TIME
@@ -2665,10 +2670,10 @@ void SearcherGPU::SearchClusterWithFilterMemOptOffload(const IVFGPU& cur_ivf,
 #endif
       // refine the final distances
       size_t short_block_bytes_in_uint32 =
-        cur_ivf.DQ.short_code_length() + cur_ivf.DQ.num_short_factors();
+        cur_ivf.quantizer().short_code_length() + cur_ivf.quantizer().num_short_factors();
       uint32_t* block = cur_cluster.first_block_host(cur_ivf) + i * short_block_bytes_in_uint32;
       float onorm     = *reinterpret_cast<const float*>(
-        block + (short_block_bytes_in_uint32 - cur_ivf.DQ.num_short_factors()));
+        block + (short_block_bytes_in_uint32 - cur_ivf.quantizer().num_short_factors()));
       float x_ip   = (cur_cluster.ex_factor_host(cur_ivf, 0))[i].xipnorm;
       float approx = h_ip_results[i];
       float refined =
@@ -2730,7 +2735,7 @@ void SearcherGPU::SearchClusterWithFilterMemOpt(const IVFGPU& cur_ivf,
   std::vector<StepStat> stats;  // push in call order
 #endif
   size_t num_vector_cluster         = cur_cluster.num;
-  size_t num_dimensions             = cur_ivf.num_padded_dim;
+  size_t num_dimensions             = cur_ivf.get_num_padded_dim();
   uint32_t* rabitq_codes_and_factor = cur_cluster.first_block(cur_ivf);
   PID* ids                          = cur_cluster.ids(cur_ivf);
 
@@ -2773,17 +2778,18 @@ void SearcherGPU::SearchClusterWithFilterMemOpt(const IVFGPU& cur_ivf,
   int threadsPerBlock = 256;  // must be a multiple of 32
   int warpsPerBlock   = threadsPerBlock / 32;
   int grid            = (num_vector_cluster + warpsPerBlock - 1) / warpsPerBlock;
-  compute_ip_kernel_fp32<<<grid, threadsPerBlock, 0, stream_>>>(d_unit_q_gpu,
-                                                                rabitq_codes_and_factor,
-                                                                num_dimensions,
-                                                                cur_ivf.DQ.num_short_factors(),
-                                                                num_vector_cluster,
-                                                                d_ip_results,
-                                                                d_est_dis,
-                                                                delta,
-                                                                sumq,
-                                                                y,
-                                                                one_over_sqrtD);
+  compute_ip_kernel_fp32<<<grid, threadsPerBlock, 0, stream_>>>(
+    d_unit_q_gpu,
+    rabitq_codes_and_factor,
+    num_dimensions,
+    cur_ivf.quantizer().num_short_factors(),
+    num_vector_cluster,
+    d_ip_results,
+    d_est_dis,
+    delta,
+    sumq,
+    y,
+    one_over_sqrtD);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
 #ifdef COUNT_CLUSTER_TIME
@@ -2860,9 +2866,9 @@ void SearcherGPU::SearchClusterWithFilterMemOpt(const IVFGPU& cur_ivf,
     d_top_idx,
     written,
     D,
-    cur_ivf.ex_bits,
-    cur_cluster.long_code(cur_ivf, 0, cur_ivf.DQ.long_code_length()),
-    cur_ivf.DQ.long_code_length(),
+    cur_ivf.get_ex_bits(),
+    cur_cluster.long_code(cur_ivf, 0, cur_ivf.quantizer().long_code_length()),
+    cur_ivf.quantizer().long_code_length(),
     d_ip2);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
@@ -2887,9 +2893,9 @@ void SearcherGPU::SearchClusterWithFilterMemOpt(const IVFGPU& cur_ivf,
     sumq,
     written,
     cur_cluster.first_block(cur_ivf),
-    cur_ivf.DQ.short_code_length() + cur_ivf.DQ.num_short_factors(),
+    cur_ivf.quantizer().short_code_length() + cur_ivf.quantizer().num_short_factors(),
     cur_cluster.ex_factor(cur_ivf, 0),
-    cur_ivf.DQ.num_short_factors());
+    cur_ivf.quantizer().num_short_factors());
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
 #ifdef COUNT_CLUSTER_TIME
@@ -3081,7 +3087,7 @@ void SearcherGPU::SearchClusterWithFilterMemOptOneforMulti(
   std::vector<StepStat> stats;  // push in call order
 #endif
   size_t num_vector_cluster         = cur_cluster.num;
-  size_t num_dimensions             = cur_ivf.num_padded_dim;
+  size_t num_dimensions             = cur_ivf.get_num_padded_dim();
   uint32_t* rabitq_codes_and_factor = cur_cluster.first_block(cur_ivf);
   PID* ids                          = cur_cluster.ids(cur_ivf);
 
@@ -3124,17 +3130,18 @@ void SearcherGPU::SearchClusterWithFilterMemOptOneforMulti(
   int threadsPerBlock = 256;  // must be a multiple of 32
   int warpsPerBlock   = threadsPerBlock / 32;
   int grid            = (num_vector_cluster + warpsPerBlock - 1) / warpsPerBlock;
-  compute_ip_kernel_fp32<<<grid, threadsPerBlock, 0, stream_>>>(d_unit_q_gpu,
-                                                                rabitq_codes_and_factor,
-                                                                num_dimensions,
-                                                                cur_ivf.DQ.num_short_factors(),
-                                                                num_vector_cluster,
-                                                                d_ip_results,
-                                                                d_est_dis,
-                                                                delta,
-                                                                sumq,
-                                                                y,
-                                                                one_over_sqrtD);
+  compute_ip_kernel_fp32<<<grid, threadsPerBlock, 0, stream_>>>(
+    d_unit_q_gpu,
+    rabitq_codes_and_factor,
+    num_dimensions,
+    cur_ivf.quantizer().num_short_factors(),
+    num_vector_cluster,
+    d_ip_results,
+    d_est_dis,
+    delta,
+    sumq,
+    y,
+    one_over_sqrtD);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
 #ifdef COUNT_CLUSTER_TIME
@@ -3211,9 +3218,9 @@ void SearcherGPU::SearchClusterWithFilterMemOptOneforMulti(
     d_top_idx,
     written,
     D,
-    cur_ivf.ex_bits,
-    cur_cluster.long_code(cur_ivf, 0, cur_ivf.DQ.long_code_length()),
-    cur_ivf.DQ.long_code_length(),
+    cur_ivf.get_ex_bits(),
+    cur_cluster.long_code(cur_ivf, 0, cur_ivf.quantizer().long_code_length()),
+    cur_ivf.quantizer().long_code_length(),
     d_ip2);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
@@ -3238,9 +3245,9 @@ void SearcherGPU::SearchClusterWithFilterMemOptOneforMulti(
     sumq,
     written,
     cur_cluster.first_block(cur_ivf),
-    cur_ivf.DQ.short_code_length() + cur_ivf.DQ.num_short_factors(),
+    cur_ivf.quantizer().short_code_length() + cur_ivf.quantizer().num_short_factors(),
     cur_cluster.ex_factor(cur_ivf, 0),
-    cur_ivf.DQ.num_short_factors());
+    cur_ivf.quantizer().num_short_factors());
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
 #ifdef COUNT_CLUSTER_TIME
@@ -3336,7 +3343,7 @@ void SearcherGPU::SearchClusterWithFilterMemOptV2(const IVFGPU& cur_ivf,
   std::vector<StepStat> stats;  // push in call order
 #endif
   size_t num_vector_cluster         = cur_cluster.num;
-  size_t num_dimensions             = cur_ivf.num_padded_dim;
+  size_t num_dimensions             = cur_ivf.get_num_padded_dim();
   uint32_t* rabitq_codes_and_factor = cur_cluster.first_block(cur_ivf);
   PID* ids                          = cur_cluster.ids(cur_ivf);
 
@@ -3376,18 +3383,19 @@ void SearcherGPU::SearchClusterWithFilterMemOptV2(const IVFGPU& cur_ivf,
   int threadsPerBlock = 256;  // must be a multiple of 32
   int warpsPerBlock   = threadsPerBlock / 32;
   int grid            = (num_vector_cluster + warpsPerBlock - 1) / warpsPerBlock;
-  compute_ip_kernel_fp32_opt<<<grid, threadsPerBlock, 0, stream_>>>(d_unit_q_gpu,
-                                                                    rabitq_codes_and_factor,
-                                                                    num_dimensions,
-                                                                    cur_ivf.DQ.num_short_factors(),
-                                                                    num_vector_cluster,
-                                                                    d_ip_results,
-                                                                    d_est_dis,
-                                                                    delta,
-                                                                    sumq,
-                                                                    y,
-                                                                    one_over_sqrtD,
-                                                                    h_filter_distk);
+  compute_ip_kernel_fp32_opt<<<grid, threadsPerBlock, 0, stream_>>>(
+    d_unit_q_gpu,
+    rabitq_codes_and_factor,
+    num_dimensions,
+    cur_ivf.quantizer().num_short_factors(),
+    num_vector_cluster,
+    d_ip_results,
+    d_est_dis,
+    delta,
+    sumq,
+    y,
+    one_over_sqrtD,
+    h_filter_distk);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
 #ifdef COUNT_CLUSTER_TIME
@@ -3436,9 +3444,9 @@ void SearcherGPU::SearchClusterWithFilterMemOptV2(const IVFGPU& cur_ivf,
     d_top_idx,
     written,
     D,
-    cur_ivf.ex_bits,
-    cur_cluster.long_code(cur_ivf, 0, cur_ivf.DQ.long_code_length()),
-    cur_ivf.DQ.long_code_length(),
+    cur_ivf.get_ex_bits(),
+    cur_cluster.long_code(cur_ivf, 0, cur_ivf.quantizer().long_code_length()),
+    cur_ivf.quantizer().long_code_length(),
     d_ip2);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
@@ -3463,9 +3471,9 @@ void SearcherGPU::SearchClusterWithFilterMemOptV2(const IVFGPU& cur_ivf,
     sumq,
     written,
     cur_cluster.first_block(cur_ivf),
-    cur_ivf.DQ.short_code_length() + cur_ivf.DQ.num_short_factors(),
+    cur_ivf.quantizer().short_code_length() + cur_ivf.quantizer().num_short_factors(),
     cur_cluster.ex_factor(cur_ivf, 0),
-    cur_ivf.DQ.num_short_factors());
+    cur_ivf.quantizer().num_short_factors());
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
 #ifdef COUNT_CLUSTER_TIME
@@ -4176,19 +4184,20 @@ void SearcherGPU::SearchMultipleClusters(const IVFGPU& cur_ivf,
   int warps = vecs_to_compute;  //
   int grids = (warps * 32 + BLOCK - 1) / BLOCK;
   dim3 grid(grids), block(BLOCK);
-  compute_ip_kernel_fp32_multi<<<grids, BLOCK, 0, stream_>>>(d_unit_q_gpu,
-                                                             d_sum_norm,
-                                                             d_cluster_meta,
-                                                             D,
-                                                             cur_ivf.d_short_data,
-                                                             cur_ivf.DQ.num_short_factors(),
-                                                             cur_ivf.DQ.short_code_length(),
-                                                             d_starts,
-                                                             nprobe,
-                                                             one_over_sqrtD,
-                                                             h_filter_distk,
-                                                             d_ip_results,
-                                                             d_est_dis);
+  compute_ip_kernel_fp32_multi<<<grids, BLOCK, 0, stream_>>>(
+    d_unit_q_gpu,
+    d_sum_norm,
+    d_cluster_meta,
+    D,
+    cur_ivf.get_short_data_device(),
+    cur_ivf.quantizer().num_short_factors(),
+    cur_ivf.quantizer().short_code_length(),
+    d_starts,
+    nprobe,
+    one_over_sqrtD,
+    h_filter_distk,
+    d_ip_results,
+    d_est_dis);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
 #ifdef DEBUG_MULTIPLE_SEARCH
@@ -4201,7 +4210,7 @@ void SearcherGPU::SearchMultipleClusters(const IVFGPU& cur_ivf,
   int KM      = KNNs[0].capacity * 10;
   int written = fast_select_and_keep_multi(d_est_dis,
                                            d_ip_results,
-                                           cur_ivf.d_ids,
+                                           cur_ivf.get_ids_device(),
                                            d_starts,
                                            vecs_to_compute,
                                            nprobe,
@@ -4225,15 +4234,15 @@ void SearcherGPU::SearchMultipleClusters(const IVFGPU& cur_ivf,
                                                    nprobe,
                                                    D,
                                                    d_cluster_meta,
-                                                   cur_ivf.d_long_code,
-                                                   cur_ivf.DQ.long_code_length(),
-                                                   cur_ivf.d_short_data,
-                                                   cur_ivf.DQ.short_code_length(),
-                                                   cur_ivf.d_ex_factor,
-                                                   cur_ivf.DQ.num_short_factors(),
+                                                   cur_ivf.get_long_code_device(),
+                                                   cur_ivf.quantizer().long_code_length(),
+                                                   cur_ivf.get_short_data_device(),
+                                                   cur_ivf.quantizer().short_code_length(),
+                                                   cur_ivf.get_ex_factor_device(),
+                                                   cur_ivf.quantizer().num_short_factors(),
                                                    FAC_RESCALE,
                                                    BLOCK,
-                                                   cur_ivf.ex_bits);
+                                                   cur_ivf.get_ex_bits());
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 #ifdef DEBUG_MULTIPLE_SEARCH
   printf("refine_multi_kernel done\n");
@@ -4331,8 +4340,8 @@ void SearcherGPU::AllocateSearcherSpace(const IVFGPU& cur_ivf,
   //    cudaMallocAsync(&d_ip2, sizeof(float) * max_cluster_length * num_queries, s);
   //    cudaMallocAsync(&d_centroid_candidates, sizeof(Candidate) * max_nprobes * num_queries, s);
   RAFT_CUDA_TRY(cudaMallocAsync(
-    &d_centroid_distances, sizeof(float) * num_queries * cur_ivf.num_clusters(), stream_));
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_c_norms, sizeof(float) * cur_ivf.num_clusters(), stream_));
+    &d_centroid_distances, sizeof(float) * num_queries * cur_ivf.get_num_centroids(), stream_));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_c_norms, sizeof(float) * cur_ivf.get_num_centroids(), stream_));
   RAFT_CUDA_TRY(cudaMallocAsync(&d_q_norms, sizeof(float) * num_queries, stream_));
   raft::resource::sync_stream(handle_);
 };

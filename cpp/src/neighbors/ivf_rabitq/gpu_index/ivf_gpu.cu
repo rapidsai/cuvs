@@ -31,7 +31,9 @@ IVFGPU::IVFGPU(raft::resources const& handle,
                size_t k,
                size_t bits_per_dim,
                bool batch_flag = false)
-  : num_vectors(n),
+  : handle_(handle),
+    stream_(raft::resource::get_cuda_stream(handle_)),
+    num_vectors(n),
     num_dimensions(dim),
     num_padded_dim(rd_up_to_multiple_of_new(dim, 64)),
     num_centroids(k),
@@ -48,10 +50,8 @@ IVFGPU::IVFGPU(raft::resources const& handle,
     h_long_code(nullptr),
     h_ex_factor(nullptr),
     h_ids(nullptr),
-    DQ(handle, dim, bits_per_dim - 1, batch_flag),
-    Rota(handle, dim),
-    handle_(handle),
-    stream_(raft::resource::get_cuda_stream(handle_))
+    DQ(std::make_unique<DataQuantizerGPU>(handle_, dim, bits_per_dim - 1, batch_flag)),
+    Rota(std::make_unique<RotatorGPU>(handle_, dim))
 {
 }
 
@@ -65,7 +65,7 @@ void IVFGPU::AllocateDeviceMemory()
 {
   std::cout << "Allocating device memory for IVFGPU..." << std::endl;
 
-  this->initializer = new FlatInitializerGPU(handle_, num_padded_dim, num_centroids);
+  this->initializer = std::make_unique<FlatInitializerGPU>(handle_, num_padded_dim, num_centroids);
   // if (num_centroids < 20000ul) {
   //     this->initer = new FlatInitializer(num_dimensions, num_centroids);
   // } else {
@@ -153,9 +153,8 @@ void IVFGPU::FreeDeviceMemory() const
   if (d_ids) RAFT_CUDA_TRY(cudaFreeAsync(d_ids, stream_));
   if (d_cluster_meta) RAFT_CUDA_TRY(cudaFreeAsync(d_cluster_meta, stream_));
   //    if (d_centroids)    cudaFreeAsync(d_centroids, stream_);
-  // jamxia edit: not setting initializer to nullptr due to constness of FreeDeviceMemory(), but
+  // jamxia edit: not resetting initializer to nullptr due to constness of FreeDeviceMemory(), but
   // really this function should set all pointers to null after freeing
-  delete initializer;
 }
 
 void IVFGPU::load(const char* filename, bool load_batch_flag)
@@ -175,15 +174,15 @@ void IVFGPU::load(const char* filename, bool load_batch_flag)
   if (load_batch_flag) input.read(reinterpret_cast<char*>(&this->batch_flag), sizeof(bool));
 
   // Initialize quantizer and rotator (host objects that drive GPU routines).
-  this->DQ   = DataQuantizerGPU(handle_, num_dimensions, ex_bits, batch_flag);
-  this->Rota = RotatorGPU(handle_, num_dimensions);
+  this->DQ   = std::make_unique<DataQuantizerGPU>(handle_, num_dimensions, ex_bits, batch_flag);
+  this->Rota = std::make_unique<RotatorGPU>(handle_, num_dimensions);
   // Load cluster sizes.
   std::vector<size_t> cluster_sizes(num_centroids, 0);
   input.read(reinterpret_cast<char*>(cluster_sizes.data()), sizeof(size_t) * num_centroids);
   assert(std::accumulate(cluster_sizes.begin(), cluster_sizes.end(), size_t(0)) == num_vectors);
 
   // Load rotator from file.
-  this->Rota.load(input);
+  this->rotator().load(input);
   // Free any previously allocated device memory.
   FreeDeviceMemory();
   // Allocate device memory based on the cluster sizes.
@@ -252,15 +251,15 @@ void IVFGPU::load_transposed(const char* filename)
   input.read(reinterpret_cast<char*>(&this->batch_flag), sizeof(bool));
 
   // Initialize quantizer and rotator (host objects that drive GPU routines).
-  this->DQ   = DataQuantizerGPU(handle_, num_dimensions, ex_bits, batch_flag);
-  this->Rota = RotatorGPU(handle_, num_dimensions);
+  this->DQ   = std::make_unique<DataQuantizerGPU>(handle_, num_dimensions, ex_bits, batch_flag);
+  this->Rota = std::make_unique<RotatorGPU>(handle_, num_dimensions);
   // Load cluster sizes.
   std::vector<size_t> cluster_sizes(num_centroids, 0);
   input.read(reinterpret_cast<char*>(cluster_sizes.data()), sizeof(size_t) * num_centroids);
   assert(std::accumulate(cluster_sizes.begin(), cluster_sizes.end(), size_t(0)) == num_vectors);
 
   // Load rotator from file.
-  this->Rota.load(input);
+  this->rotator().load(input);
   // Free any previously allocated device memory.
   FreeDeviceMemory();
   // Allocate device memory based on the cluster sizes.
@@ -313,7 +312,7 @@ void IVFGPU::load_transposed(const char* filename)
       if (cluster_size == 0) continue;
 
       // Calculate dimensions per vector
-      size_t bytes_per_vector   = DQ.block_bytes();
+      size_t bytes_per_vector   = DQ->block_bytes();
       size_t uint32s_per_vector = bytes_per_vector / sizeof(uint32_t);
 
       // Get pointers to source (sequential) and destination (transposed) data
@@ -383,7 +382,7 @@ void IVFGPU::init_clusters(const std::vector<size_t>& cluster_sizes)
     // For cluster i, get number of vectors.
     size_t num = cluster_sizes[i];
     // Compute how many blocks are needed for this cluster.
-    size_t num_blocks = DQ.num_blocks(num);
+    size_t num_blocks = DQ->num_blocks(num);
 
     // Create a GPUClusterMeta structure for this cluster.
     GPUClusterMeta meta(num, added_vectors);
@@ -487,7 +486,7 @@ void IVFGPU::save(const char* filename, bool save_batch_flag) const
   output.write(reinterpret_cast<const char*>(cluster_sizes.data()), sizeof(size_t) * num_centroids);
 
   // Save rotator.
-  this->Rota.save(output);
+  this->rotator().save(output);
 
   // Save initializer data.
   this->initializer->SaveCentroids(output, filename);
@@ -595,12 +594,12 @@ void IVFGPU::construct(const float* host_data,
   // -------------------------
   //    auto start_gpu_normal = std::chrono::high_resolution_clock::now();
 
-  float* d_data         = nullptr;
-  float* d_centroid     = nullptr;
-  size_t data_bytes     = num_vectors * num_dimensions * sizeof(float);
-  size_t centroid_bytes = num_centroids * num_dimensions * sizeof(float);
-  size_t ids_bytes      = num_vectors * sizeof(float);
-  DQ.fast_quantize_flag = fast_quantize;
+  float* d_data          = nullptr;
+  float* d_centroid      = nullptr;
+  size_t data_bytes      = num_vectors * num_dimensions * sizeof(float);
+  size_t centroid_bytes  = num_centroids * num_dimensions * sizeof(float);
+  size_t ids_bytes       = num_vectors * sizeof(float);
+  DQ->fast_quantize_flag = fast_quantize;
   RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_data, data_bytes, stream_));
   RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_centroid, centroid_bytes, stream_));
   RAFT_CUDA_TRY(cudaMemcpyAsync(d_data, host_data, data_bytes, cudaMemcpyHostToDevice, stream_));
@@ -679,39 +678,39 @@ void IVFGPU::quantize_cluster(GPUClusterMeta& cp,
   //    cudaMemcpy(idp, IDs.data(), sizeof(PID) * num, cudaMemcpyHostToDevice);
 
   // Call the GPU quantization function.
-  // Here, we assume DQ.quantize accepts device pointers for raw data and centroid,
+  // Here, we assume DQ->quantize accepts device pointers for raw data and centroid,
   // the device pointer for IDs, the number of points, the RotatorGPU instance,
   // and pointers for the output short data, long code, ex_factor, and rotated centroid.
   if (!batch_flag) {
-    DQ.quantize(d_data,
-                d_centroid,
-                idp,
-                num,
-                Rota,
-                cp.first_block(*this),
-                cp.long_code(*this, 0, DQ.long_code_length()),
-                reinterpret_cast<float*>(cp.ex_factor(*this, 0)),
-                d_rotated_c);
+    DQ->quantize(d_data,
+                 d_centroid,
+                 idp,
+                 num,
+                 this->rotator(),
+                 cp.first_block(*this),
+                 cp.long_code(*this, 0, DQ->long_code_length()),
+                 reinterpret_cast<float*>(cp.ex_factor(*this, 0)),
+                 d_rotated_c);
   } else {
-    //        if (!DQ.fast_quantize_flag) {
-    //            DQ.quantize_batch(d_data, d_centroid, idp, num, Rota,
+    //        if (!DQ->fast_quantize_flag) {
+    //            DQ->quantize_batch(d_data, d_centroid, idp, num, Rota,
     //                              cp.first_block_batch(*this),
     //                              cp.short_factor_batch(*this, 0),
-    //                              cp.long_code(*this, 0, DQ.long_code_length()),
+    //                              cp.long_code(*this, 0, DQ->long_code_length()),
     //                              reinterpret_cast<float*>(cp.ex_factor_batch(*this, 0)),
     //                              d_rotated_c);
     //        }
     //        else {
-    DQ.quantize_batch_opt(d_data,
-                          d_centroid,
-                          idp,
-                          num,
-                          Rota,
-                          cp.first_block_batch(*this),
-                          cp.short_factor_batch(*this, 0),
-                          cp.long_code(*this, 0, DQ.long_code_length()),
-                          reinterpret_cast<float*>(cp.ex_factor_batch(*this, 0)),
-                          d_rotated_c);
+    DQ->quantize_batch_opt(d_data,
+                           d_centroid,
+                           idp,
+                           num,
+                           this->rotator(),
+                           cp.first_block_batch(*this),
+                           cp.short_factor_batch(*this, 0),
+                           cp.long_code(*this, 0, DQ->long_code_length()),
+                           reinterpret_cast<float*>(cp.ex_factor_batch(*this, 0)),
+                           d_rotated_c);
     //        }
   }
 }

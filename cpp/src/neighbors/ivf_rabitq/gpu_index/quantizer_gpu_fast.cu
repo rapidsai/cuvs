@@ -453,7 +453,7 @@ void DataQuantizerGPU::data_transformation_batch_opt(
   float* d_X_and_C_pad;
   RAFT_CUDA_TRY(
     cudaMallocAsync((void**)&d_X_and_C_pad, (num_points + 1) * D * sizeof(float), stream_));
-  raft::resource::sync_stream(*handle_);
+  raft::resource::sync_stream(handle_);
 
   // Create a pointer to the start of the centroid section for the kernel.
   float* d_C_pad_ptr = d_X_and_C_pad + num_points * D;
@@ -523,7 +523,7 @@ void DataQuantizerGPU::rabitq_codes_and_factors_fused(const float* d_rotated_c,
     d_short_data_factors,
     d_short_data);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
-  raft::resource::sync_stream(*handle_);
+  raft::resource::sync_stream(handle_);
 }
 
 //---------------------------------------------------------------------------
@@ -561,7 +561,7 @@ void DataQuantizerGPU::exrabitq_codes_and_factors_fused(const int* d_bin_XP,
     d_long_code,
     d_ex_factor);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
-  raft::resource::sync_stream(*handle_);
+  raft::resource::sync_stream(handle_);
 }
 
 void DataQuantizerGPU::quantize_batch_opt(const float* d_data,
@@ -620,7 +620,7 @@ void DataQuantizerGPU::quantize_batch_opt(const float* d_data,
   // jamxia edit
   RAFT_CUDA_TRY(cudaFreeAsync(d_XP, stream_));
 
-  raft::resource::sync_stream(*handle_);
+  raft::resource::sync_stream(handle_);
 }
 
 constexpr std::array<float, 9> kTightStart = {
@@ -1107,7 +1107,7 @@ void DataQuantizerGPU::exrabitq_codes_and_factors_fused_ori(const int* d_bin_XP,
                                                       d_long_code,
                                                       d_ex_factor);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
-  raft::resource::sync_stream(*handle_);
+  raft::resource::sync_stream(handle_);
 }
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

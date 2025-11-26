@@ -55,9 +55,8 @@ class DataQuantizerGPU {
 #else
   static constexpr size_t NUM_SHORT_FACTORS = 4;
 #endif
-  raft::resources* handle_;  // reusable resource handle (as pointer instead of const ref due to
-                             // presence of operator=)
-  rmm::cuda_stream_view stream_;  // CUDA stream obtained from handle_
+  raft::resources const& handle_;  // reusable resource handle
+  rmm::cuda_stream_view stream_;   // CUDA stream obtained from handle_
 
   // Private helper functions (to be implemented with GPU kernels eventually):
   //    void pack_binary(const int* /*int matrix*/, uint64_t* out, size_t index) const;
@@ -108,31 +107,14 @@ class DataQuantizerGPU {
       FAC_ERR(2.0 / std::sqrt((double)(D - 1))),
       batch_flag_dq(batch_flag_dq),
       fast_quantize_flag(false),
-      handle_(const_cast<raft::resources*>(&handle)),
-      stream_(raft::resource::get_cuda_stream(*handle_))
+      handle_(handle),
+      stream_(raft::resource::get_cuda_stream(handle_))
   {
     const_scaling_factor = get_const_scaling_factors(handle, dim, b);
   }
 
-  explicit DataQuantizerGPU() {}
-
-  // Assignment operator.
-  DataQuantizerGPU& operator=(const DataQuantizerGPU& other)
-  {
-    this->DIM                  = other.DIM;
-    this->D                    = other.D;
-    this->EX_BITS              = other.EX_BITS;
-    this->SHORT_CODE_LENGTH    = other.SHORT_CODE_LENGTH;
-    this->LONG_CODE_LENGTH     = other.LONG_CODE_LENGTH;
-    this->FAC_NORM             = other.FAC_NORM;
-    this->FAC_ERR              = other.FAC_ERR;
-    this->batch_flag_dq        = other.batch_flag_dq;
-    this->fast_quantize_flag   = other.fast_quantize_flag;
-    this->const_scaling_factor = other.const_scaling_factor;
-    this->handle_              = other.handle_;
-    this->stream_              = other.stream_;
-    return *this;
-  }
+  // Disable copy assignment
+  DataQuantizerGPU& operator=(const DataQuantizerGPU& other) = delete;
 
   // Accessor functions.
   size_t short_code_length() const { return SHORT_CODE_LENGTH; }

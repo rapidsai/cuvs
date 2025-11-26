@@ -21,8 +21,7 @@
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
 RotatorGPU::RotatorGPU(raft::resources const& handle, uint32_t dim)
-  : handle_(const_cast<raft::resources*>(&handle)),
-    stream_(raft::resource::get_cuda_stream(*handle_))
+  : handle_(handle), stream_(raft::resource::get_cuda_stream(handle_))
 {
   // keep track of cuda stream
   // Compute padded dimension
@@ -44,23 +43,6 @@ RotatorGPU::~RotatorGPU()
   if (d_P) { RAFT_CUDA_TRY(cudaFreeAsync(d_P, stream_)); }
 }
 
-RotatorGPU& RotatorGPU::operator=(const RotatorGPU& other)
-{
-  if (this != &other) {
-    D       = other.D;
-    handle_ = other.handle_;
-    stream_ = other.stream_;
-    // Firstly free it in case not dimension not match
-    if (d_P) { RAFT_CUDA_TRY(cudaFreeAsync(d_P, stream_)); }
-    RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_P, sizeof(float) * D * D, stream_));
-    // Copy the rotation matrix from the other object.
-    RAFT_CUDA_TRY(
-      cudaMemcpyAsync(d_P, other.d_P, sizeof(float) * D * D, cudaMemcpyDeviceToDevice, stream_));
-    raft::resource::sync_stream(*handle_);
-  }
-  return *this;
-}
-
 size_t RotatorGPU::size() const { return D; }
 
 void RotatorGPU::load(std::ifstream& input)
@@ -71,7 +53,7 @@ void RotatorGPU::load(std::ifstream& input)
   }
   RAFT_CUDA_TRY(
     cudaMemcpyAsync(d_P, hostP, sizeof(float) * D * D, cudaMemcpyHostToDevice, stream_));
-  raft::resource::sync_stream(*handle_);
+  raft::resource::sync_stream(handle_);
   delete[] hostP;
 }
 
@@ -80,7 +62,7 @@ void RotatorGPU::save(std::ofstream& output) const
   float* hostP = new float[D * D];
   RAFT_CUDA_TRY(
     cudaMemcpyAsync(hostP, d_P, sizeof(float) * D * D, cudaMemcpyDeviceToHost, stream_));
-  raft::resource::sync_stream(*handle_);
+  raft::resource::sync_stream(handle_);
   for (size_t i = 0; i < D * D; ++i) {
     output.write(reinterpret_cast<char*>(&hostP[i]), sizeof(float));
   }
@@ -102,11 +84,11 @@ void RotatorGPU::rotate(const float* d_A, float* d_RAND_A, size_t N) const
   // Note that in Cublas it is RAND_A^T in column major, which is what we want in row-major
   // Here, we use the RAFT wrapper for gemm.
   raft::linalg::gemm(
-    *handle_,
+    handle_,
     raft::make_device_matrix_view<float, int64_t, raft::col_major>(const_cast<float*>(d_P), D, D),
     raft::make_device_matrix_view<float, int64_t, raft::col_major>(const_cast<float*>(d_A), D, N),
     raft::make_device_matrix_view<float, int64_t, raft::col_major>(d_RAND_A, D, N));
-  raft::resource::sync_stream(*handle_);
+  raft::resource::sync_stream(handle_);
 }
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

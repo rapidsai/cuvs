@@ -4198,8 +4198,9 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
 #endif
   // First allocate space for LUT
   size_t lut_size =
-    num_queries * (cur_ivf.num_padded_dim / BITS_PER_CHUNK) * LUT_SIZE * sizeof(float);
-  // each line's space is (cur_ivf.num_padded_dim / BITS_PER_CHUNK) * LUT_SIZE * sizeof(float);
+    num_queries * (cur_ivf.get_num_padded_dim() / BITS_PER_CHUNK) * LUT_SIZE * sizeof(float);
+  // each line's space is (cur_ivf.get_num_padded_dim() / BITS_PER_CHUNK) * LUT_SIZE *
+  // sizeof(float);
   float* d_lut_for_queries = nullptr;
   RAFT_CUDA_TRY(cudaMallocAsync(&d_lut_for_queries, lut_size, stream_));
   thrust::fill(thrust::cuda::par.on(stream_),
@@ -4236,13 +4237,14 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
   dim3 blockDim(256, 1, 1);
   size_t num_chunks = D / BITS_PER_CHUNK;
   size_t candidate_storage =
-    cur_ivf.max_cluster_length * (2 * sizeof(float) + sizeof(int));  // ip, idx
-  size_t query_storage = D * sizeof(float);                          // For shared query vector
+    cur_ivf.get_max_cluster_length() * (2 * sizeof(float) + sizeof(int));  // ip, idx
+  size_t query_storage = D * sizeof(float);  // For shared query vector
   //    std::cout << "trying to compute distances" << std::endl;
-  //    if (MAX_TOP_K < cur_ivf.max_cluster_length) {
+  //    if (MAX_TOP_K < cur_ivf.get_max_cluster_length()) {
   //        throw std::runtime_error(
   //                "MAX_TOP_K (" + std::to_string(MAX_TOP_K) +
-  //                ") < max_cluster_length (" + std::to_string(cur_ivf.max_cluster_length) + ")");
+  //                ") < max_cluster_length (" + std::to_string(cur_ivf.get_max_cluster_length()) +
+  //                ")");
   //    }
   const int smem_bytes =
     raft::matrix::detail::select::warpsort::calc_smem_size_for_block_wide<T, IdxT>(blockDim.x / 32,
@@ -4278,15 +4280,15 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
                                        98304));  // 96KB for ampere devices
   }
 #ifdef DEBUG_BATCH_SEARCH
-  printf("ivf.max_cluster_length: %d\n", cur_ivf.max_cluster_length);
+  printf("ivf.max_cluster_length: %d\n", cur_ivf.get_max_cluster_length());
 #endif
   computeInnerProductsWithLUT<<<gridDim, blockDim, shared_mem_size, stream_>>>(
     d_sorted_pairs,
     d_query,
-    cur_ivf.d_short_data,
+    cur_ivf.get_short_data_device(),
     d_cluster_meta,
     d_lut_for_queries,
-    cur_ivf.d_short_factors_batch,
+    cur_ivf.get_short_factors_batch_device(),
     d_G_k1xSumq,
     d_G_kbxSumq,
     d_centroid_distances,
@@ -4294,15 +4296,15 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
     num_queries,
     nprobe,
     num_pairs,
-    cur_ivf.num_centroids,
+    cur_ivf.get_num_centroids(),
     D,
     d_topk_threshold_batch,
     15,  // by default just set amplification vector to 10
-    cur_ivf.max_cluster_length,
-    cur_ivf.ex_bits,
-    cur_ivf.d_long_code,
-    reinterpret_cast<const float*>(cur_ivf.d_ex_factor),
-    cur_ivf.d_ids,
+    cur_ivf.get_max_cluster_length(),
+    cur_ivf.get_ex_bits(),
+    cur_ivf.get_long_code_device(),
+    reinterpret_cast<const float*>(cur_ivf.get_ex_factor_device()),
+    cur_ivf.get_ids_device(),
     d_topk_dists,
     d_topk_pids,
     d_query_write_counters);
@@ -4672,7 +4674,7 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(
   // Using BF16 for storage
 
   // Allocate space for LUT with reduced precision
-  size_t lut_elements = num_queries * (cur_ivf.num_padded_dim / BITS_PER_CHUNK) * LUT_SIZE;
+  size_t lut_elements = num_queries * (cur_ivf.get_num_padded_dim() / BITS_PER_CHUNK) * LUT_SIZE;
   size_t lut_size     = lut_elements * sizeof(lut_dtype);
 
   lut_dtype* d_lut_for_queries = nullptr;
@@ -4690,7 +4692,7 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(
 
   // Precompute LUTs
   launchPrecomputeLUTs_bf16(
-    d_query, d_lut_for_queries, num_queries, cur_ivf.num_padded_dim, stream_);
+    d_query, d_lut_for_queries, num_queries, cur_ivf.get_num_padded_dim(), stream_);
   // #ifdef DEBUG_BATCH_SEARCH
   //  Clean the input distances
   size_t candidates_per_query = nprobe * topk;
@@ -4718,15 +4720,16 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(
   dim3 gridDim(num_pairs, 1, 1);
   dim3 blockDim(256, 1, 1);
   size_t num_chunks = D / BITS_PER_CHUNK;
-  //    size_t candidate_storage = cur_ivf.max_cluster_length * (2 * sizeof(float) + sizeof(int));
+  //    size_t candidate_storage = cur_ivf.get_max_cluster_length() * (2 * sizeof(float) +
+  //    sizeof(int));
   //    // ip, idx
   size_t query_storage = D * sizeof(float);  // For shared query vector
   const int smem_bytes =
     raft::matrix::detail::select::warpsort::calc_smem_size_for_block_wide<T, IdxT>(blockDim.x / 32,
                                                                                    MAX_TOP_K);
   size_t first_part_shared_mem =
-    max(lut_size / num_queries, cur_ivf.max_cluster_length * (sizeof(float)));
-  size_t second_part_shared_mem = cur_ivf.max_cluster_length * (sizeof(float) + sizeof(int));
+    max(lut_size / num_queries, cur_ivf.get_max_cluster_length() * (sizeof(float)));
+  size_t second_part_shared_mem = cur_ivf.get_max_cluster_length() * (sizeof(float) + sizeof(int));
   size_t third_part_shared_mem  = query_storage;
   // smem reuses first 3 parts
   size_t shared_mem_size =
@@ -4762,16 +4765,16 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(
                                        98304));  // 96KB for ampere devices
   }
 #ifdef DEBUG_BATCH_SEARCH
-  printf("ivf.max_cluster_length: %d\n", cur_ivf.max_cluster_length);
+  printf("ivf.max_cluster_length: %d\n", cur_ivf.get_max_cluster_length());
 #endif
 
   computeInnerProductsWithLUT16Opt<<<gridDim, blockDim, shared_mem_size, stream_>>>(
     d_sorted_pairs,
     d_query,
-    cur_ivf.d_short_data,
+    cur_ivf.get_short_data_device(),
     d_cluster_meta,
     d_lut_for_queries,
-    cur_ivf.d_short_factors_batch,
+    cur_ivf.get_short_factors_batch_device(),
     d_G_k1xSumq,
     d_G_kbxSumq,
     d_centroid_distances,
@@ -4779,15 +4782,15 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(
     num_queries,
     nprobe,
     num_pairs,
-    cur_ivf.num_centroids,
+    cur_ivf.get_num_centroids(),
     D,
     d_topk_threshold_batch,
     15,  // by default just set amplification vector to 10
-    cur_ivf.max_cluster_length,
-    cur_ivf.ex_bits,
-    cur_ivf.d_long_code,
-    reinterpret_cast<const float*>(cur_ivf.d_ex_factor),
-    cur_ivf.d_ids,
+    cur_ivf.get_max_cluster_length(),
+    cur_ivf.get_ex_bits(),
+    cur_ivf.get_long_code_device(),
+    reinterpret_cast<const float*>(cur_ivf.get_ex_factor_device()),
+    cur_ivf.get_ids_device(),
     d_topk_dists,
     d_topk_pids,
     d_query_write_counters);
@@ -5018,7 +5021,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
 {
   // query quantize
   const int num_bits  = use_4bit ? 4 : 8;  // Choose bit width
-  const int num_words = (cur_ivf.num_padded_dim + 31) / 32;
+  const int num_words = (cur_ivf.get_num_padded_dim() + 31) / 32;
 
   // Allocate memory for quantization
   float* d_query_ranges;
@@ -5028,7 +5031,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
 
   size_t ranges_size    = num_queries * 2 * sizeof(float);
   size_t widths_size    = num_queries * sizeof(float);
-  size_t quantized_size = num_queries * cur_ivf.num_padded_dim * sizeof(int8_t);
+  size_t quantized_size = num_queries * cur_ivf.get_num_padded_dim() * sizeof(int8_t);
   size_t packed_size    = num_queries * num_bits * num_words * sizeof(uint32_t);
 
   RAFT_CUDA_TRY(cudaMallocAsync(&d_query_ranges, ranges_size, stream_));
@@ -5056,15 +5059,15 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
       dim3 block(256);
       dim3 grid(num_queries);
       findQueryRanges<<<grid, block, 0, stream_>>>(
-        d_query, d_query_ranges, num_queries, cur_ivf.num_padded_dim);
+        d_query, d_query_ranges, num_queries, cur_ivf.get_num_padded_dim());
       RAFT_CUDA_TRY(cudaPeekAtLastError());
     }
 
     // Step 2: Quantize queries to int8_t with BQ=8
     {
       const int block_size = 256;
-      //        const int grid_size = (num_queries * cur_ivf.num_padded_dim + block_size - 1) /
-      //        block_size;
+      //        const int grid_size = (num_queries * cur_ivf.get_num_padded_dim() + block_size - 1)
+      //        / block_size;
       const int grid_size = num_queries;
       if (use_4bit) {
         quantizeQueriesToInt4<<<grid_size, block_size, 0, stream_>>>(d_query,
@@ -5072,7 +5075,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
                                                                      d_quantized_queries,
                                                                      d_widths,
                                                                      num_queries,
-                                                                     cur_ivf.num_padded_dim);
+                                                                     cur_ivf.get_num_padded_dim());
         RAFT_CUDA_TRY(cudaPeekAtLastError());
       } else {
         quantizeQueriesToInt8<<<grid_size, block_size, 0, stream_>>>(d_query,
@@ -5080,7 +5083,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
                                                                      d_quantized_queries,
                                                                      d_widths,
                                                                      num_queries,
-                                                                     cur_ivf.num_padded_dim);
+                                                                     cur_ivf.get_num_padded_dim());
         RAFT_CUDA_TRY(cudaPeekAtLastError());
       }
     }
@@ -5093,11 +5096,11 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
 
     if (use_4bit) {
       packInt4QueryBitPlanes<<<grid_size, block_size, 0, stream_>>>(
-        d_quantized_queries, d_packed_queries, num_queries, cur_ivf.num_padded_dim);
+        d_quantized_queries, d_packed_queries, num_queries, cur_ivf.get_num_padded_dim());
       RAFT_CUDA_TRY(cudaPeekAtLastError());
     } else {
       packInt8QueryBitPlanes<<<grid_size, block_size, 0, stream_>>>(
-        d_quantized_queries, d_packed_queries, num_queries, cur_ivf.num_padded_dim);
+        d_quantized_queries, d_packed_queries, num_queries, cur_ivf.get_num_padded_dim());
       RAFT_CUDA_TRY(cudaPeekAtLastError());
     }
   }
@@ -5135,8 +5138,8 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
   // Now we need: packed query bits, candidate storage, and query vector
   // this part is also used to store ip2 results
   size_t packed_query_size =
-    max(num_bits * num_words * sizeof(uint32_t), cur_ivf.max_cluster_length * sizeof(float));
-  size_t candidate_storage = cur_ivf.max_cluster_length * (sizeof(float) + sizeof(int));
+    max(num_bits * num_words * sizeof(uint32_t), cur_ivf.get_max_cluster_length() * sizeof(float));
+  size_t candidate_storage = cur_ivf.get_max_cluster_length() * (sizeof(float) + sizeof(int));
   size_t shared_mem_size   = max(packed_query_size + candidate_storage + query_storage +
                                  10 * sizeof(float),  // +sizeof(float) for width
                                (size_t)smem_bytes);
@@ -5162,11 +5165,11 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
     computeInnerProductsWithBitwiseOpt<<<gridDim, blockDim, shared_mem_size, stream_>>>(
       d_sorted_pairs,
       d_query,
-      cur_ivf.d_short_data,  // This is already transposed bit-packed data
+      cur_ivf.get_short_data_device(),  // This is already transposed bit-packed data
       d_cluster_meta,
       d_packed_queries,  // Packed query bit planes
       d_widths,          // Query scaling factors
-      cur_ivf.d_short_factors_batch,
+      cur_ivf.get_short_factors_batch_device(),
       d_G_k1xSumq,
       d_G_kbxSumq,
       d_centroid_distances,
@@ -5174,15 +5177,15 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
       num_queries,
       nprobe,
       num_pairs,
-      cur_ivf.num_centroids,
+      cur_ivf.get_num_centroids(),
       D,
       d_topk_threshold_batch,
       15,
-      cur_ivf.max_cluster_length,
-      cur_ivf.ex_bits,
-      cur_ivf.d_long_code,
-      reinterpret_cast<const float*>(cur_ivf.d_ex_factor),
-      cur_ivf.d_ids,
+      cur_ivf.get_max_cluster_length(),
+      cur_ivf.get_ex_bits(),
+      cur_ivf.get_long_code_device(),
+      reinterpret_cast<const float*>(cur_ivf.get_ex_factor_device()),
+      cur_ivf.get_ids_device(),
       d_topk_dists,
       d_topk_pids,
       d_query_write_counters,
@@ -5195,11 +5198,11 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
     computeInnerProductsWithBitwiseOpt4bit<<<gridDim, blockDim, shared_mem_size, stream_>>>(
       d_sorted_pairs,
       d_query,
-      cur_ivf.d_short_data,  // This is already transposed bit-packed data
+      cur_ivf.get_short_data_device(),  // This is already transposed bit-packed data
       d_cluster_meta,
       d_packed_queries,  // Packed query bit planes
       d_widths,          // Query scaling factors
-      cur_ivf.d_short_factors_batch,
+      cur_ivf.get_short_factors_batch_device(),
       d_G_k1xSumq,
       d_G_kbxSumq,
       d_centroid_distances,
@@ -5207,15 +5210,15 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
       num_queries,
       nprobe,
       num_pairs,
-      cur_ivf.num_centroids,
+      cur_ivf.get_num_centroids(),
       D,
       d_topk_threshold_batch,
       15,
-      cur_ivf.max_cluster_length,
-      cur_ivf.ex_bits,
-      cur_ivf.d_long_code,
-      reinterpret_cast<const float*>(cur_ivf.d_ex_factor),
-      cur_ivf.d_ids,
+      cur_ivf.get_max_cluster_length(),
+      cur_ivf.get_ex_bits(),
+      cur_ivf.get_long_code_device(),
+      reinterpret_cast<const float*>(cur_ivf.get_ex_factor_device()),
+      cur_ivf.get_ids_device(),
       d_topk_dists,
       d_topk_pids,
       d_query_write_counters,
@@ -5282,8 +5285,9 @@ void SearcherGPU::SearchClusterQueryPairsPreComputeThreshold(
 #endif
   // First allocate space for LUT
   size_t lut_size =
-    num_queries * (cur_ivf.num_padded_dim / BITS_PER_CHUNK) * LUT_SIZE * sizeof(float);
-  // each line's space is (cur_ivf.num_padded_dim / BITS_PER_CHUNK) * LUT_SIZE * sizeof(float);
+    num_queries * (cur_ivf.get_num_padded_dim() / BITS_PER_CHUNK) * LUT_SIZE * sizeof(float);
+  // each line's space is (cur_ivf.get_num_padded_dim() / BITS_PER_CHUNK) * LUT_SIZE *
+  // sizeof(float);
   float* d_lut_for_queries = nullptr;
   RAFT_CUDA_TRY(cudaMallocAsync(&d_lut_for_queries, lut_size, stream_));
   thrust::fill(thrust::cuda::par.on(stream_),
@@ -5316,7 +5320,7 @@ void SearcherGPU::SearchClusterQueryPairsPreComputeThreshold(
   dim3 gridDim(num_nearest_pairs, 1, 1);
   dim3 blockDim(256, 1, 1);
   size_t num_chunks        = D / BITS_PER_CHUNK;
-  size_t candidate_storage = cur_ivf.max_cluster_length * (2 * sizeof(float) + sizeof(int));
+  size_t candidate_storage = cur_ivf.get_max_cluster_length() * (2 * sizeof(float) + sizeof(int));
   size_t query_storage     = D * sizeof(float);  // For shared query vector
 
   const int smem_bytes =
@@ -5348,17 +5352,17 @@ void SearcherGPU::SearchClusterQueryPairsPreComputeThreshold(
                                        98304));  // 96KB for ampere devices
   }
 #ifdef DEBUG_BATCH_SEARCH
-  printf("ivf.max_cluster_length: %d\n", cur_ivf.max_cluster_length);
+  printf("ivf.max_cluster_length: %d\n", cur_ivf.get_max_cluster_length());
 #endif
   // first round: compute LUT and search the nearest clusters for each query to get a proper
   // threshold
   computeInnerProductsWithAlwaysLUT<<<gridDim, blockDim, shared_mem_size, stream_>>>(
     d_nearest_sorted_pairs,
     d_query,
-    cur_ivf.d_short_data,
+    cur_ivf.get_short_data_device(),
     d_cluster_meta,
     d_lut_for_queries,
-    cur_ivf.d_short_factors_batch,
+    cur_ivf.get_short_factors_batch_device(),
     d_G_k1xSumq,
     d_G_kbxSumq,
     d_centroid_distances,
@@ -5366,15 +5370,15 @@ void SearcherGPU::SearchClusterQueryPairsPreComputeThreshold(
     num_queries,
     nprobe,
     num_nearest_pairs,
-    cur_ivf.num_centroids,
+    cur_ivf.get_num_centroids(),
     D,
     d_topk_threshold_batch,
     15,  // by default just set amplification vector to 10
-    cur_ivf.max_cluster_length,
-    cur_ivf.ex_bits,
-    cur_ivf.d_long_code,
-    reinterpret_cast<const float*>(cur_ivf.d_ex_factor),
-    cur_ivf.d_ids,
+    cur_ivf.get_max_cluster_length(),
+    cur_ivf.get_ex_bits(),
+    cur_ivf.get_long_code_device(),
+    reinterpret_cast<const float*>(cur_ivf.get_ex_factor_device()),
+    cur_ivf.get_ids_device(),
     d_topk_dists,
     d_topk_pids,
     d_query_write_counters);
@@ -5388,10 +5392,10 @@ void SearcherGPU::SearchClusterQueryPairsPreComputeThreshold(
                                                           stream_>>>(
       d_rest_sorted_pairs,
       d_query,
-      cur_ivf.d_short_data,
+      cur_ivf.get_short_data_device(),
       d_cluster_meta,
       d_lut_for_queries,
-      cur_ivf.d_short_factors_batch,
+      cur_ivf.get_short_factors_batch_device(),
       d_G_k1xSumq,
       d_G_kbxSumq,
       d_centroid_distances,
@@ -5399,15 +5403,15 @@ void SearcherGPU::SearchClusterQueryPairsPreComputeThreshold(
       num_queries,
       nprobe,
       num_rest_pairs,
-      cur_ivf.num_centroids,
+      cur_ivf.get_num_centroids(),
       D,
       d_topk_threshold_batch,
       15,  // by default just set amplification vector to 10
-      cur_ivf.max_cluster_length,
-      cur_ivf.ex_bits,
-      cur_ivf.d_long_code,
-      reinterpret_cast<const float*>(cur_ivf.d_ex_factor),
-      cur_ivf.d_ids,
+      cur_ivf.get_max_cluster_length(),
+      cur_ivf.get_ex_bits(),
+      cur_ivf.get_long_code_device(),
+      reinterpret_cast<const float*>(cur_ivf.get_ex_factor_device()),
+      cur_ivf.get_ids_device(),
       d_topk_dists,
       d_topk_pids,
       d_query_write_counters);

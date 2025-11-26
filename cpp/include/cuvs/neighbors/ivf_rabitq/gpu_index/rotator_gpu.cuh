@@ -26,24 +26,23 @@ namespace cuvs::neighbors::ivf_rabitq::detail {
 // It is assumed that A and RAND_A reside in GPU memory.
 class RotatorGPU {
  private:
-  size_t D;                  // Padded dimension
-  raft::resources* handle_;  // reusable resource handle (as pointer instead of const ref due to
-                             // presence of operator=)
-  rmm::cuda_stream_view stream_;  // CUDA stream obtained from handle_
- public:                          /**
-                                   * @brief Construct a new RotatorGPU object.
-                                   * @param dim The original dimension; the padded dimension D is computed as
-                                   * rd_up_to_multiple_of(dim, 64).
-                                   *
-                                   * The constructor generates a random rotation matrix on the CPU (using Eigen) and then
-                                   * copies it into                    device memory in column-major order.
-                                   */
+  size_t D;                        // Padded dimension
+  raft::resources const& handle_;  // reusable resource handle
+  rmm::cuda_stream_view stream_;   // CUDA stream obtained from handle_
+ public:                           /**
+                                    * @brief Construct a new RotatorGPU object.
+                                    * @param dim The original dimension; the padded dimension D is computed as
+                                    * rd_up_to_multiple_of(dim, 64).
+                                    *
+                                    * The constructor generates a random rotation matrix on the CPU (using Eigen) and then
+                                    * copies it into                    device memory in column-major order.
+                                    */
   explicit RotatorGPU(raft::resources const& handle, uint32_t dim);
 
   ~RotatorGPU();
 
-  // Assignment operator.
-  RotatorGPU& operator=(const RotatorGPU& other);
+  // Disable copy assignment
+  RotatorGPU& operator=(const RotatorGPU& other) = delete;
 
   size_t size() const;
 

@@ -148,7 +148,7 @@ void DataQuantizerGPU::rabitq_codes(const int* d_bin_XP,
 
   // Free the intermediate binary array.
   //    cudaFree(d_binary);
-  raft::resource::sync_stream(*handle_);
+  raft::resource::sync_stream(handle_);
 }
 
 //---------------------------------------------------------------------------
@@ -395,7 +395,7 @@ void DataQuantizerGPU::data_transformation(const float* d_data,
   RAFT_CUDA_TRY(cudaFreeAsync(d_XP, stream_));
   RAFT_CUDA_TRY(cudaFreeAsync(d_CP, stream_));
 
-  raft::resource::sync_stream(*handle_);
+  raft::resource::sync_stream(handle_);
 }
 
 //---------------------------------------------------------------------------
@@ -470,7 +470,7 @@ void DataQuantizerGPU::data_transformation_batch(const float* d_data,
   RAFT_CUDA_TRY(cudaFreeAsync(d_C_pad, stream_));
   RAFT_CUDA_TRY(cudaFreeAsync(d_CP, stream_));
 
-  raft::resource::sync_stream(*handle_);
+  raft::resource::sync_stream(handle_);
 }
 
 // void DataQuantizerGPU::data_transformation(const float* d_data,
@@ -649,7 +649,7 @@ void DataQuantizerGPU::rabitq_factor(const float* d_data,
                                                             FAC_NORM,
                                                             FAC_ERR);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
-  raft::resource::sync_stream(*handle_);
+  raft::resource::sync_stream(handle_);
 }
 
 //==============================================================================
@@ -846,7 +846,7 @@ void DataQuantizerGPU::store_compacted_code(uint8_t* o_raw, uint8_t* o_compact) 
               << std::endl;
     exit(EXIT_FAILURE);
   }
-  raft::resource::sync_stream(*handle_);
+  raft::resource::sync_stream(handle_);
 }
 
 //---------------------------------------------------------------------------
@@ -1345,7 +1345,7 @@ void DataQuantizerGPU::exrabitq_codes_hybrid_advanced(const int* d_bin_XP,
     RAFT_CUDA_TRY(cudaEventCreate(&buffers[i].d2h_done));
     RAFT_CUDA_TRY(cudaEventCreate(&buffers[i].gpu_compute_done));
   }
-  raft::resource::sync_stream(*handle_);
+  raft::resource::sync_stream(handle_);
 
   // Thread pool for CPU computation
   std::vector<std::thread> cpu_threads;
@@ -1933,7 +1933,7 @@ void DataQuantizerGPU::exrabitq_codes(const int* d_bin_XP,
   exrabitq_codes_kernel<<<gridSize, blockSize, 0, stream_>>>(
     d_bin_XP, d_XP_norm, d_long_code, d_ex_factor, d_fac_x2, num_points, D, EX_BITS);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
-  raft::resource::sync_stream(*handle_);
+  raft::resource::sync_stream(handle_);
 }
 #ifdef DEBUG_BATCH_CONSTRUCT
 int debug_first_cluster_count = 0;
@@ -1999,7 +1999,7 @@ void DataQuantizerGPU::exrabitq_codes_batch(const int* d_bin_XP,
   RAFT_CUDA_TRY(cudaFreeAsync(ip_norm_inv, stream_));
   RAFT_CUDA_TRY(cudaFreeAsync(d_temp_codes, stream_));
   RAFT_CUDA_TRY(cudaGetLastError());
-  raft::resource::sync_stream(*handle_);
+  raft::resource::sync_stream(handle_);
 }
 
 //-----------------------------------------------------------------------------
@@ -2040,7 +2040,7 @@ void DataQuantizerGPU::quantize(const float* d_data,
   int* d_bin_XP    = nullptr;
   RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_XP_norm, num_points * D * sizeof(float), stream_));
   RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_bin_XP, num_points * D * sizeof(int), stream_));
-  raft::resource::sync_stream(*handle_);
+  raft::resource::sync_stream(handle_);
   data_transformation(
     d_data, d_centroid, d_IDs, num_points, rotator, d_rotated_c, d_XP_norm, d_bin_XP);
 #ifdef DEBUG_TIME
@@ -2081,7 +2081,7 @@ void DataQuantizerGPU::quantize(const float* d_data,
   RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_all_factor_sumxb, factor_bytes, stream_));
   RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_all_factor_err, factor_bytes, stream_));
 #ifdef DEBUG_TIME
-  raft::resource::sync_stream(*handle_);
+  raft::resource::sync_stream(handle_);
   RAFT_CUDA_TRY(cudaEventRecord(stop));
   RAFT_CUDA_TRY(cudaEventSynchronize(stop));
   RAFT_CUDA_TRY(cudaEventElapsedTime(&elapsed, start, stop));
@@ -2147,7 +2147,7 @@ void DataQuantizerGPU::quantize(const float* d_data,
                                   block_code_bytes,
                                   cudaMemcpyDeviceToDevice,
                                   stream_));
-    raft::resource::sync_stream(*handle_);
+    raft::resource::sync_stream(handle_);
 #if defined(HIGH_ACC_FAST_SCAN)
     float* block_fac = (float*)block_factor(cur_block, D);
     RAFT_CUDA_TRY(cudaMemcpyAsync(
@@ -2190,7 +2190,7 @@ void DataQuantizerGPU::quantize(const float* d_data,
                                   cudaMemcpyDeviceToDevice,
                                   stream_));
 #endif
-    raft::resource::sync_stream(*handle_);
+    raft::resource::sync_stream(handle_);
     cur_block = next_block(cur_block, code_len, FAST_SIZE, NUM_SHORT_FACTORS);
   }
 #ifdef DEBUG_TIME
@@ -2212,7 +2212,7 @@ void DataQuantizerGPU::quantize(const float* d_data,
   RAFT_CUDA_TRY(cudaFreeAsync(d_XP_norm, stream_));
   RAFT_CUDA_TRY(cudaFreeAsync(d_bin_XP, stream_));
 
-  raft::resource::sync_stream(*handle_);
+  raft::resource::sync_stream(handle_);
 #ifdef DEBUG_TIME
   RAFT_CUDA_TRY(cudaEventRecord(stop));
   RAFT_CUDA_TRY(cudaEventSynchronize(stop));
@@ -2507,7 +2507,7 @@ void DataQuantizerGPU::quantize_batch(const float* d_data,
     int h_bin_XP[20];
     RAFT_CUDA_TRY(
       cudaMemcpyAsync(h_bin_XP, d_bin_XP, 20 * sizeof(int), cudaMemcpyDeviceToHost, stream_));
-    raft::resource::sync_stream(*handle_);
+    raft::resource::sync_stream(handle_);
 
     // Print them
     for (int i = 0; i < 20; i++) {
@@ -2637,7 +2637,7 @@ void DataQuantizerGPU::quantize_batch(const float* d_data,
                                   cudaMemcpyDeviceToDevice,
                                   stream_));
 #endif
-    raft::resource::sync_stream(*handle_);
+    raft::resource::sync_stream(handle_);
     cur_block = next_block(cur_block, code_len, FAST_SIZE, NUM_SHORT_FACTORS);
   }
 #ifdef DEBUG_TIME
