@@ -51,6 +51,7 @@ pytest \
  --cov=cuvs \
  --cov-report=xml:"${RAPIDS_COVERAGE_DIR}/cuvs-coverage.xml" \
  --cov-report=term \
+ -s -v \
  tests
 
 rapids-logger "pytest cuvs-bench"
