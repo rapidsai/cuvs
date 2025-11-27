@@ -70,7 +70,7 @@ class RotatorGPU {
   raft::resources const& handle_;  // reusable resource handle
   rmm::cuda_stream_view stream_;   // CUDA stream obtained from handle_
   size_t D;                        // Padded dimension
-  raft::device_matrix<float, uint32_t, raft::row_major> rotation_matrix_;  // Rotation matrix P
+  raft::device_matrix<float, int64_t, raft::row_major> rotation_matrix_;  // Rotation matrix P
 };
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

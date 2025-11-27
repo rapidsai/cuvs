@@ -22,7 +22,7 @@ namespace cuvs::neighbors::ivf_rabitq::detail {
 RotatorGPU::RotatorGPU(raft::resources const& handle, uint32_t dim)
   : handle_(handle),
     stream_(raft::resource::get_cuda_stream(handle_)),
-    rotation_matrix_(raft::make_device_matrix<float, uint32_t, raft::row_major>(handle_, 0, 0))
+    rotation_matrix_(raft::make_device_matrix<float, int64_t, raft::row_major>(handle_, 0, 0))
 {
   // keep track of cuda stream
   // Compute padded dimension
@@ -32,7 +32,7 @@ RotatorGPU::RotatorGPU(raft::resources const& handle, uint32_t dim)
   };
   D = rd_up_to_multiple_of(dim, 64);
   // Create a random matrix (size D x D)
-  rotation_matrix_ = raft::make_device_matrix<float, uint32_t, raft::row_major>(handle_, D, D);
+  rotation_matrix_ = raft::make_device_matrix<float, int64_t, raft::row_major>(handle_, D, D);
   raft::random::RngState rng(7ULL);
   raft::random::normal(handle, rng, rotation_matrix_.data_handle(), D * D, 0.0f, 1.0f);
   // Compute the random rotation matrix in-place
@@ -43,7 +43,7 @@ size_t RotatorGPU::size() const { return D; }
 
 void RotatorGPU::load(std::ifstream& input)
 {
-  auto host_buf = raft::make_host_vector<float>(D * D);
+  auto host_buf = raft::make_host_vector<float, int64_t>(D * D);
   for (size_t i = 0; i < D * D; ++i) {
     input.read(reinterpret_cast<char*>(&host_buf(i)), sizeof(float));
   }
@@ -53,7 +53,7 @@ void RotatorGPU::load(std::ifstream& input)
 
 void RotatorGPU::save(std::ofstream& output) const
 {
-  auto host_buf = raft::make_host_vector<float>(D * D);
+  auto host_buf = raft::make_host_vector<float, int64_t>(D * D);
   raft::copy(host_buf.data_handle(), rotation_matrix_.data_handle(), D * D, stream_);
   raft::resource::sync_stream(handle_);
   for (size_t i = 0; i < D * D; ++i) {

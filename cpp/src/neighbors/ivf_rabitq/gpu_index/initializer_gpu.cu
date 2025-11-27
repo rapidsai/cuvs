@@ -284,7 +284,7 @@ __global__ void FillCandidatesKernel(const float* d_distances,
 
 FlatInitializerGPU::FlatInitializerGPU(raft::resources const& handle, size_t d, size_t k)
   : InitializerGPU(handle, d, k),
-    centroids_(raft::make_device_matrix<float, uint32_t, raft::row_major>(handle_, K, D))
+    centroids_(raft::make_device_matrix<float, int64_t, raft::row_major>(handle_, K, D))
 {
   dist_func = L2SqrGPU;
   raft::resource::sync_stream(handle_);
@@ -429,7 +429,7 @@ void FlatInitializerGPU::ComputeCentroidsDistances(const float* query,
 void FlatInitializerGPU::LoadCentroids(std::ifstream& input, const char* filename)
 {
   // Allocate temporary host buffer for centroids.
-  auto host_buf = raft::make_host_vector<float>(K * D);
+  auto host_buf = raft::make_host_vector<float, int64_t>(K * D);
   // Read the raw data from the file.
   input.read(reinterpret_cast<char*>(host_buf.data_handle()), data_bytes());
   // Copy the data from host to device.
@@ -443,7 +443,7 @@ void FlatInitializerGPU::LoadCentroids(std::ifstream& input, const char* filenam
 void FlatInitializerGPU::SaveCentroids(std::ofstream& output, const char* filename) const
 {
   // Allocate temporary host buffer for centroids.
-  auto host_buf = raft::make_host_vector<float>(K * D);
+  auto host_buf = raft::make_host_vector<float, int64_t>(K * D);
   // Copy centroids from device to host.
   raft::copy(host_buf.data_handle(), centroids_.data_handle(), data_elements(), stream_);
   raft::resource::sync_stream(handle_);
@@ -547,8 +547,8 @@ void FlatInitializerGPU::ComputeCentroidsDistancesTranspose(const float* query,
 void FlatInitializerGPU::LoadCentroidsTranspose(std::ifstream& input, const char* filename)
 {
   // Allocate temporary host buffers.
-  auto host_buf_row_major       = raft::make_host_vector<float>(K * D);
-  auto host_buf_transposed      = raft::make_host_vector<float>(K * D);
+  auto host_buf_row_major       = raft::make_host_vector<float, int64_t>(K * D);
+  auto host_buf_transposed      = raft::make_host_vector<float, int64_t>(K * D);
   auto* hostCentroidsRowMajor   = new float[K * D];
   auto* hostCentroidsTransposed = new float[K * D];
 
@@ -571,8 +571,8 @@ void FlatInitializerGPU::LoadCentroidsTranspose(std::ifstream& input, const char
 void FlatInitializerGPU::SaveCentroidsTranspose(std::ofstream& output, const char* filename) const
 {
   // Allocate temporary host buffers.
-  auto host_buf_row_major  = raft::make_host_vector<float>(K * D);
-  auto host_buf_transposed = raft::make_host_vector<float>(K * D);
+  auto host_buf_row_major  = raft::make_host_vector<float, int64_t>(K * D);
+  auto host_buf_transposed = raft::make_host_vector<float, int64_t>(K * D);
 
   // Copy centroids from device (transposed) to host.
   raft::copy(host_buf_transposed.data_handle(), centroids_.data_handle(), data_elements(), stream_);

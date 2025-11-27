@@ -123,7 +123,7 @@ class FlatInitializerGPU : public InitializerGPU {
  private:
   // D, K are inherited from parent
 
-  raft::device_matrix<float, uint32_t, raft::row_major>
+  raft::device_matrix<float, int64_t, raft::row_major>
     centroids_;  // Stored in GPU device memory. Points to the parent centroids' array
 
   // For simplicity, we use a single distance function.
