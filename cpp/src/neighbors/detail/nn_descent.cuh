@@ -243,7 +243,11 @@ RAFT_KERNEL preprocess_data_kernel(
   Data_t* s_vec  = (Data_t*)buffer;
   size_t list_id = list_offset + blockIdx.x;
 
-  load_vec(s_vec, input_data + blockIdx.x * dim, dim, dim, threadIdx.x % raft::warp_size());
+  load_vec(s_vec,
+           input_data + static_cast<size_t>(blockIdx.x) * dim,
+           dim,
+           dim,
+           threadIdx.x % raft::warp_size());
   if (threadIdx.x == 0) { l2_norm = 0; }
   __syncthreads();
 
