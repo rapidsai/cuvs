@@ -16,6 +16,9 @@
 #include <cuvs/neighbors/ivf_rabitq/gpu_index/rotator_gpu.cuh>
 #include <cuvs/neighbors/ivf_rabitq/utils/utils_cuda.cuh>
 
+#include <raft/core/device_mdarray.hpp>
+#include <raft/core/host_mdarray.hpp>
+#include <raft/core/mdspan_types.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 
@@ -46,38 +49,23 @@ class IVFGPU {
     size_t start_index;  // Combined offset: index of first vector in the flattened arrays.
 
     // Constructor: computes iter and REMAIN based on FAST_SIZE.
-    __host__ GPUClusterMeta(size_t num, size_t start_idx) : num(num), start_index(start_idx)
+    GPUClusterMeta(size_t num, size_t start_idx) : num(num), start_index(start_idx)
     {
       iter   = num / FAST_SIZE;
       remain = num - iter * FAST_SIZE;
     }
 
     // default constructor (useful for vector initialize)
-    __host__ GPUClusterMeta() : num(0), iter(0), remain(0), start_index(0) {}
+    GPUClusterMeta() : num(0), iter(0), remain(0), start_index(0) {}
 
     // Copy constructor.
-    __host__ GPUClusterMeta(const GPUClusterMeta& other) = default;
+    GPUClusterMeta(const GPUClusterMeta& other) = default;
 
-    // Move constructor.（Would there be a memory leak if using this?
-    __host__ GPUClusterMeta(GPUClusterMeta&& other) noexcept
-      : num(other.num), iter(other.iter), remain(other.remain), start_index(other.start_index)
-    {
-    }
+    // Copy assignment.
+    GPUClusterMeta& operator=(const GPUClusterMeta& other) = default;
 
-    __host__ __device__ GPUClusterMeta& operator=(const GPUClusterMeta& other)
-    {
-      // self-assignment check is cheap and avoids UB if someone
-      // ever writes “meta = meta;”
-      if (this != &other) {
-        num         = other.num;
-        iter        = other.iter;
-        remain      = other.remain;
-        start_index = other.start_index;
-      }
-      return *this;
-    }
     // Destructor.
-    __host__ __device__ ~GPUClusterMeta() = default;
+    ~GPUClusterMeta() = default;
 
     /**
      * @brief Compute pointer to the first block of quantized short data. note that short code
@@ -201,19 +189,22 @@ class IVFGPU {
   IVFGPU(raft::resources const& handle)
     : handle_(handle),
       stream_(raft::resource::get_cuda_stream(handle_)),
-      Rota(std::make_unique<RotatorGPU>(handle_, 128)),
-      d_short_data(nullptr),
-      d_long_code(nullptr),
-      d_short_factors_batch(nullptr),
-      d_ex_factor(nullptr),
-      d_ids(nullptr),
+      short_data_(raft::make_device_vector<uint32_t, int64_t>(handle_, 0)),
+      long_code_(raft::make_device_vector<uint8_t, int64_t>(handle_, 0)),
+      ex_factor_(raft::make_device_vector<ExFactor, int64_t>(handle_, 0)),
+      ids_(raft::make_device_vector<PID, int64_t>(handle_, 0)),
+      cluster_meta_(raft::make_device_vector<GPUClusterMeta, int64_t>(handle_, 0)),
+      batch_flag(false),
+      short_factors_batch_(raft::make_device_vector<float, int64_t>(handle_, 0)),
+      short_data_host_(raft::make_host_vector<uint32_t, int64_t>(0)),
+      long_code_host_(raft::make_host_vector<uint8_t, int64_t>(0)),
+      ex_factor_host_(raft::make_host_vector<ExFactor, int64_t>(0)),
+      ids_host_(raft::make_host_vector<PID, int64_t>(0)),
+      cluster_meta_host_(raft::make_host_vector<GPUClusterMeta, int64_t>(0)),
       initializer(nullptr),
-      d_cluster_meta(nullptr),
-      batch_flag(false)
+      Rota(std::make_unique<RotatorGPU>(handle_, 128))
   {
   }
-
-  ~IVFGPU();
 
   /**
    * @brief Build function
@@ -254,22 +245,46 @@ class IVFGPU {
   // device data getters
   __host__ __device__ uint32_t* get_short_data_device() const noexcept
   {
-    return this->d_short_data;
+    return const_cast<uint32_t*>(this->short_data_.data_handle());
   }
-  __host__ __device__ uint8_t* get_long_code_device() const noexcept { return this->d_long_code; }
-  __host__ __device__ ExFactor* get_ex_factor_device() const noexcept { return this->d_ex_factor; }
-  __host__ __device__ PID* get_ids_device() const noexcept { return this->d_ids; }
+  __host__ __device__ uint8_t* get_long_code_device() const noexcept
+  {
+    return const_cast<uint8_t*>(this->long_code_.data_handle());
+  }
+  __host__ __device__ ExFactor* get_ex_factor_device() const noexcept
+  {
+    return const_cast<ExFactor*>(this->ex_factor_.data_handle());
+  }
+  __host__ __device__ PID* get_ids_device() const noexcept
+  {
+    return const_cast<PID*>(this->ids_.data_handle());
+  }
   __host__ __device__ float* get_short_factors_batch_device() const noexcept
   {
-    return this->d_short_factors_batch;
+    return const_cast<float*>(this->short_factors_batch_.data_handle());
   }
 
   // host data getters
-  std::vector<GPUClusterMeta> const& get_cluster_meta_host() { return h_cluster_meta; }
-  __host__ __device__ uint32_t* get_short_data_host() const noexcept { return h_short_data; }
-  __host__ __device__ uint8_t* get_long_code_host() const noexcept { return h_long_code; }
-  __host__ __device__ ExFactor* get_ex_factor_host() const noexcept { return h_ex_factor; }
-  __host__ __device__ PID* get_ids_host() const noexcept { return h_ids; }
+  raft::host_vector<GPUClusterMeta, int64_t> const& get_cluster_meta_host()
+  {
+    return cluster_meta_host_;
+  }
+  __host__ __device__ uint32_t* get_short_data_host() const noexcept
+  {
+    return const_cast<uint32_t*>(short_data_host_.data_handle());
+  }
+  __host__ __device__ uint8_t* get_long_code_host() const noexcept
+  {
+    return const_cast<uint8_t*>(long_code_host_.data_handle());
+  }
+  __host__ __device__ ExFactor* get_ex_factor_host() const noexcept
+  {
+    return const_cast<ExFactor*>(ex_factor_host_.data_handle());
+  }
+  __host__ __device__ PID* get_ids_host() const noexcept
+  {
+    return const_cast<PID*>(ids_host_.data_handle());
+  }
 
   // metadata getters
   size_t get_num_dimensions() const noexcept { return this->num_dimensions; }
@@ -350,20 +365,11 @@ class IVFGPU {
                                        int query_bits);
 
  private:
-  //    // Host copy of per-cluster metadata.
-  //    std::vector<GPUClusterMeta> h_cluster_meta;
-
   /**
    * @brief function to allocate memory based on the cluster
    *
-   * @param cluster_sizes
    */
   void AllocateDeviceMemory();
-
-  /**
-   * @brief function to free all memory
-   */
-  void FreeDeviceMemory() const;
 
   // Following are inline functions to compute spaces for memory allocation
 
@@ -422,8 +428,6 @@ class IVFGPU {
 
   void AllocateHostMemory();
 
-  void FreeHostMemory() const;
-
   void BatchClusterSearchGather(const float* d_query,
                                 size_t k,
                                 size_t nprobe,
@@ -435,30 +439,30 @@ class IVFGPU {
   rmm::cuda_stream_view stream_;   // CUDA stream obtained from handle_
 
   // Device pointers for each data array.
-  uint32_t* d_short_data;          // RaBitQ code and factors.
-  uint8_t* d_long_code;            // ExRaBitQ code.
-  ExFactor* d_ex_factor;           // ExRaBitQ factor.
-  PID* d_ids;                      // PID of vectors。
-  GPUClusterMeta* d_cluster_meta;  // Device-side array of clusters.  Replace std::vector with a raw
-                                   // pointer for clusters.
+  raft::device_vector<uint32_t, int64_t> short_data_;          // RaBitQ code and factors.
+  raft::device_vector<uint8_t, int64_t> long_code_;            // ExRaBitQ code.
+  raft::device_vector<ExFactor, int64_t> ex_factor_;           // ExRaBitQ factor.
+  raft::device_vector<PID, int64_t> ids_;                      // PID of vectors.
+  raft::device_vector<GPUClusterMeta, int64_t> cluster_meta_;  // Device-side array of clusters.
 
   // batch-data
   bool batch_flag;
   //    uint32_t* d_short_data_batch;   // rabitq codes
-  float* d_short_factors_batch;  // N * 3 float rabitq factors
-  // d_long_code is the same
+  raft::device_vector<float, int64_t> short_factors_batch_;  // N * 3 float rabitq factors
+  // long_code_ is the same
   // exfactor use the same place as before
 
   // host-side copies
-  std::vector<GPUClusterMeta> h_cluster_meta;  // Host-side copy of clusters
   //    float* d_centroids;      // Device centroids (if needed for search, now stored in
   //    initializer).
 
-  uint32_t* h_short_data;  // TODO: CPU side, we need on factors from h_short_data, so no need to
-                           // store all these codes
-  uint8_t* h_long_code;    // ExRaBitQ code.
-  ExFactor* h_ex_factor;   // ExRaBitQ factor.
-  PID* h_ids;              // PID of vectors。
+  raft::host_vector<uint32_t, int64_t>
+    short_data_host_;  // TODO: CPU side, we need on factors from short_data_host_, so no need to
+                       // store all these codes
+  raft::host_vector<uint8_t, int64_t> long_code_host_;            // ExRaBitQ code.
+  raft::host_vector<ExFactor, int64_t> ex_factor_host_;           // ExRaBitQ factor.
+  raft::host_vector<PID, int64_t> ids_host_;                      // PID of vectors.
+  raft::host_vector<GPUClusterMeta, int64_t> cluster_meta_host_;  // Host-side copy of clusters
 
   // Index meta-data.
   size_t num_vectors;     // Total number of vectors.

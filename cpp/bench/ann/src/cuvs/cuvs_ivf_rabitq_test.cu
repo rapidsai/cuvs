@@ -305,9 +305,10 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
   // find the longest cluster to allocate space;
   int max_cluster_length     = 0;
   long int total_num_vectors = 0;
-  for (auto i : ivf.get_cluster_meta_host()) {
-    total_num_vectors += i.num;
-    if (i.num > (unsigned int)max_cluster_length) { max_cluster_length = i.num; }
+  for (int64_t i = 0; i < ivf.get_cluster_meta_host().extent(0); ++i) {
+    total_num_vectors += ivf.get_cluster_meta_host()(i).num;
+    max_cluster_length =
+      max(max_cluster_length, static_cast<int>(ivf.get_cluster_meta_host()(i).num));
   }
   // TODO: this should be part of the load function
   ivf.set_max_cluster_length(max_cluster_length);

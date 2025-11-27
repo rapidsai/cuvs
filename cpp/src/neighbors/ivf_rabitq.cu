@@ -165,8 +165,8 @@ void search(raft::resources const& handle,
 
   // find the longest cluster to allocate space
   size_t max_cluster_length = 0;
-  for (auto i : idx.rabitq_index().get_cluster_meta_host()) {
-    max_cluster_length = max(max_cluster_length, i.num);
+  for (int64_t i = 0; i < idx.rabitq_index().get_cluster_meta_host().extent(0); ++i) {
+    max_cluster_length = max(max_cluster_length, idx.rabitq_index().get_cluster_meta_host()(i).num);
   }
   // TODO: this should be part of the load function
   idx.rabitq_index().set_max_cluster_length(max_cluster_length);
