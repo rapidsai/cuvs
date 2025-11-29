@@ -6,10 +6,10 @@ package com.nvidia.cuvs;
 
 /**
  * Parameters for ACE (Augmented Core Extraction) graph build algorithm.
- * ACE enables building indices for datasets too large to fit in GPU memory by:
+ * ACE enables building indexes for datasets too large to fit in GPU memory by:
  * 1. Partitioning the dataset in core (closest) and augmented (second-closest)
  * partitions using balanced k-means.
- * 2. Building sub-indices for each partition independently
+ * 2. Building sub-indexes for each partition independently
  * 3. Concatenating sub-graphs into a final unified index
  *
  * @since 25.12
