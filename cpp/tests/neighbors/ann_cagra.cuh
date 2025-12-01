@@ -992,6 +992,9 @@ class AnnCagraIndexFilteredMergeTest : public ::testing::TestWithParam<AnnCagraI
       GTEST_SKIP();
     }
 
+    // Can't filter out more rows than are in the dataset
+    if (static_cast<uint32_t>(ps.n_rows) <= test_cagra_sample_filter::offset) { GTEST_SKIP(); }
+
     size_t queries_size = ps.n_queries * ps.k;
     std::vector<SearchIdxT> indices_Cagra(queries_size);
     std::vector<SearchIdxT> indices_naive(queries_size);
@@ -1016,6 +1019,7 @@ class AnnCagraIndexFilteredMergeTest : public ::testing::TestWithParam<AnnCagraI
       rmm::device_uvector<SearchIdxT> indices_naive_dev(queries_size, stream_);
 
       auto* database_filtered_ptr = database.data() + test_cagra_sample_filter::offset * ps.dim;
+
       cuvs::neighbors::naive_knn<DistanceT, DataT, IdxT>(
         handle_,
         distances_naive_dev.data(),
@@ -1027,6 +1031,7 @@ class AnnCagraIndexFilteredMergeTest : public ::testing::TestWithParam<AnnCagraI
         ps.dim,
         ps.k,
         ps.metric);
+
       raft::linalg::addScalar(indices_naive_dev.data(),
                               indices_naive_dev.data(),
                               IdxT(test_cagra_sample_filter::offset),
