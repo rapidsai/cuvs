@@ -74,3 +74,41 @@ func SearchIndex[T any](Resources cuvs.Resource, params *SearchParams, index *Iv
 
 	return cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatSearch(C.cuvsResources_t(Resources.Resource), params.params, index.index, (*C.DLManagedTensor)(unsafe.Pointer(queries.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(neighbors.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(distances.C_tensor)), prefilter)))
 }
+
+func GetNLists(index *IvfFlatIndex) (nlist int64, err error) {
+	var ret C.int64_t
+	if !index.trained {
+		return 0, errors.New("index needs to be built before calling GetNLists")
+	}
+
+	err = cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatIndexGetNLists(index.index, &ret)))
+	if err != nil {
+		return
+	}
+
+	nlist = int64(ret)
+	return
+}
+
+func GetDim(index *IvfFlatIndex) (dim int64, err error) {
+        var ret C.int64_t
+        if !index.trained {
+                return 0, errors.New("index needs to be built before calling GetNLists")
+        }
+
+        err = cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatIndexGetDim(index.index, &ret)))
+        if err != nil {
+                return
+        }
+
+        dim = int64(ret)
+        return
+}
+
+func GetCenters[T any](index *IvfFlatIndex, centers * cuvs.Tensor[T]) error {
+        if !index.trained {
+                return errors.New("index needs to be built before calling GetNLists")
+        }
+
+	return cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatIndexGetCenters(index.index,  (*C.DLManagedTensor)(unsafe.Pointer(centers.C_tensor)))))
+}
