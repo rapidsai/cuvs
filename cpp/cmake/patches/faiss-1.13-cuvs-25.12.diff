@@ -120,34 +120,6 @@ index f23ca19d8..3ba606606 100644
  #endif
 
      /// Pinned memory allocation for use with this GPU
-diff --git a/faiss/gpu/impl/BinaryCuvsCagra.cu b/faiss/gpu/impl/BinaryCuvsCagra.cu
-index 0ca21dc5f..b331fdc8f 100644
---- a/faiss/gpu/impl/BinaryCuvsCagra.cu
-+++ b/faiss/gpu/impl/BinaryCuvsCagra.cu
-@@ -32,6 +32,9 @@
- #include <raft/core/resource/thrust_policy.hpp>
- #include <raft/linalg/map.cuh>
-
-+#include <thrust/copy.h>
-+#include <thrust/device_ptr.h>
-+
- namespace faiss {
- namespace gpu {
-
-diff --git a/faiss/gpu/impl/CuvsCagra.cu b/faiss/gpu/impl/CuvsCagra.cu
-index 482e4d672..4246776e8 100644
---- a/faiss/gpu/impl/CuvsCagra.cu
-+++ b/faiss/gpu/impl/CuvsCagra.cu
-@@ -31,6 +31,9 @@
- #include <raft/core/device_resources.hpp>
- #include <raft/core/resource/thrust_policy.hpp>
-
-+#include <thrust/copy.h>
-+#include <thrust/device_ptr.h>
-+
- namespace faiss {
- namespace gpu {
-
 diff --git a/faiss/gpu/impl/CuvsFlatIndex.cu b/faiss/gpu/impl/CuvsFlatIndex.cu
 index 15cf427cf..d877e766d 100644
 --- a/faiss/gpu/impl/CuvsFlatIndex.cu
