@@ -101,10 +101,9 @@ func TestIvfFlat(t *testing.T) {
 		t.Fatalf("error moving centers to device: %v", err)
 	}
 
-	if err := GetCenters(index, &centers) ; err != nil {
+	if err := GetCenters(index, &centers); err != nil {
 		t.Fatalf("error getting centers: %v", err)
 	}
-
 
 	if _, err := centers.ToHost(&resource); err != nil {
 		t.Fatalf("error moving neighbors to host: %v", err)
