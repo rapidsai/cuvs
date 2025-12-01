@@ -14,6 +14,7 @@ func TestIvfFlat(t *testing.T) {
 		nQueries    = 4
 		k           = 4
 		epsilon     = 0.001
+		nList       = 512
 	)
 
 	resource, _ := cuvs.NewResource(nil)
@@ -38,6 +39,8 @@ func TestIvfFlat(t *testing.T) {
 		t.Fatalf("error creating index params: %v", err)
 	}
 	defer indexParams.Close()
+
+	indexParams.SetNLists(nList)
 
 	index, _ := CreateIndex(indexParams, &dataset)
 	defer index.Close()
@@ -69,6 +72,55 @@ func TestIvfFlat(t *testing.T) {
 
 	if err := resource.Sync(); err != nil {
 		t.Fatalf("error syncing resource: %v", err)
+	}
+
+	nlists, err := GetNLists(index)
+	if err != nil {
+		t.Fatalf("error getting nlists: %v", err)
+	}
+
+	if nList != nlists {
+		t.Error("error nlists no match")
+	}
+
+	dim, err := GetDim(index)
+	if err != nil {
+		t.Fatalf("error getting dimension: %v", err)
+	}
+	if dim != nFeatures {
+		t.Error("error dimension not match")
+	}
+
+	centers, err := cuvs.NewTensorOnDevice[float32](&resource, []int64{int64(nlists), int64(dim)})
+	if err != nil {
+		t.Fatalf("error creating neighbors tensor: %v", err)
+	}
+	defer centers.Close()
+
+	if _, err := centers.ToDevice(&resource); err != nil {
+		t.Fatalf("error moving centers to device: %v", err)
+	}
+
+	if err := GetCenters(index, &centers) ; err != nil {
+		t.Fatalf("error getting centers: %v", err)
+	}
+
+
+	if _, err := centers.ToHost(&resource); err != nil {
+		t.Fatalf("error moving neighbors to host: %v", err)
+	}
+
+	centersResult, err := centers.Slice()
+	if err != nil {
+		t.Fatalf("error get centers.Slice(): %v", err)
+	}
+	if len(centersResult) != nList {
+		t.Error("error number of centers != nList")
+	}
+	for _, c := range centersResult {
+		if len(c) != int(dim) {
+			t.Error("error dimension not match with centers")
+		}
 	}
 
 	if _, err := queries.ToDevice(&resource); err != nil {
