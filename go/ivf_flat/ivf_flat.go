@@ -93,7 +93,7 @@ func GetNLists(index *IvfFlatIndex) (nlist int64, err error) {
 func GetDim(index *IvfFlatIndex) (dim int64, err error) {
 	var ret C.int64_t
 	if !index.trained {
-		return 0, errors.New("index needs to be built before calling GetNLists")
+		return 0, errors.New("index needs to be built before calling GetDim")
 	}
 
 	err = cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatIndexGetDim(index.index, &ret)))
@@ -107,7 +107,7 @@ func GetDim(index *IvfFlatIndex) (dim int64, err error) {
 
 func GetCenters[T any](index *IvfFlatIndex, centers *cuvs.Tensor[T]) error {
 	if !index.trained {
-		return errors.New("index needs to be built before calling GetNLists")
+		return errors.New("index needs to be built before calling GetCenters")
 	}
 
 	return cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatIndexGetCenters(index.index, (*C.DLManagedTensor)(unsafe.Pointer(centers.C_tensor)))))
