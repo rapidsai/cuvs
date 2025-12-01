@@ -214,8 +214,8 @@ files:
     includes:
       - bench_python
 channels:
-  - rapidsai-nightly
   - rapidsai
+  - rapidsai-nightly
   - conda-forge
 dependencies:
   build:
