@@ -19,12 +19,17 @@ public class HnswAceParams {
   private long efConstruction;
   private String buildDir;
   private boolean useDisk;
+  private double maxHostMemoryGb;
+  private double maxGpuMemoryGb;
 
-  private HnswAceParams(long npartitions, long efConstruction, String buildDir, boolean useDisk) {
+  private HnswAceParams(long npartitions, long efConstruction, String buildDir, boolean useDisk,
+                        double maxHostMemoryGb, double maxGpuMemoryGb) {
     this.npartitions = npartitions;
     this.efConstruction = efConstruction;
     this.buildDir = buildDir;
     this.useDisk = useDisk;
+    this.maxHostMemoryGb = maxHostMemoryGb;
+    this.maxGpuMemoryGb = maxGpuMemoryGb;
   }
 
   /**
@@ -63,6 +68,24 @@ public class HnswAceParams {
     return useDisk;
   }
 
+  /**
+   * Gets the maximum host memory limit in GiB.
+   *
+   * @return the max host memory limit (0 means use available memory)
+   */
+  public double getMaxHostMemoryGb() {
+    return maxHostMemoryGb;
+  }
+
+  /**
+   * Gets the maximum GPU memory limit in GiB.
+   *
+   * @return the max GPU memory limit (0 means use available memory)
+   */
+  public double getMaxGpuMemoryGb() {
+    return maxGpuMemoryGb;
+  }
+
   @Override
   public String toString() {
     return "HnswAceParams [npartitions="
@@ -73,6 +96,10 @@ public class HnswAceParams {
         + buildDir
         + ", useDisk="
         + useDisk
+        + ", maxHostMemoryGb="
+        + maxHostMemoryGb
+        + ", maxGpuMemoryGb="
+        + maxGpuMemoryGb
         + "]";
   }
 
@@ -81,10 +108,12 @@ public class HnswAceParams {
    */
   public static class Builder {
 
-    private long npartitions = 1;
+    private long npartitions = 0;
     private long efConstruction = 120;
     private String buildDir = "/tmp/hnsw_ace_build";
     private boolean useDisk = false;
+    private double maxHostMemoryGb = 0;
+    private double maxGpuMemoryGb = 0;
 
     /**
      * Constructs this Builder.
@@ -93,8 +122,17 @@ public class HnswAceParams {
 
     /**
      * Sets the number of partitions for ACE partitioned build.
+     *
+     * When set to 0 (default), the number of partitions is automatically derived
+     * based on available host and GPU memory to maximize partition size while
+     * ensuring the build fits in memory.
+     *
      * Small values might improve recall but potentially degrade performance.
      * 100k - 5M vectors per partition is recommended.
+     *
+     * If the specified number of partitions results in partitions that exceed
+     * available memory, the value will be automatically increased to fit memory
+     * constraints and a warning will be issued.
      *
      * @param npartitions the number of partitions
      * @return an instance of Builder
@@ -141,12 +179,41 @@ public class HnswAceParams {
     }
 
     /**
+     * Sets the maximum host memory to use for ACE build in GiB.
+     *
+     * When set to 0 (default), uses available host memory.
+     * Useful for testing or when running alongside other memory-intensive processes.
+     *
+     * @param maxHostMemoryGb the max host memory in GiB
+     * @return an instance of Builder
+     */
+    public Builder withMaxHostMemoryGb(double maxHostMemoryGb) {
+      this.maxHostMemoryGb = maxHostMemoryGb;
+      return this;
+    }
+
+    /**
+     * Sets the maximum GPU memory to use for ACE build in GiB.
+     *
+     * When set to 0 (default), uses available GPU memory.
+     * Useful for testing or when running alongside other memory-intensive processes.
+     *
+     * @param maxGpuMemoryGb the max GPU memory in GiB
+     * @return an instance of Builder
+     */
+    public Builder withMaxGpuMemoryGb(double maxGpuMemoryGb) {
+      this.maxGpuMemoryGb = maxGpuMemoryGb;
+      return this;
+    }
+
+    /**
      * Builds an instance of {@link HnswAceParams}.
      *
      * @return an instance of {@link HnswAceParams}
      */
     public HnswAceParams build() {
-      return new HnswAceParams(npartitions, efConstruction, buildDir, useDisk);
+      return new HnswAceParams(npartitions, efConstruction, buildDir, useDisk,
+                               maxHostMemoryGb, maxGpuMemoryGb);
     }
   }
 }

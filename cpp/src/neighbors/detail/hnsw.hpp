@@ -1257,11 +1257,13 @@ std::unique_ptr<index<T>> build(raft::resources const& res,
 
   // Configure ACE parameters for CAGRA
   cuvs::neighbors::cagra::graph_build_params::ace_params cagra_ace_params;
-  cagra_ace_params.npartitions     = ace_params.npartitions;
-  cagra_ace_params.ef_construction = ace_params.ef_construction;
-  cagra_ace_params.build_dir       = ace_params.build_dir;
-  cagra_ace_params.use_disk        = ace_params.use_disk;
-  cagra_params.graph_build_params  = cagra_ace_params;
+  cagra_ace_params.npartitions        = ace_params.npartitions;
+  cagra_ace_params.ef_construction    = ace_params.ef_construction;
+  cagra_ace_params.build_dir          = ace_params.build_dir;
+  cagra_ace_params.use_disk           = ace_params.use_disk;
+  cagra_ace_params.max_host_memory_gb = ace_params.max_host_memory_gb;
+  cagra_ace_params.max_gpu_memory_gb  = ace_params.max_gpu_memory_gb;
+  cagra_params.graph_build_params     = cagra_ace_params;
 
   RAFT_LOG_INFO(
     "hnsw::build - Building HNSW index using ACE with %zu partitions, ef_construction=%zu",

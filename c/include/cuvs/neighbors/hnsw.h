@@ -46,8 +46,17 @@ enum cuvsHnswHierarchy {
 struct cuvsHnswAceParams {
   /**
    * Number of partitions for ACE partitioned build.
+   *
+   * When set to 0 (default), the number of partitions is automatically derived
+   * based on available host and GPU memory to maximize partition size while
+   * ensuring the build fits in memory.
+   *
    * Small values might improve recall but potentially degrade performance and
    * increase memory usage. 100k - 5M vectors per partition is recommended.
+   *
+   * If the specified number of partitions results in partitions that exceed
+   * available memory, the value will be automatically increased to fit memory
+   * constraints and a warning will be issued.
    */
   size_t npartitions;
   /**
@@ -65,6 +74,18 @@ struct cuvsHnswAceParams {
    * When true, enables disk-based operations for memory-efficient graph construction.
    */
   bool use_disk;
+  /**
+   * Maximum host memory to use for ACE build in GiB.
+   * When set to 0 (default), uses available host memory.
+   * Useful for testing or when running alongside other memory-intensive processes.
+   */
+  double max_host_memory_gb;
+  /**
+   * Maximum GPU memory to use for ACE build in GiB.
+   * When set to 0 (default), uses available GPU memory.
+   * Useful for testing or when running alongside other memory-intensive processes.
+   */
+  double max_gpu_memory_gb;
 };
 
 typedef struct cuvsHnswAceParams* cuvsHnswAceParams_t;
