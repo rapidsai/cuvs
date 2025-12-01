@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -149,8 +149,8 @@ testing::AssertionResult devArrMatchHost(
   bool ok   = true;
   auto fail = testing::AssertionFailure();
   for (size_t i(0); i < size; ++i) {
-    auto exp = expected_h[i];
-    auto act = act_h.get()[i];
+    const auto exp = static_cast<double>(expected_h[i]);
+    const auto act = static_cast<double>(act_h.get()[i]);
     if (!eq_compare(exp, act)) {
       ok = false;
       fail << "actual=" << act << " != expected=" << exp << " @" << i << "; ";

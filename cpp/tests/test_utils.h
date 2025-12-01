@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -42,11 +42,16 @@ struct CompareApprox {
   CompareApprox(T eps_) : eps(eps_) {}
   bool operator()(const T& a, const T& b) const
   {
-    T diff  = std::abs(a - b);
-    T m     = std::max(std::abs(a), std::abs(b));
-    T ratio = diff > eps ? diff / m : diff;
+    using compute_t     = double;
+    const auto a_comp   = static_cast<compute_t>(a);
+    const auto b_comp   = static_cast<compute_t>(b);
+    const auto eps_comp = static_cast<compute_t>(eps);
 
-    return (ratio <= eps);
+    const auto diff  = std::abs(a_comp - b_comp);
+    const auto m     = std::max(std::abs(a_comp), std::abs(b_comp));
+    const auto ratio = diff > eps_comp ? diff / m : diff;
+
+    return (ratio <= eps_comp);
   }
 
  private:
@@ -105,7 +110,8 @@ template <typename T, typename L>
 testing::AssertionResult match(const T& expected, const T& actual, L eq_compare)
 {
   if (!eq_compare(expected, actual)) {
-    return testing::AssertionFailure() << "actual=" << actual << " != expected=" << expected;
+    return testing::AssertionFailure() << "actual=" << static_cast<double>(actual)
+                                       << " != expected=" << static_cast<double>(expected);
   }
   return testing::AssertionSuccess();
 }
