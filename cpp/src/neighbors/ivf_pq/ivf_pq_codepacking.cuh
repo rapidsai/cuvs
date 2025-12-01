@@ -131,7 +131,7 @@ __device__ void run_on_vector(
  *    type: (uint32_t in_ix, uint32_t j) -> uint8_t, where j = [0..pq_dim).
  */
 template <uint32_t PqBits, uint32_t SubWarpSize, typename IdxT, typename Action>
-__device__ void write_vector(
+__device__ void write_vector_interleaved(
   raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
     out_list_data,
   uint32_t out_ix,
@@ -164,6 +164,58 @@ __device__ void write_vector(
     }
   }
 }
+
+/**
+ * Process a single vector in a list.
+ *
+ * @tparam PqBits
+ * @tparam SubWarpSize how many threads work on the same ix (only the first thread writes data).
+ * @tparam IdxT type of the index passed to the action
+ * @tparam Action tells how to process a single vector (e.g. encode or just pack)
+ *
+ * @param[in] out_list_data the encoded cluster data.
+ * @param[in] out_ix in-cluster index of the vector to be processed (one-per-SubWarpSize threads).
+ * @param[in] in_ix the input index passed to the action (one-per-SubWarpSize threads).
+ * @param[in] pq_dim
+ * @param action a callable action to be invoked on each PQ code (component of the encoding)
+ *    type: (uint32_t in_ix, uint32_t j) -> uint8_t, where j = [0..pq_dim).
+ */
+ template <uint32_t PqBits, uint32_t SubWarpSize, typename IdxT, typename Action>
+ __device__ void write_vector_flat(
+   raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+     out_list_data,
+   uint32_t out_ix,
+   IdxT in_ix,
+   uint32_t pq_dim,
+   Action action)
+ {
+   const uint32_t lane_id = raft::Pow2<SubWarpSize>::mod(threadIdx.x);
+ 
+   using group_align         = raft::Pow2<kIndexGroupSize>;
+   const uint32_t group_ix   = group_align::div(out_ix);
+   const uint32_t ingroup_ix = group_align::mod(out_ix);
+ 
+   
+   raft::TxN_t<uint8_t, kIndexGroupVecLen>::io_t code_chunk;
+   pq_vec_t code_chunk;
+   bitfield_view_t<PqBits> code_view{reinterpret_cast<uint8_t*>(&code_chunk)};
+   constexpr uint32_t kChunkSize = (sizeof(pq_vec_t) * 8u) / PqBits;
+   for (uint32_t j = 0, i = 0; j < pq_dim; i++) {
+     // clear the chunk
+     if (lane_id == 0) { code_chunk = pq_vec_t{}; }
+     // write the codes, one/pq_dim at a time
+ #pragma unroll
+     for (uint32_t k = 0; k < kChunkSize && j < pq_dim; k++, j++) {
+       // write a single code
+       uint8_t code = action(in_ix, j);
+       if (lane_id == 0) { code_view[k] = code; }
+     }
+     // write the chunk to the list
+     if (lane_id == 0) {
+       *reinterpret_cast<pq_vec_t*>(&out_list_data(group_ix, i, ingroup_ix, 0)) = code_chunk;
+     }
+   }
+ }
 
 /** Process the given indices or a block of a single list (cluster). */
 template <uint32_t PqBits, typename Action>
