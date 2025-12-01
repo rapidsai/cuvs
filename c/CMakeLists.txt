@@ -1,15 +1,8 @@
 # =============================================================================
-# Copyright (c) 2025, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
-# in compliance with the License. You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software distributed under the License
-# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
-# or implied. See the License for the specific language governing permissions and limitations under
-# the License.
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
 # =============================================================================
 
 cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
@@ -71,6 +64,15 @@ if(BUILD_CAGRA_HNSWLIB)
   include(../cpp/cmake/thirdparty/get_hnswlib.cmake)
 endif()
 
+if(BUILD_MG_ALGOS AND CUVSC_STATIC_CUVS_LIBRARY)
+  rapids_find_generate_module(
+    NCCL
+    HEADER_NAMES nccl.h
+    LIBRARY_NAMES nccl
+  )
+  find_package(NCCL REQUIRED)
+endif()
+
 # ##################################################################################################
 # * cuvs_c -------------------------------------------------------------------------------
 add_library(
@@ -105,6 +107,17 @@ set_target_properties(
              INTERFACE_POSITION_INDEPENDENT_CODE ON
              EXPORT_NAME c_api
 )
+
+# Setup the VERSION and SOVERSION of our library
+#
+# Long term goal is that every release that breaks the C ABI will update `cuvs_abi_version` allowing
+# us to have multiple releases of libcuvs_c that don't need consumers to rebuild against
+if(PROJECT_IS_TOP_LEVEL)
+  set(cuvs_abi_version "1")
+  set(cuvs_version "${cuvs_abi_version}.${RAPIDS_VERSION}")
+  set_target_properties(cuvs_c PROPERTIES VERSION "${cuvs_version}")
+  set_target_properties(cuvs_c PROPERTIES SOVERSION "${cuvs_abi_version}")
+endif()
 
 # Encode what optional components we are building
 set(CUVS_BUILD_CAGRA_HNSWLIB ${BUILD_CAGRA_HNSWLIB})

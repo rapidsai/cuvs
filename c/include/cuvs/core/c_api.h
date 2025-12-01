@@ -1,23 +1,13 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
 #include <cuda_runtime.h>
 #include <dlpack/dlpack.h>
+#include <rapids_logger/log_levels.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -45,6 +35,35 @@ const char* cuvsGetLastErrorText();
  *        clears any previously seen error message.
  */
 void cuvsSetLastErrorText(const char* error);
+
+/** @} */
+
+/**
+ * @defgroup log_c cuVS Logging
+ * @{
+ */
+
+/**
+ * @brief An enum denoting log levels
+ *
+ */
+typedef enum {
+  CUVS_LOG_LEVEL_TRACE    = RAPIDS_LOGGER_LOG_LEVEL_TRACE,
+  CUVS_LOG_LEVEL_DEBUG    = RAPIDS_LOGGER_LOG_LEVEL_DEBUG,
+  CUVS_LOG_LEVEL_INFO     = RAPIDS_LOGGER_LOG_LEVEL_INFO,
+  CUVS_LOG_LEVEL_WARN     = RAPIDS_LOGGER_LOG_LEVEL_WARN,
+  CUVS_LOG_LEVEL_ERROR    = RAPIDS_LOGGER_LOG_LEVEL_ERROR,
+  CUVS_LOG_LEVEL_CRITICAL = RAPIDS_LOGGER_LOG_LEVEL_CRITICAL,
+  CUVS_LOG_LEVEL_OFF      = RAPIDS_LOGGER_LOG_LEVEL_OFF
+} cuvsLogLevel_t;
+
+/** @brief Returns the current log level
+ */
+cuvsLogLevel_t cuvsGetLogLevel();
+
+/** @brief Sets the log level
+ */
+void cuvsSetLogLevel(cuvsLogLevel_t);
 
 /** @} */
 
@@ -138,6 +157,15 @@ cuvsError_t cuvsMultiGpuResourcesCreateWithDeviceIds(cuvsResources_t* res,
  * @return cuvsError_t
  */
 cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res);
+
+/**
+ * @brief Set a memory pool on all devices managed by the multi-GPU resources
+ *
+ * @param[in] res cuvsResources_t opaque C handle for multi-GPU resources
+ * @param[in] percent_of_free_memory Percent of free memory to allocate for the pool
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsMultiGpuResourcesSetMemoryPool(cuvsResources_t res, int percent_of_free_memory);
 /** @} */
 
 /**

@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -21,59 +10,22 @@
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/neighbors/scann.hpp>
 
-#include <cub/cub.cuh>
 #include <cuda_bf16.h>
-#include <nvtx3/nvtx3.hpp>
-#include <raft/cluster/kmeans.cuh>
-#include <raft/cluster/kmeans_types.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/error.hpp>
 #include <raft/core/host_device_accessor.hpp>
-#include <raft/core/host_mdarray.hpp>
-#include <raft/core/host_mdspan.hpp>
-#include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/linalg/add.cuh>
-#include <raft/linalg/coalesced_reduction.cuh>
-#include <raft/linalg/dot.cuh>
-#include <raft/linalg/gemm.hpp>
-#include <raft/linalg/gemv.cuh>
-#include <raft/linalg/linalg_types.hpp>
 #include <raft/linalg/map.cuh>
-#include <raft/linalg/matrix_vector.cuh>
-#include <raft/linalg/matrix_vector_op.cuh>
-#include <raft/linalg/multiply.cuh>
-#include <raft/linalg/normalize.cuh>
-#include <raft/linalg/power.cuh>
-#include <raft/linalg/reduce.cuh>
-#include <raft/linalg/transpose.cuh>
-#include <raft/linalg/unary_op.cuh>
-#include <raft/matrix/argmin.cuh>
 #include <raft/matrix/copy.cuh>
-#include <raft/matrix/diagonal.cuh>
-#include <raft/matrix/init.cuh>
 #include <raft/matrix/sample_rows.cuh>
 #include <raft/matrix/slice.cuh>
-#include <raft/random/make_blobs.cuh>
 #include <raft/random/rng.cuh>
-#include <raft/sparse/neighbors/cross_component_nn.cuh>
-#include <raft/util/memory_type_dispatcher.cuh>
-
-#include <thrust/device_vector.h>
-#include <thrust/sequence.h>
-#include <thrust/unique.h>
-
-#include <cuvs/distance/distance.hpp>
 
 #include "scann_avq.cuh"
 #include "scann_common.cuh"
 #include "scann_quantize.cuh"
 #include "scann_soar.cuh"
-
-#include <chrono>
-#include <cstdio>
-#include <vector>
 
 namespace cuvs::neighbors::experimental::scann::detail {
 using namespace cuvs::spatial::knn::detail;  // NOLINT
@@ -81,8 +33,6 @@ using namespace cuvs::spatial::knn::detail;  // NOLINT
 /* @defgroup scann_build_detail scann build
  * @{
  */
-
-static const std::string RAFT_NAME = "raft";
 
 template <typename T,
           typename IdxT     = int64_t,
@@ -313,16 +263,9 @@ index<T, IdxT> build(
     // TODO (rmaschal): Might be more efficient to do on CPU, to avoid DtoH copy
     auto bf16_dataset = raft::make_device_matrix<int16_t, int64_t>(res, batch_view.extent(0), dim);
 
-    if (params.bf16_enabled) {
-      raft::linalg::unaryOp(
-        bf16_dataset.data_handle(),
-        batch_view.data_handle(),
-        batch_view.size(),
-        [] __device__(T x) {
-          nv_bfloat16 val = __float2bfloat16(x);
-          return reinterpret_cast<int16_t&>(val);
-        },
-        resource::get_cuda_stream(res));
+    if (params.reordering_bf16) {
+      quantize_bfloat16(
+        res, batch_view, bf16_dataset.view(), params.reordering_noise_shaping_threshold);
     }
 
     // Prefetch next batch
@@ -340,7 +283,7 @@ index<T, IdxT> build(
                quantized_soar_residuals.size(),
                stream);
 
-    if (params.bf16_enabled) {
+    if (params.reordering_bf16) {
       raft::copy(idx.bf16_dataset().data_handle() + batch.offset() * dim,
                  bf16_dataset.data_handle(),
                  bf16_dataset.size(),
