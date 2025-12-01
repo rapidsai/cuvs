@@ -155,14 +155,16 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
   void testProductQuantizationFromDataset()
   {
     using LabelT = uint32_t;
-    config_      = {params_.pq_bits,
-                    params_.pq_dim,
-                    params_.n_vq_centers,
-                    25,
-                    0,
-                    0,
-                    params_.pq_kmeans_type,
-                    params_.use_vq};
+    config_      = cuvs::preprocessing::quantize::pq::params({params_.pq_bits,
+                                                              params_.pq_dim,
+                                                              params_.n_vq_centers,
+                                                              25,
+                                                              0,
+                                                              0,
+                                                              params_.pq_kmeans_type,
+                                                              256},
+                                                        params_.use_vq,
+                                                        params_.use_subspaces);
     raft::resource::sync_stream(handle);
     auto pq = train(handle, config_, dataset_.view());
 

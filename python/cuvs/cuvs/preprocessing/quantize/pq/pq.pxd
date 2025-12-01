@@ -22,6 +22,7 @@ cdef extern from "cuvs/preprocessing/quantize/pq.h" nogil:
         double vq_kmeans_trainset_fraction
         double pq_kmeans_trainset_fraction
         cuvsKMeansType pq_kmeans_type
+        uint32_t max_train_points_per_pq_code
         bool use_vq
         bool use_subspaces
 

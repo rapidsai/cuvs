@@ -61,7 +61,14 @@ struct cuvsProductQuantizerParams {
    */
   cuvsKMeansType pq_kmeans_type;
   /**
-   * Whether to use vector quantization (VQ) before product quantization (PQ).
+   * The max number of data points to use per PQ code during PQ codebook training. Using more data
+   * points per PQ code may increase the quality of PQ codebook but may also increase the build
+   * time. We will use `pq_n_centers * max_train_points_per_pq_code` training
+   * points to train each PQ codebook.
+   */
+  uint32_t max_train_points_per_pq_code;
+  /**
+   * Whether to use Vector Quantization (KMeans) before product quantization (PQ).
    * When true, VQ is used before PQ. When false, only product quantization is used.
    */
   bool use_vq;

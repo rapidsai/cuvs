@@ -76,16 +76,12 @@ struct vpq_params {
   cuvs::cluster::kmeans::kmeans_type pq_kmeans_type =
     cuvs::cluster::kmeans::kmeans_type::KMeansBalanced;
   /**
-   * Whether to use vector quantization (VQ) before product quantization (PQ).
-   * When true, VQ is used before PQ.
+   * The max number of data points to use per PQ code during PQ codebook training. Using more data
+   * points per PQ code may increase the quality of PQ codebook but may also increase the build
+   * time. We will use `pq_n_centers * max_train_points_per_pq_code` training
+   * points to train each PQ codebook.
    */
-  bool use_vq = false;
-  /**
-   * Whether to use subspaces for product quantization (PQ).
-   * When true, one PQ codebook is used for each subspace. Otherwise, a single
-   * PQ codebook is used.
-   */
-  bool use_subspaces = true;
+  uint32_t max_train_points_per_pq_code = 256;
 };
 
 /** @} */  // end group cagra_cpp_index_params

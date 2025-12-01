@@ -68,6 +68,67 @@ auto subsample(raft::resources const& res,
 
 namespace cuvs::neighbors::detail {
 
+template <typename MathT, typename IdxT>
+void train_pq_centers(
+  const raft::resources& res,
+  const cuvs::neighbors::vpq_params& params,
+  const raft::device_matrix_view<const MathT, IdxT, raft::row_major> pq_trainset_view,
+  const raft::device_matrix_view<MathT, uint32_t, raft::row_major> pq_centers_view,
+  std::optional<raft::device_vector_view<uint32_t, IdxT>> sub_labels_view       = std::nullopt,
+  std::optional<raft::device_vector_view<uint32_t, IdxT>> pq_cluster_sizes_view = std::nullopt)
+{
+  if (params.pq_kmeans_type == cuvs::cluster::kmeans::kmeans_type::KMeansBalanced) {
+    std::optional<raft::device_vector<uint32_t, IdxT>> sub_labels_opt       = std::nullopt;
+    std::optional<raft::device_vector<uint32_t, IdxT>> pq_cluster_sizes_opt = std::nullopt;
+    if (!sub_labels_view) {
+      sub_labels_opt = std::make_optional(
+        raft::make_device_vector<uint32_t, IdxT>(res, pq_trainset_view.extent(0)));
+      sub_labels_view = std::make_optional(sub_labels_opt.value().view());
+    }
+    if (!pq_cluster_sizes_view) {
+      pq_cluster_sizes_opt = std::make_optional(
+        raft::make_device_vector<uint32_t, IdxT>(res, pq_centers_view.extent(0)));
+      pq_cluster_sizes_view = std::make_optional(pq_cluster_sizes_opt.value().view());
+    }
+    cuvs::cluster::kmeans::balanced_params kmeans_params;
+    kmeans_params.n_iters = params.kmeans_n_iters;
+    kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
+
+    cuvs::cluster::kmeans_balanced::helpers::build_clusters<
+      MathT,
+      MathT,
+      IdxT,
+      uint32_t,
+      uint32_t,
+      cuvs::spatial::knn::detail::utils::mapping<MathT>>(
+      res,
+      kmeans_params,
+      pq_trainset_view,
+      pq_centers_view,
+      sub_labels_view.value(),
+      pq_cluster_sizes_view.value(),
+      cuvs::spatial::knn::detail::utils::mapping<MathT>{});
+  } else {
+    const auto pq_n_centers = pq_centers_view.extent(0);
+    cuvs::cluster::kmeans::params kmeans_params;
+    kmeans_params.n_clusters = pq_n_centers;
+    kmeans_params.max_iter   = params.kmeans_n_iters;
+    kmeans_params.metric     = cuvs::distance::DistanceType::L2Expanded;
+    kmeans_params.init       = cuvs::cluster::kmeans::params::InitMethod::Random;
+
+    std::optional<raft::device_vector_view<const MathT, IdxT>> sample_weight = std::nullopt;
+    MathT inertia;
+    IdxT n_iter;
+    cuvs::cluster::kmeans::fit(res,
+                               kmeans_params,
+                               pq_trainset_view,
+                               sample_weight,
+                               pq_centers_view,
+                               raft::make_host_scalar_view<MathT, IdxT>(&inertia),
+                               raft::make_host_scalar_view<IdxT, IdxT>(&n_iter));
+  }
+}
+
 template <typename DatasetT>
 auto fill_missing_params_heuristics(const vpq_params& params, const DatasetT& dataset) -> vpq_params
 {
@@ -87,7 +148,7 @@ auto fill_missing_params_heuristics(const vpq_params& params, const DatasetT& da
     double pq_trainset_size       = 1000.0 * (1u << r.pq_bits);
     r.pq_kmeans_trainset_fraction = std::min(1.0, pq_trainset_size / n_rows);
   }
-  r.use_vq = params.use_vq;
+  r.max_train_points_per_pq_code = params.max_train_points_per_pq_code;
   return r;
 }
 
@@ -181,7 +242,8 @@ auto train_pq(
   const ix_t pq_bits      = params.pq_bits;
   const ix_t pq_n_centers = ix_t{1} << pq_bits;
   const ix_t pq_len       = raft::div_rounding_up_safe(dim, pq_dim);
-  const ix_t n_rows_train = n_rows * params.pq_kmeans_trainset_fraction;
+  const ix_t n_rows_train = std::min((ix_t)(n_rows * params.pq_kmeans_trainset_fraction),
+                                     params.max_train_points_per_pq_code * pq_n_centers);
 
   // Subsample the dataset and transform into the required type if necessary
   auto pq_trainset = transform_data<MathT>(res, util::subsample(res, dataset, n_rows_train));
@@ -204,36 +266,9 @@ auto train_pq(
 
   auto pq_centers =
     raft::make_device_matrix<MathT, uint32_t, raft::row_major>(res, pq_n_centers, pq_len);
-
-  // Train PQ centers
-  {
-    auto pq_centers_view =
-      raft::make_device_matrix_view<MathT, ix_t>(pq_centers.data_handle(), pq_n_centers, pq_len);
-    auto pq_trainset_view = raft::make_device_matrix_view<const MathT, ix_t>(
-      pq_trainset.data_handle(), n_rows_train * pq_dim, pq_len);
-
-    if (params.pq_kmeans_type == cuvs::cluster::kmeans::kmeans_type::KMeansBalanced) {
-      cuvs::cluster::kmeans::balanced_params kmeans_params;
-      kmeans_params.n_iters = params.kmeans_n_iters;
-      kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
-      cuvs::cluster::kmeans::fit(res, kmeans_params, pq_trainset_view, pq_centers_view);
-    } else {
-      cuvs::cluster::kmeans::params kmeans_params;
-      kmeans_params.n_clusters = pq_n_centers;
-      kmeans_params.max_iter   = params.kmeans_n_iters;
-      kmeans_params.metric     = cuvs::distance::DistanceType::L2Expanded;
-      std::optional<raft::device_vector_view<const MathT, ix_t>> sample_weight = std::nullopt;
-      MathT inertia;
-      ix_t n_iter;
-      cuvs::cluster::kmeans::fit(res,
-                                 kmeans_params,
-                                 pq_trainset_view,
-                                 sample_weight,
-                                 pq_centers_view,
-                                 raft::make_host_scalar_view<MathT, ix_t>(&inertia),
-                                 raft::make_host_scalar_view<ix_t, ix_t>(&n_iter));
-    }
-  }
+  auto pq_trainset_view = raft::make_device_matrix_view<const MathT, ix_t>(
+    pq_trainset.data_handle(), n_rows_train * pq_dim, pq_len);
+  train_pq_centers<MathT, ix_t>(res, params, pq_trainset_view, pq_centers.view());
 
   return pq_centers;
 }
@@ -419,7 +454,7 @@ void process_and_fill_codes(
   const ix_t pq_bits      = params.pq_bits;
   const ix_t pq_n_centers = ix_t{1} << pq_bits;
   ix_t codes_rowlen       = 0;
-  if (params.use_vq) {
+  if (vq_centers.has_value()) {
     // NB: codes must be aligned at least to sizeof(label_t) to be able to read labels.
     codes_rowlen = sizeof(label_t) *
                    (1 + raft::div_rounding_up_safe<ix_t>(pq_dim * pq_bits, 8 * sizeof(label_t)));
@@ -567,7 +602,7 @@ void process_and_fill_codes_subspaces(
   const ix_t pq_bits      = params.pq_bits;
   const ix_t pq_n_centers = ix_t{1} << pq_bits;
   ix_t codes_rowlen       = 0;
-  if (params.use_vq) {
+  if (vq_centers.has_value()) {
     // NB: codes must be aligned at least to sizeof(label_t) to be able to read labels.
     codes_rowlen = sizeof(label_t) *
                    (1 + raft::div_rounding_up_safe<ix_t>(pq_dim * pq_bits, 8 * sizeof(label_t)));

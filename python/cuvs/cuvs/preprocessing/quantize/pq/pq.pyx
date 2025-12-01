@@ -50,8 +50,12 @@ cdef class QuantizerParams:
     pq_kmeans_type: str
         specifies the type of kmeans algorithm to use for PQ training
         possible values: "kmeans", "kmeans_balanced"
+    max_train_points_per_pq_code: int
+        specifies the max number of data points to use per PQ code during PQ
+        codebook training. Using more data points per PQ code may increase the
+        quality of PQ codebook but may also increase the build time.
     use_vq: bool
-        specifies whether to use vector quantization (VQ) before product
+        specifies whether to use Vector Quantization (KMeans) before product
         quantization (PQ).
     use_subspaces: bool
         specifies whether to use subspaces for product quantization (PQ).
@@ -71,6 +75,7 @@ cdef class QuantizerParams:
                  kmeans_n_iters=25, vq_kmeans_trainset_fraction=0.0,
                  pq_kmeans_trainset_fraction=0.0,
                  pq_kmeans_type="kmeans_balanced",
+                 max_train_points_per_pq_code=256,
                  use_vq=False,
                  use_subspaces=True):
         if pq_bits not in [4, 5, 6, 7, 8]:
@@ -83,6 +88,7 @@ cdef class QuantizerParams:
         self.params.pq_kmeans_trainset_fraction = pq_kmeans_trainset_fraction
         pq_kmeans_type_c = PQ_KMEANS_TYPES[pq_kmeans_type]
         self.params.pq_kmeans_type = <cuvsKMeansType>pq_kmeans_type_c
+        self.params.max_train_points_per_pq_code = max_train_points_per_pq_code
         self.params.use_vq = use_vq
         self.params.use_subspaces = use_subspaces
 
@@ -113,6 +119,10 @@ cdef class QuantizerParams:
     @property
     def pq_kmeans_type(self):
         return self.params.pq_kmeans_type
+
+    @property
+    def max_train_points_per_pq_code(self):
+        return self.params.max_train_points_per_pq_code
 
     @property
     def use_vq(self):

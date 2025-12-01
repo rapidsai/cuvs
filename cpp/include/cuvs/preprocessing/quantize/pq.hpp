@@ -21,7 +21,26 @@ namespace cuvs::preprocessing::quantize::pq {
  * @brief Product Quantizer parameters.
  * @see cuvs::neighbors::vpq_params
  */
-using params = cuvs::neighbors::vpq_params;
+struct params : public cuvs::neighbors::vpq_params {
+  params() = default;
+  explicit params(cuvs::neighbors::vpq_params vpq_params,
+                  bool use_vq        = false,
+                  bool use_subspaces = true)
+    : cuvs::neighbors::vpq_params(vpq_params), use_vq(use_vq), use_subspaces(use_subspaces)
+  {
+  }
+  /**
+   * Whether to use Vector Quantization (KMeans) before product quantization (PQ).
+   * When true, VQ is used before PQ.
+   */
+  bool use_vq = false;
+  /**
+   * Whether to use subspaces for product quantization (PQ).
+   * When true, one PQ codebook is used for each subspace. Otherwise, a single
+   * PQ codebook is used.
+   */
+  bool use_subspaces = true;
+};
 
 /**
  * @brief Defines and stores VPQ codebooks upon training
