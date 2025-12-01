@@ -17,8 +17,6 @@
 #include <utils.h>
 
 #include <chrono>
-#include <cmath>
-#include <cstdio>
 #include <memory>
 #include <vector>
 
@@ -180,8 +178,6 @@ class diskann_ssd : public algo<T> {
     uint32_t QD                   = 192;
     std::string dataset_base_file = "";
     std::string index_file        = "";
-    uint32_t build_dram_budget    = std::numeric_limits<uint32_t>::max();
-    uint32_t search_dram_budget   = std::numeric_limits<uint32_t>::max();
   };
   using search_param_base = typename algo<T>::search_param;
 
@@ -236,17 +232,12 @@ template <typename T>
 diskann_ssd<T>::diskann_ssd(Metric metric, int dim, const build_param& param) : algo<T>(metric, dim)
 {
   // Currently set the indexing RAM budget and the search RAM budget to max value to avoid sharding
-  float build_dram_budget  = static_cast<float>(param.build_dram_budget) / 1024.0f;
-  float search_dram_budget = static_cast<float>(param.search_dram_budget) / 1024.0f;
-  char search_buf[16];
-  char build_buf[16];
-  std::snprintf(search_buf, sizeof(search_buf), "%.2f", search_dram_budget);
-  std::snprintf(build_buf, sizeof(build_buf), "%.2f", build_dram_budget);
-  const std::string search_dram_budget_gb(search_buf);
-  const std::string build_dram_budget_gb(build_buf);
+  uint32_t build_dram_budget  = std::numeric_limits<uint32_t>::max();
+  uint32_t search_dram_budget = std::numeric_limits<uint32_t>::max();
   index_build_params_str =
     std::string(std::to_string(param.R)) + " " + std::string(std::to_string(param.L_build)) + " " +
-    search_dram_budget_gb + " " + build_dram_budget_gb + " " +
+    std::string(std::to_string(search_dram_budget)) + " " +
+    std::string(std::to_string(build_dram_budget)) + " " +
     std::string(std::to_string(param.num_threads)) + " " + std::string(std::to_string(false)) +
     " " + std::string(std::to_string(false)) + " " + std::string(std::to_string(0)) + " " +
     std::string(std::to_string(param.QD));
