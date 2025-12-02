@@ -58,11 +58,12 @@ struct index_params : cuvs::neighbors::index_params {
   int num_threads = 0;
 
   /** HNSW M parameter: number of bi-directional links per node (used when building with ACE).
-   *  graph_degree = m * 2, intermediate_graph_degree = m * 3.
    */
   size_t m = 32;
 
-  /** Parameters for graph building (ACE algorithm).
+  /** Parameters to fine tune GPU graph building. By default we select the parameters based on
+   * dataset shape and HNSW build parameters. You can override these parameters to fine tune the
+   * graph building process as described in the CAGRA build docs.
    *
    * Set ace_params to configure ACE (Augmented Core Extraction) parameters for building
    * a GPU-accelerated HNSW index. ACE enables building indexes for datasets too large
@@ -192,20 +193,21 @@ struct extend_params {
  */
 
 /**
- * @defgroup hnsw_cpp_index_build Build HNSW index using ACE algorithm
+ * @defgroup hnsw_cpp_index_build Build HNSW index on the GPU
  * @{
  */
 
 /**
- * @brief Build an HNSW index using the ACE (Augmented Core Extraction) algorithm
+ * @brief Build an HNSW index on the GPU
  *
- * ACE enables building HNSW indices for datasets too large to fit in GPU memory by:
- * 1. Partitioning the dataset using balanced k-means into core and augmented partitions
- * 2. Building sub-indices for each partition independently
- * 3. Concatenating sub-graphs into a final unified index
+ * The resulting graph is compatible for HNSW search, but is not an exact equivalent of the graph
+ * built by the HNSW.
  *
- * The returned index is ready for search via hnsw::search() or can be serialized
- * using hnsw::serialize().
+ * The HNSW index construction parameters `M` and `ef_construction` are the main parameters to
+ * control the graph degree and graph quality.  We have additional options that can be used to fine
+ * tune graph building on the GPU (see `cuvs::neighbors::cagra::index_params`). In case the index
+ * does not fit the host or GPU memory,  we would use disk as temporary storage. In such cases it is
+ * important to set `ace_params.build_dir` to a fast disk with sufficient storage size.
  *
  * NOTE: This function requires CUDA headers to be available at compile time.
  *
@@ -222,11 +224,12 @@ struct extend_params {
  *   hnsw::index_params params;
  *   params.metric = cuvs::distance::DistanceType::L2Expanded;
  *   params.hierarchy = hnsw::HnswHierarchy::GPU;
+ *   params.m = 32;
+ *   params.ef_construction = 120;
  *
- *   // Configure ACE parameters
+ *   // Configure GPU graph building parameters
  *   auto ace_params = hnsw::graph_build_params::ace_params();
  *   ace_params.npartitions = 4;
- *   ace_params.ef_construction = 120;
  *   ace_params.use_disk = true;
  *   ace_params.build_dir = "/tmp/hnsw_ace_build";
  *   params.graph_build_params = ace_params;
@@ -253,11 +256,57 @@ std::unique_ptr<index<float>> build(
   raft::host_matrix_view<const float, int64_t, raft::row_major> dataset);
 
 /**
- * @brief Build an HNSW index using the ACE algorithm (half precision)
+ * @brief Build an HNSW index on the GPU
+ *
+ * The resulting graph is compatible for HNSW search, but is not an exact equivalent of the graph
+ * built by the HNSW.
+ *
+ * The HNSW index construction parameters `M` and `ef_construction` are the main parameters to
+ * control the graph degree and graph quality.  We have additional options that can be used to fine
+ * tune graph building on the GPU (see `cuvs::neighbors::cagra::index_params`). In case the index
+ * does not fit the host or GPU memory,  we would use disk as temporary storage. In such cases it is
+ * important to set `ace_params.build_dir` to a fast disk with sufficient storage size.
+ *
+ * NOTE: This function requires CUDA headers to be available at compile time.
  *
  * @param[in] res raft resources
  * @param[in] params hnsw index parameters including ACE configuration
  * @param[in] dataset a host matrix view to a row-major matrix [n_rows, dim]
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   raft::resources res;
+ *
+ *   // Create index parameters with ACE configuration
+ *   hnsw::index_params params;
+ *   params.metric = cuvs::distance::DistanceType::L2Expanded;
+ *   params.hierarchy = hnsw::HnswHierarchy::GPU;
+ *   params.m = 32;
+ *   params.ef_construction = 120;
+ *
+ *   // Configure GPU graph building parameters
+ *   auto ace_params = hnsw::graph_build_params::ace_params();
+ *   ace_params.npartitions = 4;
+ *   ace_params.use_disk = true;
+ *   ace_params.build_dir = "/tmp/hnsw_ace_build";
+ *   params.graph_build_params = ace_params;
+ *
+ *   // Build the index
+ *   auto dataset = raft::make_host_matrix<float, int64_t>(res, N, D);
+ *   // ... fill dataset ...
+ *   auto hnsw_index = hnsw::build(res, params, raft::make_const_mdspan(dataset.view()));
+ *
+ *   // Search the index
+ *   hnsw::search_params search_params;
+ *   search_params.ef = 200;
+ *   auto neighbors = raft::make_host_matrix<uint64_t, int64_t>(res, n_queries, k);
+ *   auto distances = raft::make_host_matrix<float, int64_t>(res, n_queries, k);
+ *   hnsw::search(res, search_params, *hnsw_index, queries, neighbors.view(), distances.view());
+ *
+ *   // Serialize the index
+ *   hnsw::serialize(res, "index.bin", *hnsw_index);
+ * @endcode
  */
 std::unique_ptr<index<half>> build(
   raft::resources const& res,
@@ -265,11 +314,57 @@ std::unique_ptr<index<half>> build(
   raft::host_matrix_view<const half, int64_t, raft::row_major> dataset);
 
 /**
- * @brief Build an HNSW index using the ACE algorithm (uint8 data)
+ * @brief Build an HNSW index on the GPU
+ *
+ * The resulting graph is compatible for HNSW search, but is not an exact equivalent of the graph
+ * built by the HNSW.
+ *
+ * The HNSW index construction parameters `M` and `ef_construction` are the main parameters to
+ * control the graph degree and graph quality.  We have additional options that can be used to fine
+ * tune graph building on the GPU (see `cuvs::neighbors::cagra::index_params`). In case the index
+ * does not fit the host or GPU memory,  we would use disk as temporary storage. In such cases it is
+ * important to set `ace_params.build_dir` to a fast disk with sufficient storage size.
+ *
+ * NOTE: This function requires CUDA headers to be available at compile time.
  *
  * @param[in] res raft resources
  * @param[in] params hnsw index parameters including ACE configuration
  * @param[in] dataset a host matrix view to a row-major matrix [n_rows, dim]
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   raft::resources res;
+ *
+ *   // Create index parameters with ACE configuration
+ *   hnsw::index_params params;
+ *   params.metric = cuvs::distance::DistanceType::L2Expanded;
+ *   params.hierarchy = hnsw::HnswHierarchy::GPU;
+ *   params.m = 32;
+ *   params.ef_construction = 120;
+ *
+ *   // Configure GPU graph building parameters
+ *   auto ace_params = hnsw::graph_build_params::ace_params();
+ *   ace_params.npartitions = 4;
+ *   ace_params.use_disk = true;
+ *   ace_params.build_dir = "/tmp/hnsw_ace_build";
+ *   params.graph_build_params = ace_params;
+ *
+ *   // Build the index
+ *   auto dataset = raft::make_host_matrix<float, int64_t>(res, N, D);
+ *   // ... fill dataset ...
+ *   auto hnsw_index = hnsw::build(res, params, raft::make_const_mdspan(dataset.view()));
+ *
+ *   // Search the index
+ *   hnsw::search_params search_params;
+ *   search_params.ef = 200;
+ *   auto neighbors = raft::make_host_matrix<uint64_t, int64_t>(res, n_queries, k);
+ *   auto distances = raft::make_host_matrix<float, int64_t>(res, n_queries, k);
+ *   hnsw::search(res, search_params, *hnsw_index, queries, neighbors.view(), distances.view());
+ *
+ *   // Serialize the index
+ *   hnsw::serialize(res, "index.bin", *hnsw_index);
+ * @endcode
  */
 std::unique_ptr<index<uint8_t>> build(
   raft::resources const& res,
@@ -277,11 +372,57 @@ std::unique_ptr<index<uint8_t>> build(
   raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset);
 
 /**
- * @brief Build an HNSW index using the ACE algorithm (int8 data)
+ * @brief Build an HNSW index on the GPU
+ *
+ * The resulting graph is compatible for HNSW search, but is not an exact equivalent of the graph
+ * built by the HNSW.
+ *
+ * The HNSW index construction parameters `M` and `ef_construction` are the main parameters to
+ * control the graph degree and graph quality.  We have additional options that can be used to fine
+ * tune graph building on the GPU (see `cuvs::neighbors::cagra::index_params`). In case the index
+ * does not fit the host or GPU memory,  we would use disk as temporary storage. In such cases it is
+ * important to set `ace_params.build_dir` to a fast disk with sufficient storage size.
+ *
+ * NOTE: This function requires CUDA headers to be available at compile time.
  *
  * @param[in] res raft resources
  * @param[in] params hnsw index parameters including ACE configuration
  * @param[in] dataset a host matrix view to a row-major matrix [n_rows, dim]
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   raft::resources res;
+ *
+ *   // Create index parameters with ACE configuration
+ *   hnsw::index_params params;
+ *   params.metric = cuvs::distance::DistanceType::L2Expanded;
+ *   params.hierarchy = hnsw::HnswHierarchy::GPU;
+ *   params.m = 32;
+ *   params.ef_construction = 120;
+ *
+ *   // Configure GPU graph building parameters
+ *   auto ace_params = hnsw::graph_build_params::ace_params();
+ *   ace_params.npartitions = 4;
+ *   ace_params.use_disk = true;
+ *   ace_params.build_dir = "/tmp/hnsw_ace_build";
+ *   params.graph_build_params = ace_params;
+ *
+ *   // Build the index
+ *   auto dataset = raft::make_host_matrix<float, int64_t>(res, N, D);
+ *   // ... fill dataset ...
+ *   auto hnsw_index = hnsw::build(res, params, raft::make_const_mdspan(dataset.view()));
+ *
+ *   // Search the index
+ *   hnsw::search_params search_params;
+ *   search_params.ef = 200;
+ *   auto neighbors = raft::make_host_matrix<uint64_t, int64_t>(res, n_queries, k);
+ *   auto distances = raft::make_host_matrix<float, int64_t>(res, n_queries, k);
+ *   hnsw::search(res, search_params, *hnsw_index, queries, neighbors.view(), distances.view());
+ *
+ *   // Serialize the index
+ *   hnsw::serialize(res, "index.bin", *hnsw_index);
+ * @endcode
  */
 std::unique_ptr<index<int8_t>> build(
   raft::resources const& res,

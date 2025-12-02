@@ -142,18 +142,18 @@ TEST(HnswAceC, BuildSearch)
   // create ACE params
   cuvsHnswAceParams_t ace_params;
   cuvsHnswAceParamsCreate(&ace_params);
-  ace_params->npartitions     = 2;
-  ace_params->ef_construction = 100;
-  ace_params->build_dir       = "/tmp/hnsw_ace_test";
-  ace_params->use_disk        = false;
+  ace_params->npartitions = 2;
+  ace_params->build_dir   = "/tmp/hnsw_ace_test";
+  ace_params->use_disk    = false;
 
   // create index params
   cuvsHnswIndexParams_t hnsw_params;
   cuvsHnswIndexParamsCreate(&hnsw_params);
-  hnsw_params->hierarchy  = GPU;
-  hnsw_params->ace_params = ace_params;
-  hnsw_params->metric     = L2Expanded;
-  hnsw_params->m          = 16;
+  hnsw_params->hierarchy       = GPU;
+  hnsw_params->ef_construction = 100;
+  hnsw_params->ace_params      = ace_params;
+  hnsw_params->metric          = L2Expanded;
+  hnsw_params->m               = 16;
 
   // create HNSW index
   cuvsHnswIndex_t hnsw_index;
@@ -243,18 +243,18 @@ TEST(HnswAceDiskC, BuildSerializeDeserializeSearch)
   // create ACE params with use_disk = true
   cuvsHnswAceParams_t ace_params;
   cuvsHnswAceParamsCreate(&ace_params);
-  ace_params->npartitions     = 2;
-  ace_params->ef_construction = 100;
-  ace_params->build_dir       = "/tmp/hnsw_ace_disk_test";
-  ace_params->use_disk        = true;
+  ace_params->npartitions = 2;
+  ace_params->build_dir   = "/tmp/hnsw_ace_disk_test";
+  ace_params->use_disk    = true;
 
   // create index params
   cuvsHnswIndexParams_t hnsw_params;
   cuvsHnswIndexParamsCreate(&hnsw_params);
-  hnsw_params->hierarchy  = GPU;
-  hnsw_params->ace_params = ace_params;
-  hnsw_params->metric     = L2Expanded;
-  hnsw_params->m          = 16;
+  hnsw_params->hierarchy       = GPU;
+  hnsw_params->ef_construction = 100;
+  hnsw_params->ace_params      = ace_params;
+  hnsw_params->metric          = L2Expanded;
+  hnsw_params->m               = 16;
 
   // create HNSW index
   cuvsHnswIndex_t hnsw_index;

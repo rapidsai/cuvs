@@ -40,7 +40,7 @@ void hnsw_build_search_ace(raft::device_resources const& dev_resources,
   hnsw_params.metric    = cuvs::distance::DistanceType::L2Expanded;
   hnsw_params.hierarchy = hnsw::HnswHierarchy::GPU;
 
-  // ACE index parameters for building HNSW directly
+  // Parameters for GPU accelerated HNSW index building
   auto ace_params = hnsw::graph_build_params::ace_params();
   // Set the number of partitions. Small values might improve recall but potentially degrade
   // performance and increase memory usage. Partitions should not be too small to prevent issues in
@@ -49,9 +49,6 @@ void hnsw_build_search_ace(raft::device_resources const& dev_resources,
   // dim * sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance
   // in the partition sizes (up to 3x in our tests).
   ace_params.npartitions = 4;
-  // Set the index quality for the ACE build. Bigger values increase the index quality. At some
-  // point, increasing this will no longer improve the quality.
-  ace_params.ef_construction = 120;
   // Set the directory to store the ACE build artifacts. This should be the fastest disk in the
   // system and hold enough space for twice the dataset, final graph, and label mapping.
   ace_params.build_dir = "/tmp/hnsw_ace_build";
@@ -60,6 +57,14 @@ void hnsw_build_search_ace(raft::device_resources const& dev_resources,
   // graph fits in host and GPU memory, and on disk otherwise.
   ace_params.use_disk            = true;
   hnsw_params.graph_build_params = ace_params;
+  // Set M parameter to control the graph degree (graph_degree = m * 2, intermediate_graph_degree =
+  // m * 3). Higher values work for higher intrinsic dimensionality and/or high recall, low values
+  // can work for datasets with low intrinsic dimensionality and/or low recalls. Higher values lead
+  // to higher memory consumption.
+  hnsw_params.m = 32;
+  // Set the index quality for the ACE build. Bigger values increase the index quality. At some
+  // point, increasing this will no longer improve the quality.
+  hnsw_params.ef_construction = 120;
 
   // Build the HNSW index using ACE
   std::cout << "Building HNSW index using ACE" << std::endl;
@@ -68,7 +73,7 @@ void hnsw_build_search_ace(raft::device_resources const& dev_resources,
 
   // For disk-based indexes, the build function serializes the index to disk
   // We need to deserialize it before searching
-  std::string hnsw_index_path = "/tmp/hnsw_ace_build/hnsw_index.bin";
+  std::string hnsw_index_path = hnsw_index->file_path();
   std::cout << "Deserializing HNSW index from disk for search" << std::endl;
   hnsw::index<float>* hnsw_index_deserialized = nullptr;
   hnsw::deserialize(dev_resources,

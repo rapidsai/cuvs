@@ -24,6 +24,7 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <new>
 #include <random>
 #include <sys/mman.h>
 #include <thread>
@@ -1211,12 +1212,20 @@ void deserialize(raft::resources const& res,
                  cuvs::distance::DistanceType metric,
                  index<T>** idx)
 {
-  auto hnsw_index = std::make_unique<index_impl<T>>(dim, metric, params.hierarchy);
-  auto appr_algo  = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
-    hnsw_index->get_space(), filename);
-  if (params.hierarchy == HnswHierarchy::NONE) { appr_algo->base_layer_only = true; }
-  hnsw_index->set_index(std::move(appr_algo));
-  *idx = hnsw_index.release();
+  try {
+    auto hnsw_index = std::make_unique<index_impl<T>>(dim, metric, params.hierarchy);
+    auto appr_algo  = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
+      hnsw_index->get_space(), filename);
+    if (params.hierarchy == HnswHierarchy::NONE) { appr_algo->base_layer_only = true; }
+    hnsw_index->set_index(std::move(appr_algo));
+    *idx = hnsw_index.release();
+  } catch (const std::bad_alloc& e) {
+    RAFT_FAIL(
+      "Failed to deserialize HNSW index from '%s': insufficient host memory. "
+      "The index is too large to fit in available RAM. "
+      "Consider using a machine with more memory or reducing the dataset size.",
+      filename.c_str());
+  }
 }
 
 /**
