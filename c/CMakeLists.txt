@@ -33,11 +33,7 @@ option(CUVSC_STATIC_CUVS_LIBRARY "Link against statical version of libcuvs" OFF)
 # Check if cuVS is already available. If so, it is the user's responsibility to ensure that the
 # CMake package is also available at build time of the Python cuvs package.
 if(NOT TARGET cuvs::cuvs)
-  if(CUVSC_STATIC_CUVS_LIBRARY)
-    find_package(cuvs "${RAPIDS_VERSION}" REQUIRED COMPONENTS cuvs_static)
-  else()
-    find_package(cuvs "${RAPIDS_VERSION}" REQUIRED COMPONENTS cuvs_shared)
-  endif()
+  find_package(cuvs "${RAPIDS_VERSION}" REQUIRED)
 else()
   set(BUILDING_FROM_CUVS ON)
 endif()
@@ -171,29 +167,40 @@ if(PROJECT_IS_TOP_LEVEL)
   include(CPack)
 
   # Add CUDAToolkit as an export dependency
-  rapids_export_package(INSTALL CUDAToolkit cuvs-exports)
-  rapids_export_package(BUILD CUDAToolkit cuvs-exports)
+  rapids_export_package(INSTALL CUDAToolkit cuvs-c-exports)
+  rapids_export_package(BUILD CUDAToolkit cuvs-c-exports)
 
   install(
     TARGETS cuvs_c
     DESTINATION ${lib_dir}
-    COMPONENT c_api
+    COMPONENT cuvs_c
     EXPORT cuvs-c-exports
+  )
+
+  rapids_export(
+    INSTALL cuvs_c
+    VERSION "${RAPIDS_VERSION}"
+    EXPORT_SET cuvs-c-exports
+    GLOBAL_TARGETS cuvs_c
+    NAMESPACE cuvs::
+  )
+  rapids_export(
+    BUILD cuvs_c
+    VERSION "${RAPIDS_VERSION}"
+    EXPORT_SET cuvs-c-exports
+    GLOBAL_TARGETS cuvs_c
+    NAMESPACE cuvs::
   )
   install(
     DIRECTORY include/cuvs
-    COMPONENT c_api
+    COMPONENT cuvs_c
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
   )
   install(
     FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/core/c_config.h
-    COMPONENT c_api
+    COMPONENT cuvs_c
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cuvs/core/
   )
-
-  include(../cpp/cmake/modules/generate_cuvs_export.cmake)
-  generate_cuvs_export(CLIB COMPONENTS c_api EXPORT_SETS cuvs-c-exports)
-
 endif()
 
 # ##################################################################################################
