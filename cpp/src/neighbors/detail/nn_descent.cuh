@@ -240,7 +240,11 @@ RAFT_KERNEL preprocess_data_kernel(
   Data_t* s_vec  = (Data_t*)buffer;
   size_t list_id = list_offset + blockIdx.x;
 
-  load_vec(s_vec, input_data + blockIdx.x * dim, dim, dim, threadIdx.x % raft::warp_size());
+  load_vec(s_vec,
+           input_data + static_cast<size_t>(blockIdx.x) * dim,
+           dim,
+           dim,
+           threadIdx.x % raft::warp_size());
   if (threadIdx.x == 0) { l2_norm = 0; }
   __syncthreads();
 
@@ -1314,12 +1318,10 @@ GNND<Data_t, Index_t>::GNND(raft::resources const& res, const BuildConfig& build
 
   using input_t = typename std::remove_const<Data_t>::type;
   if (build_config.fp32_dist_computation && std::is_same_v<input_t, float>) {
-    std::cout << "use fp32 distance computation" << std::endl;
     // use fp32 distance computation for better precision with smaller dimension
     d_data_float_.emplace(
       raft::make_device_matrix<float, size_t, raft::row_major>(res, nrow_, ndim_));
   } else {
-    std::cout << "use fp16 distance computation" << std::endl;
     d_data_half_.emplace(raft::make_device_matrix<half, size_t, raft::row_major>(
       res,
       nrow_,
