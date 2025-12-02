@@ -17,6 +17,7 @@ mod error;
 pub mod ivf_flat;
 pub mod ivf_pq;
 mod resources;
+pub mod vamana;
 
 pub use dlpack::ManagedTensor;
 pub use error::{Error, Result};
