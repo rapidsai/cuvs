@@ -62,7 +62,6 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
         size_t npartitions
         size_t ef_construction
         const char* build_dir
-        bool use_disk
         double max_host_memory_gb
         double max_gpu_memory_gb
     ctypedef cuvsAceParams* cuvsAceParams_t

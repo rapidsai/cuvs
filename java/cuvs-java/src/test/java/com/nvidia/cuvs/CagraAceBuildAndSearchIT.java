@@ -67,22 +67,21 @@ public class CagraAceBuildAndSearchIT extends CuVSTestCase {
   }
 
   /**
-   * Test ACE build with in-memory mode (use_disk=false).
-   * This tests the basic ACE functionality with small datasets that fit in memory.
+   * Test ACE build.
+   * ACE always uses disk-based storage for memory-efficient graph construction.
    */
   @Test
-  public void testAceInMemoryBuild() throws Throwable {
+  public void testAceBuild() throws Throwable {
     float[][] dataset = createSampleData();
     float[][] queries = createSampleQueries();
     List<Map<Integer, Float>> expectedResults = getExpectedResults();
 
     try (CuVSResources resources = CheckedCuVSResources.create()) {
-      // Configure ACE parameters for in-memory mode
+      // Configure ACE parameters (always uses disk-based storage)
       CuVSAceParams aceParams =
           new CuVSAceParams.Builder()
               .withNpartitions(2)
               .withEfConstruction(120)
-              .withUseDisk(false)
               .build();
 
       // Configure index parameters with ACE build algorithm
@@ -105,7 +104,7 @@ public class CagraAceBuildAndSearchIT extends CuVSTestCase {
 
         // Verify index was built
         assertNotNull("Index should not be null", index);
-        log.debug("ACE index built successfully in memory");
+        log.debug("ACE index built successfully");
 
         // Perform search
         CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
@@ -129,23 +128,22 @@ public class CagraAceBuildAndSearchIT extends CuVSTestCase {
   }
 
   /**
-   * Test ACE build with disk-based mode (use_disk=true).
-   * This tests ACE's ability to handle large datasets that don't fit in GPU memory.
+   * Test ACE build with explicit build directory.
+   * This tests ACE's disk-based storage with a custom build directory.
    */
   @Test
-  public void testAceDiskBasedBuild() throws Throwable {
+  public void testAceBuildWithCustomBuildDir() throws Throwable {
     float[][] dataset = createSampleData();
     float[][] queries = createSampleQueries();
     List<Map<Integer, Float>> expectedResults = getExpectedResults();
 
     try (CuVSResources resources = CheckedCuVSResources.create()) {
-      // Configure ACE parameters for disk-based mode
+      // Configure ACE parameters with custom build directory
       Path buildDir = Path.of("/tmp/java_ace_test");
       CuVSAceParams aceParams =
           new CuVSAceParams.Builder()
               .withNpartitions(2)
               .withEfConstruction(120)
-              .withUseDisk(true)
               .withBuildDir(buildDir.toString())
               .build();
 

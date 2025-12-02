@@ -11,6 +11,8 @@ package com.nvidia.cuvs;
  * 2. Building sub-indexes for each partition independently
  * 3. Concatenating sub-graphs into a final unified index
  *
+ * ACE always uses disk-based storage for memory-efficient graph construction.
+ *
  * @since 25.02
  */
 public class HnswAceParams {
@@ -18,16 +20,14 @@ public class HnswAceParams {
   private long npartitions;
   private long efConstruction;
   private String buildDir;
-  private boolean useDisk;
   private double maxHostMemoryGb;
   private double maxGpuMemoryGb;
 
-  private HnswAceParams(long npartitions, long efConstruction, String buildDir, boolean useDisk,
+  private HnswAceParams(long npartitions, long efConstruction, String buildDir,
                         double maxHostMemoryGb, double maxGpuMemoryGb) {
     this.npartitions = npartitions;
     this.efConstruction = efConstruction;
     this.buildDir = buildDir;
-    this.useDisk = useDisk;
     this.maxHostMemoryGb = maxHostMemoryGb;
     this.maxGpuMemoryGb = maxGpuMemoryGb;
   }
@@ -60,15 +60,6 @@ public class HnswAceParams {
   }
 
   /**
-   * Gets whether disk-based storage is enabled for ACE build.
-   *
-   * @return true if disk mode is enabled
-   */
-  public boolean isUseDisk() {
-    return useDisk;
-  }
-
-  /**
    * Gets the maximum host memory limit in GiB.
    *
    * @return the max host memory limit (0 means use available memory)
@@ -94,8 +85,6 @@ public class HnswAceParams {
         + efConstruction
         + ", buildDir="
         + buildDir
-        + ", useDisk="
-        + useDisk
         + ", maxHostMemoryGb="
         + maxHostMemoryGb
         + ", maxGpuMemoryGb="
@@ -111,7 +100,6 @@ public class HnswAceParams {
     private long npartitions = 0;
     private long efConstruction = 120;
     private String buildDir = "/tmp/hnsw_ace_build";
-    private boolean useDisk = false;
     private double maxHostMemoryGb = 0;
     private double maxGpuMemoryGb = 0;
 
@@ -155,26 +143,14 @@ public class HnswAceParams {
     }
 
     /**
-     * Sets the directory to store ACE build artifacts.
-     * Used when useDisk is true or when the graph does not fit in memory.
+     * Sets the directory to store ACE build artifacts (e.g., KNN graph, optimized
+     * graph, reordered dataset). ACE always uses disk-based storage.
      *
      * @param buildDir the build directory path
      * @return an instance of Builder
      */
     public Builder withBuildDir(String buildDir) {
       this.buildDir = buildDir;
-      return this;
-    }
-
-    /**
-     * Sets whether to use disk-based storage for ACE build.
-     * When true, enables disk-based operations for memory-efficient graph construction.
-     *
-     * @param useDisk true to enable disk mode
-     * @return an instance of Builder
-     */
-    public Builder withUseDisk(boolean useDisk) {
-      this.useDisk = useDisk;
       return this;
     }
 
@@ -212,7 +188,7 @@ public class HnswAceParams {
      * @return an instance of {@link HnswAceParams}
      */
     public HnswAceParams build() {
-      return new HnswAceParams(npartitions, efConstruction, buildDir, useDisk,
+      return new HnswAceParams(npartitions, efConstruction, buildDir,
                                maxHostMemoryGb, maxGpuMemoryGb);
     }
   }

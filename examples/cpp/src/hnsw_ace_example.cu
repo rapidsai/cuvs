@@ -52,10 +52,6 @@ void hnsw_build_search_ace(raft::device_resources const& dev_resources,
   // Set the directory to store the ACE build artifacts. This should be the fastest disk in the
   // system and hold enough space for twice the dataset, final graph, and label mapping.
   ace_params.build_dir = "/tmp/hnsw_ace_build";
-  // Set whether to use disk-based storage for ACE build. When true, enables disk-based operations
-  // for memory-efficient graph construction. If not set, the index will be built in memory if the
-  // graph fits in host and GPU memory, and on disk otherwise.
-  ace_params.use_disk            = true;
   hnsw_params.graph_build_params = ace_params;
   // Set M parameter to control the graph degree (graph_degree = m * 2, intermediate_graph_degree =
   // m * 3). Higher values work for higher intrinsic dimensionality and/or high recall, low values

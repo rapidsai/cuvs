@@ -278,7 +278,6 @@ void ace_check_partition_sizes(
 }
 
 // ACE: Create forward/backward mappings between original and reordered vector IDs
-// The in-memory path can be parallelized but the disk path requires ordering.
 template <typename IdxT>
 void ace_create_forward_and_backward_lists(
   size_t dataset_size,
@@ -299,50 +298,25 @@ void ace_create_forward_and_backward_lists(
       augmented_partition_offsets(c - 1) + partition_histogram(c - 1, 1);
   }
 
-  if (static_cast<size_t>(core_forward_mapping.extent(0)) == 0) {
-    // Memory path: both backward mappings
-    RAFT_EXPECTS(static_cast<size_t>(core_backward_mapping.extent(0)) == dataset_size,
-                 "core_backward_mapping must be of size dataset_size");
-    RAFT_EXPECTS(static_cast<size_t>(augmented_backward_mapping.extent(0)) == dataset_size,
-                 "augmented_backward_mapping must be of size dataset_size");
-#pragma omp parallel for
-    for (size_t i = 0; i < dataset_size; i++) {
-      size_t core_partition_id = partition_labels(i, 0);
-      size_t core_id;
-#pragma omp atomic capture
-      core_id = core_partition_offsets(core_partition_id)++;
-      RAFT_EXPECTS(core_id < dataset_size, "Vector ID must be smaller than dataset_size");
-      core_backward_mapping(core_id) = i;
+  RAFT_EXPECTS(static_cast<size_t>(core_forward_mapping.extent(0)) == dataset_size,
+               "core_forward_mapping must be of size dataset_size");
+  RAFT_EXPECTS(static_cast<size_t>(core_backward_mapping.extent(0)) == dataset_size,
+               "core_backward_mapping must be of size dataset_size");
+  RAFT_EXPECTS(static_cast<size_t>(augmented_backward_mapping.extent(0)) == dataset_size,
+               "augmented_backward_mapping must be of size dataset_size");
+  for (size_t i = 0; i < dataset_size; i++) {
+    size_t core_partition_id = partition_labels(i, 0);
+    size_t core_id;
+    core_id = core_partition_offsets(core_partition_id)++;
+    RAFT_EXPECTS(core_id < dataset_size, "Vector ID must be smaller than dataset_size");
+    core_backward_mapping(core_id) = i;
+    core_forward_mapping(i)        = core_id;
 
-      size_t augmented_partition_id = partition_labels(i, 1);
-      size_t augmented_id;
-#pragma omp atomic capture
-      augmented_id = augmented_partition_offsets(augmented_partition_id)++;
-      RAFT_EXPECTS(augmented_id < dataset_size, "Vector ID must be smaller than dataset_size");
-      augmented_backward_mapping(augmented_id) = i;
-    }
-  } else {
-    // Disk path: all three mappings
-    RAFT_EXPECTS(static_cast<size_t>(core_forward_mapping.extent(0)) == dataset_size,
-                 "core_forward_mapping must be of size dataset_size");
-    RAFT_EXPECTS(static_cast<size_t>(core_backward_mapping.extent(0)) == dataset_size,
-                 "core_backward_mapping must be of size dataset_size");
-    RAFT_EXPECTS(static_cast<size_t>(augmented_backward_mapping.extent(0)) == dataset_size,
-                 "augmented_backward_mapping must be of size dataset_size");
-    for (size_t i = 0; i < dataset_size; i++) {
-      size_t core_partition_id = partition_labels(i, 0);
-      size_t core_id;
-      core_id = core_partition_offsets(core_partition_id)++;
-      RAFT_EXPECTS(core_id < dataset_size, "Vector ID must be smaller than dataset_size");
-      core_backward_mapping(core_id) = i;
-      core_forward_mapping(i)        = core_id;
-
-      size_t augmented_partition_id = partition_labels(i, 1);
-      size_t augmented_id;
-      augmented_id = augmented_partition_offsets(augmented_partition_id)++;
-      RAFT_EXPECTS(augmented_id < dataset_size, "Vector ID must be smaller than dataset_size");
-      augmented_backward_mapping(augmented_id) = i;
-    }
+    size_t augmented_partition_id = partition_labels(i, 1);
+    size_t augmented_id;
+    augmented_id = augmented_partition_offsets(augmented_partition_id)++;
+    RAFT_EXPECTS(augmented_id < dataset_size, "Vector ID must be smaller than dataset_size");
+    augmented_backward_mapping(augmented_id) = i;
   }
 
   // Restore idxptr arrays
@@ -354,79 +328,9 @@ void ace_create_forward_and_backward_lists(
   augmented_partition_offsets(0) = 0;
 }
 
-// ACE: Gather partition dataset
-template <typename T, typename IdxT>
-void ace_gather_partition_dataset(
-  size_t core_sub_dataset_size,
-  size_t augmented_sub_dataset_size,
-  size_t dataset_dim,
-  size_t partition_id,
-  raft::host_matrix_view<const T, int64_t, row_major> dataset,
-  raft::host_vector_view<IdxT, int64_t, raft::row_major> core_backward_mapping,
-  raft::host_vector_view<IdxT, int64_t, raft::row_major> augmented_backward_mapping,
-  raft::host_vector_view<IdxT, int64_t, raft::row_major> core_partition_offsets,
-  raft::host_vector_view<IdxT, int64_t, raft::row_major> augmented_partition_offsets,
-  raft::host_matrix_view<T, int64_t, raft::row_major> sub_dataset)
-{
-  const size_t vector_size_bytes = dataset_dim * sizeof(T);
-
-  // Copy core partition vectors
-#pragma omp parallel for
-  for (size_t j = 0; j < core_sub_dataset_size; j++) {
-    size_t i = core_backward_mapping(j + core_partition_offsets(partition_id));
-    memcpy(&sub_dataset(j, 0), &dataset(i, 0), vector_size_bytes);
-  }
-
-  // Copy augmented partition vectors (2nd closest partition)
-#pragma omp parallel for
-  for (size_t j = 0; j < augmented_sub_dataset_size; j++) {
-    size_t i = augmented_backward_mapping(j + augmented_partition_offsets(partition_id));
-    memcpy(&sub_dataset(j + core_sub_dataset_size, 0), &dataset(i, 0), vector_size_bytes);
-  }
-}
-
-// ACE: Adjust IDs from core and augmented partitions to global reordered IDs
+// ACE: Adjust ids in sub search graph in place
 template <typename IdxT>
 void ace_adjust_sub_graph_ids(
-  size_t core_sub_dataset_size,
-  size_t augmented_sub_dataset_size,
-  size_t graph_degree,
-  size_t partition_id,
-  raft::host_matrix_view<IdxT, int64_t, raft::row_major> sub_search_graph,
-  raft::host_matrix_view<IdxT, int64_t, raft::row_major> search_graph,
-  raft::host_vector_view<IdxT, int64_t, raft::row_major> core_partition_offsets,
-  raft::host_vector_view<IdxT, int64_t, raft::row_major> augmented_partition_offsets,
-  raft::host_vector_view<IdxT, int64_t, raft::row_major> core_backward_mapping,
-  raft::host_vector_view<IdxT, int64_t, raft::row_major> augmented_backward_mapping)
-{
-#pragma omp parallel for
-  for (size_t i = 0; i < core_sub_dataset_size; i++) {
-    // Map row index from local → reordered → original
-    size_t i_reordered = i + core_partition_offsets(partition_id);
-    size_t i_original  = core_backward_mapping(i_reordered);
-
-    for (size_t k = 0; k < graph_degree; k++) {
-      size_t j = sub_search_graph(i, k);
-      size_t j_original;
-
-      if (j < core_sub_dataset_size) {
-        // core partition neighbor: local → core reordered → original
-        size_t j_reordered = j + core_partition_offsets(partition_id);
-        j_original         = core_backward_mapping(j_reordered);
-      } else {
-        // Augmented partition neighbor: local → augmented reordered → original
-        size_t j_augmented = j - core_sub_dataset_size;
-        j_original =
-          augmented_backward_mapping(j_augmented + augmented_partition_offsets(partition_id));
-      }
-      search_graph(i_original, k) = j_original;
-    }
-  }
-}
-
-// ACE: Adjust ids in sub search graph in place for disk version
-template <typename IdxT>
-void ace_adjust_sub_graph_ids_disk(
   size_t core_sub_dataset_size,
   size_t augmented_sub_dataset_size,
   size_t graph_degree,
@@ -682,8 +586,6 @@ void ace_load_partition_dataset_from_disk(
   raft::host_vector_view<IdxT, int64_t, raft::row_major> augmented_partition_offsets,
   raft::host_matrix_view<T, int64_t, raft::row_major> sub_dataset)
 {
-  size_t n_partitions = partition_histogram.extent(0);
-
   RAFT_LOG_DEBUG("ACE: Loading partition %lu dataset from disk", partition_id);
 
   size_t core_size            = partition_histogram(partition_id, 0);
@@ -813,18 +715,17 @@ constexpr double usable_cpu_memory_fraction = 0.8;
 constexpr double usable_gpu_memory_fraction = 0.8;
 constexpr double imbalance_factor           = 3.0;
 
-// Check if disk mode should be used for ACE based on memory constraints
+// Initialize memory requirements for ACE
 template <typename T, typename IdxT>
-bool ace_check_use_disk_mode(bool use_disk,
-                             std::string& build_dir,
-                             size_t dataset_size,
-                             size_t dataset_dim,
-                             size_t n_partitions,
-                             size_t intermediate_degree,
-                             size_t graph_degree,
-                             std::optional<double> max_host_memory_gb,
-                             std::optional<double> max_gpu_memory_gb,
-                             ace_memory_requirements& mem)
+void ace_init_memory_requirements(std::string& build_dir,
+                                  size_t dataset_size,
+                                  size_t dataset_dim,
+                                  size_t n_partitions,
+                                  size_t intermediate_degree,
+                                  size_t graph_degree,
+                                  std::optional<double> max_host_memory_gb,
+                                  std::optional<double> max_gpu_memory_gb,
+                                  ace_memory_requirements& mem)
 {
   // Use overridden memory limits if provided (> 0), otherwise query actual system memory
   if (max_host_memory_gb.has_value() && max_host_memory_gb.value() > 0) {
@@ -835,84 +736,51 @@ bool ace_check_use_disk_mode(bool use_disk,
   }
 
   // Optimistic memory model: focus on largest arrays, assumes all partitions are of equal size
-  // For memory path:
   //   - Partition labels (core + augmented): 2 * dataset_size * sizeof(IdxT)
-  //   - Backward ID mapping arrays (core + augmented): 2 * dataset_size * sizeof(IdxT)
+  //   - ID mapping arrays (core + augmented + forward): 3 * dataset_size * sizeof(IdxT)
   //   - Avg. per-partition dataset: 2 * (dataset_size / n_partitions) * dataset_dim * sizeof(T)
   //   - Avg. per-partition graph during build: 2 * (dataset_size / n_partitions) * (intermediate +
-  //   final)
-  //   * sizeof(IdxT)
-  //   - Final assembled graph: dataset_size * graph_degree * sizeof(IdxT)
+  //   final) * sizeof(IdxT)
   mem.partition_labels_size = 2 * dataset_size * sizeof(IdxT);
-  mem.id_mapping_size       = 2 * dataset_size * sizeof(IdxT);
+  mem.id_mapping_size       = 3 * dataset_size * sizeof(IdxT);
   mem.sub_dataset_size =
     imbalance_factor * 2 * (dataset_size / n_partitions) * dataset_dim * sizeof(T);
   mem.sub_graph_size = imbalance_factor * 2 * (dataset_size / n_partitions) *
                        (intermediate_degree + graph_degree) * sizeof(IdxT);
   mem.cagra_graph_size = dataset_size * graph_degree * sizeof(IdxT);
-  mem.total_size       = mem.partition_labels_size + mem.id_mapping_size + mem.sub_dataset_size +
-                   mem.sub_graph_size + mem.cagra_graph_size;
+  mem.total_size =
+    mem.partition_labels_size + mem.id_mapping_size + mem.sub_dataset_size + mem.sub_graph_size;
 
   RAFT_LOG_INFO("ACE: Estimated host memory required: %.2f GiB, available: %.2f GiB",
                 to_gib(mem.total_size),
                 to_gib(mem.available_host_memory));
 
-  bool host_memory_limited =
-    static_cast<size_t>(usable_cpu_memory_fraction * mem.available_host_memory) < mem.total_size;
-
-  // GPU is mostly limited by the index size (update_graph() in the end of this routine).
-  // Check if GPU has enough memory for the final graph or use disk mode instead.
-  // TODO: Extend model or use managed memory if running out of GPU memory.
+  // GPU memory for per-partition processing
   if (max_gpu_memory_gb.has_value() && max_gpu_memory_gb.value() > 0) {
     mem.available_gpu_memory = static_cast<size_t>(max_gpu_memory_gb.value() * (1ULL << 30));
     RAFT_LOG_INFO("ACE: Using overridden GPU memory limit: %.2f GiB", max_gpu_memory_gb.value());
   } else {
     mem.available_gpu_memory = rmm::available_device_memory().second;
   }
-  bool gpu_memory_limited = static_cast<size_t>(usable_gpu_memory_fraction *
-                                                mem.available_gpu_memory) < mem.cagra_graph_size;
 
-  RAFT_LOG_INFO("ACE: Estimated GPU memory required: %.2f GiB, available: %.2f GiB",
+  RAFT_LOG_INFO("ACE: Final graph size: %.2f GiB, available GPU memory: %.2f GiB",
                 to_gib(mem.cagra_graph_size),
                 to_gib(mem.available_gpu_memory));
 
-  bool use_disk_mode = use_disk || host_memory_limited || gpu_memory_limited;
-  if (use_disk_mode) {
-    bool valid_build_dir = !build_dir.empty();
-    valid_build_dir &= build_dir.length() <= 255;
-    valid_build_dir &= build_dir.find('\0') == std::string::npos;
-    valid_build_dir &= build_dir.find("//") == std::string::npos;
-    if (!valid_build_dir) {
-      RAFT_LOG_WARN("ACE: Invalid build_dir path, resetting to default: /tmp/ace_build");
-      build_dir = "/tmp/ace_build";
-    }
-    if (mkdir(build_dir.c_str(), 0755) != 0 && errno != EEXIST) {
-      RAFT_EXPECTS(false, "Failed to create ACE build directory: %s", build_dir.c_str());
-    }
+  // Validate and create build directory
+  bool valid_build_dir = !build_dir.empty();
+  valid_build_dir &= build_dir.length() <= 255;
+  valid_build_dir &= build_dir.find('\0') == std::string::npos;
+  valid_build_dir &= build_dir.find("//") == std::string::npos;
+  if (!valid_build_dir) {
+    RAFT_LOG_WARN("ACE: Invalid build_dir path, resetting to default: /tmp/ace_build");
+    build_dir = "/tmp/ace_build";
+  }
+  if (mkdir(build_dir.c_str(), 0755) != 0 && errno != EEXIST) {
+    RAFT_EXPECTS(false, "Failed to create ACE build directory: %s", build_dir.c_str());
   }
 
-  if (host_memory_limited && gpu_memory_limited) {
-    RAFT_LOG_INFO(
-      "ACE: Graph does not fit in host and GPU memory. Using disk-mode with temporary storage %s",
-      build_dir.c_str());
-  } else if (host_memory_limited) {
-    RAFT_LOG_INFO(
-      "ACE: Graph does not fit in host memory. Using disk-mode with temporary storage %s",
-      build_dir.c_str());
-  } else if (gpu_memory_limited) {
-    RAFT_LOG_INFO(
-      "ACE: Graph does not fit in GPU memory. Using disk-mode with temporary storage %s",
-      build_dir.c_str());
-  } else if (use_disk) {
-    RAFT_LOG_INFO(
-      "ACE: Graph fits in host and GPU memory but disk mode is forced. Using disk-mode with "
-      "temporary storage %s",
-      build_dir.c_str());
-  } else {
-    RAFT_LOG_INFO("ACE: Graph fits in host and GPU memory. Using in-memory mode.");
-  }
-
-  return use_disk_mode;
+  RAFT_LOG_INFO("ACE: Using build directory %s", build_dir.c_str());
 }
 
 // Validate and adjust partitions for disk mode memory requirements
@@ -1032,13 +900,12 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
 }
 
 // Build CAGRA index using ACE (Augmented Core Extraction) partitioning
-// ACE enables building indexes for datasets too large to fit in GPU memory by:
+// ACE enables building indices for datasets too large to fit in memory by:
 // 1. Partitioning the dataset using balanced k-means in core (non-overlapping) and augmented
 // (second-closest) partitions
-// 2. Building sub-indexes for each partition independently
+// 2. Building sub-indices for each partition independently
 // 3. Concatenating sub-graphs (of core partitions) into a final unified index
-// Supports both in-memory and disk-based modes depending on available host memory.
-// In disk mode, the graph is stored in build_dir and dataset is reordered on disk.
+// ACE stores the graph in build_dir and reorders the dataset on disk.
 // The returned index is not usable for search. Use the created files for search instead.
 template <typename T, typename IdxT>
 index<T, IdxT> build_ace(raft::resources const& res,
@@ -1054,7 +921,6 @@ index<T, IdxT> build_ace(raft::resources const& res,
   size_t npartitions = ace_params.npartitions;
   size_t ef_construction = ace_params.ef_construction;
   std::string build_dir  = ace_params.build_dir;
-  bool use_disk          = ace_params.use_disk;
 
   common::nvtx::range<common::nvtx::domain::cuvs> function_scope(
     "cagra::build_ace<host>(%zu, %zu, %zu)",
@@ -1104,24 +970,21 @@ index<T, IdxT> build_ace(raft::resources const& res,
   try {
     check_graph_degree<T, IdxT>(intermediate_degree, graph_degree, dataset_size);
 
-    // Check if disk mode should be used based on memory constraints
+    // Initialize memory requirements for ACE disk mode
     ace_memory_requirements mem;
-    bool use_disk_mode = ace_check_use_disk_mode<T, IdxT>(use_disk,
-                                                          build_dir,
-                                                          dataset_size,
-                                                          dataset_dim,
-                                                          n_partitions,
-                                                          intermediate_degree,
-                                                          graph_degree,
-                                                          ace_params.max_host_memory_gb,
-                                                          ace_params.max_gpu_memory_gb,
-                                                          mem);
+    ace_init_memory_requirements<T, IdxT>(build_dir,
+                                          dataset_size,
+                                          dataset_dim,
+                                          n_partitions,
+                                          intermediate_degree,
+                                          graph_degree,
+                                          ace_params.max_host_memory_gb,
+                                          ace_params.max_gpu_memory_gb,
+                                          mem);
 
-    // Validate and adjust partitions if disk mode is enabled
-    if (use_disk_mode) {
-      ace_validate_disk_mode_partitions<T, IdxT>(
-        n_partitions, dataset_size, dataset_dim, intermediate_degree, graph_degree, mem);
-    }
+    // Validate and adjust partitions based on memory requirements
+    ace_validate_disk_mode_partitions<T, IdxT>(
+      n_partitions, dataset_size, dataset_dim, intermediate_degree, graph_degree, mem);
 
     // Preallocate space for files for better performance and fail early if not enough space.
     cuvs::util::file_descriptor reordered_fd;
@@ -1133,147 +996,142 @@ index<T, IdxT> build_ace(raft::resources const& res,
     size_t mapping_header_size   = 0;
     size_t graph_header_size     = 0;
 
-    if (use_disk_mode) {
-      if (mkdir(build_dir.c_str(), 0755) != 0 && errno != EEXIST) {
-        RAFT_EXPECTS(false, "Failed to create ACE build directory: %s", build_dir.c_str());
-      }
-      // Mark for cleanup if we fail after creating the directory
-      cleanup_on_failure = true;
+    // Mark for cleanup if we fail after creating files
+    cleanup_on_failure = true;
 
-      // Helper lambda to write numpy header to file descriptor
-      auto write_numpy_header = [](int fd,
-                                   const std::vector<size_t>& shape,
-                                   const raft::detail::numpy_serializer::dtype_t& dtype) {
-        std::stringstream ss;
+    // Helper lambda to write numpy header to file descriptor
+    auto write_numpy_header = [](int fd,
+                                 const std::vector<size_t>& shape,
+                                 const raft::detail::numpy_serializer::dtype_t& dtype) {
+      std::stringstream ss;
 
-        const bool fortran_order                              = false;
-        const raft::detail::numpy_serializer::header_t header = {dtype, fortran_order, shape};
+      const bool fortran_order                              = false;
+      const raft::detail::numpy_serializer::header_t header = {dtype, fortran_order, shape};
 
-        raft::detail::numpy_serializer::write_header(ss, header);
+      raft::detail::numpy_serializer::write_header(ss, header);
 
-        std::string header_str = ss.str();
-        ssize_t written        = write(fd, header_str.data(), header_str.size());
-        if (written < 0 || static_cast<size_t>(written) != header_str.size()) {
-          RAFT_FAIL("Failed to write numpy header to file descriptor");
-        }
-        return header_str.size();
-      };
+      std::string header_str = ss.str();
+      ssize_t written        = write(fd, header_str.data(), header_str.size());
+      if (written < 0 || static_cast<size_t>(written) != header_str.size()) {
+        RAFT_FAIL("Failed to write numpy header to file descriptor");
+      }
+      return header_str.size();
+    };
 
-      // Create and allocate dataset file
-      reordered_fd = cuvs::util::file_descriptor(
-        build_dir + "/reordered_dataset.npy", O_CREAT | O_RDWR | O_TRUNC, 0644);
-      {
-        std::stringstream ss;
-        const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<T>();
-        const bool fortran_order = false;
-        const raft::detail::numpy_serializer::header_t header = {
-          dtype, fortran_order, {dataset_size, dataset_dim}};
-        raft::detail::numpy_serializer::write_header(ss, header);
-        reordered_header_size = ss.str().size();
-      }
-      if (posix_fallocate(reordered_fd.get(),
-                          0,
-                          reordered_header_size + dataset_size * dataset_dim * sizeof(T)) != 0) {
-        RAFT_FAIL("Failed to pre-allocate space for reordered dataset file");
-      }
-      {
-        auto dtype_for_dataset = raft::detail::numpy_serializer::get_numpy_dtype<T>();
-        RAFT_LOG_DEBUG("Writing reordered_dataset.npy header: shape=[%zu,%zu], dtype=%c",
-                       dataset_size,
-                       dataset_dim,
-                       dtype_for_dataset.kind);
-        if (lseek(reordered_fd.get(), 0, SEEK_SET) == -1) {
-          RAFT_FAIL("Failed to seek to beginning of reordered dataset file");
-        }
-        write_numpy_header(reordered_fd.get(), {dataset_size, dataset_dim}, dtype_for_dataset);
-      }
-
-      // Create and allocate augmented dataset file
-      augmented_fd = cuvs::util::file_descriptor(
-        build_dir + "/augmented_dataset.npy", O_CREAT | O_RDWR | O_TRUNC, 0644);
-      {
-        std::stringstream ss;
-        const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<T>();
-        const bool fortran_order = false;
-        const raft::detail::numpy_serializer::header_t header = {
-          dtype, fortran_order, {dataset_size, dataset_dim}};
-        raft::detail::numpy_serializer::write_header(ss, header);
-        augmented_header_size = ss.str().size();
-      }
-      if (posix_fallocate(augmented_fd.get(),
-                          0,
-                          augmented_header_size + dataset_size * dataset_dim * sizeof(T)) != 0) {
-        RAFT_FAIL("Failed to pre-allocate space for augmented dataset file");
-      }
-      // Seek to beginning before writing header
-      if (lseek(augmented_fd.get(), 0, SEEK_SET) == -1) {
-        RAFT_FAIL("Failed to seek to beginning of augmented dataset file");
-      }
-      write_numpy_header(augmented_fd.get(),
-                         {dataset_size, dataset_dim},
-                         raft::detail::numpy_serializer::get_numpy_dtype<T>());
-
-      // Create and allocate mapping file
-      mapping_fd = cuvs::util::file_descriptor(
-        build_dir + "/dataset_mapping.npy", O_CREAT | O_RDWR | O_TRUNC, 0644);
-      {
-        std::stringstream ss;
-        const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<IdxT>();
-        const bool fortran_order = false;
-        const raft::detail::numpy_serializer::header_t header = {
-          dtype, fortran_order, {dataset_size}};
-        raft::detail::numpy_serializer::write_header(ss, header);
-        mapping_header_size = ss.str().size();
-      }
-      if (posix_fallocate(mapping_fd.get(), 0, mapping_header_size + dataset_size * sizeof(IdxT)) !=
-          0) {
-        RAFT_FAIL("Failed to pre-allocate space for dataset mapping file");
-      }
-      {
-        auto dtype_for_mapping = raft::detail::numpy_serializer::get_numpy_dtype<IdxT>();
-        RAFT_LOG_DEBUG("Writing dataset_mapping.npy header: shape=[%zu], dtype=%c",
-                       dataset_size,
-                       dtype_for_mapping.kind);
-        if (lseek(mapping_fd.get(), 0, SEEK_SET) == -1) {
-          RAFT_FAIL("Failed to seek to beginning of mapping file");
-        }
-        write_numpy_header(mapping_fd.get(), {dataset_size}, dtype_for_mapping);
-      }
-
-      // Create and allocate graph file
-      graph_fd = cuvs::util::file_descriptor(
-        build_dir + "/cagra_graph.npy", O_CREAT | O_RDWR | O_TRUNC, 0644);
-      {
-        std::stringstream ss;
-        const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<IdxT>();
-        const bool fortran_order = false;
-        const raft::detail::numpy_serializer::header_t header = {
-          dtype, fortran_order, {dataset_size, graph_degree}};
-        raft::detail::numpy_serializer::write_header(ss, header);
-        graph_header_size = ss.str().size();
-      }
-      if (posix_fallocate(graph_fd.get(), 0, graph_header_size + mem.cagra_graph_size) != 0) {
-        RAFT_FAIL("Failed to pre-allocate space for graph file");
-      }
-      {
-        auto dtype_for_graph = raft::detail::numpy_serializer::get_numpy_dtype<IdxT>();
-        RAFT_LOG_DEBUG("Writing cagra_graph.npy header: shape=[%zu,%zu], dtype=%c",
-                       dataset_size,
-                       graph_degree,
-                       dtype_for_graph.kind);
-        if (lseek(graph_fd.get(), 0, SEEK_SET) == -1) {
-          RAFT_FAIL("Failed to seek to beginning of graph file");
-        }
-        write_numpy_header(graph_fd.get(), {dataset_size, graph_degree}, dtype_for_graph);
-      }
-
-      RAFT_LOG_DEBUG(
-        "ACE: Wrote numpy headers (reordered: %zu, augmented: %zu, mapping: %zu, graph: %zu bytes)",
-        reordered_header_size,
-        augmented_header_size,
-        mapping_header_size,
-        graph_header_size);
+    // Create and allocate dataset file
+    reordered_fd = cuvs::util::file_descriptor(
+      build_dir + "/reordered_dataset.npy", O_CREAT | O_RDWR | O_TRUNC, 0644);
+    {
+      std::stringstream ss;
+      const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<T>();
+      const bool fortran_order = false;
+      const raft::detail::numpy_serializer::header_t header = {
+        dtype, fortran_order, {dataset_size, dataset_dim}};
+      raft::detail::numpy_serializer::write_header(ss, header);
+      reordered_header_size = ss.str().size();
     }
+    if (posix_fallocate(reordered_fd.get(),
+                        0,
+                        reordered_header_size + dataset_size * dataset_dim * sizeof(T)) != 0) {
+      RAFT_FAIL("Failed to pre-allocate space for reordered dataset file");
+    }
+    {
+      auto dtype_for_dataset = raft::detail::numpy_serializer::get_numpy_dtype<T>();
+      RAFT_LOG_DEBUG("Writing reordered_dataset.npy header: shape=[%zu,%zu], dtype=%c",
+                     dataset_size,
+                     dataset_dim,
+                     dtype_for_dataset.kind);
+      if (lseek(reordered_fd.get(), 0, SEEK_SET) == -1) {
+        RAFT_FAIL("Failed to seek to beginning of reordered dataset file");
+      }
+      write_numpy_header(reordered_fd.get(), {dataset_size, dataset_dim}, dtype_for_dataset);
+    }
+
+    // Create and allocate augmented dataset file
+    augmented_fd = cuvs::util::file_descriptor(
+      build_dir + "/augmented_dataset.npy", O_CREAT | O_RDWR | O_TRUNC, 0644);
+    {
+      std::stringstream ss;
+      const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<T>();
+      const bool fortran_order = false;
+      const raft::detail::numpy_serializer::header_t header = {
+        dtype, fortran_order, {dataset_size, dataset_dim}};
+      raft::detail::numpy_serializer::write_header(ss, header);
+      augmented_header_size = ss.str().size();
+    }
+    if (posix_fallocate(augmented_fd.get(),
+                        0,
+                        augmented_header_size + dataset_size * dataset_dim * sizeof(T)) != 0) {
+      RAFT_FAIL("Failed to pre-allocate space for augmented dataset file");
+    }
+    // Seek to beginning before writing header
+    if (lseek(augmented_fd.get(), 0, SEEK_SET) == -1) {
+      RAFT_FAIL("Failed to seek to beginning of augmented dataset file");
+    }
+    write_numpy_header(augmented_fd.get(),
+                       {dataset_size, dataset_dim},
+                       raft::detail::numpy_serializer::get_numpy_dtype<T>());
+
+    // Create and allocate mapping file
+    mapping_fd = cuvs::util::file_descriptor(
+      build_dir + "/dataset_mapping.npy", O_CREAT | O_RDWR | O_TRUNC, 0644);
+    {
+      std::stringstream ss;
+      const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<IdxT>();
+      const bool fortran_order = false;
+      const raft::detail::numpy_serializer::header_t header = {
+        dtype, fortran_order, {dataset_size}};
+      raft::detail::numpy_serializer::write_header(ss, header);
+      mapping_header_size = ss.str().size();
+    }
+    if (posix_fallocate(mapping_fd.get(), 0, mapping_header_size + dataset_size * sizeof(IdxT)) !=
+        0) {
+      RAFT_FAIL("Failed to pre-allocate space for dataset mapping file");
+    }
+    {
+      auto dtype_for_mapping = raft::detail::numpy_serializer::get_numpy_dtype<IdxT>();
+      RAFT_LOG_DEBUG("Writing dataset_mapping.npy header: shape=[%zu], dtype=%c",
+                     dataset_size,
+                     dtype_for_mapping.kind);
+      if (lseek(mapping_fd.get(), 0, SEEK_SET) == -1) {
+        RAFT_FAIL("Failed to seek to beginning of mapping file");
+      }
+      write_numpy_header(mapping_fd.get(), {dataset_size}, dtype_for_mapping);
+    }
+
+    // Create and allocate graph file
+    graph_fd =
+      cuvs::util::file_descriptor(build_dir + "/cagra_graph.npy", O_CREAT | O_RDWR | O_TRUNC, 0644);
+    {
+      std::stringstream ss;
+      const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<IdxT>();
+      const bool fortran_order = false;
+      const raft::detail::numpy_serializer::header_t header = {
+        dtype, fortran_order, {dataset_size, graph_degree}};
+      raft::detail::numpy_serializer::write_header(ss, header);
+      graph_header_size = ss.str().size();
+    }
+    if (posix_fallocate(graph_fd.get(), 0, graph_header_size + mem.cagra_graph_size) != 0) {
+      RAFT_FAIL("Failed to pre-allocate space for graph file");
+    }
+    {
+      auto dtype_for_graph = raft::detail::numpy_serializer::get_numpy_dtype<IdxT>();
+      RAFT_LOG_DEBUG("Writing cagra_graph.npy header: shape=[%zu,%zu], dtype=%c",
+                     dataset_size,
+                     graph_degree,
+                     dtype_for_graph.kind);
+      if (lseek(graph_fd.get(), 0, SEEK_SET) == -1) {
+        RAFT_FAIL("Failed to seek to beginning of graph file");
+      }
+      write_numpy_header(graph_fd.get(), {dataset_size, graph_degree}, dtype_for_graph);
+    }
+
+    RAFT_LOG_DEBUG(
+      "ACE: Wrote numpy headers (reordered: %zu, augmented: %zu, mapping: %zu, graph: %zu bytes)",
+      reordered_header_size,
+      augmented_header_size,
+      mapping_header_size,
+      graph_header_size);
 
     auto partition_start     = std::chrono::high_resolution_clock::now();
     auto partition_labels    = raft::make_host_matrix<IdxT, int64_t>(dataset_size, 2);
@@ -1306,10 +1164,9 @@ index<T, IdxT> build_ace(raft::resources const& res,
       min_partition_size);
 
     // Create vector lists for each partition
-    auto vectorlist_start      = std::chrono::high_resolution_clock::now();
-    auto core_forward_mapping  = use_disk_mode ? raft::make_host_vector<IdxT, int64_t>(dataset_size)
-                                               : raft::make_host_vector<IdxT, int64_t>(0);
-    auto core_backward_mapping = raft::make_host_vector<IdxT, int64_t>(dataset_size);
+    auto vectorlist_start            = std::chrono::high_resolution_clock::now();
+    auto core_forward_mapping        = raft::make_host_vector<IdxT, int64_t>(dataset_size);
+    auto core_backward_mapping       = raft::make_host_vector<IdxT, int64_t>(dataset_size);
     auto augmented_backward_mapping  = raft::make_host_vector<IdxT, int64_t>(dataset_size);
     auto core_partition_offsets      = raft::make_host_vector<IdxT, int64_t>(n_partitions + 1);
     auto augmented_partition_offsets = raft::make_host_vector<IdxT, int64_t>(n_partitions + 1);
@@ -1332,29 +1189,22 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
     // Reorder the dataset based on partitions and store to disk. Uses write buffers to improve
     // performance.
-    if (use_disk_mode) {
-      ace_reorder_and_store_dataset<T, IdxT>(res,
-                                             build_dir,
-                                             dataset,
-                                             partition_labels.view(),
-                                             partition_histogram.view(),
-                                             core_backward_mapping.view(),
-                                             core_partition_offsets.view(),
-                                             augmented_partition_offsets.view(),
-                                             reordered_fd,
-                                             augmented_fd,
-                                             mapping_fd,
-                                             reordered_header_size,
-                                             augmented_header_size,
-                                             mapping_header_size);
-      // core_backward_mapping is not needed anymore.
-      core_backward_mapping = raft::make_host_vector<IdxT, int64_t>(0);
-    }
-
-    // Placeholder search graph for in-memory version
-    auto search_graph = use_disk_mode
-                          ? raft::make_host_matrix<IdxT, int64_t>(0, 0)
-                          : raft::make_host_matrix<IdxT, int64_t>(dataset_size, graph_degree);
+    ace_reorder_and_store_dataset<T, IdxT>(res,
+                                           build_dir,
+                                           dataset,
+                                           partition_labels.view(),
+                                           partition_histogram.view(),
+                                           core_backward_mapping.view(),
+                                           core_partition_offsets.view(),
+                                           augmented_partition_offsets.view(),
+                                           reordered_fd,
+                                           augmented_fd,
+                                           mapping_fd,
+                                           reordered_header_size,
+                                           augmented_header_size,
+                                           mapping_header_size);
+    // core_backward_mapping is not needed anymore.
+    core_backward_mapping = raft::make_host_vector<IdxT, int64_t>(0);
 
     // Process each partition
     auto partition_processing_start = std::chrono::high_resolution_clock::now();
@@ -1378,29 +1228,15 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
       auto sub_dataset = raft::make_host_matrix<T, int64_t>(sub_dataset_size, dataset_dim);
 
-      if (use_disk_mode) {
-        // Load partition dataset from disk files
-        ace_load_partition_dataset_from_disk<T, IdxT>(res,
-                                                      build_dir,
-                                                      partition_id,
-                                                      dataset_dim,
-                                                      partition_histogram.view(),
-                                                      core_partition_offsets.view(),
-                                                      augmented_partition_offsets.view(),
-                                                      sub_dataset.view());
-      } else {
-        // Gather partition dataset from memory
-        ace_gather_partition_dataset<T, IdxT>(core_sub_dataset_size,
-                                              augmented_sub_dataset_size,
-                                              dataset_dim,
-                                              partition_id,
-                                              dataset,
-                                              core_backward_mapping.view(),
-                                              augmented_backward_mapping.view(),
-                                              core_partition_offsets.view(),
-                                              augmented_partition_offsets.view(),
-                                              sub_dataset.view());
-      }
+      // Load partition dataset from disk files
+      ace_load_partition_dataset_from_disk<T, IdxT>(res,
+                                                    build_dir,
+                                                    partition_id,
+                                                    dataset_dim,
+                                                    partition_histogram.view(),
+                                                    core_partition_offsets.view(),
+                                                    augmented_partition_offsets.view(),
+                                                    sub_dataset.view());
       auto read_end = std::chrono::high_resolution_clock::now();
       auto read_elapsed =
         std::chrono::duration_cast<std::chrono::milliseconds>(read_end - start).count();
@@ -1433,43 +1269,28 @@ index<T, IdxT> build_ace(raft::resources const& res,
                         stream);
       raft::resource::sync_stream(res, stream);
 
-      if (use_disk_mode) {
-        // Adjust IDs in sub_search_graph in place for disk storage
-        ace_adjust_sub_graph_ids_disk<IdxT>(core_sub_dataset_size,
-                                            augmented_sub_dataset_size,
-                                            graph_degree,
-                                            partition_id,
-                                            sub_search_graph.view(),
-                                            core_partition_offsets.view(),
-                                            augmented_partition_offsets.view(),
-                                            augmented_backward_mapping.view(),
-                                            core_forward_mapping.view());
-      } else {
-        // Adjust IDs in sub_search_graph and save to search_graph
-        ace_adjust_sub_graph_ids<IdxT>(core_sub_dataset_size,
-                                       augmented_sub_dataset_size,
-                                       graph_degree,
-                                       partition_id,
-                                       sub_search_graph.view(),
-                                       search_graph.view(),
-                                       core_partition_offsets.view(),
-                                       augmented_partition_offsets.view(),
-                                       core_backward_mapping.view(),
-                                       augmented_backward_mapping.view());
-      }
+      // Adjust IDs in sub_search_graph in place for disk storage
+      ace_adjust_sub_graph_ids<IdxT>(core_sub_dataset_size,
+                                     augmented_sub_dataset_size,
+                                     graph_degree,
+                                     partition_id,
+                                     sub_search_graph.view(),
+                                     core_partition_offsets.view(),
+                                     augmented_partition_offsets.view(),
+                                     augmented_backward_mapping.view(),
+                                     core_forward_mapping.view());
 
       auto adjust_end = std::chrono::high_resolution_clock::now();
       auto adjust_elapsed =
         std::chrono::duration_cast<std::chrono::milliseconds>(adjust_end - optimize_end).count();
 
-      if (use_disk_mode) {
-        const size_t graph_offset =
-          static_cast<size_t>(core_partition_offsets(partition_id)) * graph_degree * sizeof(IdxT) +
-          graph_header_size;
-        const size_t graph_bytes = core_sub_dataset_size * graph_degree * sizeof(IdxT);
-        cuvs::util::write_large_file(
-          graph_fd, sub_search_graph.data_handle(), graph_bytes, graph_offset);
-      }
+      // Write graph to disk
+      const size_t graph_offset =
+        static_cast<size_t>(core_partition_offsets(partition_id)) * graph_degree * sizeof(IdxT) +
+        graph_header_size;
+      const size_t graph_bytes = core_sub_dataset_size * graph_degree * sizeof(IdxT);
+      cuvs::util::write_large_file(
+        graph_fd, sub_search_graph.data_handle(), graph_bytes, graph_offset);
 
       auto end = std::chrono::high_resolution_clock::now();
       auto write_elapsed =
@@ -1508,47 +1329,25 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
     // Clean up augmented dataset file to save disk space (no longer needed after partitions
     // processed)
-    if (use_disk_mode) {
-      const std::string augmented_dataset_path = build_dir + "/augmented_dataset.npy";
-      if (std::filesystem::exists(augmented_dataset_path)) {
-        std::filesystem::remove(augmented_dataset_path);
-        RAFT_LOG_INFO("ACE: Removed augmented dataset file to save disk space");
-      }
+    const std::string augmented_dataset_path = build_dir + "/augmented_dataset.npy";
+    if (std::filesystem::exists(augmented_dataset_path)) {
+      std::filesystem::remove(augmented_dataset_path);
+      RAFT_LOG_INFO("ACE: Removed augmented dataset file to save disk space");
     }
 
     auto index_creation_start = std::chrono::high_resolution_clock::now();
     index<T, IdxT> idx(res, params.metric);
-    // Only add graph and dataset if not using disk storage. The returned index is empty if using
-    // disk storage. Use the files written to disk for search.
-    if (!use_disk_mode) {
-      idx.update_graph(res, raft::make_const_mdspan(search_graph.view()));
+    // ACE always uses disk storage. Use the files written to disk for search.
+    idx.update_dataset(res, std::move(reordered_fd));
+    idx.update_graph(res, std::move(graph_fd));
+    idx.update_mapping(res, std::move(mapping_fd));
 
-      if (params.attach_dataset_on_build) {
-        try {
-          idx.update_dataset(res, dataset);
-        } catch (std::bad_alloc& e) {
-          RAFT_LOG_WARN(
-            "Insufficient GPU memory to attach dataset to ACE index. Only the graph will be "
-            "stored.");
-        } catch (raft::logic_error& e) {
-          RAFT_LOG_WARN(
-            "Insufficient GPU memory to attach dataset to ACE index. Only the graph will be "
-            "stored.");
-        }
-      }
-    } else {
-      idx.update_dataset(res, std::move(reordered_fd));
-      idx.update_graph(res, std::move(graph_fd));
-      idx.update_mapping(res, std::move(mapping_fd));
-
-      RAFT_LOG_INFO(
-        "ACE: Set disk storage at %s (dataset shape [%zu, %zu], graph shape [%zu, %zu])",
-        build_dir.c_str(),
-        idx.size(),
-        idx.dim(),
-        idx.size(),
-        idx.graph_degree());
-    }
+    RAFT_LOG_INFO("ACE: Set disk storage at %s (dataset shape [%zu, %zu], graph shape [%zu, %zu])",
+                  build_dir.c_str(),
+                  idx.size(),
+                  idx.dim(),
+                  idx.size(),
+                  idx.graph_degree());
 
     auto index_creation_end     = std::chrono::high_resolution_clock::now();
     auto index_creation_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(

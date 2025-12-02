@@ -71,12 +71,11 @@ struct index_params : cuvs::neighbors::index_params {
    *
    * @code{.cpp}
    * hnsw::index_params params;
-   * // Configure ACE parameters
+   * // Configure ACE parameters (ACE always uses disk-based storage)
    * params.graph_build_params = hnsw::graph_build_params::ace_params();
    * auto& ace = std::get<hnsw::graph_build_params::ace_params>(params.graph_build_params);
    * ace.npartitions = 4;
    * ace.ef_construction = 120;
-   * ace.use_disk = true;
    * ace.build_dir = "/tmp/hnsw_ace_build";
    * @endcode
    */
@@ -230,7 +229,6 @@ struct extend_params {
  *   // Configure GPU graph building parameters
  *   auto ace_params = hnsw::graph_build_params::ace_params();
  *   ace_params.npartitions = 4;
- *   ace_params.use_disk = true;
  *   ace_params.build_dir = "/tmp/hnsw_ace_build";
  *   params.graph_build_params = ace_params;
  *
@@ -288,7 +286,6 @@ std::unique_ptr<index<float>> build(
  *   // Configure GPU graph building parameters
  *   auto ace_params = hnsw::graph_build_params::ace_params();
  *   ace_params.npartitions = 4;
- *   ace_params.use_disk = true;
  *   ace_params.build_dir = "/tmp/hnsw_ace_build";
  *   params.graph_build_params = ace_params;
  *
@@ -346,7 +343,6 @@ std::unique_ptr<index<half>> build(
  *   // Configure GPU graph building parameters
  *   auto ace_params = hnsw::graph_build_params::ace_params();
  *   ace_params.npartitions = 4;
- *   ace_params.use_disk = true;
  *   ace_params.build_dir = "/tmp/hnsw_ace_build";
  *   params.graph_build_params = ace_params;
  *
@@ -404,7 +400,6 @@ std::unique_ptr<index<uint8_t>> build(
  *   // Configure GPU graph building parameters
  *   auto ace_params = hnsw::graph_build_params::ace_params();
  *   ace_params.npartitions = 4;
- *   ace_params.use_disk = true;
  *   ace_params.build_dir = "/tmp/hnsw_ace_build";
  *   params.graph_build_params = ace_params;
  *

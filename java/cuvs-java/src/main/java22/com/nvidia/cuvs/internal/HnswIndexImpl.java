@@ -306,7 +306,6 @@ public class HnswIndexImpl implements HnswIndex {
 
     cuvsHnswAceParams.npartitions(seg, aceParams.getNpartitions());
     cuvsHnswAceParams.ef_construction(seg, aceParams.getEfConstruction());
-    cuvsHnswAceParams.use_disk(seg, aceParams.isUseDisk());
     cuvsHnswAceParams.max_host_memory_gb(seg, aceParams.getMaxHostMemoryGb());
     cuvsHnswAceParams.max_gpu_memory_gb(seg, aceParams.getMaxGpuMemoryGb());
 

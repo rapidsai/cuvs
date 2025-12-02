@@ -5,10 +5,8 @@
 import os
 import tempfile
 
-import cupy as cp
 import numpy as np
 import pytest
-from pylibraft.common import device_ndarray
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
 
@@ -27,7 +25,6 @@ def run_cagra_ace_build_search_test(
     graph_degree=64,
     npartitions=2,
     ef_construction=100,
-    use_disk=False,
     hierarchy="none",
 ):
     dataset = generate_data((n_rows, n_cols), dtype)
@@ -48,7 +45,6 @@ def run_cagra_ace_build_search_test(
             npartitions=npartitions,
             ef_construction=ef_construction,
             build_dir=temp_dir,
-            use_disk=use_disk,
         )
 
         # Build parameters
@@ -60,95 +56,47 @@ def run_cagra_ace_build_search_test(
             ace_params=ace_params,
         )
 
-        # Build the index with ACE (uses host memory)
+        # Build the index with ACE (uses disk-based storage)
         index = cagra.build(build_params, dataset)
 
         assert index.trained
 
-        # For disk-based mode, we can't search directly
-        # (would need HNSW conversion which is tested separately)
-        if not use_disk:
-            # For in-memory mode, we can search directly
-            # But queries need to be on device
-            search_params = cagra.SearchParams(itopk_size=64)
+        # Verify that expected files were created
+        assert os.path.exists(os.path.join(temp_dir, "cagra_graph.npy"))
+        assert os.path.exists(os.path.join(temp_dir, "reordered_dataset.npy"))
+        assert os.path.exists(os.path.join(temp_dir, "dataset_mapping.npy"))
 
-            # Transfer queries to device for search
-            queries_device = device_ndarray(queries)
+        # Test HNSW conversion from disk-based ACE index
+        hnsw_params = hnsw.IndexParams(hierarchy=hierarchy)
+        hnsw_index_serialized = hnsw.from_cagra(hnsw_params, index)
+        assert hnsw_index_serialized is not None
+        assert os.path.exists(os.path.join(temp_dir, "hnsw_index.bin"))
 
-            out_dist, out_idx = cagra.search(
-                search_params, index, queries_device, k
-            )
+        # Deserialize the HNSW index from disk for search
+        hnsw_index = hnsw.load(
+            hnsw_params,
+            os.path.join(temp_dir, "hnsw_index.bin"),
+            n_cols,
+            dtype,
+        )
 
-            # Convert results back to host
-            out_idx_host = out_idx.copy_to_host()
+        search_params = hnsw.SearchParams(ef=200, num_threads=1)
+        out_dist, out_idx = hnsw.search(search_params, hnsw_index, queries, k)
 
-            # Calculate reference values with sklearn
-            skl_metric = {
-                "sqeuclidean": "sqeuclidean",
-                "inner_product": "cosine",
-                "euclidean": "euclidean",
-            }[metric]
-            nn_skl = NearestNeighbors(
-                n_neighbors=k, algorithm="brute", metric=skl_metric
-            )
-            nn_skl.fit(dataset)
-            skl_idx = nn_skl.kneighbors(queries, return_distance=False)
+        # Calculate reference values with sklearn
+        skl_metric = {
+            "sqeuclidean": "sqeuclidean",
+            "inner_product": "cosine",
+            "euclidean": "euclidean",
+        }[metric]
+        nn_skl = NearestNeighbors(
+            n_neighbors=k, algorithm="brute", metric=skl_metric
+        )
+        nn_skl.fit(dataset)
+        skl_dist, skl_idx = nn_skl.kneighbors(queries, return_distance=True)
 
-            recall = calc_recall(out_idx_host, skl_idx)
-            assert recall > 0.7
-
-            # test that we can get the cagra graph from the index
-            graph = index.graph
-            assert graph.shape == (n_rows, graph_degree)
-
-            # make sure we can convert the graph to cupy, and access it
-            cp_graph = cp.array(graph)
-            assert cp_graph.shape == (n_rows, graph_degree)
-        else:
-            # For disk-based mode, verify that expected files were created
-            assert os.path.exists(os.path.join(temp_dir, "cagra_graph.npy"))
-            assert os.path.exists(
-                os.path.join(temp_dir, "reordered_dataset.npy")
-            )
-            assert os.path.exists(
-                os.path.join(temp_dir, "dataset_mapping.npy")
-            )
-
-            # Test HNSW conversion from disk-based ACE index
-            hnsw_params = hnsw.IndexParams(hierarchy=hierarchy)
-            hnsw_index_serialized = hnsw.from_cagra(hnsw_params, index)
-            assert hnsw_index_serialized is not None
-            assert os.path.exists(os.path.join(temp_dir, "hnsw_index.bin"))
-
-            # Deserialize the HNSW index from disk for search
-            hnsw_index = hnsw.load(
-                hnsw_params,
-                os.path.join(temp_dir, "hnsw_index.bin"),
-                n_cols,
-                dtype,
-            )
-
-            search_params = hnsw.SearchParams(ef=200, num_threads=1)
-            out_dist, out_idx = hnsw.search(
-                search_params, hnsw_index, queries, k
-            )
-
-            # Calculate reference values with sklearn
-            skl_metric = {
-                "sqeuclidean": "sqeuclidean",
-                "inner_product": "cosine",
-                "euclidean": "euclidean",
-            }[metric]
-            nn_skl = NearestNeighbors(
-                n_neighbors=k, algorithm="brute", metric=skl_metric
-            )
-            nn_skl.fit(dataset)
-            skl_dist, skl_idx = nn_skl.kneighbors(
-                queries, return_distance=True
-            )
-
-            recall = calc_recall(out_idx, skl_idx)
-            assert recall > 0.7
+        recall = calc_recall(out_idx, skl_idx)
+        assert recall > 0.7
 
 
 @pytest.mark.parametrize("dim", [64, 128])
@@ -156,10 +104,9 @@ def run_cagra_ace_build_search_test(
 @pytest.mark.parametrize("metric", ["sqeuclidean", "inner_product"])
 @pytest.mark.parametrize("npartitions", [2, 4])
 @pytest.mark.parametrize("ef_construction", [100, 200])
-@pytest.mark.parametrize("use_disk", [False, True])
 @pytest.mark.parametrize("hierarchy", ["none", "gpu"])
 def test_cagra_ace_dtypes_and_metrics(
-    dim, dtype, metric, npartitions, ef_construction, use_disk, hierarchy
+    dim, dtype, metric, npartitions, ef_construction, hierarchy
 ):
     """Test ACE with different data types and metrics."""
     run_cagra_ace_build_search_test(
@@ -168,13 +115,16 @@ def test_cagra_ace_dtypes_and_metrics(
         metric=metric,
         npartitions=npartitions,
         ef_construction=ef_construction,
-        use_disk=use_disk,
         hierarchy=hierarchy,
     )
 
 
-def test_cagra_ace_tiny_memory_limit_triggers_disk_mode():
-    """Test that setting tiny memory limits triggers disk mode automatically."""
+def test_cagra_ace_with_memory_limits():
+    """Test ACE build with custom memory limits.
+
+    ACE always uses disk-based storage, but memory limits help control
+    the number of partitions to fit within available memory.
+    """
     n_rows = 5000
     n_cols = 64
     dtype = np.float32
@@ -184,15 +134,13 @@ def test_cagra_ace_tiny_memory_limit_triggers_disk_mode():
 
     # Create a temporary directory for ACE build
     with tempfile.TemporaryDirectory() as temp_dir:
-        # Set ACE parameters with tiny memory limits (0.001 GiB = ~1 MB)
-        # This should force disk mode even though we didn't explicitly set use_disk=True
+        # Set ACE parameters with memory limits
         ace_params = cagra.AceParams(
             npartitions=2,
             ef_construction=100,
             build_dir=temp_dir,
-            use_disk=False,  # Not explicitly requesting disk mode
-            max_host_memory_gb=0.001,  # Tiny limit to force disk mode
-            max_gpu_memory_gb=0.001,  # Tiny limit to force disk mode
+            max_host_memory_gb=0.001,  # Tiny limit to force more partitions
+            max_gpu_memory_gb=0.001,  # Tiny limit to force more partitions
         )
 
         # Build parameters
@@ -204,19 +152,18 @@ def test_cagra_ace_tiny_memory_limit_triggers_disk_mode():
             ace_params=ace_params,
         )
 
-        # Build the index with ACE - should automatically use disk mode
+        # Build the index with ACE (always uses disk mode)
         index = cagra.build(build_params, dataset)
 
         assert index.trained
 
-        # In disk mode, the graph should be stored in the build directory
-        # Check that the graph file was created
+        # ACE always stores files to disk
         graph_file = os.path.join(temp_dir, "cagra_graph.npy")
         reordered_file = os.path.join(temp_dir, "reordered_dataset.npy")
 
         assert os.path.exists(graph_file), (
-            "Graph file should exist when disk mode is triggered"
+            "Graph file should exist for ACE build"
         )
         assert os.path.exists(reordered_file), (
-            "Reordered dataset file should exist when disk mode is triggered"
+            "Reordered dataset file should exist for ACE build"
         )

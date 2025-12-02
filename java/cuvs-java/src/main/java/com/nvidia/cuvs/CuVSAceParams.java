@@ -12,6 +12,8 @@ package com.nvidia.cuvs;
  * 2. Building sub-indexes for each partition independently
  * 3. Concatenating sub-graphs into a final unified index
  *
+ * ACE always uses disk-based storage for memory-efficient graph construction.
+ *
  * @since 25.12
  */
 public class CuVSAceParams {
@@ -45,20 +47,12 @@ public class CuVSAceParams {
   private final long efConstruction;
 
   /**
-   * Directory to store ACE build artifacts (e.g., KNN graph, optimized graph).
+   * Directory to store ACE build artifacts (e.g., KNN graph, optimized graph, reordered dataset).
    *
-   * Used when {@link #isUseDisk()} is true or when the graph does not fit in host and GPU memory.
    * This should be the fastest disk in the system and hold enough space for twice the dataset, final
    * graph, and label mapping.
    */
   private final String buildDir;
-
-  /**
-   * Whether to use disk-based storage for ACE builds.
-   *
-   * When true, enables disk-based operations for memory-efficient graph construction.
-   */
-  private final boolean useDisk;
 
   /**
    * Maximum host memory to use for ACE build in GiB.
@@ -76,12 +70,11 @@ public class CuVSAceParams {
    */
   private final double maxGpuMemoryGb;
 
-  private CuVSAceParams(long npartitions, long efConstruction, String buildDir, boolean useDisk,
+  private CuVSAceParams(long npartitions, long efConstruction, String buildDir,
                         double maxHostMemoryGb, double maxGpuMemoryGb) {
     this.npartitions = npartitions;
     this.efConstruction = efConstruction;
     this.buildDir = buildDir;
-    this.useDisk = useDisk;
     this.maxHostMemoryGb = maxHostMemoryGb;
     this.maxGpuMemoryGb = maxGpuMemoryGb;
   }
@@ -114,15 +107,6 @@ public class CuVSAceParams {
   }
 
   /**
-   * Gets whether disk-based mode is enabled.
-   *
-   * @return true if disk-based mode is enabled
-   */
-  public boolean isUseDisk() {
-    return useDisk;
-  }
-
-  /**
    * Gets the maximum host memory limit in GiB.
    *
    * @return the max host memory limit (0 means use available memory)
@@ -148,8 +132,6 @@ public class CuVSAceParams {
         + efConstruction
         + ", buildDir="
         + buildDir
-        + ", useDisk="
-        + useDisk
         + ", maxHostMemoryGb="
         + maxHostMemoryGb
         + ", maxGpuMemoryGb="
@@ -170,9 +152,6 @@ public class CuVSAceParams {
 
     /** Directory to store intermediate build files */
     private String buildDir = "/tmp/ace_build";
-
-    /** Whether to use disk-based mode for very large datasets */
-    private boolean useDisk = false;
 
     /** Maximum host memory in GiB (0 = use available memory) */
     private double maxHostMemoryGb = 0;
@@ -216,17 +195,6 @@ public class CuVSAceParams {
     }
 
     /**
-     * Sets whether to use disk-based mode.
-     *
-     * @param useDisk whether to use disk-based mode
-     * @return an instance of Builder
-     */
-    public Builder withUseDisk(boolean useDisk) {
-      this.useDisk = useDisk;
-      return this;
-    }
-
-    /**
      * Sets the maximum host memory to use for ACE build in GiB.
      *
      * When set to 0 (default), uses available host memory.
@@ -260,7 +228,7 @@ public class CuVSAceParams {
      * @return an instance of {@link CuVSAceParams}
      */
     public CuVSAceParams build() {
-      return new CuVSAceParams(npartitions, efConstruction, buildDir, useDisk,
+      return new CuVSAceParams(npartitions, efConstruction, buildDir,
                                maxHostMemoryGb, maxGpuMemoryGb);
     }
   }

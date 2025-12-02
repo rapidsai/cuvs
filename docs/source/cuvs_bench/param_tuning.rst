@@ -233,13 +233,6 @@ CAGRA uses a graph-based index, which creates an intermediate, approximate kNN g
    - 120
    - Controls index time and accuracy when using ACE build. Bigger values increase the index quality. At some point, increasing this will no longer improve the quality.
 
- * - `use_disk`
-   - `build`
-   - N
-   - Boolean
-   - `false`
-   - Whether to use disk-based storage for ACE build. When true, forces ACE to use disk-based storage even if the graph fits in host and GPU memory. When false, ACE will use in-memory storage if the graph fits in host and GPU memory and disk-based storage otherwise.
-
  * - `query_memory_type`
    - `search`
    - N
@@ -761,14 +754,7 @@ cuVS HNSW builds an HNSW index using the ACE (Augmented Core Extraction) algorit
    - N
    - String
    - "/tmp/ace_build"
-   - The directory to use for the ACE build. This should be the fastest disk in the system and hold enough space for twice the dataset, final graph, and label mapping.
-
- * - `use_disk`
-   - `build`
-   - N
-   - Boolean
-   - `false`
-   - Whether to use disk-based storage for ACE build. When true, forces ACE to use disk-based storage even if the graph fits in host and GPU memory. When false, ACE will use in-memory storage if the graph fits in host and GPU memory and disk-based storage otherwise.
+   - The directory to use for the ACE build. ACE always uses disk-based storage for memory-efficient graph construction. This should be the fastest disk in the system and hold enough space for twice the dataset, final graph, and label mapping.
 
  * - `ef`
    - `search`

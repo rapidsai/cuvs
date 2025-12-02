@@ -52,10 +52,6 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
   // Set the directory to store the ACE build artifacts. This should be the fastest disk in the
   // system and hold enough space for twice the dataset, final graph, and label mapping.
   ace_params.build_dir = "/tmp/ace_build";
-  // Set whether to use disk-based storage for ACE build. When true, enables disk-based operations
-  // for memory-efficient graph construction. If not set, the index will be built in memory if the
-  // graph fits in host and GPU memory, and on disk otherwise.
-  ace_params.use_disk             = true;
   index_params.graph_build_params = ace_params;
 
   // ACE requires the dataset to be on the host

@@ -124,19 +124,13 @@ struct ace_params {
    */
   size_t ef_construction = 120;
   /**
-   * Directory to store ACE build artifacts (e.g., KNN graph, optimized graph).
+   * Directory to store ACE build artifacts (e.g., KNN graph, optimized graph, reordered dataset).
    *
-   * Used when `use_disk` is true or when the graph does not fit in host and GPU
-   * memory. This should be the fastest disk in the system and hold enough space
+   * ACE always uses disk-based storage for memory-efficient graph construction.
+   * This should be the fastest disk in the system and hold enough space
    * for twice the dataset, final graph, and label mapping.
    */
   std::string build_dir = "/tmp/ace_build";
-  /**
-   * Whether to use disk-based storage for ACE build.
-   *
-   * When true, enables disk-based operations for memory-efficient graph construction.
-   */
-  bool use_disk = false;
   /**
    * Maximum host memory to use for ACE build in GiB.
    *

@@ -132,6 +132,8 @@ cdef class AceParams:
     partitioning the dataset using balanced k-means and building sub-indexes
     for each partition independently.
 
+    ACE always uses disk-based storage for memory-efficient graph construction.
+
     Parameters
     ----------
     npartitions : int, default = 0
@@ -157,13 +159,9 @@ cdef class AceParams:
         quality.
     build_dir : str, default = "/tmp/ace_build"
         Directory to store ACE build artifacts (e.g., KNN graph, optimized
-        graph). Used when `use_disk` is true or when the graph does not fit
-        in host and GPU memory. This should be the fastest disk in the system
-        and hold enough space for twice the dataset, final graph, and label
-        mapping.
-    use_disk : bool, default = False
-        Whether to use disk-based storage for ACE build. When true, enables
-        disk-based operations for memory-efficient graph construction.
+        graph, reordered dataset). This should be the fastest disk in the
+        system and hold enough space for twice the dataset, final graph, and
+        label mapping.
     max_host_memory_gb : float, default = 0
         Maximum host memory to use for ACE build in GiB. When set to 0
         (default), uses available host memory. Useful for testing or
@@ -188,12 +186,10 @@ cdef class AceParams:
                  npartitions=0,
                  ef_construction=120,
                  build_dir="/tmp/ace_build",
-                 use_disk=False,
                  max_host_memory_gb=0,
                  max_gpu_memory_gb=0):
         self.params.npartitions = npartitions
         self.params.ef_construction = ef_construction
-        self.params.use_disk = use_disk
         self.params.max_host_memory_gb = max_host_memory_gb
         self.params.max_gpu_memory_gb = max_gpu_memory_gb
 
@@ -222,10 +218,6 @@ cdef class AceParams:
             return self._build_dir_bytes.decode('utf-8')
         else:
             return ""
-
-    @property
-    def use_disk(self):
-        return self.params.use_disk
 
     @property
     def max_host_memory_gb(self):
@@ -349,7 +341,8 @@ cdef class IndexParams:
             # Copy values from Python object to new C struct
             new_ace_params.npartitions = ace_params.params.npartitions
             new_ace_params.ef_construction = ace_params.params.ef_construction
-            new_ace_params.use_disk = ace_params.params.use_disk
+            new_ace_params.max_host_memory_gb = ace_params.params.max_host_memory_gb
+            new_ace_params.max_gpu_memory_gb = ace_params.params.max_gpu_memory_gb
 
             # Copy the build_dir string
             if new_ace_params.build_dir != NULL:
@@ -551,7 +544,7 @@ def build(IndexParams index_params, dataset, resources=None):
     ...     (n_samples, n_features)
     ... ).astype(np.float32)
     >>> ace_params = cagra.AceParams(
-    ...     npartitions=4, use_disk=True, build_dir="/tmp/ace"
+    ...     npartitions=4, build_dir="/tmp/ace"
     ... )
     >>> build_params = cagra.IndexParams(
     ...     metric="sqeuclidean",

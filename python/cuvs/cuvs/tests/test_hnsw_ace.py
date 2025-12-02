@@ -23,7 +23,6 @@ def run_hnsw_ace_build_search_test(
     metric="sqeuclidean",
     npartitions=2,
     ef_construction=100,
-    use_disk=False,
     hierarchy="gpu",
     expected_recall=0.9,
 ):
@@ -31,8 +30,8 @@ def run_hnsw_ace_build_search_test(
     Test HNSW index build using ACE algorithm.
 
     - Build HNSW index using ACE via hnsw.build()
-    - For disk mode: serialize -> deserialize -> search
-    - For in-memory mode: search directly
+    - The index is automatically serialized to disk
+    - Deserialize the index and perform search
     """
     dataset = generate_data((n_rows, n_cols), dtype)
     queries = generate_data((n_queries, n_cols), dtype)
@@ -52,7 +51,6 @@ def run_hnsw_ace_build_search_test(
             npartitions=npartitions,
             ef_construction=ef_construction,
             build_dir=temp_dir,
-            use_disk=use_disk,
         )
 
         # Build parameters with ACE configuration
@@ -68,36 +66,27 @@ def run_hnsw_ace_build_search_test(
 
         assert hnsw_index.trained
 
-        if use_disk:
-            # For disk mode, the index is serialized to disk by the build function
-            # We need to deserialize it before searching
-            hnsw_file = os.path.join(temp_dir, "hnsw_index.bin")
-            assert os.path.exists(hnsw_file)
+        # ACE always uses disk mode, the index is serialized to disk by build
+        # We need to deserialize it before searching
+        hnsw_file = os.path.join(temp_dir, "hnsw_index.bin")
+        assert os.path.exists(hnsw_file)
 
-            # Deserialize from disk for searching
-            deserialized_index = hnsw.load(
-                index_params,
-                hnsw_file,
-                n_cols,
-                dtype,
-                metric=metric,
-            )
+        # Deserialize from disk for searching
+        deserialized_index = hnsw.load(
+            index_params,
+            hnsw_file,
+            n_cols,
+            dtype,
+            metric=metric,
+        )
 
-            # Search the deserialized index
-            search_params = hnsw.SearchParams(
-                ef=max(ef_construction, k * 2), num_threads=1
-            )
-            out_dist, out_idx = hnsw.search(
-                search_params, deserialized_index, queries, k
-            )
-        else:
-            # For in-memory mode, search directly
-            search_params = hnsw.SearchParams(
-                ef=max(ef_construction, k * 2), num_threads=1
-            )
-            out_dist, out_idx = hnsw.search(
-                search_params, hnsw_index, queries, k
-            )
+        # Search the deserialized index
+        search_params = hnsw.SearchParams(
+            ef=max(ef_construction, k * 2), num_threads=1
+        )
+        out_dist, out_idx = hnsw.search(
+            search_params, deserialized_index, queries, k
+        )
 
         # Calculate reference values with sklearn
         skl_metric = {
@@ -121,12 +110,11 @@ def run_hnsw_ace_build_search_test(
 @pytest.mark.parametrize("dtype", [np.float32, np.float16, np.int8, np.uint8])
 @pytest.mark.parametrize("metric", ["sqeuclidean", "inner_product"])
 @pytest.mark.parametrize("npartitions", [2, 4])
-@pytest.mark.parametrize("use_disk", [False, True])
-def test_hnsw_ace_build_search(dim, dtype, metric, npartitions, use_disk):
+def test_hnsw_ace_build_search(dim, dtype, metric, npartitions):
     """
     Test HNSW ACE build and search with various configurations.
 
-    Tests both in-memory and disk-based modes
+    ACE always uses disk-based storage for memory-efficient graph construction.
     """
     # Lower recall expectation for certain combinations
     expected_recall = 0.7
@@ -138,19 +126,16 @@ def test_hnsw_ace_build_search(dim, dtype, metric, npartitions, use_disk):
         dtype=dtype,
         metric=metric,
         npartitions=npartitions,
-        use_disk=use_disk,
         hierarchy="gpu",
         expected_recall=expected_recall,
     )
 
 
 @pytest.mark.parametrize("hierarchy", ["none", "gpu"])
-@pytest.mark.parametrize("use_disk", [False, True])
-def test_hnsw_ace_hierarchy(hierarchy, use_disk):
+def test_hnsw_ace_hierarchy(hierarchy):
     """Test HNSW ACE with different hierarchy options."""
     run_hnsw_ace_build_search_test(
         hierarchy=hierarchy,
-        use_disk=use_disk,
         expected_recall=0.7,
     )
 
@@ -160,7 +145,6 @@ def test_hnsw_ace_ef_construction(ef_construction):
     """Test HNSW ACE with different ef_construction values."""
     run_hnsw_ace_build_search_test(
         ef_construction=ef_construction,
-        use_disk=True,
         expected_recall=0.7,
     )
 
@@ -181,12 +165,11 @@ def test_hnsw_ace_disk_serialize_deserialize():
     queries = generate_data((n_queries, n_cols), dtype)
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        # Create ACE params with disk mode enabled
+        # Create ACE params (always uses disk-based storage)
         ace_params = hnsw.AceParams(
             npartitions=2,
             ef_construction=100,
             build_dir=temp_dir,
-            use_disk=True,
         )
 
         # Create HNSW index params with ACE
@@ -232,8 +215,12 @@ def test_hnsw_ace_disk_serialize_deserialize():
         assert recall >= 0.7, f"Recall {recall:.3f} is below expected 0.7"
 
 
-def test_hnsw_ace_tiny_memory_limit_triggers_disk_mode():
-    """Test that setting tiny memory limits triggers disk mode automatically."""
+def test_hnsw_ace_with_memory_limits():
+    """Test ACE build with custom memory limits.
+
+    ACE always uses disk-based storage, but memory limits help control
+    the number of partitions to fit within available memory.
+    """
     n_rows = 5000
     n_cols = 64
     dtype = np.float32
@@ -242,15 +229,13 @@ def test_hnsw_ace_tiny_memory_limit_triggers_disk_mode():
     dataset = generate_data((n_rows, n_cols), dtype)
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        # Set ACE parameters with tiny memory limits (0.001 GiB = ~1 MB)
-        # This should force disk mode even though we didn't explicitly set use_disk=True
+        # Set ACE parameters with memory limits
         ace_params = hnsw.AceParams(
             npartitions=2,
             ef_construction=100,
             build_dir=temp_dir,
-            use_disk=False,  # Not explicitly requesting disk mode
-            max_host_memory_gb=0.001,  # Tiny limit to force disk mode
-            max_gpu_memory_gb=0.001,  # Tiny limit to force disk mode
+            max_host_memory_gb=0.001,  # Tiny limit to force more partitions
+            max_gpu_memory_gb=0.001,  # Tiny limit to force more partitions
         )
 
         # Create HNSW index params with ACE
@@ -261,18 +246,17 @@ def test_hnsw_ace_tiny_memory_limit_triggers_disk_mode():
             ace_params=ace_params,
         )
 
-        # Build the index using ACE - should automatically use disk mode
+        # Build the index using ACE (always uses disk mode)
         hnsw_index = hnsw.build(index_params, dataset)
         assert hnsw_index.trained
 
-        # In disk mode, the graph should be stored in the build directory
-        # Check that the graph file was created
+        # ACE always stores files to disk
         graph_file = os.path.join(temp_dir, "cagra_graph.npy")
         reordered_file = os.path.join(temp_dir, "reordered_dataset.npy")
 
         assert os.path.exists(graph_file), (
-            "Graph file should exist when disk mode is triggered"
+            "Graph file should exist for ACE build"
         )
         assert os.path.exists(reordered_file), (
-            "Reordered dataset file should exist when disk mode is triggered"
+            "Reordered dataset file should exist for ACE build"
         )

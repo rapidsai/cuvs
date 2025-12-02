@@ -72,10 +72,11 @@ public class HnswAceBuildAndSearchIT extends CuVSTestCase {
   }
 
   /**
-   * Test HNSW ACE build with in-memory mode (use_disk=false).
+   * Test HNSW ACE build.
+   * ACE always uses disk-based storage for memory-efficient graph construction.
    */
   @Test
-  public void testHnswAceInMemoryBuild() throws Throwable {
+  public void testHnswAceBuild() throws Throwable {
     float[][] dataset = createSampleData();
     float[][] queries = createSampleQueries();
     List<Map<Integer, Float>> expectedResults = getExpectedResults();
@@ -84,13 +85,12 @@ public class HnswAceBuildAndSearchIT extends CuVSTestCase {
       Path buildDir = Files.createTempDirectory("hnsw_ace_test");
 
       try {
-        // Configure ACE parameters for in-memory mode
+        // Configure ACE parameters (ACE always uses disk-based storage)
         HnswAceParams aceParams =
             new HnswAceParams.Builder()
                 .withNpartitions(2)
                 .withEfConstruction(100)
                 .withBuildDir(buildDir.toString())
-                .withUseDisk(false)
                 .build();
 
         // Configure HNSW index parameters with ACE
@@ -107,7 +107,7 @@ public class HnswAceBuildAndSearchIT extends CuVSTestCase {
         try (var datasetMatrix = CuVSMatrix.ofArray(dataset)) {
           HnswIndex hnswIndex = HnswIndex.build(resources, hnswParams, datasetMatrix);
           assertNotNull("HNSW index should not be null", hnswIndex);
-          log.debug("HNSW ACE index built successfully in memory");
+          log.debug("HNSW ACE index built successfully");
 
           // Search the index directly
           HnswSearchParams searchParams = new HnswSearchParams.Builder().withEF(100).build();
@@ -123,7 +123,7 @@ public class HnswAceBuildAndSearchIT extends CuVSTestCase {
 
           // Verify search results
           checkResults(expectedResults, results.getResults());
-          log.debug("HNSW ACE in-memory search verification passed");
+          log.debug("HNSW ACE search verification passed");
 
           hnswIndex.close();
         }
@@ -134,12 +134,12 @@ public class HnswAceBuildAndSearchIT extends CuVSTestCase {
   }
 
   /**
-   * Test HNSW ACE build with disk-based mode (use_disk=true).
-   * This follows the same approach as C++ and C tests:
+   * Test HNSW ACE build with explicit build directory.
+   * ACE always uses disk-based storage, so the workflow is:
    * build -> serialize -> deserialize -> search
    */
   @Test
-  public void testHnswAceDiskBasedBuild() throws Throwable {
+  public void testHnswAceBuildWithCustomDir() throws Throwable {
     float[][] dataset = createSampleData();
     float[][] queries = createSampleQueries();
     List<Map<Integer, Float>> expectedResults = getExpectedResults();
@@ -148,13 +148,12 @@ public class HnswAceBuildAndSearchIT extends CuVSTestCase {
       Path buildDir = Files.createTempDirectory("hnsw_ace_disk_test");
 
       try {
-        // Configure ACE parameters for disk-based mode
+        // Configure ACE parameters with custom build directory (ACE always uses disk)
         HnswAceParams aceParams =
             new HnswAceParams.Builder()
                 .withNpartitions(2)
                 .withEfConstruction(100)
                 .withBuildDir(buildDir.toString())
-                .withUseDisk(true)
                 .build();
 
         // Configure HNSW index parameters with ACE
@@ -232,13 +231,12 @@ public class HnswAceBuildAndSearchIT extends CuVSTestCase {
         Path buildDir = Files.createTempDirectory("hnsw_ace_hierarchy_test");
 
         try {
-          HnswAceParams aceParams =
-              new HnswAceParams.Builder()
-                  .withNpartitions(2)
-                  .withEfConstruction(100)
-                  .withBuildDir(buildDir.toString())
-                  .withUseDisk(false)
-                  .build();
+        HnswAceParams aceParams =
+            new HnswAceParams.Builder()
+                .withNpartitions(2)
+                .withEfConstruction(100)
+                .withBuildDir(buildDir.toString())
+                .build();
 
           HnswIndexParams hnswParams =
               new HnswIndexParams.Builder()
@@ -288,13 +286,12 @@ public class HnswAceBuildAndSearchIT extends CuVSTestCase {
       Path buildDir = Files.createTempDirectory("hnsw_ace_serialize_test");
 
       try {
-        // Create ACE params with disk mode enabled
+        // Create ACE params
         HnswAceParams aceParams =
             new HnswAceParams.Builder()
                 .withNpartitions(2)
                 .withEfConstruction(100)
                 .withBuildDir(buildDir.toString())
-                .withUseDisk(true)
                 .build();
 
         // Create HNSW index params with ACE

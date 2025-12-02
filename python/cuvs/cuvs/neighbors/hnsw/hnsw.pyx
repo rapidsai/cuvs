@@ -55,11 +55,9 @@ cdef class AceParams:
         The index quality for the ACE build. Bigger values increase the index
         quality.
     build_dir : string, default = "/tmp/hnsw_ace_build" (optional)
-        Directory to store ACE build artifacts (KNN graph, optimized graph).
-        Used when `use_disk` is true or when the graph does not fit in memory.
-    use_disk : bool, default = False (optional)
-        Whether to use disk-based storage for ACE build. When true, enables
-        disk-based operations for memory-efficient graph construction.
+        Directory to store ACE build artifacts (KNN graph, optimized graph,
+        reordered dataset). ACE always uses disk-based storage for
+        memory-efficient graph construction.
     max_host_memory_gb : float, default = 0 (optional)
         Maximum host memory to use for ACE build in GiB. When set to 0
         (default), uses available host memory. Useful for testing or
@@ -85,14 +83,12 @@ cdef class AceParams:
                  npartitions=0,
                  ef_construction=120,
                  build_dir="/tmp/hnsw_ace_build",
-                 use_disk=False,
                  max_host_memory_gb=0,
                  max_gpu_memory_gb=0):
         self.params.npartitions = npartitions
         self.params.ef_construction = ef_construction
         self._build_dir_bytes = build_dir.encode('utf-8')
         self.params.build_dir = self._build_dir_bytes
-        self.params.use_disk = use_disk
         self.params.max_host_memory_gb = max_host_memory_gb
         self.params.max_gpu_memory_gb = max_gpu_memory_gb
 
@@ -109,10 +105,6 @@ cdef class AceParams:
         if self.params.build_dir is not NULL:
             return self.params.build_dir.decode('utf-8')
         return "/tmp/hnsw_ace_build"
-
-    @property
-    def use_disk(self):
-        return self.params.use_disk
 
     @property
     def max_host_memory_gb(self):
@@ -514,7 +506,6 @@ def build(IndexParams index_params, dataset, resources=None):
     >>> ace_params = hnsw.AceParams(
     ...     npartitions=4,
     ...     ef_construction=120,
-    ...     use_disk=True,
     ...     build_dir="/tmp/hnsw_ace_build"
     ... )
     >>>

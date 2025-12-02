@@ -65,15 +65,10 @@ struct cuvsHnswAceParams {
    */
   size_t ef_construction;
   /**
-   * Directory to store ACE build artifacts (e.g., KNN graph, optimized graph).
-   * Used when `use_disk` is true or when the graph does not fit in memory.
+   * Directory to store ACE build artifacts (e.g., KNN graph, optimized graph, reordered dataset).
+   * ACE always uses disk-based storage for memory-efficient graph construction.
    */
   const char* build_dir;
-  /**
-   * Whether to use disk-based storage for ACE build.
-   * When true, enables disk-based operations for memory-efficient graph construction.
-   */
-  bool use_disk;
   /**
    * Maximum host memory to use for ACE build in GiB.
    * When set to 0 (default), uses available host memory.
@@ -319,7 +314,6 @@ cuvsError_t cuvsHnswFromCagraWithDataset(cuvsResources_t res,
  * cuvsHnswAceParamsCreate(&ace_params);
  * ace_params->npartitions = 4;
  * ace_params->ef_construction = 120;
- * ace_params->use_disk = true;
  * ace_params->build_dir = "/tmp/hnsw_ace_build";
  *
  * // Create index parameters
