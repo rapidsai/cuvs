@@ -68,7 +68,7 @@ class index_impl : public index_iface<IdxT> {
   raft::device_matrix_view<const half, uint32_t, raft::row_major> centers_half(
     const raft::resources& res) const override;
 
-  uint32_t get_list_size_in_bytes(uint32_t label) const noexcept override;
+  uint32_t get_list_size_in_bytes(uint32_t label) const override;
 
  protected:
   cuvs::distance::DistanceType metric_;
@@ -111,8 +111,7 @@ class owning_impl : public index_impl<IdxT> {
               uint32_t pq_dim,
               bool conservative_memory_allocation);
 
-  ~owning_impl() = default;
-
+  ~owning_impl()                             = default;
   owning_impl(owning_impl&&)                 = default;
   owning_impl& operator=(owning_impl&&)      = default;
   owning_impl(const owning_impl&)            = delete;

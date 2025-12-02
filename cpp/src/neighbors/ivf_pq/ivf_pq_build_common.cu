@@ -306,8 +306,17 @@ void pad_centers_with_norms(
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
   raft::device_matrix_view<float, uint32_t, raft::row_major> padded_centers)
 {
-  detail::pad_centers_with_norms(
-    res, centers.data_handle(), centers.extent(0), centers.extent(1), padded_centers);
+  RAFT_EXPECTS(padded_centers.extent(1) == raft::round_up_safe(centers.extent(1) + 1, 8u),
+               "padded_centers must have extent(1) == round_up(centers.extent(1) + 1, 8u). Got "
+               "padded_centers.extent(1) = %u, expected %u",
+               padded_centers.extent(1),
+               raft::round_up_safe(centers.extent(1) + 1, 8u));
+  detail::pad_centers_with_norms(res,
+                                 centers.data_handle(),
+                                 centers.extent(0),
+                                 centers.extent(1),
+                                 padded_centers.extent(1),
+                                 padded_centers.data_handle());
 }
 
 void pad_centers_with_norms(
@@ -315,8 +324,17 @@ void pad_centers_with_norms(
   raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
   raft::device_matrix_view<float, uint32_t, raft::row_major> padded_centers)
 {
-  detail::pad_centers_with_norms(
-    res, centers.data_handle(), centers.extent(0), centers.extent(1), padded_centers);
+  RAFT_EXPECTS(padded_centers.extent(1) == raft::round_up_safe(centers.extent(1) + 1, 8u),
+               "padded_centers must have extent(1) == round_up(centers.extent(1) + 1, 8u). Got "
+               "padded_centers.extent(1) = %u, expected %u",
+               padded_centers.extent(1),
+               raft::round_up_safe(centers.extent(1) + 1, 8u));
+  detail::pad_centers_with_norms(res,
+                                 centers.data_handle(),
+                                 centers.extent(0),
+                                 centers.extent(1),
+                                 padded_centers.extent(1),
+                                 padded_centers.data_handle());
 }
 
 void rotate_padded_centers(
