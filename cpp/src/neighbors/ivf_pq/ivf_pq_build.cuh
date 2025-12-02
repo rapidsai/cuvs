@@ -266,7 +266,7 @@ inline void pad_centers_with_norms(raft::resources const& res,
                                   cudaMemcpyDefault,
                                   stream));
 
-  rmm::device_uvector<float> center_norms(centers.extent(0), stream);
+  rmm::device_uvector<float> center_norms(n_lists, stream);
   raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
     center_norms.data(), centers, dim, n_lists, stream);
   RAFT_CUDA_TRY(cudaMemcpy2DAsync(padded_centers + dim,
