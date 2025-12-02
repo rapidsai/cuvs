@@ -298,7 +298,7 @@ template <typename IdxT>
 raft::device_mdspan<float, pq_centers_extents, raft::row_major>
 view_impl<IdxT>::pq_centers() noexcept
 {
-  return raft::mdspan<float, pq_centers_extents, raft::row_major>(
+  return raft::device_mdspan<float, pq_centers_extents, raft::row_major>(
     const_cast<float*>(pq_centers_view_.data_handle()), pq_centers_view_.extents());
 }
 
@@ -848,6 +848,8 @@ raft::device_matrix_view<const half, uint32_t, raft::row_major> index<IdxT>::cen
   return impl_->centers_half(res);
 }
 
-template struct index<int64_t>;
+template class view_impl<int64_t>;
+template class owning_impl<int64_t>;
+template class index<int64_t>;
 
 }  // namespace cuvs::neighbors::ivf_pq
