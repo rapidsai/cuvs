@@ -691,7 +691,7 @@ public class CagraIndexImpl implements CagraIndex {
    * @param mergeParams Parameters to control the merge operation, or null to use defaults
    * @return A new merged CAGRA index
    */
-  public static CagraIndex merge(CagraIndex[] indexes, CagraMergeParams mergeParams) {
+  public static CagraIndex merge(CagraIndex[] indexes, CagraIndexParams mergeParams) {
     CuVSResources resources = indexes[0].getCuVSResources();
     var mergedIndex = createCagraIndex();
 
@@ -705,43 +705,27 @@ public class CagraIndexImpl implements CagraIndex {
             ValueLayout.ADDRESS, i, indexImpl.cagraIndexReference.getMemorySegment());
       }
 
-      try (var nativeMergeParams = createMergeParamsSegment(mergeParams);
+      try (var nativeMergeParams = segmentFromIndexParams(mergeParams);
           var resourcesAccessor = resources.access()) {
         var cuvsRes = resourcesAccessor.handle();
+
+        MemorySegment mergeFilter = cuvsFilter.allocate(localArena);
+        cuvsFilter.type(mergeFilter, 0); // NO_FILTER
+        cuvsFilter.addr(mergeFilter, 0);
+
         checkCuVSError(
             cuvsCagraMerge(
-                cuvsRes, nativeMergeParams.handle(), indexesSegment, indexes.length, mergedIndex),
+                cuvsRes,
+                nativeMergeParams.handle(),
+                indexesSegment,
+                indexes.length,
+                mergedIndex,
+                mergeFilter),
             "cuvsCagraMerge");
       }
     }
 
     return new CagraIndexImpl(new IndexReference(mergedIndex, null), resources);
-  }
-
-  /**
-   * Creates (allocates and fill) native memory version of merge parameters.
-   *
-   * @return A memory segment with the merge parameters
-   */
-  private static CloseableHandle createMergeParamsSegment(CagraMergeParams mergeParams) {
-    var handles = new ArrayList<CloseableHandle>();
-
-    var nativeMergeParams = createCagraMergeParams();
-    handles.add(nativeMergeParams);
-    var seg = nativeMergeParams.handle();
-
-    // The output index params are already allocated by cuvsCagraMergeParamsCreate,
-    // we just need to populate it.
-    var outputIndexParamsPtr = cuvsCagraMergeParams.output_index_params(seg);
-    if (mergeParams != null) {
-      populateNativeIndexParams(outputIndexParamsPtr, mergeParams.getOutputIndexParams(), handles);
-      cuvsCagraMergeParams.strategy(seg, mergeParams.getStrategy().value);
-    } else {
-      populateNativeIndexParams(
-          outputIndexParamsPtr, new CagraIndexParams.Builder().build(), handles);
-    }
-
-    return new CompositeCloseableHandle(seg, handles);
   }
 
   /**

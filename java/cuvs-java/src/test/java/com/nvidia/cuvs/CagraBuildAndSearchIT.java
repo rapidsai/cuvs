@@ -12,7 +12,6 @@ import static org.junit.Assert.*;
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
 import com.nvidia.cuvs.CagraIndexParams.CuvsDistanceType;
-import com.nvidia.cuvs.CagraMergeParams.MergeStrategy;
 import java.lang.foreign.Arena;
 import java.lang.foreign.Linker;
 import java.lang.foreign.MemoryLayout;
@@ -808,15 +807,9 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
               .withMetric(CuvsDistanceType.L2Expanded)
               .build();
 
-      CagraMergeParams physicalMergeParams =
-          new CagraMergeParams.Builder()
-              .withOutputIndexParams(outputIndexParams)
-              .withStrategy(MergeStrategy.PHYSICAL)
-              .build();
-
       log.trace("Merging indexes with PHYSICAL strategy...");
       try (CagraIndex physicalMergedIndex =
-          CagraIndex.merge(new CagraIndex[] {index1, index2}, physicalMergeParams)) {
+          CagraIndex.merge(new CagraIndex[] {index1, index2}, outputIndexParams)) {
         log.trace("Physical merge completed successfully");
 
         CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
