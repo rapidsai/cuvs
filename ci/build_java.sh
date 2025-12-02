@@ -14,6 +14,9 @@ fi
 
 if [ -e "/opt/conda/etc/profile.d/conda.sh" ]; then
   . /opt/conda/etc/profile.d/conda.sh
+
+rapids-logger "Configuring conda strict channel priority"
+conda config --set channel_priority strict
 fi
 
 rapids-logger "Downloading artifacts from previous jobs"
