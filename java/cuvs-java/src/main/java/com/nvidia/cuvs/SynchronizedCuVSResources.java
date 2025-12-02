@@ -27,7 +27,17 @@ public class SynchronizedCuVSResources implements CuVSResources {
   @Override
   public ScopedAccess access() {
     lock.lock();
-    return new DelegatingScopedAccess(inner.access(), lock::unlock);
+    return new ScopedAccess() {
+      @Override
+      public long handle() {
+        return inner.access().handle();
+      }
+
+      @Override
+      public void close() {
+        lock.unlock();
+      }
+    };
   }
 
   @Override

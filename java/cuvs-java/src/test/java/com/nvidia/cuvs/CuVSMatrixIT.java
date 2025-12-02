@@ -9,7 +9,6 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
-import com.nvidia.cuvs.spi.CuVSProvider;
 import java.lang.foreign.*;
 import java.util.Locale;
 import org.junit.Before;
@@ -39,20 +38,6 @@ public class CuVSMatrixIT extends CuVSTestCase {
     {0, 4, 2}
   };
 
-  @FunctionalInterface
-  interface TestFunction {
-    void apply() throws Throwable;
-  }
-
-  private static void withPooledMemory(TestFunction testFunction) throws Throwable {
-    try {
-      CuVSProvider.provider().enableRMMManagedPooledMemory(10, 60);
-      testFunction.apply();
-    } finally {
-      CuVSProvider.provider().resetRMMPooledMemory();
-    }
-  }
-
   private void testByteDatasetRowGetAccess(CuVSMatrix dataset) {
     for (int n = 0; n < dataset.size(); ++n) {
       var row = dataset.getRow(n);
@@ -68,11 +53,6 @@ public class CuVSMatrixIT extends CuVSTestCase {
     try (var matrix = CuVSMatrix.ofArray(byteData)) {
       testByteDatasetRowGetAccess(matrix);
     }
-  }
-
-  @Test
-  public void testPooledByteDeviceDatasetRowGetAccess() throws Throwable {
-    withPooledMemory(this::testByteDeviceDatasetRowGetAccess);
   }
 
   @Test
@@ -109,11 +89,6 @@ public class CuVSMatrixIT extends CuVSTestCase {
   }
 
   @Test
-  public void testPooledByteDeviceDatasetRowCopy() throws Throwable {
-    withPooledMemory(this::testByteDeviceDatasetRowCopy);
-  }
-
-  @Test
   public void testByteDeviceDatasetRowCopy() throws Throwable {
     try (var resources = CheckedCuVSResources.create()) {
       var builder =
@@ -143,11 +118,6 @@ public class CuVSMatrixIT extends CuVSTestCase {
     try (var dataset = CuVSMatrix.ofArray(byteData)) {
       testByteDatasetCopy(dataset);
     }
-  }
-
-  @Test
-  public void testPooledByteDeviceDatasetCopy() throws Throwable {
-    withPooledMemory(this::testByteDeviceDatasetCopy);
   }
 
   @Test
@@ -414,11 +384,6 @@ public class CuVSMatrixIT extends CuVSTestCase {
   }
 
   @Test
-  public void testPooledDeviceToHost() throws Throwable {
-    withPooledMemory(this::testDeviceToHost);
-  }
-
-  @Test
   public void testHostToDevice() throws Throwable {
 
     final int size = 16 * 1024;
@@ -432,11 +397,6 @@ public class CuVSMatrixIT extends CuVSTestCase {
         checkSameData(hostMatrix, deviceMatrix, data, size, columns);
       }
     }
-  }
-
-  @Test
-  public void testPooledHostToDevice() throws Throwable {
-    withPooledMemory(this::testHostToDevice);
   }
 
   @Test

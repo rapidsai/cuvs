@@ -9,10 +9,7 @@ import static com.nvidia.cuvs.internal.panama.headers_h.*;
 import static com.nvidia.cuvs.internal.panama.headers_h_1.C_INT;
 
 import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.DelegatingScopedAccess;
-import com.nvidia.cuvs.internal.common.PinnedMemoryBuffer;
 import java.lang.foreign.Arena;
-import java.lang.foreign.MemorySegment;
 import java.nio.file.Path;
 
 /**
@@ -27,8 +24,6 @@ public class CuVSResourcesImpl implements CuVSResources {
   private final ScopedAccess access;
   private final int deviceId;
 
-  private final PinnedMemoryBuffer hostBuffer = new PinnedMemoryBuffer();
-
   /**
    * Constructor that allocates the resources needed for cuVS
    *
@@ -42,7 +37,16 @@ public class CuVSResourcesImpl implements CuVSResources {
       var deviceIdPtr = localArena.allocate(C_INT);
       checkCuVSError(cuvsDeviceIdGet(resourceHandle, deviceIdPtr), "cuvsDeviceIdGet");
       this.deviceId = deviceIdPtr.get(C_INT, 0);
-      this.access = new ScopedAccessWithHostBuffer(resourceHandle, hostBuffer.address());
+      this.access =
+          new ScopedAccess() {
+            @Override
+            public long handle() {
+              return resourceHandle;
+            }
+
+            @Override
+            public void close() {}
+          };
     }
   }
 
@@ -61,25 +65,11 @@ public class CuVSResourcesImpl implements CuVSResources {
     synchronized (this) {
       int returnValue = cuvsResourcesDestroy(resourceHandle);
       checkCuVSError(returnValue, "cuvsResourcesDestroy");
-      hostBuffer.close();
     }
   }
 
   @Override
   public Path tempDirectory() {
     return tempDirectory;
-  }
-
-  public static MemorySegment getHostBuffer(ScopedAccess access) {
-
-    while (access instanceof DelegatingScopedAccess delegatingScopedAccess) {
-      access = delegatingScopedAccess.inner();
-    }
-
-    if (access instanceof ScopedAccessWithHostBuffer withHostBuffer) {
-      return withHostBuffer.hostBuffer();
-    }
-
-    throw new IllegalArgumentException("Unsupported access type: " + access.getClass().getName());
   }
 }

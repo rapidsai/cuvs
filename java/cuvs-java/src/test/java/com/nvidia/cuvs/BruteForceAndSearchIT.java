@@ -6,7 +6,6 @@ package com.nvidia.cuvs;
 
 import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
 
-import com.nvidia.cuvs.spi.CuVSProvider;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.LongToIntFunction;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -24,12 +22,6 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
   @Before
   public void setup() {
     assumeTrue("not supported on " + System.getProperty("os.name"), isLinuxAmd64());
-    CuVSProvider.provider().enableRMMPooledMemory(10, 60);
-  }
-
-  @After
-  public void cleanup() {
-    CuVSProvider.provider().resetRMMPooledMemory();
   }
 
   // Sample data and query

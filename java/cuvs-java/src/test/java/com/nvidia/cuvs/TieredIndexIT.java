@@ -10,14 +10,12 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
-import com.nvidia.cuvs.spi.CuVSProvider;
 import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -33,13 +31,7 @@ public class TieredIndexIT extends CuVSTestCase {
   public void setup() {
     assumeTrue("not supported on " + System.getProperty("os.name"), isLinuxAmd64());
     initializeRandom();
-    CuVSProvider.provider().enableRMMPooledMemory(10, 60);
     log.debug("Random context initialized for test");
-  }
-
-  @After
-  public void cleanup() {
-    CuVSProvider.provider().resetRMMPooledMemory();
   }
 
   @Test

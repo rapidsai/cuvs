@@ -19,6 +19,8 @@ function(find_and_configure_hnswlib)
     FIND_VAR find_args
     CPM_VAR cpm_args
     TO_INSTALL_VAR to_install
+    BUILD_EXPORT_SET cuvs-exports
+    INSTALL_EXPORT_SET cuvs-exports
   )
 
   rapids_cpm_find(

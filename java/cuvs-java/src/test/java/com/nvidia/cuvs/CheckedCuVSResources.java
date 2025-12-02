@@ -41,8 +41,18 @@ public class CheckedCuVSResources implements CuVSResources {
               + currentThreadId
               + "]");
     }
-    return new DelegatingScopedAccess(
-        inner.access(), () -> CheckedCuVSResources.this.currentThreadId.set(0));
+    return new ScopedAccess() {
+      @Override
+      public long handle() {
+        checkNotDestroyed();
+        return inner.access().handle();
+      }
+
+      @Override
+      public void close() {
+        CheckedCuVSResources.this.currentThreadId.set(0);
+      }
+    };
   }
 
   @Override

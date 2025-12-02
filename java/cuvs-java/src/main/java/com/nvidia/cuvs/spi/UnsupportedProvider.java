@@ -101,21 +101,6 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
-  public void enableRMMPooledMemory(int initialPoolSizePercent, int maxPoolSizePercent) {
-    throw new UnsupportedOperationException(reasons);
-  }
-
-  @Override
-  public void enableRMMManagedPooledMemory(int initialPoolSizePercent, int maxPoolSizePercent) {
-    throw new UnsupportedOperationException(reasons);
-  }
-
-  @Override
-  public void resetRMMPooledMemory() {
-    throw new UnsupportedOperationException(reasons);
-  }
-
-  @Override
   public CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
       CuVSResources cuVSResources,
       long size,
