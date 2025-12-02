@@ -244,22 +244,21 @@ auto calculate_offsets_and_indices(IdxT n_rows,
   return max_cluster_size;
 }
 
-inline void pad_centers_with_norms(
-  raft::resources const& res,
-  const float* centers,
-  uint32_t n_lists,
-  uint32_t dim,
-  raft::device_matrix_view<float, uint32_t, raft::row_major> padded_centers)
+inline void pad_centers_with_norms(raft::resources const& res,
+                                   const float* centers,
+                                   uint32_t n_lists,
+                                   uint32_t dim,
+                                   uint32_t dim_ext,
+                                   float* padded_centers)
 {
   auto stream = raft::resource::get_cuda_stream(res);
 
   // Make sure to have trailing zeroes between dim and dim_ext;
   // We rely on this to enable padded tensor gemm kernels during coarse search.
-  cuvs::spatial::knn::detail::utils::memzero(
-    padded_centers.data_handle(), padded_centers.size(), stream);
+  cuvs::spatial::knn::detail::utils::memzero(padded_centers, n_lists * dim_ext, stream);
   // combine cluster_centers and their norms
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(padded_centers.data_handle(),
-                                  sizeof(float) * padded_centers.extent(1),
+  RAFT_CUDA_TRY(cudaMemcpy2DAsync(padded_centers,
+                                  sizeof(float) * dim_ext,
                                   centers,
                                   sizeof(float) * dim,
                                   sizeof(float) * dim,
@@ -270,12 +269,12 @@ inline void pad_centers_with_norms(
   rmm::device_uvector<float> center_norms(n_lists, stream);
   raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
     center_norms.data(), centers, dim, n_lists, stream);
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(padded_centers.data_handle() + dim,
-                                  sizeof(float) * padded_centers.extent(1),
+  RAFT_CUDA_TRY(cudaMemcpy2DAsync(padded_centers + dim,
+                                  sizeof(float) * dim_ext,
                                   center_norms.data(),
                                   sizeof(float),
                                   sizeof(float),
-                                  padded_centers.extent(0),
+                                  n_lists,
                                   cudaMemcpyDefault,
                                   stream));
 }
@@ -283,21 +282,13 @@ inline void pad_centers_with_norms(
 template <typename IdxT>
 void set_centers(raft::resources const& handle, index<IdxT>* index, const float* cluster_centers)
 {
-  switch (utils::check_pointer_residency(cluster_centers)) {
-    case utils::pointer_residency::host_only:
-      cuvs::neighbors::ivf_pq::helpers::pad_centers_with_norms(
-        handle,
-        raft::make_host_matrix_view<const float, uint32_t, raft::row_major>(
-          cluster_centers, index->n_lists(), index->dim()),
-        index->centers());
-      break;
-    default:
-      cuvs::neighbors::ivf_pq::helpers::pad_centers_with_norms(
-        handle,
-        raft::make_device_matrix_view<const float, uint32_t, raft::row_major>(
-          cluster_centers, index->n_lists(), index->dim()),
-        index->centers());
-  }
+  pad_centers_with_norms(handle,
+                         cluster_centers,
+                         index->n_lists(),
+                         index->dim(),
+                         index->dim_ext(),
+                         index->centers().data_handle());
+
   cuvs::neighbors::ivf_pq::helpers::rotate_padded_centers(
     handle, index->centers(), index->rotation_matrix(), index->centers_rot());
 }

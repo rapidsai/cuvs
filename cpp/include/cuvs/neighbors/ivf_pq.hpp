@@ -286,19 +286,19 @@ class index_iface {
  public:
   virtual ~index_iface() = default;
 
-  virtual cuvs::distance::DistanceType metric() const noexcept           = 0;
-  virtual codebook_gen codebook_kind() const noexcept                    = 0;
-  virtual IdxT size() const noexcept                                     = 0;
-  virtual uint32_t dim() const noexcept                                  = 0;
-  virtual uint32_t dim_ext() const noexcept                              = 0;
-  virtual uint32_t rot_dim() const noexcept                              = 0;
-  virtual uint32_t pq_bits() const noexcept                              = 0;
-  virtual uint32_t pq_dim() const noexcept                               = 0;
-  virtual uint32_t pq_len() const noexcept                               = 0;
-  virtual uint32_t pq_book_size() const noexcept                         = 0;
-  virtual uint32_t n_lists() const noexcept                              = 0;
-  virtual bool conservative_memory_allocation() const noexcept           = 0;
-  virtual uint32_t get_list_size_in_bytes(uint32_t label) const noexcept = 0;
+  virtual cuvs::distance::DistanceType metric() const noexcept  = 0;
+  virtual codebook_gen codebook_kind() const noexcept           = 0;
+  virtual IdxT size() const noexcept                            = 0;
+  virtual uint32_t dim() const noexcept                         = 0;
+  virtual uint32_t dim_ext() const noexcept                     = 0;
+  virtual uint32_t rot_dim() const noexcept                     = 0;
+  virtual uint32_t pq_bits() const noexcept                     = 0;
+  virtual uint32_t pq_dim() const noexcept                      = 0;
+  virtual uint32_t pq_len() const noexcept                      = 0;
+  virtual uint32_t pq_book_size() const noexcept                = 0;
+  virtual uint32_t n_lists() const noexcept                     = 0;
+  virtual bool conservative_memory_allocation() const noexcept  = 0;
+  virtual uint32_t get_list_size_in_bytes(uint32_t label) const = 0;
 
   virtual std::vector<std::shared_ptr<list_data<IdxT>>>& lists() noexcept             = 0;
   virtual const std::vector<std::shared_ptr<list_data<IdxT>>>& lists() const noexcept = 0;
@@ -577,7 +577,7 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
    *
    * @param[in] label list ID
    */
-  uint32_t get_list_size_in_bytes(uint32_t label) const noexcept override;
+  uint32_t get_list_size_in_bytes(uint32_t label) const override;
 
   /**
    * @brief Construct index from implementation pointer.

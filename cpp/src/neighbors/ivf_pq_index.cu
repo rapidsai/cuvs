@@ -619,7 +619,7 @@ raft::device_vector_view<const uint32_t, uint32_t, raft::row_major> index<IdxT>:
 // centers() and centers_rot() are now pure virtual and implemented in derived classes
 
 template <typename IdxT>
-uint32_t index<IdxT>::get_list_size_in_bytes(uint32_t label) const noexcept
+uint32_t index<IdxT>::get_list_size_in_bytes(uint32_t label) const
 {
   return impl_->get_list_size_in_bytes(label);
 }
@@ -651,7 +651,7 @@ uint32_t index<IdxT>::calculate_pq_dim(uint32_t dim)
 }
 
 template <typename IdxT>
-uint32_t index_impl<IdxT>::get_list_size_in_bytes(uint32_t label) const noexcept
+uint32_t index_impl<IdxT>::get_list_size_in_bytes(uint32_t label) const
 {
   RAFT_EXPECTS(label < lists_.size(),
                "Expected label to be less than number of lists in the index");
@@ -664,14 +664,27 @@ raft::device_matrix_view<const int8_t, uint32_t, raft::row_major>
 index_impl<IdxT>::rotation_matrix_int8(const raft::resources& res) const
 {
   if (!rotation_matrix_int8_.has_value()) {
+    // Get dimensions without calling virtual function that returns matrix view
+    uint32_t rot_dim = this->rot_dim();
+    uint32_t dim     = this->dim();
     rotation_matrix_int8_.emplace(
-      raft::make_device_mdarray<int8_t, uint32_t>(res, this->rotation_matrix().extents()));
-    raft::linalg::map(res,
-                      rotation_matrix_int8_->view(),
-                      cuvs::spatial::knn::detail::utils::mapping<int8_t>{},
-                      this->rotation_matrix());
+      raft::make_device_mdarray<int8_t, uint32_t>(res, raft::make_extents<uint32_t>(rot_dim, dim)));
+
+    // Use vector views to avoid host_device_accessor issues
+    // Calculate size manually to avoid calling view().size()
+    size_t matrix_size = static_cast<size_t>(rot_dim) * static_cast<size_t>(dim);
+    auto output_vec    = raft::make_device_vector_view<int8_t, size_t>(
+      rotation_matrix_int8_->data_handle(), matrix_size);
+    auto input_vec = raft::make_device_vector_view<const float, size_t>(
+      this->rotation_matrix().data_handle(), matrix_size);
+
+    raft::linalg::map(
+      res, output_vec, cuvs::spatial::knn::detail::utils::mapping<int8_t>{}, input_vec);
   }
-  return rotation_matrix_int8_->view();
+  // Construct the view directly to avoid copy constructor issues
+  return raft::make_device_matrix_view<const int8_t, uint32_t>(rotation_matrix_int8_->data_handle(),
+                                                               rotation_matrix_int8_->extent(0),
+                                                               rotation_matrix_int8_->extent(1));
 }
 
 template <typename IdxT>
@@ -684,7 +697,10 @@ raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> index_impl<Idx
     uint32_t dim_ext      = raft::round_up_safe(dim + 1, 8u);
     uint32_t dim_ext_int8 = raft::round_up_safe(dim + 2, 16u);
     centers_int8_.emplace(raft::make_device_matrix<int8_t, uint32_t>(res, n_lists, dim_ext_int8));
-    auto* inputs = this->centers().data_handle();
+
+    // Get the centers matrix view and immediately extract the raw pointer
+    auto centers_view   = this->centers();
+    const float* inputs = centers_view.data_handle();
     /* NOTE: maximizing the range and the precision of int8_t GEMM
 
     int8_t has a very limited range [-128, 127], which is problematic when storing both vectors and
@@ -720,24 +736,35 @@ raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> index_impl<Idx
     it is limited by the range we can cover (the squared norm must be within `m * 2` before
     normalization).
     */
+    // Get raw pointer to avoid capturing matrix view in device lambda
+    int8_t* centers_int8_ptr = this->centers_int8_->data_handle();
+    // Calculate size manually to avoid calling view().size()
+    size_t centers_int8_size = static_cast<size_t>(n_lists) * static_cast<size_t>(dim_ext_int8);
+
+    auto centers_int8_vec_view =
+      raft::make_device_vector_view<int8_t, size_t>(centers_int8_ptr, centers_int8_size);
+
     raft::linalg::map_offset(res,
-                             this->centers_int8_->view(),
-                             [dim, dim_ext, dim_ext_int8, inputs] __device__(uint32_t ix) {
+                             centers_int8_vec_view,
+                             [dim, dim_ext, dim_ext_int8, inputs] __device__(size_t ix) -> int8_t {
                                uint32_t col = ix % dim_ext_int8;
                                uint32_t row = ix / dim_ext_int8;
                                if (col < dim) {
-                                 return static_cast<int8_t>(std::clamp(
-                                   inputs[col + row * dim_ext] * 128.0f, -128.0f, 127.f));
+                                 return static_cast<int8_t>(fmaxf(
+                                   -128.0f, fminf(127.0f, inputs[col + row * dim_ext] * 128.0f)));
                                }
                                auto x = inputs[row * dim_ext + dim];
                                auto c = 64.0f / static_cast<float>(dim_ext_int8 - dim - 1);
-                               auto y = std::clamp(x * c, -128.0f, 127.f);
-                               auto z = std::clamp((y - std::round(y)) * 128.0f, -128.0f, 127.f);
-                               if (col > dim) { return static_cast<int8_t>(std::round(y)); }
+                               auto y = fmaxf(-128.0f, fminf(127.0f, x * c));
+                               auto z = fmaxf(-128.0f, fminf(127.0f, (y - roundf(y)) * 128.0f));
+                               if (col > dim) { return static_cast<int8_t>(roundf(y)); }
                                return static_cast<int8_t>(z);
                              });
   }
-  return centers_int8_->view();
+
+  // Construct the view directly to avoid copy constructor issues
+  return raft::make_device_matrix_view<const int8_t, uint32_t>(
+    centers_int8_->data_handle(), centers_int8_->extent(0), centers_int8_->extent(1));
 }
 
 template <typename IdxT>
@@ -745,12 +772,26 @@ raft::device_matrix_view<const half, uint32_t, raft::row_major>
 index_impl<IdxT>::rotation_matrix_half(const raft::resources& res) const
 {
   if (!rotation_matrix_half_.has_value()) {
+    // Get dimensions without calling virtual function that returns matrix view
+    uint32_t rot_dim = this->rot_dim();
+    uint32_t dim     = this->dim();
     rotation_matrix_half_.emplace(
-      raft::make_device_mdarray<half, uint32_t>(res, this->rotation_matrix().extents()));
-    raft::linalg::map(
-      res, rotation_matrix_half_->view(), raft::cast_op<half>{}, this->rotation_matrix());
+      raft::make_device_mdarray<half, uint32_t>(res, raft::make_extents<uint32_t>(rot_dim, dim)));
+
+    // Use vector views to avoid host_device_accessor issues
+    // Calculate size manually to avoid calling view().size()
+    size_t matrix_size = static_cast<size_t>(rot_dim) * static_cast<size_t>(dim);
+    auto output_vec    = raft::make_device_vector_view<half, size_t>(
+      rotation_matrix_half_->data_handle(), matrix_size);
+    auto input_vec = raft::make_device_vector_view<const float, size_t>(
+      this->rotation_matrix().data_handle(), matrix_size);
+
+    raft::linalg::map(res, output_vec, raft::cast_op<half>{}, input_vec);
   }
-  return rotation_matrix_half_->view();
+  // Construct the view directly to avoid copy constructor issues
+  return raft::make_device_matrix_view<const half, uint32_t>(rotation_matrix_half_->data_handle(),
+                                                             rotation_matrix_half_->extent(0),
+                                                             rotation_matrix_half_->extent(1));
 }
 
 template <typename IdxT>
@@ -758,11 +799,25 @@ raft::device_matrix_view<const half, uint32_t, raft::row_major> index_impl<IdxT>
   const raft::resources& res) const
 {
   if (!centers_half_.has_value()) {
-    centers_half_.emplace(
-      raft::make_device_mdarray<half, uint32_t>(res, this->centers().extents()));
-    raft::linalg::map(res, centers_half_->view(), raft::cast_op<half>{}, this->centers());
+    // Get dimensions without calling virtual function that returns matrix view
+    uint32_t n_lists = this->n_lists();
+    uint32_t dim_ext = this->dim_ext();
+    centers_half_.emplace(raft::make_device_mdarray<half, uint32_t>(
+      res, raft::make_extents<uint32_t>(n_lists, dim_ext)));
+
+    // Use vector views to avoid host_device_accessor issues
+    // Calculate size manually to avoid calling view().size()
+    size_t matrix_size = static_cast<size_t>(n_lists) * static_cast<size_t>(dim_ext);
+    auto output_vec =
+      raft::make_device_vector_view<half, size_t>(centers_half_->data_handle(), matrix_size);
+    auto input_vec = raft::make_device_vector_view<const float, size_t>(
+      this->centers().data_handle(), matrix_size);
+
+    raft::linalg::map(res, output_vec, raft::cast_op<half>{}, input_vec);
   }
-  return centers_half_->view();
+  // Construct the view directly to avoid copy constructor issues
+  return raft::make_device_matrix_view<const half, uint32_t>(
+    centers_half_->data_handle(), centers_half_->extent(0), centers_half_->extent(1));
 }
 
 template <typename IdxT>
@@ -793,10 +848,6 @@ raft::device_matrix_view<const half, uint32_t, raft::row_major> index<IdxT>::cen
   return impl_->centers_half(res);
 }
 
-template class index_iface<int64_t>;
-template class index_impl<int64_t>;
-template struct owning_impl<int64_t>;
-template struct view_impl<int64_t>;
 template struct index<int64_t>;
 
 }  // namespace cuvs::neighbors::ivf_pq
