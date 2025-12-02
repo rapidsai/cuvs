@@ -124,34 +124,54 @@ class AnnHnswAceTest : public ::testing::TestWithParam<AnnHnswAceInputs> {
       search_params.ef          = std::max(ps.ef_construction, ps.k * 2);
       search_params.num_threads = 1;
 
-      if (ps.use_disk) {
-        // When using ACE disk mode, the index is serialized to disk by the build function
-        // We need to deserialize it before searching
-        std::string hnsw_file = temp_dir + "/hnsw_index.bin";
-
-        // Deserialize from disk for searching
-        hnsw::index<DataT>* deserialized_index = nullptr;
-        hnsw::deserialize(handle_, hnsw_params, hnsw_file, ps.dim, ps.metric, &deserialized_index);
-        ASSERT_NE(deserialized_index, nullptr);
-
-        hnsw::search(handle_,
-                     search_params,
-                     *deserialized_index,
-                     queries_host.view(),
-                     indexes_hnsw_host.view(),
-                     distances_hnsw_host.view());
-
-        // Clean up deserialized index
-        delete deserialized_index;
-      } else {
+      if (!ps.use_disk) {
         hnsw::search(handle_,
                      search_params,
                      *hnsw_index,
                      queries_host.view(),
                      indexes_hnsw_host.view(),
                      distances_hnsw_host.view());
+        for (size_t i = 0; i < queries_size; i++) {
+          indexes_hnsw[i]   = indexes_hnsw_host.data_handle()[i];
+          distances_hnsw[i] = distances_hnsw_host.data_handle()[i];
+        }
+
+        // Convert indexes for comparison
+        std::vector<IdxT> indexes_hnsw_converted(queries_size);
+        for (size_t i = 0; i < queries_size; i++) {
+          indexes_hnsw_converted[i] = static_cast<IdxT>(indexes_hnsw[i]);
+        }
+
+        EXPECT_TRUE(cuvs::neighbors::eval_neighbours(indexes_naive,
+                                                     indexes_hnsw_converted,
+                                                     distances_naive,
+                                                     distances_hnsw,
+                                                     ps.n_queries,
+                                                     ps.k,
+                                                     0.003,
+                                                     ps.min_recall))
+          << "HNSW ACE build and search failed recall check";
       }
 
+      tmp_index_file index_file;
+      hnsw::serialize(handle_, index_file.filename, *hnsw_index);
+
+      hnsw::index<DataT>* deserialized_index = nullptr;
+      hnsw::deserialize(
+        handle_, hnsw_params, index_file.filename, ps.dim, ps.metric, &deserialized_index);
+      ASSERT_NE(deserialized_index, nullptr);
+
+      // Reset search results
+      for (size_t i = 0; i < queries_size; i++) {
+        indexes_hnsw[i]   = 0;
+        distances_hnsw[i] = 0;
+      }
+      hnsw::search(handle_,
+                   search_params,
+                   *deserialized_index,
+                   queries_host.view(),
+                   indexes_hnsw_host.view(),
+                   distances_hnsw_host.view());
       for (size_t i = 0; i < queries_size; i++) {
         indexes_hnsw[i]   = indexes_hnsw_host.data_handle()[i];
         distances_hnsw[i] = distances_hnsw_host.data_handle()[i];
@@ -172,6 +192,8 @@ class AnnHnswAceTest : public ::testing::TestWithParam<AnnHnswAceInputs> {
                                                    0.003,
                                                    ps.min_recall))
         << "HNSW ACE build and search failed recall check";
+      // Clean up deserialized index
+      delete deserialized_index;
     }
 
     // Clean up temporary directory
