@@ -79,7 +79,7 @@ class SearcherGPU {
   float* d_c_norms                 = nullptr;  // centroid norms
   float* d_q_norms                 = nullptr;  // query norms
   Candidate* d_centroid_candidates = nullptr;  // for candidate computation
-  std::vector<DeviceResultPool*>
+  std::vector<DeviceResultPool>
     topk_results;  // TODO: Change the vectors into a whole array on the GPU
 
   // quantization for queries
@@ -134,25 +134,25 @@ class SearcherGPU {
   void SearchCluster(const IVFGPU& cur_ivf,
                      const typename IVFGPU::GPUClusterMeta& cur_cluster,
                      float sqr_y,
-                     DeviceResultPool* KNNs,
+                     DeviceResultPool& KNNs,
                      float* centroid_data);
 
   void SearchClustershowingTime(const IVFGPU& cur_ivf,
                                 const IVFGPU::GPUClusterMeta& cur_cluster,
                                 float sqr_y,
-                                DeviceResultPool* KNNs,
+                                DeviceResultPool& KNNs,
                                 float* centroid_data);
 
   void SearchClusterWithFilter(const IVFGPU& cur_ivf,
                                const IVFGPU::GPUClusterMeta& cur_cluster,
                                float sqr_y,
-                               DeviceResultPool* KNNs,
+                               DeviceResultPool& KNNs,
                                float* centroid_data);
 
   void SearchClusterWithFilterMemOpt(const IVFGPU& cur_ivf,
                                      const IVFGPU::GPUClusterMeta& cur_cluster,
                                      float sqr_y,
-                                     DeviceResultPool* KNNs,
+                                     DeviceResultPool& KNNs,
                                      float* centroid_data);
 
   void SearchClusterWithFilterMemOptOffload(const IVFGPU& cur_ivf,
@@ -164,13 +164,13 @@ class SearcherGPU {
   void SearchClusterWithFilterMemOptV2(const IVFGPU& cur_ivf,
                                        const IVFGPU::GPUClusterMeta& cur_cluster,
                                        float sqr_y,
-                                       DeviceResultPool* KNNs,
+                                       DeviceResultPool& KNNs,
                                        float* centroid_data);
 
   void SearchMultipleClusters(const IVFGPU& cur_ivf,
                               IVFGPU::GPUClusterMeta* d_cluster_meta,
                               Candidate* d_centroid_candidates,
-                              DeviceResultPool* KNNs,
+                              DeviceResultPool& KNNs,
                               float* d_centroid,
                               const float* h_query,
                               size_t nprobe);
@@ -178,7 +178,7 @@ class SearcherGPU {
   void SearchClusterWithFilterMemOptOneforMulti(const IVFGPU& cur_ivf,
                                                 const IVFGPU::GPUClusterMeta& cur_cluster,
                                                 float sqr_y,
-                                                DeviceResultPool* KNNs,
+                                                DeviceResultPool& KNNs,
                                                 float* centroid_data);
 
   static SearcherGPU* CreateNewSearcherforStream(size_t d,

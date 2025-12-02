@@ -702,8 +702,11 @@ void IVFGPU::quantize_cluster(GPUClusterMeta& cp,
 /// @param nprobe      number of clusters probed
 /// @param TOPK        how many final neighbors to return
 /// @param results     host‐array[TOPK] to receive the final PIDs
-void merge_knn_pools(
-  raft::resources const& handle, DeviceResultPool** knn_array, int nprobe, int TOPK, PID* results)
+void merge_knn_pools(raft::resources const& handle,
+                     std::vector<DeviceResultPool>& knn_array,
+                     int nprobe,
+                     int TOPK,
+                     PID* results)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   int Ncombined       = nprobe * TOPK;
@@ -716,19 +719,11 @@ void merge_knn_pools(
 
   // 2) Copy each pool’s TOPK entries into the combined arrays:
   for (int i = 0; i < nprobe; i++) {
-    DeviceResultPool* pool = knn_array[i];
+    DeviceResultPool& pool = knn_array[i];
     // distances
-    RAFT_CUDA_TRY(cudaMemcpyAsync(d_combined_dist + i * TOPK,
-                                  pool->distances,
-                                  sizeof(float) * TOPK,
-                                  cudaMemcpyDeviceToDevice,
-                                  stream));
+    raft::copy(d_combined_dist + i * TOPK, pool.distances.data_handle(), TOPK, stream);
     // pids
-    RAFT_CUDA_TRY(cudaMemcpyAsync(d_combined_pids + i * TOPK,
-                                  pool->ids,
-                                  sizeof(uint32_t) * TOPK,
-                                  cudaMemcpyDeviceToDevice,
-                                  stream));
+    raft::copy(d_combined_pids + i * TOPK, pool.ids.data_handle(), TOPK, stream);
   }
 
   // 3) In‑place sort the Ncombined distances ascending, carrying along the pids:
@@ -758,11 +753,12 @@ void merge_knn_pools(
 /// If fewer than TOPK total candidates exist, the remaining slots are filled
 /// with `INVALID_PID` (here taken as `std::numeric_limits<uint32_t>::max()`).
 ///
-void merge_knn_pools_filter(raft::resources const& handle,
-                            DeviceResultPool** knn_array,  // host array of length nprobe
-                            int nprobe,
-                            int TOPK,
-                            PID* results)  // host array [TOPK]
+void merge_knn_pools_filter(
+  raft::resources const& handle,
+  std::vector<DeviceResultPool>& knn_array,  // host array of length nprobe
+  int nprobe,
+  int TOPK,
+  PID* results)  // host array [TOPK]
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   //    printf("I'm in \n");
@@ -772,7 +768,7 @@ void merge_knn_pools_filter(raft::resources const& handle,
   std::vector<int> offset(nprobe);  // prefix sum of pool sizes
   int Ncombined = 0;
   for (int i = 0; i < nprobe; ++i) {
-    int sz    = std::min(knn_array[i]->size, knn_array[i]->capacity);  // safety
+    int sz    = std::min(knn_array[i].size, knn_array[i].capacity);  // safety
     offset[i] = Ncombined;
     Ncombined += sz;
   }
@@ -794,23 +790,15 @@ void merge_knn_pools_filter(raft::resources const& handle,
   // 3) Copy each pool’s *valid* entries into the combined buffers
   //------------------------------------------------------------------
   for (int i = 0; i < nprobe; ++i) {
-    DeviceResultPool* pool = knn_array[i];
-    int sz                 = std::min(pool->size, pool->capacity);
+    DeviceResultPool& pool = knn_array[i];
+    int sz                 = std::min(pool.size, pool.capacity);
     if (sz <= 0) continue;  // skip empty pools
 
     // distances
-    RAFT_CUDA_TRY(cudaMemcpyAsync(d_combined_dist + offset[i],
-                                  pool->distances,
-                                  sizeof(float) * sz,
-                                  cudaMemcpyDeviceToDevice,
-                                  stream));
+    raft::copy(d_combined_dist + offset[i], pool.distances.data_handle(), sz, stream);
 
     // ids
-    RAFT_CUDA_TRY(cudaMemcpyAsync(d_combined_pids + offset[i],
-                                  pool->ids,
-                                  sizeof(uint32_t) * sz,
-                                  cudaMemcpyDeviceToDevice,
-                                  stream));
+    raft::copy(d_combined_pids + offset[i], pool.ids.data_handle(), sz, stream);
   }
 
   //------------------------------------------------------------------
@@ -844,11 +832,12 @@ void merge_knn_pools_filter(raft::resources const& handle,
 
 // … (DeviceResultPool definition, RAFT_CUDA_TRY macro, etc.) …
 
-void merge_knn_pools_filter_cub(raft::resources const& handle,
-                                DeviceResultPool** knn_array,  // host array of length nprobe
-                                int nprobe,
-                                int TOPK,
-                                PID* results)  // host array [TOPK]
+void merge_knn_pools_filter_cub(
+  raft::resources const& handle,
+  std::vector<DeviceResultPool>& knn_array,  // host array of length nprobe
+  int nprobe,
+  int TOPK,
+  PID* results)  // host array [TOPK]
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   //------------------------------------------------------------------
@@ -857,7 +846,7 @@ void merge_knn_pools_filter_cub(raft::resources const& handle,
   std::vector<int> offset(nprobe);
   int Ncombined = 0;
   for (int i = 0; i < nprobe; ++i) {
-    int sz    = std::min(knn_array[i]->size, knn_array[i]->capacity);
+    int sz    = std::min(knn_array[i].size, knn_array[i].capacity);
     offset[i] = Ncombined;
     Ncombined += sz;
   }
@@ -879,21 +868,12 @@ void merge_knn_pools_filter_cub(raft::resources const& handle,
   // 3) Copy each pool’s *valid* entries into the combined buffers
   //------------------------------------------------------------------
   for (int i = 0; i < nprobe; ++i) {
-    DeviceResultPool* pool = knn_array[i];
-    int sz                 = std::min(pool->size, pool->capacity);
+    DeviceResultPool& pool = knn_array[i];
+    int sz                 = std::min(pool.size, pool.capacity);
     if (sz <= 0) continue;
 
-    RAFT_CUDA_TRY(cudaMemcpyAsync(d_combined_dist + offset[i],
-                                  pool->distances,
-                                  sizeof(float) * sz,
-                                  cudaMemcpyDeviceToDevice,
-                                  stream));
-
-    RAFT_CUDA_TRY(cudaMemcpyAsync(d_combined_pids + offset[i],
-                                  pool->ids,
-                                  sizeof(uint32_t) * sz,
-                                  cudaMemcpyDeviceToDevice,
-                                  stream));
+    raft::copy(d_combined_dist + offset[i], pool.distances.data_handle(), sz, stream);
+    raft::copy(d_combined_pids + offset[i], pool.ids.data_handle(), sz, stream);
   }
 
   //------------------------------------------------------------------
@@ -961,8 +941,11 @@ pinned_unique<T> make_pinned(size_t count)
   // lambda matches void(T*) exactly
   return pinned_unique<T>(ptr, [](T* p) { RAFT_CUDA_TRY(cudaFreeHost(p)); });
 }
-void merge_knn_pools_filter_host_cumh(
-  raft::resources const& handle, DeviceResultPool** knn_array, int nprobe, int TOPK, PID* results)
+void merge_knn_pools_filter_host_cumh(raft::resources const& handle,
+                                      std::vector<DeviceResultPool>& knn_array,
+                                      int nprobe,
+                                      int TOPK,
+                                      PID* results)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   //------------------------------------------------------------------
@@ -971,7 +954,7 @@ void merge_knn_pools_filter_host_cumh(
   std::vector<int> offset(nprobe);
   int Ncombined = 0;
   for (int i = 0; i < nprobe; ++i) {
-    int sz    = std::min(knn_array[i]->size, knn_array[i]->capacity);
+    int sz    = std::min(knn_array[i].size, knn_array[i].capacity);
     offset[i] = Ncombined;
     Ncombined += sz;
   }
@@ -991,18 +974,12 @@ void merge_knn_pools_filter_host_cumh(
   // 3) Device → host copies (still on the same stream)
   //------------------------------------------------------------------
   for (int i = 0; i < nprobe; ++i) {
-    DeviceResultPool* pool = knn_array[i];
-    int sz                 = std::min(pool->size, pool->capacity);
+    DeviceResultPool& pool = knn_array[i];
+    int sz                 = std::min(pool.size, pool.capacity);
     if (sz == 0) continue;
 
-    RAFT_CUDA_TRY(cudaMemcpyAsync(h_dist.get() + offset[i],
-                                  pool->distances,
-                                  sizeof(float) * sz,
-                                  cudaMemcpyDeviceToHost,
-                                  stream));
-
-    RAFT_CUDA_TRY(cudaMemcpyAsync(
-      h_pid.get() + offset[i], pool->ids, sizeof(uint32_t) * sz, cudaMemcpyDeviceToHost, stream));
+    raft::copy(h_dist.get() + offset[i], pool.distances.data_handle(), sz, stream);
+    raft::copy(h_pid.get() + offset[i], pool.ids.data_handle(), sz, stream);
   }
 
   //------------------------------------------------------------------
@@ -1035,8 +1012,11 @@ void merge_knn_pools_filter_host_cumh(
  * @param TOPK      number of neighbours requested
  * @param results   host array [TOPK] – receives the PIDs of the best K
  */
-void merge_knn_pools_filter_host(
-  raft::resources const& handle, DeviceResultPool** knn_array, int nprobe, int TOPK, PID* results)
+void merge_knn_pools_filter_host(raft::resources const& handle,
+                                 std::vector<DeviceResultPool>& knn_array,
+                                 int nprobe,
+                                 int TOPK,
+                                 PID* results)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   //------------------------------------------------------------------
@@ -1045,7 +1025,7 @@ void merge_knn_pools_filter_host(
   std::vector<int> offset(nprobe);
   int Ncombined = 0;
   for (int i = 0; i < nprobe; ++i) {
-    int sz    = std::min(knn_array[i]->size, knn_array[i]->capacity);
+    int sz    = std::min(knn_array[i].size, knn_array[i].capacity);
     offset[i] = Ncombined;
     Ncombined += sz;
   }
@@ -1066,20 +1046,14 @@ void merge_knn_pools_filter_host(
   // 3) Copy each pool's valid entries *device → host*
   //------------------------------------------------------------------
   for (int i = 0; i < nprobe; ++i) {
-    DeviceResultPool* pool = knn_array[i];
-    int sz                 = std::min(pool->size, pool->capacity);
+    DeviceResultPool& pool = knn_array[i];
+    int sz                 = std::min(pool.size, pool.capacity);
     if (sz == 0) continue;
 
     /* distances */
-    RAFT_CUDA_TRY(cudaMemcpyAsync(h_dist.data() + offset[i],
-                                  pool->distances,
-                                  sizeof(float) * sz,
-                                  cudaMemcpyDeviceToHost,
-                                  stream));
-
+    raft::copy(h_dist.data() + offset[i], pool.distances.data_handle(), sz, stream);
     /* pids */
-    RAFT_CUDA_TRY(cudaMemcpyAsync(
-      h_pid.data() + offset[i], pool->ids, sizeof(uint32_t) * sz, cudaMemcpyDeviceToHost, stream));
+    raft::copy(h_pid.data() + offset[i], pool.ids.data_handle(), sz, stream);
   }
 
   //------------------------------------------------------------------
@@ -1119,7 +1093,7 @@ void merge_knn_pools_filter_host(
  *                      of the final TOPK came from probe 0, 1, …, nprobe-1
  */
 void merge_knn_pools_with_stats(raft::resources const& handle,
-                                DeviceResultPool** knn_array,
+                                std::vector<DeviceResultPool>& knn_array,
                                 int nprobe,
                                 int TOPK,
                                 PID* results,
@@ -1145,14 +1119,11 @@ void merge_knn_pools_with_stats(raft::resources const& handle,
    *     and annotate its source probe index                             *
    * ------------------------------------------------------------------ */
   for (int i = 0; i < nprobe; ++i) {
-    DeviceResultPool* pool = knn_array[i];
+    DeviceResultPool& pool = knn_array[i];
 
     // copy distances & pids
-    RAFT_CUDA_TRY(cudaMemcpyAsync(
-      d_dist + i * TOPK, pool->distances, sizeof(float) * TOPK, cudaMemcpyDeviceToDevice, stream));
-
-    RAFT_CUDA_TRY(cudaMemcpyAsync(
-      d_pid + i * TOPK, pool->ids, sizeof(uint32_t) * TOPK, cudaMemcpyDeviceToDevice, stream));
+    raft::copy(d_dist + i * TOPK, pool.distances.data_handle(), TOPK, stream);
+    raft::copy(d_pid + i * TOPK, pool.ids.data_handle(), TOPK, stream);
 
     // fill the “source-probe” column with value i
     thrust::device_ptr<int> src_ptr(d_src);
@@ -1220,9 +1191,9 @@ void IVFGPU::search(const float* d_query, size_t k, size_t nprobe, PID* results)
   RAFT_CUDA_TRY(cudaFreeAsync(d_centroid_candidates, stream_));
 
   // Create a device result pool. (k*nprobe for multiple use)
-  DeviceResultPool** knn_array = new DeviceResultPool*[nprobe];
+  std::vector<DeviceResultPool> knn_array(nprobe);
   for (size_t i = 0; i < nprobe; ++i) {
-    knn_array[i] = createDeviceResultPool(k, stream_);  // 每个都用 k 初始化
+    knn_array[i] = createDeviceResultPool(handle_, k);  // 每个都用 k 初始化
   }
 
   // For each of the nprobe closest centroids, perform GPU search. and finally get TOPK *
@@ -1291,10 +1262,6 @@ void IVFGPU::search(const float* d_query, size_t k, size_t nprobe, PID* results)
   // Copy the result pool back to host.
   //    copy_results_from_pool(KNNs, results);
   merge_knn_pools_filter(handle_, knn_array, nprobe, k, results);
-  // free pools
-  for (size_t i = 0; i < nprobe; ++i) {
-    freeDeviceResultPool(knn_array[i], stream_);
-  }
 }
 
 __global__ void set_inf(float* a, size_t n)
@@ -1366,9 +1333,9 @@ void IVFGPU::MemOptimizedSearch(
   RAFT_CUDA_TRY(cudaFreeAsync(d_centroid_candidates, stream_));
 
   // Create a device result pool. (k*nprobe for multiple use)
-  DeviceResultPool** knn_array = new DeviceResultPool*[nprobe];
+  std::vector<DeviceResultPool> knn_array(nprobe);
   for (size_t i = 0; i < nprobe; ++i) {
-    knn_array[i] = createDeviceResultPool(k, stream_);  // 每个都用 k 初始化
+    knn_array[i] = createDeviceResultPool(handle_, k);  // 每个都用 k 初始化
   }
 
   // For each of the nprobe closest centroids, perform GPU search. and finally get TOPK *
@@ -1408,10 +1375,6 @@ void IVFGPU::MemOptimizedSearch(
   // Copy the result pool back to host.
   //    copy_results_from_pool(KNNs, results);
   merge_knn_pools_filter(handle_, knn_array, nprobe, k, results);
-  // free pools
-  for (size_t i = 0; i < nprobe; ++i) {
-    freeDeviceResultPool(knn_array[i], stream_);
-  }
 }
 
 __global__ void gather_cluster_meta_kernel(
@@ -2523,7 +2486,7 @@ void IVFGPU::MultiClusterSearch(const float* d_query,
                                 size_t nprobe,
                                 PID* results,
                                 void* searcher1,
-                                DeviceResultPool** knn_array,
+                                std::vector<DeviceResultPool>& knn_array,
                                 std::vector<Candidate>& centroid_candidates) const
 {
   // Compute distances from query to centroids on GPU.
@@ -2684,9 +2647,9 @@ void IVFGPU::MemOptimizedSearchV2(
   RAFT_CUDA_TRY(cudaFreeAsync(d_centroid_candidates, stream_));
 
   // Create a device result pool. (k*nprobe for multiple use)
-  DeviceResultPool** knn_array = new DeviceResultPool*[nprobe];
+  std::vector<DeviceResultPool> knn_array(nprobe);
   for (size_t i = 0; i < nprobe; ++i) {
-    knn_array[i] = createDeviceResultPool(k, stream_);  // 每个都用 k 初始化
+    knn_array[i] = createDeviceResultPool(handle_, k);  // 每个都用 k 初始化
   }
 
   // For each of the nprobe closest centroids, perform GPU search. and finally get TOPK *
@@ -2731,10 +2694,6 @@ void IVFGPU::MemOptimizedSearchV2(
   // Copy the result pool back to host.
   //    copy_results_from_pool(KNNs, results);
   merge_knn_pools_filter(handle_, knn_array, nprobe, k, results);
-  // free pools
-  for (size_t i = 0; i < nprobe; ++i) {
-    freeDeviceResultPool(knn_array[i], stream_);
-  }
 }
 
 void IVFGPU::CPUGPUCoSearch(
@@ -2856,11 +2815,11 @@ void IVFGPU::CPUGPUCoSearchV2(
   // In the offload version, always merge the following part to the first one
 
   // first 3 on GPU
-  int startpoint                   = 1;
-  DeviceResultPool** knn_array_gpu = new DeviceResultPool*[startpoint];
+  int startpoint = 1;
+  std::vector<DeviceResultPool> knn_array_gpu(startpoint);
 
   for (size_t i = 0; i < startpoint; ++i)
-    knn_array_gpu[i] = createDeviceResultPool(k, stream_);
+    knn_array_gpu[i] = createDeviceResultPool(handle_, k);
 
   BoundedKNN** knn_array = new BoundedKNN*[nprobe];
   for (size_t i = 0; i < nprobe; ++i)
@@ -2896,19 +2855,12 @@ void IVFGPU::CPUGPUCoSearchV2(
                                             knn_array_gpu[i],
                                             h_centroid);
 
-    RAFT_CUDA_TRY(cudaMemcpyAsync(first_3_dis,
-                                  knn_array_gpu[i]->distances,
-                                  knn_array_gpu[i]->size * sizeof(float),
-                                  cudaMemcpyDeviceToHost,
-                                  stream_));
-    RAFT_CUDA_TRY(cudaMemcpyAsync(first_3_pid,
-                                  knn_array_gpu[i]->ids,
-                                  knn_array_gpu[i]->size * sizeof(PID),
-                                  cudaMemcpyDeviceToHost,
-                                  stream_));
+    raft::copy(
+      first_3_dis, knn_array_gpu[i].distances.data_handle(), knn_array_gpu[i].size, stream_);
+    raft::copy(first_3_pid, knn_array_gpu[i].ids.data_handle(), knn_array_gpu[i].size, stream_);
     raft::resource::sync_stream(handle_);
     //        printf("filter dist before: %f\n", searcher->h_filter_distk);
-    for (int j = 0; j < knn_array_gpu[i]->size; ++j) {
+    for (int j = 0; j < knn_array_gpu[i].size; ++j) {
       knn_array[0]->insert({first_3_dis[j], first_3_pid[j]});
     }
     searcher->h_filter_distk = knn_array[0]->worst().est_dist;
@@ -2963,10 +2915,6 @@ void IVFGPU::CPUGPUCoSearchV2(
   // free pools
   for (size_t i = 0; i < nprobe; ++i) {
     delete knn_array[i];
-  }
-
-  for (size_t i = 0; i < startpoint; ++i) {
-    freeDeviceResultPool(knn_array_gpu[i], stream_);
   }
 }
 
@@ -3055,9 +3003,9 @@ void IVFGPU::search_with_time(const float* d_query,
   // 3) Create nprobe result pools         (CPU)
   //------------------------------------------------------------------
   cpu.start();
-  DeviceResultPool** knn_array = new DeviceResultPool*[nprobe];
+  std::vector<DeviceResultPool> knn_array(nprobe);
   for (size_t i = 0; i < nprobe; ++i)
-    knn_array[i] = createDeviceResultPool(k, stream_);
+    knn_array[i] = createDeviceResultPool(handle_, k);
   raft::resource::sync_stream(handle_);
   stats.push_back({"alloc_pools", cpu.stop()});
 
@@ -3093,9 +3041,6 @@ void IVFGPU::search_with_time(const float* d_query,
   std::vector<int> probe_hist(nprobe, 0);
   //    merge_knn_pools_with_stats(knn_array, nprobe, k, results, probe_hist.data());
   merge_knn_pools_filter(handle_, knn_array, nprobe, k, results);
-  for (size_t i = 0; i < nprobe; ++i)
-    freeDeviceResultPool(knn_array[i], stream_);
-  delete[] knn_array;
   stats.push_back({"merge_pools", cpu.stop()});
 
   //------------------------------------------------------------------

@@ -320,7 +320,7 @@ class IVFGPU {
                           size_t nprobe,
                           PID* results,
                           void* searcher1,
-                          DeviceResultPool** knn_array,
+                          std::vector<DeviceResultPool>& knn_array,
                           std::vector<Candidate>& centroid_candidates) const;
 
   void BatchClusterSearch(const float* d_query,

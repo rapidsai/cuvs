@@ -11,6 +11,7 @@
 
 #include <cuvs/neighbors/ivf_rabitq/utils/utils_cuda.cuh>
 
+#include <raft/core/device_mdarray.hpp>
 #include <raft/core/resources.hpp>
 
 #include <rmm/cuda_stream_view.hpp>
@@ -62,10 +63,12 @@ class BoundedKNN {
 /// The arrays are allocated in device memory (e.g., in global or shared memory).
 struct DeviceResultPool {
   // Pointers to device arrays. For simplicity we assume they point to global memory.
-  uint32_t* ids;     // array of candidate IDs
-  float* distances;  // corresponding distances
-  int capacity;      // maximum number of candidates
-  int size = 0;      // current number of candidates
+  raft::device_vector<uint32_t, int64_t> ids =
+    raft::make_device_vector<uint32_t, int64_t>(raft::resources(), 0);  // array of candidate IDs
+  raft::device_vector<float, int64_t> distances =
+    raft::make_device_vector<float, int64_t>(raft::resources(), 0);  // corresponding distances
+  int capacity;                                                      // maximum number of candidates
+  int size = 0;                                                      // current number of candidates
 
   // Device function: binary search to find the insertion index.
   __device__ int find_bsearch(float dist) const
@@ -74,7 +77,7 @@ struct DeviceResultPool {
     int hi = size;
     while (lo < hi) {
       int mid = (lo + hi) >> 1;
-      if (distances[mid] < dist)
+      if (distances(mid) < dist)
         lo = mid + 1;
       else
         hi = mid;
@@ -87,16 +90,16 @@ struct DeviceResultPool {
   __device__ void insert(uint32_t id, float dist)
   {
     // If the pool is full and dist is greater than the worst (last element), do nothing.
-    if (size == capacity && dist > distances[size - 1]) return;
+    if (size == capacity && dist > distances(size - 1)) return;
 
     int idx = find_bsearch(dist);
     // Shift elements to the right.
     for (int j = size; j > idx; j--) {
-      ids[j]       = ids[j - 1];
-      distances[j] = distances[j - 1];
+      ids(j)       = ids(j - 1);
+      distances(j) = distances(j - 1);
     }
-    ids[idx]       = id;
-    distances[idx] = dist;
+    ids(idx)       = id;
+    distances(idx) = dist;
     if (size < capacity) size++;
   }
 
@@ -106,37 +109,7 @@ struct DeviceResultPool {
   //    }
 };
 
-struct HostResultPool {
-  // Pointers to host arrays. For simplicity we assume they point to global memory.
-  uint32_t* ids;     // array of candidate IDs
-  float* distances;  // corresponding distances
-  int capacity;      // maximum number of candidates
-  int size = 0;      // current number of candidates
-};
-
-DeviceResultPool* createDeviceResultPool(int capacity, rmm::cuda_stream_view stream);
-
-// Frees both the device buffers and the host‑side wrapper.
-// Safe to call with a nullptr.
-inline void freeDeviceResultPool(DeviceResultPool* pool, rmm::cuda_stream_view stream)
-{
-  if (pool == nullptr) {  // nothing to do
-    return;
-  }
-
-  // 1. Release device buffers (if they were allocated).
-  if (pool->ids != nullptr) {
-    cudaFreeAsync(pool->ids, stream);
-    pool->ids = nullptr;
-  }
-  if (pool->distances != nullptr) {
-    cudaFreeAsync(pool->distances, stream);
-    pool->distances = nullptr;
-  }
-
-  // 2. Finally, delete the host‑side structure itself.
-  delete pool;
-}
+DeviceResultPool createDeviceResultPool(raft::resources const& handle, const int capacity);
 
 /**
  * @brief Copy candidate IDs from a device result pool to a host array.
