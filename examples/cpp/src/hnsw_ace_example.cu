@@ -61,7 +61,7 @@ void hnsw_build_search_ace(raft::device_resources const& dev_resources,
   // m * 3). Higher values work for higher intrinsic dimensionality and/or high recall, low values
   // can work for datasets with low intrinsic dimensionality and/or low recalls. Higher values lead
   // to higher memory consumption.
-  hnsw_params.m = 32;
+  hnsw_params.M = 32;
   // Set the index quality for the ACE build. Bigger values increase the index quality. At some
   // point, increasing this will no longer improve the quality.
   hnsw_params.ef_construction = 120;

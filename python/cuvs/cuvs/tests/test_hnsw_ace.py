@@ -50,7 +50,6 @@ def run_hnsw_ace_build_search_test(
         # Set up ACE parameters
         ace_params = hnsw.AceParams(
             npartitions=npartitions,
-            ef_construction=ef_construction,
             build_dir=temp_dir,
             use_disk=use_disk,
         )
@@ -58,7 +57,8 @@ def run_hnsw_ace_build_search_test(
         # Build parameters with ACE configuration
         index_params = hnsw.IndexParams(
             hierarchy=hierarchy,
-            m=32,
+            M=32,
+            ef_construction=ef_construction,
             metric=metric,
             ace_params=ace_params,
         )
@@ -184,7 +184,6 @@ def test_hnsw_ace_disk_serialize_deserialize():
         # Create ACE params with disk mode enabled
         ace_params = hnsw.AceParams(
             npartitions=2,
-            ef_construction=100,
             build_dir=temp_dir,
             use_disk=True,
         )
@@ -192,7 +191,8 @@ def test_hnsw_ace_disk_serialize_deserialize():
         # Create HNSW index params with ACE
         index_params = hnsw.IndexParams(
             hierarchy="gpu",
-            m=32,
+            M=32,
+            ef_construction=120,
             metric=metric,
             ace_params=ace_params,
         )

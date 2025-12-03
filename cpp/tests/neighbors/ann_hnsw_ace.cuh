@@ -98,14 +98,14 @@ class AnnHnswAceTest : public ::testing::TestWithParam<AnnHnswAceInputs> {
 
       // Configure HNSW index parameters with ACE
       hnsw::index_params hnsw_params;
-      hnsw_params.metric    = ps.metric;
-      hnsw_params.hierarchy = hnsw::HnswHierarchy::GPU;
-      hnsw_params.m         = 32;
+      hnsw_params.metric          = ps.metric;
+      hnsw_params.hierarchy       = hnsw::HnswHierarchy::GPU;
+      hnsw_params.M               = 32;
+      hnsw_params.ef_construction = ps.ef_construction;
 
       // Configure ACE parameters
       auto ace_params                = graph_build_params::ace_params();
       ace_params.npartitions         = ps.npartitions;
-      ace_params.ef_construction     = ps.ef_construction;
       ace_params.build_dir           = temp_dir;
       ace_params.use_disk            = ps.use_disk;
       ace_params.max_host_memory_gb  = ps.max_host_memory_gb;

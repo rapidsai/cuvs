@@ -51,9 +51,6 @@ cdef class AceParams:
         If the specified number of partitions results in partitions that exceed
         available memory, the value will be automatically increased to fit
         memory constraints and a warning will be issued.
-    ef_construction : int, default = 120 (optional)
-        The index quality for the ACE build. Bigger values increase the index
-        quality.
     build_dir : string, default = "/tmp/hnsw_ace_build" (optional)
         Directory to store ACE build artifacts (KNN graph, optimized graph).
         Used when `use_disk` is true or when the graph does not fit in memory.
@@ -83,13 +80,11 @@ cdef class AceParams:
 
     def __init__(self, *,
                  npartitions=0,
-                 ef_construction=120,
                  build_dir="/tmp/hnsw_ace_build",
                  use_disk=False,
                  max_host_memory_gb=0,
                  max_gpu_memory_gb=0):
         self.params.npartitions = npartitions
-        self.params.ef_construction = ef_construction
         self._build_dir_bytes = build_dir.encode('utf-8')
         self.params.build_dir = self._build_dir_bytes
         self.params.use_disk = use_disk
@@ -99,10 +94,6 @@ cdef class AceParams:
     @property
     def npartitions(self):
         return self.params.npartitions
-
-    @property
-    def ef_construction(self):
-        return self.params.ef_construction
 
     @property
     def build_dir(self):
@@ -145,7 +136,7 @@ cdef class IndexParams:
         NOTE: When hierarchy is `gpu`, while the majority of the work is done
         on the GPU, initialization of the HNSW index itself and some other
         work is parallelized with the help of CPU threads.
-    m : int, default = 32 (optional)
+    M : int, default = 32 (optional)
         HNSW M parameter: number of bi-directional links per node
         (used when building with ACE). graph_degree = m * 2,
         intermediate_graph_degree = m * 3.
@@ -170,7 +161,7 @@ cdef class IndexParams:
                  hierarchy="none",
                  ef_construction=200,
                  num_threads=0,
-                 m=32,
+                 M=32,
                  metric="sqeuclidean",
                  ace_params=None):
         if hierarchy == "none":
@@ -184,7 +175,7 @@ cdef class IndexParams:
                              " Valid values are 'none', 'cpu', and 'gpu'.")
         self.params.ef_construction = ef_construction
         self.params.num_threads = num_threads
-        self.params.m = m
+        self.params.M = M
         self.params.metric = DISTANCE_TYPES[metric]
 
         if ace_params is not None:
@@ -214,7 +205,7 @@ cdef class IndexParams:
 
     @property
     def m(self):
-        return self.params.m
+        return self.params.M
 
     @property
     def ace_params(self):
@@ -513,7 +504,6 @@ def build(IndexParams index_params, dataset, resources=None):
     >>> # Create ACE parameters
     >>> ace_params = hnsw.AceParams(
     ...     npartitions=4,
-    ...     ef_construction=120,
     ...     use_disk=True,
     ...     build_dir="/tmp/hnsw_ace_build"
     ... )
@@ -522,6 +512,8 @@ def build(IndexParams index_params, dataset, resources=None):
     >>> index_params = hnsw.IndexParams(
     ...     hierarchy="gpu",
     ...     ace_params=ace_params,
+    ...     ef_construction=120,
+    ...     M=32,
     ...     metric="sqeuclidean"
     ... )
     >>>
