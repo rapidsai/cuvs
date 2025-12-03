@@ -8,7 +8,6 @@
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_resources.hpp>
 #include <raft/random/make_blobs.cuh>
-// #include <raft/sparse/neighbors/cross_component_nn.cuh>
 
 #include <cuvs/neighbors/scann.hpp>
 

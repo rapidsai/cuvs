@@ -12,7 +12,6 @@
 #include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
-// #include <raft/neighbors/detail/refine.cuh>
 #include <raft/util/itertools.hpp>
 
 #include <rmm/cuda_stream_view.hpp>
