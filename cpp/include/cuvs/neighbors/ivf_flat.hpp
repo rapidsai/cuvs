@@ -207,8 +207,7 @@ struct index : cuvs::neighbors::index {
   /** packed k-means cluster centers corresponding to the lists [n_lists, dim] when the
    * BitwiseHamming metric is selected */
   raft::device_matrix_view<uint8_t, int64_t, raft::row_major> binary_centers() noexcept;
-  raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> binary_centers()
-    const noexcept;
+  raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> binary_centers() const noexcept;
 
   /**
    * (Optional) Precomputed norms of the `centers` w.r.t. the chosen distance metric [n_lists].
