@@ -9,6 +9,8 @@
 
 #include "quantizer_gpu.cuh"
 
+#include <curand_kernel.h>
+
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -292,9 +294,7 @@ __global__ void exrabitq_fused_kernel_batch(
   // Dynamically allocated shared memory for one row's data.
   extern __shared__ float s_mem[];
   float* s_xp_norm    = s_mem;
-  int* s_bin_xp       = (int*)(s_xp_norm + D);
-  float* s_xp         = (float*)(s_bin_xp + D);
-  uint8_t* s_tmp_code = (uint8_t*)(s_xp + D);
+  uint8_t* s_tmp_code = (uint8_t*)(s_xp_norm + D);
 
   int tid = threadIdx.x;
 
@@ -303,8 +303,6 @@ __global__ void exrabitq_fused_kernel_batch(
   //=========================================================================
   for (int j = tid; j < D; j += BlockSize) {
     s_xp_norm[j] = d_XP_norm[row * D + j];
-    s_bin_xp[j]  = d_bin_XP[row * D + j];
-    s_xp[j]      = d_XP[row * D + j];
   }
   __syncthreads();
 
@@ -326,7 +324,7 @@ __global__ void exrabitq_fused_kernel_batch(
 
   // Parallel bit-flipping
   for (int j = tid; j < D; j += BlockSize) {
-    if (s_bin_xp[j] == 0) { s_tmp_code[j] = (~s_tmp_code[j]) & mask; }
+    if (d_bin_XP[row * D + j] == 0) { s_tmp_code[j] = (~s_tmp_code[j]) & mask; }
   }
   __syncthreads();
 
@@ -346,7 +344,7 @@ __global__ void exrabitq_fused_kernel_batch(
   float l2_sqr = 0.f, ip_resi_xucb = 0.f, ip_cent_xucb = 0.f, xu_sq = 0.f;
 
   for (size_t j = tid; j < D; j += BlockSize) {
-    float res  = s_xp[j];
+    float res  = d_XP[row * D + j];
     int xu_pre = s_tmp_code[j];
     xu_pre += static_cast<int>(res >= 0) << EX_BITS;
     float xu = float(xu_pre) - (static_cast<float>(1 << EX_BITS) - 0.5f);
@@ -447,23 +445,19 @@ void DataQuantizerGPU::data_transformation_batch_opt(
   float* d_XP_norm,
   int* d_bin_XP,
   float* d_XP_output  // XP_output is (num_points + 1) * D to store extra centroid
-) const
+)
 {
   // 1. Allocate a single temporary buffer for both padded data and the padded centroid.
-  float* d_X_and_C_pad;
-  RAFT_CUDA_TRY(
-    cudaMallocAsync((void**)&d_X_and_C_pad, (num_points + 1) * D * sizeof(float), stream_));
-  raft::resource::sync_stream(handle_);
 
   // Create a pointer to the start of the centroid section for the kernel.
-  float* d_C_pad_ptr = d_X_and_C_pad + num_points * D;
+  float* d_C_pad_ptr = d_X_and_C_pad.data_handle() + num_points * D;
 
   // 2. Launch a single kernel to gather and pad both data and centroid.
-  int blockSize           = 256;
+  int blockSize = D < 256 ? 128 : 256;
   size_t totalPadElements = (num_points + 1) * D;
   int gridPadSize         = (totalPadElements + blockSize - 1) / blockSize;
   gatherAndPadKernel<<<gridPadSize, blockSize, 0, stream_>>>(
-    d_data, d_IDs, d_centroid, d_X_and_C_pad, num_points, DIM, D);
+    d_data, d_IDs, d_centroid, d_X_and_C_pad.data_handle(), num_points, DIM, D);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // 3. Allocate a single output buffer for both rotated data (XP) and rotated centroid (CP).
@@ -471,7 +465,7 @@ void DataQuantizerGPU::data_transformation_batch_opt(
 
   // 4. Perform a single, combined rotation.
   // The input is d_X_and_C_pad, output is d_XP_and_CP. The number of "points" is num_points + 1.
-  rotator.rotate(d_X_and_C_pad, d_XP_and_CP, num_points + 1);
+  rotator.rotate(d_X_and_C_pad.data_handle(), d_XP_and_CP, num_points + 1);
 
   // Create pointers to the specific results within the combined buffer.
   float* d_XP = d_XP_and_CP;
@@ -497,8 +491,6 @@ void DataQuantizerGPU::data_transformation_batch_opt(
                                                     D);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
-  // Free temporary buffers.
-  RAFT_CUDA_TRY(cudaFreeAsync(d_X_and_C_pad, stream_));
 }
 
 // Fused function to compute RaBitQ codes and factors in a single pass.
@@ -543,8 +535,6 @@ void DataQuantizerGPU::exrabitq_codes_and_factors_fused(const int* d_bin_XP,
 
   // Calculate required shared memory size
   size_t shared_mem_size = D * sizeof(float) +         // s_xp_norm
-                           D * sizeof(int) +           // s_bin_xp
-                           D * sizeof(float) +         // s_xp
                            D * sizeof(uint8_t) +       // s_tmp_code
                            BlockSize * sizeof(float);  // s_partials for reduction
 
@@ -573,21 +563,14 @@ void DataQuantizerGPU::quantize_batch_opt(const float* d_data,
                                           float* d_short_data_factors,
                                           uint8_t* d_long_code,
                                           float* d_ex_factor,
-                                          float* d_rotated_c) const
+                                          float* d_rotated_c)
 {
 #ifdef DEBUG_BATCH_CONSTRUCT
 //    printf("Scaling factor: %f\n", const_scaling_factor);
 #endif
   // 1. Data Transformation:
-
-  float* d_XP_norm = nullptr;
-  int* d_bin_XP    = nullptr;
-  float* d_XP;
-  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_XP_norm, num_points * D * sizeof(float), stream_));
-  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_bin_XP, num_points * D * sizeof(int), stream_));
-  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_XP, (num_points + 1) * D * sizeof(float), stream_));
   data_transformation_batch_opt(
-    d_data, d_centroid, d_IDs, num_points, rotator, d_rotated_c, d_XP_norm, d_bin_XP, d_XP);
+    d_data, d_centroid, d_IDs, num_points, rotator, d_rotated_c, d_XP_norm.data_handle(), d_bin_XP.data_handle(), d_XP.data_handle());
 
 #ifdef DEBUG_BATCH_CONSTRUCT
 //    if (debug_first_cluster_count_2 == 0) {
@@ -603,24 +586,16 @@ void DataQuantizerGPU::quantize_batch_opt(const float* d_data,
 //    }
 #endif
   rabitq_codes_and_factors_fused(
-    d_rotated_c, d_bin_XP, d_XP, d_short_data, d_short_data_factors, num_points);
+    d_rotated_c, d_bin_XP.data_handle(), d_XP.data_handle(), d_short_data, d_short_data_factors, num_points);
 
   // 5. Compute ExRaBitQ quantization codes.
   if (fast_quantize_flag) {
     exrabitq_codes_and_factors_fused(
-      d_bin_XP, d_XP_norm, d_XP, d_long_code, d_ex_factor, d_rotated_c, num_points);
+      d_bin_XP.data_handle(), d_XP_norm.data_handle(), d_XP.data_handle(), d_long_code, d_ex_factor, d_rotated_c, num_points);
   } else {
     exrabitq_codes_and_factors_fused_ori(
-      d_bin_XP, d_XP_norm, d_XP, d_long_code, d_ex_factor, d_rotated_c, num_points);
+      d_bin_XP.data_handle(), d_XP_norm.data_handle(), d_XP.data_handle(), d_long_code, d_ex_factor, d_rotated_c, num_points);
   }
-
-  // Free intermediate buffers.
-  RAFT_CUDA_TRY(cudaFreeAsync(d_XP_norm, stream_));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_bin_XP, stream_));
-  // jamxia edit
-  RAFT_CUDA_TRY(cudaFreeAsync(d_XP, stream_));
-
-  raft::resource::sync_stream(handle_);
 }
 
 constexpr std::array<float, 9> kTightStart = {
@@ -757,7 +732,7 @@ __device__ float compute_best_rescale_parallel(
   }
 
   // Block-level reduction for max
-  __shared__ float* s_reduce;
+  float* s_reduce;
   s_reduce      = reuse_space;
   s_reduce[tid] = local_max;
   __syncthreads();
@@ -810,9 +785,9 @@ __device__ float compute_best_rescale_parallel(
   }
 
   // Parallel reduction to find best coarse point
-  __shared__ float* s_coarse_ip;
+  float* s_coarse_ip;
   s_coarse_ip = reuse_space + BlockSize;
-  __shared__ float* s_coarse_t;
+  float* s_coarse_t;
   s_coarse_t       = s_coarse_ip + BlockSize;
   s_coarse_ip[tid] = best_coarse_ip;
   s_coarse_t[tid]  = best_coarse_t;
@@ -863,9 +838,9 @@ __device__ float compute_best_rescale_parallel(
   }
 
   // Final reduction
-  __shared__ float* s_fine_ip;
+  float* s_fine_ip;
   s_fine_ip = s_coarse_ip;
-  __shared__ float* s_fine_t;
+  float* s_fine_t;
   s_fine_t       = s_coarse_t;
   s_fine_ip[tid] = best_fine_ip;
   s_fine_t[tid]  = best_fine_t;
@@ -908,9 +883,7 @@ __global__ void exrabitq_fused_kernel_batch_ori(
   // Dynamically allocated shared memory for one row's data.
   extern __shared__ float s_mem[];
   float* s_xp_norm    = s_mem;
-  int* s_bin_xp       = (int*)(s_xp_norm + D);
-  float* s_xp         = (float*)(s_bin_xp + D);
-  uint8_t* s_tmp_code = (uint8_t*)(s_xp + D);
+  uint8_t* s_tmp_code = (uint8_t*)(s_xp_norm + D);
 
   int tid = threadIdx.x;
 
@@ -927,14 +900,9 @@ __global__ void exrabitq_fused_kernel_batch_ori(
     compute_best_rescale_parallel(s_xp_norm,
                                   D,
                                   EX_BITS,
-                                  (float*)s_bin_xp,  // Reused as workspace
+                                  (s_xp_norm + D),  // Reused as workspace
                                   BlockSize);
 
-  // NOW load the actual data we need
-  for (int j = tid; j < D; j += BlockSize) {
-    s_bin_xp[j] = d_bin_XP[row * D + j];
-    s_xp[j]     = d_XP[row * D + j];
-  }
   __syncthreads();
 
   //=========================================================================
@@ -955,7 +923,7 @@ __global__ void exrabitq_fused_kernel_batch_ori(
 
   // Parallel bit-flipping
   for (int j = tid; j < D; j += BlockSize) {
-    if (s_bin_xp[j] == 0) { s_tmp_code[j] = (~s_tmp_code[j]) & mask; }
+    if (d_bin_XP[row * D + j] == 0) { s_tmp_code[j] = (~s_tmp_code[j]) & mask; }
   }
   __syncthreads();
 
@@ -975,7 +943,7 @@ __global__ void exrabitq_fused_kernel_batch_ori(
   float l2_sqr = 0.f, ip_resi_xucb = 0.f, ip_cent_xucb = 0.f, xu_sq = 0.f;
 
   for (size_t j = tid; j < D; j += BlockSize) {
-    float res  = s_xp[j];
+    float res  = d_XP[row * D + j];
     int xu_pre = s_tmp_code[j];
     xu_pre += static_cast<int>(res >= 0) << EX_BITS;
     float xu = float(xu_pre) - (static_cast<float>(1 << EX_BITS) - 0.5f);
@@ -1083,8 +1051,6 @@ void DataQuantizerGPU::exrabitq_codes_and_factors_fused_ori(const int* d_bin_XP,
 
   // Calculate required shared memory size
   size_t shared_mem_size = D * sizeof(float) +         // s_xp_norm
-                           D * sizeof(int) +           // s_bin_xp
-                           D * sizeof(float) +         // s_xp
                            D * sizeof(uint8_t) +       // s_tmp_code
                            BlockSize * sizeof(float);  // s_partials for reduction
 
@@ -1110,4 +1076,147 @@ void DataQuantizerGPU::exrabitq_codes_and_factors_fused_ori(const int* d_bin_XP,
   raft::resource::sync_stream(handle_);
 }
 
+  // GPU kernel for final reduction
+__global__ void reduce_sum_kernel(const float* __restrict__ input, float* __restrict__ output, int n) {
+    extern __shared__ float sdata[];
+
+    int tid = threadIdx.x;
+    int i = blockIdx.x * blockDim.x * 2 + tid;
+
+    float sum = 0;
+    if (i < n) sum += input[i];
+    if (i + blockDim.x < n) sum += input[i + blockDim.x];
+
+    sdata[tid] = sum;
+    __syncthreads();
+
+    for (int s = blockDim.x / 2; s > 0; s >>= 1) {
+        if (tid < s) {
+            sdata[tid] += sdata[tid + s];
+        }
+        __syncthreads();
+    }
+
+    if (tid == 0) output[blockIdx.x] = sdata[0];
+}
+
+__global__ void fully_fused_kernel(
+    float* __restrict__ output_factors,
+    const int rows,
+    const int cols,
+    const int ex_bits,
+    unsigned long long seed)
+{
+    const int row_id = blockIdx.x;
+    if (row_id >= rows) return;
+
+    const int tid = threadIdx.x;
+    const int block_size = blockDim.x;
+
+    // Calculate shared memory layout
+    // row_data: cols floats
+    // reuse_space: 3 * block_size floats (for best_rescale computation)
+    extern __shared__ float shared_mem[];
+    float* row_data = shared_mem;
+    float* reuse_space = &row_data[cols];  // No reduction_buffer needed!
+
+    // Initialize RNG state per thread
+    curandState rng_state;
+    curand_init(seed, row_id * block_size + tid, 0, &rng_state);
+
+    // Generate random Gaussian values
+    for (int i = tid; i < cols; i += block_size) {
+        row_data[i] = curand_normal(&rng_state);
+    }
+    __syncthreads();
+
+    // Calculate L2 norm
+    float local_sum = 0.0f;
+    for (int i = tid; i < cols; i += block_size) {
+        float val = row_data[i];
+        local_sum += val * val;
+    }
+
+    float norm_squared = blockReduceSumdup(local_sum);
+
+    __shared__ float inv_norm;
+    if (tid == 0) {
+        inv_norm = rsqrtf(norm_squared);
+    }
+    __syncthreads();
+
+    for (int i = tid; i < cols; i += block_size) {
+        row_data[i] = fabsf(row_data[i] * inv_norm);
+    }
+    __syncthreads();
+
+    float rescale_factor = compute_best_rescale_parallel(
+        row_data, cols, ex_bits, reuse_space, block_size);
+
+    if (tid == 0) {
+        output_factors[row_id] = rescale_factor;
+    }
+}
+
+float DataQuantizerGPU::get_const_scaling_factors_fully_gpu(size_t dim, size_t ex_bits) {
+    constexpr long kConstNum = 100;
+
+    float* d_factors;
+    float* d_sum;
+    RAFT_CUDA_TRY(cudaMallocAsync(&d_factors, kConstNum * sizeof(float), stream_));
+    RAFT_CUDA_TRY(cudaMallocAsync(&d_sum, sizeof(float), stream_));
+
+    // Calculate block size (must be power of 2 for reductions)
+    int block_size = 256;
+    if (dim <= 512) block_size = 128;
+    if (dim >= 1536) block_size = 512;
+
+    // Calculate shared memory size
+    size_t shared_mem_size = (
+        dim +                    // row_data
+        3 * block_size           // reuse_space for best_rescale
+    ) * sizeof(float);
+
+    // Check shared memory limit
+  if (shared_mem_size > 49152){
+    cudaFuncSetAttribute(fully_fused_kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 98304);  // 96KB for ampere devices
+  }
+
+#ifdef DEBUG_BATCH_CONSTRUCT
+    unsigned long long seed = 42;
+#else
+    unsigned long long seed = time(nullptr);
+#endif
+
+    // Launch fully fused kernel
+    fully_fused_kernel<<<kConstNum, block_size, shared_mem_size, stream_>>>(
+        d_factors, kConstNum, dim, ex_bits, seed);
+    RAFT_CUDA_TRY(cudaGetLastError());
+
+    // Reduce sum on GPU
+    // reduce_sum_kernel<<<1, 128, 128 * sizeof(float)>>>(d_factors, d_sum, kConstNum);
+    // RAFT_CUDA_TRY(cudaGetLastError());
+
+    // Use CUB for reduction - handles any size optimally
+
+    size_t temp_storage_bytes = 0;
+    cub::DeviceReduce::Sum(nullptr, temp_storage_bytes, d_factors, d_sum, kConstNum, stream_);
+
+    void* d_temp_storage = nullptr;
+    RAFT_CUDA_TRY(cudaMallocAsync(&d_temp_storage, temp_storage_bytes, stream_));
+
+    cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes, d_factors, d_sum, kConstNum, stream_);
+    RAFT_CUDA_TRY(cudaGetLastError());
+
+    // Copy single value back
+    float sum;
+    RAFT_CUDA_TRY(cudaMemcpyAsync(&sum, d_sum, sizeof(float), cudaMemcpyDeviceToHost, stream_));
+
+    RAFT_CUDA_TRY(cudaFreeAsync(d_factors, stream_));
+    RAFT_CUDA_TRY(cudaFreeAsync(d_sum, stream_));
+
+    return sum / kConstNum;
+}
+
 }  // namespace cuvs::neighbors::ivf_rabitq::detail
+

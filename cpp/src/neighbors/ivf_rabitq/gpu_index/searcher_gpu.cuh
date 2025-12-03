@@ -46,6 +46,7 @@ class SearcherGPU {
                        size_t d,
                        size_t ex_bits,
                        std::string mode          = "",
+                       DataQuantizerGPU::FastQuantizeFactors* fast_quantize_factors = nullptr,
                        bool rabitq_quantize_flag = true);
 
   SearcherGPU(SearcherGPU&& other) = default;

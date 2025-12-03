@@ -162,6 +162,7 @@ void IVFGPU::load(const char* filename, bool load_batch_flag)
 
   // Initialize quantizer and rotator (host objects that drive GPU routines).
   this->DQ   = std::make_unique<DataQuantizerGPU>(handle_, num_dimensions, ex_bits, batch_flag);
+  input.read(reinterpret_cast<char*>(this->DQ->get_query_scaling_factor()), sizeof(DataQuantizerGPU::FastQuantizeFactors));
   this->Rota = std::make_unique<RotatorGPU>(handle_, num_dimensions);
   // Load cluster sizes.
   std::vector<size_t> cluster_sizes(num_centroids, 0);
@@ -241,6 +242,7 @@ void IVFGPU::load_transposed(const char* filename)
 
   // Initialize quantizer and rotator (host objects that drive GPU routines).
   this->DQ   = std::make_unique<DataQuantizerGPU>(handle_, num_dimensions, ex_bits, batch_flag);
+  input.read(reinterpret_cast<char*>(this->DQ->get_query_scaling_factor()), sizeof(DataQuantizerGPU::FastQuantizeFactors));
   this->Rota = std::make_unique<RotatorGPU>(handle_, num_dimensions);
   // Load cluster sizes.
   std::vector<size_t> cluster_sizes(num_centroids, 0);
@@ -459,6 +461,7 @@ void IVFGPU::save(const char* filename, bool save_batch_flag) const
   output.write(reinterpret_cast<const char*>(&num_centroids), sizeof(size_t));
   output.write(reinterpret_cast<const char*>(&ex_bits), sizeof(size_t));
   if (save_batch_flag) output.write(reinterpret_cast<const char*>(&batch_flag), sizeof(bool));
+  output.write(reinterpret_cast<const char*>(DQ->get_query_scaling_factor()), sizeof(DataQuantizerGPU::FastQuantizeFactors));
 
   // Save number of vectors of each cluster.
   std::vector<GPUClusterMeta> h_cluster_meta(num_centroids);
@@ -534,12 +537,259 @@ void IVFGPU::save(const char* filename, bool save_batch_flag) const
   std::cout << "IVFGPU index saved\n";
 }
 
+
+  /**
+ * @brief Build GPUClusterMeta from counts and offsets on GPU
+ */
+__global__ void build_cluster_meta_kernel(
+        IVFGPU::GPUClusterMeta* d_cluster_meta,
+        const unsigned long long* d_counts,
+        const size_t* d_offsets,
+        size_t num_centroids
+) {
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < num_centroids) {
+        d_cluster_meta[idx] = IVFGPU::GPUClusterMeta(d_counts[idx], d_offsets[idx]);
+    }
+}
+
+/**
+ * @brief Scatter PIDs into flat array based on cluster assignment
+ * Uses atomics to determine write position within each cluster
+ */
+__global__ void scatter_pids_kernel(
+        PID* d_flat_pids,
+        const PID* d_cluster_ids,
+        const size_t* d_offsets,
+        size_t* d_atomic_counters,  // Initialized to d_offsets values
+        size_t num_vectors
+) {
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < num_vectors) {
+        PID cid = d_cluster_ids[idx];
+        // Atomically get position and increment
+        size_t pos = atomicAdd((unsigned long long*)&d_atomic_counters[cid], 1ULL);
+        d_flat_pids[pos] = static_cast<PID>(idx);
+    }
+}
+
+// ============================================
+// Modified construct function
+// ============================================
+
+void IVFGPU::construct_on_gpu(const float* device_data, const float* device_centroids, const PID* device_cluster_ids
+        , bool fast_quantize) {
+    std::cout << "Start IVFGPU construction (GPU-accelerated metadata)...\n";
+
+    DQ->fast_quantize_flag = fast_quantize;
+
+    // pre-compute rescaling factors for search
+    DQ->compute_query_scaling_factors(this->num_padded_dim);
+
+    // compute rescaling factors for query if neeeded
+    if (DQ->fast_quantize_flag) {
+        DQ->compute_quantize_scaling_factors();
+    }
+
+    if (DQ->fast_quantize_flag) {
+        if (ex_bits == 3) {
+            DQ->set_quantize_scaling_factors(DQ->get_query_scaling_factor()->const_scaling_factor_4bit);
+        }
+        else if (ex_bits == 7) {
+            DQ->set_quantize_scaling_factors(DQ->get_query_scaling_factor()->const_scaling_factor_8bit);
+        }
+        else {
+            DQ->compute_quantize_scaling_factors();
+        }
+    }
+
+
+    // -------------------------
+    // 2. Validate cluster IDs on GPU
+    // -------------------------
+    int* d_error_flag = nullptr;
+    RAFT_CUDA_TRY(cudaMallocAsync(&d_error_flag, sizeof(int), stream_));
+    RAFT_CUDA_TRY(cudaMemsetAsync(d_error_flag, 0, sizeof(int), stream_));
+
+    int block_size = 256;
+    int num_blocks = (num_vectors + block_size - 1) / block_size;
+
+    // -------------------------
+    // 9. Allocate device memory for IVF arrays
+    // -------------------------
+    std::vector<size_t> counts(num_centroids);  // counts is not used here
+    AllocateDeviceMemory();
+
+    // -------------------------
+    // 3. Compute histogram (cluster sizes) on GPU using CUB
+    // -------------------------
+
+    // Use CUB's DeviceHistogram
+    using CounterT = unsigned long long;
+
+    int num_levels   = num_centroids + 1;
+    int lower_level  = 0;
+    int upper_level  = num_centroids;
+
+    CounterT* d_histogram = nullptr;
+    RAFT_CUDA_TRY(cudaMallocAsync(&d_histogram, num_centroids * sizeof(CounterT), stream_));
+
+    // Determine temporary device storage requirements
+    void* d_temp_storage = nullptr;
+    size_t temp_storage_bytes = 0;
+    cub::DeviceHistogram::HistogramEven(
+            d_temp_storage, temp_storage_bytes,
+            device_cluster_ids, d_histogram,
+            num_levels, lower_level, upper_level,
+            num_vectors, stream_);
+
+    RAFT_CUDA_TRY(cudaMallocAsync(&d_temp_storage, temp_storage_bytes, stream_));
+
+    // Compute histogram
+    cub::DeviceHistogram::HistogramEven(
+            d_temp_storage, temp_storage_bytes,
+            device_cluster_ids, d_histogram,
+            num_levels, lower_level, upper_level,
+            num_vectors, stream_);
+
+
+    RAFT_CUDA_TRY(cudaFreeAsync(d_temp_storage, stream_));
+
+    // -------------------------
+    // 4. Compute prefix sum (offsets) on GPU using CUB
+    // -------------------------
+    size_t* d_offsets = nullptr;
+    RAFT_CUDA_TRY(cudaMallocAsync(&d_offsets, (num_centroids + 1) * sizeof(size_t), stream_));
+
+    // Determine temporary storage requirements
+    d_temp_storage = nullptr;
+    temp_storage_bytes = 0;
+    cub::DeviceScan::ExclusiveSum(
+            d_temp_storage, temp_storage_bytes,
+            d_histogram, d_offsets,
+            num_centroids, stream_);
+
+    RAFT_CUDA_TRY(cudaMallocAsync(&d_temp_storage, temp_storage_bytes, stream_));
+
+    // Compute exclusive sum
+    cub::DeviceScan::ExclusiveSum(
+            d_temp_storage, temp_storage_bytes,
+            d_histogram, d_offsets,
+            num_centroids, stream_);
+
+
+    RAFT_CUDA_TRY(cudaFreeAsync(d_temp_storage, stream_));
+
+    // Set the last offset element
+    RAFT_CUDA_TRY(cudaMemcpyAsync(d_offsets + num_centroids, &num_vectors, sizeof(size_t), cudaMemcpyHostToDevice, stream_));
+
+    // -------------------------
+    // 5. Build cluster metadata on GPU
+    // -------------------------
+    GPUClusterMeta* d_cluster_meta_temp = cluster_meta_.data_handle();
+
+    num_blocks = (num_centroids + block_size - 1) / block_size;
+    build_cluster_meta_kernel<<<num_blocks, block_size, 0, stream_>>>(
+            d_cluster_meta_temp, d_histogram, d_offsets, num_centroids);
+
+     RAFT_CUDA_TRY(cudaFreeAsync(d_histogram, stream_));
+    // -------------------------
+    // 6. Scatter PIDs to flat array on GPU
+    // -------------------------
+    PID* d_flat_pids = ids_.data_handle();
+
+    // Create atomic counters initialized with offsets
+    size_t* d_atomic_counters = nullptr;
+    RAFT_CUDA_TRY(cudaMallocAsync(&d_atomic_counters, num_centroids * sizeof(size_t),stream_));
+    RAFT_CUDA_TRY(cudaMemcpyAsync(d_atomic_counters, d_offsets, num_centroids * sizeof(size_t), cudaMemcpyDeviceToDevice, stream_));
+
+    num_blocks = (num_vectors + block_size - 1) / block_size;
+    scatter_pids_kernel<<<num_blocks, block_size, 0, stream_>>>(
+            d_flat_pids, device_cluster_ids, d_offsets, d_atomic_counters, num_vectors);
+
+    RAFT_CUDA_TRY(cudaFreeAsync(d_atomic_counters, stream_));
+
+    // -------------------------
+    // 7. Copy cluster metadata back to host
+    // -------------------------
+    std::vector<GPUClusterMeta> h_cluster_meta(num_centroids);
+    RAFT_CUDA_TRY(cudaMemcpyAsync(h_cluster_meta.data(), d_cluster_meta_temp,
+               num_centroids * sizeof(GPUClusterMeta), cudaMemcpyDeviceToHost, stream_));
+    RAFT_CUDA_TRY(cudaStreamSynchronize(stream_));
+    // Copy counts for AllocateDeviceMemory
+
+    RAFT_CUDA_TRY(cudaFreeAsync(d_offsets, stream_));
+
+    // -------------------------
+    // 10. Allocate and process rotated centroids
+    // -------------------------
+    float* d_rotated_centroids = nullptr;
+    RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_rotated_centroids, num_centroids * num_padded_dim * sizeof(float), stream_));
+
+    // -------------------------
+    // 10.5 get max cluster length and allocate temporary buffer for quantization
+    // Do note that this update will disable the ability of quantization with multiple streams
+    // -------------------------
+    max_cluster_length = 0;
+    for (const auto& meta : h_cluster_meta) {
+      max_cluster_length = std::max(max_cluster_length, meta.num);
+    }
+    // std::cout << "Max cluster length: " << max_cluster_length << std::endl;
+    DQ->alloc_buffers(max_cluster_length);
+
+    // Process clusters sequentially
+    for (size_t i = 0; i < num_centroids; ++i) {
+        const float* cur_centroid = device_centroids + i * num_dimensions;
+        float* cur_rotated_c = d_rotated_centroids + i * num_padded_dim;
+        GPUClusterMeta& cp = h_cluster_meta[i];
+
+#ifdef DEBUG_BATCH_CONSTRUCT
+        std::cout << "cluster size:" << h_cluster_meta[i].num << std::endl;
+#endif
+
+        quantize_cluster(cp, device_data, cur_centroid, cur_rotated_c);
+      // if (i % 100 == 0) printf("Cluster %zu quantization finished!\n", i);
+    }
+
+    // Add rotated centroids
+    initializer->AddVectors(d_rotated_centroids);
+
+    // Clean up
+    RAFT_CUDA_TRY(cudaFreeAsync(d_rotated_centroids, stream_));
+    raft::resource::sync_stream(handle_);
+
+    std::cout << "IVFGPU construction completed.\n";
+}
+
 void IVFGPU::construct(const float* host_data,
                        const float* host_centroids,
                        const PID* host_cluster_ids,
                        bool fast_quantize)
 {
   std::cout << "Start IVFGPU construction...\n";
+
+  DQ->fast_quantize_flag = fast_quantize;
+
+  // pre-compute rescaling factors for search
+  DQ->compute_query_scaling_factors(this->num_padded_dim);
+
+  // compute rescaling factors for query if neeeded
+  if (DQ->fast_quantize_flag) {
+    DQ->compute_quantize_scaling_factors();
+  }
+
+  if (DQ->fast_quantize_flag) {
+    if (ex_bits == 3) {
+      DQ->set_quantize_scaling_factors(DQ->get_query_scaling_factor()->const_scaling_factor_4bit);
+    }
+    else if (ex_bits == 7) {
+      DQ->set_quantize_scaling_factors(DQ->get_query_scaling_factor()->const_scaling_factor_8bit);
+    }
+    else {
+      DQ->compute_quantize_scaling_factors();
+    }
+  }
+
   // -------------------------
   // Build cluster membership info on host.
   // -------------------------
@@ -597,7 +847,6 @@ void IVFGPU::construct(const float* host_data,
   AllocateDeviceMemory();
   raft::copy(ids_.data_handle(), flat_pids.data(), ids_bytes / sizeof(PID), stream_);
 
-  // 数据可能需要按照cluster重新组织！
   raft::copy(cluster_meta_.data_handle(), h_cluster_meta.data(), num_centroids, stream_);
 
   //    cudaDeviceSynchronize();
@@ -612,6 +861,16 @@ void IVFGPU::construct(const float* host_data,
   float* d_rotated_centroids = nullptr;
   RAFT_CUDA_TRY(cudaMallocAsync(
     (void**)&d_rotated_centroids, num_centroids * num_padded_dim * sizeof(float), stream_));
+
+  // -------------------------
+  // Get max cluster length and allocate temporary buffer for quantization
+  // Do note that this update will disable the ability of quantization with multiple streams
+  // -------------------------
+  max_cluster_length = 0;
+  for (const auto& meta : h_cluster_meta) {
+    max_cluster_length = std::max(max_cluster_length, meta.num);
+  }
+  DQ->alloc_buffers(max_cluster_length);
 
   // -------------------------
   // For each cluster, perform quantization.
@@ -629,7 +888,7 @@ void IVFGPU::construct(const float* host_data,
     std::cout << "cluster size:" << h_cluster_meta[i].num << std::endl;
 #endif
     quantize_cluster(cp, d_data, cur_centroid, cur_rotated_c);
-    if (i % 100 == 0) printf("Cluster %d quantization finished!\n", i);
+    // if (i % 100 == 0) printf("Cluster %d quantization finished!\n", i);
   }
 
   // After quantization, add the rotated centroids into the initializer.
@@ -3062,3 +3321,4 @@ void IVFGPU::search_with_time(const float* d_query,
 }
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail
+
