@@ -7,7 +7,7 @@
 // Created by Stardust on 4/14/25.
 //
 
-#include <cuvs/neighbors/ivf_rabitq/gpu_index/pool_gpu.cuh>
+#include "pool_gpu.cuh"
 
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/util/cuda_rt_essentials.hpp>

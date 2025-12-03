@@ -8,7 +8,6 @@
 #include <cuda_fp16.h>
 
 #include <cuvs/neighbors/common.hpp>
-#include <cuvs/neighbors/ivf_rabitq/gpu_index/ivf_gpu.cuh>
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/error.hpp>
@@ -23,6 +22,11 @@
 #include <vector>
 
 namespace cuvs::neighbors::ivf_rabitq {
+
+// forward declaration
+namespace detail {
+class IVFGPU;
+}
 
 /**
  * @defgroup ivf_rabitq_cpp_index_params IVF-RaBitQ index build parameters
@@ -98,11 +102,13 @@ struct index : cuvs::neighbors::index {
                 "IdxT must be able to represent all values of uint32_t");
 
  public:
-  index(const index&)                    = delete;
-  index(index&&)                         = default;
+  index(const index&) = delete;
+  index(
+    index&&);  // declaration only; definition in impl to allow member unique_ptr of incomplete type
   auto operator=(const index&) -> index& = delete;
-  auto operator=(index&&) -> index&      = default;
-  ~index()                               = default;
+  auto operator=(index&&) -> index&;  // declaration only; definition in impl to allow member
+                                      // unique_ptr of incomplete type
+  ~index();  // declaration only; definition in impl to allow member unique_ptr of incomplete type
 
   /**
    * @brief Construct an empty index yet to be populated.

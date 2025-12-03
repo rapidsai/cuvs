@@ -421,6 +421,7 @@ if(CUVS_ANN_BENCH_USE_CUVS_IVF_RABITQ)
 
   target_include_directories(
     RABITQ_BENCH_TEST PUBLIC "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/include>"
+                             "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/src>"
   )
 
   set_target_properties(

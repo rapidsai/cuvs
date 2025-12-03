@@ -9,6 +9,9 @@
 
 #pragma once
 
+#include "../defines.hpp"
+#include "../utils/utils_cuda.cuh"
+
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resources.hpp>
@@ -16,8 +19,6 @@
 #include <rmm/cuda_stream_view.hpp>
 
 #include <cstdint>
-#include <cuvs/neighbors/ivf_rabitq/defines.hpp>
-#include <cuvs/neighbors/ivf_rabitq/utils/utils_cuda.cuh>
 #include <fstream>
 
 namespace cuvs::neighbors::ivf_rabitq::detail {

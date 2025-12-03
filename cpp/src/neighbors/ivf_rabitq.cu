@@ -3,8 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "ivf_rabitq/gpu_index/ivf_gpu.cuh"
+#include "ivf_rabitq/gpu_index/searcher_gpu.cuh"
 #include <cuvs/neighbors/ivf_rabitq.hpp>
-#include <cuvs/neighbors/ivf_rabitq/gpu_index/searcher_gpu.cuh>
 
 #include "../cluster/kmeans_balanced.cuh"
 #include "../core/nvtx.hpp"
@@ -280,6 +281,15 @@ index<IdxT>::index(raft::resources const& handle, const index_params& params, ui
   : index(handle)
 {
 }
+
+template <typename IdxT>
+index<IdxT>::index(index&&) = default;
+
+template <typename IdxT>
+auto index<IdxT>::operator=(index&&) -> index<IdxT>& = default;
+
+template <typename IdxT>
+index<IdxT>::~index() = default;
 
 template struct index<int64_t>;
 

@@ -13,9 +13,9 @@
 
 #include <cublas_v2.h>
 
-#include <cuvs/neighbors/ivf_rabitq/gpu_index/ivf_gpu.cuh>
-#include <cuvs/neighbors/ivf_rabitq/gpu_index/query_gatherer.cuh>
-#include <cuvs/neighbors/ivf_rabitq/gpu_index/searcher_gpu.cuh>
+#include "ivf_gpu.cuh"
+#include "query_gatherer.cuh"
+#include "searcher_gpu.cuh"
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>

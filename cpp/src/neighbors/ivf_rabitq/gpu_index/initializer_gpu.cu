@@ -7,7 +7,8 @@
 // Created by Stardust on 3/3/25.
 //
 
-#include <cuvs/neighbors/ivf_rabitq/gpu_index/initializer_gpu.cuh>
+#include "initializer_gpu.cuh"
+
 #include <thrust/device_ptr.h>
 #include <thrust/sequence.h>
 #include <thrust/sort.h>

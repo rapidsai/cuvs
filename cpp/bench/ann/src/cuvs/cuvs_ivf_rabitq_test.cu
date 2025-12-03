@@ -9,10 +9,10 @@
 #include <queue>
 #include <vector>
 
-#include <cuvs/neighbors/ivf_rabitq/gpu_index/ivf_gpu.cuh>
-#include <cuvs/neighbors/ivf_rabitq/gpu_index/searcher_gpu.cuh>
-#include <cuvs/neighbors/ivf_rabitq/utils/IO.hpp>
-#include <cuvs/neighbors/ivf_rabitq/utils/StopW.hpp>
+#include <neighbors/ivf_rabitq/gpu_index/ivf_gpu.cuh>
+#include <neighbors/ivf_rabitq/gpu_index/searcher_gpu.cuh>
+#include <neighbors/ivf_rabitq/utils/IO.hpp>
+#include <neighbors/ivf_rabitq/utils/StopW.hpp>
 
 #include <raft/core/device_resources.hpp>
 
