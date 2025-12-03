@@ -13,6 +13,9 @@ CPP_CHANNEL=$(rapids-download-conda-from-github cpp)
 rapids-logger "Create test conda environment"
 . /opt/conda/etc/profile.d/conda.sh
 
+rapids-logger "Configuring conda strict channel priority"
+conda config --set channel_priority strict
+
 rapids-dependency-file-generator \
   --output conda \
   --file-key go \
