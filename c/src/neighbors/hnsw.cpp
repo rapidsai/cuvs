@@ -34,14 +34,13 @@ void _build(cuvsResources_t res,
   cpp_params.hierarchy                 = static_cast<cuvs::neighbors::hnsw::HnswHierarchy>(params->hierarchy);
   cpp_params.ef_construction = params->ef_construction;
   cpp_params.num_threads     = params->num_threads;
-  cpp_params.m               = params->m;
+  cpp_params.M               = params->M;
   cpp_params.metric          = static_cast<cuvs::distance::DistanceType>(params->metric);
 
   // Configure ACE parameters
   RAFT_EXPECTS(params->ace_params != nullptr, "ACE parameters must be set for hnsw::build");
   auto ace_params                 = cuvs::neighbors::hnsw::graph_build_params::ace_params();
   ace_params.npartitions          = params->ace_params->npartitions;
-  ace_params.ef_construction      = params->ace_params->ef_construction;
   ace_params.build_dir            = params->ace_params->build_dir ? params->ace_params->build_dir : "/tmp/hnsw_ace_build";
   ace_params.use_disk             = params->ace_params->use_disk;
   cpp_params.graph_build_params   = ace_params;
@@ -153,7 +152,6 @@ extern "C" cuvsError_t cuvsHnswAceParamsCreate(cuvsHnswAceParams_t* params)
 {
   return cuvs::core::translate_exceptions([=] {
     *params = new cuvsHnswAceParams{.npartitions     = 1,
-                                    .ef_construction = 120,
                                     .build_dir       = "/tmp/hnsw_ace_build",
                                     .use_disk        = false};
   });
@@ -170,7 +168,7 @@ extern "C" cuvsError_t cuvsHnswIndexParamsCreate(cuvsHnswIndexParams_t* params)
     *params = new cuvsHnswIndexParams{.hierarchy                 = cuvsHnswHierarchy::NONE,
                                       .ef_construction = 200,
                                       .num_threads     = 0,
-                                      .m               = 32,
+                                      .M               = 32,
                                       .metric          = L2Expanded,
                                       .ace_params      = nullptr};
   });

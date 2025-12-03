@@ -51,11 +51,6 @@ struct cuvsHnswAceParams {
    */
   size_t npartitions;
   /**
-   * The index quality for the ACE build.
-   * Bigger values increase the index quality.
-   */
-  size_t ef_construction;
-  /**
    * Directory to store ACE build artifacts (e.g., KNN graph, optimized graph).
    * Used when `use_disk` is true or when the graph does not fit in memory.
    */
@@ -101,7 +96,7 @@ struct cuvsHnswIndexParams {
   /** HNSW M parameter: number of bi-directional links per node (used when building with ACE).
    *  graph_degree = m * 2, intermediate_graph_degree = m * 3.
    */
-  size_t m;
+  size_t M;
   /** Distance type for the index. */
   cuvsDistanceType metric;
   /**
@@ -297,7 +292,6 @@ cuvsError_t cuvsHnswFromCagraWithDataset(cuvsResources_t res,
  * cuvsHnswAceParams_t ace_params;
  * cuvsHnswAceParamsCreate(&ace_params);
  * ace_params->npartitions = 4;
- * ace_params->ef_construction = 120;
  * ace_params->use_disk = true;
  * ace_params->build_dir = "/tmp/hnsw_ace_build";
  *
@@ -306,6 +300,8 @@ cuvsError_t cuvsHnswFromCagraWithDataset(cuvsResources_t res,
  * cuvsHnswIndexParamsCreate(&params);
  * params->hierarchy = GPU;
  * params->ace_params = ace_params;
+ * params->M = 32;
+ * params->ef_construction = 120;
  *
  * // Create HNSW index
  * cuvsHnswIndex_t hnsw_index;

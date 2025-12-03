@@ -294,7 +294,7 @@ public class HnswIndexImpl implements HnswIndex {
     cuvsHnswIndexParams.hierarchy(seg, params.getHierarchy().value);
     cuvsHnswIndexParams.ef_construction(seg, params.getEfConstruction());
     cuvsHnswIndexParams.num_threads(seg, params.getNumThreads());
-    cuvsHnswIndexParams.m(seg, params.getM());
+    cuvsHnswIndexParams.M(seg, params.getM());
     cuvsHnswIndexParams.metric(seg, params.getMetric().value);
 
     return hnswParams;
@@ -305,7 +305,6 @@ public class HnswIndexImpl implements HnswIndex {
     MemorySegment seg = params.handle();
 
     cuvsHnswAceParams.npartitions(seg, aceParams.getNpartitions());
-    cuvsHnswAceParams.ef_construction(seg, aceParams.getEfConstruction());
     cuvsHnswAceParams.use_disk(seg, aceParams.isUseDisk());
 
     String buildDir = aceParams.getBuildDir();
