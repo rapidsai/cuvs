@@ -279,7 +279,7 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix<float, uint32_t, raft::row_major> centers_;
   raft::device_matrix<uint8_t, int64_t, raft::row_major> binary_centers_;
   std::optional<raft::device_vector<float, uint32_t>> center_norms_;
-  bool binary_index_ = metric_ == cuvs::distance::DistanceType::BitwiseHamming;
+  bool binary_index_;
 
   // Computed members
   raft::device_vector<T*, uint32_t> data_ptrs_;
