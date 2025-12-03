@@ -44,8 +44,7 @@ function(ConfigureTest)
   add_executable(${TEST_NAME} ${_CUVS_TEST_PATH})
   target_link_libraries(
     ${TEST_NAME} PRIVATE cuvs::c_api GTest::gtest GTest::gtest_main
-                         $<$<BOOL:${CUVSC_STATIC_CUVS_LIBRARY}>:$<COMPILE_ONLY:cuvs::cuvs_static>>
-                         $<$<NOT:$<BOOL:${CUVSC_STATIC_CUVS_LIBRARY}>>:cuvs::cuvs>
+                         $<IF:$<BOOL:${CUVSC_STATIC_CUVS_LIBRARY}>,$<COMPILE_ONLY:cuvs::cuvs_static>,cuvs::cuvs>
                          $<TARGET_NAME_IF_EXISTS:conda_env>
   )
   set_target_properties(
