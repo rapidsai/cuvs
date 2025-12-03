@@ -7,7 +7,7 @@
 // Created by Stardust on 4/1/25.
 //
 
-#include <cuvs/neighbors/ivf_rabitq/utils/tools_gpu.cuh>
+#include "tools_gpu.cuh"
 
 #include <raft/util/cuda_rt_essentials.hpp>
 

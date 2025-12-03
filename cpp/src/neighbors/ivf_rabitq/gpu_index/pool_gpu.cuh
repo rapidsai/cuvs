@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include <cuvs/neighbors/ivf_rabitq/utils/utils_cuda.cuh>
+#include "../utils/utils_cuda.cuh"
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/resources.hpp>
