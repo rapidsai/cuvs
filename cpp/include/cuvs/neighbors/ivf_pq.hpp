@@ -1153,7 +1153,6 @@ void build(raft::resources const& handle,
  * @param[in] centers Cluster centers
  * @param[in] centers_rot Optional rotated cluster centers
  * @param[in] rotation_matrix Optional rotation matrix
- * @param[out] idx pointer to ivf_pq::index
  */
 auto build(
   raft::resources const& handle,
