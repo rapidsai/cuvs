@@ -51,13 +51,13 @@ void hnsw_build_search_ace(raft::device_resources const& dev_resources,
   ace_params.npartitions = 4;
   // Set the directory to store the ACE build artifacts. This should be the fastest disk in the
   // system and hold enough space for twice the dataset, final graph, and label mapping.
-  ace_params.build_dir = "/tmp/hnsw_ace_build";
+  ace_params.build_dir           = "/tmp/hnsw_ace_build";
   hnsw_params.graph_build_params = ace_params;
   // Set M parameter to control the graph degree (graph_degree = m * 2, intermediate_graph_degree =
   // m * 3). Higher values work for higher intrinsic dimensionality and/or high recall, low values
   // can work for datasets with low intrinsic dimensionality and/or low recalls. Higher values lead
   // to higher memory consumption.
-  hnsw_params.m = 32;
+  hnsw_params.M = 32;
   // Set the index quality for the ACE build. Bigger values increase the index quality. At some
   // point, increasing this will no longer improve the quality.
   hnsw_params.ef_construction = 120;

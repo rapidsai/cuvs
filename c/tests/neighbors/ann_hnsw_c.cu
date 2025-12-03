@@ -152,7 +152,7 @@ TEST(HnswAceC, BuildSerializeDeserializeSearch)
   hnsw_params->ef_construction = 100;
   hnsw_params->ace_params      = ace_params;
   hnsw_params->metric          = L2Expanded;
-  hnsw_params->m               = 16;
+  hnsw_params->M               = 16;
 
   // create HNSW index
   cuvsHnswIndex_t hnsw_index;

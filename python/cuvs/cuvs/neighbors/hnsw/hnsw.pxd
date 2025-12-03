@@ -23,7 +23,6 @@ cdef extern from "cuvs/neighbors/hnsw.h" nogil:
 
     ctypedef struct cuvsHnswAceParams:
         size_t npartitions
-        size_t ef_construction
         const char* build_dir
         double max_host_memory_gb
         double max_gpu_memory_gb
@@ -38,7 +37,7 @@ cdef extern from "cuvs/neighbors/hnsw.h" nogil:
         cuvsHnswHierarchy hierarchy
         int32_t ef_construction
         int32_t num_threads
-        size_t m
+        size_t M
         cuvsDistanceType metric
         cuvsHnswAceParams_t ace_params
 

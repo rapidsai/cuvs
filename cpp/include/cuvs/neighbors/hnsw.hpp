@@ -59,7 +59,7 @@ struct index_params : cuvs::neighbors::index_params {
 
   /** HNSW M parameter: number of bi-directional links per node (used when building with ACE).
    */
-  size_t m = 32;
+  size_t M = 32;
 
   /** Parameters to fine tune GPU graph building. By default we select the parameters based on
    * dataset shape and HNSW build parameters. You can override these parameters to fine tune the
@@ -72,10 +72,12 @@ struct index_params : cuvs::neighbors::index_params {
    * @code{.cpp}
    * hnsw::index_params params;
    * // Configure ACE parameters (ACE always uses disk-based storage)
+   * params.M = 32;
+   * params.ef_construction = 120;
+   * // Configure ACE parameters
    * params.graph_build_params = hnsw::graph_build_params::ace_params();
    * auto& ace = std::get<hnsw::graph_build_params::ace_params>(params.graph_build_params);
    * ace.npartitions = 4;
-   * ace.ef_construction = 120;
    * ace.build_dir = "/tmp/hnsw_ace_build";
    * @endcode
    */
@@ -223,7 +225,7 @@ struct extend_params {
  *   hnsw::index_params params;
  *   params.metric = cuvs::distance::DistanceType::L2Expanded;
  *   params.hierarchy = hnsw::HnswHierarchy::GPU;
- *   params.m = 32;
+ *   params.M = 32;
  *   params.ef_construction = 120;
  *
  *   // Configure GPU graph building parameters
@@ -280,7 +282,7 @@ std::unique_ptr<index<float>> build(
  *   hnsw::index_params params;
  *   params.metric = cuvs::distance::DistanceType::L2Expanded;
  *   params.hierarchy = hnsw::HnswHierarchy::GPU;
- *   params.m = 32;
+ *   params.M = 32;
  *   params.ef_construction = 120;
  *
  *   // Configure GPU graph building parameters
@@ -337,7 +339,7 @@ std::unique_ptr<index<half>> build(
  *   hnsw::index_params params;
  *   params.metric = cuvs::distance::DistanceType::L2Expanded;
  *   params.hierarchy = hnsw::HnswHierarchy::GPU;
- *   params.m = 32;
+ *   params.M = 32;
  *   params.ef_construction = 120;
  *
  *   // Configure GPU graph building parameters
@@ -394,7 +396,7 @@ std::unique_ptr<index<uint8_t>> build(
  *   hnsw::index_params params;
  *   params.metric = cuvs::distance::DistanceType::L2Expanded;
  *   params.hierarchy = hnsw::HnswHierarchy::GPU;
- *   params.m = 32;
+ *   params.M = 32;
  *   params.ef_construction = 120;
  *
  *   // Configure GPU graph building parameters

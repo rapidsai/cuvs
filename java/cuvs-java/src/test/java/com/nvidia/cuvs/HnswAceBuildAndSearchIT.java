@@ -89,7 +89,6 @@ public class HnswAceBuildAndSearchIT extends CuVSTestCase {
         HnswAceParams aceParams =
             new HnswAceParams.Builder()
                 .withNpartitions(2)
-                .withEfConstruction(100)
                 .withBuildDir(buildDir.toString())
                 .build();
 
@@ -98,6 +97,7 @@ public class HnswAceBuildAndSearchIT extends CuVSTestCase {
             new HnswIndexParams.Builder()
                 .withHierarchy(CuvsHnswHierarchy.GPU)
                 .withM(16)
+                .withEfConstruction(100)
                 .withMetric(CuvsDistanceType.L2Expanded)
                 .withVectorDimension(2)
                 .withAceParams(aceParams)
@@ -152,7 +152,6 @@ public class HnswAceBuildAndSearchIT extends CuVSTestCase {
         HnswAceParams aceParams =
             new HnswAceParams.Builder()
                 .withNpartitions(2)
-                .withEfConstruction(100)
                 .withBuildDir(buildDir.toString())
                 .build();
 
@@ -161,6 +160,7 @@ public class HnswAceBuildAndSearchIT extends CuVSTestCase {
             new HnswIndexParams.Builder()
                 .withHierarchy(CuvsHnswHierarchy.GPU)
                 .withM(16)
+                .withEfConstruction(100)
                 .withMetric(CuvsDistanceType.L2Expanded)
                 .withVectorDimension(2)
                 .withAceParams(aceParams)
@@ -231,17 +231,17 @@ public class HnswAceBuildAndSearchIT extends CuVSTestCase {
         Path buildDir = Files.createTempDirectory("hnsw_ace_hierarchy_test");
 
         try {
-        HnswAceParams aceParams =
-            new HnswAceParams.Builder()
-                .withNpartitions(2)
-                .withEfConstruction(100)
-                .withBuildDir(buildDir.toString())
-                .build();
+          HnswAceParams aceParams =
+              new HnswAceParams.Builder()
+                  .withNpartitions(2)
+                  .withBuildDir(buildDir.toString())
+                  .build();
 
           HnswIndexParams hnswParams =
               new HnswIndexParams.Builder()
                   .withHierarchy(hierarchy)
                   .withM(16)
+                  .withEfConstruction(100)
                   .withMetric(CuvsDistanceType.L2Expanded)
                   .withVectorDimension(2)
                   .withAceParams(aceParams)
@@ -290,7 +290,6 @@ public class HnswAceBuildAndSearchIT extends CuVSTestCase {
         HnswAceParams aceParams =
             new HnswAceParams.Builder()
                 .withNpartitions(2)
-                .withEfConstruction(100)
                 .withBuildDir(buildDir.toString())
                 .build();
 
@@ -299,6 +298,7 @@ public class HnswAceBuildAndSearchIT extends CuVSTestCase {
             new HnswIndexParams.Builder()
                 .withHierarchy(CuvsHnswHierarchy.GPU)
                 .withM(16)
+                .withEfConstruction(100)
                 .withMetric(CuvsDistanceType.L2Expanded)
                 .withVectorDimension(2)
                 .withAceParams(aceParams)

@@ -18,15 +18,13 @@ package com.nvidia.cuvs;
 public class HnswAceParams {
 
   private long npartitions;
-  private long efConstruction;
   private String buildDir;
   private double maxHostMemoryGb;
   private double maxGpuMemoryGb;
 
-  private HnswAceParams(long npartitions, long efConstruction, String buildDir,
+  private HnswAceParams(long npartitions, String buildDir,
                         double maxHostMemoryGb, double maxGpuMemoryGb) {
     this.npartitions = npartitions;
-    this.efConstruction = efConstruction;
     this.buildDir = buildDir;
     this.maxHostMemoryGb = maxHostMemoryGb;
     this.maxGpuMemoryGb = maxGpuMemoryGb;
@@ -39,15 +37,6 @@ public class HnswAceParams {
    */
   public long getNpartitions() {
     return npartitions;
-  }
-
-  /**
-   * Gets the index quality for the ACE build.
-   *
-   * @return the ef_construction value
-   */
-  public long getEfConstruction() {
-    return efConstruction;
   }
 
   /**
@@ -81,8 +70,6 @@ public class HnswAceParams {
   public String toString() {
     return "HnswAceParams [npartitions="
         + npartitions
-        + ", efConstruction="
-        + efConstruction
         + ", buildDir="
         + buildDir
         + ", maxHostMemoryGb="
@@ -98,7 +85,6 @@ public class HnswAceParams {
   public static class Builder {
 
     private long npartitions = 0;
-    private long efConstruction = 120;
     private String buildDir = "/tmp/hnsw_ace_build";
     private double maxHostMemoryGb = 0;
     private double maxGpuMemoryGb = 0;
@@ -127,18 +113,6 @@ public class HnswAceParams {
      */
     public Builder withNpartitions(long npartitions) {
       this.npartitions = npartitions;
-      return this;
-    }
-
-    /**
-     * Sets the index quality for the ACE build.
-     * Bigger values increase the index quality.
-     *
-     * @param efConstruction the ef_construction value
-     * @return an instance of Builder
-     */
-    public Builder withEfConstruction(long efConstruction) {
-      this.efConstruction = efConstruction;
       return this;
     }
 
@@ -188,7 +162,7 @@ public class HnswAceParams {
      * @return an instance of {@link HnswAceParams}
      */
     public HnswAceParams build() {
-      return new HnswAceParams(npartitions, efConstruction, buildDir,
+      return new HnswAceParams(npartitions, buildDir,
                                maxHostMemoryGb, maxGpuMemoryGb);
     }
   }
