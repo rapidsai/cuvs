@@ -227,6 +227,38 @@ void build_linkage(
   raft::device_vector_view<float, int64_t> out_distances,
   raft::device_vector_view<int64_t, int64_t> out_sizes,
   std::optional<raft::device_vector_view<float, int64_t>> core_dists);
+
+/**
+ * Build dendrogram from a Minimum Spanning Tree (MST).
+ *
+ * This function takes a sorted MST (represented as edges with source, destination, and weights)
+ * and constructs a dendrogram (hierarchical clustering tree) on the host.
+ *
+ * @tparam value_idx Index type for nodes
+ * @tparam value_t Value type for edge weights/distances
+ *
+ * @param[in] handle The raft resources handle
+ * @param[in] rows Source nodes of the MST edges (device memory, size: nnz)
+ * @param[in] cols Destination nodes of the MST edges (device memory, size: nnz)
+ * @param[in] data Edge weights/distances of the MST (device memory, size: nnz)
+ * @param[in] nnz Number of edges in the MST (should be n_nodes - 1 for a connected tree)
+ * @param[out] children Output dendrogram children array (device memory, size: nnz * 2)
+ *                      Each pair of consecutive elements represents the two children
+ *                      merged at each step of the hierarchy
+ * @param[out] out_delta Output distances/heights at which clusters are merged (device memory, size:
+ * nnz)
+ * @param[out] out_size Output cluster sizes at each merge step (device memory, size: nnz)
+ */
+template <typename value_idx, typename value_t>
+void build_dendrogram_host(raft::resources const& handle,
+                           const value_idx* rows,
+                           const value_idx* cols,
+                           const value_t* data,
+                           size_t nnz,
+                           value_idx* children,
+                           value_t* out_delta,
+                           value_idx* out_size);
+
 }  // namespace helpers
 /**
  * @}

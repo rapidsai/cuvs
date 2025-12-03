@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -19,7 +19,7 @@
 #include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/linalg/unary_op.cuh>
-#include <raft/neighbors/refine.cuh>
+// #include <raft/neighbors/refine.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <rmm/cuda_stream_pool.hpp>
 
