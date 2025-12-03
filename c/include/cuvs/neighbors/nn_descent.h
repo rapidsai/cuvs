@@ -34,10 +34,6 @@ extern "C" {
  * `max_iterations`: The number of iterations that nn-descent will refine
  * the graph for. More iterations produce a better quality graph at cost of performance
  * `termination_threshold`: The delta at which nn-descent will terminate its iterations
- * `return_distances`: Boolean to decide whether to return distances array
- * `fp32_dist_computation`: Boolean to decide whether to use fp32 distance computation for better
- * precision at the cost of performance and memory usage. We recommend using this for smaller
- * dimensions or if the distances array is needed for precision-sensitive workloads.
  */
 struct cuvsNNDescentIndexParams {
   cuvsDistanceType metric;
@@ -47,7 +43,6 @@ struct cuvsNNDescentIndexParams {
   size_t max_iterations;
   float termination_threshold;
   bool return_distances;
-  bool fp32_dist_computation;
 };
 
 typedef struct cuvsNNDescentIndexParams* cuvsNNDescentIndexParams_t;

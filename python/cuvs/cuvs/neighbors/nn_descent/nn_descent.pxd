@@ -22,7 +22,6 @@ cdef extern from "cuvs/neighbors/nn_descent.h" nogil:
         size_t max_iterations
         float termination_threshold
         bool return_distances
-        bool fp32_dist_computation
 
     ctypedef cuvsNNDescentIndexParams* cuvsNNDescentIndexParams_t
 

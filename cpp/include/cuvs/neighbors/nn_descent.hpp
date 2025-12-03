@@ -37,9 +37,6 @@ namespace cuvs::neighbors::nn_descent {
  * the graph for. More iterations produce a better quality graph at cost of performance
  * - `termination_threshold`: The delta at which nn-descent will terminate its iterations
  * - `return_distances`: Boolean to decide whether to return distances array
- * - `fp32_dist_computation`: Boolean to decide whether to use fp32 distance computation for better
- * precision at the cost of performance and memory usage. We recommend using this for smaller
- * dimensions or if the distances array is needed for precision-sensitive workloads.
  */
 struct index_params : cuvs::neighbors::index_params {
   size_t graph_degree              = 64;
@@ -47,7 +44,6 @@ struct index_params : cuvs::neighbors::index_params {
   size_t max_iterations            = 20;
   float termination_threshold      = 0.0001;
   bool return_distances            = true;
-  bool fp32_dist_computation       = false;
 
   /** @brief Construct NN descent parameters for a specific kNN graph degree
    *

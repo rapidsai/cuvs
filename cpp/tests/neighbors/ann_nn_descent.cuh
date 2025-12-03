@@ -36,7 +36,6 @@ struct AnnNNDescentInputs {
   cuvs::distance::DistanceType metric;
   bool host_dataset;
   double min_recall;
-  bool fp32_dist_computation;
 };
 
 struct AnnNNDescentBatchInputs {
@@ -112,7 +111,6 @@ class AnnNNDescentTest : public ::testing::TestWithParam<AnnNNDescentInputs> {
         index_params.intermediate_graph_degree = 2 * ps.graph_degree;
         index_params.max_iterations            = 100;
         index_params.return_distances          = true;
-        index_params.fp32_dist_computation     = ps.fp32_dist_computation;
 
         auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
           (const DataT*)database.data(), ps.n_rows, ps.dim);
@@ -475,19 +473,7 @@ const std::vector<AnnNNDescentInputs> inputs =
                                                       cuvs::distance::DistanceType::InnerProduct,
                                                       cuvs::distance::DistanceType::CosineExpanded},
                                                      {false, true},
-                                                     {0.90},
-                                                     {false});  // fp32_dist_computation
-
-const std::vector<AnnNNDescentInputs> fp32_distance_computation_inputs =
-  raft::util::itertools::product<AnnNNDescentInputs>({2000, 4000},  // n_rows
-                                                     {4, 64},       // dim
-                                                     {32, 64},      // graph_degree
-                                                     {cuvs::distance::DistanceType::L2Expanded,
-                                                      cuvs::distance::DistanceType::InnerProduct,
-                                                      cuvs::distance::DistanceType::CosineExpanded},
-                                                     {false, true},
-                                                     {0.90},
-                                                     {true});  // fp32_dist_computation
+                                                     {0.90});
 
 const std::vector<AnnNNDescentInputs> inputsDistEpilogue =
   raft::util::itertools::product<AnnNNDescentInputs>(
