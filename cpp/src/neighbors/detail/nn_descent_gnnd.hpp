@@ -64,6 +64,8 @@ struct BuildConfig {
   float termination_threshold{0.0001};
   size_t output_graph_degree{32};
   cuvs::distance::DistanceType metric{cuvs::distance::DistanceType::L2Expanded};
+  cuvs::neighbors::nn_descent::DIST_COMP_DTYPE dist_comp_dtype{
+    cuvs::neighbors::nn_descent::DIST_COMP_DTYPE::AUTO};
 };
 
 template <typename Index_t>
@@ -303,7 +305,8 @@ inline BuildConfig get_build_config(raft::resources const& res,
                            .max_iterations        = params.max_iterations,
                            .termination_threshold = params.termination_threshold,
                            .output_graph_degree   = params.graph_degree,
-                           .metric                = params.metric};
+                           .metric                = params.metric,
+                           .dist_comp_dtype       = params.dist_comp_dtype};
   return build_config;
 }
 

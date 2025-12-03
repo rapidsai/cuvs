@@ -1317,7 +1317,10 @@ GNND<Data_t, Index_t>::GNND(raft::resources const& res, const BuildConfig& build
   static_assert(NUM_SAMPLES <= 32);
 
   using input_t = typename std::remove_const<Data_t>::type;
-  if (std::is_same_v<input_t, float> && build_config.dataset_dim <= 16) {
+  if (std::is_same_v<input_t, float> &&
+      (build_config.dist_comp_dtype == cuvs::neighbors::nn_descent::DIST_COMP_DTYPE::FP32 ||
+       (build_config.dist_comp_dtype == cuvs::neighbors::nn_descent::DIST_COMP_DTYPE::AUTO &&
+        build_config.dataset_dim <= 16))) {
     // use fp32 distance computation for better precision with smaller dimension
     d_data_float_.emplace(
       raft::make_device_matrix<float, size_t, raft::row_major>(res, nrow_, ndim_));
