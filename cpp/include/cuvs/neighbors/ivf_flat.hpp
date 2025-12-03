@@ -206,8 +206,8 @@ struct index : cuvs::neighbors::index {
 
   /** packed k-means cluster centers corresponding to the lists [n_lists, dim] when the
    * BitwiseHamming metric is selected */
-  raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> binary_centers() noexcept;
-  raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> binary_centers()
+  raft::device_matrix_view<uint8_t, int64_t, raft::row_major> binary_centers() noexcept;
+  raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> binary_centers()
     const noexcept;
 
   /**
@@ -235,7 +235,10 @@ struct index : cuvs::neighbors::index {
   /** Total length of the index. */
   IdxT size() const noexcept;
 
-  /** Dimensionality of the data. */
+  /** Dimensionality of the data.
+   * @note For binary index, this returns the dimensionality of the byte dataset, which is the
+   * number of bits / 8.
+   */
   uint32_t dim() const noexcept;
 
   /** Number of clusters/inverted lists. */
@@ -275,7 +278,7 @@ struct index : cuvs::neighbors::index {
   std::vector<std::shared_ptr<list_data<T, IdxT>>> lists_;
   raft::device_vector<uint32_t, uint32_t> list_sizes_;
   raft::device_matrix<float, uint32_t, raft::row_major> centers_;
-  raft::device_matrix<uint8_t, uint32_t, raft::row_major> binary_centers_;
+  raft::device_matrix<uint8_t, int64_t, raft::row_major> binary_centers_;
   std::optional<raft::device_vector<float, uint32_t>> center_norms_;
   bool binary_index_ = metric_ == cuvs::distance::DistanceType::BitwiseHamming;
 

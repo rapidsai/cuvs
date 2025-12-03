@@ -46,19 +46,18 @@ index<T, IdxT>::index(raft::resources const& res,
                ? raft::make_device_matrix<float, uint32_t>(res, n_lists, dim)
                : raft::make_device_matrix<float, uint32_t>(res, 0, 0)),
     binary_centers_(metric != cuvs::distance::DistanceType::BitwiseHamming
-                      ? raft::make_device_matrix<uint8_t, uint32_t>(res, 0, 0)
-                      : raft::make_device_matrix<uint8_t, uint32_t>(res, n_lists, dim)),
+                      ? raft::make_device_matrix<uint8_t, int64_t>(res, 0, 0)
+                      : raft::make_device_matrix<uint8_t, int64_t>(res, n_lists, dim)),
     center_norms_(std::nullopt),
     data_ptrs_{raft::make_device_vector<T*, uint32_t>(res, n_lists)},
     inds_ptrs_{raft::make_device_vector<IdxT*, uint32_t>(res, n_lists)},
-    accum_sorted_sizes_{raft::make_host_vector<IdxT, uint32_t>(n_lists + 1)}
+    accum_sorted_sizes_{raft::make_host_vector<IdxT, uint32_t>(n_lists + 1)},
+    binary_index_(metric == cuvs::distance::DistanceType::BitwiseHamming)
 {
   if (metric == cuvs::distance::DistanceType::BitwiseHamming && !std::is_same_v<T, uint8_t>) {
     RAFT_FAIL("BitwiseHamming distance is only supported with uint8_t data type, got %s",
               typeid(T).name());
   }
-
-  binary_index_ = metric == cuvs::distance::DistanceType::BitwiseHamming;
 
   check_consistency();
   accum_sorted_sizes_(n_lists) = 0;
@@ -108,14 +107,14 @@ raft::device_matrix_view<const float, uint32_t, raft::row_major> index<T, IdxT>:
 }
 
 template <typename T, typename IdxT>
-raft::device_matrix_view<uint8_t, uint32_t, raft::row_major>
+raft::device_matrix_view<uint8_t, int64_t, raft::row_major>
 index<T, IdxT>::binary_centers() noexcept
 {
   return binary_centers_.view();
 }
 
 template <typename T, typename IdxT>
-raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> index<T, IdxT>::binary_centers()
+raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> index<T, IdxT>::binary_centers()
   const noexcept
 {
   return binary_centers_.view();

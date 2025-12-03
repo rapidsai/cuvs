@@ -70,7 +70,7 @@ void fusedDistanceNNImpl(OutT* min,
   switch (metric) {
     case cuvs::distance::DistanceType::CosineExpanded:
       if constexpr (std::is_same_v<DataT, uint8_t> || std::is_same_v<DataT, int8_t>) {
-        assert(false && "Cosine distance is not supported for uint8_t/int8_t data types");
+        RAFT_FAIL("Cosine distance is not supported for uint8_t/int8_t data types");
       } else {
         fusedCosineNN<DataT, OutT, IdxT, P, ReduceOpT, KVPReduceOpT>(
           min, x, y, xn, yn, m, n, k, workspace, redOp, pairRedOp, sqrt, stream);
@@ -79,7 +79,7 @@ void fusedDistanceNNImpl(OutT* min,
     case cuvs::distance::DistanceType::L2SqrtExpanded:
     case cuvs::distance::DistanceType::L2Expanded:
       if constexpr (std::is_same_v<DataT, uint8_t> || std::is_same_v<DataT, int8_t>) {
-        assert(false && "L2 distance is not supported for uint8_t/int8_t data types");
+        RAFT_FAIL("L2 distance is not supported for uint8_t/int8_t data types");
       } else {
         fusedL2NNImpl<DataT, OutT, IdxT, P, ReduceOpT, KVPReduceOpT>(
           min, x, y, xn, yn, m, n, k, workspace, redOp, pairRedOp, sqrt, false, stream);
@@ -90,10 +90,10 @@ void fusedDistanceNNImpl(OutT* min,
         fusedBitwiseHammingNN<DataT, OutT, IdxT, P, ReduceOpT, KVPReduceOpT>(
           min, x, y, xn, yn, m, n, k, workspace, redOp, pairRedOp, sqrt, stream);
       } else {
-        assert(false && "BitwiseHamming distance only supports uint8_t data type");
+        RAFT_FAIL("BitwiseHamming distance only supports uint8_t data type");
       }
       break;
-    default: assert("only cosine/l2/bitwise hamming metric is supported with fusedDistanceNN\n");
+    default: RAFT_FAIL("only cosine/l2/bitwise hamming metric is supported with fusedDistanceNN");
   }
 }
 
