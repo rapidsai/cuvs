@@ -13,7 +13,7 @@
 
 // jamxia edit
 // #include "utils/tools.hpp"
-#include "tools.hpp"
+#include <cuvs/neighbors/ivf_rabitq/utils/tools.hpp>
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 

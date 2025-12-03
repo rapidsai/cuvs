@@ -9,9 +9,9 @@
 
 #pragma once
 
-#include "ivf_gpu.cuh"
-#include "pool_gpu.cuh"
-#include "quantizer_gpu.cuh"
+#include <cuvs/neighbors/ivf_rabitq/gpu_index/ivf_gpu.cuh>
+#include <cuvs/neighbors/ivf_rabitq/gpu_index/pool_gpu.cuh>
+#include <cuvs/neighbors/ivf_rabitq/gpu_index/quantizer_gpu.cuh>
 
 #include <raft/core/resources.hpp>
 

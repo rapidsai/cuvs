@@ -7,7 +7,7 @@
 // Created by Stardust on 8/18/25.
 //
 
-#include "query_gatherer.cuh"
+#include <cuvs/neighbors/ivf_rabitq/gpu_index/query_gatherer.cuh>
 
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/util/cuda_rt_essentials.hpp>

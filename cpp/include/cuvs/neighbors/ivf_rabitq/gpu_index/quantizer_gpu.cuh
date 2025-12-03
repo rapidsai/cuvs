@@ -16,13 +16,12 @@
 #include <iostream>
 #include <vector>
 // #include <math_functions.h>
-
-#include "../defines.hpp"
-#include "../utils/space_cuda.cuh"
-#include "../utils/tools_gpu.cuh"
+#include <cuvs/neighbors/ivf_rabitq/defines.hpp>
 // Assume RotatorGPU is defined in your GPU version of Rotator.
-#include "rotator_gpu.cuh"
+#include <cuvs/neighbors/ivf_rabitq/gpu_index/rotator_gpu.cuh>
 // Include space_cuda.cuh if needed for CUDA‐related memory routines.
+#include <cuvs/neighbors/ivf_rabitq/utils/space_cuda.cuh>
+#include <cuvs/neighbors/ivf_rabitq/utils/tools_gpu.cuh>
 
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>

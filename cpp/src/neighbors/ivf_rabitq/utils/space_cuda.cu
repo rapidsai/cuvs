@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "space_cuda.cuh"
+#include <cuvs/neighbors/ivf_rabitq/utils/space_cuda.cuh>
 
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/util/cuda_rt_essentials.hpp>

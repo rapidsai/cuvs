@@ -9,8 +9,8 @@
 
 #pragma once
 
-#include "../defines.hpp"
-#include "../utils/utils_cuda.cuh"
+#include <cuvs/neighbors/ivf_rabitq/defines.hpp>
+#include <cuvs/neighbors/ivf_rabitq/utils/utils_cuda.cuh>
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>

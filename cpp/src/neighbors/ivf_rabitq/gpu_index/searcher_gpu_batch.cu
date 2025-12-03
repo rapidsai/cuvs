@@ -7,7 +7,7 @@
 // Created by Stardust on 8/24/25.
 //
 
-#include "searcher_gpu.cuh"
+#include <cuvs/neighbors/ivf_rabitq/gpu_index/searcher_gpu.cuh>
 
 #include <chrono>
 #include <cmath>

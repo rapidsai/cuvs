@@ -7,7 +7,7 @@
 // Created by Stardust on 3/24/25.
 //
 
-#include "rotator_gpu.cuh"
+#include <cuvs/neighbors/ivf_rabitq/gpu_index/rotator_gpu.cuh>
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdarray.hpp>

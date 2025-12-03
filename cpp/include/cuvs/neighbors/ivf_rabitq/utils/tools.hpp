@@ -4,11 +4,11 @@
  */
 
 #pragma once
-#include "../defines.hpp"
+#include <omp.h>
 
 #include <queue>
 
-#include <omp.h>
+#include <cuvs/neighbors/ivf_rabitq/defines.hpp>
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 

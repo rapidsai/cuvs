@@ -7,9 +7,9 @@
 // Created by Stardust on 4/14/25.
 //
 
-#include "../utils/memory.hpp"
-#include "../utils/space_cuda.cuh"
-#include "searcher_gpu.cuh"
+#include <cuvs/neighbors/ivf_rabitq/gpu_index/searcher_gpu.cuh>
+#include <cuvs/neighbors/ivf_rabitq/utils/memory.hpp>
+#include <cuvs/neighbors/ivf_rabitq/utils/space_cuda.cuh>
 
 #include <raft/core/resource/cuda_stream.hpp>
 

@@ -7,7 +7,7 @@
 // Created by Stardust on 10/8/25.
 //
 
-#include "quantizer_gpu.cuh"
+#include <cuvs/neighbors/ivf_rabitq/gpu_index/quantizer_gpu.cuh>
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/host_mdarray.hpp>

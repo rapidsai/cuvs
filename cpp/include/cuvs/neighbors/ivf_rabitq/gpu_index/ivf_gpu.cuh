@@ -9,12 +9,12 @@
 
 #pragma once
 
-#include "../defines.hpp"
-#include "../utils/utils_cuda.cuh"
-#include "initializer_gpu.cuh"
-#include "pool_gpu.cuh"
-#include "quantizer_gpu.cuh"
-#include "rotator_gpu.cuh"
+#include <cuvs/neighbors/ivf_rabitq/defines.hpp>
+#include <cuvs/neighbors/ivf_rabitq/gpu_index/initializer_gpu.cuh>
+#include <cuvs/neighbors/ivf_rabitq/gpu_index/pool_gpu.cuh>
+#include <cuvs/neighbors/ivf_rabitq/gpu_index/quantizer_gpu.cuh>
+#include <cuvs/neighbors/ivf_rabitq/gpu_index/rotator_gpu.cuh>
+#include <cuvs/neighbors/ivf_rabitq/utils/utils_cuda.cuh>
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/host_mdarray.hpp>
