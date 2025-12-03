@@ -40,6 +40,12 @@ typedef uint32_t PID;
  * stub functions with CUDA kernels and device‐side implementations.
  */
 class DataQuantizerGPU {
+public:
+  struct FastQuantizeFactors {
+    float const_scaling_factor_4bit;
+    float const_scaling_factor_8bit;
+  };
+
  private:
   size_t DIM;                // Original data dimension.
   size_t D;                  // Padded dimension (multiple of 64).
@@ -50,6 +56,8 @@ class DataQuantizerGPU {
   double FAC_ERR;
   bool batch_flag_dq;
   float const_scaling_factor;
+  FastQuantizeFactors fast_quantize_factors;
+  static constexpr size_t FAST_SIZE = 4;
 #if defined(HIGH_ACC_FAST_SCAN)
   static constexpr size_t NUM_SHORT_FACTORS = 1;
 #else
@@ -57,6 +65,12 @@ class DataQuantizerGPU {
 #endif
   raft::resources const& handle_;  // reusable resource handle
   rmm::cuda_stream_view stream_;   // CUDA stream obtained from handle_
+
+  // device temporary space to quantize a cluster
+  raft::device_vector<float, int64_t>  d_XP_norm = raft::make_device_vector<float, int64_t>(handle_, 0);
+  raft::device_vector<int, int64_t> d_bin_XP = raft::make_device_vector<int, int64_t>(handle_, 0);
+  raft::device_vector<float, int64_t> d_XP = raft::make_device_vector<float, int64_t>(handle_, 0);
+  raft::device_vector<float, int64_t> d_X_and_C_pad = raft::make_device_vector<float, int64_t>(handle_, 0);
 
   // Private helper functions (to be implemented with GPU kernels eventually):
   //    void pack_binary(const int* /*int matrix*/, uint64_t* out, size_t index) const;
@@ -92,6 +106,8 @@ class DataQuantizerGPU {
   //    };
  public:
   static float get_const_scaling_factors(raft::resources const& handle, size_t dim, size_t ex_bits);
+
+  float get_const_scaling_factors_fully_gpu(size_t dim, size_t ex_bits);
   // Constructor: initialize from dimension and bit count.
   explicit DataQuantizerGPU(raft::resources const& handle,
                             size_t dim,
@@ -107,11 +123,10 @@ class DataQuantizerGPU {
       FAC_ERR(2.0 / std::sqrt((double)(D - 1))),
       batch_flag_dq(batch_flag_dq),
       fast_quantize_flag(false),
+      const_scaling_factor(0.0f),
       handle_(handle),
       stream_(raft::resource::get_cuda_stream(handle_))
-  {
-    const_scaling_factor = get_const_scaling_factors(handle, dim, b);
-  }
+  {}
 
   // Disable copy assignment
   DataQuantizerGPU& operator=(const DataQuantizerGPU& other) = delete;
@@ -131,6 +146,21 @@ class DataQuantizerGPU {
   }  // May be useless
   size_t num_blocks(size_t num) const { return div_rd_up_new(num, FAST_SIZE); }
   static constexpr size_t num_short_factors() { return NUM_SHORT_FACTORS; }
+  const FastQuantizeFactors* get_query_scaling_factor() const { return &fast_quantize_factors;}
+  FastQuantizeFactors* get_query_scaling_factor() { return &fast_quantize_factors;   }
+  void compute_query_scaling_factors(size_t dim) {
+    fast_quantize_factors.const_scaling_factor_4bit = get_const_scaling_factors(handle_, dim, 3);
+    fast_quantize_factors.const_scaling_factor_8bit = get_const_scaling_factors_fully_gpu(dim, 7);
+  }
+  void compute_quantize_scaling_factors() {
+    const_scaling_factor = get_const_scaling_factors_fully_gpu(D, EX_BITS);
+  }
+  void set_quantize_scaling_factors(float value) {
+    const_scaling_factor = value;
+  }
+
+  // functions to malloc temp buffers for gpu
+  void alloc_buffers(size_t num_points);
 
   /*!
    * @brief Quantize the input data.
@@ -192,7 +222,7 @@ class DataQuantizerGPU {
                           float* short_data_factors,
                           uint8_t* d_long_code,
                           float* d_ex_factor,
-                          float* d_rotated_c) const;
+                          float* d_rotated_c);
 
   /*!
    * @brief Get pointer of factors for the current block.
@@ -270,7 +300,7 @@ class DataQuantizerGPU {
                                      float* d_rotated_c,
                                      float* d_XP_norm,
                                      int* d_bin_XP,
-                                     float* d_XP) const;
+                                     float* d_XP);
 
   void exrabitq_codes_hybrid_advanced(const int* d_bin_XP,
                                       const float* d_XP_norm,

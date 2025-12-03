@@ -1434,7 +1434,8 @@ SearcherGPU::SearcherGPU(raft::resources const& handle,
                          const float* q,
                          size_t d,
                          size_t ex_bits,
-                         std::string mode,
+                         std::string mode ,
+                         DataQuantizerGPU::FastQuantizeFactors* fast_quantize_factors,
                          bool rabitq_quantize_flag)
   : D(d),
     query_(q),
@@ -1448,11 +1449,14 @@ SearcherGPU::SearcherGPU(raft::resources const& handle,
   set_unit_q(memory::align_mm<64, float>(D * sizeof(float)));
   set_quant_query(memory::align_mm<64, int16_t>(D * sizeof(int16_t)));
   filter_distk_ = INFINITY;
-  if (mode_ == "quant4") {
-    best_rescaling_factor = DataQuantizerGPU::get_const_scaling_factors(
-      handle, d, 3);  // suppose that always quantize query to 4 bits (1 + 3) per dim
-  } else if (mode_ == "quant8") {
-    best_rescaling_factor = DataQuantizerGPU::get_const_scaling_factors(handle, d, 7);
+  if (mode_ == "quant4" && fast_quantize_factors != nullptr) {
+    best_rescaling_factor = fast_quantize_factors->const_scaling_factor_4bit;  // suppose that always quantize query to 4 bits (1 + 3) per dim
+  }
+  else if (mode_ == "quant8" && fast_quantize_factors != nullptr) {
+    best_rescaling_factor = fast_quantize_factors->const_scaling_factor_8bit;
+  }
+  else if (!fast_quantize_factors && (mode_ == "quant4" || mode_ == "quant8")) {
+    std::cerr << "ERROR: fast_quantize_factors must be set for quant4/quant8 mode" << std::endl;
   }
   raft::resource::sync_stream(handle);
 }

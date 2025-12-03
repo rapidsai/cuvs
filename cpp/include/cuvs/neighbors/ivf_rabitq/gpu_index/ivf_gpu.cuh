@@ -49,7 +49,7 @@ class IVFGPU {
     size_t start_index;  // Combined offset: index of first vector in the flattened arrays.
 
     // Constructor: computes iter and REMAIN based on FAST_SIZE.
-    GPUClusterMeta(size_t num, size_t start_idx) : num(num), start_index(start_idx)
+    __host__ __device__ GPUClusterMeta(size_t num, size_t start_idx) : num(num), start_index(start_idx)
     {
       iter   = num / FAST_SIZE;
       remain = num - iter * FAST_SIZE;
@@ -217,6 +217,18 @@ class IVFGPU {
                  const float* host_centroids,
                  const uint32_t* pids,
                  bool fast_quantize = false);
+
+  /**
+   * @brief Build function
+   *
+   * @param device_data pointer to device data.
+   * @param device_centroids pointer to centroids.
+   * @param device_cluster_ids PIDs of vectors.
+   */
+  void construct_on_gpu(const float* device_data,
+    const float* device_centroids,
+    const PID* device_cluster_ids,
+    bool fast_quantize);
 
   /**
    * @brief ANN search
