@@ -96,7 +96,6 @@ cdef class IndexParams:
         if return_distances is not None:
             self.params.return_distances = return_distances
 
-
     @property
     def metric(self):
         return DISTANCE_NAMES[self.params.metric]
