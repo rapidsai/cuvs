@@ -12,9 +12,6 @@ export CMAKE_GENERATOR=Ninja
 
 rapids-print-env
 
-# Use RAFT CI artifacts from PR
-source ./ci/use_conda_packages_from_prs.sh
-
 rapids-logger "Begin py build"
 
 CPP_CHANNEL=$(rapids-download-conda-from-github cpp)

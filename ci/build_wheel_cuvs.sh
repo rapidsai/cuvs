@@ -6,9 +6,6 @@ set -euo pipefail
 
 source rapids-init-pip
 
-# Use RAFT wheel artifacts from PR
-source ./ci/use_wheels_from_prs.sh
-
 package_dir="python/cuvs"
 
 RAPIDS_PY_CUDA_SUFFIX="$(rapids-wheel-ctk-name-gen "${RAPIDS_CUDA_VERSION}")"
