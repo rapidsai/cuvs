@@ -6,12 +6,11 @@ set -euo pipefail
 
 . /opt/conda/etc/profile.d/conda.sh
 
-source ./ci/use_conda_packages_from_prs.sh
-
 rapids-logger "Configuring conda strict channel priority"
 conda config --set channel_priority strict
 
 CPP_CHANNEL=$(rapids-download-conda-from-github cpp)
+source ./ci/use_conda_packages_from_prs.sh
 
 rapids-logger "Generate C++ testing dependencies"
 rapids-dependency-file-generator \

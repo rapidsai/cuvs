@@ -8,8 +8,6 @@ source rapids-configure-sccache
 
 source rapids-date-string
 
-source ./ci/use_conda_packages_from_prs.sh
-
 export CMAKE_GENERATOR=Ninja
 
 rapids-print-env
@@ -17,6 +15,7 @@ rapids-print-env
 rapids-logger "Begin py build"
 
 CPP_CHANNEL=$(rapids-download-conda-from-github cpp)
+source ./ci/use_conda_packages_from_prs.sh
 
 version=$(rapids-generate-version)
 export RAPIDS_PACKAGE_VERSION=${version}

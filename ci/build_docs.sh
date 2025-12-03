@@ -4,11 +4,11 @@
 
 set -euo pipefail
 
-source ./ci/use_conda_packages_from_prs.sh
-
 rapids-logger "Downloading artifacts from previous jobs"
 CPP_CHANNEL=$(rapids-download-conda-from-github cpp)
 PYTHON_CHANNEL=$(rapids-download-conda-from-github python)
+
+source ./ci/use_conda_packages_from_prs.sh
 
 rapids-logger "Create test conda environment"
 . /opt/conda/etc/profile.d/conda.sh

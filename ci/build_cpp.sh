@@ -8,8 +8,6 @@ source rapids-configure-sccache
 
 source rapids-date-string
 
-source ./ci/use_conda_packages_from_prs.sh
-
 export CMAKE_GENERATOR=Ninja
 
 rapids-print-env
@@ -25,6 +23,7 @@ export RAPIDS_PACKAGE_VERSION
 RAPIDS_ARTIFACTS_DIR=${RAPIDS_ARTIFACTS_DIR:-"${PWD}/artifacts"}
 mkdir -p "${RAPIDS_ARTIFACTS_DIR}"
 export RAPIDS_ARTIFACTS_DIR
+source ./ci/use_conda_packages_from_prs.sh
 
 # populates `RATTLER_CHANNELS` array and `RATTLER_ARGS` array
 source rapids-rattler-channel-string
