@@ -61,11 +61,11 @@ std::ostream& operator<<(std::ostream& os, const GramMatrixInputs& p)
 }
 
 /*struct KernelParams {
-// Kernel function parameters
-KernelType kernel;  //!< Type of the kernel function
-int degree;         //!< Degree of polynomial kernel (ignored by others)
-double gamma;       //!< multiplier in the
-double coef0;       //!< additive constant in poly and tanh kernels
+  // Kernel function parameters
+  KernelType kernel;  //!< Type of the kernel function
+  int degree;         //!< Degree of polynomial kernel (ignored by others)
+  double gamma;       //!< multiplier in the
+  double coef0;       //!< additive constant in poly and tanh kernels
 };*/
 
 // const KernelParams linear_kernel_params{.kernel=KernelType::LINEAR};
