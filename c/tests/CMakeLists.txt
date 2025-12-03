@@ -44,6 +44,8 @@ function(ConfigureTest)
   add_executable(${TEST_NAME} ${_CUVS_TEST_PATH})
   target_link_libraries(
     ${TEST_NAME} PRIVATE cuvs::c_api GTest::gtest GTest::gtest_main
+                         $<$<BOOL:${CUVSC_STATIC_CUVS_LIBRARY}>:$<COMPILE_ONLY:cuvs::cuvs_static>>
+                         $<$<NOT:$<BOOL:${CUVSC_STATIC_CUVS_LIBRARY}>>:cuvs::cuvs>
                          $<TARGET_NAME_IF_EXISTS:conda_env>
   )
   set_target_properties(
@@ -90,6 +92,7 @@ endif()
 
 ConfigureTest(NAME cuvs_c_headers PATH core/headers.c)
 ConfigureTest(NAME cuvs_c_test PATH core/c_api.c)
+target_link_libraries(cuvs_c_test PRIVATE CUDA::cudart)
 ConfigureTest(NAME cuvs_c_neighbors_test PATH neighbors/c_api.c)
 
 # ##################################################################################################
