@@ -10,7 +10,7 @@
 #include "../ivf_list.cuh"
 #include "ivf_pq_codepacking.cuh"
 #include "ivf_pq_contiguous_list_data.cuh"
-#include "ivf_pq_list_data.cuh"
+#include "ivf_pq_list_data.hpp"
 #include "ivf_pq_process_and_fill_codes.cuh"
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/common.hpp>
