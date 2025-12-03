@@ -77,7 +77,7 @@ void build(raft::resources const& handle,
   // NB: here cluster_centers is used as if it is [n_clusters, data_dim] not [n_clusters,
   // dim_ext]!
   rmm::device_uvector<float> cluster_centers_buf(params.n_lists * dim, stream, device_memory);
-  auto cluster_centers      = cluster_centers_buf.data();
+  auto cluster_centers = cluster_centers_buf.data();
   auto centers_view =
     raft::make_device_matrix_view<float, int64_t>(cluster_centers, params.n_lists, dim);
   cuvs::cluster::kmeans::balanced_params kmeans_params;
@@ -86,18 +86,14 @@ void build(raft::resources const& handle,
   // find cluster labels for dataset vectors
   rmm::device_uvector<uint32_t> labels(n_rows, stream, big_memory_resource);
   auto labels_view = raft::make_device_vector_view<uint32_t, int64_t>(labels.data(), n_rows);
-  cuvs::cluster::kmeans_balanced::fit_predict(handle,
-                                          kmeans_params,
-                                          d_dataset_view,
-                                          centers_view,
-                                          labels_view
-                                          );
+  cuvs::cluster::kmeans_balanced::fit_predict(
+    handle, kmeans_params, d_dataset_view, centers_view, labels_view);
 
   // Call RaBitQ index construct
-  index->rabitq_index().construct_on_gpu(d_dataset_array.view().data_handle(),
-                                cluster_centers,
-                                labels_view.data_handle(),
-                                params.fast_quantize_flag);
+  index->rabitq_index().construct_on_gpu(d_dataset_view.data_handle(),
+                                         cluster_centers,
+                                         labels_view.data_handle(),
+                                         params.fast_quantize_flag);
 }
 
 template <typename T, typename IdxT>
