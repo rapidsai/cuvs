@@ -339,7 +339,7 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
       cudaMallocAsync(&d_final_pids, NQ * TOPK * sizeof(PID), single_stream);
       cudaDeviceSynchronize();
 
-      if (searcher.mode == "lut32") {
+      if (searcher.get_mode() == "lut32") {
         stopw.reset();
         ivf.BatchClusterSearch(d_rotated_query,
                                TOPK,
@@ -353,7 +353,7 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
         cudaDeviceSynchronize();
         total_time += stopw.getElapsedTimeMicro();
         // time stop
-      } else if (searcher.mode == "lut16") {
+      } else if (searcher.get_mode() == "lut16") {
         // test v3 lut using fp16
         stopw.reset();
         ivf.BatchClusterSearchLUT16(d_rotated_query,
@@ -367,7 +367,7 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
                                     d_final_pids);
         cudaDeviceSynchronize();
         total_time += stopw.getElapsedTimeMicro();
-      } else if (searcher.mode == "quant8") {
+      } else if (searcher.get_mode() == "quant8") {
         stopw.reset();
         ivf.BatchClusterSearchQuantizeQuery(d_rotated_query,
                                             TOPK,
@@ -381,7 +381,7 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
                                             8);
         cudaDeviceSynchronize();
         total_time += stopw.getElapsedTimeMicro();
-      } else if (searcher.mode == "quant4") {
+      } else if (searcher.get_mode() == "quant4") {
         stopw.reset();
         ivf.BatchClusterSearchQuantizeQuery(d_rotated_query,
                                             TOPK,

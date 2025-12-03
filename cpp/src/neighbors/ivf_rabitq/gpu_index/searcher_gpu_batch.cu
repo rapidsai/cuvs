@@ -4291,7 +4291,7 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
     cur_ivf.get_short_factors_batch_device(),
     d_G_k1xSumq,
     d_G_kbxSumq,
-    d_centroid_distances,
+    get_centroid_distances(),
     topk,
     num_queries,
     nprobe,
@@ -4777,7 +4777,7 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(
     cur_ivf.get_short_factors_batch_device(),
     d_G_k1xSumq,
     d_G_kbxSumq,
-    d_centroid_distances,
+    get_centroid_distances(),
     topk,
     num_queries,
     nprobe,
@@ -5039,7 +5039,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
   RAFT_CUDA_TRY(cudaMallocAsync(&d_quantized_queries, quantized_size, stream_));
   RAFT_CUDA_TRY(cudaMallocAsync(&d_packed_queries, packed_size, stream_));
 
-  if (rabitq_quantize_flag) {
+  if (rabitq_quantize_flag_) {
     const int block_size = 256;
     const int grid_size  = num_queries;
     size_t shared_mem    = D * sizeof(float) + D * sizeof(int8_t) + block_size * sizeof(float);
@@ -5172,7 +5172,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
       cur_ivf.get_short_factors_batch_device(),
       d_G_k1xSumq,
       d_G_kbxSumq,
-      d_centroid_distances,
+      get_centroid_distances(),
       topk,
       num_queries,
       nprobe,
@@ -5205,7 +5205,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
       cur_ivf.get_short_factors_batch_device(),
       d_G_k1xSumq,
       d_G_kbxSumq,
-      d_centroid_distances,
+      get_centroid_distances(),
       topk,
       num_queries,
       nprobe,
@@ -5365,7 +5365,7 @@ void SearcherGPU::SearchClusterQueryPairsPreComputeThreshold(
     cur_ivf.get_short_factors_batch_device(),
     d_G_k1xSumq,
     d_G_kbxSumq,
-    d_centroid_distances,
+    get_centroid_distances(),
     topk,
     num_queries,
     nprobe,
@@ -5398,7 +5398,7 @@ void SearcherGPU::SearchClusterQueryPairsPreComputeThreshold(
       cur_ivf.get_short_factors_batch_device(),
       d_G_k1xSumq,
       d_G_kbxSumq,
-      d_centroid_distances,
+      get_centroid_distances(),
       topk,
       num_queries,
       nprobe,

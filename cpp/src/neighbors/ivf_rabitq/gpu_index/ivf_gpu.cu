@@ -1293,11 +1293,8 @@ void IVFGPU::MemOptimizedSearch(
   // d_query is on CPU now
   SearcherGPU* searcher = ((SearcherGPU*)searcher1);
   // adjust initialization accordingly
-  searcher->query          = d_query;
-  searcher->h_filter_distk = INFINITY;
-  float temp               = INFINITY;
-  RAFT_CUDA_TRY(cudaMemcpyAsync(
-    searcher->d_filter_distk, &temp, sizeof(float), cudaMemcpyHostToDevice, stream_));
+  searcher->set_query(d_query);
+  searcher->set_filter_distk(INFINITY);
   //    printf("querying...\n");
   //    SearcherGPU searcher(d_query, num_padded_dim, ex_bits);
   //    RAFT_CUDA_TRY(cudaMemset(searcher->d_unit_q_gpu, 0, sizeof(float)  * num_dimensions));
@@ -2014,7 +2011,7 @@ void IVFGPU::BatchClusterSearch(const float* d_query,
                                   d_query,
                                   num_padded_dim,
                                   &beta,
-                                  searcher_batch->d_centroid_distances,
+                                  searcher_batch->get_centroid_distances(),
                                   num_centroids));
 
   // Step2: fused kernel to compute q and c norms
@@ -2028,18 +2025,19 @@ void IVFGPU::BatchClusterSearch(const float* d_query,
     initializer->GetCentroid(0),
     num_centroids,
     num_padded_dim,
-    searcher_batch->d_q_norms,
-    searcher_batch->d_c_norms);
+    searcher_batch->get_q_norms(),
+    searcher_batch->get_c_norms());
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // Step3: add all norms together
   int add_threads = 256;
   int add_blocks  = (batch_size * num_centroids + add_threads - 1) / add_threads;
-  add_norms_kernel<<<add_blocks, add_threads, 0, stream_>>>(searcher_batch->d_centroid_distances,
-                                                            searcher_batch->d_q_norms,
-                                                            searcher_batch->d_c_norms,
-                                                            batch_size,
-                                                            num_centroids);
+  add_norms_kernel<<<add_blocks, add_threads, 0, stream_>>>(
+    searcher_batch->get_centroid_distances(),
+    searcher_batch->get_q_norms(),
+    searcher_batch->get_c_norms(),
+    batch_size,
+    num_centroids);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // Step4: select topk and copy back
@@ -2052,7 +2050,7 @@ void IVFGPU::BatchClusterSearch(const float* d_query,
 
   // Then TOPK is copied back to CPU side
   auto in_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
-    searcher_batch->d_centroid_distances, batch_size, num_centroids);
+    searcher_batch->get_centroid_distances(), batch_size, num_centroids);
   auto outv_v =
     raft::make_device_matrix_view<float, int64_t, raft::row_major>(d_raft_vals, batch_size, nprobe);
   auto outi_v =
@@ -2137,7 +2135,7 @@ void IVFGPU::BatchClusterSearchLUT16(const float* d_query,
                                   d_query,
                                   num_padded_dim,
                                   &beta,
-                                  searcher_batch->d_centroid_distances,
+                                  searcher_batch->get_centroid_distances(),
                                   num_centroids));
 
   // Step2: fused kernel to compute q and c norms
@@ -2151,18 +2149,19 @@ void IVFGPU::BatchClusterSearchLUT16(const float* d_query,
     initializer->GetCentroid(0),
     num_centroids,
     num_padded_dim,
-    searcher_batch->d_q_norms,
-    searcher_batch->d_c_norms);
+    searcher_batch->get_q_norms(),
+    searcher_batch->get_c_norms());
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // Step3: add all norms together
   int add_threads = 256;
   int add_blocks  = (batch_size * num_centroids + add_threads - 1) / add_threads;
-  add_norms_kernel<<<add_blocks, add_threads, 0, stream_>>>(searcher_batch->d_centroid_distances,
-                                                            searcher_batch->d_q_norms,
-                                                            searcher_batch->d_c_norms,
-                                                            batch_size,
-                                                            num_centroids);
+  add_norms_kernel<<<add_blocks, add_threads, 0, stream_>>>(
+    searcher_batch->get_centroid_distances(),
+    searcher_batch->get_q_norms(),
+    searcher_batch->get_c_norms(),
+    batch_size,
+    num_centroids);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // Step4: select topk and copy back
@@ -2175,7 +2174,7 @@ void IVFGPU::BatchClusterSearchLUT16(const float* d_query,
 
   // Then TOPK is copied back to CPU side
   auto in_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
-    searcher_batch->d_centroid_distances, batch_size, num_centroids);
+    searcher_batch->get_centroid_distances(), batch_size, num_centroids);
   auto outv_v =
     raft::make_device_matrix_view<float, int64_t, raft::row_major>(d_raft_vals, batch_size, nprobe);
   auto outi_v =
@@ -2261,7 +2260,7 @@ void IVFGPU::BatchClusterSearchQuantizeQuery(const float* d_query,
                                   d_query,
                                   num_padded_dim,
                                   &beta,
-                                  searcher_batch->d_centroid_distances,
+                                  searcher_batch->get_centroid_distances(),
                                   num_centroids));
 
   // Step2: fused kernel to compute q and c norms
@@ -2275,18 +2274,19 @@ void IVFGPU::BatchClusterSearchQuantizeQuery(const float* d_query,
     initializer->GetCentroid(0),
     num_centroids,
     num_padded_dim,
-    searcher_batch->d_q_norms,
-    searcher_batch->d_c_norms);
+    searcher_batch->get_q_norms(),
+    searcher_batch->get_c_norms());
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // Step3: add all norms together
   int add_threads = 256;
   int add_blocks  = (batch_size * num_centroids + add_threads - 1) / add_threads;
-  add_norms_kernel<<<add_blocks, add_threads, 0, stream_>>>(searcher_batch->d_centroid_distances,
-                                                            searcher_batch->d_q_norms,
-                                                            searcher_batch->d_c_norms,
-                                                            batch_size,
-                                                            num_centroids);
+  add_norms_kernel<<<add_blocks, add_threads, 0, stream_>>>(
+    searcher_batch->get_centroid_distances(),
+    searcher_batch->get_q_norms(),
+    searcher_batch->get_c_norms(),
+    batch_size,
+    num_centroids);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // Step4: select topk and copy back
@@ -2299,7 +2299,7 @@ void IVFGPU::BatchClusterSearchQuantizeQuery(const float* d_query,
 
   // Then TOPK is copied back to CPU side
   auto in_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
-    searcher_batch->d_centroid_distances, batch_size, num_centroids);
+    searcher_batch->get_centroid_distances(), batch_size, num_centroids);
   auto outv_v =
     raft::make_device_matrix_view<float, int64_t, raft::row_major>(d_raft_vals, batch_size, nprobe);
   auto outi_v =
@@ -2384,7 +2384,7 @@ void IVFGPU::BatchClusterSearchPreComputeThresholds(const float* d_query,
                                   d_query,
                                   num_padded_dim,
                                   &beta,
-                                  searcher_batch->d_centroid_distances,
+                                  searcher_batch->get_centroid_distances(),
                                   num_centroids));
 
   // Step2: fused kernel to compute q and c norms
@@ -2398,18 +2398,19 @@ void IVFGPU::BatchClusterSearchPreComputeThresholds(const float* d_query,
     initializer->GetCentroid(0),
     num_centroids,
     num_padded_dim,
-    searcher_batch->d_q_norms,
-    searcher_batch->d_c_norms);
+    searcher_batch->get_q_norms(),
+    searcher_batch->get_c_norms());
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // Step3: add all norms together
   int add_threads = 256;
   int add_blocks  = (batch_size * num_centroids + add_threads - 1) / add_threads;
-  add_norms_kernel<<<add_blocks, add_threads, 0, stream_>>>(searcher_batch->d_centroid_distances,
-                                                            searcher_batch->d_q_norms,
-                                                            searcher_batch->d_c_norms,
-                                                            batch_size,
-                                                            num_centroids);
+  add_norms_kernel<<<add_blocks, add_threads, 0, stream_>>>(
+    searcher_batch->get_centroid_distances(),
+    searcher_batch->get_q_norms(),
+    searcher_batch->get_c_norms(),
+    batch_size,
+    num_centroids);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // Step4: select topk and copy back
@@ -2422,7 +2423,7 @@ void IVFGPU::BatchClusterSearchPreComputeThresholds(const float* d_query,
 
   // Then TOPK is copied back to CPU side
   auto in_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
-    searcher_batch->d_centroid_distances, batch_size, num_centroids);
+    searcher_batch->get_centroid_distances(), batch_size, num_centroids);
   auto outv_v =
     raft::make_device_matrix_view<float, int64_t, raft::row_major>(d_raft_vals, batch_size, nprobe);
   auto outi_v =
@@ -2493,11 +2494,8 @@ void IVFGPU::MultiClusterSearch(const float* d_query,
   // d_query is on CPU now
   SearcherGPU* searcher = ((SearcherGPU*)searcher1);
   // adjust initialization accordingly
-  searcher->query          = d_query;
-  searcher->h_filter_distk = INFINITY;
-  float temp               = INFINITY;
-  RAFT_CUDA_TRY(cudaMemcpyAsync(
-    searcher->d_filter_distk, &temp, sizeof(float), cudaMemcpyHostToDevice, stream_));
+  searcher->set_query(d_query);
+  searcher->set_filter_distk(INFINITY);
   //    cudaMemsetAsync(searcher->d_est_dis, 0, sizeof(float)  * this->num_vectors, stream);
 
   Candidate* d_centroid_candidates = nullptr;
@@ -2607,11 +2605,8 @@ void IVFGPU::MemOptimizedSearchV2(
   // d_query is on CPU now
   SearcherGPU* searcher = ((SearcherGPU*)searcher1);
   // adjust initialization accordingly
-  searcher->query          = d_query;
-  searcher->h_filter_distk = INFINITY;
-  float temp               = INFINITY;
-  RAFT_CUDA_TRY(cudaMemcpyAsync(
-    searcher->d_filter_distk, &temp, sizeof(float), cudaMemcpyHostToDevice, stream_));
+  searcher->set_query(d_query);
+  searcher->set_filter_distk(INFINITY);
   //    printf("querying...\n");
   //    SearcherGPU searcher(d_query, num_padded_dim, ex_bits);
   //    RAFT_CUDA_TRY(cudaMemset(searcher->d_unit_q_gpu, 0, sizeof(float)  * num_dimensions));
@@ -2668,10 +2663,14 @@ void IVFGPU::MemOptimizedSearchV2(
     // need to set for each cluster
     //        init_buffers_to_inf_kernel(searcher->d_ip_results, searcher->d_est_dis,
     //        h_cluster_meta[cid].num, s);
-    RAFT_CUDA_TRY(cudaMemsetAsync(
-      searcher->d_ip_results, 0, sizeof(float) * cluster_meta_host_(cid).num, stream_));
-    RAFT_CUDA_TRY(cudaMemsetAsync(
-      searcher->d_est_dis, 0, sizeof(float) * cluster_meta_host_(cid).num, stream_));
+    RAFT_CUDA_TRY(cudaMemsetAsync(searcher->get_ip_results().data_handle(),
+                                  0,
+                                  sizeof(float) * cluster_meta_host_(cid).num,
+                                  stream_));
+    RAFT_CUDA_TRY(cudaMemsetAsync(searcher->get_est_dis().data_handle(),
+                                  0,
+                                  sizeof(float) * cluster_meta_host_(cid).num,
+                                  stream_));
 
     // 3-a) async copy centroid i -> pinned host buffer
     const float* d_centroid = this->initializer->GetCentroid(cid);
@@ -2703,11 +2702,8 @@ void IVFGPU::CPUGPUCoSearch(
   // d_query is on CPU now
   SearcherGPU* searcher = ((SearcherGPU*)searcher1);
   // adjust initialization accordingly
-  searcher->query          = d_query;
-  searcher->h_filter_distk = INFINITY;
-  float temp               = INFINITY;
-  RAFT_CUDA_TRY(cudaMemcpyAsync(
-    searcher->d_filter_distk, &temp, sizeof(float), cudaMemcpyHostToDevice, stream_));
+  searcher->set_query(d_query);
+  searcher->set_filter_distk(INFINITY);
 
   Candidate* d_centroid_candidates = nullptr;
   RAFT_CUDA_TRY(cudaMallocAsync(&d_centroid_candidates, nprobe * sizeof(Candidate), stream_));
@@ -2765,7 +2761,7 @@ void IVFGPU::CPUGPUCoSearch(
         knn_array[0]->insert(knn_array[i]->candidates()[j]);
       }
       // update final h_dist
-      searcher->h_filter_distk = knn_array[0]->worst().est_dist;
+      searcher->set_filter_distk(knn_array[0]->worst().est_dist);
       //            printf("filter dist: %f\n", searcher->h_filter_distk);
     }
   }
@@ -2792,11 +2788,8 @@ void IVFGPU::CPUGPUCoSearchV2(
   // d_query is on CPU now
   SearcherGPU* searcher = ((SearcherGPU*)searcher1);
   // adjust initialization accordingly
-  searcher->query          = d_query;
-  searcher->h_filter_distk = INFINITY;
-  float temp               = INFINITY;
-  RAFT_CUDA_TRY(cudaMemcpyAsync(
-    searcher->d_filter_distk, &temp, sizeof(float), cudaMemcpyHostToDevice, stream_));
+  searcher->set_query(d_query);
+  searcher->set_filter_distk(INFINITY);
 
   Candidate* d_centroid_candidates = nullptr;
   RAFT_CUDA_TRY(cudaMallocAsync(&d_centroid_candidates, nprobe * sizeof(Candidate), stream_));
@@ -2863,7 +2856,7 @@ void IVFGPU::CPUGPUCoSearchV2(
     for (int j = 0; j < knn_array_gpu[i].size; ++j) {
       knn_array[0]->insert({first_3_dis[j], first_3_pid[j]});
     }
-    searcher->h_filter_distk = knn_array[0]->worst().est_dist;
+    searcher->set_filter_distk(knn_array[0]->worst().est_dist);
     //        printf("filter dist after: %f\n", searcher->h_filter_distk);
   }
 
@@ -2898,7 +2891,7 @@ void IVFGPU::CPUGPUCoSearchV2(
       }
       // update final h_dist
       //            printf("filter dist before: %f\n", searcher->h_filter_distk);
-      searcher->h_filter_distk = knn_array[0]->worst().est_dist;
+      searcher->set_filter_distk(knn_array[0]->worst().est_dist);
       //            printf("filter dist after: %f\n", searcher->h_filter_distk);
     }
   }
@@ -3064,8 +3057,8 @@ void IVFGPU::search_with_time(const float* d_query,
     }
   }
 
-  printf("Clusters using sort: %d\n", searcher.sort_num);
-  printf("Clusters using direct copy: %d\n", searcher.direct_num);
+  printf("Clusters using sort: %d\n", searcher.get_sort_num());
+  printf("Clusters using direct copy: %d\n", searcher.get_direct_num());
 }
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

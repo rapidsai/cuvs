@@ -41,64 +41,6 @@ struct SumNorm {
 
 class SearcherGPU {
  public:
-  size_t D;                        // number of dimension
-  const float* query   = nullptr;  // rotated query
-  int16_t* quant_query = nullptr;  // quantized query (to 2 bytes)
-  float* unit_q        = nullptr;
-  int shift;
-  float delta = 0;  // quantized related
-  float sumq;
-  float one_over_sqrtD  = 0;  // 1/sqrt(D)
-  int FAC_RESCALE       = 0;
-  float* d_filter_distk = nullptr;
-  float h_filter_distk  = INFINITY;
-  int direct_num        = 0;
-  int sort_num          = 0;
-  bool rabitq_quantize_flag;
-  std::string mode;
-  //    float *d_filter_distk = 0x7F800000; // infinity
-
-  // Additional preparation to avoid repeatedly malloc space among different probes
-  // will be more if using multiple clusters method
-  float* d_unit_q_gpu = nullptr;
-  float* d_ip_results = nullptr;  // will be more if using multiple clusters method
-  float* d_est_dis    = nullptr;
-  float* d_top_ip     = nullptr;
-  PID* d_top_pids     = nullptr;
-  int* d_top_idx      = nullptr;
-  float* d_ip2        = nullptr;
-  Candidate3* d_buf   = nullptr;
-
-  float* h_ip_results = nullptr;
-  float* h_est_dis    = nullptr;
-
-  // batch
-  float* d_topk_threshold = nullptr;  // threshold to filter distance for each query
-  float* d_centroid_distances =
-    nullptr;  // stores distances between centroids and queries (l2 square)
-  float* d_c_norms                 = nullptr;  // centroid norms
-  float* d_q_norms                 = nullptr;  // query norms
-  Candidate* d_centroid_candidates = nullptr;  // for candidate computation
-  std::vector<DeviceResultPool>
-    topk_results;  // TODO: Change the vectors into a whole array on the GPU
-
-  // quantization for queries
-  float best_rescaling_factor = 0.0f;
-
-  // additional for multiple cluster search！！！！！！
-
-  // constexpr int  K      = 20000;  // total centroids in memory
-  // constexpr int  ITER   = 20;     // timing iterations
-  // constexpr int  BLOCK  = 256;    // baseline / warp256 block‑dim
-  // constexpr float EPS_R = 1e-6f;  // verification tol
-
-  //--------------------------------------------------------------
-
-  SumNorm* d_sum_norm            = nullptr;
-  Candidate4* d_candidate_buffer = nullptr;
-  //    float* c_query = nullptr;
-  //    int* d_starts = nullptr;
-
   explicit SearcherGPU(raft::resources const& handle,
                        const float* q,
                        size_t d,
@@ -106,7 +48,7 @@ class SearcherGPU {
                        std::string mode          = "",
                        bool rabitq_quantize_flag = true);
 
-  ~SearcherGPU() { destroy(); }
+  SearcherGPU(SearcherGPU&& other) = default;
 
   /**
    * @brief malloc temp search space in GPU memory
@@ -123,6 +65,36 @@ class SearcherGPU {
                              size_t k,
                              size_t max_nprobes,
                              size_t max_cluster_length);
+
+  // Getter methods
+  int get_direct_num() { return direct_num_; }
+  int get_sort_num() { return sort_num_; }
+  std::string const& get_mode() { return mode_; }
+  raft::device_vector<float, int64_t>& get_unit_q_gpu() { return unit_q_gpu_; }
+  raft::device_vector<float, int64_t>& get_ip_results() { return ip_results_; }
+  raft::device_vector<float, int64_t>& get_est_dis() { return est_dis_; }
+  raft::device_vector<float, int64_t>& get_top_ip() { return top_ip_; }
+  raft::device_vector<PID, int64_t>& get_top_pids() { return top_pids_; }
+  raft::device_vector<int, int64_t>& get_top_idx() { return top_idx_; }
+  raft::device_vector<float, int64_t>& get_ip2() { return ip2_; }
+  raft::device_vector<Candidate3, int64_t>& get_buf() { return buf_; }
+  float* get_centroid_distances() { return centroid_distances_.data_handle(); }
+  float* get_c_norms() { return c_norms_.data_handle(); }
+  float* get_q_norms() { return q_norms_.data_handle(); }
+  raft::device_vector<SumNorm, int64_t>& get_sum_norm() { return sum_norm_; }
+  raft::device_vector<Candidate4, int64_t>& get_candidate_buffer() { return candidate_buffer_; }
+
+  // Setter methods
+  void set_query(const float* query) { query_ = query; }
+  void set_quant_query(int16_t* quant_query)
+  {
+    quant_query_ = std::unique_ptr<int16_t, decltype(std::free)*>(quant_query, std::free);
+  }  // quant_query must be allocated with `malloc` or similar, as opposed to `new`
+  void set_unit_q(float* unit_q)
+  {
+    unit_q_ = std::unique_ptr<float, decltype(std::free)*>(unit_q, std::free);
+  }  // unit_q must be allocated with `malloc` or similar, as opposed to `new`
+  void set_filter_distk(const float filter_distk) { filter_distk_ = filter_distk; }
 
   /**
    * @brief Search one of the IVF Cluster
@@ -181,12 +153,12 @@ class SearcherGPU {
                                                 DeviceResultPool& KNNs,
                                                 float* centroid_data);
 
-  static SearcherGPU* CreateNewSearcherforStream(size_t d,
+  static SearcherGPU* CreateNewSearcherforStream(raft::resources const& handle,
+                                                 size_t d,
                                                  size_t ex_bits,
                                                  size_t num_clusters,
                                                  size_t num_vectors,
-                                                 size_t k,
-                                                 rmm::cuda_stream_view stream);
+                                                 size_t k);
 
   /**
    * @brief Function to Search <cluster_id, query_id> pairs
@@ -268,22 +240,70 @@ class SearcherGPU {
   raft::resources const& handle_;  // reusable resource handle
   rmm::cuda_stream_view stream_;   // CUDA stream obtained from handle_
   //    float* uint_q = nullptr;
-  void destroy() noexcept;
+  size_t D;                       // number of dimension
+  const float* query_ = nullptr;  // rotated query (non-owning)
+  std::unique_ptr<int16_t, decltype(std::free)*> quant_query_ = {
+    nullptr, std::free};  // quantized query (to 2 bytes)
+  std::unique_ptr<float, decltype(std::free)*> unit_q_ = {nullptr, std::free};
+  int shift_;
+  float delta_ = 0;  // quantized related
+  float sumq_;
+  float one_over_sqrtD_ = 0;  // 1/sqrt(D)
+  int FAC_RESCALE_      = 0;
+  float filter_distk_   = INFINITY;
+  int direct_num_       = 0;
+  int sort_num_         = 0;
+  bool rabitq_quantize_flag_;
+  std::string mode_;
 
-  /* ---------- tiny helpers ---------- */
-  inline void safeCudaFreeAsync(void* p) noexcept
-  {
-    if (p) RAFT_CUDA_TRY_NO_THROW(cudaFreeAsync(p, stream_));  // ignore error in a noexcept dtor
-  }
-  template <typename T>
-  static inline void safeHostFree(T*& p) noexcept
-  {
-    if (p) {
-      /* replace with delete[] if you used new[] */
-      std::free(p);
-      p = nullptr;
-    }
-  }
+  // Additional preparation to avoid repeatedly malloc space among different probes
+  // will be more if using multiple clusters method
+  raft::device_vector<float, int64_t> unit_q_gpu_ =
+    raft::make_device_vector<float, int64_t>(handle_, 0);
+  raft::device_vector<float, int64_t> ip_results_ = raft::make_device_vector<float, int64_t>(
+    handle_, 0);  // will be more if using multiple clusters method
+  raft::device_vector<float, int64_t> est_dis_ =
+    raft::make_device_vector<float, int64_t>(handle_, 0);
+  raft::device_vector<float, int64_t> top_ip_ =
+    raft::make_device_vector<float, int64_t>(handle_, 0);
+  raft::device_vector<PID, int64_t> top_pids_ = raft::make_device_vector<PID, int64_t>(handle_, 0);
+  raft::device_vector<int, int64_t> top_idx_  = raft::make_device_vector<int, int64_t>(handle_, 0);
+  raft::device_vector<float, int64_t> ip2_ = raft::make_device_vector<float, int64_t>(handle_, 0);
+  raft::device_vector<Candidate3, int64_t> buf_ =
+    raft::make_device_vector<Candidate3, int64_t>(handle_, 0);
+
+  raft::host_vector<float, int64_t> ip_results_host_ = raft::make_host_vector<float, int64_t>(0);
+  raft::host_vector<float, int64_t> est_dis_host_    = raft::make_host_vector<float, int64_t>(0);
+
+  // batch
+  raft::device_vector<float, int64_t> centroid_distances_ =
+    raft::make_device_vector<float, int64_t>(
+      handle_, 0);  // stores distances between centroids and queries (l2 square)
+  raft::device_vector<float, int64_t> c_norms_ =
+    raft::make_device_vector<float, int64_t>(handle_, 0);  // centroid norms
+  raft::device_vector<float, int64_t> q_norms_ =
+    raft::make_device_vector<float, int64_t>(handle_, 0);  // query norms
+  std::vector<DeviceResultPool>
+    topk_results;  // TODO: Change the vectors into a whole array on the GPU
+
+  // quantization for queries
+  float best_rescaling_factor = 0.0f;
+
+  // additional for multiple cluster search！！！！！！
+
+  // constexpr int  K      = 20000;  // total centroids in memory
+  // constexpr int  ITER   = 20;     // timing iterations
+  // constexpr int  BLOCK  = 256;    // baseline / warp256 block‑dim
+  // constexpr float EPS_R = 1e-6f;  // verification tol
+
+  //--------------------------------------------------------------
+
+  raft::device_vector<SumNorm, int64_t> sum_norm_ =
+    raft::make_device_vector<SumNorm, int64_t>(handle_, 0);
+  raft::device_vector<Candidate4, int64_t> candidate_buffer_ =
+    raft::make_device_vector<Candidate4, int64_t>(handle_, 0);
+  //    float* c_query = nullptr;
+  //    int* d_starts = nullptr;
 
   void SearchClusterWithFilterMemOptBoundedKNN(const IVFGPU& cur_ivf,
                                                const IVFGPU::GPUClusterMeta& cur_cluster,
