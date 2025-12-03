@@ -15,7 +15,7 @@ from cuvs.tests.ann_utils import calc_recall
 @pytest.mark.parametrize("n_rows", [1024, 2048])
 @pytest.mark.parametrize("n_cols", [32, 64])
 @pytest.mark.parametrize("device_memory", [True, False])
-@pytest.mark.parametrize("dtype", [np.float32])
+@pytest.mark.parametrize("dtype", [np.float32, np.float16])
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("return_distances", [True, False])
 def test_nn_descent(
