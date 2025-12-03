@@ -269,15 +269,6 @@ __global__ void compute_ip_kernel_fp32(const float* __restrict__ quant_query_fp3
 
     ip_results[warp_id] = ip_xb_prime;
     est_dis[warp_id]    = result;
-#ifdef DEBUG_MULTIPLE_SEARCH
-    if (warp_id > 270 && warp_id < 275)
-      printf("warp id: %d, word: %x, ip_xb_prime: %f, result: %f, onorm: %f\n",
-             warp_id,
-             block[0],
-             ip_xb_prime,
-             result,
-             onorm);
-#endif
   }
 }
 
@@ -536,20 +527,6 @@ __global__ void refine_with_ip2_kernel(float* d_top_dist,
   // 6) apply refinement formula:
   float refined = onorm * onorm + sqr_y -
                   xip * (sqrt(sqr_y)) * (FAC_RESCALE * approx + ip2 - (FAC_RESCALE - 0.5f) * sumq);
-#ifdef DEBUG_MULTIPLE_SEARCH
-  printf(
-    "onorm_ori_refine: %f, sqr_y_ori: %f, xip_ori: %f, approx_ori: %f, sumq_ori: %f, ip2_ori: %f, "
-    "ip_ori: %f, idx in cluster and refined dis: %d %f\n",
-    onorm,
-    sqr_y,
-    xip,
-    approx,
-    sumq,
-    ip2,
-    d_top_dist[tid],
-    vid,
-    refined);
-#endif
 
   // 7) store back:
   d_top_dist[tid] = refined;
@@ -1041,15 +1018,7 @@ __global__ void compute_long_ip_kernel(const float* unit_q,
   }
 
   // Write result:
-  if (lane == 0) {
-    d_ip2[warpId] = partial;
-#ifdef DEBUG_MULTIPLE_SEARCH
-//        if (vid == 925) {
-//            printf("first four codes of uint8_t: %d, %d, %d, %d\n", codes[0], codes[1], codes[2],
-//            codes[3]);
-//        }
-#endif
-  }
+  if (lane == 0) { d_ip2[warpId] = partial; }
 }
 
 // In this implementation, we directly compute the inner product between 1-bit rabitq codes and
@@ -1434,7 +1403,7 @@ SearcherGPU::SearcherGPU(raft::resources const& handle,
                          const float* q,
                          size_t d,
                          size_t ex_bits,
-                         std::string mode ,
+                         std::string mode,
                          DataQuantizerGPU::FastQuantizeFactors* fast_quantize_factors,
                          bool rabitq_quantize_flag)
   : D(d),
@@ -1450,12 +1419,12 @@ SearcherGPU::SearcherGPU(raft::resources const& handle,
   set_quant_query(memory::align_mm<64, int16_t>(D * sizeof(int16_t)));
   filter_distk_ = INFINITY;
   if (mode_ == "quant4" && fast_quantize_factors != nullptr) {
-    best_rescaling_factor = fast_quantize_factors->const_scaling_factor_4bit;  // suppose that always quantize query to 4 bits (1 + 3) per dim
-  }
-  else if (mode_ == "quant8" && fast_quantize_factors != nullptr) {
+    best_rescaling_factor =
+      fast_quantize_factors->const_scaling_factor_4bit;  // suppose that always quantize query to 4
+                                                         // bits (1 + 3) per dim
+  } else if (mode_ == "quant8" && fast_quantize_factors != nullptr) {
     best_rescaling_factor = fast_quantize_factors->const_scaling_factor_8bit;
-  }
-  else if (!fast_quantize_factors && (mode_ == "quant4" || mode_ == "quant8")) {
+  } else if (!fast_quantize_factors && (mode_ == "quant4" || mode_ == "quant8")) {
     std::cerr << "ERROR: fast_quantize_factors must be set for quant4/quant8 mode" << std::endl;
   }
   raft::resource::sync_stream(handle);
@@ -2268,38 +2237,20 @@ void SearcherGPU::SearchClusterWithFilter(const IVFGPU& cur_ivf,
                                           float* centroid_data)
 {
   // related information
-#ifdef COUNT_CLUSTER_TIME
-  struct StepStat {
-    std::string name;
-    double ms = 0;
-  };
-  std::vector<StepStat> stats;  // push in call order
-#endif
   size_t num_vector_cluster         = cur_cluster.num;
   size_t num_dimensions             = cur_ivf.get_num_padded_dim();
   uint32_t* rabitq_codes_and_factor = cur_cluster.first_block(cur_ivf);
   PID* ids                          = cur_cluster.ids(cur_ivf);
 
   //--------------------------------------------------------
-// A) host-side scalar preparation
-//--------------------------------------------------------
-#ifdef COUNT_CLUSTER_TIME
-  CpuTimer cpu;
-  cpu.start();
-#endif
+  // A) host-side scalar preparation
+  //--------------------------------------------------------
   float y      = std::sqrt(sqr_y);
   this->shift_ = 0;
   this->sumq_  = normalize_query16_scalar(unit_q_.get(), query_, centroid_data, y, D);
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"host-prep", cpu.stop()});
-#endif
-//--------------------------------------------------------
-// B) H2D copies of query + buffers (GPU time)
-//--------------------------------------------------------
-#ifdef COUNT_CLUSTER_TIME
-  GpuTimer gt;
-  gt.start(stream_);
-#endif
+  //--------------------------------------------------------
+  // B) H2D copies of query + buffers (GPU time)
+  //--------------------------------------------------------
   float* unit_q_gpu = nullptr;
   RAFT_CUDA_TRY(cudaMallocAsync(&unit_q_gpu, sizeof(float) * num_dimensions, stream_));
   raft::copy(unit_q_gpu, unit_q_.get(), num_dimensions, stream_);
@@ -2310,16 +2261,9 @@ void SearcherGPU::SearchClusterWithFilter(const IVFGPU& cur_ivf,
   float* est_dis    = nullptr;
   RAFT_CUDA_TRY(cudaMallocAsync(&ip_results, sizeof(float) * num_vector_cluster, stream_));
   RAFT_CUDA_TRY(cudaMallocAsync(&est_dis, sizeof(float) * num_vector_cluster, stream_));
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"copy-query-H2D", gt.stop(stream_)});
-#endif
   //--------------------------------------------------------
   // C) IP kernel
   //--------------------------------------------------------
-
-#ifdef COUNT_CLUSTER_TIME
-  gt.start(stream_);
-#endif
   int threadsPerBlock = 256;  // must be a multiple of 32
   int warpsPerBlock   = threadsPerBlock / 32;
   int grid            = (num_vector_cluster + warpsPerBlock - 1) / warpsPerBlock;
@@ -2336,14 +2280,8 @@ void SearcherGPU::SearchClusterWithFilter(const IVFGPU& cur_ivf,
     y,
     one_over_sqrtD_);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"kernel-ip", gt.stop(stream_)});
-#endif
 
   // (D) apply filters and restore K
-#ifdef COUNT_CLUSTER_TIME
-  gt.start(stream_);
-#endif
   //    printf("trying to filter and gather...");
   size_t M  = 10;  // multiples of 10 temporally
   size_t KM = M * KNNs.capacity;
@@ -2372,11 +2310,8 @@ void SearcherGPU::SearchClusterWithFilter(const IVFGPU& cur_ivf,
                                      d_top_pids,
                                      d_top_idx,
                                      stream_);
-//    int written = fused_filter_gather(est_dis, ip_results, ids, num_vector_cluster, KM,
-//    h_filter_distk, d_top_ip, d_top_pids, d_top_idx, stream);
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"kernel-filter-select_topk*m", gt.stop(stream_)});
-#endif
+  //    int written = fused_filter_gather(est_dis, ip_results, ids, num_vector_cluster, KM,
+  //    h_filter_distk, d_top_ip, d_top_pids, d_top_idx, stream);
 
   //    int written = (int)selectTopKM(est_dis, ip_results, ids,
   //            num_vector_cluster,
@@ -2386,22 +2321,19 @@ void SearcherGPU::SearchClusterWithFilter(const IVFGPU& cur_ivf,
   //            stream);
 
   // original correct version
-//    select_topk_m_inplace(            // unchanged API, but it calls kernels ↦ must take stream
-//    too
-//            est_dis, ids, ip_results,
-//            num_vector_cluster,
-//            KNNs->capacity, M,
-//            d_top_ip, d_top_pids, d_top_idx,
-//            stream                           // <-- add parameter inside that function
-//    );
-//    written = KM;
-//    printf("written: %d\n", written);
-//--------------------------------------------------------
-// E) long-code IP kernel
-//--------------------------------------------------------
-#ifdef COUNT_CLUSTER_TIME
-  gt.start(stream_);
-#endif
+  //    select_topk_m_inplace(            // unchanged API, but it calls kernels ↦ must take stream
+  //    too
+  //            est_dis, ids, ip_results,
+  //            num_vector_cluster,
+  //            KNNs->capacity, M,
+  //            d_top_ip, d_top_pids, d_top_idx,
+  //            stream                           // <-- add parameter inside that function
+  //    );
+  //    written = KM;
+  //    printf("written: %d\n", written);
+  //--------------------------------------------------------
+  // E) long-code IP kernel
+  //--------------------------------------------------------
   float* d_ip2;
   RAFT_CUDA_TRY(cudaMallocAsync(&d_ip2, sizeof(float) * KM, stream_));
 
@@ -2416,15 +2348,9 @@ void SearcherGPU::SearchClusterWithFilter(const IVFGPU& cur_ivf,
     cur_ivf.quantizer().long_code_length(),
     d_ip2);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"kernel-long_ip", gt.stop(stream_)});
-#endif
-//--------------------------------------------------------
-// F) refine kernel
-//--------------------------------------------------------
-#ifdef COUNT_CLUSTER_TIME
-  gt.start(stream_);
-#endif
+  //--------------------------------------------------------
+  // F) refine kernel
+  //--------------------------------------------------------
   int threads = 256;
   int blocks  = (written + threads - 1) / threads;
   // now d_top_dist is top ip instead
@@ -2441,16 +2367,10 @@ void SearcherGPU::SearchClusterWithFilter(const IVFGPU& cur_ivf,
     cur_cluster.ex_factor(cur_ivf, 0),
     cur_ivf.quantizer().num_short_factors());
   RAFT_CUDA_TRY(cudaPeekAtLastError());
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"kernel-refine", gt.stop(stream_)});
-#endif
 
-//--------------------------------------------------------
-// G) D2H copy + write_topk_to_pool  (host work)
-//--------------------------------------------------------
-#ifdef COUNT_CLUSTER_TIME
-  gt.start(stream_);
-#endif
+  //--------------------------------------------------------
+  // G) D2H copy + write_topk_to_pool  (host work)
+  //--------------------------------------------------------
   //    cpu.start();
   //    printf("writing back results... \n");
   if (written > KNNs.capacity) {
@@ -2478,29 +2398,7 @@ void SearcherGPU::SearchClusterWithFilter(const IVFGPU& cur_ivf,
   //    printf("writing finished \n");
 
   // TODO: update h_filter
-//   f write_ms = gt.stop();
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"select_final_topk_write_back", gt.stop()});
-
-  //--------------------------------------------------------
-  // H)  final report (once per probe or outside the OMP loop)
-  //--------------------------------------------------------
-  double total_ms = 0.0;
-  for (auto& s : stats)
-    total_ms += s.ms;
-
-  std::cout << "\n---- SearchCluster timing ----\n";
-  std::cout << std::left << std::setw(22) << "Step" << std::right << std::setw(12) << "ms"
-            << std::setw(10) << "%" << '\n';
-
-  for (auto& s : stats) {
-    std::cout << std::left << std::setw(22) << s.name << std::right << std::setw(12) << std::fixed
-              << std::setprecision(3) << s.ms << std::setw(9) << std::fixed << std::setprecision(1)
-              << (s.ms * 100.0 / total_ms) << '\n';
-  }
-  std::cout << std::left << std::setw(22) << "TOTAL" << std::right << std::setw(12) << std::fixed
-            << std::setprecision(3) << total_ms << '\n';
-#endif
+  //   f write_ms = gt.stop();
 
   //    RAFT_CUDA_TRY(cudaFree(quant_query_gpu));
   //    RAFT_CUDA_TRY(cudaFree(rotated_query_gpu));
@@ -2535,53 +2433,29 @@ void SearcherGPU::SearchClusterWithFilterMemOptOffload(const IVFGPU& cur_ivf,
                                                        float* centroid_data)
 {
   // related information
-#ifdef COUNT_CLUSTER_TIME
-  struct StepStat {
-    std::string name;
-    double ms = 0;
-  };
-  std::vector<StepStat> stats;  // push in call order
-#endif
   size_t num_vector_cluster         = cur_cluster.num;
   size_t num_dimensions             = cur_ivf.get_num_padded_dim();
   uint32_t* rabitq_codes_and_factor = cur_cluster.first_block(cur_ivf);
   PID* ids                          = cur_cluster.ids(cur_ivf);
 
   //--------------------------------------------------------
-// A) host-side scalar preparation
-//--------------------------------------------------------
-#ifdef COUNT_CLUSTER_TIME
-  CpuTimer cpu;
-  cpu.start();
-#endif
+  // A) host-side scalar preparation
+  //--------------------------------------------------------
   float y      = std::sqrt(sqr_y);
   this->shift_ = 0;
   this->sumq_  = normalize_query16_scalar(unit_q_.get(), query_, centroid_data, y, D);
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"host-prep", cpu.stop()});
-#endif
-//--------------------------------------------------------
-// B) H2D copies of query + buffers (GPU time)
-//--------------------------------------------------------
-#ifdef COUNT_CLUSTER_TIME
-  GpuTimer gt;
-  gt.start(stream_);
-#endif
+  //--------------------------------------------------------
+  // B) H2D copies of query + buffers (GPU time)
+  //--------------------------------------------------------
   raft::copy(unit_q_gpu_.data_handle(), unit_q_.get(), num_dimensions, stream_);
   //    cudaMallocAsync(&quant_query_gpu, sizeof(int16_t) * D, stream);
   //    cudaMemcpyAsync(quant_query_gpu, quant_query,
   //                    sizeof(int16_t) * D, cudaMemcpyHostToDevice, stream);
 
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"copy-query-H2D", gt.stop(stream_)});
-#endif
   //--------------------------------------------------------
   // C) IP kernel
   //--------------------------------------------------------
 
-#ifdef COUNT_CLUSTER_TIME
-  gt.start(stream_);
-#endif
   int threadsPerBlock = 256;  // must be a multiple of 32
   int warpsPerBlock   = threadsPerBlock / 32;
   int grid            = (num_vector_cluster + warpsPerBlock - 1) / warpsPerBlock;
@@ -2599,13 +2473,6 @@ void SearcherGPU::SearchClusterWithFilterMemOptOffload(const IVFGPU& cur_ivf,
     one_over_sqrtD_);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"kernel-ip", gt.stop(stream_)});
-#endif
-
-#ifdef COUNT_CLUSTER_TIME
-  gt.start(stream_);
-#endif
   // copy data offload to CPU;
   ip_results_host_ = raft::make_host_vector<float, int64_t>(num_vector_cluster);
   est_dis_host_    = raft::make_host_vector<float, int64_t>(num_vector_cluster);
@@ -2614,14 +2481,6 @@ void SearcherGPU::SearchClusterWithFilterMemOptOffload(const IVFGPU& cur_ivf,
   raft::copy(est_dis_host_.data_handle(), est_dis_.data_handle(), num_vector_cluster, stream_);
   RAFT_CUDA_TRY(cudaDeviceSynchronize());
   // (D) apply filters and restore K
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"copy back data from GPU to CPU:", gt.stop(stream_)});
-#endif
-
-#ifdef COUNT_CLUSTER_TIME
-  cpu.start();
-  int count = 0;
-#endif
   for (size_t i = 0; i < num_vector_cluster; ++i) {
     if (est_dis_host_(i) < filter_distk_) {
       // get long codes
@@ -2634,9 +2493,6 @@ void SearcherGPU::SearchClusterWithFilterMemOptOffload(const IVFGPU& cur_ivf,
         uint32_t c = extract_code_cpu(codes, j, cur_ivf.get_ex_bits());
         ip2 += float(c) * unit_q_.get()[j];
       }
-#ifdef COUNT_CLUSTER_TIME
-      count++;
-#endif
       // refine the final distances
       size_t short_block_bytes_in_uint32 =
         cur_ivf.quantizer().short_code_length() + cur_ivf.quantizer().num_short_factors();
@@ -2653,35 +2509,8 @@ void SearcherGPU::SearchClusterWithFilterMemOptOffload(const IVFGPU& cur_ivf,
     }
   }
 
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"CPU-side filter and get dis with ex bits", cpu.stop()});
-#endif
-
   // Note: Merge results outside this function
 
-#ifdef COUNT_CLUSTER_TIME
-  //    stats.push_back({"select_final_topk_write_back",  gt.stop()});
-
-  //--------------------------------------------------------
-  // H)  final report (once per probe or outside the OMP loop)
-  //--------------------------------------------------------
-  double total_ms = 0.0;
-  for (auto& s : stats)
-    total_ms += s.ms;
-
-  std::cout << "\n---- SearchCluster timing ----\n";
-  printf("num of vectors after filtering: %d\n", count);
-  std::cout << std::left << std::setw(22) << "Step" << std::right << std::setw(12) << "ms"
-            << std::setw(10) << "%" << '\n';
-
-  for (auto& s : stats) {
-    std::cout << std::left << std::setw(22) << s.name << std::right << std::setw(12) << std::fixed
-              << std::setprecision(3) << s.ms << std::setw(9) << std::fixed << std::setprecision(1)
-              << (s.ms * 100.0 / total_ms) << '\n';
-  }
-  std::cout << std::left << std::setw(22) << "TOTAL" << std::right << std::setw(12) << std::fixed
-            << std::setprecision(3) << total_ms << '\n';
-#endif
   //    RAFT_CUDA_TRY(cudaGetLastError());
   //    RAFT_CUDA_TRY(cudaFree(quant_query_gpu));
   //    RAFT_CUDA_TRY(cudaFree(rotated_query_gpu));
@@ -2696,53 +2525,28 @@ void SearcherGPU::SearchClusterWithFilterMemOpt(const IVFGPU& cur_ivf,
                                                 float* centroid_data)
 {
   // related information
-#ifdef COUNT_CLUSTER_TIME
-  struct StepStat {
-    std::string name;
-    double ms = 0;
-  };
-  std::vector<StepStat> stats;  // push in call order
-#endif
   size_t num_vector_cluster         = cur_cluster.num;
   size_t num_dimensions             = cur_ivf.get_num_padded_dim();
   uint32_t* rabitq_codes_and_factor = cur_cluster.first_block(cur_ivf);
   PID* ids                          = cur_cluster.ids(cur_ivf);
 
   //--------------------------------------------------------
-// A) host-side scalar preparation
-//--------------------------------------------------------
-#ifdef COUNT_CLUSTER_TIME
-  CpuTimer cpu;
-  cpu.start();
-#endif
+  // A) host-side scalar preparation
+  //--------------------------------------------------------
   float y      = std::sqrt(sqr_y);
   this->shift_ = 0;
   this->sumq_  = normalize_query16_scalar(unit_q_.get(), query_, centroid_data, y, D);
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"host-prep", cpu.stop()});
-#endif
-//--------------------------------------------------------
-// B) H2D copies of query + buffers (GPU time)
-//--------------------------------------------------------
-#ifdef COUNT_CLUSTER_TIME
-  GpuTimer gt;
-  gt.start(stream_);
-#endif
+  //--------------------------------------------------------
+  // B) H2D copies of query + buffers (GPU time)
+  //--------------------------------------------------------
   raft::copy(unit_q_gpu_.data_handle(), unit_q_.get(), num_dimensions, stream_);
   //    cudaMallocAsync(&quant_query_gpu, sizeof(int16_t) * D, stream);
   //    cudaMemcpyAsync(quant_query_gpu, quant_query,
   //                    sizeof(int16_t) * D, cudaMemcpyHostToDevice, stream);
 
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"copy-query-H2D", gt.stop(stream_)});
-#endif
   //--------------------------------------------------------
   // C) IP kernel
   //--------------------------------------------------------
-
-#ifdef COUNT_CLUSTER_TIME
-  gt.start(stream_);
-#endif
   int threadsPerBlock = 256;  // must be a multiple of 32
   int warpsPerBlock   = threadsPerBlock / 32;
   int grid            = (num_vector_cluster + warpsPerBlock - 1) / warpsPerBlock;
@@ -2760,14 +2564,7 @@ void SearcherGPU::SearchClusterWithFilterMemOpt(const IVFGPU& cur_ivf,
     one_over_sqrtD_);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"kernel-ip", gt.stop(stream_)});
-#endif
-
   // (D) apply filters and restore K
-#ifdef COUNT_CLUSTER_TIME
-  gt.start(stream_);
-#endif
   //    printf("trying to filter and gather...");
   size_t M  = 10;  // multiples of 10 temporally
   size_t KM = M * KNNs.capacity;
@@ -2799,10 +2596,6 @@ void SearcherGPU::SearchClusterWithFilterMemOpt(const IVFGPU& cur_ivf,
     return;
   }
 
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"kernel-filter-select_topk*m", gt.stop(stream_)});
-#endif
-
   //    int written = (int)selectTopKM(est_dis, ip_results, ids,
   //            num_vector_cluster,
   //            KM,                      // TOPK * M
@@ -2811,23 +2604,19 @@ void SearcherGPU::SearchClusterWithFilterMemOpt(const IVFGPU& cur_ivf,
   //            stream);
 
   // original correct version
-//    select_topk_m_inplace(            // unchanged API, but it calls kernels ↦ must take stream
-//    too
-//            est_dis, ids, ip_results,
-//            num_vector_cluster,
-//            KNNs->capacity, M,
-//            d_top_ip, d_top_pids, d_top_idx,
-//            stream                           // <-- add parameter inside that function
-//    );
-//    written = KM;
-//    printf("written: %d\n", written);
-//--------------------------------------------------------
-// E) long-code IP kernel
-//--------------------------------------------------------
-#ifdef COUNT_CLUSTER_TIME
-  gt.start(stream_);
-#endif
-
+  //    select_topk_m_inplace(            // unchanged API, but it calls kernels ↦ must take stream
+  //    too
+  //            est_dis, ids, ip_results,
+  //            num_vector_cluster,
+  //            KNNs->capacity, M,
+  //            d_top_ip, d_top_pids, d_top_idx,
+  //            stream                           // <-- add parameter inside that function
+  //    );
+  //    written = KM;
+  //    printf("written: %d\n", written);
+  //--------------------------------------------------------
+  // E) long-code IP kernel
+  //--------------------------------------------------------
   grid = (written + warpsPerBlock - 1) / warpsPerBlock;
   compute_long_ip_kernel<<<grid, threadsPerBlock, 0, stream_>>>(
     unit_q_gpu_.data_handle(),
@@ -2840,15 +2629,9 @@ void SearcherGPU::SearchClusterWithFilterMemOpt(const IVFGPU& cur_ivf,
     ip2_.data_handle());
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"kernel-long_ip", gt.stop(stream_)});
-#endif
-//--------------------------------------------------------
-// F) refine kernel
-//--------------------------------------------------------
-#ifdef COUNT_CLUSTER_TIME
-  gt.start(stream_);
-#endif
+  //--------------------------------------------------------
+  // F) refine kernel
+  //--------------------------------------------------------
   int threads = 256;
   int blocks  = (written + threads - 1) / threads;
   // now d_top_dist is top ip instead
@@ -2866,16 +2649,9 @@ void SearcherGPU::SearchClusterWithFilterMemOpt(const IVFGPU& cur_ivf,
     cur_ivf.quantizer().num_short_factors());
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"kernel-refine", gt.stop(stream_)});
-#endif
-
-//--------------------------------------------------------
-// G) D2H copy + write_topk_to_pool  (host work)
-//--------------------------------------------------------
-#ifdef COUNT_CLUSTER_TIME
-  gt.start(stream_);
-#endif
+  //--------------------------------------------------------
+  // G) D2H copy + write_topk_to_pool  (host work)
+  //--------------------------------------------------------
   //    cpu.start();
   //    printf("writing back results... \n");
   if (written > KNNs.capacity) {
@@ -2901,51 +2677,10 @@ void SearcherGPU::SearchClusterWithFilterMemOpt(const IVFGPU& cur_ivf,
     KNNs.size = written;
   }
 
-#ifdef DEBUG_MULTIPLE_SEARCH
-  // copy back KNNs from a device and print data inside
-  DeviceResultPool host_knns;
-  host_knns.capacity  = KNNs[0].capacity;
-  host_knns.distances = (float*)malloc(sizeof(float) * KNNs[0].capacity);
-  host_knns.ids       = (uint32_t*)malloc(sizeof(uint32_t) * KNNs[0].capacity);
-  RAFT_CUDA_TRY(cudaMemcpy(host_knns.distances,
-                           KNNs[0].distances,
-                           sizeof(float) * KNNs[0].capacity,
-                           cudaMemcpyDeviceToHost));
-  RAFT_CUDA_TRY(cudaMemcpy(
-    host_knns.ids, KNNs[0].ids, sizeof(uint32_t) * KNNs[0].capacity, cudaMemcpyDeviceToHost));
-  for (int i = 0; i < KNNs[0].size; i++) {
-    printf("dist-ori: %f\n", host_knns.distances[i]);
-    printf("id-ori: %d\n", host_knns.ids[i]);
-  }
-  free(host_knns.distances);
-  free(host_knns.ids);
-#endif
   //    printf("writing finished \n");
 
   // TODO: update h_filter
-//   f write_ms = gt.stop();
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"select_final_topk_write_back", gt.stop()});
-
-  //--------------------------------------------------------
-  // H)  final report (once per probe or outside the OMP loop)
-  //--------------------------------------------------------
-  double total_ms = 0.0;
-  for (auto& s : stats)
-    total_ms += s.ms;
-
-  std::cout << "\n---- SearchCluster timing ----\n";
-  std::cout << std::left << std::setw(22) << "Step" << std::right << std::setw(12) << "ms"
-            << std::setw(10) << "%" << '\n';
-
-  for (auto& s : stats) {
-    std::cout << std::left << std::setw(22) << s.name << std::right << std::setw(12) << std::fixed
-              << std::setprecision(3) << s.ms << std::setw(9) << std::fixed << std::setprecision(1)
-              << (s.ms * 100.0 / total_ms) << '\n';
-  }
-  std::cout << std::left << std::setw(22) << "TOTAL" << std::right << std::setw(12) << std::fixed
-            << std::setprecision(3) << total_ms << '\n';
-#endif
+  //   f write_ms = gt.stop();
   //    RAFT_CUDA_TRY(cudaGetLastError());
   //    RAFT_CUDA_TRY(cudaFree(quant_query_gpu));
   //    RAFT_CUDA_TRY(cudaFree(rotated_query_gpu));
@@ -3044,53 +2779,28 @@ void SearcherGPU::SearchClusterWithFilterMemOptOneforMulti(
   float* centroid_data)
 {
   // related information
-#ifdef COUNT_CLUSTER_TIME
-  struct StepStat {
-    std::string name;
-    double ms = 0;
-  };
-  std::vector<StepStat> stats;  // push in call order
-#endif
   size_t num_vector_cluster         = cur_cluster.num;
   size_t num_dimensions             = cur_ivf.get_num_padded_dim();
   uint32_t* rabitq_codes_and_factor = cur_cluster.first_block(cur_ivf);
   PID* ids                          = cur_cluster.ids(cur_ivf);
 
   //--------------------------------------------------------
-// A) host-side scalar preparation
-//--------------------------------------------------------
-#ifdef COUNT_CLUSTER_TIME
-  CpuTimer cpu;
-  cpu.start();
-#endif
+  // A) host-side scalar preparation
+  //--------------------------------------------------------
   float y      = std::sqrt(sqr_y);
   this->shift_ = 0;
   this->sumq_  = normalize_query16_scalar(unit_q_.get(), query_, centroid_data, y, D);
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"host-prep", cpu.stop()});
-#endif
-//--------------------------------------------------------
-// B) H2D copies of query + buffers (GPU time)
-//--------------------------------------------------------
-#ifdef COUNT_CLUSTER_TIME
-  GpuTimer gt;
-  gt.start(stream_);
-#endif
+  //--------------------------------------------------------
+  // B) H2D copies of query + buffers (GPU time)
+  //--------------------------------------------------------
   raft::copy(unit_q_gpu_.data_handle(), unit_q_.get(), num_dimensions, stream_);
   //    cudaMallocAsync(&quant_query_gpu, sizeof(int16_t) * D, stream);
   //    cudaMemcpyAsync(quant_query_gpu, quant_query,
   //                    sizeof(int16_t) * D, cudaMemcpyHostToDevice, stream);
 
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"copy-query-H2D", gt.stop(stream_)});
-#endif
   //--------------------------------------------------------
   // C) IP kernel
   //--------------------------------------------------------
-
-#ifdef COUNT_CLUSTER_TIME
-  gt.start(stream_);
-#endif
   int threadsPerBlock = 256;  // must be a multiple of 32
   int warpsPerBlock   = threadsPerBlock / 32;
   int grid            = (num_vector_cluster + warpsPerBlock - 1) / warpsPerBlock;
@@ -3108,14 +2818,7 @@ void SearcherGPU::SearchClusterWithFilterMemOptOneforMulti(
     one_over_sqrtD_);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"kernel-ip", gt.stop(stream_)});
-#endif
-
   // (D) apply filters and restore K
-#ifdef COUNT_CLUSTER_TIME
-  gt.start(stream_);
-#endif
   //    printf("trying to filter and gather...");
   size_t M  = 10;  // multiples of 10 temporally
   size_t KM = M * KNNs.capacity;
@@ -3147,10 +2850,6 @@ void SearcherGPU::SearchClusterWithFilterMemOptOneforMulti(
     return;
   }
 
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"kernel-filter-select_topk*m", gt.stop(stream_)});
-#endif
-
   //    int written = (int)selectTopKM(est_dis, ip_results, ids,
   //            num_vector_cluster,
   //            KM,                      // TOPK * M
@@ -3159,23 +2858,19 @@ void SearcherGPU::SearchClusterWithFilterMemOptOneforMulti(
   //            stream);
 
   // original correct version
-//    select_topk_m_inplace(            // unchanged API, but it calls kernels ↦ must take stream
-//    too
-//            est_dis, ids, ip_results,
-//            num_vector_cluster,
-//            KNNs->capacity, M,
-//            d_top_ip, d_top_pids, d_top_idx,
-//            stream                           // <-- add parameter inside that function
-//    );
-//    written = KM;
-//    printf("written: %d\n", written);
-//--------------------------------------------------------
-// E) long-code IP kernel
-//--------------------------------------------------------
-#ifdef COUNT_CLUSTER_TIME
-  gt.start(stream_);
-#endif
-
+  //    select_topk_m_inplace(            // unchanged API, but it calls kernels ↦ must take stream
+  //    too
+  //            est_dis, ids, ip_results,
+  //            num_vector_cluster,
+  //            KNNs->capacity, M,
+  //            d_top_ip, d_top_pids, d_top_idx,
+  //            stream                           // <-- add parameter inside that function
+  //    );
+  //    written = KM;
+  //    printf("written: %d\n", written);
+  //--------------------------------------------------------
+  // E) long-code IP kernel
+  //--------------------------------------------------------
   grid = (written + warpsPerBlock - 1) / warpsPerBlock;
   compute_long_ip_kernel<<<grid, threadsPerBlock, 0, stream_>>>(
     unit_q_gpu_.data_handle(),
@@ -3188,15 +2883,9 @@ void SearcherGPU::SearchClusterWithFilterMemOptOneforMulti(
     ip2_.data_handle());
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"kernel-long_ip", gt.stop(stream_)});
-#endif
-//--------------------------------------------------------
-// F) refine kernel
-//--------------------------------------------------------
-#ifdef COUNT_CLUSTER_TIME
-  gt.start(stream_);
-#endif
+  //--------------------------------------------------------
+  // F) refine kernel
+  //--------------------------------------------------------
   int threads = 256;
   int blocks  = (written + threads - 1) / threads;
   // now d_top_dist is top ip instead
@@ -3214,16 +2903,9 @@ void SearcherGPU::SearchClusterWithFilterMemOptOneforMulti(
     cur_ivf.quantizer().num_short_factors());
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"kernel-refine", gt.stop(stream_)});
-#endif
-
-//--------------------------------------------------------
-// G) D2H copy + write_topk_to_pool  (host work)
-//--------------------------------------------------------
-#ifdef COUNT_CLUSTER_TIME
-  gt.start(stream_);
-#endif
+  //--------------------------------------------------------
+  // G) D2H copy + write_topk_to_pool  (host work)
+  //--------------------------------------------------------
   //    cpu.start();
   //    printf("writing back results... \n");
   if (written > KNNs.capacity) {
@@ -3246,48 +2928,6 @@ void SearcherGPU::SearchClusterWithFilterMemOptOneforMulti(
 
     KNNs.size = written;
   }
-
-#ifdef DEBUG_MULTIPLE_SEARCH
-  // copy back KNNs from a device and print data inside
-  DeviceResultPool host_knns;
-  host_knns.capacity  = KNNs[0].capacity;
-  host_knns.distances = (float*)malloc(sizeof(float) * KNNs[0].capacity);
-  host_knns.ids       = (uint32_t*)malloc(sizeof(uint32_t) * KNNs[0].capacity);
-  RAFT_CUDA_TRY(cudaMemcpy(host_knns.distances,
-                           KNNs[0].distances,
-                           sizeof(float) * KNNs[0].capacity,
-                           cudaMemcpyDeviceToHost));
-  RAFT_CUDA_TRY(cudaMemcpy(
-    host_knns.ids, KNNs[0].ids, sizeof(uint32_t) * KNNs[0].capacity, cudaMemcpyDeviceToHost));
-  for (int i = 0; i < KNNs[0].size; i++) {
-    printf("dist-ori: %f\n", host_knns.distances[i]);
-    printf("id-ori: %d\n", host_knns.ids[i]);
-  }
-  free(host_knns.distances);
-  free(host_knns.ids);
-#endif
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"select_final_topk_write_back", gt.stop()});
-
-  //--------------------------------------------------------
-  // H)  final report (once per probe or outside the OMP loop)
-  //--------------------------------------------------------
-  double total_ms = 0.0;
-  for (auto& s : stats)
-    total_ms += s.ms;
-
-  std::cout << "\n---- SearchCluster timing ----\n";
-  std::cout << std::left << std::setw(22) << "Step" << std::right << std::setw(12) << "ms"
-            << std::setw(10) << "%" << '\n';
-
-  for (auto& s : stats) {
-    std::cout << std::left << std::setw(22) << s.name << std::right << std::setw(12) << std::fixed
-              << std::setprecision(3) << s.ms << std::setw(9) << std::fixed << std::setprecision(1)
-              << (s.ms * 100.0 / total_ms) << '\n';
-  }
-  std::cout << std::left << std::setw(22) << "TOTAL" << std::right << std::setw(12) << std::fixed
-            << std::setprecision(3) << total_ms << '\n';
-#endif
 }
 
 void SearcherGPU::SearchClusterWithFilterMemOptV2(const IVFGPU& cur_ivf,
@@ -3297,50 +2937,25 @@ void SearcherGPU::SearchClusterWithFilterMemOptV2(const IVFGPU& cur_ivf,
                                                   float* centroid_data)
 {
   // related information
-#ifdef COUNT_CLUSTER_TIME
-  struct StepStat {
-    std::string name;
-    double ms = 0;
-  };
-  std::vector<StepStat> stats;  // push in call order
-#endif
   size_t num_vector_cluster         = cur_cluster.num;
   size_t num_dimensions             = cur_ivf.get_num_padded_dim();
   uint32_t* rabitq_codes_and_factor = cur_cluster.first_block(cur_ivf);
   PID* ids                          = cur_cluster.ids(cur_ivf);
 
   //--------------------------------------------------------
-// A) host-side scalar preparation
-//--------------------------------------------------------
-#ifdef COUNT_CLUSTER_TIME
-  CpuTimer cpu;
-  cpu.start();
-#endif
+  // A) host-side scalar preparation
+  //--------------------------------------------------------
   float y      = std::sqrt(sqr_y);
   this->shift_ = 0;
   this->sumq_  = normalize_query16_scalar(unit_q_.get(), query_, centroid_data, y, D);
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"host-prep", cpu.stop()});
-#endif
-//--------------------------------------------------------
-// B) H2D copies of query + buffers (GPU time)
-//--------------------------------------------------------
-#ifdef COUNT_CLUSTER_TIME
-  GpuTimer gt;
-  gt.start(stream_);
-#endif
+  //--------------------------------------------------------
+  // B) H2D copies of query + buffers (GPU time)
+  //--------------------------------------------------------
   raft::copy(unit_q_gpu_.data_handle(), unit_q_.get(), num_dimensions, stream_);
 
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"copy-query-H2D", gt.stop(stream_)});
-#endif
   //--------------------------------------------------------
   // C) IP kernel
   //--------------------------------------------------------
-
-#ifdef COUNT_CLUSTER_TIME
-  gt.start(stream_);
-#endif
   int threadsPerBlock = 256;  // must be a multiple of 32
   int warpsPerBlock   = threadsPerBlock / 32;
   int grid            = (num_vector_cluster + warpsPerBlock - 1) / warpsPerBlock;
@@ -3359,14 +2974,7 @@ void SearcherGPU::SearchClusterWithFilterMemOptV2(const IVFGPU& cur_ivf,
     filter_distk_);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"kernel-ip", gt.stop(stream_)});
-#endif
-
   // (D) apply filters and restore K
-#ifdef COUNT_CLUSTER_TIME
-  gt.start(stream_);
-#endif
   //    printf("trying to filter and gather...");
   size_t M  = 10;  // multiples of 10 temporally
   size_t KM = M * KNNs.capacity;
@@ -3388,17 +2996,9 @@ void SearcherGPU::SearchClusterWithFilterMemOptV2(const IVFGPU& cur_ivf,
     return;
   }
 
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"kernel-filter-select_topk*m", gt.stop(stream_)});
-#endif
-
   //--------------------------------------------------------
-// E) long-code IP kernel
-//--------------------------------------------------------
-#ifdef COUNT_CLUSTER_TIME
-  gt.start(stream_);
-#endif
-
+  // E) long-code IP kernel
+  //--------------------------------------------------------
   grid = (written + warpsPerBlock - 1) / warpsPerBlock;
   compute_long_ip_kernel<<<grid, threadsPerBlock, 0, stream_>>>(
     unit_q_gpu_.data_handle(),
@@ -3411,15 +3011,9 @@ void SearcherGPU::SearchClusterWithFilterMemOptV2(const IVFGPU& cur_ivf,
     ip2_.data_handle());
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"kernel-long_ip", gt.stop(stream_)});
-#endif
-//--------------------------------------------------------
-// F) refine kernel
-//--------------------------------------------------------
-#ifdef COUNT_CLUSTER_TIME
-  gt.start(stream_);
-#endif
+  //--------------------------------------------------------
+  // F) refine kernel
+  //--------------------------------------------------------
   int threads = 256;
   int blocks  = (written + threads - 1) / threads;
   // now d_top_dist is top ip instead
@@ -3437,16 +3031,9 @@ void SearcherGPU::SearchClusterWithFilterMemOptV2(const IVFGPU& cur_ivf,
     cur_ivf.quantizer().num_short_factors());
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"kernel-refine", gt.stop(stream_)});
-#endif
-
-//--------------------------------------------------------
-// G) D2H copy + write_topk_to_pool  (host work)
-//--------------------------------------------------------
-#ifdef COUNT_CLUSTER_TIME
-  gt.start(stream_);
-#endif
+  //--------------------------------------------------------
+  // G) D2H copy + write_topk_to_pool  (host work)
+  //--------------------------------------------------------
   //    cpu.start();
   //    printf("writing back results... \n");
   if (written > KNNs.capacity) {
@@ -3463,29 +3050,7 @@ void SearcherGPU::SearchClusterWithFilterMemOptV2(const IVFGPU& cur_ivf,
   //    printf("writing finished \n");
 
   // TODO: update h_filter
-//   f write_ms = gt.stop();
-#ifdef COUNT_CLUSTER_TIME
-  stats.push_back({"select_final_topk_write_back", gt.stop()});
-
-  //--------------------------------------------------------
-  // H)  final report (once per probe or outside the OMP loop)
-  //--------------------------------------------------------
-  double total_ms = 0.0;
-  for (auto& s : stats)
-    total_ms += s.ms;
-
-  std::cout << "\n---- SearchCluster timing ----\n";
-  std::cout << std::left << std::setw(22) << "Step" << std::right << std::setw(12) << "ms"
-            << std::setw(10) << "%" << '\n';
-
-  for (auto& s : stats) {
-    std::cout << std::left << std::setw(22) << s.name << std::right << std::setw(12) << std::fixed
-              << std::setprecision(3) << s.ms << std::setw(9) << std::fixed << std::setprecision(1)
-              << (s.ms * 100.0 / total_ms) << '\n';
-  }
-  std::cout << std::left << std::setw(22) << "TOTAL" << std::right << std::setw(12) << std::fixed
-            << std::setprecision(3) << total_ms << '\n';
-#endif
+  //   f write_ms = gt.stop();
 }
 
 // following for searching multiple cluster
@@ -3631,15 +3196,6 @@ __global__ void compute_ip_kernel_fp32_multi(
       (ip_xb_prime - 0.5f * sumq + 0.58f) * (-5.0f * qnorm * one_over_sqrtD) * onorm +
       qnorm * qnorm + onorm * onorm;
 
-#ifdef DEBUG_MULTIPLE_SEARCH
-    if (warp_id > 270 && warp_id < 275)
-      printf("warp id: %d, cluster id: %d, index in cluster: %d, result: %f\n",
-             warp_id,
-             p,
-             idx_in_cluster,
-             result);
-#endif
-
     //        if (result < filter_dis) {
     const int gidx     = warp_id;  // absolute vector id
     d_ip_results[gidx] = ip_xb_prime;
@@ -3725,13 +3281,6 @@ __global__ void filterGatherKernel_multi(const float* __restrict__ dist,
       vidx -= __ldg(d_starts + vprobe);  // local idx
       // get actually pid from by probe
       vpid = __ldg(pid + d_meta[vprobe].start_index + vidx);
-#ifdef DEBUG_MULTIPLE_SEARCH
-//            for (int i = 0; i < nprobe; ++i) {
-//                printf("d_starts[i] = %d\n", d_starts[i]);
-//            }
-//            printf("vdist = %f, vip = %f, vpid = %d, vidx = %d, vprobe = %d, tid = %d\n",
-//                   vdist, vip, vpid, vidx, vprobe, tid);
-#endif
     }
   }
 
@@ -3745,11 +3294,7 @@ __global__ void filterGatherKernel_multi(const float* __restrict__ dist,
   __syncthreads();
 
   if (flag) {
-    int pos = blockBase + offset;
-#ifdef DEBUG_MULTIPLE_SEARCH
-//        printf("pos = %d, blockBase = %d, offset = %d, blockTotal = %d\n", pos, blockBase, offset,
-//        blockTotal);
-#endif
+    int pos  = blockBase + offset;
     out[pos] = {vdist, vip, vpid, vidx, vprobe};
   }
 }
@@ -3803,10 +3348,6 @@ int fast_select_and_keep_multi(
 
   const int BLK = 256;
   const int GRD = (N + BLK - 1) / BLK;
-#ifdef DEBUG_MULTIPLE_SEARCH
-  RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
-  RAFT_CUDA_TRY(cudaGetLastError());
-#endif
   //------------------------------------------------------------------
   // 1) pass-1  (filter + gather)
   //------------------------------------------------------------------
@@ -3814,10 +3355,6 @@ int fast_select_and_keep_multi(
   filterGatherKernel_multi<<<GRD, BLK, 0, stream>>>(
     d_dist, d_ip, d_pid, d_starts, N, nprobe, filter_distk, d_meta, d_buf, d_counter);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
-#ifdef DEBUG_MULTIPLE_SEARCH
-  RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
-//    RAFT_CUDA_TRY(cudaGetLastError());
-#endif
   //------------------------------------------------------------------
   // 2) fetch survivor count
   //------------------------------------------------------------------
@@ -3946,11 +3483,6 @@ __global__ void refine_multi_kernel(
     uint32_t c = extract_code(codes, d, EX_BITS);
     partial += float(c) * __ldg(q + d);
   }
-#ifdef DEBUG_MULTIPLE_SEARCH
-  if (idx_in_cluster == 925) {
-    printf("first four codes of uint8_t: %d, %d, %d, %d\n", codes[0], codes[1], codes[2], codes[3]);
-  }
-#endif
   // warp reduce
 #pragma unroll
   for (int off = 16; off > 0; off >>= 1)
@@ -3970,34 +3502,6 @@ __global__ void refine_multi_kernel(
     float refined = onorm * onorm + sqr_y -
                     xip * qnorm * (FAC_RESCALE * approx + ip2 - (FAC_RESCALE - 0.5f) * sumq);
 
-#ifdef DEBUG_MULTIPLE_SEARCH
-    //        printf("onorm: %f\n", onorm);
-    //        printf("sqr_y: %f\n", sqr_y);
-    //        printf("xip: %f\n", xip);
-    //        printf("approx: %f\n", approx);
-    //        printf("sumq: %f\n", sumq);
-    //        printf("ip2: %f\n", ip2);
-    //        printf("1bit dis: %f\n", candidate->dist);
-    //        printf("refined dist: %f\n", refined);
-    //        printf("id: %d\n", candidate->pid);
-    //        printf("warp id: %d, cluster id: %d, index in cluster: %d, refined: %f\n", warpId,
-    //        probe, idx_in_cluster, refined); if (refined < candidate->dist) {
-    printf(
-      "onorm: %f, sqr_y: %f, xip: %f, approx: %f, sumq: %f, ip2: %f, 1bit dis: %f, warp id: %d, "
-      "cluster id: %d, index in cluster: %d, refined: %f\n",
-      onorm,
-      sqr_y,
-      xip,
-      approx,
-      sumq,
-      ip2,
-      candidate->dist,
-      warpId,
-      probe,
-      idx_in_cluster,
-      refined);
-//        }
-#endif
     candidate->dist = refined;
   }
 }
@@ -4093,12 +3597,6 @@ void SearcherGPU::SearchMultipleClusters(const IVFGPU& cur_ivf,
   RAFT_CUDA_TRY(
     cudaMemcpyAsync(c_query, h_query, sizeof(float) * D, cudaMemcpyHostToDevice, stream_));
 
-#ifdef DEBUG_MULTIPLE_SEARCH
-  raft::resource::sync_stream(handle_);
-  RAFT_CUDA_TRY(cudaGetLastError());
-  printf("copy kernel done\n");
-#endif
-
   // normalize query to multiple centroids
   dim3 np(nprobe);
   normalize_warp32_kernel<<<np, 32, 0, stream_>>>(d_centroid_candidates,
@@ -4108,21 +3606,11 @@ void SearcherGPU::SearchMultipleClusters(const IVFGPU& cur_ivf,
                                                   c_query,
                                                   D);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
-#ifdef DEBUG_MULTIPLE_SEARCH
-  raft::resource::sync_stream(handle_);
-  printf("normalize_warp32_kernel done\n");
-#endif
 
   // (1.5) build prefix sum array for nprobe for the following computation (maybe better on CPU?)
   int* d_starts = nullptr;
   RAFT_CUDA_TRY(cudaMallocAsync(&d_starts, sizeof(int) * (nprobe + 1), stream_));
   build_prefix_device(d_cluster_meta, nprobe, d_starts, stream_);
-#ifdef DEBUG_MULTIPLE_SEARCH
-  printf("build_prefix_device done\n");
-  printf("h_filter_distk: %f\n", filter_distk_);
-  raft::resource::sync_stream(handle_);
-  RAFT_CUDA_TRY(cudaGetLastError());
-#endif
 
   // (2) Compute IP for all clusters
   int BLOCK = 256;
@@ -4137,11 +3625,8 @@ void SearcherGPU::SearchMultipleClusters(const IVFGPU& cur_ivf,
     stream_));
   raft::resource::sync_stream(handle_);     // or cudaEvent, or wait on the stream elsewhere
   int vecs_to_compute = h_vecs_to_compute;  // now it’s safe to use
-#ifdef DEBUG_MULTIPLE_SEARCH
-  printf("vecs_to_compute: %d\n", vecs_to_compute);
-#endif
-  int warps = vecs_to_compute;  //
-  int grids = (warps * 32 + BLOCK - 1) / BLOCK;
+  int warps           = vecs_to_compute;    //
+  int grids           = (warps * 32 + BLOCK - 1) / BLOCK;
   dim3 grid(grids), block(BLOCK);
   compute_ip_kernel_fp32_multi<<<grids, BLOCK, 0, stream_>>>(
     unit_q_gpu_.data_handle(),
@@ -4159,12 +3644,6 @@ void SearcherGPU::SearchMultipleClusters(const IVFGPU& cur_ivf,
     est_dis_.data_handle());
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
-#ifdef DEBUG_MULTIPLE_SEARCH
-  printf("compute_ip_kernel_fp32_multi done\n");
-  raft::resource::sync_stream(handle_);
-//    RAFT_CUDA_TRY(cudaGetLastError());
-#endif
-
   // (3) Gather Filtered Distances
   int KM      = KNNs.capacity * 10;
   int written = fast_select_and_keep_multi(est_dis_.data_handle(),
@@ -4178,9 +3657,6 @@ void SearcherGPU::SearchMultipleClusters(const IVFGPU& cur_ivf,
                                            d_cluster_meta,
                                            candidate_buffer_.data_handle(),
                                            stream_);
-#ifdef DEBUG_MULTIPLE_SEARCH
-  printf("fast_select_and_keep_multi done\n");
-#endif
 
   // (4) access and compute long codes **and restore distances*** based on the candidate buffer
   int nWarps = written;  // 1 warp / candidate
@@ -4203,18 +3679,12 @@ void SearcherGPU::SearchMultipleClusters(const IVFGPU& cur_ivf,
                                                    BLOCK,
                                                    cur_ivf.get_ex_bits());
   RAFT_CUDA_TRY(cudaPeekAtLastError());
-#ifdef DEBUG_MULTIPLE_SEARCH
-  printf("refine_multi_kernel done\n");
-#endif
 
   // (5) Finally sort the buffers
   //    float kth =
   write_topk_to_pool_from_candidates(
     KNNs, candidate_buffer_.data_handle(), written, KNNs.capacity, stream_);
-//    printf("written: %d, kth: %f\n", written, kth);
-#ifdef DEBUG_MULTIPLE_SEARCH
-  printf("write_topk_to_pool_from_candidates done\n");
-#endif
+  //    printf("written: %d, kth: %f\n", written, kth);
 
   // Update filter dist if possible
   //    if (kth > 0) {
@@ -4223,26 +3693,6 @@ void SearcherGPU::SearchMultipleClusters(const IVFGPU& cur_ivf,
   //        }
   //    }
   KNNs.size = written < KNNs.capacity ? written : KNNs.capacity;
-
-#ifdef DEBUG_MULTIPLE_SEARCH
-  // copy back KNNs from a device and print data inside
-  printf("written: %d\n", written);
-  printf("Knns capacity: %d\n", KNNs.capacity);
-  DeviceResultPool host_knns;
-  host_knns.capacity  = KNNs.capacity;
-  host_knns.distances = (float*)malloc(sizeof(float) * KNNs.capacity);
-  host_knns.ids       = (uint32_t*)malloc(sizeof(uint32_t) * KNNs.capacity);
-  RAFT_CUDA_TRY(cudaMemcpy(
-    host_knns.distances, KNNs.distances, sizeof(float) * KNNs.capacity, cudaMemcpyDeviceToHost));
-  RAFT_CUDA_TRY(
-    cudaMemcpy(host_knns.ids, KNNs.ids, sizeof(uint32_t) * KNNs.capacity, cudaMemcpyDeviceToHost));
-  for (int i = 0; i < KNNs.size; i++) {
-    printf("dist: %f\n", host_knns.distances[i]);
-    printf("id: %d\n", host_knns.ids[i]);
-  }
-  free(host_knns.distances);
-  free(host_knns.ids);
-#endif
 
   // (
   RAFT_CUDA_TRY(cudaFreeAsync(d_starts, stream_));

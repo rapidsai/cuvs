@@ -8,6 +8,9 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/util/cuda_rt_essentials.hpp>
 
+#include <cuda_fp16.h>
+#include <cuda_runtime.h>
+
 #include <algorithm>  // std::max, std::min, std::clamp
 #include <cmath>      // std::abs
 #include <cstdint>    // int16_t, int32_t
@@ -55,9 +58,6 @@ float L2SqrCPU_STL(const float* h_x, const float* h_y, size_t N)
       return diff * diff;
     });
 }
-
-#include <cuda_fp16.h>
-#include <cuda_runtime.h>
 
 // 每个线程块处理256个元素，可根据GPU架构调整
 constexpr int BLOCK_SIZE = 256;
