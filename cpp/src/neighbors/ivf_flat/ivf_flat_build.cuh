@@ -311,8 +311,7 @@ void extend(raft::resources const& handle,
             list_sizes_view,
             false,
             true,
-            raft::identity_op{},
-            raft::resource::get_workspace_resource(handle));
+            raft::identity_op{});
         }
 
         // Convert updated centroids back to binary format
