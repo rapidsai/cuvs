@@ -226,7 +226,7 @@ class AnnHnswAceTest : public ::testing::TestWithParam<AnnHnswAceInputs> {
       hnsw::index_params hnsw_params;
       hnsw_params.metric    = ps.metric;
       hnsw_params.hierarchy = hnsw::HnswHierarchy::GPU;
-      hnsw_params.m         = 32;
+      hnsw_params.M         = 32;
 
       // Configure ACE parameters with tiny memory limits to force disk mode
       auto ace_params            = graph_build_params::ace_params();
