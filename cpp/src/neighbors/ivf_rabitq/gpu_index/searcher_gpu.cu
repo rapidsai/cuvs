@@ -1277,8 +1277,7 @@ SearcherGPU::SearcherGPU(raft::resources const& handle,
     FAC_RESCALE_(1 << ex_bits),
     rabitq_quantize_flag_(rabitq_quantize_flag),
     mode_(mode),
-    handle_(handle),
-    stream_(raft::resource::get_cuda_stream(handle_))
+    handle_(handle)
 {
   set_unit_q(memory::align_mm<64, float>(D * sizeof(float)));
   set_quant_query(memory::align_mm<64, int16_t>(D * sizeof(int16_t)));

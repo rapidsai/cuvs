@@ -185,19 +185,7 @@ class IVFGPU {
          bool batch_flag);
   IVFGPU(raft::resources const& handle)
     : handle_(handle),
-      stream_(raft::resource::get_cuda_stream(handle_)),
-      short_data_(raft::make_device_vector<uint32_t, int64_t>(handle_, 0)),
-      long_code_(raft::make_device_vector<uint8_t, int64_t>(handle_, 0)),
-      ex_factor_(raft::make_device_vector<ExFactor, int64_t>(handle_, 0)),
-      ids_(raft::make_device_vector<PID, int64_t>(handle_, 0)),
-      cluster_meta_(raft::make_device_vector<GPUClusterMeta, int64_t>(handle_, 0)),
       batch_flag(false),
-      short_factors_batch_(raft::make_device_vector<float, int64_t>(handle_, 0)),
-      short_data_host_(raft::make_host_vector<uint32_t, int64_t>(0)),
-      long_code_host_(raft::make_host_vector<uint8_t, int64_t>(0)),
-      ex_factor_host_(raft::make_host_vector<ExFactor, int64_t>(0)),
-      ids_host_(raft::make_host_vector<PID, int64_t>(0)),
-      cluster_meta_host_(raft::make_host_vector<GPUClusterMeta, int64_t>(0)),
       initializer(nullptr),
       Rota(std::make_unique<RotatorGPU>(handle_, 128))
   {
@@ -434,29 +422,41 @@ class IVFGPU {
                                 rmm::cuda_stream_view single_stream);
 
   raft::resources const& handle_;  // reusable resource handle
-  rmm::cuda_stream_view stream_;   // CUDA stream obtained from handle_
+  rmm::cuda_stream_view stream_ =
+    raft::resource::get_cuda_stream(handle_);  // CUDA stream obtained from handle_
 
   // Device pointers for each data array.
-  raft::device_vector<uint32_t, int64_t> short_data_;          // RaBitQ code and factors.
-  raft::device_vector<uint8_t, int64_t> long_code_;            // ExRaBitQ code.
-  raft::device_vector<ExFactor, int64_t> ex_factor_;           // ExRaBitQ factor.
-  raft::device_vector<PID, int64_t> ids_;                      // PID of vectors.
-  raft::device_vector<GPUClusterMeta, int64_t> cluster_meta_;  // Device-side array of clusters.
+  raft::device_vector<uint32_t, int64_t> short_data_ =
+    raft::make_device_vector<uint32_t, int64_t>(handle_, 0);  // RaBitQ code and factors.
+  raft::device_vector<uint8_t, int64_t> long_code_ =
+    raft::make_device_vector<uint8_t, int64_t>(handle_, 0);  // ExRaBitQ code.
+  raft::device_vector<ExFactor, int64_t> ex_factor_ =
+    raft::make_device_vector<ExFactor, int64_t>(handle_, 0);  // ExRaBitQ factor.
+  raft::device_vector<PID, int64_t> ids_ =
+    raft::make_device_vector<PID, int64_t>(handle_, 0);  // PID of vectors.
+  raft::device_vector<GPUClusterMeta, int64_t> cluster_meta_ =
+    raft::make_device_vector<GPUClusterMeta, int64_t>(handle_,
+                                                      0);  // Device-side array of clusters.
 
   // batch-data
   bool batch_flag;
-  raft::device_vector<float, int64_t> short_factors_batch_;  // N * 3 float rabitq factors
+  raft::device_vector<float, int64_t> short_factors_batch_ =
+    raft::make_device_vector<float, int64_t>(handle_, 0);  // N * 3 float rabitq factors
   // long_code_ is the same
   // exfactor use the same place as before
 
   // host-side copies
-  raft::host_vector<uint32_t, int64_t>
-    short_data_host_;  // TODO: CPU side, we need on factors from short_data_host_, so no need to
-                       // store all these codes
-  raft::host_vector<uint8_t, int64_t> long_code_host_;            // ExRaBitQ code.
-  raft::host_vector<ExFactor, int64_t> ex_factor_host_;           // ExRaBitQ factor.
-  raft::host_vector<PID, int64_t> ids_host_;                      // PID of vectors.
-  raft::host_vector<GPUClusterMeta, int64_t> cluster_meta_host_;  // Host-side copy of clusters
+  raft::host_vector<uint32_t, int64_t> short_data_host_ = raft::make_host_vector<uint32_t, int64_t>(
+    0);  // TODO: CPU side, we need on factors from short_data_host_, so no need to
+         // store all these codes
+  raft::host_vector<uint8_t, int64_t> long_code_host_ =
+    raft::make_host_vector<uint8_t, int64_t>(0);  // ExRaBitQ code.
+  raft::host_vector<ExFactor, int64_t> ex_factor_host_ =
+    raft::make_host_vector<ExFactor, int64_t>(0);  // ExRaBitQ factor.
+  raft::host_vector<PID, int64_t> ids_host_ =
+    raft::make_host_vector<PID, int64_t>(0);  // PID of vectors.
+  raft::host_vector<GPUClusterMeta, int64_t> cluster_meta_host_ =
+    raft::make_host_vector<GPUClusterMeta, int64_t>(0);  // Host-side copy of clusters
 
   // Index meta-data.
   size_t num_vectors;     // Total number of vectors.

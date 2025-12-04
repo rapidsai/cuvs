@@ -60,7 +60,8 @@ class DataQuantizerGPU {
   static constexpr size_t NUM_SHORT_FACTORS = 4;
 #endif
   raft::resources const& handle_;  // reusable resource handle
-  rmm::cuda_stream_view stream_;   // CUDA stream obtained from handle_
+  rmm::cuda_stream_view stream_ =
+    raft::resource::get_cuda_stream(handle_);  // CUDA stream obtained from handle_
 
   // device temporary space to quantize a cluster
   raft::device_vector<float, int64_t> d_XP_norm =
@@ -113,8 +114,7 @@ class DataQuantizerGPU {
       batch_flag_dq(batch_flag_dq),
       fast_quantize_flag(false),
       const_scaling_factor(0.0f),
-      handle_(handle),
-      stream_(raft::resource::get_cuda_stream(handle_))
+      handle_(handle)
   {
   }
 

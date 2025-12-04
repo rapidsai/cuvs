@@ -239,9 +239,10 @@ class SearcherGPU {
 
  private:
   raft::resources const& handle_;  // reusable resource handle
-  rmm::cuda_stream_view stream_;   // CUDA stream obtained from handle_
-  size_t D;                        // number of dimension
-  const float* query_ = nullptr;   // rotated query (non-owning)
+  rmm::cuda_stream_view stream_ =
+    raft::resource::get_cuda_stream(handle_);  // CUDA stream obtained from handle_
+  size_t D;                                    // number of dimension
+  const float* query_ = nullptr;               // rotated query (non-owning)
   std::unique_ptr<int16_t, decltype(std::free)*> quant_query_ = {
     nullptr, std::free};  // quantized query (to 2 bytes)
   std::unique_ptr<float, decltype(std::free)*> unit_q_ = {nullptr, std::free};

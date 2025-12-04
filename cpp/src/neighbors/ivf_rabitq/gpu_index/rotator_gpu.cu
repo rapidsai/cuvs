@@ -19,10 +19,7 @@
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
-RotatorGPU::RotatorGPU(raft::resources const& handle, uint32_t dim)
-  : handle_(handle),
-    stream_(raft::resource::get_cuda_stream(handle_)),
-    rotation_matrix_(raft::make_device_matrix<float, int64_t, raft::row_major>(handle_, 0, 0))
+RotatorGPU::RotatorGPU(raft::resources const& handle, uint32_t dim) : handle_(handle)
 {
   // keep track of cuda stream
   // Compute padded dimension
