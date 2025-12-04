@@ -223,8 +223,7 @@ void extend(raft::resources const& handle,
                                             enable_prefetch);
   vec_batches.prefetch_next_batch();
 
-  if constexpr (std::is_same_v<T, uint8_t>) {
-    // For uint8_t, handle both binary and non-binary cases
+  
     for (const auto& batch : vec_batches) {
       auto batch_data_view = raft::make_device_matrix_view<const uint8_t, IdxT>(
         batch.data(), batch.size(), index->dim());
@@ -234,8 +233,13 @@ void extend(raft::resources const& handle,
         index->binary_centers().data_handle(), n_lists, dim);
 
       if (index->binary_index()) {
-        cuvs::cluster::kmeans::detail::predict_bitwise_hamming(
-          handle, batch_data_view, centroids_view, batch_labels_view);
+        if constexpr (std::is_same_v<T, uint8_t>) {
+          cuvs::cluster::kmeans::detail::predict_bitwise_hamming(
+            handle, batch_data_view, centroids_view, batch_labels_view);
+        } else {
+          RAFT_FAIL("BitwiseHamming distance is only supported with uint8_t data type, got %s",
+                    typeid(T).name());
+        }
       } else {
         auto orig_centroids_view = raft::make_device_matrix_view<const float, IdxT>(
           index->centers().data_handle(), n_lists, dim);
@@ -251,27 +255,6 @@ void extend(raft::resources const& handle,
       // iteration if different streams are used for kernel and copy.
       raft::resource::sync_stream(handle);
     }
-  } else {
-    auto orig_centroids_view = raft::make_device_matrix_view<const float, IdxT>(
-      index->centers().data_handle(), n_lists, dim);
-    for (const auto& batch : vec_batches) {
-      auto batch_data_view =
-        raft::make_device_matrix_view<const T, IdxT>(batch.data(), batch.size(), index->dim());
-      auto batch_labels_view = raft::make_device_vector_view<LabelT, IdxT>(
-        new_labels.data_handle() + batch.offset(), batch.size());
-
-      cuvs::cluster::kmeans_balanced::predict(handle,
-                                              kmeans_params,
-                                              batch_data_view,
-                                              orig_centroids_view,
-                                              batch_labels_view,
-                                              utils::mapping<float>{});
-      vec_batches.prefetch_next_batch();
-      // User needs to make sure kernel finishes its work before we overwrite batch in the next
-      // iteration if different streams are used for kernel and copy.
-      raft::resource::sync_stream(handle);
-    }
-  }
 
   auto* list_sizes_ptr    = index->list_sizes().data_handle();
   auto old_list_sizes_dev = raft::make_device_mdarray<uint32_t>(
