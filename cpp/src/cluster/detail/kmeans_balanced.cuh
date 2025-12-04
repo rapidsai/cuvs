@@ -29,6 +29,7 @@
 #include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/argmin.cuh>
 #include <raft/matrix/gather.cuh>
+#include <raft/matrix/init.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/device_atomics.cuh>
 #include <raft/util/integer_utils.hpp>
@@ -441,7 +442,8 @@ void calc_centers_and_sizes(const raft::resources& handle,
   if (is_packed_binary) {
     if constexpr (std::is_same_v<T, uint8_t>) {
       RAFT_EXPECTS(dim * 8 == centers_dim, "dim must be the packed dimension");
-      auto decoded_dataset_iter = make_bitwise_expanded_iterator(dataset, n_rows, centers_dim);
+      auto decoded_dataset_iter =
+        make_bitwise_expanded_iterator<MathT, IdxT>(dataset, n_rows, centers_dim);
       raft::linalg::reduce_rows_by_key(decoded_dataset_iter,
                                        centers_dim,
                                        labels,
@@ -564,9 +566,9 @@ void predict(const raft::resources& handle,
     need_compute_norm || params.is_packed_binary ? max_minibatch_size : 0, stream, mem_res);
   if (params.is_packed_binary) {
     raft::matrix::fill(
+      handle,
       raft::make_device_matrix_view<MathT, IdxT>(cur_dataset_norm.data(), max_minibatch_size, 1),
-      static_cast<MathT>(transformed_dim),
-      stream);
+      static_cast<MathT>(transformed_dim));
   }
   const MathT* dataset_norm_ptr = nullptr;
   auto cur_dataset_ptr          = cur_dataset.data();
@@ -576,11 +578,13 @@ void predict(const raft::resources& handle,
     if constexpr (std::is_same_v<T, MathT>) {
       cur_dataset_ptr = const_cast<MathT*>(dataset + offset * dim);
     } else if (params.is_packed_binary) {
-      raft::linalg::map_offset(
-        handle,
-        raft::make_device_matrix_view<MathT, IdxT>(
-          cur_dataset_ptr, minibatch_size, transformed_dim),
-        cuvs::spatial::knn::detail::utils::bitwise_decode_op<MathT, IdxT>(dataset + offset * dim));
+      if constexpr (std::is_same_v<T, uint8_t>) {
+        raft::linalg::map_offset(handle,
+                                 raft::make_device_matrix_view<MathT, IdxT>(
+                                   cur_dataset_ptr, minibatch_size, transformed_dim),
+                                 cuvs::spatial::knn::detail::utils::bitwise_decode_op<MathT, IdxT>(
+                                   dataset + offset * dim));
+      }
     } else {
       raft::linalg::unaryOp(
         cur_dataset_ptr, dataset + offset * dim, minibatch_size * dim, mapping_op, stream);
@@ -754,20 +758,23 @@ auto adjust_centers(MathT* centers,
   const dim3 grid_dim(1, raft::ceildiv(n_clusters, static_cast<IdxT>(kBlockDimY)), 1);
   rmm::device_scalar<IdxT> update_count(0, stream, device_memory);
   if (is_packed_binary) {
-    IdxT transformed_dim  = is_packed_binary ? dim * 8 : dim;
-    auto dataset_iterator = make_bitwise_expanded_iterator(dataset, n_rows, transformed_dim);
-    adjust_centers_kernel<kBlockDimY><<<grid_dim, block_dim, 0, stream>>>(centers,
-                                                                          n_clusters,
-                                                                          transformed_dim,
-                                                                          dataset_iterator,
-                                                                          n_rows,
-                                                                          labels,
-                                                                          cluster_sizes,
-                                                                          threshold,
-                                                                          average,
-                                                                          ofst,
-                                                                          update_count.data(),
-                                                                          mapping_op);
+    IdxT transformed_dim = is_packed_binary ? dim * 8 : dim;
+    if constexpr (std::is_same_v<T, uint8_t>) {
+      auto dataset_iterator =
+        make_bitwise_expanded_iterator<MathT, IdxT>(dataset, n_rows, transformed_dim);
+      adjust_centers_kernel<kBlockDimY><<<grid_dim, block_dim, 0, stream>>>(centers,
+                                                                            n_clusters,
+                                                                            transformed_dim,
+                                                                            dataset_iterator,
+                                                                            n_rows,
+                                                                            labels,
+                                                                            cluster_sizes,
+                                                                            threshold,
+                                                                            average,
+                                                                            ofst,
+                                                                            update_count.data(),
+                                                                            mapping_op);
+    }
   } else {
     adjust_centers_kernel<kBlockDimY><<<grid_dim, block_dim, 0, stream>>>(centers,
                                                                           n_clusters,
@@ -855,20 +862,21 @@ void balancing_em_iters(const raft::resources& handle,
     // (but not on the first iteration)
     bool did_adjust = false;
     if (iter > 0) {
-      if (params.is_packed_binary && std::is_same_v<T, uint8_t>) {
-        // On-the-fly bit expansion handled inside adjust_centers when is_packed_binary=true
-        did_adjust = adjust_centers(cluster_centers,
-                                    n_clusters,
-                                    transformed_dim,
-                                    dataset,
-                                    n_rows,
-                                    cluster_labels,
-                                    cluster_sizes,
-                                    balancing_threshold,
-                                    raft::identity_op{},
-                                    stream,
-                                    device_memory,
-                                    true);
+      if (params.is_packed_binary) {
+        if constexpr (std::is_same_v<T, uint8_t>) {
+          did_adjust = adjust_centers(cluster_centers,
+                                      n_clusters,
+                                      transformed_dim,
+                                      dataset,
+                                      n_rows,
+                                      cluster_labels,
+                                      cluster_sizes,
+                                      balancing_threshold,
+                                      raft::identity_op{},
+                                      stream,
+                                      device_memory,
+                                      true);
+        }
       } else {
         did_adjust = adjust_centers(cluster_centers,
                                     n_clusters,
@@ -1138,9 +1146,12 @@ auto build_fine_clusters(const raft::resources& handle,
     }
     IdxT transformed_dim = params.is_packed_binary ? dim * 8 : dim;
     if (params.is_packed_binary) {
-      auto dataset_iterator = make_bitwise_expanded_iterator(dataset_mptr, n_rows, transformed_dim);
-      raft::matrix::gather(
-        dataset_iterator, transformed_dim, n_rows, mc_trainset_ids, k, mc_trainset, stream);
+      if constexpr (std::is_same_v<T, uint8_t>) {
+        auto dataset_iterator =
+          make_bitwise_expanded_iterator<MathT, IdxT>(dataset_mptr, n_rows, transformed_dim);
+        raft::matrix::gather(
+          dataset_iterator, transformed_dim, n_rows, mc_trainset_ids, k, mc_trainset, stream);
+      }
     } else {
       thrust::transform_iterator<MappingOpT, const T*> mapping_itr(dataset_mptr, mapping_op);
       raft::matrix::gather(mapping_itr, dim, n_rows, mc_trainset_ids, k, mc_trainset, stream);
@@ -1258,9 +1269,9 @@ void build_hierarchical(const raft::resources& handle,
   } else if (params.is_packed_binary) {
     dataset_norm_buf.resize(n_rows, stream);
     raft::matrix::fill(
+      handle,
       raft::make_device_matrix_view<MathT, IdxT>(dataset_norm_buf.data(), n_rows, 1),
-      static_cast<MathT>(transformed_dim),
-      stream);
+      static_cast<MathT>(transformed_dim));
     dataset_norm = (const MathT*)dataset_norm_buf.data();
   }
 

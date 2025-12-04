@@ -201,7 +201,7 @@ HDI constexpr auto mapping<int8_t>::operator()(const float& x) const -> int8_t
 
 template <typename OutT, typename IdxT>
 struct bitwise_decode_op {
-  bitwise_decode_op(const uint8_t* const binary_vecs) : binary_vecs(binary_vecs) {}
+  bitwise_decode_op(const uint8_t* binary_vecs) : binary_vecs(binary_vecs) {}
   const uint8_t* binary_vecs;
   /// Returns 1 if the i-th bit is 1, otherwise return -1.
   HDI constexpr auto operator()(const IdxT& i) -> OutT
