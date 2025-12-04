@@ -410,9 +410,9 @@ void calc_centers_and_sizes(const raft::resources& handle,
                             IdxT n_rows,
                             const LabelT* labels,
                             bool reset_counters,
+                            bool is_packed_binary,
                             MappingOpT mapping_op,
-                            rmm::device_async_resource_ref mr,
-                            bool is_packed_binary = false)
+                            rmm::device_async_resource_ref mr)
 {
   auto stream = raft::resource::get_cuda_stream(handle);
 
@@ -936,9 +936,9 @@ void balancing_em_iters(const raft::resources& handle,
                            n_rows,
                            cluster_labels,
                            true,
+                           params.is_packed_binary,
                            mapping_op,
-                           device_memory,
-                           params.is_packed_binary);
+                           device_memory);
   }
 }
 
@@ -981,9 +981,9 @@ void build_clusters(const raft::resources& handle,
                          n_rows,
                          cluster_labels,
                          true,
+                         params.is_packed_binary,
                          mapping_op,
-                         device_memory,
-                         params.is_packed_binary);
+                         device_memory);
 
   // run EM
   balancing_em_iters(handle,

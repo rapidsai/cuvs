@@ -301,25 +301,18 @@ void extend(raft::resources const& handle,
         for (const auto& batch : vec_batches) {
           auto batch_labels_view = raft::make_device_vector_view<const LabelT, IdxT>(
             new_labels.data_handle() + batch.offset(), batch.size());
-
-          cuvs::cluster::kmeans::detail::calc_centers_and_sizes<
-            uint8_t,
-            float,
-            IdxT,
-            LabelT,
-            std::remove_pointer_t<decltype(list_sizes_ptr)>,
-            raft::identity_op>(handle,
-                               expanded_centers_view.data_handle(),
-                               list_sizes_view.data_handle(),
-                               n_lists,
-                               dim,
-                               batch.data(),
-                               batch.size(),
-                               batch_labels_view.data_handle(),
-                               false,
-                               raft::identity_op{},
-                               raft::resource::get_workspace_resource(handle),
-                               true);
+          auto batch_data_view =
+            raft::make_device_matrix_view<const T, IdxT>(batch.data(), batch.size(), index->dim());
+          cuvs::cluster::kmeans_balanced::helpers::calc_centers_and_sizes(
+            handle,
+            batch_data_view,
+            batch_labels_view,
+            expanded_centers_view,
+            list_sizes_view,
+            false,
+            true,
+            raft::identity_op{},
+            raft::resource::get_workspace_resource(handle));
         }
 
         // Convert updated centroids back to binary format
@@ -346,6 +339,7 @@ void extend(raft::resources const& handle,
                                                                         batch_labels_view,
                                                                         centroids_view,
                                                                         list_sizes_view,
+                                                                        false,
                                                                         false,
                                                                         utils::mapping<float>{});
       }
@@ -529,13 +523,9 @@ inline auto build(raft::resources const& handle,
     kmeans_params.n_iters = params.kmeans_n_iters;
     kmeans_params.metric =
       index.binary_index() ? cuvs::distance::DistanceType::L2Expanded : index.metric();
-    if (index.binary_index()) {
-      kmeans_params.is_packed_binary = true;  // Enable on-the-fly bit expansion
-    }
-
+    kmeans_params.is_packed_binary = index.binary_index();
     if constexpr (std::is_same_v<T, uint8_t>) {
       if (index.binary_index()) {
-        // For binary data, use on-the-fly bit expansion during kmeans training
         rmm::device_uvector<float> decoded_centers(index.n_lists() * index.dim() * 8,
                                                    stream,
                                                    raft::resource::get_workspace_resource(handle));
