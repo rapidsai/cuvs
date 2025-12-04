@@ -533,10 +533,6 @@ void IVFGPU::construct_on_gpu(const float* device_data,
   // -------------------------
   // 2. Validate cluster IDs on GPU
   // -------------------------
-  int* d_error_flag = nullptr;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_error_flag, sizeof(int), stream_));
-  RAFT_CUDA_TRY(cudaMemsetAsync(d_error_flag, 0, sizeof(int), stream_));
-
   int block_size = 256;
   int num_blocks = (num_vectors + block_size - 1) / block_size;
 

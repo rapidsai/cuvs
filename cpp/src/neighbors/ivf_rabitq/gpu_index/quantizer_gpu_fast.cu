@@ -1204,6 +1204,7 @@ float DataQuantizerGPU::get_const_scaling_factors_fully_gpu(size_t dim, size_t e
 
   RAFT_CUDA_TRY(cudaFreeAsync(d_factors, stream_));
   RAFT_CUDA_TRY(cudaFreeAsync(d_sum, stream_));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_temp_storage, stream_));
 
   return sum / kConstNum;
 }
