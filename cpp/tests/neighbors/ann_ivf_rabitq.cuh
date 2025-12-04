@@ -104,7 +104,7 @@ class ivf_rabitq_test : public ::testing::TestWithParam<ivf_rabitq_inputs> {
     size_t queries_size = size_t{ps.num_queries} * size_t{ps.k};
     rmm::device_uvector<EvalT> distances_naive_dev(queries_size, stream_);
     rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
-    cuvs::neighbors::naive_knn<EvalT, DataT, int64_t>(
+    cuvs::neighbors::naive_knn<EvalT, DataT, IdxT>(
       handle_,
       distances_naive_dev.data(),
       indices_naive_dev.data(),
@@ -127,7 +127,7 @@ class ivf_rabitq_test : public ::testing::TestWithParam<ivf_rabitq_inputs> {
     auto ipams = ps.index_params;
 
     auto database_view =
-      raft::make_device_matrix_view<const DataT, int64_t>(database.data(), ps.num_db_vecs, ps.dim);
+      raft::make_device_matrix_view<const DataT, IdxT>(database.data(), ps.num_db_vecs, ps.dim);
     cuvs::neighbors::ivf_rabitq::index<IdxT> idx(
       handle_, ps.num_db_vecs, ps.dim, ipams.n_lists, ipams.bits_per_dim);
     cuvs::neighbors::ivf_rabitq::build(handle_, ipams, database_view, &idx);
@@ -138,11 +138,11 @@ class ivf_rabitq_test : public ::testing::TestWithParam<ivf_rabitq_inputs> {
   {
     auto ipams = ps.index_params;
 
-    auto host_database = raft::make_host_matrix<DataT, int64_t>(ps.num_db_vecs, ps.dim);
+    auto host_database = raft::make_host_matrix<DataT, IdxT>(ps.num_db_vecs, ps.dim);
     raft::copy(host_database.data_handle(), database.data(), ps.num_db_vecs * ps.dim, stream_);
     // `ivf_rabitq::build` internally distinguishes between device and host pointers. For
     // convenience, we wrap the host pointer as a device matrix view here.
-    auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
+    auto database_view = raft::make_device_matrix_view<const DataT, IdxT>(
       host_database.data_handle(), ps.num_db_vecs, ps.dim);
     cuvs::neighbors::ivf_rabitq::index<IdxT> idx(
       handle_, ps.num_db_vecs, ps.dim, ipams.n_lists, ipams.bits_per_dim);
@@ -271,7 +271,7 @@ inline auto with_dims(const std::vector<uint32_t>& dims) -> test_cases_t
   });
 }
 
-inline auto small_dims() -> test_cases_t { return with_dims({1, 2, 3, 4, 5}); }
+inline auto small_dims() -> test_cases_t { return with_dims({1, 2, 3, 4, 5, 6, 7, 8}); }
 
 inline auto big_dims() -> test_cases_t
 {

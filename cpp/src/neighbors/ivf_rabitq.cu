@@ -110,6 +110,8 @@ void search(raft::resources const& handle,
   size_t dim          = queries.extent(1);
   auto padded_dim     = idx.rabitq_index().get_num_padded_dim();
   auto padded_queries = raft::make_device_matrix<T, int64_t>(handle, NQ, padded_dim);
+  RAFT_CUDA_TRY(
+    cudaMemsetAsync(padded_queries.data_handle(), 0, sizeof(T) * NQ * padded_dim, stream));
   RAFT_CUDA_TRY(cudaMemcpy2DAsync(padded_queries.data_handle(),
                                   sizeof(T) * padded_dim,
                                   queries.data_handle(),
