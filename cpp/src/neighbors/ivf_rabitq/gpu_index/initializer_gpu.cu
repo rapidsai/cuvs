@@ -44,7 +44,6 @@ __global__ void ComputeDistancesKernelNormal(const float* __restrict__ centroids
       sum += diff * diff;
     }
     d_distances[i] = sum;
-    //        printf("Centroid %d, distances %f\n", i, d_distances[i]);
   }
 }
 
@@ -206,33 +205,6 @@ __global__ void ComputeDistancesKernelWarp(const float4* __restrict__ centroids,
   // ------------------------------------------------------------------
   if (lane == 0) d_distances[warpId] = sum;
 }
-// Kernel for transposed layout (column-major)
-// Each block is assigned one getCentroidbyId; threads compute partial sums over dimensions.
-//__global__ void ComputeDistancesKernelTranspose(const float* __restrict__ centroids,
-//                                                const float* __restrict__ d_query,
-//                                                float* d_distances,
-//                                                size_t K,
-//                                                size_t D) {
-//    int centroid_id = blockIdx.x;
-//    int tid = threadIdx.x;
-//    extern __shared__ float sdata[];
-//    float partial = 0.0f;
-//    // For transposed layout, the d-th component of getCentroidbyId (blockIdx.x) is at
-//    centroids[d*K + centroid_id]. for (int d = tid; d < D; d += blockDim.x) {
-//        float diff = d_query[d] - centroids[d * K + centroid_id];
-//        partial += diff * diff;
-//    }
-//    sdata[tid] = partial;
-//    __syncthreads();
-//    // Parallel reduction in shared memory.
-//    for (unsigned int s = blockDim.x / 2; s > 0; s >>= 1) {
-//        if (tid < s)
-//            sdata[tid] += sdata[tid + s];
-//        __syncthreads();
-//    }
-//    if (tid == 0)
-//        d_distances[centroid_id] = sdata[0];
-//}
 
 // Kernel 1: Compute partial distances per dimension.
 // For each dimension d and each centroid i, compute:
@@ -323,13 +295,8 @@ void FlatInitializerGPU::ComputeCentroidsDistances(const float* query,
   float* d_distances = nullptr;
   RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_distances, sizeof(float) * K, stream_));
   // Launch kernel: each thread computes distance for one centroid.
-  int blockSize = 256;
-  int gridSize  = (K + blockSize - 1) / blockSize;
-  ////    size_t sharedMemSize = blockSize * D * sizeof(float) + D * sizeof(float);
-  //    ComputeDistancesKernelVectorized<<<gridSize, blockSize>>>(
-  //            reinterpret_cast<const float4*>(centroids_.data_handle()),
-  //            reinterpret_cast<const float4*>(d_query),
-  //            d_distances, K, D/4);
+  int blockSize             = 256;
+  int gridSize              = (K + blockSize - 1) / blockSize;
   int warpSize              = 32;
   const int WARPS_PER_BLOCK = 8;  // 4 × 32 = 128 threads
   dim3 block(WARPS_PER_BLOCK * warpSize);
@@ -341,25 +308,10 @@ void FlatInitializerGPU::ComputeCentroidsDistances(const float* query,
     K,
     D / 4);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
-  //    ComputeDistancesKernelNormal<<<gridSize, blockSize>>>(centroids_.data_handle(), d_query,
-  //    d_distances, K, D); ComputeDistancesKernelOptimized<<<gridSize, blockSize, sharedMemSize>>>(
-  //            centroids_.data_handle(), d_query, d_distances, K, D);
 
   // Allocate device memory for candidate IDs.
   PID* d_candidate_ids = nullptr;
   RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_candidate_ids, sizeof(PID) * K, stream_));
-  //    auto policy = thrust::cuda::par.on(stream);
-  //    {
-  //        // Initialize candidate IDs as a sequence 0,1,...,K-1 using Thrust.
-  //        thrust::device_ptr<PID> dev_ptr = thrust::device_pointer_cast(d_candidate_ids);
-  //        thrust::sequence(policy, dev_ptr, dev_ptr + K);
-  //    }
-  //    {
-  //        // Sort distances and candidate IDs by distance using Thrust.
-  //        thrust::device_ptr<float> dist_ptr = thrust::device_pointer_cast(d_distances);
-  //        thrust::device_ptr<PID> id_ptr = thrust::device_pointer_cast(d_candidate_ids);
-  //        thrust::sort_by_key(policy, dist_ptr, dist_ptr + K, id_ptr);
-  //    }
 
   // Another option instead of using thrust:
   // Replace the first block with:
@@ -415,8 +367,6 @@ void FlatInitializerGPU::ComputeCentroidsDistances(const float* query,
   FillCandidatesKernel<<<gridSize2, blockSize2, 0, stream_>>>(
     d_distances, d_candidate_ids, candidates, nprobe);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
-  //    RAFT_CUDA_TRY(cudaGetLastError());
-  //    RAFT_CUDA_TRY(cudaDeviceSynchronize());
 
   // Free temporary device memory.
   RAFT_CUDA_TRY(cudaFreeAsync(d_query, stream_));

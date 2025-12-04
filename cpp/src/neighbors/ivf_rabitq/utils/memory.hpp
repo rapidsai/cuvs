@@ -11,8 +11,6 @@
 #include <cstdlib>
 #include <cstring>
 
-// jamxia edit
-// #include "utils/tools.hpp"
 #include "tools.hpp"
 
 namespace cuvs::neighbors::ivf_rabitq::detail {

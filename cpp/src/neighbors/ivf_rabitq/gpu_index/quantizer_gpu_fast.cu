@@ -378,7 +378,6 @@ __global__ void exrabitq_fused_kernel_batch(
     size_t base           = 2 * row;
     d_ex_factor[base + 0] = fadd;
     d_ex_factor[base + 1] = frescale;
-    //        d_ex_factor[base + 2] = ferr;
   }
 
   //=========================================================================
@@ -762,9 +761,8 @@ __device__ float compute_best_rescale_parallel(
   // Phase 1: Coarse grid search
   //=========================================================================
   const int COARSE_SAMPLES = 64;  // Though not fully utilize each thread, but very fast
-  //    const int COARSE_SAMPLES = BlockSize;  // Adjust based on BlockSize
-  float best_coarse_ip = 0.0f;
-  float best_coarse_t  = t_start;
+  float best_coarse_ip     = 0.0f;
+  float best_coarse_t      = t_start;
 
   for (int i = tid; i < COARSE_SAMPLES; i += BlockSize) {
     float t = t_start + (t_end - t_start) * i / (COARSE_SAMPLES - 1);
@@ -816,9 +814,8 @@ __device__ float compute_best_rescale_parallel(
   float fine_end   = fminf(t_end, center_t + range);
 
   const int FINE_SAMPLES = 32;
-  //    const int FINE_SAMPLES = BlockSize;
-  float best_fine_ip = 0.0f;
-  float best_fine_t  = center_t;
+  float best_fine_ip     = 0.0f;
+  float best_fine_t      = center_t;
 
   for (int i = tid; i < FINE_SAMPLES; i += BlockSize) {
     float t = fine_start + (fine_end - fine_start) * i / (FINE_SAMPLES - 1);
@@ -981,7 +978,6 @@ __global__ void exrabitq_fused_kernel_batch_ori(
     size_t base           = 2 * row;
     d_ex_factor[base + 0] = fadd;
     d_ex_factor[base + 1] = frescale;
-    //        d_ex_factor[base + 2] = ferr;
   }
 
   //=========================================================================
@@ -1190,10 +1186,6 @@ float DataQuantizerGPU::get_const_scaling_factors_fully_gpu(size_t dim, size_t e
   fully_fused_kernel<<<kConstNum, block_size, shared_mem_size, stream_>>>(
     d_factors, kConstNum, dim, ex_bits, seed);
   RAFT_CUDA_TRY(cudaGetLastError());
-
-  // Reduce sum on GPU
-  // reduce_sum_kernel<<<1, 128, 128 * sizeof(float)>>>(d_factors, d_sum, kConstNum);
-  // RAFT_CUDA_TRY(cudaGetLastError());
 
   // Use CUB for reduction - handles any size optimally
 

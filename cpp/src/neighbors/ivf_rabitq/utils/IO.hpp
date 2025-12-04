@@ -99,7 +99,6 @@ template <typename T, class M>
 void load_vecs_k(const char* filename, M& Mat, size_t k)
 {
   static_assert(std::is_same_v<T, typename M::element_type>, "T must match M::element_type");
-  // 你的 exists / filesize 等工具函数省略
   if (!file_exits(filename)) {
     std::cerr << "File " << filename << " not exists\n";
     std::abort();
@@ -109,27 +108,27 @@ void load_vecs_k(const char* filename, M& Mat, size_t k)
   size_t file_size = get_filesize(filename);
   std::ifstream input(filename, std::ios::binary);
 
-  // 先读首个 cols（按你的文件格式）
+  // read `cols` under assumption of file format
   input.read(reinterpret_cast<char*>(&tmp), sizeof(uint32_t));
   const size_t cols = tmp;
 
-  // rows 的推导保持和你原代码一致
+  //  calculate rows under assumption of file format
   const size_t rows = file_size / (cols * sizeof(T) + sizeof(uint32_t));
 
-  // 分配最终大小：行数 * k
+  // allocate final size: rows * k
   Mat = raft::make_host_matrix<T, int64_t>(rows * k, cols);
 
-  // 回到文件开头，逐行读取
+  // return to start of file and read line by line
   input.seekg(0, input.beg);
 
   for (size_t i = 0; i < rows; ++i) {
-    // 读取该行的列头
+    // read header for current line
     input.read(reinterpret_cast<char*>(&tmp), sizeof(uint32_t));
-    // 读取一整行到第 i 行
+    // read rest of line into i-th row of output
     T* base = &Mat(i, 0);
     input.read(reinterpret_cast<char*>(base), sizeof(T) * cols);
 
-    // 复制到其余 (k-1) 份
+    // create (k-1) copies
     for (size_t t = 1; t < k; ++t) {
       std::memcpy(&Mat(i + t * rows, 0), base, sizeof(T) * cols);
     }

@@ -45,9 +45,9 @@ class SearcherGPU {
                        const float* q,
                        size_t d,
                        size_t ex_bits,
-                       std::string mode          = "",
+                       std::string mode                                             = "",
                        DataQuantizerGPU::FastQuantizeFactors* fast_quantize_factors = nullptr,
-                       bool rabitq_quantize_flag = true);
+                       bool rabitq_quantize_flag                                    = true);
 
   SearcherGPU(SearcherGPU&& other) = default;
 
@@ -240,9 +240,8 @@ class SearcherGPU {
  private:
   raft::resources const& handle_;  // reusable resource handle
   rmm::cuda_stream_view stream_;   // CUDA stream obtained from handle_
-  //    float* uint_q = nullptr;
-  size_t D;                       // number of dimension
-  const float* query_ = nullptr;  // rotated query (non-owning)
+  size_t D;                        // number of dimension
+  const float* query_ = nullptr;   // rotated query (non-owning)
   std::unique_ptr<int16_t, decltype(std::free)*> quant_query_ = {
     nullptr, std::free};  // quantized query (to 2 bytes)
   std::unique_ptr<float, decltype(std::free)*> unit_q_ = {nullptr, std::free};
@@ -290,21 +289,12 @@ class SearcherGPU {
   // quantization for queries
   float best_rescaling_factor = 0.0f;
 
-  // additional for multiple cluster search！！！！！！
-
-  // constexpr int  K      = 20000;  // total centroids in memory
-  // constexpr int  ITER   = 20;     // timing iterations
-  // constexpr int  BLOCK  = 256;    // baseline / warp256 block‑dim
-  // constexpr float EPS_R = 1e-6f;  // verification tol
-
   //--------------------------------------------------------------
 
   raft::device_vector<SumNorm, int64_t> sum_norm_ =
     raft::make_device_vector<SumNorm, int64_t>(handle_, 0);
   raft::device_vector<Candidate4, int64_t> candidate_buffer_ =
     raft::make_device_vector<Candidate4, int64_t>(handle_, 0);
-  //    float* c_query = nullptr;
-  //    int* d_starts = nullptr;
 
   void SearchClusterWithFilterMemOptBoundedKNN(const IVFGPU& cur_ivf,
                                                const IVFGPU::GPUClusterMeta& cur_cluster,

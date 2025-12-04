@@ -47,8 +47,7 @@ inline float normalize_query16_scalar(float* unit_q,  // out: normalised vector 
     float sum            = 0.0f;
 
     for (size_t i = 0; i < D; ++i) {
-      float u = (q[i] - c[i]) * inv_norm;  // (q - c) / norm
-      //            float u = q[i]; // (q - c) / norm       // use this for float
+      float u   = (q[i] - c[i]) * inv_norm;  // (q - c) / norm
       unit_q[i] = u;
       sum += u;  // running sum
     }
@@ -63,8 +62,6 @@ inline float normalize_query16_scalar(float* unit_q,  // out: normalised vector 
 
 inline float compute_sum_q(const float* __restrict__ q, size_t D)
 {
-  // jamxia edit
-  // constexpr float eps = 1e-5f;
   float sum = 0.0f;
   for (size_t i = 0; i < D; ++i) {
     float u = q[i];  // (q - c) / norm       // use this for float

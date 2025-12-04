@@ -26,7 +26,6 @@ float L2SqrThrust(raft::resources const& handle, const float* h_x, const float* 
   thrust::device_vector<float> d_x(h_x, h_x + N);
   thrust::device_vector<float> d_y(h_y, h_y + N);
 
-  //    printf("I'm in!");
   // Create zip iterators
   auto begin = thrust::make_zip_iterator(thrust::make_tuple(d_x.begin(), d_y.begin()));
   auto end   = thrust::make_zip_iterator(thrust::make_tuple(d_x.end(), d_y.end()));
@@ -59,10 +58,10 @@ float L2SqrCPU_STL(const float* h_x, const float* h_y, size_t N)
     });
 }
 
-// 每个线程块处理256个元素，可根据GPU架构调整
+// tunable by GPU arch
 constexpr int BLOCK_SIZE = 256;
 
-// 计算剩余尾部元素的核函数
+// kernel for processing tail elements (modulo 16)
 __global__ void l2sqr_tail_kernel(const float* __restrict__ x,
                                   const float* __restrict__ y,
                                   float* __restrict__ output,
@@ -78,7 +77,7 @@ __global__ void l2sqr_tail_kernel(const float* __restrict__ x,
     sum += diff * diff;
   }
 
-  // 块内归约
+  // block-level reduction
   __shared__ float smem[BLOCK_SIZE];
   smem[threadIdx.x] = sum;
   __syncthreads();
@@ -91,7 +90,7 @@ __global__ void l2sqr_tail_kernel(const float* __restrict__ x,
   if (threadIdx.x == 0) { atomicAdd(output, smem[0]); }
 }
 
-// 主计算核函数（批量处理16的倍数部分）
+// kernel for processing elements in batches of 16
 __global__ void l2sqr_main_kernel(const float* __restrict__ x,
                                   const float* __restrict__ y,
                                   float* __restrict__ output,
@@ -102,7 +101,7 @@ __global__ void l2sqr_main_kernel(const float* __restrict__ x,
 
   float sum = 0.0f;
 
-  // 每个线程处理4个元素（提高指令级并行）
+  // process 4 elements per thread for instruction-level parallelism
   for (size_t base = tid * 4; base < L; base += stride * 4) {
     const size_t remaining = min(L - base, 4UL);
 
@@ -113,7 +112,7 @@ __global__ void l2sqr_main_kernel(const float* __restrict__ x,
     }
   }
 
-  // 块内归约
+  // block-level reduction
   __shared__ float smem[BLOCK_SIZE];
   smem[threadIdx.x] = sum;
   __syncthreads();
@@ -126,7 +125,7 @@ __global__ void l2sqr_main_kernel(const float* __restrict__ x,
   if (threadIdx.x == 0) { atomicAdd(output, smem[0]); }
 }
 
-// 主机函数封装
+// host driver function
 float L2Sqr_CUDA(raft::resources const& handle, const float* x, const float* y, size_t L)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
@@ -134,7 +133,7 @@ float L2Sqr_CUDA(raft::resources const& handle, const float* x, const float* y, 
   RAFT_CUDA_TRY(cudaMallocAsync(&d_output, sizeof(float), stream));
   RAFT_CUDA_TRY(cudaMemsetAsync(d_output, 0, sizeof(float), stream));
 
-  // 计算主部分（16倍数部分）
+  // processes batches of 16
   const size_t num16 = L - (L % 16);
   if (num16 > 0) {
     const int grid_size = (num16 + BLOCK_SIZE * 4 - 1) / (BLOCK_SIZE * 4);
@@ -142,14 +141,14 @@ float L2Sqr_CUDA(raft::resources const& handle, const float* x, const float* y, 
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
 
-  // 处理尾部剩余元素
+  // process remainders
   if (L > num16) {
     const int tail_grid = (L - num16 + BLOCK_SIZE - 1) / BLOCK_SIZE;
     l2sqr_tail_kernel<<<tail_grid, BLOCK_SIZE, 0, stream>>>(x, y, d_output, num16, L);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
 
-  // 回传结果
+  // fetch result
   float result;
   RAFT_CUDA_TRY(cudaMemcpyAsync(&result, d_output, sizeof(float), cudaMemcpyDeviceToHost, stream));
   raft::resource::sync_stream(handle);
@@ -157,61 +156,6 @@ float L2Sqr_CUDA(raft::resources const& handle, const float* x, const float* y, 
 
   return result;
 }
-
-////--------------------------------------------------------------------
-//// Scalar helper: find minimum and maximum in a float array
-////--------------------------------------------------------------------
-// inline void data_range16_scalar(const float* __restrict__ q,
-//                                 float& vl,
-//                                 float& vr,
-//                                 size_t L)
-//{
-//     vl =  std::numeric_limits<float>::max();
-//     vr = -std::numeric_limits<float>::max();
-//
-//     for (size_t i = 0; i < L; ++i) {
-//         float v = q[i];
-//         vl = (v < vl) ? v : vl;
-//         vr = (v > vr) ? v : vr;
-//     }
-// }
-//
-////--------------------------------------------------------------------
-//// Portable quantizer (no AVX/SSE required)
-////--------------------------------------------------------------------
-// void high_acc_quantize16_scalar(int16_t* __restrict__ result,
-//                                 const float*  __restrict__ q,
-//                                 float& width,
-//                                 size_t D)
-//{
-//     constexpr int BQ          = 14;                    // signed‑14‑bit
-//     constexpr int32_t MAX_Q   =  (1 << (BQ - 1)) - 1;  // +8191
-//     constexpr int32_t MIN_Q   = -(1 << (BQ - 1));      // -8192
-//
-//     // 1. range scan --------------------------------------------------
-//     float vl, vr;
-//     data_range16_scalar(q, vl, vr, D);
-//     float vmax = std::max(std::abs(vl), std::abs(vr));
-//
-//     // 2. compute bin width ------------------------------------------
-//     width = vmax / MAX_Q;               // == vmax / 8191
-//     float inv_width = (width > 0.f) ? 1.0f / width : 0.0f;
-//
-//     // 3. element‑wise quantisation ----------------------------------
-//     for (size_t i = 0; i < D; ++i)
-//     {
-//         float  scaled = q[i] * inv_width;
-//
-//         // original rounding rule: round half away from zero
-//         float  biased = scaled + ((scaled >= 0.f) ? 0.5f : -0.5f);
-//         int32_t q32   = static_cast<int32_t>(biased);
-//
-//         // saturate to signed‑14‑bit range (safety, avoids UB on cast)
-//         q32 = std::clamp(q32, MIN_Q, MAX_Q);
-//
-//         result[i] = static_cast<int16_t>(q32);
-//     }
-// }
 
 //--------------------------------------------------------------------
 // Scalar helper: find minimum and maximum in a float array

@@ -49,7 +49,8 @@ class IVFGPU {
     size_t start_index;  // Combined offset: index of first vector in the flattened arrays.
 
     // Constructor: computes iter and REMAIN based on FAST_SIZE.
-    __host__ __device__ GPUClusterMeta(size_t num, size_t start_idx) : num(num), start_index(start_idx)
+    __host__ __device__ GPUClusterMeta(size_t num, size_t start_idx)
+      : num(num), start_index(start_idx)
     {
       iter   = num / FAST_SIZE;
       remain = num - iter * FAST_SIZE;
@@ -74,8 +75,6 @@ class IVFGPU {
      * @param parent Pointer to the IVFGPU instance that holds the base pointer.
      * @return Pointer to the first block of this cluster’s short data.
      */
-    // jamxia edit
-    // __host__ __device__
     __host__ uint32_t* first_block(const IVFGPU& parent) const
     {
       return parent.get_short_data_device() +
@@ -97,8 +96,6 @@ class IVFGPU {
       return d_short_data + start_index * (short_code_length + num_short_factors);
     }
 
-    // jamxia edit
-    // __host__ __device__
     __host__ uint32_t* first_block_host(const IVFGPU& parent) const
     {
       return parent.get_short_data_host() + start_index * (parent.quantizer().short_code_length() +
@@ -226,9 +223,9 @@ class IVFGPU {
    * @param device_cluster_ids PIDs of vectors.
    */
   void construct_on_gpu(const float* device_data,
-    const float* device_centroids,
-    const PID* device_cluster_ids,
-    bool fast_quantize);
+                        const float* device_centroids,
+                        const PID* device_cluster_ids,
+                        bool fast_quantize);
 
   /**
    * @brief ANN search
@@ -385,17 +382,6 @@ class IVFGPU {
 
   // Following are inline functions to compute spaces for memory allocation
 
-  // TODO: Check whether it is actually an inline function
-  // now 1 block represent 1 binaried vector + factor
-  //    size_t GetShortDataBytes(size_t* cluster_sizes, size_t num_clusters) const {
-  //        assert(num_clusters == num_centroids);  // num of clusters
-  //        size_t total_blocks = 0;
-  //        for (auto s = 0; s < num_clusters; s++) {
-  //            total_blocks += cluster_sizes[s];
-  //        }
-  //        return total_blocks * this->quantizer().block_bytes();
-  //    }
-
   size_t GetShortDataBytesSimple() const
   {
     //        assert(num_clusters == num_centroids);  // num of clusters
@@ -434,7 +420,7 @@ class IVFGPU {
   void init_clusters(const std::vector<size_t>& cluster_sizes);
 
   void quantize_cluster(GPUClusterMeta& cp,
-                        /*const std::vector<PID> &IDs,*/ const float* data,
+                        const float* data,
                         const float* cur_centroid,
                         float* rotated_c) const;
 
@@ -459,15 +445,11 @@ class IVFGPU {
 
   // batch-data
   bool batch_flag;
-  //    uint32_t* d_short_data_batch;   // rabitq codes
   raft::device_vector<float, int64_t> short_factors_batch_;  // N * 3 float rabitq factors
   // long_code_ is the same
   // exfactor use the same place as before
 
   // host-side copies
-  //    float* d_centroids;      // Device centroids (if needed for search, now stored in
-  //    initializer).
-
   raft::host_vector<uint32_t, int64_t>
     short_data_host_;  // TODO: CPU side, we need on factors from short_data_host_, so no need to
                        // store all these codes

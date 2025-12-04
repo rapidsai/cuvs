@@ -21,8 +21,6 @@
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
 class BatchedQueryGatherer {
-  // private:
-
  public:
   // Configuration
   int D;                       // Dimension of each query

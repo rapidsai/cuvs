@@ -98,9 +98,6 @@ BatchedQueryGatherer::BatchedQueryGatherer(raft::resources const& handle,
   RAFT_CUDA_TRY(
     cudaMallocHost(&h_cluster_ids, static_cast<size_t>(max_clusters_per_batch) * sizeof(int)));
 
-  //    // Create CUDA stream
-  //    cudaStreamCreate(&stream);
-
   reset_batch();
   raft::resource::sync_stream(handle_);
 }

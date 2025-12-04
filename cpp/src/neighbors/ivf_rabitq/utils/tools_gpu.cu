@@ -29,11 +29,6 @@ std::vector<cudaStream_t> create_cuda_streams(size_t num_streams)
     // cudaStreamCreate allocates a new stream and returns its handle.
     // The handle is stored in the vector at the current index.
     RAFT_CUDA_TRY(cudaStreamCreate(&streams[i]));
-
-    // Always check for errors after a CUDA API call.
-    //        CUDA_CHECK(err);
-
-    //        std::cout << "  Successfully created CUDA stream " << i << "." << std::endl;
   }
   std::cout << "All CUDA streams created successfully." << std::endl;
   return streams;
@@ -52,15 +47,11 @@ void delete_cuda_streams(std::vector<cudaStream_t>& streams)
   for (cudaStream_t stream : streams) {
     // cudaStreamDestroy frees the resources associated with a stream.
     RAFT_CUDA_TRY(cudaStreamDestroy(stream));
-
-    // It's good practice to check for errors even during cleanup.
-    //        CUDA_CHECK(err);
   }
   std::cout << "Successfully destroyed all CUDA streams." << std::endl;
 
   // Clear the vector to remove the now-invalidated handles.
   streams.clear();
-  //    std::cout << "Streams vector has been cleared." << std::endl;
 }
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail
