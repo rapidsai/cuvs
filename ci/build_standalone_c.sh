@@ -40,7 +40,6 @@ scl enable gcc-toolset-${TOOLSET_VERSION} -- \
       cmake -S cpp -B cpp/build/ \
             -DCMAKE_CUDA_HOST_COMPILER=/opt/rh/gcc-toolset-${TOOLSET_VERSION}/root/usr/bin/gcc \
             -DCMAKE_CUDA_ARCHITECTURES=RAPIDS \
-            -DBUILD_SHARED_LIBS=OFF \
             -DCUTLASS_ENABLE_TESTS=OFF \
             -DDISABLE_OPENMP=OFF \
             -DBUILD_TESTS=OFF \
