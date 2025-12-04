@@ -782,7 +782,6 @@ __global__ void FusedFilterGather(const float* __restrict__ est_dist,
 
   const int tid       = threadIdx.x + blockIdx.x * blockDim.x;
   const int lane      = threadIdx.x & 31;
-  const int warp      = threadIdx.x >> 5;
   const unsigned mask = __ballot_sync(0xFFFFFFFF, tid < N && est_dist[tid] < filter_k);
 
   //------------------------- warp-prefix --------------------------------
@@ -881,7 +880,6 @@ inline int select_and_keep_topKM_by_distance_timed(const float* est_dist,
 
   s[2] = {"host-overhead", host_timer.stop()};
 
-print_stats:
   //------------------------------------------------------------------
   // pretty print
   //------------------------------------------------------------------
@@ -2061,7 +2059,6 @@ inline int fast_select_and_keep_timed(const float* d_dist,
 
   s[5] = {"host overhead", host.stop()};
 
-print_stats:
   // ───────────────────────── pretty print ─────────────────────
   double gpu_total = std::accumulate(
     s.begin(), s.begin() + 5, 0.0, [](double a, const StepStat& st) { return a + st.ms; });

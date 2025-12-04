@@ -373,7 +373,6 @@ __global__ void exrabitq_fused_kernel_batch(
     float ratio     = (l2_sqr * xu_sq) / (ip_resi_xucb * ip_resi_xucb);
     float inner     = (ratio - 1.f) / fmaxf(float(D - 1), 1.f);
     float tmp_error = l2_norm * kConstEpsilon * sqrtf(fmaxf(inner, 0.f));
-    float ferr      = 2.f * tmp_error;
 
     size_t base           = 2 * row;
     d_ex_factor[base + 0] = fadd;
@@ -973,7 +972,6 @@ __global__ void exrabitq_fused_kernel_batch_ori(
     float ratio     = (l2_sqr * xu_sq) / (ip_resi_xucb * ip_resi_xucb);
     float inner     = (ratio - 1.f) / fmaxf(float(D - 1), 1.f);
     float tmp_error = l2_norm * kConstEpsilon * sqrtf(fmaxf(inner, 0.f));
-    float ferr      = 2.f * tmp_error;
 
     size_t base           = 2 * row;
     d_ex_factor[base + 0] = fadd;

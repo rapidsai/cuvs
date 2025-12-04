@@ -295,8 +295,6 @@ void FlatInitializerGPU::ComputeCentroidsDistances(const float* query,
   float* d_distances = nullptr;
   RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_distances, sizeof(float) * K, stream_));
   // Launch kernel: each thread computes distance for one centroid.
-  int blockSize             = 256;
-  int gridSize              = (K + blockSize - 1) / blockSize;
   int warpSize              = 32;
   const int WARPS_PER_BLOCK = 8;  // 4 × 32 = 128 threads
   dim3 block(WARPS_PER_BLOCK * warpSize);

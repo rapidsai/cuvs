@@ -94,18 +94,12 @@ void DataQuantizerGPU::rabitq_codes(const int* d_bin_XP,
 {
   // Number of uint32_t values per data point.
   size_t blocks_per_point = D / 32;
-  size_t total_uint64     = num_points * blocks_per_point;
 
   // Launch kernel: one block per data point, each with (D/64) threads.
   dim3 grid(num_points);
   dim3 block(blocks_per_point);
   pack_binary_kernel<<<grid, block, 0, stream_>>>(d_bin_XP, d_packed_code, num_points, D);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
-
-  // Launch kernel to pack the binary codes into 8-bit packed codes.
-  // Here, we assume a simple scheme where each uint64_t is converted to 8 bytes.
-  int threads  = 256;
-  int gridSize = (total_uint64 + threads - 1) / threads;
 
   raft::resource::sync_stream(handle_);
 }
@@ -2026,10 +2020,7 @@ void DataQuantizerGPU::quantize_batch(const float* d_data,
   // 2. (skipped) Compute total blocks for factors and short codes.
 
   // 3. Allocate intermediate buffers on device.
-  size_t code_len          = short_code_length();  // from quantizer parameters.
-  size_t short_codes_bytes = code_len * num_points * sizeof(uint32_t);
-
-  size_t factor_bytes = num_points * sizeof(float) * 3;  // we have 3 factors for batch data
+  size_t code_len = short_code_length();  // from quantizer parameters.
 
   // 4. Compute RaBitQ quantization codes.
   rabitq_codes(d_bin_XP, d_short_data, num_points);
@@ -2046,7 +2037,6 @@ void DataQuantizerGPU::quantize_batch(const float* d_data,
   uint32_t* cur_block = d_short_data;
   // copy point by point (follows point-factor data layout)
   for (size_t i = 0; i < num_points; i++) {
-    size_t block_code_bytes = code_len * sizeof(uint32_t);
 #if defined(HIGH_ACC_FAST_SCAN)
     float* block_fac = (float*)block_factor(cur_block, D);
 #else

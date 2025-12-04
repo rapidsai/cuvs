@@ -266,8 +266,6 @@ __global__ void computeInnerProductsWithLUT(
   // Pointer to this query's LUT in global memory
   float* query_lut = d_lut_for_queries + query_idx * lut_per_query_size;
 
-  // Pointer to this query's vector
-  const float* query_vec = d_query + query_idx * D;
   // ------
 
   // Step 1 (skipped): Check if LUT needs to be computed and compute if necessary
@@ -1335,15 +1333,12 @@ __global__ void computeInnerProductsWithAlwaysLUT(
   // Shared values for this <cluster, query> pair
   __shared__ float q_g_add;       // squared distance to centroid
   __shared__ float q_k1xsumq;     // query factor
-  __shared__ float q_g_error;     // sqrt(q_g_add)
-                                  //    __shared__ float threshold;     // threshold for this query
   __shared__ int num_candidates;  // counter for candidates
 
   // Load shared query-cluster values
   if (tid == 0) {
     // Get squared distance from query to this cluster's centroid
-    q_g_add   = d_centroid_distances[query_idx * num_centroids + cluster_idx];
-    q_g_error = sqrtf(q_g_add);
+    q_g_add = d_centroid_distances[query_idx * num_centroids + cluster_idx];
 
     // Get query factor
     q_k1xsumq = d_G_k1xSumq[query_idx];
@@ -1380,7 +1375,6 @@ __global__ void computeInnerProductsWithAlwaysLUT(
       float3 factors       = reinterpret_cast<const float3*>(d_short_factors)[factor_offset];
       float f_add          = factors.x;
       float f_rescale      = factors.y;
-      float f_error        = factors.z;
 
       // Compute inner product using LUT
       float ip = 0.0f;
@@ -1412,9 +1406,6 @@ __global__ void computeInnerProductsWithAlwaysLUT(
 
       // Compute estimated distance
       float est_dist = f_add + q_g_add + f_rescale * (ip + q_k1xsumq);
-
-      // Compute lower bound
-      float low_dist = est_dist - f_error * q_g_error;
 
       // Check threshold
       // first round, always threshold
@@ -1656,9 +1647,6 @@ __global__ void computeInnerProductsWithLUTWithoutUpdatingThreshold(
 
   // Pointer to this query's LUT in global memory
   float* query_lut = d_lut_for_queries + query_idx * lut_per_query_size;
-
-  // Pointer to this query's vector
-  const float* query_vec = d_query + query_idx * D;
 
   // Then Load LUT into shared memory
   // Each thread loads part of the LUT
@@ -2774,7 +2762,6 @@ __global__ void computeInnerProductsWithBitwiseOpt4bitNoEX(
         float3 factors        = reinterpret_cast<const float3*>(d_short_factors)[factor_offset];
         float f_add           = factors.x;
         float f_rescale       = factors.y;
-        float f_error         = factors.z;
         size_t global_vec_idx = cluster_start_index + vec_idx;
 
         // Compute exact inner product with float query
@@ -3328,7 +3315,6 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(
   size_t num_pairs = num_queries * nprobe;
   dim3 gridDim(num_pairs, 1, 1);
   dim3 blockDim(256, 1, 1);
-  size_t num_chunks    = D / BITS_PER_CHUNK;
   size_t query_storage = D * sizeof(float);  // For shared query vector
   const int smem_bytes =
     raft::matrix::detail::select::warpsort::calc_smem_size_for_block_wide<T, IdxT>(blockDim.x / 32,
