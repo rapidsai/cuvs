@@ -466,7 +466,7 @@ void calc_centers_and_sizes(const raft::resources& handle,
       mapping_itr, dim, labels, nullptr, n_rows, dim, n_clusters, centers, stream, reset_counters);
   }
 
-  raft::resource::sync_stream(handle); 
+  raft::resource::sync_stream(handle);
 
   // Compute weight of each cluster
   cuvs::cluster::kmeans::detail::countLabels(
@@ -1106,9 +1106,11 @@ auto build_fine_clusters(const raft::resources& handle,
                          rmm::device_async_resource_ref managed_memory,
                          rmm::device_async_resource_ref device_memory) -> IdxT
 {
-  auto stream = raft::resource::get_cuda_stream(handle);
+  auto stream          = raft::resource::get_cuda_stream(handle);
+  IdxT transformed_dim = params.is_packed_binary ? dim * 8 : dim;
   rmm::device_uvector<IdxT> mc_trainset_ids_buf(mesocluster_size_max, stream, managed_memory);
-  rmm::device_uvector<MathT> mc_trainset_buf(mesocluster_size_max * dim, stream, device_memory);
+  rmm::device_uvector<MathT> mc_trainset_buf(
+    mesocluster_size_max * transformed_dim, stream, device_memory);
   rmm::device_uvector<MathT> mc_trainset_norm_buf(mesocluster_size_max, stream, device_memory);
   auto mc_trainset_ids  = mc_trainset_ids_buf.data();
   auto mc_trainset      = mc_trainset_buf.data();
@@ -1169,7 +1171,6 @@ auto build_fine_clusters(const raft::resources& handle,
                    mapping_op,
                    device_memory,
                    mc_trainset_norm);
-    IdxT transformed_dim = params.is_packed_binary ? dim * 8 : dim;
     raft::copy(cluster_centers + (transformed_dim * fine_clusters_csum[i]),
                mc_trainset_ccenters.data(),
                fine_clusters_nums[i] * transformed_dim,
@@ -1273,8 +1274,10 @@ void build_hierarchical(const raft::resources& handle,
   // build coarse clusters (mesoclusters)
   rmm::device_uvector<LabelT> mesocluster_labels_buf(n_rows, stream, &managed_memory);
   rmm::device_uvector<CounterT> mesocluster_sizes_buf(n_mesoclusters, stream, &managed_memory);
+  IdxT transformed_dim = params.is_packed_binary ? dim * 8 : dim;
   {
-    rmm::device_uvector<MathT> mesocluster_centers_buf(n_mesoclusters * dim, stream, device_memory);
+    rmm::device_uvector<MathT> mesocluster_centers_buf(
+      n_mesoclusters * transformed_dim, stream, device_memory);
     build_clusters(handle,
                    params,
                    dim,
