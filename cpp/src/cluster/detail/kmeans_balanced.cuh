@@ -70,9 +70,8 @@ constexpr static inline float kAdjustCentersWeight = 7.0f;
  * @return A transform iterator that yields float values for each bit
  */
 template <typename MathT, typename IdxT>
-auto make_bitwise_expanded_iterator(const uint8_t* packed_data, IdxT n_rows, IdxT expanded_dim)
+auto make_bitwise_expanded_iterator(const uint8_t* packed_data)
 {
-  IdxT packed_dim    = raft::div_rounding_up_safe<IdxT>(expanded_dim, IdxT{8});
   auto counting_iter = thrust::make_counting_iterator<IdxT>(0);
   auto decoder = cuvs::spatial::knn::detail::utils::bitwise_decode_op<MathT, IdxT>(packed_data);
   return thrust::make_transform_iterator(counting_iter, decoder);
@@ -442,8 +441,7 @@ void calc_centers_and_sizes(const raft::resources& handle,
   if (is_packed_binary) {
     if constexpr (std::is_same_v<T, uint8_t>) {
       RAFT_EXPECTS(dim * 8 == centers_dim, "dim must be the packed dimension");
-      auto decoded_dataset_iter =
-        make_bitwise_expanded_iterator<MathT, IdxT>(dataset, n_rows, centers_dim);
+      auto decoded_dataset_iter = make_bitwise_expanded_iterator<MathT, IdxT>(dataset);
       raft::linalg::reduce_rows_by_key(decoded_dataset_iter,
                                        centers_dim,
                                        labels,
@@ -760,8 +758,7 @@ auto adjust_centers(MathT* centers,
   if (is_packed_binary) {
     IdxT transformed_dim = is_packed_binary ? dim * 8 : dim;
     if constexpr (std::is_same_v<T, uint8_t>) {
-      auto dataset_iterator =
-        make_bitwise_expanded_iterator<MathT, IdxT>(dataset, n_rows, transformed_dim);
+      auto dataset_iterator = make_bitwise_expanded_iterator<MathT, IdxT>(dataset);
       adjust_centers_kernel<kBlockDimY><<<grid_dim, block_dim, 0, stream>>>(centers,
                                                                             n_clusters,
                                                                             transformed_dim,
@@ -1147,8 +1144,7 @@ auto build_fine_clusters(const raft::resources& handle,
     IdxT transformed_dim = params.is_packed_binary ? dim * 8 : dim;
     if (params.is_packed_binary) {
       if constexpr (std::is_same_v<T, uint8_t>) {
-        auto dataset_iterator =
-          make_bitwise_expanded_iterator<MathT, IdxT>(dataset_mptr, n_rows, transformed_dim);
+        auto dataset_iterator = make_bitwise_expanded_iterator<MathT, IdxT>(dataset_mptr);
         raft::matrix::gather(
           dataset_iterator, transformed_dim, n_rows, mc_trainset_ids, k, mc_trainset, stream);
       }
