@@ -1196,6 +1196,8 @@ void launch_with_fixed_consts(cuvs::distance::DistanceType metric, Args&&... arg
   }
 }
 
+#define BASE_CAPACITY 8u
+
 /**
  * Lift the `capacity` and `veclen` parameters to the template level,
  * forward the rest of the arguments unmodified to `launch_interleaved_scan_kernel`.
@@ -1222,7 +1224,7 @@ struct select_interleaved_scan_kernel {
           k_max, veclen, select_min, std::forward<Args>(args)...);
       }
     }
-    if constexpr (Capacity > 1) {
+    if constexpr (Capacity > BASE_CAPACITY) {
       if (k_max * 2 <= Capacity) {
         return select_interleaved_scan_kernel<T,
                                               AccT,
@@ -1259,6 +1261,29 @@ struct select_interleaved_scan_kernel {
     }
   }
 };
+
+template <typename I>
+constexpr inline auto is_a_power_of_four(I val) noexcept
+  -> std::enable_if_t<std::is_integral<I>::value, bool>
+{
+  // 0x55555555 checks if bit is at even position
+  return (val != 0) && (((val - 1) & val) == 0) && ((val & 0x55555555) != 0);
+}
+
+template <typename T>
+constexpr inline auto bound_by_power_of_four(T x) noexcept
+  -> std::enable_if_t<std::is_integral<T>::value, T>
+{
+  if (is_a_power_of_four(x)) { return x; }
+  constexpr T kMaxUnsafe = std::numeric_limits<T>::max();
+  constexpr T kMaxSafe   = is_a_power_of_four(kMaxUnsafe) ? kMaxUnsafe : (kMaxUnsafe >> 1);
+  const T limited        = std::min(x, kMaxSafe);
+  T bound                = T{1};
+  while (bound < limited) {
+    bound <<= 2;
+  }
+  return bound < x ? T{0} : bound;
+}
 
 /**
  * @brief Configure and launch an appropriate template instance of the interleaved scan kernel.
@@ -1309,7 +1334,7 @@ void ivfflat_interleaved_scan(const index<T, IdxT>& index,
                               uint32_t& grid_dim_x,
                               rmm::cuda_stream_view stream)
 {
-  const int capacity = raft::bound_by_power_of_two(k);
+  const int capacity = std::max(BASE_CAPACITY, bound_by_power_of_two(k));
 
   auto filter_adapter = cuvs::neighbors::filtering::ivf_to_sample_filter(
     index.inds_ptrs().data_handle(), sample_filter);
