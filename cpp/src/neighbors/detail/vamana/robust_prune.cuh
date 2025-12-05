@@ -51,9 +51,9 @@ namespace {
 **********************************************************************************************/
 template <typename T,
           typename accT,
-          typename IdxT     = uint32_t,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename IdxT = uint32_t,
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 __global__ void RobustPruneKernel(
   raft::device_matrix_view<IdxT, int64_t> graph,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
@@ -103,9 +103,7 @@ __global__ void RobustPruneKernel(
     __syncthreads();
     if (threadIdx.x == 0) {
       for (int j = 0; j < degree; j++) {
-        if (graph(queryId, j) == raft::upper_bound<IdxT>()) {
-          break;
-        }
+        if (graph(queryId, j) == raft::upper_bound<IdxT>()) { break; }
       }
     }
     for (int j = threadIdx.x; j < degree + visited_size; j += blockDim.x) {
