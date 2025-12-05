@@ -47,6 +47,12 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
+  public HnswIndex hnswIndexBuild(CuVSResources resources, HnswIndexParams hnswParams, CuVSMatrix dataset)
+      throws Throwable {
+    throw new UnsupportedOperationException(reasons);
+  }
+
+  @Override
   public TieredIndex.Builder newTieredIndexBuilder(CuVSResources cuVSResources) {
     throw new UnsupportedOperationException(reasons);
   }
