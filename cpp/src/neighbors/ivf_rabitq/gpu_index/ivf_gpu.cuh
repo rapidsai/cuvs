@@ -214,28 +214,10 @@ class IVFGPU {
                         const PID* device_cluster_ids,
                         bool fast_quantize);
 
-  /**
-   * @brief ANN search
-   *
-   * @param host_query pointer to query vector (currently on host)
-   * @param results pid results function
-   * @param k number of nearest neighbors to retrieve.
-   * @param nprobe number of nearest clusters to probe.
-   */
-  void search(const float* d_query, size_t k, size_t nprobe, PID* results) const;
-  //    void search(const float* host_query, float* results, size_t k, size_t nprobe) const;
-  void search_with_time(const float* d_query,
-                        size_t k,
-                        size_t nprobe,
-                        PID* results,
-                        std::vector<int>& probe_hist) const;
-
-  // save_batch_flag and load_batch_flag are add for compatity with the previous non-batch index,
-  // load_transposed only applies for new batch index
+  // save_batch_flag for compatity with the previous non-batch index,
   void save(const char* filename, bool save_batch_flag = false) const;
 
-  void load(const char* filename, bool load_batch_flag = false);
-
+  // load_transposed only applies for new batch index
   void load_transposed(const char* filename);
 
   // device data getters
@@ -299,26 +281,6 @@ class IVFGPU {
     max_cluster_length = new_max_cluster_length;
   }
 
-  void MemOptimizedSearch(
-    const float* d_query, size_t k, size_t nprobe, PID* results, void* searcher) const;
-
-  void CPUGPUCoSearch(
-    const float* d_query, size_t k, size_t nprobe, PID* results, void* searcher1) const;
-
-  void CPUGPUCoSearchV2(
-    const float* d_query, size_t k, size_t nprobe, PID* results, void* searcher1) const;
-
-  void MemOptimizedSearchV2(
-    const float* d_query, size_t k, size_t nprobe, PID* results, void* searcher1) const;
-
-  void MultiClusterSearch(const float* d_query,
-                          size_t k,
-                          size_t nprobe,
-                          PID* results,
-                          void* searcher1,
-                          std::vector<DeviceResultPool>& knn_array,
-                          std::vector<Candidate>& centroid_candidates) const;
-
   void BatchClusterSearch(const float* d_query,
                           size_t k,
                           size_t nprobe,
@@ -328,16 +290,6 @@ class IVFGPU {
                           float* d_final_dists,
                           PID* d_topk_pids,
                           PID* d_final_pids);
-
-  void BatchClusterSearchPreComputeThresholds(const float* d_query,
-                                              size_t k,
-                                              size_t nprobe,
-                                              void* searcher,
-                                              size_t batch_size,
-                                              float* d_topk_dists,
-                                              float* d_final_dists,
-                                              PID* d_topk_pids,
-                                              PID* d_final_pids);
 
   void BatchClusterSearchLUT16(const float* d_query,
                                size_t k,
@@ -412,13 +364,6 @@ class IVFGPU {
                         float* rotated_c) const;
 
   void AllocateHostMemory();
-
-  void BatchClusterSearchGather(const float* d_query,
-                                size_t k,
-                                size_t nprobe,
-                                void* searcher,
-                                size_t batch_size,
-                                rmm::cuda_stream_view single_stream);
 
   raft::resources const& handle_;  // reusable resource handle
   rmm::cuda_stream_view stream_ =
