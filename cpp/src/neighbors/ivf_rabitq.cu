@@ -106,29 +106,29 @@ void search(raft::resources const& handle,
 {
   auto stream = raft::resource::get_cuda_stream(handle).value();
 
-  size_t NQ           = queries.extent(0);
-  size_t dim          = queries.extent(1);
-  auto padded_dim     = idx.rabitq_index().get_num_padded_dim();
-  auto padded_queries = raft::make_device_matrix<T, int64_t>(handle, NQ, padded_dim);
-  if (padded_dim != dim) {
+  size_t NQ            = queries.extent(0);
+  size_t dim           = queries.extent(1);
+  auto padded_dim      = idx.rabitq_index().get_num_padded_dim();
+  auto rotated_queries = raft::make_device_matrix<T, int64_t>(handle, NQ, padded_dim);
+  if (padded_dim == dim) {
+    // TODO: replace RotatorGPU::rotate with cuVS/RAFT primitives
+    idx.rabitq_index().rotator().rotate(queries.data_handle(), rotated_queries.data_handle(), NQ);
+  } else {
+    auto padded_queries = raft::make_device_matrix<T, int64_t>(handle, NQ, padded_dim);
     RAFT_CUDA_TRY(
       cudaMemsetAsync(padded_queries.data_handle(), 0, sizeof(T) * NQ * padded_dim, stream));
+    RAFT_CUDA_TRY(cudaMemcpy2DAsync(padded_queries.data_handle(),
+                                    sizeof(T) * padded_dim,
+                                    queries.data_handle(),
+                                    sizeof(T) * dim,
+                                    sizeof(T) * dim,
+                                    NQ,
+                                    cudaMemcpyDefault,
+                                    stream));
+    // TODO: replace RotatorGPU::rotate with cuVS/RAFT primitives
+    idx.rabitq_index().rotator().rotate(
+      padded_queries.data_handle(), rotated_queries.data_handle(), NQ);
   }
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(padded_queries.data_handle(),
-                                  sizeof(T) * padded_dim,
-                                  queries.data_handle(),
-                                  sizeof(T) * dim,
-                                  sizeof(T) * dim,
-                                  NQ,
-                                  cudaMemcpyDefault,
-                                  stream));
-  raft::resource::sync_stream(handle);
-
-  auto rotated_queries = raft::make_device_matrix<T, int64_t>(handle, NQ, padded_dim);
-
-  // TODO: replace RotatorGPU::rotate with cuVS/RAFT primitives
-  idx.rabitq_index().rotator().rotate(
-    padded_queries.data_handle(), rotated_queries.data_handle(), NQ);
 
   auto search_mode_to_string = [](search_mode mode) -> std::string {
     switch (mode) {
