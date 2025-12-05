@@ -29,27 +29,5 @@ inline T* align_mm(size_t nbytes)
   return static_cast<T*>(p);
 }
 
-template <typename T, size_t alignment = 64>
-struct align_allocator {
-  T* ptr            = nullptr;
-  size_t alignment_ = alignment;
-  using value_type  = T;
-  T* allocate(size_t n)
-  {
-    size_t nbytes = rd_up_to_multiple_of(n * sizeof(T), alignment_);
-    return ptr    = (T*)std::aligned_alloc(alignment_, nbytes);
-  }
-  void deallocate(T* p, size_t)
-  {
-    std::free(p);
-    p = nullptr;
-  }
-  template <typename U>
-  struct rebind {
-    typedef align_allocator<U> other;
-  };
-  bool operator!=(const align_allocator& rhs) { return alignment_ != rhs.alignment_; }
-  bool operator==(const align_allocator& rhs) { return alignment_ == rhs.alignment_; }
-};
 }  // namespace memory
 }  // namespace cuvs::neighbors::ivf_rabitq::detail
