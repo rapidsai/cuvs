@@ -10,7 +10,6 @@
 #pragma once
 
 #include "ivf_gpu.cuh"
-#include "pool_gpu.cuh"
 #include "quantizer_gpu.cuh"
 
 #include <raft/core/device_mdarray.hpp>

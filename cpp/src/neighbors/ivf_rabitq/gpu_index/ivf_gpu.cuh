@@ -11,7 +11,6 @@
 
 #include "../defines.hpp"
 #include "initializer_gpu.cuh"
-#include "pool_gpu.cuh"
 #include "quantizer_gpu.cuh"
 #include "rotator_gpu.cuh"
 

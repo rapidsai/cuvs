@@ -213,7 +213,6 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ivf_rabitq/gpu_index/initializer_gpu.cu
     src/neighbors/ivf_rabitq/gpu_index/quantizer_gpu.cu
     src/neighbors/ivf_rabitq/gpu_index/rotator_gpu.cu
-    src/neighbors/ivf_rabitq/gpu_index/pool_gpu.cu
     src/neighbors/ivf_rabitq/gpu_index/searcher_gpu.cu
     src/neighbors/ivf_rabitq/gpu_index/quantizer_gpu_fast.cu
   )
