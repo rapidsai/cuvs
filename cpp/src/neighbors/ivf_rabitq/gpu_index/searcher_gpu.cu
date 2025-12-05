@@ -8,7 +8,7 @@
 //
 
 #include "../utils/memory.hpp"
-#include "../utils/space_cuda.cuh"
+#include "../utils/space.hpp"
 #include "searcher_gpu.cuh"
 
 #include <raft/core/resource/cuda_stream.hpp>

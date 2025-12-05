@@ -5,34 +5,11 @@
 
 #pragma once
 
-#include <raft/core/resources.hpp>
-
-#include <thrust/device_vector.h>
-#include <thrust/functional.h>
-#include <thrust/transform_reduce.h>
+#include <algorithm>
+#include <cmath>
+#include <numeric>
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
-
-struct L2Functor {
-  __host__ __device__ float operator()(const thrust::tuple<float, float>& t) const
-  {
-    float x    = thrust::get<0>(t);
-    float y    = thrust::get<1>(t);
-    float diff = x - y;
-    return diff * diff;
-  }
-};
-
-float L2SqrThrust(raft::resources const& handle, const float* h_x, const float* h_y, size_t N);
-
-float L2SqrCPU_STL(const float* h_x, const float* h_y, size_t N);
-
-float L2Sqr_CUDA(raft::resources const& handle, const float* x, const float* y, size_t L);
-
-void high_acc_quantize16_scalar(int16_t* __restrict__ result,
-                                const float* __restrict__ q,
-                                float& width,
-                                size_t D);
 
 inline float normalize_query16_scalar(float* unit_q,  // out: normalised vector (length D)
                                       const float* __restrict__ q,
@@ -60,14 +37,19 @@ inline float normalize_query16_scalar(float* unit_q,  // out: normalised vector 
   }
 }
 
-inline float compute_sum_q(const float* __restrict__ q, size_t D)
+inline float L2SqrCPU_STL(const float* h_x, const float* h_y, size_t N)
 {
-  float sum = 0.0f;
-  for (size_t i = 0; i < D; ++i) {
-    float u = q[i];  // (q - c) / norm       // use this for float
-    sum += u;        // running sum
-  }
-  return sum;  // same as _mm512_reduce_add_ps
+  // Using STL algorithms
+  return std::inner_product(
+    h_x,
+    h_x + N,                // First range
+    h_y,                    // Second range begin
+    0.0f,                   // Initial value
+    std::plus<float>(),     // Sum operation
+    [](float a, float b) {  // Product operation (replaced with squared difference)
+      float diff = a - b;
+      return diff * diff;
+    });
 }
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

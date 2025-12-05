@@ -10,7 +10,6 @@
 #pragma once
 
 #include "../defines.hpp"
-#include "../utils/utils_cuda.cuh"
 #include "initializer_gpu.cuh"
 #include "pool_gpu.cuh"
 #include "quantizer_gpu.cuh"

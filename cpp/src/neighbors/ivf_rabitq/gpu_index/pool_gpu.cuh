@@ -9,8 +9,6 @@
 
 #pragma once
 
-#include "../utils/utils_cuda.cuh"
-
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/resources.hpp>
 

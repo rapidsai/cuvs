@@ -9,6 +9,8 @@
 
 #include "initializer_gpu.cuh"
 
+#include <raft/core/host_mdarray.hpp>
+
 #include <thrust/device_ptr.h>
 #include <thrust/sequence.h>
 #include <thrust/sort.h>

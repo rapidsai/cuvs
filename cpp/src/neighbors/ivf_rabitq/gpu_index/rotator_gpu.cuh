@@ -10,7 +10,6 @@
 #pragma once
 
 #include "../defines.hpp"
-#include "../utils/utils_cuda.cuh"
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/mdspan_types.hpp>

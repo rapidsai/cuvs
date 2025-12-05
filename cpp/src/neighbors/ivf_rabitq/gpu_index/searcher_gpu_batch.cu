@@ -9,19 +9,22 @@
 
 #include "searcher_gpu.cuh"
 
+#include <raft/core/device_mdarray.hpp>
+#include <raft/core/device_resources.hpp>
+#include <raft/matrix/select_k.cuh>
+#include <raft/neighbors/detail/ivf_flat_interleaved_scan.cuh>
+
+#include <thrust/device_ptr.h>
+#include <thrust/fill.h>
+#include <thrust/gather.h>
+#include <thrust/sequence.h>
+
 #include <cfloat>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cuda_runtime.h>
 #include <limits>
-#include <raft/core/device_mdarray.hpp>
-#include <raft/core/device_resources.hpp>
-#include <raft/matrix/select_k.cuh>
-#include <raft/neighbors/detail/ivf_flat_interleaved_scan.cuh>
-#include <thrust/device_ptr.h>
-#include <thrust/gather.h>
-#include <thrust/sequence.h>
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 

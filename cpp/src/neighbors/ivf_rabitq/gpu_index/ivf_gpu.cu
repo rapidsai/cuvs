@@ -13,10 +13,12 @@
 
 #include <cublas_v2.h>
 
+#include "../utils/tools.hpp"
 #include "ivf_gpu.cuh"
 #include "query_gatherer.cuh"
 #include "searcher_gpu.cuh"
 
+#include <raft/core/cublas_macros.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/matrix/select_k.cuh>
@@ -38,7 +40,7 @@ IVFGPU::IVFGPU(raft::resources const& handle,
     batch_flag(batch_flag),
     num_vectors(n),
     num_dimensions(dim),
-    num_padded_dim(rd_up_to_multiple_of_new(dim, 64)),
+    num_padded_dim(rd_up_to_multiple_of(dim, 64)),
     num_centroids(k),
     ex_bits(bits_per_dim - 1),
     initializer(nullptr),
@@ -101,7 +103,7 @@ void IVFGPU::load(const char* filename, bool load_batch_flag)
   input.read(reinterpret_cast<char*>(&this->num_vectors), sizeof(size_t));
   input.read(reinterpret_cast<char*>(&this->num_dimensions), sizeof(size_t));
   // Compute padded dimension.
-  this->num_padded_dim = rd_up_to_multiple_of_new(this->num_dimensions, 64);
+  this->num_padded_dim = rd_up_to_multiple_of(this->num_dimensions, 64);
   input.read(reinterpret_cast<char*>(&this->num_centroids), sizeof(size_t));
   input.read(reinterpret_cast<char*>(&this->ex_bits), sizeof(size_t));
   if (load_batch_flag) input.read(reinterpret_cast<char*>(&this->batch_flag), sizeof(bool));
@@ -174,7 +176,7 @@ void IVFGPU::load_transposed(const char* filename)
   input.read(reinterpret_cast<char*>(&this->num_vectors), sizeof(size_t));
   input.read(reinterpret_cast<char*>(&this->num_dimensions), sizeof(size_t));
   // Compute padded dimension.
-  this->num_padded_dim = rd_up_to_multiple_of_new(this->num_dimensions, 64);
+  this->num_padded_dim = rd_up_to_multiple_of(this->num_dimensions, 64);
   input.read(reinterpret_cast<char*>(&this->num_centroids), sizeof(size_t));
   input.read(reinterpret_cast<char*>(&this->ex_bits), sizeof(size_t));
   input.read(reinterpret_cast<char*>(&this->batch_flag), sizeof(bool));
@@ -1885,20 +1887,20 @@ void IVFGPU::BatchClusterSearch(const float* d_query,
   cublasCreate(&cb);
   cublasSetStream(cb, stream_);
   const float alpha = -2.f, beta = 0.f;
-  RABITQ_CUBLAS_CHECK(cublasSgemm(cb,
-                                  CUBLAS_OP_T,
-                                  CUBLAS_OP_N,
-                                  num_centroids,
-                                  batch_size,
-                                  num_padded_dim,
-                                  &alpha,
-                                  initializer->GetCentroid(0),
-                                  num_padded_dim,
-                                  d_query,
-                                  num_padded_dim,
-                                  &beta,
-                                  searcher_batch->get_centroid_distances(),
-                                  num_centroids));
+  RAFT_CUBLAS_TRY(cublasSgemm(cb,
+                              CUBLAS_OP_T,
+                              CUBLAS_OP_N,
+                              num_centroids,
+                              batch_size,
+                              num_padded_dim,
+                              &alpha,
+                              initializer->GetCentroid(0),
+                              num_padded_dim,
+                              d_query,
+                              num_padded_dim,
+                              &beta,
+                              searcher_batch->get_centroid_distances(),
+                              num_centroids));
 
   // Step2: fused kernel to compute q and c norms
   int grid                  = num_centroids + batch_size;
@@ -2009,20 +2011,20 @@ void IVFGPU::BatchClusterSearchLUT16(const float* d_query,
   cublasCreate(&cb);
   cublasSetStream(cb, stream_);
   const float alpha = -2.f, beta = 0.f;
-  RABITQ_CUBLAS_CHECK(cublasSgemm(cb,
-                                  CUBLAS_OP_T,
-                                  CUBLAS_OP_N,
-                                  num_centroids,
-                                  batch_size,
-                                  num_padded_dim,
-                                  &alpha,
-                                  initializer->GetCentroid(0),
-                                  num_padded_dim,
-                                  d_query,
-                                  num_padded_dim,
-                                  &beta,
-                                  searcher_batch->get_centroid_distances(),
-                                  num_centroids));
+  RAFT_CUBLAS_TRY(cublasSgemm(cb,
+                              CUBLAS_OP_T,
+                              CUBLAS_OP_N,
+                              num_centroids,
+                              batch_size,
+                              num_padded_dim,
+                              &alpha,
+                              initializer->GetCentroid(0),
+                              num_padded_dim,
+                              d_query,
+                              num_padded_dim,
+                              &beta,
+                              searcher_batch->get_centroid_distances(),
+                              num_centroids));
 
   // Step2: fused kernel to compute q and c norms
   int grid                  = num_centroids + batch_size;
@@ -2134,20 +2136,20 @@ void IVFGPU::BatchClusterSearchQuantizeQuery(const float* d_query,
   cublasCreate(&cb);
   cublasSetStream(cb, stream_);
   const float alpha = -2.f, beta = 0.f;
-  RABITQ_CUBLAS_CHECK(cublasSgemm(cb,
-                                  CUBLAS_OP_T,
-                                  CUBLAS_OP_N,
-                                  num_centroids,
-                                  batch_size,
-                                  num_padded_dim,
-                                  &alpha,
-                                  initializer->GetCentroid(0),
-                                  num_padded_dim,
-                                  d_query,
-                                  num_padded_dim,
-                                  &beta,
-                                  searcher_batch->get_centroid_distances(),
-                                  num_centroids));
+  RAFT_CUBLAS_TRY(cublasSgemm(cb,
+                              CUBLAS_OP_T,
+                              CUBLAS_OP_N,
+                              num_centroids,
+                              batch_size,
+                              num_padded_dim,
+                              &alpha,
+                              initializer->GetCentroid(0),
+                              num_padded_dim,
+                              d_query,
+                              num_padded_dim,
+                              &beta,
+                              searcher_batch->get_centroid_distances(),
+                              num_centroids));
 
   // Step2: fused kernel to compute q and c norms
   int grid                  = num_centroids + batch_size;
@@ -2258,20 +2260,20 @@ void IVFGPU::BatchClusterSearchPreComputeThresholds(const float* d_query,
   cublasCreate(&cb);
   cublasSetStream(cb, stream_);
   const float alpha = -2.f, beta = 0.f;
-  RABITQ_CUBLAS_CHECK(cublasSgemm(cb,
-                                  CUBLAS_OP_T,
-                                  CUBLAS_OP_N,
-                                  num_centroids,
-                                  batch_size,
-                                  num_padded_dim,
-                                  &alpha,
-                                  initializer->GetCentroid(0),
-                                  num_padded_dim,
-                                  d_query,
-                                  num_padded_dim,
-                                  &beta,
-                                  searcher_batch->get_centroid_distances(),
-                                  num_centroids));
+  RAFT_CUBLAS_TRY(cublasSgemm(cb,
+                              CUBLAS_OP_T,
+                              CUBLAS_OP_N,
+                              num_centroids,
+                              batch_size,
+                              num_padded_dim,
+                              &alpha,
+                              initializer->GetCentroid(0),
+                              num_padded_dim,
+                              d_query,
+                              num_padded_dim,
+                              &beta,
+                              searcher_batch->get_centroid_distances(),
+                              num_centroids));
 
   // Step2: fused kernel to compute q and c norms
   int grid                  = num_centroids + batch_size;

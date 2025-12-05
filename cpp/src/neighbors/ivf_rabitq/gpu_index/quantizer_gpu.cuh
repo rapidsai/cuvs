@@ -10,8 +10,7 @@
 #pragma once
 
 #include "../defines.hpp"
-#include "../utils/space_cuda.cuh"
-#include "../utils/tools_gpu.cuh"
+#include "../utils/tools.hpp"
 #include "rotator_gpu.cuh"
 
 #include <raft/core/resource/cuda_stream.hpp>
@@ -104,7 +103,7 @@ class DataQuantizerGPU {
                             size_t b,
                             bool batch_flag_dq = false)
     : DIM(dim),
-      D(rd_up_to_multiple_of_new(dim, 64)),
+      D(rd_up_to_multiple_of(dim, 64)),
       EX_BITS(b),
       SHORT_CODE_LENGTH((D + 31) / 32),
       LONG_CODE_LENGTH(D * EX_BITS / 8)  // Simplified for now.
@@ -134,7 +133,7 @@ class DataQuantizerGPU {
       return SHORT_CODE_LENGTH * sizeof(uint32_t);
     }
   }  // May be useless
-  size_t num_blocks(size_t num) const { return div_rd_up_new(num, FAST_SIZE); }
+  size_t num_blocks(size_t num) const { return div_rd_up(num, FAST_SIZE); }
   static constexpr size_t num_short_factors() { return NUM_SHORT_FACTORS; }
   const FastQuantizeFactors* get_query_scaling_factor() const { return &fast_quantize_factors; }
   FastQuantizeFactors* get_query_scaling_factor() { return &fast_quantize_factors; }

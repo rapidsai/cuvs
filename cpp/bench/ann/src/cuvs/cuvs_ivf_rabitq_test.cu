@@ -13,13 +13,14 @@
 #include <neighbors/ivf_rabitq/gpu_index/searcher_gpu.cuh>
 #include <neighbors/ivf_rabitq/utils/IO.hpp>
 #include <neighbors/ivf_rabitq/utils/StopW.hpp>
+#include <neighbors/ivf_rabitq/utils/space.hpp>
 
 #include <raft/core/device_resources.hpp>
 
-#include <raft/core/resources.hpp>
+#include <cuvs/cluster/kmeans.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
-#include <cuvs/cluster/kmeans.hpp>
+#include <raft/core/resources.hpp>
 
 #include <rmm/mr/device_memory_resource.hpp>
 #include <rmm/mr/pool_memory_resource.hpp>
@@ -55,15 +56,12 @@ int test_ivf_rabitq_construct_batch(raft::resources const& handle, int argc, cha
 
   // number of k-means iterations
   int kmeans_n_iters = 20;
-  if (argc > 5) {
-    kmeans_n_iters = atoi(argv[5]);
-  }
+  if (argc > 5) { kmeans_n_iters = atoi(argv[5]); }
   bool clusters_from_file = false;
   if (argc > 6) {
     std::string arg_str = argv[6];
-    clusters_from_file = (arg_str != "false" && arg_str != "0");
+    clusters_from_file  = (arg_str != "false" && arg_str != "0");
   }
-
 
   char data_file[500];
   char centroids_file[500];
@@ -78,14 +76,14 @@ int test_ivf_rabitq_construct_batch(raft::resources const& handle, int argc, cha
   sprintf(ivf_file, "ivf_exhaf%d_gpu_batch.index", B);
 
   // Load data from file (using your load_vecs template functions).
-  FloatRowMat data      = raft::make_host_matrix<float, int64_t>(0, 0);
-  FloatRowMat centroids = raft::make_host_matrix<float, int64_t>(0, 0);
-  UintRowMat cids       = raft::make_host_matrix<uint32_t, int64_t>(0, 0);
+  raft::host_matrix<float, int64_t> data      = raft::make_host_matrix<float, int64_t>(0, 0);
+  raft::host_matrix<float, int64_t> centroids = raft::make_host_matrix<float, int64_t>(0, 0);
+  raft::host_matrix<uint32_t, int64_t> cids   = raft::make_host_matrix<uint32_t, int64_t>(0, 0);
   ;  // Assume cids are stored as uint32_t
-  load_vecs<float, FloatRowMat>(data_file, data);
+  load_vecs<float, raft::host_matrix<float, int64_t>>(data_file, data);
   if (clusters_from_file) {
-    load_vecs<float, FloatRowMat>(centroids_file, centroids);
-    load_vecs<PID, UintRowMat>(cids_file, cids);
+    load_vecs<float, raft::host_matrix<float, int64_t>>(centroids_file, centroids);
+    load_vecs<PID, raft::host_matrix<uint32_t, int64_t>>(cids_file, cids);
   }
 
   size_t N   = data.extent(0);
@@ -95,105 +93,96 @@ int test_ivf_rabitq_construct_batch(raft::resources const& handle, int argc, cha
 
   StopW stopw;
   if (!clusters_from_file) {
-        // Allocate host memory for centroids and cluster IDs
-        // Timer for clustering
-        StopW clustering_timer;
-        stopw.reset();
+    // Allocate host memory for centroids and cluster IDs
+    // Timer for clustering
+    StopW clustering_timer;
+    stopw.reset();
 
-        // Create RAFT resources handle
-        raft::resources handle;
-        auto stream = raft::resource::get_cuda_stream(handle);
+    // Create RAFT resources handle
+    raft::resources handle;
+    auto stream = raft::resource::get_cuda_stream(handle);
 
-        // Create device matrices - using int for extents
-        auto d_data = raft::make_device_matrix<float, int>(handle, N, DIM);
-        auto d_centroids = raft::make_device_matrix<float, int>(handle, K, DIM);
-        auto d_labels = raft::make_device_vector<uint32_t, int>(handle, N);
+    // Create device matrices - using int for extents
+    auto d_data      = raft::make_device_matrix<float, int>(handle, N, DIM);
+    auto d_centroids = raft::make_device_matrix<float, int>(handle, K, DIM);
+    auto d_labels    = raft::make_device_vector<uint32_t, int>(handle, N);
 
-        // Perform k-means clustering using cuVS
-        std::cout << "\n=== Starting K-means Clustering ===" << std::endl;
+    // Perform k-means clustering using cuVS
+    std::cout << "\n=== Starting K-means Clustering ===" << std::endl;
 
+    // === Balanced K-means ===
+    std::cout << "Using Balanced K-means for better cluster size distribution..." << std::endl;
 
-        // === Balanced K-means ===
-        std::cout << "Using Balanced K-means for better cluster size distribution..." << std::endl;
+    // Copy data to device
+    cudaMemcpyAsync(d_data.data_handle(),
+                    data.data_handle(),
+                    N * DIM * sizeof(float),
+                    cudaMemcpyHostToDevice,
+                    stream);
 
-        // Copy data to device
-        cudaMemcpyAsync(d_data.data_handle(),
-                                   data.data_handle(),
-                                   N * DIM * sizeof(float),
-                                   cudaMemcpyHostToDevice,
-                                   stream);
+    // Set up balanced k-means parameters
+    cuvs::cluster::kmeans::balanced_params params;
+    params.n_iters = kmeans_n_iters;
+    params.metric  = cuvs::distance::DistanceType::L2Expanded;
 
-        // Set up balanced k-means parameters
-        cuvs::cluster::kmeans::balanced_params params;
-        params.n_iters = kmeans_n_iters;
-        params.metric = cuvs::distance::DistanceType::L2Expanded;
+    // Create views
+    auto data_view = raft::make_device_matrix_view<const float, int>(d_data.data_handle(), N, DIM);
+    auto centroids_view =
+      raft::make_device_matrix_view<float, int>(d_centroids.data_handle(), K, DIM);
+    auto labels_view = raft::make_device_vector_view<uint32_t, int>(d_labels.data_handle(), N);
 
-        // Create views
-        auto data_view = raft::make_device_matrix_view<const float, int>(
-                d_data.data_handle(), N, DIM);
-        auto centroids_view = raft::make_device_matrix_view<float, int>(
-                d_centroids.data_handle(), K, DIM);
-        auto labels_view = raft::make_device_vector_view<uint32_t, int>(
-                d_labels.data_handle(), N);
+    // Perform balanced k-means
+    // clustering_timer.reset();
+    cuvs::cluster::kmeans::fit_predict(handle, params, data_view, centroids_view, labels_view);
+    // cudaStreamSynchronize(stream);
+    // float clustering_time = clustering_timer.getElapsedTimeMili();
+    //
+    // std::cout << "Balanced k-means clustering completed in "
+    //           << clustering_time / 1000.0f << " seconds" << std::endl;
+    //
+    // std::cout << "Clustering results transferred to host memory" << std::endl;
 
-        // Perform balanced k-means
-        // clustering_timer.reset();
-        cuvs::cluster::kmeans::fit_predict(
-                handle,
-                params,
-                data_view,
-                centroids_view,
-                labels_view
-        );
-        // cudaStreamSynchronize(stream);
-        // float clustering_time = clustering_timer.getElapsedTimeMili();
-        //
-        // std::cout << "Balanced k-means clustering completed in "
-        //           << clustering_time / 1000.0f << " seconds" << std::endl;
-        //
-        // std::cout << "Clustering results transferred to host memory" << std::endl;
+    // Now construct the IVF index with the computed centroids and cluster IDs
+    std::cout << "\n=== Constructing IVF Index ===" << std::endl;
 
+    // Create an IVFGPU instance. (Its constructor will allocate device memory as needed.)
+    IVFGPU ivf(handle, N, DIM, K, B, true);
 
-        // Now construct the IVF index with the computed centroids and cluster IDs
-        std::cout << "\n=== Constructing IVF Index ===" << std::endl;
+    // Construct the index (this function performs necessary host-to-device transfers internally).
+    ivf.construct_on_gpu(
+      d_data.data_handle(), d_centroids.data_handle(), d_labels.data_handle(), fast_quantize_flag);
+    //    ivf.construct(data_device.data_handle(), centroids_device.data_handle(),
+    //    labels_device.data_handle(), fast_quantize_flag);
+    float minutes = stopw.getElapsedTimeMili() / 1000.0f / 60.0f;
+    float seconds = stopw.getElapsedTimeMili() / 1000.0f;
+    std::cout << "IVFGPU constructed\n";
 
+    // Save the index to a file.
+    ivf.save(ivf_file, true);
 
-        // Create an IVFGPU instance. (Its constructor will allocate device memory as needed.)
-        IVFGPU ivf(handle, N, DIM, K, B, true);
+    std::cout << "Indexing time: " << seconds << " seconds\n";
+  } else {
+    load_vecs<float, raft::host_matrix<float, int64_t>>(centroids_file, centroids);
+    load_vecs<PID, raft::host_matrix<uint32_t, int64_t>>(cids_file, cids);
 
-        // Construct the index (this function performs necessary host-to-device transfers internally).
-        ivf.construct_on_gpu(d_data.data_handle(), d_centroids.data_handle(), d_labels.data_handle(), fast_quantize_flag);
-        //    ivf.construct(data_device.data_handle(), centroids_device.data_handle(), labels_device.data_handle(), fast_quantize_flag);
-        float minutes = stopw.getElapsedTimeMili() / 1000.0f / 60.0f;
-        float seconds = stopw.getElapsedTimeMili() / 1000.0f;
-        std::cout << "IVFGPU constructed\n";
+    // Now construct the IVF index with the computed centroids and cluster IDs
+    std::cout << "\n=== Constructing IVF Index ===" << std::endl;
+    stopw.reset();
+    // Create an IVFGPU instance. (Its constructor will allocate device memory as needed.)
+    IVFGPU ivf(handle, N, DIM, K, B, true);
 
-        // Save the index to a file.
-        ivf.save(ivf_file, true);
+    // Construct the index (this function performs necessary host-to-device transfers internally).
+    ivf.construct(
+      data.data_handle(), centroids.data_handle(), cids.data_handle(), fast_quantize_flag);
+    float minutes = stopw.getElapsedTimeMili() / 1000.0f / 60.0f;
+    float seconds = stopw.getElapsedTimeMili() / 1000.0f;
+    std::cout << "IVFGPU constructed\n";
 
-        std::cout << "Indexing time: " << seconds << " seconds\n";
-    }
-    else {
-        load_vecs<float, FloatRowMat>(centroids_file, centroids);
-        load_vecs<PID, UintRowMat>(cids_file, cids);
+    // Save the index to a file.
+    ivf.save(ivf_file, true);
 
-        // Now construct the IVF index with the computed centroids and cluster IDs
-        std::cout << "\n=== Constructing IVF Index ===" << std::endl;
-        stopw.reset();
-        // Create an IVFGPU instance. (Its constructor will allocate device memory as needed.)
-        IVFGPU ivf(handle, N, DIM, K, B, true);
-
-        // Construct the index (this function performs necessary host-to-device transfers internally).
-        ivf.construct(data.data_handle(), centroids.data_handle(), cids.data_handle(), fast_quantize_flag);
-        float minutes = stopw.getElapsedTimeMili() / 1000.0f / 60.0f;
-        float seconds = stopw.getElapsedTimeMili() / 1000.0f;
-        std::cout << "IVFGPU constructed\n";
-
-        // Save the index to a file.
-        ivf.save(ivf_file, true);
-
-        std::cout << "Indexing time: " << seconds << " seconds\n";
-    }
+    std::cout << "Indexing time: " << seconds << " seconds\n";
+  }
 
   return 0;
 }
@@ -223,9 +212,9 @@ std::vector<T> horizontal_avg_standalone(const std::vector<std::vector<T>>& data
 }
 
 double get_ratio_standalone(size_t numq,
-                            const FloatRowMat& query,
-                            const FloatRowMat& data,
-                            const UintRowMat& gt,
+                            const raft::host_matrix<float, int64_t>& query,
+                            const raft::host_matrix<float, int64_t>& data,
+                            const raft::host_matrix<uint32_t, int64_t>& gt,
                             PID* ann_results,
                             size_t K,
                             float (*dist_func)(const float*, const float*, size_t))
@@ -301,13 +290,13 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
   sprintf(ivf_file, "ivf_exhaf%d_gpu_batch.index", B);
   //    sprintf(ivf_file, "../bin/test_gpu.index", DATASET, B);
 
-  FloatRowMat data  = raft::make_host_matrix<float, int64_t>(0, 0);
-  FloatRowMat query = raft::make_host_matrix<float, int64_t>(0, 0);
-  UintRowMat gt     = raft::make_host_matrix<uint32_t, int64_t>(0, 0);
+  raft::host_matrix<float, int64_t> data  = raft::make_host_matrix<float, int64_t>(0, 0);
+  raft::host_matrix<float, int64_t> query = raft::make_host_matrix<float, int64_t>(0, 0);
+  raft::host_matrix<uint32_t, int64_t> gt = raft::make_host_matrix<uint32_t, int64_t>(0, 0);
 
-  load_vecs<float, FloatRowMat>(data_file, data);
-  load_vecs_k<float, FloatRowMat>(query_file, query, EXPAND_FACTOR);
-  load_vecs_k<PID, UintRowMat>(gt_file, gt, EXPAND_FACTOR);
+  load_vecs<float, raft::host_matrix<float, int64_t>>(data_file, data);
+  load_vecs_k<float, raft::host_matrix<float, int64_t>>(query_file, query, EXPAND_FACTOR);
+  load_vecs_k<PID, raft::host_matrix<uint32_t, int64_t>>(gt_file, gt, EXPAND_FACTOR);
 
   size_t N   = data.extent(0);
   size_t DIM = data.extent(1);
@@ -355,14 +344,15 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
   size_t total_count = NQ * TOPK;
   //    StopW stopw;
 
-  FloatRowMat padded_query = raft::make_host_matrix<float, int64_t>(NQ, ivf.get_num_padded_dim());
+  raft::host_matrix<float, int64_t> padded_query =
+    raft::make_host_matrix<float, int64_t>(NQ, ivf.get_num_padded_dim());
   // padded_query.setZero();
   memset(padded_query.data_handle(), 0, sizeof(float) * NQ * ivf.get_num_padded_dim());
-  FloatRowMat rotated_query = raft::make_host_matrix<float, int64_t>(NQ, ivf.get_num_padded_dim());
+  raft::host_matrix<float, int64_t> rotated_query =
+    raft::make_host_matrix<float, int64_t>(NQ, ivf.get_num_padded_dim());
   for (size_t i = 0; i < NQ; ++i) {
     std::memcpy(&padded_query(i, 0), &query(i, 0), sizeof(float) * DIM);
   }
-
 
   // adjust nprobes
   for (auto it = all_nprobes.begin(); it != all_nprobes.end();) {
@@ -427,17 +417,19 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
       stopw.reset();
       // Allocate device memory for query vectors.
       float* d_query = nullptr;
-      cudaMallocAsync(&d_query, NQ * ivf.get_num_padded_dim() * sizeof(float) , single_stream);
+      cudaMallocAsync(&d_query, NQ * ivf.get_num_padded_dim() * sizeof(float), single_stream);
 
       // Copy query vectors from host to device.
       cudaMemcpyAsync(d_query,
-                 padded_query.data_handle(),
-                 NQ * ivf.get_num_padded_dim() * sizeof(float),
-                 cudaMemcpyHostToDevice, single_stream);
+                      padded_query.data_handle(),
+                      NQ * ivf.get_num_padded_dim() * sizeof(float),
+                      cudaMemcpyHostToDevice,
+                      single_stream);
 
       // Allocate device memory for rotated queries.
       float* d_rotated_query = nullptr;
-      cudaMallocAsync(&d_rotated_query, NQ * ivf.get_num_padded_dim() * sizeof(float), single_stream);
+      cudaMallocAsync(
+        &d_rotated_query, NQ * ivf.get_num_padded_dim() * sizeof(float), single_stream);
 
       // Rotate query and set manually
       ivf.rotator().rotate(d_query, d_rotated_query, NQ);
@@ -551,7 +543,7 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
       cudaFreeAsync(d_final_dists, single_stream);
       cudaFreeAsync(d_topk_pids, single_stream);
       cudaFreeAsync(d_final_pids, single_stream);
-      cudaFreeAsync(d_query,single_stream);
+      cudaFreeAsync(d_query, single_stream);
 
       float qps = NQ / (total_time / 1e6);
 
@@ -603,18 +595,15 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
 
   // --- Find the first nprobe where recall crosses certain thresholds ---
   struct ThresholdInfo {
-    float  threshold;
+    float threshold;
     size_t nprobe;
-    float  recall;
-    float  qps;
-    bool   found;
+    float recall;
+    float qps;
+    bool found;
   };
 
   std::vector<ThresholdInfo> thresholds = {
-    {0.90f, 0, 0.0f, 0.0f, false},
-    {0.95f, 0, 0.0f, 0.0f, false},
-    {0.99f, 0, 0.0f, 0.0f, false}
-  };
+    {0.90f, 0, 0.0f, 0.0f, false}, {0.95f, 0, 0.0f, 0.0f, false}, {0.99f, 0, 0.0f, 0.0f, false}};
 
   // For each threshold, find the earliest nprobe that meets recall >= threshold.
   for (auto& t : thresholds) {
@@ -632,14 +621,11 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
   std::cout << "\nRecall threshold summary (first nprobe reaching each level):\n";
   for (auto const& t : thresholds) {
     if (t.found) {
-      std::cout << "  recall >= " << t.threshold
-                << " at nprobe = " << t.nprobe
-                << "  (recall = " << std::fixed << std::setprecision(P_RECALL)
-                << t.recall << ", QPS = " << std::setprecision(P_QPS)
-                << t.qps << ")\n";
+      std::cout << "  recall >= " << t.threshold << " at nprobe = " << t.nprobe
+                << "  (recall = " << std::fixed << std::setprecision(P_RECALL) << t.recall
+                << ", QPS = " << std::setprecision(P_QPS) << t.qps << ")\n";
     } else {
-      std::cout << "  recall >= " << t.threshold
-                << " was NOT reached for any nprobe.\n";
+      std::cout << "  recall >= " << t.threshold << " was NOT reached for any nprobe.\n";
     }
   }
 
