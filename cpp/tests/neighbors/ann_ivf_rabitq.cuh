@@ -307,12 +307,17 @@ inline auto var_bits_per_dim() -> test_cases_t
 {
   ivf_rabitq_inputs dflt;
   std::vector<uint32_t> xs;
-  for (auto x = 2; x <= 9; ++x) {
+  for (auto x = 1; x <= 9; ++x) {
     xs.push_back(x);
   }
   return map<ivf_rabitq_inputs>(xs, [](uint32_t bits_per_dim) {
     ivf_rabitq_inputs x;
     x.index_params.bits_per_dim = bits_per_dim;
+    if (bits_per_dim == 1) {
+      // bit_per_dim = 1 is only supported for search mode QUANT4
+      x.search_params.mode = ivf_rabitq::search_mode::QUANT4;
+      x.min_recall         = 0.3;
+    }
     return x;
   });
 }
