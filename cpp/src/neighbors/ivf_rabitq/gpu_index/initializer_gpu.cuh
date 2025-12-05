@@ -107,19 +107,6 @@ class FlatInitializerGPU : public InitializerGPU {
 
   void SaveCentroids(std::ofstream& output, const char* filename) const override;
 
-  __host__ __device__ float* GetCentroidTranspose(PID id) const;
-
-  void AddVectorsTranspose(const float* cent);
-
-  void ComputeCentroidsDistancesTranspose(const float* query,
-                                          size_t nprobe,
-                                          Candidate* candidates,
-                                          size_t num_candidates) const;
-
-  void LoadCentroidsTranspose(std::ifstream& input, const char* filename);
-
-  void SaveCentroidsTranspose(std::ofstream& output, const char* filename) const;
-
  private:
   // D, K are inherited from parent
 
