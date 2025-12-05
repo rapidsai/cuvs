@@ -571,7 +571,7 @@ TEST(CagraC, BuildMergeSearch)
   cuvsResourcesDestroy(res);
 }
 
-TEST(CagraC, BuildSearchACEMemory)
+TEST(CagraC, BuildSearchACE)
 {
   // create cuvsResources_t
   cuvsResources_t res;
@@ -595,7 +595,7 @@ TEST(CagraC, BuildSearchACEMemory)
   cuvsCagraIndex_t index;
   cuvsCagraIndexCreate(&index);
 
-  // build index with ACE memory mode
+  // build index with ACE (always uses disk-based storage)
   cuvsCagraIndexParams_t build_params;
   cuvsCagraIndexParamsCreate(&build_params);
   build_params->build_algo = ACE;
@@ -604,7 +604,6 @@ TEST(CagraC, BuildSearchACEMemory)
   cuvsAceParamsCreate(&ace_params);
   ace_params->npartitions = 2;
   ace_params->ef_construction = 120;
-  ace_params->use_disk = false;
 
   build_params->graph_build_params = ace_params;
   cuvsCagraBuild(res, build_params, &dataset_tensor, index);
@@ -675,7 +674,7 @@ TEST(CagraC, BuildSearchACEMemory)
   cuvsResourcesDestroy(res);
 }
 
-TEST(CagraC, BuildSearchACEDisk)
+TEST(CagraC, BuildSearchACEWithHNSW)
 {
   // create cuvsResources_t
   cuvsResources_t res;
@@ -697,7 +696,7 @@ TEST(CagraC, BuildSearchACEDisk)
   cuvsCagraIndex_t index;
   cuvsCagraIndexCreate(&index);
 
-  // build index with ACE memory mode
+  // build index with ACE (always uses disk-based storage)
   cuvsCagraIndexParams_t build_params;
   cuvsCagraIndexParamsCreate(&build_params);
   build_params->build_algo = ACE;
@@ -706,7 +705,6 @@ TEST(CagraC, BuildSearchACEDisk)
   cuvsAceParamsCreate(&ace_params);
   ace_params->npartitions = 2;
   ace_params->ef_construction = 120;
-  ace_params->use_disk = true;
   ace_params->build_dir = strdup("/tmp/cagra_ace_test_disk");
 
   build_params->graph_build_params = ace_params;

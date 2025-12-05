@@ -88,10 +88,11 @@ static void _set_graph_build_params(
       cuvs::neighbors::cagra::graph_build_params::ace_params ace_p;
       if (params.graph_build_params) {
         auto ace_params_c             = static_cast<cuvsAceParams*>(params.graph_build_params);
-        ace_p.npartitions     = ace_params_c->npartitions;
-        ace_p.ef_construction = ace_params_c->ef_construction;
-        ace_p.build_dir       = std::string(ace_params_c->build_dir);
-        ace_p.use_disk        = ace_params_c->use_disk;
+        ace_p.npartitions         = ace_params_c->npartitions;
+        ace_p.ef_construction     = ace_params_c->ef_construction;
+        ace_p.build_dir           = std::string(ace_params_c->build_dir);
+        ace_p.max_host_memory_gb  = ace_params_c->max_host_memory_gb;
+        ace_p.max_gpu_memory_gb   = ace_params_c->max_gpu_memory_gb;
       }
       out_params = ace_p;
       break;
@@ -414,7 +415,8 @@ static void _populate_cagra_index_params_from_cpp(cuvsCagraIndexParams_t c_param
     c_ace_params->npartitions = ace_params.npartitions;
     c_ace_params->ef_construction = ace_params.ef_construction;
     c_ace_params->build_dir = ace_params.build_dir.empty() ? nullptr : strdup(ace_params.build_dir.c_str());
-    c_ace_params->use_disk = ace_params.use_disk;
+    c_ace_params->max_host_memory_gb = ace_params.max_host_memory_gb;
+    c_ace_params->max_gpu_memory_gb = ace_params.max_gpu_memory_gb;
     c_params->graph_build_params = c_ace_params;
   }
 }
@@ -778,10 +780,11 @@ extern "C" cuvsError_t cuvsAceParamsCreate(cuvsAceParams_t* params)
     // Allocate and copy the build directory string
     const char* build_dir = strdup(ps.build_dir.c_str());
 
-    *params = new cuvsAceParams{.npartitions     = ps.npartitions,
-                                .ef_construction = ps.ef_construction,
-                                .build_dir       = build_dir,
-                                .use_disk        = ps.use_disk};
+    *params = new cuvsAceParams{.npartitions         = ps.npartitions,
+                                .ef_construction     = ps.ef_construction,
+                                .build_dir           = build_dir,
+                                .max_host_memory_gb  = ps.max_host_memory_gb,
+                                .max_gpu_memory_gb   = ps.max_gpu_memory_gb};
   });
 }
 

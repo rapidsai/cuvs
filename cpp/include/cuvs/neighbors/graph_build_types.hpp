@@ -99,6 +99,10 @@ struct ace_params {
   /**
    * Number of partitions for ACE (Augmented Core Extraction) partitioned build.
    *
+   * When set to 0 (default), the number of partitions is automatically derived
+   * based on available host and GPU memory to maximize partition size while
+   * ensuring the build fits in memory.
+   *
    * Small values might improve recall but potentially degrade performance and
    * increase memory usage. Partitions should not be too small to prevent issues
    * in KNN graph construction. 100k - 5M vectors per partition is recommended
@@ -106,8 +110,12 @@ struct ace_params {
    * average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because of the
    * core and augmented vectors. Please account for imbalance in the partition
    * sizes (up to 3x in our tests).
+   *
+   * If the specified number of partitions results in partitions that exceed
+   * available memory, the value will be automatically increased to fit memory
+   * constraints and a warning will be issued.
    */
-  size_t npartitions = 1;
+  size_t npartitions = 0;
   /**
    * The index quality for the ACE build.
    *
@@ -116,19 +124,29 @@ struct ace_params {
    */
   size_t ef_construction = 120;
   /**
-   * Directory to store ACE build artifacts (e.g., KNN graph, optimized graph).
+   * Directory to store ACE build artifacts (e.g., KNN graph, optimized graph, reordered dataset).
    *
-   * Used when `use_disk` is true or when the graph does not fit in host and GPU
-   * memory. This should be the fastest disk in the system and hold enough space
+   * ACE always uses disk-based storage for memory-efficient graph construction.
+   * This should be the fastest disk in the system and hold enough space
    * for twice the dataset, final graph, and label mapping.
    */
   std::string build_dir = "/tmp/ace_build";
   /**
-   * Whether to use disk-based storage for ACE build.
+   * Maximum host memory to use for ACE build in GiB.
    *
-   * When true, enables disk-based operations for memory-efficient graph construction.
+   * When set to 0 (default), uses available host memory.
+   * When set to a positive value, limits host memory usage to the specified amount.
+   * Useful for testing or when running alongside other memory-intensive processes.
    */
-  bool use_disk = false;
+  double max_host_memory_gb = 0;
+  /**
+   * Maximum GPU memory to use for ACE build in GiB.
+   *
+   * When set to 0 (default), uses available GPU memory.
+   * When set to a positive value, limits GPU memory usage to the specified amount.
+   * Useful for testing or when running alongside other memory-intensive processes.
+   */
+  double max_gpu_memory_gb = 0;
 
   ace_params() = default;
 };

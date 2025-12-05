@@ -348,7 +348,6 @@ void parse_build_param(const nlohmann::json& conf,
       if (ace_conf.contains("ef_construction")) {
         ace_params.ef_construction = ace_conf.at("ef_construction");
       }
-      if (ace_conf.contains("use_disk")) { ace_params.use_disk = ace_conf.at("use_disk"); }
       cagra_params.graph_build_params = ace_params;
     }
     ::parse_build_param<T, IdxT>(conf, cagra_params);
