@@ -466,9 +466,11 @@ void calc_centers_and_sizes(const raft::resources& handle,
       mapping_itr, dim, labels, nullptr, n_rows, dim, n_clusters, centers, stream, reset_counters);
   }
 
+  raft::resource::sync_stream(handle); 
+
   // Compute weight of each cluster
-  // cuvs::cluster::kmeans::detail::countLabels(
-  //   handle, labels, temp_sizes, n_rows, n_clusters, workspace);
+  cuvs::cluster::kmeans::detail::countLabels(
+    handle, labels, temp_sizes, n_rows, n_clusters, workspace);
 
   // Add previous sizes if necessary
   if (!reset_counters) {
@@ -596,7 +598,7 @@ void predict(const raft::resources& handle,
         compute_norm(handle,
                      cur_dataset_norm.data(),
                      cur_dataset_ptr,
-                     transformed_dim,
+                     dim,
                      minibatch_size,
                      mapping_op,
                      raft::sqrt_op{},
@@ -605,7 +607,7 @@ void predict(const raft::resources& handle,
         compute_norm(handle,
                      cur_dataset_norm.data(),
                      cur_dataset_ptr,
-                     transformed_dim,
+                     dim,
                      minibatch_size,
                      mapping_op,
                      raft::identity_op{},
