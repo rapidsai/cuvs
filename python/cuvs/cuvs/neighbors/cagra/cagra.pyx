@@ -350,6 +350,8 @@ cdef class IndexParams:
             new_ace_params.npartitions = ace_params.params.npartitions
             new_ace_params.ef_construction = ace_params.params.ef_construction
             new_ace_params.use_disk = ace_params.params.use_disk
+            new_ace_params.max_host_memory_gb = ace_params.params.max_host_memory_gb
+            new_ace_params.max_gpu_memory_gb = ace_params.params.max_gpu_memory_gb
 
             # Copy the build_dir string
             if new_ace_params.build_dir != NULL:
