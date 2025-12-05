@@ -7,15 +7,8 @@
 // Created by Stardust on 2/23/25.
 //
 
-#include "omp.h"
-#include <chrono>
-#include <cuda_runtime.h>
-
-#include <cublas_v2.h>
-
 #include "../utils/tools.hpp"
 #include "ivf_gpu.cuh"
-#include "query_gatherer.cuh"
 #include "searcher_gpu.cuh"
 
 #include <raft/core/cublas_macros.hpp>
@@ -25,6 +18,11 @@
 
 #include <thrust/sort.h>
 
+#include <cublas_v2.h>
+
+#include <cuda_runtime.h>
+
+#include <chrono>
 #include <limits>
 #include <numeric>
 
