@@ -91,8 +91,6 @@ class DataQuantizerGPU {
                       const float* d_fac_x2,
                       size_t num_points) const;
 
-  void store_compacted_code(uint8_t* dest, uint8_t* src) const;
-
  public:
   static float get_const_scaling_factors(raft::resources const& handle, size_t dim, size_t ex_bits);
 
@@ -132,7 +130,7 @@ class DataQuantizerGPU {
       // 3 factors for batch: f_add, f_rescale and f_error are stored separately
       return SHORT_CODE_LENGTH * sizeof(uint32_t);
     }
-  }  // May be useless
+  }
   size_t num_blocks(size_t num) const { return div_rd_up(num, FAST_SIZE); }
   static constexpr size_t num_short_factors() { return NUM_SHORT_FACTORS; }
   const FastQuantizeFactors* get_query_scaling_factor() const { return &fast_quantize_factors; }
@@ -190,18 +188,6 @@ class DataQuantizerGPU {
    * @param outExFactor Output buffer for extra factors.
    * @param outTemp Temporary buffer.
    */
-
-  void quantize_batch(const float* d_data,
-                      const float* d_centroid,
-                      const PID* d_IDs,
-                      size_t num_points,
-                      const RotatorGPU& rotator,
-                      uint32_t* d_short_data,
-                      float* short_data_factors,
-                      uint8_t* d_long_code,
-                      float* d_ex_factor,
-                      float* d_rotated_c) const;
-
   void quantize_batch_opt(const float* d_data,
                           const float* d_centroid,
                           const PID* d_IDs,
@@ -271,16 +257,6 @@ class DataQuantizerGPU {
                            float* d_XP_norm,
                            int* d_bin_XP) const;
 
-  void data_transformation_batch(const float* d_data,
-                                 const float* d_centroid,
-                                 const PID* d_IDs,
-                                 size_t num_points,
-                                 const RotatorGPU& rotator,
-                                 float* d_rotated_c,
-                                 float* d_XP_norm,
-                                 int* d_bin_XP,
-                                 float* d_XP) const;
-
   void data_transformation_batch_opt(const float* d_data,
                                      const float* d_centroid,
                                      const PID* d_IDs,
@@ -290,21 +266,6 @@ class DataQuantizerGPU {
                                      float* d_XP_norm,
                                      int* d_bin_XP,
                                      float* d_XP);
-
-  void exrabitq_codes_hybrid_advanced(const int* d_bin_XP,
-                                      const float* d_XP_norm,
-                                      uint8_t* d_long_code,
-                                      float* d_ex_factor,
-                                      const float* d_fac_x2,
-                                      size_t num_points) const;
-
-  void exrabitq_codes_batch(const int* d_bin_XP,
-                            const float* d_XP_norm,
-                            float* d_XP,
-                            uint8_t* d_long_code,
-                            float* d_ex_factor,
-                            const float* d_fac_x2,
-                            size_t num_points) const;
 
   void exrabitq_codes_and_factors_fused(const int* d_bin_XP,
                                         const float* d_XP_norm,
