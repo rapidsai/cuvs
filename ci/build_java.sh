@@ -4,6 +4,8 @@
 
 set -euo pipefail
 
+source ./ci/use_conda_packages_from_prs.sh
+
 # TODO: Remove this argument-handling when build and test workflows are separated,
 #       and test_java.sh no longer calls build_java.sh
 #       ref: https://github.com/rapidsai/cuvs/issues/868
@@ -21,7 +23,6 @@ conda config --set channel_priority strict
 
 rapids-logger "Downloading artifacts from previous jobs"
 CPP_CHANNEL=$(rapids-download-conda-from-github cpp)
-source ./ci/use_conda_packages_from_prs.sh
 
 rapids-logger "Generate Java testing dependencies"
 
