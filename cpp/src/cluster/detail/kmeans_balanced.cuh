@@ -58,9 +58,6 @@ constexpr static inline float kAdjustCentersWeight = 7.0f;
  *
  * This helper function creates a thrust transform iterator that expands packed
  * uint8_t data into float values on-the-fly (bit 1 → +1.0f, bit 0 → -1.0f),
- * avoiding the need to materialize the expanded data in memory.
- *
- * Uses the existing bitwise_decode_op from ann_utils.cuh.
  *
  * @tparam IdxT index type
  *
@@ -70,10 +67,11 @@ constexpr static inline float kAdjustCentersWeight = 7.0f;
  * @return A transform iterator that yields float values for each bit
  */
 template <typename MathT, typename IdxT>
-auto make_bitwise_expanded_iterator(const uint8_t* packed_data)
+auto make_bitwise_expanded_iterator(const uint8_t* packed_data, IdxT packed_dim)
 {
   auto counting_iter = thrust::make_counting_iterator<IdxT>(0);
-  auto decoder = cuvs::spatial::knn::detail::utils::bitwise_decode_op<MathT, IdxT>(packed_data);
+  auto decoder =
+    cuvs::spatial::knn::detail::utils::bitwise_decode_op<MathT, IdxT>(packed_data, packed_dim);
   return thrust::make_transform_iterator(counting_iter, decoder);
 }
 
@@ -441,7 +439,7 @@ void calc_centers_and_sizes(const raft::resources& handle,
   if (is_packed_binary) {
     if constexpr (std::is_same_v<T, uint8_t>) {
       RAFT_EXPECTS(dim * 8 == centers_dim, "dim must be the packed dimension");
-      auto decoded_dataset_iter = make_bitwise_expanded_iterator<MathT, IdxT>(dataset);
+      auto decoded_dataset_iter = make_bitwise_expanded_iterator<MathT, IdxT>(dataset, dim);
       raft::linalg::reduce_rows_by_key(decoded_dataset_iter,
                                        centers_dim,
                                        labels,
@@ -452,6 +450,7 @@ void calc_centers_and_sizes(const raft::resources& handle,
                                        centers,
                                        stream,
                                        reset_counters);
+      raft::print_device_vector("labels", labels, n_rows, std::cout);
     } else {
       RAFT_FAIL("Packed binary mode is only supported for uint8_t data type");
     }
@@ -468,8 +467,8 @@ void calc_centers_and_sizes(const raft::resources& handle,
   }
 
   // Compute weight of each cluster
-  cuvs::cluster::kmeans::detail::countLabels(
-    handle, labels, temp_sizes, n_rows, n_clusters, workspace);
+  // cuvs::cluster::kmeans::detail::countLabels(
+  //   handle, labels, temp_sizes, n_rows, n_clusters, workspace);
 
   // Add previous sizes if necessary
   if (!reset_counters) {
@@ -505,9 +504,12 @@ void compute_norm(const raft::resources& handle,
     dataset_ptr = reinterpret_cast<const MathT*>(dataset);
   } else {
     mapped_dataset.resize(n_rows * dim, stream);
+
     raft::linalg::unaryOp(mapped_dataset.data(), dataset, n_rows * dim, mapping_op, stream);
+
     dataset_ptr = static_cast<const MathT*>(mapped_dataset.data());
   }
+
   raft::linalg::rowNorm<raft::linalg::L2Norm, true, MathT, IdxT>(
     dataset_norm, dataset_ptr, dim, n_rows, stream, norm_fin_op);
 }
@@ -581,7 +583,7 @@ void predict(const raft::resources& handle,
                                  raft::make_device_matrix_view<MathT, IdxT>(
                                    cur_dataset_ptr, minibatch_size, transformed_dim),
                                  cuvs::spatial::knn::detail::utils::bitwise_decode_op<MathT, IdxT>(
-                                   dataset + offset * dim));
+                                   dataset + offset * dim, dim));
       }
     } else {
       raft::linalg::unaryOp(
@@ -758,7 +760,7 @@ auto adjust_centers(MathT* centers,
   if (is_packed_binary) {
     IdxT transformed_dim = is_packed_binary ? dim * 8 : dim;
     if constexpr (std::is_same_v<T, uint8_t>) {
-      auto dataset_iterator = make_bitwise_expanded_iterator<MathT, IdxT>(dataset);
+      auto dataset_iterator = make_bitwise_expanded_iterator<MathT, IdxT>(dataset, dim);
       adjust_centers_kernel<kBlockDimY><<<grid_dim, block_dim, 0, stream>>>(centers,
                                                                             n_clusters,
                                                                             transformed_dim,
@@ -1141,17 +1143,8 @@ auto build_fine_clusters(const raft::resources& handle,
       RAFT_EXPECTS(fine_clusters_nums[i] > 0,
                    "Number of fine clusters must be non-zero for a non-empty mesocluster");
     }
-    IdxT transformed_dim = params.is_packed_binary ? dim * 8 : dim;
-    if (params.is_packed_binary) {
-      if constexpr (std::is_same_v<T, uint8_t>) {
-        auto dataset_iterator = make_bitwise_expanded_iterator<MathT, IdxT>(dataset_mptr);
-        raft::matrix::gather(
-          dataset_iterator, transformed_dim, n_rows, mc_trainset_ids, k, mc_trainset, stream);
-      }
-    } else {
-      thrust::transform_iterator<MappingOpT, const T*> mapping_itr(dataset_mptr, mapping_op);
-      raft::matrix::gather(mapping_itr, dim, n_rows, mc_trainset_ids, k, mc_trainset, stream);
-    }
+    thrust::transform_iterator<MappingOpT, const T*> mapping_itr(dataset_mptr, mapping_op);
+    raft::matrix::gather(mapping_itr, dim, n_rows, mc_trainset_ids, k, mc_trainset, stream);
     if (params.metric == cuvs::distance::DistanceType::L2Expanded ||
         params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
         params.metric == cuvs::distance::DistanceType::CosineExpanded) {
@@ -1174,10 +1167,10 @@ auto build_fine_clusters(const raft::resources& handle,
                    mapping_op,
                    device_memory,
                    mc_trainset_norm);
-
-    raft::copy(cluster_centers + (dim * fine_clusters_csum[i]),
+    IdxT transformed_dim = params.is_packed_binary ? dim * 8 : dim;
+    raft::copy(cluster_centers + (transformed_dim * fine_clusters_csum[i]),
                mc_trainset_ccenters.data(),
-               fine_clusters_nums[i] * dim,
+               fine_clusters_nums[i] * transformed_dim,
                stream);
     raft::resource::sync_stream(handle, stream);
     n_clusters_done += fine_clusters_nums[i];
@@ -1233,7 +1226,6 @@ void build_hierarchical(const raft::resources& handle,
 
   // Precompute the L2 norm of the dataset if relevant and not yet computed.
   rmm::device_uvector<MathT> dataset_norm_buf(0, stream, device_memory);
-  IdxT transformed_dim = params.is_packed_binary ? dim * 8 : dim;
   if (dataset_norm == nullptr &&
       (params.metric == cuvs::distance::DistanceType::L2Expanded ||
        params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
@@ -1246,7 +1238,7 @@ void build_hierarchical(const raft::resources& handle,
         compute_norm(handle,
                      dataset_norm_buf.data() + offset,
                      dataset + offset * dim,
-                     transformed_dim,
+                     dim,
                      minibatch_size,
                      mapping_op,
                      raft::sqrt_op{},
@@ -1255,7 +1247,7 @@ void build_hierarchical(const raft::resources& handle,
         compute_norm(handle,
                      dataset_norm_buf.data() + offset,
                      dataset + offset * dim,
-                     transformed_dim,
+                     dim,
                      minibatch_size,
                      mapping_op,
                      raft::identity_op{},
@@ -1267,7 +1259,7 @@ void build_hierarchical(const raft::resources& handle,
     raft::matrix::fill(
       handle,
       raft::make_device_matrix_view<MathT, IdxT>(dataset_norm_buf.data(), n_rows, 1),
-      static_cast<MathT>(transformed_dim));
+      static_cast<MathT>(dim * 8));
     dataset_norm = (const MathT*)dataset_norm_buf.data();
   }
 

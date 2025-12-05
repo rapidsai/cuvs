@@ -266,46 +266,46 @@ void extend(raft::resources const& handle,
       raft::make_device_vector_view<std::remove_pointer_t<decltype(list_sizes_ptr)>, IdxT>(
         list_sizes_ptr, n_lists);
 
-      if (index->binary_index()) {
-        if constexpr (std::is_same_v<T, uint8_t>) {
-          // For binary data, we need to work in the expanded space and then convert back
-          rmm::device_uvector<float> temp_expanded_centers(
-            n_lists * dim * 8, stream, raft::resource::get_workspace_resource(handle));
-          auto expanded_centers_view = raft::make_device_matrix_view<float, IdxT>(
-            temp_expanded_centers.data(), n_lists, dim * 8);
+    if (index->binary_index()) {
+      if constexpr (std::is_same_v<T, uint8_t>) {
+        // For binary data, we need to work in the expanded space and then convert back
+        rmm::device_uvector<float> temp_expanded_centers(
+          n_lists * dim * 8, stream, raft::resource::get_workspace_resource(handle));
+        auto expanded_centers_view = raft::make_device_matrix_view<float, IdxT>(
+          temp_expanded_centers.data(), n_lists, dim * 8);
 
-          raft::linalg::map_offset(
-            handle,
-            expanded_centers_view,
-            utils::bitwise_decode_op<float, IdxT>(index->binary_centers().data_handle()));
+        raft::linalg::map_offset(
+          handle,
+          expanded_centers_view,
+          utils::bitwise_decode_op<float, IdxT>(index->binary_centers().data_handle(), dim));
 
-          vec_batches.reset();
-          for (const auto& batch : vec_batches) {
-            auto batch_labels_view = raft::make_device_vector_view<const LabelT, IdxT>(
-              new_labels.data_handle() + batch.offset(), batch.size());
-            auto batch_data_view =
-              raft::make_device_matrix_view<const T, IdxT>(batch.data(), batch.size(), index->dim());
-            cuvs::cluster::kmeans_balanced::helpers::calc_centers_and_sizes(handle,
-                                                                            batch_data_view,
-                                                                            batch_labels_view,
-                                                                            expanded_centers_view,
-                                                                            list_sizes_view,
-                                                                            false,
-                                                                            true,
-                                                                            raft::identity_op{});
-          }
-
-          // Convert updated centroids back to binary format
-          cuvs::preprocessing::quantize::binary::quantizer<float> temp_quantizer(handle);
-          cuvs::preprocessing::quantize::binary::transform(
-            handle, temp_quantizer, expanded_centers_view, index->binary_centers());
-
-        } else {
-          // Error: BitwiseHamming with non-uint8_t type
-          RAFT_FAIL("BitwiseHamming distance is only supported with uint8_t data type, got %s",
-                    typeid(T).name());
+        vec_batches.reset();
+        for (const auto& batch : vec_batches) {
+          auto batch_labels_view = raft::make_device_vector_view<const LabelT, IdxT>(
+            new_labels.data_handle() + batch.offset(), batch.size());
+          auto batch_data_view =
+            raft::make_device_matrix_view<const T, IdxT>(batch.data(), batch.size(), index->dim());
+          cuvs::cluster::kmeans_balanced::helpers::calc_centers_and_sizes(handle,
+                                                                          batch_data_view,
+                                                                          batch_labels_view,
+                                                                          expanded_centers_view,
+                                                                          list_sizes_view,
+                                                                          false,
+                                                                          true,
+                                                                          raft::identity_op{});
         }
+
+        // Convert updated centroids back to binary format
+        cuvs::preprocessing::quantize::binary::quantizer<float> temp_quantizer(handle);
+        cuvs::preprocessing::quantize::binary::transform(
+          handle, temp_quantizer, expanded_centers_view, index->binary_centers());
+
       } else {
+        // Error: BitwiseHamming with non-uint8_t type
+        RAFT_FAIL("BitwiseHamming distance is only supported with uint8_t data type, got %s",
+                  typeid(T).name());
+      }
+    } else {
       auto centroids_view = raft::make_device_matrix_view<float, IdxT>(
         index->centers().data_handle(), index->centers().extent(0), index->centers().extent(1));
       vec_batches.reset();
