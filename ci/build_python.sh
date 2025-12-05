@@ -8,8 +8,6 @@ source rapids-configure-sccache
 
 source rapids-date-string
 
-source ./ci/use_conda_packages_from_prs.sh
-
 export CMAKE_GENERATOR=Ninja
 
 rapids-print-env

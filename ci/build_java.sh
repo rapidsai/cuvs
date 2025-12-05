@@ -4,8 +4,6 @@
 
 set -euo pipefail
 
-source ./ci/use_conda_packages_from_prs.sh
-
 # TODO: Remove this argument-handling when build and test workflows are separated,
 #       and test_java.sh no longer calls build_java.sh
 #       ref: https://github.com/rapidsai/cuvs/issues/868
