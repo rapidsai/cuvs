@@ -27,9 +27,9 @@ namespace cuvs::neighbors::ball_cover::detail {
  * @code{.cpp}
  *
  *  #include <raft/core/resources.hpp>
- *  #include <raft/neighbors/ball_cover.cuh>
- *  #include <raft/distance/distance_types.hpp>
- *  using namespace raft::neighbors;
+ *  #include <cuvs/neighbors/ball_cover.cuh>
+ *  #include <cuvs/distance/distance_types.hpp>
+ *  using namespace cuvs::neighbors;
  *
  *  raft::resources handle;
  *  ...
@@ -359,9 +359,9 @@ void eps_nn(raft::resources const& handle,
  * @code{.cpp}
  *
  *  #include <raft/core/resources.hpp>
- *  #include <raft/neighbors/ball_cover.cuh>
- *  #include <raft/distance/distance_types.hpp>
- *  using namespace raft::neighbors;
+ *  #include <cuvs/neighbors/ball_cover.cuh>
+ *  #include <cuvs/distance/distance_types.hpp>
+ *  using namespace cuvs::neighbors;
  *
  *  raft::resources handle;
  *  ...
