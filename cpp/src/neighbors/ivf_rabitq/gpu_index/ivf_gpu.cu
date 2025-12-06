@@ -14,11 +14,10 @@
 #include <raft/core/cublas_macros.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/linalg/detail/cublaslt_wrappers.hpp>
 #include <raft/matrix/select_k.cuh>
 
 #include <thrust/sort.h>
-
-#include <cublas_v2.h>
 
 #include <cuda_runtime.h>
 
@@ -1035,25 +1034,23 @@ void IVFGPU::BatchClusterSearch(const float* d_query,
   // batch_size = num_queries
   // First compute distances from query to centroids on CPU and select TOPK for each
 
-  // Step 1: Compute -2 * Q * C^T using cuBLAS
-  cublasHandle_t cb;
-  cublasCreate(&cb);
-  cublasSetStream(cb, stream_);
+  // Step 1: Compute -2 * Q * C^T using RAFT wrapper for cuBLASLt
   const float alpha = -2.f, beta = 0.f;
-  RAFT_CUBLAS_TRY(cublasSgemm(cb,
-                              CUBLAS_OP_T,
-                              CUBLAS_OP_N,
-                              num_centroids,
-                              batch_size,
-                              num_padded_dim,
-                              &alpha,
-                              initializer->GetCentroid(0),
-                              num_padded_dim,
-                              d_query,
-                              num_padded_dim,
-                              &beta,
-                              searcher_batch->get_centroid_distances(),
-                              num_centroids));
+  raft::linalg::detail::matmul</* DevicePointerMode = */ true>(
+    handle_,
+    /* trans_a = */ true,
+    /* trans_b = */ false,
+    num_centroids,
+    batch_size,
+    num_padded_dim,
+    &alpha,
+    initializer->GetCentroid(0),
+    num_padded_dim,
+    d_query,
+    num_padded_dim,
+    &beta,
+    searcher_batch->get_centroid_distances(),
+    num_centroids);
 
   // Step2: fused kernel to compute q and c norms
   int grid                  = num_centroids + batch_size;
@@ -1136,7 +1133,6 @@ void IVFGPU::BatchClusterSearch(const float* d_query,
                                           d_final_pids);
 
   // clear
-  cublasDestroy(cb);
   RAFT_CUDA_TRY(cudaFreeAsync(d_raft_vals, stream_));
   RAFT_CUDA_TRY(cudaFreeAsync(d_raft_idx, stream_));
   RAFT_CUDA_TRY(cudaFreeAsync(d_sorted_pairs, stream_));
@@ -1159,25 +1155,23 @@ void IVFGPU::BatchClusterSearchLUT16(const float* d_query,
   // batch_size = num_queries
   // First compute distances from query to centroids on CPU and select TOPK for each
 
-  // Step 1: Compute -2 * Q * C^T using cuBLAS
-  cublasHandle_t cb;
-  cublasCreate(&cb);
-  cublasSetStream(cb, stream_);
+  // Step 1: Compute -2 * Q * C^T using RAFT wrapper for cuBLASLt
   const float alpha = -2.f, beta = 0.f;
-  RAFT_CUBLAS_TRY(cublasSgemm(cb,
-                              CUBLAS_OP_T,
-                              CUBLAS_OP_N,
-                              num_centroids,
-                              batch_size,
-                              num_padded_dim,
-                              &alpha,
-                              initializer->GetCentroid(0),
-                              num_padded_dim,
-                              d_query,
-                              num_padded_dim,
-                              &beta,
-                              searcher_batch->get_centroid_distances(),
-                              num_centroids));
+  raft::linalg::detail::matmul</* DevicePointerMode = */ true>(
+    handle_,
+    /* trans_a = */ true,
+    /* trans_b = */ false,
+    num_centroids,
+    batch_size,
+    num_padded_dim,
+    &alpha,
+    initializer->GetCentroid(0),
+    num_padded_dim,
+    d_query,
+    num_padded_dim,
+    &beta,
+    searcher_batch->get_centroid_distances(),
+    num_centroids);
 
   // Step2: fused kernel to compute q and c norms
   int grid                  = num_centroids + batch_size;
@@ -1260,7 +1254,6 @@ void IVFGPU::BatchClusterSearchLUT16(const float* d_query,
                                                       d_final_pids);
 
   // clear
-  cublasDestroy(cb);
   RAFT_CUDA_TRY(cudaFreeAsync(d_raft_vals, stream_));
   RAFT_CUDA_TRY(cudaFreeAsync(d_raft_idx, stream_));
   RAFT_CUDA_TRY(cudaFreeAsync(d_sorted_pairs, stream_));
@@ -1284,25 +1277,23 @@ void IVFGPU::BatchClusterSearchQuantizeQuery(const float* d_query,
   // batch_size = num_queries
   // First compute distances from query to centroids on CPU and select TOPK for each
 
-  // Step 1: Compute -2 * Q * C^T using cuBLAS
-  cublasHandle_t cb;
-  cublasCreate(&cb);
-  cublasSetStream(cb, stream_);
+  // Step 1: Compute -2 * Q * C^T using RAFT wrapper for cuBLASLt
   const float alpha = -2.f, beta = 0.f;
-  RAFT_CUBLAS_TRY(cublasSgemm(cb,
-                              CUBLAS_OP_T,
-                              CUBLAS_OP_N,
-                              num_centroids,
-                              batch_size,
-                              num_padded_dim,
-                              &alpha,
-                              initializer->GetCentroid(0),
-                              num_padded_dim,
-                              d_query,
-                              num_padded_dim,
-                              &beta,
-                              searcher_batch->get_centroid_distances(),
-                              num_centroids));
+  raft::linalg::detail::matmul</* DevicePointerMode = */ true>(
+    handle_,
+    /* trans_a = */ true,
+    /* trans_b = */ false,
+    num_centroids,
+    batch_size,
+    num_padded_dim,
+    &alpha,
+    initializer->GetCentroid(0),
+    num_padded_dim,
+    d_query,
+    num_padded_dim,
+    &beta,
+    searcher_batch->get_centroid_distances(),
+    num_centroids);
 
   // Step2: fused kernel to compute q and c norms
   int grid                  = num_centroids + batch_size;
@@ -1386,7 +1377,6 @@ void IVFGPU::BatchClusterSearchQuantizeQuery(const float* d_query,
                                                        query_bits == 4);
 
   // clear
-  cublasDestroy(cb);
   RAFT_CUDA_TRY(cudaFreeAsync(d_raft_vals, stream_));
   RAFT_CUDA_TRY(cudaFreeAsync(d_raft_idx, stream_));
   RAFT_CUDA_TRY(cudaFreeAsync(d_sorted_pairs, stream_));

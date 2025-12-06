@@ -217,15 +217,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ivf_rabitq/gpu_index/quantizer_gpu_fast.cu
   )
 
-  target_link_libraries(
-    ivf_rabitq_lib
-    PRIVATE OpenMP::OpenMP_CXX
-            ${CUDA_CUBLAS_LIBRARIES}
-            CUDA::cudart
-            raft::raft
-            # CUDA::cudadevrt
-            rmm
-  ) # fix rmm dependencies
+  target_link_libraries(ivf_rabitq_lib PRIVATE OpenMP::OpenMP_CXX CUDA::cudart raft::raft rmm)
 
   target_include_directories(
     ivf_rabitq_lib PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
