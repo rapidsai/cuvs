@@ -463,7 +463,7 @@ void extend_core(
       using out_owning_type =
         owning_dataset<T, int64_t, out_layout_type, out_container_policy_type>;
       auto out_layout = raft::make_strided_layout(updated_dataset_view.extents(),
-                                                  std::array<int64_t, 2>{stride, 1});
+                                                  cuda::std::array<int64_t, 2>{stride, 1});
 
       index.update_dataset(handle, out_owning_type{std::move(updated_dataset), out_layout});
     }
