@@ -234,9 +234,6 @@ void build_linkage(
  * This function takes a sorted MST (represented as edges with source, destination, and weights)
  * and constructs a dendrogram (hierarchical clustering tree) on the host.
  *
- * @tparam value_idx Index type for nodes
- * @tparam value_t Value type for edge weights/distances
- *
  * @param[in] handle The raft resources handle
  * @param[in] rows Source nodes of the MST edges (device memory, size: nnz)
  * @param[in] cols Destination nodes of the MST edges (device memory, size: nnz)
@@ -249,15 +246,14 @@ void build_linkage(
  * nnz)
  * @param[out] out_size Output cluster sizes at each merge step (device memory, size: nnz)
  */
-template <typename value_idx, typename value_t>
 void build_dendrogram_host(raft::resources const& handle,
-                           const value_idx* rows,
-                           const value_idx* cols,
-                           const value_t* data,
+                           const int64_t* rows,
+                           const int64_t* cols,
+                           const float* data,
                            size_t nnz,
-                           value_idx* children,
-                           value_t* out_delta,
-                           value_idx* out_size);
+                           int64_t* children,
+                           float* out_delta,
+                           int64_t* out_size);
 
 }  // namespace helpers
 /**

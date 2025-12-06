@@ -9,18 +9,18 @@
 
 namespace cuvs::cluster::agglomerative::helpers {
 
-#define CUVS_INST_AGGLOMERATIVE(IdxT, ValueT)                             \
-  void build_dendrogram_host<IdxT, ValueT>(raft::resources const& handle, \
-                                           const IdxT* rows,              \
-                                           const IdxT* cols,              \
-                                           const ValueT* data,            \
-                                           size_t nnz,                    \
-                                           IdxT* children,                \
-                                           ValueT* out_delta,             \
-                                           IdxT* out_size)                \
-  {                                                                       \
-    detail::build_dendrogram_host<IdxT, ValueT>(                          \
-      handle, rows, cols, data, nnz, children, out_delta, out_size);      \
+#define CUVS_INST_AGGLOMERATIVE(IdxT, ValueT)                        \
+  void build_dendrogram_host(raft::resources const& handle,          \
+                             const IdxT* rows,                       \
+                             const IdxT* cols,                       \
+                             const ValueT* data,                     \
+                             size_t nnz,                             \
+                             IdxT* children,                         \
+                             ValueT* out_delta,                      \
+                             IdxT* out_size)                         \
+  {                                                                  \
+    detail::build_dendrogram_host<IdxT, ValueT>(                     \
+      handle, rows, cols, data, nnz, children, out_delta, out_size); \
   }
 
 CUVS_INST_AGGLOMERATIVE(int64_t, float);
