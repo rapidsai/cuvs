@@ -1886,13 +1886,8 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
                                                                                    MAX_TOP_K);
   size_t shared_mem_size =
     num_chunks * LUT_SIZE * sizeof(float) + candidate_storage + query_storage + smem_bytes;
-  // Note that for large dimensions, we need to set it for specific kernel
-  if (shared_mem_size > 49152) {
-    // for larger dimensions
-    RAFT_CUDA_TRY(cudaFuncSetAttribute(computeInnerProductsWithLUT,
-                                       cudaFuncAttributeMaxDynamicSharedMemorySize,
-                                       98304));  // 96KB for ampere devices
-  }
+  RAFT_CUDA_TRY(cudaFuncSetAttribute(
+    computeInnerProductsWithLUT, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size));
   computeInnerProductsWithLUT<<<gridDim, blockDim, shared_mem_size, stream_>>>(
     d_sorted_pairs,
     d_query,
@@ -2260,13 +2255,9 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(
   // smem reuses first 3 parts
   size_t shared_mem_size =
     max(first_part_shared_mem + second_part_shared_mem + third_part_shared_mem, (size_t)smem_bytes);
-  // Note that for large dimensions, we need to set it for specific kernel
-  if (shared_mem_size > 49152) {
-    // for larger dimensions
-    RAFT_CUDA_TRY(cudaFuncSetAttribute(computeInnerProductsWithLUT,
-                                       cudaFuncAttributeMaxDynamicSharedMemorySize,
-                                       98304));  // 96KB for ampere devices
-  }
+  RAFT_CUDA_TRY(cudaFuncSetAttribute(computeInnerProductsWithLUT16Opt,
+                                     cudaFuncAttributeMaxDynamicSharedMemorySize,
+                                     shared_mem_size));
 
   computeInnerProductsWithLUT16Opt<<<gridDim, blockDim, shared_mem_size, stream_>>>(
     d_sorted_pairs,
@@ -2659,12 +2650,10 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
                                  10 * sizeof(float),  // +sizeof(float) for width
                                (size_t)smem_bytes);
 
-  if (shared_mem_size > 49152) {
-    RAFT_CUDA_TRY(cudaFuncSetAttribute(
-      computeInnerProductsWithBitwiseOpt, cudaFuncAttributeMaxDynamicSharedMemorySize, 98304));
-  }
-
   if (!use_4bit) {
+    RAFT_CUDA_TRY(cudaFuncSetAttribute(computeInnerProductsWithBitwiseOpt,
+                                       cudaFuncAttributeMaxDynamicSharedMemorySize,
+                                       shared_mem_size));
     computeInnerProductsWithBitwiseOpt<<<gridDim, blockDim, shared_mem_size, stream_>>>(
       d_sorted_pairs,
       d_query,
@@ -2698,6 +2687,9 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   } else {
     if (cur_ivf.get_ex_bits() != 0) {
+      RAFT_CUDA_TRY(cudaFuncSetAttribute(computeInnerProductsWithBitwiseOpt4bit,
+                                         cudaFuncAttributeMaxDynamicSharedMemorySize,
+                                         shared_mem_size));
       computeInnerProductsWithBitwiseOpt4bit<<<gridDim, blockDim, shared_mem_size, stream_>>>(
         d_sorted_pairs,
         d_query,
@@ -2729,6 +2721,9 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
         num_words  // Add num_words parameter
       );
     } else {
+      RAFT_CUDA_TRY(cudaFuncSetAttribute(computeInnerProductsWithBitwiseOpt4bitNoEX,
+                                         cudaFuncAttributeMaxDynamicSharedMemorySize,
+                                         shared_mem_size));
       computeInnerProductsWithBitwiseOpt4bitNoEX<<<gridDim, blockDim, shared_mem_size, stream_>>>(
         d_sorted_pairs,
         d_query,

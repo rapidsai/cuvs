@@ -1147,12 +1147,8 @@ float DataQuantizerGPU::get_const_scaling_factors_fully_gpu(size_t dim, size_t e
                             ) *
                            sizeof(float);
 
-  // Check shared memory limit
-  if (shared_mem_size > 49152) {
-    cudaFuncSetAttribute(fully_fused_kernel,
-                         cudaFuncAttributeMaxDynamicSharedMemorySize,
-                         98304);  // 96KB for ampere devices
-  }
+  RAFT_CUDA_TRY(cudaFuncSetAttribute(
+    fully_fused_kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size));
 
   unsigned long long seed = time(nullptr);
   // Launch fully fused kernel
