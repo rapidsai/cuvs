@@ -6,11 +6,13 @@ package com.nvidia.cuvs;
 
 /**
  * Parameters for ACE (Augmented Core Extraction) graph build algorithm.
- * ACE enables building indices for datasets too large to fit in GPU memory by:
+ * ACE enables building indexes for datasets too large to fit in GPU memory by:
  * 1. Partitioning the dataset in core (closest) and augmented (second-closest)
  * partitions using balanced k-means.
- * 2. Building sub-indices for each partition independently
+ * 2. Building sub-indexes for each partition independently
  * 3. Concatenating sub-graphs into a final unified index
+ *
+ * ACE always uses disk-based storage for memory-efficient graph construction.
  *
  * @since 25.12
  */
@@ -19,12 +21,20 @@ public class CuVSAceParams {
   /**
    * Number of partitions for ACE (Augmented Core Extraction) partitioned build.
    *
+   * When set to 0 (default), the number of partitions is automatically derived
+   * based on available host and GPU memory to maximize partition size while
+   * ensuring the build fits in memory.
+   *
    * Small values might improve recall but potentially degrade performance and increase memory usage.
    * Partitions should not be too small to prevent issues in KNN graph construction. 100k - 5M
    * vectors per partition is recommended depending on the available host and GPU memory. The
    * partition size is on average {@code 2 * (n_rows / npartitions) * dim * sizeof(T)}—the factor 2
    * accounts for core and augmented vectors. Please account for imbalance in the partition sizes
    * (up to 3x in our tests).
+   *
+   * If the specified number of partitions results in partitions that exceed
+   * available memory, the value will be automatically increased to fit memory
+   * constraints and a warning will be issued.
    */
   private final long npartitions;
 
@@ -37,26 +47,36 @@ public class CuVSAceParams {
   private final long efConstruction;
 
   /**
-   * Directory to store ACE build artifacts (e.g., KNN graph, optimized graph).
+   * Directory to store ACE build artifacts (e.g., KNN graph, optimized graph, reordered dataset).
    *
-   * Used when {@link #isUseDisk()} is true or when the graph does not fit in host and GPU memory.
    * This should be the fastest disk in the system and hold enough space for twice the dataset, final
    * graph, and label mapping.
    */
   private final String buildDir;
 
   /**
-   * Whether to use disk-based storage for ACE builds.
+   * Maximum host memory to use for ACE build in GiB.
    *
-   * When true, enables disk-based operations for memory-efficient graph construction.
+   * When set to 0 (default), uses available host memory.
+   * Useful for testing or when running alongside other memory-intensive processes.
    */
-  private final boolean useDisk;
+  private final double maxHostMemoryGb;
 
-  private CuVSAceParams(long npartitions, long efConstruction, String buildDir, boolean useDisk) {
+  /**
+   * Maximum GPU memory to use for ACE build in GiB.
+   *
+   * When set to 0 (default), uses available GPU memory.
+   * Useful for testing or when running alongside other memory-intensive processes.
+   */
+  private final double maxGpuMemoryGb;
+
+  private CuVSAceParams(long npartitions, long efConstruction, String buildDir,
+                        double maxHostMemoryGb, double maxGpuMemoryGb) {
     this.npartitions = npartitions;
     this.efConstruction = efConstruction;
     this.buildDir = buildDir;
-    this.useDisk = useDisk;
+    this.maxHostMemoryGb = maxHostMemoryGb;
+    this.maxGpuMemoryGb = maxGpuMemoryGb;
   }
 
   /**
@@ -87,12 +107,21 @@ public class CuVSAceParams {
   }
 
   /**
-   * Gets whether disk-based mode is enabled.
+   * Gets the maximum host memory limit in GiB.
    *
-   * @return true if disk-based mode is enabled
+   * @return the max host memory limit (0 means use available memory)
    */
-  public boolean isUseDisk() {
-    return useDisk;
+  public double getMaxHostMemoryGb() {
+    return maxHostMemoryGb;
+  }
+
+  /**
+   * Gets the maximum GPU memory limit in GiB.
+   *
+   * @return the max GPU memory limit (0 means use available memory)
+   */
+  public double getMaxGpuMemoryGb() {
+    return maxGpuMemoryGb;
   }
 
   @Override
@@ -103,8 +132,10 @@ public class CuVSAceParams {
         + efConstruction
         + ", buildDir="
         + buildDir
-        + ", useDisk="
-        + useDisk
+        + ", maxHostMemoryGb="
+        + maxHostMemoryGb
+        + ", maxGpuMemoryGb="
+        + maxGpuMemoryGb
         + "]";
   }
 
@@ -113,8 +144,8 @@ public class CuVSAceParams {
    */
   public static class Builder {
 
-    /** Number of partitions to split the dataset into */
-    private long npartitions = 1;
+    /** Number of partitions to split the dataset into (0 = auto-derive based on memory) */
+    private long npartitions = 0;
 
     /** ef_construction parameter for HNSW used in ACE */
     private long efConstruction = 120;
@@ -122,8 +153,11 @@ public class CuVSAceParams {
     /** Directory to store intermediate build files */
     private String buildDir = "/tmp/ace_build";
 
-    /** Whether to use disk-based mode for very large datasets */
-    private boolean useDisk = false;
+    /** Maximum host memory in GiB (0 = use available memory) */
+    private double maxHostMemoryGb = 0;
+
+    /** Maximum GPU memory in GiB (0 = use available memory) */
+    private double maxGpuMemoryGb = 0;
 
     public Builder() {}
 
@@ -161,13 +195,30 @@ public class CuVSAceParams {
     }
 
     /**
-     * Sets whether to use disk-based mode.
+     * Sets the maximum host memory to use for ACE build in GiB.
      *
-     * @param useDisk whether to use disk-based mode
+     * When set to 0 (default), uses available host memory.
+     * Useful for testing or when running alongside other memory-intensive processes.
+     *
+     * @param maxHostMemoryGb the max host memory in GiB
      * @return an instance of Builder
      */
-    public Builder withUseDisk(boolean useDisk) {
-      this.useDisk = useDisk;
+    public Builder withMaxHostMemoryGb(double maxHostMemoryGb) {
+      this.maxHostMemoryGb = maxHostMemoryGb;
+      return this;
+    }
+
+    /**
+     * Sets the maximum GPU memory to use for ACE build in GiB.
+     *
+     * When set to 0 (default), uses available GPU memory.
+     * Useful for testing or when running alongside other memory-intensive processes.
+     *
+     * @param maxGpuMemoryGb the max GPU memory in GiB
+     * @return an instance of Builder
+     */
+    public Builder withMaxGpuMemoryGb(double maxGpuMemoryGb) {
+      this.maxGpuMemoryGb = maxGpuMemoryGb;
       return this;
     }
 
@@ -177,7 +228,8 @@ public class CuVSAceParams {
      * @return an instance of {@link CuVSAceParams}
      */
     public CuVSAceParams build() {
-      return new CuVSAceParams(npartitions, efConstruction, buildDir, useDisk);
+      return new CuVSAceParams(npartitions, efConstruction, buildDir,
+                               maxHostMemoryGb, maxGpuMemoryGb);
     }
   }
 }

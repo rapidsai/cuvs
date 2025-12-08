@@ -4,6 +4,7 @@
 #
 # cython: language_level=3
 
+from libc.stddef cimport size_t
 from libc.stdint cimport int32_t, uintptr_t
 from libcpp cimport bool
 
@@ -20,10 +21,25 @@ cdef extern from "cuvs/neighbors/hnsw.h" nogil:
         CPU
         GPU
 
+    ctypedef struct cuvsHnswAceParams:
+        size_t npartitions
+        const char* build_dir
+        double max_host_memory_gb
+        double max_gpu_memory_gb
+
+    ctypedef cuvsHnswAceParams* cuvsHnswAceParams_t
+
+    cuvsError_t cuvsHnswAceParamsCreate(cuvsHnswAceParams_t* params)
+
+    cuvsError_t cuvsHnswAceParamsDestroy(cuvsHnswAceParams_t params)
+
     ctypedef struct cuvsHnswIndexParams:
         cuvsHnswHierarchy hierarchy
         int32_t ef_construction
         int32_t num_threads
+        size_t M
+        cuvsDistanceType metric
+        cuvsHnswAceParams_t ace_params
 
     ctypedef cuvsHnswIndexParams* cuvsHnswIndexParams_t
 
@@ -54,6 +70,11 @@ cdef extern from "cuvs/neighbors/hnsw.h" nogil:
                                   cuvsHnswIndexParams_t params,
                                   cuvsCagraIndex_t cagra_index,
                                   cuvsHnswIndex_t hnsw_index) except +
+
+    cuvsError_t cuvsHnswBuild(cuvsResources_t res,
+                              cuvsHnswIndexParams_t params,
+                              DLManagedTensor* dataset,
+                              cuvsHnswIndex_t index) except +
 
     cuvsError_t cuvsHnswExtend(cuvsResources_t res,
                                cuvsHnswExtendParams_t params,
