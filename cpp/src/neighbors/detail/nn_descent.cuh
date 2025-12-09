@@ -1635,9 +1635,9 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
 }
 
 template <typename T,
-          typename IdxT     = uint32_t,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename IdxT = uint32_t,
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 void build(raft::resources const& res,
            const index_params& params,
            raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
@@ -1681,9 +1681,9 @@ void build(raft::resources const& res,
 }
 
 template <typename T,
-          typename IdxT     = uint32_t,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename IdxT = uint32_t,
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 index<IdxT> build(
   raft::resources const& res,
   const index_params& params,
