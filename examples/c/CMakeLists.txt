@@ -17,7 +17,7 @@ include(rapids-find)
 
 # ------------- configure project --------------#
 
-rapids_cuda_init_architectures(test_cuvs)
+rapids_cuda_init_architectures(test_cuvs_c)
 
 project(test_cuvs_c LANGUAGES C CXX CUDA)
 
@@ -27,6 +27,7 @@ rapids_cpm_init()
 set(BUILD_CUVS_C_LIBRARY ON)
 include(../cmake/thirdparty/get_dlpack.cmake)
 include(../cmake/thirdparty/get_cuvs.cmake)
+find_package(CUDAToolkit)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Werror")
 
