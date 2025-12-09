@@ -6,6 +6,7 @@ import "C"
 import (
 	"errors"
 	"unsafe"
+	"runtime"
 
 	cuvs "github.com/rapidsai/cuvs/go"
 )
@@ -17,7 +18,7 @@ type IvfFlatIndex struct {
 }
 
 // Creates a new empty IvfFlatIndex
-func CreateIndex(params *IndexParams, dataset *cuvs.Tensor[float32]) (*IvfFlatIndex, error) {
+func CreateIndex[T any](params *IndexParams, dataset *cuvs.Tensor[T]) (*IvfFlatIndex, error) {
 	var index C.cuvsIvfFlatIndex_t
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatIndexCreate(&index)))
 	if err != nil {
@@ -41,6 +42,8 @@ func BuildIndex[T any](Resources cuvs.Resource, params *IndexParams, dataset *cu
 		return err
 	}
 	index.trained = true
+	runtime.KeepAlive(dataset.C_tensor)
+	runtime.KeepAlive(dataset)
 	return nil
 }
 
@@ -110,5 +113,8 @@ func GetCenters[T any](index *IvfFlatIndex, centers *cuvs.Tensor[T]) error {
 		return errors.New("index needs to be built before calling GetCenters")
 	}
 
-	return cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatIndexGetCenters(index.index, (*C.DLManagedTensor)(unsafe.Pointer(centers.C_tensor)))))
+	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatIndexGetCenters(index.index, (*C.DLManagedTensor)(unsafe.Pointer(centers.C_tensor)))))
+	runtime.KeepAlive(centers)
+	runtime.KeepAlive(centers.C_tensor)
+	return err
 }
