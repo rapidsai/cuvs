@@ -27,7 +27,7 @@ rapids_cpm_init()
 set(BUILD_CUVS_C_LIBRARY ON)
 include(../cmake/thirdparty/get_dlpack.cmake)
 include(../cmake/thirdparty/get_cuvs.cmake)
-find_package(CUDAToolkit)
+find_package(CUDAToolkit REQUIRED)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Werror")
 
