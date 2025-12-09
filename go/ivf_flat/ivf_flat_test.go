@@ -97,10 +97,6 @@ func TestIvfFlat(t *testing.T) {
 	}
 	defer centers.Close()
 
-	if _, err := centers.ToDevice(&resource); err != nil {
-		t.Fatalf("error moving centers to device: %v", err)
-	}
-
 	if err := GetCenters(index, &centers); err != nil {
 		t.Fatalf("error getting centers: %v", err)
 	}
