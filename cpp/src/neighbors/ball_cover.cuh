@@ -28,7 +28,7 @@ namespace cuvs::neighbors::ball_cover::detail {
  *
  *  #include <raft/core/resources.hpp>
  *  #include <cuvs/neighbors/ball_cover.cuh>
- *  #include <cuvs/distance/distance_types.hpp>
+ *  #include <cuvs/distance/distance.hpp>
  *  using namespace cuvs::neighbors;
  *
  *  raft::resources handle;
