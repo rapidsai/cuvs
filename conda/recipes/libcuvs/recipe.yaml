@@ -111,14 +111,12 @@ outputs:
         - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
         - libraft-headers =${{ minor_version }}
         - nccl
-        - cuda-cudart
         - libcublas
         - libcurand
         - libcusolver
         - libcusparse
       ignore_run_exports:
         by_name:
-          - cuda-cudart
           - cuda-version
           - libaio
           - libboost
@@ -166,14 +164,12 @@ outputs:
         - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
         - libraft-headers =${{ minor_version }}
         - nccl
-        - cuda-cudart
         - libcublas
         - libcurand
         - libcusolver
         - libcusparse
       ignore_run_exports:
         by_name:
-          - cuda-cudart
           - cuda-version
           - libaio
           - libboost
@@ -252,14 +248,12 @@ outputs:
         - ${{ pin_subpackage("libcuvs", exact=True) }}
         - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
         - nccl
-        - cuda-cudart
         - libcublas
         - libcurand
         - libcusolver
         - libcusparse
       ignore_run_exports:
         by_name:
-          - cuda-cudart
           - cuda-version
           - libaio
           - libboost
@@ -319,7 +313,6 @@ outputs:
       run:
         - ${{ pin_subpackage("libcuvs", exact=True) }}
         - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
-        - cuda-cudart
         - libcublas
         - libcurand
         - libcusolver
@@ -330,7 +323,6 @@ outputs:
           then: mkl =2023
       ignore_run_exports:
         by_name:
-          - cuda-cudart
           - cuda-version
           - libcublas
           - libcurand

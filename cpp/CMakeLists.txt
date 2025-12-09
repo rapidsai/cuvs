@@ -54,7 +54,6 @@ option(CUDA_ENABLE_KERNELINFO "Enable kernel resource usage info" OFF)
 option(CUDA_ENABLE_LINEINFO
        "Enable the -lineinfo option for nvcc (useful for cuda-memcheck / profiler)" OFF
 )
-option(CUDA_STATIC_RUNTIME "Statically link the CUDA runtime" OFF)
 option(CUDA_STATIC_MATH_LIBRARIES "Statically link the CUDA math libraries" OFF)
 option(CUVS_STATIC_RAPIDS_LIBRARIES "Build and statically link RAPIDS libraries" OFF)
 option(CUDA_LOG_COMPILE_TIME "Write a log of compilation times to nvcc_compile_log.csv" OFF)
@@ -112,7 +111,6 @@ message(VERBOSE "cuVS: Disable OpenMP: ${DISABLE_OPENMP}")
 message(VERBOSE "cuVS: Enable kernel resource usage info: ${CUDA_ENABLE_KERNELINFO}")
 message(VERBOSE "cuVS: Enable lineinfo in nvcc: ${CUDA_ENABLE_LINEINFO}")
 message(VERBOSE "cuVS: Enable nvtx markers: ${CUVS_NVTX}")
-message(VERBOSE "cuVS: Statically link the CUDA runtime: ${CUDA_STATIC_RUNTIME}")
 message(VERBOSE "cuVS: Statically link the CUDA math libraries: ${CUDA_STATIC_MATH_LIBRARIES}")
 message(VERBOSE "cuVS: Build and statically link RAPIDS libraries: ${CUVS_STATIC_RAPIDS_LIBRARIES}")
 
@@ -149,7 +147,7 @@ endif()
 
 if(NOT BUILD_CPU_ONLY)
   # CUDA runtime
-  rapids_cuda_init_runtime(USE_STATIC ${CUDA_STATIC_RUNTIME})
+  rapids_cuda_init_runtime(USE_STATIC ON)
   # * find CUDAToolkit package
   # * determine GPU architectures
   # * enable the CMake CUDA language
