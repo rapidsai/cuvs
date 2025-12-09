@@ -420,6 +420,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/cagra_build_int8.cu
     src/neighbors/cagra_build_uint8.cu
     src/neighbors/cagra_extend_float.cu
+    src/neighbors/cagra_extend_half.cu
     src/neighbors/cagra_extend_int8.cu
     src/neighbors/cagra_extend_uint8.cu
     src/neighbors/cagra_optimize.cu
