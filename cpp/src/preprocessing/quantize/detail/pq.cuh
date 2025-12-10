@@ -36,6 +36,8 @@ auto train_pq_subspaces(
   RAFT_EXPECTS((dim % pq_dim) == 0, "Dimension must be divisible by pq_dim");
   ix_t n_rows_train = n_rows * params.pq_kmeans_trainset_fraction;
   n_rows_train      = std::min(n_rows_train, params.max_train_points_per_pq_code * pq_n_centers);
+  RAFT_EXPECTS(n_rows_train > pq_n_centers,
+               "The number of training samples must be greater than the number of PQ centers");
 
   std::optional<raft::device_matrix<MathT, ix_t, raft::row_major>> pq_trainset = std::nullopt;
 
@@ -102,10 +104,11 @@ auto train_pq_subspaces(
   return pq_centers;
 }
 
-template <typename T>
-quantizer<T> train(raft::resources const& res,
-                   const cuvs::preprocessing::quantize::pq::params params,
-                   raft::device_matrix_view<const T, int64_t> dataset)
+template <typename T, typename AccessorType>
+quantizer<T> train(
+  raft::resources const& res,
+  const cuvs::preprocessing::quantize::pq::params params,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, AccessorType> dataset)
 {
   auto n_rows = dataset.extent(0);
   auto dim    = dataset.extent(1);
@@ -147,11 +150,12 @@ quantizer<T> train(raft::resources const& res,
   }
 }
 
-template <typename T, typename QuantI = uint8_t>
-void transform(raft::resources const& res,
-               const quantizer<T>& quantizer,
-               raft::device_matrix_view<const T, int64_t> dataset,
-               raft::device_matrix_view<QuantI, int64_t> out)
+template <typename T, typename AccessorType, typename QuantI = uint8_t>
+void transform(
+  raft::resources const& res,
+  const quantizer<T>& quantizer,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, AccessorType> dataset,
+  raft::device_matrix_view<QuantI, int64_t> out)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "preprocessing::quantize::pq::transform(%zu, %zu, %zu)",

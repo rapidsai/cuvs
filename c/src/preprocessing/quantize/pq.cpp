@@ -24,18 +24,25 @@ void _transform(cuvsResources_t res,
   auto q = reinterpret_cast<cuvs::preprocessing::quantize::pq::quantizer<T>*>(quantizer->addr);
 
   auto dataset = dataset_tensor->dl_tensor;
+  using mdspan_type     = raft::device_matrix_view<T const, int64_t, raft::row_major>;
+  using out_mdspan_type = raft::device_matrix_view<OutputT, int64_t, raft::row_major>;
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
-    using mdspan_type     = raft::device_matrix_view<T const, int64_t, raft::row_major>;
-    using out_mdspan_type = raft::device_matrix_view<OutputT, int64_t, raft::row_major>;
-
     cuvs::preprocessing::quantize::pq::transform(
       *res_ptr,
       *q,
       cuvs::core::from_dlpack<mdspan_type>(dataset_tensor),
       cuvs::core::from_dlpack<out_mdspan_type>(out_tensor));
 
+  } else if (cuvs::core::is_dlpack_host_compatible(dataset)) {
+    using host_mdspan_type     = raft::host_matrix_view<T const, int64_t, raft::row_major>;
+
+    cuvs::preprocessing::quantize::pq::transform(
+      *res_ptr,
+      *q,
+      cuvs::core::from_dlpack<host_mdspan_type>(dataset_tensor),
+      cuvs::core::from_dlpack<out_mdspan_type>(out_tensor));
   } else {
-    RAFT_FAIL("dataset must be accessible on device memory");
+    RAFT_FAIL("dataset must be accessible on host or device memory");
   }
 }
 
@@ -68,8 +75,13 @@ void* _train(cuvsResources_t res,
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
     ret = new cuvs::preprocessing::quantize::pq::quantizer<T>{
       cuvs::preprocessing::quantize::pq::train(*res_ptr, quantizer_params, mds)};
+  } else if (cuvs::core::is_dlpack_host_compatible(dataset)) {
+    using host_mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
+    auto mds          = cuvs::core::from_dlpack<host_mdspan_type>(dataset_tensor);
+    ret = new cuvs::preprocessing::quantize::pq::quantizer<T>{
+      cuvs::preprocessing::quantize::pq::train(*res_ptr, quantizer_params, mds)};
   } else {
-    RAFT_FAIL("dataset must be accessible on device memory");
+    RAFT_FAIL("dataset must be accessible on host or device memory");
   }
   return ret;
 }

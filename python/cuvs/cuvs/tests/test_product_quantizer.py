@@ -16,8 +16,15 @@ from cuvs.preprocessing.quantize import pq
 @pytest.mark.parametrize("pq_kmeans_type", ["kmeans", "kmeans_balanced"])
 @pytest.mark.parametrize("use_vq", [True, False])
 @pytest.mark.parametrize("use_subspaces", [True, False])
+@pytest.mark.parametrize("device_memory", [True, False])
 def test_product_quantizer(
-    n_rows, n_cols, inplace, pq_kmeans_type, use_vq, use_subspaces
+    n_rows,
+    n_cols,
+    inplace,
+    pq_kmeans_type,
+    use_vq,
+    use_subspaces,
+    device_memory,
 ):
     pq_dim = 32
     pq_bits = 8
@@ -35,7 +42,10 @@ def test_product_quantizer(
         use_vq=use_vq,
         use_subspaces=use_subspaces,
     )
-    quantizer = pq.train(params, input1_device)
+    if device_memory:
+        quantizer = pq.train(params, input1_device)
+    else:
+        quantizer = pq.train(params, input1)
 
     output = (
         np.zeros((n_rows, quantizer.encoded_dim), dtype="uint8")
@@ -43,7 +53,12 @@ def test_product_quantizer(
         else None
     )
     output_device = device_ndarray(output) if inplace else None
-    transformed = pq.transform(quantizer, input1_device, output=output_device)
+    if device_memory:
+        transformed = pq.transform(
+            quantizer, input1_device, output=output_device
+        )
+    else:
+        transformed = pq.transform(quantizer, input1, output=output_device)
     actual = transformed if not inplace else output_device
     actual = actual.copy_to_host()
 

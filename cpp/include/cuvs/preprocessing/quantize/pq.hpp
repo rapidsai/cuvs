@@ -66,13 +66,18 @@ struct quantizer {
  *
  * @param[in] res raft resource
  * @param[in] params configure product quantizer, e.g. quantile
- * @param[in] dataset a row-major matrix view on device
+ * @param[in] dataset a row-major matrix view on device or host
  *
  * @return quantizer
  */
 quantizer<float> train(raft::resources const& res,
                        const params params,
                        raft::device_matrix_view<const float, int64_t> dataset);
+
+/** @copydoc train */
+quantizer<float> train(raft::resources const& res,
+                       const params params,
+                       raft::host_matrix_view<const float, int64_t> dataset);
 
 /**
  * @brief Applies quantization transform to given dataset
@@ -92,13 +97,19 @@ quantizer<float> train(raft::resources const& res,
  *
  * @param[in] res raft resource
  * @param[in] quant a product quantizer
- * @param[in] dataset a row-major matrix view on device
+ * @param[in] dataset a row-major matrix view on device or host
  * @param[out] out a row-major matrix view on device
  *
  */
 void transform(raft::resources const& res,
                const quantizer<float>& quant,
                raft::device_matrix_view<const float, int64_t> dataset,
+               raft::device_matrix_view<uint8_t, int64_t> out);
+
+/** @copydoc transform */
+void transform(raft::resources const& res,
+               const quantizer<float>& quant,
+               raft::host_matrix_view<const float, int64_t> dataset,
                raft::device_matrix_view<uint8_t, int64_t> out);
 
 /**

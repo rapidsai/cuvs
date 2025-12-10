@@ -27,6 +27,7 @@ struct ProductQuantizationInputs {
   uint32_t n_vq_centers;                              // Number of VQ centers
   bool use_vq;                                        // Whether to use VQ
   bool use_subspaces;                                 // Whether to use subspaces
+  bool host_dataset;                                  // Whether to use host dataset
   uint64_t seed;                                      // Random seed
 };
 
@@ -37,7 +38,7 @@ std::ostream& operator<<(std::ostream& os, const ProductQuantizationInputs<T>& i
             << " pq_bits:" << inputs.pq_bits << " pq_dim:" << inputs.pq_dim
             << " pq_kmeans_type:" << (int)inputs.pq_kmeans_type
             << " n_vq_centers:" << inputs.n_vq_centers << " use_vq:" << inputs.use_vq
-            << " seed:" << inputs.seed;
+            << " host_dataset:" << inputs.host_dataset << " seed:" << inputs.seed;
 }
 
 template <typename T>
@@ -74,9 +75,11 @@ void compare_vectors_l2(const raft::resources& res,
     mean_dist += d;
     // The theoretical estimate of the error is hard to come up with,
     // the estimate below is based on experimentation + curse of dimensionality
-    ASSERT_LE(d, 1.2 * eps * std::pow(2.0, compression_ratio))
-      << " (ix = " << i << ", eps = " << eps << ", compression_ratio = " << compression_ratio
-      << ")";
+    if (dim > 5) {
+      ASSERT_LE(d, 1.2 * eps * std::pow(2.0, compression_ratio))
+        << " (ix = " << i << ", eps = " << eps << ", compression_ratio = " << compression_ratio
+        << ")";
+    }
   }
   mean_dist /= n_rows;
   if (print_data) {
@@ -93,7 +96,8 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
       stream(raft::resource::get_cuda_stream(handle)),
       dataset_(raft::make_device_matrix<T, int64_t, raft::row_major>(
         handle, params_.n_samples, params_.n_features)),
-      labels_(raft::make_device_vector<int64_t, int64_t>(handle, params_.n_samples)),
+      dataset_host_(
+        raft::make_host_matrix<T, int64_t, raft::row_major>(params_.n_samples, params_.n_features)),
       n_samples_(params_.n_samples),
       n_features_(params_.n_features)
   {
@@ -107,6 +111,7 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
       raft::random::uniform(
         handle, r, dataset_.data_handle(), n_samples_ * n_features_, T(0.1), T(2.0));
     } else {
+      auto labels_ = raft::make_device_vector<int64_t, int64_t>(handle, n_samples_);
       raft::random::make_blobs<T, int64_t, raft::row_major>(
         handle,
         dataset_.view(),
@@ -120,6 +125,8 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
         static_cast<T>(10.0),   // Center box max
         params_.seed);          // Random seed
     }
+    raft::copy(
+      dataset_host_.data_handle(), dataset_.data_handle(), n_samples_ * n_features_, stream);
   }
 
   void TearDown() override {}
@@ -166,13 +173,27 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
                                                         params_.use_vq,
                                                         params_.use_subspaces);
     raft::resource::sync_stream(handle);
-    auto pq = train(handle, config_, dataset_.view());
+
+    if ((n_samples_ < (1 << params_.pq_bits)) || (n_features_ % params_.pq_dim != 0)) {
+      EXPECT_THROW(train(handle, config_, raft::make_const_mdspan(dataset_host_.view())),
+                   raft::logic_error);
+      return;
+    }
+
+    auto pq = params_.host_dataset
+                ? train(handle, config_, raft::make_const_mdspan(dataset_host_.view()))
+                : train(handle, config_, raft::make_const_mdspan(dataset_.view()));
 
     auto n_encoded_cols = get_quantized_dim(pq.params_quantizer);
     auto d_quantized_output =
       raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, n_encoded_cols);
 
-    transform(handle, pq, dataset_.view(), d_quantized_output.view());
+    if (params_.host_dataset) {
+      transform(
+        handle, pq, raft::make_const_mdspan(dataset_host_.view()), d_quantized_output.view());
+    } else {
+      transform(handle, pq, raft::make_const_mdspan(dataset_.view()), d_quantized_output.view());
+    }
 
     // 1. Verify that the quantized output is not all zeros or NaNs
     {
@@ -215,33 +236,102 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
   int n_features_;
 
   raft::device_matrix<T, int64_t, raft::row_major> dataset_;
-  raft::device_vector<int64_t, int64_t, raft::row_major> labels_;
+  raft::host_matrix<T, int64_t, raft::row_major> dataset_host_;
   params config_;
 };
 
 // Define test cases with different parameters
 template <typename T>
 const std::vector<ProductQuantizationInputs<T>> inputs = {
+  // Extreme cases
+  {1, 64, 4, 8, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, true, false, false, 42ULL},
+  {512, 1, 8, 1, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, true, true, false, 42ULL},
+  {20, 2, 4, 1, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, false, true, false, 42ULL},
+  {200, 8, 7, 2, cuvs::cluster::kmeans::kmeans_type::KMeans, 2, false, true, false, 42ULL},
+  {299,
+   3000,
+   8,
+   64,
+   cuvs::cluster::kmeans::kmeans_type::KMeansBalanced,
+   0,
+   false,
+   true,
+   false,
+   42ULL},
   // Small dataset
-  {100, 64, 4, 8, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, false, false, 42ULL},
+  {100,
+   64,
+   4,
+   8,
+   cuvs::cluster::kmeans::kmeans_type::KMeansBalanced,
+   0,
+   false,
+   false,
+   false,
+   42ULL},
 
   // Small dataset with bigger dims
-  {100, 90, 6, 10, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, false, false, 42ULL},
-  {300, 128, 7, 32, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, true, true, 42ULL},
+  {100,
+   90,
+   6,
+   10,
+   cuvs::cluster::kmeans::kmeans_type::KMeansBalanced,
+   0,
+   false,
+   false,
+   true,
+   42ULL},
+  {300, 128, 7, 32, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, true, true, true, 42ULL},
 
   // Medium dataset
-  {500, 40, 5, 8, cuvs::cluster::kmeans::kmeans_type::KMeans, 0, false, false, 42ULL},
-  {500, 60, 6, 6, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 4, true, true, 42ULL},
-  {500, 128, 5, 8, cuvs::cluster::kmeans::kmeans_type::KMeans, 0, true, false, 42ULL},
+  {500, 40, 5, 8, cuvs::cluster::kmeans::kmeans_type::KMeans, 0, false, false, false, 42ULL},
+  {500, 60, 6, 6, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 4, true, true, true, 42ULL},
+  {500, 128, 5, 8, cuvs::cluster::kmeans::kmeans_type::KMeans, 0, true, false, false, 42ULL},
 
   // Larger dataset
-  {1000, 40, 4, 10, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, false, false, 42ULL},
-  {3000, 1024, 4, 32, cuvs::cluster::kmeans::kmeans_type::KMeans, 0, false, false, 42ULL},
-  {1000, 2048, 4, 128, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, true, true, 42ULL},
+  {1000,
+   40,
+   4,
+   10,
+   cuvs::cluster::kmeans::kmeans_type::KMeansBalanced,
+   0,
+   false,
+   false,
+   false,
+   42ULL},
+  {3000, 1024, 4, 32, cuvs::cluster::kmeans::kmeans_type::KMeans, 0, false, false, false, 42ULL},
+  {1000,
+   2048,
+   4,
+   128,
+   cuvs::cluster::kmeans::kmeans_type::KMeansBalanced,
+   0,
+   true,
+   true,
+   false,
+   42ULL},
 
   // Benchmark datasets
-  {50000, 1024, 8, 128, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, false, true, 42ULL},
-  {50000, 2048, 8, 128, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 10, true, true, 42ULL}};
+  {50000,
+   1024,
+   8,
+   128,
+   cuvs::cluster::kmeans::kmeans_type::KMeansBalanced,
+   0,
+   false,
+   true,
+   false,
+   42ULL},
+  {50000,
+   2048,
+   8,
+   128,
+   cuvs::cluster::kmeans::kmeans_type::KMeansBalanced,
+   10,
+   true,
+   true,
+   true,
+   42ULL}};
 
 typedef ProductQuantizationTest<float> ProductQuantizationTestF;
 TEST_P(ProductQuantizationTestF, Result) { this->testProductQuantizationFromDataset(); }

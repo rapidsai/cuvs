@@ -148,7 +148,7 @@ cuvsError_t cuvsProductQuantizerTrain(cuvsResources_t res,
  * @param[in] res raft resource
  * @param[in] quantizer product quantizer
  * @param[in] dataset a row-major host or device matrix to transform
- * @param[out] out a row-major host or device matrix to store transformed data
+ * @param[out] out a row-major device matrix to store transformed data
  */
 cuvsError_t cuvsProductQuantizerTransform(cuvsResources_t res,
                                           cuvsProductQuantizer_t quantizer,
@@ -162,8 +162,8 @@ cuvsError_t cuvsProductQuantizerTransform(cuvsResources_t res,
  *
  * @param[in] res raft resource
  * @param[in] quantizer product quantizer
- * @param[in] codes a row-major host or device matrix of quantized codes
- * @param[out] out a row-major host or device matrix to store the original data
+ * @param[in] codes a row-major device matrix of quantized codes
+ * @param[out] out a row-major device matrix to store the original data
  */
  cuvsError_t cuvsProductQuantizerInverseTransform(cuvsResources_t res,
   cuvsProductQuantizer_t quantizer,

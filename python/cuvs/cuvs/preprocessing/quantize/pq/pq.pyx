@@ -210,7 +210,7 @@ def train(QuantizerParams params, dataset, resources=None):
     Parameters
     ----------
     params : QuantizerParams object
-    dataset : row major device dataset. FP32
+    dataset : row major dataset on host or device memory. FP32
     {resources_docstring}
 
     Returns
@@ -258,7 +258,7 @@ def transform(Quantizer quantizer, dataset, output=None, resources=None):
     Parameters
     ----------
     quantizer : trained Quantizer object
-    dataset : row major device dataset to transform. FP32
+    dataset : row major dataset on host or device memory. FP32
     output : optional preallocated output memory, on device memory
     {resources_docstring}
 
@@ -285,11 +285,9 @@ def transform(Quantizer quantizer, dataset, output=None, resources=None):
                        [np.dtype("float32")])
 
     if output is None:
-        on_device = hasattr(dataset, "__cuda_array_interface__")
-        ndarray = device_ndarray if on_device else np
         encoded_cols = quantizer.encoded_dim
-        output = ndarray.empty((dataset_ai.shape[0],
-                                encoded_cols), dtype="uint8")
+        output = device_ndarray.empty((dataset_ai.shape[0],
+                                       encoded_cols), dtype="uint8")
 
     output_ai = wrap_array(output)
     _check_input_array(output_ai, [np.dtype("uint8")])
