@@ -10,6 +10,8 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 
+#include <cstdint>
+
 namespace cuvs::preprocessing::spectral_embedding {
 
 /**
@@ -170,6 +172,16 @@ void transform(raft::resources const& handle,
 void transform(raft::resources const& handle,
                params config,
                raft::device_coo_matrix_view<double, int, int, int> connectivity_graph,
+               raft::device_matrix_view<double, int, raft::col_major> embedding);
+
+void transform(raft::resources const& handle,
+               params config,
+               raft::device_coo_matrix_view<float, int, int, int64_t> connectivity_graph,
+               raft::device_matrix_view<float, int, raft::col_major> embedding);
+
+void transform(raft::resources const& handle,
+               params config,
+               raft::device_coo_matrix_view<double, int, int, int64_t> connectivity_graph,
                raft::device_matrix_view<double, int, raft::col_major> embedding);
 
 /**
