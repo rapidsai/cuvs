@@ -63,7 +63,6 @@ cache:
       - libraft-headers =${{ minor_version }}
       - nccl ${{ nccl_version }}
       - cuda-version =${{ cuda_version }}
-      - cuda-cudart-dev
       - cuda-profiler-api
       - libcublas-dev
       - libcurand-dev
@@ -101,7 +100,6 @@ outputs:
         - libraft-headers =${{ minor_version }}
         - nccl ${{ nccl_version }}
         - cuda-version =${{ cuda_version }}
-        - cuda-cudart-dev
         - cuda-profiler-api
         - libcublas-dev
         - libcurand-dev
@@ -153,7 +151,6 @@ outputs:
         - ${{ pin_subpackage("libcuvs", exact=True) }}
         - cuda-version =${{ cuda_version }}
         - openblas  # required by some CPU algos in benchmarks
-        - cuda-cudart-dev
         - cuda-profiler-api
         - libcublas-dev
         - libcurand-dev
@@ -238,7 +235,6 @@ outputs:
         - libraft-headers =${{ minor_version }}
         - librmm =${{ minor_version }}
         - nccl ${{ nccl_version }}
-        - cuda-cudart-dev
         - cuda-profiler-api
         - libcublas-dev
         - libcurand-dev
@@ -293,7 +289,6 @@ outputs:
         - ${{ stdlib("c") }}
       host:
         - ${{ pin_subpackage("libcuvs", exact=True) }}
-        - cuda-cudart-dev
         - cuda-profiler-api
         - cuda-version =${{ cuda_version }}
         - libcublas-dev
