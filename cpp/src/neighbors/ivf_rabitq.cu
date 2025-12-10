@@ -104,12 +104,6 @@ void search(raft::resources const& handle,
             raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,
             raft::device_matrix_view<float, IdxT, raft::row_major> distances)
 {
-  // ex_bits = 0 <=> bits_per_dim = 1
-  if (idx.rabitq_index().get_ex_bits() == 0) {
-    RAFT_EXPECTS(params.mode == search_mode::QUANT4,
-                 "Unsupported search mode for bits_per_dim = 1");
-  }
-
   auto stream = raft::resource::get_cuda_stream(handle).value();
 
   size_t NQ            = queries.extent(0);
@@ -262,9 +256,6 @@ index<IdxT>::index(raft::resources const& handle,
   : rabitq_index_(std::make_unique<detail::IVFGPU>(
       handle, n_rows, dim, n_lists, bits_per_dim, /* batch_flag = */ true))
 {
-  // All current search modes support bits_per_dim in the range of [2, 9].
-  // Additionally, QUANT4 mode supports bits_per_dim of 1.
-  // The per-mode requirement is checked during search.
   RAFT_EXPECTS(bits_per_dim >= 1 && bits_per_dim <= 9, "Unsupported bits_per_dim");
 }
 

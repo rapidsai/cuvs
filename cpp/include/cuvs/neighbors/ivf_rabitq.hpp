@@ -44,8 +44,7 @@ struct index_params : cuvs::neighbors::index_params {
    * The total number of bits per dimension (single bit required for the binary RaBitQ algorithm +
    * additional bits for extended RaBitQ).
    *
-   * Supported values for all search modes: [2, 3, 4, 5, 6, 7, 8, 9].
-   * Additionally, bits_per_dim = 1 is supported in search mode QUANT4.
+   * Supported values: [1, 2, 3, 4, 5, 6, 7, 8, 9].
    *
    * Hint: the smaller the 'bits_per_dim', the smaller the index size and the better the search
    * performance, but the lower the recall.

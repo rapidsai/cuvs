@@ -313,11 +313,7 @@ inline auto var_bits_per_dim() -> test_cases_t
   return map<ivf_rabitq_inputs>(xs, [](uint32_t bits_per_dim) {
     ivf_rabitq_inputs x;
     x.index_params.bits_per_dim = bits_per_dim;
-    if (bits_per_dim == 1) {
-      // bit_per_dim = 1 is only supported for search mode QUANT4
-      x.search_params.mode = ivf_rabitq::search_mode::QUANT4;
-      x.min_recall         = 0.3;
-    }
+    if (bits_per_dim == 1) { x.min_recall = 0.3; }
     return x;
   });
 }
@@ -333,6 +329,23 @@ inline auto var_search_mode() -> test_cases_t
   return map<ivf_rabitq_inputs>(xs, [](cuvs::neighbors::ivf_rabitq::search_mode mode) {
     ivf_rabitq_inputs x;
     x.search_params.mode = mode;
+    return x;
+  });
+}
+
+inline auto var_search_mode_1_bit() -> test_cases_t
+{
+  ivf_rabitq_inputs dflt;
+  std::vector<cuvs::neighbors::ivf_rabitq::search_mode> xs{ivf_rabitq::search_mode::LUT16,
+                                                           ivf_rabitq::search_mode::LUT32,
+                                                           ivf_rabitq::search_mode::QUANT4,
+                                                           ivf_rabitq::search_mode::QUANT8};
+
+  return map<ivf_rabitq_inputs>(xs, [](cuvs::neighbors::ivf_rabitq::search_mode mode) {
+    ivf_rabitq_inputs x;
+    x.search_params.mode        = mode;
+    x.index_params.bits_per_dim = 1;
+    x.min_recall                = 0.3;
     return x;
   });
 }
