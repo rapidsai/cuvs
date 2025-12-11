@@ -238,7 +238,6 @@ void build_linkage(
  * @param[in] rows Source nodes of the MST edges (device memory, size: nnz)
  * @param[in] cols Destination nodes of the MST edges (device memory, size: nnz)
  * @param[in] data Edge weights/distances of the MST (device memory, size: nnz)
- * @param[in] nnz Number of edges in the MST (should be n_nodes - 1 for a connected tree)
  * @param[out] children Output dendrogram children array (device memory, size: nnz * 2)
  *                      Each pair of consecutive elements represents the two children
  *                      merged at each step of the hierarchy
@@ -247,13 +246,12 @@ void build_linkage(
  * @param[out] out_size Output cluster sizes at each merge step (device memory, size: nnz)
  */
 void build_dendrogram_host(raft::resources const& handle,
-                           const int64_t* rows,
-                           const int64_t* cols,
-                           const float* data,
-                           size_t nnz,
-                           int64_t* children,
-                           float* out_delta,
-                           int64_t* out_size);
+                           raft::device_vector_view<const int64_t, int64_t> rows,
+                           raft::device_vector_view<const int64_t, int64_t> cols,
+                           raft::device_vector_view<const float, int64_t> data,
+                           raft::device_matrix_view<int64_t, int64_t, raft::row_major> children,
+                           raft::device_vector_view<float, int64_t> out_delta,
+                           raft::device_vector_view<int64_t, int64_t> out_size);
 
 }  // namespace helpers
 /**

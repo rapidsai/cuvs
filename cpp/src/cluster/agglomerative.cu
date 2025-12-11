@@ -9,18 +9,24 @@
 
 namespace cuvs::cluster::agglomerative::helpers {
 
-#define CUVS_INST_AGGLOMERATIVE(IdxT, ValueT)                        \
-  void build_dendrogram_host(raft::resources const& handle,          \
-                             const IdxT* rows,                       \
-                             const IdxT* cols,                       \
-                             const ValueT* data,                     \
-                             size_t nnz,                             \
-                             IdxT* children,                         \
-                             ValueT* out_delta,                      \
-                             IdxT* out_size)                         \
-  {                                                                  \
-    detail::build_dendrogram_host<IdxT, ValueT>(                     \
-      handle, rows, cols, data, nnz, children, out_delta, out_size); \
+#define CUVS_INST_AGGLOMERATIVE(IdxT, ValueT)                                                \
+  void build_dendrogram_host(raft::resources const& handle,                                  \
+                             raft::device_vector_view<const IdxT, IdxT> rows,                \
+                             raft::device_vector_view<const IdxT, IdxT> cols,                \
+                             raft::device_vector_view<const ValueT, IdxT> data,              \
+                             raft::device_matrix_view<IdxT, IdxT, raft::row_major> children, \
+                             raft::device_vector_view<ValueT, IdxT> out_delta,               \
+                             raft::device_vector_view<IdxT, IdxT> out_size)                  \
+  {                                                                                          \
+    size_t nnz = rows.extent(0);                                                             \
+    detail::build_dendrogram_host<IdxT, ValueT>(handle,                                      \
+                                                rows.data_handle(),                          \
+                                                cols.data_handle(),                          \
+                                                data.data_handle(),                          \
+                                                nnz,                                         \
+                                                children.data_handle(),                      \
+                                                out_delta.data_handle(),                     \
+                                                out_size.data_handle());                     \
   }
 
 CUVS_INST_AGGLOMERATIVE(int64_t, float);
