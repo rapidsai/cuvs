@@ -36,6 +36,7 @@ if ! command -V ninja >/dev/null 2>&1; then
     rm /tmp/ninja-linux.zip
 fi
 
+source rapids-install-sccache
 source rapids-configure-sccache
 source rapids-date-string
 
