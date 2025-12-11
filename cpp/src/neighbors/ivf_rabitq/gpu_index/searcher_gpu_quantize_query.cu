@@ -11,6 +11,7 @@
 #include "searcher_gpu.cuh"
 #include "searcher_gpu_common.cuh"
 
+#include <raft/matrix/detail/select_warpsort.cuh>
 #include <raft/neighbors/detail/ivf_flat_interleaved_scan.cuh>
 
 #include <thrust/fill.h>
@@ -21,6 +22,7 @@
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
+template <typename QueueT, bool SharedQueueBuffer>
 __global__ void computeInnerProductsWithBitwiseOpt(const ComputeInnerProductsKernelParams params)
 {
   const int block_id = blockIdx.x;
@@ -195,9 +197,7 @@ __global__ void computeInnerProductsWithBitwiseOpt(const ComputeInnerProductsKer
 
     __shared__ int probe_slot;
     {
-      using block_sort_t = typename raft::neighbors::ivf_flat::detail::
-        flat_block_sort<MAX_TOP_K, true, float, uint32_t>::type;
-      block_sort_t queue(params.topk);
+      QueueT queue(params.topk);
 
       // Additional shared values needed for Step 3
       __shared__ float q_kbxsumq;
@@ -289,8 +289,11 @@ __global__ void computeInnerProductsWithBitwiseOpt(const ComputeInnerProductsKer
       __syncthreads();
 
       // Step 3 Part 3: Merge results and write back top-k
-
-      queue.done((uint8_t*)shared_mem_raw_2);
+      if constexpr (SharedQueueBuffer) {
+        queue.done((uint8_t*)shared_mem_raw_2);
+      } else {
+        queue.done();
+      }
 
       // Atomically get write position
       if (tid == 0) { probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], 1); }
@@ -340,6 +343,31 @@ __global__ void computeInnerProductsWithBitwiseOpt(const ComputeInnerProductsKer
   }
 }
 
+// instantiate the kernel with a queue type that satisfies the capacity requirement
+template <int Capacity = MAX_TOP_K_WARP_SORT>
+auto instantiateComputeInnerProductsWithBitwiseOpt(const uint32_t topk)
+{
+  static_assert(Capacity <= MAX_TOP_K_WARP_SORT,
+                "Capacity exceeds maximum supported: " STR(MAX_TOP_K_WARP_SORT));
+  if constexpr (Capacity <=
+                MAX_TOP_K_BLOCK_SORT) {  // base case: use block_sort (requires shared mem)
+    using block_sort_t = typename raft::neighbors::ivf_flat::detail::
+      flat_block_sort<MAX_TOP_K_BLOCK_SORT, true, T, IdxT>::type;
+    return computeInnerProductsWithBitwiseOpt<block_sort_t, /* SharedQueueBuffer = */ true>;
+  } else {
+    if (topk * WARP_SORT_CAPACITY_FACTOR >
+        Capacity) {  // base case: use warp_sort (does not require shared mem)
+      using warp_sort_t =
+        raft::matrix::detail::select::warpsort::warp_sort_filtered<Capacity, true, T, IdxT>;
+      return computeInnerProductsWithBitwiseOpt<warp_sort_t, /* SharedQueueBuffer = */ false>;
+    } else {  // recursive case
+      return instantiateComputeInnerProductsWithBitwiseOpt<Capacity / WARP_SORT_CAPACITY_FACTOR>(
+        topk);
+    }
+  }
+}
+
+template <typename QueueT, bool SharedQueueBuffer>
 __global__ void computeInnerProductsWithBitwiseOpt8bitNoEX(
   const ComputeInnerProductsKernelParams params)
 {
@@ -463,9 +491,7 @@ __global__ void computeInnerProductsWithBitwiseOpt8bitNoEX(
   __syncthreads();
 
   if (num_candidates > 0) {
-    using block_sort_t = typename raft::neighbors::ivf_flat::detail::
-      flat_block_sort<MAX_TOP_K, true, float, uint32_t>::type;
-    block_sort_t queue(params.topk);
+    QueueT queue(params.topk);
 
     for (size_t i = tid; i < params.D; i += num_threads) {
       shared_query[i] = params.d_query[query_idx * params.D + i];
@@ -532,7 +558,11 @@ __global__ void computeInnerProductsWithBitwiseOpt8bitNoEX(
     __syncthreads();
     //    ------------------
     __shared__ int probe_slot;
-    queue.done((uint8_t*)shared_mem_raw_2);
+    if constexpr (SharedQueueBuffer) {
+      queue.done((uint8_t*)shared_mem_raw_2);
+    } else {
+      queue.done();
+    }
 
     // Atomically get write position
     if (tid == 0) { probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], 1); }
@@ -577,6 +607,32 @@ __global__ void computeInnerProductsWithBitwiseOpt8bitNoEX(
   }
 }
 
+// instantiate the kernel with a queue type that satisfies the capacity requirement
+template <int Capacity = MAX_TOP_K_WARP_SORT>
+auto instantiateComputeInnerProductsWithBitwiseOpt8bitNoEX(const uint32_t topk)
+{
+  static_assert(Capacity <= MAX_TOP_K_WARP_SORT,
+                "Capacity exceeds maximum supported: " STR(MAX_TOP_K_WARP_SORT));
+  if constexpr (Capacity <=
+                MAX_TOP_K_BLOCK_SORT) {  // base case: use block_sort (requires shared mem)
+    using block_sort_t = typename raft::neighbors::ivf_flat::detail::
+      flat_block_sort<MAX_TOP_K_BLOCK_SORT, true, T, IdxT>::type;
+    return computeInnerProductsWithBitwiseOpt8bitNoEX<block_sort_t, /* SharedQueueBuffer = */ true>;
+  } else {
+    if (topk * WARP_SORT_CAPACITY_FACTOR >
+        Capacity) {  // base case: use warp_sort (does not require shared mem)
+      using warp_sort_t =
+        raft::matrix::detail::select::warpsort::warp_sort_filtered<Capacity, true, T, IdxT>;
+      return computeInnerProductsWithBitwiseOpt8bitNoEX<warp_sort_t,
+                                                        /* SharedQueueBuffer = */ false>;
+    } else {  // recursive case
+      return instantiateComputeInnerProductsWithBitwiseOpt8bitNoEX<Capacity /
+                                                                   WARP_SORT_CAPACITY_FACTOR>(topk);
+    }
+  }
+}
+
+template <typename QueueT, bool SharedQueueBuffer>
 __global__ void computeInnerProductsWithBitwiseOpt4bit(
   const ComputeInnerProductsKernelParams params)
 {
@@ -752,9 +808,7 @@ __global__ void computeInnerProductsWithBitwiseOpt4bit(
 
     __shared__ int probe_slot;
     {
-      using block_sort_t = typename raft::neighbors::ivf_flat::detail::
-        flat_block_sort<MAX_TOP_K, true, float, uint32_t>::type;
-      block_sort_t queue(params.topk);
+      QueueT queue(params.topk);
 
       // Additional shared values needed for Step 3
       __shared__ float q_kbxsumq;
@@ -846,8 +900,11 @@ __global__ void computeInnerProductsWithBitwiseOpt4bit(
       __syncthreads();
 
       // Step 3 Part 3: Merge results and write back top-k
-
-      queue.done((uint8_t*)shared_mem_raw_2);
+      if constexpr (SharedQueueBuffer) {
+        queue.done((uint8_t*)shared_mem_raw_2);
+      } else {
+        queue.done();
+      }
 
       // Atomically get write position
       if (tid == 0) { probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], 1); }
@@ -897,6 +954,31 @@ __global__ void computeInnerProductsWithBitwiseOpt4bit(
   }
 }
 
+// instantiate the kernel with a queue type that satisfies the capacity requirement
+template <int Capacity = MAX_TOP_K_WARP_SORT>
+auto instantiateComputeInnerProductsWithBitwiseOpt4bit(const uint32_t topk)
+{
+  static_assert(Capacity <= MAX_TOP_K_WARP_SORT,
+                "Capacity exceeds maximum supported: " STR(MAX_TOP_K_WARP_SORT));
+  if constexpr (Capacity <=
+                MAX_TOP_K_BLOCK_SORT) {  // base case: use block_sort (requires shared mem)
+    using block_sort_t = typename raft::neighbors::ivf_flat::detail::
+      flat_block_sort<MAX_TOP_K_BLOCK_SORT, true, T, IdxT>::type;
+    return computeInnerProductsWithBitwiseOpt4bit<block_sort_t, /* SharedQueueBuffer = */ true>;
+  } else {
+    if (topk * WARP_SORT_CAPACITY_FACTOR >
+        Capacity) {  // base case: use warp_sort (does not require shared mem)
+      using warp_sort_t =
+        raft::matrix::detail::select::warpsort::warp_sort_filtered<Capacity, true, T, IdxT>;
+      return computeInnerProductsWithBitwiseOpt4bit<warp_sort_t, /* SharedQueueBuffer = */ false>;
+    } else {  // recursive case
+      return instantiateComputeInnerProductsWithBitwiseOpt4bit<Capacity /
+                                                               WARP_SORT_CAPACITY_FACTOR>(topk);
+    }
+  }
+}
+
+template <typename QueueT, bool SharedQueueBuffer>
 __global__ void computeInnerProductsWithBitwiseOpt4bitNoEX(
   const ComputeInnerProductsKernelParams params)
 {
@@ -1016,9 +1098,7 @@ __global__ void computeInnerProductsWithBitwiseOpt4bitNoEX(
   __syncthreads();
 
   if (num_candidates > 0) {
-    using block_sort_t = typename raft::neighbors::ivf_flat::detail::
-      flat_block_sort<MAX_TOP_K, true, float, uint32_t>::type;
-    block_sort_t queue(params.topk);
+    QueueT queue(params.topk);
 
     for (size_t i = tid; i < params.D; i += num_threads) {
       shared_query[i] = params.d_query[query_idx * params.D + i];
@@ -1085,7 +1165,11 @@ __global__ void computeInnerProductsWithBitwiseOpt4bitNoEX(
     __syncthreads();
     //    ------------------
     __shared__ int probe_slot;
-    queue.done((uint8_t*)shared_mem_raw_2);
+    if constexpr (SharedQueueBuffer) {
+      queue.done((uint8_t*)shared_mem_raw_2);
+    } else {
+      queue.done();
+    }
 
     // Atomically get write position
     if (tid == 0) { probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], 1); }
@@ -1126,6 +1210,31 @@ __global__ void computeInnerProductsWithBitwiseOpt4bitNoEX(
 
       // Note: atomicMin on int representation works correctly for positive floats
       // because IEEE 754 float format preserves ordering for positive values
+    }
+  }
+}
+
+// instantiate the kernel with a queue type that satisfies the capacity requirement
+template <int Capacity = MAX_TOP_K_WARP_SORT>
+auto instantiateComputeInnerProductsWithBitwiseOpt4bitNoEX(const uint32_t topk)
+{
+  static_assert(Capacity <= MAX_TOP_K_WARP_SORT,
+                "Capacity exceeds maximum supported: " STR(MAX_TOP_K_WARP_SORT));
+  if constexpr (Capacity <=
+                MAX_TOP_K_BLOCK_SORT) {  // base case: use block_sort (requires shared mem)
+    using block_sort_t = typename raft::neighbors::ivf_flat::detail::
+      flat_block_sort<MAX_TOP_K_BLOCK_SORT, true, T, IdxT>::type;
+    return computeInnerProductsWithBitwiseOpt4bitNoEX<block_sort_t, /* SharedQueueBuffer = */ true>;
+  } else {
+    if (topk * WARP_SORT_CAPACITY_FACTOR >
+        Capacity) {  // base case: use warp_sort (does not require shared mem)
+      using warp_sort_t =
+        raft::matrix::detail::select::warpsort::warp_sort_filtered<Capacity, true, T, IdxT>;
+      return computeInnerProductsWithBitwiseOpt4bitNoEX<warp_sort_t,
+                                                        /* SharedQueueBuffer = */ false>;
+    } else {  // recursive case
+      return instantiateComputeInnerProductsWithBitwiseOpt4bitNoEX<Capacity /
+                                                                   WARP_SORT_CAPACITY_FACTOR>(topk);
     }
   }
 }
@@ -1590,14 +1699,16 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
 
   // Launch modified kernel with packed queries instead of LUT
   size_t num_pairs = num_queries * nprobe;
-  dim3 gridDim(num_pairs, 1, 1);
-  dim3 blockDim(256, 1, 1);
+  uint32_t gridDim{static_cast<uint32_t>(num_pairs)};
+  uint32_t blockDim{topk > MAX_TOP_K_BLOCK_SORT ? static_cast<uint32_t>(WARP_SIZE) : 256};
 
   // Recalculate shared memory for new approach
   size_t query_storage = D * sizeof(float);  // For shared query vector
-  const int smem_bytes =
-    raft::matrix::detail::select::warpsort::calc_smem_size_for_block_wide<T, IdxT>(blockDim.x / 32,
-                                                                                   MAX_TOP_K);
+  const int queue_buffer_smem_bytes =
+    (topk > MAX_TOP_K_BLOCK_SORT)
+      ? 0
+      : raft::matrix::detail::select::warpsort::calc_smem_size_for_block_wide<T, IdxT>(
+          blockDim / WARP_SIZE, MAX_TOP_K_BLOCK_SORT);
 
   // Now we need: packed query bits, candidate storage, and query vector
   // this part is also used to store ip2 results
@@ -1606,12 +1717,8 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
   size_t candidate_storage = cur_ivf.get_max_cluster_length() * (sizeof(float) + sizeof(int));
   size_t shared_mem_size   = max(packed_query_size + candidate_storage + query_storage +
                                  10 * sizeof(float),  // +sizeof(float) for width
-                               (size_t)smem_bytes);
+                               (size_t)queue_buffer_smem_bytes);
 
-  if (shared_mem_size > 49152) {
-    RAFT_CUDA_TRY(cudaFuncSetAttribute(
-      computeInnerProductsWithBitwiseOpt, cudaFuncAttributeMaxDynamicSharedMemorySize, 98304));
-  }
   ComputeInnerProductsKernelParams kernelParams;
   kernelParams.d_sorted_pairs          = d_sorted_pairs;
   kernelParams.d_query                 = d_query;
@@ -1643,20 +1750,28 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
 
   if (!use_4bit) {
     if (cur_ivf.get_ex_bits() != 0) {
-      computeInnerProductsWithBitwiseOpt<<<gridDim, blockDim, shared_mem_size, stream_>>>(
-        kernelParams);
+      auto kernel = instantiateComputeInnerProductsWithBitwiseOpt(topk);
+      RAFT_CUDA_TRY(
+        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size));
+      kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
     } else {
-      computeInnerProductsWithBitwiseOpt8bitNoEX<<<gridDim, blockDim, shared_mem_size, stream_>>>(
-        kernelParams);
+      auto kernel = instantiateComputeInnerProductsWithBitwiseOpt8bitNoEX(topk);
+      RAFT_CUDA_TRY(
+        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size));
+      kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
     }
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   } else {
     if (cur_ivf.get_ex_bits() != 0) {
-      computeInnerProductsWithBitwiseOpt4bit<<<gridDim, blockDim, shared_mem_size, stream_>>>(
-        kernelParams);
+      auto kernel = instantiateComputeInnerProductsWithBitwiseOpt4bit(topk);
+      RAFT_CUDA_TRY(
+        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size));
+      kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
     } else {
-      computeInnerProductsWithBitwiseOpt4bitNoEX<<<gridDim, blockDim, shared_mem_size, stream_>>>(
-        kernelParams);
+      auto kernel = instantiateComputeInnerProductsWithBitwiseOpt4bitNoEX(topk);
+      RAFT_CUDA_TRY(
+        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size));
+      kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
     }
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }

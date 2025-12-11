@@ -12,6 +12,7 @@
 #include "searcher_gpu.cuh"
 #include "searcher_gpu_common.cuh"
 
+#include <raft/matrix/detail/select_warpsort.cuh>
 #include <raft/neighbors/detail/ivf_flat_interleaved_scan.cuh>
 
 #include <thrust/fill.h>
@@ -132,6 +133,7 @@ void launchPrecomputeLUTs(const float* d_query,
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
+template <typename QueueT, bool SharedQueueBuffer>
 __global__ void computeInnerProductsWithLUT(const ComputeInnerProductsKernelParams params)
 {
   // Each block handles one <cluster, query> pair
@@ -204,7 +206,9 @@ __global__ void computeInnerProductsWithLUT(const ComputeInnerProductsKernelPara
   float* shared_candidate_dists = shared_lut + (num_chunks * LUT_SIZE);
   float* shared_candidate_ips   = shared_candidate_dists + params.max_candidates_per_pair;
   int* shared_candidate_indices = (int*)(shared_candidate_ips + params.max_candidates_per_pair);
-  int* shared_buffer            = shared_candidate_indices + params.max_candidates_per_pair;
+  int* shared_buffer            = nullptr;
+  if constexpr (SharedQueueBuffer)
+    shared_buffer = shared_candidate_indices + params.max_candidates_per_pair;
 
   // Calculate short code parameters
   const size_t short_code_length = params.D / 32;        // number of uint32_t per vector
@@ -294,9 +298,7 @@ __global__ void computeInnerProductsWithLUT(const ComputeInnerProductsKernelPara
   __syncthreads();
   //    __shared__ int probe_slot;
   if (final_num_candidates > 0) {
-    using block_sort_t = typename raft::neighbors::ivf_flat::detail::
-      flat_block_sort<MAX_TOP_K, true, float, uint32_t>::type;
-    block_sort_t queue(params.topk);
+    QueueT queue(params.topk);
 
     // Additional shared values needed for Step 3
     __shared__ float q_kbxsumq;
@@ -398,8 +400,11 @@ __global__ void computeInnerProductsWithLUT(const ComputeInnerProductsKernelPara
 
     // Step 3 Part 3: Merge results and write back top-k
 
-    uint8_t* queue_buffer = (uint8_t*)shared_buffer;
-    queue.done(queue_buffer);
+    if constexpr (SharedQueueBuffer) {
+      queue.done((uint8_t*)shared_buffer);
+    } else {
+      queue.done();
+    }
 
     // Atomically get write position
     __shared__ int probe_slot;
@@ -449,6 +454,30 @@ __global__ void computeInnerProductsWithLUT(const ComputeInnerProductsKernelPara
   }
 }
 
+// instantiate the kernel with a queue type that satisfies the capacity requirement
+template <int Capacity = MAX_TOP_K_WARP_SORT>
+auto instantiateComputeInnerProductsWithLUT(const uint32_t topk)
+{
+  static_assert(Capacity <= MAX_TOP_K_WARP_SORT,
+                "Capacity exceeds maximum supported: " STR(MAX_TOP_K_WARP_SORT));
+  if constexpr (Capacity <=
+                MAX_TOP_K_BLOCK_SORT) {  // base case: use block_sort (requires shared mem)
+    using block_sort_t = typename raft::neighbors::ivf_flat::detail::
+      flat_block_sort<MAX_TOP_K_BLOCK_SORT, true, T, IdxT>::type;
+    return computeInnerProductsWithLUT<block_sort_t, /* SharedQueueBuffer = */ true>;
+  } else {
+    if (topk * WARP_SORT_CAPACITY_FACTOR >
+        Capacity) {  // base case: use warp_sort (does not require shared mem)
+      using warp_sort_t =
+        raft::matrix::detail::select::warpsort::warp_sort_filtered<Capacity, true, T, IdxT>;
+      return computeInnerProductsWithLUT<warp_sort_t, /* SharedQueueBuffer = */ false>;
+    } else {  // recursive case
+      return instantiateComputeInnerProductsWithLUT<Capacity / WARP_SORT_CAPACITY_FACTOR>(topk);
+    }
+  }
+}
+
+template <typename QueueT, bool SharedQueueBuffer>
 __global__ void computeInnerProductsWithLUTNoEX(const ComputeInnerProductsKernelParams params)
 {
   // Each block handles one <cluster, query> pair
@@ -602,9 +631,7 @@ __global__ void computeInnerProductsWithLUTNoEX(const ComputeInnerProductsKernel
   if (num_candidates > 0) {
     __shared__ int probe_slot;
     {
-      using block_sort_t = typename raft::neighbors::ivf_flat::detail::
-        flat_block_sort<MAX_TOP_K, true, float, uint32_t>::type;
-      block_sort_t queue(params.topk);
+      QueueT queue(params.topk);
 
       const int candidates_per_thread = (num_candidates + num_threads - 1) / num_threads;
 
@@ -625,8 +652,11 @@ __global__ void computeInnerProductsWithLUTNoEX(const ComputeInnerProductsKernel
       __syncthreads();
 
       // Step 3: Merge results and write back top-k
-
-      queue.done((uint8_t*)shared_lut);
+      if constexpr (SharedQueueBuffer) {
+        queue.done((uint8_t*)shared_lut);
+      } else {
+        queue.done();
+      }
 
       // Atomically get write position
       if (tid == 0) { probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], 1); }
@@ -673,6 +703,29 @@ __global__ void computeInnerProductsWithLUTNoEX(const ComputeInnerProductsKernel
 
       // Note: atomicMin on int representation works correctly for positive floats
       // because IEEE 754 float format preserves ordering for positive values
+    }
+  }
+}
+
+// instantiate the kernel with a queue type that satisfies the capacity requirement
+template <int Capacity = MAX_TOP_K_WARP_SORT>
+auto instantiateComputeInnerProductsWithLUTNoEX(const uint32_t topk)
+{
+  static_assert(Capacity <= MAX_TOP_K_WARP_SORT,
+                "Capacity exceeds maximum supported: " STR(MAX_TOP_K_WARP_SORT));
+  if constexpr (Capacity <=
+                MAX_TOP_K_BLOCK_SORT) {  // base case: use block_sort (requires shared mem)
+    using block_sort_t = typename raft::neighbors::ivf_flat::detail::
+      flat_block_sort<MAX_TOP_K_BLOCK_SORT, true, T, IdxT>::type;
+    return computeInnerProductsWithLUTNoEX<block_sort_t, /* SharedQueueBuffer = */ true>;
+  } else {
+    if (topk * WARP_SORT_CAPACITY_FACTOR >
+        Capacity) {  // base case: use warp_sort (does not require shared mem)
+      using warp_sort_t =
+        raft::matrix::detail::select::warpsort::warp_sort_filtered<Capacity, true, T, IdxT>;
+      return computeInnerProductsWithLUTNoEX<warp_sort_t, /* SharedQueueBuffer = */ false>;
+    } else {  // recursive case
+      return instantiateComputeInnerProductsWithLUTNoEX<Capacity / WARP_SORT_CAPACITY_FACTOR>(topk);
     }
   }
 }
@@ -726,15 +779,18 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
                std::numeric_limits<float>::infinity());
   // Then launch kernel for computation
   size_t num_pairs = num_queries * nprobe;
-  dim3 gridDim(num_pairs, 1, 1);
-  dim3 blockDim(256, 1, 1);
+  uint32_t gridDim{static_cast<uint32_t>(num_pairs)};
+  uint32_t blockDim{topk > MAX_TOP_K_BLOCK_SORT ? static_cast<uint32_t>(WARP_SIZE) : 256};
   size_t num_chunks = D / BITS_PER_CHUNK;
   size_t candidate_storage =
     cur_ivf.get_max_cluster_length() * (2 * sizeof(float) + sizeof(int));  // ip, idx
   size_t query_storage = D * sizeof(float);  // For shared query vector
-  const int smem_bytes =
-    raft::matrix::detail::select::warpsort::calc_smem_size_for_block_wide<T, IdxT>(blockDim.x / 32,
-                                                                                   MAX_TOP_K);
+  const int queue_buffer_smem_bytes =
+    (topk > MAX_TOP_K_BLOCK_SORT)
+      ? 0
+      : raft::matrix::detail::select::warpsort::calc_smem_size_for_block_wide<T, IdxT>(
+          blockDim / WARP_SIZE, MAX_TOP_K_BLOCK_SORT);
+
   ComputeInnerProductsKernelParams kernelParams;
   kernelParams.d_sorted_pairs          = d_sorted_pairs;
   kernelParams.d_query                 = d_query;
@@ -762,19 +818,20 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
   kernelParams.d_query_write_counters = d_query_write_counters;
 
   if (cur_ivf.get_ex_bits() != 0) {
-    size_t shared_mem_size =
-      num_chunks * LUT_SIZE * sizeof(float) + candidate_storage + query_storage + smem_bytes;
-    RAFT_CUDA_TRY(cudaFuncSetAttribute(
-      computeInnerProductsWithLUT, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size));
-    computeInnerProductsWithLUT<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
+    auto kernel            = instantiateComputeInnerProductsWithLUT(topk);
+    size_t shared_mem_size = num_chunks * LUT_SIZE * sizeof(float) + candidate_storage +
+                             query_storage + queue_buffer_smem_bytes;
+    RAFT_CUDA_TRY(
+      cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size));
+    kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
   } else {
+    auto kernel            = instantiateComputeInnerProductsWithLUTNoEX(topk);
     size_t shared_mem_size = max(num_chunks * LUT_SIZE * sizeof(float) +
                                    cur_ivf.get_max_cluster_length() * (sizeof(float) + sizeof(int)),
-                                 (size_t)smem_bytes);
-    RAFT_CUDA_TRY(cudaFuncSetAttribute(computeInnerProductsWithLUTNoEX,
-                                       cudaFuncAttributeMaxDynamicSharedMemorySize,
-                                       shared_mem_size));
-    computeInnerProductsWithLUTNoEX<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
+                                 (size_t)queue_buffer_smem_bytes);
+    RAFT_CUDA_TRY(
+      cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size));
+    kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
   }
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 

@@ -296,9 +296,11 @@ inline auto var_n_probes() -> test_cases_t
 
 inline auto var_k() -> test_cases_t
 {
-  return map<ivf_rabitq_inputs, uint32_t>({1, 2, 3, 5, 8, 15, 16, 32, 63}, [](uint32_t k) {
+  return map<ivf_rabitq_inputs, uint32_t>({1, 5, 10, 32, 64, 16384}, [](uint32_t k) {
     ivf_rabitq_inputs x;
-    x.k = k;
+    x.k           = k;
+    x.num_db_vecs = max(x.num_db_vecs, k * 2);
+    if (k > 64) x.num_queries = 64;  // reduce runtime of large-k tests
     return x;
   });
 }
