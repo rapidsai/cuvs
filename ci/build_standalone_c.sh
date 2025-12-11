@@ -5,6 +5,7 @@
 set -euo pipefail
 
 TOOLSET_VERSION=14
+NINJA_VERSION=v1.13.1
 
 BUILD_C_LIB_TESTS="OFF"
 if [[ "${1:-}" == "--build-tests" ]]; then
