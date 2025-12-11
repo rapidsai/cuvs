@@ -813,7 +813,6 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(
                         handle_,
                         /* sorted = */ false);
 
-  //    std::cout << "block distances merged!" << std::endl;
   RAFT_CUDA_TRY(cudaFreeAsync(d_topk_threshold_batch, stream_));
   RAFT_CUDA_TRY(cudaFreeAsync(d_lut_for_queries, stream_));
   RAFT_CUDA_TRY(cudaFreeAsync(d_query_write_counters, stream_));
