@@ -5,7 +5,7 @@
 # cmake-format: on
 # =============================================================================
 
-include_guard()
+include_guard(GLOBAL)
 
 function(embed_fatbins library_name kernel_target)
   find_package(CUDAToolkit REQUIRED)

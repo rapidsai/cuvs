@@ -5,7 +5,7 @@
 # cmake-format: on
 # =============================================================================
 
-include_guard()
+include_guard(GLOBAL)
 
 # Generate JIT LTO kernel files at build time using a Python generator script Arguments: kernel_name
 # - Name of the kernel type (e.g., "interleaved_scan") generator_script - Path to the Python script

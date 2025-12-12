@@ -3,8 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "nvjitlink_checker.hpp"
+
 #include <chrono>
-#include <iostream>
 #include <iterator>
 #include <memory>
 #include <new>
@@ -18,26 +19,6 @@
 #include "nvJitLink.h"
 
 #include <raft/util/cuda_rt_essentials.hpp>
-
-namespace {
-// We can make a better RAII wrapper around nvjitlinkhandle
-void check_nvjitlink_result(nvJitLinkHandle handle, nvJitLinkResult result)
-{
-  if (result != NVJITLINK_SUCCESS) {
-    std::cerr << "\n nvJITLink failed with error " << result << '\n';
-    size_t log_size = 0;
-    result          = nvJitLinkGetErrorLogSize(handle, &log_size);
-    if (result == NVJITLINK_SUCCESS && log_size > 0) {
-      std::unique_ptr<char[]> log{new char[log_size]};
-      result = nvJitLinkGetErrorLog(handle, log.get());
-      if (result == NVJITLINK_SUCCESS) {
-        std::cerr << "AlgorithmPlanner nvJITLink error log: " << log.get() << '\n';
-      }
-    }
-    exit(1);
-  }
-}
-}  // namespace
 
 void AlgorithmPlanner::add_entrypoint()
 {
