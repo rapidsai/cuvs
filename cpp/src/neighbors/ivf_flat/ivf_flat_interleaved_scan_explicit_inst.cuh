@@ -6,7 +6,7 @@
 #pragma once
 
 #include "../detail/ann_utils.cuh"
-#if CUDART_VERSION >= 13000
+#ifdef CUVS_ENABLE_JIT_LTO
 #include "ivf_flat_interleaved_scan_jit.cuh"
 #else
 #include "ivf_flat_interleaved_scan.cuh"
