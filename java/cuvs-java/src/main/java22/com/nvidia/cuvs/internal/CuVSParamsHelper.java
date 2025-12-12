@@ -21,11 +21,11 @@ import java.lang.foreign.MemorySegment;
  * Destroy calls, so that the params native resources will be cleared when
  * {@link AutoCloseable#close()} is called.
  */
-final class CuVSParamsHelper {
+public final class CuVSParamsHelper {
 
   private CuVSParamsHelper() {}
 
-  static CloseableHandle createCagraIndexParams() {
+  public static CloseableHandle createCagraIndexParams() {
     try (var localArena = Arena.ofConfined()) {
       var paramsPtrPtr = localArena.allocate(cuvsCagraIndexParams_t);
       checkCuVSError(cuvsCagraIndexParamsCreate(paramsPtrPtr), "cuvsCagraIndexParamsCreate");
@@ -65,7 +65,7 @@ final class CuVSParamsHelper {
     }
   }
 
-  static CloseableHandle createIvfPqIndexParams() {
+  public static CloseableHandle createIvfPqIndexParams() {
     try (var localArena = Arena.ofConfined()) {
       var paramsPtrPtr = localArena.allocate(cuvsIvfPqIndexParams_t);
       checkCuVSError(cuvsIvfPqIndexParamsCreate(paramsPtrPtr), "cuvsIvfPqIndexParamsCreate");
@@ -84,7 +84,7 @@ final class CuVSParamsHelper {
     }
   }
 
-  static CloseableHandle createIvfPqSearchParams() {
+  public static CloseableHandle createIvfPqSearchParams() {
     try (var localArena = Arena.ofConfined()) {
       var paramsPtrPtr = localArena.allocate(cuvsIvfPqSearchParams_t);
       checkCuVSError(cuvsIvfPqSearchParamsCreate(paramsPtrPtr), "cuvsIvfPqSearchParamsCreate");
@@ -117,6 +117,25 @@ final class CuVSParamsHelper {
         @Override
         public void close() {
           checkCuVSError(cuvsCagraMergeParamsDestroy(paramsPtr), "cuvsCagraMergeParamsDestroy");
+        }
+      };
+    }
+  }
+
+  public static CloseableHandle createAceParams() {
+    try (var localArena = Arena.ofConfined()) {
+      var paramsPtrPtr = localArena.allocate(cuvsAceParams_t);
+      checkCuVSError(cuvsAceParamsCreate(paramsPtrPtr), "cuvsAceParamsCreate");
+      var paramsPtr = paramsPtrPtr.get(cuvsAceParams_t, 0L);
+      return new CloseableHandle() {
+        @Override
+        public MemorySegment handle() {
+          return paramsPtr;
+        }
+
+        @Override
+        public void close() {
+          checkCuVSError(cuvsAceParamsDestroy(paramsPtr), "cuvsAceParamsDestroy");
         }
       };
     }

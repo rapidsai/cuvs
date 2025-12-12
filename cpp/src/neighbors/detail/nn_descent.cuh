@@ -243,7 +243,11 @@ RAFT_KERNEL preprocess_data_kernel(
   Data_t* s_vec  = (Data_t*)buffer;
   size_t list_id = list_offset + blockIdx.x;
 
-  load_vec(s_vec, input_data + blockIdx.x * dim, dim, dim, threadIdx.x % raft::warp_size());
+  load_vec(s_vec,
+           input_data + static_cast<size_t>(blockIdx.x) * dim,
+           dim,
+           dim,
+           threadIdx.x % raft::warp_size());
   if (threadIdx.x == 0) { l2_norm = 0; }
   __syncthreads();
 
@@ -1108,7 +1112,7 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
 {
   using input_t = typename std::remove_const<Data_t>::type;
 
-  if (build_config_.metric == cuvsDistanceType::BitwiseHamming &&
+  if (build_config_.metric == distance::DistanceType::BitwiseHamming &&
       !(std::is_same_v<input_t, uint8_t> || std::is_same_v<input_t, int8_t>)) {
     RAFT_FAIL(
       "Data type needs to be int8 or uint8 for NN Descent to run with BitwiseHamming distance.");
@@ -1298,9 +1302,9 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
 }
 
 template <typename T,
-          typename IdxT     = uint32_t,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename IdxT = uint32_t,
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 void build(raft::resources const& res,
            const index_params& params,
            raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
@@ -1344,9 +1348,9 @@ void build(raft::resources const& res,
 }
 
 template <typename T,
-          typename IdxT     = uint32_t,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename IdxT = uint32_t,
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 index<IdxT> build(
   raft::resources const& res,
   const index_params& params,

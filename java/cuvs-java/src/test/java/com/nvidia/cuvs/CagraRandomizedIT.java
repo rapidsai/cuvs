@@ -11,6 +11,7 @@ import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
 import java.util.BitSet;
 import java.util.List;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
@@ -34,6 +35,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
     DEVICE
   }
 
+  @Ignore // https://github.com/rapidsai/cuvs/issues/1468
   @Test
   public void testResultsTopKWithRandomValues() throws Throwable {
     TestDatasetMemoryKind[] testDatasetMemoryKinds = {

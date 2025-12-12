@@ -1,11 +1,12 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
 #include "kmeans.cuh"
+#include <cuvs/cluster/kmeans.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/error.hpp>
@@ -24,8 +25,8 @@ void compute_dispersion(raft::resources const& handle,
                         raft::device_matrix_view<const value_t, idx_t> X,
                         cuvs::cluster::kmeans::params& params,
                         raft::device_matrix_view<value_t, idx_t> centroids_view,
-                        raft::device_vector_view<idx_t> labels,
-                        raft::device_vector_view<idx_t> clusterSizes,
+                        raft::device_vector_view<idx_t, idx_t> labels,
+                        raft::device_vector_view<idx_t, idx_t> clusterSizes,
                         rmm::device_uvector<char>& workspace,
                         raft::host_vector_view<value_t> clusterDispertionView,
                         raft::host_vector_view<value_t> resultsView,
@@ -44,7 +45,7 @@ void compute_dispersion(raft::resources const& handle,
 
   params.n_clusters = val;
 
-  cuvs::cluster::kmeans::detail::kmeans_fit_predict<value_t, idx_t>(
+  cuvs::cluster::kmeans::fit_predict(
     handle, params, X, std::nullopt, std::make_optional(centroids_view), labels, residual, n_iter);
 
   detail::countLabels(handle, labels.data_handle(), clusterSizes.data_handle(), n, val, workspace);
@@ -108,12 +109,15 @@ void find_k(raft::resources const& handle,
 
   auto centroids_view =
     raft::make_device_matrix_view<value_t, idx_t>(centroids.data_handle(), left, d);
+  auto labels_view = raft::make_device_vector_view<idx_t, idx_t>(labels.data_handle(), n);
+  auto clusterSizes_view =
+    raft::make_device_vector_view<idx_t, idx_t>(clusterSizes.data_handle(), kmax);
   compute_dispersion<value_t, idx_t>(handle,
                                      X,
                                      params,
                                      centroids_view,
-                                     labels.view(),
-                                     clusterSizes.view(),
+                                     labels_view,
+                                     clusterSizes_view,
                                      workspace,
                                      clusterDispertionView,
                                      resultsView,
@@ -132,8 +136,8 @@ void find_k(raft::resources const& handle,
                                        X,
                                        params,
                                        centroids_view,
-                                       labels.view(),
-                                       clusterSizes.view(),
+                                       labels_view,
+                                       clusterSizes_view,
                                        workspace,
                                        clusterDispertionView,
                                        resultsView,
@@ -158,8 +162,8 @@ void find_k(raft::resources const& handle,
                                          X,
                                          params,
                                          centroids_view,
-                                         labels.view(),
-                                         clusterSizes.view(),
+                                         labels_view,
+                                         clusterSizes_view,
                                          workspace,
                                          clusterDispertionView,
                                          resultsView,
@@ -208,15 +212,14 @@ void find_k(raft::resources const& handle,
       raft::make_device_matrix_view<value_t, idx_t>(centroids.data_handle(), best_k[0], d);
 
     params.n_clusters = best_k[0];
-    cuvs::cluster::kmeans::detail::kmeans_fit_predict<value_t, idx_t>(
-      handle,
-      params,
-      X,
-      std::nullopt,
-      std::make_optional(centroids_view),
-      labels.view(),
-      residual,
-      n_iter);
+    cuvs::cluster::kmeans::fit_predict(handle,
+                                       params,
+                                       X,
+                                       std::nullopt,
+                                       std::make_optional(centroids_view),
+                                       labels.view(),
+                                       residual,
+                                       n_iter);
   }
 }
 }  // namespace  cuvs::cluster::kmeans::detail

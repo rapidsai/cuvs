@@ -117,7 +117,7 @@ ConfigureTest(
 ConfigureTest(
   NAME CLUSTER_TEST
   PATH cluster/kmeans.cu cluster/kmeans_balanced.cu cluster/kmeans_find_k.cu cluster/linkage.cu
-       cluster/connect_knn.cu
+       cluster/connect_knn.cu cluster/spectral.cu
   GPUS 1
   PERCENT 100
 )
@@ -190,6 +190,34 @@ ConfigureTest(
 ConfigureTest(
   NAME NEIGHBORS_ANN_CAGRA_UINT8_UINT32_TEST
   PATH neighbors/ann_cagra/test_uint8_t_uint32_t.cu
+  GPUS 1
+  PERCENT 100
+)
+
+ConfigureTest(
+  NAME NEIGHBORS_ANN_CAGRA_ACE_FLOAT_UINT32_TEST
+  PATH neighbors/ann_cagra_ace/test_float_uint32_t.cu
+  GPUS 1
+  PERCENT 100
+)
+
+ConfigureTest(
+  NAME NEIGHBORS_ANN_CAGRA_ACE_HALF_UINT32_TEST
+  PATH neighbors/ann_cagra_ace/test_half_uint32_t.cu
+  GPUS 1
+  PERCENT 100
+)
+
+ConfigureTest(
+  NAME NEIGHBORS_ANN_CAGRA_ACE_INT8_UINT32_TEST
+  PATH neighbors/ann_cagra_ace/test_int8_t_uint32_t.cu
+  GPUS 1
+  PERCENT 100
+)
+
+ConfigureTest(
+  NAME NEIGHBORS_ANN_CAGRA_ACE_UINT8_UINT32_TEST
+  PATH neighbors/ann_cagra_ace/test_uint8_t_uint32_t.cu
   GPUS 1
   PERCENT 100
 )
@@ -281,6 +309,7 @@ ConfigureTest(
        distance/gram.cu
        distance/masked_nn.cu
        distance/sparse_distance.cu
+       sparse/gram.cu
        sparse/neighbors/cross_component_nn.cu
   GPUS 1
   PERCENT 100

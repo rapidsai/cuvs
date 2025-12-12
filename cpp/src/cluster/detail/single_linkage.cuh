@@ -43,7 +43,7 @@ namespace cuvs::cluster::agglomerative::detail {
 template <typename value_t   = float,
           typename value_idx = int,
           typename nnz_t     = size_t,
-          typename Accessor  = raft::device_accessor<std::experimental::default_accessor<value_t>>>
+          typename Accessor  = raft::device_accessor<cuda::std::default_accessor<value_t>>>
 void build_mr_linkage(
   raft::resources const& handle,
   raft::mdspan<const value_t, raft::matrix_extent<value_idx>, raft::row_major, Accessor> X,
@@ -61,73 +61,80 @@ void build_mr_linkage(
   size_t n    = X.extent(1);
   auto stream = raft::resource::get_cuda_stream(handle);
 
-  auto mr_indptr = raft::make_device_vector<value_idx, value_idx>(handle, m + 1);
-  raft::sparse::COO<value_t, value_idx, nnz_t> mr_coo(stream, min_samples * m * 2);
+  {  // scope to drop mr_coo and mr_indptr early
+    std::optional<raft::sparse::COO<value_t, value_idx, nnz_t>> mr_coo;
 
-  auto inds  = raft::make_device_matrix<value_idx, value_idx>(handle, m, min_samples);
-  auto dists = raft::make_device_matrix<value_t, value_idx>(handle, m, min_samples);
+    {  // scope to drop inds and dists matrices early
+      auto inds  = raft::make_device_matrix<value_idx, value_idx>(handle, m, min_samples);
+      auto dists = raft::make_device_matrix<value_t, value_idx>(handle, m, min_samples);
 
-  if (all_neighbors_p.metric != metric) {
-    RAFT_LOG_WARN("Setting all neighbors metric to given metrix for build_mr_linkage");
-    all_neighbors_p.metric = metric;
-  }
-  cuvs::neighbors::all_neighbors::build(
-    handle, all_neighbors_p, X, inds.view(), dists.view(), core_dists, alpha);
+      if (all_neighbors_p.metric != metric) {
+        RAFT_LOG_WARN("Setting all neighbors metric to given metrix for build_mr_linkage");
+        all_neighbors_p.metric = metric;
+      }
+      cuvs::neighbors::all_neighbors::build(
+        handle, all_neighbors_p, X, inds.view(), dists.view(), core_dists, alpha);
 
-  // self-loops get max distance
-  auto coo_rows = raft::make_device_vector<value_idx, value_idx>(handle, min_samples * m);
-  raft::linalg::map_offset(handle, coo_rows.view(), raft::div_const_op<value_idx>(min_samples));
+      // allocate memory after all neighbors build
+      mr_coo.emplace(stream, min_samples * m * 2);
+      // self-loops get max distance
+      auto coo_rows = raft::make_device_vector<value_idx, value_idx>(handle, min_samples * m);
+      raft::linalg::map_offset(handle, coo_rows.view(), raft::div_const_op<value_idx>(min_samples));
 
-  raft::sparse::linalg::symmetrize(handle,
-                                   coo_rows.data_handle(),
-                                   inds.data_handle(),
-                                   dists.data_handle(),
-                                   static_cast<value_idx>(m),
-                                   static_cast<value_idx>(m),
-                                   static_cast<nnz_t>(min_samples * m),
-                                   mr_coo);
+      raft::sparse::linalg::symmetrize(handle,
+                                       coo_rows.data_handle(),
+                                       inds.data_handle(),
+                                       dists.data_handle(),
+                                       static_cast<value_idx>(m),
+                                       static_cast<value_idx>(m),
+                                       static_cast<nnz_t>(min_samples * m),
+                                       mr_coo.value());
+    }  // scope to drop inds and dists matrices early
+    auto mr_indptr = raft::make_device_vector<value_idx, value_idx>(handle, m + 1);
+    raft::sparse::convert::sorted_coo_to_csr(
+      mr_coo.value().rows(), mr_coo.value().nnz, mr_indptr.data_handle(), m + 1, stream);
 
-  raft::sparse::convert::sorted_coo_to_csr(
-    mr_coo.rows(), mr_coo.nnz, mr_indptr.data_handle(), m + 1, stream);
+    auto rows_view    = raft::make_device_vector_view<const value_idx, nnz_t>(mr_coo.value().rows(),
+                                                                           mr_coo.value().nnz);
+    auto cols_view    = raft::make_device_vector_view<const value_idx, nnz_t>(mr_coo.value().cols(),
+                                                                           mr_coo.value().nnz);
+    auto vals_in_view = raft::make_device_vector_view<const value_t, nnz_t>(mr_coo.value().vals(),
+                                                                            mr_coo.value().nnz);
+    auto vals_out_view =
+      raft::make_device_vector_view<value_t, nnz_t>(mr_coo.value().vals(), mr_coo.value().nnz);
 
-  auto rows_view = raft::make_device_vector_view<const value_idx, nnz_t>(mr_coo.rows(), mr_coo.nnz);
-  auto cols_view = raft::make_device_vector_view<const value_idx, nnz_t>(mr_coo.cols(), mr_coo.nnz);
-  auto vals_in_view =
-    raft::make_device_vector_view<const value_t, nnz_t>(mr_coo.vals(), mr_coo.nnz);
-  auto vals_out_view = raft::make_device_vector_view<value_t, nnz_t>(mr_coo.vals(), mr_coo.nnz);
+    raft::linalg::map(
+      handle,
+      vals_out_view,
+      [=] __device__(const value_idx row, const value_idx col, const value_t val) {
+        return row == col ? std::numeric_limits<value_t>::max() : val;
+      },
+      rows_view,
+      cols_view,
+      vals_in_view);
 
-  raft::linalg::map(
-    handle,
-    vals_out_view,
-    [=] __device__(const value_idx row, const value_idx col, const value_t val) {
-      return row == col ? std::numeric_limits<value_t>::max() : val;
-    },
-    rows_view,
-    cols_view,
-    vals_in_view);
+    rmm::device_uvector<value_idx> color(m, raft::resource::get_cuda_stream(handle));
+    cuvs::sparse::neighbors::MutualReachabilityFixConnectivitiesRedOp<value_idx, value_t>
+      reduction_op(core_dists.data_handle(), m);
 
-  rmm::device_uvector<value_idx> color(m, raft::resource::get_cuda_stream(handle));
-  cuvs::sparse::neighbors::MutualReachabilityFixConnectivitiesRedOp<value_idx, value_t>
-    reduction_op(core_dists.data_handle(), m);
+    size_t nnz = m * min_samples;
 
-  size_t nnz = m * min_samples;
-
-  detail::build_sorted_mst<value_idx, value_t>(handle,
-                                               X.data_handle(),
-                                               mr_indptr.data_handle(),
-                                               mr_coo.cols(),
-                                               mr_coo.vals(),
-                                               m,
-                                               n,
-                                               out_mst.structure_view().get_rows().data(),
-                                               out_mst.structure_view().get_cols().data(),
-                                               out_mst.get_elements().data(),
-                                               color.data(),
-                                               mr_coo.nnz,
-                                               reduction_op,
-                                               metric,
-                                               10);
-
+    detail::build_sorted_mst<value_idx, value_t>(handle,
+                                                 X.data_handle(),
+                                                 mr_indptr.data_handle(),
+                                                 mr_coo.value().cols(),
+                                                 mr_coo.value().vals(),
+                                                 m,
+                                                 n,
+                                                 out_mst.structure_view().get_rows().data(),
+                                                 out_mst.structure_view().get_cols().data(),
+                                                 out_mst.get_elements().data(),
+                                                 color.data(),
+                                                 mr_coo.value().nnz,
+                                                 reduction_op,
+                                                 metric,
+                                                 10);
+  }  // scope to drop mr_coo and mr_indptr early
   /**
    * Perform hierarchical labeling
    */

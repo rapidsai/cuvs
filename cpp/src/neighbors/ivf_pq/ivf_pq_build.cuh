@@ -10,6 +10,7 @@
 #include "../ivf_list.cuh"
 #include "ivf_pq_codepacking.cuh"
 #include "ivf_pq_contiguous_list_data.cuh"
+#include "ivf_pq_list_data.hpp"
 #include "ivf_pq_process_and_fill_codes.cuh"
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/common.hpp>
@@ -19,6 +20,7 @@
 
 // TODO (cjnolet): This should be using an exposed API instead of circumventing the public APIs.
 #include "../../cluster/kmeans_balanced.cuh"
+#include <cuvs/cluster/kmeans.hpp>
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/logger.hpp>
@@ -49,7 +51,7 @@
 
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/device_uvector.hpp>
-#include <rmm/mr/device/managed_memory_resource.hpp>
+#include <rmm/mr/managed_memory_resource.hpp>
 
 #include <cuda_fp16.h>
 #include <thrust/extrema.h>
@@ -491,96 +493,6 @@ void train_per_cluster(raft::resources const& handle,
   transpose_pq_centers(handle, index, pq_centers_tmp.data());
 }
 
-/**
- * A consumer for the `run_on_list` and `run_on_vector` that just flattens PQ codes
- * one-per-byte. That is, independent of the code width (pq_bits), one code uses
- * the whole byte, hence one vectors uses pq_dim bytes.
- */
-struct unpack_codes {
-  raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> out_codes;
-
-  /**
-   * Create a callable to be passed to `run_on_list`.
-   *
-   * @param[out] out_codes the destination for the read codes.
-   */
-  __device__ inline unpack_codes(
-    raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> out_codes)
-    : out_codes{out_codes}
-  {
-  }
-
-  /**  Write j-th component (code) of the i-th vector into the output array. */
-  __device__ inline void operator()(uint8_t code, uint32_t i, uint32_t j)
-  {
-    out_codes(i, j) = code;
-  }
-};
-
-template <uint32_t BlockSize, uint32_t PqBits>
-__launch_bounds__(BlockSize) static __global__ void unpack_list_data_kernel(
-  raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> out_codes,
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    in_list_data,
-  std::variant<uint32_t, const uint32_t*> offset_or_indices)
-{
-  const uint32_t pq_dim = out_codes.extent(1);
-  auto unpack_action    = unpack_codes{out_codes};
-  run_on_list<PqBits>(in_list_data, offset_or_indices, out_codes.extent(0), pq_dim, unpack_action);
-}
-
-/**
- * Unpack flat PQ codes from an existing list by the given offset.
- *
- * @param[out] codes flat PQ codes, one code per byte [n_rows, pq_dim]
- * @param[in] list_data the packed ivf::list data.
- * @param[in] offset_or_indices how many records in the list to skip or the exact indices.
- * @param[in] pq_bits codebook size (1 << pq_bits)
- * @param[in] stream
- */
-inline void unpack_list_data(
-  raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> codes,
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
-  std::variant<uint32_t, const uint32_t*> offset_or_indices,
-  uint32_t pq_bits,
-  rmm::cuda_stream_view stream)
-{
-  auto n_rows = codes.extent(0);
-  if (n_rows == 0) { return; }
-
-  constexpr uint32_t kBlockSize = 256;
-  dim3 blocks(raft::div_rounding_up_safe<uint32_t>(n_rows, kBlockSize), 1, 1);
-  dim3 threads(kBlockSize, 1, 1);
-  auto kernel = [pq_bits]() {
-    switch (pq_bits) {
-      case 4: return unpack_list_data_kernel<kBlockSize, 4>;
-      case 5: return unpack_list_data_kernel<kBlockSize, 5>;
-      case 6: return unpack_list_data_kernel<kBlockSize, 6>;
-      case 7: return unpack_list_data_kernel<kBlockSize, 7>;
-      case 8: return unpack_list_data_kernel<kBlockSize, 8>;
-      default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
-    }
-  }();
-  kernel<<<blocks, threads, 0, stream>>>(codes, list_data, offset_or_indices);
-  RAFT_CUDA_TRY(cudaPeekAtLastError());
-}
-
-/** Unpack the list data; see the public interface for the api and usage. */
-template <typename IdxT>
-void unpack_list_data(raft::resources const& res,
-                      const index<IdxT>& index,
-                      raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> out_codes,
-                      uint32_t label,
-                      std::variant<uint32_t, const uint32_t*> offset_or_indices)
-{
-  unpack_list_data(out_codes,
-                   index.lists()[label]->data.view(),
-                   offset_or_indices,
-                   index.pq_bits(),
-                   raft::resource::get_cuda_stream(res));
-}
-
 /** A consumer for the `run_on_list` and `run_on_vector` that approximates the original input data.
  */
 struct reconstruct_vectors {
@@ -737,93 +649,6 @@ void reconstruct_list_data(raft::resources const& res,
       utils::mapping<T>{},
       raft::make_device_matrix_view<const float>(out_float_ptr, n_rows, index.dim()));
   }
-}
-
-/**
- * A producer for the `write_list` and `write_vector` reads the codes byte-by-byte. That is,
- * independent of the code width (pq_bits), one code uses the whole byte, hence one vectors uses
- * pq_dim bytes.
- */
-struct pass_codes {
-  raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes;
-
-  /**
-   * Create a callable to be passed to `run_on_list`.
-   *
-   * @param[in] codes the source codes.
-   */
-  __device__ inline pass_codes(
-    raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes)
-    : codes{codes}
-  {
-  }
-
-  /** Read j-th component (code) of the i-th vector from the source. */
-  __device__ inline auto operator()(uint32_t i, uint32_t j) const -> uint8_t { return codes(i, j); }
-};
-
-template <uint32_t BlockSize, uint32_t PqBits>
-__launch_bounds__(BlockSize) static __global__ void pack_list_data_kernel(
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
-  raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes,
-  std::variant<uint32_t, const uint32_t*> offset_or_indices)
-{
-  write_list<PqBits, 1>(
-    list_data, offset_or_indices, codes.extent(0), codes.extent(1), pass_codes{codes});
-}
-
-/**
- * Write flat PQ codes into an existing list by the given offset.
- *
- * NB: no memory allocation happens here; the list must fit the data (offset + n_rows).
- *
- * @param[out] list_data the packed ivf::list data.
- * @param[in] codes flat PQ codes, one code per byte [n_rows, pq_dim]
- * @param[in] offset_or_indices how many records in the list to skip or the exact indices.
- * @param[in] pq_bits codebook size (1 << pq_bits)
- * @param[in] stream
- */
-inline void pack_list_data(
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
-  raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes,
-  std::variant<uint32_t, const uint32_t*> offset_or_indices,
-  uint32_t pq_bits,
-  rmm::cuda_stream_view stream)
-{
-  auto n_rows = codes.extent(0);
-  if (n_rows == 0) { return; }
-
-  constexpr uint32_t kBlockSize = 256;
-  dim3 blocks(raft::div_rounding_up_safe<uint32_t>(n_rows, kBlockSize), 1, 1);
-  dim3 threads(kBlockSize, 1, 1);
-  auto kernel = [pq_bits]() {
-    switch (pq_bits) {
-      case 4: return pack_list_data_kernel<kBlockSize, 4>;
-      case 5: return pack_list_data_kernel<kBlockSize, 5>;
-      case 6: return pack_list_data_kernel<kBlockSize, 6>;
-      case 7: return pack_list_data_kernel<kBlockSize, 7>;
-      case 8: return pack_list_data_kernel<kBlockSize, 8>;
-      default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
-    }
-  }();
-  kernel<<<blocks, threads, 0, stream>>>(list_data, codes, offset_or_indices);
-  RAFT_CUDA_TRY(cudaPeekAtLastError());
-}
-
-template <typename IdxT>
-void pack_list_data(raft::resources const& res,
-                    index<IdxT>* index,
-                    raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> new_codes,
-                    uint32_t label,
-                    std::variant<uint32_t, const uint32_t*> offset_or_indices)
-{
-  pack_list_data(index->lists()[label]->data.view(),
-                 new_codes,
-                 offset_or_indices,
-                 index->pq_bits(),
-                 raft::resource::get_cuda_stream(res));
 }
 
 template <uint32_t BlockSize, uint32_t PqBits>
@@ -1214,12 +1039,8 @@ void extend(raft::resources const& handle,
         cluster_centers.data(), n_clusters, index->dim());
       cuvs::cluster::kmeans::balanced_params kmeans_params;
       kmeans_params.metric = static_cast<cuvs::distance::DistanceType>((int)index->metric());
-      cuvs::cluster::kmeans_balanced::predict(handle,
-                                              kmeans_params,
-                                              batch_data_view,
-                                              centers_view,
-                                              batch_labels_view,
-                                              utils::mapping<float>{});
+      cuvs::cluster::kmeans::predict(
+        handle, kmeans_params, batch_data_view, centers_view, batch_labels_view);
       vec_batches.prefetch_next_batch();
       // User needs to make sure kernel finishes its work before we overwrite batch in the next
       // iteration if different streams are used for kernel and copy.
@@ -1400,8 +1221,7 @@ auto build(raft::resources const& handle,
       raft::linalg::row_normalize<raft::linalg::L2Norm>(
         handle, trainset_const_view, trainset.view());
     }
-    cuvs::cluster::kmeans_balanced::fit(
-      handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
+    cuvs::cluster::kmeans::fit(handle, kmeans_params, trainset_const_view, centers_view);
 
     // Trainset labels are needed for training PQ codebooks
     rmm::device_uvector<uint32_t> labels(n_rows_train, stream, big_memory_resource);
@@ -1412,17 +1232,13 @@ auto build(raft::resources const& handle,
     }
     auto labels_view =
       raft::make_device_vector_view<uint32_t, internal_extents_t>(labels.data(), n_rows_train);
-    cuvs::cluster::kmeans_balanced::predict(handle,
-                                            kmeans_params,
-                                            trainset_const_view,
-                                            centers_const_view,
-                                            labels_view,
-                                            utils::mapping<float>());
+    cuvs::cluster::kmeans::predict(
+      handle, kmeans_params, trainset_const_view, centers_const_view, labels_view);
 
     // Make rotation matrix
     helpers::make_rotation_matrix(handle, &index, params.force_random_rotation);
 
-    helpers::set_centers(handle, &index, raft::make_const_mdspan(centers_view));
+    helpers::set_centers(handle, &index, centers_const_view);
 
     // Train PQ codebooks
     switch (index.codebook_kind()) {

@@ -7,6 +7,7 @@ package com.nvidia.cuvs.spi;
 import com.nvidia.cuvs.*;
 import java.lang.invoke.MethodHandle;
 import java.nio.file.Path;
+import java.util.logging.Level;
 
 /**
  * A provider that unconditionally throws UnsupportedOperationException.
@@ -40,6 +41,12 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
+  public HnswIndex hnswIndexFromCagra(HnswIndexParams hnswParams, CagraIndex cagraIndex)
+      throws Throwable {
+    throw new UnsupportedOperationException(reasons);
+  }
+
+  @Override
   public TieredIndex.Builder newTieredIndexBuilder(CuVSResources cuVSResources) {
     throw new UnsupportedOperationException(reasons);
   }
@@ -69,6 +76,42 @@ final class UnsupportedProvider implements CuVSProvider {
 
   @Override
   public GPUInfoProvider gpuInfoProvider() {
+    throw new UnsupportedOperationException(reasons);
+  }
+
+  @Override
+  public CagraIndexParams cagraIndexParamsFromHnswParams(
+      long rows,
+      long dim,
+      int m,
+      int efConstruction,
+      CagraIndexParams.HnswHeuristicType heuristic,
+      CagraIndexParams.CuvsDistanceType metric) {
+    throw new UnsupportedOperationException(reasons);
+  }
+
+  @Override
+  public void setLogLevel(Level level) {
+    throw new UnsupportedOperationException(reasons);
+  }
+
+  @Override
+  public Level getLogLevel() {
+    throw new UnsupportedOperationException(reasons);
+  }
+
+  @Override
+  public void enableRMMPooledMemory(int initialPoolSizePercent, int maxPoolSizePercent) {
+    throw new UnsupportedOperationException(reasons);
+  }
+
+  @Override
+  public void enableRMMManagedPooledMemory(int initialPoolSizePercent, int maxPoolSizePercent) {
+    throw new UnsupportedOperationException(reasons);
+  }
+
+  @Override
+  public void resetRMMPooledMemory() {
     throw new UnsupportedOperationException(reasons);
   }
 

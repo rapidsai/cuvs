@@ -161,7 +161,6 @@ def run_cagra_build_search_test(
 def test_cagra_dataset_dtype_host_device(
     dtype, array_type, inplace, build_algo, metric, serialize
 ):
-
     # Note that inner_product tests use normalized input which we cannot
     # represent in int8, therefore we test only sqeuclidean metric here.
     run_cagra_build_search_test(
