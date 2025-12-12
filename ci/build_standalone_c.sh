@@ -5,6 +5,7 @@
 set -euo pipefail
 
 TOOLSET_VERSION=14
+NINJA_VERSION=v1.13.1
 
 BUILD_C_LIB_TESTS="OFF"
 if [[ "${1:-}" == "--build-tests" ]]; then
@@ -35,6 +36,7 @@ if ! command -V ninja >/dev/null 2>&1; then
     rm /tmp/ninja-linux.zip
 fi
 
+source rapids-install-sccache
 source rapids-configure-sccache
 source rapids-date-string
 
