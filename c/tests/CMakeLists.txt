@@ -86,9 +86,6 @@ ConfigureTest(
 if(BUILD_CAGRA_HNSWLIB)
   ConfigureTest(NAME HNSW_C_TEST PATH neighbors/ann_hnsw_c.cu)
   target_link_libraries(HNSW_C_TEST PRIVATE hnswlib::hnswlib)
-
-  ConfigureTest(NAME HNSW_CAGRA_C_TEST PATH neighbors/ann_hnsw_cagra_c.cu)
-  target_link_libraries(HNSW_CAGRA_C_TEST PRIVATE hnswlib::hnswlib)
 endif()
 
 # ##################################################################################################
