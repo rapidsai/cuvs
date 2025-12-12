@@ -349,10 +349,7 @@ if(NOT BUILD_CPU_ONLY)
 
     # Generate interleaved scan kernel files at build time
     include(cmake/modules/generate_jit_lto_kernels.cmake)
-    generate_jit_lto_kernels(
-      "interleaved_scan"
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/generate_kernels.py"
-    )
+    generate_jit_lto_kernels()
 
     set(JIT_LTO_FILES
         src/detail/jit_lto/AlgorithmLauncher.cu src/detail/jit_lto/AlgorithmPlanner.cu
@@ -606,9 +603,6 @@ if(NOT BUILD_CPU_ONLY)
       ${FILTER_DEVICE_FUNCTION_FILES} ${POST_LAMBDA_DEVICE_FUNCTION_FILES}
     )
 
-    # Make sure the kernels are generated before we try to build them
-    add_dependencies(cuvs_jit_lto_fatbins ${INTERLEAVED_SCAN_KERNELS_TARGET})
-
     target_compile_definitions(cuvs_jit_lto_fatbins PRIVATE BUILD_KERNEL)
     target_include_directories(
       cuvs_jit_lto_fatbins
@@ -709,7 +703,6 @@ if(NOT BUILD_CPU_ONLY)
     )
 
     if(JIT_LTO_COMPILATION)
-      add_dependencies(cuvs ${INTERLEAVED_SCAN_KERNELS_TARGET})
       embed_fatbins(cuvs cuvs_jit_lto_fatbins)
     endif()
 
@@ -770,7 +763,6 @@ SECTIONS
     )
 
     if(JIT_LTO_COMPILATION)
-      add_dependencies(cuvs_static ${INTERLEAVED_SCAN_KERNELS_TARGET})
       embed_fatbins(cuvs_static cuvs_jit_lto_fatbins)
     endif()
   endif()

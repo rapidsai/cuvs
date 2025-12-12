@@ -1,53 +1,115 @@
 # =============================================================================
 # cmake-format: off
-# SPDX-FileCopyrightText: Copyright (c) 2018-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 # =============================================================================
 
 include_guard(GLOBAL)
 
-# Generate JIT LTO kernel files at build time using a Python generator script Arguments: kernel_name
-# - Name of the kernel type (e.g., "interleaved_scan") generator_script - Path to the Python script
-# that generates the kernels
-function(generate_jit_lto_kernels kernel_name generator_script)
-  find_package(Python3 REQUIRED COMPONENTS Interpreter)
-
-  set(OUTPUT_BASE_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated_kernels)
-  set(GENERATED_CMAKE_FILE ${OUTPUT_BASE_DIR}/${kernel_name}.cmake)
-
-  # Generate the kernels at build time
-  add_custom_command(
-    OUTPUT ${GENERATED_CMAKE_FILE}
-    COMMAND ${Python3_EXECUTABLE} ${generator_script} ${OUTPUT_BASE_DIR} ${kernel_name}
-    DEPENDS ${generator_script}
-    COMMENT "Generating ${kernel_name} kernel files..."
-    VERBATIM
-  )
-
-  # Create a custom target that depends on the generated CMake file Use a unique target name based
-  # on the kernel name
-  set(TARGET_NAME "generate_${kernel_name}_kernels_target")
-  add_custom_target(${TARGET_NAME} DEPENDS ${GENERATED_CMAKE_FILE})
-
-  # Only generate if the CMake file doesn't exist
-  if(NOT EXISTS ${GENERATED_CMAKE_FILE})
-    message(VERBOSE "Generating ${kernel_name} kernels for the first time...")
-    execute_process(
-      COMMAND ${Python3_EXECUTABLE} ${generator_script} ${OUTPUT_BASE_DIR} ${kernel_name}
-      RESULT_VARIABLE GENERATION_RESULT
-      OUTPUT_VARIABLE GENERATION_OUTPUT
-      ERROR_VARIABLE GENERATION_ERROR
-    )
-
-    if(NOT GENERATION_RESULT EQUAL 0)
-      message(
-        FATAL_ERROR
-          "Failed to generate kernel files during configuration\nOutput: ${GENERATION_OUTPUT}\nError: ${GENERATION_ERROR}"
-      )
-    endif()
+function(parse_data_type_configs config data_type acc_type veclens type_abbrev acc_abbrev)
+  if(config MATCHES [==[^([^,]+),([^,]+),\[([0-9]+(,[0-9]+)*)?\],([^,]+),([^,]+)$]==])
+    set("${data_type}" "${CMAKE_MATCH_1}" PARENT_SCOPE)
+    set("${acc_type}" "${CMAKE_MATCH_2}" PARENT_SCOPE)
+    string(REPLACE "," ";" veclens_value "${CMAKE_MATCH_3}")
+    set("${veclens}" "${veclens_value}" PARENT_SCOPE)
+    set("${type_abbrev}" "${CMAKE_MATCH_5}" PARENT_SCOPE)
+    set("${acc_abbrev}" "${CMAKE_MATCH_6}" PARENT_SCOPE)
+  else()
+    message(FATAL_ERROR "Invalid data type config: ${config}")
   endif()
+endfunction()
 
-  # Include the generated CMake file The generated file handles setting variables to PARENT_SCOPE
-  include(${GENERATED_CMAKE_FILE})
+function(generate_jit_lto_kernels)
+  set(generated_kernels_dir "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels")
+  string(TIMESTAMP year "%Y")
+
+  set(capacities 0 1 2 4 8 16 32 64 128 256)
+  set(ascending_values true false)
+  set(compute_norm_values true false)
+  set(data_type_configs
+    "float,float,[1,4],f,f"
+    "__half,__half,[1,8],h,h"
+    "uint8_t,uint32_t,[1,16],uc,ui"
+    "int8_t,int32_t,[1,16],sc,i"
+  )
+  set(idx_type int64_t)
+  set(idx_abbrev l)
+  set(metric_configs euclidean inner_prod)
+  set(filter_configs filter_none filter_bitset)
+  set(post_lambda_configs post_identity post_sqrt post_compose)
+
+  foreach(config IN LISTS data_type_configs)
+    parse_data_type_configs("${config}" data_type acc_type veclens type_abbrev acc_abbrev)
+    foreach(veclen IN LISTS veclens)
+      foreach(capacity IN LISTS capacities)
+        foreach(ascending IN LISTS ascending_values)
+          foreach(compute_norm IN LISTS compute_norm_values)
+            set(filename "${generated_kernels_dir}/interleaved_scan_kernels/interleaved_scan_kernel_${capacity}_${veclen}_${ascending}_${compute_norm}_${type_abbrev}_${acc_abbrev}_${idx_abbrev}.cu")
+            configure_file(
+              "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_kernel.cu.in"
+              "${filename}"
+              @ONLY
+            )
+            list(APPEND INTERLEAVED_SCAN_KERNEL_FILES "${filename}")
+          endforeach()
+        endforeach()
+      endforeach()
+
+      foreach(metric_name IN LISTS metric_configs)
+        if(metric_name STREQUAL "euclidean")
+          set(header_file "neighbors/ivf_flat/jit_lto_kernels/metric_euclidean_dist.cuh")
+        elseif(metric_name STREQUAL "inner_prod")
+          set(header_file "neighbors/ivf_flat/jit_lto_kernels/metric_inner_product.cuh")
+        endif()
+
+        set(filename "${generated_kernels_dir}/metric_device_functions/metric_${metric_name}_${veclen}_${type_abbrev}_${acc_abbrev}.cu")
+        configure_file(
+          "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/metric.cu.in"
+          "${filename}"
+          @ONLY
+        )
+        list(APPEND METRIC_DEVICE_FUNCTION_FILES "${filename}")
+      endforeach()
+    endforeach()
+  endforeach()
+
+  foreach(filter_name IN LISTS filter_configs)
+    if(filter_name STREQUAL "filter_none")
+      set(header_file "neighbors/ivf_flat/jit_lto_kernels/filter_none.cuh")
+    elseif(filter_name STREQUAL "filter_bitset")
+      set(header_file "neighbors/ivf_flat/jit_lto_kernels/filter_bitset.cuh")
+    endif()
+
+    set(filename "${generated_kernels_dir}/filter_device_functions/${filter_name}.cu")
+    configure_file(
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/filter.cu.in"
+      "${filename}"
+      @ONLY
+    )
+    list(APPEND FILTER_DEVICE_FUNCTION_FILES "${filename}")
+  endforeach()
+
+  foreach(post_lambda_name IN LISTS post_lambda_configs)
+    if(post_lambda_name STREQUAL "post_identity")
+      set(header_file "neighbors/ivf_flat/jit_lto_kernels/post_identity.cuh")
+    elseif(post_lambda_name STREQUAL "post_sqrt")
+      set(header_file "neighbors/ivf_flat/jit_lto_kernels/post_sqrt.cuh")
+    elseif(post_lambda_name STREQUAL "post_compose")
+      set(header_file "neighbors/ivf_flat/jit_lto_kernels/post_compose.cuh")
+    endif()
+
+    set(filename "${generated_kernels_dir}/post_lambda_device_functions/${post_lambda_name}.cu")
+    configure_file(
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/post_lambda.cu.in"
+      "${filename}"
+      @ONLY
+    )
+    list(APPEND POST_LAMBDA_DEVICE_FUNCTION_FILES "${filename}")
+  endforeach()
+
+  set(INTERLEAVED_SCAN_KERNEL_FILES "${INTERLEAVED_SCAN_KERNEL_FILES}" PARENT_SCOPE)
+  set(METRIC_DEVICE_FUNCTION_FILES "${METRIC_DEVICE_FUNCTION_FILES}" PARENT_SCOPE)
+  set(FILTER_DEVICE_FUNCTION_FILES "${FILTER_DEVICE_FUNCTION_FILES}" PARENT_SCOPE)
+  set(POST_LAMBDA_DEVICE_FUNCTION_FILES "${POST_LAMBDA_DEVICE_FUNCTION_FILES}" PARENT_SCOPE)
 endfunction()
