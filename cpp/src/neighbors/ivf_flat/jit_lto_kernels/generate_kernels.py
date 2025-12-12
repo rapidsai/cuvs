@@ -21,32 +21,32 @@ COMPUTE_NORM_VALUES = [True, False]
 # Data type configurations: (data_type, acc_type, veclens, type_abbrev, acc_abbrev)
 # Each data type has veclen=1 and one optimized larger veclen
 DATA_TYPE_CONFIGS = [
-    ('float', 'float', [1, 4], 'f', 'f'),
-    ('__half', '__half', [1, 8], 'h', 'h'),
-    ('uint8_t', 'uint32_t', [1, 16], 'uc', 'ui'),
-    ('int8_t', 'int32_t', [1, 16], 'sc', 'i'),
+    ("float", "float", [1, 4], "f", "f"),
+    ("__half", "__half", [1, 8], "h", "h"),
+    ("uint8_t", "uint32_t", [1, 16], "uc", "ui"),
+    ("int8_t", "int32_t", [1, 16], "sc", "i"),
 ]
 
-IDX_TYPE = 'int64_t'
-IDX_TYPE_ABBREV = 'l'
+IDX_TYPE = "int64_t"
+IDX_TYPE_ABBREV = "l"
 
 # Metric configurations for device functions
 METRIC_CONFIGS = [
-    'euclidean',
-    'inner_prod',
+    "euclidean",
+    "inner_prod",
 ]
 
 # Filter configurations
 FILTER_CONFIGS = [
-    'filter_none',
-    'filter_bitset',
+    "filter_none",
+    "filter_bitset",
 ]
 
 # Post lambda configurations
 POST_LAMBDA_CONFIGS = [
-    'post_identity',
-    'post_sqrt',
-    'post_compose',
+    "post_identity",
+    "post_sqrt",
+    "post_compose",
 ]
 
 
@@ -54,48 +54,56 @@ def generate_kernel_combinations():
     """Generate all valid kernel parameter combinations."""
     kernels = []
 
-    for data_type, acc_type, veclens, type_abbrev, acc_abbrev in DATA_TYPE_CONFIGS:
+    for (
+        data_type,
+        acc_type,
+        veclens,
+        type_abbrev,
+        acc_abbrev,
+    ) in DATA_TYPE_CONFIGS:
         for capacity, veclen, ascending, compute_norm in itertools.product(
             CAPACITIES, veclens, ASCENDING_VALUES, COMPUTE_NORM_VALUES
         ):
-            kernels.append({
-                'capacity': capacity,
-                'veclen': veclen,
-                'ascending': ascending,
-                'compute_norm': compute_norm,
-                'data_type': data_type,
-                'acc_type': acc_type,
-                'idx_type': IDX_TYPE,
-                'type_abbrev': type_abbrev,
-                'acc_abbrev': acc_abbrev,
-                'idx_abbrev': IDX_TYPE_ABBREV,
-            })
+            kernels.append(
+                {
+                    "capacity": capacity,
+                    "veclen": veclen,
+                    "ascending": ascending,
+                    "compute_norm": compute_norm,
+                    "data_type": data_type,
+                    "acc_type": acc_type,
+                    "idx_type": IDX_TYPE,
+                    "type_abbrev": type_abbrev,
+                    "acc_abbrev": acc_abbrev,
+                    "idx_abbrev": IDX_TYPE_ABBREV,
+                }
+            )
 
     return kernels
 
 
 def generate_filename(params):
     """Generate filename from kernel parameters."""
-    capacity = params['capacity']
-    veclen = params['veclen']
-    ascending = 'true' if params['ascending'] else 'false'
-    compute_norm = 'true' if params['compute_norm'] else 'false'
-    type_abbrev = params['type_abbrev']
-    acc_abbrev = params['acc_abbrev']
-    idx_abbrev = params['idx_abbrev']
+    capacity = params["capacity"]
+    veclen = params["veclen"]
+    ascending = "true" if params["ascending"] else "false"
+    compute_norm = "true" if params["compute_norm"] else "false"
+    type_abbrev = params["type_abbrev"]
+    acc_abbrev = params["acc_abbrev"]
+    idx_abbrev = params["idx_abbrev"]
 
     return f"interleaved_scan_kernel_{capacity}_{veclen}_{ascending}_{compute_norm}_{type_abbrev}_{acc_abbrev}_{idx_abbrev}.cu"
 
 
 def generate_cuda_file_content(params):
     """Generate the content of a CUDA kernel instantiation file."""
-    capacity = params['capacity']
-    veclen = params['veclen']
-    ascending = 'true' if params['ascending'] else 'false'
-    compute_norm = 'true' if params['compute_norm'] else 'false'
-    data_type = params['data_type']
-    acc_type = params['acc_type']
-    idx_type = params['idx_type']
+    capacity = params["capacity"]
+    veclen = params["veclen"]
+    ascending = "true" if params["ascending"] else "false"
+    compute_norm = "true" if params["compute_norm"] else "false"
+    data_type = params["data_type"]
+    acc_type = params["acc_type"]
+    idx_type = params["idx_type"]
 
     content = f"""/*
  * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
@@ -122,18 +130,18 @@ template __global__ void interleaved_scan_kernel<{capacity}, {veclen}, {ascendin
 
 #include <cuvs/detail/jit_lto/RegisterKernelFragment.h>
 #include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>
-#include "interleaved_scan_kernel_{capacity}_{veclen}_{ascending}_{compute_norm}_{params['type_abbrev']}_{params['acc_abbrev']}_{params['idx_abbrev']}.h"
+#include "interleaved_scan_kernel_{capacity}_{veclen}_{ascending}_{compute_norm}_{params["type_abbrev"]}_{params["acc_abbrev"]}_{params["idx_abbrev"]}.h"
 
 using namespace cuvs::neighbors::ivf_flat::detail;
 
-__attribute__((__constructor__)) static void register_kernel_{capacity}_{veclen}_{ascending}_{compute_norm}_{params['type_abbrev']}_{params['acc_abbrev']}_{params['idx_abbrev']}()
+__attribute__((__constructor__)) static void register_kernel_{capacity}_{veclen}_{ascending}_{compute_norm}_{params["type_abbrev"]}_{params["acc_abbrev"]}_{params["idx_abbrev"]}()
 {{
-  registerAlgorithm<tag_{params['type_abbrev']},
-    tag_acc_{params['acc_abbrev']},
-    tag_idx_{params['idx_abbrev']}>(
+  registerAlgorithm<tag_{params["type_abbrev"]},
+    tag_acc_{params["acc_abbrev"]},
+    tag_idx_{params["idx_abbrev"]}>(
     "interleaved_scan_kernel_{capacity}_{veclen}_{ascending}_{compute_norm}",
-    embedded_interleaved_scan_kernel_{capacity}_{veclen}_{ascending}_{compute_norm}_{params['type_abbrev']}_{params['acc_abbrev']}_{params['idx_abbrev']},
-    sizeof(embedded_interleaved_scan_kernel_{capacity}_{veclen}_{ascending}_{compute_norm}_{params['type_abbrev']}_{params['acc_abbrev']}_{params['idx_abbrev']}));
+    embedded_interleaved_scan_kernel_{capacity}_{veclen}_{ascending}_{compute_norm}_{params["type_abbrev"]}_{params["acc_abbrev"]}_{params["idx_abbrev"]},
+    sizeof(embedded_interleaved_scan_kernel_{capacity}_{veclen}_{ascending}_{compute_norm}_{params["type_abbrev"]}_{params["acc_abbrev"]}_{params["idx_abbrev"]}));
 }}
 
 #endif
@@ -141,15 +149,31 @@ __attribute__((__constructor__)) static void register_kernel_{capacity}_{veclen}
     return content
 
 
-def generate_metric_device_function_content(metric_name, veclen, data_type, acc_type):
+def generate_metric_device_function_content(
+    metric_name, veclen, data_type, acc_type
+):
     """Generate content for a metric device function file."""
-    type_abbrev = {'float': 'f', '__half': 'h', 'uint8_t': 'uc', 'int8_t': 'sc'}[data_type]
-    acc_abbrev = {'float': 'f', '__half': 'h', 'uint32_t': 'ui', 'int32_t': 'i'}[acc_type]
+    type_abbrev = {
+        "float": "f",
+        "__half": "h",
+        "uint8_t": "uc",
+        "int8_t": "sc",
+    }[data_type]
+    acc_abbrev = {
+        "float": "f",
+        "__half": "h",
+        "uint32_t": "ui",
+        "int32_t": "i",
+    }[acc_type]
 
-    if metric_name == 'euclidean':
-        header_file = 'neighbors/ivf_flat/jit_lto_kernels/metric_euclidean_dist.cuh'
+    if metric_name == "euclidean":
+        header_file = (
+            "neighbors/ivf_flat/jit_lto_kernels/metric_euclidean_dist.cuh"
+        )
     else:  # inner_prod
-        header_file = 'neighbors/ivf_flat/jit_lto_kernels/metric_inner_product.cuh'
+        header_file = (
+            "neighbors/ivf_flat/jit_lto_kernels/metric_inner_product.cuh"
+        )
 
     content = f"""/*
  * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
@@ -193,10 +217,10 @@ __attribute__((__constructor__)) static void register_metric_{metric_name}_{vecl
 
 def generate_filter_device_function_content(filter_name):
     """Generate content for a filter device function file."""
-    if filter_name == 'filter_none':
-        header_file = 'neighbors/ivf_flat/jit_lto_kernels/filter_none.cuh'
+    if filter_name == "filter_none":
+        header_file = "neighbors/ivf_flat/jit_lto_kernels/filter_none.cuh"
     else:  # filter_bitset
-        header_file = 'neighbors/ivf_flat/jit_lto_kernels/filter_bitset.cuh'
+        header_file = "neighbors/ivf_flat/jit_lto_kernels/filter_bitset.cuh"
 
     content = f"""/*
  * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
@@ -236,12 +260,12 @@ __attribute__((__constructor__)) static void register_{filter_name}()
 
 def generate_post_lambda_device_function_content(post_lambda_name):
     """Generate content for a post lambda device function file."""
-    if post_lambda_name == 'post_identity':
-        header_file = 'neighbors/ivf_flat/jit_lto_kernels/post_identity.cuh'
-    elif post_lambda_name == 'post_sqrt':
-        header_file = 'neighbors/ivf_flat/jit_lto_kernels/post_sqrt.cuh'
+    if post_lambda_name == "post_identity":
+        header_file = "neighbors/ivf_flat/jit_lto_kernels/post_identity.cuh"
+    elif post_lambda_name == "post_sqrt":
+        header_file = "neighbors/ivf_flat/jit_lto_kernels/post_sqrt.cuh"
     else:  # post_compose
-        header_file = 'neighbors/ivf_flat/jit_lto_kernels/post_compose.cuh'
+        header_file = "neighbors/ivf_flat/jit_lto_kernels/post_compose.cuh"
 
     content = f"""/*
  * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
@@ -281,18 +305,26 @@ __attribute__((__constructor__)) static void register_{post_lambda_name}()
 
 def generate_metric_device_functions(output_base_dir):
     """Generate all metric device function files."""
-    metric_dir = output_base_dir / 'metric_device_functions'
+    metric_dir = output_base_dir / "metric_device_functions"
     metric_dir.mkdir(parents=True, exist_ok=True)
 
     metric_files = []
 
     for metric_name in METRIC_CONFIGS:
-        for data_type, acc_type, veclens, type_abbrev, acc_abbrev in DATA_TYPE_CONFIGS:
+        for (
+            data_type,
+            acc_type,
+            veclens,
+            type_abbrev,
+            acc_abbrev,
+        ) in DATA_TYPE_CONFIGS:
             for veclen in veclens:
                 filename = f"metric_{metric_name}_{veclen}_{type_abbrev}_{acc_abbrev}.cu"
                 filepath = metric_dir / filename
 
-                content = generate_metric_device_function_content(metric_name, veclen, data_type, acc_type)
+                content = generate_metric_device_function_content(
+                    metric_name, veclen, data_type, acc_type
+                )
 
                 # Only write if content has changed
                 if not filepath.exists() or filepath.read_text() != content:
@@ -305,7 +337,7 @@ def generate_metric_device_functions(output_base_dir):
 
 def generate_filter_device_functions(output_base_dir):
     """Generate all filter device function files."""
-    filter_dir = output_base_dir / 'filter_device_functions'
+    filter_dir = output_base_dir / "filter_device_functions"
     filter_dir.mkdir(parents=True, exist_ok=True)
 
     filter_files = []
@@ -327,7 +359,7 @@ def generate_filter_device_functions(output_base_dir):
 
 def generate_post_lambda_device_functions(output_base_dir):
     """Generate all post lambda device function files."""
-    post_lambda_dir = output_base_dir / 'post_lambda_device_functions'
+    post_lambda_dir = output_base_dir / "post_lambda_device_functions"
     post_lambda_dir.mkdir(parents=True, exist_ok=True)
 
     post_lambda_files = []
@@ -336,7 +368,9 @@ def generate_post_lambda_device_functions(output_base_dir):
         filename = f"{post_lambda_name}.cu"
         filepath = post_lambda_dir / filename
 
-        content = generate_post_lambda_device_function_content(post_lambda_name)
+        content = generate_post_lambda_device_function_content(
+            post_lambda_name
+        )
 
         # Only write if content has changed
         if not filepath.exists() or filepath.read_text() != content:
@@ -354,12 +388,14 @@ def main():
     script_dir = Path(__file__).parent.absolute()
 
     # Output directory - use CMAKE_CURRENT_BINARY_DIR if provided, otherwise use source dir
-    output_base_dir = Path(sys.argv[1]).absolute() if len(sys.argv) > 1 else script_dir
+    output_base_dir = (
+        Path(sys.argv[1]).absolute() if len(sys.argv) > 1 else script_dir
+    )
 
     # Kernel name - use provided name if available, otherwise default to "interleaved_scan"
     kernel_name = sys.argv[2] if len(sys.argv) > 2 else "interleaved_scan"
 
-    output_dir = output_base_dir / 'interleaved_scan_kernels'
+    output_dir = output_base_dir / "interleaved_scan_kernels"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     kernels = generate_kernel_combinations()
@@ -388,29 +424,37 @@ def main():
     post_lambda_files = generate_post_lambda_device_functions(output_base_dir)
 
     # Generate CMake file listing all generated files
-    cmake_file = output_base_dir / f'{kernel_name}.cmake'
+    cmake_file = output_base_dir / f"{kernel_name}.cmake"
 
     cmake_content = "# Auto-generated file listing all kernel and device function files\n\n"
 
     # Set relative path lists
     cmake_content += "set(INTERLEAVED_SCAN_KERNEL_FILES\n"
     for filename in sorted(generated_files):
-        cmake_content += f"  generated_kernels/interleaved_scan_kernels/{filename}\n"
+        cmake_content += (
+            f"  generated_kernels/interleaved_scan_kernels/{filename}\n"
+        )
     cmake_content += ")\n\n"
 
     cmake_content += "set(METRIC_DEVICE_FUNCTION_FILES\n"
     for filename in sorted(metric_files):
-        cmake_content += f"  generated_kernels/metric_device_functions/{filename}\n"
+        cmake_content += (
+            f"  generated_kernels/metric_device_functions/{filename}\n"
+        )
     cmake_content += ")\n\n"
 
     cmake_content += "set(FILTER_DEVICE_FUNCTION_FILES\n"
     for filename in sorted(filter_files):
-        cmake_content += f"  generated_kernels/filter_device_functions/{filename}\n"
+        cmake_content += (
+            f"  generated_kernels/filter_device_functions/{filename}\n"
+        )
     cmake_content += ")\n\n"
 
     cmake_content += "set(POST_LAMBDA_DEVICE_FUNCTION_FILES\n"
     for filename in sorted(post_lambda_files):
-        cmake_content += f"  generated_kernels/post_lambda_device_functions/{filename}\n"
+        cmake_content += (
+            f"  generated_kernels/post_lambda_device_functions/{filename}\n"
+        )
     cmake_content += ")\n\n"
 
     # Add logic to prepend CMAKE_CURRENT_BINARY_DIR and set variables to PARENT_SCOPE
@@ -466,5 +510,5 @@ set(INTERLEAVED_SCAN_KERNELS_TARGET
         cmake_file.write_text(cmake_content)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

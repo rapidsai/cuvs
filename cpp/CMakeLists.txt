@@ -766,8 +766,7 @@ SECTIONS
              $<TARGET_NAME_IF_EXISTS:NCCL::NCCL> # needs to be public for DT_NEEDED
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>> # header only
       PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-              $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
-              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
+              $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink> $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
     )
 
     if(JIT_LTO_COMPILATION)
