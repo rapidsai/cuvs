@@ -82,8 +82,7 @@ function(generate_jit_lto_kernels)
         )
         configure_file(
           "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/metric.cu.in"
-          "${filename}"
-          @ONLY
+          "${filename}" @ONLY
         )
         list(APPEND METRIC_DEVICE_FUNCTION_FILES "${filename}")
       endforeach()
@@ -97,9 +96,7 @@ function(generate_jit_lto_kernels)
       set(header_file "neighbors/ivf_flat/jit_lto_kernels/filter_bitset.cuh")
     endif()
 
-    set(filename
-        "${generated_kernels_dir}/filter_device_functions/${filter_name}.cu"
-    )
+    set(filename "${generated_kernels_dir}/filter_device_functions/${filter_name}.cu")
     configure_file(
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/filter.cu.in"
       "${filename}" @ONLY
