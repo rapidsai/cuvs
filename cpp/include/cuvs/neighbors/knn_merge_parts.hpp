@@ -27,17 +27,17 @@ void knn_merge_parts(raft::resources const& res,
                      raft::device_matrix_view<const int64_t, int64_t> inV,
                      raft::device_matrix_view<float, int64_t> outK,
                      raft::device_matrix_view<int64_t, int64_t> outV,
-                     raft::device_vector_view<int64_t> translations);
+                     raft::device_vector_view<int64_t, int64_t> translations);
 void knn_merge_parts(raft::resources const& res,
                      raft::device_matrix_view<const float, int64_t> inK,
                      raft::device_matrix_view<const uint32_t, int64_t> inV,
                      raft::device_matrix_view<float, int64_t> outK,
                      raft::device_matrix_view<uint32_t, int64_t> outV,
-                     raft::device_vector_view<uint32_t> translations);
+                     raft::device_vector_view<uint32_t, int64_t> translations);
 void knn_merge_parts(raft::resources const& res,
                      raft::device_matrix_view<const float, int64_t> inK,
                      raft::device_matrix_view<const int32_t, int64_t> inV,
                      raft::device_matrix_view<float, int64_t> outK,
                      raft::device_matrix_view<int32_t, int64_t> outV,
-                     raft::device_vector_view<int32_t> translations);
+                     raft::device_vector_view<int32_t, int64_t> translations);
 }  // namespace cuvs::neighbors
