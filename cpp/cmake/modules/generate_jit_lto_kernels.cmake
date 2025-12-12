@@ -7,7 +7,7 @@
 
 include_guard(GLOBAL)
 
-function(parse_data_type_configs config)
+function(parse_jit_lto_data_type_configs config)
   set(options)
   set(one_value DATA_TYPE ACC_TYPE VECLENS TYPE_ABBREV ACC_ABBREV)
   set(multi_value)
@@ -51,6 +51,7 @@ function(parse_data_type_configs config)
   endif()
 endfunction()
 
+# cmake-lint: disable=R0915
 function(generate_jit_lto_kernels)
   set(generated_kernels_dir "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels")
   string(TIMESTAMP year "%Y")
@@ -68,7 +69,10 @@ function(generate_jit_lto_kernels)
   set(post_lambda_configs post_identity post_sqrt post_compose)
 
   foreach(config IN LISTS data_type_configs)
-    parse_data_type_configs("${config}" DATA_TYPE data_type ACC_TYPE acc_type VECLENS veclens TYPE_ABBREV type_abbrev ACC_ABBREV acc_abbrev)
+    parse_jit_lto_data_type_configs(
+      "${config}" DATA_TYPE data_type ACC_TYPE acc_type VECLENS veclens TYPE_ABBREV type_abbrev
+      ACC_ABBREV acc_abbrev
+    )
     foreach(veclen IN LISTS veclens)
       foreach(capacity IN LISTS capacities)
         foreach(ascending IN LISTS ascending_values)
