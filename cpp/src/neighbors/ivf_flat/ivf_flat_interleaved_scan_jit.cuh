@@ -66,23 +66,6 @@ constexpr auto get_filter_type_tag()
   }
 }
 
-// template <typename Lambda, int Veclen, typename T, typename AccT>
-// constexpr auto get_metric_tag()
-// {
-//   // Get tags for T and AccT
-//   auto t_tag   = get_data_type_tag<T>();
-//   auto acc_tag = get_acc_type_tag<AccT>();
-
-//   // Check for euclidean_dist and return templated tag with tag types
-//   if constexpr (std::is_same_v<Lambda, euclidean_dist<Veclen, T, AccT>>) {
-//     return tag_metric_euclidean<Veclen, decltype(t_tag), decltype(acc_tag)>{};
-//   }
-//   // Check for inner_prod_dist and return templated tag with tag types
-//   if constexpr (std::is_same_v<Lambda, inner_prod_dist<Veclen, T, AccT>>) {
-//     return tag_metric_inner_product<Veclen, decltype(t_tag), decltype(acc_tag)>{};
-//   }
-// }
-
 template <typename MetricTag, int Veclen, typename T, typename AccT>
 constexpr auto get_metric_name()
 {
@@ -116,7 +99,6 @@ constexpr auto get_post_lambda_name()
 /**
  *  Configure the gridDim.x to maximize GPU occupancy, but reduce the output size
  */
-// template <typename T>
 inline uint32_t configure_launch_x(uint32_t numQueries,
                                    uint32_t n_probes,
                                    int32_t sMemSize,

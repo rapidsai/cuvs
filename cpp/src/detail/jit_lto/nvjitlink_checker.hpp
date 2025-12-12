@@ -9,7 +9,6 @@
 #include <nvJitLink.h>
 #include <string>
 
-namespace {
 // We can make a better RAII wrapper around nvjitlinkhandle
 void check_nvjitlink_result(nvJitLinkHandle handle, nvJitLinkResult result)
 {
@@ -26,4 +25,3 @@ void check_nvjitlink_result(nvJitLinkHandle handle, nvJitLinkResult result)
     }
   }
 }
-}  // namespace
