@@ -309,6 +309,7 @@ ConfigureTest(
        distance/gram.cu
        distance/masked_nn.cu
        distance/sparse_distance.cu
+       sparse/gram.cu
        sparse/neighbors/cross_component_nn.cu
   GPUS 1
   PERCENT 100
