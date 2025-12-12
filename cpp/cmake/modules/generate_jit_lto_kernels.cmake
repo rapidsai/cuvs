@@ -7,29 +7,45 @@
 
 include_guard(GLOBAL)
 
-function(parse_data_type_configs config data_type acc_type veclens type_abbrev acc_abbrev)
+function(parse_data_type_configs config)
+  set(options)
+  set(one_value DATA_TYPE ACC_TYPE VECLENS TYPE_ABBREV ACC_ABBREV)
+  set(multi_value)
+
+  cmake_parse_arguments(_JIT_LTO "${options}" "${one_value}" "${multi_value}" ${ARGN})
+
   if(config MATCHES [==[^([^,]+),([^,]+),\[([0-9]+(,[0-9]+)*)?\],([^,]+),([^,]+)$]==])
-    set(${data_type}
-        "${CMAKE_MATCH_1}"
-        PARENT_SCOPE
-    )
-    set(${acc_type}
-        "${CMAKE_MATCH_2}"
-        PARENT_SCOPE
-    )
-    string(REPLACE "," ";" veclens_value "${CMAKE_MATCH_3}")
-    set(${veclens}
-        "${veclens_value}"
-        PARENT_SCOPE
-    )
-    set(${type_abbrev}
-        "${CMAKE_MATCH_5}"
-        PARENT_SCOPE
-    )
-    set(${acc_abbrev}
-        "${CMAKE_MATCH_6}"
-        PARENT_SCOPE
-    )
+    if(_JIT_LTO_DATA_TYPE)
+      set(${_JIT_LTO_DATA_TYPE}
+          "${CMAKE_MATCH_1}"
+          PARENT_SCOPE
+      )
+    endif()
+    if(_JIT_LTO_ACC_TYPE)
+      set(${_JIT_LTO_ACC_TYPE}
+          "${CMAKE_MATCH_2}"
+          PARENT_SCOPE
+      )
+    endif()
+    if(_JIT_LTO_VECLENS)
+      string(REPLACE "," ";" veclens_value "${CMAKE_MATCH_3}")
+      set(${_JIT_LTO_VECLENS}
+          "${veclens_value}"
+          PARENT_SCOPE
+      )
+    endif()
+    if(_JIT_LTO_TYPE_ABBREV)
+      set(${_JIT_LTO_TYPE_ABBREV}
+          "${CMAKE_MATCH_5}"
+          PARENT_SCOPE
+      )
+    endif()
+    if(_JIT_LTO_ACC_ABBREV)
+      set(${_JIT_LTO_ACC_ABBREV}
+          "${CMAKE_MATCH_6}"
+          PARENT_SCOPE
+      )
+    endif()
   else()
     message(FATAL_ERROR "Invalid data type config: ${config}")
   endif()
@@ -52,7 +68,7 @@ function(generate_jit_lto_kernels)
   set(post_lambda_configs post_identity post_sqrt post_compose)
 
   foreach(config IN LISTS data_type_configs)
-    parse_data_type_configs("${config}" data_type acc_type veclens type_abbrev acc_abbrev)
+    parse_data_type_configs("${config}" DATA_TYPE data_type ACC_TYPE acc_type VECLENS veclens TYPE_ABBREV type_abbrev ACC_ABBREV acc_abbrev)
     foreach(veclen IN LISTS veclens)
       foreach(capacity IN LISTS capacities)
         foreach(ascending IN LISTS ascending_values)
