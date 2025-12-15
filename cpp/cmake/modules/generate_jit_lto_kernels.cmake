@@ -30,27 +30,33 @@ function(embed_jit_lto_fatbin)
             "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
   )
   target_compile_options(
-    ${_JIT_LTO_FATBIN_TARGET} PRIVATE -Xfatbin=--compress-all --compress-mode=size "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
-                                  "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+    ${_JIT_LTO_FATBIN_TARGET}
+    PRIVATE -Xfatbin=--compress-all
+            --compress-mode=size
+            "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
+            "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
   )
   set_target_properties(
     ${_JIT_LTO_FATBIN_TARGET}
     PROPERTIES CUDA_ARCHITECTURES ${JIT_LTO_TARGET_ARCHITECTURE}
-                CUDA_STANDARD 17
-                CUDA_STANDARD_REQUIRED ON
-                CUDA_SEPARABLE_COMPILATION ON
-                CUDA_FATBIN_COMPILATION ON
-                POSITION_INDEPENDENT_CODE ON
-                INTERPROCEDURAL_OPTIMIZATION ON
+               CUDA_STANDARD 17
+               CUDA_STANDARD_REQUIRED ON
+               CUDA_SEPARABLE_COMPILATION ON
+               CUDA_FATBIN_COMPILATION ON
+               POSITION_INDEPENDENT_CODE ON
+               INTERPROCEDURAL_OPTIMIZATION ON
   )
   target_link_libraries(${_JIT_LTO_FATBIN_TARGET} PRIVATE rmm::rmm raft::raft CCCL::CCCL)
 
   add_custom_command(
     OUTPUT "${_JIT_LTO_EMBEDDED_HEADER}"
-    COMMAND "${bin_to_c}" -c -p 0x0 --name "${_JIT_LTO_EMBEDDED_ARRAY}" --static $<TARGET_OBJECTS:${_JIT_LTO_FATBIN_TARGET}> > "${_JIT_LTO_EMBEDDED_HEADER}"
+    COMMAND "${bin_to_c}" -c -p 0x0 --name "${_JIT_LTO_EMBEDDED_ARRAY}" --static
+            $<TARGET_OBJECTS:${_JIT_LTO_FATBIN_TARGET}> > "${_JIT_LTO_EMBEDDED_HEADER}"
     DEPENDS $<TARGET_OBJECTS:${_JIT_LTO_FATBIN_TARGET}>
   )
-  target_sources(${_JIT_LTO_EMBEDDED_TARGET} PRIVATE "${_JIT_LTO_FATBIN_SOURCE}" "${_JIT_LTO_EMBEDDED_HEADER}")
+  target_sources(
+    ${_JIT_LTO_EMBEDDED_TARGET} PRIVATE "${_JIT_LTO_FATBIN_SOURCE}" "${_JIT_LTO_EMBEDDED_HEADER}"
+  )
   cmake_path(GET _JIT_LTO_EMBEDDED_HEADER PARENT_PATH header_dir)
   target_include_directories(${_JIT_LTO_EMBEDDED_TARGET} PRIVATE "${header_dir}")
 endfunction()
@@ -133,7 +139,9 @@ function(generate_jit_lto_kernels target)
       foreach(capacity IN LISTS capacities)
         foreach(ascending IN LISTS ascending_values)
           foreach(compute_norm IN LISTS compute_norm_values)
-            set(kernel_name "interleaved_scan_kernel_${capacity}_${veclen}_${ascending}_${compute_norm}_${type_abbrev}_${acc_abbrev}_${idx_abbrev}")
+            set(kernel_name
+                "interleaved_scan_kernel_${capacity}_${veclen}_${ascending}_${compute_norm}_${type_abbrev}_${acc_abbrev}_${idx_abbrev}"
+            )
             set(filename
                 "${generated_kernels_dir}/interleaved_scan_kernels/fatbin_${kernel_name}.cu"
             )
@@ -161,9 +169,7 @@ function(generate_jit_lto_kernels target)
         endif()
 
         set(kernel_name "metric_${metric_name}_${veclen}_${type_abbrev}_${acc_abbrev}")
-        set(filename
-            "${generated_kernels_dir}/metric_device_functions/fatbin_${kernel_name}.cu"
-        )
+        set(filename "${generated_kernels_dir}/metric_device_functions/fatbin_${kernel_name}.cu")
         configure_file(
           "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/metric.cu.in"
           "${filename}" @ONLY
