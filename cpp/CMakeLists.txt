@@ -732,8 +732,9 @@ SECTIONS
               $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
               $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
               $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
-              $<LINK_ONLY:$<$<BOOL:${JIT_LTO_COMPILATION}>:jit_lto_kernels>>
     )
+    # Can't do target_link_libraries() on this one, because it's a static library
+    target_sources(cuvs_static PRIVATE $<$<BOOL:${JIT_LTO_COMPILATION}>:$<TARGET_SOURCES:jit_lto_kernels>>)
   endif()
 
   # ################################################################################################
