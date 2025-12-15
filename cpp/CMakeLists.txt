@@ -354,6 +354,7 @@ if(NOT BUILD_CPU_ONLY)
     set(JIT_LTO_FILES
         src/detail/jit_lto/AlgorithmLauncher.cu src/detail/jit_lto/AlgorithmPlanner.cu
         src/detail/jit_lto/FragmentDatabase.cu src/detail/jit_lto/FragmentEntry.cu
+        src/detail/jit_lto/nvjitlink_checker.cpp
     )
   endif()
 
