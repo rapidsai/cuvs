@@ -114,10 +114,7 @@ function(generate_jit_lto_kernels target)
             "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
             "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
   )
-  set_target_properties(
-    ${target}
-    PROPERTIES POSITION_INDEPENDENT_CODE ON
-  )
+  set_target_properties(${target} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
   set(generated_kernels_dir "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels")
   string(TIMESTAMP year "%Y")
