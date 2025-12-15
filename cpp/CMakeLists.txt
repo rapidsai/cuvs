@@ -733,7 +733,7 @@ SECTIONS
     )
     # Can't do target_link_libraries() on this one, because it's a static library
     target_sources(
-      cuvs_static PRIVATE $<$<BOOL:${JIT_LTO_COMPILATION}>:$<TARGET_SOURCES:jit_lto_kernels>>
+      cuvs_static PRIVATE $<$<BOOL:${JIT_LTO_COMPILATION}>:$<TARGET_OBJECTS:jit_lto_kernels>>
     )
   endif()
 
