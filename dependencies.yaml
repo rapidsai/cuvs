@@ -3,7 +3,7 @@ files:
   all:
     output: conda
     matrix:
-      cuda: ["12.9", "13.0"]
+      cuda: ["12.9", "13.1"]
       arch: [x86_64, aarch64]
     includes:
       - build
@@ -30,7 +30,7 @@ files:
   bench_ann:
     output: conda
     matrix:
-      cuda: ["12.9", "13.0"]
+      cuda: ["12.9", "13.1"]
       arch: [x86_64, aarch64]
     includes:
       - bench
@@ -87,7 +87,7 @@ files:
   rust:
     output: conda
     matrix:
-      cuda: ["12.9", "13.0"]
+      cuda: ["12.9", "13.1"]
       arch: [x86_64, aarch64]
     includes:
       # clang/libclang only needed for bindgen support
@@ -102,7 +102,7 @@ files:
   go:
     output: conda
     matrix:
-      cuda: ["12.9", "13.0"]
+      cuda: ["12.9", "13.1"]
       arch: [x86_64, aarch64]
     includes:
       - clang
@@ -306,6 +306,10 @@ dependencies:
               cuda: "13.0"
             packages:
               - cuda-version=13.0
+          - matrix:
+              cuda: "13.1"
+            packages:
+              - cuda-version=13.1
   cuda:
     common:
       - output_types: [conda]
