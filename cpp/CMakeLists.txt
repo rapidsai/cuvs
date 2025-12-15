@@ -363,6 +363,7 @@ if(NOT BUILD_CPU_ONLY)
   add_library(
     cuvs_objs OBJECT
     src/cluster/detail/minClusterDistanceCompute.cu
+    src/cluster/agglomerative.cu
     src/cluster/kmeans_cluster_cost.cu
     src/cluster/kmeans_fit_mg_float.cu
     src/cluster/kmeans_fit_mg_double.cu
@@ -439,7 +440,6 @@ if(NOT BUILD_CPU_ONLY)
     src/distance/distance.cu
     src/distance/pairwise_distance.cu
     src/distance/sparse_distance.cu
-    src/embed/spectral.cu
     src/neighbors/all_neighbors/all_neighbors.cu
     src/neighbors/ball_cover.cu
     src/neighbors/epsilon_neighborhood.cu
