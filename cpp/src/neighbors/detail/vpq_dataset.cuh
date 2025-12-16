@@ -123,8 +123,8 @@ void train_pq_centers(
                                pq_trainset_view,
                                sample_weight,
                                pq_centers_view,
-                               raft::make_host_scalar_view<MathT, IdxT>(&inertia),
-                               raft::make_host_scalar_view<IdxT, IdxT>(&n_iter));
+                               raft::make_host_scalar_view<MathT>(&inertia),
+                               raft::make_host_scalar_view<IdxT>(&n_iter));
   }
 }
 
