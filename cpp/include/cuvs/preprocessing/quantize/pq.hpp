@@ -57,9 +57,13 @@ struct quantizer {
 /**
  * @brief Initializes a product quantizer to be used later for quantizing the dataset.
  *
+ * The use of a pool memory resource is recommended for more consistent training performance.
+ *
  * Usage example:
  * @code{.cpp}
  * raft::handle_t handle;
+ * // Set the workspace memory resource to a pool with 2 GiB upper limit.
+ * raft::resource::set_workspace_to_pool_resource(handle, 2 * 1024 * 1024 * 1024ull);
  * cuvs::preprocessing::quantize::pq::params params;
  * auto quantizer = cuvs::preprocessing::quantize::pq::train(handle, params, dataset);
  * @endcode
