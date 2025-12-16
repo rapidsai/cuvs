@@ -13,6 +13,9 @@
 
 #pragma once
 
+#include <algorithm>
+#include <rmm/cuda_device.hpp>
+
 namespace cuvs::neighbors::detail::faiss_select {
 // If the inner size (dim) of the vectors is small, we want a larger query tile
 // size, like 1024
