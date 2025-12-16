@@ -29,5 +29,7 @@ rapids-pip-retry install \
 # 0 really means "add --no-build-isolation" (ref: https://github.com/pypa/pip/issues/5735)
 export PIP_NO_BUILD_ISOLATION=0
 
+export SCCACHE_RECACHE=1
+
 ci/build_wheel.sh libcuvs ${package_dir}
 ci/validate_wheel.sh ${package_dir} "${RAPIDS_WHEEL_BLD_OUTPUT_DIR}"
