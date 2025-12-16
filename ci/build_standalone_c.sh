@@ -56,6 +56,8 @@ RAPIDS_ARTIFACTS_DIR=${RAPIDS_ARTIFACTS_DIR:-"${PWD}/artifacts"}
 mkdir -p "${RAPIDS_ARTIFACTS_DIR}"
 export RAPIDS_ARTIFACTS_DIR
 
+export SCCACHE_NO_CACHE=1 SCCACHE_NO_DIST_COMPILE=1
+
 scl enable gcc-toolset-${TOOLSET_VERSION} -- \
       cmake -S cpp -B cpp/build/ -GNinja \
             -DCMAKE_CUDA_HOST_COMPILER=/opt/rh/gcc-toolset-${TOOLSET_VERSION}/root/usr/bin/gcc \
