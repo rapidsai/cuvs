@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs;
 
@@ -93,14 +82,14 @@ public class HnswBuildAndSearchIT extends CuVSTestCase {
         SearchResults results = hnswIndex.search(hnswQuery);
 
         // Check results
-        log.info(results.getResults().toString());
+        log.debug(results.getResults().toString());
         checkResults(expectedResults, results.getResults());
 
         // Cleanup
-        hnswIndex.destroyIndex();
+        hnswIndex.close();
       }
     } finally {
-      index.destroyIndex();
+      index.close();
       Files.deleteIfExists(hnswIndexPath);
     }
   }
@@ -119,9 +108,9 @@ public class HnswBuildAndSearchIT extends CuVSTestCase {
             Map.of(1, 0.15224178f, 0, 0.59063464f, 3, 0.59866416f));
 
     for (int j = 0; j < 10; j++) {
-      try (CuVSResources resources = CuVSResources.create()) {
+      try (CuVSResources resources = CheckedCuVSResources.create()) {
         HnswQuery hnswQuery =
-            new HnswQuery.Builder()
+            new HnswQuery.Builder(resources)
                 .withMapping(SearchResults.IDENTITY_MAPPING)
                 .withQueryVectors(queries)
                 .withSearchParams(new HnswSearchParams.Builder().build())
@@ -144,9 +133,9 @@ public class HnswBuildAndSearchIT extends CuVSTestCase {
     LongToIntFunction rotate = l -> (int) ((l + 1) % dataset.length);
 
     for (int j = 0; j < 10; j++) {
-      try (CuVSResources resources = CuVSResources.create()) {
+      try (CuVSResources resources = CheckedCuVSResources.create()) {
         HnswQuery hnswQuery =
-            new HnswQuery.Builder()
+            new HnswQuery.Builder(resources)
                 .withQueryVectors(queries)
                 .withMapping(rotate)
                 .withSearchParams(new HnswSearchParams.Builder().build())
@@ -170,9 +159,9 @@ public class HnswBuildAndSearchIT extends CuVSTestCase {
     LongToIntFunction rotate = SearchResults.mappingsFromList(mappings);
 
     for (int j = 0; j < 10; j++) {
-      try (CuVSResources resources = CuVSResources.create()) {
+      try (CuVSResources resources = CheckedCuVSResources.create()) {
         HnswQuery hnswQuery =
-            new HnswQuery.Builder()
+            new HnswQuery.Builder(resources)
                 .withQueryVectors(queries)
                 .withMapping(rotate)
                 .withSearchParams(new HnswSearchParams.Builder().build())

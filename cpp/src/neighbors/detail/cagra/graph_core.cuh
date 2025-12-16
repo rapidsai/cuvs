@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
@@ -25,6 +14,7 @@
 
 // TODO: This shouldn't be invoking anything from spatial/knn
 #include "../../../core/nvtx.hpp"
+#include "../../../core/omp_wrapper.hpp"
 #include "../ann_utils.cuh"
 
 #include <raft/util/bitonic_sort.cuh>
@@ -33,7 +23,6 @@
 #include <cuda_fp16.h>
 
 #include <float.h>
-#include <omp.h>
 #include <sys/time.h>
 
 #include <climits>
@@ -107,7 +96,7 @@ __global__ void kern_sort(const DATA_T* const dataset,  // [dataset_chunk_size, 
           norm2_dst += elem_b * elem_b;
         }
       }
-    } else {
+    } else if (metric == cuvs::distance::DistanceType::L2Expanded) {
       // L2Expanded
       for (int d = lane_id; d < dataset_dim; d += raft::WarpSize) {
         float diff = cuvs::spatial::knn::detail::utils::mapping<float>{}(
@@ -115,6 +104,15 @@ __global__ void kern_sort(const DATA_T* const dataset,  // [dataset_chunk_size, 
                      cuvs::spatial::knn::detail::utils::mapping<float>{}(
                        dataset[d + static_cast<uint64_t>(dataset_dim) * dstNode]);
         dist += diff * diff;
+      }
+    } else if (metric == cuvs::distance::DistanceType::BitwiseHamming) {
+      if constexpr (std::is_integral_v<DATA_T>) {
+        for (int d = lane_id; d < dataset_dim; d += raft::WarpSize) {
+          dist += __popc(
+            static_cast<uint32_t>(dataset[d + static_cast<uint64_t>(dataset_dim) * srcNode] ^
+                                  dataset[d + static_cast<uint64_t>(dataset_dim) * dstNode]) &
+            0xffu);
+        }
       }
     }
     dist += __shfl_xor_sync(0xffffffff, dist, 1);
@@ -171,15 +169,16 @@ __global__ void kern_prune(const IdxT* const knn_graph,  // [graph_chunk_size, g
   uint64_t* const num_retain = stats;
   uint64_t* const num_full   = stats + 1;
 
-  const uint64_t nid = blockIdx.x + (batch_size * batch_id);
-  if (nid >= graph_size) { return; }
+  const uint64_t iA = blockIdx.x + (batch_size * batch_id);
+  if (iA >= graph_size) { return; }
   for (uint32_t k = threadIdx.x; k < graph_degree; k += blockDim.x) {
     smem_num_detour[k] = 0;
+    if (knn_graph[k + ((uint64_t)graph_degree * iA)] == iA) {
+      // Lower the priority of self-edge
+      smem_num_detour[k] = graph_degree;
+    }
   }
   __syncthreads();
-
-  const uint64_t iA = nid;
-  if (iA >= graph_size) { return; }
 
   // count number of detours (A->D->B)
   for (uint32_t kAD = 0; kAD < graph_degree - 1; kAD++) {
@@ -490,13 +489,12 @@ void shift_array(T* array, uint64_t num)
 }
 }  // namespace
 
-template <
-  typename DataT,
-  typename IdxT       = uint32_t,
-  typename d_accessor = raft::host_device_accessor<std::experimental::default_accessor<DataT>,
-                                                   raft::memory_type::device>,
-  typename g_accessor =
-    raft::host_device_accessor<std::experimental::default_accessor<IdxT>, raft::memory_type::host>>
+template <typename DataT,
+          typename IdxT       = uint32_t,
+          typename d_accessor = raft::host_device_accessor<cuda::std::default_accessor<DataT>,
+                                                           raft::memory_type::device>,
+          typename g_accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<IdxT>, raft::memory_type::host>>
 void sort_knn_graph(
   raft::resources const& res,
   const cuvs::distance::DistanceType metric,
@@ -508,8 +506,10 @@ void sort_knn_graph(
   RAFT_EXPECTS(
     metric == cuvs::distance::DistanceType::InnerProduct ||
       metric == cuvs::distance::DistanceType::CosineExpanded ||
-      metric == cuvs::distance::DistanceType::L2Expanded,
-    "Unsupported metric. Only InnerProduct, CosineExpanded, and L2Expanded are supported");
+      metric == cuvs::distance::DistanceType::L2Expanded ||
+      metric == cuvs::distance::DistanceType::BitwiseHamming,
+    "Unsupported metric. Only InnerProduct, CosineExpanded, L2Expanded and BitwiseHamming are "
+    "supported");
   const uint64_t dataset_size = dataset.extent(0);
   const uint64_t dataset_dim  = dataset.extent(1);
   const DataT* dataset_ptr    = dataset.data_handle();
@@ -1156,10 +1156,9 @@ void count_2hop_detours(raft::host_matrix_view<IdxT, int64_t, raft::row_major> k
   }
 }
 
-template <
-  typename IdxT = uint32_t,
-  typename g_accessor =
-    raft::host_device_accessor<std::experimental::default_accessor<IdxT>, raft::memory_type::host>>
+template <typename IdxT = uint32_t,
+          typename g_accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<IdxT>, raft::memory_type::host>>
 void optimize(
   raft::resources const& res,
   raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph,
@@ -1410,7 +1409,7 @@ void optimize(
       "overflows occur during the norm computation between the dataset vectors.");
 
     const double time_prune_end = cur_time();
-    RAFT_LOG_DEBUG("# Pruning time: %.1lf sec", time_prune_end - time_prune_start);
+    RAFT_LOG_DEBUG("# Pruning time: %.1lf ms", (time_prune_end - time_prune_start) * 1000.0);
   }
 
   auto rev_graph       = raft::make_host_matrix<IdxT, int64_t>(graph_size, output_graph_degree);
@@ -1480,7 +1479,8 @@ void optimize(
                raft::resource::get_cuda_stream(res));
 
     const double time_make_end = cur_time();
-    RAFT_LOG_DEBUG("# Making reverse graph time: %.1lf sec", time_make_end - time_make_start);
+    RAFT_LOG_DEBUG("# Making reverse graph time: %.1lf ms",
+                   (time_make_end - time_make_start) * 1000.0);
   }
 
   {
@@ -1567,7 +1567,8 @@ void optimize(
                  "many MST optimization edges.");
 
     const double time_replace_end = cur_time();
-    RAFT_LOG_DEBUG("# Replacing edges time: %.1lf sec", time_replace_end - time_replace_start);
+    RAFT_LOG_DEBUG("# Replacing edges time: %.1lf ms",
+                   (time_replace_end - time_replace_start) * 1000.0);
 
     /* stats */
     uint64_t num_replaced_edges = 0;

@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 use std::convert::From;
@@ -51,7 +40,7 @@ impl ManagedTensor {
                 res.get_cuda_stream()?,
             ))?;
 
-            let mut ret = self.0.clone();
+            let mut ret = self.0;
             ret.dl_tensor.data = device_data;
             ret.deleter = Some(rmm_free_tensor);
             ret.dl_tensor.device.device_type = ffi::DLDeviceType::kDLCUDA;
@@ -205,5 +194,9 @@ mod tests {
         // make sure we can get the shape ok
         assert_eq!(unsafe { *tensor.shape }, 8);
         assert_eq!(unsafe { *tensor.shape.add(1) }, 4);
+
+        let arr = ndarray::Array::<f32, _>::zeros((8,));
+        let tensor = unsafe { (*(ManagedTensor::from(&arr).as_ptr())).dl_tensor };
+        assert_eq!(tensor.ndim, 1);
     }
 }

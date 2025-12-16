@@ -1,21 +1,12 @@
-# Copyright (c) 2025, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 #
 
 import numpy as np
 import pytest
+import cupy as cp
 from pylibraft.common import device_ndarray
+from sklearn.datasets import make_blobs
 
 from cuvs.neighbors import brute_force, nn_descent
 from cuvs.tests.ann_utils import calc_recall
@@ -24,7 +15,7 @@ from cuvs.tests.ann_utils import calc_recall
 @pytest.mark.parametrize("n_rows", [1024, 2048])
 @pytest.mark.parametrize("n_cols", [32, 64])
 @pytest.mark.parametrize("device_memory", [True, False])
-@pytest.mark.parametrize("dtype", [np.float32])
+@pytest.mark.parametrize("dtype", [np.float32, np.float16])
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("return_distances", [True, False])
 def test_nn_descent(
@@ -67,3 +58,38 @@ def test_nn_descent(
         assert distances.shape == graph.shape
 
     assert calc_recall(graph, bfknn_graph) > 0.9
+
+
+@pytest.mark.parametrize("n_cols", [2, 17, 32])
+@pytest.mark.parametrize("dist_comp_dtype", ["auto", "fp32", "fp16"])
+@pytest.mark.parametrize("dtype", [np.float32, np.float16])
+def test_nn_descent_dist_comp_dtype(n_cols, dist_comp_dtype, dtype):
+    metric = "sqeuclidean"
+    graph_degree = 32
+    n_rows = 100_000
+
+    X, _ = make_blobs(
+        n_samples=n_rows, n_features=n_cols, centers=10, random_state=42
+    )
+    X = X.astype(dtype)
+
+    params = nn_descent.IndexParams(
+        metric=metric,
+        graph_degree=graph_degree,
+        return_distances=True,
+        dist_comp_dtype=dist_comp_dtype,
+    )
+
+    index = nn_descent.build(params, X)
+    nnd_indices = index.graph
+
+    gpu_X = cp.asarray(X)
+    index = brute_force.build(gpu_X, metric=metric)
+    _, bf_indices = brute_force.search(index, gpu_X, k=graph_degree)
+    bf_indices = bf_indices.copy_to_host()
+
+    if n_cols <= 16 and dist_comp_dtype == "fp16" and dtype == np.float32:
+        # for small dim, if data is fp32 but dist_comp_dtype is fp16, the recall will be low
+        assert calc_recall(nnd_indices, bf_indices) < 0.7
+    else:
+        assert calc_recall(nnd_indices, bf_indices) > 0.9

@@ -1,20 +1,10 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs;
 
+import static com.carrotsearch.randomizedtesting.RandomizedTest.*;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -35,7 +25,7 @@ public abstract class CuVSTestCase {
 
   protected void initializeRandom() {
     random = RandomizedContext.current().getRandom();
-    log.info("Test seed: " + RandomizedContext.current().getRunnerSeedAsString());
+    log.debug("Test seed: " + RandomizedContext.current().getRunnerSeedAsString());
   }
 
   protected float[][] generateData(Random random, int rows, int cols) {
@@ -58,7 +48,7 @@ public abstract class CuVSTestCase {
       Map<Integer, Double> distances = new TreeMap<>();
       for (int j = 0; j < dataset.length; j++) {
         double distance = 0;
-        if (prefilters != null && prefilters[q].get(j) == false) {
+        if (prefilters != null && !prefilters[q].get(j)) {
           distance = Double.POSITIVE_INFINITY;
         } else {
           for (int k = 0; k < dimensions; k++) {
@@ -77,7 +67,7 @@ public abstract class CuVSTestCase {
       neighborsResult.add(neighbors.subList(0, Math.min(topK * 2 + 10, dataset.length)));
     }
 
-    log.info("Expected results generated successfully.");
+    log.trace("Expected results generated successfully.");
     return neighborsResult;
   }
 
@@ -89,8 +79,8 @@ public abstract class CuVSTestCase {
       int numQueries) {
 
     for (int i = 0; i < numQueries; i++) {
-      log.info("Results returned for query " + i + ": " + results.getResults().get(i).keySet());
-      log.info(
+      log.debug("Results returned for query " + i + ": " + results.getResults().get(i).keySet());
+      log.debug(
           "Expected results for query "
               + i
               + ": "
@@ -109,7 +99,7 @@ public abstract class CuVSTestCase {
               .toList();
 
       // just make sure that the first 5 results are in the expected list (which
-      // comprises of 2*topK results)
+      // consists of 2*topK results)
       for (int j = 0; j < Math.min(5, sortedResultKeys.size()); j++) {
         assertTrue(
             "Not found in expected list: " + sortedResultKeys.get(j),
@@ -124,14 +114,18 @@ public abstract class CuVSTestCase {
     List<Map<Integer, Float>> sortedActual = new ArrayList<Map<Integer, Float>>();
     for (Map<Integer, Float> map : expected) {
       sortedExpected.add(
-          new TreeMap<Integer, Float>(map) {
+          new TreeMap<>(map) {
             @Override
             public boolean equals(Object o) {
-              Map<Integer, Float> map = (Map<Integer, Float>) o;
+              if (!(o instanceof Map<?, ?>)) {
+                return false;
+              }
+              @SuppressWarnings("unchecked")
+              var map = (Map<Integer, Float>) o;
               if (this.size() != map.size()) return false;
               for (Integer key : map.keySet()) {
                 try {
-                  if (Math.abs((float) map.get(key) - ((float) get(key))) < 0.0001f == false) {
+                  if (Math.abs(map.get(key) - ((float) get(key))) >= 0.0001f) {
                     return false;
                   }
                 } catch (Exception ex) {
@@ -143,7 +137,7 @@ public abstract class CuVSTestCase {
           });
     }
     for (Map<Integer, Float> map : actual) {
-      sortedActual.add(new TreeMap<Integer, Float>(map));
+      sortedActual.add(new TreeMap<>(map));
     }
     assertEquals(sortedExpected, sortedActual);
   }
@@ -151,5 +145,59 @@ public abstract class CuVSTestCase {
   protected static boolean isLinuxAmd64() {
     String name = System.getProperty("os.name");
     return (name.startsWith("Linux")) && System.getProperty("os.arch").equals("amd64");
+  }
+
+  protected static int[][] createIntMatrix() {
+    int rows = randomIntBetween(1, 32);
+    int cols = randomIntBetween(1, 100);
+
+    return createIntMatrix(rows, cols);
+  }
+
+  protected static int[][] createIntMatrix(int rows, int cols) {
+    int[][] result = new int[rows][cols];
+
+    for (int r = 0; r < rows; ++r) {
+      for (int c = 0; c < cols; ++c) {
+        result[r][c] = randomInt();
+      }
+    }
+    return result;
+  }
+
+  protected static byte[][] createByteMatrix() {
+    int rows = randomIntBetween(1, 32);
+    int cols = randomIntBetween(1, 100);
+
+    return createByteMatrix(rows, cols);
+  }
+
+  protected static byte[][] createByteMatrix(int rows, int cols) {
+    byte[][] result = new byte[rows][cols];
+
+    for (int r = 0; r < rows; ++r) {
+      for (int c = 0; c < cols; ++c) {
+        result[r][c] = randomByte();
+      }
+    }
+    return result;
+  }
+
+  protected static float[][] createFloatMatrix() {
+    int rows = randomIntBetween(1, 32);
+    int cols = randomIntBetween(1, 100);
+
+    return createFloatMatrix(rows, cols);
+  }
+
+  protected static float[][] createFloatMatrix(int rows, int cols) {
+    float[][] result = new float[rows][cols];
+
+    for (int r = 0; r < rows; ++r) {
+      for (int c = 0; c < cols; ++c) {
+        result[r][c] = randomFloat();
+      }
+    }
+    return result;
   }
 }

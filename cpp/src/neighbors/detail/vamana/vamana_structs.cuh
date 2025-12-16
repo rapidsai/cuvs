@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -50,20 +39,6 @@ template <typename IdxT, typename accT>
 struct __align__(16) DistPair {
   accT dist;
   IdxT idx;
-
-  __device__ __host__ DistPair& operator=(const DistPair& other)
-  {
-    dist = other.dist;
-    idx  = other.idx;
-    return *this;
-  }
-
-  __device__ __host__ DistPair& operator=(const volatile DistPair& other)
-  {
-    dist = other.dist;
-    idx  = other.idx;
-    return *this;
-  }
 };
 
 // Swap the values of two DistPair<SUMTYPE> objects
@@ -80,8 +55,8 @@ __device__ __host__ void swap(DistPair<IdxT, accT>* a, DistPair<IdxT, accT>* b)
 }
 
 // Structure to sort by distance
+template <typename IdxT, typename accT>
 struct CmpDist {
-  template <typename IdxT, typename accT>
   __device__ bool operator()(const DistPair<IdxT, accT>& lhs, const DistPair<IdxT, accT>& rhs)
   {
     return lhs.dist < rhs.dist;
@@ -309,19 +284,20 @@ __global__ void init_query_candidate_list(QueryCandidates<IdxT, accT>* query_lis
                                           IdxT* visited_id_ptr,
                                           accT* visited_dist_ptr,
                                           int num_queries,
-                                          int maxSize)
+                                          int maxSize,
+                                          int extra_queries_in_list = 0)
 {
   IdxT* ids_ptr  = static_cast<IdxT*>(visited_id_ptr);
   accT* dist_ptr = static_cast<accT*>(visited_dist_ptr);
 
   for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < num_queries * maxSize;
-       i += blockDim.x + gridDim.x) {
+       i += blockDim.x * gridDim.x) {
     ids_ptr[i]  = raft::upper_bound<IdxT>();
     dist_ptr[i] = raft::upper_bound<accT>();
   }
 
-  for (size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < num_queries;
-       i += blockDim.x + gridDim.x) {
+  for (size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < num_queries + extra_queries_in_list;
+       i += blockDim.x * gridDim.x) {
     query_list[i].maxSize = maxSize;
     query_list[i].size    = 0;
     query_list[i].ids     = &ids_ptr[i * (size_t)(maxSize)];
@@ -361,6 +337,18 @@ __global__ void prefix_sums_sizes(QueryCandidates<IdxT, accT>* query_list,
 
 // Device fcn to have a threadblock copy coordinates into shared memory
 template <typename T, typename accT>
+__device__ void update_shared_point(
+  Point<T, accT>* shared_point, const T* data_ptr, int id, int dim, int idx)
+{
+  shared_point->id  = id;
+  shared_point->Dim = dim;
+  for (size_t i = threadIdx.x; i < dim; i += blockDim.x) {
+    shared_point->coords[i] = data_ptr[(size_t)(id) * (size_t)(dim) + i];
+  }
+}
+
+// Device fcn to have a threadblock copy coordinates into shared memory
+template <typename T, typename accT>
 __device__ void update_shared_point(Point<T, accT>* shared_point,
                                     const T* data_ptr,
                                     int id,
@@ -392,8 +380,11 @@ __global__ void write_graph_edges_kernel(raft::device_matrix_view<IdxT, int64_t>
 
 // Create src and dest edge lists used to sort and create reverse edges
 template <typename accT, typename IdxT = uint32_t>
-__global__ void create_reverse_edge_list(
-  void* query_list_ptr, int num_queries, int degree, IdxT* edge_src, IdxT* edge_dest)
+__global__ void create_reverse_edge_list(void* query_list_ptr,
+                                         int num_queries,
+                                         int degree,
+                                         IdxT* edge_src,
+                                         DistPair<IdxT, accT>* edge_dest)
 {
   QueryCandidates<IdxT, accT>* query_list =
     static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
@@ -404,8 +395,9 @@ __global__ void create_reverse_edge_list(
     int cand_count = query_list[i + 1].size - query_list[i].size;
 
     for (int j = 0; j < cand_count; j++) {
-      edge_src[query_list[i].size + j]  = query_list[i].queryId;
-      edge_dest[query_list[i].size + j] = query_list[i].ids[j];
+      edge_src[query_list[i].size + j]       = query_list[i].queryId;
+      edge_dest[query_list[i].size + j].idx  = query_list[i].ids[j];
+      edge_dest[query_list[i].size + j].dist = query_list[i].dists[j];
     }
   }
 }
@@ -448,9 +440,9 @@ __global__ void populate_reverse_list_struct(QueryCandidates<IdxT, accT>* revers
 // Recompute distances of reverse list. Allows us to avoid keeping distances during sort
 template <typename T,
           typename accT,
-          typename IdxT     = uint32_t,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename IdxT = uint32_t,
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 __global__ void recompute_reverse_dists(
   QueryCandidates<IdxT, accT>* reverse_list,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,

@@ -1,21 +1,9 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs;
 
-import com.nvidia.cuvs.BruteForceIndex.Builder;
 import com.nvidia.cuvs.spi.CuVSProvider;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -34,12 +22,13 @@ import java.util.Objects;
  *
  * @since 25.02
  */
-public interface CagraIndex {
+public interface CagraIndex extends AutoCloseable {
 
   /**
    * Invokes the native destroy_cagra_index to de-allocate the CAGRA index
    */
-  void destroyIndex() throws Throwable;
+  @Override
+  void close() throws Exception;
 
   /**
    * Invokes the native search_cagra_index via the Panama API for searching a
@@ -50,6 +39,13 @@ public interface CagraIndex {
    * @return an instance of {@link SearchResults} containing the results
    */
   SearchResults search(CagraQuery query) throws Throwable;
+
+  /** Returns the CAGRA graph
+   *
+   * @return a {@link CuVSDeviceMatrix} encapsulating the native int (uint32_t) array used to represent
+   * the cagra graph
+   */
+  CuVSDeviceMatrix getGraph();
 
   /**
    * A method to persist a CAGRA index using an instance of {@link OutputStream}
@@ -210,6 +206,12 @@ public interface CagraIndex {
     Builder from(InputStream inputStream);
 
     /**
+     * Sets a CAGRA graph instance to re-create an index from a
+     * previously built graph.
+     */
+    Builder from(CuVSMatrix graph);
+
+    /**
      * Sets the dataset vectors for building the {@link CagraIndex}.
      *
      * @param vectors a two-dimensional float array
@@ -220,10 +222,10 @@ public interface CagraIndex {
     /**
      * Sets the dataset for building the {@link CagraIndex}.
      *
-     * @param dataset a {@link Dataset} object containing the vectors
+     * @param dataset a {@link CuVSMatrix} object containing the vectors
      * @return an instance of this Builder
      */
-    Builder withDataset(Dataset dataset);
+    Builder withDataset(CuVSMatrix dataset);
 
     /**
      * Registers an instance of configured {@link CagraIndexParams} with this

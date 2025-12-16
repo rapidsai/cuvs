@@ -1,18 +1,7 @@
 <!--
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
@@ -22,7 +11,7 @@
     <groupId>com.nvidia.cuvs</groupId>
     <artifactId>cuvs-java</artifactId>
     <!-- NOTE: The version automatically gets updated when ci/release/update-version.sh is invoked. -->
-    <!--CUVS_JAVA#VERSION_UPDATE_MARKER_START--><version>25.08.0</version><!--CUVS_JAVA#VERSION_UPDATE_MARKER_END-->
+    <!--CUVS_JAVA#VERSION_UPDATE_MARKER_START--><version>26.02.0</version><!--CUVS_JAVA#VERSION_UPDATE_MARKER_END-->
     <name>cuvs-java</name>
     <description>
         This project provides Java bindings for cuVS, enabling approximate nearest neighbors search and clustering
@@ -62,6 +51,7 @@
         <maven.compiler.source>22</maven.compiler.source>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <native.build.path>${project.build.directory}/../../../cpp/build</native.build.path>
     </properties>
 
     <distributionManagement>
@@ -101,13 +91,6 @@
             <version>4.13.1</version>
             <scope>test</scope>
         </dependency>
-
-        <dependency>
-            <groupId>com.diffplug.spotless</groupId>
-            <artifactId>spotless-maven-plugin</artifactId>
-            <version>2.44.5</version>
-        </dependency>
-
     </dependencies>
 
     <build>
@@ -115,10 +98,11 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.13.0</version>
+                <version>3.11.0</version>
                 <executions>
                     <execution>
                         <id>default-compile</id>
+                        <phase>compile</phase>
                         <goals>
                             <goal>compile</goal>
                         </goals>
@@ -141,6 +125,9 @@
                                 <compileSourceRoot>${project.basedir}/src/main/java22</compileSourceRoot>
                             </compileSourceRoots>
                             <multiReleaseOutput>true</multiReleaseOutput>
+                            <excludes>
+                                <exclude>module-info.java</exclude>
+                            </excludes>
                         </configuration>
                     </execution>
                 </executions>
@@ -164,38 +151,16 @@
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <version>3.4.2</version>
-                <configuration>
-                    <descriptorRefs>
-                        <descriptorRef>jar-with-dependencies</descriptorRef>
-                    </descriptorRefs>
-                    <mergeManifestMode>merge</mergeManifestMode>
-                    <archiverConfig>
-                        <duplicateBehavior>add</duplicateBehavior>
-                    </archiverConfig>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>assemble-all</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>single</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
                 <version>3.4.2</version>
                 <configuration>
                     <archive>
+                        <manifest>
+                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                        </manifest>
                         <manifestEntries>
                             <Multi-Release>true</Multi-Release>
                             <addClasspath>true</addClasspath>
-                            <mainClass>
-                                com.nvidia.cuvs.examples.CagraExample</mainClass>
                         </manifestEntries>
                     </archive>
                 </configuration>
@@ -284,4 +249,172 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>x86_64-cuda12</id>
+            <activation>
+                <property>
+                    <name>cuda.version</name>
+                    <value>12</value>
+                </property>
+            </activation>
+            <properties>
+                <native.classifier>x86_64-cuda12</native.classifier>
+                <native.lib.path>${native.build.path}/cuda12</native.lib.path>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-resources-plugin</artifactId>
+                        <version>3.3.1</version>
+                        <executions>
+                            <execution>
+                                <id>copy-native-libs</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>copy-resources</goal>
+                                </goals>
+                                <configuration>
+                                    <overwrite>true</overwrite>
+                                    <outputDirectory>${project.build.directory}/native-libs/${os.arch}/${os.name}</outputDirectory>
+                                    <resources>
+                                        <resource>
+                                            <directory>${native.lib.path}</directory>
+                                            <includes>
+                                                <include>libcuvs.so</include>
+                                                <include>libcuvs_c.so</include>
+                                            </includes>
+                                        </resource>
+                                        <resource>
+                                            <directory>${native.lib.path}/_deps/rmm-build</directory>
+                                            <includes>
+                                                <include>librmm.so</include>
+                                            </includes>
+                                        </resource>
+                                        <resource>
+                                            <directory>${native.lib.path}/_deps/rapids_logger-build</directory>
+                                            <includes>
+                                                <include>librapids_logger.so</include>
+                                            </includes>
+                                        </resource>
+                                    </resources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-assembly-plugin</artifactId>
+                        <version>3.4.2</version>
+                        <configuration>
+                            <descriptors>
+                                <descriptor>src/assembly/native-with-deps.xml</descriptor>
+                            </descriptors>
+                            <archive>
+                                <manifestEntries>
+                                    <Multi-Release>true</Multi-Release>
+                                    <addClasspath>true</addClasspath>
+                                    <Embedded-Libraries-Cuda-Version>12</Embedded-Libraries-Cuda-Version>
+                                </manifestEntries>
+                            </archive>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>assemble-native</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>single</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <profile>
+            <id>x86_64-cuda13</id>
+            <activation>
+                <property>
+                    <name>cuda.version</name>
+                    <value>13</value>
+                </property>
+            </activation>
+            <properties>
+                <native.classifier>x86_64-cuda13</native.classifier>
+                <native.lib.path>${native.build.path}/cuda13</native.lib.path>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-resources-plugin</artifactId>
+                        <version>3.3.1</version>
+                        <executions>
+                            <execution>
+                                <id>copy-native-libs</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>copy-resources</goal>
+                                </goals>
+                                <configuration>
+                                    <overwrite>true</overwrite>
+                                    <outputDirectory>${project.build.directory}/native-libs/${os.arch}/${os.name}</outputDirectory>
+                                    <resources>
+                                        <resource>
+                                            <directory>${native.lib.path}</directory>
+                                            <includes>
+                                                <include>libcuvs.so</include>
+                                                <include>libcuvs_c.so</include>
+                                            </includes>
+                                        </resource>
+                                        <resource>
+                                            <directory>${native.lib.path}/_deps/rmm-build</directory>
+                                            <includes>
+                                                <include>librmm.so</include>
+                                            </includes>
+                                        </resource>
+                                        <resource>
+                                            <directory>${native.lib.path}/_deps/rapids_logger-build</directory>
+                                            <includes>
+                                                <include>librapids_logger.so</include>
+                                            </includes>
+                                        </resource>
+                                    </resources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-assembly-plugin</artifactId>
+                        <version>3.4.2</version>
+                        <configuration>
+                            <descriptors>
+                                <descriptor>src/assembly/native-with-deps.xml</descriptor>
+                            </descriptors>
+                            <archive>
+                                <manifestEntries>
+                                    <Multi-Release>true</Multi-Release>
+                                    <addClasspath>true</addClasspath>
+                                    <Embedded-Libraries-Cuda-Version>13</Embedded-Libraries-Cuda-Version>
+                                </manifestEntries>
+                            </archive>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>assemble-native</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>single</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

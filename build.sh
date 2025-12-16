@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# Copyright (c) 2020-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2020-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 
 # cuvs build scripts
 
@@ -517,10 +518,10 @@ if hasArg docs; then
     cd "${DOXYGEN_BUILD_DIR}"
     doxygen Doxyfile
     cd "${SPHINX_BUILD_DIR}"
-    sphinx-build -b html source _html
+    make html
     cd "${REPODIR}"/rust
     cargo doc -p cuvs --no-deps
-    rsync -av "${RUST_BUILD_DIR}"/doc/ "${SPHINX_BUILD_DIR}"/_html/_static/rust
+    rsync -av "${RUST_BUILD_DIR}"/doc/ "${SPHINX_BUILD_DIR}"/build/html/_static/rust
 fi
 
 ################################################################################

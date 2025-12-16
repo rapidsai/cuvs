@@ -1,31 +1,11 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 
-header = """/*
- * Copyright (c) 2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+import datetime
+
+header = f"""/*
+ * SPDX-FileCopyrightText: Copyright (c) 2024-{datetime.datetime.today().year}, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 /*
@@ -85,26 +65,62 @@ declaration_macro = """
 #define COMMA ,
 """
 
-none_filter_int64 = "cuvs::neighbors::filtering::ivf_to_sample_filter" \
-                    "<int64_t COMMA cuvs::neighbors::filtering::none_sample_filter>"
-bitset_filter64 = "cuvs::neighbors::filtering::ivf_to_sample_filter" \
-                  "<int64_t COMMA cuvs::neighbors::filtering::bitset_filter<uint32_t COMMA int64_t>>"
+none_filter_int64 = (
+    "cuvs::neighbors::filtering::ivf_to_sample_filter"
+    "<int64_t COMMA cuvs::neighbors::filtering::none_sample_filter>"
+)
+bitset_filter64 = (
+    "cuvs::neighbors::filtering::ivf_to_sample_filter"
+    "<int64_t COMMA cuvs::neighbors::filtering::bitset_filter<uint32_t COMMA int64_t>>"
+)
 
 types = dict(
-    half_fp8_false=("half", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>", none_filter_int64),
-    half_fp8_true=("half", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>", none_filter_int64),
+    half_fp8_false=(
+        "half",
+        "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>",
+        none_filter_int64,
+    ),
+    half_fp8_true=(
+        "half",
+        "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>",
+        none_filter_int64,
+    ),
     half_half=("half", "half", none_filter_int64),
     float_half=("float", "half", none_filter_int64),
-    float_float= ("float", "float", none_filter_int64),
-    float_fp8_false=("float", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>", none_filter_int64),
-    float_fp8_true=("float", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>", none_filter_int64),
-    half_fp8_false_bitset64=("half", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>", bitset_filter64),
-    half_fp8_true_bitset64=("half", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>", bitset_filter64),
+    float_float=("float", "float", none_filter_int64),
+    float_fp8_false=(
+        "float",
+        "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>",
+        none_filter_int64,
+    ),
+    float_fp8_true=(
+        "float",
+        "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>",
+        none_filter_int64,
+    ),
+    half_fp8_false_bitset64=(
+        "half",
+        "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>",
+        bitset_filter64,
+    ),
+    half_fp8_true_bitset64=(
+        "half",
+        "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>",
+        bitset_filter64,
+    ),
     half_half_bitset64=("half", "half", bitset_filter64),
     float_half_bitset64=("float", "half", bitset_filter64),
-    float_float_bitset64= ("float", "float", bitset_filter64),
-    float_fp8_false_bitset64=("float", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>", bitset_filter64),
-    float_fp8_true_bitset64=("float", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>", bitset_filter64)
+    float_float_bitset64=("float", "float", bitset_filter64),
+    float_fp8_false_bitset64=(
+        "float",
+        "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>",
+        bitset_filter64,
+    ),
+    float_fp8_true_bitset64=(
+        "float",
+        "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>",
+        bitset_filter64,
+    ),
 )
 
 for path_key, (OutT, LutT, FilterT) in types.items():
@@ -112,5 +128,7 @@ for path_key, (OutT, LutT, FilterT) in types.items():
     with open(path, "w") as f:
         f.write(header)
         f.write(declaration_macro)
-        f.write(f"instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select({OutT}, {LutT}, {FilterT});\n")
+        f.write(
+            f"instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select({OutT}, {LutT}, {FilterT});\n"
+        )
     print(f"src/neighbors/ivf_pq/{path}")

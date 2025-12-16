@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 use std::env;
@@ -20,8 +9,7 @@ use std::path::PathBuf;
 
 fn main() {
     // build the cuvs c-api library with cmake, and link it into this crate
-    let cuvs_build = cmake::Config::new(".")
-        .build();
+    let cuvs_build = cmake::Config::new(".").build();
 
     println!(
         "cargo:rustc-link-search=native={}/lib",
@@ -74,9 +62,11 @@ fn main() {
     // run bindgen to automatically create rust bindings for the cuvs c-api
     bindgen::Builder::default()
         .header("cuvs_c_wrapper.h")
-        .clang_arg("-I../../cpp/include")
         // needed to find cudaruntime.h
         .clang_args(cmake_cxx_flags.split(' '))
+        // include cuvs c headers and dlpack headers we copied
+        // into our staging location
+        .clang_arg(format!("-I{}/build/bindings/include/", out_path.display()))
         // include dlpack from the cmake build dependencies
         .clang_arg(format!(
             "-I{}/build/_deps/dlpack-src/include/",

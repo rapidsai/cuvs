@@ -1,31 +1,11 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 
-header = """/*
- * Copyright (c) 2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+import datetime
+
+header = f"""/*
+ * SPDX-FileCopyrightText: Copyright (c) 2024-{datetime.datetime.today().year}, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 /*
@@ -227,24 +207,24 @@ cagra_macro = """
                    const std::string& filename);
 """
 
-flat_macros = dict (
-    flat = dict(
+flat_macros = dict(
+    flat=dict(
         include=include_macro,
         definition=flat_macro,
         name="CUVS_INST_MG_FLAT",
     )
 )
 
-pq_macros = dict (
-    pq = dict(
+pq_macros = dict(
+    pq=dict(
         include=include_macro,
         definition=pq_macro,
         name="CUVS_INST_MG_PQ",
     )
 )
 
-cagra_macros = dict (
-    cagra = dict(
+cagra_macros = dict(
+    cagra=dict(
         include=include_macro,
         definition=cagra_macro,
         name="CUVS_INST_MG_CAGRA",
@@ -253,6 +233,7 @@ cagra_macros = dict (
 
 flat_types = dict(
     float_int64_t=("float", "int64_t"),
+    half_int64_t=("half", "int64_t"),
     int8_t_int64_t=("int8_t", "int64_t"),
     uint8_t_int64_t=("uint8_t", "int64_t"),
 )
@@ -271,17 +252,21 @@ cagra_types = dict(
     uint8_t_uint32_t=("uint8_t", "uint32_t"),
 )
 
-for macros, types in [(flat_macros, flat_types), (pq_macros, pq_types), (cagra_macros, cagra_types)]:
-  for type_path, (T, IdxT) in types.items():
-      for macro_path, macro in macros.items():
-          path = f"iface_{macro_path}_{type_path}.cu"
-          with open(path, "w") as f:
-              f.write(header)
-              f.write(macro['include'])
-              f.write(namespace_macro)
-              f.write(macro["definition"])
-              f.write(f"{macro['name']}({T}, {IdxT});\n\n")
-              f.write(f"#undef {macro['name']}\n")
-              f.write(footer)
+for macros, types in [
+    (flat_macros, flat_types),
+    (pq_macros, pq_types),
+    (cagra_macros, cagra_types),
+]:
+    for type_path, (T, IdxT) in types.items():
+        for macro_path, macro in macros.items():
+            path = f"iface_{macro_path}_{type_path}.cu"
+            with open(path, "w") as f:
+                f.write(header)
+                f.write(macro["include"])
+                f.write(namespace_macro)
+                f.write(macro["definition"])
+                f.write(f"{macro['name']}({T}, {IdxT});\n\n")
+                f.write(f"#undef {macro['name']}\n")
+                f.write(footer)
 
-          print(f"src/neighbors/iface/{path}")
+            print(f"src/neighbors/iface/{path}")

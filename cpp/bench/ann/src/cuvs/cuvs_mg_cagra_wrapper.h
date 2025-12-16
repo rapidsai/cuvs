@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
@@ -31,6 +20,7 @@ class cuvs_mg_cagra : public algo<T>, public algo_gpu {
  public:
   using search_param_base = typename algo<T>::search_param;
   using algo<T>::dim_;
+  using algo<T>::metric_;
 
   struct build_param : public cuvs::bench::cuvs_cagra<T, IdxT>::build_param {
     cuvs::neighbors::distribution_mode mode;
@@ -43,9 +33,6 @@ class cuvs_mg_cagra : public algo<T>, public algo_gpu {
   cuvs_mg_cagra(Metric metric, int dim, const build_param& param, int concurrent_searches = 1)
     : algo<T>(metric, dim), index_params_(param), clique_()
   {
-    index_params_.cagra_params.metric         = parse_metric_type(metric);
-    index_params_.ivf_pq_build_params->metric = parse_metric_type(metric);
-
     clique_.set_memory_pool(80);
   }
 
@@ -98,8 +85,9 @@ template <typename T, typename IdxT>
 void cuvs_mg_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
 {
   auto dataset_extents = raft::make_extents<IdxT>(nrow, dim_);
-  index_params_.prepare_build_params(dataset_extents);
-  cuvs::neighbors::mg_index_params<cagra::index_params> build_params = index_params_.cagra_params;
+  auto params          = index_params_.cagra_params(dataset_extents, parse_metric_type(metric_));
+
+  cuvs::neighbors::mg_index_params<cagra::index_params> build_params = params;
   build_params.mode                                                  = index_params_.mode;
 
   auto dataset_view =

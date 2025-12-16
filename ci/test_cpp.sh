@@ -1,9 +1,13 @@
 #!/bin/bash
-# Copyright (c) 2022-2023, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 
 set -euo pipefail
 
 . /opt/conda/etc/profile.d/conda.sh
+
+rapids-logger "Configuring conda strict channel priority"
+conda config --set channel_priority strict
 
 CPP_CHANNEL=$(rapids-download-conda-from-github cpp)
 
@@ -29,6 +33,11 @@ rapids-print-env
 
 rapids-logger "Check GPU usage"
 nvidia-smi
+
+# RAPIDS_DATASET_ROOT_DIR is used by test scripts
+RAPIDS_DATASET_ROOT_DIR=${RAPIDS_TESTS_DIR}/dataset
+export RAPIDS_DATASET_ROOT_DIR
+./ci/get_test_data.sh --NEIGHBORS_ANN_VAMANA_TEST
 
 EXITCODE=0
 trap "EXITCODE=1" ERR

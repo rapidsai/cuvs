@@ -1,41 +1,35 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs;
 
 import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
 
+import com.nvidia.cuvs.spi.CuVSProvider;
 import java.io.*;
-import java.lang.invoke.MethodHandles;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.LongToIntFunction;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class BruteForceAndSearchIT extends CuVSTestCase {
-
-  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   @Before
   public void setup() {
     assumeTrue("not supported on " + System.getProperty("os.name"), isLinuxAmd64());
+    CuVSProvider.provider().enableRMMPooledMemory(10, 60);
+  }
+
+  @After
+  public void cleanup() {
+    CuVSProvider.provider().resetRMMPooledMemory();
   }
 
   // Sample data and query
@@ -60,37 +54,33 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
         new BruteForceIndexParams.Builder().withNumWriterThreads(32).build();
 
     // Create the index with the dataset
-    BruteForceIndex index =
+    try (BruteForceIndex index =
         BruteForceIndex.newBuilder(resources)
             .withDataset(dataset)
             .withIndexParams(indexParams)
-            .build();
+            .build()) {
 
-    // Saving the index on to the disk.
-    String indexFileName = UUID.randomUUID().toString() + ".bf";
-    try (var outputStream = new FileOutputStream(indexFileName)) {
-      index.serialize(outputStream);
-    }
+      // Saving the index on to the disk.
+      String indexFileName = UUID.randomUUID() + ".bf";
+      try (var outputStream = new FileOutputStream(indexFileName)) {
+        index.serialize(outputStream);
+      }
 
-    // Loading a BRUTEFORCE index from disk.
-    File indexFile = new File(indexFileName);
-    InputStream inputStream = new FileInputStream(indexFile);
-    BruteForceIndex loadedIndex = BruteForceIndex.newBuilder(resources).from(inputStream).build();
+      // Loading a BRUTEFORCE index from disk.
+      Path indexFile = Path.of(indexFileName);
+      try (var inputStream = Files.newInputStream(indexFile);
+          BruteForceIndex loadedIndex =
+              BruteForceIndex.newBuilder(resources).from(inputStream).build()) {
 
-    // search the loaded index
-    SearchResults results = loadedIndex.search(cuvsQuery);
-    checkResults(expectedResults, results.getResults());
+        // search the loaded index
+        SearchResults results = loadedIndex.search(cuvsQuery);
+        checkResults(expectedResults, results.getResults());
 
-    // search the first index
-    results = index.search(cuvsQuery);
-    checkResults(expectedResults, results.getResults());
-
-    // Cleanup
-    index.destroyIndex();
-    loadedIndex.destroyIndex();
-
-    if (indexFile.exists()) {
-      indexFile.delete();
+        // search the first index
+        results = index.search(cuvsQuery);
+        checkResults(expectedResults, results.getResults());
+      }
+      Files.deleteIfExists(indexFile);
     }
   }
 
@@ -108,9 +98,9 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
             Map.of(1, 0.15224183f, 0, 0.5906347f, 3, 0.5986643f));
     for (int j = 0; j < 10; j++) {
 
-      try (CuVSResources resources = CuVSResources.create()) {
+      try (CuVSResources resources = CheckedCuVSResources.create()) {
         BruteForceQuery cuvsQuery =
-            new BruteForceQuery.Builder()
+            new BruteForceQuery.Builder(resources)
                 .withTopK(3)
                 .withQueryVectors(queries)
                 .withMapping(SearchResults.IDENTITY_MAPPING)
@@ -136,9 +126,9 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
             Map.of(0, 0.5906347f, 1, 0.15224195f, 3, 0.5986643f));
 
     for (int j = 0; j < 10; j++) {
-      try (CuVSResources resources = CuVSResources.create()) {
+      try (CuVSResources resources = CheckedCuVSResources.create()) {
         BruteForceQuery cuvsQuery =
-            new BruteForceQuery.Builder()
+            new BruteForceQuery.Builder(resources)
                 .withTopK(3)
                 .withQueryVectors(queries)
                 .withPrefilters(
@@ -162,9 +152,9 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
     LongToIntFunction rotate = l -> (int) ((l + 1) % dataset.length);
 
     for (int j = 0; j < 10; j++) {
-      try (CuVSResources resources = CuVSResources.create()) {
+      try (CuVSResources resources = CheckedCuVSResources.create()) {
         BruteForceQuery cuvsQuery =
-            new BruteForceQuery.Builder()
+            new BruteForceQuery.Builder(resources)
                 .withTopK(3)
                 .withQueryVectors(queries)
                 .withMapping(rotate)
@@ -187,9 +177,9 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
     LongToIntFunction rotate = SearchResults.mappingsFromList(mappings);
 
     for (int j = 0; j < 10; j++) {
-      try (CuVSResources resources = CuVSResources.create()) {
+      try (CuVSResources resources = CheckedCuVSResources.create()) {
         BruteForceQuery cuvsQuery =
-            new BruteForceQuery.Builder()
+            new BruteForceQuery.Builder(resources)
                 .withTopK(3)
                 .withQueryVectors(queries)
                 .withMapping(rotate)

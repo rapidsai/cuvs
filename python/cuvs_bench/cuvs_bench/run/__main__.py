@@ -1,17 +1,6 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 #
 
 import os
@@ -112,6 +101,7 @@ from .run import run_benchmark
 @click.option(
     "-m",
     "--search-mode",
+    type=click.Choice(["latency", "throughput"], case_sensitive=False),
     default="latency",
     show_default=True,
     prompt='Enter the search mode ("latency" or "throughput")',
@@ -135,7 +125,7 @@ from .run import run_benchmark
     "--dry-run",
     is_flag=True,
     help="Dry-run mode will convert the yaml config for the specified "
-    "algorithms and datasets to the json format that’s consumed "
+    "algorithms and datasets to the json format that's consumed "
     "by the lower-level c++ binaries and then print the command to "
     "run execute the benchmarks but will not actually execute "
     "the command.",

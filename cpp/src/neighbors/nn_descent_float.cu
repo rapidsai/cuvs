@@ -1,19 +1,10 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "./detail/nn_descent_gnnd.hpp"
+#include "./detail/reachability.cuh"
 #include "nn_descent.cuh"
 #include <cuvs/neighbors/nn_descent.hpp>
 
@@ -54,7 +45,30 @@ namespace cuvs::neighbors::nn_descent {
       return idx;                                                                             \
     }                                                                                         \
   };                                                                                          \
-  template class detail::GNND<const T, int>;
+  template class detail::GNND<const T, int>;                                                  \
+                                                                                              \
+  template void detail::GNND<const T, int>::build<                                            \
+    cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>>(                  \
+    const T* data,                                                                            \
+    const int nrow,                                                                           \
+    int* output_graph,                                                                        \
+    bool return_distances,                                                                    \
+    float* output_distances,                                                                  \
+    cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T> dist_epilogue);    \
+  template void detail::GNND<const T, int>::local_join<                                       \
+    cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>>(                  \
+    cudaStream_t stream,                                                                      \
+    cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T> dist_epilogue);    \
+                                                                                              \
+  template void detail::GNND<const T, int>::build<raft::identity_op>(                         \
+    const T* data,                                                                            \
+    const int nrow,                                                                           \
+    int* output_graph,                                                                        \
+    bool return_distances,                                                                    \
+    float* output_distances,                                                                  \
+    raft::identity_op dist_epilogue);                                                         \
+  template void detail::GNND<const T, int>::local_join<raft::identity_op>(                    \
+    cudaStream_t stream, raft::identity_op dist_epilogue);
 
 CUVS_INST_NN_DESCENT_BUILD(float, uint32_t);
 

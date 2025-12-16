@@ -1,26 +1,17 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs;
 
 import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
 
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
+import com.nvidia.cuvs.spi.CuVSProvider;
 import java.lang.invoke.MethodHandles;
 import java.util.BitSet;
 import java.util.List;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -36,7 +27,13 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
   public void setup() {
     assumeTrue(isLinuxAmd64());
     initializeRandom();
-    log.info("Random context initialized for test.");
+    log.trace("Random context initialized for test.");
+    CuVSProvider.provider().enableRMMPooledMemory(10, 60);
+  }
+
+  @After
+  public void cleanup() {
+    CuVSProvider.provider().resetRMMPooledMemory();
   }
 
   @Test
@@ -80,10 +77,10 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
     // Generate random query vectors
     float[][] queries = generateData(random, numQueries, dimensions);
 
-    log.info("Dataset size: {}x{}", datasetSize, dimensions);
-    log.info("Query size: {}x{}", numQueries, dimensions);
-    log.info("TopK: {}", topK);
-    log.info("Use native memory dataset? " + useNativeMemoryDataset);
+    log.debug("Dataset size: {}x{}", datasetSize, dimensions);
+    log.debug("Query size: {}x{}", numQueries, dimensions);
+    log.debug("TopK: {}", topK);
+    log.debug("Use native memory dataset? " + useNativeMemoryDataset);
 
     // Debugging: Log dataset and queries
     if (log.isDebugEnabled()) {
@@ -106,10 +103,10 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
     List<List<Integer>> expected = generateExpectedResults(topK, vectors, queries, prefilters, log);
 
     // Create CuVS index and query
-    try (CuVSResources resources = CuVSResources.create()) {
+    try (CuVSResources resources = CheckedCuVSResources.create()) {
 
       BruteForceQuery query =
-          new BruteForceQuery.Builder()
+          new BruteForceQuery.Builder(resources)
               .withTopK(topK)
               .withQueryVectors(queries)
               .withPrefilters(prefilters, vectors.length)
@@ -120,7 +117,8 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
 
       BruteForceIndex index;
       if (useNativeMemoryDataset) {
-        var datasetBuilder = Dataset.builder(vectors.length, vectors[0].length);
+        var datasetBuilder =
+            CuVSMatrix.hostBuilder(vectors.length, vectors[0].length, CuVSMatrix.DataType.FLOAT);
         for (float[] v : vectors) {
           datasetBuilder.addVector(v);
         }
@@ -137,7 +135,7 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
                 .build();
       }
 
-      log.info("Index built successfully. Executing search...");
+      log.trace("Index built successfully. Executing search...");
       SearchResults results = index.search(query);
 
       compareResults(results, expected, topK, datasetSize, numQueries);

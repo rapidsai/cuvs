@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "../common/ann_types.hpp"
@@ -19,32 +8,71 @@
 #include "cuvs_cagra_hnswlib_wrapper.h"
 
 #include <rmm/cuda_device.hpp>
-#include <rmm/mr/device/pool_memory_resource.hpp>
+#include <rmm/mr/pool_memory_resource.hpp>
 #include <rmm/resource_ref.hpp>
 
 namespace cuvs::bench {
 
 template <typename T, typename IdxT>
-void parse_build_param(const nlohmann::json& conf,
-                       typename cuvs::bench::cuvs_cagra_hnswlib<T, IdxT>::build_param& param)
+auto parse_build_param(const nlohmann::json& conf) ->
+  typename cuvs::bench::cuvs_cagra_hnswlib<T, IdxT>::build_param
 {
+  typename cuvs::bench::cuvs_cagra_hnswlib<T, IdxT>::build_param param;
+  auto& hnsw_params  = param.hnsw_index_params;
+  auto& cagra_params = param.cagra_build_params;
   if (conf.contains("hierarchy")) {
     if (conf.at("hierarchy") == "none") {
-      param.hnsw_index_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::NONE;
+      hnsw_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::NONE;
     } else if (conf.at("hierarchy") == "cpu") {
-      param.hnsw_index_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::CPU;
+      hnsw_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::CPU;
     } else if (conf.at("hierarchy") == "gpu") {
-      param.hnsw_index_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::GPU;
+      hnsw_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::GPU;
     } else {
       THROW("Invalid value for hierarchy: %s", conf.at("hierarchy").get<std::string>().c_str());
     }
+  } else {
+    hnsw_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::GPU;
   }
   if (conf.contains("ef_construction")) {
-    param.hnsw_index_params.ef_construction = conf.at("ef_construction");
+    hnsw_params.ef_construction = conf.at("ef_construction");
   }
-  if (conf.contains("num_threads")) {
-    param.hnsw_index_params.num_threads = conf.at("num_threads");
+  if (conf.contains("num_threads")) { hnsw_params.num_threads = conf.at("num_threads"); }
+
+  // Reuse the CAGRA wrapper params parser
+  ::parse_build_param<T, IdxT>(conf, cagra_params);
+  // If the users provides parameter M, we can use the CAGRA-HNSW heuristics to find optimal
+  // parameters for the dataset and HNSW reference.
+  if (conf.contains("M")) {
+    // Postpone the parsing of the CAGRA build params until the dataset extents are known.
+    // We the default parameters depend on the dataset extents; and we still would like to be able
+    // to override them.
+    cagra_params.cagra_params = [conf, hnsw_params](raft::matrix_extent<int64_t> extents,
+                                                    cuvs::distance::DistanceType dist_type) {
+      auto ps = cuvs::neighbors::cagra::index_params::from_hnsw_params(
+        extents,
+        conf.at("M"),
+        hnsw_params.ef_construction,
+        cuvs::neighbors::cagra::hnsw_heuristic_type::SAME_GRAPH_FOOTPRINT,
+        dist_type);
+      ps.metric = dist_type;
+      // Parse ACE parameters if provided
+      if (conf.contains("npartitions") || conf.contains("build_dir") ||
+          conf.contains("ef_construction") || conf.contains("use_disk")) {
+        auto ace_params = cuvs::neighbors::cagra::graph_build_params::ace_params();
+        if (conf.contains("npartitions")) { ace_params.npartitions = conf.at("npartitions"); }
+        if (conf.contains("build_dir")) { ace_params.build_dir = conf.at("build_dir"); }
+        if (conf.contains("ef_construction")) {
+          ace_params.ef_construction = conf.at("ef_construction");
+        }
+        if (conf.contains("use_disk")) { ace_params.use_disk = conf.at("use_disk"); }
+        ps.graph_build_params = ace_params;
+      }
+      // NB: above, we only provide the defaults. Below we parse the explicit parameters as usual.
+      ::parse_build_param<T, uint32_t>(conf, ps);
+      return ps;
+    };
   }
+  return param;
 }
 
 template <typename T, typename IdxT>
@@ -69,10 +97,8 @@ auto create_algo(const std::string& algo_name,
   if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half> || std::is_same_v<T, int8_t> ||
                 std::is_same_v<T, uint8_t>) {
     if (algo_name == "raft_cagra_hnswlib" || algo_name == "cuvs_cagra_hnswlib") {
-      typename cuvs::bench::cuvs_cagra_hnswlib<T, uint32_t>::build_param bparam;
-      ::parse_build_param<T, uint32_t>(conf, bparam.cagra_build_param);
-      parse_build_param<T, uint32_t>(conf, bparam);
-      a = std::make_unique<cuvs::bench::cuvs_cagra_hnswlib<T, uint32_t>>(metric, dim, bparam);
+      auto params = parse_build_param<T, uint32_t>(conf);
+      a = std::make_unique<cuvs::bench::cuvs_cagra_hnswlib<T, uint32_t>>(metric, dim, params);
     }
   }
 

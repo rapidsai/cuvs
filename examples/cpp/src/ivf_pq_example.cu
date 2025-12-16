@@ -1,28 +1,17 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "common.cuh"
 
-#include <raft/core/device_mdarray.hpp>
-#include <raft/core/device_resources.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/refine.hpp>
+#include <raft/core/device_mdarray.hpp>
+#include <raft/core/device_resources.hpp>
 
-#include <rmm/mr/device/device_memory_resource.hpp>
-#include <rmm/mr/device/pool_memory_resource.hpp>
+#include <rmm/mr/device_memory_resource.hpp>
+#include <rmm/mr/pool_memory_resource.hpp>
 
 #include <cstdint>
 
@@ -60,8 +49,7 @@ void ivf_pq_build_search(raft::device_resources const& dev_resources,
   auto distances    = raft::make_device_matrix<float>(dev_resources, n_queries, topk);
 
   // Search K nearest neighbors for each of the queries.
-  ivf_pq::search(
-    dev_resources, search_params, index, queries, neighbors.view(), distances.view());
+  ivf_pq::search(dev_resources, search_params, index, queries, neighbors.view(), distances.view());
 
   // Re-ranking operation: refine the initial search results by computing exact distances
   int64_t topk_refined = 7;

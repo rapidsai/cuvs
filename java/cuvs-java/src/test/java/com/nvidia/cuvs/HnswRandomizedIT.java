@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs;
 
@@ -40,7 +29,7 @@ public class HnswRandomizedIT extends CuVSTestCase {
   public void setup() {
     assumeTrue("not supported on " + System.getProperty("os.name"), isLinuxAmd64());
     initializeRandom();
-    log.info("Random context initialized for test.");
+    log.trace("Random context initialized for test.");
   }
 
   @Test
@@ -72,10 +61,10 @@ public class HnswRandomizedIT extends CuVSTestCase {
     // Generate random query vectors
     float[][] queries = generateData(random, numQueries, dimensions);
 
-    log.info("Dataset size: {}x{}", datasetSize, dimensions);
-    log.info("Query size: {}x{}", numQueries, dimensions);
-    log.info("TopK: {}", topK);
-    log.info("Use native memory dataset? " + useNativeMemoryDataset);
+    log.debug("Dataset size: {}x{}", datasetSize, dimensions);
+    log.debug("Query size: {}x{}", numQueries, dimensions);
+    log.debug("TopK: {}", topK);
+    log.debug("Use native memory dataset? " + useNativeMemoryDataset);
 
     // Debugging: Log dataset and queries
     if (log.isDebugEnabled()) {
@@ -98,7 +87,7 @@ public class HnswRandomizedIT extends CuVSTestCase {
     List<List<Integer>> expected = generateExpectedResults(topK, vectors, queries, null, log);
 
     // Create CuVS index and query
-    try (CuVSResources resources = CuVSResources.create()) {
+    try (CuVSResources resources = CheckedCuVSResources.create()) {
 
       // Configure index parameters
       CagraIndexParams indexParams =
@@ -113,7 +102,8 @@ public class HnswRandomizedIT extends CuVSTestCase {
       // Create the index with the dataset
       final CagraIndex index;
       if (useNativeMemoryDataset) {
-        var datasetBuilder = Dataset.builder(vectors.length, vectors[0].length);
+        var datasetBuilder =
+            CuVSMatrix.hostBuilder(vectors.length, vectors[0].length, CuVSMatrix.DataType.FLOAT);
         for (float[] v : vectors) {
           datasetBuilder.addVector(v);
         }
@@ -153,20 +143,20 @@ public class HnswRandomizedIT extends CuVSTestCase {
               new HnswSearchParams.Builder().withNumThreads(32).build();
 
           HnswQuery hnswQuery =
-              new HnswQuery.Builder()
+              new HnswQuery.Builder(resources)
                   .withQueryVectors(queries)
                   .withSearchParams(hnswSearchParams)
                   .withTopK(topK)
                   .build();
 
-          log.info("Index built successfully. Executing search...");
+          log.trace("Index built successfully. Executing search...");
           SearchResults results = hnswIndex.search(hnswQuery);
           compareResults(results, expected, topK, datasetSize, numQueries);
 
-          hnswIndex.destroyIndex();
+          hnswIndex.close();
         }
       } finally {
-        index.destroyIndex();
+        index.close();
         Files.deleteIfExists(hnswIndexPath);
       }
     }
