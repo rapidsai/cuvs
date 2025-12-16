@@ -161,8 +161,7 @@ __global__ void computeInnerProductsWithLUT16Opt(const ComputeInnerProductsKerne
       // Check threshold
       if (low_dist < threshold) {
         is_candidate = true;
-        //                local_low_dist = est_dist;
-        local_ip = ip;
+        local_ip     = ip;
       }
     }
     // Collectively add candidates to shared memory
@@ -171,7 +170,6 @@ __global__ void computeInnerProductsWithLUT16Opt(const ComputeInnerProductsKerne
     if (is_candidate) {
       int candidate_slot = atomicAdd(&num_candidates, 1);
       if (candidate_slot < params.max_candidates_per_pair) {
-        //                shared_candidate_dists[candidate_slot] = local_low_dist;
         shared_candidate_ips[candidate_slot]     = local_ip;
         shared_candidate_indices[candidate_slot] = vec_idx;
       }
