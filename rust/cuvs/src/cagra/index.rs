@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -105,7 +105,7 @@ mod tests {
         let res = Resources::new().unwrap();
 
         // Create a new random dataset to index
-        let n_datapoints = 257;
+        let n_datapoints = 256;
         let n_features = 16;
         let dataset =
             ndarray::Array::<f32, _>::random((n_datapoints, n_features), Uniform::new(0., 1.0));
