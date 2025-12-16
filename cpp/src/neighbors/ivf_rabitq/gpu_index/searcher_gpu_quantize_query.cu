@@ -1573,6 +1573,9 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
   bool use_4bit  // Add parameter to choose 4-bit or 8-bit
 )
 {
+  RAFT_EXPECTS(topk <= MAX_TOP_K_WARP_SORT,
+               "Top-K value exceeds maximum supported: " STR(MAX_TOP_K_WARP_SORT));
+
   // query quantize
   const int num_bits  = use_4bit ? 4 : 8;  // Choose bit width
   const int num_words = (cur_ivf.get_num_padded_dim() + 31) / 32;

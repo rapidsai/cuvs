@@ -750,6 +750,8 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(
   float* d_final_dists,
   PID* d_final_pids)
 {
+  RAFT_EXPECTS(topk <= MAX_TOP_K_WARP_SORT,
+               "Top-K value exceeds maximum supported: " STR(MAX_TOP_K_WARP_SORT));
   // Using BF16 for storage
 
   // Allocate space for LUT with reduced precision

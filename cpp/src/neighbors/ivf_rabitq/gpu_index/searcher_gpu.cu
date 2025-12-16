@@ -744,6 +744,9 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
                                           float* d_final_dists,
                                           PID* d_final_pids)
 {
+  RAFT_EXPECTS(topk <= MAX_TOP_K_WARP_SORT,
+               "Top-K value exceeds maximum supported: " STR(MAX_TOP_K_WARP_SORT));
+
   // First allocate space for LUT
   size_t lut_size =
     num_queries * (cur_ivf.get_num_padded_dim() / BITS_PER_CHUNK) * LUT_SIZE * sizeof(float);
