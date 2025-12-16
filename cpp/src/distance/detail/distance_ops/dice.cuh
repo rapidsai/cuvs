@@ -9,17 +9,6 @@
 
 namespace cuvs::distance::detail::ops {
 
-// Epilogue operator for CUTLASS based kernel
-template <typename DataT, typename AccT>
-struct dice_cutlass_op {
-  __device__ dice_cutlass_op() noexcept {}
-  __device__ AccT operator()(AccT& aNorm, const AccT& bNorm, AccT& accVal) const noexcept
-  {
-    return static_cast<AccT>(1.0) - static_cast<AccT>(2 * accVal / (aNorm + bNorm));
-  }
-  __device__ AccT operator()(DataT aData) const noexcept { return aData; }
-};
-
 /**
  * @brief the expanded dice distance matrix calculation
  *
@@ -70,11 +59,6 @@ struct dice_distance_op {
         acc[i][j] = 1.0 - (2 * acc[i][j] / (regxn[i] + regyn[j]));
       }
     }
-  }
-
-  constexpr dice_cutlass_op<DataT, AccT> get_cutlass_op() const
-  {
-    return dice_cutlass_op<DataT, AccT>();
   }
 };
 
