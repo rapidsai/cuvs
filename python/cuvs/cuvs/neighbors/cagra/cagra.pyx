@@ -511,8 +511,10 @@ def build(IndexParams index_params, dataset, resources=None):
     ...                                   dtype=cp.float32)
     >>> build_params = cagra.IndexParams(metric="sqeuclidean")
     >>> index = cagra.build(build_params, dataset)
+    >>> queries = cp.random.random_sample((n_queries, n_features),
+    ...                                   dtype=cp.float32)
     >>> distances, neighbors = cagra.search(cagra.SearchParams(),
-    ...                                      index, dataset,
+    ...                                      index, queries,
     ...                                      k)
     >>> distances = cp.asarray(distances)
     >>> neighbors = cp.asarray(neighbors)
