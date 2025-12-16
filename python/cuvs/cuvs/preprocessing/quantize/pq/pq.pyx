@@ -135,7 +135,7 @@ cdef class QuantizerParams:
 
 cdef class Quantizer:
     """
-    Defines and stores product quantizer upon training
+    Defines and stores Product Quantizer upon training
 
     The quantization is performed by a linear mapping of an interval in the
     float data type to the full range of the quantized int type.
@@ -197,14 +197,14 @@ cdef class Quantizer:
         return encoded_dim
 
     def __repr__(self):
-        return f"product.Quantizer(pq_bits={self.pq_bits}, " \
+        return f"pq.Quantizer(pq_bits={self.pq_bits}, " \
                f"pq_dim={self.pq_dim})"
 
 
 @auto_sync_resources
 def train(QuantizerParams params, dataset, resources=None):
     """
-    Initializes a product quantizer to be used later for quantizing
+    Initializes a Product Quantizer to be used later for quantizing
     the dataset.
 
     Parameters
@@ -215,20 +215,20 @@ def train(QuantizerParams params, dataset, resources=None):
 
     Returns
     -------
-    quantizer: cuvs.preprocessing.quantize.product.Quantizer
+    quantizer: cuvs.preprocessing.quantize.pq.Quantizer
 
     Examples
     --------
 
     >>> import cupy as cp
-    >>> from cuvs.preprocessing.quantize import product
+    >>> from cuvs.preprocessing.quantize import pq
     >>> n_samples = 5000
     >>> n_features = 64
     >>> dataset = cp.random.random_sample((n_samples, n_features),
     ...                                   dtype=cp.float32)
-    >>> params = product.QuantizerParams(pq_bits=8, pq_dim=16)
-    >>> quantizer = product.train(params, dataset)
-    >>> transformed = product.transform(quantizer, dataset)
+    >>> params = pq.QuantizerParams(pq_bits=8, pq_dim=16)
+    >>> quantizer = pq.train(params, dataset)
+    >>> transformed = pq.transform(quantizer, dataset)
     """
     dataset_ai = wrap_array(dataset)
 
@@ -253,7 +253,7 @@ def train(QuantizerParams params, dataset, resources=None):
 @auto_convert_output
 def transform(Quantizer quantizer, dataset, output=None, resources=None):
     """
-    Applies product quantization transform to given dataset
+    Applies Product Quantization transform to given dataset
 
     Parameters
     ----------
@@ -269,14 +269,14 @@ def transform(Quantizer quantizer, dataset, output=None, resources=None):
     Examples
     --------
     >>> import cupy as cp
-    >>> from cuvs.preprocessing.quantize import product
+    >>> from cuvs.preprocessing.quantize import pq
     >>> n_samples = 5000
     >>> n_features = 64
     >>> dataset = cp.random.random_sample((n_samples, n_features),
     ...                                   dtype=cp.float32)
-    >>> params = product.QuantizerParams(pq_bits=8, pq_dim=16)
-    >>> quantizer = product.train(params, dataset)
-    >>> transformed = product.transform(quantizer, dataset)
+    >>> params = pq.QuantizerParams(pq_bits=8, pq_dim=16)
+    >>> quantizer = pq.train(params, dataset)
+    >>> transformed = pq.transform(quantizer, dataset)
     """
 
     dataset_ai = wrap_array(dataset)
@@ -311,7 +311,7 @@ def transform(Quantizer quantizer, dataset, output=None, resources=None):
 @auto_convert_output
 def inverse_transform(Quantizer quantizer, codes, output=None, resources=None):
     """
-    Applies product quantization inverse transform to given codes
+    Applies Product Quantization inverse transform to given codes
 
     Parameters
     ----------
@@ -327,15 +327,15 @@ def inverse_transform(Quantizer quantizer, codes, output=None, resources=None):
     Examples
     --------
     >>> import cupy as cp
-    >>> from cuvs.preprocessing.quantize import product
+    >>> from cuvs.preprocessing.quantize import pq
     >>> n_samples = 5000
     >>> n_features = 64
     >>> dataset = cp.random.random_sample((n_samples, n_features),
     ...                                   dtype=cp.float32)
-    >>> params = product.QuantizerParams(pq_bits=8, pq_dim=16)
-    >>> quantizer = product.train(params, dataset)
-    >>> transformed = product.transform(quantizer, dataset)
-    >>> reconstructed = product.inverse_transform(quantizer, transformed)
+    >>> params = pq.QuantizerParams(pq_bits=8, pq_dim=16)
+    >>> quantizer = pq.train(params, dataset)
+    >>> transformed = pq.transform(quantizer, dataset)
+    >>> reconstructed = pq.inverse_transform(quantizer, transformed)
     """
 
     codes_ai = wrap_array(codes)
