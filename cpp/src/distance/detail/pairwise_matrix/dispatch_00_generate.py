@@ -84,7 +84,7 @@ op_instances = [
     dict(
         path_prefix="dice",
         OpT="cuvs::distance::detail::ops::dice_distance_op",
-        archs = [60, 80],
+        archs=[60, 80],
     ),
     dict(
         path_prefix="hamming_unexpanded",
