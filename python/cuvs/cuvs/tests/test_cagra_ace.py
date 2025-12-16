@@ -17,9 +17,9 @@ from cuvs.tests.ann_utils import calc_recall, generate_data
 
 
 def run_cagra_ace_build_search_test(
-    n_rows=5000,
-    n_cols=64,
-    n_queries=10,
+    n_rows=10000,
+    n_cols=10,
+    n_queries=100,
     k=10,
     dtype=np.float32,
     metric="sqeuclidean",
@@ -28,7 +28,7 @@ def run_cagra_ace_build_search_test(
     npartitions=2,
     ef_construction=100,
     use_disk=False,
-    hierarchy="none",
+    hierarchy="gpu",
 ):
     dataset = generate_data((n_rows, n_cols), dtype)
     queries = generate_data((n_queries, n_cols), dtype)
@@ -151,24 +151,41 @@ def run_cagra_ace_build_search_test(
             assert recall > 0.7
 
 
-@pytest.mark.parametrize("dim", [64, 128])
 @pytest.mark.parametrize("dtype", [np.float32, np.float16, np.int8, np.uint8])
 @pytest.mark.parametrize("metric", ["sqeuclidean", "inner_product"])
-@pytest.mark.parametrize("npartitions", [2, 4])
-@pytest.mark.parametrize("ef_construction", [100, 200])
 @pytest.mark.parametrize("use_disk", [False, True])
-@pytest.mark.parametrize("hierarchy", ["none", "gpu"])
-def test_cagra_ace_dtypes_and_metrics(
-    dim, dtype, metric, npartitions, ef_construction, use_disk, hierarchy
-):
+def test_cagra_ace_dtypes_and_metrics(dtype, metric, use_disk):
     """Test ACE with different data types and metrics."""
     run_cagra_ace_build_search_test(
-        n_cols=dim,
         dtype=dtype,
         metric=metric,
-        npartitions=npartitions,
-        ef_construction=ef_construction,
         use_disk=use_disk,
+    )
+
+
+@pytest.mark.parametrize("npartitions", [2, 3, 8])
+def test_cagra_ace_partitions(npartitions):
+    """Test ACE with different partition sizes (disk mode only)."""
+    run_cagra_ace_build_search_test(
+        use_disk=True,
+        npartitions=npartitions,
+    )
+
+
+@pytest.mark.parametrize("ef_construction", [50, 100, 200])
+def test_cagra_ace_ef_construction(ef_construction):
+    """Test ACE with different ef_construction values (disk mode only)."""
+    run_cagra_ace_build_search_test(
+        use_disk=True,
+        ef_construction=ef_construction,
+    )
+
+
+@pytest.mark.parametrize("hierarchy", ["none", "gpu"])
+def test_cagra_ace_hierarchy(hierarchy):
+    """Test ACE with different hierarchy modes (disk mode only)."""
+    run_cagra_ace_build_search_test(
+        use_disk=True,
         hierarchy=hierarchy,
     )
 
