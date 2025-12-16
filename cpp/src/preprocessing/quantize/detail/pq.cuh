@@ -36,8 +36,9 @@ auto train_pq_subspaces(
   RAFT_EXPECTS((dim % pq_dim) == 0, "Dimension must be divisible by pq_dim");
   ix_t n_rows_train = n_rows * params.pq_kmeans_trainset_fraction;
   n_rows_train      = std::min(n_rows_train, params.max_train_points_per_pq_code * pq_n_centers);
-  RAFT_EXPECTS(n_rows_train > pq_n_centers,
-               "The number of training samples must be greater than the number of PQ centers");
+  RAFT_EXPECTS(
+    n_rows_train >= pq_n_centers,
+    "The number of training samples must be equal to or greater than the number of PQ centers");
 
   std::optional<raft::device_matrix<MathT, ix_t, raft::row_major>> pq_trainset = std::nullopt;
 

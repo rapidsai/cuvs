@@ -243,8 +243,9 @@ auto train_pq(
   const ix_t pq_len       = raft::div_rounding_up_safe(dim, pq_dim);
   const ix_t n_rows_train = std::min((ix_t)(n_rows * params.pq_kmeans_trainset_fraction),
                                      params.max_train_points_per_pq_code * pq_n_centers);
-  RAFT_EXPECTS(n_rows_train > pq_n_centers,
-               "The number of training samples must be greater than the number of PQ centers");
+  RAFT_EXPECTS(
+    n_rows_train >= pq_n_centers,
+    "The number of training samples must be greater than or equal to the number of PQ centers");
 
   // Subsample the dataset and transform into the required type if necessary
   auto pq_trainset = transform_data<MathT>(res, util::subsample(res, dataset, n_rows_train));
