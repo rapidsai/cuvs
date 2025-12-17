@@ -128,4 +128,9 @@ void fit_predict(raft::resources const& handle,
  * @}
  */
 
+void fit_predict(raft::resources const& handle,
+                 params config,
+                 raft::device_matrix_view<float, int, raft::row_major> dataset,
+                 raft::device_vector_view<int, int> labels);
+
 }  // namespace cuvs::cluster::spectral
