@@ -511,26 +511,13 @@ def build(IndexParams index_params, dataset, resources=None):
     ...                                   dtype=cp.float32)
     >>> build_params = cagra.IndexParams(metric="sqeuclidean")
     >>> index = cagra.build(build_params, dataset)
+    >>> queries = cp.random.random_sample((n_queries, n_features),
+    ...                                   dtype=cp.float32)
     >>> distances, neighbors = cagra.search(cagra.SearchParams(),
-    ...                                      index, dataset,
+    ...                                      index, queries,
     ...                                      k)
     >>> distances = cp.asarray(distances)
     >>> neighbors = cp.asarray(neighbors)
-
-    >>> # ACE example with host data
-    >>> import numpy as np
-    >>> dataset_host = np.random.random_sample(
-    ...     (n_samples, n_features)
-    ... ).astype(np.float32)
-    >>> ace_params = cagra.AceParams(
-    ...     npartitions=4, use_disk=True, build_dir="/tmp/ace"
-    ... )
-    >>> build_params = cagra.IndexParams(
-    ...     metric="sqeuclidean",
-    ...     build_algo="ace",
-    ...     ace_params=ace_params
-    ... )
-    >>> idx = cagra.build(build_params, dataset_host)
     """
 
     # Check if ACE build is requested
