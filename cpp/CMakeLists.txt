@@ -733,7 +733,8 @@ SECTIONS
     )
     # Anything that links against the static library has to have these objects
     target_sources(
-      cuvs_static INTERFACE $<$<BOOL:${JIT_LTO_COMPILATION}>:$<TARGET_OBJECTS:cuvs_jit_lto_kernels>>
+      cuvs_static
+      INTERFACE $<$<BOOL:${JIT_LTO_COMPILATION}>:$<TARGET_OBJECTS:cuvs_jit_lto_kernels>>
     )
   endif()
 
@@ -776,7 +777,9 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
 
   set(target_names cuvs cuvs_static cuvs_jit_lto_kernels cuvs_cpp_headers cuvs_c)
   set(component_names cuvs_shared cuvs_static cuvs_static cuvs_cpp_headers c_api)
-  set(export_names cuvs-shared-exports cuvs-static-exports cuvs-static-exports cuvs-cpp-headers-exports cuvs-c-exports)
+  set(export_names cuvs-shared-exports cuvs-static-exports cuvs-static-exports
+                   cuvs-cpp-headers-exports cuvs-c-exports
+  )
   foreach(target component export IN ZIP_LISTS target_names component_names export_names)
     if(TARGET ${target})
       install(
