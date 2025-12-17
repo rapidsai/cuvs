@@ -19,7 +19,7 @@ extern "C" {
  * @{
  */
 /**
- * @brief Binary quantizer parameters.
+ * @brief Product quantizer parameters.
  */
 struct cuvsProductQuantizerParams {
   /**

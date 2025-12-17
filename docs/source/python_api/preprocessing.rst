@@ -13,17 +13,17 @@ Binary Quantizer
 Product Quantizer
 #################
 
-.. autoclass:: cuvs.preprocessing.quantize.product.Quantizer
+.. autoclass:: cuvs.preprocessing.quantize.pq.Quantizer
     :members:
 
-.. autoclass:: cuvs.preprocessing.quantize.product.QuantizerParams
+.. autoclass:: cuvs.preprocessing.quantize.pq.QuantizerParams
     :members:
 
-.. autofunction:: cuvs.preprocessing.quantize.product.train
+.. autofunction:: cuvs.preprocessing.quantize.pq.train
 
-.. autofunction:: cuvs.preprocessing.quantize.product.transform
+.. autofunction:: cuvs.preprocessing.quantize.pq.transform
 
-.. autofunction:: cuvs.preprocessing.quantize.product.inverse_transform
+.. autofunction:: cuvs.preprocessing.quantize.pq.inverse_transform
 
 Scalar Quantizer
 ################
