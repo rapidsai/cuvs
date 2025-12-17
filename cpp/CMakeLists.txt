@@ -347,6 +347,7 @@ if(NOT BUILD_CPU_ONLY)
     # Generate interleaved scan kernel files at build time
     include(cmake/modules/generate_jit_lto_kernels.cmake)
     generate_jit_lto_kernels(cuvs_jit_lto_kernels)
+    add_library(cuvs::cuvs_jit_lto_kernels ALIAS cuvs_jit_lto_kernels)
 
     set(JIT_LTO_FILES
         src/detail/jit_lto/AlgorithmLauncher.cu
@@ -671,7 +672,7 @@ if(NOT BUILD_CPU_ONLY)
               $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
               cuvs-cagra-search
               $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
-              $<$<BOOL:${JIT_LTO_COMPILATION}>:cuvs_jit_lto_kernels>
+              $<$<BOOL:${JIT_LTO_COMPILATION}>:cuvs::cuvs_jit_lto_kernels>
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
@@ -734,7 +735,7 @@ SECTIONS
     # Anything that links against the static library has to have these objects
     target_sources(
       cuvs_static
-      INTERFACE $<$<BOOL:${JIT_LTO_COMPILATION}>:$<TARGET_OBJECTS:cuvs_jit_lto_kernels>>
+      INTERFACE $<$<BOOL:${JIT_LTO_COMPILATION}>:$<TARGET_OBJECTS:cuvs::cuvs_jit_lto_kernels>>
     )
   endif()
 
