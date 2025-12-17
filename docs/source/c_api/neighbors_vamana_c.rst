@@ -8,7 +8,7 @@ Vamana is the graph construction algorithm behind the well-known DiskANN vector 
    :language: c
    :class: highlight
 
-``#include <raft/neighbors/vamana.h>``
+``#include <cuvs/neighbors/vamana.h>``
 
 Index build parameters
 ----------------------
