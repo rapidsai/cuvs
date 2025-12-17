@@ -29,6 +29,9 @@ project(
 )
 set(CMAKE_INSTALL_MESSAGE LAZY)
 
+# Disable C++20 module scanning (not using modules, just C++20 features)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+
 # Write the version header
 rapids_cmake_write_version_file(include/cuvs/version_config.h)
 
