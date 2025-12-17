@@ -16,7 +16,7 @@ You may prefer to use `mamba`, as it provides significant speedup over `conda`.
 
 1. Set up the required environment variables:
 ```bash
-LIBCLANG_PATH=$(dirname "$(find "$CONDA_PREFIX" -name libclang.so | head -n 1)")
+LIBCLANG_PATH=$(dirname "$(find /opt/conda -name libclang.so | head -n 1)")
 export LIBCLANG_PATH
 echo "LIBCLANG_PATH=$LIBCLANG_PATH"
 ```
