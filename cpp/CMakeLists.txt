@@ -346,7 +346,7 @@ if(NOT BUILD_CPU_ONLY)
   if(JIT_LTO_COMPILATION)
     # Generate interleaved scan kernel files at build time
     include(cmake/modules/generate_jit_lto_kernels.cmake)
-    generate_jit_lto_kernels(jit_lto_kernels)
+    generate_jit_lto_kernels(cuvs_jit_lto_kernels)
 
     set(JIT_LTO_FILES
         src/detail/jit_lto/AlgorithmLauncher.cu
@@ -671,7 +671,7 @@ if(NOT BUILD_CPU_ONLY)
               $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
               cuvs-cagra-search
               $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
-              $<$<BOOL:${JIT_LTO_COMPILATION}>:jit_lto_kernels>
+              $<$<BOOL:${JIT_LTO_COMPILATION}>:cuvs_jit_lto_kernels>
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
@@ -731,9 +731,9 @@ SECTIONS
       PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
               $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink> $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
     )
-    # Can't do target_link_libraries() on this one, because it's a static library
+    # Anything that links against the static library has to have these objects
     target_sources(
-      cuvs_static PRIVATE $<$<BOOL:${JIT_LTO_COMPILATION}>:$<TARGET_OBJECTS:jit_lto_kernels>>
+      cuvs_static INTERFACE $<$<BOOL:${JIT_LTO_COMPILATION}>:$<TARGET_OBJECTS:cuvs_jit_lto_kernels>>
     )
   endif()
 
@@ -774,9 +774,9 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
   include(GNUInstallDirs)
   include(CPack)
 
-  set(target_names cuvs cuvs_static cuvs_cpp_headers cuvs_c)
-  set(component_names cuvs_shared cuvs_static cuvs_cpp_headers c_api)
-  set(export_names cuvs-shared-exports cuvs-static-exports cuvs-cpp-headers-exports cuvs-c-exports)
+  set(target_names cuvs cuvs_static cuvs_jit_lto_kernels cuvs_cpp_headers cuvs_c)
+  set(component_names cuvs_shared cuvs_static cuvs_static cuvs_cpp_headers c_api)
+  set(export_names cuvs-shared-exports cuvs-static-exports cuvs-static-exports cuvs-cpp-headers-exports cuvs-c-exports)
   foreach(target component export IN ZIP_LISTS target_names component_names export_names)
     if(TARGET ${target})
       install(
@@ -817,6 +817,8 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     )
   endif()
 
+  list(REMOVE_DUPLICATES cuvs_components)
+  list(REMOVE_DUPLICATES cuvs_export_sets)
   include(cmake/modules/generate_cuvs_export.cmake)
   generate_cuvs_export(COMPONENTS ${cuvs_components} EXPORT_SETS ${cuvs_export_sets})
 
