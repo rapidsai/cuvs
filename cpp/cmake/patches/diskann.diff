@@ -3,7 +3,7 @@ index 3d3d2b8..a007fa4 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -23,10 +23,6 @@ set(CMAKE_STANDARD 17)
- set(CMAKE_CXX_STANDARD 17)
+ set(CMAKE_CXX_STANDARD 20)
  set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 -if(NOT MSVC)
