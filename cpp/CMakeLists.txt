@@ -672,7 +672,7 @@ if(NOT BUILD_CPU_ONLY)
               $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
               cuvs-cagra-search
               $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
-              $<$<BOOL:${JIT_LTO_COMPILATION}>:cuvs::cuvs_jit_lto_kernels>
+              $<$<BOOL:${JIT_LTO_COMPILATION}>:$<LINK_LIBRARY:WHOLE_ARCHIVE,cuvs::cuvs_jit_lto_kernels>>
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
@@ -731,11 +731,7 @@ SECTIONS
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>> # header only
       PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
               $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink> $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
-    )
-    # Anything that links against the static library has to have these objects
-    target_sources(
-      cuvs_static
-      INTERFACE $<$<BOOL:${JIT_LTO_COMPILATION}>:$<TARGET_OBJECTS:cuvs::cuvs_jit_lto_kernels>>
+              $<$<BOOL:${JIT_LTO_COMPILATION}>:$<LINK_LIBRARY:WHOLE_ARCHIVE,cuvs::cuvs_jit_lto_kernels>>
     )
   endif()
 

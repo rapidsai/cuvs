@@ -107,7 +107,7 @@ endfunction()
 
 # cmake-lint: disable=R0915
 function(generate_jit_lto_kernels target)
-  add_library(${target} OBJECT)
+  add_library(${target} STATIC)
   target_include_directories(
     ${target}
     PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
