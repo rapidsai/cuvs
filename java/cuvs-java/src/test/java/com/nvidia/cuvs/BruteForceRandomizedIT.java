@@ -7,9 +7,11 @@ package com.nvidia.cuvs;
 import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
 
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
+import com.nvidia.cuvs.spi.CuVSProvider;
 import java.lang.invoke.MethodHandles;
 import java.util.BitSet;
 import java.util.List;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -26,6 +28,12 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
     assumeTrue(isLinuxAmd64());
     initializeRandom();
     log.trace("Random context initialized for test.");
+    CuVSProvider.provider().enableRMMPooledMemory(10, 60);
+  }
+
+  @After
+  public void cleanup() {
+    CuVSProvider.provider().resetRMMPooledMemory();
   }
 
   @Test

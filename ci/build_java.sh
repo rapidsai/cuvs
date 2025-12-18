@@ -4,6 +4,12 @@
 
 set -euo pipefail
 
+source rapids-configure-sccache
+
+export SCCACHE_S3_KEY_PREFIX="cuvs-java/${RAPIDS_CONDA_ARCH}/cuda${RAPIDS_CUDA_VERSION%%.*}/maven/objects-cache"
+export SCCACHE_S3_PREPROCESSOR_CACHE_KEY_PREFIX="cuvs-java/${RAPIDS_CONDA_ARCH}/cuda${RAPIDS_CUDA_VERSION%%.*}/maven/preprocessor-cache"
+export SCCACHE_S3_USE_PREPROCESSOR_CACHE_MODE=true
+
 # TODO: Remove this argument-handling when build and test workflows are separated,
 #       and test_java.sh no longer calls build_java.sh
 #       ref: https://github.com/rapidsai/cuvs/issues/868
@@ -51,6 +57,9 @@ RAPIDS_CUDA_MAJOR="${RAPIDS_CUDA_VERSION%%.*}"
 export RAPIDS_CUDA_MAJOR
 
 bash ./build.sh java "${EXTRA_BUILD_ARGS[@]}"
+
+sccache --show-adv-stats
+sccache --stop-server >/dev/null 2>&1 || true
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}

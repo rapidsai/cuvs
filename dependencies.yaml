@@ -222,7 +222,7 @@ dependencies:
     common:
       - output_types: [conda, requirements, pyproject]
         packages:
-          - &rapids_build_backend rapids-build-backend>=0.4.0,<0.5.0.dev0
+          - &rapids_build_backend rapids-build-backend>=0.4.0,<0.5.0
       - output_types: [conda]
         packages:
           - scikit-build-core>=0.10.0
@@ -233,7 +233,7 @@ dependencies:
     common:
       - output_types: [conda, requirements, pyproject]
         packages:
-          - cython>=3.0.0,<3.2.0a0
+          - cython>=3.0.0,<3.2.0
   rapids_build:
     common:
       - output_types: [conda, requirements, pyproject]
@@ -425,12 +425,12 @@ dependencies:
     common:
       - output_types: [conda, requirements, pyproject]
         packages:
-          - &numpy numpy>=1.23,<3.0a0
+          - &numpy numpy>=1.23,<3.0
   test_python_common:
     common:
       - output_types: [conda, requirements, pyproject]
         packages:
-          - pytest<9.0.0a0
+          - pytest<9.0.0
           - pytest-cov
   test_py_cuvs:
     common:
@@ -488,11 +488,11 @@ dependencies:
           - matrix:
               cuda: "12.*"
             packages:
-              - cuda-python>=12.9.2,<13.0a0
+              - cuda-python>=12.9.2,<13.0
           # fallback to CUDA 13 versions if 'cuda' is '13.*' or not provided
           - matrix:
             packages:
-              - cuda-python>=13.0.1,<14.0a0
+              - cuda-python>=13.0.1,<14.0
   depends_on_cuvs:
     common:
       - output_types: conda
