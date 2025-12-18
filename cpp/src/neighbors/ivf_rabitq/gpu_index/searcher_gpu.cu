@@ -14,6 +14,7 @@
 #include "searcher_gpu_common.cuh"
 
 #include <raft/matrix/detail/select_warpsort.cuh>
+#include <raft/matrix/select_k.cuh>
 
 #include <thrust/fill.h>
 
@@ -763,11 +764,11 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
   //  Clean the input distances
   size_t candidates_per_query = nprobe * topk;
   size_t total_elements       = num_queries * candidates_per_query;
-  int threads                 = 256;
-  int blocks                  = (total_elements + threads - 1) / threads;
+  thrust::fill(thrust::cuda::par.on(stream_),
+               d_topk_dists,
+               d_topk_dists + total_elements,
+               std::numeric_limits<float>::infinity());
 
-  initDistancesKernel<<<blocks, threads, 0, stream_>>>(d_topk_dists, total_elements);
-  RAFT_CUDA_TRY(cudaPeekAtLastError());
   int* d_query_write_counters;  // One counter per query, indicates where to store final results
                                 // (0~nprobe)
   RAFT_CUDA_TRY(cudaMallocAsync(&d_query_write_counters, num_queries * sizeof(int), stream_));
@@ -839,15 +840,16 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // merge results from different blocks
-  mergeClusterTopKFinal(d_topk_dists,
-                        d_topk_pids,
-                        d_final_dists,
-                        d_final_pids,
-                        num_queries,
-                        nprobe,
-                        topk,
-                        handle_,
-                        /* sorted = */ false);
+  raft::matrix::detail::select_k(handle_,
+                                 d_topk_dists,
+                                 d_topk_pids,
+                                 num_queries,
+                                 nprobe * topk,
+                                 topk,
+                                 d_final_dists,
+                                 d_final_pids,
+                                 /*select_min = */ true,
+                                 /* sorted = */ false);
 
   RAFT_CUDA_TRY(cudaFreeAsync(d_topk_threshold_batch, stream_));
   RAFT_CUDA_TRY(cudaFreeAsync(d_lut_for_queries, stream_));

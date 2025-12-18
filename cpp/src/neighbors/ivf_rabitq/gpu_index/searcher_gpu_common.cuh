@@ -9,8 +9,6 @@
 
 #include "searcher_gpu.cuh"
 
-#include <raft/matrix/select_k.cuh>
-
 #include <cstdint>
 #include <cuda_runtime.h>
 
@@ -76,41 +74,6 @@ __device__ inline uint32_t extract_code(const uint8_t* codes, size_t d, size_t E
   if (bitOffset + EX_BITS > 8) { v |= codes[byteIdx + 1]; }
   int shift = 16 - (bitOffset + EX_BITS);
   return (v >> shift) & ((1u << EX_BITS) - 1);
-}
-
-// Kernel to init invalid distances
-__global__ void initDistancesKernel(float* d_input_dists, size_t total_elements)
-{
-  size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
-  if (tid < total_elements) { d_input_dists[tid] = INFINITY; }
-}
-
-// Final function to merge top-k results from all clusters
-void mergeClusterTopKFinal(const float* d_topk_dists,  // Input: top-k distances from all clusters
-                           const PID* d_topk_pids,     // Input: top-k PIDs from all clusters
-                           float* d_final_dists,  // Output: final top-k distances for each query
-                           PID* d_final_pids,     // Output: final top-k PIDs for each query
-                           size_t num_queries,
-                           size_t nprobe,
-                           size_t topk,
-                           raft::resources const& handle,
-                           bool sorted = false  // Whether to sort the final results
-)
-{
-  auto stream = raft::resource::get_cuda_stream(handle);
-
-  size_t candidates_per_query = nprobe * topk;
-
-  raft::matrix::detail::select_k(handle,
-                                 d_topk_dists,
-                                 d_topk_pids,
-                                 num_queries,
-                                 candidates_per_query,
-                                 topk,
-                                 d_final_dists,
-                                 d_final_pids,
-                                 true,
-                                 sorted);
 }
 
 }  // namespace
