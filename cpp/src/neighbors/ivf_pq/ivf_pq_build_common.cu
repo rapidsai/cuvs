@@ -270,14 +270,14 @@ void make_rotation_matrix(raft::resources const& res,
 
 void extract_centers(raft::resources const& res,
                      const cuvs::neighbors::ivf_pq::index<int64_t>& index,
-                     raft::device_matrix_view<float, uint32_t, raft::row_major> cluster_centers)
+                     raft::device_matrix_view<float, int64_t, raft::row_major> cluster_centers)
 {
   detail::extract_centers(res, index, cluster_centers);
 }
 
 void extract_centers(raft::resources const& res,
                      const cuvs::neighbors::ivf_pq::index<int64_t>& index,
-                     raft::host_matrix_view<float, uint32_t, raft::row_major> cluster_centers)
+                     raft::host_matrix_view<float, int64_t, raft::row_major> cluster_centers)
 {
   detail::extract_centers(res, index, cluster_centers);
 }

@@ -269,10 +269,8 @@ constexpr typename list_spec<SizeT, IdxT>::list_extents list_spec<SizeT, IdxT>::
 {
   // how many elems of pq_dim fit into one kIndexGroupVecLen-byte chunk
   auto pq_chunk = (kIndexGroupVecLen * 8u) / pq_bits;
-  return raft::make_extents<SizeT>(raft::div_rounding_up_safe<SizeT>(n_rows, kIndexGroupSize),
-                                   raft::div_rounding_up_safe<SizeT>(pq_dim, pq_chunk),
-                                   kIndexGroupSize,
-                                   kIndexGroupVecLen);
+  return list_extents{raft::div_rounding_up_safe<SizeT>(n_rows, kIndexGroupSize),
+                      raft::div_rounding_up_safe<SizeT>(pq_dim, pq_chunk)};
 }
 
 template <typename IdxT, typename SizeT = uint32_t>
@@ -3101,7 +3099,7 @@ void rotate_padded_centers(
  */
 void extract_centers(raft::resources const& res,
                      const index<int64_t>& index,
-                     raft::device_matrix_view<float, uint32_t, raft::row_major> cluster_centers);
+                     raft::device_matrix_view<float, int64_t, raft::row_major> cluster_centers);
 
 /** @copydoc extract_centers */
 void extract_centers(raft::resources const& res,

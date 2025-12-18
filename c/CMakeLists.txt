@@ -33,7 +33,11 @@ option(CUVSC_STATIC_CUVS_LIBRARY "Link against statical version of libcuvs" OFF)
 # Check if cuVS is already available. If so, it is the user's responsibility to ensure that the
 # CMake package is also available at build time of the Python cuvs package.
 if(NOT TARGET cuvs::cuvs)
-  find_package(cuvs "${RAPIDS_VERSION}" REQUIRED)
+  if(CUVSC_STATIC_CUVS_LIBRARY)
+    find_package(cuvs "${RAPIDS_VERSION}" REQUIRED COMPONENTS cuvs_static)
+  else()
+    find_package(cuvs "${RAPIDS_VERSION}" REQUIRED COMPONENTS cuvs_shared)
+  endif()
 else()
   set(BUILDING_FROM_CUVS ON)
 endif()
@@ -155,8 +159,10 @@ target_include_directories(
 
 target_link_libraries(
   cuvs_c
-  PUBLIC $<IF:$<BOOL:${CUVSC_STATIC_CUVS_LIBRARY}>,cuvs::cuvs_static,cuvs::cuvs>
-  PRIVATE raft::raft $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
+  PRIVATE # we don't want any dependencies exported
+          $<IF:$<BOOL:${CUVSC_STATIC_CUVS_LIBRARY}>,cuvs::cuvs_static,cuvs::cuvs> #
+          $<COMPILE_ONLY:raft::raft> # enforce we shouldn't use raft symbols
+          $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
 )
 
 # ##################################################################################################
@@ -167,45 +173,36 @@ if(PROJECT_IS_TOP_LEVEL)
   include(CPack)
 
   # Add CUDAToolkit as an export dependency
-  rapids_export_package(INSTALL CUDAToolkit cuvs-c-exports)
-  rapids_export_package(BUILD CUDAToolkit cuvs-c-exports)
+  rapids_export_package(INSTALL CUDAToolkit cuvs-exports)
+  rapids_export_package(BUILD CUDAToolkit cuvs-exports)
 
   install(
     TARGETS cuvs_c
     DESTINATION ${lib_dir}
-    COMPONENT cuvs_c
+    COMPONENT c_api
     EXPORT cuvs-c-exports
-  )
-
-  rapids_export(
-    INSTALL cuvs_c
-    VERSION "${RAPIDS_VERSION}"
-    EXPORT_SET cuvs-c-exports
-    GLOBAL_TARGETS cuvs_c
-    NAMESPACE cuvs::
-  )
-  rapids_export(
-    BUILD cuvs_c
-    VERSION "${RAPIDS_VERSION}"
-    EXPORT_SET cuvs-c-exports
-    GLOBAL_TARGETS cuvs_c
-    NAMESPACE cuvs::
   )
   install(
     DIRECTORY include/cuvs
-    COMPONENT cuvs_c
+    COMPONENT c_api
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
   )
   install(
     FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/core/c_config.h
-    COMPONENT cuvs_c
+    COMPONENT c_api
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cuvs/core/
   )
+
+  include(../cpp/cmake/modules/generate_cuvs_export.cmake)
+  generate_cuvs_export(CLIB COMPONENTS c_api EXPORT_SETS cuvs-c-exports)
+
 endif()
 
 # ##################################################################################################
 # * build tests ----------------------------------------------------
 if(BUILD_TESTS)
+  include(rapids-cuda)
+  rapids_cuda_init_architectures(CUVS_C)
   enable_language(CUDA)
   find_package(CUDAToolkit REQUIRED)
 

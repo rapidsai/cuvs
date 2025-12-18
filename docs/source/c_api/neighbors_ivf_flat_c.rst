@@ -7,7 +7,7 @@ The IVF-Flat method is an ANN algorithm. It uses an inverted file index (IVF) wi
    :language: c
    :class: highlight
 
-``#include <raft/neighbors/ivf_flat.h>``
+``#include <cuvs/neighbors/ivf_flat.h>``
 
 Index build parameters
 ----------------------
