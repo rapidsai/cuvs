@@ -201,6 +201,8 @@ endif()
 # ##################################################################################################
 # * build tests ----------------------------------------------------
 if(BUILD_TESTS)
+  include(rapids-cuda)
+  rapids_cuda_init_architectures(CUVS_C)
   enable_language(CUDA)
   find_package(CUDAToolkit REQUIRED)
 
