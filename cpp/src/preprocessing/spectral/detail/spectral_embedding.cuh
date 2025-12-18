@@ -102,7 +102,9 @@ void compute_eigenpairs(raft::resources const& handle,
   config.ncv            = std::min(n_samples, std::max(2 * config.n_components + 1, 20));
   config.tolerance      = spectral_embedding_config.tolerance;
   config.which          = raft::sparse::solver::LANCZOS_WHICH::LA;
-  config.seed           = spectral_embedding_config.seed;
+  if (spectral_embedding_config.seed.has_value()) {
+    config.seed = spectral_embedding_config.seed.value();
+  }
 
   auto eigenvalues =
     raft::make_device_vector<DataT, int, raft::col_major>(handle, config.n_components);
