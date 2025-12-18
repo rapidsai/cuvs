@@ -8,11 +8,11 @@
 //
 
 // This file implements `SearcherGPU::SearchClusterQueryPairsQuantizeQuery`.
+#include "../../ivf_flat/ivf_flat_interleaved_scan.cuh"
 #include "searcher_gpu.cuh"
 #include "searcher_gpu_common.cuh"
 
 #include <raft/matrix/detail/select_warpsort.cuh>
-#include <raft/neighbors/detail/ivf_flat_interleaved_scan.cuh>
 
 #include <thrust/fill.h>
 
@@ -351,7 +351,7 @@ auto instantiateComputeInnerProductsWithBitwiseOpt(const uint32_t topk)
                 "Capacity exceeds maximum supported: " STR(MAX_TOP_K_WARP_SORT));
   if constexpr (Capacity <=
                 MAX_TOP_K_BLOCK_SORT) {  // base case: use block_sort (requires shared mem)
-    using block_sort_t = typename raft::neighbors::ivf_flat::detail::
+    using block_sort_t = typename cuvs::neighbors::ivf_flat::detail::
       flat_block_sort<MAX_TOP_K_BLOCK_SORT, true, T, IdxT>::type;
     return computeInnerProductsWithBitwiseOpt<block_sort_t, /* SharedQueueBuffer = */ true>;
   } else {
@@ -615,7 +615,7 @@ auto instantiateComputeInnerProductsWithBitwiseOpt8bitNoEX(const uint32_t topk)
                 "Capacity exceeds maximum supported: " STR(MAX_TOP_K_WARP_SORT));
   if constexpr (Capacity <=
                 MAX_TOP_K_BLOCK_SORT) {  // base case: use block_sort (requires shared mem)
-    using block_sort_t = typename raft::neighbors::ivf_flat::detail::
+    using block_sort_t = typename cuvs::neighbors::ivf_flat::detail::
       flat_block_sort<MAX_TOP_K_BLOCK_SORT, true, T, IdxT>::type;
     return computeInnerProductsWithBitwiseOpt8bitNoEX<block_sort_t, /* SharedQueueBuffer = */ true>;
   } else {
@@ -962,7 +962,7 @@ auto instantiateComputeInnerProductsWithBitwiseOpt4bit(const uint32_t topk)
                 "Capacity exceeds maximum supported: " STR(MAX_TOP_K_WARP_SORT));
   if constexpr (Capacity <=
                 MAX_TOP_K_BLOCK_SORT) {  // base case: use block_sort (requires shared mem)
-    using block_sort_t = typename raft::neighbors::ivf_flat::detail::
+    using block_sort_t = typename cuvs::neighbors::ivf_flat::detail::
       flat_block_sort<MAX_TOP_K_BLOCK_SORT, true, T, IdxT>::type;
     return computeInnerProductsWithBitwiseOpt4bit<block_sort_t, /* SharedQueueBuffer = */ true>;
   } else {
@@ -1222,7 +1222,7 @@ auto instantiateComputeInnerProductsWithBitwiseOpt4bitNoEX(const uint32_t topk)
                 "Capacity exceeds maximum supported: " STR(MAX_TOP_K_WARP_SORT));
   if constexpr (Capacity <=
                 MAX_TOP_K_BLOCK_SORT) {  // base case: use block_sort (requires shared mem)
-    using block_sort_t = typename raft::neighbors::ivf_flat::detail::
+    using block_sort_t = typename cuvs::neighbors::ivf_flat::detail::
       flat_block_sort<MAX_TOP_K_BLOCK_SORT, true, T, IdxT>::type;
     return computeInnerProductsWithBitwiseOpt4bitNoEX<block_sort_t, /* SharedQueueBuffer = */ true>;
   } else {
