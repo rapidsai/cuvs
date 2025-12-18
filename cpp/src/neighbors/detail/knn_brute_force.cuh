@@ -8,6 +8,7 @@
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/knn_merge_parts.hpp>
+#include <cuvs/neighbors/refine.hpp>
 #include <cuvs/selection/select_k.hpp>
 
 #include "../../distance/detail/distance_ops/l2_exp.cuh"
@@ -725,6 +726,66 @@ void brute_force_search_filtered(
   return;
 }
 
+template <typename T, typename DistT, typename LayoutT>
+void maybe_apply_two_pass_precision(
+  raft::resources const& res,
+  const cuvs::neighbors::brute_force::index<T, DistT>& idx,
+  raft::device_matrix_view<const T, int64_t, LayoutT> queries,
+  raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+  raft::device_matrix_view<DistT, int64_t, raft::row_major> distances)
+{
+  auto metric = idx.metric();
+  if (metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+      metric == cuvs::distance::DistanceType::L2Expanded ||
+      (metric == cuvs::distance::DistanceType::LpUnexpanded && idx.metric_arg() == (DistT)2.0)) {
+    auto n_queries = queries.extent(0);
+    auto k         = neighbors.extent(1);
+    auto dim       = idx.dim();
+
+    // The current refinement implementation is limited to k <= 1024
+    if (k > 1024) { return; }
+
+    auto neighbor_candidates = raft::make_device_matrix<int64_t, int64_t>(res, n_queries, k);
+    raft::copy(res, neighbor_candidates.view(), neighbors);
+
+    cuvs::distance::DistanceType refinement_metric = cuvs::distance::DistanceType::L2Unexpanded;
+    if (metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+        metric == cuvs::distance::DistanceType::LpUnexpanded) {
+      refinement_metric = cuvs::distance::DistanceType::L2SqrtUnexpanded;
+    }
+
+    if constexpr (std::is_same_v<LayoutT, raft::col_major>) {
+      // The pointer-based transpose API expects 'int' dimensions.
+      if (n_queries > (int64_t)std::numeric_limits<int>::max() ||
+          dim > (int64_t)std::numeric_limits<int>::max()) {
+        return;
+      }
+      auto queries_rm = raft::make_device_matrix<T, int64_t>(res, n_queries, dim);
+      raft::linalg::transpose(res,
+                              const_cast<T*>(queries.data_handle()),
+                              queries_rm.data_handle(),
+                              (int)n_queries,
+                              (int)dim,
+                              raft::resource::get_cuda_stream(res));
+      cuvs::neighbors::refine(res,
+                              idx.dataset(),
+                              raft::make_const_mdspan(queries_rm.view()),
+                              raft::make_const_mdspan(neighbor_candidates.view()),
+                              neighbors,
+                              distances,
+                              refinement_metric);
+    } else {
+      cuvs::neighbors::refine(res,
+                              idx.dataset(),
+                              queries,
+                              raft::make_const_mdspan(neighbor_candidates.view()),
+                              neighbors,
+                              distances,
+                              refinement_metric);
+    }
+  }
+}
+
 template <typename T, typename IdxT, typename DistT, typename LayoutT>
 void search(raft::resources const& res,
             const cuvs::neighbors::brute_force::index<T, DistT>& idx,
@@ -736,31 +797,31 @@ void search(raft::resources const& res,
   try {
     auto& sample_filter =
       dynamic_cast<const cuvs::neighbors::filtering::none_sample_filter&>(sample_filter_ref);
-    return brute_force_search<T, int64_t, DistT>(res, idx, queries, neighbors, distances);
+    brute_force_search<T, int64_t, DistT>(res, idx, queries, neighbors, distances);
   } catch (const std::bad_cast&) {
-  }
-  if constexpr (std::is_same_v<LayoutT, raft::col_major>) {
-    RAFT_FAIL("filtered search isn't available with col_major queries yet");
-  } else {
-    try {
-      auto& sample_filter =
-        dynamic_cast<const cuvs::neighbors::filtering::bitmap_filter<uint32_t, int64_t>&>(
-          sample_filter_ref);
-      return brute_force_search_filtered<T, int64_t, uint32_t, DistT>(
-        res, idx, queries, &sample_filter, neighbors, distances);
-    } catch (const std::bad_cast&) {
+    if constexpr (std::is_same_v<LayoutT, raft::col_major>) {
+      RAFT_FAIL("filtered search isn't available with col_major queries yet");
+    } else {
+      try {
+        auto& sample_filter =
+          dynamic_cast<const cuvs::neighbors::filtering::bitmap_filter<uint32_t, int64_t>&>(
+            sample_filter_ref);
+        brute_force_search_filtered<T, int64_t, uint32_t, DistT>(
+          res, idx, queries, &sample_filter, neighbors, distances);
+      } catch (const std::bad_cast&) {
+        try {
+          auto& sample_filter =
+            dynamic_cast<const cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>&>(
+              sample_filter_ref);
+          brute_force_search_filtered<T, int64_t, uint32_t, DistT>(
+            res, idx, queries, &sample_filter, neighbors, distances);
+        } catch (const std::bad_cast&) {
+          RAFT_FAIL("Unsupported sample filter type");
+        }
+      }
     }
-
-    try {
-      auto& sample_filter =
-        dynamic_cast<const cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>&>(
-          sample_filter_ref);
-      return brute_force_search_filtered<T, int64_t, uint32_t, DistT>(
-        res, idx, queries, &sample_filter, neighbors, distances);
-    } catch (const std::bad_cast&) {
-      RAFT_FAIL("Unsupported sample filter type");
-    }
   }
+  maybe_apply_two_pass_precision(res, idx, queries, neighbors, distances);
 }
 
 template <typename T, typename DistT, typename AccessorT, typename LayoutT = raft::row_major>
