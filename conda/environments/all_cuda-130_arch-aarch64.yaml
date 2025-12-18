@@ -26,6 +26,7 @@ dependencies:
 - go
 - graphviz
 - ipython
+- libboost-devel
 - libclang==20.1.4
 - libcublas-dev
 - libcurand-dev
@@ -33,11 +34,13 @@ dependencies:
 - libcusparse-dev
 - librmm==25.12.*
 - make
+- maven
 - nccl>=2.19
 - ninja
 - numpy>=1.23,<3.0a0
 - numpydoc
 - openblas
+- openjdk=22.*
 - pre-commit
 - pylibraft==25.12.*
 - pytest-cov
