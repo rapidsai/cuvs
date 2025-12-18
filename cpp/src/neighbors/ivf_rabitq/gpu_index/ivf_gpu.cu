@@ -149,66 +149,71 @@ void IVFGPU::load_transposed(const char* filename)
     memcpy(h_ptr, h_buf.data(), n_bytes);
   };
 
-  auto read_into_device_host_transposed_short = [&](void* d_ptr, void* h_ptr, size_t n_bytes) {
-    // Read all clusters' data into staging buffer (still in sequential format)
-    std::vector<std::uint8_t> h_buf(n_bytes);
-    input.read(reinterpret_cast<char*>(h_buf.data()), n_bytes);
-    if (input.gcount() != static_cast<std::streamsize>(n_bytes))
-      throw std::runtime_error("unexpected EOF");
+  auto read_into_device_host_transposed_short =
+    [&](void* d_ptr, void* h_ptr, size_t n_bytes, size_t& max_cluster_size) {
+      // Read all clusters' data into staging buffer (still in sequential format)
+      std::vector<std::uint8_t> h_buf(n_bytes);
+      input.read(reinterpret_cast<char*>(h_buf.data()), n_bytes);
+      if (input.gcount() != static_cast<std::streamsize>(n_bytes))
+        throw std::runtime_error("unexpected EOF");
 
-    // Create transposed buffer
-    std::vector<std::uint8_t> h_transposed(n_bytes);
+      // Create transposed buffer
+      std::vector<std::uint8_t> h_transposed(n_bytes);
 
-    // Process each cluster and transpose its vectors
-    size_t src_offset = 0;  // offset in original sequential buffer
-    size_t dst_offset = 0;  // offset in transposed buffer
+      // Process each cluster and transpose its vectors
+      size_t src_offset = 0;  // offset in original sequential buffer
+      size_t dst_offset = 0;  // offset in transposed buffer
 
-    for (size_t cluster_id = 0; cluster_id < num_centroids; cluster_id++) {
-      size_t cluster_size = cluster_sizes[cluster_id];
-      if (cluster_size == 0) continue;
+      // Also evaluate maximum cluster size during this loop
+      max_cluster_size = 0;
+      for (size_t cluster_id = 0; cluster_id < num_centroids; cluster_id++) {
+        size_t cluster_size = cluster_sizes[cluster_id];
+        max_cluster_size    = max(max_cluster_size, cluster_size);
+        if (cluster_size == 0) continue;
 
-      // Calculate dimensions per vector
-      size_t bytes_per_vector   = DQ->block_bytes();
-      size_t uint32s_per_vector = bytes_per_vector / sizeof(uint32_t);
+        // Calculate dimensions per vector
+        size_t bytes_per_vector   = DQ->block_bytes();
+        size_t uint32s_per_vector = bytes_per_vector / sizeof(uint32_t);
 
-      // Get pointers to source (sequential) and destination (transposed) data
-      uint32_t* src_cluster = reinterpret_cast<uint32_t*>(h_buf.data() + src_offset);
-      uint32_t* dst_cluster = reinterpret_cast<uint32_t*>(h_transposed.data() + dst_offset);
+        // Get pointers to source (sequential) and destination (transposed) data
+        uint32_t* src_cluster = reinterpret_cast<uint32_t*>(h_buf.data() + src_offset);
+        uint32_t* dst_cluster = reinterpret_cast<uint32_t*>(h_transposed.data() + dst_offset);
 
-      // Transpose the cluster:
-      // From: vec1[all_dims], vec2[all_dims], ..., vecn[all_dims]
-      // To: vec1[dim0-31], vec2[dim0-31], ..., vecn[dim0-31],
-      //     vec1[dim32-63], vec2[dim32-63], ..., vecn[dim32-63], ...
+        // Transpose the cluster:
+        // From: vec1[all_dims], vec2[all_dims], ..., vecn[all_dims]
+        // To: vec1[dim0-31], vec2[dim0-31], ..., vecn[dim0-31],
+        //     vec1[dim32-63], vec2[dim32-63], ..., vecn[dim32-63], ...
 
-      for (size_t dim_chunk = 0; dim_chunk < uint32s_per_vector; dim_chunk++) {
-        for (size_t vec_id = 0; vec_id < cluster_size; vec_id++) {
-          // Source: vector vec_id, dimension chunk dim_chunk
-          size_t src_idx = vec_id * uint32s_per_vector + dim_chunk;
-          // Destination: dimension chunk dim_chunk, vector vec_id
-          size_t dst_idx = dim_chunk * cluster_size + vec_id;
+        for (size_t dim_chunk = 0; dim_chunk < uint32s_per_vector; dim_chunk++) {
+          for (size_t vec_id = 0; vec_id < cluster_size; vec_id++) {
+            // Source: vector vec_id, dimension chunk dim_chunk
+            size_t src_idx = vec_id * uint32s_per_vector + dim_chunk;
+            // Destination: dimension chunk dim_chunk, vector vec_id
+            size_t dst_idx = dim_chunk * cluster_size + vec_id;
 
-          dst_cluster[dst_idx] = src_cluster[src_idx];
+            dst_cluster[dst_idx] = src_cluster[src_idx];
+          }
         }
+
+        // Update offsets for next cluster
+        size_t cluster_bytes = cluster_size * bytes_per_vector;
+        src_offset += cluster_bytes;
+        dst_offset += cluster_bytes;
       }
 
-      // Update offsets for next cluster
-      size_t cluster_bytes = cluster_size * bytes_per_vector;
-      src_offset += cluster_bytes;
-      dst_offset += cluster_bytes;
-    }
-
-    // Copy transposed data to device and host
-    RAFT_CUDA_TRY(
-      cudaMemcpyAsync(d_ptr, h_transposed.data(), n_bytes, cudaMemcpyHostToDevice, stream_));
-    raft::resource::sync_stream(handle_);
-    memcpy(h_ptr, h_transposed.data(), n_bytes);
-  };
+      // Copy transposed data to device and host
+      RAFT_CUDA_TRY(
+        cudaMemcpyAsync(d_ptr, h_transposed.data(), n_bytes, cudaMemcpyHostToDevice, stream_));
+      raft::resource::sync_stream(handle_);
+      memcpy(h_ptr, h_transposed.data(), n_bytes);
+    };
 
   // New change: host copy of ivf.
   AllocateHostMemory();
-  //    std::cout << "batch flag: " << batch_flag << std::endl;
-  read_into_device_host_transposed_short(
-    short_data_.data_handle(), short_data_host_.data_handle(), GetShortDataBytesSimple());
+  read_into_device_host_transposed_short(short_data_.data_handle(),
+                                         short_data_host_.data_handle(),
+                                         GetShortDataBytesSimple(),
+                                         this->max_cluster_length);
   if (batch_flag)
     read_into_device(short_factors_batch_.data_handle(),
                      GetShortDataFactorBytesBatch());  // no copy on CPU

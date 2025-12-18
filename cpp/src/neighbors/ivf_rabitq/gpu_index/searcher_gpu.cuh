@@ -34,20 +34,12 @@ class SearcherGPU {
   SearcherGPU(SearcherGPU&& other) = default;
 
   /**
-   * @brief malloc temp search space in GPU memory
+   * @brief Allocate temp search space in GPU memory
    *
-   * @param cur_ivf related ivf for search
+   * @param num_centroids number of cluster centroids
    * @param num_queries number of queries
-   * @param k topk
-   * @param max_nprobes maximum nprobes for search
-   * @param s cuda stream
-   * @return no returns
    */
-  void AllocateSearcherSpace(const IVFGPU& cur_ivf,
-                             size_t num_queries,
-                             size_t k,
-                             size_t max_nprobes,
-                             size_t max_cluster_length);
+  void AllocateSearcherSpace(size_t num_centroids, size_t num_queries);
 
   // Getter methods
   std::string const& get_mode() { return mode_; }

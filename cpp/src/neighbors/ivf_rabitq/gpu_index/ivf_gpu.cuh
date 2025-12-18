@@ -274,12 +274,6 @@ class IVFGPU {
   DataQuantizerGPU& quantizer() const { return *(this->DQ); }
   RotatorGPU& rotator() const { return *(this->Rota); }
 
-  // metadata setters
-  void set_max_cluster_length(size_t new_max_cluster_length)
-  {
-    max_cluster_length = new_max_cluster_length;
-  }
-
   void BatchClusterSearch(const float* d_query,
                           size_t k,
                           size_t nprobe,
@@ -402,12 +396,12 @@ class IVFGPU {
     raft::make_host_vector<GPUClusterMeta, int64_t>(0);  // Host-side copy of clusters
 
   // Index meta-data.
-  size_t num_vectors;     // Total number of vectors.
-  size_t num_dimensions;  // Dimensionality of the input vectors.
-  size_t num_padded_dim;  // padded dimensions
-  size_t num_centroids;   // Centroids && Clusters
-  size_t max_cluster_length;
-  size_t ex_bits;  // Extra bits parameter for quantization.
+  size_t num_vectors;         // Total number of vectors.
+  size_t num_dimensions;      // Dimensionality of the input vectors.
+  size_t num_padded_dim;      // padded dimensions
+  size_t num_centroids;       // Centroids && Clusters
+  size_t max_cluster_length;  // Maximum length of clusters
+  size_t ex_bits;             // Extra bits parameter for quantization.
 
   std::unique_ptr<InitializerGPU>
     initializer;  // Initializer, indicates which initializer to use (currently only FlatIVF)

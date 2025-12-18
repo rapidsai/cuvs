@@ -147,16 +147,8 @@ void search(raft::resources const& handle,
                                idx.rabitq_index().quantizer().get_query_scaling_factor(),
                                /* rabitq_quantize_flag = */ true);
 
-  // find the longest cluster to allocate space
-  size_t max_cluster_length = 0;
-  for (int64_t i = 0; i < idx.rabitq_index().get_cluster_meta_host().extent(0); ++i) {
-    max_cluster_length = max(max_cluster_length, idx.rabitq_index().get_cluster_meta_host()(i).num);
-  }
-  // TODO: this should be part of the load function
-  idx.rabitq_index().set_max_cluster_length(max_cluster_length);
-
   auto k = neighbors.extent(1);
-  searcher.AllocateSearcherSpace(idx.rabitq_index(), NQ, k, params.n_probes, max_cluster_length);
+  searcher.AllocateSearcherSpace(idx.rabitq_index().get_num_centroids(), NQ);
 
   float* d_topk_dists;
   uint32_t *d_topk_ids, *d_final_ids;
