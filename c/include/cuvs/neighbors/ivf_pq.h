@@ -334,6 +334,44 @@ cuvsError_t cuvsIvfPqBuild(cuvsResources_t res,
                            cuvsIvfPqIndexParams_t params,
                            DLManagedTensor* dataset,
                            cuvsIvfPqIndex_t index);
+
+/**
+ * @brief Build a view-type IVF-PQ index from device memory precomputed centroids and codebook.
+ *
+ * This function creates a non-owning index that stores a reference to the provided device data.
+ * All parameters must be provided with correct extents. The caller is responsible for ensuring
+ * the lifetime of the input data exceeds the lifetime of the returned index.
+ *
+ * The index_params must be consistent with the provided matrices. Specifically:
+ * - index_params.codebook_kind determines the expected shape of pq_centers
+ * - index_params.metric will be stored in the index
+ * - index_params.conservative_memory_allocation will be stored in the index
+ * The function will verify consistency between index_params, dim, and the matrix extents.
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] params cuvsIvfPqIndexParams_t used to configure the index (must be consistent with
+ * matrices)
+ * @param[in] dim dimensionality of the input data
+ * @param[in] pq_centers PQ codebook on device memory with required shape:
+ *   - codebook_kind PER_SUBSPACE: [pq_dim, pq_len, pq_book_size]
+ *   - codebook_kind PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
+ * @param[in] centers Cluster centers in the original space [n_lists, dim_ext]
+ *   where dim_ext = round_up(dim + 1, 8)
+ * @param[in] centers_rot Rotated cluster centers [n_lists, rot_dim]
+ *   where rot_dim = pq_len * pq_dim
+ * @param[in] rotation_matrix Transform matrix (original space -> rotated padded space) [rot_dim,
+ * dim]
+ * @param[out] index cuvsIvfPqIndex_t Newly built view-type IVF-PQ index
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfPqBuildPrecomputed(cuvsResources_t res,
+                                      cuvsIvfPqIndexParams_t params,
+                                      uint32_t dim,
+                                      DLManagedTensor* pq_centers,
+                                      DLManagedTensor* centers,
+                                      DLManagedTensor* centers_rot,
+                                      DLManagedTensor* rotation_matrix,
+                                      cuvsIvfPqIndex_t index);
 /**
  * @}
  */

@@ -91,6 +91,15 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
                                DLManagedTensor* dataset,
                                cuvsIvfPqIndex_t index)
 
+    cuvsError_t cuvsIvfPqBuildPrecomputed(cuvsResources_t res,
+                                          cuvsIvfPqIndexParams_t params,
+                                          uint32_t dim,
+                                          DLManagedTensor* pq_centers,
+                                          DLManagedTensor* centers,
+                                          DLManagedTensor* centers_rot,
+                                          DLManagedTensor* rotation_matrix,
+                                          cuvsIvfPqIndex_t index)
+
     cuvsError_t cuvsIvfPqSearch(cuvsResources_t res,
                                 cuvsIvfPqSearchParams* params,
                                 cuvsIvfPqIndex_t index,
