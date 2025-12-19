@@ -298,8 +298,7 @@ template <typename IdxT>
 raft::device_mdspan<float, pq_centers_extents, raft::row_major>
 view_impl<IdxT>::pq_centers() noexcept
 {
-  return raft::device_mdspan<float, pq_centers_extents, raft::row_major>(
-    const_cast<float*>(pq_centers_view_.data_handle()), pq_centers_view_.extents());
+  RAFT_FAIL("Non-const pq_centers() getter is not supported for view type index");
 }
 
 template <typename IdxT>
@@ -312,10 +311,7 @@ raft::device_mdspan<const float, pq_centers_extents, raft::row_major> view_impl<
 template <typename IdxT>
 raft::device_matrix_view<float, uint32_t, raft::row_major> view_impl<IdxT>::centers() noexcept
 {
-  return raft::make_device_matrix_view<float, uint32_t>(
-    const_cast<float*>(centers_view_.data_handle()),
-    centers_view_.extent(0),
-    centers_view_.extent(1));
+  RAFT_FAIL("Non-const centers() getter is not supported for view type index");
 }
 
 template <typename IdxT>
@@ -328,10 +324,7 @@ raft::device_matrix_view<const float, uint32_t, raft::row_major> view_impl<IdxT>
 template <typename IdxT>
 raft::device_matrix_view<float, uint32_t, raft::row_major> view_impl<IdxT>::centers_rot() noexcept
 {
-  return raft::make_device_matrix_view<float, uint32_t>(
-    const_cast<float*>(centers_rot_view_.data_handle()),
-    centers_rot_view_.extent(0),
-    centers_rot_view_.extent(1));
+  RAFT_FAIL("Non-const centers_rot() getter is not supported for view type index");
 }
 
 template <typename IdxT>
@@ -345,10 +338,7 @@ template <typename IdxT>
 raft::device_matrix_view<float, uint32_t, raft::row_major>
 view_impl<IdxT>::rotation_matrix() noexcept
 {
-  return raft::make_device_matrix_view<float, uint32_t>(
-    const_cast<float*>(rotation_matrix_view_.data_handle()),
-    rotation_matrix_view_.extent(0),
-    rotation_matrix_view_.extent(1));
+  RAFT_FAIL("Non-const rotation_matrix() getter is not supported for view type index");
 }
 
 template <typename IdxT>
