@@ -8,8 +8,11 @@
 # https://gitlab.kitware.com/cmake/cmake/-/merge_requests/11516, we may be able
 # to port the algorithm to CMake script and use it in other RAPIDS projects.
 
+import argparse
 import json
+import re
 import sys
+import warnings
 from itertools import chain
 from typing import TYPE_CHECKING
 
@@ -20,54 +23,140 @@ if TYPE_CHECKING:
     Matrix = MatrixValue | list["Matrix"] | dict[str, "Matrix"]
 
 
+class NoKeyError(ValueError):
+    pass
+
+
+class UnusedKeyWarning(UserWarning):
+    pass
+
+
+class UsedKeyWarning(UserWarning):
+    pass
+
+
+IDENTIFIER_RE: re.Pattern = re.compile("^(?P<underscores>_*)(?P<rest>.*)$")
+
+
 def iterate_matrix_product(
     matrix: "Matrix",
+    warn_unused=True,
+    warn_used=True,
 ) -> "Generator[dict[str, MatrixValue]]":
     def iterate_next_dimension(
-        queue: "Iterator[tuple[str | None, Matrix]]",
+        queue: "Iterator[tuple[tuple[str | int, ...], str | None, Matrix]]",
         entry: "dict[str, MatrixValue]",
-    ) -> "Generator[dict[str, MatrixValue]]":
+    ) -> "Generator[tuple[dict[str, MatrixValue], bool]]":
         try:
-            key, matrix = next(queue)
+            path, key, matrix = next(queue)
         except StopIteration:
-            yield entry
+            yield (entry, False)
         else:
-            yield from iterate_impl(matrix, key, queue, entry)
+            used = False
+            for e, u in iterate_impl(path, key, matrix, queue, entry):
+                if u:
+                    used = True
+                yield e, u
+
+            try:
+                last = path[-1]
+            except IndexError:
+                pass
+            else:
+                if isinstance(last, str):
+                    match = IDENTIFIER_RE.search(last)
+                    assert match
+                    underscores = match.group("underscores")
+                    rest = match.group("rest")
+                    path_repr = "".join(
+                        f"[{json.dumps(i)}]" for i in path[:-1]
+                    )
+
+                    if warn_used and used and underscores:
+                        warnings.warn(
+                            f"Key {json.dumps(last)} at root{path_repr} "
+                            f"is used in a matrix product entry even though it "
+                            f"begins with {json.dumps(underscores)}. Consider "
+                            f"renaming it to {json.dumps(rest)} to indicate this.",
+                            category=UsedKeyWarning,
+                        )
+                    elif warn_unused and not used and not underscores:
+                        warnings.warn(
+                            f"Key {json.dumps(last)} at root{path_repr} "
+                            f"is never used in a matrix product entry and is used "
+                            f"only for grouping. Consider renaming it to "
+                            f"{json.dumps(f'_{last}')} to indicate this.",
+                            category=UnusedKeyWarning,
+                        )
 
     def iterate_impl(
-        matrix: "Matrix",
+        path: tuple[str | int, ...],
         key: str | None,
-        queue: "Iterator[tuple[str | None, Matrix]]",
+        matrix: "Matrix",
+        queue: "Iterator[tuple[tuple[str | int, ...], str | None, Matrix]]",
         entry: "dict[str, MatrixValue]",
-    ) -> "Generator[dict[str, MatrixValue]]":
+    ) -> "Generator[tuple[dict[str, MatrixValue], bool]]":
         if isinstance(matrix, dict):
-            yield from iterate_next_dimension(
-                chain(sorted(matrix.items()), queue),
-                entry,
+            yield from (
+                (e, False)
+                for e, _ in iterate_next_dimension(
+                    chain(
+                        (
+                            ((*path, k), k, v)
+                            for (k, v) in sorted(matrix.items())
+                        ),
+                        queue,
+                    ),
+                    entry,
+                )
             )
         elif isinstance(matrix, list):
             queue_list = list(queue)
-            for v in matrix:
+            for i, v in enumerate(matrix):
                 yield from iterate_next_dimension(
-                    chain([(key, v)], queue_list), entry
+                    chain([((*path, i), key, v)], queue_list), entry
                 )
         else:
-            assert key is not None
-            yield from iterate_next_dimension(queue, {**entry, key: matrix})
+            if key is None:
+                raise NoKeyError
+            yield from (
+                (e, True)
+                for e, _ in iterate_next_dimension(
+                    queue, {**entry, key: matrix}
+                )
+            )
 
-    return iterate_impl(matrix, None, chain(), {})
+    yield from (
+        entry for entry, _ in iterate_impl((), None, matrix, chain(), {})
+    )
 
 
-try:
-    filename = sys.argv[1]
-except IndexError:
-    filename = "-"
-with sys.stdin if filename == "-" else open(filename) as f:
-    matrix: "Matrix" = json.load(f)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--warn-unused", action=argparse.BooleanOptionalAction, default=True
+    )
+    parser.add_argument(
+        "--warn-used", action=argparse.BooleanOptionalAction, default=True
+    )
+    parser.add_argument("filename", nargs="?", default="-")
+    namespace = parser.parse_args()
+    with (
+        sys.stdin
+        if namespace.filename == "-"
+        else open(namespace.filename) as f
+    ):
+        matrix: "Matrix" = json.load(f)
 
-json.dump(
-    list(iterate_matrix_product(matrix)),
-    sys.stdout,
-    indent=2,
-    sort_keys=True,
-)
+    json.dump(
+        list(
+            iterate_matrix_product(
+                matrix,
+                warn_unused=namespace.warn_unused,
+                warn_used=namespace.warn_used,
+            )
+        ),
+        sys.stdout,
+        indent=2,
+        sort_keys=True,
+    )

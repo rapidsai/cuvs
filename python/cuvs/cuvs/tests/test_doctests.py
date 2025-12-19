@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 import cuvs.cluster
+import cuvs.common
 import cuvs.distance
 import cuvs.neighbors
 import cuvs.preprocessing.quantize
