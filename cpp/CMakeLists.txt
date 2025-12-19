@@ -302,6 +302,10 @@ if(NOT BUILD_CPU_ONLY)
   file(GLOB_RECURSE compute_distance_sources "src/neighbors/detail/cagra/compute_distance_*.cu")
   set_source_files_properties(${compute_distance_sources} PROPERTIES COMPILE_FLAGS -maxrregcount=64)
 
+  # Allow invalid CUDA kernels from ivf_pq_search in the short term
+  file(GLOB_RECURSE ivf_pq_search_sources "src/neighbors/ivf_pq/detail/ivf_pq_search_*_t.cu")
+  set_source_files_properties(${ivf_pq_search_sources} PROPERTIES COMPILE_FLAGS -static-global-template-stub=false)
+
   set_target_properties(
     cuvs-cagra-search
     PROPERTIES BUILD_RPATH "\$ORIGIN"
