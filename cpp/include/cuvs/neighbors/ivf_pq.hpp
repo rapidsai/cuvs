@@ -276,8 +276,8 @@ constexpr typename list_spec<SizeT, IdxT>::list_extents list_spec<SizeT, IdxT>::
 template <typename IdxT, typename SizeT = uint32_t>
 using list_data = ivf::list<list_spec, SizeT, IdxT>;
 
-using pq_centers_extents = std::experimental::
-  extents<uint32_t, raft::dynamic_extent, raft::dynamic_extent, raft::dynamic_extent>;
+using pq_centers_extents =
+  raft::extents<uint32_t, raft::dynamic_extent, raft::dynamic_extent, raft::dynamic_extent>;
 
 template <typename IdxT>
 class index_iface {
