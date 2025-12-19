@@ -5,9 +5,10 @@
 
 #pragma once
 
-#include "../ivf_common.cuh"           // dummy_block_sort_t
-#include "../sample_filter.cuh"        // none_sample_filter
-#include <cuvs/distance/distance.hpp>  // cuvs::distance::DistanceType
+#include "../ivf_common.cuh"              // dummy_block_sort_t
+#include "../sample_filter.cuh"           // none_sample_filter
+#include "ivf_pq_compute_similarity.hpp"  // cuvs::neighbors::ivf_pq::detail::selected
+#include <cuvs/distance/distance.hpp>     // cuvs::distance::DistanceType
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>               // codebook_gen
 #include <raft/matrix/detail/select_warpsort.cuh>  // matrix::detail::select::warpsort::warp_sort_distributed
@@ -577,13 +578,10 @@ struct occupancy_t {
 };
 
 template <typename OutT, typename LutT>
-struct selected {
-  compute_similarity_kernel_t<OutT, LutT> kernel;
-  dim3 grid_dim;
-  dim3 block_dim;
-  size_t smem_size;
-  size_t device_lut_size;
-};
+auto get_kernel(selected<OutT, LutT> s) -> const void*
+{
+  return s.kernel;
+}
 
 template <typename OutT, typename LutT>
 void compute_similarity_run(selected<OutT, LutT> s,
@@ -610,31 +608,8 @@ void compute_similarity_run(selected<OutT, LutT> s,
                             OutT* _out_scores,
                             uint32_t* _out_indices)
 {
-  // Define the kernel function pointer type for casting
-  using kernel_t = void (*)(uint32_t,
-                            uint32_t,
-                            uint32_t,
-                            uint32_t,
-                            uint32_t,
-                            distance::DistanceType,
-                            codebook_gen,
-                            uint32_t,
-                            uint32_t,
-                            const float*,
-                            const float*,
-                            const uint8_t* const*,
-                            const uint32_t*,
-                            const uint32_t*,
-                            const float*,
-                            const uint32_t*,
-                            float*,
-                            filtering::ivf_filter_dev,
-                            LutT*,
-                            OutT*,
-                            uint32_t*);
-
   auto launch_kernel = [&](filtering::ivf_filter_dev sample_filter) {
-    auto kernel = reinterpret_cast<kernel_t>(s.kernel);
+    auto kernel = reinterpret_cast<compute_similarity_kernel_t<OutT, LutT>>(get_kernel(s));
     kernel<<<s.grid_dim, s.block_dim, s.smem_size, stream>>>(dim,
                                                              n_probes,
                                                              pq_dim,
@@ -924,18 +899,21 @@ auto compute_similarity_select(const cudaDeviceProp& dev_props,
       ) {
         selected_perf = cur;
         if (lut_is_in_shmem) {
-          selected_config = {
-            kernel, dim3(n_blocks, 1, 1), dim3(n_threads, 1, 1), smem_size, size_t(0)};
+          selected_config = selected<OutT, LutT>(reinterpret_cast<const void*>(kernel),
+                                                 dim3(n_blocks, 1, 1),
+                                                 dim3(n_threads, 1, 1),
+                                                 smem_size,
+                                                 size_t(0));
         } else {
           // When the global memory is used for the lookup table, we need to minimize the grid
           // size; otherwise, the kernel may quickly run out of memory.
           auto n_blocks_min =
             std::min<uint32_t>(n_blocks, cur.blocks_per_sm * dev_props.multiProcessorCount);
-          selected_config = {kernel,
-                             dim3(n_blocks_min, 1, 1),
-                             dim3(n_threads, 1, 1),
-                             smem_size,
-                             size_t(n_blocks_min) * size_t(pq_dim << pq_bits)};
+          selected_config = selected<OutT, LutT>(reinterpret_cast<const void*>(kernel),
+                                                 dim3(n_blocks_min, 1, 1),
+                                                 dim3(n_threads, 1, 1),
+                                                 smem_size,
+                                                 size_t(n_blocks_min) * size_t(pq_dim << pq_bits));
         }
         // Actual shmem/L1 split wildly rounds up the specified preferred carveout, so we set here
         // a rather conservative bar; most likely, the kernel gets more shared memory than this,

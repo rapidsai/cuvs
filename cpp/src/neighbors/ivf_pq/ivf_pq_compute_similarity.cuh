@@ -8,7 +8,8 @@
 #include "../sample_filter.cuh"  // none_sample_filter
 #include "ivf_pq_fp_8bit.cuh"    // cuvs::neighbors::ivf_pq::detail::fp_8bit
 
-#include <cuvs/distance/distance.hpp>  // cuvs::distance::DistanceType
+#include "ivf_pq_compute_similarity.hpp"  // cuvs::neighbors::ivf_pq::detail::selected
+#include <cuvs/distance/distance.hpp>     // cuvs::distance::DistanceType
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>    // cuvs::neighbors::ivf_pq::codebook_gen
 #include <raft/core/detail/macros.hpp>  // RAFT_WEAK_FUNCTION
@@ -23,15 +24,6 @@ namespace cuvs::neighbors::ivf_pq::detail {
 // -inl.cuh header diverging.
 auto RAFT_WEAK_FUNCTION is_local_topk_feasible(uint32_t k, uint32_t n_probes, uint32_t n_queries)
   -> bool;
-
-template <typename OutT, typename LutT>
-struct selected {
-  const void* kernel;  // Type-erased kernel pointer (compatible with any __global__ function)
-  dim3 grid_dim;
-  dim3 block_dim;
-  size_t smem_size;
-  size_t device_lut_size;
-};
 
 template <typename OutT, typename LutT>
 void compute_similarity_run(selected<OutT, LutT> s,
