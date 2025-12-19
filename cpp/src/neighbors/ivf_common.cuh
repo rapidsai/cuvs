@@ -30,31 +30,20 @@ struct dummy_block_sort_t {
 };
 
 /**
- * For each query, we calculate a cumulative sum of the cluster sizes that we probe, and return that
- * in chunk_indices. Essentially this is a segmented inclusive scan of the cluster sizes. The total
- * number of samples per query (sum of the cluster sizes that we probe) is returned in n_samples.
+ * Returns a pointer to calc_chunk_indices_kernel for the given BlockDim.
+ * The kernel is defined and the pointer is taken in ivf_common.cu to comply
+ * with CUDA whole compilation rules. See
+ * https://developer.nvidia.com/blog/cuda-c-compiler-updates-impacting-elf-visibility-and-linkage/
  */
 template <int BlockDim>
-__launch_bounds__(BlockDim) __global__
-  void calc_chunk_indices_kernel(uint32_t n_probes,
-                                 const uint32_t* cluster_sizes,      // [n_clusters]
-                                 const uint32_t* clusters_to_probe,  // [n_queries, n_probes]
-                                 uint32_t* chunk_indices,            // [n_queries, n_probes]
-                                 uint32_t* n_samples                 // [n_queries]
-  );
+void* get_calc_chunk_indices_kernel();
 
-extern template __global__ void calc_chunk_indices_kernel<32>(
-  uint32_t, const uint32_t*, const uint32_t*, uint32_t*, uint32_t*);
-extern template __global__ void calc_chunk_indices_kernel<64>(
-  uint32_t, const uint32_t*, const uint32_t*, uint32_t*, uint32_t*);
-extern template __global__ void calc_chunk_indices_kernel<128>(
-  uint32_t, const uint32_t*, const uint32_t*, uint32_t*, uint32_t*);
-extern template __global__ void calc_chunk_indices_kernel<256>(
-  uint32_t, const uint32_t*, const uint32_t*, uint32_t*, uint32_t*);
-extern template __global__ void calc_chunk_indices_kernel<512>(
-  uint32_t, const uint32_t*, const uint32_t*, uint32_t*, uint32_t*);
-extern template __global__ void calc_chunk_indices_kernel<1024>(
-  uint32_t, const uint32_t*, const uint32_t*, uint32_t*, uint32_t*);
+extern template void* get_calc_chunk_indices_kernel<32>();
+extern template void* get_calc_chunk_indices_kernel<64>();
+extern template void* get_calc_chunk_indices_kernel<128>();
+extern template void* get_calc_chunk_indices_kernel<256>();
+extern template void* get_calc_chunk_indices_kernel<512>();
+extern template void* get_calc_chunk_indices_kernel<1024>();
 
 struct calc_chunk_indices {
  public:
@@ -88,7 +77,7 @@ struct calc_chunk_indices {
     if constexpr (BlockDim >= raft::WarpSize * 2) {
       if (BlockDim >= n_probes * 2) { return try_block_dim<(BlockDim / 2)>(n_probes, n_queries); }
     }
-    return {reinterpret_cast<void*>(calc_chunk_indices_kernel<BlockDim>),
+    return {get_calc_chunk_indices_kernel<BlockDim>(),
             dim3(BlockDim, 1, 1),
             dim3(n_queries, 1, 1),
             n_probes};
