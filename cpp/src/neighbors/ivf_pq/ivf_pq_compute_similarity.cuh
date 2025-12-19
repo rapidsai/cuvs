@@ -24,9 +24,42 @@ namespace cuvs::neighbors::ivf_pq::detail {
 auto RAFT_WEAK_FUNCTION is_local_topk_feasible(uint32_t k, uint32_t n_probes, uint32_t n_queries)
   -> bool;
 
+template <typename OutT,
+          typename LutT,
+          uint32_t PqBits,
+          int Capacity,
+          bool PrecompBaseDiff,
+          bool EnableSMemLut>
+RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
+                                      uint32_t n_probes,
+                                      uint32_t pq_dim,
+                                      uint32_t n_queries,
+                                      uint32_t queries_offset,
+                                      distance::DistanceType metric,
+                                      codebook_gen codebook_kind,
+                                      uint32_t topk,
+                                      uint32_t max_samples,
+                                      const float* cluster_centers,
+                                      const float* pq_centers,
+                                      const uint8_t* const* pq_dataset,
+                                      const uint32_t* cluster_labels,
+                                      const uint32_t* _chunk_indices,
+                                      const float* queries,
+                                      const uint32_t* index_list,
+                                      float* query_kths,
+                                      filtering::ivf_filter_dev sample_filter,
+                                      LutT* lut_scores,
+                                      OutT* _out_scores,
+                                      uint32_t* _out_indices);
+
+// The signature of the kernel defined by a minimal set of template parameters
+template <typename OutT, typename LutT>
+using compute_similarity_kernel_t =
+  decltype(&compute_similarity_kernel<OutT, LutT, 8, 0, true, true>);
+
 template <typename OutT, typename LutT>
 struct selected {
-  const void* kernel;  // Type-erased kernel pointer (compatible with any __global__ function)
+  compute_similarity_kernel_t<OutT, LutT> kernel;
   dim3 grid_dim;
   dim3 block_dim;
   size_t smem_size;
