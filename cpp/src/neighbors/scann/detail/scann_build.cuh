@@ -34,9 +34,9 @@ using namespace cuvs::spatial::knn::detail;  // NOLINT
  */
 
 template <typename T,
-          typename IdxT     = int64_t,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename IdxT = int64_t,
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 index<T, IdxT> build(
   raft::resources const& res,
   const index_params& params,

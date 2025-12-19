@@ -12,8 +12,6 @@
 #include "vamana_structs.cuh"
 #include <cuvs/neighbors/vamana.hpp>
 
-#include <raft/cluster/kmeans.cuh>
-#include <raft/cluster/kmeans_types.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/error.hpp>
@@ -94,9 +92,9 @@ __global__ void print_queryIds(void* query_list_ptr)
  *******************************************************************************************/
 template <typename T,
           typename accT,
-          typename IdxT     = uint32_t,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename IdxT = uint32_t,
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 void batched_insert_vamana(
   raft::resources const& res,
   const index_params& params,
@@ -567,9 +565,9 @@ auto quantize_all_vectors(raft::resources const& res,
 }
 
 template <typename T,
-          typename IdxT     = uint64_t,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename IdxT = uint64_t,
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 index<T, IdxT> build(
   raft::resources const& res,
   const index_params& params,
