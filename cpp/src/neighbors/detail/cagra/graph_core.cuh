@@ -489,13 +489,12 @@ void shift_array(T* array, uint64_t num)
 }
 }  // namespace
 
-template <
-  typename DataT,
-  typename IdxT       = uint32_t,
-  typename d_accessor = raft::host_device_accessor<std::experimental::default_accessor<DataT>,
-                                                   raft::memory_type::device>,
-  typename g_accessor =
-    raft::host_device_accessor<std::experimental::default_accessor<IdxT>, raft::memory_type::host>>
+template <typename DataT,
+          typename IdxT       = uint32_t,
+          typename d_accessor = raft::host_device_accessor<cuda::std::default_accessor<DataT>,
+                                                           raft::memory_type::device>,
+          typename g_accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<IdxT>, raft::memory_type::host>>
 void sort_knn_graph(
   raft::resources const& res,
   const cuvs::distance::DistanceType metric,
@@ -1157,10 +1156,9 @@ void count_2hop_detours(raft::host_matrix_view<IdxT, int64_t, raft::row_major> k
   }
 }
 
-template <
-  typename IdxT = uint32_t,
-  typename g_accessor =
-    raft::host_device_accessor<std::experimental::default_accessor<IdxT>, raft::memory_type::host>>
+template <typename IdxT = uint32_t,
+          typename g_accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<IdxT>, raft::memory_type::host>>
 void optimize(
   raft::resources const& res,
   raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph,

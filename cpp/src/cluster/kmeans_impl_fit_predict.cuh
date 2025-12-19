@@ -26,12 +26,24 @@ void fit_predict(raft::resources const& handle,
       raft::make_device_matrix<DataT, IndexT>(handle, pams.n_clusters, n_features);
     cuvs::cluster::kmeans::fit(
       handle, pams, X, sample_weight, centroids_matrix.view(), inertia, n_iter);
-    cuvs::cluster::kmeans::predict(
-      handle, pams, X, sample_weight, centroids_matrix.view(), labels, true, inertia);
+    cuvs::cluster::kmeans::predict(handle,
+                                   pams,
+                                   X,
+                                   sample_weight,
+                                   raft::make_const_mdspan(centroids_matrix.view()),
+                                   labels,
+                                   true,
+                                   inertia);
   } else {
     cuvs::cluster::kmeans::fit(handle, pams, X, sample_weight, centroids.value(), inertia, n_iter);
-    cuvs::cluster::kmeans::predict(
-      handle, pams, X, sample_weight, centroids.value(), labels, true, inertia);
+    cuvs::cluster::kmeans::predict(handle,
+                                   pams,
+                                   X,
+                                   sample_weight,
+                                   raft::make_const_mdspan(centroids.value()),
+                                   labels,
+                                   true,
+                                   inertia);
   }
 }
 
