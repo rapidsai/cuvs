@@ -323,6 +323,12 @@ extern "C" cuvsError_t cuvsIvfPqExtend(cuvsResources_t res,
   return cuvs::core::translate_exceptions([=] {
     auto vectors = new_vectors->dl_tensor;
 
+    // Set the index dtype if not already set (e.g., for view-type indices built from precomputed data)
+    if (index->dtype.code == 0 && index->dtype.bits == 0) {
+      index->dtype.code = vectors.dtype.code;
+      index->dtype.bits = vectors.dtype.bits;
+    }
+
     if (vectors.dtype.code == kDLFloat && vectors.dtype.bits == 32) {
       _extend<float, int64_t>(res, new_vectors, new_indices, *index);
     } else if (vectors.dtype.code == kDLFloat && vectors.dtype.bits == 16) {
@@ -427,8 +433,9 @@ extern "C" cuvsError_t cuvsIvfPqBuildPrecomputed(cuvsResources_t res,
         *res_ptr, build_params, dim, pq_centers_mds, centers_mds, centers_rot_mds, rotation_matrix_mds));
 
     index->addr = reinterpret_cast<uintptr_t>(idx);
-    index->dtype.code = kDLFloat;
-    index->dtype.bits = 32;
+    // Leave dtype unset (0) - it will be set when extend() is called with actual data
+    index->dtype.code = 0;
+    index->dtype.bits = 0;
   });
 }
 
