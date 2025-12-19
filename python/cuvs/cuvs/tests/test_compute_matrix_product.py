@@ -210,11 +210,15 @@ else:
             [
                 pytest.warns(
                     UsedKeyWarning,
-                    match=r'^Key "_c" at root\["_a"\]\[0\]\["_b"\] is used in a matrix product entry even though it begins with "_"\. Consider renaming it to "c" to indicate this\.$',
+                    match=r'^Key "_c" at root\["_a"\]\[0\]\["_b"\] is used in '
+                    r'a matrix product entry even though it begins with "_"\. '
+                    r'Consider renaming it to "c" to indicate this\.$',
                 ),
                 pytest.warns(
                     UsedKeyWarning,
-                    match=r'^Key "__b" at root is used in a matrix product entry even though it begins with "__"\. Consider renaming it to "b" to indicate this\.$',
+                    match=r'^Key "__b" at root is used in a matrix product '
+                    r'entry even though it begins with "__"\. Consider '
+                    r'renaming it to "b" to indicate this\.$',
                 ),
             ],
             id="used",
