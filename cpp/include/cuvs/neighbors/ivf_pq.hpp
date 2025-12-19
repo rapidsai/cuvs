@@ -317,19 +317,19 @@ class index_iface {
   virtual raft::host_vector_view<const IdxT, uint32_t, raft::row_major> accum_sorted_sizes()
     const noexcept = 0;
 
-  virtual raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers() noexcept = 0;
+  virtual raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers() = 0;
   virtual raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers()
     const noexcept = 0;
 
-  virtual raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept = 0;
+  virtual raft::device_matrix_view<float, uint32_t, raft::row_major> centers() = 0;
   virtual raft::device_matrix_view<const float, uint32_t, raft::row_major> centers()
     const noexcept = 0;
 
-  virtual raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() noexcept = 0;
+  virtual raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() = 0;
   virtual raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot()
     const noexcept = 0;
 
-  virtual raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix() noexcept = 0;
+  virtual raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix() = 0;
   virtual raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix()
     const noexcept = 0;
 
@@ -498,7 +498,7 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
    *   - codebook_gen::PER_SUBSPACE: [pq_dim , pq_len, pq_book_size]
    *   - codebook_gen::PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
    */
-  raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers() noexcept override;
+  raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers() override;
   raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers()
     const noexcept override;
 
@@ -517,7 +517,7 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
     const noexcept override;
 
   /** The transform matrix (original space -> rotated padded space) [rot_dim, dim] */
-  raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix() noexcept override;
+  raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix() override;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix()
     const noexcept override;
 
@@ -545,7 +545,7 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
     const noexcept override;
 
   /** Cluster centers corresponding to the lists in the original space [n_lists, dim_ext] */
-  raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept override;
+  raft::device_matrix_view<float, uint32_t, raft::row_major> centers() override;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers()
     const noexcept override;
 
@@ -555,7 +555,7 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
     const raft::resources& res) const override;
 
   /** Cluster centers corresponding to the lists in the rotated space [n_lists, rot_dim] */
-  raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() noexcept override;
+  raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() override;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot()
     const noexcept override;
 
