@@ -136,7 +136,7 @@ cuvsError_t cuvsVamanaIndexGetDims(cuvsVamanaIndex_t index, int* dim);
  *
  * Build the index from the dataset for efficient DiskANN search.
  *
- * The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm
+ * The build uses the Vamana insertion-based algorithm to create the graph. The algorithm
  * starts with an empty graph and iteratively inserts batches of nodes. Each batch involves
  * performing a greedy search for each vector to be inserted, and inserting it with edges to
  * all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied
