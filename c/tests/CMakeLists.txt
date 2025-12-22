@@ -94,7 +94,7 @@ endif()
 
 ConfigureTest(NAME cuvs_c_headers PATH core/headers.c)
 ConfigureTest(NAME cuvs_c_test PATH core/c_api.c)
-target_link_libraries(cuvs_c_test PRIVATE CUDA::cudart)
+target_link_libraries(cuvs_c_test PRIVATE CUDA::cudart_static)
 ConfigureTest(NAME cuvs_c_neighbors_test PATH neighbors/c_api.c)
 
 # ##################################################################################################

@@ -227,11 +227,6 @@ cuVS has the following configurable cmake flags available:
    - OFF
    - Enable the `-lineinfo` option for nvcc
 
- * - CUDA_STATIC_RUNTIME
-   - ON, OFF
-   - OFF
-   - Statically link the CUDA runtime
-
  * - CUDA_STATIC_MATH_LIBRARIES
    - ON, OFF
    - OFF
