@@ -128,8 +128,8 @@ cdef class AceParams:
     """
     Parameters for ACE (Augmented Core Extraction) graph building algorithm.
 
-    ACE enables building indices for datasets too large to fit in GPU memory by
-    partitioning the dataset using balanced k-means and building sub-indices
+    ACE enables building indexes for datasets too large to fit in GPU memory by
+    partitioning the dataset using balanced k-means and building sub-indexes
     for each partition independently.
 
     Parameters
