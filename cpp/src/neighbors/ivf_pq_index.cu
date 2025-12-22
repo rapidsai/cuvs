@@ -241,7 +241,8 @@ view_impl<IdxT>::view_impl(
 }
 
 template <typename IdxT>
-raft::device_mdspan<float, pq_centers_extents, raft::row_major> owning_impl<IdxT>::pq_centers()
+raft::device_mdspan<float, pq_centers_extents, raft::row_major>
+owning_impl<IdxT>::pq_centers() noexcept
 {
   return pq_centers_.view();
 }
@@ -254,7 +255,7 @@ owning_impl<IdxT>::pq_centers() const noexcept
 }
 
 template <typename IdxT>
-raft::device_matrix_view<float, uint32_t, raft::row_major> owning_impl<IdxT>::centers()
+raft::device_matrix_view<float, uint32_t, raft::row_major> owning_impl<IdxT>::centers() noexcept
 {
   return centers_.view();
 }
@@ -267,7 +268,7 @@ raft::device_matrix_view<const float, uint32_t, raft::row_major> owning_impl<Idx
 }
 
 template <typename IdxT>
-raft::device_matrix_view<float, uint32_t, raft::row_major> owning_impl<IdxT>::centers_rot()
+raft::device_matrix_view<float, uint32_t, raft::row_major> owning_impl<IdxT>::centers_rot() noexcept
 {
   return centers_rot_.view();
 }
@@ -280,7 +281,8 @@ raft::device_matrix_view<const float, uint32_t, raft::row_major> owning_impl<Idx
 }
 
 template <typename IdxT>
-raft::device_matrix_view<float, uint32_t, raft::row_major> owning_impl<IdxT>::rotation_matrix()
+raft::device_matrix_view<float, uint32_t, raft::row_major>
+owning_impl<IdxT>::rotation_matrix() noexcept
 {
   return rotation_matrix_.view();
 }

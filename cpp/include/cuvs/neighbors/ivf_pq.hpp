@@ -494,7 +494,6 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
    *   - codebook_gen::PER_SUBSPACE: [pq_dim , pq_len, pq_book_size]
    *   - codebook_gen::PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
    */
-  raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers() override;
   raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers()
     const noexcept override;
 
@@ -513,7 +512,6 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
     const noexcept override;
 
   /** The transform matrix (original space -> rotated padded space) [rot_dim, dim] */
-  raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix() override;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix()
     const noexcept override;
 
@@ -541,7 +539,6 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
     const noexcept override;
 
   /** Cluster centers corresponding to the lists in the original space [n_lists, dim_ext] */
-  raft::device_matrix_view<float, uint32_t, raft::row_major> centers() override;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers()
     const noexcept override;
 
@@ -551,7 +548,6 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
     const raft::resources& res) const override;
 
   /** Cluster centers corresponding to the lists in the rotated space [n_lists, rot_dim] */
-  raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() override;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot()
     const noexcept override;
 
@@ -2999,36 +2995,6 @@ void erase_list(raft::resources const& res, index<int64_t>* index, uint32_t labe
  * @param[inout] index pointer to IVF-PQ index
  */
 void reset_index(const raft::resources& res, index<int64_t>* index);
-
-/**
- * @brief Public helper API exposing the computation of the index's rotation matrix.
- * NB: This is to be used only when the rotation matrix is not already computed through
- * cuvs::neighbors::ivf_pq::build.
- *
- * Usage example:
- * @code{.cpp}
- *   raft::resources res;
- *   // use default index parameters
- *   ivf_pq::index_params index_params;
- *   // force random rotation
- *   index_params.force_random_rotation = true;
- *   // initialize an empty index
- *   cuvs::neighbors::ivf_pq::index<int64_t> index(res, index_params, D);
- *   // reset the index
- *   reset_index(res, &index);
- *   // compute the rotation matrix with random_rotation
- *   cuvs::neighbors::ivf_pq::helpers::make_rotation_matrix(
- *     res, &index, index_params.force_random_rotation);
- * @endcode
- *
- * @param[in] res raft resource
- * @param[inout] index pointer to IVF-PQ index
- * @param[in] force_random_rotation whether to apply a random rotation matrix on the input data. See
- * cuvs::neighbors::ivf_pq::index_params for more details.
- */
-void make_rotation_matrix(raft::resources const& res,
-                          index<int64_t>* index,
-                          bool force_random_rotation);
 
 /**
  * @brief Pad cluster centers with their L2 norms for efficient GEMM operations.

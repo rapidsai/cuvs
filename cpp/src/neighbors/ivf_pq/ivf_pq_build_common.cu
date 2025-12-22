@@ -257,17 +257,6 @@ void make_rotation_matrix(raft::resources const& handle,
   }
 }
 
-void make_rotation_matrix(raft::resources const& res,
-                          index<int64_t>* index,
-                          bool force_random_rotation)
-{
-  make_rotation_matrix(res,
-                       force_random_rotation,
-                       index->rot_dim(),
-                       index->dim(),
-                       index->rotation_matrix().data_handle());
-}
-
 void extract_centers(raft::resources const& res,
                      const cuvs::neighbors::ivf_pq::index<int64_t>& index,
                      raft::device_matrix_view<float, int64_t, raft::row_major> cluster_centers)
