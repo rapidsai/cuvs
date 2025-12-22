@@ -150,7 +150,7 @@ index 15cf427cf..d1669831c 100644
          std::optional<raft::device_vector_view<const float, int64_t>>
                  norms_view = raft::make_device_vector_view(
 diff --git a/faiss/gpu/impl/CuvsIVFPQ.cu b/faiss/gpu/impl/CuvsIVFPQ.cu
-index 1e2fef225..e9781144f 100644
+index 1e2fef225..99a115443 100644
 --- a/faiss/gpu/impl/CuvsIVFPQ.cu
 +++ b/faiss/gpu/impl/CuvsIVFPQ.cu
 @@ -149,22 +149,60 @@ void CuvsIVFPQ::updateQuantizer(Index* quantizer) {
@@ -195,14 +195,14 @@ index 1e2fef225..e9781144f 100644
 -                    raft_handle,
 -                    cuvs_index.get(),
 +            auto mutable_centers_view =
-                     raft::make_device_matrix_view<float, uint32_t>(
--                            centroids.data(), numLists_, dim_));
++                    raft::make_device_matrix_view<float, uint32_t>(
 +                            const_cast<float*>(
 +                                    cuvs_index->centers().data_handle()),
 +                            numLists_,
 +                            cuvs_index->centers().extent(1));
 +            auto mutable_centers_rot_view =
-+                    raft::make_device_matrix_view<float, uint32_t>(
+                     raft::make_device_matrix_view<float, uint32_t>(
+-                            centroids.data(), numLists_, dim_));
 +                            const_cast<float*>(
 +                                    cuvs_index->centers_rot().data_handle()),
 +                            cuvs_index->centers_rot().extent(0),
@@ -257,6 +257,33 @@ index 1e2fef225..e9781144f 100644
      }
 
      setPQCentroids_();
+@@ -435,7 +492,7 @@ void CuvsIVFPQ::copyInvertedListsFrom(const InvertedLists* ivf) {
+     }
+
+     raft::update_device(
+-            cuvs_index->list_sizes().data_handle(),
++            const_cast<uint32_t*>(cuvs_index->list_sizes().data_handle()),
+             list_sizes_.data(),
+             nlist,
+             raft_handle.get_stream());
+@@ -508,7 +565,7 @@ void CuvsIVFPQ::addEncodedVectorsToList_(
+     // fetch the list indices ptr on host
+     raft::update_host(
+             &list_indices_ptr,
+-            cuvs_index->inds_ptrs().data_handle() + listId,
++            const_cast<idx_t**>(cuvs_index->inds_ptrs().data_handle()) + listId,
+             1,
+             stream);
+     raft_handle.sync_stream();
+@@ -520,7 +577,7 @@ void CuvsIVFPQ::setPQCentroids_() {
+     auto stream = resources_->getDefaultStreamCurrentDevice();
+
+     raft::copy(
+-            cuvs_index->pq_centers().data_handle(),
++            const_cast<float*>(cuvs_index->pq_centers().data_handle()),
+             pqCentroidsInnermostCode_.data(),
+             pqCentroidsInnermostCode_.numElements(),
+             stream);
 diff --git a/faiss/gpu/utils/CuvsUtils.h b/faiss/gpu/utils/CuvsUtils.h
 index e44e5f12d..42fe8ca48 100644
 --- a/faiss/gpu/utils/CuvsUtils.h
