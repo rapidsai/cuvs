@@ -866,13 +866,13 @@ auto clone(const raft::resources& res, const index<IdxT>& source) -> index<IdxT>
 
   // Create owning_impl directly to get mutable access for copying
   auto impl = std::make_unique<owning_impl<IdxT>>(res,
-                                                   source.metric(),
-                                                   source.codebook_kind(),
-                                                   source.n_lists(),
-                                                   source.dim(),
-                                                   source.pq_bits(),
-                                                   source.pq_dim(),
-                                                   source.conservative_memory_allocation());
+                                                  source.metric(),
+                                                  source.codebook_kind(),
+                                                  source.n_lists(),
+                                                  source.dim(),
+                                                  source.pq_bits(),
+                                                  source.pq_dim(),
+                                                  source.conservative_memory_allocation());
 
   // raft::copy the independent parts using mutable accessors
   raft::copy(impl->list_sizes().data_handle(),
@@ -887,10 +887,8 @@ auto clone(const raft::resources& res, const index<IdxT>& source) -> index<IdxT>
              source.pq_centers().data_handle(),
              source.pq_centers().size(),
              stream);
-  raft::copy(impl->centers().data_handle(),
-             source.centers().data_handle(),
-             source.centers().size(),
-             stream);
+  raft::copy(
+    impl->centers().data_handle(), source.centers().data_handle(), source.centers().size(), stream);
   raft::copy(impl->centers_rot().data_handle(),
              source.centers_rot().data_handle(),
              source.centers_rot().size(),
