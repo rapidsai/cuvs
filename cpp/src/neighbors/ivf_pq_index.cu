@@ -483,7 +483,6 @@ raft::device_matrix_view<const float, uint32_t, raft::row_major> index<IdxT>::ce
   return impl_->centers_rot();
 }
 
-
 template <typename IdxT>
 raft::device_matrix_view<const float, uint32_t, raft::row_major> index<IdxT>::rotation_matrix()
   const noexcept

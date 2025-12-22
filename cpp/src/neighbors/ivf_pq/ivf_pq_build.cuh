@@ -281,7 +281,9 @@ inline void pad_centers_with_norms(raft::resources const& res,
 }
 
 template <typename IdxT>
-void set_centers(raft::resources const& handle, index<IdxT>* index, const float* cluster_centers)
+void set_centers(raft::resources const& handle,
+                 owning_impl<IdxT>* index,
+                 const float* cluster_centers)
 {
   pad_centers_with_norms(handle,
                          cluster_centers,
@@ -1138,20 +1140,21 @@ auto build(raft::resources const& handle,
   RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
 
-  index<IdxT> idx(handle,
-                  params.metric,
-                  params.codebook_kind,
-                  params.n_lists,
-                  dim,
-                  params.pq_bits,
-                  params.pq_dim,
-                  params.conservative_memory_allocation);
+  auto idx = std::make_unique<cuvs::neighbors::ivf_pq::owning_impl<IdxT>>(
+    handle,
+    params.metric,
+    params.codebook_kind,
+    params.n_lists,
+    dim,
+    params.pq_bits,
+    params.pq_dim == 0 ? index<IdxT>::calculate_pq_dim(dim) : params.pq_dim,
+    params.conservative_memory_allocation);
 
   auto stream = raft::resource::get_cuda_stream(handle);
-  utils::memzero(idx.accum_sorted_sizes().data_handle(), idx.accum_sorted_sizes().size(), stream);
-  utils::memzero(idx.list_sizes().data_handle(), idx.list_sizes().size(), stream);
-  utils::memzero(idx.data_ptrs().data_handle(), idx.data_ptrs().size(), stream);
-  utils::memzero(idx.inds_ptrs().data_handle(), idx.inds_ptrs().size(), stream);
+  utils::memzero(idx->accum_sorted_sizes().data_handle(), idx->accum_sorted_sizes().size(), stream);
+  utils::memzero(idx->list_sizes().data_handle(), idx->list_sizes().size(), stream);
+  utils::memzero(idx->data_ptrs().data_handle(), idx->data_ptrs().size(), stream);
+  utils::memzero(idx->inds_ptrs().data_handle(), idx->inds_ptrs().size(), stream);
 
   {
     raft::random::RngState random_state{137};
@@ -1211,18 +1214,18 @@ auto build(raft::resources const& handle,
     // NB: here cluster_centers is used as if it is [n_clusters, data_dim] not [n_clusters,
     // dim_ext]!
     rmm::device_uvector<float> cluster_centers_buf(
-      idx.n_lists() * idx.dim(), stream, device_memory);
+      idx->n_lists() * idx->dim(), stream, device_memory);
     auto cluster_centers = cluster_centers_buf.data();
 
     // Train balanced hierarchical kmeans clustering
     auto trainset_const_view = raft::make_const_mdspan(trainset.view());
     auto centers_view        = raft::make_device_matrix_view<float, internal_extents_t>(
-      cluster_centers, idx.n_lists(), idx.dim());
+      cluster_centers, idx->n_lists(), idx->dim());
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
-    kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>((int)idx.metric());
+    kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>((int)idx->metric());
 
-    if (idx.metric() == distance::DistanceType::CosineExpanded) {
+    if (idx->metric() == distance::DistanceType::CosineExpanded) {
       raft::linalg::row_normalize<raft::linalg::L2Norm>(
         handle, trainset_const_view, trainset.view());
     }
@@ -1231,7 +1234,7 @@ auto build(raft::resources const& handle,
     // Trainset labels are needed for training PQ codebooks
     rmm::device_uvector<uint32_t> labels(n_rows_train, stream, big_memory_resource);
     auto centers_const_view = raft::make_device_matrix_view<const float, internal_extents_t>(
-      cluster_centers, idx.n_lists(), idx.dim());
+      cluster_centers, idx->n_lists(), idx->dim());
     if (idx.metric() == distance::DistanceType::CosineExpanded) {
       raft::linalg::row_normalize<raft::linalg::L2Norm>(handle, centers_const_view, centers_view);
     }
@@ -1245,11 +1248,13 @@ auto build(raft::resources const& handle,
 
     set_centers(handle, &idx, cluster_centers);
 
+    index<IdxT> index(std::move(idx));
+
     // Train PQ codebooks
-    switch (idx.codebook_kind()) {
+    switch (index.codebook_kind()) {
       case codebook_gen::PER_SUBSPACE:
         train_per_subset(handle,
-                         idx,
+                         index,
                          n_rows_train,
                          trainset.data_handle(),
                          labels.data(),
@@ -1258,7 +1263,7 @@ auto build(raft::resources const& handle,
         break;
       case codebook_gen::PER_CLUSTER:
         train_per_cluster(handle,
-                          idx,
+                          index,
                           n_rows_train,
                           trainset.data_handle(),
                           labels.data(),

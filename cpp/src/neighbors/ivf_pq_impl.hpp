@@ -117,15 +117,19 @@ class owning_impl : public index_impl<IdxT> {
   owning_impl(const owning_impl&)            = delete;
   owning_impl& operator=(const owning_impl&) = delete;
 
+  raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers() noexcept;
   raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers()
     const noexcept override;
 
+  raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers()
     const noexcept override;
 
+  raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() noexcept;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot()
     const noexcept override;
 
+  raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix() noexcept;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix()
     const noexcept override;
 
@@ -158,19 +162,15 @@ class view_impl : public index_impl<IdxT> {
   view_impl(const view_impl&)            = delete;
   view_impl& operator=(const view_impl&) = delete;
 
-  raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers() override;
   raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers()
     const noexcept override;
 
-  raft::device_matrix_view<float, uint32_t, raft::row_major> centers() override;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers()
     const noexcept override;
 
-  raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() override;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot()
     const noexcept override;
 
-  raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix() override;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix()
     const noexcept override;
 
