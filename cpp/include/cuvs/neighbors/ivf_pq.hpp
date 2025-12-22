@@ -317,19 +317,15 @@ class index_iface {
   virtual raft::host_vector_view<const IdxT, uint32_t, raft::row_major> accum_sorted_sizes()
     const noexcept = 0;
 
-  virtual raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers() = 0;
   virtual raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers()
     const noexcept = 0;
 
-  virtual raft::device_matrix_view<float, uint32_t, raft::row_major> centers() = 0;
   virtual raft::device_matrix_view<const float, uint32_t, raft::row_major> centers()
     const noexcept = 0;
 
-  virtual raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() = 0;
   virtual raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot()
     const noexcept = 0;
 
-  virtual raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix() = 0;
   virtual raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix()
     const noexcept = 0;
 
