@@ -1,12 +1,12 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2020-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
+#include "faiss_select/Select.cuh"
 #include <raft/core/resources.hpp>
-#include <raft/neighbors/detail/faiss_select/Select.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/pow2_utils.cuh>
@@ -68,7 +68,7 @@ RAFT_KERNEL haversine_knn_kernel(value_idx* out_inds,
   __shared__ distance_t smemK[kNumWarps * warp_q];
   __shared__ value_idx smemV[kNumWarps * warp_q];
 
-  using namespace raft::neighbors::detail::faiss_select;
+  using namespace cuvs::neighbors::detail::faiss_select;
   BlockSelect<distance_t, value_idx, false, Comparator<distance_t>, warp_q, thread_q, tpb> heap(
     std::numeric_limits<distance_t>::max(), std::numeric_limits<value_idx>::max(), smemK, smemV, k);
 
