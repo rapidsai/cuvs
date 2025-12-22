@@ -310,36 +310,38 @@ __global__ void computeInnerProductsWithBitwiseOpt(const ComputeInnerProductsKer
 
     // Step 4: Update threshold atomically (simplified version)
     // If threshold only decreases (gets tighter), we can use atomicMin
-    float max_topk_dist;
+    if (num_candidates >= params.topk) {
+      float max_topk_dist;
 
-    if (tid == 0) {
-      max_topk_dist = -INFINITY;
+      if (tid == 0) {
+        max_topk_dist = -INFINITY;
 
-      // Find the maximum distance in our top-k results
-      uint32_t output_offset =
-        query_idx * (params.topk * params.nprobe) +
-        probe_slot * params.topk;  // <-- Use probe_slot, not (block_id % nprobe)
+        // Find the maximum distance in our top-k results
+        uint32_t output_offset =
+          query_idx * (params.topk * params.nprobe) +
+          probe_slot * params.topk;  // <-- Use probe_slot, not (block_id % nprobe)
 
-      for (uint32_t i = 0; i < params.topk; i++) {
-        float dist = params.d_topk_dists[output_offset + i];
-        if (dist > 0 && dist > max_topk_dist) { max_topk_dist = dist; }
+        for (uint32_t i = 0; i < params.topk; i++) {
+          float dist = params.d_topk_dists[output_offset + i];
+          if (dist > 0 && dist > max_topk_dist) { max_topk_dist = dist; }
+        }
       }
-    }
 
-    __syncthreads();
+      __syncthreads();
 
-    // Update threshold using atomicMin (for floats)
-    // max_topk_dist should be > 0 to prevent using initialized memory
-    if (tid == 0 && max_topk_dist > 0 && max_topk_dist < threshold) {
-      // Use integer interpretation for atomic operations
-      int* threshold_ptr = (int*)(params.d_threshold + query_idx);
-      int new_val        = __float_as_int(max_topk_dist);
+      // Update threshold using atomicMin (for floats)
+      // max_topk_dist should be > 0 to prevent using initialized memory
+      if (tid == 0 && max_topk_dist > 0 && max_topk_dist < threshold) {
+        // Use integer interpretation for atomic operations
+        int* threshold_ptr = (int*)(params.d_threshold + query_idx);
+        int new_val        = __float_as_int(max_topk_dist);
 
-      // Atomic minimum for floats (assuming positive distances)
-      atomicMin(threshold_ptr, new_val);
+        // Atomic minimum for floats (assuming positive distances)
+        atomicMin(threshold_ptr, new_val);
 
-      // Note: atomicMin on int representation works correctly for positive floats
-      // because IEEE 754 float format preserves ordering for positive values
+        // Note: atomicMin on int representation works correctly for positive floats
+        // because IEEE 754 float format preserves ordering for positive values
+      }
     }
   }
 }
@@ -574,36 +576,40 @@ __global__ void computeInnerProductsWithBitwiseOpt8bitNoEX(
     queue.store(params.d_topk_dists + output_offset,
                 (uint32_t*)(params.d_topk_pids + output_offset));
 
-    float max_topk_dist;
+    // Step 3: Update threshold atomically (simplified version)
+    // If threshold only decreases (gets tighter), we can use atomicMin
+    if (num_candidates >= params.topk) {
+      float max_topk_dist;
 
-    if (tid == 0) {
-      max_topk_dist = -INFINITY;
+      if (tid == 0) {
+        max_topk_dist = -INFINITY;
 
-      // Find the maximum distance in our top-k results
-      uint32_t output_offset =
-        query_idx * (params.topk * params.nprobe) +
-        probe_slot * params.topk;  // <-- Use probe_slot, not (block_id % nprobe)
+        // Find the maximum distance in our top-k results
+        uint32_t output_offset =
+          query_idx * (params.topk * params.nprobe) +
+          probe_slot * params.topk;  // <-- Use probe_slot, not (block_id % nprobe)
 
-      for (uint32_t i = 0; i < params.topk; i++) {
-        float dist = params.d_topk_dists[output_offset + i];
-        if (dist > 0 && dist > max_topk_dist) { max_topk_dist = dist; }
+        for (uint32_t i = 0; i < params.topk; i++) {
+          float dist = params.d_topk_dists[output_offset + i];
+          if (dist > 0 && dist > max_topk_dist) { max_topk_dist = dist; }
+        }
       }
-    }
 
-    __syncthreads();
+      __syncthreads();
 
-    // Update threshold using atomicMin (for floats)
-    // max_topk_dist should be > 0 to prevent using initialized memory
-    if (tid == 0 && max_topk_dist > 0 && max_topk_dist < threshold) {
-      // Use integer interpretation for atomic operations
-      int* threshold_ptr = (int*)(params.d_threshold + query_idx);
-      int new_val        = __float_as_int(max_topk_dist);
+      // Update threshold using atomicMin (for floats)
+      // max_topk_dist should be > 0 to prevent using initialized memory
+      if (tid == 0 && max_topk_dist > 0 && max_topk_dist < threshold) {
+        // Use integer interpretation for atomic operations
+        int* threshold_ptr = (int*)(params.d_threshold + query_idx);
+        int new_val        = __float_as_int(max_topk_dist);
 
-      // Atomic minimum for floats (assuming positive distances)
-      atomicMin(threshold_ptr, new_val);
+        // Atomic minimum for floats (assuming positive distances)
+        atomicMin(threshold_ptr, new_val);
 
-      // Note: atomicMin on int representation works correctly for positive floats
-      // because IEEE 754 float format preserves ordering for positive values
+        // Note: atomicMin on int representation works correctly for positive floats
+        // because IEEE 754 float format preserves ordering for positive values
+      }
     }
   }
 }
@@ -921,36 +927,38 @@ __global__ void computeInnerProductsWithBitwiseOpt4bit(
 
     // Step 4: Update threshold atomically (simplified version)
     // If threshold only decreases (gets tighter), we can use atomicMin
-    float max_topk_dist;
+    if (num_candidates >= params.topk) {
+      float max_topk_dist;
 
-    if (tid == 0) {
-      max_topk_dist = -INFINITY;
+      if (tid == 0) {
+        max_topk_dist = -INFINITY;
 
-      // Find the maximum distance in our top-k results
-      uint32_t output_offset =
-        query_idx * (params.topk * params.nprobe) +
-        probe_slot * params.topk;  // <-- Use probe_slot, not (block_id % nprobe)
+        // Find the maximum distance in our top-k results
+        uint32_t output_offset =
+          query_idx * (params.topk * params.nprobe) +
+          probe_slot * params.topk;  // <-- Use probe_slot, not (block_id % nprobe)
 
-      for (uint32_t i = 0; i < params.topk; i++) {
-        float dist = params.d_topk_dists[output_offset + i];
-        if (dist > 0 && dist > max_topk_dist) { max_topk_dist = dist; }
+        for (uint32_t i = 0; i < params.topk; i++) {
+          float dist = params.d_topk_dists[output_offset + i];
+          if (dist > 0 && dist > max_topk_dist) { max_topk_dist = dist; }
+        }
       }
-    }
 
-    __syncthreads();
+      __syncthreads();
 
-    // Update threshold using atomicMin (for floats)
-    // max_topk_dist should be > 0 to prevent using initialized memory
-    if (tid == 0 && max_topk_dist > 0 && max_topk_dist < threshold) {
-      // Use integer interpretation for atomic operations
-      int* threshold_ptr = (int*)(params.d_threshold + query_idx);
-      int new_val        = __float_as_int(max_topk_dist);
+      // Update threshold using atomicMin (for floats)
+      // max_topk_dist should be > 0 to prevent using initialized memory
+      if (tid == 0 && max_topk_dist > 0 && max_topk_dist < threshold) {
+        // Use integer interpretation for atomic operations
+        int* threshold_ptr = (int*)(params.d_threshold + query_idx);
+        int new_val        = __float_as_int(max_topk_dist);
 
-      // Atomic minimum for floats (assuming positive distances)
-      atomicMin(threshold_ptr, new_val);
+        // Atomic minimum for floats (assuming positive distances)
+        atomicMin(threshold_ptr, new_val);
 
-      // Note: atomicMin on int representation works correctly for positive floats
-      // because IEEE 754 float format preserves ordering for positive values
+        // Note: atomicMin on int representation works correctly for positive floats
+        // because IEEE 754 float format preserves ordering for positive values
+      }
     }
   }
 }
@@ -1181,36 +1189,40 @@ __global__ void computeInnerProductsWithBitwiseOpt4bitNoEX(
     queue.store(params.d_topk_dists + output_offset,
                 (uint32_t*)(params.d_topk_pids + output_offset));
 
-    float max_topk_dist;
+    // Step 3: Update threshold atomically (simplified version)
+    // If threshold only decreases (gets tighter), we can use atomicMin
+    if (num_candidates >= params.topk) {
+      float max_topk_dist;
 
-    if (tid == 0) {
-      max_topk_dist = -INFINITY;
+      if (tid == 0) {
+        max_topk_dist = -INFINITY;
 
-      // Find the maximum distance in our top-k results
-      uint32_t output_offset =
-        query_idx * (params.topk * params.nprobe) +
-        probe_slot * params.topk;  // <-- Use probe_slot, not (block_id % nprobe)
+        // Find the maximum distance in our top-k results
+        uint32_t output_offset =
+          query_idx * (params.topk * params.nprobe) +
+          probe_slot * params.topk;  // <-- Use probe_slot, not (block_id % nprobe)
 
-      for (uint32_t i = 0; i < params.topk; i++) {
-        float dist = params.d_topk_dists[output_offset + i];
-        if (dist > 0 && dist > max_topk_dist) { max_topk_dist = dist; }
+        for (uint32_t i = 0; i < params.topk; i++) {
+          float dist = params.d_topk_dists[output_offset + i];
+          if (dist > 0 && dist > max_topk_dist) { max_topk_dist = dist; }
+        }
       }
-    }
 
-    __syncthreads();
+      __syncthreads();
 
-    // Update threshold using atomicMin (for floats)
-    // max_topk_dist should be > 0 to prevent using initialized memory
-    if (tid == 0 && max_topk_dist > 0 && max_topk_dist < threshold) {
-      // Use integer interpretation for atomic operations
-      int* threshold_ptr = (int*)(params.d_threshold + query_idx);
-      int new_val        = __float_as_int(max_topk_dist);
+      // Update threshold using atomicMin (for floats)
+      // max_topk_dist should be > 0 to prevent using initialized memory
+      if (tid == 0 && max_topk_dist > 0 && max_topk_dist < threshold) {
+        // Use integer interpretation for atomic operations
+        int* threshold_ptr = (int*)(params.d_threshold + query_idx);
+        int new_val        = __float_as_int(max_topk_dist);
 
-      // Atomic minimum for floats (assuming positive distances)
-      atomicMin(threshold_ptr, new_val);
+        // Atomic minimum for floats (assuming positive distances)
+        atomicMin(threshold_ptr, new_val);
 
-      // Note: atomicMin on int representation works correctly for positive floats
-      // because IEEE 754 float format preserves ordering for positive values
+        // Note: atomicMin on int representation works correctly for positive floats
+        // because IEEE 754 float format preserves ordering for positive values
+      }
     }
   }
 }
