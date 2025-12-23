@@ -450,7 +450,6 @@ void calc_centers_and_sizes(const raft::resources& handle,
                                        centers,
                                        stream,
                                        reset_counters);
-      raft::print_device_vector("labels", labels, n_rows, std::cout);
     } else {
       RAFT_FAIL("Packed binary mode is only supported for uint8_t data type");
     }
@@ -867,7 +866,7 @@ void balancing_em_iters(const raft::resources& handle,
         if constexpr (std::is_same_v<T, uint8_t>) {
           did_adjust = adjust_centers(cluster_centers,
                                       n_clusters,
-                                      transformed_dim,
+                                      dim,
                                       dataset,
                                       n_rows,
                                       cluster_labels,
@@ -881,7 +880,7 @@ void balancing_em_iters(const raft::resources& handle,
       } else {
         did_adjust = adjust_centers(cluster_centers,
                                     n_clusters,
-                                    transformed_dim,
+                                    dim,
                                     dataset,
                                     n_rows,
                                     cluster_labels,
@@ -906,9 +905,9 @@ void balancing_em_iters(const raft::resources& handle,
       case cuvs::distance::DistanceType::CosineExpanded:
       case cuvs::distance::DistanceType::CorrelationExpanded: {
         auto clusters_in_view = raft::make_device_matrix_view<const MathT, IdxT, raft::row_major>(
-          cluster_centers, n_clusters, dim);
+          cluster_centers, n_clusters, transformed_dim);
         auto clusters_out_view = raft::make_device_matrix_view<MathT, IdxT, raft::row_major>(
-          cluster_centers, n_clusters, dim);
+          cluster_centers, n_clusters, transformed_dim);
         raft::linalg::row_normalize<raft::linalg::L2Norm>(
           handle, clusters_in_view, clusters_out_view);
         break;
@@ -1109,18 +1108,21 @@ auto build_fine_clusters(const raft::resources& handle,
   auto stream          = raft::resource::get_cuda_stream(handle);
   IdxT transformed_dim = params.is_packed_binary ? dim * 8 : dim;
   rmm::device_uvector<IdxT> mc_trainset_ids_buf(mesocluster_size_max, stream, managed_memory);
-  rmm::device_uvector<MathT> mc_trainset_buf(
-    mesocluster_size_max * transformed_dim, stream, device_memory);
+  // For packed binary: gather and store raw uint8_t, pass to build_clusters<uint8_t, float>
+  // For non-packed: gather with transform to MathT, pass to build_clusters<MathT, MathT>
+  rmm::device_uvector<uint8_t> mc_trainset_packed_buf(
+    params.is_packed_binary ? mesocluster_size_max * dim : 0, stream, device_memory);
+  rmm::device_uvector<MathT> mc_trainset_mapped_buf(
+    !params.is_packed_binary ? mesocluster_size_max * dim : 0, stream, device_memory);
   rmm::device_uvector<MathT> mc_trainset_norm_buf(mesocluster_size_max, stream, device_memory);
   auto mc_trainset_ids  = mc_trainset_ids_buf.data();
-  auto mc_trainset      = mc_trainset_buf.data();
   auto mc_trainset_norm = mc_trainset_norm_buf.data();
 
   // label (cluster ID) of each vector
   rmm::device_uvector<LabelT> mc_trainset_labels(mesocluster_size_max, stream, device_memory);
 
   rmm::device_uvector<MathT> mc_trainset_ccenters(
-    fine_clusters_nums_max * dim, stream, device_memory);
+    fine_clusters_nums_max * transformed_dim, stream, device_memory);
   // number of vectors in each cluster
   rmm::device_uvector<CounterT> mc_trainset_csizes_tmp(
     fine_clusters_nums_max, stream, device_memory);
@@ -1147,30 +1149,75 @@ auto build_fine_clusters(const raft::resources& handle,
       RAFT_EXPECTS(fine_clusters_nums[i] > 0,
                    "Number of fine clusters must be non-zero for a non-empty mesocluster");
     }
-    thrust::transform_iterator<MappingOpT, const T*> mapping_itr(dataset_mptr, mapping_op);
-    raft::matrix::gather(mapping_itr, dim, n_rows, mc_trainset_ids, k, mc_trainset, stream);
+
+    // Gather data based on mode
+    if (params.is_packed_binary) {
+      // For packed binary: gather raw uint8_t data (no transformation)
+      if constexpr (std::is_same_v<T, uint8_t>) {
+        raft::matrix::gather(
+          dataset_mptr, dim, n_rows, mc_trainset_ids, k, mc_trainset_packed_buf.data(), stream);
+      } else {
+        RAFT_FAIL("Packed binary mode requires uint8_t data type, got %s", typeid(T).name());
+      }
+    } else {
+      // For non-packed: gather with transform to MathT
+      thrust::transform_iterator<MappingOpT, const T*> mapping_itr(dataset_mptr, mapping_op);
+      raft::matrix::gather(
+        mapping_itr, dim, n_rows, mc_trainset_ids, k, mc_trainset_mapped_buf.data(), stream);
+    }
+
     if (params.metric == cuvs::distance::DistanceType::L2Expanded ||
         params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
         params.metric == cuvs::distance::DistanceType::CosineExpanded) {
-      thrust::gather(raft::resource::get_thrust_policy(handle),
-                     mc_trainset_ids,
-                     mc_trainset_ids + k,
-                     dataset_norm_mptr,
-                     mc_trainset_norm);
+      if (params.is_packed_binary) {
+        // For packed binary, norm is constant = transformed_dim
+        raft::matrix::fill(
+          handle,
+          raft::make_device_matrix_view<MathT, IdxT>(mc_trainset_norm, k, 1),
+          static_cast<MathT>(transformed_dim));
+      } else {
+        thrust::gather(raft::resource::get_thrust_policy(handle),
+                       mc_trainset_ids,
+                       mc_trainset_ids + k,
+                       dataset_norm_mptr,
+                       mc_trainset_norm);
+      }
     }
 
-    build_clusters(handle,
-                   params,
-                   dim,
-                   mc_trainset,
-                   k,
-                   fine_clusters_nums[i],
-                   mc_trainset_ccenters.data(),
-                   mc_trainset_labels.data(),
-                   mc_trainset_csizes_tmp.data(),
-                   mapping_op,
-                   device_memory,
-                   mc_trainset_norm);
+    // Call build_clusters with appropriate type
+    if (params.is_packed_binary) {
+      // For packed binary: pass uint8_t*, build_clusters<uint8_t, MathT> will expand on-the-fly
+      if constexpr (std::is_same_v<T, uint8_t>) {
+        build_clusters(handle,
+                       params,
+                       dim,
+                       mc_trainset_packed_buf.data(),
+                       k,
+                       fine_clusters_nums[i],
+                       mc_trainset_ccenters.data(),
+                       mc_trainset_labels.data(),
+                       mc_trainset_csizes_tmp.data(),
+                       raft::identity_op{},  // No additional mapping needed for packed binary
+                       device_memory,
+                       mc_trainset_norm);
+      } else {
+        RAFT_FAIL("Packed binary mode requires uint8_t data type");
+      }
+    } else {
+      // For non-packed: pass MathT*, build_clusters<MathT, MathT> with identity_op
+      build_clusters(handle,
+                     params,
+                     dim,
+                     mc_trainset_mapped_buf.data(),
+                     k,
+                     fine_clusters_nums[i],
+                     mc_trainset_ccenters.data(),
+                     mc_trainset_labels.data(),
+                     mc_trainset_csizes_tmp.data(),
+                     raft::identity_op{},  // Data already transformed
+                     device_memory,
+                     mc_trainset_norm);
+    }
     raft::copy(cluster_centers + (transformed_dim * fine_clusters_csum[i]),
                mc_trainset_ccenters.data(),
                fine_clusters_nums[i] * transformed_dim,
