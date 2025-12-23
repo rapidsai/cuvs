@@ -29,6 +29,9 @@ project(
 )
 set(CMAKE_INSTALL_MESSAGE LAZY)
 
+# Disable C++20 module scanning (not using modules, just C++20 features)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+
 # Write the version header
 rapids_cmake_write_version_file(include/cuvs/version_config.h)
 
@@ -305,9 +308,9 @@ if(NOT BUILD_CPU_ONLY)
   set_target_properties(
     cuvs-cagra-search
     PROPERTIES BUILD_RPATH "\$ORIGIN"
-               CXX_STANDARD 17
+               CXX_STANDARD 20
                CXX_STANDARD_REQUIRED ON
-               CUDA_STANDARD 17
+               CUDA_STANDARD 20
                CUDA_STANDARD_REQUIRED ON
                CUDA_SEPARABLE_COMPILATION ON
                POSITION_INDEPENDENT_CODE ON
@@ -545,9 +548,9 @@ if(NOT BUILD_CPU_ONLY)
 
   set_target_properties(
     cuvs_objs
-    PROPERTIES CXX_STANDARD 17
+    PROPERTIES CXX_STANDARD 20
                CXX_STANDARD_REQUIRED ON
-               CUDA_STANDARD 17
+               CUDA_STANDARD 20
                CUDA_STANDARD_REQUIRED ON
                POSITION_INDEPENDENT_CODE ON
   )
@@ -605,9 +608,9 @@ if(NOT BUILD_CPU_ONLY)
       cuvs
       PROPERTIES BUILD_RPATH "\$ORIGIN"
                  INSTALL_RPATH "\$ORIGIN"
-                 CXX_STANDARD 17
+                 CXX_STANDARD 20
                  CXX_STANDARD_REQUIRED ON
-                 CUDA_STANDARD 17
+                 CUDA_STANDARD 20
                  CUDA_STANDARD_REQUIRED ON
                  CUDA_RESOLVE_DEVICE_SYMBOLS ON
                  INTERFACE_POSITION_INDEPENDENT_CODE ON
@@ -660,9 +663,9 @@ SECTIONS
       cuvs_static
       PROPERTIES BUILD_RPATH "\$ORIGIN"
                  INSTALL_RPATH "\$ORIGIN"
-                 CXX_STANDARD 17
+                 CXX_STANDARD 20
                  CXX_STANDARD_REQUIRED ON
-                 CUDA_STANDARD 17
+                 CUDA_STANDARD 20
                  CUDA_STANDARD_REQUIRED ON
                  CUDA_RESOLVE_DEVICE_SYMBOLS ON
                  POSITION_INDEPENDENT_CODE ON
