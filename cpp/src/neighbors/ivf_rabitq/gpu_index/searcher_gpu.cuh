@@ -21,6 +21,10 @@
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
+#define MAX_TOP_K_BLOCK_SORT \
+  64  // the search implementation performs block-level sorting if topk <= MAX_TOP_K_BLOCK_SORT;
+      // otherwise block sort is not used. must be power of 2; increases shared mem usage
+
 class SearcherGPU {
  public:
   explicit SearcherGPU(raft::resources const& handle,

@@ -22,6 +22,7 @@
 namespace cuvs::neighbors::ivf_rabitq {
 
 namespace detail {
+
 using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 template <typename T, typename IdxT, typename accessor>
@@ -146,14 +147,22 @@ void search(raft::resources const& handle,
                                search_mode_to_string(params.mode),
                                idx.rabitq_index().quantizer().get_query_scaling_factor(),
                                /* rabitq_quantize_flag = */ true);
+  searcher.AllocateSearcherSpace(idx.rabitq_index().get_num_centroids(), NQ);
 
   auto k = neighbors.extent(1);
-  searcher.AllocateSearcherSpace(idx.rabitq_index().get_num_centroids(), NQ);
+  auto max_candidates_per_query_per_probe =
+    k > MAX_TOP_K_BLOCK_SORT ? idx.rabitq_index().get_max_cluster_length() : k;
 
   float* d_topk_dists;
   uint32_t *d_topk_ids, *d_final_ids;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_topk_dists, NQ * params.n_probes * k * sizeof(float), stream));
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_topk_ids, NQ * params.n_probes * k * sizeof(uint32_t), stream));
+  RAFT_CUDA_TRY(
+    cudaMallocAsync(&d_topk_dists,
+                    NQ * params.n_probes * max_candidates_per_query_per_probe * sizeof(float),
+                    stream));
+  RAFT_CUDA_TRY(
+    cudaMallocAsync(&d_topk_ids,
+                    NQ * params.n_probes * max_candidates_per_query_per_probe * sizeof(uint32_t),
+                    stream));
   RAFT_CUDA_TRY(cudaMallocAsync(&d_final_ids, NQ * k * sizeof(uint32_t), stream));
 
   if (params.mode == search_mode::LUT32) {

@@ -15,14 +15,6 @@
 namespace cuvs::neighbors::ivf_rabitq::detail {
 namespace {
 
-#define MAX_TOP_K_BLOCK_SORT 64     // power of 2; increases shared mem usage
-#define MAX_TOP_K_WARP_SORT  16384  // power of 2; does not increase shared mem usage
-#define WARP_SORT_CAPACITY_FACTOR \
-  4  // factor between successive capacity values for instantiating warp_sort class
-#define STR(x) STR_HELPER(x)  // convert macro value to literal string
-#define STR_HELPER(x) \
-  #x  // Helper macro for stringification (two levels required for proper expansion)
-
 static constexpr int BITS_PER_CHUNK = 4;
 static constexpr int LUT_SIZE       = (1 << BITS_PER_CHUNK);  // 16
 static constexpr int WARP_SIZE      = 32;
