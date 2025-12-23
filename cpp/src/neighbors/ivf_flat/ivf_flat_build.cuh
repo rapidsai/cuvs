@@ -172,7 +172,7 @@ RAFT_KERNEL build_index_kernel(const LabelT* labels,
   }
 }
 
-/** See raft::neighbors::ivf_flat::extend docs */
+/** See cuvs::neighbors::ivf_flat::extend docs */
 template <typename T, typename IdxT>
 void extend(raft::resources const& handle,
             index<T, IdxT>* index,
@@ -433,7 +433,7 @@ void extend(raft::resources const& handle,
   }
 }
 
-/** See raft::neighbors::ivf_flat::extend docs */
+/** See cuvs::neighbors::ivf_flat::extend docs */
 template <typename T, typename IdxT>
 auto extend(raft::resources const& handle,
             const index<T, IdxT>& orig_index,
@@ -446,7 +446,7 @@ auto extend(raft::resources const& handle,
   return ext_index;
 }
 
-/** See raft::neighbors::ivf_flat::build docs */
+/** See cuvs::neighbors::ivf_flat::build docs */
 template <typename T, typename IdxT>
 inline auto build(raft::resources const& handle,
                   const index_params& params,
@@ -543,7 +543,7 @@ inline auto build(raft::resources const& handle,
 /**
  * Build an index that can be used in refinement operation.
  *
- * See raft::neighbors::refine for details on the refinement operation.
+ * See cuvs::neighbors::refine for details on the refinement operation.
  *
  * The returned index cannot be used for a regular ivf_flat::search. The index misses information
  * about coarse clusters. Instead, the neighbor candidates are assumed to form clusters, one for
