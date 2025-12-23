@@ -150,10 +150,26 @@ index 15cf427cf..d1669831c 100644
          std::optional<raft::device_vector_view<const float, int64_t>>
                  norms_view = raft::make_device_vector_view(
 diff --git a/faiss/gpu/impl/CuvsIVFPQ.cu b/faiss/gpu/impl/CuvsIVFPQ.cu
-index 1e2fef225..5cdde33e4 100644
+index 1e2fef225..35b388147 100644
 --- a/faiss/gpu/impl/CuvsIVFPQ.cu
 +++ b/faiss/gpu/impl/CuvsIVFPQ.cu
-@@ -149,22 +149,60 @@ void CuvsIVFPQ::updateQuantizer(Index* quantizer) {
+@@ -129,8 +129,14 @@ void CuvsIVFPQ::updateQuantizer(Index* quantizer) {
+
+     cuvs::neighbors::ivf_pq::helpers::reset_index(
+             raft_handle, cuvs_index.get());
++    auto mutable_rotation_matrix_view =
++            raft::make_device_matrix_view<float, uint32_t>(
++                    const_cast<float*>(
++                            cuvs_index->rotation_matrix().data_handle()),
++                    cuvs_index->rotation_matrix().extent(0),
++                    cuvs_index->rotation_matrix().extent(1));
+     cuvs::neighbors::ivf_pq::helpers::make_rotation_matrix(
+-            raft_handle, cuvs_index.get(), false);
++            raft_handle, mutable_rotation_matrix_view, false);
+
+     // If the index instance is a GpuIndexFlat, then we can use direct access to
+     // the centroids within.
+@@ -149,22 +155,60 @@ void CuvsIVFPQ::updateQuantizer(Index* quantizer) {
              // as float32 and store locally
              gpuData->reconstruct(0, gpuData->getSize(), centroids);
 
@@ -222,7 +238,7 @@ index 1e2fef225..5cdde33e4 100644
          }
      } else {
          DeviceTensor<float, 2, true> centroids(
-@@ -180,11 +218,30 @@ void CuvsIVFPQ::updateQuantizer(Index* quantizer) {
+@@ -180,11 +224,30 @@ void CuvsIVFPQ::updateQuantizer(Index* quantizer) {
 
          centroids.copyFrom(vecs, stream);
 
@@ -257,7 +273,7 @@ index 1e2fef225..5cdde33e4 100644
      }
 
      setPQCentroids_();
-@@ -520,7 +577,7 @@ void CuvsIVFPQ::setPQCentroids_() {
+@@ -520,7 +583,7 @@ void CuvsIVFPQ::setPQCentroids_() {
      auto stream = resources_->getDefaultStreamCurrentDevice();
 
      raft::copy(
