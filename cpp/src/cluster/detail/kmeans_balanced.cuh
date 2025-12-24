@@ -413,6 +413,17 @@ void calc_centers_and_sizes(const raft::resources& handle,
 {
   auto stream = raft::resource::get_cuda_stream(handle);
 
+  RAFT_LOG_INFO(
+    "calc_centers_and_sizes: T=%s, MathT=%s, n_clusters=%d, dim=%d, n_rows=%d, "
+    "is_packed_binary=%d, reset_counters=%d",
+    typeid(T).name(),
+    typeid(MathT).name(),
+    static_cast<int>(n_clusters),
+    static_cast<int>(dim),
+    static_cast<int>(n_rows),
+    is_packed_binary,
+    reset_counters);
+
   // For packed binary, dim is packed dimension, centers are in expanded dimension (dim * 8)
   IdxT centers_dim = is_packed_binary ? (dim * 8) : dim;
 
@@ -465,8 +476,6 @@ void calc_centers_and_sizes(const raft::resources& handle,
       mapping_itr, dim, labels, nullptr, n_rows, dim, n_clusters, centers, stream, reset_counters);
   }
 
-  raft::resource::sync_stream(handle);
-
   // Compute weight of each cluster
   cuvs::cluster::kmeans::detail::countLabels(
     handle, labels, temp_sizes, n_rows, n_clusters, workspace);
@@ -481,6 +490,9 @@ void calc_centers_and_sizes(const raft::resources& handle,
                                                              clusterSizesView,
                                                              centersView,
                                                              raft::div_checkzero_op{});
+
+  RAFT_LOG_TRACE_VEC(cluster_sizes, std::min<IdxT>(n_clusters, 10));
+  RAFT_LOG_TRACE_VEC(centers, std::min<IdxT>(centers_dim, 20));
 }
 
 /** Computes the L2 norm of the dataset, converting to MathT if necessary */
@@ -555,9 +567,9 @@ void predict(const raft::resources& handle,
   auto mem_res = mr.value_or(raft::resource::get_workspace_resource(handle));
   auto [max_minibatch_size, _mem_per_row] =
     calc_minibatch_size<MathT>(n_clusters, n_rows, dim, params.metric, std::is_same_v<T, MathT>);
-  rmm::device_uvector<MathT> cur_dataset(
-    std::is_same_v<T, MathT> ? 0 : max_minibatch_size * dim, stream, mem_res);
   IdxT transformed_dim   = params.is_packed_binary ? dim * 8 : dim;
+  rmm::device_uvector<MathT> cur_dataset(
+    std::is_same_v<T, MathT> ? 0 : max_minibatch_size * transformed_dim, stream, mem_res);
   bool need_compute_norm = dataset_norm == nullptr &&
                            (params.metric == cuvs::distance::DistanceType::L2Expanded ||
                             params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
@@ -759,8 +771,8 @@ auto adjust_centers(MathT* centers,
   const dim3 grid_dim(1, raft::ceildiv(n_clusters, static_cast<IdxT>(kBlockDimY)), 1);
   rmm::device_scalar<IdxT> update_count(0, stream, device_memory);
   if (is_packed_binary) {
-    IdxT transformed_dim = is_packed_binary ? dim * 8 : dim;
     if constexpr (std::is_same_v<T, uint8_t>) {
+      IdxT transformed_dim  = dim * 8;
       auto dataset_iterator = make_bitwise_expanded_iterator<MathT, IdxT>(dataset, dim);
       adjust_centers_kernel<kBlockDimY><<<grid_dim, block_dim, 0, stream>>>(centers,
                                                                             n_clusters,
@@ -964,6 +976,15 @@ void build_clusters(const raft::resources& handle,
 {
   auto stream = raft::resource::get_cuda_stream(handle);
 
+  RAFT_LOG_INFO(
+    "build_clusters: T=%s, MathT=%s, n_clusters=%d, dim=%d, n_rows=%d, is_packed_binary=%d",
+    typeid(T).name(),
+    typeid(MathT).name(),
+    static_cast<int>(n_clusters),
+    static_cast<int>(dim),
+    static_cast<int>(n_rows),
+    params.is_packed_binary);
+
   // "randomly" initialize labels
   auto labels_view = raft::make_device_vector_view<LabelT, IdxT>(cluster_labels, n_rows);
   raft::linalg::map_offset(
@@ -1107,12 +1128,22 @@ auto build_fine_clusters(const raft::resources& handle,
 {
   auto stream          = raft::resource::get_cuda_stream(handle);
   IdxT transformed_dim = params.is_packed_binary ? dim * 8 : dim;
+
+  RAFT_LOG_INFO(
+    "build_fine_clusters: T=%s, MathT=%s, dim=%d, n_rows=%d, n_mesoclusters=%d, "
+    "is_packed_binary=%d, transformed_dim=%d",
+    typeid(T).name(),
+    typeid(MathT).name(),
+    static_cast<int>(dim),
+    static_cast<int>(n_rows),
+    static_cast<int>(n_mesoclusters),
+    params.is_packed_binary,
+    static_cast<int>(transformed_dim));
   rmm::device_uvector<IdxT> mc_trainset_ids_buf(mesocluster_size_max, stream, managed_memory);
-  // For packed binary: gather and store raw uint8_t, pass to build_clusters<uint8_t, float>
-  // For non-packed: gather with transform to MathT, pass to build_clusters<MathT, MathT>
+  // For packed binary: use uint8_t buffer. For non-packed: use MathT buffer (original approach)
   rmm::device_uvector<uint8_t> mc_trainset_packed_buf(
     params.is_packed_binary ? mesocluster_size_max * dim : 0, stream, device_memory);
-  rmm::device_uvector<MathT> mc_trainset_mapped_buf(
+  rmm::device_uvector<MathT> mc_trainset_buf(
     !params.is_packed_binary ? mesocluster_size_max * dim : 0, stream, device_memory);
   rmm::device_uvector<MathT> mc_trainset_norm_buf(mesocluster_size_max, stream, device_memory);
   auto mc_trainset_ids  = mc_trainset_ids_buf.data();
@@ -1134,13 +1165,21 @@ auto build_fine_clusters(const raft::resources& handle,
     for (IdxT j = 0; j < n_rows && k < mesocluster_size_max; j++) {
       if (labels_mptr[j] == LabelT(i)) { mc_trainset_ids[k++] = j; }
     }
+    
+    RAFT_LOG_INFO(
+      "Mesocluster %d: gathered %d points, size=%d, fine_clusters=%d",
+      static_cast<int>(i),
+      static_cast<int>(k),
+      static_cast<int>(mesocluster_sizes[i]),
+      static_cast<int>(fine_clusters_nums[i]));
+    
     if (k != static_cast<IdxT>(mesocluster_sizes[i]))
-      RAFT_LOG_DEBUG("Incorrect mesocluster size at %d. %zu vs %zu",
+      RAFT_LOG_INFO("Incorrect mesocluster size at %d. %zu vs %zu",
                      static_cast<int>(i),
                      static_cast<size_t>(k),
                      static_cast<size_t>(mesocluster_sizes[i]));
     if (k == 0) {
-      RAFT_LOG_DEBUG("Empty cluster %d", i);
+      RAFT_LOG_INFO("Empty cluster %d", i);
       RAFT_EXPECTS(fine_clusters_nums[i] == 0,
                    "Number of fine clusters must be zero for the empty mesocluster (got %d)",
                    static_cast<int>(fine_clusters_nums[i]));
@@ -1152,18 +1191,19 @@ auto build_fine_clusters(const raft::resources& handle,
 
     // Gather data based on mode
     if (params.is_packed_binary) {
-      // For packed binary: gather raw uint8_t data (no transformation)
+      RAFT_LOG_INFO("Mesocluster %d: gathering packed binary data (uint8_t)", static_cast<int>(i));
+      // Packed binary: gather raw uint8_t without transformation
       if constexpr (std::is_same_v<T, uint8_t>) {
         raft::matrix::gather(
           dataset_mptr, dim, n_rows, mc_trainset_ids, k, mc_trainset_packed_buf.data(), stream);
       } else {
-        RAFT_FAIL("Packed binary mode requires uint8_t data type, got %s", typeid(T).name());
+        RAFT_FAIL("Packed binary mode requires uint8_t data type");
       }
     } else {
-      // For non-packed: gather with transform to MathT
+      RAFT_LOG_INFO("Mesocluster %d: gathering with transform T→MathT", static_cast<int>(i));
       thrust::transform_iterator<MappingOpT, const T*> mapping_itr(dataset_mptr, mapping_op);
       raft::matrix::gather(
-        mapping_itr, dim, n_rows, mc_trainset_ids, k, mc_trainset_mapped_buf.data(), stream);
+        mapping_itr, dim, n_rows, mc_trainset_ids, k, mc_trainset_buf.data(), stream);
     }
 
     if (params.metric == cuvs::distance::DistanceType::L2Expanded ||
@@ -1171,10 +1211,9 @@ auto build_fine_clusters(const raft::resources& handle,
         params.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (params.is_packed_binary) {
         // For packed binary, norm is constant = transformed_dim
-        raft::matrix::fill(
-          handle,
-          raft::make_device_matrix_view<MathT, IdxT>(mc_trainset_norm, k, 1),
-          static_cast<MathT>(transformed_dim));
+        raft::matrix::fill(handle,
+                           raft::make_device_matrix_view<MathT, IdxT>(mc_trainset_norm, k, 1),
+                           static_cast<MathT>(transformed_dim));
       } else {
         thrust::gather(raft::resource::get_thrust_policy(handle),
                        mc_trainset_ids,
@@ -1184,9 +1223,11 @@ auto build_fine_clusters(const raft::resources& handle,
       }
     }
 
-    // Call build_clusters with appropriate type
+    // Call build_clusters with appropriate data type
     if (params.is_packed_binary) {
-      // For packed binary: pass uint8_t*, build_clusters<uint8_t, MathT> will expand on-the-fly
+      RAFT_LOG_INFO("Mesocluster %d: calling build_clusters<uint8_t, MathT> with identity_op", 
+                     static_cast<int>(i));
+      // Packed binary: pass uint8_t*, build_clusters<uint8_t, MathT> will expand on-the-fly
       if constexpr (std::is_same_v<T, uint8_t>) {
         build_clusters(handle,
                        params,
@@ -1197,24 +1238,26 @@ auto build_fine_clusters(const raft::resources& handle,
                        mc_trainset_ccenters.data(),
                        mc_trainset_labels.data(),
                        mc_trainset_csizes_tmp.data(),
-                       raft::identity_op{},  // No additional mapping needed for packed binary
+                       raft::identity_op{},  // For packed binary, no additional mapping
                        device_memory,
                        mc_trainset_norm);
       } else {
         RAFT_FAIL("Packed binary mode requires uint8_t data type");
       }
     } else {
-      // For non-packed: pass MathT*, build_clusters<MathT, MathT> with identity_op
+      RAFT_LOG_INFO("Mesocluster %d: calling build_clusters<MathT, MathT> with mapping_op", 
+                     static_cast<int>(i));
+      // Non-packed: pass MathT*, build_clusters<MathT, MathT> (original approach)
       build_clusters(handle,
                      params,
                      dim,
-                     mc_trainset_mapped_buf.data(),
+                     mc_trainset_buf.data(),
                      k,
                      fine_clusters_nums[i],
                      mc_trainset_ccenters.data(),
                      mc_trainset_labels.data(),
                      mc_trainset_csizes_tmp.data(),
-                     raft::identity_op{},  // Data already transformed
+                     mapping_op,  // Passed but not used since T=MathT
                      device_memory,
                      mc_trainset_norm);
     }
@@ -1259,14 +1302,26 @@ void build_hierarchical(const raft::resources& handle,
                         MappingOpT mapping_op,
                         const MathT* dataset_norm = nullptr)
 {
-  auto stream  = raft::resource::get_cuda_stream(handle);
-  using LabelT = uint32_t;
+  auto stream          = raft::resource::get_cuda_stream(handle);
+  using LabelT         = uint32_t;
+  IdxT transformed_dim = params.is_packed_binary ? dim * 8 : dim;
 
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "build_hierarchical(%zu, %u)", static_cast<size_t>(n_rows), n_clusters);
 
   IdxT n_mesoclusters = std::min(n_clusters, static_cast<IdxT>(std::sqrt(n_clusters) + 0.5));
-  RAFT_LOG_DEBUG("build_hierarchical: n_mesoclusters: %u", n_mesoclusters);
+  
+  RAFT_LOG_INFO(
+    "build_hierarchical: T=%s, MathT=%s, n_clusters=%d, dim=%d, n_rows=%d, "
+    "n_mesoclusters=%d, is_packed_binary=%d, transformed_dim=%d",
+    typeid(T).name(),
+    typeid(MathT).name(),
+    static_cast<int>(n_clusters),
+    static_cast<int>(dim),
+    static_cast<int>(n_rows),
+    static_cast<int>(n_mesoclusters),
+    params.is_packed_binary,
+    static_cast<int>(transformed_dim));
 
   // TODO: Remove the explicit managed memory- we shouldn't be creating this on the user's behalf.
   rmm::mr::managed_memory_resource managed_memory;
@@ -1309,7 +1364,7 @@ void build_hierarchical(const raft::resources& handle,
     raft::matrix::fill(
       handle,
       raft::make_device_matrix_view<MathT, IdxT>(dataset_norm_buf.data(), n_rows, 1),
-      static_cast<MathT>(dim * 8));
+      static_cast<MathT>(transformed_dim));
     dataset_norm = (const MathT*)dataset_norm_buf.data();
   }
 
@@ -1321,10 +1376,10 @@ void build_hierarchical(const raft::resources& handle,
   // build coarse clusters (mesoclusters)
   rmm::device_uvector<LabelT> mesocluster_labels_buf(n_rows, stream, &managed_memory);
   rmm::device_uvector<CounterT> mesocluster_sizes_buf(n_mesoclusters, stream, &managed_memory);
-  IdxT transformed_dim = params.is_packed_binary ? dim * 8 : dim;
   {
     rmm::device_uvector<MathT> mesocluster_centers_buf(
       n_mesoclusters * transformed_dim, stream, device_memory);
+    std::cout << "now building mesoclusters" << std::endl;
     build_clusters(handle,
                    params,
                    dim,
@@ -1351,7 +1406,7 @@ void build_hierarchical(const raft::resources& handle,
   const IdxT mesocluster_size_max_balanced = raft::div_rounding_up_safe<size_t>(
     2lu * size_t(n_rows), std::max<size_t>(size_t(n_mesoclusters), 1lu));
   if (mesocluster_size_max > mesocluster_size_max_balanced) {
-    RAFT_LOG_DEBUG(
+    RAFT_LOG_INFO(
       "build_hierarchical: built unbalanced mesoclusters (max_mesocluster_size == %u > %u). "
       "At most %u points will be used for training within each mesocluster. "
       "Consider increasing the number of training iterations `n_iters`.",
