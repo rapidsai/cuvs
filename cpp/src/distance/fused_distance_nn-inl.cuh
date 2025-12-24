@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -98,99 +98,99 @@ void fusedDistanceNN(OutT* min,
   auto py      = reinterpret_cast<uintptr_t>(y);
   if (16 % sizeof(DataT) == 0 && bytes % 16 == 0 && px % 16 == 0 && py % 16 == 0) {
     if (is_skinny) {
-      detail::fusedDistanceNNImpl<
-        DataT,
-        OutT,
-        IdxT,
-        typename raft::linalg::Policy4x4Skinny<DataT, 16 / sizeof(DataT)>::Policy,
-        ReduceOpT>(min,
-                   x,
-                   y,
-                   xn,
-                   yn,
-                   m,
-                   n,
-                   k,
-                   (int*)workspace,
-                   redOp,
-                   pairRedOp,
-                   sqrt,
-                   initOutBuffer,
-                   isRowMajor,
-                   metric,
-                   metric_arg,
-                   stream);
+      constexpr int max_veclen = std::min<int>(4, 16 / sizeof(DataT));
+      detail::fusedDistanceNNImpl<DataT,
+                                  OutT,
+                                  IdxT,
+                                  typename raft::linalg::Policy4x4Skinny<DataT, max_veclen>::Policy,
+                                  ReduceOpT>(min,
+                                             x,
+                                             y,
+                                             xn,
+                                             yn,
+                                             m,
+                                             n,
+                                             k,
+                                             (int*)workspace,
+                                             redOp,
+                                             pairRedOp,
+                                             sqrt,
+                                             initOutBuffer,
+                                             isRowMajor,
+                                             metric,
+                                             metric_arg,
+                                             stream);
     } else {
-      detail::fusedDistanceNNImpl<
-        DataT,
-        OutT,
-        IdxT,
-        typename raft::linalg::Policy4x4<DataT, 16 / sizeof(DataT)>::Policy,
-        ReduceOpT>(min,
-                   x,
-                   y,
-                   xn,
-                   yn,
-                   m,
-                   n,
-                   k,
-                   (int*)workspace,
-                   redOp,
-                   pairRedOp,
-                   sqrt,
-                   initOutBuffer,
-                   isRowMajor,
-                   metric,
-                   metric_arg,
-                   stream);
+      constexpr int max_veclen = std::min<int>(4, 16 / sizeof(DataT));
+      detail::fusedDistanceNNImpl<DataT,
+                                  OutT,
+                                  IdxT,
+                                  typename raft::linalg::Policy4x4<DataT, max_veclen>::Policy,
+                                  ReduceOpT>(min,
+                                             x,
+                                             y,
+                                             xn,
+                                             yn,
+                                             m,
+                                             n,
+                                             k,
+                                             (int*)workspace,
+                                             redOp,
+                                             pairRedOp,
+                                             sqrt,
+                                             initOutBuffer,
+                                             isRowMajor,
+                                             metric,
+                                             metric_arg,
+                                             stream);
     }
   } else if (8 % sizeof(DataT) == 0 && bytes % 8 == 0 && px % 8 == 0 && py % 8 == 0) {
     if (is_skinny) {
-      detail::fusedDistanceNNImpl<
-        DataT,
-        OutT,
-        IdxT,
-        typename raft::linalg::Policy4x4Skinny<DataT, 8 / sizeof(DataT)>::Policy,
-        ReduceOpT>(min,
-                   x,
-                   y,
-                   xn,
-                   yn,
-                   m,
-                   n,
-                   k,
-                   (int*)workspace,
-                   redOp,
-                   pairRedOp,
-                   sqrt,
-                   initOutBuffer,
-                   isRowMajor,
-                   metric,
-                   metric_arg,
-                   stream);
+      constexpr int max_veclen = std::min<int>(4, 8 / sizeof(DataT));
+      detail::fusedDistanceNNImpl<DataT,
+                                  OutT,
+                                  IdxT,
+                                  typename raft::linalg::Policy4x4Skinny<DataT, max_veclen>::Policy,
+                                  ReduceOpT>(min,
+                                             x,
+                                             y,
+                                             xn,
+                                             yn,
+                                             m,
+                                             n,
+                                             k,
+                                             (int*)workspace,
+                                             redOp,
+                                             pairRedOp,
+                                             sqrt,
+                                             initOutBuffer,
+                                             isRowMajor,
+                                             metric,
+                                             metric_arg,
+                                             stream);
     } else {
-      detail::fusedDistanceNNImpl<
-        DataT,
-        OutT,
-        IdxT,
-        typename raft::linalg::Policy4x4<DataT, 8 / sizeof(DataT)>::Policy,
-        ReduceOpT>(min,
-                   x,
-                   y,
-                   xn,
-                   yn,
-                   m,
-                   n,
-                   k,
-                   (int*)workspace,
-                   redOp,
-                   pairRedOp,
-                   sqrt,
-                   initOutBuffer,
-                   isRowMajor,
-                   metric,
-                   metric_arg,
-                   stream);
+      constexpr int max_veclen = std::min<int>(4, 8 / sizeof(DataT));
+      detail::fusedDistanceNNImpl<DataT,
+                                  OutT,
+                                  IdxT,
+                                  typename raft::linalg::Policy4x4<DataT, max_veclen>::Policy,
+                                  ReduceOpT>(min,
+                                             x,
+                                             y,
+                                             xn,
+                                             yn,
+                                             m,
+                                             n,
+                                             k,
+                                             (int*)workspace,
+                                             redOp,
+                                             pairRedOp,
+                                             sqrt,
+                                             initOutBuffer,
+                                             isRowMajor,
+                                             metric,
+                                             metric_arg,
+                                             stream);
     }
   } else {
     if (is_skinny) {
@@ -289,8 +289,9 @@ void fusedDistanceNNMinReduce(OutT* min,
                               float metric_arg,
                               cudaStream_t stream)
 {
-  MinAndDistanceReduceOp<IdxT, DataT> redOp;
-  KVPMinReduce<IdxT, DataT> pairRedOp;
+  using AccT = std::conditional_t<std::is_same_v<DataT, uint8_t>, uint32_t, DataT>;
+  MinAndDistanceReduceOp<IdxT, AccT> redOp;
+  KVPMinReduce<IdxT, AccT> pairRedOp;
 
   fusedDistanceNN<DataT, OutT, IdxT>(min,
                                      x,
