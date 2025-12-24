@@ -550,33 +550,136 @@ __device__ auto compute_code_subspaces(
   auto data_mapping      = cuvs::spatial::knn::detail::utils::mapping<MathT>{};
   const uint32_t lane_id = raft::Pow2<SubWarpSize>::mod(raft::laneId());
 
-  const uint32_t pq_book_size = pq_centers.extent(0);
-  const uint32_t pq_len       = pq_centers.extent(1);
-  float min_dist              = std::numeric_limits<float>::infinity();
-  uint8_t code                = 0;
+  const uint32_t pq_book_size           = pq_centers.extent(0);
+  const uint32_t pq_len                 = pq_centers.extent(1);
+  const MathT* __restrict__ centers_ptr = pq_centers.data_handle();
+  const DataT* __restrict__ dataset_ptr = dataset.data_handle() + i * dataset.extent(1);
+  float min_dist                        = std::numeric_limits<float>::infinity();
+  uint8_t code                          = 0;
 
-  // Cooperatively load dataset into shared memory
-  for (uint32_t k = lane_id; k < pq_len; k += SubWarpSize) {
-    auto jk = j * pq_len + k;
-    auto x  = data_mapping(dataset(i, jk));
-    if (vq_centers) { x -= vq_centers.value()(vq_label, jk); }
-    smem_dataset[k] = x;
-  }
-  __syncwarp();
-
-  for (uint32_t l = lane_id; l < pq_book_size; l += SubWarpSize) {
-    float d = 0.0f;
-#pragma unroll 4
-    for (uint32_t k = 0; k < pq_len; k++) {
-      float x          = smem_dataset[k];
-      float center_val = pq_centers(l, k);
-      float diff       = x - center_val;
-      d += diff * diff;
+  if (pq_len <= SubWarpSize) {
+    // Each thread loads one dataset element and will share to others using shuffle
+    float my_dataset_val = 0.0f;
+    if (lane_id < pq_len) {
+      auto jk = j * pq_len + lane_id;
+      auto x  = data_mapping(dataset_ptr[jk]);
+      if (vq_centers) { x -= vq_centers.value()(vq_label, jk); }
+      my_dataset_val = x;
     }
 
-    if (d < min_dist) {
-      min_dist = d;
-      code     = uint8_t(l);
+    // Each thread evaluates by chunks of 4 PQ centers
+    uint32_t l = lane_id;
+
+    for (; l + 3 * SubWarpSize < pq_book_size; l += 4 * SubWarpSize) {
+      float d0 = 0.0f, d1 = 0.0f, d2 = 0.0f, d3 = 0.0f;
+
+#pragma unroll 4
+      for (uint32_t k = 0; k < pq_len; k++) {
+        float x  = __shfl_sync(0xffffffff, my_dataset_val, k, SubWarpSize);
+        float c0 = __ldg(&centers_ptr[l * pq_len + k]);
+        float c1 = __ldg(&centers_ptr[(l + SubWarpSize) * pq_len + k]);
+        float c2 = __ldg(&centers_ptr[(l + 2 * SubWarpSize) * pq_len + k]);
+        float c3 = __ldg(&centers_ptr[(l + 3 * SubWarpSize) * pq_len + k]);
+        d0       = __fmaf_rn(x - c0, x - c0, d0);
+        d1       = __fmaf_rn(x - c1, x - c1, d1);
+        d2       = __fmaf_rn(x - c2, x - c2, d2);
+        d3       = __fmaf_rn(x - c3, x - c3, d3);
+      }
+
+      if (d0 < min_dist) {
+        min_dist = d0;
+        code     = uint8_t(l);
+      }
+      if (d1 < min_dist) {
+        min_dist = d1;
+        code     = uint8_t(l + SubWarpSize);
+      }
+      if (d2 < min_dist) {
+        min_dist = d2;
+        code     = uint8_t(l + 2 * SubWarpSize);
+      }
+      if (d3 < min_dist) {
+        min_dist = d3;
+        code     = uint8_t(l + 3 * SubWarpSize);
+      }
+    }
+
+    // Tail loop
+    for (; l < pq_book_size; l += SubWarpSize) {
+      float d0 = 0.0f;
+#pragma unroll
+      for (uint32_t k = 0; k < pq_len; k++) {
+        float x          = __shfl_sync(0xffffffff, my_dataset_val, k, SubWarpSize);
+        float center_val = __ldg(&centers_ptr[l * pq_len + k]);
+        d0               = __fmaf_rn(x - center_val, x - center_val, d0);
+      }
+
+      if (d0 < min_dist) {
+        min_dist = d0;
+        code     = uint8_t(l);
+      }
+    }
+  } else {
+    // Cooperatively load dataset into shared memory if pq_len > SubWarpSize
+    for (uint32_t k = lane_id; k < pq_len; k += SubWarpSize) {
+      auto jk = j * pq_len + k;
+      auto x  = data_mapping(dataset_ptr[jk]);
+      if (vq_centers) { x -= vq_centers.value()(vq_label, jk); }
+      smem_dataset[k] = x;
+    }
+    __syncwarp();
+
+    // Each thread evaluates by chunks of 4 PQ centers
+    uint32_t l = lane_id;
+    for (; l + 3 * SubWarpSize < pq_book_size; l += 4 * SubWarpSize) {
+      float d0 = 0.0f, d1 = 0.0f, d2 = 0.0f, d3 = 0.0f;
+
+#pragma unroll 4
+      for (uint32_t k = 0; k < pq_len; k++) {
+        float x  = smem_dataset[k];
+        float c0 = __ldg(&centers_ptr[l * pq_len + k]);
+        float c1 = __ldg(&centers_ptr[(l + SubWarpSize) * pq_len + k]);
+        float c2 = __ldg(&centers_ptr[(l + 2 * SubWarpSize) * pq_len + k]);
+        float c3 = __ldg(&centers_ptr[(l + 3 * SubWarpSize) * pq_len + k]);
+        d0       = __fmaf_rn(x - c0, x - c0, d0);
+        d1       = __fmaf_rn(x - c1, x - c1, d1);
+        d2       = __fmaf_rn(x - c2, x - c2, d2);
+        d3       = __fmaf_rn(x - c3, x - c3, d3);
+      }
+
+      if (d0 < min_dist) {
+        min_dist = d0;
+        code     = uint8_t(l);
+      }
+      if (d1 < min_dist) {
+        min_dist = d1;
+        code     = uint8_t(l + SubWarpSize);
+      }
+      if (d2 < min_dist) {
+        min_dist = d2;
+        code     = uint8_t(l + 2 * SubWarpSize);
+      }
+      if (d3 < min_dist) {
+        min_dist = d3;
+        code     = uint8_t(l + 3 * SubWarpSize);
+      }
+    }
+
+    // Tail loop
+    for (; l < pq_book_size; l += SubWarpSize) {
+      float d0 = 0.0f;
+
+#pragma unroll 4
+      for (uint32_t k = 0; k < pq_len; k++) {
+        float x          = smem_dataset[k];
+        float center_val = __ldg(&centers_ptr[l * pq_len + k]);
+        d0               = __fmaf_rn(x - center_val, x - center_val, d0);
+      }
+
+      if (d0 < min_dist) {
+        min_dist = d0;
+        code     = uint8_t(l);
+      }
     }
   }
 
@@ -679,7 +782,10 @@ void process_and_fill_codes_subspaces(
   const ix_t threads_per_vec             = std::min<ix_t>(raft::WarpSize, pq_n_centers);
   const uint32_t num_subwarps            = kBlockSize / threads_per_vec;
   const uint32_t pq_len                  = pq_centers.extent(1);
-  const uint32_t kSharedMemorySize       = num_subwarps * pq_len * sizeof(MathT);
+
+  // Minimal shared memory allocation
+  const uint32_t kSharedMemorySize =
+    pq_len <= threads_per_vec ? 0 : num_subwarps * pq_len * sizeof(MathT);
 
   dim3 threads(kBlockSize, 1, 1);
   auto kernel = [](uint32_t pq_bits) {
