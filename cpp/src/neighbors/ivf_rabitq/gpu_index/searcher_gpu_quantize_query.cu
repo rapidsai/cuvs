@@ -62,15 +62,9 @@ __global__ void computeInnerProductsWithBitwiseOpt8bit(
   // Shared values for this <cluster, query> pair
   __shared__ int num_candidates;
   __shared__ float q_g_add;
-  __shared__ float q_k1xsumq;
-  __shared__ float q_g_error;
-  __shared__ float threshold;
 
   if (tid == 0) {
     q_g_add        = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
-    q_g_error      = sqrtf(q_g_add);
-    q_k1xsumq      = params.d_G_k1xSumq[query_idx];
-    threshold      = params.d_threshold[query_idx];
     num_candidates = 0;
   }
   __syncthreads();
@@ -89,17 +83,7 @@ __global__ void computeInnerProductsWithBitwiseOpt8bit(
   // Optimized first-round IP computation - accumulate on the fly
   for (size_t vec_base = 0; vec_base < num_vectors_in_cluster; vec_base += vectors_per_iteration) {
     size_t vec_idx = vec_base + tid;
-
-    bool is_candidate        = false;
-    float local_ip_quantized = 0;
-
     if (vec_idx < num_vectors_in_cluster) {
-      size_t factor_offset = cluster_start_index + vec_idx;
-      float3 factors       = reinterpret_cast<const float3*>(params.d_short_factors)[factor_offset];
-      float f_add          = factors.x;
-      float f_rescale      = factors.y;
-      float f_error        = factors.z;
-
       int32_t accumulator = 0;  // Single accumulator, no array needed
 
       // Load data once, accumulate directly
@@ -120,22 +104,11 @@ __global__ void computeInnerProductsWithBitwiseOpt8bit(
       }
 
       // Restore scale and compute estimated distance
-      float ip       = (float)accumulator * query_width;
-      float est_dist = f_add + q_g_add + f_rescale * (ip + q_k1xsumq);
-      float low_dist = est_dist - f_error * q_g_error;
+      float ip = (float)accumulator * query_width;
 
-      if (low_dist < threshold) {
-        is_candidate       = true;
-        local_ip_quantized = ip;
-      }
-    }
-
-    __syncwarp();
-
-    if (is_candidate) {
       int candidate_slot = atomicAdd(&num_candidates, 1);
       if (candidate_slot < params.max_candidates_per_pair) {
-        shared_candidate_ips[candidate_slot]     = local_ip_quantized;
+        shared_candidate_ips[candidate_slot]     = ip;
         shared_candidate_indices[candidate_slot] = vec_idx;
       }
     }
@@ -284,42 +257,6 @@ __global__ void computeInnerProductsWithBitwiseOpt8bit(
         }
       }
       __syncthreads();
-    }
-
-    // Step 4: Update threshold atomically (simplified version)
-    // If threshold only decreases (gets tighter), we can use atomicMin
-    if (num_candidates >= params.topk) {
-      float max_topk_dist;
-
-      if (tid == 0) {
-        max_topk_dist = -INFINITY;
-
-        // Find the maximum distance in our top-k results
-        uint32_t output_offset =
-          query_idx * (params.topk * params.nprobe) +
-          probe_slot * params.topk;  // <-- Use probe_slot, not (block_id % nprobe)
-
-        for (uint32_t i = 0; i < params.topk; i++) {
-          float dist = params.d_topk_dists[output_offset + i];
-          if (dist > 0 && dist > max_topk_dist && dist < INFINITY) { max_topk_dist = dist; }
-        }
-      }
-
-      __syncthreads();
-
-      // Update threshold using atomicMin (for floats)
-      // max_topk_dist should be > 0 to prevent using initialized memory
-      if (tid == 0 && max_topk_dist > 0 && max_topk_dist < threshold) {
-        // Use integer interpretation for atomic operations
-        int* threshold_ptr = (int*)(params.d_threshold + query_idx);
-        int new_val        = __float_as_int(max_topk_dist);
-
-        // Atomic minimum for floats (assuming positive distances)
-        atomicMin(threshold_ptr, new_val);
-
-        // Note: atomicMin on int representation works correctly for positive floats
-        // because IEEE 754 float format preserves ordering for positive values
-      }
     }
   }
 }
@@ -685,14 +622,10 @@ __global__ void computeInnerProductsWithBitwiseOpt8bitNoEX(
   __shared__ int num_candidates;
   __shared__ float q_g_add;
   __shared__ float q_k1xsumq;
-  __shared__ float q_g_error;
-  __shared__ float threshold;
 
   if (tid == 0) {
     q_g_add        = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
-    q_g_error      = sqrtf(q_g_add);
     q_k1xsumq      = params.d_G_k1xSumq[query_idx];
-    threshold      = params.d_threshold[query_idx];
     num_candidates = 0;
   }
   __syncthreads();
@@ -712,16 +645,11 @@ __global__ void computeInnerProductsWithBitwiseOpt8bitNoEX(
   // Optimized first-round IP computation - accumulate on the fly
   for (size_t vec_base = 0; vec_base < num_vectors_in_cluster; vec_base += vectors_per_iteration) {
     size_t vec_idx = vec_base + tid;
-
-    bool is_candidate        = false;
-    float local_ip_quantized = 0;
-
     if (vec_idx < num_vectors_in_cluster) {
-      size_t factor_offset = cluster_start_index + vec_idx;
-      float3 factors       = reinterpret_cast<const float3*>(params.d_short_factors)[factor_offset];
-      float f_add          = factors.x;
-      float f_rescale      = factors.y;
-      float f_error        = factors.z;
+      // size_t factor_offset = cluster_start_index + vec_idx;
+      // float3 factors       = reinterpret_cast<const
+      // float3*>(params.d_short_factors)[factor_offset]; float f_add          = factors.x; float
+      // f_rescale      = factors.y; float f_error        = factors.z;
 
       int32_t accumulator = 0;  // Single accumulator, no array needed
 
@@ -743,22 +671,11 @@ __global__ void computeInnerProductsWithBitwiseOpt8bitNoEX(
       }
 
       // Restore scale and compute estimated distance
-      float ip       = (float)accumulator * query_width;
-      float est_dist = f_add + q_g_add + f_rescale * (ip + q_k1xsumq);
-      float low_dist = est_dist - f_error * q_g_error;
+      float ip = (float)accumulator * query_width;
 
-      if (low_dist < threshold) {
-        is_candidate       = true;
-        local_ip_quantized = ip;
-      }
-    }
-
-    __syncwarp();
-
-    if (is_candidate) {
       int candidate_slot = atomicAdd(&num_candidates, 1);
       if (candidate_slot < params.max_candidates_per_pair) {
-        shared_candidate_ips[candidate_slot]     = local_ip_quantized;
+        shared_candidate_ips[candidate_slot]     = ip;
         shared_candidate_indices[candidate_slot] = vec_idx;
       }
     }
@@ -834,39 +751,6 @@ __global__ void computeInnerProductsWithBitwiseOpt8bitNoEX(
         // Write to global memory
         params.d_topk_dists[output_offset + cand_idx] = final_1bit_dist;
         params.d_topk_pids[output_offset + cand_idx]  = final_1bit_pid;
-      }
-    }
-    __syncthreads();
-
-    // Step 3: Update threshold atomically (simplified version)
-    // If threshold only decreases (gets tighter), we can use atomicMin
-    if (num_candidates >= params.topk) {
-      float max_topk_dist;
-
-      if (tid == 0) {
-        max_topk_dist = -INFINITY;
-
-        // Find the maximum distance in our top-k results
-        for (uint32_t i = 0; i < params.topk; i++) {
-          float dist = params.d_topk_dists[output_offset + i];
-          if (dist > 0 && dist > max_topk_dist && dist < INFINITY) { max_topk_dist = dist; }
-        }
-      }
-
-      __syncthreads();
-
-      // Update threshold using atomicMin (for floats)
-      // max_topk_dist should be > 0 to prevent using initialized memory
-      if (tid == 0 && max_topk_dist > 0 && max_topk_dist < threshold) {
-        // Use integer interpretation for atomic operations
-        int* threshold_ptr = (int*)(params.d_threshold + query_idx);
-        int new_val        = __float_as_int(max_topk_dist);
-
-        // Atomic minimum for floats (assuming positive distances)
-        atomicMin(threshold_ptr, new_val);
-
-        // Note: atomicMin on int representation works correctly for positive floats
-        // because IEEE 754 float format preserves ordering for positive values
       }
     }
   }
@@ -1152,15 +1036,9 @@ __global__ void computeInnerProductsWithBitwiseOpt4bit(
   // Shared values for this <cluster, query> pair
   __shared__ int num_candidates;
   __shared__ float q_g_add;
-  __shared__ float q_k1xsumq;
-  __shared__ float q_g_error;
-  __shared__ float threshold;
 
   if (tid == 0) {
     q_g_add        = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
-    q_g_error      = sqrtf(q_g_add);
-    q_k1xsumq      = params.d_G_k1xSumq[query_idx];
-    threshold      = params.d_threshold[query_idx];
     num_candidates = 0;
   }
   __syncthreads();
@@ -1180,17 +1058,7 @@ __global__ void computeInnerProductsWithBitwiseOpt4bit(
   // Optimized first-round IP computation - accumulate on the fly
   for (size_t vec_base = 0; vec_base < num_vectors_in_cluster; vec_base += vectors_per_iteration) {
     size_t vec_idx = vec_base + tid;
-
-    bool is_candidate        = false;
-    float local_ip_quantized = 0;
-
     if (vec_idx < num_vectors_in_cluster) {
-      size_t factor_offset = cluster_start_index + vec_idx;
-      float3 factors       = reinterpret_cast<const float3*>(params.d_short_factors)[factor_offset];
-      float f_add          = factors.x;
-      float f_rescale      = factors.y;
-      float f_error        = factors.z;
-
       int32_t accumulator = 0;  // Single accumulator, no array needed
 
       // Load data once, accumulate directly
@@ -1209,22 +1077,11 @@ __global__ void computeInnerProductsWithBitwiseOpt4bit(
       }
 
       // Restore scale and compute estimated distance
-      float ip       = (float)accumulator * query_width;
-      float est_dist = f_add + q_g_add + f_rescale * (ip + q_k1xsumq);
-      float low_dist = est_dist - f_error * q_g_error;
+      float ip = (float)accumulator * query_width;
 
-      if (low_dist < threshold) {
-        is_candidate       = true;
-        local_ip_quantized = ip;
-      }
-    }
-
-    __syncwarp();
-
-    if (is_candidate) {
       int candidate_slot = atomicAdd(&num_candidates, 1);
       if (candidate_slot < params.max_candidates_per_pair) {
-        shared_candidate_ips[candidate_slot]     = local_ip_quantized;
+        shared_candidate_ips[candidate_slot]     = ip;
         shared_candidate_indices[candidate_slot] = vec_idx;
       }
     }
@@ -1372,39 +1229,6 @@ __global__ void computeInnerProductsWithBitwiseOpt4bit(
           params.d_topk_dists[output_offset + cand_idx] = ex_dist;
           params.d_topk_pids[output_offset + cand_idx]  = (uint32_t)params.d_pids[global_vec_idx];
         }
-      }
-      __syncthreads();
-    }
-
-    // Step 4: Update threshold atomically (simplified version)
-    // If threshold only decreases (gets tighter), we can use atomicMin
-    if (num_candidates >= params.topk) {
-      float max_topk_dist;
-
-      if (tid == 0) {
-        max_topk_dist = -INFINITY;
-
-        // Find the maximum distance in our top-k results
-        for (uint32_t i = 0; i < params.topk; i++) {
-          float dist = params.d_topk_dists[output_offset + i];
-          if (dist > 0 && dist > max_topk_dist && dist < INFINITY) { max_topk_dist = dist; }
-        }
-      }
-
-      __syncthreads();
-
-      // Update threshold using atomicMin (for floats)
-      // max_topk_dist should be > 0 to prevent using initialized memory
-      if (tid == 0 && max_topk_dist > 0 && max_topk_dist < threshold) {
-        // Use integer interpretation for atomic operations
-        int* threshold_ptr = (int*)(params.d_threshold + query_idx);
-        int new_val        = __float_as_int(max_topk_dist);
-
-        // Atomic minimum for floats (assuming positive distances)
-        atomicMin(threshold_ptr, new_val);
-
-        // Note: atomicMin on int representation works correctly for positive floats
-        // because IEEE 754 float format preserves ordering for positive values
       }
     }
   }
@@ -1771,14 +1595,10 @@ __global__ void computeInnerProductsWithBitwiseOpt4bitNoEX(
   __shared__ int num_candidates;
   __shared__ float q_g_add;
   __shared__ float q_k1xsumq;
-  __shared__ float q_g_error;
-  __shared__ float threshold;
 
   if (tid == 0) {
     q_g_add        = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
-    q_g_error      = sqrtf(q_g_add);
     q_k1xsumq      = params.d_G_k1xSumq[query_idx];
-    threshold      = params.d_threshold[query_idx];
     num_candidates = 0;
   }
   __syncthreads();
@@ -1798,17 +1618,7 @@ __global__ void computeInnerProductsWithBitwiseOpt4bitNoEX(
   // Optimized first-round IP computation - accumulate on the fly
   for (size_t vec_base = 0; vec_base < num_vectors_in_cluster; vec_base += vectors_per_iteration) {
     size_t vec_idx = vec_base + tid;
-
-    bool is_candidate        = false;
-    float local_ip_quantized = 0;
-
     if (vec_idx < num_vectors_in_cluster) {
-      size_t factor_offset = cluster_start_index + vec_idx;
-      float3 factors       = reinterpret_cast<const float3*>(params.d_short_factors)[factor_offset];
-      float f_add          = factors.x;
-      float f_rescale      = factors.y;
-      float f_error        = factors.z;
-
       int32_t accumulator = 0;  // Single accumulator, no array needed
 
       // Load data once, accumulate directly
@@ -1825,22 +1635,11 @@ __global__ void computeInnerProductsWithBitwiseOpt4bitNoEX(
       }
 
       // Restore scale and compute estimated distance
-      float ip       = (float)accumulator * query_width;
-      float est_dist = f_add + q_g_add + f_rescale * (ip + q_k1xsumq);
-      float low_dist = est_dist - f_error * q_g_error;
+      float ip = (float)accumulator * query_width;
 
-      if (low_dist < threshold) {
-        is_candidate       = true;
-        local_ip_quantized = ip;
-      }
-    }
-
-    __syncwarp();
-
-    if (is_candidate) {
       int candidate_slot = atomicAdd(&num_candidates, 1);
       if (candidate_slot < params.max_candidates_per_pair) {
-        shared_candidate_ips[candidate_slot]     = local_ip_quantized;
+        shared_candidate_ips[candidate_slot]     = ip;
         shared_candidate_indices[candidate_slot] = vec_idx;
       }
     }
@@ -1915,39 +1714,6 @@ __global__ void computeInnerProductsWithBitwiseOpt4bitNoEX(
         // Write to global memory
         params.d_topk_dists[output_offset + cand_idx] = final_1bit_dist;
         params.d_topk_pids[output_offset + cand_idx]  = final_1bit_pid;
-      }
-    }
-    __syncthreads();
-
-    // Step 3: Update threshold atomically (simplified version)
-    // If threshold only decreases (gets tighter), we can use atomicMin
-    if (num_candidates >= params.topk) {
-      float max_topk_dist;
-
-      if (tid == 0) {
-        max_topk_dist = -INFINITY;
-
-        // Find the maximum distance in our top-k results
-        for (uint32_t i = 0; i < params.topk; i++) {
-          float dist = params.d_topk_dists[output_offset + i];
-          if (dist > 0 && dist > max_topk_dist && dist < INFINITY) { max_topk_dist = dist; }
-        }
-      }
-
-      __syncthreads();
-
-      // Update threshold using atomicMin (for floats)
-      // max_topk_dist should be > 0 to prevent using initialized memory
-      if (tid == 0 && max_topk_dist > 0 && max_topk_dist < threshold) {
-        // Use integer interpretation for atomic operations
-        int* threshold_ptr = (int*)(params.d_threshold + query_idx);
-        int new_val        = __float_as_int(max_topk_dist);
-
-        // Atomic minimum for floats (assuming positive distances)
-        atomicMin(threshold_ptr, new_val);
-
-        // Note: atomicMin on int representation works correctly for positive floats
-        // because IEEE 754 float format preserves ordering for positive values
       }
     }
   }
@@ -2524,6 +2290,9 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
   bool use_4bit  // Add parameter to choose 4-bit or 8-bit
 )
 {
+  // choose algorithm
+  const bool use_block_sort{topk <= MAX_TOP_K_BLOCK_SORT};
+
   // query quantize
   const int num_bits  = use_4bit ? 4 : 8;  // Choose bit width
   const int num_words = (cur_ivf.get_num_padded_dim() + 31) / 32;
@@ -2534,7 +2303,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
   size_t quantized_size  = num_queries * cur_ivf.get_num_padded_dim() * sizeof(int8_t);
   size_t packed_size     = num_queries * num_bits * num_words * sizeof(uint32_t);
   size_t counters_size   = num_queries * sizeof(int);
-  size_t thresholds_size = num_queries * sizeof(float);
+  size_t thresholds_size = use_block_sort ? num_queries * sizeof(float) : 0;
 
   auto align4 = [](size_t x) { return (x + 3) & ~size_t(3); };
 
@@ -2634,9 +2403,8 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
   }
 
   // Initialize distances
-  size_t max_cluster_length = cur_ivf.get_max_cluster_length();
-  size_t max_candidates_per_query_per_probe =
-    topk > MAX_TOP_K_BLOCK_SORT ? max_cluster_length : topk;
+  size_t max_cluster_length                 = cur_ivf.get_max_cluster_length();
+  size_t max_candidates_per_query_per_probe = use_block_sort ? topk : max_cluster_length;
   size_t total_elements = max_candidates_per_query_per_probe * num_queries * nprobe;
   thrust::fill(thrust::cuda::par.on(stream_),
                d_topk_dists,
@@ -2645,10 +2413,12 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
 
   RAFT_CUDA_TRY(cudaMemsetAsync(d_query_write_counters, 0, num_queries * sizeof(int), stream_));
 
-  thrust::fill(thrust::cuda::par.on(stream_),
-               d_topk_threshold_batch,
-               d_topk_threshold_batch + num_queries,
-               std::numeric_limits<float>::infinity());
+  if (use_block_sort) {
+    thrust::fill(thrust::cuda::par.on(stream_),
+                 d_topk_threshold_batch,
+                 d_topk_threshold_batch + num_queries,
+                 std::numeric_limits<float>::infinity());
+  }
 
   // Launch modified kernel with packed queries instead of LUT
   size_t num_pairs = num_queries * nprobe;
@@ -2658,10 +2428,9 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
   // Recalculate shared memory for new approach
   size_t query_storage = D * sizeof(float);  // For shared query vector
   const int queue_buffer_smem_bytes =
-    (topk > MAX_TOP_K_BLOCK_SORT)
-      ? 0
-      : raft::matrix::detail::select::warpsort::calc_smem_size_for_block_wide<T, IdxT>(
-          blockDim / WARP_SIZE, MAX_TOP_K_BLOCK_SORT);
+    use_block_sort ? raft::matrix::detail::select::warpsort::calc_smem_size_for_block_wide<T, IdxT>(
+                       blockDim / WARP_SIZE, MAX_TOP_K_BLOCK_SORT)
+                   : 0;
 
   // Now we need: packed query bits, candidate storage, and query vector
   // this part is also used to store ip2 results
@@ -2703,15 +2472,14 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
 
   if (!use_4bit) {
     if (cur_ivf.get_ex_bits() != 0) {
-      auto kernel = topk > MAX_TOP_K_BLOCK_SORT ? computeInnerProductsWithBitwiseOpt8bit
-                                                : computeInnerProductsWithBitwiseOpt8bitBlockSort;
+      auto kernel = use_block_sort ? computeInnerProductsWithBitwiseOpt8bitBlockSort
+                                   : computeInnerProductsWithBitwiseOpt8bit;
       RAFT_CUDA_TRY(
         cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size));
       kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
     } else {
-      auto kernel = topk > MAX_TOP_K_BLOCK_SORT
-                      ? computeInnerProductsWithBitwiseOpt8bitNoEX
-                      : computeInnerProductsWithBitwiseOpt8bitNoEXBlockSort;
+      auto kernel = use_block_sort ? computeInnerProductsWithBitwiseOpt8bitNoEXBlockSort
+                                   : computeInnerProductsWithBitwiseOpt8bitNoEX;
       RAFT_CUDA_TRY(
         cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size));
       kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
@@ -2719,15 +2487,14 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   } else {
     if (cur_ivf.get_ex_bits() != 0) {
-      auto kernel = topk > MAX_TOP_K_BLOCK_SORT ? computeInnerProductsWithBitwiseOpt4bit
-                                                : computeInnerProductsWithBitwiseOpt4bitBlockSort;
+      auto kernel = use_block_sort ? computeInnerProductsWithBitwiseOpt4bitBlockSort
+                                   : computeInnerProductsWithBitwiseOpt4bit;
       RAFT_CUDA_TRY(
         cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size));
       kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
     } else {
-      auto kernel = topk > MAX_TOP_K_BLOCK_SORT
-                      ? computeInnerProductsWithBitwiseOpt4bitNoEX
-                      : computeInnerProductsWithBitwiseOpt4bitNoEXBlockSort;
+      auto kernel = use_block_sort ? computeInnerProductsWithBitwiseOpt4bitNoEXBlockSort
+                                   : computeInnerProductsWithBitwiseOpt4bitNoEX;
       RAFT_CUDA_TRY(
         cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size));
       kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
