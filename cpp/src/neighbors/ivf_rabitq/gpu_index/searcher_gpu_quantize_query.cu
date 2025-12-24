@@ -301,7 +301,7 @@ __global__ void computeInnerProductsWithBitwiseOpt8bit(
 
         for (uint32_t i = 0; i < params.topk; i++) {
           float dist = params.d_topk_dists[output_offset + i];
-          if (dist > 0 && dist > max_topk_dist) { max_topk_dist = dist; }
+          if (dist > 0 && dist > max_topk_dist && dist < INFINITY) { max_topk_dist = dist; }
         }
       }
 
@@ -622,7 +622,7 @@ __global__ void computeInnerProductsWithBitwiseOpt8bitBlockSort(
 
         for (uint32_t i = 0; i < params.topk; i++) {
           float dist = params.d_topk_dists[output_offset + i];
-          if (dist > 0 && dist > max_topk_dist) { max_topk_dist = dist; }
+          if (dist > 0 && dist > max_topk_dist && dist < INFINITY) { max_topk_dist = dist; }
         }
       }
 
@@ -849,7 +849,7 @@ __global__ void computeInnerProductsWithBitwiseOpt8bitNoEX(
         // Find the maximum distance in our top-k results
         for (uint32_t i = 0; i < params.topk; i++) {
           float dist = params.d_topk_dists[output_offset + i];
-          if (dist > 0 && dist > max_topk_dist) { max_topk_dist = dist; }
+          if (dist > 0 && dist > max_topk_dist && dist < INFINITY) { max_topk_dist = dist; }
         }
       }
 
@@ -1090,7 +1090,7 @@ __global__ void computeInnerProductsWithBitwiseOpt8bitNoEXBlockSort(
 
         for (uint32_t i = 0; i < params.topk; i++) {
           float dist = params.d_topk_dists[output_offset + i];
-          if (dist > 0 && dist > max_topk_dist) { max_topk_dist = dist; }
+          if (dist > 0 && dist > max_topk_dist && dist < INFINITY) { max_topk_dist = dist; }
         }
       }
 
@@ -1387,7 +1387,7 @@ __global__ void computeInnerProductsWithBitwiseOpt4bit(
         // Find the maximum distance in our top-k results
         for (uint32_t i = 0; i < params.topk; i++) {
           float dist = params.d_topk_dists[output_offset + i];
-          if (dist > 0 && dist > max_topk_dist) { max_topk_dist = dist; }
+          if (dist > 0 && dist > max_topk_dist && dist < INFINITY) { max_topk_dist = dist; }
         }
       }
 
@@ -1708,7 +1708,7 @@ __global__ void computeInnerProductsWithBitwiseOpt4bitBlockSort(
 
         for (uint32_t i = 0; i < params.topk; i++) {
           float dist = params.d_topk_dists[output_offset + i];
-          if (dist > 0 && dist > max_topk_dist) { max_topk_dist = dist; }
+          if (dist > 0 && dist > max_topk_dist && dist < INFINITY) { max_topk_dist = dist; }
         }
       }
 
@@ -1930,7 +1930,7 @@ __global__ void computeInnerProductsWithBitwiseOpt4bitNoEX(
         // Find the maximum distance in our top-k results
         for (uint32_t i = 0; i < params.topk; i++) {
           float dist = params.d_topk_dists[output_offset + i];
-          if (dist > 0 && dist > max_topk_dist) { max_topk_dist = dist; }
+          if (dist > 0 && dist > max_topk_dist && dist < INFINITY) { max_topk_dist = dist; }
         }
       }
 
@@ -2167,7 +2167,7 @@ __global__ void computeInnerProductsWithBitwiseOpt4bitNoEXBlockSort(
 
         for (uint32_t i = 0; i < params.topk; i++) {
           float dist = params.d_topk_dists[output_offset + i];
-          if (dist > 0 && dist > max_topk_dist) { max_topk_dist = dist; }
+          if (dist > 0 && dist > max_topk_dist && dist < INFINITY) { max_topk_dist = dist; }
         }
       }
 

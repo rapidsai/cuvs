@@ -288,7 +288,7 @@ __global__ void computeInnerProductsWithLUT16Opt(const ComputeInnerProductsKerne
         // Find the maximum distance in our top-k results
         for (uint32_t i = 0; i < params.max_candidates_per_pair; i++) {
           float dist = params.d_topk_dists[output_offset + i];
-          if (dist > 0 && dist > max_topk_dist) { max_topk_dist = dist; }
+          if (dist > 0 && dist > max_topk_dist && dist < INFINITY) { max_topk_dist = dist; }
         }
       }
 
@@ -601,7 +601,7 @@ __global__ void computeInnerProductsWithLUT16OptBlockSort(
         // Find the maximum distance in our top-k results
         for (uint32_t i = 0; i < params.topk; i++) {
           float dist = params.d_topk_dists[output_offset + i];
-          if (dist > 0 && dist > max_topk_dist) { max_topk_dist = dist; }
+          if (dist > 0 && dist > max_topk_dist && dist < INFINITY) { max_topk_dist = dist; }
         }
       }
 
@@ -813,7 +813,7 @@ __global__ void computeInnerProductsWithLUT16OptNoEX(const ComputeInnerProductsK
         // Find the maximum distance in our top-k results
         for (uint32_t i = 0; i < params.max_candidates_per_pair; i++) {
           float dist = params.d_topk_dists[output_offset + i];
-          if (dist > 0 && dist > max_topk_dist) { max_topk_dist = dist; }
+          if (dist > 0 && dist > max_topk_dist && dist < INFINITY) { max_topk_dist = dist; }
         }
       }
 
@@ -1043,7 +1043,7 @@ __global__ void computeInnerProductsWithLUT16OptNoEXBlockSort(
 
         for (uint32_t i = 0; i < params.topk; i++) {
           float dist = params.d_topk_dists[output_offset + i];
-          if (dist > 0 && dist > max_topk_dist) { max_topk_dist = dist; }
+          if (dist > 0 && dist > max_topk_dist && dist < INFINITY) { max_topk_dist = dist; }
         }
       }
 
