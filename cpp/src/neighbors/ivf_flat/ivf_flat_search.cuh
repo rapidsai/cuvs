@@ -97,8 +97,8 @@ void search_impl(raft::resources const& handle,
       converted_queries_ptr, queries, n_queries * index.dim(), utils::mapping<float>{}, stream);
   }
 
-  if constexpr (std::is_same_v<T, uint8_t>) {
-    if (index.metric() == cuvs::distance::DistanceType::BitwiseHamming) {
+  if (index.metric() == cuvs::distance::DistanceType::BitwiseHamming) {
+    if constexpr (std::is_same_v<T, uint8_t>) {
       cuvs::distance::detail::ops::bitwise_hamming_distance_op<uint8_t, uint32_t, IdxT> distance_op{
         static_cast<IdxT>(index.dim())};
 
