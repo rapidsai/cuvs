@@ -504,14 +504,6 @@ inline auto build(raft::resources const& handle,
     kmeans_params.metric =
       index.binary_index() ? cuvs::distance::DistanceType::L2Expanded : index.metric();
     kmeans_params.is_packed_binary = index.binary_index();
-    std::cout << "kmeans_params.is_packed_binary: " << kmeans_params.is_packed_binary << std::endl;
-    std::cout << "index.binary_index(): " << index.binary_index() << std::endl;
-    std::cout << "index.metric(): " << static_cast<int>(index.metric()) << std::endl;
-    std::cout << "index.n_lists(): " << index.n_lists() << std::endl;
-    std::cout << "index.dim(): " << index.dim() << std::endl;
-    std::cout << "trainset_const_view.extent(0): " << trainset_const_view.extent(0) << std::endl;
-    std::cout << "trainset_const_view.extent(1): " << trainset_const_view.extent(1) << std::endl;
-    std::cout << "trainset.size(): " << trainset.size() << std::endl;
     if constexpr (std::is_same_v<T, uint8_t>) {
       if (index.binary_index()) {
         rmm::device_uvector<float> decoded_centers(index.n_lists() * index.dim() * 8,
