@@ -100,6 +100,7 @@ add_library(
   src/neighbors/tiered_index.cpp
   src/neighbors/all_neighbors.cpp
   src/preprocessing/quantize/binary.cpp
+  src/preprocessing/quantize/pq.cpp
   src/preprocessing/quantize/scalar.cpp
   src/distance/pairwise_distance.cpp
 )
