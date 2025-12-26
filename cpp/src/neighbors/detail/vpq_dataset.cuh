@@ -554,12 +554,12 @@ __device__ auto compute_code_subspaces(
   const uint32_t pq_len                 = pq_centers.extent(1);
   const MathT* __restrict__ centers_ptr = pq_centers.data_handle();
   const DataT* __restrict__ dataset_ptr = dataset.data_handle() + i * dataset.extent(1);
-  float min_dist                        = std::numeric_limits<float>::infinity();
+  MathT min_dist                        = std::numeric_limits<MathT>::infinity();
   uint8_t code                          = 0;
 
   if (pq_len <= SubWarpSize) {
     // Each thread loads one dataset element and will share to others using shuffle
-    float my_dataset_val = 0.0f;
+    MathT my_dataset_val = 0.0f;
     if (lane_id < pq_len) {
       auto jk = j * pq_len + lane_id;
       auto x  = data_mapping(dataset_ptr[jk]);
@@ -567,50 +567,50 @@ __device__ auto compute_code_subspaces(
       my_dataset_val = x;
     }
 
+    const uint32_t subwarp_idx  = raft::laneId() / SubWarpSize;
+    const uint32_t subwarp_mask = (SubWarpSize == 32)
+                                    ? 0xffffffffu
+                                    : (((1u << SubWarpSize) - 1) << (subwarp_idx * SubWarpSize));
     // Each thread evaluates by chunks of 4 PQ centers
     uint32_t l = lane_id;
 
     for (; l + 3 * SubWarpSize < pq_book_size; l += 4 * SubWarpSize) {
-      float d0 = 0.0f, d1 = 0.0f, d2 = 0.0f, d3 = 0.0f;
+      MathT d0 = 0.0f, d1 = 0.0f, d2 = 0.0f, d3 = 0.0f;
 
 #pragma unroll 4
       for (uint32_t k = 0; k < pq_len; k++) {
-        float x  = __shfl_sync(0xffffffff, my_dataset_val, k, SubWarpSize);
-        float c0 = __ldg(&centers_ptr[l * pq_len + k]);
-        float c1 = __ldg(&centers_ptr[(l + SubWarpSize) * pq_len + k]);
-        float c2 = __ldg(&centers_ptr[(l + 2 * SubWarpSize) * pq_len + k]);
-        float c3 = __ldg(&centers_ptr[(l + 3 * SubWarpSize) * pq_len + k]);
-        d0       = __fmaf_rn(x - c0, x - c0, d0);
-        d1       = __fmaf_rn(x - c1, x - c1, d1);
-        d2       = __fmaf_rn(x - c2, x - c2, d2);
-        d3       = __fmaf_rn(x - c3, x - c3, d3);
+        MathT x  = __shfl_sync(subwarp_mask, my_dataset_val, k, SubWarpSize);
+        MathT c0 = __ldg(&centers_ptr[l * pq_len + k]);
+        MathT c1 = __ldg(&centers_ptr[(l + SubWarpSize) * pq_len + k]);
+        MathT c2 = __ldg(&centers_ptr[(l + 2 * SubWarpSize) * pq_len + k]);
+        MathT c3 = __ldg(&centers_ptr[(l + 3 * SubWarpSize) * pq_len + k]);
+
+        d0 = __fmaf_rn(x - c0, x - c0, d0);
+        d1 = __fmaf_rn(x - c1, x - c1, d1);
+        d2 = __fmaf_rn(x - c2, x - c2, d2);
+        d3 = __fmaf_rn(x - c3, x - c3, d3);
       }
 
-      if (d0 < min_dist) {
-        min_dist = d0;
-        code     = uint8_t(l);
-      }
-      if (d1 < min_dist) {
-        min_dist = d1;
-        code     = uint8_t(l + SubWarpSize);
-      }
-      if (d2 < min_dist) {
-        min_dist = d2;
-        code     = uint8_t(l + 2 * SubWarpSize);
-      }
-      if (d3 < min_dist) {
-        min_dist = d3;
-        code     = uint8_t(l + 3 * SubWarpSize);
+      MathT best_dist_01      = fminf(d0, d1);
+      MathT best_dist_23      = fminf(d2, d3);
+      MathT best_dist         = fminf(best_dist_01, best_dist_23);
+      const uint32_t idx_01   = (d1 < d0) ? (l + SubWarpSize) : l;
+      const uint32_t idx_23   = (d3 < d2) ? (l + 3 * SubWarpSize) : (l + 2 * SubWarpSize);
+      const uint32_t best_idx = (best_dist_23 < best_dist_01) ? idx_23 : idx_01;
+
+      if (best_dist < min_dist) {
+        min_dist = best_dist;
+        code     = uint8_t(best_idx);
       }
     }
 
     // Tail loop
     for (; l < pq_book_size; l += SubWarpSize) {
-      float d0 = 0.0f;
+      MathT d0 = 0.0f;
 #pragma unroll
       for (uint32_t k = 0; k < pq_len; k++) {
-        float x          = __shfl_sync(0xffffffff, my_dataset_val, k, SubWarpSize);
-        float center_val = __ldg(&centers_ptr[l * pq_len + k]);
+        MathT x          = __shfl_sync(subwarp_mask, my_dataset_val, k, SubWarpSize);
+        MathT center_val = __ldg(&centers_ptr[l * pq_len + k]);
         d0               = __fmaf_rn(x - center_val, x - center_val, d0);
       }
 
@@ -632,47 +632,42 @@ __device__ auto compute_code_subspaces(
     // Each thread evaluates by chunks of 4 PQ centers
     uint32_t l = lane_id;
     for (; l + 3 * SubWarpSize < pq_book_size; l += 4 * SubWarpSize) {
-      float d0 = 0.0f, d1 = 0.0f, d2 = 0.0f, d3 = 0.0f;
+      MathT d0 = 0.0f, d1 = 0.0f, d2 = 0.0f, d3 = 0.0f;
 
 #pragma unroll 4
       for (uint32_t k = 0; k < pq_len; k++) {
-        float x  = smem_dataset[k];
-        float c0 = __ldg(&centers_ptr[l * pq_len + k]);
-        float c1 = __ldg(&centers_ptr[(l + SubWarpSize) * pq_len + k]);
-        float c2 = __ldg(&centers_ptr[(l + 2 * SubWarpSize) * pq_len + k]);
-        float c3 = __ldg(&centers_ptr[(l + 3 * SubWarpSize) * pq_len + k]);
+        MathT x  = smem_dataset[k];
+        MathT c0 = __ldg(&centers_ptr[l * pq_len + k]);
+        MathT c1 = __ldg(&centers_ptr[(l + SubWarpSize) * pq_len + k]);
+        MathT c2 = __ldg(&centers_ptr[(l + 2 * SubWarpSize) * pq_len + k]);
+        MathT c3 = __ldg(&centers_ptr[(l + 3 * SubWarpSize) * pq_len + k]);
         d0       = __fmaf_rn(x - c0, x - c0, d0);
         d1       = __fmaf_rn(x - c1, x - c1, d1);
         d2       = __fmaf_rn(x - c2, x - c2, d2);
         d3       = __fmaf_rn(x - c3, x - c3, d3);
       }
 
-      if (d0 < min_dist) {
-        min_dist = d0;
-        code     = uint8_t(l);
-      }
-      if (d1 < min_dist) {
-        min_dist = d1;
-        code     = uint8_t(l + SubWarpSize);
-      }
-      if (d2 < min_dist) {
-        min_dist = d2;
-        code     = uint8_t(l + 2 * SubWarpSize);
-      }
-      if (d3 < min_dist) {
-        min_dist = d3;
-        code     = uint8_t(l + 3 * SubWarpSize);
+      MathT best_dist_01      = fminf(d0, d1);
+      MathT best_dist_23      = fminf(d2, d3);
+      MathT best_dist         = fminf(best_dist_01, best_dist_23);
+      const uint32_t idx_01   = (d1 < d0) ? (l + SubWarpSize) : l;
+      const uint32_t idx_23   = (d3 < d2) ? (l + 3 * SubWarpSize) : (l + 2 * SubWarpSize);
+      const uint32_t best_idx = (best_dist_23 < best_dist_01) ? idx_23 : idx_01;
+
+      if (best_dist < min_dist) {
+        min_dist = best_dist;
+        code     = uint8_t(best_idx);
       }
     }
 
     // Tail loop
     for (; l < pq_book_size; l += SubWarpSize) {
-      float d0 = 0.0f;
+      MathT d0 = 0.0f;
 
 #pragma unroll 4
       for (uint32_t k = 0; k < pq_len; k++) {
-        float x          = smem_dataset[k];
-        float center_val = __ldg(&centers_ptr[l * pq_len + k]);
+        MathT x          = smem_dataset[k];
+        MathT center_val = __ldg(&centers_ptr[l * pq_len + k]);
         d0               = __fmaf_rn(x - center_val, x - center_val, d0);
       }
 
@@ -721,9 +716,7 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_subspaces_kernel
 
   const uint32_t lane_id = raft::Pow2<kSubWarpSize>::mod(threadIdx.x);
   const LabelT vq_label  = vq_labels ? vq_labels.value()(row_ix) : 0;
-
-  // write label
-  auto* out_codes_ptr = &out_codes(row_ix, 0);
+  auto* out_codes_ptr    = &out_codes(row_ix, 0);
 
   // write label
   if (vq_centers) {

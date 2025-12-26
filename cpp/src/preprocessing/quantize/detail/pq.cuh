@@ -105,11 +105,11 @@ auto train_pq_subspaces(
   return pq_centers;
 }
 
-template <typename T, typename AccessorType>
-quantizer<T> train(
+template <typename DataT, typename MathT, typename AccessorType>
+quantizer<MathT> train(
   raft::resources const& res,
   const cuvs::preprocessing::quantize::pq::params params,
-  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, AccessorType> dataset)
+  raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, AccessorType> dataset)
 {
   auto n_rows = dataset.extent(0);
   auto dim    = dataset.extent(1);
@@ -125,33 +125,34 @@ quantizer<T> train(
       static_cast<const cuvs::neighbors::vpq_params&>(params), dataset),
     params.use_vq,
     params.use_subspaces);
-  std::optional<raft::device_matrix_view<const T, uint32_t, raft::row_major>>
-    vq_code_book_view_opt                                                           = std::nullopt;
-  std::optional<raft::device_matrix<T, uint32_t, raft::row_major>> vq_code_book_opt = std::nullopt;
+  std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>>
+    vq_code_book_view_opt = std::nullopt;
+  std::optional<raft::device_matrix<MathT, uint32_t, raft::row_major>> vq_code_book_opt =
+    std::nullopt;
   if (ps.use_vq) {
-    vq_code_book_opt      = cuvs::neighbors::detail::train_vq<T>(res, ps, dataset);
+    vq_code_book_opt      = cuvs::neighbors::detail::train_vq<MathT>(res, ps, dataset);
     vq_code_book_view_opt = raft::make_const_mdspan(vq_code_book_opt.value().view());
   } else {
-    vq_code_book_opt = raft::make_device_matrix<T, uint32_t, raft::row_major>(res, 0, 0);
+    vq_code_book_opt = raft::make_device_matrix<MathT, uint32_t, raft::row_major>(res, 0, 0);
   }
   auto empty_codes = raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(res, 0, 0);
   if (ps.use_subspaces) {
-    auto pq_code_book = train_pq_subspaces<T>(res, ps, dataset, vq_code_book_view_opt);
+    auto pq_code_book = train_pq_subspaces<MathT>(res, ps, dataset, vq_code_book_view_opt);
     return {
       ps,
-      cuvs::neighbors::vpq_dataset<T, int64_t>{
+      cuvs::neighbors::vpq_dataset<MathT, int64_t>{
         std::move(vq_code_book_opt.value()), std::move(pq_code_book), std::move(empty_codes)}};
   } else {
     auto pq_code_book =
-      cuvs::neighbors::detail::train_pq<T>(res, ps, dataset, vq_code_book_view_opt);
+      cuvs::neighbors::detail::train_pq<MathT>(res, ps, dataset, vq_code_book_view_opt);
     return {
       ps,
-      cuvs::neighbors::vpq_dataset<T, int64_t>{
+      cuvs::neighbors::vpq_dataset<MathT, int64_t>{
         std::move(vq_code_book_opt.value()), std::move(pq_code_book), std::move(empty_codes)}};
   }
 }
 
-template <typename T, typename AccessorType, typename QuantI = uint8_t>
+template <typename T, typename QuantI, typename AccessorType>
 void transform(
   raft::resources const& res,
   const quantizer<T>& quantizer,
