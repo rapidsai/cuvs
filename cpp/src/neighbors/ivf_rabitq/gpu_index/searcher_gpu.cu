@@ -657,7 +657,7 @@ __global__ void computeInnerProductsWithLUTNoEX(const ComputeInnerProductsKernel
 
   __syncthreads();
 
-  // Step 2 Part 1: Compute distances using LUT && decide candidates
+  // Step 2 Part 1: Compute distances using LUT
 
   // Shared values for this <cluster, query> pair
   __shared__ float q_g_add;    // squared distance to centroid
