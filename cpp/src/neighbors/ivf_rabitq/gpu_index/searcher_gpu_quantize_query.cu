@@ -43,8 +43,6 @@ __global__ void computeInnerProductsWithBitwiseOpt(const ComputeInnerProductsKer
   const int tid         = threadIdx.x;
   const int num_threads = blockDim.x;
 
-  float q_g_add = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
-
   // Allocate shared memory for candidates
   float* shared_query       = reinterpret_cast<float*>(shared_mem_raw_2);
   float* shared_ip2_results = shared_query + params.D;
@@ -95,7 +93,8 @@ __global__ void computeInnerProductsWithBitwiseOpt(const ComputeInnerProductsKer
   // Step 2: Load float query and compute exact IPs for candidates
 
   const size_t short_code_length = params.D / 32;
-  float q_kbxsumq                = params.d_G_kbxSumq[query_idx];
+  float q_g_add   = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
+  float q_kbxsumq = params.d_G_kbxSumq[query_idx];
 
   // Atomically get write position
   __shared__ int probe_slot;
@@ -276,24 +275,16 @@ __global__ void computeInnerProductsWithBitwiseOpt8bitBlockSort(
   }
 
   // Load query width
-  __shared__ float query_width;
-  if (tid == 0) { query_width = params.d_widths[query_idx]; }
-  __syncthreads();
+  float query_width = params.d_widths[query_idx];
 
   // Shared values for this <cluster, query> pair
   __shared__ int num_candidates;
-  __shared__ float q_g_add;
-  __shared__ float q_k1xsumq;
-  __shared__ float q_g_error;
-  __shared__ float threshold;
+  float q_g_add   = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
+  float q_k1xsumq = params.d_G_k1xSumq[query_idx];
+  float q_g_error = sqrtf(q_g_add);
+  float threshold = params.d_threshold[query_idx];
 
-  if (tid == 0) {
-    q_g_add        = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
-    q_g_error      = sqrtf(q_g_add);
-    q_k1xsumq      = params.d_G_k1xSumq[query_idx];
-    threshold      = params.d_threshold[query_idx];
-    num_candidates = 0;
-  }
+  if (tid == 0) { num_candidates = 0; }
   __syncthreads();
 
   // Allocate shared memory for candidates
@@ -423,10 +414,7 @@ __global__ void computeInnerProductsWithBitwiseOpt8bitBlockSort(
         flat_block_sort<MAX_TOP_K_BLOCK_SORT, true, T, IdxT>::type;
       block_sort_t queue(params.topk);
 
-      // Additional shared values needed for Step 3
-      __shared__ float q_kbxsumq;
-      if (tid == 0) { q_kbxsumq = params.d_G_kbxSumq[query_idx]; }
-      __syncthreads();
+      float q_kbxsumq = params.d_G_kbxSumq[query_idx];
 
       // Calculate long code parameters
       const uint32_t long_code_size = (params.D * params.ex_bits + 7) / 8;
@@ -597,24 +585,16 @@ __global__ void computeInnerProductsWithBitwiseOpt8bitNoEXBlockSort(
   }
 
   // Load query width
-  __shared__ float query_width;
-  if (tid == 0) { query_width = params.d_widths[query_idx]; }
-  __syncthreads();
+  float query_width = params.d_widths[query_idx];
 
   // Shared values for this <cluster, query> pair
   __shared__ int num_candidates;
-  __shared__ float q_g_add;
-  __shared__ float q_k1xsumq;
-  __shared__ float q_g_error;
-  __shared__ float threshold;
+  float q_g_add   = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
+  float q_k1xsumq = params.d_G_k1xSumq[query_idx];
+  float q_g_error = sqrtf(q_g_add);
+  float threshold = params.d_threshold[query_idx];
 
-  if (tid == 0) {
-    q_g_add        = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
-    q_g_error      = sqrtf(q_g_add);
-    q_k1xsumq      = params.d_G_k1xSumq[query_idx];
-    threshold      = params.d_threshold[query_idx];
-    num_candidates = 0;
-  }
+  if (tid == 0) { num_candidates = 0; }
   __syncthreads();
 
   // Allocate shared memory for candidates
@@ -838,24 +818,16 @@ __global__ void computeInnerProductsWithBitwiseOpt4bitBlockSort(
   }
 
   // Load query width
-  __shared__ float query_width;
-  if (tid == 0) { query_width = params.d_widths[query_idx]; }
-  __syncthreads();
+  float query_width = params.d_widths[query_idx];
 
   // Shared values for this <cluster, query> pair
   __shared__ int num_candidates;
-  __shared__ float q_g_add;
-  __shared__ float q_k1xsumq;
-  __shared__ float q_g_error;
-  __shared__ float threshold;
+  float q_g_add   = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
+  float q_k1xsumq = params.d_G_k1xSumq[query_idx];
+  float q_g_error = sqrtf(q_g_add);
+  float threshold = params.d_threshold[query_idx];
 
-  if (tid == 0) {
-    q_g_add        = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
-    q_g_error      = sqrtf(q_g_add);
-    q_k1xsumq      = params.d_G_k1xSumq[query_idx];
-    threshold      = params.d_threshold[query_idx];
-    num_candidates = 0;
-  }
+  if (tid == 0) { num_candidates = 0; }
   __syncthreads();
 
   // Allocate shared memory for candidates
@@ -986,9 +958,7 @@ __global__ void computeInnerProductsWithBitwiseOpt4bitBlockSort(
       block_sort_t queue(params.topk);
 
       // Additional shared values needed for Step 3
-      __shared__ float q_kbxsumq;
-      if (tid == 0) { q_kbxsumq = params.d_G_kbxSumq[query_idx]; }
-      __syncthreads();
+      float q_kbxsumq = params.d_G_kbxSumq[query_idx];
 
       // Calculate long code parameters
       const uint32_t long_code_size = (params.D * params.ex_bits + 7) / 8;
@@ -1159,24 +1129,16 @@ __global__ void computeInnerProductsWithBitwiseOpt4bitNoEXBlockSort(
   }
 
   // Load query width
-  __shared__ float query_width;
-  if (tid == 0) { query_width = params.d_widths[query_idx]; }
-  __syncthreads();
+  float query_width = params.d_widths[query_idx];
 
   // Shared values for this <cluster, query> pair
   __shared__ int num_candidates;
-  __shared__ float q_g_add;
-  __shared__ float q_k1xsumq;
-  __shared__ float q_g_error;
-  __shared__ float threshold;
+  float q_g_add   = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
+  float q_k1xsumq = params.d_G_k1xSumq[query_idx];
+  float q_g_error = sqrtf(q_g_add);
+  float threshold = params.d_threshold[query_idx];
 
-  if (tid == 0) {
-    q_g_add        = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
-    q_g_error      = sqrtf(q_g_add);
-    q_k1xsumq      = params.d_G_k1xSumq[query_idx];
-    threshold      = params.d_threshold[query_idx];
-    num_candidates = 0;
-  }
+  if (tid == 0) { num_candidates = 0; }
   __syncthreads();
 
   // Allocate shared memory for candidates

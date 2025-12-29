@@ -159,16 +159,6 @@ __global__ void computeInnerProductsWithLUT(const ComputeInnerProductsKernelPara
   const int tid         = threadIdx.x;
   const int num_threads = blockDim.x;
 
-  // Shared values for this <cluster, query> pair
-  __shared__ float q_g_add;  // squared distance to centroid
-
-  // Load shared query-cluster values
-  if (tid == 0) {
-    // Get squared distance from query to this cluster's centroid
-    q_g_add = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
-  }
-  __syncthreads();
-
   // Calculate long code parameters
   const size_t long_code_size = (params.D * params.ex_bits + 7) / 8;
 
@@ -243,6 +233,9 @@ __global__ void computeInnerProductsWithLUT(const ComputeInnerProductsKernelPara
   size_t output_offset = query_idx * (params.max_candidates_per_pair * params.nprobe) +
                          probe_slot * params.max_candidates_per_pair;
 
+  // Common values for this <cluster, query> pair
+  float q_g_add   = params.d_centroid_distances[query_idx * params.num_centroids +
+                                              cluster_idx];  // squared distance to centroid
   float q_kbxsumq = params.d_G_kbxSumq[query_idx];
 
   // Each thread processes one or more vectors
@@ -347,22 +340,17 @@ __global__ void computeInnerProductsWithLUTBlockSort(const ComputeInnerProductsK
   // Step 2 Part 1: Compute distances using LUT && decide candidates
 
   // Shared values for this <cluster, query> pair
-  __shared__ float q_g_add;       // squared distance to centroid
-  __shared__ float q_k1xsumq;     // query factor
-  __shared__ float q_g_error;     // sqrt(q_g_add)
-  __shared__ float threshold;     // threshold for this query
   __shared__ int num_candidates;  // counter for candidates
+  // Get squared distance from query to this cluster's centroid
+  float q_g_add   = params.d_centroid_distances[query_idx * params.num_centroids +
+                                              cluster_idx];  // squared distance to centroid
+  float q_g_error = sqrtf(q_g_add);                            // sqrt(q_g_add)
+  float q_k1xsumq = params.d_G_k1xSumq[query_idx];             // query factor
+  float threshold = params.d_threshold[query_idx];             // load threshold
 
-  // Load shared query-cluster values
+  // Initialize shared memory variable
   if (tid == 0) {
-    // Get squared distance from query to this cluster's centroid
-    q_g_add   = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
-    q_g_error = sqrtf(q_g_add);
-
-    // Get query factor
-    q_k1xsumq      = params.d_G_k1xSumq[query_idx];
-    threshold      = params.d_threshold[query_idx];  // NEW: load threshold
-    num_candidates = 0;                              // NEW: initialize counter
+    num_candidates = 0;  // NEW: initialize counter
   }
   __syncthreads();
 
@@ -464,10 +452,7 @@ __global__ void computeInnerProductsWithLUTBlockSort(const ComputeInnerProductsK
       flat_block_sort<MAX_TOP_K_BLOCK_SORT, true, T, IdxT>::type;
     block_sort_t queue(params.topk);
 
-    // Additional shared values needed for Step 3
-    __shared__ float q_kbxsumq;
-    if (tid == 0) { q_kbxsumq = params.d_G_kbxSumq[query_idx]; }
-    __syncthreads();
+    float q_kbxsumq = params.d_G_kbxSumq[query_idx];
 
     // Calculate long code parameters
     const size_t long_code_size = (params.D * params.ex_bits + 7) / 8;
@@ -659,18 +644,11 @@ __global__ void computeInnerProductsWithLUTNoEX(const ComputeInnerProductsKernel
 
   // Step 2 Part 1: Compute distances using LUT
 
-  // Shared values for this <cluster, query> pair
-  __shared__ float q_g_add;    // squared distance to centroid
-  __shared__ float q_k1xsumq;  // query factor
-  // Load shared query-cluster values
-  if (tid == 0) {
-    // Get squared distance from query to this cluster's centroid
-    q_g_add = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
-
-    // Get query factor
-    q_k1xsumq = params.d_G_k1xSumq[query_idx];
-  }
-  __syncthreads();
+  // Common values for this <cluster, query> pair
+  // Get squared distance from query to this cluster's centroid
+  float q_g_add   = params.d_centroid_distances[query_idx * params.num_centroids +
+                                              cluster_idx];  // squared distance to centroid
+  float q_k1xsumq = params.d_G_k1xSumq[query_idx];             // query factor
 
   // Calculate short code parameters
   const uint32_t short_code_length = params.D / 32;        // number of uint32_t per vector
@@ -779,18 +757,14 @@ __global__ void computeInnerProductsWithLUTNoEXBlockSort(
   // Shared values for this <cluster, query> pair
 
   __shared__ int num_candidates;  // counter for candidates
-  __shared__ float q_g_add;       // squared distance to centroid
-  __shared__ float q_k1xsumq;     // query factor
-  __shared__ float threshold;     // threshold for this query
-  // Load shared query-cluster values
+  // Get squared distance from query to this cluster's centroid
+  float q_g_add   = params.d_centroid_distances[query_idx * params.num_centroids +
+                                              cluster_idx];  // squared distance to centroid
+  float q_k1xsumq = params.d_G_k1xSumq[query_idx];             // query factor
+  float threshold = params.d_threshold[query_idx];             // threshold for this query
+  // Initialized shared memory variable
   if (tid == 0) {
-    // Get squared distance from query to this cluster's centroid
-    q_g_add = params.d_centroid_distances[query_idx * params.num_centroids + cluster_idx];
-
-    // Get query factor
-    q_k1xsumq      = params.d_G_k1xSumq[query_idx];
-    threshold      = params.d_threshold[query_idx];  // NEW: load threshold
-    num_candidates = 0;                              // NEW: initialize counter
+    num_candidates = 0;  // NEW: initialize counter
   }
   __syncthreads();
 
