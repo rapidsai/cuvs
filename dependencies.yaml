@@ -263,8 +263,8 @@ dependencies:
       - output_types: [conda, requirements, pyproject]
         packages:
           - *rapids_build_backend
-          - setuptools>=77.0.0
-          - wheel
+          - &setuptools setuptools>=77.0.0
+          - &wheel wheel
   build_py_cuvs:
     common:
       - output_types: [conda]
@@ -396,8 +396,8 @@ dependencies:
     common:
       - output_types: [requirements, pyproject]
         packages:
-          - wheel
-          - setuptools>=77.0.0
+          - *wheel
+          - *setuptools
   py_version:
     specific:
       - output_types: conda
