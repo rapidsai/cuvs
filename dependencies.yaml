@@ -225,10 +225,10 @@ dependencies:
           - &rapids_build_backend rapids-build-backend>=0.4.0,<0.5.0
       - output_types: [conda]
         packages:
-          - scikit-build-core>=0.10.0
+          - scikit-build-core>=0.11.0
       - output_types: [requirements, pyproject]
         packages:
-          - scikit-build-core[pyproject]>=0.10.0
+          - scikit-build-core[pyproject]>=0.11.0
   build_cython:
     common:
       - output_types: [conda, requirements, pyproject]
@@ -263,7 +263,7 @@ dependencies:
       - output_types: [conda, requirements, pyproject]
         packages:
           - *rapids_build_backend
-          - setuptools
+          - setuptools>=77.0.0
           - wheel
   build_py_cuvs:
     common:
@@ -397,7 +397,7 @@ dependencies:
       - output_types: [requirements, pyproject]
         packages:
           - wheel
-          - setuptools
+          - setuptools>=77.0.0
   py_version:
     specific:
       - output_types: conda
