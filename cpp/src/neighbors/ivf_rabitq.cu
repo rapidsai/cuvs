@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -153,17 +153,11 @@ void search(raft::resources const& handle,
   auto max_candidates_per_query_per_probe =
     k > MAX_TOP_K_BLOCK_SORT ? idx.rabitq_index().get_max_cluster_length() : k;
 
-  float* d_topk_dists;
-  uint32_t *d_topk_ids, *d_final_ids;
-  RAFT_CUDA_TRY(
-    cudaMallocAsync(&d_topk_dists,
-                    NQ * params.n_probes * max_candidates_per_query_per_probe * sizeof(float),
-                    stream));
-  RAFT_CUDA_TRY(
-    cudaMallocAsync(&d_topk_ids,
-                    NQ * params.n_probes * max_candidates_per_query_per_probe * sizeof(uint32_t),
-                    stream));
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_final_ids, NQ * k * sizeof(uint32_t), stream));
+  auto topk_dists = raft::make_device_vector<float, int64_t>(
+    handle, NQ * params.n_probes * max_candidates_per_query_per_probe);
+  auto topk_ids = raft::make_device_vector<uint32_t, int64_t>(
+    handle, NQ * params.n_probes * max_candidates_per_query_per_probe);
+  auto final_ids = raft::make_device_vector<uint32_t, int64_t>(handle, NQ * k);
 
   if (params.mode == search_mode::LUT32) {
     idx.rabitq_index().BatchClusterSearch(rotated_queries.data_handle(),
@@ -171,10 +165,10 @@ void search(raft::resources const& handle,
                                           params.n_probes,
                                           &searcher,
                                           NQ,
-                                          d_topk_dists,
+                                          topk_dists.data_handle(),
                                           distances.data_handle(),
-                                          d_topk_ids,
-                                          d_final_ids);
+                                          topk_ids.data_handle(),
+                                          final_ids.data_handle());
   } else if (params.mode == search_mode::LUT16) {
     // test v3 lut using fp16
     idx.rabitq_index().BatchClusterSearchLUT16(rotated_queries.data_handle(),
@@ -182,20 +176,20 @@ void search(raft::resources const& handle,
                                                params.n_probes,
                                                &searcher,
                                                NQ,
-                                               d_topk_dists,
+                                               topk_dists.data_handle(),
                                                distances.data_handle(),
-                                               d_topk_ids,
-                                               d_final_ids);
+                                               topk_ids.data_handle(),
+                                               final_ids.data_handle());
   } else if (params.mode == search_mode::QUANT8) {
     idx.rabitq_index().BatchClusterSearchQuantizeQuery(rotated_queries.data_handle(),
                                                        k,
                                                        params.n_probes,
                                                        &searcher,
                                                        NQ,
-                                                       d_topk_dists,
+                                                       topk_dists.data_handle(),
                                                        distances.data_handle(),
-                                                       d_topk_ids,
-                                                       d_final_ids,
+                                                       topk_ids.data_handle(),
+                                                       final_ids.data_handle(),
                                                        8);
   } else if (params.mode == search_mode::QUANT4) {
     idx.rabitq_index().BatchClusterSearchQuantizeQuery(rotated_queries.data_handle(),
@@ -203,22 +197,19 @@ void search(raft::resources const& handle,
                                                        params.n_probes,
                                                        &searcher,
                                                        NQ,
-                                                       d_topk_dists,
+                                                       topk_dists.data_handle(),
                                                        distances.data_handle(),
-                                                       d_topk_ids,
-                                                       d_final_ids,
+                                                       topk_ids.data_handle(),
+                                                       final_ids.data_handle(),
                                                        4);
   }
 
   // cast data in d_final_ids to array of IdxT in neighbors
-  raft::linalg::map(handle,
-                    neighbors,
-                    raft::cast_op<IdxT>{},
-                    raft::make_device_vector_view<const uint32_t, IdxT>(d_final_ids, NQ * k));
-
-  RAFT_CUDA_TRY(cudaFreeAsync(d_topk_dists, stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_topk_ids, stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_final_ids, stream));
+  raft::linalg::map(
+    handle,
+    neighbors,
+    raft::cast_op<IdxT>{},
+    raft::make_device_vector_view<const uint32_t, IdxT>(final_ids.data_handle(), NQ * k));
 }
 
 template <typename IdxT>

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -587,7 +587,6 @@ __global__ void computeInnerProductsWithLUT16OptNoEX(const ComputeInnerProductsK
         uint32_t lut_offset    = lut_chunk_idx * LUT_SIZE + pattern;
 
         // Accumulate inner product
-        //                    ip += __bfloat162float(shared_lut_bf16[lut_offset]);
         ip += __half2float(shared_lut_bf16[lut_offset]);
       }
     }
@@ -711,7 +710,6 @@ __global__ void computeInnerProductsWithLUT16OptNoEXBlockSort(
           uint32_t lut_offset    = lut_chunk_idx * LUT_SIZE + pattern;
 
           // Accumulate inner product
-          //                    ip += __bfloat162float(shared_lut_bf16[lut_offset]);
           ip += __half2float(shared_lut_bf16[lut_offset]);
         }
       }
