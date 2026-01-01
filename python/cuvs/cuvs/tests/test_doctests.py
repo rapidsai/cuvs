@@ -1,11 +1,12 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2022-2024, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
 import contextlib
 import doctest
 import inspect
 import io
+import sys
 from pathlib import Path
 
 import pytest
@@ -96,6 +97,61 @@ def _test_name_from_docstring(docstring):
     return f"{filename}:{docstring.name}"
 
 
+class VerboseDocTestRunner(doctest.DocTestRunner):
+    """A DocTestRunner that prints each example before executing it."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.current_test_name = None
+
+    def run(self, test, compileflags=None, out=None, clear_globs=True):
+        self.current_test_name = test.name
+        print(f"\n{'=' * 60}", file=sys.stderr)
+        print(f"DOCTEST: {test.name}", file=sys.stderr)
+        print(f"FILE: {test.filename}", file=sys.stderr)
+        print(f"EXAMPLES: {len(test.examples)}", file=sys.stderr)
+        print(f"{'=' * 60}", file=sys.stderr)
+        sys.stderr.flush()
+        return super().run(test, compileflags, out, clear_globs)
+
+    def report_start(self, out, test, example):
+        """Called before each example is run."""
+        idx = test.examples.index(example)
+        source = example.source.strip()
+        # Truncate long lines for readability
+        if len(source) > 100:
+            source = source[:97] + "..."
+        print(f"  [{idx:2d}] Executing: {source}", file=sys.stderr)
+        sys.stderr.flush()
+        return super().report_start(out, test, example)
+
+    def report_success(self, out, test, example, got):
+        """Called when an example succeeds."""
+        idx = test.examples.index(example)
+        print(f"  [{idx:2d}] OK", file=sys.stderr)
+        sys.stderr.flush()
+        return super().report_success(out, test, example, got)
+
+    def report_failure(self, out, test, example, got):
+        """Called when an example fails."""
+        idx = test.examples.index(example)
+        print(f"  [{idx:2d}] FAILED!", file=sys.stderr)
+        print(f"       Expected: {example.want!r}", file=sys.stderr)
+        print(f"       Got: {got!r}", file=sys.stderr)
+        sys.stderr.flush()
+        return super().report_failure(out, test, example, got)
+
+    def report_unexpected_exception(self, out, test, example, exc_info):
+        """Called when an example raises an unexpected exception."""
+        idx = test.examples.index(example)
+        print(f"  [{idx:2d}] EXCEPTION!", file=sys.stderr)
+        print(f"       {exc_info[0].__name__}: {exc_info[1]}", file=sys.stderr)
+        sys.stderr.flush()
+        return super().report_unexpected_exception(
+            out, test, example, exc_info
+        )
+
+
 @pytest.mark.parametrize(
     "docstring", DOC_STRINGS, ids=_test_name_from_docstring
 )
@@ -105,13 +161,22 @@ def test_docstring(docstring):
     # output. An ellipsis is useful for, e.g., memory addresses or
     # imprecise floating point values.
     optionflags = doctest.ELLIPSIS | doctest.NORMALIZE_WHITESPACE
-    runner = doctest.DocTestRunner(optionflags=optionflags)
+
+    # Use verbose runner to see exactly which example crashes
+    runner = VerboseDocTestRunner(optionflags=optionflags, verbose=True)
 
     # Capture stdout and include failing outputs in the traceback.
     doctest_stdout = io.StringIO()
     with contextlib.redirect_stdout(doctest_stdout):
         runner.run(docstring)
         results = runner.summarize()
+
+    print(
+        f"\nRESULT: {results.attempted} attempted, {results.failed} failed",
+        file=sys.stderr,
+    )
+    sys.stderr.flush()
+
     assert not results.failed, (
         f"{results.failed} of {results.attempted} doctests failed for "
         f"{docstring.name}:\n{doctest_stdout.getvalue()}"
