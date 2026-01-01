@@ -323,6 +323,12 @@ extern "C" cuvsError_t cuvsIvfPqExtend(cuvsResources_t res,
   return cuvs::core::translate_exceptions([=] {
     auto vectors = new_vectors->dl_tensor;
 
+    // Set the index dtype if not already set (e.g., for view-type indices built from precomputed data)
+    if (index->dtype.code == 0 && index->dtype.bits == 0) {
+      index->dtype.code = vectors.dtype.code;
+      index->dtype.bits = vectors.dtype.bits;
+    }
+
     if (vectors.dtype.code == kDLFloat && vectors.dtype.bits == 32) {
       _extend<float, int64_t>(res, new_vectors, new_indices, *index);
     } else if (vectors.dtype.code == kDLFloat && vectors.dtype.bits == 16) {
@@ -371,3 +377,65 @@ extern "C" cuvsError_t cuvsIvfPqIndexGetPqCenters(cuvsIvfPqIndex_t index,
 {
   return cuvs::core::translate_exceptions([=] { _get_pq_centers<int64_t>(*index, pq_centers); });
 }
+
+extern "C" cuvsError_t cuvsIvfPqBuildPrecomputed(cuvsResources_t res,
+                                                  cuvsIvfPqIndexParams_t params,
+                                                  uint32_t dim,
+                                                  DLManagedTensor* pq_centers_tensor,
+                                                  DLManagedTensor* centers_tensor,
+                                                  DLManagedTensor* centers_rot_tensor,
+                                                  DLManagedTensor* rotation_matrix_tensor,
+                                                  cuvsIvfPqIndex_t index)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto res_ptr = reinterpret_cast<raft::resources*>(res);
+
+    auto build_params = cuvs::neighbors::ivf_pq::index_params();
+    convert_c_index_params(*params, &build_params);
+
+    // Verify all tensors are on device
+    RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(pq_centers_tensor->dl_tensor),
+                 "pq_centers should have device compatible memory");
+    RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(centers_tensor->dl_tensor),
+                 "centers should have device compatible memory");
+    RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(centers_rot_tensor->dl_tensor),
+                 "centers_rot should have device compatible memory");
+    RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(rotation_matrix_tensor->dl_tensor),
+                 "rotation_matrix should have device compatible memory");
+
+    // Verify all tensors are float32
+    auto& pq_centers_dl = pq_centers_tensor->dl_tensor;
+    auto& centers_dl    = centers_tensor->dl_tensor;
+    auto& centers_rot_dl = centers_rot_tensor->dl_tensor;
+    auto& rotation_matrix_dl = rotation_matrix_tensor->dl_tensor;
+
+    RAFT_EXPECTS(pq_centers_dl.dtype.code == kDLFloat && pq_centers_dl.dtype.bits == 32,
+                 "pq_centers must be float32");
+    RAFT_EXPECTS(centers_dl.dtype.code == kDLFloat && centers_dl.dtype.bits == 32,
+                 "centers must be float32");
+    RAFT_EXPECTS(centers_rot_dl.dtype.code == kDLFloat && centers_rot_dl.dtype.bits == 32,
+                 "centers_rot must be float32");
+    RAFT_EXPECTS(rotation_matrix_dl.dtype.code == kDLFloat && rotation_matrix_dl.dtype.bits == 32,
+                 "rotation_matrix must be float32");
+
+    // Convert DLPack tensors to mdspan views
+    using pq_centers_mdspan_type = raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major>;
+    using matrix_mdspan_type = raft::device_matrix_view<const float, uint32_t, raft::row_major>;
+    
+    auto pq_centers_mds = cuvs::core::from_dlpack<pq_centers_mdspan_type>(pq_centers_tensor);
+    auto centers_mds = cuvs::core::from_dlpack<matrix_mdspan_type>(centers_tensor);
+    auto centers_rot_mds = cuvs::core::from_dlpack<matrix_mdspan_type>(centers_rot_tensor);
+    auto rotation_matrix_mds = cuvs::core::from_dlpack<matrix_mdspan_type>(rotation_matrix_tensor);
+
+    // Build the index
+    auto* idx = new cuvs::neighbors::ivf_pq::index<int64_t>(
+      cuvs::neighbors::ivf_pq::build(
+        *res_ptr, build_params, dim, pq_centers_mds, centers_mds, centers_rot_mds, rotation_matrix_mds));
+
+    index->addr = reinterpret_cast<uintptr_t>(idx);
+    // Leave dtype unset (0) - it will be set when extend() is called with actual data
+    index->dtype.code = 0;
+    index->dtype.bits = 0;
+  });
+}
+
