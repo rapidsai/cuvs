@@ -317,6 +317,16 @@ dependencies:
           - libcurand-dev
           - libcusolver-dev
           - libcusparse-dev
+    specific:
+      - output_types: conda
+        matrices:
+          - matrix:
+              cuda: "13.*"
+            packages:
+              - libnvjitlink-dev
+          - matrix:
+              cuda: "12.*"
+            packages:
   cuda_wheels:
     specific:
       - output_types: [requirements, pyproject]
@@ -331,6 +341,7 @@ dependencies:
               use_cuda_wheels: "true"
             packages:
               - cuda-toolkit[cublas,curand,cusolver,cusparse]==13.*
+              - nvidia-nvjitlink==13.*
           - matrix:
               use_cuda_wheels: "false"
             packages:
@@ -339,6 +350,7 @@ dependencies:
           - matrix:
             packages:
               - cuda-toolkit[cublas,curand,cusolver,cusparse]>=12,<14
+              - nvidia-nvjitlink>=13,<14
   depends_on_cupy:
     common:
       - output_types: conda
