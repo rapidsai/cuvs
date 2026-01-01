@@ -123,6 +123,18 @@ public interface CuVSProvider {
    */
   HnswIndex hnswIndexFromCagra(HnswIndexParams hnswParams, CagraIndex cagraIndex) throws Throwable;
 
+  /**
+   * Builds an HNSW index using the ACE (Augmented Core Extraction) algorithm.
+   *
+   * @param resources The CuVS resources
+   * @param hnswParams Parameters for the HNSW index with ACE configuration
+   * @param dataset The dataset to build the index from
+   * @return A new HNSW index ready for search
+   * @throws Throwable if an error occurs during building
+   */
+  HnswIndex hnswIndexBuild(CuVSResources resources, HnswIndexParams hnswParams, CuVSMatrix dataset)
+      throws Throwable;
+
   /** Creates a new TieredIndex Builder. */
   TieredIndex.Builder newTieredIndexBuilder(CuVSResources cuVSResources)
       throws UnsupportedOperationException;
