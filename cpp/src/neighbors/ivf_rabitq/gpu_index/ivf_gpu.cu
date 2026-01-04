@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -886,22 +886,17 @@ void sort_cluster_query_pairs(raft::resources const& handle,
   int total_pairs     = batch_size * nprobe;
 
   // Allocate temporary arrays for sorting
-  int* d_cluster_keys;
-  int* d_query_values;
-  int* d_sorted_clusters;
-  int* d_sorted_queries;
-
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_cluster_keys, total_pairs * sizeof(int), stream));
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_query_values, total_pairs * sizeof(int), stream));
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_sorted_clusters, total_pairs * sizeof(int), stream));
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_sorted_queries, total_pairs * sizeof(int), stream));
+  auto d_cluster_keys    = raft::make_device_vector<int, int64_t>(handle, total_pairs);
+  auto d_query_values    = raft::make_device_vector<int, int64_t>(handle, total_pairs);
+  auto d_sorted_clusters = raft::make_device_vector<int, int64_t>(handle, total_pairs);
+  auto d_sorted_queries  = raft::make_device_vector<int, int64_t>(handle, total_pairs);
 
   // Prepare data for sorting
   int threads_per_block = 256;
   int num_blocks        = (total_pairs + threads_per_block - 1) / threads_per_block;
 
   prepare_keys_values<<<num_blocks, threads_per_block, 0, stream>>>(
-    d_raft_idx, d_cluster_keys, d_query_values, batch_size, nprobe);
+    d_raft_idx, d_cluster_keys.data_handle(), d_query_values.data_handle(), batch_size, nprobe);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // Determine temporary storage requirements for CUB
@@ -910,10 +905,10 @@ void sort_cluster_query_pairs(raft::resources const& handle,
 
   cub::DeviceRadixSort::SortPairs(nullptr,
                                   temp_storage_bytes,
-                                  d_cluster_keys,
-                                  d_sorted_clusters,
-                                  d_query_values,
-                                  d_sorted_queries,
+                                  d_cluster_keys.data_handle(),
+                                  d_sorted_clusters.data_handle(),
+                                  d_query_values.data_handle(),
+                                  d_sorted_queries.data_handle(),
                                   total_pairs,
                                   0,
                                   sizeof(int) * 8,
@@ -926,10 +921,10 @@ void sort_cluster_query_pairs(raft::resources const& handle,
   // Perform radix sort
   cub::DeviceRadixSort::SortPairs(d_temp_storage,
                                   temp_storage_bytes,
-                                  d_cluster_keys,
-                                  d_sorted_clusters,
-                                  d_query_values,
-                                  d_sorted_queries,
+                                  d_cluster_keys.data_handle(),
+                                  d_sorted_clusters.data_handle(),
+                                  d_query_values.data_handle(),
+                                  d_sorted_queries.data_handle(),
                                   total_pairs,
                                   0,
                                   sizeof(int) * 8,
@@ -937,17 +932,11 @@ void sort_cluster_query_pairs(raft::resources const& handle,
 
   // Combine sorted results into pairs
   combine_to_pairs<<<num_blocks, threads_per_block, 0, stream>>>(
-    d_sorted_clusters, d_sorted_queries, d_sorted_pairs, total_pairs);
+    d_sorted_clusters.data_handle(), d_sorted_queries.data_handle(), d_sorted_pairs, total_pairs);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // Free temporary memory
   RAFT_CUDA_TRY(cudaFreeAsync(d_temp_storage, stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_cluster_keys, stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_query_values, stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_sorted_clusters, stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_sorted_queries, stream));
-
-  raft::resource::sync_stream(handle);
 }
 
 // Warp-level reduction using shuffle instructions
@@ -1086,63 +1075,54 @@ void IVFGPU::BatchClusterSearch(const float* d_query,
   // Step4: select topk and copy back
   // Use raft library
   // RAFT select_k outputs
-  float* d_raft_vals = nullptr;
-  int* d_raft_idx    = nullptr;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_raft_vals, batch_size * nprobe * sizeof(float), stream_));
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_raft_idx, batch_size * nprobe * sizeof(int), stream_));
+  auto d_raft_vals = raft::make_device_matrix<float, int64_t>(handle_, batch_size, nprobe);
+  auto d_raft_idx  = raft::make_device_matrix<int, int64_t>(handle_, batch_size, nprobe);
 
   // Then TOPK is copied back to CPU side
   auto in_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
     searcher_batch->get_centroid_distances(), batch_size, num_centroids);
-  auto outv_v =
-    raft::make_device_matrix_view<float, int64_t, raft::row_major>(d_raft_vals, batch_size, nprobe);
-  auto outi_v =
-    raft::make_device_matrix_view<int, int64_t, raft::row_major>(d_raft_idx, batch_size, nprobe);
 
   // max-k, sorted within k (nprobe)
   raft::matrix::select_k<float, int>(handle_,
                                      in_view,
                                      std::nullopt,  // carry column IDs automatically
-                                     outv_v,
-                                     outi_v,
+                                     d_raft_vals.view(),
+                                     d_raft_idx.view(),
                                      /*select_min=*/true,
                                      /*sorted=*/true,
                                      raft::matrix::SelectAlgo::kAuto);
 
   // Sortpairs
-  ClusterQueryPair* d_sorted_pairs;
-  int total_pairs = batch_size * nprobe;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_sorted_pairs, total_pairs * sizeof(ClusterQueryPair), stream_));
-  sort_cluster_query_pairs(handle_, d_raft_idx, d_sorted_pairs, batch_size, nprobe);
+  int total_pairs     = batch_size * nprobe;
+  auto d_sorted_pairs = raft::make_device_vector<ClusterQueryPair, int64_t>(handle_, total_pairs);
+  sort_cluster_query_pairs(
+    handle_, d_raft_idx.data_handle(), d_sorted_pairs.data_handle(), batch_size, nprobe);
 
   // Compute query factors
-  float *d_G_k1xSumq, *d_G_kbxSumq;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_G_k1xSumq, batch_size * sizeof(float), stream_));
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_G_kbxSumq, batch_size * sizeof(float), stream_));
-  computeQueryFactors<float>(
-    d_query, d_G_k1xSumq, d_G_kbxSumq, batch_size, num_padded_dim, ex_bits, stream_);
+  auto d_G_k1xSumq = raft::make_device_vector<float, int64_t>(handle_, batch_size);
+  auto d_G_kbxSumq = raft::make_device_vector<float, int64_t>(handle_, batch_size);
+  computeQueryFactors<float>(d_query,
+                             d_G_k1xSumq.data_handle(),
+                             d_G_kbxSumq.data_handle(),
+                             batch_size,
+                             num_padded_dim,
+                             ex_bits,
+                             stream_);
   // Then launch the search function
 
   searcher_batch->SearchClusterQueryPairs(*this,
                                           cluster_meta_.data_handle(),
-                                          d_sorted_pairs,
+                                          d_sorted_pairs.data_handle(),
                                           batch_size,
                                           d_query,
-                                          d_G_k1xSumq,
-                                          d_G_kbxSumq,
+                                          d_G_k1xSumq.data_handle(),
+                                          d_G_kbxSumq.data_handle(),
                                           nprobe,
                                           k,
                                           d_topk_dists,
                                           d_topk_pids,
                                           d_final_dists,
                                           d_final_pids);
-
-  // clear
-  RAFT_CUDA_TRY(cudaFreeAsync(d_raft_vals, stream_));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_raft_idx, stream_));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_sorted_pairs, stream_));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_G_k1xSumq, stream_));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_G_kbxSumq, stream_));
 }
 
 // normal way to first sort (cluster, query) pairs, then use a CTA to do the search
