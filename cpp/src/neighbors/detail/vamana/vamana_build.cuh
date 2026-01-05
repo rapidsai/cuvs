@@ -12,8 +12,6 @@
 #include "vamana_structs.cuh"
 #include <cuvs/neighbors/vamana.hpp>
 
-#include <raft/cluster/kmeans.cuh>
-#include <raft/cluster/kmeans_types.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/error.hpp>
