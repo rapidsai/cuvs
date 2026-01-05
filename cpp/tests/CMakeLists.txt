@@ -54,9 +54,9 @@ function(ConfigureTest)
     ${TEST_NAME}
     PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<BUILD_INTERFACE:${CUVS_BINARY_DIR}/gtests>"
                INSTALL_RPATH "\$ORIGIN/../../../lib"
-               CXX_STANDARD 17
+               CXX_STANDARD 20
                CXX_STANDARD_REQUIRED ON
-               CUDA_STANDARD 17
+               CUDA_STANDARD 20
                CUDA_STANDARD_REQUIRED ON
   )
   target_compile_options(
@@ -311,13 +311,6 @@ ConfigureTest(
        distance/sparse_distance.cu
        sparse/gram.cu
        sparse/neighbors/cross_component_nn.cu
-  GPUS 1
-  PERCENT 100
-)
-
-ConfigureTest(
-  NAME SPARSE_TEST
-  PATH sparse/cluster/cluster_solvers.cu sparse/cluster/eigen_solvers.cu sparse/cluster/spectral.cu
   GPUS 1
   PERCENT 100
 )

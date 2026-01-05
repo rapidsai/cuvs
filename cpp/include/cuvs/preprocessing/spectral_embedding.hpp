@@ -10,7 +10,7 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 
-#include <cstdint>
+#include <optional>
 
 namespace cuvs::preprocessing::spectral_embedding {
 
@@ -62,7 +62,7 @@ struct params {
    * and eigenvalue solver initialization. Use the same seed value to
    * ensure reproducible results across runs.
    */
-  uint64_t seed;
+  std::optional<uint64_t> seed = std::nullopt;
 };
 
 /**
