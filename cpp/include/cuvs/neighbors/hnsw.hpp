@@ -457,7 +457,7 @@ std::unique_ptr<index<int8_t>> build(
  * Usage example:
  * @code{.cpp}
  *   // Build a CAGRA index
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   cagra::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
@@ -493,7 +493,7 @@ std::unique_ptr<index<float>> from_cagra(
  * Usage example:
  * @code{.cpp}
  *   // Build a CAGRA index
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   cagra::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
@@ -529,7 +529,7 @@ std::unique_ptr<index<half>> from_cagra(
  * Usage example:
  * @code{.cpp}
  *   // Build a CAGRA index
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   cagra::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
@@ -565,7 +565,7 @@ std::unique_ptr<index<uint8_t>> from_cagra(
  * Usage example:
  * @code{.cpp}
  *   // Build a CAGRA index
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   cagra::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
