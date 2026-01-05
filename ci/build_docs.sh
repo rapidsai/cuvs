@@ -45,7 +45,7 @@ popd
 
 rapids-logger "Build Rust docs"
 pushd rust
-LIBCLANG_PATH=$(dirname "$(find /opt/conda -name libclang.so | head -n 1)")
+LIBCLANG_PATH=$(dirname "$(find "$CONDA_PREFIX" -name libclang.so | head -n 1)")
 export LIBCLANG_PATH
 cargo doc -p cuvs --no-deps
 popd
