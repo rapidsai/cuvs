@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::io::{stderr, Write};
 
 use crate::dlpack::ManagedTensor;
@@ -93,7 +93,7 @@ impl Drop for Index {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ndarray::s;
+
     use ndarray_rand::rand_distr::Uniform;
     use ndarray_rand::RandomExt;
 
@@ -112,7 +112,7 @@ mod tests {
         let dataset_device = ManagedTensor::from(&dataset).to_device(&res).unwrap();
 
         // build the vamana index
-        let index = Index::build(&res, &build_params, dataset_device)
+        let _index = Index::build(&res, &build_params, dataset_device)
             .expect("failed to create vamana index");
     }
 }
