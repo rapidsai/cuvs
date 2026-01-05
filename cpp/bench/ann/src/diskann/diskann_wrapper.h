@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -174,14 +174,14 @@ class diskann_ssd : public algo<T> {
   struct build_param {
     uint32_t R;
     uint32_t L_build;
-    uint32_t build_pq_bytes       = 0;
-    float alpha                   = 1.2;
-    int num_threads               = omp_get_max_threads();
-    uint32_t QD                   = 192;
-    std::string dataset_base_file = "";
-    std::string index_file        = "";
-    uint32_t build_dram_budget    = std::numeric_limits<uint32_t>::max();
-    uint32_t search_dram_budget   = std::numeric_limits<uint32_t>::max();
+    uint32_t build_pq_bytes               = 0;
+    float alpha                           = 1.2;
+    int num_threads                       = omp_get_max_threads();
+    uint32_t QD                           = 192;
+    std::string dataset_base_file         = "";
+    std::string index_file                = "";
+    uint32_t build_dram_budget_megabytes  = std::numeric_limits<uint32_t>::max();
+    uint32_t search_dram_budget_megabytes = std::numeric_limits<uint32_t>::max();
   };
   using search_param_base = typename algo<T>::search_param;
 
@@ -236,8 +236,8 @@ template <typename T>
 diskann_ssd<T>::diskann_ssd(Metric metric, int dim, const build_param& param) : algo<T>(metric, dim)
 {
   // Currently set the indexing RAM budget and the search RAM budget to max value to avoid sharding
-  float build_dram_budget  = static_cast<float>(param.build_dram_budget) / 1024.0f;
-  float search_dram_budget = static_cast<float>(param.search_dram_budget) / 1024.0f;
+  float build_dram_budget  = static_cast<float>(param.build_dram_budget_megabytes) / 1024.0f;
+  float search_dram_budget = static_cast<float>(param.search_dram_budget_megabytes) / 1024.0f;
   char search_buf[16];
   char build_buf[16];
   std::snprintf(search_buf, sizeof(search_buf), "%.2f", search_dram_budget);

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -39,11 +39,11 @@ void parse_build_param(const nlohmann::json& conf,
   if (conf.contains("alpha")) { param.alpha = conf.at("alpha"); }
   if (conf.contains("num_threads")) { param.num_threads = conf.at("num_threads"); }
   if (conf.contains("QD")) { param.QD = conf.at("QD"); }
-  if (conf.contains("build_dram_budget")) {
-    param.build_dram_budget = conf.at("build_dram_budget");
+  if (conf.contains("build_dram_budget_megabytes")) {
+    param.build_dram_budget_megabytes = conf.at("build_dram_budget_megabytes");
   }
-  if (conf.contains("search_dram_budget")) {
-    param.search_dram_budget = conf.at("search_dram_budget");
+  if (conf.contains("search_dram_budget_megabytes")) {
+    param.search_dram_budget_megabytes = conf.at("search_dram_budget_megabytes");
   }
   param.dataset_base_file = cuvs::bench::configuration::singleton().get_dataset_conf().base_file;
   for (const auto& index : cuvs::bench::configuration::singleton().get_indices()) {
