@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
@@ -30,7 +30,7 @@ cdef class QuantizerParams:
     ----------
     pq_bits: int
         specifies the bit length of the vector element after compression by PQ
-        possible values: [4, 5, 6, 7, 8]
+        possible values: within [4, 16]
     pq_dim: int
         specifies the dimensionality of the vector after compression by PQ
     vq_n_centers: int
@@ -78,8 +78,8 @@ cdef class QuantizerParams:
                  max_train_points_per_pq_code=256,
                  use_vq=False,
                  use_subspaces=True):
-        if pq_bits not in [4, 5, 6, 7, 8]:
-            raise ValueError("pq_bits must be one of [4, 5, 6, 7, 8]")
+        if pq_bits < 4 or pq_bits > 16:
+            raise ValueError("pq_bits must be within [4, 16]")
         self.params.pq_bits = pq_bits
         self.params.pq_dim = pq_dim
         self.params.vq_n_centers = vq_n_centers

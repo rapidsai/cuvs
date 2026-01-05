@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -25,7 +25,7 @@ struct cuvsProductQuantizerParams {
   /**
    * The bit length of the vector element after compression by PQ.
    *
-   * Possible values: [4, 5, 6, 7, 8].
+   * Possible values: within [4, 16].
    *
    * Hint: the smaller the 'pq_bits', the smaller the index size and the better the search
    * performance, but the lower the recall.

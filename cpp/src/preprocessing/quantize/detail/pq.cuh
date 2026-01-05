@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -7,7 +7,7 @@
 
 #include "../../../core/nvtx.hpp"
 #include "../../../neighbors/detail/vpq_dataset.cuh"
-#include "../../../neighbors/ivf_pq/ivf_pq_codepacking.cuh"  // pq_bits-bitfield
+#include "pq_codepacking.cuh"  // pq_bits-bitfield
 
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/preprocessing/quantize/pq.hpp>
@@ -119,6 +119,9 @@ quantizer<MathT> train(
     dim,
     params.pq_bits,
     params.pq_dim);
+  RAFT_EXPECTS(params.pq_bits >= 4 && params.pq_bits <= 16,
+               "PQ bits must be within [4, 16], got %u",
+               params.pq_bits);
 
   cuvs::preprocessing::quantize::pq::params ps(
     cuvs::neighbors::detail::fill_missing_params_heuristics(
@@ -168,6 +171,8 @@ void transform(
                "Output matrix must have the same number of rows as the input dataset");
   RAFT_EXPECTS(out.extent(1) == get_quantized_dim(quantizer.params_quantizer),
                "Output matrix doesn't have the correct number of columns");
+  RAFT_EXPECTS(quantizer.params_quantizer.pq_bits >= 4 && quantizer.params_quantizer.pq_bits <= 16,
+               "PQ bits must be within [4, 16]");
   // Encode dataset
   std::optional<raft::device_matrix_view<const T, uint32_t, raft::row_major>> vq_centers =
     std::nullopt;
@@ -195,7 +200,8 @@ void transform(
 }
 
 template <uint32_t BlockSize,
-          uint32_t PqBits,
+          uint32_t SubWarpSize,
+          typename CodeT,
           typename DataT,
           typename MathT,
           typename IdxT,
@@ -205,11 +211,11 @@ __launch_bounds__(BlockSize) RAFT_KERNEL reconstruct_vectors_kernel(
   raft::device_matrix_view<DataT, IdxT, raft::row_major> dataset,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
   std::optional<raft::device_matrix_view<const DataT, IdxT, raft::row_major>> vq_centers,
+  const uint32_t pq_bits,
   bool use_subspaces)
 {
-  const uint32_t kSubWarpSize  = raft::WarpSize;
-  constexpr uint32_t n_centers = 1 << PqBits;
-  using subwarp_align          = raft::Pow2<kSubWarpSize>;
+  const uint32_t n_centers = 1 << pq_bits;
+  using subwarp_align      = raft::Pow2<SubWarpSize>;
   const IdxT row_ix = subwarp_align::div(IdxT{threadIdx.x} + IdxT{BlockSize} * IdxT{blockIdx.x});
   if (row_ix >= dataset.extent(0)) { return; }
   uint32_t lane_id      = subwarp_align::mod(raft::laneId());
@@ -221,9 +227,9 @@ __launch_bounds__(BlockSize) RAFT_KERNEL reconstruct_vectors_kernel(
     vq_label      = *reinterpret_cast<const LabelT*>(out_codes_ptr);
     out_codes_ptr = (&codes(row_ix, 0)) + sizeof(LabelT);
   }
-  cuvs::neighbors::ivf_pq::detail::bitfield_view_t<PqBits, const uint8_t> code_view{out_codes_ptr};
-  for (uint32_t j = lane_id; j < pq_len; j += kSubWarpSize) {
-    const uint8_t code = code_view[j];
+  cuvs::preprocessing::quantize::detail::bitfield_const_view_t code_view{out_codes_ptr, pq_bits};
+  for (uint32_t j = lane_id; j < pq_len; j += SubWarpSize) {
+    const CodeT code = code_view[j];
     for (uint32_t k = 0; k < pq_centers.extent(1); k++) {
       const auto col                    = j * pq_centers.extent(1) + k;
       const uint32_t pq_subspace_offset = use_subspaces ? n_centers * j : 0;
@@ -262,17 +268,31 @@ auto reconstruct_vectors(
   const ix_t threads_per_vec = raft::WarpSize;
   dim3 threads(kBlockSize, 1, 1);
   auto kernel = [](uint32_t pq_bits) {
-    switch (pq_bits) {
-      case 4: return reconstruct_vectors_kernel<kBlockSize, 4, data_t, MathT, IdxT, LabelT>;
-      case 5: return reconstruct_vectors_kernel<kBlockSize, 5, data_t, MathT, IdxT, LabelT>;
-      case 6: return reconstruct_vectors_kernel<kBlockSize, 6, data_t, MathT, IdxT, LabelT>;
-      case 7: return reconstruct_vectors_kernel<kBlockSize, 7, data_t, MathT, IdxT, LabelT>;
-      case 8: return reconstruct_vectors_kernel<kBlockSize, 8, data_t, MathT, IdxT, LabelT>;
-      default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
+    if (pq_bits == 4) {
+      return reconstruct_vectors_kernel<kBlockSize, 16, uint8_t, data_t, MathT, IdxT, LabelT>;
+    } else if (pq_bits <= 8) {
+      return reconstruct_vectors_kernel<kBlockSize,
+                                        raft::WarpSize,
+                                        uint8_t,
+                                        data_t,
+                                        MathT,
+                                        IdxT,
+                                        LabelT>;
+    } else if (pq_bits <= 16) {
+      return reconstruct_vectors_kernel<kBlockSize,
+                                        raft::WarpSize,
+                                        uint16_t,
+                                        data_t,
+                                        MathT,
+                                        IdxT,
+                                        LabelT>;
+    } else {
+      RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 16]", pq_bits);
     }
   }(pq_bits);
   dim3 blocks(raft::div_rounding_up_safe<ix_t>(n_rows, kBlockSize / threads_per_vec), 1, 1);
-  kernel<<<blocks, threads, 0, stream>>>(codes, out_vectors, pq_centers, vq_centers, use_subspaces);
+  kernel<<<blocks, threads, 0, stream>>>(
+    codes, out_vectors, pq_centers, vq_centers, pq_bits, use_subspaces);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   return codes;
@@ -295,6 +315,8 @@ void inverse_transform(raft::resources const& res,
                "Output matrix must have the same number of rows as the input codes");
   RAFT_EXPECTS(codes.extent(1) == get_quantized_dim(quant.params_quantizer),
                "Codes matrix doesn't have the correct number of columns");
+  RAFT_EXPECTS(quant.params_quantizer.pq_bits >= 4 && quant.params_quantizer.pq_bits <= 16,
+               "PQ bits must be within [4, 16]");
 
   std::optional<raft::device_matrix_view<const T, uint32_t, raft::row_major>> vq_centers_opt =
     std::nullopt;

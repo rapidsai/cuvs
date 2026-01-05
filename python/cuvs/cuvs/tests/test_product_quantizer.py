@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 
@@ -10,8 +10,9 @@ from pylibraft.common import device_ndarray
 from cuvs.preprocessing.quantize import pq
 
 
-@pytest.mark.parametrize("n_rows", [450, 700])
+@pytest.mark.parametrize("n_rows", [550, 700])
 @pytest.mark.parametrize("n_cols", [64, 128])
+@pytest.mark.parametrize("pq_bits", [7, 9])
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("pq_kmeans_type", ["kmeans", "kmeans_balanced"])
 @pytest.mark.parametrize("use_vq", [True, False])
@@ -20,6 +21,7 @@ from cuvs.preprocessing.quantize import pq
 def test_product_quantizer(
     n_rows,
     n_cols,
+    pq_bits,
     inplace,
     pq_kmeans_type,
     use_vq,
@@ -27,7 +29,6 @@ def test_product_quantizer(
     device_memory,
 ):
     pq_dim = 32
-    pq_bits = 8
     vq_n_centers = 0
     dtype = np.float32
     input1 = np.random.random_sample((n_rows, n_cols)).astype(dtype)

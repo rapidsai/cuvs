@@ -1,13 +1,14 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
 #include <cuvs/neighbors/common.hpp>
 
-#include "../ivf_pq/ivf_pq_build.cuh"  // pq_bits-bitfield
-#include "ann_utils.cuh"               // utils::mapping etc
+#include "../../cluster/kmeans_balanced.cuh"
+#include "../../preprocessing/quantize/detail/pq_codepacking.cuh"  // pq_bits-bitfield
+#include "ann_utils.cuh"                                           // utils::mapping etc
 
 #include <cuvs/cluster/kmeans.hpp>
 
@@ -276,7 +277,12 @@ auto train_pq(
   return pq_centers;
 }
 
-template <uint32_t SubWarpSize, typename DataT, typename MathT, typename IdxT, typename LabelT>
+template <uint32_t SubWarpSize,
+          typename CodeT,
+          typename DataT,
+          typename MathT,
+          typename IdxT,
+          typename LabelT>
 __device__ auto compute_code(
   raft::device_matrix_view<const DataT, IdxT, raft::row_major> dataset,
   std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers,
@@ -284,15 +290,17 @@ __device__ auto compute_code(
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
   IdxT i,
   uint32_t j,
-  LabelT vq_label) -> uint8_t
+  LabelT vq_label) -> CodeT
 {
+  static_assert(std::is_same_v<CodeT, uint8_t> || std::is_same_v<CodeT, uint16_t>,
+                "CodeT must be uint8_t or uint16_t");
   auto data_mapping      = cuvs::spatial::knn::detail::utils::mapping<MathT>{};
   const uint32_t lane_id = raft::Pow2<SubWarpSize>::mod(raft::laneId());
 
   const uint32_t pq_book_size = pq_centers.extent(0);
   const uint32_t pq_len       = pq_centers.extent(1);
   float min_dist              = std::numeric_limits<float>::infinity();
-  uint8_t code                = 0;
+  CodeT code                  = 0;
   // calculate the distance for each PQ cluster, find the minimum for each thread
   uint32_t l = lane_id;
   if (pq_centers_smem) {
@@ -308,7 +316,7 @@ __device__ auto compute_code(
       }
       if (d < min_dist) {
         min_dist = d;
-        code     = uint8_t(l);
+        code     = CodeT(l);
       }
     }
   }
@@ -325,7 +333,7 @@ __device__ auto compute_code(
     }
     if (d < min_dist) {
       min_dist = d;
-      code     = uint8_t(l);
+      code     = CodeT(l);
     }
   }
   // reduce among threads
@@ -381,7 +389,8 @@ __device__ inline void copy_vectorized(T* out, const T* in, uint32_t n)
 }
 
 template <uint32_t BlockSize,
-          uint32_t PqBits,
+          uint32_t SubWarpSize,
+          typename CodeT,
           typename DataT,
           typename MathT,
           typename IdxT,
@@ -392,12 +401,12 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_kernel(
   std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers,
   std::optional<raft::device_vector_view<const LabelT, IdxT, raft::row_major>> vq_labels,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
-  const uint32_t shared_memory_size)
+  const uint32_t shared_memory_size,
+  const uint32_t pq_bits)
 {
   extern __shared__ __align__(256) uint8_t pq_centers_smem[];
-  constexpr uint32_t kSubWarpSize = std::min<uint32_t>(raft::WarpSize, 1u << PqBits);
-  using subwarp_align             = raft::Pow2<kSubWarpSize>;
-  const IdxT row_ix = subwarp_align::div(IdxT{threadIdx.x} + IdxT{BlockSize} * IdxT{blockIdx.x});
+  using subwarp_align = raft::Pow2<SubWarpSize>;
+  const IdxT row_ix   = subwarp_align::div(IdxT{threadIdx.x} + IdxT{BlockSize} * IdxT{blockIdx.x});
   if (row_ix >= out_codes.extent(0)) { return; }
 
   const uint32_t pq_dim = raft::div_rounding_up_unsafe(dataset.extent(1), pq_centers.extent(1));
@@ -411,7 +420,7 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_kernel(
   auto pq_centers_smem_view = raft::make_device_matrix_view<const MathT, uint32_t, raft::row_major>(
     reinterpret_cast<const MathT*>(pq_centers_smem), rows_in_shared_memory, pq_centers.extent(1));
 
-  const uint32_t lane_id = raft::Pow2<kSubWarpSize>::mod(threadIdx.x);
+  const uint32_t lane_id = subwarp_align::mod(threadIdx.x);
   const LabelT vq_label  = vq_labels ? vq_labels.value()(row_ix) : 0;
   auto* out_codes_ptr    = &out_codes(row_ix, 0);
 
@@ -422,16 +431,16 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_kernel(
     out_codes_ptr += sizeof(LabelT);
   }
 
-  cuvs::neighbors::ivf_pq::detail::bitfield_view_t<PqBits> code_view{out_codes_ptr};
+  cuvs::preprocessing::quantize::detail::bitfield_view_t code_view{out_codes_ptr, pq_bits};
   for (uint32_t j = 0; j < pq_dim; j++) {
     // find PQ label
-    uint8_t code = compute_code<kSubWarpSize>(dataset,
-                                              vq_centers,
-                                              std::make_optional(pq_centers_smem_view),
-                                              pq_centers,
-                                              row_ix,
-                                              j,
-                                              vq_label);
+    CodeT code = compute_code<SubWarpSize, CodeT>(dataset,
+                                                  vq_centers,
+                                                  std::make_optional(pq_centers_smem_view),
+                                                  pq_centers,
+                                                  row_ix,
+                                                  j,
+                                                  vq_label);
     // TODO: this writes in global memory one byte per warp, which is very slow.
     //  It's better to keep the codes in the shared memory or registers and dump them at once.
     if (lane_id == 0) { code_view[j] = code; }
@@ -481,13 +490,26 @@ void process_and_fill_codes(
   dim3 threads(kBlockSize, 1, 1);
   ix_t max_batch_size = std::min<ix_t>(n_rows, kReasonableMaxBatchSize);
   auto kernel         = [](uint32_t pq_bits) {
-    switch (pq_bits) {
-      case 4: return process_and_fill_codes_kernel<kBlockSize, 4, data_t, MathT, IdxT, label_t>;
-      case 5: return process_and_fill_codes_kernel<kBlockSize, 5, data_t, MathT, IdxT, label_t>;
-      case 6: return process_and_fill_codes_kernel<kBlockSize, 6, data_t, MathT, IdxT, label_t>;
-      case 7: return process_and_fill_codes_kernel<kBlockSize, 7, data_t, MathT, IdxT, label_t>;
-      case 8: return process_and_fill_codes_kernel<kBlockSize, 8, data_t, MathT, IdxT, label_t>;
-      default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
+    if (pq_bits == 4) {
+      return process_and_fill_codes_kernel<kBlockSize, 16, uint8_t, data_t, MathT, IdxT, label_t>;
+    } else if (pq_bits <= 8) {
+      return process_and_fill_codes_kernel<kBlockSize,
+                                                   raft::WarpSize,
+                                                   uint8_t,
+                                                   data_t,
+                                                   MathT,
+                                                   IdxT,
+                                                   label_t>;
+    } else if (pq_bits <= 16) {
+      return process_and_fill_codes_kernel<kBlockSize,
+                                                   raft::WarpSize,
+                                                   uint16_t,
+                                                   data_t,
+                                                   MathT,
+                                                   IdxT,
+                                                   label_t>;
+    } else {
+      RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 16]", pq_bits);
     }
   }(pq_bits);
   for (const auto& batch : cuvs::spatial::knn::detail::utils::batch_load_iterator(
@@ -513,7 +535,8 @@ void process_and_fill_codes(
       vq_centers,
       labels_view,
       pq_centers,
-      kSharedMemorySize);
+      kSharedMemorySize,
+      pq_bits);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
 }
@@ -537,7 +560,12 @@ auto vpq_convert_math_type(const raft::resources& res, vpq_dataset<OldMathT, Idx
     std::move(vq_code_book), std::move(pq_code_book), std::move(src.data)};
 }
 
-template <uint32_t SubWarpSize, typename DataT, typename MathT, typename IdxT, typename LabelT>
+template <uint32_t SubWarpSize,
+          typename CodeT,
+          typename DataT,
+          typename MathT,
+          typename IdxT,
+          typename LabelT>
 __device__ auto compute_code_subspaces(
   raft::device_matrix_view<const DataT, IdxT, raft::row_major> dataset,
   std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers,
@@ -545,8 +573,10 @@ __device__ auto compute_code_subspaces(
   MathT* smem_dataset,
   IdxT i,
   uint32_t j,
-  LabelT vq_label) -> uint8_t
+  LabelT vq_label) -> CodeT
 {
+  static_assert(std::is_same_v<CodeT, uint8_t> || std::is_same_v<CodeT, uint16_t>,
+                "CodeT must be uint8_t or uint16_t");
   auto data_mapping      = cuvs::spatial::knn::detail::utils::mapping<MathT>{};
   const uint32_t lane_id = raft::Pow2<SubWarpSize>::mod(raft::laneId());
 
@@ -555,7 +585,7 @@ __device__ auto compute_code_subspaces(
   const MathT* __restrict__ centers_ptr = pq_centers.data_handle();
   const DataT* __restrict__ dataset_ptr = dataset.data_handle() + i * dataset.extent(1);
   MathT min_dist                        = std::numeric_limits<MathT>::infinity();
-  uint8_t code                          = 0;
+  CodeT code                            = 0;
 
   if (pq_len <= SubWarpSize) {
     // Each thread loads one dataset element and will share to others using shuffle
@@ -567,7 +597,7 @@ __device__ auto compute_code_subspaces(
       my_dataset_val = x;
     }
 
-    const uint32_t subwarp_idx  = raft::laneId() / SubWarpSize;
+    const uint32_t subwarp_idx  = raft::Pow2<SubWarpSize>::div(raft::laneId());
     const uint32_t subwarp_mask = (SubWarpSize == 32)
                                     ? 0xffffffffu
                                     : (((1u << SubWarpSize) - 1) << (subwarp_idx * SubWarpSize));
@@ -600,7 +630,7 @@ __device__ auto compute_code_subspaces(
 
       if (best_dist < min_dist) {
         min_dist = best_dist;
-        code     = uint8_t(best_idx);
+        code     = CodeT(best_idx);
       }
     }
 
@@ -616,7 +646,7 @@ __device__ auto compute_code_subspaces(
 
       if (d0 < min_dist) {
         min_dist = d0;
-        code     = uint8_t(l);
+        code     = CodeT(l);
       }
     }
   } else {
@@ -656,7 +686,7 @@ __device__ auto compute_code_subspaces(
 
       if (best_dist < min_dist) {
         min_dist = best_dist;
-        code     = uint8_t(best_idx);
+        code     = CodeT(best_idx);
       }
     }
 
@@ -673,7 +703,7 @@ __device__ auto compute_code_subspaces(
 
       if (d0 < min_dist) {
         min_dist = d0;
-        code     = uint8_t(l);
+        code     = CodeT(l);
       }
     }
   }
@@ -692,7 +722,8 @@ __device__ auto compute_code_subspaces(
 }
 
 template <uint32_t BlockSize,
-          uint32_t PqBits,
+          uint32_t SubWarpSize,
+          typename CodeT,
           typename DataT,
           typename MathT,
           typename IdxT,
@@ -702,19 +733,19 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_subspaces_kernel
   raft::device_matrix_view<const DataT, IdxT, raft::row_major> dataset,
   std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers,
   std::optional<raft::device_vector_view<const LabelT, IdxT, raft::row_major>> vq_labels,
-  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers)
+  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
+  const uint32_t pq_bits)
 {
   extern __shared__ __align__(256) uint8_t smem_buffer[];
-  constexpr uint32_t kSubWarpSize = std::min<uint32_t>(raft::WarpSize, 1u << PqBits);
-  using subwarp_align             = raft::Pow2<kSubWarpSize>;
-  const IdxT row_ix = subwarp_align::div(IdxT{threadIdx.x} + IdxT{BlockSize} * IdxT{blockIdx.x});
+  using subwarp_align = raft::Pow2<SubWarpSize>;
+  const IdxT row_ix   = subwarp_align::div(IdxT{threadIdx.x} + IdxT{BlockSize} * IdxT{blockIdx.x});
   if (row_ix >= out_codes.extent(0)) { return; }
 
-  const uint32_t subwarp_id = threadIdx.x / kSubWarpSize;
+  const uint32_t subwarp_id = subwarp_align::div(threadIdx.x);
   MathT* smem_dataset   = reinterpret_cast<MathT*>(smem_buffer) + subwarp_id * pq_centers.extent(1);
   const uint32_t pq_dim = raft::div_rounding_up_unsafe(dataset.extent(1), pq_centers.extent(1));
 
-  const uint32_t lane_id = raft::Pow2<kSubWarpSize>::mod(threadIdx.x);
+  const uint32_t lane_id = subwarp_align::mod(threadIdx.x);
   const LabelT vq_label  = vq_labels ? vq_labels.value()(row_ix) : 0;
   auto* out_codes_ptr    = &out_codes(row_ix, 0);
 
@@ -725,13 +756,13 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_subspaces_kernel
     out_codes_ptr += sizeof(LabelT);
   }
 
-  cuvs::neighbors::ivf_pq::detail::bitfield_view_t<PqBits> code_view{out_codes_ptr};
+  cuvs::preprocessing::quantize::detail::bitfield_view_t code_view{out_codes_ptr, pq_bits};
   for (uint32_t j = 0; j < pq_dim; j++) {
     // find PQ label
-    uint32_t subspace_offset = j * pq_centers.extent(1) * (1 << PqBits);
+    uint32_t subspace_offset = j * pq_centers.extent(1) * (1 << pq_bits);
     auto pq_subspace_view    = raft::make_device_matrix_view(
-      pq_centers.data_handle() + subspace_offset, (uint32_t)(1 << PqBits), pq_centers.extent(1));
-    uint8_t code = compute_code_subspaces<kSubWarpSize>(
+      pq_centers.data_handle() + subspace_offset, (uint32_t)(1 << pq_bits), pq_centers.extent(1));
+    CodeT code = compute_code_subspaces<SubWarpSize, CodeT>(
       dataset, vq_centers, pq_subspace_view, smem_dataset, row_ix, j, vq_label);
     if (lane_id == 0) { code_view[j] = code; }
   }
@@ -782,18 +813,32 @@ void process_and_fill_codes_subspaces(
 
   dim3 threads(kBlockSize, 1, 1);
   auto kernel = [](uint32_t pq_bits) {
-    switch (pq_bits) {
-      case 4:
-        return process_and_fill_codes_subspaces_kernel<kBlockSize, 4, data_t, MathT, IdxT, label_t>;
-      case 5:
-        return process_and_fill_codes_subspaces_kernel<kBlockSize, 5, data_t, MathT, IdxT, label_t>;
-      case 6:
-        return process_and_fill_codes_subspaces_kernel<kBlockSize, 6, data_t, MathT, IdxT, label_t>;
-      case 7:
-        return process_and_fill_codes_subspaces_kernel<kBlockSize, 7, data_t, MathT, IdxT, label_t>;
-      case 8:
-        return process_and_fill_codes_subspaces_kernel<kBlockSize, 8, data_t, MathT, IdxT, label_t>;
-      default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
+    if (pq_bits == 4) {
+      return process_and_fill_codes_subspaces_kernel<kBlockSize,
+                                                     16,
+                                                     uint8_t,
+                                                     data_t,
+                                                     MathT,
+                                                     IdxT,
+                                                     label_t>;
+    } else if (pq_bits <= 8) {
+      return process_and_fill_codes_subspaces_kernel<kBlockSize,
+                                                     raft::WarpSize,
+                                                     uint8_t,
+                                                     data_t,
+                                                     MathT,
+                                                     IdxT,
+                                                     label_t>;
+    } else if (pq_bits <= 16) {
+      return process_and_fill_codes_subspaces_kernel<kBlockSize,
+                                                     raft::WarpSize,
+                                                     uint16_t,
+                                                     data_t,
+                                                     MathT,
+                                                     IdxT,
+                                                     label_t>;
+    } else {
+      RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 16]", pq_bits);
     }
   }(pq_bits);
 
@@ -831,7 +876,8 @@ void process_and_fill_codes_subspaces(
       batch_view,
       vq_centers,
       labels_view,
-      pq_centers);
+      pq_centers,
+      pq_bits);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
     vec_batches.prefetch_next_batch();
     raft::resource::sync_stream(res);
