@@ -906,7 +906,7 @@ auto clone(const raft::resources& res, const index<IdxT>& source) -> index<IdxT>
 
 /**
  * Extend the index in-place.
- * See raft::spatial::knn::ivf_pq::extend docs.
+ * See cuvs::spatial::knn::ivf_pq::extend docs.
  */
 template <typename T, typename IdxT>
 void extend(raft::resources const& handle,
@@ -1108,7 +1108,7 @@ void extend(raft::resources const& handle,
 
 /**
  * Create a new index that contains more data.
- * See raft::spatial::knn::ivf_pq::extend docs.
+ * See cuvs::spatial::knn::ivf_pq::extend docs.
  */
 template <typename T, typename IdxT>
 auto extend(raft::resources const& handle,
@@ -1238,7 +1238,7 @@ auto build(raft::resources const& handle,
     // Make rotation matrix
     helpers::make_rotation_matrix(handle, &index, params.force_random_rotation);
 
-    helpers::set_centers(handle, &index, raft::make_const_mdspan(centers_view));
+    helpers::set_centers(handle, &index, centers_const_view);
 
     // Train PQ codebooks
     switch (index.codebook_kind()) {
