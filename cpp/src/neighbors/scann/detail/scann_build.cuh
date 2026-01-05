@@ -5,7 +5,6 @@
 
 #pragma once
 
-#include "../../../cluster/kmeans_balanced.cuh"
 #include "../../detail/ann_utils.cuh"
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/neighbors/scann.hpp>
@@ -35,9 +34,9 @@ using namespace cuvs::spatial::knn::detail;  // NOLINT
  */
 
 template <typename T,
-          typename IdxT     = int64_t,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename IdxT = int64_t,
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 index<T, IdxT> build(
   raft::resources const& res,
   const index_params& params,
@@ -77,7 +76,7 @@ index<T, IdxT> build(
     // fit kmean
 
     RAFT_LOG_DEBUG("Fitting Kmeans");
-    cuvs::cluster::kmeans_balanced::fit(
+    cuvs::cluster::kmeans::fit(
       res, kmeans_params, raft::make_const_mdspan(trainset.view()), centroids_view);
   }
   raft::resource::sync_stream(res);
@@ -119,7 +118,7 @@ index<T, IdxT> build(
     auto batch_labels_view = raft::make_device_vector_view<uint32_t, int64_t>(
       labels_view.data_handle() + batch.offset(), batch.size());
 
-    cuvs::cluster::kmeans_balanced::predict(
+    cuvs::cluster::kmeans::predict(
       res, kmeans_params, batch_view, raft::make_const_mdspan(centroids_view), batch_labels_view);
 
     dataset_vec_batches.prefetch_next_batch();

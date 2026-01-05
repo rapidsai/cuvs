@@ -490,7 +490,7 @@ struct index : cuvs::neighbors::index {
    *
    * - Cagra index is normally created by the cagra::build
    * @code{.cpp}
-   *   using namespace raft::neighbors::experimental;
+   *   using namespace cuvs::neighbors;
    *   auto dataset = raft::make_host_matrix<float, int64_t>(n_rows, n_cols);
    *   load_dataset(dataset.view());
    *   // use default index parameters
@@ -510,7 +510,7 @@ struct index : cuvs::neighbors::index {
    *
    * - Constructing index using existing knn-graph
    * @code{.cpp}
-   *   using namespace raft::neighbors::experimental;
+   *   using namespace cuvs::neighbors;
    *
    *   auto dataset = raft::make_device_matrix<float, int64_t>(res, n_rows, n_cols);
    *   auto knn_graph = raft::make_device_matrix<uint32_t, int64_t>(res, n_rows, graph_degree);
@@ -1172,7 +1172,7 @@ auto build(raft::resources const& res,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   auto additional_dataset = raft::make_device_matrix<float, int64_t>(handle,add_size,dim);
  *   // set_additional_dataset(additional_dataset.view());
  *
@@ -1210,7 +1210,7 @@ void extend(
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   auto additional_dataset = raft::make_host_matrix<float, int64_t>(handle,add_size,dim);
  *   // set_additional_dataset(additional_dataset.view());
  *
@@ -1248,7 +1248,7 @@ void extend(
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   auto additional_dataset = raft::make_device_matrix<int8_t, int64_t>(handle,add_size,dim);
  *   // set_additional_dataset(additional_dataset.view());
  *
@@ -1286,7 +1286,7 @@ void extend(
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   auto additional_dataset = raft::make_host_matrix<int8_t, int64_t>(handle,add_size,dim);
  *   // set_additional_dataset(additional_dataset.view());
  *
@@ -1324,7 +1324,7 @@ void extend(
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   auto additional_dataset = raft::make_host_matrix<uint8_t, int64_t>(handle,add_size,dim);
  *   // set_additional_dataset(additional_dataset.view());
  *
@@ -1362,7 +1362,7 @@ void extend(
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   auto additional_dataset = raft::make_host_matrix<uint8_t, int64_t>(handle,add_size,dim);
  *   // set_additional_dataset(additional_dataset.view());
  *
@@ -2323,7 +2323,7 @@ void serialize_to_hnswlib(
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   auto dataset0 = raft::make_host_matrix<float, int64_t>(handle, size0, dim);
  *   auto dataset1 = raft::make_host_matrix<float, int64_t>(handle, size1, dim);
  *
@@ -2358,7 +2358,7 @@ auto merge(raft::resources const& res,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   auto dataset0 = raft::make_host_matrix<half, int64_t>(handle, size0, dim);
  *   auto dataset1 = raft::make_host_matrix<half, int64_t>(handle, size1, dim);
  *
@@ -2393,7 +2393,7 @@ auto merge(raft::resources const& res,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   auto dataset0 = raft::make_host_matrix<int8_t, int64_t>(handle, size0, dim);
  *   auto dataset1 = raft::make_host_matrix<int8_t, int64_t>(handle, size1, dim);
  *
@@ -2428,7 +2428,7 @@ auto merge(raft::resources const& res,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   auto dataset0 = raft::make_host_matrix<uint8_t, int64_t>(handle, size0, dim);
  *   auto dataset1 = raft::make_host_matrix<uint8_t, int64_t>(handle, size1, dim);
  *

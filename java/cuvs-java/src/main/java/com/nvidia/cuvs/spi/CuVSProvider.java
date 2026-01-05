@@ -121,8 +121,7 @@ public interface CuVSProvider {
    * @return A new HNSW index
    * @throws Throwable if an error occurs during conversion
    */
-  HnswIndex hnswIndexFromCagra(HnswIndexParams hnswParams, CagraIndex cagraIndex)
-      throws Throwable;
+  HnswIndex hnswIndexFromCagra(HnswIndexParams hnswParams, CagraIndex cagraIndex) throws Throwable;
 
   /** Creates a new TieredIndex Builder. */
   TieredIndex.Builder newTieredIndexBuilder(CuVSResources cuVSResources)
@@ -157,6 +156,29 @@ public interface CuVSProvider {
   void setLogLevel(java.util.logging.Level level);
 
   java.util.logging.Level getLogLevel();
+
+  /**
+   * Switch RMM allocations (used internally by various cuVS algorithms and by the default implementation of
+   * {@link CuVSDeviceMatrix}) to use pooled memory.
+   * This operation has a global effect, and will affect all resources on the current device.
+   *
+   * @param initialPoolSizePercent The initial pool size, in percentage of the total GPU memory
+   * @param maxPoolSizePercent The maximum pool size, in percentage of the total GPU memory
+   */
+  void enableRMMPooledMemory(int initialPoolSizePercent, int maxPoolSizePercent);
+
+  /**
+   * Switch RMM allocations (used internally by various cuVS algorithms and by the default implementation of
+   * {@link CuVSDeviceMatrix}) to use pooled memory.
+   * This operation has a global effect, and will affect all resources on the current device.
+   *
+   * @param initialPoolSizePercent The initial pool size, in percentage of the total GPU memory
+   * @param maxPoolSizePercent The maximum pool size, in percentage of the total GPU memory
+   */
+  void enableRMMManagedPooledMemory(int initialPoolSizePercent, int maxPoolSizePercent);
+
+  /** Disables pooled memory on the current device, reverting back to the default setting.  */
+  void resetRMMPooledMemory();
 
   /** Retrieves the system-wide provider. */
   static CuVSProvider provider() {

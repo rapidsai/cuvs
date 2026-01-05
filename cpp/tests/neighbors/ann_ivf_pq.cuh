@@ -781,75 +781,83 @@ inline auto big_dims_small_lut() -> test_cases_t
 }
 
 /**
+ * Helper function to add test cases with modifications.
+ * Note: Marked noinline to work around GCC 14 false positive stringop-overflow warnings
+ * when compiling with C++20.
+ */
+template <typename F>
+__attribute__((noinline)) void add_test_case(test_cases_t& xs, F&& modifier)
+{
+  ivf_pq_inputs temp{};
+  modifier(temp);
+  xs.push_back(std::move(temp));
+}
+
+/**
  * A minimal set of tests to check various enum-like parameters.
  */
 inline auto enum_variety() -> test_cases_t
 {
   test_cases_t xs;
-#define ADD_CASE(f)                               \
-  do {                                            \
-    xs.push_back({});                             \
-    ([](ivf_pq_inputs & x) f)(xs[xs.size() - 1]); \
-  } while (0);
 
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.index_params.codebook_kind = ivf_pq::codebook_gen::PER_CLUSTER;
     x.min_recall                 = 0.86;
   });
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.index_params.codebook_kind = ivf_pq::codebook_gen::PER_SUBSPACE;
     x.min_recall                 = 0.86;
   });
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.index_params.codebook_kind = ivf_pq::codebook_gen::PER_CLUSTER;
     x.index_params.pq_bits       = 4;
     x.min_recall                 = 0.79;
   });
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.index_params.codebook_kind = ivf_pq::codebook_gen::PER_CLUSTER;
     x.index_params.pq_bits       = 5;
     x.min_recall                 = 0.83;
   });
 
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.index_params.pq_bits = 6;
     x.min_recall           = 0.84;
   });
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.index_params.pq_bits = 7;
     x.min_recall           = 0.85;
   });
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.index_params.pq_bits = 8;
     x.min_recall           = 0.86;
   });
 
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.index_params.force_random_rotation = true;
     x.min_recall                         = 0.86;
   });
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.index_params.force_random_rotation = false;
     x.min_recall                         = 0.86;
   });
 
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.search_params.lut_dtype = CUDA_R_32F;
     x.min_recall              = 0.86;
   });
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.search_params.lut_dtype = CUDA_R_16F;
     x.min_recall              = 0.86;
   });
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.search_params.lut_dtype = CUDA_R_8U;
     x.min_recall              = 0.84;
   });
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.search_params.coarse_search_dtype = CUDA_R_16F;
     x.min_recall                        = 0.86;
   });
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.search_params.coarse_search_dtype = CUDA_R_8I;
     // 8-bit coarse search is experimental and there's no go guarantee of any recall
     // if the data is not normalized. Especially for L2, because we store vector norms alongside the
@@ -857,16 +865,16 @@ inline auto enum_variety() -> test_cases_t
     x.min_recall = 0.1;
   });
 
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.search_params.internal_distance_dtype = CUDA_R_32F;
     x.min_recall                            = 0.86;
   });
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.search_params.internal_distance_dtype = CUDA_R_16F;
     x.search_params.lut_dtype               = CUDA_R_16F;
     x.min_recall                            = 0.86;
   });
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.search_params.internal_distance_dtype = CUDA_R_16F;
     x.search_params.lut_dtype               = CUDA_R_16F;
     x.search_params.coarse_search_dtype     = CUDA_R_16F;
@@ -989,13 +997,7 @@ inline auto special_cases() -> test_cases_t
 {
   test_cases_t xs;
 
-#define ADD_CASE(f)                               \
-  do {                                            \
-    xs.push_back({});                             \
-    ([](ivf_pq_inputs & x) f)(xs[xs.size() - 1]); \
-  } while (0);
-
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.num_db_vecs                = 1183514;
     x.dim                        = 100;
     x.num_queries                = 10000;
@@ -1008,7 +1010,7 @@ inline auto special_cases() -> test_cases_t
   });
 
   // Test large max_internal_batch_size
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.num_db_vecs                           = 500000;
     x.dim                                   = 100;
     x.num_queries                           = 128 * 1024 * 1024;
@@ -1022,7 +1024,7 @@ inline auto special_cases() -> test_cases_t
   });
 
   // Test small max_internal_batch_size
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.num_db_vecs                           = 500000;
     x.dim                                   = 100;
     x.num_queries                           = 128 * 1024 * 1024;
@@ -1035,7 +1037,7 @@ inline auto special_cases() -> test_cases_t
     x.search_params.max_internal_batch_size = 1024 * 1024;
   });
 
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.num_db_vecs                = 10000;
     x.dim                        = 16;
     x.num_queries                = 500;
@@ -1047,7 +1049,7 @@ inline auto special_cases() -> test_cases_t
     x.search_params.n_probes     = 100;
   });
 
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.num_db_vecs                = 10000;
     x.dim                        = 16;
     x.num_queries                = 500;

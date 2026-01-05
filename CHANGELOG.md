@@ -1,3 +1,100 @@
+# cuvs 25.12.00 (10 Dec 2025)
+
+### 🚨 Breaking Changes
+* Using `all_neighbors` for mutual reachability by @jinsolp in https://github.com/rapidsai/cuvs/pull/1234
+* Refactor libcuvs_c header and source locations by @robertmaynard in https://github.com/rapidsai/cuvs/pull/1357
+* Update cagra C API enums to have more long term stable values by @robertmaynard in https://github.com/rapidsai/cuvs/pull/1436
+* Require CUDA 12.2+ by @jakirkham in https://github.com/rapidsai/cuvs/pull/1476
+* Remove mutual_reachability_graph Public API by @tarang-jain in https://github.com/rapidsai/cuvs/pull/1481
+### 🐛 Bug Fixes
+* Allow compilation when OpenMP is disabled by @robertmaynard in https://github.com/rapidsai/cuvs/pull/1346
+* Deallocation should be noexcept by @bdice in https://github.com/rapidsai/cuvs/pull/1416
+* ANN_BENCH: Don't throw in noexcept do_deallocate by @achirkin in https://github.com/rapidsai/cuvs/pull/1417
+* Remove unneeded cutlass public build/install dependency by @robertmaynard in https://github.com/rapidsai/cuvs/pull/1411
+* cuvs_static properly adds C include dir to target_include_directories by @robertmaynard in https://github.com/rapidsai/cuvs/pull/1426
+* Fix C/Python serialization for FP16. Add python tests by @lowener in https://github.com/rapidsai/cuvs/pull/1429
+* Properly guard usage of openmp function calls  by @robertmaynard in https://github.com/rapidsai/cuvs/pull/1435
+* Update nlohmann-json to 3.12.0 by @KyleFromNVIDIA in https://github.com/rapidsai/cuvs/pull/1449
+* Fix test params for filtered ivf_flat by @aamijar in https://github.com/rapidsai/cuvs/pull/1463
+* [REVIEW][Java][Bug] Fix `CuVSMatrix#getRow` to take strides into consideration by @ldematte in https://github.com/rapidsai/cuvs/pull/1442
+* Adding more tests and I find the compression settings are broken in the Golang API by @maxwbuckley in https://github.com/rapidsai/cuvs/pull/1472
+* Fix binary quantizer host transform bounds and stream order by @achirkin in https://github.com/rapidsai/cuvs/pull/1473
+* [BUG] Check if dynamic batching conf is null by @tarang-jain in https://github.com/rapidsai/cuvs/pull/1459
+* Include cagra search algorithms in libcuvs_static.a by @robertmaynard in https://github.com/rapidsai/cuvs/pull/1457
+* [Java] Disable flaky test `testFloatSerialization` by @mythrocks in https://github.com/rapidsai/cuvs/pull/1503
+* Add libaio to cuvs-bench-cpu, improve bench dependencies by @tarang-jain in https://github.com/rapidsai/cuvs/pull/1480
+* [Java] Fix `CagraBuildAndSearchIT` concurrent deallocation errors by @ldematte in https://github.com/rapidsai/cuvs/pull/1510
+* Pin Cython pre-3.2.0 and PyTest pre-9 by @jakirkham in https://github.com/rapidsai/cuvs/pull/1528
+* Fix a bug in compute_distance_00_generate.py by @enp1s0 in https://github.com/rapidsai/cuvs/pull/1532
+* Check stride information in from_dlpack by @benfred in https://github.com/rapidsai/cuvs/pull/1458
+* refactored update-version.sh to handle new branching strategy by @rockhowse in https://github.com/rapidsai/cuvs/pull/1535
+* fixed bug with update-version.sh by @rockhowse in https://github.com/rapidsai/cuvs/pull/1556
+* fix(ci): remove unsupported `name` parameter from custom job def by @gforsyth in https://github.com/rapidsai/cuvs/pull/1560
+* Remove need to have rapids_logger headers installed to use clib by @robertmaynard in https://github.com/rapidsai/cuvs/pull/1527
+* Fix BruteForce serialize test by @lowener in https://github.com/rapidsai/cuvs/pull/1568
+* [C] Fix: `cuvsRMMMemoryResourceReset` sets a valid resource by @ldematte in https://github.com/rapidsai/cuvs/pull/1540
+* Fix typo in date field by @vyasr in https://github.com/rapidsai/cuvs/pull/1563
+* SNMG ANN build with OpenMP nested parallelism by @viclafargue in https://github.com/rapidsai/cuvs/pull/1526
+### 📖 Documentation
+* Fix table of content documentation by @lowener in https://github.com/rapidsai/cuvs/pull/1427
+* Docs Spectral Clustering by @aamijar in https://github.com/rapidsai/cuvs/pull/1490
+* Use current system architecture in conda environment creation command by @bdice in https://github.com/rapidsai/cuvs/pull/1499
+* Updating README for release by @cjnolet in https://github.com/rapidsai/cuvs/pull/1584
+### 🚀 New Features
+* Unify binding headers by @robertmaynard in https://github.com/rapidsai/cuvs/pull/1413
+* CAGRA: decouple source idx type from graph idx type and add a mapping between them by @achirkin in https://github.com/rapidsai/cuvs/pull/1251
+* Add SOVERSION information to libcuvs_c by @robertmaynard in https://github.com/rapidsai/cuvs/pull/1474
+* Spectral Clustering by @aamijar in https://github.com/rapidsai/cuvs/pull/1425
+* ANN_BENCH: integrate NVTX statistics by @achirkin in https://github.com/rapidsai/cuvs/pull/1529
+* Add Augmented Core Extraction Algorithm by @julianmi in https://github.com/rapidsai/cuvs/pull/1404
+* Extend CI to build and test x86 libcuvs_c tarballs by @robertmaynard in https://github.com/rapidsai/cuvs/pull/1524
+* Introduce `libcuvs-headers` and `libcuvs-static` CMake components and conda packages by @divyegala in https://github.com/rapidsai/cuvs/pull/1494
+* [Java] Bindings, tests and benchmarks for RMM pooled memory by @ldematte in https://github.com/rapidsai/cuvs/pull/1453
+### 🛠️ Improvements
+* Update `RAPIDS_BRANCH`, codify changes in `update-version.sh` by @KyleFromNVIDIA in https://github.com/rapidsai/cuvs/pull/1368
+* Move eigen_solvers from raft by @aamijar in https://github.com/rapidsai/cuvs/pull/1402
+* CosineExpanded Distance Metric for CAGRA by @tarang-jain in https://github.com/rapidsai/cuvs/pull/197
+* Enable `sccache-dist` connection pool by @trxcllnt in https://github.com/rapidsai/cuvs/pull/1431
+* Use pinned_host_memory_resource instead of pinned_memory_resource. by @bdice in https://github.com/rapidsai/cuvs/pull/1434
+* Use main in RAPIDS_BRANCH by @bdice in https://github.com/rapidsai/cuvs/pull/1439
+* Use main shared-workflows branch by @bdice in https://github.com/rapidsai/cuvs/pull/1444
+* [Review] ScaNN: Add option for AVQ/Noise Shaping to bfloat16 quantization by @rmaschal in https://github.com/rapidsai/cuvs/pull/1354
+* Add NVTX annotations to CAGRA knn graph build stage by @achirkin in https://github.com/rapidsai/cuvs/pull/1443
+* [Review][C] Export the ability to get/set the log level to the C API by @ldematte in https://github.com/rapidsai/cuvs/pull/1375
+* [Java] Test indexing and serialization with integral (byte) dataset by @ldematte in https://github.com/rapidsai/cuvs/pull/1366
+* Use SPDX for all copyright headers by @KyleFromNVIDIA in https://github.com/rapidsai/cuvs/pull/1446
+* [REVIEW][Java] Log level api by @ldematte in https://github.com/rapidsai/cuvs/pull/1376
+* [Review] [Java] Disable flaky Java tests to reduce CI churn by @mythrocks in https://github.com/rapidsai/cuvs/pull/1469
+* Refactor rapids_cpm_package_details to rapids_cpm_package_info by @bdice in https://github.com/rapidsai/cuvs/pull/1433
+* Fix golang test name and add more logging and error checking. by @maxwbuckley in https://github.com/rapidsai/cuvs/pull/1471
+* Use an explicit std::min for byte alignment calculation by @maxwbuckley in https://github.com/rapidsai/cuvs/pull/1465
+* Replace custom cuda_pinned_resource with RMM's pinned_host_memory_resource by @bdice in https://github.com/rapidsai/cuvs/pull/1466
+* Add patch for FAISS memory resources by @bdice in https://github.com/rapidsai/cuvs/pull/1477
+* Improved CAGRA build parameter heuristics by @achirkin in https://github.com/rapidsai/cuvs/pull/1448
+* Decouple C++ library from C library by @divyegala in https://github.com/rapidsai/cuvs/pull/1488
+* Use `RAPIDS_BRANCH` in cmake-format invocations that need rapids-cmake configs by @bdice in https://github.com/rapidsai/cuvs/pull/1475
+* eigen `tolerance` option Spectral Embedding by @aamijar in https://github.com/rapidsai/cuvs/pull/1493
+* Update to CUDA 13.0.2 by @bdice in https://github.com/rapidsai/cuvs/pull/1506
+* Single Linkage to Use all_neighbors API to build the KNN graph by @tarang-jain in https://github.com/rapidsai/cuvs/pull/1507
+* Migrate to new CCCL memory resource interface by @bdice in https://github.com/rapidsai/cuvs/pull/1502
+* Remove unused headers scann by @lowener in https://github.com/rapidsai/cuvs/pull/1508
+* Update RMM includes from `<rmm/mr/device/*>` to `<rmm/mr/*>` by @bdice in https://github.com/rapidsai/cuvs/pull/1538
+* Use ruff-check, ruff-format instead of black, flake8 by @KyleFromNVIDIA in https://github.com/rapidsai/cuvs/pull/1500
+* Set memory pool from Python multi-GPU resource by @viclafargue in https://github.com/rapidsai/cuvs/pull/1530
+* [Java] Fix format with spotless by @ldematte in https://github.com/rapidsai/cuvs/pull/1539
+* fix bad version update by @trxcllnt in https://github.com/rapidsai/cuvs/pull/1555
+* Deduplicate KMeans instantiations by @divyegala in https://github.com/rapidsai/cuvs/pull/1565
+* Improve memory usage in `build_mr_linkage` by @jinsolp in https://github.com/rapidsai/cuvs/pull/1550
+* Use `sccache-dist` build cluster for conda and wheel builds by @trxcllnt in https://github.com/rapidsai/cuvs/pull/1495
+* [Java] One PinnedMemoryBuffer per CuVSResourcesImpl by @ldematte in https://github.com/rapidsai/cuvs/pull/1441
+* [Java] Relax cuVS version matching by @ldematte in https://github.com/rapidsai/cuvs/pull/1544
+
+## New Contributors
+* @maxwbuckley made their first contribution in https://github.com/rapidsai/cuvs/pull/1471
+* @rockhowse made their first contribution in https://github.com/rapidsai/cuvs/pull/1535
+
+**Full Changelog**: https://github.com/rapidsai/cuvs/compare/v25.12.00a...release/25.12
+
 # cuvs 25.10.00 (8 Oct 2025)
 
 ## 🚨 Breaking Changes

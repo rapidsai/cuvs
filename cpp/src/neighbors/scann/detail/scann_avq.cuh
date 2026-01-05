@@ -17,6 +17,7 @@
 #include <raft/linalg/dot.cuh>
 #include <raft/linalg/linalg_types.hpp>
 #include <raft/linalg/map.cuh>
+#include <raft/linalg/matrix_vector.cuh>
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/linalg/multiply.cuh>
 #include <raft/linalg/norm.cuh>
@@ -394,8 +395,8 @@ class cluster_loader {
   raft::device_matrix<T, int64_t> d_cluster_buf_;
   raft::device_matrix<T, int64_t> d_cluster_copy_buf_;
   const T* dataset_ptr_;
-  raft::host_vector_view<const LabelT> h_cluster_offsets_;
-  raft::device_vector_view<const LabelT> cluster_ids_;
+  raft::host_vector_view<const LabelT, int64_t> h_cluster_offsets_;
+  raft::device_vector_view<const LabelT, int64_t> cluster_ids_;
   cudaStream_t stream_;
   int64_t dim_;
   int64_t n_rows_;
@@ -418,8 +419,8 @@ class cluster_loader {
                  int64_t n_rows,
                  int64_t max_cluster_size,
                  int64_t h_buf_size,
-                 raft::host_vector_view<LabelT> h_cluster_offsets,
-                 raft::device_vector_view<LabelT> cluster_ids,
+                 raft::host_vector_view<LabelT, int64_t> h_cluster_offsets,
+                 raft::device_vector_view<LabelT, int64_t> cluster_ids,
                  bool needs_copy,
                  cudaStream_t stream)
     : dim_(dim),
@@ -439,8 +440,8 @@ class cluster_loader {
  public:
   cluster_loader(raft::resources const& res,
                  raft::device_matrix_view<const T, int64_t> dataset_view,
-                 raft::host_vector_view<LabelT> h_cluster_offsets,
-                 raft::device_vector_view<LabelT> cluster_ids,
+                 raft::host_vector_view<LabelT, int64_t> h_cluster_offsets,
+                 raft::device_vector_view<LabelT, int64_t> cluster_ids,
                  int64_t max_cluster_size,
                  cudaStream_t stream)
     : cluster_loader(res,
@@ -459,8 +460,8 @@ class cluster_loader {
 
   cluster_loader(raft::resources const& res,
                  raft::host_matrix_view<const T, int64_t> dataset_view,
-                 raft::host_vector_view<LabelT> h_cluster_offsets,
-                 raft::device_vector_view<LabelT> cluster_ids,
+                 raft::host_vector_view<LabelT, int64_t> h_cluster_offsets,
+                 raft::device_vector_view<LabelT, int64_t> cluster_ids,
                  int64_t max_cluster_size,
                  cudaStream_t stream)
     : cluster_loader(res,
@@ -576,10 +577,10 @@ class cluster_loader {
  * @param eta the weight for the parallel component of the residual in the avq update
  */
 template <typename T,
-          typename IdxT     = int64_t,
-          typename LabelT   = uint32_t,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename IdxT   = int64_t,
+          typename LabelT = uint32_t,
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 void apply_avq(raft::resources const& res,
                raft::mdspan<const T, raft::matrix_extent<IdxT>, raft::row_major, Accessor> dataset,
                raft::device_matrix_view<T, IdxT> centroids_view,
