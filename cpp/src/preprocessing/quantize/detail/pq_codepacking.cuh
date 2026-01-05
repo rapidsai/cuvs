@@ -118,17 +118,7 @@ struct bitfield_const_view_t {
 };
 
 /**
- * Bitfield view for non-const pointers.
  * View a byte array as an array of unsigned integers of custom small bit size.
- * Supports both reading and writing individual bit-packed values.
- *
- * Example usage:
- * ```
- * uint8_t data[10] = {0};
- * bitfield_view_t view{data, 6};  // 6-bit values
- * view[0] = 15;  // Write 15 to first 6-bit slot
- * uint16_t val = view[0];  // Read back the value
- * ```
  */
 struct bitfield_view_t {
   uint8_t* raw;
