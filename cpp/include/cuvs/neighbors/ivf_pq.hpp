@@ -2846,7 +2846,7 @@ void make_rotation_matrix(raft::resources const& res,
 
 /**
  * @brief Public helper API for externally modifying the index's IVF centroids.
- * NB: The index must be reset before this. Use raft::neighbors::ivf_pq::extend to construct IVF
+ * NB: The index must be reset before this. Use cuvs::neighbors::ivf_pq::extend to construct IVF
  lists according to new centroids.
  *
  * Usage example:
