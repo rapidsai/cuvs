@@ -130,7 +130,7 @@ void all_knn_query(raft::resources const& handle,
  *  #include <raft/core/resources.hpp>
  *  #include <cuvs/neighbors/ball_cover.hpp>
  *  #include <cuvs/distance/distance.hpp>
- *  using namespace raft::neighbors;
+ *  using namespace cuvs::neighbors;
  *
  *  raft::resources handle;
  *  ...
