@@ -157,6 +157,29 @@ public interface CuVSProvider {
 
   java.util.logging.Level getLogLevel();
 
+  /**
+   * Switch RMM allocations (used internally by various cuVS algorithms and by the default implementation of
+   * {@link CuVSDeviceMatrix}) to use pooled memory.
+   * This operation has a global effect, and will affect all resources on the current device.
+   *
+   * @param initialPoolSizePercent The initial pool size, in percentage of the total GPU memory
+   * @param maxPoolSizePercent The maximum pool size, in percentage of the total GPU memory
+   */
+  void enableRMMPooledMemory(int initialPoolSizePercent, int maxPoolSizePercent);
+
+  /**
+   * Switch RMM allocations (used internally by various cuVS algorithms and by the default implementation of
+   * {@link CuVSDeviceMatrix}) to use pooled memory.
+   * This operation has a global effect, and will affect all resources on the current device.
+   *
+   * @param initialPoolSizePercent The initial pool size, in percentage of the total GPU memory
+   * @param maxPoolSizePercent The maximum pool size, in percentage of the total GPU memory
+   */
+  void enableRMMManagedPooledMemory(int initialPoolSizePercent, int maxPoolSizePercent);
+
+  /** Disables pooled memory on the current device, reverting back to the default setting.  */
+  void resetRMMPooledMemory();
+
   /** Retrieves the system-wide provider. */
   static CuVSProvider provider() {
     return CuVSServiceProvider.Holder.INSTANCE;

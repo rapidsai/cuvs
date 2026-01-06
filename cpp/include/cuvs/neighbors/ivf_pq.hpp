@@ -269,10 +269,8 @@ constexpr typename list_spec<SizeT, IdxT>::list_extents list_spec<SizeT, IdxT>::
 {
   // how many elems of pq_dim fit into one kIndexGroupVecLen-byte chunk
   auto pq_chunk = (kIndexGroupVecLen * 8u) / pq_bits;
-  return raft::make_extents<SizeT>(raft::div_rounding_up_safe<SizeT>(n_rows, kIndexGroupSize),
-                                   raft::div_rounding_up_safe<SizeT>(pq_dim, pq_chunk),
-                                   kIndexGroupSize,
-                                   kIndexGroupVecLen);
+  return list_extents{raft::div_rounding_up_safe<SizeT>(n_rows, kIndexGroupSize),
+                      raft::div_rounding_up_safe<SizeT>(pq_dim, pq_chunk)};
 }
 
 template <typename IdxT, typename SizeT = uint32_t>
@@ -335,8 +333,8 @@ struct index : cuvs::neighbors::index {
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
 
-  using pq_centers_extents = std::experimental::
-    extents<uint32_t, raft::dynamic_extent, raft::dynamic_extent, raft::dynamic_extent>;
+  using pq_centers_extents =
+    raft::extents<uint32_t, raft::dynamic_extent, raft::dynamic_extent, raft::dynamic_extent>;
 
  public:
   index(const index&)                    = delete;
@@ -2848,7 +2846,7 @@ void make_rotation_matrix(raft::resources const& res,
 
 /**
  * @brief Public helper API for externally modifying the index's IVF centroids.
- * NB: The index must be reset before this. Use raft::neighbors::ivf_pq::extend to construct IVF
+ * NB: The index must be reset before this. Use cuvs::neighbors::ivf_pq::extend to construct IVF
  lists according to new centroids.
  *
  * Usage example:
@@ -2875,7 +2873,7 @@ void make_rotation_matrix(raft::resources const& res,
  */
 void set_centers(raft::resources const& res,
                  index<int64_t>* index,
-                 raft::device_matrix_view<const float, uint32_t> cluster_centers);
+                 raft::device_matrix_view<const float, int64_t> cluster_centers);
 
 /**
  * @brief Public helper API for fetching a trained index's IVF centroids
@@ -2896,7 +2894,7 @@ void set_centers(raft::resources const& res,
  */
 void extract_centers(raft::resources const& res,
                      const index<int64_t>& index,
-                     raft::device_matrix_view<float, uint32_t, raft::row_major> cluster_centers);
+                     raft::device_matrix_view<float, int64_t, raft::row_major> cluster_centers);
 
 /** @copydoc extract_centers */
 void extract_centers(raft::resources const& res,

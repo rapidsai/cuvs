@@ -17,7 +17,7 @@ size_t get_free_host_memory()
   std::string line;
   while (std::getline(meminfo, line)) {
     if (line.find("MemAvailable:") != std::string::npos) {
-      available_memory = std::stoi(line.substr(line.find(":") + 1));
+      available_memory = std::stoull(line.substr(line.find(":") + 1));
     }
   }
   available_memory *= 1024;
