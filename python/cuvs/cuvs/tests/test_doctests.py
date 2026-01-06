@@ -19,6 +19,10 @@ import cuvs.preprocessing.quantize
 
 
 def _name_in_all(parent, name):
+    # Skip multi-GPU (mg) modules - they require special multi-GPU setup
+    # See: https://github.com/rapidsai/cuvs/issues/1647
+    if name == "mg" or name == "mg_resources" or name == "MultiGpuResources":
+        return False
     return name in getattr(parent, "__all__", [])
 
 
@@ -89,10 +93,6 @@ DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.common))
 DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.cluster))
 DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.distance))
 DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.preprocessing.quantize))
-
-# Filter out multi-GPU (mg) doctests since they are known to cause sporadic segfaults
-# See: https://github.com/rapidsai/cuvs/issues/1647
-DOC_STRINGS = [ds for ds in DOC_STRINGS if ".mg." not in ds.name]
 
 
 def _test_name_from_docstring(docstring):
