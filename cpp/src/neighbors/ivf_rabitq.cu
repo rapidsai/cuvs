@@ -150,13 +150,7 @@ void search(raft::resources const& handle,
   searcher.AllocateSearcherSpace(idx.rabitq_index().get_num_centroids(), NQ);
 
   auto k = neighbors.extent(1);
-  auto max_candidates_per_query_per_probe =
-    k > MAX_TOP_K_BLOCK_SORT ? idx.rabitq_index().get_max_cluster_length() : k;
 
-  auto topk_dists = raft::make_device_vector<float, int64_t>(
-    handle, NQ * params.n_probes * max_candidates_per_query_per_probe);
-  auto topk_ids = raft::make_device_vector<uint32_t, int64_t>(
-    handle, NQ * params.n_probes * max_candidates_per_query_per_probe);
   auto final_ids = raft::make_device_vector<uint32_t, int64_t>(handle, NQ * k);
 
   if (params.mode == search_mode::LUT32) {
@@ -165,9 +159,7 @@ void search(raft::resources const& handle,
                                           params.n_probes,
                                           &searcher,
                                           NQ,
-                                          topk_dists.data_handle(),
                                           distances.data_handle(),
-                                          topk_ids.data_handle(),
                                           final_ids.data_handle());
   } else if (params.mode == search_mode::LUT16) {
     // test v3 lut using fp16
@@ -176,9 +168,7 @@ void search(raft::resources const& handle,
                                                params.n_probes,
                                                &searcher,
                                                NQ,
-                                               topk_dists.data_handle(),
                                                distances.data_handle(),
-                                               topk_ids.data_handle(),
                                                final_ids.data_handle());
   } else if (params.mode == search_mode::QUANT8) {
     idx.rabitq_index().BatchClusterSearchQuantizeQuery(rotated_queries.data_handle(),
@@ -186,9 +176,7 @@ void search(raft::resources const& handle,
                                                        params.n_probes,
                                                        &searcher,
                                                        NQ,
-                                                       topk_dists.data_handle(),
                                                        distances.data_handle(),
-                                                       topk_ids.data_handle(),
                                                        final_ids.data_handle(),
                                                        8);
   } else if (params.mode == search_mode::QUANT4) {
@@ -197,9 +185,7 @@ void search(raft::resources const& handle,
                                                        params.n_probes,
                                                        &searcher,
                                                        NQ,
-                                                       topk_dists.data_handle(),
                                                        distances.data_handle(),
-                                                       topk_ids.data_handle(),
                                                        final_ids.data_handle(),
                                                        4);
   }

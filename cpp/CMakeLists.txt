@@ -1,6 +1,6 @@
 # =============================================================================
 # cmake-format: off
-# SPDX-FileCopyrightText: Copyright (c) 2020-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2020-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
@@ -229,6 +229,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ivf_rabitq/gpu_index/searcher_gpu_shared_mem_opt.cu
     src/neighbors/ivf_rabitq/gpu_index/searcher_gpu_quantize_query.cu
     src/neighbors/ivf_rabitq/gpu_index/quantizer_gpu_fast.cu
+    src/neighbors/ivf_rabitq/utils/searcher_gpu_utils.cu
   )
 
   target_link_libraries(ivf_rabitq_lib PRIVATE OpenMP::OpenMP_CXX CUDA::cudart raft::raft rmm)

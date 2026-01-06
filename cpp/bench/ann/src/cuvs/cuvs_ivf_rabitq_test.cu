@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -394,11 +394,9 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
       size_t total_correct = 0;
       double total_ratio   = 0;
       float total_time     = 0;
-      float *d_topk_dists, *d_final_dists;
-      PID *d_topk_pids, *d_final_pids;
-      cudaMallocAsync(&d_topk_dists, NQ * nprobe * TOPK * sizeof(float), single_stream);
+      float* d_final_dists;
+      PID* d_final_pids;
       cudaMallocAsync(&d_final_dists, NQ * TOPK * sizeof(float), single_stream);
-      cudaMallocAsync(&d_topk_pids, NQ * nprobe * TOPK * sizeof(PID), single_stream);
       cudaMallocAsync(&d_final_pids, NQ * TOPK * sizeof(PID), single_stream);
       cudaDeviceSynchronize();
 
@@ -424,55 +422,25 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
       searcher.set_query(d_rotated_query);
 
       if (searcher.get_mode() == "lut32") {
-        ivf.BatchClusterSearch(d_rotated_query,
-                               TOPK,
-                               nprobe,
-                               &searcher,
-                               NQ,
-                               d_topk_dists,
-                               d_final_dists,
-                               d_topk_pids,
-                               d_final_pids);
+        ivf.BatchClusterSearch(
+          d_rotated_query, TOPK, nprobe, &searcher, NQ, d_final_dists, d_final_pids);
         cudaDeviceSynchronize();
         total_time += stopw.getElapsedTimeMicro();
         // time stop
       } else if (searcher.get_mode() == "lut16") {
         // test v3 lut using fp16
-        ivf.BatchClusterSearchLUT16(d_rotated_query,
-                                    TOPK,
-                                    nprobe,
-                                    &searcher,
-                                    NQ,
-                                    d_topk_dists,
-                                    d_final_dists,
-                                    d_topk_pids,
-                                    d_final_pids);
+        ivf.BatchClusterSearchLUT16(
+          d_rotated_query, TOPK, nprobe, &searcher, NQ, d_final_dists, d_final_pids);
         cudaDeviceSynchronize();
         total_time += stopw.getElapsedTimeMicro();
       } else if (searcher.get_mode() == "quant8") {
-        ivf.BatchClusterSearchQuantizeQuery(d_rotated_query,
-                                            TOPK,
-                                            nprobe,
-                                            &searcher,
-                                            NQ,
-                                            d_topk_dists,
-                                            d_final_dists,
-                                            d_topk_pids,
-                                            d_final_pids,
-                                            8);
+        ivf.BatchClusterSearchQuantizeQuery(
+          d_rotated_query, TOPK, nprobe, &searcher, NQ, d_final_dists, d_final_pids, 8);
         cudaDeviceSynchronize();
         total_time += stopw.getElapsedTimeMicro();
       } else if (searcher.get_mode() == "quant4") {
-        ivf.BatchClusterSearchQuantizeQuery(d_rotated_query,
-                                            TOPK,
-                                            nprobe,
-                                            &searcher,
-                                            NQ,
-                                            d_topk_dists,
-                                            d_final_dists,
-                                            d_topk_pids,
-                                            d_final_pids,
-                                            4);
+        ivf.BatchClusterSearchQuantizeQuery(
+          d_rotated_query, TOPK, nprobe, &searcher, NQ, d_final_dists, d_final_pids, 4);
         cudaDeviceSynchronize();
         total_time += stopw.getElapsedTimeMicro();
       }
@@ -527,9 +495,7 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
       // Clean up
       delete[] h_final_pids;
 
-      cudaFreeAsync(d_topk_dists, single_stream);
       cudaFreeAsync(d_final_dists, single_stream);
-      cudaFreeAsync(d_topk_pids, single_stream);
       cudaFreeAsync(d_final_pids, single_stream);
       cudaFreeAsync(d_query, single_stream);
 

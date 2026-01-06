@@ -9,6 +9,7 @@
 
 // This file implements `SearcherGPU::SearchClusterQueryPairsQuantizeQuery`.
 #include "../../ivf_flat/ivf_flat_interleaved_scan.cuh"
+#include "../utils/searcher_gpu_utils.hpp"
 #include "searcher_gpu.cuh"
 #include "searcher_gpu_common.cuh"
 
@@ -98,11 +99,12 @@ __global__ void computeInnerProductsWithBitwiseOpt(const ComputeInnerProductsKer
 
   // Atomically get write position
   __shared__ int probe_slot;
-  if (tid == 0) { probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], 1); }
+  if (tid == 0) {
+    probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], num_vectors_in_cluster);
+  }
   __syncthreads();
   // Calculate output offset
-  uint32_t output_offset = query_idx * (params.max_candidates_per_pair * params.nprobe) +
-                           probe_slot * params.max_candidates_per_pair;
+  uint32_t output_offset = query_idx * params.max_candidates_per_query + probe_slot;
 
   for (size_t vec_base = 0; vec_base < num_vectors_in_cluster; vec_base += num_threads) {
     size_t vec_idx = vec_base + tid;
@@ -192,11 +194,12 @@ __global__ void computeInnerProductsWithBitwiseOptNoEX(
   // Compute exact float inner products for all candidates
   // Atomically get write position
   __shared__ int probe_slot;
-  if (tid == 0) { probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], 1); }
+  if (tid == 0) {
+    probe_slot = atomicAdd(&params.d_query_write_counters[query_idx], num_vectors_in_cluster);
+  }
   __syncthreads();
   // Calculate output offset
-  uint32_t output_offset = query_idx * (params.max_candidates_per_pair * params.nprobe) +
-                           probe_slot * params.max_candidates_per_pair;
+  uint32_t output_offset = query_idx * params.max_candidates_per_query + probe_slot;
 
   for (size_t vec_base = 0; vec_base < num_vectors_in_cluster; vec_base += num_threads) {
     size_t vec_idx = vec_base + tid;
@@ -1653,14 +1656,13 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
   const float* d_G_kbxSumq,
   size_t nprobe,
   size_t topk,
-  float* d_topk_dists,
-  PID* d_topk_pids,
   float* d_final_dists,
   PID* d_final_pids,
   bool use_4bit  // Add parameter to choose 4-bit or 8-bit
 )
 {
-  // choose algorithm
+  // check if the inner products kernel should use block sort to keep a top-k priority queue vs.
+  // outputting distances from all vectors in probed clusters
   const bool use_block_sort{topk <= MAX_TOP_K_BLOCK_SORT};
 
   // query quantize
@@ -1752,13 +1754,40 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
     }
   }
 
-  // Initialize distances
-  size_t max_cluster_length                 = cur_ivf.get_max_cluster_length();
-  size_t max_candidates_per_query_per_probe = use_block_sort ? topk : max_cluster_length;
-  size_t total_elements = max_candidates_per_query_per_probe * num_queries * nprobe;
+  // We minimize max_cluster_size to reduce shared memory usage when the probe clusters do not
+  // include the largest cluster. This optimization is expected to be more effective when
+  // num_queries and/or nprobe are low.
+  uint32_t max_cluster_size;
+
+  // For the intermediate distances (and associated IDs), we want to minimize the allocation both to
+  // reduce memory footprint and to avoid unnecessary passes in the final RAFT select_k call. For
+  // `use_block_sort = true`, the required allocation is simply num_queries * nprobe * topk. For
+  // `use_block_sort = false`, the strategy here is to compute the sum of cluster sizes over all
+  // probed clusters for each query, and use the maximum of these sums as the allocation size needed
+  // per query. This avoids negative performance impact from any abnormally large cluster when using
+  // the global maximum cluster size as the allocation size per query per probe.
+  std::optional<size_t> max_probed_vectors_count =
+    use_block_sort ? std::nullopt : std::optional<size_t>{0};
+
+  // call utility function to evalate max_cluster_size and max_probed_vectors_count
+  get_max_probed_cluster_size_and_vectors_count(handle_,
+                                                d_sorted_pairs,
+                                                num_queries * nprobe,
+                                                cur_ivf.get_cluster_meta().data_handle(),
+                                                num_queries,
+                                                max_cluster_size,
+                                                max_probed_vectors_count);
+
+  // allocate memory for intermediate output
+  size_t total_elements =
+    use_block_sort ? num_queries * nprobe * topk : num_queries * max_probed_vectors_count.value();
+  auto d_topk_dists = raft::make_device_vector<float, int64_t>(handle_, total_elements);
+  auto d_topk_pids  = raft::make_device_vector<PID, int64_t>(handle_, total_elements);
+
+  // initialize distances
   thrust::fill(thrust::cuda::par.on(stream_),
-               d_topk_dists,
-               d_topk_dists + total_elements,
+               d_topk_dists.data_handle(),
+               d_topk_dists.data_handle() + total_elements,
                std::numeric_limits<float>::infinity());
 
   RAFT_CUDA_TRY(
@@ -1786,9 +1815,8 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
   // Now we need: packed query bits, candidate storage, and query vector
   // this part is also used to store ip2 results
   size_t packed_query_size = max((use_block_sort ? (num_bits * num_words * sizeof(uint32_t)) : 0),
-                                 max_cluster_length * sizeof(float));
-  size_t candidate_storage =
-    use_block_sort ? max_cluster_length * (sizeof(float) + sizeof(int)) : 0;
+                                 max_cluster_size * sizeof(float));
+  size_t candidate_storage = use_block_sort ? max_cluster_size * (sizeof(float) + sizeof(int)) : 0;
   size_t shared_mem_size =
     max(packed_query_size + candidate_storage + query_storage, (size_t)queue_buffer_smem_bytes);
 
@@ -1810,13 +1838,15 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
   kernelParams.num_centroids           = cur_ivf.get_num_centroids();
   kernelParams.D                       = D;
   kernelParams.d_threshold             = d_topk_threshold_batch.data_handle();
-  kernelParams.max_candidates_per_pair = max_cluster_length;
-  kernelParams.ex_bits                 = cur_ivf.get_ex_bits();
-  kernelParams.d_long_code             = cur_ivf.get_long_code_device();
+  kernelParams.max_candidates_per_pair = max_cluster_size;
+  kernelParams.max_candidates_per_query =
+    use_block_sort ? 0 /* unused */ : max_probed_vectors_count.value();
+  kernelParams.ex_bits      = cur_ivf.get_ex_bits();
+  kernelParams.d_long_code  = cur_ivf.get_long_code_device();
   kernelParams.d_ex_factor  = reinterpret_cast<const float*>(cur_ivf.get_ex_factor_device());
   kernelParams.d_pids       = cur_ivf.get_ids_device();
-  kernelParams.d_topk_dists = d_topk_dists;
-  kernelParams.d_topk_pids  = d_topk_pids;
+  kernelParams.d_topk_dists = d_topk_dists.data_handle();
+  kernelParams.d_topk_pids  = d_topk_pids.data_handle();
   kernelParams.d_query_write_counters = d_query_write_counters.data_handle();
   kernelParams.num_bits               = num_bits;
   kernelParams.num_words              = num_words;
@@ -1854,16 +1884,17 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
   }
 
   // Merge results
-  raft::matrix::detail::select_k(handle_,
-                                 d_topk_dists,
-                                 d_topk_pids,
-                                 num_queries,
-                                 nprobe * max_candidates_per_query_per_probe,
-                                 topk,
-                                 d_final_dists,
-                                 d_final_pids,
-                                 /*select_min = */ true,
-                                 /* sorted = */ false);
+  raft::matrix::detail::select_k(
+    handle_,
+    d_topk_dists.data_handle(),
+    d_topk_pids.data_handle(),
+    num_queries,
+    use_block_sort ? (nprobe * topk) : max_probed_vectors_count.value(),
+    topk,
+    d_final_dists,
+    d_final_pids,
+    /*select_min = */ true,
+    /* sorted = */ false);
 
   raft::resource::sync_stream(handle_);
 }

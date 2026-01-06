@@ -1019,9 +1019,7 @@ void IVFGPU::BatchClusterSearch(const float* d_query,
                                 size_t nprobe,
                                 void* searcher,
                                 size_t batch_size,
-                                float* d_topk_dists,
                                 float* d_final_dists,
-                                PID* d_topk_pids,
                                 PID* d_final_pids)
 {
   SearcherGPU* searcher_batch = ((SearcherGPU*)searcher);
@@ -1119,8 +1117,6 @@ void IVFGPU::BatchClusterSearch(const float* d_query,
                                           d_G_kbxSumq.data_handle(),
                                           nprobe,
                                           k,
-                                          d_topk_dists,
-                                          d_topk_pids,
                                           d_final_dists,
                                           d_final_pids);
 }
@@ -1131,9 +1127,7 @@ void IVFGPU::BatchClusterSearchLUT16(const float* d_query,
                                      size_t nprobe,
                                      void* searcher,
                                      size_t batch_size,
-                                     float* d_topk_dists,
                                      float* d_final_dists,
-                                     PID* d_topk_pids,
                                      PID* d_final_pids)
 {
   SearcherGPU* searcher_batch = ((SearcherGPU*)searcher);
@@ -1233,8 +1227,6 @@ void IVFGPU::BatchClusterSearchLUT16(const float* d_query,
                                                       d_G_kbxSumq,
                                                       nprobe,
                                                       k,
-                                                      d_topk_dists,
-                                                      d_topk_pids,
                                                       d_final_dists,
                                                       d_final_pids);
 
@@ -1252,9 +1244,7 @@ void IVFGPU::BatchClusterSearchQuantizeQuery(const float* d_query,
                                              size_t nprobe,
                                              void* searcher,
                                              size_t batch_size,
-                                             float* d_topk_dists,
                                              float* d_final_dists,
-                                             PID* d_topk_pids,
                                              PID* d_final_pids,
                                              int query_bits)
 {
@@ -1355,8 +1345,6 @@ void IVFGPU::BatchClusterSearchQuantizeQuery(const float* d_query,
                                                        d_G_kbxSumq,
                                                        nprobe,
                                                        k,
-                                                       d_topk_dists,
-                                                       d_topk_pids,
                                                        d_final_dists,
                                                        d_final_pids,
                                                        query_bits == 4);

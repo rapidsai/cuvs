@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -240,9 +240,13 @@ class IVFGPU {
   {
     return const_cast<float*>(this->short_factors_batch_.data_handle());
   }
+  raft::device_vector<GPUClusterMeta, int64_t> const& get_cluster_meta() const
+  {
+    return cluster_meta_;
+  }
 
   // host data getters
-  raft::host_vector<GPUClusterMeta, int64_t> const& get_cluster_meta_host()
+  raft::host_vector<GPUClusterMeta, int64_t> const& get_cluster_meta_host() const
   {
     return cluster_meta_host_;
   }
@@ -279,9 +283,7 @@ class IVFGPU {
                           size_t nprobe,
                           void* searcher,
                           size_t batch_size,
-                          float* d_topk_dists,
                           float* d_final_dists,
-                          PID* d_topk_pids,
                           PID* d_final_pids);
 
   void BatchClusterSearchLUT16(const float* d_query,
@@ -289,9 +291,7 @@ class IVFGPU {
                                size_t nprobe,
                                void* searcher,
                                size_t batch_size,
-                               float* d_topk_dists,
                                float* d_final_dists,
-                               PID* d_topk_pids,
                                PID* d_final_pids);
 
   void BatchClusterSearchQuantizeQuery(const float* d_query,
@@ -299,9 +299,7 @@ class IVFGPU {
                                        size_t nprobe,
                                        void* searcher,
                                        size_t batch_size,
-                                       float* d_topk_dists,
                                        float* d_final_dists,
-                                       PID* d_topk_pids,
                                        PID* d_final_pids,
                                        int query_bits);
 

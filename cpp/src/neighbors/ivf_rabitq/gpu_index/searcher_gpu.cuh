@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -76,8 +76,6 @@ class SearcherGPU {
    * @param nprobe
    * @param d_centroid
    * @param topk
-   * @param d_topk_dists
-   * @param d_topk_pids
    * @param stream
    */
   void SearchClusterQueryPairs(const IVFGPU& cur_ivf,
@@ -89,8 +87,6 @@ class SearcherGPU {
                                const float* d_G_kbxSumq,
                                size_t nprobe,
                                size_t topk,
-                               float* d_topk_dists,
-                               PID* d_topk_pids,
                                float* d_final_dists,
                                PID* d_final_pids);
 
@@ -103,8 +99,6 @@ class SearcherGPU {
                                            const float* d_G_kbxSumq,
                                            size_t nprobe,
                                            size_t topk,
-                                           float* d_topk_dists,
-                                           PID* d_topk_pids,
                                            float* d_final_dists,
                                            PID* d_final_pids);
 
@@ -117,8 +111,6 @@ class SearcherGPU {
                                             const float* d_G_kbxSumq,
                                             size_t nprobe,
                                             size_t topk,
-                                            float* d_topk_dists,
-                                            PID* d_topk_pids,
                                             float* d_final_dists,
                                             PID* d_final_pids,
                                             bool use_4bit = false);

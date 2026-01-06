@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -47,15 +47,17 @@ struct ComputeInnerProductsKernelParams {
   uint32_t D                                   = 0;
   const float* d_threshold                     = nullptr;  // threshold for each query
   uint32_t max_candidates_per_pair             = 0;        // max storage per pair, 1000 suggested
-  uint32_t ex_bits                             = 0;        // bits per dimension in ex codes
-  const uint8_t* d_long_code                   = nullptr;  // long codes for all vectors
-  const float* d_ex_factor                     = nullptr;  // ex factors for distance computation
-  const PID* d_pids                            = nullptr;  // PIDs for all vectors
-  float* d_topk_dists                          = nullptr;  // output top-k distances
-  PID* d_topk_pids                             = nullptr;  // output top-k PIDs
-  int* d_query_write_counters                  = nullptr;
-  uint32_t num_bits                            = 0;  // number of bits (8 for int8)
-  uint32_t num_words                           = 0;  // approx. D/32
+  uint32_t max_candidates_per_query =
+    0;  // max number of vectors in probed clusters for any particular query
+  uint32_t ex_bits            = 0;        // bits per dimension in ex codes
+  const uint8_t* d_long_code  = nullptr;  // long codes for all vectors
+  const float* d_ex_factor    = nullptr;  // ex factors for distance computation
+  const PID* d_pids           = nullptr;  // PIDs for all vectors
+  float* d_topk_dists         = nullptr;  // output top-k distances
+  PID* d_topk_pids            = nullptr;  // output top-k PIDs
+  int* d_query_write_counters = nullptr;
+  uint32_t num_bits           = 0;  // number of bits (8 for int8)
+  uint32_t num_words          = 0;  // approx. D/32
 };
 
 // function to extract long codes
