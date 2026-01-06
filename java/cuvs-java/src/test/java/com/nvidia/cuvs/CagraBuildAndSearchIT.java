@@ -12,7 +12,6 @@ import static org.junit.Assert.*;
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
 import com.nvidia.cuvs.CagraIndexParams.CuvsDistanceType;
-import com.nvidia.cuvs.CagraMergeParams.MergeStrategy;
 import com.nvidia.cuvs.spi.CuVSProvider;
 import java.lang.foreign.Arena;
 import java.lang.foreign.Linker;
