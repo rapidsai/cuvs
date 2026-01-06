@@ -16,10 +16,10 @@
 #include "common.cuh"
 
 void cagra_build_search_filtered(raft::device_resources const& dev_resources,
-                               raft::device_matrix_view<const float, int64_t> dataset,
-                               raft::device_matrix_view<const float, int64_t> queries,
-			       raft::device_matrix_view<int32_t, int64_t> data_labels,
-			       raft::device_vector_view<int32_t> query_labels)
+                                 raft::device_matrix_view<const float, int64_t> dataset,
+                                 raft::device_matrix_view<const float, int64_t> queries,
+                                 raft::device_matrix_view<int32_t, int64_t> data_labels,
+                                 raft::device_vector_view<int32_t> query_labels)
 {
   using namespace cuvs::neighbors;
 
@@ -40,57 +40,63 @@ void cagra_build_search_filtered(raft::device_resources const& dev_resources,
   std::cout << "CAGRA graph has degree " << index.graph_degree() << ", graph size ["
             << index.graph().extent(0) << ", " << index.graph().extent(1) << "]" << std::endl;
 
-
   // use default search parameters
   cagra::search_params search_params;
 
   // Create label filter structure and assign label metadata for data and queries
-  auto my_filter = cuvs::neighbors::filtering::label_filter<int32_t,int64_t>();
-  my_filter.data_labels_ = data_labels;
+  auto my_filter          = cuvs::neighbors::filtering::label_filter<int32_t, int64_t>();
+  my_filter.data_labels_  = data_labels;
   my_filter.query_labels_ = query_labels;
 
   // search K nearest neighbors
-  cagra::search(dev_resources, search_params, index, queries, neighbors.view(), distances.view(), my_filter);
+  cagra::search(
+    dev_resources, search_params, index, queries, neighbors.view(), distances.view(), my_filter);
 
   // The call to cagra::search is asynchronous. Before accessing the data, sync by calling
   raft::resource::sync_stream(dev_resources);
 
-  print_results_filter(dev_resources, neighbors.view(), distances.view(), data_labels, query_labels);
+  print_results_filter(
+    dev_resources, neighbors.view(), distances.view(), data_labels, query_labels);
 }
 
 // Generate random metadata labels for each data vector and query for filtered search
 void generate_categories(raft::device_resources const& dev_resources,
-                      raft::device_matrix_view<int32_t,int64_t> data_labels,
-                      raft::device_vector_view<int32_t> query_labels,
-                      int num_categories, int density)
+                         raft::device_matrix_view<int32_t, int64_t> data_labels,
+                         raft::device_vector_view<int32_t> query_labels,
+                         int num_categories,
+                         int density)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(dev_resources);
 
-  int N = data_labels.extent(0);
+  int N       = data_labels.extent(0);
   auto labels = raft::make_host_matrix<int32_t, int64_t>(N, density);
-  for(int i=0; i<N; i++) {
-    int len=0;
-    for(int j=0; j<density; j++) {
-      int val = (int)(rand())%num_categories;
-      bool good=true;
-      for(int k=0; k<len; k++) {
-        if(val == labels(i,k)) good = false;
+  for (int i = 0; i < N; i++) {
+    int len = 0;
+    for (int j = 0; j < density; j++) {
+      int val   = (int)(rand()) % num_categories;
+      bool good = true;
+      for (int k = 0; k < len; k++) {
+        if (val == labels(i, k)) good = false;
       }
-      if(good) {
-        labels(i,len) = val;
+      if (good) {
+        labels(i, len) = val;
         len++;
       }
     }
-    for(int j=len; j<density; j++) {
-      labels(i,j) = -1;
+    for (int j = len; j < density; j++) {
+      labels(i, j) = -1;
     }
   }
 
   raft::copy(data_labels.data_handle(), labels.data_handle(), labels.size(), stream);
 
   raft::random::RngState r(1234ULL);
-  raft::random::uniformInt(dev_resources, r, raft::make_device_vector_view(query_labels.data_handle(), query_labels.size()), 0,num_categories);
-
+  raft::random::uniformInt(
+    dev_resources,
+    r,
+    raft::make_device_vector_view(query_labels.data_handle(), query_labels.size()),
+    0,
+    num_categories);
 }
 
 int main()
@@ -116,19 +122,19 @@ int main()
   auto queries      = raft::make_device_matrix<float, int64_t>(dev_resources, n_queries, n_dim);
   generate_dataset(dev_resources, dataset.view(), queries.view());
 
+  int n_categories = 100;  // Total number of possible filter label values
+  int density      = 10;   // Maximum number of filter labels per data vector
 
-  int n_categories = 100; // Total number of possible filter label values
-  int density = 10; // Maximum number of filter labels per data vector
+  auto data_labels  = raft::make_device_matrix<int32_t, int64_t>(dev_resources, n_samples, density);
+  auto query_labels = raft::make_device_vector<int32_t, uint32_t>(dev_resources, n_queries);
 
-  auto data_labels = raft::make_device_matrix<int32_t,int64_t>(dev_resources, n_samples, density);
-  auto query_labels = raft::make_device_vector<int32_t,uint32_t>(dev_resources, n_queries);
-
-  generate_categories(dev_resources, data_labels.view(), query_labels.view(), n_categories, density);
+  generate_categories(
+    dev_resources, data_labels.view(), query_labels.view(), n_categories, density);
 
   // Simple build and search example.
   cagra_build_search_filtered(dev_resources,
-                            raft::make_const_mdspan(dataset.view()),
-                            raft::make_const_mdspan(queries.view()),
-			    data_labels.view(),
-			    query_labels.view());
+                              raft::make_const_mdspan(dataset.view()),
+                              raft::make_const_mdspan(queries.view()),
+                              data_labels.view(),
+                              query_labels.view());
 }

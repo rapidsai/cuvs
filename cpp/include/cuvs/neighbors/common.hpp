@@ -592,7 +592,7 @@ struct bitset_filter : public base_filter {
 
 template <typename label_t, typename index_t>
 struct label_filter : public base_filter {
-  raft::device_matrix_view<label_t,index_t> data_labels_;
+  raft::device_matrix_view<label_t, index_t> data_labels_;
   raft::device_vector_view<label_t> query_labels_;
 
   inline _RAFT_HOST_DEVICE bool operator()(
@@ -601,20 +601,15 @@ struct label_filter : public base_filter {
     const uint32_t sample_ix) const
   {
     int density = data_labels_.extent(1);
-    for(int i=0; i<density; i++) {
-      if(query_labels_(query_ix) == data_labels_(sample_ix, i)) {
-        return true;
-      }
+    for (int i = 0; i < density; i++) {
+      if (query_labels_(query_ix) == data_labels_(sample_ix, i)) { return true; }
       // Use max value as marker for end of label list (if < density)
-      if (data_labels_(sample_ix, i) == std::numeric_limits<label_t>::max()) {
-        return false;
-      }
+      if (data_labels_(sample_ix, i) == std::numeric_limits<label_t>::max()) { return false; }
     }
     return false;
   }
 
   FilterType get_filter_type() const override { return FilterType::None; }
-
 };
 
 /** @} */  // end group neighbors_filtering

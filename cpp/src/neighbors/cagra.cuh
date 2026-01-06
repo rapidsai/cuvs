@@ -382,8 +382,8 @@ void search(raft::resources const& res,
   } catch (const std::bad_cast&) {
   }
   try {
-    using label_filter_type    = cuvs::neighbors::filtering::label_filter<int32_t, int64_t>;
-    auto& label_filter       = dynamic_cast<const label_filter_type&>(sample_filter_ref);
+    using label_filter_type   = cuvs::neighbors::filtering::label_filter<int32_t, int64_t>;
+    auto& label_filter        = dynamic_cast<const label_filter_type&>(sample_filter_ref);
     search_params params_copy = params;
     if (params.filtering_rate < 0.0) { params_copy.filtering_rate = 0.0; }
     auto label_filter_copy = label_filter;
