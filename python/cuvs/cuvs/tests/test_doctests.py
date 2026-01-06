@@ -90,12 +90,9 @@ DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.cluster))
 DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.distance))
 DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.preprocessing.quantize))
 
-# Skip doctests that are known to cause sporadic segfaults (pending triage)
+# Filter out multi-GPU (mg) doctests since they are known to cause sporadic segfaults
 # See: https://github.com/rapidsai/cuvs/issues/1647
-SKIP_DOCTESTS = {
-    "cuvs.neighbors.cagra.cagra.build",
-}
-DOC_STRINGS = [ds for ds in DOC_STRINGS if ds.name not in SKIP_DOCTESTS]
+DOC_STRINGS = [ds for ds in DOC_STRINGS if ".mg." not in ds.name]
 
 
 def _test_name_from_docstring(docstring):
