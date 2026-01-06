@@ -10,6 +10,9 @@ CPP_CHANNEL=$(rapids-download-conda-from-github cpp)
 rapids-logger "Create test conda environment"
 . /opt/conda/etc/profile.d/conda.sh
 
+rapids-logger "Configuring conda strict channel priority"
+conda config --set channel_priority strict
+
 rapids-dependency-file-generator \
   --output conda \
   --file-key rust \
@@ -41,7 +44,7 @@ sccache --stop-server 2>/dev/null || true
 
 # we need to set up LIBCLANG_PATH to allow rust bindgen to work,
 # grab it from the conda env
-LIBCLANG_PATH=$(dirname "$(find /opt/conda -name libclang.so | head -n 1)")
+LIBCLANG_PATH=$(dirname "$(find "$CONDA_PREFIX" -name libclang.so | head -n 1)")
 export LIBCLANG_PATH
 echo "LIBCLANG_PATH=$LIBCLANG_PATH"
 

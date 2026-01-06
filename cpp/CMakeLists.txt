@@ -29,6 +29,9 @@ project(
 )
 set(CMAKE_INSTALL_MESSAGE LAZY)
 
+# Disable C++20 module scanning (not using modules, just C++20 features)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+
 # Write the version header
 rapids_cmake_write_version_file(include/cuvs/version_config.h)
 
@@ -305,9 +308,9 @@ if(NOT BUILD_CPU_ONLY)
   set_target_properties(
     cuvs-cagra-search
     PROPERTIES BUILD_RPATH "\$ORIGIN"
-               CXX_STANDARD 17
+               CXX_STANDARD 20
                CXX_STANDARD_REQUIRED ON
-               CUDA_STANDARD 17
+               CUDA_STANDARD 20
                CUDA_STANDARD_REQUIRED ON
                CUDA_SEPARABLE_COMPILATION ON
                POSITION_INDEPENDENT_CODE ON
@@ -338,6 +341,7 @@ if(NOT BUILD_CPU_ONLY)
   add_library(
     cuvs_objs OBJECT
     src/cluster/detail/minClusterDistanceCompute.cu
+    src/cluster/agglomerative.cu
     src/cluster/kmeans_cluster_cost.cu
     src/cluster/kmeans_fit_mg_float.cu
     src/cluster/kmeans_fit_mg_double.cu
@@ -414,7 +418,6 @@ if(NOT BUILD_CPU_ONLY)
     src/distance/distance.cu
     src/distance/pairwise_distance.cu
     src/distance/sparse_distance.cu
-    src/embed/spectral.cu
     src/neighbors/all_neighbors/all_neighbors.cu
     src/neighbors/ball_cover.cu
     src/neighbors/epsilon_neighborhood.cu
@@ -497,6 +500,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_fp8_false.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_fp8_true.cu
     src/neighbors/ivf_pq/detail/ivf_pq_contiguous_list_data.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_list_data.cu
     src/neighbors/ivf_pq/detail/ivf_pq_process_and_fill_codes.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_float_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_half_int64_t.cu
@@ -543,9 +547,9 @@ if(NOT BUILD_CPU_ONLY)
 
   set_target_properties(
     cuvs_objs
-    PROPERTIES CXX_STANDARD 17
+    PROPERTIES CXX_STANDARD 20
                CXX_STANDARD_REQUIRED ON
-               CUDA_STANDARD 17
+               CUDA_STANDARD 20
                CUDA_STANDARD_REQUIRED ON
                POSITION_INDEPENDENT_CODE ON
   )
@@ -603,9 +607,9 @@ if(NOT BUILD_CPU_ONLY)
       cuvs
       PROPERTIES BUILD_RPATH "\$ORIGIN"
                  INSTALL_RPATH "\$ORIGIN"
-                 CXX_STANDARD 17
+                 CXX_STANDARD 20
                  CXX_STANDARD_REQUIRED ON
-                 CUDA_STANDARD 17
+                 CUDA_STANDARD 20
                  CUDA_STANDARD_REQUIRED ON
                  CUDA_RESOLVE_DEVICE_SYMBOLS ON
                  INTERFACE_POSITION_INDEPENDENT_CODE ON
@@ -658,9 +662,9 @@ SECTIONS
       cuvs_static
       PROPERTIES BUILD_RPATH "\$ORIGIN"
                  INSTALL_RPATH "\$ORIGIN"
-                 CXX_STANDARD 17
+                 CXX_STANDARD 20
                  CXX_STANDARD_REQUIRED ON
-                 CUDA_STANDARD 17
+                 CUDA_STANDARD 20
                  CUDA_STANDARD_REQUIRED ON
                  CUDA_RESOLVE_DEVICE_SYMBOLS ON
                  POSITION_INDEPENDENT_CODE ON

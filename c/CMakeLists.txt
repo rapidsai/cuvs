@@ -19,6 +19,9 @@ project(
 )
 set(CMAKE_INSTALL_MESSAGE LAZY)
 
+# Disable C++20 module scanning (not using modules, just C++20 features)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+
 # ##################################################################################################
 # * User Options  ------------------------------------------------------------
 
@@ -105,7 +108,7 @@ set_target_properties(
   cuvs_c
   PROPERTIES BUILD_RPATH "\$ORIGIN"
              INSTALL_RPATH "\$ORIGIN"
-             CXX_STANDARD 17
+             CXX_STANDARD 20
              CXX_STANDARD_REQUIRED ON
              POSITION_INDEPENDENT_CODE ON
              INTERFACE_POSITION_INDEPENDENT_CODE ON
@@ -159,8 +162,10 @@ target_include_directories(
 
 target_link_libraries(
   cuvs_c
-  PUBLIC $<IF:$<BOOL:${CUVSC_STATIC_CUVS_LIBRARY}>,cuvs::cuvs_static,cuvs::cuvs>
-  PRIVATE raft::raft $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
+  PRIVATE # we don't want any dependencies exported
+          $<IF:$<BOOL:${CUVSC_STATIC_CUVS_LIBRARY}>,cuvs::cuvs_static,cuvs::cuvs> #
+          $<COMPILE_ONLY:raft::raft> # enforce we shouldn't use raft symbols
+          $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
 )
 
 # ##################################################################################################
@@ -199,6 +204,8 @@ endif()
 # ##################################################################################################
 # * build tests ----------------------------------------------------
 if(BUILD_TESTS)
+  include(rapids-cuda)
+  rapids_cuda_init_architectures(CUVS_C)
   enable_language(CUDA)
   find_package(CUDAToolkit REQUIRED)
 

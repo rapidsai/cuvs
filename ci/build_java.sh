@@ -22,6 +22,9 @@ if [ -e "/opt/conda/etc/profile.d/conda.sh" ]; then
   . /opt/conda/etc/profile.d/conda.sh
 fi
 
+rapids-logger "Configuring conda strict channel priority"
+conda config --set channel_priority strict
+
 rapids-logger "Downloading artifacts from previous jobs"
 CPP_CHANNEL=$(rapids-download-conda-from-github cpp)
 
