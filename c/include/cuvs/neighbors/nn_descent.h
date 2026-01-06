@@ -16,6 +16,18 @@ extern "C" {
 #endif
 
 /**
+ * @brief Dtype to use for distance computation
+ * - `NND_DIST_COMP_AUTO`: Automatically determine the best dtype for distance computation based on the dataset dimensions.
+ * - `NND_DIST_COMP_FP32`: Use fp32 distance computation for better precision at the cost of performance and memory usage.
+ * - `NND_DIST_COMP_FP16`: Use fp16 distance computation.
+ */
+typedef enum {
+  NND_DIST_COMP_AUTO = 0,
+  NND_DIST_COMP_FP32 = 1,
+  NND_DIST_COMP_FP16 = 2
+} cuvsNNDescentDistCompDtype;
+
+/**
  * @defgroup nn_descent_c_index_params The nn-descent algorithm parameters.
  * @{
  */
@@ -34,6 +46,8 @@ extern "C" {
  * `max_iterations`: The number of iterations that nn-descent will refine
  * the graph for. More iterations produce a better quality graph at cost of performance
  * `termination_threshold`: The delta at which nn-descent will terminate its iterations
+ * `return_distances`: Boolean to decide whether to return distances array
+ * `dist_comp_dtype`: dtype to use for distance computation. Defaults to `NND_DIST_COMP_AUTO` which automatically determines the best dtype for distance computation based on the dataset dimensions. Use `NND_DIST_COMP_FP32` for better precision at the cost of performance and memory usage. This option is only valid when data type is fp32. Use `NND_DIST_COMP_FP16` for better performance and memory usage at the cost of precision.
  */
 struct cuvsNNDescentIndexParams {
   cuvsDistanceType metric;
@@ -43,6 +57,7 @@ struct cuvsNNDescentIndexParams {
   size_t max_iterations;
   float termination_threshold;
   bool return_distances;
+  cuvsNNDescentDistCompDtype dist_comp_dtype;
 };
 
 typedef struct cuvsNNDescentIndexParams* cuvsNNDescentIndexParams_t;
