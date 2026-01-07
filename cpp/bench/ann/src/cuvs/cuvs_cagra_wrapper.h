@@ -22,8 +22,6 @@
 #include <raft/core/logger.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/linalg/unary_op.cuh>
-// #include <raft/neighbors/dataset.hpp>
-// #include <raft/neighbors/detail/cagra/cagra_build.cuh>
 #include <raft/util/cudart_utils.hpp>
 
 #include <rmm/device_uvector.hpp>
