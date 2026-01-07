@@ -10,7 +10,7 @@
 #include "../ivf_common.cuh"                  // cuvs::neighbors::detail::ivf
 #include "ivf_flat_interleaved_scan_ext.cuh"  // interleaved_scan
 #include <cuvs/neighbors/common.hpp>          // none_sample_filter
-#include <cuvs/neighbors/ivf_flat.hpp>        // raft::neighbors::ivf_flat::index
+#include <cuvs/neighbors/ivf_flat.hpp>        // cuvs::neighbors::ivf_flat::index
 
 #include "../detail/ann_utils.cuh"      // utils::mapping
 #include <cuvs/distance/distance.hpp>   // is_min_close, DistanceType
@@ -296,7 +296,7 @@ void search_impl(raft::resources const& handle,
                                      stream);
 }
 
-/** See raft::neighbors::ivf_flat::search docs */
+/** See cuvs::neighbors::ivf_flat::search docs */
 template <typename T,
           typename IdxT,
           typename IvfSampleFilterT = cuvs::neighbors::filtering::none_sample_filter>
