@@ -35,6 +35,12 @@ class Dataset:
         Ground truth distances, shape (n_queries, k_gt)
     distance_metric : str
         Distance metric ("euclidean", "inner_product", "cosine")
+    base_file : Optional[str]
+        Path to base vectors file (for C++ backend compatibility)
+    query_file : Optional[str]
+        Path to query vectors file (for C++ backend compatibility)
+    groundtruth_neighbors_file : Optional[str]
+        Path to ground truth neighbors file (for C++ backend compatibility)
     metadata : Dict[str, Any]
         Additional dataset metadata
     """
@@ -44,6 +50,9 @@ class Dataset:
     groundtruth_neighbors: Optional[np.ndarray] = None
     groundtruth_distances: Optional[np.ndarray] = None
     distance_metric: str = "euclidean"
+    base_file: Optional[str] = None
+    query_file: Optional[str] = None
+    groundtruth_neighbors_file: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
     
     @property
@@ -288,7 +297,7 @@ class BenchmarkBackend(ABC):
         """
         pass
     
-    def initialize(self) -> None:
+    def initialize(self) -> None: # FIXME: Should this be implemented by subclasses `abstractmethod`?
         """
         Initialize backend (called once before any build/search operations).
         
@@ -302,7 +311,7 @@ class BenchmarkBackend(ABC):
         """
         pass
     
-    def cleanup(self) -> None:
+    def cleanup(self) -> None: # FIXME: Should this be implemented by subclasses?
         """
         Clean up backend resources (called once after all benchmarks complete).
         
@@ -317,17 +326,38 @@ class BenchmarkBackend(ABC):
         pass
     
     @property
-    @abstractmethod
     def name(self) -> str:
         """
-        Unique backend name (e.g., 'cpp_gbench', 'milvus', 'qdrant').
+        User-defined name for this index configuration.
         
-        Used for logging and result organization.
+        Must be provided in the config dict. Matches 'name' field in runners.py config.
         
         Returns
         -------
         str
-            Backend name
+            User-defined index name
+            
+        Raises
+        ------
+        ValueError
+            If 'name' is not provided in config
+        """
+        if "name" not in self.config:
+            raise ValueError("'name' is required in config (user-defined index label)")
+        return self.config["name"]
+    
+    @property
+    @abstractmethod
+    def algo(self) -> str:
+        """
+        Algorithm name (e.g., 'cuvs_ivf_flat', 'cuvs_cagra', 'hnswlib').
+        
+        Used for logging, result organization, and mapping to executables.
+        
+        Returns
+        -------
+        str
+            Algorithm name
             
         Raises
         ------
@@ -337,7 +367,7 @@ class BenchmarkBackend(ABC):
         pass
     
     @property
-    def supports_gpu(self) -> bool:
+    def supports_gpu(self) -> bool: # FIXME: I think this should be implemented by subclasses.
         """
         Whether this backend uses GPU acceleration.
         
@@ -349,7 +379,7 @@ class BenchmarkBackend(ABC):
         return False
     
     @property
-    def requires_network(self) -> bool:
+    def requires_network(self) -> bool: # FIXME: This will never be true for C++ backends and should be implemented by subclasses.
         """
         Whether this backend requires network connectivity.
         
