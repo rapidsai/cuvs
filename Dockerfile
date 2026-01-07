@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # syntax=docker/dockerfile:1.5
 
 # ==============================================================================
@@ -55,7 +58,7 @@ RUN wget --quiet https://github.com/conda-forge/miniforge/releases/latest/downlo
 
 # Create conda environment and install cuVS packages with pinned dependencies
 RUN conda create -n cuvs python=${PYTHON_VER} -y && \
-    conda run -n cuvs conda install -c rapidsai -c conda-forge -c nvidia \
+    conda run -n cuvs conda install -c rapidsai -c conda-forge \
         cuvs=${RAPIDS_VER} \
         libcuvs=${RAPIDS_VER} \
         cuda-version=${CUDA_VER} \
