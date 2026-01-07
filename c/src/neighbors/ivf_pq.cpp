@@ -465,8 +465,8 @@ extern "C" cuvsError_t cuvsIvfPqBuildPrecomputed(cuvsResources_t res,
     auto& centers_rot_dl = centers_rot_tensor->dl_tensor;
     auto& rotation_matrix_dl = rotation_matrix_tensor->dl_tensor;
 
-    RAFT_EXPECTS(pq_centers_dl.dtype.code == kDLFloat && pq_centers_dl.dtype.bits == 32,
-                 "pq_centers must be float32");
+    RAFT_EXPECTS(pq_centers_dl.dtype.code == kDLUint && pq_centers_dl.dtype.bits == 8,
+                 "pq_centers must be uint8");
     RAFT_EXPECTS(centers_dl.dtype.code == kDLFloat && centers_dl.dtype.bits == 32,
                  "centers must be float32");
     RAFT_EXPECTS(centers_rot_dl.dtype.code == kDLFloat && centers_rot_dl.dtype.bits == 32,
