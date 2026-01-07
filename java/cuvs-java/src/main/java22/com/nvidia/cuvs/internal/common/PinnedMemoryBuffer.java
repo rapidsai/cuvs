@@ -10,35 +10,18 @@ import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
-import java.lang.foreign.ValueLayout;
 
 public class PinnedMemoryBuffer implements AutoCloseable {
 
-  private static final int CHUNK_BYTES =
+  public static final int CHUNK_BYTES =
       8 * 1024 * 1024; // Based on benchmarks, 8MB seems the minimum size to optimize PCIe bandwidth
-  private final long hostBufferBytes;
 
   private MemorySegment hostBuffer = MemorySegment.NULL;
 
-  public PinnedMemoryBuffer(long rows, long columns, ValueLayout valueLayout) {
-
-    long rowBytes = columns * valueLayout.byteSize();
-    long matrixBytes = rows * rowBytes;
-    if (matrixBytes < CHUNK_BYTES) {
-      this.hostBufferBytes = matrixBytes;
-    } else if (rowBytes > CHUNK_BYTES) {
-      // We need to buffer at least one row at time
-      this.hostBufferBytes = rowBytes;
-    } else {
-      var rowCount = (CHUNK_BYTES / rowBytes);
-      this.hostBufferBytes = rowBytes * rowCount;
-    }
-  }
-
-  private static MemorySegment createPinnedBuffer(long bufferBytes) {
+  private static MemorySegment createPinnedBuffer() {
     try (var localArena = Arena.ofConfined()) {
       MemorySegment pointer = localArena.allocate(C_POINTER);
-      checkCudaError(cudaMallocHost(pointer, bufferBytes), "cudaMallocHost");
+      checkCudaError(cudaMallocHost(pointer, PinnedMemoryBuffer.CHUNK_BYTES), "cudaMallocHost");
       return pointer.get(C_POINTER, 0);
     }
   }
@@ -49,13 +32,9 @@ public class PinnedMemoryBuffer implements AutoCloseable {
 
   public MemorySegment address() {
     if (hostBuffer == MemorySegment.NULL) {
-      hostBuffer = createPinnedBuffer(hostBufferBytes);
+      hostBuffer = createPinnedBuffer();
     }
     return hostBuffer;
-  }
-
-  public long size() {
-    return hostBufferBytes;
   }
 
   @Override
