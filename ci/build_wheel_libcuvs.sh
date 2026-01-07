@@ -9,6 +9,11 @@ source rapids-init-pip
 package_name="libcuvs"
 package_dir="python/libcuvs"
 
+# Only use stable ABI package for Python >= 3.11
+if [[ "${RAPIDS_PY_VERSION}" != "3.10" ]]; then
+  source ./ci/use_upstream_sabi_wheels.sh
+fi
+
 rapids-logger "Generating build requirements"
 matrix_selectors="cuda=${RAPIDS_CUDA_VERSION%.*};arch=$(arch);py=${RAPIDS_PY_VERSION};cuda_suffixed=true"
 
