@@ -1,17 +1,6 @@
 #
-# Copyright (c) 2025, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
 
@@ -72,6 +61,14 @@ cdef class IndexParams:
         More iterations produce a better quality graph at cost of performance
     termination_threshold : float
         The delta at which nn-descent will terminate its iterations
+    return_distances : bool
+        Whether to return distances array
+    dist_comp_dtype : str, default = "auto"
+        Dtype to use for distance computation.
+        Supported dtypes are `auto`, `fp32`, and `fp16`
+        `auto` automatically determines the best dtype for distance computation based on the dataset dimensions.
+        `fp32` uses fp32 distance computation for better precision at the cost of performance and memory usage. This option is only valid when data type is fp32.
+        `fp16` uses fp16 distance computation for better performance and memory usage at the cost of precision.
     """
 
     cdef cuvsNNDescentIndexParams* params
@@ -90,8 +87,8 @@ cdef class IndexParams:
                  intermediate_graph_degree=None,
                  max_iterations=None,
                  termination_threshold=None,
-                 n_clusters=None,
-                 return_distances=None
+                 return_distances=None,
+                 dist_comp_dtype="auto"
                  ):
         if metric is not None:
             self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
@@ -103,10 +100,17 @@ cdef class IndexParams:
             self.params.max_iterations = max_iterations
         if termination_threshold is not None:
             self.params.termination_threshold = termination_threshold
-        if n_clusters is not None:
-            self.params.n_clusters = n_clusters
         if return_distances is not None:
             self.params.return_distances = return_distances
+
+        if dist_comp_dtype is "auto":
+            self.params.dist_comp_dtype = cuvsNNDescentDistCompDtype.NND_DIST_COMP_AUTO
+        elif dist_comp_dtype is "fp32":
+            self.params.dist_comp_dtype = cuvsNNDescentDistCompDtype.NND_DIST_COMP_FP32
+        elif dist_comp_dtype is "fp16":
+            self.params.dist_comp_dtype = cuvsNNDescentDistCompDtype.NND_DIST_COMP_FP16
+        else:
+            raise ValueError(f"Invalid dist_comp_dtype: {dist_comp_dtype}. Supported options are 'auto', 'fp32', and 'fp16'.")
 
     @property
     def metric(self):
@@ -132,9 +136,9 @@ cdef class IndexParams:
     def termination_threshold(self):
         return self.params.termination_threshold
 
-    @property
-    def n_clusters(self):
-        return self.params.n_clusters
+    def get_handle(self):
+        """Get a pointer to the underlying C object."""
+        return <size_t>self.params
 
 cdef class Index:
     """
@@ -235,7 +239,7 @@ def build(IndexParams index_params, dataset, graph=None, resources=None):
     >>> graph = index.graph
     """
     dataset_ai = wrap_array(dataset)
-    _check_input_array(dataset_ai, [np.dtype('float32'), np.dtype('byte'),
+    _check_input_array(dataset_ai, [np.dtype('float32'), np.dtype('float16'), np.dtype('byte'),
                                     np.dtype('ubyte')])
 
     cdef Index idx = Index()

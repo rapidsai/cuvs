@@ -1,31 +1,11 @@
-# Copyright (c) 2023-2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 
-header = """/*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+import datetime
+
+header = f"""/*
+ * SPDX-FileCopyrightText: Copyright (c) 2023-{datetime.datetime.today().year}, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 /*
@@ -42,7 +22,7 @@ header = """/*
 
 #define COMMA ,
 
-namespace cuvs::neighbors::cagra::detail::single_cta_search {
+namespace cuvs::neighbors::cagra::detail::single_cta_search {{
 """
 
 trailer = """
@@ -71,10 +51,10 @@ for type_path, (data_t, idx_t, distance_t) in search_types.items():
     with open(path, "w") as f:
         f.write(header)
         f.write(
-                f"instantiate_kernel_selection(\n  {data_t}, {idx_t}, {distance_t}, cuvs::neighbors::filtering::none_sample_filter);\n"
+            f"instantiate_kernel_selection(\n  {data_t}, {idx_t}, {distance_t}, cuvs::neighbors::filtering::none_sample_filter);\n"
         )
         f.write(
-                f"instantiate_kernel_selection(\n  {data_t}, {idx_t}, {distance_t}, CagraSampleFilterWithQueryIdOffset<cuvs::neighbors::filtering::bitset_filter<uint32_t COMMA int64_t>>);\n"
+            f"instantiate_kernel_selection(\n  {data_t}, {idx_t}, {distance_t}, CagraSampleFilterWithQueryIdOffset<cuvs::neighbors::filtering::bitset_filter<uint32_t COMMA int64_t>>);\n"
         )
 
         f.write(trailer)

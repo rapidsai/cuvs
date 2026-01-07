@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
@@ -26,7 +15,7 @@
 #include <raft/linalg/add.cuh>
 #include <raft/matrix/gather.cuh>
 #include <rmm/cuda_stream_pool.hpp>
-#include <rmm/mr/device/managed_memory_resource.hpp>
+#include <rmm/mr/managed_memory_resource.hpp>
 #include <thrust/sequence.h>
 
 namespace cuvs::neighbors::ivf_pq {
@@ -275,6 +264,54 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     cuvs::neighbors::ivf_pq::index<IdxT> index(handle_);
     cuvs::neighbors::ivf_pq::deserialize(handle_, index_file.filename, &index);
     return index;
+  }
+
+  void build_precomputed()
+  {
+    auto ipams              = ps.index_params;
+    ipams.add_data_on_build = false;
+    auto database_view =
+      raft::make_device_matrix_view<const DataT, int64_t>(database.data(), ps.num_db_vecs, ps.dim);
+    const auto& base_index = cuvs::neighbors::ivf_pq::build(handle_, ipams, database_view);
+
+    auto view_index = cuvs::neighbors::ivf_pq::build(handle_,
+                                                     ipams,
+                                                     base_index.dim(),
+                                                     base_index.pq_centers(),
+                                                     base_index.centers(),
+                                                     base_index.centers_rot(),
+                                                     base_index.rotation_matrix());
+
+    ASSERT_EQ(base_index.pq_centers().data_handle(), view_index.pq_centers().data_handle());
+    ASSERT_EQ(base_index.centers().data_handle(), view_index.centers().data_handle());
+    ASSERT_EQ(base_index.centers_rot().data_handle(), view_index.centers_rot().data_handle());
+    ASSERT_EQ(base_index.rotation_matrix().data_handle(),
+              view_index.rotation_matrix().data_handle());
+
+    ASSERT_EQ(base_index.pq_centers().extents(), view_index.pq_centers().extents());
+    ASSERT_EQ(base_index.centers().extents(), view_index.centers().extents());
+    ASSERT_EQ(base_index.centers_rot().extents(), view_index.centers_rot().extents());
+    ASSERT_EQ(base_index.rotation_matrix().extents(), view_index.rotation_matrix().extents());
+
+    auto db_indices = raft::make_device_vector<IdxT>(handle_, ps.num_db_vecs);
+    raft::linalg::map_offset(handle_, db_indices.view(), raft::identity_op{});
+
+    auto vecs_view =
+      raft::make_device_matrix_view<const DataT, int64_t>(database.data(), ps.num_db_vecs, ps.dim);
+    auto inds_view =
+      raft::make_device_vector_view<const IdxT, int64_t>(db_indices.data_handle(), ps.num_db_vecs);
+
+    cuvs::neighbors::ivf_pq::extend(handle_, vecs_view, inds_view, &view_index);
+    cuvs::neighbors::ivf_pq::extend(handle_,
+                                    vecs_view,
+                                    inds_view,
+                                    const_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(&base_index));
+
+    // Verify that both indices have identical list sizes after extension
+    ASSERT_TRUE(cuvs::devArrMatch(base_index.list_sizes().data_handle(),
+                                  view_index.list_sizes().data_handle(),
+                                  base_index.n_lists(),
+                                  cuvs::Compare<uint32_t>{}));
   }
 
   void check_reconstruction(const index<IdxT>& index,
@@ -792,75 +829,83 @@ inline auto big_dims_small_lut() -> test_cases_t
 }
 
 /**
+ * Helper function to add test cases with modifications.
+ * Note: Marked noinline to work around GCC 14 false positive stringop-overflow warnings
+ * when compiling with C++20.
+ */
+template <typename F>
+__attribute__((noinline)) void add_test_case(test_cases_t& xs, F&& modifier)
+{
+  ivf_pq_inputs temp{};
+  modifier(temp);
+  xs.push_back(std::move(temp));
+}
+
+/**
  * A minimal set of tests to check various enum-like parameters.
  */
 inline auto enum_variety() -> test_cases_t
 {
   test_cases_t xs;
-#define ADD_CASE(f)                               \
-  do {                                            \
-    xs.push_back({});                             \
-    ([](ivf_pq_inputs & x) f)(xs[xs.size() - 1]); \
-  } while (0);
 
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.index_params.codebook_kind = ivf_pq::codebook_gen::PER_CLUSTER;
     x.min_recall                 = 0.86;
   });
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.index_params.codebook_kind = ivf_pq::codebook_gen::PER_SUBSPACE;
     x.min_recall                 = 0.86;
   });
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.index_params.codebook_kind = ivf_pq::codebook_gen::PER_CLUSTER;
     x.index_params.pq_bits       = 4;
     x.min_recall                 = 0.79;
   });
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.index_params.codebook_kind = ivf_pq::codebook_gen::PER_CLUSTER;
     x.index_params.pq_bits       = 5;
     x.min_recall                 = 0.83;
   });
 
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.index_params.pq_bits = 6;
     x.min_recall           = 0.84;
   });
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.index_params.pq_bits = 7;
     x.min_recall           = 0.85;
   });
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.index_params.pq_bits = 8;
     x.min_recall           = 0.86;
   });
 
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.index_params.force_random_rotation = true;
     x.min_recall                         = 0.86;
   });
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.index_params.force_random_rotation = false;
     x.min_recall                         = 0.86;
   });
 
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.search_params.lut_dtype = CUDA_R_32F;
     x.min_recall              = 0.86;
   });
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.search_params.lut_dtype = CUDA_R_16F;
     x.min_recall              = 0.86;
   });
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.search_params.lut_dtype = CUDA_R_8U;
     x.min_recall              = 0.84;
   });
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.search_params.coarse_search_dtype = CUDA_R_16F;
     x.min_recall                        = 0.86;
   });
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.search_params.coarse_search_dtype = CUDA_R_8I;
     // 8-bit coarse search is experimental and there's no go guarantee of any recall
     // if the data is not normalized. Especially for L2, because we store vector norms alongside the
@@ -868,16 +913,16 @@ inline auto enum_variety() -> test_cases_t
     x.min_recall = 0.1;
   });
 
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.search_params.internal_distance_dtype = CUDA_R_32F;
     x.min_recall                            = 0.86;
   });
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.search_params.internal_distance_dtype = CUDA_R_16F;
     x.search_params.lut_dtype               = CUDA_R_16F;
     x.min_recall                            = 0.86;
   });
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.search_params.internal_distance_dtype = CUDA_R_16F;
     x.search_params.lut_dtype               = CUDA_R_16F;
     x.search_params.coarse_search_dtype     = CUDA_R_16F;
@@ -1000,13 +1045,7 @@ inline auto special_cases() -> test_cases_t
 {
   test_cases_t xs;
 
-#define ADD_CASE(f)                               \
-  do {                                            \
-    xs.push_back({});                             \
-    ([](ivf_pq_inputs & x) f)(xs[xs.size() - 1]); \
-  } while (0);
-
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.num_db_vecs                = 1183514;
     x.dim                        = 100;
     x.num_queries                = 10000;
@@ -1019,7 +1058,7 @@ inline auto special_cases() -> test_cases_t
   });
 
   // Test large max_internal_batch_size
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.num_db_vecs                           = 500000;
     x.dim                                   = 100;
     x.num_queries                           = 128 * 1024 * 1024;
@@ -1033,7 +1072,7 @@ inline auto special_cases() -> test_cases_t
   });
 
   // Test small max_internal_batch_size
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.num_db_vecs                           = 500000;
     x.dim                                   = 100;
     x.num_queries                           = 128 * 1024 * 1024;
@@ -1046,7 +1085,7 @@ inline auto special_cases() -> test_cases_t
     x.search_params.max_internal_batch_size = 1024 * 1024;
   });
 
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.num_db_vecs                = 10000;
     x.dim                        = 16;
     x.num_queries                = 500;
@@ -1058,7 +1097,7 @@ inline auto special_cases() -> test_cases_t
     x.search_params.n_probes     = 100;
   });
 
-  ADD_CASE({
+  add_test_case(xs, [](ivf_pq_inputs& x) {
     x.num_db_vecs                = 10000;
     x.dim                        = 16;
     x.num_queries                = 500;
@@ -1104,6 +1143,9 @@ inline auto special_cases() -> test_cases_t
   {                                                          \
     this->run([this]() { return this->build_serialize(); }); \
   }
+
+#define TEST_BUILD_PRECOMPUTED(type) \
+  TEST_P(type, build_precomputed) /* NOLINT */ { this->build_precomputed(); }
 
 #define INSTANTIATE(type, vals) \
   INSTANTIATE_TEST_SUITE_P(IvfPq, type, ::testing::ValuesIn(vals)); /* NOLINT */

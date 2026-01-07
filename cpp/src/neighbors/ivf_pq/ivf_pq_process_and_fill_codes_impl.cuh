@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -72,12 +61,13 @@ __launch_bounds__(BlockSize) static __global__ void process_and_fill_codes_kerne
 }
 
 template <typename IdxT>
-void launch_process_and_fill_codes_kernel(raft::resources const& handle,
-                                          index<IdxT>& index,
-                                          raft::device_matrix_view<float> new_vectors_residual,
-                                          std::variant<IdxT, const IdxT*> src_offset_or_indices,
-                                          const uint32_t* new_labels,
-                                          IdxT n_rows)
+void launch_process_and_fill_codes_kernel(
+  raft::resources const& handle,
+  index<IdxT>& index,
+  raft::device_matrix_view<float, IdxT> new_vectors_residual,
+  std::variant<IdxT, const IdxT*> src_offset_or_indices,
+  const uint32_t* new_labels,
+  IdxT n_rows)
 {
   constexpr uint32_t kBlockSize  = 256;
   const uint32_t threads_per_vec = std::min<uint32_t>(raft::WarpSize, index.pq_book_size());

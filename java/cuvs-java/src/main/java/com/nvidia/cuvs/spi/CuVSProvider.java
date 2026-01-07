@@ -1,27 +1,10 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.spi;
 
-import com.nvidia.cuvs.BruteForceIndex;
-import com.nvidia.cuvs.CagraIndex;
-import com.nvidia.cuvs.CagraMergeParams;
-import com.nvidia.cuvs.CuVSMatrix;
-import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.HnswIndex;
-import com.nvidia.cuvs.TieredIndex;
+import com.nvidia.cuvs.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
 import java.nio.file.Path;
@@ -52,25 +35,62 @@ public interface CuVSProvider {
   /** Creates a new CuVSResources. */
   CuVSResources newCuVSResources(Path tempDirectory) throws Throwable;
 
-  /** Create a {@link CuVSMatrix.Builder} instance **/
-  CuVSMatrix.Builder newMatrixBuilder(int size, int dimensions, CuVSMatrix.DataType dataType);
+  /** Create a {@link CuVSMatrix.Builder} instance for a host memory matrix **/
+  CuVSMatrix.Builder<CuVSHostMatrix> newHostMatrixBuilder(
+      long size, long dimensions, CuVSMatrix.DataType dataType);
+
+  /** Create a {@link CuVSMatrix.Builder} instance for a host memory matrix **/
+  CuVSMatrix.Builder<CuVSHostMatrix> newHostMatrixBuilder(
+      long size, long columns, int rowStride, int columnStride, CuVSMatrix.DataType dataType);
+
+  /** Create a {@link CuVSMatrix.Builder} instance for a device memory matrix **/
+  CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
+      CuVSResources cuVSResources, long size, long dimensions, CuVSMatrix.DataType dataType);
+
+  /** Create a {@link CuVSMatrix.Builder} instance for a device memory matrix **/
+  CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
+      CuVSResources cuVSResources,
+      long size,
+      long dimensions,
+      int rowStride,
+      int columnStride,
+      CuVSMatrix.DataType dataType);
 
   /**
-   * Returns the factory method used to build a Dataset from native memory.
+   * Returns the factory method used to build a CuVSMatrix from native memory.
    * The factory method will have this signature:
-   * {@code Dataset createNativeDataset(memorySegment, size, dimensions, dataType)},
+   * {@code CuVSMatrix createNativeMatrix(memorySegment, size, dimensions, dataType)},
    * where {@code memorySegment} is a {@code java.lang.foreign.MemorySegment} containing {@code int size} vectors of
    * {@code int dimensions} length of type {@link CuVSMatrix.DataType}.
    * <p>
    * In order to expose this factory in a way that is compatible with Java 21, the factory method is returned as a
    * {@link MethodHandle} with {@link MethodType} equal to
-   * {@code (Dataset.class, MemorySegment.class, int.class, int.class, Dataset.DataType.class)}.
+   * {@code (CuVSMatrix.class, MemorySegment.class, int.class, int.class, CuVSMatrix.DataType.class)}.
    * The caller will need to invoke the factory via the {@link MethodHandle#invokeExact} method:
-   * {@code Dataset dataset = (Dataset)newNativeDatasetBuilder().invokeExact(memorySegment, size, dimensions, dataType)}
+   * {@code var matrix = (CuVSMatrix)newNativeMatrixBuilder().invokeExact(memorySegment, size, dimensions, dataType)}
    * </p>
-   * @return a MethodHandle which can be invoked to build a Dataset from an external {@code MemorySegment}
+   * @return a MethodHandle which can be invoked to build a CuVSMatrix from an external {@code MemorySegment}
    */
   MethodHandle newNativeMatrixBuilder();
+
+  /**
+   * Returns the factory method used to build a CuVSMatrix from native memory, with strides.
+   * The factory method will have this signature:
+   * {@code CuVSMatrix createNativeMatrix(memorySegment, size, dimensions, rowStride, columnStride, dataType)},
+   * where {@code memorySegment} is a {@code java.lang.foreign.MemorySegment} containing {@code int size} vectors of
+   * {@code int dimensions} length of type {@link CuVSMatrix.DataType}. Rows have a stride of {@code rowStride},
+   * where 0 indicates "no stride" (a stride equal to the number of columns), and columns have a stride of
+   * {@code columnStride}
+   * <p>
+   * In order to expose this factory in a way that is compatible with Java 21, the factory method is returned as a
+   * {@link MethodHandle} with {@link MethodType} equal to
+   * {@code (CuVSMatrix.class, MemorySegment.class, int.class, int.class, int.class, int.class, DataType.class)}.
+   * The caller will need to invoke the factory via the {@link MethodHandle#invokeExact} method:
+   * {@code var matrix = (CuVSMatrix)newNativeMatrixBuilder().invokeExact(memorySegment, size, dimensions, rowStride, columnStride, dataType)}
+   * </p>
+   * @return a MethodHandle which can be invoked to build a CuVSMatrix from an external {@code MemorySegment}
+   */
+  MethodHandle newNativeMatrixBuilderWithStrides();
 
   /** Create a {@link CuVSMatrix} from an on-heap array **/
   CuVSMatrix newMatrixFromArray(float[][] vectors);
@@ -92,6 +112,16 @@ public interface CuVSProvider {
   /** Creates a new HnswIndex Builder. */
   HnswIndex.Builder newHnswIndexBuilder(CuVSResources cuVSResources)
       throws UnsupportedOperationException;
+
+  /**
+   * Creates an HNSW index from an existing CAGRA index.
+   *
+   * @param hnswParams Parameters for the HNSW index
+   * @param cagraIndex The CAGRA index to convert from
+   * @return A new HNSW index
+   * @throws Throwable if an error occurs during conversion
+   */
+  HnswIndex hnswIndexFromCagra(HnswIndexParams hnswParams, CagraIndex cagraIndex) throws Throwable;
 
   /** Creates a new TieredIndex Builder. */
   TieredIndex.Builder newTieredIndexBuilder(CuVSResources cuVSResources)
@@ -120,8 +150,62 @@ public interface CuVSProvider {
     return mergeCagraIndexes(indexes);
   }
 
+  /** Returns a {@link GPUInfoProvider} to query the system for GPU related information */
+  GPUInfoProvider gpuInfoProvider();
+
+  void setLogLevel(java.util.logging.Level level);
+
+  java.util.logging.Level getLogLevel();
+
+  /**
+   * Switch RMM allocations (used internally by various cuVS algorithms and by the default implementation of
+   * {@link CuVSDeviceMatrix}) to use pooled memory.
+   * This operation has a global effect, and will affect all resources on the current device.
+   *
+   * @param initialPoolSizePercent The initial pool size, in percentage of the total GPU memory
+   * @param maxPoolSizePercent The maximum pool size, in percentage of the total GPU memory
+   */
+  void enableRMMPooledMemory(int initialPoolSizePercent, int maxPoolSizePercent);
+
+  /**
+   * Switch RMM allocations (used internally by various cuVS algorithms and by the default implementation of
+   * {@link CuVSDeviceMatrix}) to use pooled memory.
+   * This operation has a global effect, and will affect all resources on the current device.
+   *
+   * @param initialPoolSizePercent The initial pool size, in percentage of the total GPU memory
+   * @param maxPoolSizePercent The maximum pool size, in percentage of the total GPU memory
+   */
+  void enableRMMManagedPooledMemory(int initialPoolSizePercent, int maxPoolSizePercent);
+
+  /** Disables pooled memory on the current device, reverting back to the default setting.  */
+  void resetRMMPooledMemory();
+
   /** Retrieves the system-wide provider. */
   static CuVSProvider provider() {
     return CuVSServiceProvider.Holder.INSTANCE;
   }
+
+  /**
+   * Create a CAGRA index parameters compatible with HNSW index
+   *
+   * Note: The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce
+   * exactly the same recalls and QPS for the same parameter `ef`. The graphs are different
+   * internally. Depending on the selected heuristics, the CAGRA-produced graph's QPS-Recall curve
+   * may be shifted along the curve right or left. See the heuristics descriptions for more details.
+   *
+   * @param rows The number of rows in the input dataset
+   * @param dim The number of dimensions in the input dataset
+   * @param m HNSW index parameter M
+   * @param efConstruction HNSW index parameter ef_construction
+   * @param heuristic The heuristic to use for selecting the graph build parameters
+   * @param metric The distance metric to search
+   * @return A new CAGRA index parameters object
+   */
+  CagraIndexParams cagraIndexParamsFromHnswParams(
+      long rows,
+      long dim,
+      int m,
+      int efConstruction,
+      CagraIndexParams.HnswHeuristicType heuristic,
+      CagraIndexParams.CuvsDistanceType metric);
 }

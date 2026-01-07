@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
@@ -30,10 +19,10 @@
 
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/device_uvector.hpp>
-#include <rmm/mr/device/device_memory_resource.hpp>
-#include <rmm/mr/device/failure_callback_resource_adaptor.hpp>
-#include <rmm/mr/device/managed_memory_resource.hpp>
-#include <rmm/mr/device/pool_memory_resource.hpp>
+#include <rmm/mr/device_memory_resource.hpp>
+#include <rmm/mr/failure_callback_resource_adaptor.hpp>
+#include <rmm/mr/managed_memory_resource.hpp>
+#include <rmm/mr/pool_memory_resource.hpp>
 
 #include <memory>
 #include <type_traits>
@@ -192,9 +181,9 @@ inline auto configured_raft_resources::operator=(configured_raft_resources&&)
 /** A helper to refine the neighbors when the data is on device or on host. */
 template <typename DatasetT, typename QueriesT, typename CandidatesT>
 void refine_helper(const raft::resources& res,
-                   DatasetT dataset,
-                   QueriesT queries,
-                   CandidatesT candidates,
+                   const DatasetT& dataset,
+                   const QueriesT& queries,
+                   const CandidatesT& candidates,
                    int k,
                    algo_base::index_type* neighbors,
                    float* distances,

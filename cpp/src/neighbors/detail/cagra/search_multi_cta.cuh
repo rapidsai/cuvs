@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
@@ -55,11 +44,14 @@ template <typename DataT,
           typename IndexT,
           typename DistanceT,
           typename SAMPLE_FILTER_T,
-          typename OutputIndexT = IndexT>
-struct search : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, OutputIndexT> {
-  using base_type  = search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, OutputIndexT>;
+          typename SourceIndexT = IndexT,
+          typename OutputIndexT = SourceIndexT>
+struct search
+  : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, SourceIndexT, OutputIndexT> {
+  using base_type =
+    search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, SourceIndexT, OutputIndexT>;
   using DATA_T     = typename base_type::DATA_T;
-  using INDEX_T    = typename base_type ::INDEX_T;
+  using INDEX_T    = typename base_type::INDEX_T;
   using DISTANCE_T = typename base_type::DISTANCE_T;
 
   using base_type::algo;
@@ -210,20 +202,24 @@ struct search : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_
 
   ~search() {}
 
-  void operator()(raft::resources const& res,
-                  raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,
-                  OutputIndexT* const topk_indices_ptr,  // [num_queries, topk]
-                  DISTANCE_T* const topk_distances_ptr,  // [num_queries, topk]
-                  const DATA_T* const queries_ptr,       // [num_queries, dataset_dim]
-                  const uint32_t num_queries,
-                  const INDEX_T* dev_seed_ptr,              // [num_queries, num_seeds]
-                  uint32_t* const num_executed_iterations,  // [num_queries,]
-                  uint32_t topk,
-                  SAMPLE_FILTER_T sample_filter)
+  void operator()(
+    raft::resources const& res,
+    raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,
+    std::optional<raft::device_vector_view<const SourceIndexT, int64_t>> source_indices,
+    OutputIndexT* const topk_indices_ptr,  // [num_queries, topk]
+    DISTANCE_T* const topk_distances_ptr,  // [num_queries, topk]
+    const DATA_T* const queries_ptr,       // [num_queries, dataset_dim]
+    const uint32_t num_queries,
+    const INDEX_T* dev_seed_ptr,              // [num_queries, num_seeds]
+    uint32_t* const num_executed_iterations,  // [num_queries,]
+    uint32_t topk,
+    SAMPLE_FILTER_T sample_filter)
   {
-    cudaStream_t stream = raft::resource::get_cuda_stream(res);
+    auto source_indices_ptr = source_indices.has_value() ? source_indices->data_handle() : nullptr;
+    cudaStream_t stream     = raft::resource::get_cuda_stream(res);
     select_and_run(dataset_desc,
                    graph,
+                   source_indices_ptr,
                    intermediate_indices.data(),
                    intermediate_distances.data(),
                    queries_ptr,
@@ -264,7 +260,16 @@ struct search : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_
                      true,
                      NULL,
                      stream);
-    if constexpr (kNeedIndexCopy) {
+    if (source_indices_ptr != nullptr) {
+      raft::linalg::map(
+        res,
+        raft::make_device_matrix_view<OutputIndexT, int64_t>(topk_indices_ptr, num_queries, topk),
+        [source_indices_ptr] __device__(IndexT x) {
+          return static_cast<OutputIndexT>(source_indices_ptr[x]);
+        },
+        raft::make_device_matrix_view<const IndexT, int64_t>(
+          output_indices_ptr, num_queries, topk));
+    } else if constexpr (kNeedIndexCopy) {
       raft::linalg::map(
         res,
         raft::make_device_matrix_view<OutputIndexT, int64_t>(topk_indices_ptr, num_queries, topk),

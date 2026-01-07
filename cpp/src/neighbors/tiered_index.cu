@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "detail/tiered_index.cuh"
@@ -173,6 +162,33 @@ void search(raft::resources const& res,
 {
   index.state->search(
     res, search_params, ivf_pq::typed_search, queries, neighbors, distances, sample_filter);
+}
+
+auto merge(raft::resources const& res,
+           const index_params<cagra::index_params>& index_params,
+           const std::vector<tiered_index::index<cagra::index<float, uint32_t>>*>& indices)
+  -> tiered_index::index<cagra::index<float, uint32_t>>
+{
+  auto state = detail::merge(res, index_params, indices);
+  return cuvs::neighbors::tiered_index::index<cagra::index<float, uint32_t>>(state);
+}
+
+auto merge(raft::resources const& res,
+           const index_params<ivf_flat::index_params>& index_params,
+           const std::vector<tiered_index::index<ivf_flat::index<float, int64_t>>*>& indices)
+  -> tiered_index::index<ivf_flat::index<float, int64_t>>
+{
+  auto state = detail::merge(res, index_params, indices);
+  return cuvs::neighbors::tiered_index::index<ivf_flat::index<float, int64_t>>(state);
+}
+
+auto merge(raft::resources const& res,
+           const index_params<ivf_pq::index_params>& index_params,
+           const std::vector<tiered_index::index<ivf_pq::typed_index<float, int64_t>>*>& indices)
+  -> tiered_index::index<ivf_pq::typed_index<float, int64_t>>
+{
+  auto state = detail::merge(res, index_params, indices);
+  return cuvs::neighbors::tiered_index::index<ivf_pq::typed_index<float, int64_t>>(state);
 }
 
 template <typename UpstreamT>

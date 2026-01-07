@@ -1,31 +1,11 @@
-# Copyright (c) 2025, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 
-header = """/*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+import datetime
+
+header = f"""/*
+ * SPDX-FileCopyrightText: Copyright (c) 2024-{datetime.datetime.today().year}, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 /*
@@ -113,38 +93,38 @@ macro_pass_eps = """
 
 """
 
-euclideanSq="cuvs::neighbors::ball_cover::detail::EuclideanSqFunc"
+euclideanSq = "cuvs::neighbors::ball_cover::detail::EuclideanSqFunc"
 
 types = dict(
     int64_float=("std::int64_t", "float"),
 )
 
-path = f"registers_pass_one.cu"
+path = "registers_pass_one.cu"
 with open(path, "w") as f:
     f.write(header)
     f.write(macro_pass_one)
     for type_path, (int_t, data_t) in types.items():
-        f.write(f"instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one(\n")
+        f.write("instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one(\n")
         f.write(f"  {int_t}, {data_t});\n")
     f.write("#undef instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one\n")
 print(f"src/neighbors/ball_cover/detail/ball_cover/{path}")
 
-path = f"registers_pass_two.cu"
+path = "registers_pass_two.cu"
 with open(path, "w") as f:
     f.write(header)
     f.write(macro_pass_two)
     for type_path, (int_t, data_t) in types.items():
-        f.write(f"instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_two(\n")
+        f.write("instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_two(\n")
         f.write(f"  {int_t}, {data_t});\n")
     f.write("#undef instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_two\n")
 print(f"src/neighbors/ball_cover/detail/ball_cover/{path}")
 
-path="registers_eps_pass_euclidean.cu"
+path = "registers_eps_pass_euclidean.cu"
 with open(path, "w") as f:
     f.write(header)
     f.write(macro_pass_eps)
     for type_path, (int_t, data_t) in types.items():
-        f.write(f"instantiate_cuvs_neighbors_detail_rbc_eps_pass(\n")
+        f.write("instantiate_cuvs_neighbors_detail_rbc_eps_pass(\n")
         f.write(f"  {int_t}, {data_t}, {euclideanSq});\n")
     f.write("#undef instantiate_cuvs_neighbors_detail_rbc_eps_pass\n")
     print(f"src/neighbors/ball_cover/detail/ball_cover/{path}")

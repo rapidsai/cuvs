@@ -1,23 +1,29 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "kmeans.cuh"
+#include "kmeans_impl.cuh"
 #include <raft/core/resources.hpp>
 
 namespace cuvs::cluster::kmeans {
+
+#define INSTANTIATE_PREDICT(DataT, IndexT)                                      \
+  template void predict<DataT, IndexT>(                                         \
+    raft::resources const& handle,                                              \
+    const kmeans::params& params,                                               \
+    raft::device_matrix_view<const DataT, IndexT> X,                            \
+    std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight, \
+    raft::device_matrix_view<const DataT, IndexT> centroids,                    \
+    raft::device_vector_view<IndexT, IndexT> labels,                            \
+    bool normalize_weight,                                                      \
+    raft::host_scalar_view<DataT> inertia);
+
+INSTANTIATE_PREDICT(double, int)
+INSTANTIATE_PREDICT(double, int64_t)
+
+#undef INSTANTIATE_PREDICT
 
 void predict(raft::resources const& handle,
              const kmeans::params& params,
@@ -35,10 +41,10 @@ void predict(raft::resources const& handle,
 
 void predict(raft::resources const& handle,
              const kmeans::params& params,
-             raft::device_matrix_view<const double, int> X,
-             std::optional<raft::device_vector_view<const double, int>> sample_weight,
-             raft::device_matrix_view<const double, int> centroids,
-             raft::device_vector_view<int64_t, int> labels,
+             raft::device_matrix_view<const double, int64_t> X,
+             std::optional<raft::device_vector_view<const double, int64_t>> sample_weight,
+             raft::device_matrix_view<const double, int64_t> centroids,
+             raft::device_vector_view<int64_t, int64_t> labels,
              bool normalize_weight,
              raft::host_scalar_view<double> inertia)
 

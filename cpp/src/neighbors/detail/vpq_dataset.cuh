@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
@@ -20,8 +9,7 @@
 #include "../ivf_pq/ivf_pq_build.cuh"  // pq_bits-bitfield
 #include "ann_utils.cuh"               // utils::mapping etc
 
-// TODO(cjnolet): This should be using exposed APIs.
-#include "../../cluster/kmeans_balanced.cuh"
+#include <cuvs/cluster/kmeans.hpp>
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
@@ -145,12 +133,7 @@ auto train_vq(const raft::resources& res, const vpq_params& params, const Datase
     raft::make_device_matrix_view<MathT, ix_t>(vq_centers.data_handle(), vq_n_centers, dim);
   auto vq_trainset_view = raft::make_device_matrix_view<const kmeans_in_type, ix_t>(
     vq_trainset.data_handle(), n_rows_train, dim);
-  cuvs::cluster::kmeans_balanced::fit<kmeans_in_type, MathT, ix_t>(
-    res,
-    kmeans_params,
-    vq_trainset_view,
-    vq_centers_view,
-    cuvs::spatial::knn::detail::utils::mapping<MathT>{});
+  cuvs::cluster::kmeans::fit(res, kmeans_params, vq_trainset_view, vq_centers_view);
 
   return vq_centers;
 }
@@ -175,14 +158,8 @@ auto predict_vq(const raft::resources& res, const DatasetT& dataset, const VqCen
   auto vq_dataset_view = raft::make_device_matrix_view<const kmeans_data_type, index_type>(
     dataset.data_handle(), dataset.extent(0), dataset.extent(1));
 
-  cuvs::cluster::kmeans_balanced::
-    predict<kmeans_data_type, kmeans_math_type, index_type, label_type>(
-      res,
-      kmeans_params,
-      vq_dataset_view,
-      vq_centers_view,
-      vq_labels.view(),
-      cuvs::spatial::knn::detail::utils::mapping<kmeans_math_type>{});
+  cuvs::cluster::kmeans::predict(
+    res, kmeans_params, vq_dataset_view, vq_centers_view, vq_labels.view());
 
   return vq_labels;
 }
@@ -235,8 +212,7 @@ auto train_pq(const raft::resources& res,
     auto pq_trainset_view = raft::make_device_matrix_view<const MathT, ix_t>(
       pq_trainset.data_handle(), n_rows_train * pq_dim, pq_len);
 
-    cuvs::cluster::kmeans_balanced::fit<MathT, MathT, ix_t>(
-      res, kmeans_params, pq_trainset_view, pq_centers_view);
+    cuvs::cluster::kmeans::fit(res, kmeans_params, pq_trainset_view, pq_centers_view);
   }
 
   return pq_centers;

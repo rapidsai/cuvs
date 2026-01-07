@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -23,8 +12,6 @@
 #include "vamana_structs.cuh"
 #include <cuvs/neighbors/vamana.hpp>
 
-#include <raft/cluster/kmeans.cuh>
-#include <raft/cluster/kmeans_types.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/error.hpp>
@@ -105,9 +92,9 @@ __global__ void print_queryIds(void* query_list_ptr)
  *******************************************************************************************/
 template <typename T,
           typename accT,
-          typename IdxT     = uint32_t,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename IdxT = uint32_t,
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 void batched_insert_vamana(
   raft::resources const& res,
   const index_params& params,
@@ -570,6 +557,7 @@ auto quantize_all_vectors(raft::resources const& res,
 {
   auto dim         = residuals.extent(1);
   auto vq_codebook = raft::make_device_matrix<float, uint32_t, raft::row_major>(res, 1, dim);
+  raft::matrix::fill<float>(res, vq_codebook.view(), 0.0);
 
   auto codes = cuvs::neighbors::detail::process_and_fill_codes_subspaces<float, int64_t>(
     res, ps, residuals, raft::make_const_mdspan(vq_codebook.view()), pq_codebook);
@@ -577,9 +565,9 @@ auto quantize_all_vectors(raft::resources const& res,
 }
 
 template <typename T,
-          typename IdxT     = uint64_t,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename IdxT = uint64_t,
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 index<T, IdxT> build(
   raft::resources const& res,
   const index_params& params,

@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -75,6 +64,8 @@ struct BuildConfig {
   float termination_threshold{0.0001};
   size_t output_graph_degree{32};
   cuvs::distance::DistanceType metric{cuvs::distance::DistanceType::L2Expanded};
+  cuvs::neighbors::nn_descent::DIST_COMP_DTYPE dist_comp_dtype{
+    cuvs::neighbors::nn_descent::DIST_COMP_DTYPE::AUTO};
 };
 
 template <typename Index_t>
@@ -237,7 +228,8 @@ class GNND {
   size_t nrow_;
   size_t ndim_;
 
-  raft::device_matrix<__half, size_t, raft::row_major> d_data_;
+  std::optional<raft::device_matrix<float, size_t, raft::row_major>> d_data_float_;
+  std::optional<raft::device_matrix<half, size_t, raft::row_major>> d_data_half_;
   raft::device_vector<DistData_t, size_t> l2_norms_;
 
   raft::device_matrix<ID_t, size_t, raft::row_major> graph_buffer_;
@@ -313,7 +305,8 @@ inline BuildConfig get_build_config(raft::resources const& res,
                            .max_iterations        = params.max_iterations,
                            .termination_threshold = params.termination_threshold,
                            .output_graph_degree   = params.graph_degree,
-                           .metric                = params.metric};
+                           .metric                = params.metric,
+                           .dist_comp_dtype       = params.dist_comp_dtype};
   return build_config;
 }
 

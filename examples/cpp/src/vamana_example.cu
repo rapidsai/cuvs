@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <cstdint>
@@ -22,8 +11,8 @@
 
 #include <cuvs/neighbors/vamana.hpp>
 
-#include <rmm/mr/device/device_memory_resource.hpp>
-#include <rmm/mr/device/pool_memory_resource.hpp>
+#include <rmm/mr/device_memory_resource.hpp>
+#include <rmm/mr/pool_memory_resource.hpp>
 
 #include "common.cuh"
 
@@ -63,12 +52,12 @@ void vamana_build_and_write(raft::device_resources const& dev_resources,
 
   std::cout << "Time to build index: " << elapsed_seconds.count() << "s\n";
 
-  // Output index to file (in-memory format)
-  serialize(dev_resources, out_fname, index);
-
-  // Output index to file (disk sector-aligned format)
   if (codebook_prefix != "") {
-    serialize(dev_resources, out_fname + ".sector_aligned", index, false, true);
+    // Output index to file (disk sector-aligned format)
+    serialize(dev_resources, out_fname, index, false, true);
+  } else {
+    // Output index to file (in-memory format)
+    serialize(dev_resources, out_fname, index);
   }
 }
 
@@ -80,8 +69,8 @@ void usage()
     "codebook prefix>\n");
 
   printf("Input file expected to be binary file of fp32 vectors.\n");
-  printf("Graph degree sizes supported: 32, 64, 128, 256\n");
   printf("Datatype of input dataset (int8 or float)\n");
+  printf("Graph degree sizes supported: 32, 64, 128, 256\n");
   printf("Visited_size must be > degree and a power of 2.\n");
   printf("max_fraction > 0 and <= 1. Typical values are 0.06 or 0.1.\n");
   printf("Default iterations = 1.0, increase for better quality graph.\n");
