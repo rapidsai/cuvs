@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
 set -euo pipefail
@@ -94,9 +94,12 @@ fi
 
 rapids-logger "Begin gathering licenses"
 cp LICENSE c/build/install/
-if [ -e "./tool/extract_licenses_via_spdx.py" ]; then
-      python ./tool/extract_licenses_via_spdx.py "." --with-licenses >> c/build/install/LICENSE
-fi
+
+python ./tool/extract_licenses_via_spdx.py "." --with-licenses > SPDX_FRAGMENT_LICENSE_FILES
+cat SPDX_FRAGMENT_LICENSE_FILES >> c/build/install/LICENSE
+
+python ./tool/find_and_copy_license_files.py "." > DEP_LICENSE_FILES
+cat DEP_LICENSE_FILES >> c/build/install/LICENSE
 
 rapids-logger "Begin c tarball creation"
 tar czf libcuvs_c.tar.gz -C c/build/install/ .
