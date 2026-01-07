@@ -471,7 +471,7 @@ def build(IndexParams index_params, dataset, resources=None):
 
 
 @auto_sync_resources
-def build_precomputed(IndexParams index_params, uint32_t dim, pq_centers, centers, 
+def build_precomputed(IndexParams index_params, uint32_t dim, pq_centers, centers,
                       centers_rot, rotation_matrix, resources=None):
     """
     Build a view-type IVF-PQ index from precomputed centroids and codebook.
@@ -526,9 +526,9 @@ def build_precomputed(IndexParams index_params, uint32_t dim, pq_centers, center
     >>> pq_book_size = 1 << pq_bits
     >>> rot_dim = pq_len * pq_dim
     >>> dim_ext = ((dim + 1 + 7) // 8) * 8  # round_up(dim + 1, 8)
-    >>> 
+    >>>
     >>> # Prepare precomputed matrices (example with random data)
-    >>> pq_centers = cp.random.random((pq_dim, pq_len, pq_book_size), 
+    >>> pq_centers = cp.random.random((pq_dim, pq_len, pq_book_size),
     ...                               dtype=cp.float32)
     >>> centers = cp.random.random((n_lists, dim_ext), dtype=cp.float32)
     >>> centers_rot = cp.random.random((n_lists, rot_dim), dtype=cp.float32)
@@ -536,7 +536,7 @@ def build_precomputed(IndexParams index_params, uint32_t dim, pq_centers, center
     >>>
     >>> # Build index from precomputed data
     >>> build_params = ivf_pq.IndexParams(n_lists=n_lists, pq_dim=pq_dim,
-    ...                                    pq_bits=pq_bits, 
+    ...                                    pq_bits=pq_bits,
     ...                                    codebook_kind="subspace")
     >>> index = ivf_pq.build_precomputed(build_params, dim, pq_centers,
     ...                                   centers, centers_rot, rotation_matrix)
@@ -544,19 +544,19 @@ def build_precomputed(IndexParams index_params, uint32_t dim, pq_centers, center
     # Wrap and validate inputs
     pq_centers_ai = wrap_array(pq_centers)
     _check_input_array(pq_centers_ai, [np.dtype('float32')])
-    
+
     centers_ai = wrap_array(centers)
     _check_input_array(centers_ai, [np.dtype('float32')])
-    
+
     centers_rot_ai = wrap_array(centers_rot)
     _check_input_array(centers_rot_ai, [np.dtype('float32')])
-    
+
     rotation_matrix_ai = wrap_array(rotation_matrix)
     _check_input_array(rotation_matrix_ai, [np.dtype('float32')])
 
     # Create index
     cdef Index idx = Index()
-    
+
     # Convert to DLPack
     cdef cydlpack.DLManagedTensor* pq_centers_dlpack = \
         cydlpack.dlpack_c(pq_centers_ai)
@@ -566,7 +566,7 @@ def build_precomputed(IndexParams index_params, uint32_t dim, pq_centers, center
         cydlpack.dlpack_c(centers_rot_ai)
     cdef cydlpack.DLManagedTensor* rotation_matrix_dlpack = \
         cydlpack.dlpack_c(rotation_matrix_ai)
-    
+
     cdef cuvsIvfPqIndexParams* params = index_params.params
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 

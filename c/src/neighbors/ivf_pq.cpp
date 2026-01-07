@@ -477,7 +477,7 @@ extern "C" cuvsError_t cuvsIvfPqBuildPrecomputed(cuvsResources_t res,
     // Convert DLPack tensors to mdspan views
     using pq_centers_mdspan_type = raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major>;
     using matrix_mdspan_type = raft::device_matrix_view<const float, uint32_t, raft::row_major>;
-    
+
     auto pq_centers_mds = cuvs::core::from_dlpack<pq_centers_mdspan_type>(pq_centers_tensor);
     auto centers_mds = cuvs::core::from_dlpack<matrix_mdspan_type>(centers_tensor);
     auto centers_rot_mds = cuvs::core::from_dlpack<matrix_mdspan_type>(centers_rot_tensor);
