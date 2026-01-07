@@ -168,7 +168,7 @@ void transform(raft::resources const& handle,
   auto laplacian = create_laplacian<DataT, raft::device_coo_matrix<DataT, int, int, NNZType>>(
     handle, spectral_embedding_config, connectivity_graph, diagonal.view());
 
-  raft::sparse::op::coo_sort<DataT>(n_samples,
+  raft::sparse::op::coo_sort<DataT, int, NNZType>(n_samples,
                                     n_samples,
                                     laplacian.structure_view().get_nnz(),
                                     laplacian.structure_view().get_rows().data(),
