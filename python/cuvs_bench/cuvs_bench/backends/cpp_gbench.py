@@ -15,7 +15,7 @@ import tempfile
 import time
 import os
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import numpy as np
 
 from .base import BenchmarkBackend, Dataset, BuildResult, SearchResult
@@ -32,19 +32,21 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
     ----------
     config : Dict[str, Any]
         Configuration dictionary with:
+        - name: str - User-defined name for this index configuration (required)
         - executable_path: str - Path to C++ benchmark executable
         - data_prefix: str - Prefix for dataset paths (default: "")
-        - index_prefix: str - Prefix for index paths (default: "")
         - warmup_time: float - Warmup time in seconds (default: 1.0)
     
     Examples
     --------
     >>> config = {
+    ...     "name": "ivf_flat_experiment",
     ...     "executable_path": "/path/to/CUVS_IVF_FLAT_ANN_BENCH",
-    ...     "data_prefix": "data/",
-    ...     "index_prefix": "index/"
+    ...     "data_prefix": "data/"
     ... }
     >>> backend = CppGoogleBenchmarkBackend(config)
+    >>> print(backend.name)  # "ivf_flat_experiment" (user-defined)
+    >>> print(backend.algo)  # "cuvs_ivf_flat" (from executable)
     >>> result = backend.build(dataset, {"nlist": 1024}, Path("index/test"))
     """
     
@@ -54,7 +56,6 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         
         self.executable_path = Path(config["executable_path"])
         self.data_prefix = config.get("data_prefix", "")
-        self.index_prefix = config.get("index_prefix", "")
         self.warmup_time = config.get("warmup_time", 1.0)
         
         if not self.executable_path.exists():
@@ -67,7 +68,8 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         dataset: Dataset,
         build_params: Dict[str, Any],
         index_path: Path,
-        force: bool = False
+        force: bool = False,
+        dry_run: bool = False
     ) -> BuildResult:
         """
         Build index using C++ Google Benchmark executable.
@@ -81,7 +83,9 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         index_path : Path
             Path to save the built index
         force : bool
-            Whether to rebuild if index exists
+            Whether to force the execution regardless of existing results.
+        dry_run : bool
+            Whether to perform a dry run without actual execution.
             
         Returns
         -------
@@ -94,27 +98,48 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
                 index_path=str(index_path),
                 build_time_seconds=0.0,
                 index_size_bytes=index_path.stat().st_size,
-                algorithm=self.name,
+                algorithm=self.algo,
                 build_params=build_params,
                 metadata={"skipped": True, "reason": "index_exists"},
                 success=True
             )
+
+        # Note: runners.py doesn't validate and lets C++ fail. We validate here for
+        # better Python-side error messages.
+        # C++ requires: name, base_file, query_file, distance (see conf.hpp parse_dataset)
+        # C++ optional: groundtruth_neighbors_file
+        if not dataset.base_file:
+            raise ValueError("dataset.base_file is required (C++ parser requires it)")
+        if not dataset.query_file:
+            raise ValueError("dataset.query_file is required (C++ parser requires it)")
         
         # Create temporary JSON config (Google Benchmark format)
+        # Structure matches runners.py temp_conf exactly
         with tempfile.NamedTemporaryFile(
             mode='w', 
             suffix='.json', 
             delete=False,
             dir='.'
         ) as f:
+            dataset_config = {
+                "name": dataset.name,
+                "base_file": dataset.base_file,
+                "query_file": dataset.query_file,
+                "distance": dataset.distance_metric
+            }
+            # groundtruth_neighbors_file is optional in C++
+            if dataset.groundtruth_neighbors_file:
+                dataset_config["groundtruth_neighbors_file"] = dataset.groundtruth_neighbors_file
+            
             config = {
-                "dataset": {
-                    "name": dataset.name,
-                    "base_file": f"{dataset.name}/base.fbin",
-                    "distance": dataset.distance_metric
+                "dataset": dataset_config,
+                "search_basic_param": {
+                    "k": 10,
+                    "batch_size": 10000
                 },
                 "index": [{
                     "name": self.name,
+                    "algo": self.algo,
                     "build_param": build_params,
                     "file": str(index_path)
                 }]
@@ -133,7 +158,6 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             str(self.executable_path),
             "--build",
             f"--data_prefix={self.data_prefix}",
-            f"--index_prefix={self.index_prefix}",
             "--benchmark_out_format=json",
             "--benchmark_counters_tabular=true",
             f"--benchmark_out={temp_output_json}",
@@ -143,6 +167,20 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             cmd.append("--force")
         
         cmd.append(temp_config_path)
+        
+        # Dry run: print command and return without executing
+        if dry_run:
+            print(f"Benchmark command for {index_path.name}:\n{' '.join(cmd)}\n")
+            Path(temp_config_path).unlink(missing_ok=True)
+            return BuildResult(
+                index_path=str(index_path),
+                build_time_seconds=0.0,
+                index_size_bytes=0,
+                algorithm=self.algo,
+                build_params=build_params,
+                metadata={"dry_run": True},
+                success=True
+            )
         
         # Execute subprocess
         start_time = time.perf_counter()
@@ -175,7 +213,7 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
                 index_path=str(index_path),
                 build_time_seconds=benchmark.get("real_time", elapsed_time),
                 index_size_bytes=index_path.stat().st_size if index_path.exists() else 0,
-                algorithm=self.name,
+                algorithm=self.algo,
                 build_params=build_params,
                 metadata={
                     "cpu_time": benchmark.get("cpu_time"),
@@ -190,7 +228,7 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
                 index_path=str(index_path),
                 build_time_seconds=time.perf_counter() - start_time,
                 index_size_bytes=0,
-                algorithm=self.name,
+                algorithm=self.algo,
                 build_params=build_params,
                 success=False,
                 error_message=f"Build failed: {e.stderr}"
@@ -201,7 +239,7 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
                 index_path=str(index_path),
                 build_time_seconds=time.perf_counter() - start_time,
                 index_size_bytes=0,
-                algorithm=self.name,
+                algorithm=self.algo,
                 build_params=build_params,
                 success=False,
                 error_message=f"Build error: {str(e)}"
@@ -219,7 +257,9 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         index_path: Path,
         k: int,
         batch_size: int = 10000,
-        mode: str = "throughput"
+        mode: str = "throughput",
+        search_threads: Optional[int] = None,
+        dry_run: bool = False
     ) -> SearchResult:
         """
         Search using C++ Google Benchmark executable.
@@ -233,37 +273,58 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         index_path : Path
             Path to the built index
         k : int
-            Number of neighbors to return
+            The number of nearest neighbors to search for.
         batch_size : int
-            Number of queries per batch
+            The size of each batch for processing.
         mode : str
-            "latency" or "throughput"
+            The mode of search to perform ('latency' or 'throughput'),
+            by default 'throughput'.
+        search_threads : Optional[int]
+            The number of threads to use for searching.
+        dry_run : bool
+            Whether to perform a dry run without actual execution.
             
         Returns
         -------
         SearchResult
             Search timing, recall, and QPS
         """
+        # Note: runners.py doesn't validate and lets C++ fail. We validate here for
+        # better Python-side error messages.
+        # C++ requires: name, base_file, query_file, distance (see conf.hpp parse_dataset)
+        # C++ optional: groundtruth_neighbors_file (but needed for recall calculation)
+        if not dataset.base_file:
+            raise ValueError("dataset.base_file is required (C++ parser requires it)")
+        if not dataset.query_file:
+            raise ValueError("dataset.query_file is required (C++ parser requires it)")
+        
         # Create temporary JSON config
+        # Structure matches runners.py temp_conf exactly
         with tempfile.NamedTemporaryFile(
             mode='w', 
             suffix='.json', 
             delete=False,
             dir='.'
         ) as f:
+            dataset_config = {
+                "name": dataset.name,
+                "base_file": dataset.base_file,
+                "query_file": dataset.query_file,
+                "distance": dataset.distance_metric
+            }
+            # groundtruth_neighbors_file is optional in C++, but needed for recall calculation
+            if dataset.groundtruth_neighbors_file:
+                dataset_config["groundtruth_neighbors_file"] = dataset.groundtruth_neighbors_file
+            
             config = {
-                "dataset": {
-                    "name": dataset.name,
-                    "query_file": f"{dataset.name}/query.fbin",
-                    "groundtruth_neighbors_file": f"{dataset.name}/groundtruth.neighbors.ibin",
-                    "distance": dataset.distance_metric
-                },
+                "dataset": dataset_config,
                 "search_basic_param": {
                     "k": k,
                     "batch_size": batch_size
                 },
                 "index": [{
                     "name": self.name,
+                    "algo": self.algo,
                     "file": str(index_path),
                     "search_params": [search_params]
                 }]
@@ -281,7 +342,6 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             str(self.executable_path),
             "--search",
             f"--data_prefix={self.data_prefix}",
-            f"--index_prefix={self.index_prefix}",
             f"--mode={mode}",
             f"--benchmark_min_warmup_time={self.warmup_time}",
             f"--override_kv=k:{k}",
@@ -289,8 +349,28 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             "--benchmark_out_format=json",
             "--benchmark_counters_tabular=true",
             f"--benchmark_out={output_json}",
-            temp_config_path
         ]
+        
+        if search_threads:
+            cmd.append(f"--threads={search_threads}")
+        
+        cmd.append(temp_config_path)
+        
+        # Dry run: print command and return without executing
+        if dry_run:
+            print(f"Benchmark command for {index_path.name}:\n{' '.join(cmd)}\n")
+            Path(temp_config_path).unlink(missing_ok=True)
+            return SearchResult(
+                neighbors=np.array([]),
+                distances=np.array([]),
+                search_time_seconds=0.0,
+                queries_per_second=0.0,
+                recall=0.0,
+                algorithm=self.algo,
+                search_params=search_params,
+                metadata={"dry_run": True},
+                success=True
+            )
         
         # Execute subprocess
         start_time = time.perf_counter()
@@ -328,7 +408,7 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
                 search_time_seconds=search_time,
                 queries_per_second=qps,
                 recall=recall,
-                algorithm=self.name,
+                algorithm=self.algo,
                 search_params=search_params,
                 gpu_time_seconds=benchmark.get("GPU"),
                 cpu_time_seconds=benchmark.get("cpu_time"),
@@ -347,7 +427,7 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
                 search_time_seconds=time.perf_counter() - start_time,
                 queries_per_second=0.0,
                 recall=0.0,
-                algorithm=self.name,
+                algorithm=self.algo,
                 search_params=search_params,
                 success=False,
                 error_message=f"Search failed: {e.stderr}"
@@ -360,7 +440,7 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
                 search_time_seconds=time.perf_counter() - start_time,
                 queries_per_second=0.0,
                 recall=0.0,
-                algorithm=self.name,
+                algorithm=self.algo,
                 search_params=search_params,
                 success=False,
                 error_message=f"Search error: {str(e)}"
@@ -413,7 +493,7 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             json.dump(temp_results, f, indent=2)
     
     @property
-    def name(self) -> str:
+    def algo(self) -> str:
         """
         Extract algorithm name from executable path.
         
@@ -421,12 +501,12 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         """
         exec_name = self.executable_path.stem
         # Remove _ANN_BENCH suffix and convert to lowercase
-        name = exec_name.replace("_ANN_BENCH", "").lower()
-        return name
+        algo = exec_name.replace("_ANN_BENCH", "").lower()
+        return algo
     
     @property
     def supports_gpu(self) -> bool:
         """Check if this backend uses GPU."""
-        name_lower = self.name.lower()
-        return "cuvs" in name_lower or "faiss_gpu" in name_lower
+        algo_lower = self.algo.lower()
+        return "cuvs" in algo_lower or "faiss_gpu" in algo_lower
 
