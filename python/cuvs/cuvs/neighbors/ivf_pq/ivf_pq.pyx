@@ -293,6 +293,22 @@ cdef class Index:
         return output
 
     @property
+    def centers_padded(self):
+        """ Get the padded cluster centers [n_lists, dim_ext]
+        where dim_ext = round_up(dim + 1, 8).
+        This returns contiguous data suitable for build_precomputed. """
+        if not self.trained:
+            raise ValueError("Index needs to be built before getting"
+                             " centers_padded")
+
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsIvfPqIndexGetCentersPadded(self.index, tensor))
+        output.parent = self
+        return output
+
+    @property
     def pq_centers(self):
         """ Get the PQ cluster centers """
         if not self.trained:
@@ -303,6 +319,36 @@ cdef class Index:
         cdef cydlpack.DLManagedTensor * tensor = \
             <cydlpack.DLManagedTensor*><size_t>output.get_handle()
         check_cuvs(cuvsIvfPqIndexGetPqCenters(self.index, tensor))
+        output.parent = self
+        return output
+
+    @property
+    def centers_rot(self):
+        """ Get the rotated cluster centers [n_lists, rot_dim]
+        where rot_dim = pq_len * pq_dim """
+        if not self.trained:
+            raise ValueError("Index needs to be built before getting"
+                             " centers_rot")
+
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsIvfPqIndexGetCentersRot(self.index, tensor))
+        output.parent = self
+        return output
+
+    @property
+    def rotation_matrix(self):
+        """ Get the rotation matrix [rot_dim, dim]
+        Transform matrix (original space -> rotated padded space) """
+        if not self.trained:
+            raise ValueError("Index needs to be built before getting"
+                             " rotation_matrix")
+
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsIvfPqIndexGetRotationMatrix(self.index, tensor))
         output.parent = self
         return output
 

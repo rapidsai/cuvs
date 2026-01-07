@@ -162,10 +162,32 @@ void _get_centers(cuvsIvfPqIndex index, DLManagedTensor* output)
 }
 
 template <typename IdxT>
+void _get_centers_padded(cuvsIvfPqIndex index, DLManagedTensor* output)
+{
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
+  // Return the full padded centers [n_lists, dim_ext] as a contiguous array
+  cuvs::core::to_dlpack(index_ptr->centers(), output);
+}
+
+template <typename IdxT>
 void _get_pq_centers(cuvsIvfPqIndex index, DLManagedTensor* centers)
 {
   auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
   cuvs::core::to_dlpack(index_ptr->pq_centers(), centers);
+}
+
+template <typename IdxT>
+void _get_centers_rot(cuvsIvfPqIndex index, DLManagedTensor* centers_rot)
+{
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
+  cuvs::core::to_dlpack(index_ptr->centers_rot(), centers_rot);
+}
+
+template <typename IdxT>
+void _get_rotation_matrix(cuvsIvfPqIndex index, DLManagedTensor* rotation_matrix)
+{
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
+  cuvs::core::to_dlpack(index_ptr->rotation_matrix(), rotation_matrix);
 }
 
 template <typename IdxT>
@@ -428,10 +450,29 @@ extern "C" cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index, DLManage
   return cuvs::core::translate_exceptions([=] { _get_centers<int64_t>(*index, centers); });
 }
 
+extern "C" cuvsError_t cuvsIvfPqIndexGetCentersPadded(cuvsIvfPqIndex_t index,
+                                                      DLManagedTensor* centers)
+{
+  return cuvs::core::translate_exceptions([=] { _get_centers_padded<int64_t>(*index, centers); });
+}
+
 extern "C" cuvsError_t cuvsIvfPqIndexGetPqCenters(cuvsIvfPqIndex_t index,
                                                   DLManagedTensor* pq_centers)
 {
   return cuvs::core::translate_exceptions([=] { _get_pq_centers<int64_t>(*index, pq_centers); });
+}
+
+extern "C" cuvsError_t cuvsIvfPqIndexGetCentersRot(cuvsIvfPqIndex_t index,
+                                                   DLManagedTensor* centers_rot)
+{
+  return cuvs::core::translate_exceptions([=] { _get_centers_rot<int64_t>(*index, centers_rot); });
+}
+
+extern "C" cuvsError_t cuvsIvfPqIndexGetRotationMatrix(cuvsIvfPqIndex_t index,
+                                                       DLManagedTensor* rotation_matrix)
+{
+  return cuvs::core::translate_exceptions(
+    [=] { _get_rotation_matrix<int64_t>(*index, rotation_matrix); });
 }
 
 extern "C" cuvsError_t cuvsIvfPqBuildPrecomputed(cuvsResources_t res,
@@ -465,8 +506,8 @@ extern "C" cuvsError_t cuvsIvfPqBuildPrecomputed(cuvsResources_t res,
     auto& centers_rot_dl = centers_rot_tensor->dl_tensor;
     auto& rotation_matrix_dl = rotation_matrix_tensor->dl_tensor;
 
-    RAFT_EXPECTS(pq_centers_dl.dtype.code == kDLUint && pq_centers_dl.dtype.bits == 8,
-                 "pq_centers must be uint8");
+    RAFT_EXPECTS(pq_centers_dl.dtype.code == kDLFloat && pq_centers_dl.dtype.bits == 32,
+                 "pq_centers must be float32");
     RAFT_EXPECTS(centers_dl.dtype.code == kDLFloat && centers_dl.dtype.bits == 32,
                  "centers must be float32");
     RAFT_EXPECTS(centers_rot_dl.dtype.code == kDLFloat && centers_rot_dl.dtype.bits == 32,

@@ -279,6 +279,19 @@ cuvsError_t cuvsIvfPqIndexGetPqLen(cuvsIvfPqIndex_t index, int64_t* pq_len);
 cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index, DLManagedTensor* centers);
 
 /**
+ * @brief Get the padded cluster centers [n_lists, dim_ext]
+ *   where dim_ext = round_up(dim + 1, 8)
+ *
+ * This returns the full padded centers as a contiguous array, suitable for
+ * use with cuvsIvfPqBuildPrecomputed.
+ *
+ * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
+ * @param[out] centers Output tensor that will be populated with a non-owning view of the data
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfPqIndexGetCentersPadded(cuvsIvfPqIndex_t index, DLManagedTensor* centers);
+
+/**
  * @brief Get the PQ cluster centers
  *
  *   - codebook_gen::PER_SUBSPACE: [pq_dim , pq_len, pq_book_size]
@@ -289,6 +302,28 @@ cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index, DLManagedTensor* ce
  * @return cuvsError_t
  */
 cuvsError_t cuvsIvfPqIndexGetPqCenters(cuvsIvfPqIndex_t index, DLManagedTensor* pq_centers);
+
+/**
+ * @brief Get the rotated cluster centers [n_lists, rot_dim]
+ *   where rot_dim = pq_len * pq_dim
+ *
+ * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
+ * @param[out] centers_rot Output tensor that will be populated with a non-owning view of the data
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfPqIndexGetCentersRot(cuvsIvfPqIndex_t index, DLManagedTensor* centers_rot);
+
+/**
+ * @brief Get the rotation matrix [rot_dim, dim]
+ *   Transform matrix (original space -> rotated padded space)
+ *
+ * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
+ * @param[out] rotation_matrix Output tensor that will be populated with a non-owning view of the
+ * data
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfPqIndexGetRotationMatrix(cuvsIvfPqIndex_t index,
+                                            DLManagedTensor* rotation_matrix);
 
 /**
  * @brief Get the sizes of each list
