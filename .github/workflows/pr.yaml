@@ -186,7 +186,7 @@ jobs:
       matrix:
         cuda_version:
           - &latest_cuda12 '12.9.1'
-          - &latest_cuda13 '13.0.2'
+          - &latest_cuda13 '13.1.0'
         arch:
           - amd64
           - arm64
