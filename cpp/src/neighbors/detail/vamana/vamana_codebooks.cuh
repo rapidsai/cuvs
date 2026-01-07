@@ -9,6 +9,7 @@
 
 #include <raft/core/error.hpp>
 
+#include <fstream>
 #include <vector>
 
 namespace cuvs::neighbors::vamana::detail {

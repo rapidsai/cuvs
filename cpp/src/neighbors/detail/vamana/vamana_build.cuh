@@ -6,7 +6,8 @@
 #pragma once
 
 #include "../../../sparse/neighbors/cross_component_nn.cuh"
-#include "../../detail/vpq_dataset.cuh"
+#include "../../detail/ann_utils.cuh"
+#include "../../detail/vpq_dataset_subspaces.hpp"
 #include "greedy_search.cuh"
 #include "robust_prune.cuh"
 #include "vamana_structs.cuh"
@@ -24,10 +25,8 @@
 #include <raft/matrix/copy.cuh>
 #include <raft/matrix/init.cuh>
 #include <raft/matrix/slice.cuh>
-#include <raft/random/make_blobs.cuh>
 
 #include <thrust/device_vector.h>
-#include <thrust/sequence.h>
 #include <thrust/unique.h>
 
 #include <cuvs/distance/distance.hpp>
@@ -559,7 +558,7 @@ auto quantize_all_vectors(raft::resources const& res,
   auto vq_codebook = raft::make_device_matrix<float, uint32_t, raft::row_major>(res, 1, dim);
   raft::matrix::fill<float>(res, vq_codebook.view(), 0.0);
 
-  auto codes = cuvs::neighbors::detail::process_and_fill_codes_subspaces<float, int64_t>(
+  auto codes = cuvs::neighbors::detail::process_and_fill_codes_subspaces(
     res, ps, residuals, raft::make_const_mdspan(vq_codebook.view()), pq_codebook);
   return codes;
 }
