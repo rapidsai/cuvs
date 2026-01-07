@@ -31,7 +31,7 @@
 namespace cuvs::neighbors {
 
 /* Graph build algo used in cagra and all_neighbors */
-enum GRAPH_BUILD_ALGO { BRUTE_FORCE = 0, IVF_PQ = 1, NN_DESCENT = 2 };
+enum GRAPH_BUILD_ALGO { BRUTE_FORCE = 0, IVF_PQ = 1, NN_DESCENT = 2, ACE = 3 };
 
 /** Parameters for VPQ compression. */
 struct vpq_params {
