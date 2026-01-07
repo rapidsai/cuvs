@@ -1,17 +1,8 @@
-# Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
+
+import tempfile
 
 import numpy as np
 import pytest
@@ -44,6 +35,7 @@ def run_ivf_pq_build_search_test(
     compare=True,
     inplace=True,
     array_type="device",
+    serialize=False,
 ):
     dataset = generate_data((n_rows, n_cols), dtype)
     if metric == "inner_product":
@@ -66,6 +58,12 @@ def run_ivf_pq_build_search_test(
         index = ivf_pq.build(build_params, dataset_device)
     else:
         index = ivf_pq.build(build_params, dataset)
+
+    if serialize:
+        with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as f:
+            temp_filename = f.name
+        ivf_pq.save(temp_filename, index)
+        index = ivf_pq.load(temp_filename)
 
     if not add_data_on_build:
         dataset_1 = dataset[: n_rows // 2, :]
@@ -117,6 +115,11 @@ def run_ivf_pq_build_search_test(
     pq_centers = index.pq_centers
     assert len(pq_centers.shape) == 3
     assert pq_centers.shape[2] == 1 << pq_bits
+
+    all_list_ids = set()
+    for list_ids, list_data in index.lists():
+        all_list_ids.update(list_ids.copy_to_host())
+    assert all_list_ids == set(np.arange(n_rows))
 
     if not compare:
         return
@@ -216,9 +219,11 @@ def test_extend(dtype, array_type):
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("dtype", [np.float32, np.float16, np.int8, np.uint8])
 @pytest.mark.parametrize("array_type", ["host", "device"])
-def test_ivf_pq_dtype(inplace, dtype, array_type):
+@pytest.mark.parametrize("serialize", [True, False])
+def test_ivf_pq_dtype(inplace, dtype, array_type, serialize):
     run_ivf_pq_build_search_test(
         dtype=dtype,
         inplace=inplace,
         array_type=array_type,
+        serialize=serialize,
     )

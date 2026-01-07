@@ -1,17 +1,6 @@
 #
-# Copyright (c) 2025, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 #
 
 from pathlib import Path
@@ -51,9 +40,9 @@ def test_get_dataset_creates_expected_files(temp_datasets_dir: Path):
     # Verify that each expected file exists in the datasets directory.
     for filename in expected_files:
         file_path = temp_datasets_dir / filename
-        assert (
-            file_path.exists()
-        ), f"Expected file {filename} was not generated."
+        assert file_path.exists(), (
+            f"Expected file {filename} was not generated."
+        )
 
 
 def test_run_command_creates_results(temp_datasets_dir: Path):
@@ -62,7 +51,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
 
         python -m cuvs_bench.run --dataset test-data --dataset-path datasets/ \
             --algorithms faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,\
-            cuvs_cagra,ggnn,cuvs_cagra_hnswlib, \
+            cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq \
             --batch-size 100 -k 10 --groups test -m latency --force
 
     It then verifies that the set of expected result files
@@ -81,7 +70,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         "--dataset-path",
         dataset_path_arg,
         "--algorithms",
-        "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,",  # noqa: E501
+        "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq",  # noqa: E501
         "--batch-size",
         "100",
         "-k",
@@ -93,9 +82,9 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         "--force",
     ]
     result = runner.invoke(run_main, run_args)
-    assert (
-        result.exit_code == 0
-    ), f"Run command failed with output:\n{result.output}"
+    assert result.exit_code == 0, (
+        f"Run command failed with output:\n{result.output}"
+    )
 
     common_build_header = [
         "algo_name",
@@ -155,6 +144,18 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
                 "graph_degree",
                 "intermediate_graph_degree",
                 "label",
+            ],
+            "rows": 1,
+        },
+        "test-data/result/build/cuvs_ivf_pq,test.csv": {
+            "header": common_build_header
+            + [
+                "GPU",
+                "niter",
+                "nlist",
+                "pq_bits",
+                "pq_dim",
+                "ratio",
             ],
             "rows": 1,
         },
@@ -351,14 +352,83 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
             ],
             "rows": 2,
         },
+        "test-data/result/search/cuvs_ivf_pq,test,k10,bs100,raw.csv": {
+            "header": common_search_header
+            + [
+                "GPU",
+                "end_to_end",
+                "k",
+                "n_queries",
+                "nprobe",
+                "refine_ratio",
+                "total_queries",
+                "search_label",
+                "build time",
+                "build threads",
+                "build cpu_time",
+                "build GPU",
+                "niter",
+                "nlist",
+                "pq_bits",
+                "pq_dim",
+                "ratio",
+            ],
+            "rows": 2,
+        },
+        "test-data/result/search/cuvs_ivf_pq,test,k10,bs100,latency.csv": {
+            "header": common_search_header
+            + [
+                "GPU",
+                "end_to_end",
+                "k",
+                "n_queries",
+                "nprobe",
+                "refine_ratio",
+                "total_queries",
+                "search_label",
+                "build time",
+                "build threads",
+                "build cpu_time",
+                "build GPU",
+                "niter",
+                "nlist",
+                "pq_bits",
+                "pq_dim",
+                "ratio",
+            ],
+            "rows": 2,
+        },
+        "test-data/result/search/cuvs_ivf_pq,test,k10,bs100,throughput.csv": {
+            "header": common_search_header
+            + [
+                "GPU",
+                "end_to_end",
+                "k",
+                "n_queries",
+                "nprobe",
+                "refine_ratio",
+                "total_queries",
+                "search_label",
+                "build time",
+                "build threads",
+                "build cpu_time",
+                "build GPU",
+                "niter",
+                "nlist",
+                "pq_bits",
+                "pq_dim",
+                "ratio",
+            ],
+            "rows": 2,
+        },
     }
 
     for rel_path, expectations in expected_files.items():
         file_path = temp_datasets_dir / rel_path
         assert file_path.exists(), f"Expected file {file_path} does not exist."
-        assert (
-            file_path.stat().st_size > 0
-        ), f"Expected file {file_path} is empty."
+        assert file_path.stat().st_size > 0, (
+            f"Expected file {file_path} is empty."
+        )
 
         df = pd.read_csv(file_path)
 
@@ -366,9 +436,9 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         actual_rows = len(df)
 
         # breakpoint()
-        assert (
-            actual_header == expectations["header"]
-        ), f"Wrong header produced in file f{rel_path}"
+        assert actual_header == expectations["header"], (
+            f"Wrong header produced in file f{rel_path}"
+        )
         assert actual_rows == expectations["rows"]
 
 
@@ -378,7 +448,7 @@ def test_plot_command_creates_png_files(temp_datasets_dir: Path):
 
       python -m cuvs_bench.plot --dataset test-data --dataset-path datasets/ \
           --algorithms faiss_gpu_ivf_flat,faiss_gpu_ivf_sq, \
-          cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib \
+          cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq \
           --batch-size 100 -k 10 --groups test -m latency
 
     and then verifies that the following files are produced in the
@@ -402,7 +472,7 @@ def test_plot_command_creates_png_files(temp_datasets_dir: Path):
         "--output-filepath",
         dataset_path_arg,
         "--algorithms",
-        "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib",  # noqa: E501
+        "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq",  # noqa: E501
         "--batch-size",
         "100",
         "-k",
@@ -413,9 +483,9 @@ def test_plot_command_creates_png_files(temp_datasets_dir: Path):
         "latency",
     ]
     result = runner.invoke(plot_main, args)
-    assert (
-        result.exit_code == 0
-    ), f"Plot command failed with output:\n{result.output}"
+    assert result.exit_code == 0, (
+        f"Plot command failed with output:\n{result.output}"
+    )
 
     # Expected output file names.
     expected_files = [
@@ -426,6 +496,6 @@ def test_plot_command_creates_png_files(temp_datasets_dir: Path):
     for filename in expected_files:
         file_path = temp_datasets_dir / filename
         assert file_path.exists(), f"Expected file {filename} does not exist."
-        assert (
-            file_path.stat().st_size > 0
-        ), f"Expected file {filename} is empty."
+        assert file_path.stat().st_size > 0, (
+            f"Expected file {filename} is empty."
+        )

@@ -3,7 +3,7 @@ files:
   all:
     output: conda
     matrix:
-      cuda: ["12.9", "13.0"]
+      cuda: ["12.9", "13.1"]
       arch: [x86_64, aarch64]
     includes:
       - build
@@ -30,7 +30,7 @@ files:
   bench_ann:
     output: conda
     matrix:
-      cuda: ["12.9", "13.0"]
+      cuda: ["12.9", "13.1"]
       arch: [x86_64, aarch64]
     includes:
       - bench
@@ -87,7 +87,7 @@ files:
   rust:
     output: conda
     matrix:
-      cuda: ["12.9", "13.0"]
+      cuda: ["12.9", "13.1"]
       arch: [x86_64, aarch64]
     includes:
       # clang/libclang only needed for bindgen support
@@ -102,7 +102,7 @@ files:
   go:
     output: conda
     matrix:
-      cuda: ["12.9", "13.0"]
+      cuda: ["12.9", "13.1"]
       arch: [x86_64, aarch64]
     includes:
       - clang
@@ -214,26 +214,26 @@ files:
     includes:
       - bench_python
 channels:
-  - rapidsai
   - rapidsai-nightly
+  - rapidsai
   - conda-forge
 dependencies:
   build:
     common:
       - output_types: [conda, requirements, pyproject]
         packages:
-          - &rapids_build_backend rapids-build-backend>=0.4.0,<0.5.0.dev0
+          - &rapids_build_backend rapids-build-backend>=0.4.0,<0.5.0
       - output_types: [conda]
         packages:
-          - scikit-build-core>=0.10.0
+          - scikit-build-core>=0.11.0
       - output_types: [requirements, pyproject]
         packages:
-          - scikit-build-core[pyproject]>=0.10.0
+          - scikit-build-core[pyproject]>=0.11.0
   build_cython:
     common:
       - output_types: [conda, requirements, pyproject]
         packages:
-          - cython>=3.0.0
+          - cython>=3.0.0,<3.2.0
   rapids_build:
     common:
       - output_types: [conda, requirements, pyproject]
@@ -263,8 +263,8 @@ dependencies:
       - output_types: [conda, requirements, pyproject]
         packages:
           - *rapids_build_backend
-          - setuptools
-          - wheel
+          - &setuptools setuptools>=77.0.0
+          - &wheel wheel
   build_py_cuvs:
     common:
       - output_types: [conda]
@@ -287,10 +287,6 @@ dependencies:
       - output_types: conda
         matrices:
           - matrix:
-              cuda: "12.0"
-            packages:
-              - cuda-version=12.0
-          - matrix:
               cuda: "12.2"
             packages:
               - cuda-version=12.2
@@ -310,6 +306,10 @@ dependencies:
               cuda: "13.0"
             packages:
               - cuda-version=13.0
+          - matrix:
+              cuda: "13.1"
+            packages:
+              - cuda-version=13.1
   cuda:
     common:
       - output_types: [conda]
@@ -400,8 +400,8 @@ dependencies:
     common:
       - output_types: [requirements, pyproject]
         packages:
-          - wheel
-          - setuptools
+          - *wheel
+          - *setuptools
   py_version:
     specific:
       - output_types: conda
@@ -429,12 +429,12 @@ dependencies:
     common:
       - output_types: [conda, requirements, pyproject]
         packages:
-          - &numpy numpy>=1.23,<3.0a0
+          - &numpy numpy>=1.23,<3.0
   test_python_common:
     common:
       - output_types: [conda, requirements, pyproject]
         packages:
-          - pytest
+          - pytest<9.0.0
           - pytest-cov
   test_py_cuvs:
     common:
@@ -453,10 +453,9 @@ dependencies:
     common:
       - output_types: [conda, pyproject, requirements]
         packages:
-          - nlohmann_json>=3.11.2
+          - nlohmann_json>=3.12.0
           - glog>=0.6.0
           - h5py>=3.8.0
-          - benchmark>=1.8.2
           - openblas
     specific:
       - output_types: conda
@@ -475,7 +474,7 @@ dependencies:
       - output_types: [conda, pyproject, requirements]
         packages:
           - click
-          - cuvs==25.10.*,>=0.0.0a0
+          - cuvs==26.2.*,>=0.0.0a0
           - pandas
           - pyyaml
           - requests
@@ -493,26 +492,26 @@ dependencies:
           - matrix:
               cuda: "12.*"
             packages:
-              - cuda-python>=12.9.2,<13.0a0
+              - cuda-python>=12.9.2,<13.0
           # fallback to CUDA 13 versions if 'cuda' is '13.*' or not provided
           - matrix:
             packages:
-              - cuda-python>=13.0.1,<14.0a0
+              - cuda-python>=13.0.1,<14.0
   depends_on_cuvs:
     common:
       - output_types: conda
         packages:
-          - cuvs==25.10.*,>=0.0.0a0
+          - cuvs==26.2.*,>=0.0.0a0
   depends_on_cuvs_bench:
     common:
       - output_types: conda
         packages:
-          - cuvs-bench==25.10.*,>=0.0.0a0
+          - cuvs-bench==26.2.*,>=0.0.0a0
   depends_on_libcuvs:
     common:
       - output_types: conda
         packages:
-          - &libcuvs_unsuffixed libcuvs==25.10.*,>=0.0.0a0
+          - &libcuvs_unsuffixed libcuvs==26.2.*,>=0.0.0a0
       - output_types: requirements
         packages:
           # pip recognizes the index as a global option for the requirements.txt file
@@ -525,23 +524,23 @@ dependencies:
               cuda: "12.*"
               cuda_suffixed: "true"
             packages:
-              - libcuvs-cu12==25.10.*,>=0.0.0a0
+              - libcuvs-cu12==26.2.*,>=0.0.0a0
           - matrix:
               cuda: "13.*"
               cuda_suffixed: "true"
             packages:
-              - libcuvs-cu13==25.10.*,>=0.0.0a0
+              - libcuvs-cu13==26.2.*,>=0.0.0a0
           - {matrix: null, packages: [*libcuvs_unsuffixed]}
   depends_on_libcuvs_tests:
     common:
       - output_types: conda
         packages:
-          - libcuvs-tests==25.10.*,>=0.0.0a0
+          - libcuvs-tests==26.2.*,>=0.0.0a0
   depends_on_libraft:
     common:
       - output_types: conda
         packages:
-          - &libraft_unsuffixed libraft==25.10.*,>=0.0.0a0
+          - &libraft_unsuffixed libraft==26.2.*,>=0.0.0a0
       - output_types: requirements
         packages:
           # pip recognizes the index as a global option for the requirements.txt file
@@ -554,18 +553,18 @@ dependencies:
               cuda: "12.*"
               cuda_suffixed: "true"
             packages:
-              - libraft-cu12==25.10.*,>=0.0.0a0
+              - libraft-cu12==26.2.*,>=0.0.0a0
           - matrix:
               cuda: "13.*"
               cuda_suffixed: "true"
             packages:
-              - libraft-cu13==25.10.*,>=0.0.0a0
+              - libraft-cu13==26.2.*,>=0.0.0a0
           - {matrix: null, packages: [*libraft_unsuffixed]}
   depends_on_librmm:
     common:
       - output_types: conda
         packages:
-          - &librmm_unsuffixed librmm==25.10.*,>=0.0.0a0
+          - &librmm_unsuffixed librmm==26.2.*,>=0.0.0a0
       - output_types: requirements
         packages:
           # pip recognizes the index as a global option for the requirements.txt file
@@ -578,18 +577,18 @@ dependencies:
               cuda: "12.*"
               cuda_suffixed: "true"
             packages:
-              - librmm-cu12==25.10.*,>=0.0.0a0
+              - librmm-cu12==26.2.*,>=0.0.0a0
           - matrix:
               cuda: "13.*"
               cuda_suffixed: "true"
             packages:
-              - librmm-cu13==25.10.*,>=0.0.0a0
+              - librmm-cu13==26.2.*,>=0.0.0a0
           - {matrix: null, packages: [*librmm_unsuffixed]}
   depends_on_pylibraft:
     common:
       - output_types: conda
         packages:
-          - &pylibraft_unsuffixed pylibraft==25.10.*,>=0.0.0a0
+          - &pylibraft_unsuffixed pylibraft==26.2.*,>=0.0.0a0
       - output_types: requirements
         packages:
           # pip recognizes the index as a global option for the requirements.txt file
@@ -602,12 +601,12 @@ dependencies:
               cuda: "12.*"
               cuda_suffixed: "true"
             packages:
-              - pylibraft-cu12==25.10.*,>=0.0.0a0
+              - pylibraft-cu12==26.2.*,>=0.0.0a0
           - matrix:
               cuda: "13.*"
               cuda_suffixed: "true"
             packages:
-              - pylibraft-cu13==25.10.*,>=0.0.0a0
+              - pylibraft-cu13==26.2.*,>=0.0.0a0
           - {matrix: null, packages: [*pylibraft_unsuffixed]}
   depends_on_nccl:
     common:

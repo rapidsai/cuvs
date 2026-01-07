@@ -1,17 +1,6 @@
 #
-# Copyright (c) 2024-2025, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
 
@@ -91,11 +80,33 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
 
     cuvsError_t cuvsIvfPqIndexGetSize(cuvsIvfPqIndex_t index, int64_t * size)
 
+    cuvsError_t cuvsIvfPqIndexGetPqDim(cuvsIvfPqIndex_t index,
+                                       int64_t * pq_dim)
+
+    cuvsError_t cuvsIvfPqIndexGetPqBits(cuvsIvfPqIndex_t index,
+                                        int64_t * pq_bits)
+
+    cuvsError_t cuvsIvfPqIndexGetPqLen(cuvsIvfPqIndex_t index,
+                                       int64_t * pq_len)
+
     cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index,
                                          DLManagedTensor * centers)
 
+    cuvsError_t cuvsIvfPqIndexGetListSizes(cuvsIvfPqIndex_t index,
+                                           DLManagedTensor * list_sizes)
+
     cuvsError_t cuvsIvfPqIndexGetPqCenters(cuvsIvfPqIndex_t index,
                                            DLManagedTensor * centers)
+
+    cuvsError_t cuvsIvfPqIndexUnpackContiguousListData(cuvsResources_t res,
+                                                       cuvsIvfPqIndex_t index,
+                                                       DLManagedTensor* out,
+                                                       uint32_t label,
+                                                       uint32_t offset)
+
+    cuvsError_t cuvsIvfPqIndexGetListIndices(cuvsIvfPqIndex_t index,
+                                             uint32_t label,
+                                             DLManagedTensor* out)
 
     cuvsError_t cuvsIvfPqBuild(cuvsResources_t res,
                                cuvsIvfPqIndexParams* params,

@@ -1,16 +1,5 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 #
 
 import numpy as np
@@ -18,7 +7,7 @@ import pytest
 from pylibraft.common import device_ndarray
 
 from cuvs.neighbors import brute_force, cagra, ivf_flat, ivf_pq
-from cuvs.tests.ann_utils import generate_data
+from cuvs.tests.ann_utils import calc_recall, generate_data
 
 
 @pytest.mark.parametrize("dtype", [np.float32, np.int8, np.ubyte])
@@ -88,5 +77,17 @@ def run_save_load(ann_module, dtype):
     neighbors2 = neighbors_dev.copy_to_host()
     dist2 = distance_dev.copy_to_host()
 
-    assert np.all(neighbors == neighbors2)
     assert np.allclose(dist, dist2, rtol=1e-6)
+
+    # Sort the neighbors to avoid ordering issues
+    sorted_neighbors = np.argsort(neighbors, axis=-1)
+    sorted_neighbors2 = np.argsort(neighbors2, axis=-1)
+    neighbors = np.take_along_axis(neighbors, sorted_neighbors, axis=-1)
+    neighbors2 = np.take_along_axis(neighbors2, sorted_neighbors2, axis=-1)
+    all_match = np.all(neighbors == neighbors2)
+    # If the neighbors are not the same, there might be a cutoff between the k
+    # and k+1 neighbors at the same distance.
+    # Calculate that the recall is at least 99.8%
+    if not all_match:
+        recall = calc_recall(neighbors, neighbors2)
+        assert recall >= 0.998

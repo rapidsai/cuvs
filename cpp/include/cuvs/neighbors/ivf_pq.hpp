@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -280,10 +269,8 @@ constexpr typename list_spec<SizeT, IdxT>::list_extents list_spec<SizeT, IdxT>::
 {
   // how many elems of pq_dim fit into one kIndexGroupVecLen-byte chunk
   auto pq_chunk = (kIndexGroupVecLen * 8u) / pq_bits;
-  return raft::make_extents<SizeT>(raft::div_rounding_up_safe<SizeT>(n_rows, kIndexGroupSize),
-                                   raft::div_rounding_up_safe<SizeT>(pq_dim, pq_chunk),
-                                   kIndexGroupSize,
-                                   kIndexGroupVecLen);
+  return list_extents{raft::div_rounding_up_safe<SizeT>(n_rows, kIndexGroupSize),
+                      raft::div_rounding_up_safe<SizeT>(pq_dim, pq_chunk)};
 }
 
 template <typename IdxT, typename SizeT = uint32_t>
@@ -346,8 +333,8 @@ struct index : cuvs::neighbors::index {
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
 
-  using pq_centers_extents = std::experimental::
-    extents<uint32_t, raft::dynamic_extent, raft::dynamic_extent, raft::dynamic_extent>;
+  using pq_centers_extents =
+    raft::extents<uint32_t, raft::dynamic_extent, raft::dynamic_extent, raft::dynamic_extent>;
 
  public:
   index(const index&)                    = delete;
@@ -401,7 +388,7 @@ struct index : cuvs::neighbors::index {
   /** The dimensionality of an encoded vector after compression by PQ. */
   uint32_t pq_dim() const noexcept;
 
-  /** Dimensionality of a subspaces, i.e. the number of vector components mapped to a subspace */
+  /** Dimensionality of a subspace, i.e. the number of vector components mapped to a subspace */
   uint32_t pq_len() const noexcept;
 
   /** The number of vectors in a PQ codebook (`1 << pq_bits`). */
@@ -2500,7 +2487,7 @@ void pack_contiguous_list_data(raft::resources const& res,
  *   raft::copy(&list_size, index.list_sizes().data_handle() + label, 1,
  * resource::get_cuda_stream(res)); resource::sync_stream(res);
  *   // allocate the buffer for the output
- *   auto codes = raft::make_device_matrix<float>(res, list_size, index.pq_dim());
+ *   auto codes = raft::make_device_matrix<uint8_t>(res, list_size, index.pq_dim());
  *   // unpack the whole list
  *   ivf_pq::helpers::codepacker::unpack_list_data(res, index, codes.view(), label, 0);
  * @endcode
@@ -2574,11 +2561,11 @@ void unpack_list_data(raft::resources const& res,
  *     raft::resource::get_cuda_stream(res));
  *   raft::resource::sync_stream(res);
  *   // allocate the buffer for the output
- *   auto codes = raft::make_device_matrix<float>(res, list_size, raft::ceildiv(index.pq_dim() *
- *     index.pq_bits(), 8));
+ *   auto codes = raft::make_device_matrix<uint8_t>(res, list_size, raft::ceildiv(index.pq_dim() *
+ *      index.pq_bits(), 8));
  *   // unpack the whole list
- *   ivf_pq::helpers::codepacker::unpack_list_data(res, index, codes.data_handle(), list_size,
- * label, 0);
+ *   ivf_pq::helpers::codepacker::unpack_contiguous_list_data(res, index, codes.data_handle(),
+ *      list_size, label, 0);
  * @endcode
  *
  * @param[in] res raft resource
@@ -2859,7 +2846,7 @@ void make_rotation_matrix(raft::resources const& res,
 
 /**
  * @brief Public helper API for externally modifying the index's IVF centroids.
- * NB: The index must be reset before this. Use raft::neighbors::ivf_pq::extend to construct IVF
+ * NB: The index must be reset before this. Use cuvs::neighbors::ivf_pq::extend to construct IVF
  lists according to new centroids.
  *
  * Usage example:
@@ -2886,7 +2873,7 @@ void make_rotation_matrix(raft::resources const& res,
  */
 void set_centers(raft::resources const& res,
                  index<int64_t>* index,
-                 raft::device_matrix_view<const float, uint32_t> cluster_centers);
+                 raft::device_matrix_view<const float, int64_t> cluster_centers);
 
 /**
  * @brief Public helper API for fetching a trained index's IVF centroids
@@ -2907,7 +2894,7 @@ void set_centers(raft::resources const& res,
  */
 void extract_centers(raft::resources const& res,
                      const index<int64_t>& index,
-                     raft::device_matrix_view<float, uint32_t, raft::row_major> cluster_centers);
+                     raft::device_matrix_view<float, int64_t, raft::row_major> cluster_centers);
 
 /** @copydoc extract_centers */
 void extract_centers(raft::resources const& res,

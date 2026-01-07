@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -259,7 +248,7 @@ auto make_strided_dataset(const raft::resources& res, const SrcT& src, uint32_t 
   }
   // Something is wrong: have to make a copy and produce an owning dataset
   auto out_layout =
-    raft::make_strided_layout(src.extents(), std::array<index_type, 2>{required_stride, 1});
+    raft::make_strided_layout(src.extents(), cuda::std::array<index_type, 2>{required_stride, 1});
   auto out_array =
     raft::make_device_matrix<value_type, index_type>(res, src.extent(0), required_stride);
 
@@ -321,7 +310,7 @@ auto make_strided_dataset(
   const bool stride_matches = required_stride == src_stride;
 
   auto out_layout =
-    raft::make_strided_layout(src.extents(), std::array<index_type, 2>{required_stride, 1});
+    raft::make_strided_layout(src.extents(), cuda::std::array<index_type, 2>{required_stride, 1});
 
   using out_mdarray_type          = raft::device_matrix<value_type, index_type>;
   using out_layout_type           = typename out_mdarray_type::layout_type;

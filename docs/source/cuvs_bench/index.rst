@@ -62,18 +62,20 @@ The following command pulls the nightly container for Python version 3.10, CUDA 
 
 .. code-block:: bash
 
-   docker pull rapidsai/cuvs-bench:25.10a-cuda12.5-py3.10 # substitute cuvs-bench for the exact desired container.
+   docker pull rapidsai/cuvs-bench:26.02a-cuda12.5-py3.10 # substitute cuvs-bench for the exact desired container.
 
 The CUDA and Python versions can be changed for the supported values:
 - Supported CUDA versions: 12
 - Supported Python versions: 3.10 and 3.11.
+
+[ZAR Comment]: Please confirm accuracy (below). The Docker Hub link labels look swapped: the “pre-loaded million-scale datasets” line points to the CPU image, and the “CPU only images” line points to the datasets image.
 
 You can see the exact versions as well on the Docker Hub site:
 - `cuVS bench images <https://hub.docker.com/r/rapidsai/cuvs-bench/tags>`_
 - `cuVS bench with pre-loaded million-scale datasets images <https://hub.docker.com/r/rapidsai/cuvs-bench-cpu/tags>`_
 - `cuVS bench CPU only images <https://hub.docker.com/r/rapidsai/cuvs-bench-datasets/tags>`_
 
-**Note:** GPU containers use the CUDA toolkit from inside the container; the only requirement is a driver installed on the host machine that supports that version. So, for example, CUDA 11.8 containers can run on systems with CUDA 12. x-capable driver. Also note that the Nvidia-Docker runtime from the `Nvidia Container Toolkit <https://github.com/NVIDIA/nvidia-docker>`_ is required to use GPUs inside Docker containers.
+**Note**: GPU containers use the CUDA toolkit from inside the container; the only requirement is a driver installed on the host machine that supports that version. For example, CUDA 11.8 containers can run on systems with CUDA 12.x-capable driver. Also note that the Nvidia-Docker runtime from the `Nvidia Container Toolkit <https://github.com/NVIDIA/nvidia-docker>`_ is required to use GPUs inside Docker containers.
 
 Running the Benchmarks
 =======================
@@ -212,7 +214,7 @@ For GPU-enabled systems, the `DATA_FOLDER` variable should be a local folder whe
     export DATA_FOLDER=path/to/store/datasets/and/results
     docker run --gpus all --rm -it -u $(id -u)                      \
         -v $DATA_FOLDER:/data/benchmarks                            \
-        rapidsai/cuvs-bench:25.10-cuda12.9-py3.13              \
+        rapidsai/cuvs-bench:26.02-cuda12.9-py3.13              \
         "--dataset deep-image-96-angular"                           \
         "--normalize"                                               \
         "--algorithms cuvs_cagra,cuvs_ivf_pq --batch-size 10 -k 10" \
@@ -272,7 +274,7 @@ All of the `cuvs-bench` images contain the Conda packages, so they can be used d
         --entrypoint /bin/bash                          \
         --workdir /data/benchmarks                      \
         -v $DATA_FOLDER:/data/benchmarks                \
-        rapidsai/cuvs-bench:25.10-cuda12.9-py3.13
+        rapidsai/cuvs-bench:26.02-cuda12.9-py3.13
 
 This drops you into a command line in the container, with the `cuvs-bench` Python package ready to use, as described in the previous [Running the Benchmarks](#running-the-benchmarks) section:
 
@@ -305,7 +307,7 @@ The benchmarks capture several different measurements. The following table descr
    - Number of iterations (this is usually 1)
 
  * - GPU
-   - GU time spent building
+   - GPU time spent building
 
  * - index_size
    - Number of vectors used to train the index
@@ -351,12 +353,12 @@ The following table describes each measurement for the index search benchmarks. 
    - Total number of query vectors in each batch
 
  * - total_queries
-   - Total number of vectors queries across all iterations ( = `iterations` * `n_queries`)
+   - Total number of vector queries across all iterations ( = `iterations` * `n_queries`)
 
 Note the following:
  * A slightly different method is used to measure `Time` and `end_to_end`. That is why `end_to_end` = `Time` * `Iterations` holds only approximately.
- * The actual table displayed on the screen may differ slightly, as the hyperparameters will also be displayed for each different combination being benchmarked.
- * Recall calculation: the number of queries processed per test depends on the number of iterations. Because of this, recall can show slight fluctuations if fewer neighbors are processed than are available  for the benchmark.
+ * The actual table displayed on the screen can differ slightly, as the hyperparameters will also be displayed for each different combination being benchmarked.
+ * Recall calculation: the number of queries processed per test depends on the number of iterations. Because of this, recall can show slight fluctuations if fewer neighbors are processed than are available for the benchmark.
 
 Create and Customize Dataset Configurations
 ************************************************

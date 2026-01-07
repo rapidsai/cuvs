@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2020-2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -346,7 +335,7 @@ class sparse_knn_t {
       raft::make_device_matrix_view<const value_idx, int64_t>(merge_buffer_indices, rows, 2 * k),
       raft::make_device_matrix_view<value_t, int64_t>(out_dists, rows, k),
       raft::make_device_matrix_view<value_idx, int64_t>(out_indices, rows, k),
-      raft::make_device_vector_view<value_idx>(trans.data(), id_ranges.size()));
+      raft::make_device_vector_view<value_idx, int64_t>(trans.data(), id_ranges.size()));
   }
 
   void perform_k_selection(csr_batcher_t<value_idx, value_t> idx_batcher,
