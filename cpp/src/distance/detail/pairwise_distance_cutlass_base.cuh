@@ -18,8 +18,8 @@
 #include "pairwise_distance_epilogue_elementwise.h"
 #include "pairwise_distance_gemm.h"
 
+#include "../../util/cutlass_utils.hpp"
 #include "distance_ops/cutlass.cuh"
-#include <cuvs/util/cutlass_utils.hpp>
 
 #include <rmm/device_uvector.hpp>
 

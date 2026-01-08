@@ -15,10 +15,10 @@
 #define cutlass cuvs_cutlass
 #endif
 
-#include "epilogue_elementwise.cuh"     // FusedDistanceNNEpilogueElementwise
-#include "gemm.h"                       // FusedDistanceNNGemm
-#include <cuvs/util/cutlass_utils.hpp>  // CUVS_CUTLASS_TRY
-#include <raft/util/cudart_utils.hpp>   // getMultiProcessorCount
+#include "../../../util/cutlass_utils.hpp"  // CUVS_CUTLASS_TRY
+#include "epilogue_elementwise.cuh"         // FusedDistanceNNEpilogueElementwise
+#include "gemm.h"                           // FusedDistanceNNGemm
+#include <raft/util/cudart_utils.hpp>       // getMultiProcessorCount
 
 #include <rmm/device_uvector.hpp>
 
