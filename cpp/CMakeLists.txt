@@ -1,6 +1,6 @@
 # =============================================================================
 # cmake-format: off
-# SPDX-FileCopyrightText: Copyright (c) 2020-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2020-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
@@ -493,6 +493,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ivf_pq/detail/ivf_pq_build_extend_half_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_build_extend_int8_t_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_build_extend_uint8_t_int64_t.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_build_precomputed_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_fp8_false.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_fp8_true.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_half.cu
