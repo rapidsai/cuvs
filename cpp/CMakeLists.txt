@@ -573,6 +573,7 @@ if(NOT BUILD_CPU_ONLY)
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
             $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
             $<TARGET_NAME_IF_EXISTS:cuco::cuco>
+            $<TARGET_NAME_IF_EXISTS:nvidia::cutlass::cutlass>
   )
 
   # Endian detection
