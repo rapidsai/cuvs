@@ -1,8 +1,11 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "ivf_common.cuh"
+
+#include <raft/core/cudart_utils.hpp>
 #include <raft/util/pow2_utils.cuh>
 
 #include <cub/cub.cuh>
@@ -45,20 +48,37 @@ __launch_bounds__(BlockDim) RAFT_KERNEL
   if (threadIdx.x == 0) { n_samples[blockIdx.x] = total; }
 }
 
-/**
- * Returns a pointer to calc_chunk_indices_kernel for the given BlockDim.
- */
-template <int BlockDim>
-void* get_calc_chunk_indices_kernel()
+auto calc_chunk_indices::configure(uint32_t n_probes, uint32_t n_queries) -> configured
 {
-  return reinterpret_cast<void*>(calc_chunk_indices_kernel<BlockDim>);
+  uint32_t block_dim = 1024;
+  while (block_dim >= raft::WarpSize * 2 && block_dim >= n_probes * 2) {
+    block_dim /= 2;
+  }
+  return {dim3(block_dim, 1, 1), dim3(n_queries, 1, 1), n_probes};
 }
 
-template void* get_calc_chunk_indices_kernel<32>();
-template void* get_calc_chunk_indices_kernel<64>();
-template void* get_calc_chunk_indices_kernel<128>();
-template void* get_calc_chunk_indices_kernel<256>();
-template void* get_calc_chunk_indices_kernel<512>();
-template void* get_calc_chunk_indices_kernel<1024>();
+void calc_chunk_indices::configured::operator()(const uint32_t* cluster_sizes,
+                                                const uint32_t* clusters_to_probe,
+                                                uint32_t* chunk_indices,
+                                                uint32_t* n_samples,
+                                                rmm::cuda_stream_view stream)
+{
+  void* kernel = nullptr;
+  switch (block_dim.x) {
+    case 32: kernel = reinterpret_cast<void*>(calc_chunk_indices_kernel<32>); break;
+    case 64: kernel = reinterpret_cast<void*>(calc_chunk_indices_kernel<64>); break;
+    case 128: kernel = reinterpret_cast<void*>(calc_chunk_indices_kernel<128>); break;
+    case 256: kernel = reinterpret_cast<void*>(calc_chunk_indices_kernel<256>); break;
+    case 512: kernel = reinterpret_cast<void*>(calc_chunk_indices_kernel<512>); break;
+    case 1024: kernel = reinterpret_cast<void*>(calc_chunk_indices_kernel<1024>); break;
+    default:
+      RAFT_FAIL("Unsupported block dimension for calc_chunk_indices::configured() : %d",
+                block_dim.x);
+  }
+
+  void* args[] =  // NOLINT
+    {&n_probes, &cluster_sizes, &clusters_to_probe, &chunk_indices, &n_samples};
+  RAFT_CUDA_TRY(cudaLaunchKernel(kernel, grid_dim, block_dim, args, 0, stream));
+}
 
 }  // namespace cuvs::neighbors::ivf::detail

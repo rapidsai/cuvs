@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -30,58 +30,28 @@ struct dummy_block_sort_t {
 };
 
 /**
- * Returns a pointer to calc_chunk_indices_kernel for the given BlockDim.
- * The kernel is defined and the pointer is taken in ivf_common.cu to comply
- * with CUDA whole compilation rules. See
+ * Struct to configure and launch calc_chunk_indices_kernel.
+ *
+ * Both configure() and operator() are defined in ivf_common.cu to comply
+ * with CUDA whole compilation rules - the kernel pointer must be obtained
+ * and used within the same translation unit. See
  * https://developer.nvidia.com/blog/cuda-c-compiler-updates-impacting-elf-visibility-and-linkage/
  */
-template <int BlockDim>
-void* get_calc_chunk_indices_kernel();
-
-extern template void* get_calc_chunk_indices_kernel<32>();
-extern template void* get_calc_chunk_indices_kernel<64>();
-extern template void* get_calc_chunk_indices_kernel<128>();
-extern template void* get_calc_chunk_indices_kernel<256>();
-extern template void* get_calc_chunk_indices_kernel<512>();
-extern template void* get_calc_chunk_indices_kernel<1024>();
-
 struct calc_chunk_indices {
  public:
   struct configured {
-    void* kernel;
     dim3 block_dim;
     dim3 grid_dim;
     uint32_t n_probes;
 
-    inline void operator()(const uint32_t* cluster_sizes,
-                           const uint32_t* clusters_to_probe,
-                           uint32_t* chunk_indices,
-                           uint32_t* n_samples,
-                           rmm::cuda_stream_view stream)
-    {
-      void* args[] =  // NOLINT
-        {&n_probes, &cluster_sizes, &clusters_to_probe, &chunk_indices, &n_samples};
-      RAFT_CUDA_TRY(cudaLaunchKernel(kernel, grid_dim, block_dim, args, 0, stream));
-    }
+    void operator()(const uint32_t* cluster_sizes,
+                    const uint32_t* clusters_to_probe,
+                    uint32_t* chunk_indices,
+                    uint32_t* n_samples,
+                    rmm::cuda_stream_view stream);
   };
 
-  static inline auto configure(uint32_t n_probes, uint32_t n_queries) -> configured
-  {
-    return try_block_dim<1024>(n_probes, n_queries);
-  }
-
- private:
-  template <int BlockDim>
-  static auto try_block_dim(uint32_t n_probes, uint32_t n_queries) -> configured
-  {
-    if constexpr (BlockDim >= raft::WarpSize * 2) {
-      if (BlockDim >= n_probes * 2) { return try_block_dim<(BlockDim / 2)>(n_probes, n_queries); }
-    }
-    return {get_calc_chunk_indices_kernel<BlockDim>(),
-            dim3(BlockDim, 1, 1),
-            dim3(n_queries, 1, 1),
-            n_probes};
-  }
+  static auto configure(uint32_t n_probes, uint32_t n_queries) -> configured;
 };
 
 /**
