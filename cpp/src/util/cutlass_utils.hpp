@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <cuvs/util/cutlass_utils.hpp>
+
 #include <cutlass/cutlass.h>
 
 /**
