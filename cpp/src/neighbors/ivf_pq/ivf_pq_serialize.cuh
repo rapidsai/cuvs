@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -7,6 +7,7 @@
 
 #include "../ivf_common.cuh"
 #include "../ivf_list.cuh"
+#include "../ivf_pq_impl.hpp"
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <raft/core/host_mdarray.hpp>
@@ -134,25 +135,29 @@ auto deserialize(raft::resources const& handle_, std::istream& is) -> index<IdxT
                  static_cast<int>(pq_bits),
                  static_cast<int>(n_lists));
 
-  auto index = cuvs::neighbors::ivf_pq::index<IdxT>(
+  // Create owning_impl directly to get mutable access for deserialization
+  auto impl = std::make_unique<owning_impl<IdxT>>(
     handle_, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, cma);
 
-  raft::deserialize_mdspan(handle_, is, index.pq_centers());
-  raft::deserialize_mdspan(handle_, is, index.centers());
-  raft::deserialize_mdspan(handle_, is, index.centers_rot());
-  raft::deserialize_mdspan(handle_, is, index.rotation_matrix());
-  raft::deserialize_mdspan(handle_, is, index.list_sizes());
+  // Deserialize center/matrix data using mutable accessors
+  raft::deserialize_mdspan(handle_, is, impl->pq_centers());
+  raft::deserialize_mdspan(handle_, is, impl->centers());
+  raft::deserialize_mdspan(handle_, is, impl->centers_rot());
+  raft::deserialize_mdspan(handle_, is, impl->rotation_matrix());
+  raft::deserialize_mdspan(handle_, is, impl->list_sizes());
   auto list_device_spec = list_spec<uint32_t, IdxT>{pq_bits, pq_dim, cma};
   auto list_store_spec  = list_spec<uint32_t, IdxT>{pq_bits, pq_dim, true};
-  for (auto& list : index.lists()) {
+  for (auto& list : impl->lists()) {
     ivf::deserialize_list(handle_, is, list, list_store_spec, list_device_spec);
   }
 
+  index<IdxT> idx(std::move(impl));
+
   raft::resource::sync_stream(handle_);
 
-  ivf::detail::recompute_internal_state(handle_, index);
+  ivf::detail::recompute_internal_state(handle_, idx);
 
-  return index;
+  return idx;
 }
 
 /**
