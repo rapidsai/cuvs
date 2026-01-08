@@ -220,7 +220,7 @@ if(NOT BUILD_CPU_ONLY)
               "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
               "$<INSTALL_INTERFACE:include>"
   )
-  target_link_libraries(cuvs_cpp_headers INTERFACE raft::raft rmm::rmm)
+  target_link_libraries(cuvs_cpp_headers INTERFACE nvidia::cutlass::cutlass raft::raft rmm::rmm)
 
   add_library(
     cuvs-cagra-search OBJECT
