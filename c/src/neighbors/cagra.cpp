@@ -696,6 +696,8 @@ extern "C" cuvsError_t cuvsCagraMerge(cuvsResources_t res,
   return cuvs::core::translate_exceptions([=] {
     // Basic checks on inputs
     RAFT_EXPECTS(indices != nullptr && num_indices > 0, "indices array cannot be null or empty");
+    RAFT_EXPECTS(params != nullptr, "params cannot be null");
+
     // Use first index dtype as reference
     auto dtype = (*indices[0]).dtype;
     for (size_t i = 1; i < num_indices; ++i) {

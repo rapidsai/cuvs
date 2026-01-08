@@ -523,18 +523,15 @@ public class CagraIndexImpl implements CagraIndex {
    * Allocates the native CagraIndexParams data structures and fills the configured index parameters in.
    */
   private static CloseableHandle segmentFromIndexParams(CagraIndexParams params) {
-
-    if (params == null) {
-      return CloseableHandle.NULL;
-    }
-
     var handles = new ArrayList<CloseableHandle>();
 
     var indexParams = createCagraIndexParams();
     handles.add(indexParams);
     var indexPtr = indexParams.handle();
 
-    populateNativeIndexParams(indexPtr, params, handles);
+    if (params != null) {
+      populateNativeIndexParams(indexPtr, params, handles);
+    }
 
     return new CompositeCloseableHandle(indexPtr, handles);
   }
