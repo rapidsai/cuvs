@@ -192,6 +192,8 @@ if(NOT BUILD_CPU_ONLY)
   rapids_cpm_cccl(BUILD_EXPORT_SET cuvs-exports INSTALL_EXPORT_SET cuvs-exports)
   include(cmake/thirdparty/get_raft.cmake)
   include(cmake/thirdparty/get_cutlass.cmake)
+  include(${rapids-cmake-dir}/cpm/cuco.cmake)
+  rapids_cpm_cuco(BUILD_EXPORT_SET cuvs-exports INSTALL_EXPORT_SET cuvs-exports)
 endif()
 
 if(BUILD_TESTS OR BUILD_C_TESTS)
@@ -566,8 +568,11 @@ if(NOT BUILD_CPU_ONLY)
 
   target_link_libraries(
     cuvs_objs
-    PRIVATE cuvs::cuvs_cpp_headers ${CUVS_CTK_MATH_DEPENDENCIES}
-            $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
+    PRIVATE cuvs::cuvs_cpp_headers
+            ${CUVS_CTK_MATH_DEPENDENCIES}
+            $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+            $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
+            $<TARGET_NAME_IF_EXISTS:cuco::cuco>
   )
 
   # Endian detection
@@ -638,6 +643,7 @@ if(NOT BUILD_CPU_ONLY)
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
       PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+              $<TARGET_NAME_IF_EXISTS:cuco::cuco>
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
@@ -693,7 +699,7 @@ SECTIONS
              $<TARGET_NAME_IF_EXISTS:NCCL::NCCL> # needs to be public for DT_NEEDED
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>> # header only
       PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
+              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3> $<TARGET_NAME_IF_EXISTS:cuco::cuco>
     )
   endif()
 
