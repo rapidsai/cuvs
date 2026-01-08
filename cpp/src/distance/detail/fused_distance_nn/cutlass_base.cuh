@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,8 +17,8 @@
 
 #include "epilogue_elementwise.cuh"     // FusedDistanceNNEpilogueElementwise
 #include "gemm.h"                       // FusedDistanceNNGemm
+#include <cuvs/util/cutlass_utils.hpp>  // RAFT_CUTLASS_TRY
 #include <raft/util/cudart_utils.hpp>   // getMultiProcessorCount
-#include <raft/util/cutlass_utils.cuh>  // RAFT_CUTLASS_TRY
 
 #include <rmm/device_uvector.hpp>
 

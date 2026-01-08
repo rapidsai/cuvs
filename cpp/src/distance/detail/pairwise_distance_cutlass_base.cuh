@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -19,7 +19,7 @@
 #include "pairwise_distance_gemm.h"
 
 #include "distance_ops/cutlass.cuh"
-#include <raft/util/cutlass_utils.cuh>
+#include <cuvs/util/cutlass_utils.hpp>
 
 #include <rmm/device_uvector.hpp>
 
