@@ -1,6 +1,6 @@
 # =============================================================================
 # cmake-format: off
-# SPDX-FileCopyrightText: Copyright (c) 2020-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2020-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
@@ -28,6 +28,9 @@ project(
   LANGUAGES ${lang_list}
 )
 set(CMAKE_INSTALL_MESSAGE LAZY)
+
+# Disable C++20 module scanning (not using modules, just C++20 features)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 # Write the version header
 rapids_cmake_write_version_file(include/cuvs/version_config.h)
@@ -305,9 +308,9 @@ if(NOT BUILD_CPU_ONLY)
   set_target_properties(
     cuvs-cagra-search
     PROPERTIES BUILD_RPATH "\$ORIGIN"
-               CXX_STANDARD 17
+               CXX_STANDARD 20
                CXX_STANDARD_REQUIRED ON
-               CUDA_STANDARD 17
+               CUDA_STANDARD 20
                CUDA_STANDARD_REQUIRED ON
                CUDA_SEPARABLE_COMPILATION ON
                POSITION_INDEPENDENT_CODE ON
@@ -489,6 +492,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ivf_pq/detail/ivf_pq_build_extend_half_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_build_extend_int8_t_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_build_extend_uint8_t_int64_t.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_build_precomputed_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_fp8_false.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_fp8_true.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_half.cu
@@ -544,9 +548,9 @@ if(NOT BUILD_CPU_ONLY)
 
   set_target_properties(
     cuvs_objs
-    PROPERTIES CXX_STANDARD 17
+    PROPERTIES CXX_STANDARD 20
                CXX_STANDARD_REQUIRED ON
-               CUDA_STANDARD 17
+               CUDA_STANDARD 20
                CUDA_STANDARD_REQUIRED ON
                POSITION_INDEPENDENT_CODE ON
   )
@@ -604,9 +608,9 @@ if(NOT BUILD_CPU_ONLY)
       cuvs
       PROPERTIES BUILD_RPATH "\$ORIGIN"
                  INSTALL_RPATH "\$ORIGIN"
-                 CXX_STANDARD 17
+                 CXX_STANDARD 20
                  CXX_STANDARD_REQUIRED ON
-                 CUDA_STANDARD 17
+                 CUDA_STANDARD 20
                  CUDA_STANDARD_REQUIRED ON
                  CUDA_RESOLVE_DEVICE_SYMBOLS ON
                  INTERFACE_POSITION_INDEPENDENT_CODE ON
@@ -659,9 +663,9 @@ SECTIONS
       cuvs_static
       PROPERTIES BUILD_RPATH "\$ORIGIN"
                  INSTALL_RPATH "\$ORIGIN"
-                 CXX_STANDARD 17
+                 CXX_STANDARD 20
                  CXX_STANDARD_REQUIRED ON
-                 CUDA_STANDARD 17
+                 CUDA_STANDARD 20
                  CUDA_STANDARD_REQUIRED ON
                  CUDA_RESOLVE_DEVICE_SYMBOLS ON
                  POSITION_INDEPENDENT_CODE ON

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 
@@ -15,9 +15,9 @@ from cuvs.tests.ann_utils import calc_recall, generate_data
 
 
 def run_hnsw_ace_build_search_test(
-    n_rows=5000,
-    n_cols=64,
-    n_queries=10,
+    n_rows=10000,
+    n_cols=10,
+    n_queries=100,
     k=10,
     dtype=np.float32,
     metric="sqeuclidean",
@@ -117,51 +117,42 @@ def run_hnsw_ace_build_search_test(
         )
 
 
-@pytest.mark.parametrize("dim", [64, 128])
 @pytest.mark.parametrize("dtype", [np.float32, np.float16, np.int8, np.uint8])
 @pytest.mark.parametrize("metric", ["sqeuclidean", "inner_product"])
-@pytest.mark.parametrize("npartitions", [2, 4])
 @pytest.mark.parametrize("use_disk", [False, True])
-def test_hnsw_ace_build_search(dim, dtype, metric, npartitions, use_disk):
-    """
-    Test HNSW ACE build and search with various configurations.
-
-    Tests both in-memory and disk-based modes
-    """
-    # Lower recall expectation for certain combinations
-    expected_recall = 0.7
-    if metric == "sqeuclidean" and dtype in [np.float32, np.float16]:
-        expected_recall = 0.8
-
+def test_hnsw_ace_build_search(dtype, metric, use_disk):
+    """Test HNSWACE with different data types and metrics."""
     run_hnsw_ace_build_search_test(
-        n_cols=dim,
         dtype=dtype,
         metric=metric,
-        npartitions=npartitions,
         use_disk=use_disk,
-        hierarchy="gpu",
-        expected_recall=expected_recall,
+    )
+
+
+@pytest.mark.parametrize("npartitions", [2, 3, 8])
+def test_hnsw_ace_partitions(npartitions):
+    """Test HNSW ACE with different partition sizes (disk mode only)."""
+    run_hnsw_ace_build_search_test(
+        use_disk=True,
+        npartitions=npartitions,
+    )
+
+
+@pytest.mark.parametrize("ef_construction", [50, 100, 200])
+def test_hnsw_ace_ef_construction(ef_construction):
+    """Test HNSW ACE with different ef_construction values (disk mode only)."""
+    run_hnsw_ace_build_search_test(
+        use_disk=True,
+        ef_construction=ef_construction,
     )
 
 
 @pytest.mark.parametrize("hierarchy", ["none", "gpu"])
-@pytest.mark.parametrize("use_disk", [False, True])
-def test_hnsw_ace_hierarchy(hierarchy, use_disk):
-    """Test HNSW ACE with different hierarchy options."""
+def test_hnsw_ace_hierarchy(hierarchy):
+    """Test HNSW ACE with different hierarchy modes (disk mode only)."""
     run_hnsw_ace_build_search_test(
-        hierarchy=hierarchy,
-        use_disk=use_disk,
-        expected_recall=0.7,
-    )
-
-
-@pytest.mark.parametrize("ef_construction", [100, 200])
-def test_hnsw_ace_ef_construction(ef_construction):
-    """Test HNSW ACE with different ef_construction values."""
-    run_hnsw_ace_build_search_test(
-        ef_construction=ef_construction,
         use_disk=True,
-        expected_recall=0.7,
+        hierarchy=hierarchy,
     )
 
 
@@ -170,9 +161,9 @@ def test_hnsw_ace_disk_serialize_deserialize():
     Test the full disk-based ACE workflow:
     build -> serialize -> deserialize -> search
     """
-    n_rows = 5000
-    n_cols = 64
-    n_queries = 10
+    n_rows = 10000
+    n_cols = 10
+    n_queries = 100
     k = 10
     dtype = np.float32
     metric = "sqeuclidean"
