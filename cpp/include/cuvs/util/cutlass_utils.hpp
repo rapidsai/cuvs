@@ -9,7 +9,7 @@
 
 #include <cutlass/cutlass.h>
 
-namespace raft {
+namespace cuvs {
 
 /**
  * @brief Exception thrown when a CUTLASS error is encountered.
@@ -19,7 +19,7 @@ struct cutlass_error : public raft::exception {
   explicit cutlass_error(std::string const& message) : raft::exception(message) {}
 };
 
-}  // namespace raft
+}  // namespace cuvs
 
 /**
  * @brief Error checking macro for CUTLASS functions.
@@ -28,7 +28,7 @@ struct cutlass_error : public raft::exception {
  * throws an exception detailing the CUTLASS error that occurred.
  *
  */
-#define RAFT_CUTLASS_TRY(call)                        \
+#define CUVS_CUTLASS_TRY(call)                        \
   do {                                                \
     cutlass::Status const status = call;              \
     if (status != cutlass::Status::kSuccess) {        \
@@ -38,6 +38,6 @@ struct cutlass_error : public raft::exception {
                     "call='%s', Reason=%s",           \
                     #call,                            \
                     cutlassGetStatusString(status));  \
-      throw raft::cutlass_error(msg);                 \
+      throw cuvs::cutlass_error(msg);                 \
     }                                                 \
   } while (0)

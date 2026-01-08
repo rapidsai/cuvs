@@ -157,13 +157,13 @@ std::enable_if_t<ops::has_cutlass_op<OpT>::value> cutlassDistanceKernel(const Da
     // Instantiate CUTLASS kernel depending on templates
     cutlassDist cutlassDist_op;
     // Check the problem size is supported or not
-    RAFT_CUTLASS_TRY(cutlassDist_op.can_implement(arguments));
+    CUVS_CUTLASS_TRY(cutlassDist_op.can_implement(arguments));
 
     // Initialize CUTLASS kernel with arguments and workspace pointer
-    RAFT_CUTLASS_TRY(cutlassDist_op.initialize(arguments, workspace.data(), stream));
+    CUVS_CUTLASS_TRY(cutlassDist_op.initialize(arguments, workspace.data(), stream));
 
     // Launch initialized CUTLASS kernel
-    RAFT_CUTLASS_TRY(cutlassDist_op(stream));
+    CUVS_CUTLASS_TRY(cutlassDist_op(stream));
   }
 }
 
