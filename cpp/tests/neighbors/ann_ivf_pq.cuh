@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -264,6 +264,54 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     cuvs::neighbors::ivf_pq::index<IdxT> index(handle_);
     cuvs::neighbors::ivf_pq::deserialize(handle_, index_file.filename, &index);
     return index;
+  }
+
+  void build_precomputed()
+  {
+    auto ipams              = ps.index_params;
+    ipams.add_data_on_build = false;
+    auto database_view =
+      raft::make_device_matrix_view<const DataT, int64_t>(database.data(), ps.num_db_vecs, ps.dim);
+    const auto& base_index = cuvs::neighbors::ivf_pq::build(handle_, ipams, database_view);
+
+    auto view_index = cuvs::neighbors::ivf_pq::build(handle_,
+                                                     ipams,
+                                                     base_index.dim(),
+                                                     base_index.pq_centers(),
+                                                     base_index.centers(),
+                                                     base_index.centers_rot(),
+                                                     base_index.rotation_matrix());
+
+    ASSERT_EQ(base_index.pq_centers().data_handle(), view_index.pq_centers().data_handle());
+    ASSERT_EQ(base_index.centers().data_handle(), view_index.centers().data_handle());
+    ASSERT_EQ(base_index.centers_rot().data_handle(), view_index.centers_rot().data_handle());
+    ASSERT_EQ(base_index.rotation_matrix().data_handle(),
+              view_index.rotation_matrix().data_handle());
+
+    ASSERT_EQ(base_index.pq_centers().extents(), view_index.pq_centers().extents());
+    ASSERT_EQ(base_index.centers().extents(), view_index.centers().extents());
+    ASSERT_EQ(base_index.centers_rot().extents(), view_index.centers_rot().extents());
+    ASSERT_EQ(base_index.rotation_matrix().extents(), view_index.rotation_matrix().extents());
+
+    auto db_indices = raft::make_device_vector<IdxT>(handle_, ps.num_db_vecs);
+    raft::linalg::map_offset(handle_, db_indices.view(), raft::identity_op{});
+
+    auto vecs_view =
+      raft::make_device_matrix_view<const DataT, int64_t>(database.data(), ps.num_db_vecs, ps.dim);
+    auto inds_view =
+      raft::make_device_vector_view<const IdxT, int64_t>(db_indices.data_handle(), ps.num_db_vecs);
+
+    cuvs::neighbors::ivf_pq::extend(handle_, vecs_view, inds_view, &view_index);
+    cuvs::neighbors::ivf_pq::extend(handle_,
+                                    vecs_view,
+                                    inds_view,
+                                    const_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(&base_index));
+
+    // Verify that both indices have identical list sizes after extension
+    ASSERT_TRUE(cuvs::devArrMatch(base_index.list_sizes().data_handle(),
+                                  view_index.list_sizes().data_handle(),
+                                  base_index.n_lists(),
+                                  cuvs::Compare<uint32_t>{}));
   }
 
   void check_reconstruction(const index<IdxT>& index,
@@ -1095,6 +1143,9 @@ inline auto special_cases() -> test_cases_t
   {                                                          \
     this->run([this]() { return this->build_serialize(); }); \
   }
+
+#define TEST_BUILD_PRECOMPUTED(type) \
+  TEST_P(type, build_precomputed) /* NOLINT */ { this->build_precomputed(); }
 
 #define INSTANTIATE(type, vals) \
   INSTANTIATE_TEST_SUITE_P(IvfPq, type, ::testing::ValuesIn(vals)); /* NOLINT */
