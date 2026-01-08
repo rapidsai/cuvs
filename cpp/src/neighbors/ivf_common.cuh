@@ -51,7 +51,20 @@ struct calc_chunk_indices {
                     rmm::cuda_stream_view stream);
   };
 
-  static auto configure(uint32_t n_probes, uint32_t n_queries) -> configured;
+  static inline auto configure(uint32_t n_probes, uint32_t n_queries) -> configured
+  {
+    return try_block_dim<1024>(n_probes, n_queries);
+  }
+
+ private:
+  template <int BlockDim>
+  static auto try_block_dim(uint32_t n_probes, uint32_t n_queries) -> configured
+  {
+    if constexpr (BlockDim >= raft::WarpSize * 2) {
+      if (BlockDim >= n_probes * 2) { return try_block_dim<(BlockDim / 2)>(n_probes, n_queries); }
+    }
+    return {dim3(BlockDim, 1, 1), dim3(n_queries, 1, 1), n_probes};
+  }
 };
 
 /**

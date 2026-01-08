@@ -48,15 +48,6 @@ __launch_bounds__(BlockDim) RAFT_KERNEL
   if (threadIdx.x == 0) { n_samples[blockIdx.x] = total; }
 }
 
-auto calc_chunk_indices::configure(uint32_t n_probes, uint32_t n_queries) -> configured
-{
-  uint32_t block_dim = 1024;
-  while (block_dim >= raft::WarpSize * 2 && block_dim >= n_probes * 2) {
-    block_dim /= 2;
-  }
-  return {dim3(block_dim, 1, 1), dim3(n_queries, 1, 1), n_probes};
-}
-
 void calc_chunk_indices::configured::operator()(const uint32_t* cluster_sizes,
                                                 const uint32_t* clusters_to_probe,
                                                 uint32_t* chunk_indices,
