@@ -317,7 +317,10 @@ if(NOT BUILD_CPU_ONLY)
                CUDA_SEPARABLE_COMPILATION ON
                POSITION_INDEPENDENT_CODE ON
   )
-  target_link_libraries(cuvs-cagra-search PRIVATE cuvs::cuvs_cpp_headers)
+  target_link_libraries(
+    cuvs-cagra-search PRIVATE cuvs::cuvs_cpp_headers
+                              $<TARGET_NAME_IF_EXISTS:nvidia::cutlass::cutlass>
+  )
   target_compile_options(
     cuvs-cagra-search PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
                               "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
