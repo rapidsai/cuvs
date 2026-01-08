@@ -13,7 +13,9 @@
  * @brief Error checking macro for CUTLASS functions.
  *
  * Invokes a CUTLASS function call, if the call does not return cutlass::Status::kSuccess,
- * throws an exception detailing the CUTLASS error that occurred.
+ * throws an exception detailing the CUTLASS error that occurred. This macro
+ * is only available internally to cuvs and as such the file differs from
+ * the one found in cuvs/include/util
  *
  */
 #define CUVS_CUTLASS_TRY(call)                        \
