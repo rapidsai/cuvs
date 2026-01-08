@@ -474,7 +474,7 @@ namespace filtering {
 enum class FilterType { None, Bitmap, Bitset };
 
 struct base_filter {
-  ~base_filter()                             = default;
+  ~base_filter()                             = default; changes
   virtual FilterType get_filter_type() const = 0;
 };
 
