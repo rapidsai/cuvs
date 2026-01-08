@@ -559,6 +559,99 @@ auto vpq_convert_math_type(const raft::resources& res, vpq_dataset<OldMathT, Idx
   return vpq_dataset<NewMathT, IdxT>{
     std::move(vq_code_book), std::move(pq_code_book), std::move(src.data)};
 }
+template <typename MathT>
+struct vec4_op {};
+
+template <>
+struct vec4_op<float> {
+  using type = float4;
+  __device__ __forceinline__ static type make(float x, float y, float z, float w)
+  {
+    return make_float4(x, y, z, w);
+  }
+
+  __device__ __forceinline__ static type load(const float* ptr)
+  {
+    return __ldg(reinterpret_cast<const type*>(ptr));
+  }
+
+  __device__ __forceinline__ static void store(float* ptr, const type& val)
+  {
+    *reinterpret_cast<type*>(ptr) = val;
+  }
+
+  __device__ __forceinline__ static float sum_squares(const type& diff)
+  {
+    return diff.x * diff.x + diff.y * diff.y + diff.z * diff.z + diff.w * diff.w;
+  }
+
+  __device__ __forceinline__ static type sub(const type& a, const type& b)
+  {
+    return make_float4(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w);
+  }
+};
+
+// Helper: compute distances to 4 centers and find minimum
+template <uint32_t SubWarpSize, typename MathT, typename CodeT>
+__device__ __forceinline__ void compute_4centers_and_update(
+  MathT& min_dist, CodeT& code, MathT d0, MathT d1, MathT d2, MathT d3, uint32_t l)
+{
+  MathT best_dist_01 = fminf(d0, d1);
+  MathT best_dist_23 = fminf(d2, d3);
+  MathT best_dist    = fminf(best_dist_01, best_dist_23);
+
+  const uint32_t idx_01   = (d1 < d0) ? (l + SubWarpSize) : l;
+  const uint32_t idx_23   = (d3 < d2) ? (l + 3 * SubWarpSize) : (l + 2 * SubWarpSize);
+  const uint32_t best_idx = (best_dist_23 < best_dist_01) ? idx_23 : idx_01;
+
+  if (best_dist < min_dist) {
+    min_dist = best_dist;
+    code     = CodeT(best_idx);
+  }
+}
+
+// Helper: process 4 centers using Vec4 operations
+template <uint32_t SubWarpSize, typename MathT, typename GetXFunc>
+__device__ __forceinline__ void process_4centers_vec4(MathT& d0,
+                                                      MathT& d1,
+                                                      MathT& d2,
+                                                      MathT& d3,
+                                                      const MathT* __restrict__ centers_ptr,
+                                                      uint32_t l,
+                                                      const uint32_t pq_len,
+                                                      GetXFunc get_x_func)
+{
+  using Vec4 = typename vec4_op<MathT>::type;
+  uint32_t k = 0;
+  for (; k + 3 < pq_len; k += 4) {
+    Vec4 x_vec =
+      vec4_op<MathT>::make(get_x_func(k), get_x_func(k + 1), get_x_func(k + 2), get_x_func(k + 3));
+
+    Vec4 c0 = vec4_op<MathT>::load(&centers_ptr[l * pq_len + k]);
+    Vec4 c1 = vec4_op<MathT>::load(&centers_ptr[(l + SubWarpSize) * pq_len + k]);
+    Vec4 c2 = vec4_op<MathT>::load(&centers_ptr[(l + 2 * SubWarpSize) * pq_len + k]);
+    Vec4 c3 = vec4_op<MathT>::load(&centers_ptr[(l + 3 * SubWarpSize) * pq_len + k]);
+
+    d0 += vec4_op<MathT>::sum_squares(vec4_op<MathT>::sub(x_vec, c0));
+    d1 += vec4_op<MathT>::sum_squares(vec4_op<MathT>::sub(x_vec, c1));
+    d2 += vec4_op<MathT>::sum_squares(vec4_op<MathT>::sub(x_vec, c2));
+    d3 += vec4_op<MathT>::sum_squares(vec4_op<MathT>::sub(x_vec, c3));
+  }
+
+  // Tail loop
+  for (; k < pq_len; k++) {
+    MathT x  = get_x_func(k);
+    MathT c0 = __ldg(&centers_ptr[l * pq_len + k]);
+    MathT c1 = __ldg(&centers_ptr[(l + SubWarpSize) * pq_len + k]);
+    MathT c2 = __ldg(&centers_ptr[(l + 2 * SubWarpSize) * pq_len + k]);
+    MathT c3 = __ldg(&centers_ptr[(l + 3 * SubWarpSize) * pq_len + k]);
+
+    d0 = __fmaf_rn(x - c0, x - c0, d0);
+    d1 = __fmaf_rn(x - c1, x - c1, d1);
+    d2 = __fmaf_rn(x - c2, x - c2, d2);
+    d3 = __fmaf_rn(x - c3, x - c3, d3);
+  }
+}
 
 template <uint32_t SubWarpSize,
           typename CodeT,
@@ -571,7 +664,7 @@ __device__ auto compute_code_subspaces(
   std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
   MathT* smem_dataset,
-  IdxT i,
+  IdxT row_ix,
   uint32_t j,
   LabelT vq_label) -> CodeT
 {
@@ -583,7 +676,7 @@ __device__ auto compute_code_subspaces(
   const uint32_t pq_book_size           = pq_centers.extent(0);
   const uint32_t pq_len                 = pq_centers.extent(1);
   const MathT* __restrict__ centers_ptr = pq_centers.data_handle();
-  const DataT* __restrict__ dataset_ptr = dataset.data_handle() + i * dataset.extent(1);
+  const DataT* __restrict__ dataset_ptr = dataset.data_handle() + row_ix * dataset.extent(1);
   MathT min_dist                        = std::numeric_limits<MathT>::infinity();
   CodeT code                            = 0;
 
@@ -597,53 +690,31 @@ __device__ auto compute_code_subspaces(
       my_dataset_val = x;
     }
 
-    const uint32_t subwarp_idx  = raft::Pow2<SubWarpSize>::div(raft::laneId());
-    const uint32_t subwarp_mask = (SubWarpSize == 32)
-                                    ? 0xffffffffu
-                                    : (((1u << SubWarpSize) - 1) << (subwarp_idx * SubWarpSize));
-    // Each thread evaluates by chunks of 4 PQ centers
-    uint32_t l = lane_id;
+    const uint32_t subwarp_idx = raft::Pow2<SubWarpSize>::div(raft::laneId());
+    const uint32_t subwarp_mask =
+      (SubWarpSize == 32) ? 0xffffffffu : (0xffffu << (subwarp_idx * SubWarpSize));
 
+    auto get_x_shuffle = [&](uint32_t k) {
+      return __shfl_sync(subwarp_mask, my_dataset_val, k, SubWarpSize);
+    };
+
+    // Process 4 centers at a time
+    uint32_t l = lane_id;
     for (; l + 3 * SubWarpSize < pq_book_size; l += 4 * SubWarpSize) {
       MathT d0 = 0.0f, d1 = 0.0f, d2 = 0.0f, d3 = 0.0f;
-
-#pragma unroll 4
-      for (uint32_t k = 0; k < pq_len; k++) {
-        MathT x  = __shfl_sync(subwarp_mask, my_dataset_val, k, SubWarpSize);
-        MathT c0 = __ldg(&centers_ptr[l * pq_len + k]);
-        MathT c1 = __ldg(&centers_ptr[(l + SubWarpSize) * pq_len + k]);
-        MathT c2 = __ldg(&centers_ptr[(l + 2 * SubWarpSize) * pq_len + k]);
-        MathT c3 = __ldg(&centers_ptr[(l + 3 * SubWarpSize) * pq_len + k]);
-
-        d0 = __fmaf_rn(x - c0, x - c0, d0);
-        d1 = __fmaf_rn(x - c1, x - c1, d1);
-        d2 = __fmaf_rn(x - c2, x - c2, d2);
-        d3 = __fmaf_rn(x - c3, x - c3, d3);
-      }
-
-      MathT best_dist_01      = fminf(d0, d1);
-      MathT best_dist_23      = fminf(d2, d3);
-      MathT best_dist         = fminf(best_dist_01, best_dist_23);
-      const uint32_t idx_01   = (d1 < d0) ? (l + SubWarpSize) : l;
-      const uint32_t idx_23   = (d3 < d2) ? (l + 3 * SubWarpSize) : (l + 2 * SubWarpSize);
-      const uint32_t best_idx = (best_dist_23 < best_dist_01) ? idx_23 : idx_01;
-
-      if (best_dist < min_dist) {
-        min_dist = best_dist;
-        code     = CodeT(best_idx);
-      }
+      process_4centers_vec4<SubWarpSize, MathT>(
+        d0, d1, d2, d3, centers_ptr, l, pq_len, get_x_shuffle);
+      compute_4centers_and_update<SubWarpSize, MathT, CodeT>(min_dist, code, d0, d1, d2, d3, l);
     }
 
-    // Tail loop
+    // Tail: process 1 center at a time
     for (; l < pq_book_size; l += SubWarpSize) {
       MathT d0 = 0.0f;
-#pragma unroll
       for (uint32_t k = 0; k < pq_len; k++) {
-        MathT x          = __shfl_sync(subwarp_mask, my_dataset_val, k, SubWarpSize);
-        MathT center_val = __ldg(&centers_ptr[l * pq_len + k]);
-        d0               = __fmaf_rn(x - center_val, x - center_val, d0);
+        MathT x    = get_x_shuffle(k);
+        MathT diff = x - __ldg(&centers_ptr[l * pq_len + k]);
+        d0         = __fmaf_rn(diff, diff, d0);
       }
-
       if (d0 < min_dist) {
         min_dist = d0;
         code     = CodeT(l);
@@ -651,56 +722,31 @@ __device__ auto compute_code_subspaces(
     }
   } else {
     // Cooperatively load dataset into shared memory if pq_len > SubWarpSize
-    for (uint32_t k = lane_id; k < pq_len; k += SubWarpSize) {
-      auto jk = j * pq_len + k;
-      auto x  = data_mapping(dataset_ptr[jk]);
+    for (uint32_t l = lane_id; l < pq_len; l += SubWarpSize) {
+      auto jk = j * pq_len + l;
+      auto x  = data_mapping(__ldg(&dataset_ptr[jk]));
       if (vq_centers) { x -= vq_centers.value()(vq_label, jk); }
-      smem_dataset[k] = x;
+      smem_dataset[l] = x;
     }
     __syncwarp();
 
-    // Each thread evaluates by chunks of 4 PQ centers
+    auto get_x_smem = [&](uint32_t k) { return smem_dataset[k]; };
+
+    // Process 4 centers at a time
     uint32_t l = lane_id;
     for (; l + 3 * SubWarpSize < pq_book_size; l += 4 * SubWarpSize) {
       MathT d0 = 0.0f, d1 = 0.0f, d2 = 0.0f, d3 = 0.0f;
-
-#pragma unroll 4
-      for (uint32_t k = 0; k < pq_len; k++) {
-        MathT x  = smem_dataset[k];
-        MathT c0 = __ldg(&centers_ptr[l * pq_len + k]);
-        MathT c1 = __ldg(&centers_ptr[(l + SubWarpSize) * pq_len + k]);
-        MathT c2 = __ldg(&centers_ptr[(l + 2 * SubWarpSize) * pq_len + k]);
-        MathT c3 = __ldg(&centers_ptr[(l + 3 * SubWarpSize) * pq_len + k]);
-        d0       = __fmaf_rn(x - c0, x - c0, d0);
-        d1       = __fmaf_rn(x - c1, x - c1, d1);
-        d2       = __fmaf_rn(x - c2, x - c2, d2);
-        d3       = __fmaf_rn(x - c3, x - c3, d3);
-      }
-
-      MathT best_dist_01      = fminf(d0, d1);
-      MathT best_dist_23      = fminf(d2, d3);
-      MathT best_dist         = fminf(best_dist_01, best_dist_23);
-      const uint32_t idx_01   = (d1 < d0) ? (l + SubWarpSize) : l;
-      const uint32_t idx_23   = (d3 < d2) ? (l + 3 * SubWarpSize) : (l + 2 * SubWarpSize);
-      const uint32_t best_idx = (best_dist_23 < best_dist_01) ? idx_23 : idx_01;
-
-      if (best_dist < min_dist) {
-        min_dist = best_dist;
-        code     = CodeT(best_idx);
-      }
+      process_4centers_vec4<SubWarpSize, MathT>(d0, d1, d2, d3, centers_ptr, l, pq_len, get_x_smem);
+      compute_4centers_and_update<SubWarpSize, MathT, CodeT>(min_dist, code, d0, d1, d2, d3, l);
     }
 
-    // Tail loop
+    // Tail: process 1 center at a time
     for (; l < pq_book_size; l += SubWarpSize) {
       MathT d0 = 0.0f;
-
-#pragma unroll 4
       for (uint32_t k = 0; k < pq_len; k++) {
-        MathT x          = smem_dataset[k];
-        MathT center_val = __ldg(&centers_ptr[l * pq_len + k]);
-        d0               = __fmaf_rn(x - center_val, x - center_val, d0);
+        MathT diff = smem_dataset[k] - __ldg(&centers_ptr[l * pq_len + k]);
+        d0         = __fmaf_rn(diff, diff, d0);
       }
-
       if (d0 < min_dist) {
         min_dist = d0;
         code     = CodeT(l);
@@ -708,7 +754,7 @@ __device__ auto compute_code_subspaces(
     }
   }
 
-// Reduce among threads
+  // Reduce among threads
 #pragma unroll
   for (uint32_t stride = SubWarpSize >> 1; stride > 0; stride >>= 1) {
     const auto other_dist = raft::shfl_xor(min_dist, stride, SubWarpSize);
