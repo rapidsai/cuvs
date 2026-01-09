@@ -193,7 +193,7 @@ if(NOT BUILD_CPU_ONLY)
   include(cmake/thirdparty/get_raft.cmake)
   include(cmake/thirdparty/get_cutlass.cmake)
   include(${rapids-cmake-dir}/cpm/cuco.cmake)
-  rapids_cpm_cuco(BUILD_EXPORT_SET cuvs-exports INSTALL_EXPORT_SET cuvs-exports)
+  rapids_cpm_cuco(BUILD_EXPORT_SET cuvs-exports)
 endif()
 
 if(BUILD_TESTS OR BUILD_C_TESTS)
