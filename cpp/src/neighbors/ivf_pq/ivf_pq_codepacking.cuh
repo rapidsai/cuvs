@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -180,42 +180,40 @@ __device__ void write_vector_interleaved(
  * @param action a callable action to be invoked on each PQ code (component of the encoding)
  *    type: (uint32_t in_ix, uint32_t j) -> uint8_t, where j = [0..pq_dim).
  */
- template <uint32_t PqBits, uint32_t SubWarpSize, typename IdxT, typename Action>
- __device__ void write_vector_flat(
-   raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-     out_list_data,
-   uint32_t out_ix,
-   IdxT in_ix,
-   uint32_t pq_dim,
-   Action action)
- {
-   const uint32_t lane_id = raft::Pow2<SubWarpSize>::mod(threadIdx.x);
- 
-   using group_align         = raft::Pow2<kIndexGroupSize>;
-   const uint32_t group_ix   = group_align::div(out_ix);
-   const uint32_t ingroup_ix = group_align::mod(out_ix);
- 
-   
-   raft::TxN_t<uint8_t, kIndexGroupVecLen>::io_t code_chunk;
-   pq_vec_t code_chunk;
-   bitfield_view_t<PqBits> code_view{reinterpret_cast<uint8_t*>(&code_chunk)};
-   constexpr uint32_t kChunkSize = (sizeof(pq_vec_t) * 8u) / PqBits;
-   for (uint32_t j = 0, i = 0; j < pq_dim; i++) {
-     // clear the chunk
-     if (lane_id == 0) { code_chunk = pq_vec_t{}; }
-     // write the codes, one/pq_dim at a time
- #pragma unroll
-     for (uint32_t k = 0; k < kChunkSize && j < pq_dim; k++, j++) {
-       // write a single code
-       uint8_t code = action(in_ix, j);
-       if (lane_id == 0) { code_view[k] = code; }
-     }
-     // write the chunk to the list
-     if (lane_id == 0) {
-       *reinterpret_cast<pq_vec_t*>(&out_list_data(group_ix, i, ingroup_ix, 0)) = code_chunk;
-     }
-   }
- }
+/**
+ * Process a single vector for flat (non-interleaved) storage.
+ *
+ * @tparam PqBits
+ * @tparam SubWarpSize how many threads cooperatively compute each code
+ * @tparam IdxT type of the index passed to the action
+ * @tparam Action tells how to process a single vector (e.g. encode or just pack)
+ *
+ * @param[in] out_flat_codes flat PQ codes buffer [n_vectors, bytes_per_vector]
+ * @param[in] out_ix output vector index
+ * @param[in] in_ix the input index passed to the action
+ * @param[in] pq_dim
+ * @param[in] bytes_per_vector number of bytes per encoded vector = ceildiv(pq_dim * PqBits, 8)
+ * @param action a callable action to be invoked on each PQ code (component of the encoding)
+ *    type: (IdxT in_ix, uint32_t j) -> uint8_t, where j = [0..pq_dim).
+ */
+template <uint32_t PqBits, uint32_t SubWarpSize, typename IdxT, typename Action>
+__device__ void write_vector_flat(uint8_t* out_flat_codes,
+                                  uint32_t out_ix,
+                                  IdxT in_ix,
+                                  uint32_t pq_dim,
+                                  uint32_t bytes_per_vector,
+                                  Action action)
+{
+  const uint32_t lane_id = raft::Pow2<SubWarpSize>::mod(threadIdx.x);
+
+  uint8_t* vec_ptr = out_flat_codes + out_ix * bytes_per_vector;
+
+  bitfield_view_t<PqBits> code_view{vec_ptr};
+  for (uint32_t j = 0; j < pq_dim; j++) {
+    uint8_t code = action(in_ix, j);
+    if (lane_id == 0) { code_view[j] = code; }
+  }
+}
 
 /** Process the given indices or a block of a single list (cluster). */
 template <uint32_t PqBits, typename Action>
@@ -235,7 +233,7 @@ __device__ void run_on_list(
   }
 }
 
-/** Process the given indices or a block of a single list (cluster). */
+/** Process the given indices or a block of a single list (cluster) - interleaved layout. */
 template <uint32_t PqBits, uint32_t SubWarpSize, typename Action>
 __device__ void write_list(
   raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
@@ -252,7 +250,28 @@ __device__ void write_list(
     const uint32_t dst_ix = std::holds_alternative<uint32_t>(offset_or_indices)
                               ? std::get<uint32_t>(offset_or_indices) + ix
                               : std::get<const uint32_t*>(offset_or_indices)[ix];
-    write_vector<PqBits, SubWarpSize>(out_list_data, dst_ix, ix, pq_dim, action);
+    write_vector_interleaved<PqBits, SubWarpSize>(out_list_data, dst_ix, ix, pq_dim, action);
+  }
+}
+
+/** Process the given indices or a block of a single list (cluster) - flat layout. */
+template <uint32_t PqBits, uint32_t SubWarpSize, typename Action>
+__device__ void write_list_flat(uint8_t* out_flat_codes,
+                                std::variant<uint32_t, const uint32_t*> offset_or_indices,
+                                uint32_t len,
+                                uint32_t pq_dim,
+                                uint32_t bytes_per_vector,
+                                Action action)
+{
+  using subwarp_align = raft::Pow2<SubWarpSize>;
+  uint32_t stride     = subwarp_align::div(blockDim.x);
+  uint32_t ix         = subwarp_align::div(threadIdx.x + blockDim.x * blockIdx.x);
+  for (; ix < len; ix += stride) {
+    const uint32_t dst_ix = std::holds_alternative<uint32_t>(offset_or_indices)
+                              ? std::get<uint32_t>(offset_or_indices) + ix
+                              : std::get<const uint32_t*>(offset_or_indices)[ix];
+    write_vector_flat<PqBits, SubWarpSize>(
+      out_flat_codes, dst_ix, ix, pq_dim, bytes_per_vector, action);
   }
 }
 

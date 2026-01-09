@@ -22,11 +22,8 @@
 namespace cuvs::neighbors::ivf_pq::detail {
 
 // Serialization version
-// No backward compatibility yet; that is, can't add additional fields without breaking
-// backward compatibility.
-// TODO(hcho3) Implement next-gen serializer for IVF that allows for expansion in a backward
-//             compatible fashion.
-constexpr int kSerializationVersion = 3;
+// Version 4 adds codes_layout field
+constexpr int kSerializationVersion = 4;
 
 /**
  * Write the index to an output stream
@@ -56,6 +53,7 @@ void serialize(raft::resources const& handle_, std::ostream& os, const index<Idx
 
   raft::serialize_scalar(handle_, os, index.metric());
   raft::serialize_scalar(handle_, os, index.codebook_kind());
+  raft::serialize_scalar(handle_, os, index.codes_layout());
   raft::serialize_scalar(handle_, os, index.n_lists());
 
   raft::serialize_mdspan(handle_, os, index.pq_centers());
@@ -115,8 +113,8 @@ template <typename IdxT>
 auto deserialize(raft::resources const& handle_, std::istream& is) -> index<IdxT>
 {
   auto ver = raft::deserialize_scalar<int>(handle_, is);
-  if (ver != kSerializationVersion) {
-    RAFT_FAIL("serialization version mismatch %d vs. %d", ver, kSerializationVersion);
+  if (ver != kSerializationVersion && ver != 3) {
+    RAFT_FAIL("serialization version mismatch %d vs. %d (or 3)", ver, kSerializationVersion);
   }
   auto n_rows  = raft::deserialize_scalar<IdxT>(handle_, is);
   auto dim     = raft::deserialize_scalar<std::uint32_t>(handle_, is);
@@ -126,7 +124,11 @@ auto deserialize(raft::resources const& handle_, std::istream& is) -> index<IdxT
 
   auto metric        = raft::deserialize_scalar<cuvs::distance::DistanceType>(handle_, is);
   auto codebook_kind = raft::deserialize_scalar<cuvs::neighbors::ivf_pq::codebook_gen>(handle_, is);
-  auto n_lists       = raft::deserialize_scalar<std::uint32_t>(handle_, is);
+  // Version 4+ has codes_layout; version 3 defaults to INTERLEAVED
+  auto codes_layout =
+    (ver >= 4) ? raft::deserialize_scalar<cuvs::neighbors::ivf_pq::list_layout>(handle_, is)
+               : cuvs::neighbors::ivf_pq::list_layout::INTERLEAVED;
+  auto n_lists = raft::deserialize_scalar<std::uint32_t>(handle_, is);
 
   RAFT_LOG_DEBUG("n_rows %zu, dim %d, pq_dim %d, pq_bits %d, n_lists %d",
                  static_cast<std::size_t>(n_rows),
@@ -137,7 +139,7 @@ auto deserialize(raft::resources const& handle_, std::istream& is) -> index<IdxT
 
   // Create owning_impl directly to get mutable access for deserialization
   auto impl = std::make_unique<owning_impl<IdxT>>(
-    handle_, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, cma);
+    handle_, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, cma, codes_layout);
 
   // Deserialize center/matrix data using mutable accessors
   raft::deserialize_mdspan(handle_, is, impl->pq_centers());

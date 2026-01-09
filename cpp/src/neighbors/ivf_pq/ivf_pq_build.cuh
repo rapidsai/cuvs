@@ -653,20 +653,31 @@ void reconstruct_list_data(raft::resources const& res,
 
 template <uint32_t BlockSize, uint32_t PqBits>
 __launch_bounds__(BlockSize) static __global__ void encode_list_data_kernel(
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
+  uint8_t* list_data,
   raft::device_matrix_view<const float, uint32_t, raft::row_major> new_vectors,
   raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
   codebook_gen codebook_kind,
   uint32_t cluster_ix,
-  std::variant<uint32_t, const uint32_t*> offset_or_indices)
+  std::variant<uint32_t, const uint32_t*> offset_or_indices,
+  list_layout codes_layout,
+  uint32_t bytes_per_vector)
 {
   constexpr uint32_t kSubWarpSize = std::min<uint32_t>(raft::WarpSize, 1u << PqBits);
   const uint32_t pq_dim           = new_vectors.extent(1) / pq_centers.extent(1);
   auto encode_action =
     encode_vectors<kSubWarpSize, uint32_t>{pq_centers, new_vectors, codebook_kind, cluster_ix};
-  write_list<PqBits, kSubWarpSize>(
-    list_data, offset_or_indices, new_vectors.extent(0), pq_dim, encode_action);
+
+  if (codes_layout == list_layout::FLAT) {
+    write_list_flat<PqBits, kSubWarpSize>(
+      list_data, offset_or_indices, new_vectors.extent(0), pq_dim, bytes_per_vector, encode_action);
+  } else {
+    auto pq_extents =
+      list_spec<uint32_t, uint32_t>{PqBits, pq_dim, true}.make_list_extents(new_vectors.extent(0));
+    auto pq_dataset =
+      raft::make_mdspan<uint8_t, uint32_t, raft::row_major, false, true>(list_data, pq_extents);
+    write_list<PqBits, kSubWarpSize>(
+      pq_dataset, offset_or_indices, new_vectors.extent(0), pq_dim, encode_action);
+  }
 }
 
 template <typename T, typename IdxT>
@@ -698,6 +709,10 @@ void encode_list_data(raft::resources const& res,
   const uint32_t threads_per_vec = std::min<uint32_t>(raft::WarpSize, index->pq_book_size());
   dim3 blocks(raft::div_rounding_up_safe<uint32_t>(n_rows, kBlockSize / threads_per_vec), 1, 1);
   dim3 threads(kBlockSize, 1, 1);
+
+  const uint32_t bytes_per_vector =
+    raft::div_rounding_up_safe(index->pq_dim() * index->pq_bits(), 8u);
+
   auto kernel = [](uint32_t pq_bits) {
     switch (pq_bits) {
       case 4: return encode_list_data_kernel<kBlockSize, 4>;
@@ -708,13 +723,17 @@ void encode_list_data(raft::resources const& res,
       default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
     }
   }(index->pq_bits());
+
   kernel<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
-    index->lists()[label]->data.view(),
+    index->lists()[label]->data.data_handle(),
     new_vectors_residual.view(),
     index->pq_centers(),
     index->codebook_kind(),
     label,
-    offset_or_indices);
+    offset_or_indices,
+    index->codes_layout(),
+    bytes_per_vector);
+
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
@@ -872,7 +891,8 @@ auto clone(const raft::resources& res, const index<IdxT>& source) -> index<IdxT>
                                                   source.dim(),
                                                   source.pq_bits(),
                                                   source.pq_dim(),
-                                                  source.conservative_memory_allocation());
+                                                  source.conservative_memory_allocation(),
+                                                  source.codes_layout());
 
   // raft::copy the independent parts using mutable accessors
   raft::copy(impl->list_sizes().data_handle(),
@@ -1147,7 +1167,8 @@ auto build(raft::resources const& handle,
     dim,
     params.pq_bits,
     params.pq_dim == 0 ? index<IdxT>::calculate_pq_dim(dim) : params.pq_dim,
-    params.conservative_memory_allocation);
+    params.conservative_memory_allocation,
+    params.codes_layout);
 
   auto stream = raft::resource::get_cuda_stream(handle);
   utils::memzero(
@@ -1352,7 +1373,8 @@ auto build(raft::resources const& handle,
                                                 pq_centers,
                                                 centers,
                                                 centers_rot,
-                                                rotation_matrix);
+                                                rotation_matrix,
+                                                index_params.codes_layout);
 
   index<IdxT> view_index(std::move(impl));
 
@@ -1451,7 +1473,8 @@ auto build(
                                                   dim,
                                                   index_params.pq_bits,
                                                   pq_dim,
-                                                  index_params.conservative_memory_allocation);
+                                                  index_params.conservative_memory_allocation,
+                                                  index_params.codes_layout);
 
   utils::memzero(
     impl->accum_sorted_sizes().data_handle(), impl->accum_sorted_sizes().size(), stream);
