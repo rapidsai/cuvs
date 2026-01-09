@@ -113,8 +113,8 @@ template <typename IdxT>
 auto deserialize(raft::resources const& handle_, std::istream& is) -> index<IdxT>
 {
   auto ver = raft::deserialize_scalar<int>(handle_, is);
-  if (ver != kSerializationVersion && ver != 3) {
-    RAFT_FAIL("serialization version mismatch %d vs. %d (or 3)", ver, kSerializationVersion);
+  if (ver != kSerializationVersion) {
+    RAFT_FAIL("serialization version mismatch %d vs. %d", ver, kSerializationVersion);
   }
   auto n_rows  = raft::deserialize_scalar<IdxT>(handle_, is);
   auto dim     = raft::deserialize_scalar<std::uint32_t>(handle_, is);
@@ -124,11 +124,8 @@ auto deserialize(raft::resources const& handle_, std::istream& is) -> index<IdxT
 
   auto metric        = raft::deserialize_scalar<cuvs::distance::DistanceType>(handle_, is);
   auto codebook_kind = raft::deserialize_scalar<cuvs::neighbors::ivf_pq::codebook_gen>(handle_, is);
-  // Version 4+ has codes_layout; version 3 defaults to INTERLEAVED
-  auto codes_layout =
-    (ver >= 4) ? raft::deserialize_scalar<cuvs::neighbors::ivf_pq::list_layout>(handle_, is)
-               : cuvs::neighbors::ivf_pq::list_layout::INTERLEAVED;
-  auto n_lists = raft::deserialize_scalar<std::uint32_t>(handle_, is);
+  auto codes_layout  = raft::deserialize_scalar<cuvs::neighbors::ivf_pq::list_layout>(handle_, is);
+  auto n_lists       = raft::deserialize_scalar<std::uint32_t>(handle_, is);
 
   RAFT_LOG_DEBUG("n_rows %zu, dim %d, pq_dim %d, pq_bits %d, n_lists %d",
                  static_cast<std::size_t>(n_rows),
