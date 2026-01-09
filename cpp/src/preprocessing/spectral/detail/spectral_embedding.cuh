@@ -70,12 +70,13 @@ raft::device_csr_matrix_view<DataT, int, int, int> coo_to_csr_matrix(
 template <typename DataT, typename RetA, typename A>
 RetA create_laplacian(raft::resources const& handle,
                       params spectral_embedding_config,
-                      A csr_matrix_view,
+                      A sparse_matrix_view,
                       raft::device_vector_view<DataT, int> diagonal)
 {
-  auto laplacian = spectral_embedding_config.norm_laplacian
-                     ? raft::sparse::linalg::laplacian_normalized(handle, csr_matrix_view, diagonal)
-                     : raft::sparse::linalg::compute_graph_laplacian(handle, csr_matrix_view);
+  auto laplacian =
+    spectral_embedding_config.norm_laplacian
+      ? raft::sparse::linalg::laplacian_normalized(handle, sparse_matrix_view, diagonal)
+      : raft::sparse::linalg::compute_graph_laplacian(handle, sparse_matrix_view);
 
   auto laplacian_elements_view = raft::make_device_vector_view<DataT>(
     laplacian.get_elements().data(), laplacian.structure_view().get_nnz());
