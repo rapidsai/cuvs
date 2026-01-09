@@ -161,19 +161,10 @@ void transform(raft::resources const& handle,
                raft::device_matrix_view<DataT, int, raft::col_major> embedding)
 {
   const int n_samples = connectivity_graph.structure_view().get_n_rows();
-
-  auto diagonal = raft::make_device_vector<DataT, int>(handle, n_samples);
+  auto diagonal       = raft::make_device_vector<DataT, int>(handle, n_samples);
 
   auto laplacian = create_laplacian<DataT, raft::device_coo_matrix<DataT, int, int, NNZType>>(
     handle, spectral_embedding_config, connectivity_graph, diagonal.view());
-
-  raft::sparse::op::coo_sort<DataT, int, NNZType>(n_samples,
-                                                  n_samples,
-                                                  laplacian.structure_view().get_nnz(),
-                                                  laplacian.structure_view().get_rows().data(),
-                                                  laplacian.structure_view().get_cols().data(),
-                                                  laplacian.get_elements().data(),
-                                                  raft::resource::get_cuda_stream(handle));
   compute_eigenpairs(
     handle, spectral_embedding_config, n_samples, laplacian.view(), diagonal.view(), embedding);
 }
@@ -264,13 +255,6 @@ void transform(raft::resources const& handle,
   create_connectivity_graph<int64_t>(handle, spectral_embedding_config, dataset, sym_coo_matrix);
   auto laplacian = create_laplacian<float, raft::device_coo_matrix<float, int, int, int64_t>>(
     handle, spectral_embedding_config, sym_coo_matrix.view(), diagonal.view());
-  raft::sparse::op::coo_sort<float, int, int64_t>(n_samples,
-                                                  n_samples,
-                                                  laplacian.structure_view().get_nnz(),
-                                                  laplacian.structure_view().get_rows().data(),
-                                                  laplacian.structure_view().get_cols().data(),
-                                                  laplacian.get_elements().data(),
-                                                  raft::resource::get_cuda_stream(handle));
   compute_eigenpairs<float>(
     handle, spectral_embedding_config, n_samples, laplacian.view(), diagonal.view(), embedding);
 }
