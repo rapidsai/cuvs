@@ -522,12 +522,15 @@ auto vpq_convert_math_type(const raft::resources& res, vpq_dataset<OldMathT, Idx
   return vpq_dataset<NewMathT, IdxT>{
     std::move(vq_code_book), std::move(pq_code_book), std::move(src.data)};
 }
-template <typename MathT>
-struct vec4_op {};
+template <typename MathT, uint8_t PqLenVectorSize>
+struct vec_op {
+  using type = void;
+};
 
 template <>
-struct vec4_op<float> {
+struct vec_op<float, 4> {
   using type = float4;
+
   __device__ __forceinline__ static type make(float x, float y, float z, float w)
   {
     return make_float4(x, y, z, w);
@@ -554,6 +557,33 @@ struct vec4_op<float> {
   }
 };
 
+template <>
+struct vec_op<float, 2> {
+  using type = float2;
+
+  __device__ __forceinline__ static type make(float x, float y) { return make_float2(x, y); }
+
+  __device__ __forceinline__ static type load(const float* ptr)
+  {
+    return *reinterpret_cast<const type*>(ptr);
+  }
+
+  __device__ __forceinline__ static void store(float* ptr, const type& val)
+  {
+    *reinterpret_cast<type*>(ptr) = val;
+  }
+
+  __device__ __forceinline__ static float sum_squares(const type& diff)
+  {
+    return diff.x * diff.x + diff.y * diff.y;
+  }
+
+  __device__ __forceinline__ static type sub(const type& a, const type& b)
+  {
+    return make_float2(a.x - b.x, a.y - b.y);
+  }
+};
+
 // Helper: compute distances to 4 centers and find minimum
 template <uint32_t SubWarpSize, typename MathT, typename CodeT>
 __device__ __forceinline__ void compute_4centers_and_update(
@@ -573,32 +603,44 @@ __device__ __forceinline__ void compute_4centers_and_update(
   }
 }
 
-// Helper: process 4 centers using Vec4 operations
+// Helper: process 4 centers
 template <uint32_t SubWarpSize, typename MathT, typename GetXFunc>
-__device__ __forceinline__ void process_4centers_vec4(MathT& d0,
-                                                      MathT& d1,
-                                                      MathT& d2,
-                                                      MathT& d3,
-                                                      const MathT* __restrict__ centers_ptr,
-                                                      uint32_t l,
-                                                      const uint32_t pq_len,
-                                                      GetXFunc get_x_func)
+__device__ __forceinline__ void process_4centers_vec(MathT& d0,
+                                                     MathT& d1,
+                                                     MathT& d2,
+                                                     MathT& d3,
+                                                     const MathT* __restrict__ centers_ptr,
+                                                     uint32_t l,
+                                                     const uint32_t pq_len,
+                                                     GetXFunc get_x_func)
 {
-  using Vec4 = typename vec4_op<MathT>::type;
   uint32_t k = 0;
   for (; k + 3 < pq_len; k += 4) {
-    Vec4 x_vec =
-      vec4_op<MathT>::make(get_x_func(k), get_x_func(k + 1), get_x_func(k + 2), get_x_func(k + 3));
-
-    Vec4 c0 = vec4_op<MathT>::load(&centers_ptr[l * pq_len + k]);
-    Vec4 c1 = vec4_op<MathT>::load(&centers_ptr[(l + SubWarpSize) * pq_len + k]);
-    Vec4 c2 = vec4_op<MathT>::load(&centers_ptr[(l + 2 * SubWarpSize) * pq_len + k]);
-    Vec4 c3 = vec4_op<MathT>::load(&centers_ptr[(l + 3 * SubWarpSize) * pq_len + k]);
-
-    d0 += vec4_op<MathT>::sum_squares(vec4_op<MathT>::sub(x_vec, c0));
-    d1 += vec4_op<MathT>::sum_squares(vec4_op<MathT>::sub(x_vec, c1));
-    d2 += vec4_op<MathT>::sum_squares(vec4_op<MathT>::sub(x_vec, c2));
-    d3 += vec4_op<MathT>::sum_squares(vec4_op<MathT>::sub(x_vec, c3));
+    using VecOp = vec_op<MathT, 4>;
+    using VecT  = typename VecOp::type;
+    VecT x_vec =
+      VecOp::make(get_x_func(k), get_x_func(k + 1), get_x_func(k + 2), get_x_func(k + 3));
+    VecT c0 = VecOp::load(&centers_ptr[l * pq_len + k]);
+    VecT c1 = VecOp::load(&centers_ptr[(l + SubWarpSize) * pq_len + k]);
+    VecT c2 = VecOp::load(&centers_ptr[(l + 2 * SubWarpSize) * pq_len + k]);
+    VecT c3 = VecOp::load(&centers_ptr[(l + 3 * SubWarpSize) * pq_len + k]);
+    d0 += VecOp::sum_squares(VecOp::sub(x_vec, c0));
+    d1 += VecOp::sum_squares(VecOp::sub(x_vec, c1));
+    d2 += VecOp::sum_squares(VecOp::sub(x_vec, c2));
+    d3 += VecOp::sum_squares(VecOp::sub(x_vec, c3));
+  }
+  for (; k + 1 < pq_len; k += 2) {
+    using VecOp = vec_op<MathT, 2>;
+    using VecT  = typename VecOp::type;
+    VecT x_vec  = VecOp::make(get_x_func(k), get_x_func(k + 1));
+    VecT c0     = VecOp::load(&centers_ptr[l * pq_len + k]);
+    VecT c1     = VecOp::load(&centers_ptr[(l + SubWarpSize) * pq_len + k]);
+    VecT c2     = VecOp::load(&centers_ptr[(l + 2 * SubWarpSize) * pq_len + k]);
+    VecT c3     = VecOp::load(&centers_ptr[(l + 3 * SubWarpSize) * pq_len + k]);
+    d0 += VecOp::sum_squares(VecOp::sub(x_vec, c0));
+    d1 += VecOp::sum_squares(VecOp::sub(x_vec, c1));
+    d2 += VecOp::sum_squares(VecOp::sub(x_vec, c2));
+    d3 += VecOp::sum_squares(VecOp::sub(x_vec, c3));
   }
 
   // Tail loop
@@ -665,7 +707,7 @@ __device__ auto compute_code_subspaces(
     uint32_t l = lane_id;
     for (; l + 3 * SubWarpSize < pq_book_size; l += 4 * SubWarpSize) {
       MathT d0 = 0.0f, d1 = 0.0f, d2 = 0.0f, d3 = 0.0f;
-      process_4centers_vec4<SubWarpSize, MathT>(
+      process_4centers_vec<SubWarpSize, MathT>(
         d0, d1, d2, d3, centers_ptr, l, pq_len, get_x_shuffle);
       compute_4centers_and_update<SubWarpSize, MathT, CodeT>(min_dist, code, d0, d1, d2, d3, l);
     }
@@ -698,7 +740,7 @@ __device__ auto compute_code_subspaces(
     uint32_t l = lane_id;
     for (; l + 3 * SubWarpSize < pq_book_size; l += 4 * SubWarpSize) {
       MathT d0 = 0.0f, d1 = 0.0f, d2 = 0.0f, d3 = 0.0f;
-      process_4centers_vec4<SubWarpSize, MathT>(d0, d1, d2, d3, centers_ptr, l, pq_len, get_x_smem);
+      process_4centers_vec<SubWarpSize, MathT>(d0, d1, d2, d3, centers_ptr, l, pq_len, get_x_smem);
       compute_4centers_and_update<SubWarpSize, MathT, CodeT>(min_dist, code, d0, d1, d2, d3, l);
     }
 
