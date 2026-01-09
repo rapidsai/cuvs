@@ -227,7 +227,7 @@ __launch_bounds__(BlockSize) RAFT_KERNEL reconstruct_vectors_kernel(
     vq_label      = *reinterpret_cast<const LabelT*>(out_codes_ptr);
     out_codes_ptr = (&codes(row_ix, 0)) + sizeof(LabelT);
   }
-  cuvs::preprocessing::quantize::detail::bitfield_const_view_t code_view{out_codes_ptr, pq_bits};
+  cuvs::preprocessing::quantize::detail::bitfield_view_t code_view{out_codes_ptr, pq_bits};
   for (uint32_t j = lane_id; j < pq_len; j += SubWarpSize) {
     const CodeT code = code_view[j];
     for (uint32_t k = 0; k < pq_centers.extent(1); k++) {

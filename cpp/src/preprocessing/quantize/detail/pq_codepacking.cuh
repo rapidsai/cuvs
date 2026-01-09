@@ -9,41 +9,20 @@
 #include <raft/util/integer_utils.hpp>
 #include <raft/util/pow2_utils.cuh>
 
+#include <type_traits>
+
 namespace cuvs::preprocessing::quantize::detail {
 
-/**
- * Bitfield reference for reading from const pointers.
- * This type mimics `uint8_t` or `uint16_t` for reading bitfield values.
- */
-struct bitfield_const_ref_t {
-  const uint8_t* ptr;
-  uint32_t offset;
-  uint32_t bits;
-
-  __host__ __device__ operator uint8_t() const  // NOLINT
-  {
-    const uint8_t mask = static_cast<uint8_t>((1u << bits) - 1u);
-    uint32_t pair      = static_cast<uint32_t>(ptr[0]);
-    if (offset + bits > 8) { pair |= static_cast<uint32_t>(ptr[1]) << 8; }
-    return static_cast<uint8_t>((pair >> offset) & mask);
-  }
-
-  __host__ __device__ operator uint16_t() const  // NOLINT
-  {
-    const uint16_t mask = static_cast<uint16_t>((1u << bits) - 1u);
-    uint32_t pair       = static_cast<uint32_t>(ptr[0]);
-    if (offset + bits > 8) { pair |= static_cast<uint32_t>(ptr[1]) << 8; }
-    if (offset + bits > 16) { pair |= static_cast<uint32_t>(ptr[2]) << 16; }
-    return static_cast<uint16_t>((pair >> offset) & mask);
-  }
-};
+template <typename T>
+constexpr bool is_const_ptr_v = std::is_const_v<std::remove_pointer_t<T>>;
 
 /**
  * Bitfield reference for reading/writing from non-const pointers.
  * This type mimics `uint8_t&` or `uint16_t&` for the indexing operator.
  */
+template <typename PtrT = uint8_t*>
 struct bitfield_ref_t {
-  uint8_t* ptr;
+  PtrT ptr;
   uint32_t offset;
   uint32_t bits;
 
@@ -64,7 +43,9 @@ struct bitfield_ref_t {
     return static_cast<uint16_t>((pair >> offset) & mask);
   }
 
-  __host__ __device__ auto operator=(uint8_t code) -> bitfield_ref_t&
+  template <typename T = PtrT>
+  __host__ __device__ auto operator=(uint8_t code)
+    -> std::enable_if_t<!is_const_ptr_v<T>, bitfield_ref_t&>
   {
     const uint8_t mask = static_cast<uint8_t>((1u << bits) - 1u);
 
@@ -81,7 +62,9 @@ struct bitfield_ref_t {
     return *this;
   }
 
-  __host__ __device__ auto operator=(uint16_t code) -> bitfield_ref_t&
+  template <typename T = PtrT>
+  __host__ __device__ auto operator=(uint16_t code)
+    -> std::enable_if_t<!is_const_ptr_v<T>, bitfield_ref_t&>
   {
     const uint16_t mask = static_cast<uint16_t>((1u << bits) - 1u);
 
@@ -102,39 +85,27 @@ struct bitfield_ref_t {
 };
 
 /**
- * Bitfield view for const pointers.
  * View a byte array as an array of unsigned integers of custom small bit size.
  */
-struct bitfield_const_view_t {
-  const uint8_t* raw;
-  uint32_t bits;
-
-  __host__ __device__ auto operator[](uint32_t i) const -> bitfield_const_ref_t
-  {
-    uint32_t bit_offset = i * bits;
-    return bitfield_const_ref_t{
-      raw + raft::Pow2<8>::div(bit_offset), raft::Pow2<8>::mod(bit_offset), bits};
-  }
-};
-
-/**
- * View a byte array as an array of unsigned integers of custom small bit size.
- */
+template <typename PtrT = uint8_t*>
 struct bitfield_view_t {
-  uint8_t* raw;
+  PtrT raw;
   uint32_t bits;
 
-  __host__ __device__ auto operator[](uint32_t i) -> bitfield_ref_t
+  template <typename T = PtrT>
+  __host__ __device__ auto operator[](uint32_t i)
+    -> std::enable_if_t<!is_const_ptr_v<T>, bitfield_ref_t<PtrT>>
   {
     uint32_t bit_offset = i * bits;
-    return bitfield_ref_t{
+    return bitfield_ref_t<PtrT>{
       raw + raft::Pow2<8>::div(bit_offset), raft::Pow2<8>::mod(bit_offset), bits};
   }
 
-  __host__ __device__ auto operator[](uint32_t i) const -> bitfield_const_ref_t
+  __host__ __device__ auto operator[](uint32_t i) const
+    -> bitfield_ref_t<const std::remove_pointer_t<PtrT>*>
   {
     uint32_t bit_offset = i * bits;
-    return bitfield_const_ref_t{
+    return bitfield_ref_t<const std::remove_pointer_t<PtrT>*>{
       raw + raft::Pow2<8>::div(bit_offset), raft::Pow2<8>::mod(bit_offset), bits};
   }
 };

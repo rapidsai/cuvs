@@ -23,6 +23,7 @@
 #include <raft/util/integer_utils.hpp>
 #include <raft/util/pow2_utils.cuh>
 #include <raft/util/vectorized.cuh>
+#include <raft/util/warp_primitives.cuh>
 
 // A temporary stub till https://github.com/rapidsai/raft/pull/2077 is re-merged
 namespace cuvs::util {
@@ -349,45 +350,6 @@ __device__ auto compute_code(
   return code;
 }
 
-template <int VecBytes = 16, typename T>
-__device__ inline void copy_vectorized(T* out, const T* in, uint32_t n)
-{
-  constexpr int VecElems = VecBytes / sizeof(T);  // NOLINT
-  using align_bytes      = raft::Pow2<(size_t)VecBytes>;
-  if constexpr (VecElems > 1) {
-    using align_elems = raft::Pow2<VecElems>;
-    if (!align_bytes::areSameAlignOffsets(out, in)) {
-      return copy_vectorized<(VecBytes >> 1), T>(out, in, n);
-    }
-    {  // process unaligned head
-      const uint32_t head = align_bytes::roundUp(in) - in;
-      if (head > 0) {
-        copy_vectorized<sizeof(T), T>(out, in, head);
-        n -= head;
-        in += head;
-        out += head;
-      }
-    }
-    {  // process main part vectorized
-      using vec_t = typename raft::IOType<T, VecElems>::Type;
-      copy_vectorized<sizeof(vec_t), vec_t>(
-        reinterpret_cast<vec_t*>(out), reinterpret_cast<const vec_t*>(in), align_elems::div(n));
-    }
-    {  // process unaligned tail
-      const uint32_t tail = align_elems::mod(n);
-      if (tail > 0) {
-        n -= tail;
-        copy_vectorized<sizeof(T), T>(out + n, in + n, tail);
-      }
-    }
-  }
-  if constexpr (VecElems <= 1) {
-    for (uint32_t i = threadIdx.x; i < n; i += blockDim.x) {
-      out[i] = in[i];
-    }
-  }
-}
-
 template <uint32_t BlockSize,
           uint32_t SubWarpSize,
           typename CodeT,
@@ -404,7 +366,7 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_kernel(
   const uint32_t shared_memory_size,
   const uint32_t pq_bits)
 {
-  extern __shared__ __align__(256) uint8_t pq_centers_smem[];
+  extern __shared__ __align__(256) MathT pq_centers_smem[];
   using subwarp_align = raft::Pow2<SubWarpSize>;
   const IdxT row_ix   = subwarp_align::div(IdxT{threadIdx.x} + IdxT{BlockSize} * IdxT{blockIdx.x});
   if (row_ix >= out_codes.extent(0)) { return; }
@@ -413,13 +375,14 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_kernel(
 
   // Copy the pq_centers into shared memory for faster processing
   const IdxT rows_in_shared_memory = shared_memory_size / (sizeof(MathT) * pq_centers.extent(1));
-  copy_vectorized<4>(reinterpret_cast<MathT*>(pq_centers_smem),
-                     pq_centers.data_handle(),
-                     rows_in_shared_memory * pq_centers.extent(1));
+  for (uint32_t i = threadIdx.x; i < rows_in_shared_memory * pq_centers.extent(1);
+       i += blockDim.x) {
+    pq_centers_smem[i] = pq_centers.data_handle()[i];
+  }
   __syncthreads();
-  auto pq_centers_smem_view = raft::make_device_matrix_view<const MathT, uint32_t, raft::row_major>(
-    reinterpret_cast<const MathT*>(pq_centers_smem), rows_in_shared_memory, pq_centers.extent(1));
 
+  auto pq_centers_smem_view = raft::make_device_matrix_view<const MathT, uint32_t, raft::row_major>(
+    pq_centers_smem, rows_in_shared_memory, pq_centers.extent(1));
   const uint32_t lane_id = subwarp_align::mod(threadIdx.x);
   const LabelT vq_label  = vq_labels ? vq_labels.value()(row_ix) : 0;
   auto* out_codes_ptr    = &out_codes(row_ix, 0);
@@ -572,7 +535,7 @@ struct vec4_op<float> {
 
   __device__ __forceinline__ static type load(const float* ptr)
   {
-    return __ldg(reinterpret_cast<const type*>(ptr));
+    return *reinterpret_cast<const type*>(ptr);
   }
 
   __device__ __forceinline__ static void store(float* ptr, const type& val)
@@ -641,15 +604,15 @@ __device__ __forceinline__ void process_4centers_vec4(MathT& d0,
   // Tail loop
   for (; k < pq_len; k++) {
     MathT x  = get_x_func(k);
-    MathT c0 = __ldg(&centers_ptr[l * pq_len + k]);
-    MathT c1 = __ldg(&centers_ptr[(l + SubWarpSize) * pq_len + k]);
-    MathT c2 = __ldg(&centers_ptr[(l + 2 * SubWarpSize) * pq_len + k]);
-    MathT c3 = __ldg(&centers_ptr[(l + 3 * SubWarpSize) * pq_len + k]);
+    MathT c0 = x - centers_ptr[l * pq_len + k];
+    MathT c1 = x - centers_ptr[(l + SubWarpSize) * pq_len + k];
+    MathT c2 = x - centers_ptr[(l + 2 * SubWarpSize) * pq_len + k];
+    MathT c3 = x - centers_ptr[(l + 3 * SubWarpSize) * pq_len + k];
 
-    d0 = __fmaf_rn(x - c0, x - c0, d0);
-    d1 = __fmaf_rn(x - c1, x - c1, d1);
-    d2 = __fmaf_rn(x - c2, x - c2, d2);
-    d3 = __fmaf_rn(x - c3, x - c3, d3);
+    d0 += c0 * c0;
+    d1 += c1 * c1;
+    d2 += c2 * c2;
+    d3 += c3 * c3;
   }
 }
 
@@ -695,7 +658,7 @@ __device__ auto compute_code_subspaces(
       (SubWarpSize == 32) ? 0xffffffffu : (0xffffu << (subwarp_idx * SubWarpSize));
 
     auto get_x_shuffle = [&](uint32_t k) {
-      return __shfl_sync(subwarp_mask, my_dataset_val, k, SubWarpSize);
+      return raft::shfl(my_dataset_val, k, SubWarpSize, subwarp_mask);
     };
 
     // Process 4 centers at a time
@@ -711,9 +674,8 @@ __device__ auto compute_code_subspaces(
     for (; l < pq_book_size; l += SubWarpSize) {
       MathT d0 = 0.0f;
       for (uint32_t k = 0; k < pq_len; k++) {
-        MathT x    = get_x_shuffle(k);
-        MathT diff = x - __ldg(&centers_ptr[l * pq_len + k]);
-        d0         = __fmaf_rn(diff, diff, d0);
+        MathT diff = get_x_shuffle(k) - centers_ptr[l * pq_len + k];
+        d0 += diff * diff;
       }
       if (d0 < min_dist) {
         min_dist = d0;
@@ -724,7 +686,7 @@ __device__ auto compute_code_subspaces(
     // Cooperatively load dataset into shared memory if pq_len > SubWarpSize
     for (uint32_t l = lane_id; l < pq_len; l += SubWarpSize) {
       auto jk = j * pq_len + l;
-      auto x  = data_mapping(__ldg(&dataset_ptr[jk]));
+      auto x  = data_mapping(dataset_ptr[jk]);
       if (vq_centers) { x -= vq_centers.value()(vq_label, jk); }
       smem_dataset[l] = x;
     }
@@ -744,8 +706,8 @@ __device__ auto compute_code_subspaces(
     for (; l < pq_book_size; l += SubWarpSize) {
       MathT d0 = 0.0f;
       for (uint32_t k = 0; k < pq_len; k++) {
-        MathT diff = smem_dataset[k] - __ldg(&centers_ptr[l * pq_len + k]);
-        d0         = __fmaf_rn(diff, diff, d0);
+        MathT diff = smem_dataset[k] - centers_ptr[l * pq_len + k];
+        d0 += diff * diff;
       }
       if (d0 < min_dist) {
         min_dist = d0;

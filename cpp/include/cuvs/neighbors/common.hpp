@@ -72,6 +72,9 @@ struct vpq_params {
   double pq_kmeans_trainset_fraction = 0;
   /**
    * Type of k-means algorithm for PQ training.
+   * Balanced k-means tends to be faster than regular k-means for PQ training, for
+   * problem sets where the number of points per cluster are approximately equal.
+   * Regular k-means may be better for skewed cluster distributions
    */
   cuvs::cluster::kmeans::kmeans_type pq_kmeans_type =
     cuvs::cluster::kmeans::kmeans_type::KMeansBalanced;
