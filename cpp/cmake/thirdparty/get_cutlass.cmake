@@ -58,14 +58,14 @@ function(find_and_configure_cutlass)
   endif()
 
   rapids_export_package(
-      BUILD NvidiaCutlass cuvs-exports GLOBAL_TARGETS nvidia::cutlass::cutlass
+      BUILD NvidiaCutlass cuvs-static-exports GLOBAL_TARGETS nvidia::cutlass::cutlass
   )
 
   # Tell cmake where it can find the generated NvidiaCutlass-config.cmake we wrote.
   include("${rapids-cmake-dir}/export/find_package_root.cmake")
   rapids_export_find_package_root(
           BUILD NvidiaCutlass [=[${CMAKE_CURRENT_LIST_DIR}]=]
-          EXPORT_SET cuvs-exports
+          EXPORT_SET cuvs-static-exports
   )
 
 endfunction()
