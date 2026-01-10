@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -46,6 +46,23 @@ struct CompareApprox {
     T m     = std::max(std::abs(a), std::abs(b));
     T ratio = diff > eps ? diff / m : diff;
 
+    return (ratio <= eps);
+  }
+
+ private:
+  T eps;
+};
+
+template <typename T>
+struct CompareApproxNaN {
+  CompareApproxNaN(T eps_) : eps(eps_) {}
+  bool operator()(const T& a, const T& b) const
+  {
+    T diff  = std::abs(a - b);
+    T m     = std::max(std::abs(a), std::abs(b));
+    T ratio = diff > eps ? diff / m : diff;
+
+    if (std::isnan(a) && std::isnan(b)) { return true; }
     return (ratio <= eps);
   }
 
