@@ -30,43 +30,6 @@
 
 namespace cuvs::preprocessing::spectral_embedding::detail {
 
-template <typename DataT>
-raft::device_csr_matrix_view<DataT, int, int, int> coo_to_csr_matrix(
-  raft::resources const& handle,
-  const int n_samples,
-  raft::device_vector_view<int> sym_coo_row_ind,
-  raft::device_coo_matrix_view<DataT, int, int, int> sym_coo_matrix_view)
-{
-  auto stream = raft::resource::get_cuda_stream(handle);
-
-  raft::sparse::op::coo_sort<DataT>(n_samples,
-                                    n_samples,
-                                    sym_coo_matrix_view.structure_view().get_nnz(),
-                                    sym_coo_matrix_view.structure_view().get_rows().data(),
-                                    sym_coo_matrix_view.structure_view().get_cols().data(),
-                                    sym_coo_matrix_view.get_elements().data(),
-                                    stream);
-
-  raft::sparse::convert::sorted_coo_to_csr(sym_coo_matrix_view.structure_view().get_rows().data(),
-                                           sym_coo_matrix_view.structure_view().get_nnz(),
-                                           sym_coo_row_ind.data_handle(),
-                                           n_samples,
-                                           stream);
-
-  auto sym_coo_nnz = sym_coo_matrix_view.structure_view().get_nnz();
-  raft::copy(sym_coo_row_ind.data_handle() + sym_coo_row_ind.size() - 1, &sym_coo_nnz, 1, stream);
-
-  auto csr_matrix_view = raft::make_device_csr_matrix_view<DataT, int, int, int>(
-    const_cast<DataT*>(sym_coo_matrix_view.get_elements().data()),
-    raft::make_device_compressed_structure_view<int, int, int>(
-      const_cast<int*>(sym_coo_row_ind.data_handle()),
-      const_cast<int*>(sym_coo_matrix_view.structure_view().get_cols().data()),
-      n_samples,
-      n_samples,
-      sym_coo_matrix_view.structure_view().get_nnz()));
-  return csr_matrix_view;
-}
-
 template <typename DataT, typename OutSparseMatrixType, typename InSparseMatrixViewType>
 OutSparseMatrixType create_laplacian(raft::resources const& handle,
                                      params spectral_embedding_config,
