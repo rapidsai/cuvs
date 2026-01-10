@@ -1,6 +1,6 @@
 
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -22,6 +22,38 @@
 #include "../core/interop.hpp"
 
 namespace {
+
+template <typename T>
+void _build(cuvsResources_t res,
+            cuvsHnswIndexParams_t params,
+            DLManagedTensor* dataset_tensor,
+            cuvsHnswIndex_t hnsw_index)
+{
+  auto res_ptr    = reinterpret_cast<raft::resources*>(res);
+  auto cpp_params = cuvs::neighbors::hnsw::index_params();
+  cpp_params.hierarchy                 = static_cast<cuvs::neighbors::hnsw::HnswHierarchy>(params->hierarchy);
+  cpp_params.ef_construction = params->ef_construction;
+  cpp_params.num_threads     = params->num_threads;
+  cpp_params.M               = params->M;
+  cpp_params.metric          = static_cast<cuvs::distance::DistanceType>(params->metric);
+
+  // Configure ACE parameters
+  RAFT_EXPECTS(params->ace_params != nullptr, "ACE parameters must be set for hnsw::build");
+  auto ace_params                 = cuvs::neighbors::hnsw::graph_build_params::ace_params();
+  ace_params.npartitions          = params->ace_params->npartitions;
+  ace_params.build_dir            = params->ace_params->build_dir ? params->ace_params->build_dir : "/tmp/hnsw_ace_build";
+  ace_params.use_disk             = params->ace_params->use_disk;
+  ace_params.max_host_memory_gb   = params->ace_params->max_host_memory_gb;
+  ace_params.max_gpu_memory_gb    = params->ace_params->max_gpu_memory_gb;
+  cpp_params.graph_build_params   = ace_params;
+
+  using dataset_mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
+  auto dataset_mds          = cuvs::core::from_dlpack<dataset_mdspan_type>(dataset_tensor);
+
+  auto hnsw_index_unique_ptr = cuvs::neighbors::hnsw::build(*res_ptr, cpp_params, dataset_mds);
+  auto hnsw_index_ptr        = hnsw_index_unique_ptr.release();
+  hnsw_index->addr           = reinterpret_cast<uintptr_t>(hnsw_index_ptr);
+}
 
 template <typename T>
 void _from_cagra(cuvsResources_t res,
@@ -118,11 +150,31 @@ void* _deserialize(cuvsResources_t res,
 }
 }  // namespace
 
+extern "C" cuvsError_t cuvsHnswAceParamsCreate(cuvsHnswAceParams_t* params)
+{
+  return cuvs::core::translate_exceptions([=] {
+    *params = new cuvsHnswAceParams{.npartitions         = 0,
+                                    .build_dir           = "/tmp/hnsw_ace_build",
+                                    .use_disk            = false,
+                                    .max_host_memory_gb  = 0,
+                                    .max_gpu_memory_gb   = 0};
+  });
+}
+
+extern "C" cuvsError_t cuvsHnswAceParamsDestroy(cuvsHnswAceParams_t params)
+{
+  return cuvs::core::translate_exceptions([=] { delete params; });
+}
+
 extern "C" cuvsError_t cuvsHnswIndexParamsCreate(cuvsHnswIndexParams_t* params)
 {
   return cuvs::core::translate_exceptions([=] {
-    *params = new cuvsHnswIndexParams{
-      .hierarchy = cuvsHnswHierarchy::NONE, .ef_construction = 200, .num_threads = 0};
+    *params = new cuvsHnswIndexParams{.hierarchy                 = cuvsHnswHierarchy::NONE,
+                                      .ef_construction = 200,
+                                      .num_threads     = 0,
+                                      .M               = 32,
+                                      .metric          = L2Expanded,
+                                      .ace_params      = nullptr};
   });
 }
 
@@ -209,6 +261,29 @@ extern "C" cuvsError_t cuvsHnswFromCagraWithDataset(cuvsResources_t res,
       _from_cagra<int8_t>(res, params, cagra_index, hnsw_index, dataset_tensor);
     } else {
       RAFT_FAIL("Unsupported dtype: %d", index.dtype.code);
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsHnswBuild(cuvsResources_t res,
+                                     cuvsHnswIndexParams_t params,
+                                     DLManagedTensor* dataset,
+                                     cuvsHnswIndex_t index)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto dataset_dl = dataset->dl_tensor;
+    index->dtype    = dataset_dl.dtype;
+
+    if (dataset_dl.dtype.code == kDLFloat && dataset_dl.dtype.bits == 32) {
+      _build<float>(res, params, dataset, index);
+    } else if (dataset_dl.dtype.code == kDLFloat && dataset_dl.dtype.bits == 16) {
+      _build<half>(res, params, dataset, index);
+    } else if (dataset_dl.dtype.code == kDLUInt && dataset_dl.dtype.bits == 8) {
+      _build<uint8_t>(res, params, dataset, index);
+    } else if (dataset_dl.dtype.code == kDLInt && dataset_dl.dtype.bits == 8) {
+      _build<int8_t>(res, params, dataset, index);
+    } else {
+      RAFT_FAIL("Unsupported dtype: code=%d, bits=%d", dataset_dl.dtype.code, dataset_dl.dtype.bits);
     }
   });
 }
