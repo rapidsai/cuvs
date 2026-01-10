@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -25,6 +25,22 @@ auto to_cagra_params(raft::matrix_extent<int64_t> dataset,
     cuvs::neighbors::cagra::hnsw_heuristic_type::SAME_GRAPH_FOOTPRINT,
     metric);
 }
+
+#define CUVS_INST_HNSW_BUILD(T)                                        \
+  std::unique_ptr<index<T>> build(                                     \
+    raft::resources const& res,                                        \
+    const index_params& params,                                        \
+    raft::host_matrix_view<const T, int64_t, raft::row_major> dataset) \
+  {                                                                    \
+    return detail::build<T>(res, params, dataset);                     \
+  }
+
+CUVS_INST_HNSW_BUILD(float);
+CUVS_INST_HNSW_BUILD(half);
+CUVS_INST_HNSW_BUILD(uint8_t);
+CUVS_INST_HNSW_BUILD(int8_t);
+
+#undef CUVS_INST_HNSW_BUILD
 
 #define CUVS_INST_HNSW_FROM_CAGRA(T)                                                  \
   std::unique_ptr<index<T>> from_cagra(                                               \

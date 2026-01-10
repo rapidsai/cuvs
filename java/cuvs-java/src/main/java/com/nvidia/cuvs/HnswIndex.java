@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs;
@@ -55,6 +55,31 @@ public interface HnswIndex extends AutoCloseable {
     Objects.requireNonNull(hnswParams);
     Objects.requireNonNull(cagraIndex);
     return CuVSProvider.provider().hnswIndexFromCagra(hnswParams, cagraIndex);
+  }
+
+  /**
+   * Builds an HNSW index using the ACE (Augmented Core Extraction) algorithm.
+   *
+   * ACE enables building HNSW indexes for datasets too large to fit in GPU
+   * memory by partitioning the dataset and building sub-indexes for each
+   * partition independently.
+   *
+   * NOTE: This method requires `hnswParams.getAceParams()` to be set with
+   * an instance of HnswAceParams.
+   *
+   * @param resources The CuVS resources
+   * @param hnswParams Parameters for the HNSW index with ACE configuration
+   * @param dataset The dataset to build the index from
+   * @return A new HNSW index ready for search
+   * @throws Throwable if an error occurs during building
+   */
+  static HnswIndex build(CuVSResources resources, HnswIndexParams hnswParams, CuVSMatrix dataset)
+      throws Throwable {
+    Objects.requireNonNull(resources);
+    Objects.requireNonNull(hnswParams);
+    Objects.requireNonNull(dataset);
+    Objects.requireNonNull(hnswParams.getAceParams(), "ACE parameters must be set for build()");
+    return CuVSProvider.provider().hnswIndexBuild(resources, hnswParams, dataset);
   }
 
   /**
