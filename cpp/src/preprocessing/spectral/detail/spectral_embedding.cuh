@@ -67,11 +67,11 @@ raft::device_csr_matrix_view<DataT, int, int, int> coo_to_csr_matrix(
   return csr_matrix_view;
 }
 
-template <typename DataT, typename RetA, typename A>
-RetA create_laplacian(raft::resources const& handle,
-                      params spectral_embedding_config,
-                      A sparse_matrix_view,
-                      raft::device_vector_view<DataT, int> diagonal)
+template <typename DataT, typename OutSparseMatrixType, typename InSparseMatrixViewType>
+OutSparseMatrixType create_laplacian(raft::resources const& handle,
+                                     params spectral_embedding_config,
+                                     InSparseMatrixViewType sparse_matrix_view,
+                                     raft::device_vector_view<DataT, int> diagonal)
 {
   auto laplacian =
     spectral_embedding_config.norm_laplacian
@@ -89,11 +89,11 @@ RetA create_laplacian(raft::resources const& handle,
   return laplacian;
 }
 
-template <typename DataT, typename A>
+template <typename DataT, typename InSparseMatrixViewType>
 void compute_eigenpairs(raft::resources const& handle,
                         params spectral_embedding_config,
                         const int n_samples,
-                        A laplacian_view,
+                        InSparseMatrixViewType laplacian_view,
                         raft::device_vector_view<DataT, int> diagonal,
                         raft::device_matrix_view<DataT, int, raft::col_major> embedding)
 {
