@@ -47,29 +47,27 @@ namespace cuvs::cluster::kmeans::batched::detail {
  * Samples `n_samples_to_gather` rows from host data and copies to device.
  * Uses uniform strided sampling for simplicity and cache-friendliness.
  */
-template <typename DataT, typename IndexT>
+template <typename DataT, typename IdxT>
 void prepare_init_sample(raft::resources const& handle,
-                           raft::host_matrix_view<const DataT, IndexT> X,
-                           raft::device_matrix_view<DataT, IndexT> X_sample,
-                           uint64_t seed)
+                         raft::host_matrix_view<const DataT, IdxT> X,
+                         raft::device_matrix_view<DataT, IdxT> X_sample,
+                         uint64_t seed)
 {
   cudaStream_t stream  = raft::resource::get_cuda_stream(handle);
   auto n_samples       = X.extent(0);
   auto n_features      = X.extent(1);
   auto n_samples_out   = X_sample.extent(0);
 
-  // Use strided sampling for cache-friendliness
-  // For truly random, could use std::shuffle on indices first
   std::mt19937 gen(seed);
-  std::vector<IndexT> indices(n_samples);
+  std::vector<IdxT> indices(n_samples);
   std::iota(indices.begin(), indices.end(), 0);
   std::shuffle(indices.begin(), indices.end(), gen);
 
   std::vector<DataT> host_sample(n_samples_out * n_features);
 
 #pragma omp parallel for
-  for (IndexT i = 0; i < static_cast<IndexT>(n_samples_out); i++) {
-    IndexT src_idx = indices[i];
+  for (IdxT i = 0; i < static_cast<IdxT>(n_samples_out); i++) {
+    IdxT src_idx = indices[i];
     std::memcpy(host_sample.data() + i * n_features,
                 X.data_handle() + src_idx * n_features,
                 n_features * sizeof(DataT));
@@ -81,11 +79,11 @@ void prepare_init_sample(raft::resources const& handle,
 /**
  * @brief Initialize centroids using k-means++ on a sample of the host data
  */
-template <typename DataT, typename IndexT>
+template <typename DataT, typename IdxT>
 void init_centroids_from_host_sample(raft::resources const& handle,
                                      const cuvs::cluster::kmeans::params& params,
-                                     raft::host_matrix_view<const DataT, IndexT> X,
-                                     raft::device_matrix_view<DataT, IndexT> centroids,
+                                     raft::host_matrix_view<const DataT, IdxT> X,
+                                     raft::device_matrix_view<DataT, IdxT> centroids,
                                      rmm::device_uvector<char>& workspace)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
@@ -101,15 +99,15 @@ void init_centroids_from_host_sample(raft::resources const& handle,
   RAFT_LOG_DEBUG("KMeans batched: sampling %zu points for initialization", init_sample_size);
 
   // Sample data from host to device
-  auto init_sample = raft::make_device_matrix<DataT, IndexT>(handle, init_sample_size, n_features);
+  auto init_sample = raft::make_device_matrix<DataT, IdxT>(handle, init_sample_size, n_features);
   prepare_init_sample(handle, X, init_sample.view(), params.rng_state.seed);
 
   // Run k-means++ on the sample
   if (params.init == cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus) {
-    cuvs::cluster::kmeans::detail::kmeansPlusPlus<DataT, IndexT>(
+    cuvs::cluster::kmeans::detail::kmeansPlusPlus<DataT, IdxT>(
       handle,
       params,
-      raft::make_device_matrix_view<const DataT, IndexT>(
+      raft::make_device_matrix_view<const DataT, IdxT>(
         init_sample.data_handle(), init_sample_size, n_features),
       centroids,
       workspace);
@@ -132,14 +130,14 @@ void init_centroids_from_host_sample(raft::resources const& handle,
  * This function adds the partial sums from a batch to the running accumulators.
  * It does NOT divide - that happens once at the end of all batches.
  */
-template <typename DataT, typename IndexT>
+template <typename DataT, typename IdxT>
 void accumulate_batch_centroids(
   raft::resources const& handle,
-  raft::device_matrix_view<const DataT, IndexT> batch_data,
-  raft::device_vector_view<const raft::KeyValuePair<IndexT, DataT>, IndexT> minClusterAndDistance,
-  raft::device_vector_view<const DataT, IndexT> sample_weights,
-  raft::device_matrix_view<DataT, IndexT> centroid_sums,
-  raft::device_vector_view<DataT, IndexT> cluster_counts,
+  raft::device_matrix_view<const DataT, IdxT> batch_data,
+  raft::device_vector_view<const raft::KeyValuePair<IdxT, DataT>, IdxT> minClusterAndDistance,
+  raft::device_vector_view<const DataT, IdxT> sample_weights,
+  raft::device_matrix_view<DataT, IdxT> centroid_sums,
+  raft::device_vector_view<DataT, IdxT> cluster_counts,
   rmm::device_uvector<char>& workspace)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
@@ -148,8 +146,8 @@ void accumulate_batch_centroids(
   auto n_clusters     = centroid_sums.extent(0);
 
   // Temporary buffers for this batch's partial results
-  auto batch_sums   = raft::make_device_matrix<DataT, IndexT>(handle, n_clusters, n_features);
-  auto batch_counts = raft::make_device_vector<DataT, IndexT>(handle, n_clusters);
+  auto batch_sums   = raft::make_device_matrix<DataT, IdxT>(handle, n_clusters, n_features);
+  auto batch_counts = raft::make_device_vector<DataT, IdxT>(handle, n_clusters);
 
   // Zero the batch temporaries
   thrust::fill(raft::resource::get_thrust_policy(handle),
@@ -162,9 +160,9 @@ void accumulate_batch_centroids(
                DataT{0});
 
   // Extract cluster labels from KeyValuePair
-  cuvs::cluster::kmeans::detail::KeyValueIndexOp<IndexT, DataT> conversion_op;
-  thrust::transform_iterator<cuvs::cluster::kmeans::detail::KeyValueIndexOp<IndexT, DataT>,
-                             const raft::KeyValuePair<IndexT, DataT>*>
+  cuvs::cluster::kmeans::detail::KeyValueIndexOp<IdxT, DataT> conversion_op;
+  thrust::transform_iterator<cuvs::cluster::kmeans::detail::KeyValueIndexOp<IdxT, DataT>,
+                             const raft::KeyValuePair<IdxT, DataT>*>
     labels_itr(minClusterAndDistance.data_handle(), conversion_op);
 
   workspace.resize(n_samples, stream);
@@ -185,9 +183,9 @@ void accumulate_batch_centroids(
   raft::linalg::reduce_cols_by_key(sample_weights.data_handle(),
                                    labels_itr,
                                    batch_counts.data_handle(),
-                                   static_cast<IndexT>(1),
-                                   static_cast<IndexT>(n_samples),
-                                   static_cast<IndexT>(n_clusters),
+                                   static_cast<IdxT>(1),
+                                   static_cast<IdxT>(n_samples),
+                                   static_cast<IdxT>(n_clusters),
                                    stream);
 
   // Add batch results to running accumulators
@@ -207,12 +205,12 @@ void accumulate_batch_centroids(
 /**
  * @brief Finalize centroids by dividing accumulated sums by counts
  */
-template <typename DataT, typename IndexT>
+template <typename DataT, typename IdxT>
 void finalize_centroids(raft::resources const& handle,
-                        raft::device_matrix_view<const DataT, IndexT> centroid_sums,
-                        raft::device_vector_view<const DataT, IndexT> cluster_counts,
-                        raft::device_matrix_view<const DataT, IndexT> old_centroids,
-                        raft::device_matrix_view<DataT, IndexT> new_centroids)
+                        raft::device_matrix_view<const DataT, IdxT> centroid_sums,
+                        raft::device_vector_view<const DataT, IdxT> cluster_counts,
+                        raft::device_matrix_view<const DataT, IdxT> old_centroids,
+                        raft::device_matrix_view<DataT, IdxT> new_centroids)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   auto n_clusters     = new_centroids.extent(0);
@@ -252,7 +250,7 @@ void finalize_centroids(raft::resources const& handle,
  * @brief Main fit function for batched k-means with host data
  *
  * @tparam DataT  Data type (float, double)
- * @tparam IndexT Index type (int, int64_t)
+ * @tparam IdxT Index type (int, int64_t)
  *
  * @param[in]     handle        RAFT resources handle
  * @param[in]     params        K-means parameters
@@ -263,15 +261,15 @@ void finalize_centroids(raft::resources const& handle,
  * @param[out]    inertia       Sum of squared distances to nearest centroid
  * @param[out]    n_iter        Number of iterations run
  */
-template <typename DataT, typename IndexT>
+template <typename DataT, typename IdxT>
 void fit(raft::resources const& handle,
          const cuvs::cluster::kmeans::params& params,
-         raft::host_matrix_view<const DataT, IndexT> X,
-         IndexT batch_size,
-         std::optional<raft::host_vector_view<const DataT, IndexT>> sample_weight,
-         raft::device_matrix_view<DataT, IndexT> centroids,
+         raft::host_matrix_view<const DataT, IdxT> X,
+         IdxT batch_size,
+         std::optional<raft::host_vector_view<const DataT, IdxT>> sample_weight,
+         raft::device_matrix_view<DataT, IdxT> centroids,
          raft::host_scalar_view<DataT> inertia,
-         raft::host_scalar_view<IndexT> n_iter)
+         raft::host_scalar_view<IdxT> n_iter)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   auto n_samples      = X.extent(0);
@@ -281,7 +279,7 @@ void fit(raft::resources const& handle,
 
   RAFT_EXPECTS(batch_size > 0, "batch_size must be positive");
   RAFT_EXPECTS(n_clusters > 0, "n_clusters must be positive");
-  RAFT_EXPECTS(static_cast<IndexT>(centroids.extent(0)) == n_clusters,
+  RAFT_EXPECTS(static_cast<IdxT>(centroids.extent(0)) == n_clusters,
                "centroids.extent(0) must equal n_clusters");
   RAFT_EXPECTS(centroids.extent(1) == n_features,
                "centroids.extent(1) must equal n_features");
@@ -304,21 +302,21 @@ void fit(raft::resources const& handle,
 
   // Allocate device buffers
   // Batch buffer for data
-  auto batch_data = raft::make_device_matrix<DataT, IndexT>(handle, batch_size, n_features);
+  auto batch_data = raft::make_device_matrix<DataT, IdxT>(handle, batch_size, n_features);
   // Batch buffer for weights
-  auto batch_weights = raft::make_device_vector<DataT, IndexT>(handle, batch_size);
+  auto batch_weights = raft::make_device_vector<DataT, IdxT>(handle, batch_size);
   // Cluster assignment for batch
   auto minClusterAndDistance =
-    raft::make_device_vector<raft::KeyValuePair<IndexT, DataT>, IndexT>(handle, batch_size);
+    raft::make_device_vector<raft::KeyValuePair<IdxT, DataT>, IdxT>(handle, batch_size);
   // L2 norms of batch data
-  auto L2NormBatch = raft::make_device_vector<DataT, IndexT>(handle, batch_size);
+  auto L2NormBatch = raft::make_device_vector<DataT, IdxT>(handle, batch_size);
   // Temporary buffer for distance computation
   rmm::device_uvector<DataT> L2NormBuf_OR_DistBuf(0, stream);
 
   // Accumulators for centroid computation (persist across batches within an iteration)
-  auto centroid_sums   = raft::make_device_matrix<DataT, IndexT>(handle, n_clusters, n_features);
-  auto cluster_counts  = raft::make_device_vector<DataT, IndexT>(handle, n_clusters);
-  auto new_centroids   = raft::make_device_matrix<DataT, IndexT>(handle, n_clusters, n_features);
+  auto centroid_sums   = raft::make_device_matrix<DataT, IdxT>(handle, n_clusters, n_features);
+  auto cluster_counts  = raft::make_device_vector<DataT, IdxT>(handle, n_clusters);
+  auto new_centroids   = raft::make_device_matrix<DataT, IdxT>(handle, n_clusters, n_features);
 
   // Host buffer for batch data (pinned memory for faster H2D transfer)
   std::vector<DataT> host_batch_buffer(batch_size * n_features);
@@ -345,8 +343,8 @@ void fit(raft::resources const& handle,
     DataT total_cost = 0;
 
     // Process all data in batches
-    for (IndexT offset = 0; offset < n_samples; offset += batch_size) {
-      IndexT current_batch_size = std::min(batch_size, n_samples - offset);
+    for (IdxT offset = 0; offset < n_samples; offset += batch_size) {
+      IdxT current_batch_size = std::min(batch_size, n_samples - offset);
 
       // Copy batch data from host to device
       raft::copy(batch_data.data_handle(),
@@ -368,14 +366,14 @@ void fit(raft::resources const& handle,
       }
 
       // Create views for current batch size
-      auto batch_data_view = raft::make_device_matrix_view<const DataT, IndexT>(
+      auto batch_data_view = raft::make_device_matrix_view<const DataT, IdxT>(
         batch_data.data_handle(), current_batch_size, n_features);
-      auto batch_weights_view = raft::make_device_vector_view<const DataT, IndexT>(
+      auto batch_weights_view = raft::make_device_vector_view<const DataT, IdxT>(
         batch_weights.data_handle(), current_batch_size);
       auto minClusterAndDistance_view =
-        raft::make_device_vector_view<raft::KeyValuePair<IndexT, DataT>, IndexT>(
+        raft::make_device_vector_view<raft::KeyValuePair<IdxT, DataT>, IdxT>(
           minClusterAndDistance.data_handle(), current_batch_size);
-      auto L2NormBatch_view = raft::make_device_vector_view<DataT, IndexT>(
+      auto L2NormBatch_view = raft::make_device_vector_view<DataT, IdxT>(
         L2NormBatch.data_handle(), current_batch_size);
 
       // Compute L2 norms for batch if needed
@@ -390,12 +388,12 @@ void fit(raft::resources const& handle,
       }
 
       // Find nearest centroid for each sample in batch
-      auto centroids_const = raft::make_device_matrix_view<const DataT, IndexT>(
+      auto centroids_const = raft::make_device_matrix_view<const DataT, IdxT>(
         centroids.data_handle(), n_clusters, n_features);
-      auto L2NormBatch_const = raft::make_device_vector_view<const DataT, IndexT>(
+      auto L2NormBatch_const = raft::make_device_vector_view<const DataT, IdxT>(
         L2NormBatch.data_handle(), current_batch_size);
 
-      cuvs::cluster::kmeans::detail::minClusterAndDistanceCompute<DataT, IndexT>(
+      cuvs::cluster::kmeans::detail::minClusterAndDistanceCompute<DataT, IdxT>(
         handle,
         batch_data_view,
         centroids_const,
@@ -409,10 +407,10 @@ void fit(raft::resources const& handle,
 
       // Accumulate partial sums for this batch
       auto minClusterAndDistance_const =
-        raft::make_device_vector_view<const raft::KeyValuePair<IndexT, DataT>, IndexT>(
+        raft::make_device_vector_view<const raft::KeyValuePair<IdxT, DataT>, IdxT>(
           minClusterAndDistance.data_handle(), current_batch_size);
 
-      accumulate_batch_centroids<DataT, IndexT>(handle,
+      accumulate_batch_centroids<DataT, IdxT>(handle,
                                                 batch_data_view,
                                                 minClusterAndDistance_const,
                                                 batch_weights_view,
@@ -435,14 +433,14 @@ void fit(raft::resources const& handle,
     }  // end batch loop
 
     // Finalize centroids: divide sums by counts
-    auto centroids_const = raft::make_device_matrix_view<const DataT, IndexT>(
+    auto centroids_const = raft::make_device_matrix_view<const DataT, IdxT>(
       centroids.data_handle(), n_clusters, n_features);
-    auto centroid_sums_const = raft::make_device_matrix_view<const DataT, IndexT>(
+    auto centroid_sums_const = raft::make_device_matrix_view<const DataT, IdxT>(
       centroid_sums.data_handle(), n_clusters, n_features);
-    auto cluster_counts_const = raft::make_device_vector_view<const DataT, IndexT>(
+    auto cluster_counts_const = raft::make_device_vector_view<const DataT, IdxT>(
       cluster_counts.data_handle(), n_clusters);
 
-    finalize_centroids<DataT, IndexT>(
+    finalize_centroids<DataT, IdxT>(
       handle, centroid_sums_const, cluster_counts_const, centroids_const, new_centroids.view());
 
     // Compute squared norm of change in centroids
@@ -481,18 +479,18 @@ void fit(raft::resources const& handle,
 
   // Compute final inertia by processing all data once more
   inertia[0] = 0;
-  for (IndexT offset = 0; offset < n_samples; offset += batch_size) {
-    IndexT current_batch_size = std::min(batch_size, n_samples - offset);
+  for (IdxT offset = 0; offset < n_samples; offset += batch_size) {
+    IdxT current_batch_size = std::min(batch_size, n_samples - offset);
 
     raft::copy(batch_data.data_handle(),
                X.data_handle() + offset * n_features,
                current_batch_size * n_features,
                stream);
 
-    auto batch_data_view = raft::make_device_matrix_view<const DataT, IndexT>(
+    auto batch_data_view = raft::make_device_matrix_view<const DataT, IdxT>(
       batch_data.data_handle(), current_batch_size, n_features);
     auto minClusterAndDistance_view =
-      raft::make_device_vector_view<raft::KeyValuePair<IndexT, DataT>, IndexT>(
+      raft::make_device_vector_view<raft::KeyValuePair<IdxT, DataT>, IdxT>(
         minClusterAndDistance.data_handle(), current_batch_size);
 
     if (metric == cuvs::distance::DistanceType::L2Expanded ||
@@ -501,12 +499,12 @@ void fit(raft::resources const& handle,
         L2NormBatch.data_handle(), batch_data.data_handle(), n_features, current_batch_size, stream);
     }
 
-    auto centroids_const = raft::make_device_matrix_view<const DataT, IndexT>(
+    auto centroids_const = raft::make_device_matrix_view<const DataT, IdxT>(
       centroids.data_handle(), n_clusters, n_features);
-    auto L2NormBatch_const = raft::make_device_vector_view<const DataT, IndexT>(
+    auto L2NormBatch_const = raft::make_device_vector_view<const DataT, IdxT>(
       L2NormBatch.data_handle(), current_batch_size);
 
-    cuvs::cluster::kmeans::detail::minClusterAndDistanceCompute<DataT, IndexT>(
+    cuvs::cluster::kmeans::detail::minClusterAndDistanceCompute<DataT, IdxT>(
       handle,
       batch_data_view,
       centroids_const,
