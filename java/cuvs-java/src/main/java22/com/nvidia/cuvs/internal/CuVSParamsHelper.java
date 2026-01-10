@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.internal;
@@ -98,25 +98,6 @@ public final class CuVSParamsHelper {
         @Override
         public void close() {
           checkCuVSError(cuvsIvfPqSearchParamsDestroy(paramsPtr), "cuvsIvfPqSearchParamsDestroy");
-        }
-      };
-    }
-  }
-
-  static CloseableHandle createCagraMergeParams() {
-    try (var localArena = Arena.ofConfined()) {
-      var paramsPtrPtr = localArena.allocate(cuvsCagraMergeParams_t);
-      checkCuVSError(cuvsCagraMergeParamsCreate(paramsPtrPtr), "cuvsCagraMergeParamsCreate");
-      var paramsPtr = paramsPtrPtr.get(cuvsCagraMergeParams_t, 0L);
-      return new CloseableHandle() {
-        @Override
-        public MemorySegment handle() {
-          return paramsPtr;
-        }
-
-        @Override
-        public void close() {
-          checkCuVSError(cuvsCagraMergeParamsDestroy(paramsPtr), "cuvsCagraMergeParamsDestroy");
         }
       };
     }

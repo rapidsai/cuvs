@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.spi;
@@ -144,7 +144,7 @@ public interface CuVSProvider {
    * @return A new merged CAGRA index
    * @throws Throwable if an error occurs during the merge operation
    */
-  default CagraIndex mergeCagraIndexes(CagraIndex[] indexes, CagraMergeParams mergeParams)
+  default CagraIndex mergeCagraIndexes(CagraIndex[] indexes, CagraIndexParams mergeParams)
       throws Throwable {
     // Default implementation falls back to the method without parameters
     return mergeCagraIndexes(indexes);
