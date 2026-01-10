@@ -177,10 +177,10 @@ void create_connectivity_graph(
   raft::device_matrix_view<float, int, raft::row_major> dataset,
   raft::device_coo_matrix<float, int, int, NNZType>& connectivity_graph)
 {
-  const int n_samples  = dataset.extent(0);
-  const int n_features = dataset.extent(1);
-  const int k_search   = spectral_embedding_config.n_neighbors;
-  const NNZType nnz    = static_cast<NNZType>(n_samples) * k_search;
+  const int64_t n_samples  = dataset.extent(0);
+  const int64_t n_features = dataset.extent(1);
+  const int k_search       = spectral_embedding_config.n_neighbors;
+  const NNZType nnz        = static_cast<NNZType>(n_samples) * k_search;
 
   auto stream = raft::resource::get_cuda_stream(handle);
 
@@ -188,8 +188,8 @@ void create_connectivity_graph(
   cuvs::neighbors::brute_force::index_params index_params;
   index_params.metric = cuvs::distance::DistanceType::L2SqrtExpanded;
 
-  auto d_indices   = raft::make_device_matrix<int64_t>(handle, n_samples, k_search);
-  auto d_distances = raft::make_device_matrix<float>(handle, n_samples, k_search);
+  auto d_indices   = raft::make_device_matrix<int64_t, int64_t>(handle, n_samples, k_search);
+  auto d_distances = raft::make_device_matrix<float, int64_t>(handle, n_samples, k_search);
 
   auto index =
     cuvs::neighbors::brute_force::build(handle, index_params, raft::make_const_mdspan(dataset));
@@ -197,8 +197,8 @@ void create_connectivity_graph(
   cuvs::neighbors::brute_force::search(
     handle, search_params, index, dataset, d_indices.view(), d_distances.view());
 
-  auto knn_rows = raft::make_device_vector<int>(handle, nnz);
-  auto knn_cols = raft::make_device_vector<int>(handle, nnz);
+  auto knn_rows = raft::make_device_vector<int, NNZType>(handle, nnz);
+  auto knn_cols = raft::make_device_vector<int, NNZType>(handle, nnz);
 
   raft::linalg::unary_op(
     handle, make_const_mdspan(d_indices.view()), knn_cols.view(), [] __device__(int64_t x) {
@@ -208,10 +208,11 @@ void create_connectivity_graph(
   thrust::tabulate(raft::resource::get_thrust_policy(handle),
                    knn_rows.data_handle(),
                    knn_rows.data_handle() + nnz,
-                   [k_search] __device__(int idx) { return idx / k_search; });
+                   [k_search] __device__(NNZType idx) { return idx / k_search; });
 
   // set all distances to 1.0f (connectivity KNN graph)
-  raft::matrix::fill(handle, raft::make_device_vector_view(d_distances.data_handle(), nnz), 1.0f);
+  raft::matrix::fill(
+    handle, raft::make_device_vector_view<float, NNZType>(d_distances.data_handle(), nnz), 1.0f);
 
   auto coo_matrix_view = raft::make_device_coo_matrix_view<const float, int, int, NNZType>(
     d_distances.data_handle(),
