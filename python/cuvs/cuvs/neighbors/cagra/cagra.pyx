@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
@@ -70,7 +70,7 @@ cdef class CompressionParams:
     vq_kmeans_trainset_fraction: float
         The fraction of data to use during iterative kmeans building (VQ
         phase). When zero, an optimal value is selected using a heuristic.
-    vq_kmeans_trainset_fraction: float
+    pq_kmeans_trainset_fraction: float
         The fraction of data to use during iterative kmeans building (PQ
         phase). When zero, an optimal value is selected using a heuristic.
     """
