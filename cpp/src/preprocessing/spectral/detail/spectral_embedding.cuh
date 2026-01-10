@@ -195,7 +195,7 @@ void create_connectivity_graph(
   auto d_indices   = raft::make_device_matrix<int64_t>(handle, n_samples, k_search);
   auto d_distances = raft::make_device_matrix<float>(handle, n_samples, k_search);
 
-  cuvs::neighbors::all_neighbors::all_neighbors_params all_neighbors_params;
+  cuvs::neighbors::all_neighbors::all_neighbors_params all_neighbors_params{};
   all_neighbors_params.graph_build_params =
     cuvs::neighbors::all_neighbors::graph_build_params::brute_force_params{};
   cuvs::neighbors::all_neighbors::build(handle,
