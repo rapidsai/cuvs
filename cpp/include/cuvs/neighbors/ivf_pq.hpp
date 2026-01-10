@@ -33,6 +33,14 @@ enum class codebook_gen {  // NOLINT
   PER_CLUSTER  = 1,        // NOLINT
 };
 
+/** A type for specifying the memory layout of PQ codes in IVF lists. */
+enum class list_layout {  // NOLINT
+  /** Flat layout: each vector's PQ codes stored contiguously [n_rows, bytes_per_vector]. */
+  FLAT = 0,  // NOLINT
+  /** Interleaved layout: codes from multiple vectors interleaved for coalesced memory access. */
+  INTERLEAVED = 1,  // NOLINT
+};
+
 struct index_params : cuvs::neighbors::index_params {
   /**
    * The number of inverted lists (clusters)
@@ -69,6 +77,14 @@ struct index_params : cuvs::neighbors::index_params {
   uint32_t pq_dim = 0;
   /** How PQ codebooks are created. */
   codebook_gen codebook_kind = codebook_gen::PER_SUBSPACE;
+  /**
+   * Memory layout of PQ codes in IVF lists.
+   *
+   * - INTERLEAVED (default): Codes from multiple vectors are interleaved for coalesced GPU memory
+   *   access during search. This is optimized for search performance.
+   * - FLAT: Each vector's PQ codes are stored contiguously.
+   */
+  list_layout codes_layout = list_layout::INTERLEAVED;
   /**
    * Apply a random rotation matrix on the input data and queries even if `dim % pq_dim == 0`.
    *
@@ -276,6 +292,47 @@ constexpr typename list_spec<SizeT, IdxT>::list_extents list_spec<SizeT, IdxT>::
 template <typename IdxT, typename SizeT = uint32_t>
 using list_data = ivf::list<list_spec, SizeT, IdxT>;
 
+/**
+ * Flat (non-interleaved) storage specification for PQ-encoded data.
+ *
+ * This stores each vector's PQ codes contiguously:
+ *   [n_rows, bytes_per_vector] where bytes_per_vector = ceildiv(pq_dim * pq_bits, 8)
+ */
+template <typename SizeT, typename IdxT>
+struct flat_list_spec {
+  using value_type   = uint8_t;
+  using index_type   = IdxT;
+  using list_extents = raft::matrix_extent<SizeT>;
+
+  SizeT align_max;
+  SizeT align_min;
+  uint32_t pq_bits;
+  uint32_t pq_dim;
+
+  constexpr flat_list_spec(uint32_t pq_bits, uint32_t pq_dim, bool conservative_memory_allocation)
+    : pq_bits(pq_bits),
+      pq_dim(pq_dim),
+      align_min(1),
+      align_max(conservative_memory_allocation ? 1 : 256)
+  {
+  }
+
+  /** Number of bytes per encoded vector. */
+  constexpr SizeT bytes_per_vector() const
+  {
+    return raft::div_rounding_up_safe<SizeT>(pq_dim * pq_bits, 8u);
+  }
+
+  /** Determine the extents of an array enough to hold a given amount of data. */
+  constexpr list_extents make_list_extents(SizeT n_rows) const
+  {
+    return list_extents{n_rows, bytes_per_vector()};
+  }
+};
+
+template <typename IdxT, typename SizeT = uint32_t>
+using flat_list_data = ivf::list<flat_list_spec, SizeT, IdxT>;
+
 using pq_centers_extents =
   raft::extents<uint32_t, raft::dynamic_extent, raft::dynamic_extent, raft::dynamic_extent>;
 
@@ -286,6 +343,7 @@ class index_iface {
 
   virtual cuvs::distance::DistanceType metric() const noexcept  = 0;
   virtual codebook_gen codebook_kind() const noexcept           = 0;
+  virtual list_layout codes_layout() const noexcept             = 0;
   virtual IdxT size() const noexcept                            = 0;
   virtual uint32_t dim() const noexcept                         = 0;
   virtual uint32_t dim_ext() const noexcept                     = 0;
@@ -478,6 +536,9 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
 
   /** How PQ codebooks are created. */
   codebook_gen codebook_kind() const noexcept override;
+
+  /** Memory layout of PQ codes in IVF lists. */
+  list_layout codes_layout() const noexcept override;
 
   /** Number of clusters/inverted lists (first level quantization). */
   uint32_t n_lists() const noexcept;

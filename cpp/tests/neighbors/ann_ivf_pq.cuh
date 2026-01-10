@@ -565,6 +565,62 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     }
   }
 
+  /**
+   * Test that FLAT layout produces the same PQ codes as INTERLEAVED layout.
+   * Builds both layouts and compares the unpacked codes.
+   */
+  void check_flat_layout_codes()
+  {
+    auto ipams_interleaved              = ps.index_params;
+    ipams_interleaved.add_data_on_build = true;
+    ipams_interleaved.codes_layout      = list_layout::INTERLEAVED;
+
+    auto database_view =
+      raft::make_device_matrix_view<const DataT, int64_t>(database.data(), ps.num_db_vecs, ps.dim);
+    auto index_interleaved =
+      cuvs::neighbors::ivf_pq::build(handle_, ipams_interleaved, database_view);
+
+    auto ipams_flat              = ps.index_params;
+    ipams_flat.add_data_on_build = true;
+    ipams_flat.codes_layout      = list_layout::FLAT;
+
+    auto index_flat = cuvs::neighbors::ivf_pq::build(handle_, ipams_flat, database_view);
+
+    ASSERT_EQ(index_interleaved.codes_layout(), list_layout::INTERLEAVED);
+    ASSERT_EQ(index_flat.codes_layout(), list_layout::FLAT);
+
+    ASSERT_TRUE(cuvs::devArrMatch(index_interleaved.list_sizes().data_handle(),
+                                  index_flat.list_sizes().data_handle(),
+                                  index_interleaved.n_lists(),
+                                  cuvs::Compare<uint32_t>{}));
+
+    uint32_t bytes_per_vector =
+      raft::div_rounding_up_safe(index_flat.pq_dim() * index_flat.pq_bits(), 8u);
+
+    for (uint32_t label = 0; label < index_interleaved.n_lists(); label++) {
+      auto& list_interleaved = index_interleaved.lists()[label];
+      auto& list_flat        = index_flat.lists()[label];
+
+      uint32_t n_rows = list_interleaved->size.load();
+      if (n_rows == 0) { continue; }
+
+      rmm::device_uvector<uint8_t> interleaved_codes(n_rows * bytes_per_vector, stream_);
+      helpers::codepacker::unpack_contiguous(handle_,
+                                             list_interleaved->data.view(),
+                                             index_interleaved.pq_bits(),
+                                             0,
+                                             n_rows,
+                                             index_interleaved.pq_dim(),
+                                             interleaved_codes.data());
+
+      ASSERT_TRUE(cuvs::devArrMatch(interleaved_codes.data(),
+                                    list_flat->data.data_handle(),
+                                    n_rows * bytes_per_vector,
+                                    cuvs::Compare<uint8_t>{}))
+        << "PQ codes mismatch at list " << label;
+    }
+  }
+
   void SetUp() override  // NOLINT
   {
     gen_data();
@@ -1147,7 +1203,76 @@ inline auto special_cases() -> test_cases_t
 #define TEST_BUILD_PRECOMPUTED(type) \
   TEST_P(type, build_precomputed) /* NOLINT */ { this->build_precomputed(); }
 
+#define TEST_FLAT_LAYOUT_CODES(type) \
+  TEST_P(type, flat_layout_codes) /* NOLINT */ { this->check_flat_layout_codes(); }
+
 #define INSTANTIATE(type, vals) \
   INSTANTIATE_TEST_SUITE_P(IvfPq, type, ::testing::ValuesIn(vals)); /* NOLINT */
+
+/**
+ * Test cases for flat layout comparison.
+ * These test all pq_bits values (4-8) to ensure correct encoding.
+ */
+inline auto flat_layout_tests() -> test_cases_t
+{
+  test_cases_t xs;
+
+  // Test with pq_bits = 4 (byte-aligned, 2 codes per byte)
+  add_test_case(xs, [](ivf_pq_inputs& x) {
+    x.num_db_vecs          = 1000;
+    x.dim                  = 64;
+    x.index_params.n_lists = 10;
+    x.index_params.pq_bits = 4;
+    x.index_params.pq_dim  = 16;
+  });
+
+  // Test with pq_bits = 5 (not byte-aligned)
+  add_test_case(xs, [](ivf_pq_inputs& x) {
+    x.num_db_vecs          = 1000;
+    x.dim                  = 64;
+    x.index_params.n_lists = 10;
+    x.index_params.pq_bits = 5;
+    x.index_params.pq_dim  = 16;
+  });
+
+  // Test with pq_bits = 6 (not byte-aligned)
+  add_test_case(xs, [](ivf_pq_inputs& x) {
+    x.num_db_vecs          = 1000;
+    x.dim                  = 64;
+    x.index_params.n_lists = 10;
+    x.index_params.pq_bits = 6;
+    x.index_params.pq_dim  = 16;
+  });
+
+  // Test with pq_bits = 7 (not byte-aligned)
+  add_test_case(xs, [](ivf_pq_inputs& x) {
+    x.num_db_vecs          = 1000;
+    x.dim                  = 64;
+    x.index_params.n_lists = 10;
+    x.index_params.pq_bits = 7;
+    x.index_params.pq_dim  = 16;
+  });
+
+  // Test with pq_bits = 8 (byte-aligned, 1 code per byte)
+  add_test_case(xs, [](ivf_pq_inputs& x) {
+    x.num_db_vecs          = 1000;
+    x.dim                  = 64;
+    x.index_params.n_lists = 10;
+    x.index_params.pq_bits = 8;
+    x.index_params.pq_dim  = 16;
+  });
+
+  // Test with PER_CLUSTER codebook
+  add_test_case(xs, [](ivf_pq_inputs& x) {
+    x.num_db_vecs                = 1000;
+    x.dim                        = 64;
+    x.index_params.n_lists       = 10;
+    x.index_params.pq_bits       = 8;
+    x.index_params.pq_dim        = 16;
+    x.index_params.codebook_kind = codebook_gen::PER_CLUSTER;
+  });
+
+  return xs;
+}
 
 }  // namespace cuvs::neighbors::ivf_pq
