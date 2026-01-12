@@ -346,7 +346,111 @@ constexpr list_spec_flat<SizeT, IdxT>::list_spec_flat(
 }
 
 template <typename IdxT, typename SizeT = uint32_t>
-using flat_list_data = ivf::list<list_spec_flat, SizeT, IdxT>;
+using list_data_flat = ivf::list<list_spec_flat, SizeT, IdxT>;
+
+/**
+ * Abstract base class for IVF-PQ list data.
+ * This allows polymorphic access to list data regardless of the underlying layout
+ * (INTERLEAVED or FLAT).
+ */
+template <typename IdxT, typename SizeT = uint32_t>
+struct list_data_base {
+  using size_type  = SizeT;
+  using index_type = IdxT;
+
+  virtual ~list_data_base() = default;
+
+  /** Get the raw data pointer (same as data_ptr for compatibility with ivf::list). */
+  virtual uint8_t* data() noexcept             = 0;
+  virtual const uint8_t* data() const noexcept = 0;
+
+  /** Alias for data() - matches ivf::list interface. */
+  uint8_t* data_ptr() noexcept { return data(); }
+  const uint8_t* data_ptr() const noexcept { return data(); }
+
+  /** Get the indices pointer (same as indices_ptr for compatibility with ivf::list). */
+  virtual index_type* indices() noexcept             = 0;
+  virtual const index_type* indices() const noexcept = 0;
+
+  /** Alias for indices() - matches ivf::list interface. */
+  index_type* indices_ptr() noexcept { return indices(); }
+  const index_type* indices_ptr() const noexcept { return indices(); }
+
+  /** Get the current size (number of records). */
+  virtual size_type size() const noexcept = 0;
+
+  /** Set the current size (number of records). */
+  virtual void set_size(size_type new_size) noexcept = 0;
+
+  /** Get the total size of the data array in bytes. */
+  virtual size_t data_byte_size() const noexcept = 0;
+
+  /** Get the capacity (number of indices that can be stored). */
+  virtual size_type indices_capacity() const noexcept = 0;
+};
+
+/**
+ * Concrete list type for interleaved layout.
+ * Inherits from both list_data_base (for polymorphism) and list_data (for storage).
+ */
+template <typename IdxT, typename SizeT = uint32_t>
+struct list_data_interleaved : public list_data_base<IdxT, SizeT>, public list_data<IdxT, SizeT> {
+  using list_type = list_data<IdxT, SizeT>;
+  using typename list_data_base<IdxT, SizeT>::size_type;
+  using typename list_data_base<IdxT, SizeT>::index_type;
+
+  // Forward constructor to ivf::list
+  list_data_interleaved(raft::resources const& res,
+                        const typename list_type::spec_type& spec,
+                        size_type n_rows)
+    : list_type(res, spec, n_rows)
+  {
+  }
+
+  uint8_t* data() noexcept override { return list_type::data.data_handle(); }
+  const uint8_t* data() const noexcept override { return list_type::data.data_handle(); }
+
+  index_type* indices() noexcept override { return list_type::indices.data_handle(); }
+  const index_type* indices() const noexcept override { return list_type::indices.data_handle(); }
+
+  size_type size() const noexcept override { return list_type::size.load(); }
+  void set_size(size_type new_size) noexcept override { list_type::size.store(new_size); }
+
+  size_t data_byte_size() const noexcept override { return list_type::data.size(); }
+  size_type indices_capacity() const noexcept override { return list_type::indices.extent(0); }
+};
+
+/**
+ * Concrete list type for flat layout.
+ * Inherits from both list_data_base (for polymorphism) and list_data_flat (for storage).
+ */
+template <typename IdxT, typename SizeT = uint32_t>
+struct list_data_flat_ext : public list_data_base<IdxT, SizeT>, public list_data_flat<IdxT, SizeT> {
+  using list_type = list_data_flat<IdxT, SizeT>;
+  using typename list_data_base<IdxT, SizeT>::size_type;
+  using typename list_data_base<IdxT, SizeT>::index_type;
+
+  // Forward constructor to ivf::list
+  list_data_flat_ext(raft::resources const& res,
+                     const typename list_type::spec_type& spec,
+                     size_type n_rows)
+    : list_type(res, spec, n_rows)
+  {
+  }
+
+  // Virtual method implementations
+  uint8_t* data() noexcept override { return list_type::data.data_handle(); }
+  const uint8_t* data() const noexcept override { return list_type::data.data_handle(); }
+
+  index_type* indices() noexcept override { return list_type::indices.data_handle(); }
+  const index_type* indices() const noexcept override { return list_type::indices.data_handle(); }
+
+  size_type size() const noexcept override { return list_type::size.load(); }
+  void set_size(size_type new_size) noexcept override { list_type::size.store(new_size); }
+
+  size_t data_byte_size() const noexcept override { return list_type::data.size(); }
+  size_type indices_capacity() const noexcept override { return list_type::indices.extent(0); }
+};
 
 using pq_centers_extents =
   raft::extents<uint32_t, raft::dynamic_extent, raft::dynamic_extent, raft::dynamic_extent>;
@@ -371,8 +475,8 @@ class index_iface {
   virtual bool conservative_memory_allocation() const noexcept  = 0;
   virtual uint32_t get_list_size_in_bytes(uint32_t label) const = 0;
 
-  virtual std::vector<std::shared_ptr<list_data<IdxT>>>& lists() noexcept             = 0;
-  virtual const std::vector<std::shared_ptr<list_data<IdxT>>>& lists() const noexcept = 0;
+  virtual std::vector<std::shared_ptr<list_data_base<IdxT>>>& lists() noexcept             = 0;
+  virtual const std::vector<std::shared_ptr<list_data_base<IdxT>>>& lists() const noexcept = 0;
 
   virtual raft::device_vector_view<uint32_t, uint32_t, raft::row_major> list_sizes() noexcept = 0;
   virtual raft::device_vector_view<const uint32_t, uint32_t, raft::row_major> list_sizes()
@@ -573,9 +677,9 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
   raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers()
     const noexcept override;
 
-  /** Lists' data and indices. */
-  std::vector<std::shared_ptr<list_data<IdxT>>>& lists() noexcept override;
-  const std::vector<std::shared_ptr<list_data<IdxT>>>& lists() const noexcept override;
+  /** Lists' data and indices (polymorphic, works for both FLAT and INTERLEAVED layouts). */
+  std::vector<std::shared_ptr<list_data_base<IdxT>>>& lists() noexcept override;
+  const std::vector<std::shared_ptr<list_data_base<IdxT>>>& lists() const noexcept override;
 
   /** Pointers to the inverted lists (clusters) data  [n_lists]. */
   raft::device_vector_view<uint8_t*, uint32_t, raft::row_major> data_ptrs() noexcept override;

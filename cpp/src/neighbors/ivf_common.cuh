@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -277,8 +277,8 @@ void recompute_internal_state(const raft::resources& res, Index& index)
   auto inds_ptrs = index.inds_ptrs();
   for (uint32_t label = 0; label < index.n_lists(); label++) {
     auto& list          = index.lists()[label];
-    const auto data_ptr = list ? list->data.data_handle() : nullptr;
-    const auto inds_ptr = list ? list->indices.data_handle() : nullptr;
+    const auto data_ptr = list ? list->data_ptr() : nullptr;
+    const auto inds_ptr = list ? list->indices_ptr() : nullptr;
     raft::copy(&data_ptrs(label), &data_ptr, 1, stream);
     raft::copy(&inds_ptrs(label), &inds_ptr, 1, stream);
   }

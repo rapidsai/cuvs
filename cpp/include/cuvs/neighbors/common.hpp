@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -703,6 +703,22 @@ struct list {
 
   /** Allocate a new list capable of holding at least `n_rows` data records and indices. */
   list(raft::resources const& res, const spec_type& spec, size_type n_rows);
+
+  /**
+   * Methods for polymorphic access.
+   * Note: data_ptr/indices_ptr are used by ivf_common.cuh for both IVF-PQ and IVF-Flat.
+   */
+  value_type* data_ptr() noexcept { return data.data_handle(); }
+  const value_type* data_ptr() const noexcept { return data.data_handle(); }
+
+  index_type* indices_ptr() noexcept { return indices.data_handle(); }
+  const index_type* indices_ptr() const noexcept { return indices.data_handle(); }
+
+  size_type get_size() const noexcept { return size.load(); }
+  void set_size(size_type new_size) noexcept { size.store(new_size); }
+
+  size_t data_byte_size() const noexcept { return data.size(); }
+  size_type indices_capacity() const noexcept { return indices.extent(0); }
 };
 
 template <typename ListT, class T = void>

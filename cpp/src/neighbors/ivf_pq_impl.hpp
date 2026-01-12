@@ -42,8 +42,8 @@ class index_impl : public index_iface<IdxT> {
   uint32_t n_lists() const noexcept override;
   bool conservative_memory_allocation() const noexcept override;
 
-  std::vector<std::shared_ptr<list_data<IdxT>>>& lists() noexcept override;
-  const std::vector<std::shared_ptr<list_data<IdxT>>>& lists() const noexcept override;
+  std::vector<std::shared_ptr<list_data_base<IdxT>>>& lists() noexcept override;
+  const std::vector<std::shared_ptr<list_data_base<IdxT>>>& lists() const noexcept override;
 
   raft::device_vector_view<uint32_t, uint32_t, raft::row_major> list_sizes() noexcept override;
   raft::device_vector_view<const uint32_t, uint32_t, raft::row_major> list_sizes()
@@ -82,7 +82,7 @@ class index_impl : public index_iface<IdxT> {
   bool conservative_memory_allocation_;
 
   // Primary data members
-  std::vector<std::shared_ptr<list_data<IdxT>>> lists_;
+  std::vector<std::shared_ptr<list_data_base<IdxT>>> lists_;
   raft::device_vector<uint32_t, uint32_t, raft::row_major> list_sizes_;
 
   // Lazy-initialized low-precision variants of index members - for low-precision coarse search.

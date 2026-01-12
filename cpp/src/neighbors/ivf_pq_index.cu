@@ -122,13 +122,13 @@ bool index_impl<IdxT>::conservative_memory_allocation() const noexcept
 }
 
 template <typename IdxT>
-std::vector<std::shared_ptr<list_data<IdxT>>>& index_impl<IdxT>::lists() noexcept
+std::vector<std::shared_ptr<list_data_base<IdxT>>>& index_impl<IdxT>::lists() noexcept
 {
   return lists_;
 }
 
 template <typename IdxT>
-const std::vector<std::shared_ptr<list_data<IdxT>>>& index_impl<IdxT>::lists() const noexcept
+const std::vector<std::shared_ptr<list_data_base<IdxT>>>& index_impl<IdxT>::lists() const noexcept
 {
   return lists_;
 }
@@ -523,13 +523,13 @@ raft::device_matrix_view<const float, uint32_t, raft::row_major> index<IdxT>::ro
 }
 
 template <typename IdxT>
-std::vector<std::shared_ptr<list_data<IdxT>>>& index<IdxT>::lists() noexcept
+std::vector<std::shared_ptr<list_data_base<IdxT>>>& index<IdxT>::lists() noexcept
 {
   return impl_->lists();
 }
 
 template <typename IdxT>
-const std::vector<std::shared_ptr<list_data<IdxT>>>& index<IdxT>::lists() const noexcept
+const std::vector<std::shared_ptr<list_data_base<IdxT>>>& index<IdxT>::lists() const noexcept
 {
   return impl_->lists();
 }
@@ -625,8 +625,7 @@ uint32_t index_impl<IdxT>::get_list_size_in_bytes(uint32_t label) const
 {
   RAFT_EXPECTS(label < lists_.size(),
                "Expected label to be less than number of lists in the index");
-  auto& list_data = lists_[label]->data;
-  return list_data.size();
+  return lists_[label]->data_byte_size();
 }
 
 template <typename IdxT>

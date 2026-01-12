@@ -578,12 +578,16 @@ void reconstruct_list_data(raft::resources const& res,
 {
   auto n_rows = out_vectors.extent(0);
   if (n_rows == 0) { return; }
-  auto& list = index.lists()[label];
+  // Currently only supports interleaved layout
+  RAFT_EXPECTS(index.codes_layout() == list_layout::INTERLEAVED,
+               "reconstruct_list_data currently only supports INTERLEAVED layout");
+  auto& list_data_base_ptr = index.lists()[label];
+  auto typed_list = std::static_pointer_cast<const list_data_interleaved<IdxT>>(list_data_base_ptr);
   if (std::holds_alternative<uint32_t>(offset_or_indices)) {
     auto n_skip = std::get<uint32_t>(offset_or_indices);
     // sic! I'm using the upper bound `list.size` instead of exact `list_sizes(label)`
     // to avoid an extra device-host data raft::copy and the stream sync.
-    RAFT_EXPECTS(n_skip + n_rows <= list->size.load(),
+    RAFT_EXPECTS(n_skip + n_rows <= typed_list->size.load(),
                  "offset + output size must be not bigger than the cluster size.");
   }
 
@@ -606,7 +610,7 @@ void reconstruct_list_data(raft::resources const& res,
     }
   }(index.pq_bits());
   kernel<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(tmp.view(),
-                                                                       list->data.view(),
+                                                                       typed_list->data.view(),
                                                                        index.pq_centers(),
                                                                        index.centers_rot(),
                                                                        index.codebook_kind(),
@@ -733,7 +737,7 @@ void encode_list_data(raft::resources const& res,
       }
     }(index->pq_bits());
     kernel<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
-      index->lists()[label]->data.data_handle(),
+      index->lists()[label]->data(),
       new_vectors_residual.view(),
       index->pq_centers(),
       index->codebook_kind(),
@@ -751,8 +755,9 @@ void encode_list_data(raft::resources const& res,
         default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
       }
     }(index->pq_bits());
+    auto typed_list = std::static_pointer_cast<list_data_interleaved<IdxT>>(index->lists()[label]);
     kernel<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
-      index->lists()[label]->data.view(),
+      typed_list->data.view(),
       new_vectors_residual.view(),
       index->pq_centers(),
       index->codebook_kind(),
@@ -838,17 +843,21 @@ auto extend_list_prepare(
   uint32_t new_size = offset + n_rows;
   raft::copy(
     index->list_sizes().data_handle() + label, &new_size, 1, raft::resource::get_cuda_stream(res));
-  auto& list = index->lists()[label];
+  auto& list_data_base_ptr = index->lists()[label];
   if (index->codes_layout() == list_layout::FLAT) {
     auto spec = list_spec_flat<uint32_t, IdxT>{
       index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
-    ivf::resize_list(res, list, spec, new_size, offset);
+    auto typed_list = std::static_pointer_cast<list_data_flat_ext<IdxT>>(list_data_base_ptr);
+    ivf::resize_list(res, typed_list, spec, new_size, offset);
+    list_data_base_ptr = typed_list;
   } else {
     auto spec = list_spec_interleaved<uint32_t, IdxT>{
       index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
-    ivf::resize_list(res, list, spec, new_size, offset);
+    auto typed_list = std::static_pointer_cast<list_data_interleaved<IdxT>>(list_data_base_ptr);
+    ivf::resize_list(res, typed_list, spec, new_size, offset);
+    list_data_base_ptr = typed_list;
   }
-  raft::copy(list->indices.data_handle() + offset,
+  raft::copy(list_data_base_ptr->indices() + offset,
              new_indices.data_handle(),
              n_rows,
              raft::resource::get_cuda_stream(res));
@@ -987,17 +996,20 @@ void extend(raft::resources const& handle,
   // Try to allocate an index with the same parameters and the projected new size
   // (which can be slightly larger than index->size() + n_rows, due to padding for interleaved).
   // If this fails, the index would be too big to fit in the device anyway.
-  std::optional<list_data<IdxT, size_t>> placeholder_list;
+  std::optional<list_data<IdxT, size_t>> placeholder_list_interleaved;
+  std::optional<raft::device_matrix<uint8_t, IdxT, raft::row_major>> placeholder_list_flat;
   if (index->codes_layout() == list_layout::FLAT) {
     auto spec = list_spec_flat<uint32_t, IdxT>{
       index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
-    placeholder_list.emplace(handle, list_spec_flat<size_t, IdxT>{spec}, n_rows);
+    placeholder_list_flat.emplace(raft::make_device_matrix<uint8_t, IdxT>(
+      handle, n_rows, static_cast<IdxT>(spec.bytes_per_vector())));
   } else {
     auto spec = list_spec_interleaved<uint32_t, IdxT>{
       index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
-    placeholder_list.emplace(handle,
-                             list_spec_interleaved<size_t, IdxT>{spec},
-                             n_rows + (kIndexGroupSize - 1) * std::min<IdxT>(n_clusters, n_rows));
+    placeholder_list_interleaved.emplace(
+      handle,
+      list_spec_interleaved<size_t, IdxT>{spec},
+      n_rows + (kIndexGroupSize - 1) * std::min<IdxT>(n_clusters, n_rows));
   }
 
   // Available device memory
@@ -1071,7 +1083,8 @@ void extend(raft::resources const& handle,
   // Release the placeholder memory, because we don't intend to allocate any more long-living
   // temporary buffers before we allocate the index data.
   // This memory could potentially speed up UVM accesses, if any.
-  placeholder_list.reset();
+  placeholder_list_interleaved.reset();
+  placeholder_list_flat.reset();
   {
     // The cluster centers in the index are stored padded, which is not acceptable by
     // the kmeans_balanced::predict. Thus, we need the restructuring raft::copy.
@@ -1130,15 +1143,21 @@ void extend(raft::resources const& handle,
       auto spec = list_spec_flat<uint32_t, IdxT>{
         index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
       for (uint32_t label = 0; label < n_clusters; label++) {
+        auto& list_data_base_ptr = index->lists()[label];
+        auto typed_list = std::static_pointer_cast<list_data_flat_ext<IdxT>>(list_data_base_ptr);
         ivf::resize_list(
-          handle, index->lists()[label], spec, new_cluster_sizes[label], old_cluster_sizes[label]);
+          handle, typed_list, spec, new_cluster_sizes[label], old_cluster_sizes[label]);
+        list_data_base_ptr = typed_list;
       }
     } else {
       auto spec = list_spec_interleaved<uint32_t, IdxT>{
         index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
       for (uint32_t label = 0; label < n_clusters; label++) {
+        auto& list_data_base_ptr = index->lists()[label];
+        auto typed_list = std::static_pointer_cast<list_data_interleaved<IdxT>>(list_data_base_ptr);
         ivf::resize_list(
-          handle, index->lists()[label], spec, new_cluster_sizes[label], old_cluster_sizes[label]);
+          handle, typed_list, spec, new_cluster_sizes[label], old_cluster_sizes[label]);
+        list_data_base_ptr = typed_list;
       }
     }
   }

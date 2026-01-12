@@ -322,12 +322,13 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
   {
     // the original data cannot be reconstructed since the dataset was normalized
     if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) { return; }
-    auto& rec_list = index.lists()[label];
+    auto& rec_list_base = index.lists()[label];
     // If the data is unbalanced the list might be empty, which is actually nullptr
-    if (!rec_list) { return; }
-    auto dim = index.dim();
-    n_take   = std::min<uint32_t>(n_take, rec_list->size.load());
-    n_skip   = std::min<uint32_t>(n_skip, rec_list->size.load() - n_take);
+    if (!rec_list_base) { return; }
+    auto rec_list = std::static_pointer_cast<list_data_interleaved<IdxT>>(rec_list_base);
+    auto dim      = index.dim();
+    n_take        = std::min<uint32_t>(n_take, rec_list->size.load());
+    n_skip        = std::min<uint32_t>(n_skip, rec_list->size.load() - n_take);
 
     if (n_take == 0) { return; }
 
@@ -352,10 +353,11 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
   {
     // NB: this is not reference, the list is retained; the index will have to create a new list on
     // `erase_list` op.
-    auto old_list = index->lists()[label];
+    auto old_list_base = index->lists()[label];
     // If the data is unbalanced the list might be empty, which is actually nullptr
-    if (!old_list) { return; }
-    auto n_rows = old_list->size.load();
+    if (!old_list_base) { return; }
+    auto old_list = std::static_pointer_cast<list_data_interleaved<IdxT>>(old_list_base);
+    auto n_rows   = old_list->size.load();
     if (n_rows == 0) { return; }
     if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) { return; }
 
@@ -388,10 +390,11 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
 
   void check_packing(index<IdxT>* index, uint32_t label)
   {
-    auto old_list = index->lists()[label];
+    auto old_list_base = index->lists()[label];
     // If the data is unbalanced the list might be empty, which is actually nullptr
-    if (!old_list) { return; }
-    auto n_rows = old_list->size.load();
+    if (!old_list_base) { return; }
+    auto old_list = std::static_pointer_cast<list_data_interleaved<IdxT>>(old_list_base);
+    auto n_rows   = old_list->size.load();
 
     if (n_rows == 0) { return; }
 
@@ -405,19 +408,19 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     ivf_pq::helpers::codepacker::extend_list_with_codes(
       handle_, index, codes.view(), indices.view(), label);
 
-    auto& new_list = index->lists()[label];
+    auto new_list = std::static_pointer_cast<list_data_interleaved<IdxT>>(index->lists()[label]);
     ASSERT_NE(old_list.get(), new_list.get())
       << "The old list should have been shared and retained after ivf_pq index has erased the "
          "corresponding cluster.";
-    auto list_data_size = (n_rows / cuvs::neighbors::ivf_pq::kIndexGroupSize) *
-                          new_list->data.extent(1) * new_list->data.extent(2) *
-                          new_list->data.extent(3);
+    auto list_data_byte_size = (n_rows / cuvs::neighbors::ivf_pq::kIndexGroupSize) *
+                               new_list->data.extent(1) * new_list->data.extent(2) *
+                               new_list->data.extent(3);
 
-    ASSERT_TRUE(old_list->data.size() >= list_data_size);
-    ASSERT_TRUE(new_list->data.size() >= list_data_size);
+    ASSERT_TRUE(old_list->data.size() >= list_data_byte_size);
+    ASSERT_TRUE(new_list->data.size() >= list_data_byte_size);
     ASSERT_TRUE(cuvs::devArrMatch(old_list->data.data_handle(),
                                   new_list->data.data_handle(),
-                                  list_data_size,
+                                  list_data_byte_size,
                                   cuvs::Compare<uint8_t>{}));
 
     // Pack a few vectors back to the list.
@@ -438,12 +441,13 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
       handle_, index, codes_to_pack, label, uint32_t(row_offset));
     ASSERT_TRUE(cuvs::devArrMatch(old_list->data.data_handle(),
                                   new_list->data.data_handle(),
-                                  list_data_size,
+                                  list_data_byte_size,
                                   cuvs::Compare<uint8_t>{}));
 
     // Another test with the API that take list_data directly
-    [[maybe_unused]] auto list_data = index->lists()[label]->data.view();
-    uint32_t n_take                 = 4;
+    [[maybe_unused]] auto list_data_view =
+      std::static_pointer_cast<list_data_interleaved<IdxT>>(index->lists()[label])->data.view();
+    uint32_t n_take = 4;
     if (static_cast<decltype(n_rows)>(row_offset + n_take) > n_rows) {
       RAFT_LOG_INFO(
         "Skipping IVF-PQ check_packing/take test for label %u due to insufficient data (%u "
@@ -454,14 +458,14 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     }
     auto codes2 = raft::make_device_matrix<uint8_t>(handle_, n_take, index->pq_dim());
     ivf_pq::helpers::codepacker::unpack(
-      handle_, list_data, index->pq_bits(), row_offset, codes2.view());
+      handle_, list_data_view, index->pq_bits(), row_offset, codes2.view());
 
     // Write it back
     ivf_pq::helpers::codepacker::pack(
-      handle_, make_const_mdspan(codes2.view()), index->pq_bits(), row_offset, list_data);
+      handle_, make_const_mdspan(codes2.view()), index->pq_bits(), row_offset, list_data_view);
     ASSERT_TRUE(cuvs::devArrMatch(old_list->data.data_handle(),
                                   new_list->data.data_handle(),
-                                  list_data_size,
+                                  list_data_byte_size,
                                   cuvs::Compare<uint8_t>{}));
   }
 
@@ -598,8 +602,10 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
       raft::div_rounding_up_safe(index_flat.pq_dim() * index_flat.pq_bits(), 8u);
 
     for (uint32_t label = 0; label < index_interleaved.n_lists(); label++) {
-      auto& list_interleaved = index_interleaved.lists()[label];
-      auto& list_flat        = index_flat.lists()[label];
+      auto list_interleaved =
+        std::static_pointer_cast<list_data_interleaved<IdxT>>(index_interleaved.lists()[label]);
+      auto list_flat =
+        std::static_pointer_cast<list_data_flat_ext<IdxT>>(index_flat.lists()[label]);
 
       uint32_t n_rows = list_interleaved->size.load();
       if (n_rows == 0) { continue; }
