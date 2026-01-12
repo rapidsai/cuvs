@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,6 +8,7 @@
 #include "../../core/nvtx.hpp"
 #include "../ivf_common.cuh"
 #include "../ivf_list.cuh"
+#include "../ivf_pq_impl.hpp"
 #include "ivf_pq_codepacking.cuh"
 #include "ivf_pq_contiguous_list_data.cuh"
 #include "ivf_pq_list_data.hpp"
@@ -244,72 +245,71 @@ auto calculate_offsets_and_indices(IdxT n_rows,
   return max_cluster_size;
 }
 
-template <typename IdxT>
-void set_centers(raft::resources const& handle, index<IdxT>* index, const float* cluster_centers)
+inline void pad_centers_with_norms(raft::resources const& res,
+                                   const float* centers,
+                                   uint32_t n_lists,
+                                   uint32_t dim,
+                                   uint32_t dim_ext,
+                                   float* padded_centers)
 {
-  auto stream         = raft::resource::get_cuda_stream(handle);
-  auto* device_memory = raft::resource::get_workspace_resource(handle);
+  auto stream = raft::resource::get_cuda_stream(res);
 
   // Make sure to have trailing zeroes between dim and dim_ext;
   // We rely on this to enable padded tensor gemm kernels during coarse search.
-  cuvs::spatial::knn::detail::utils::memzero(
-    index->centers().data_handle(), index->centers().size(), stream);
+  cuvs::spatial::knn::detail::utils::memzero(padded_centers, n_lists * dim_ext, stream);
   // combine cluster_centers and their norms
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(index->centers().data_handle(),
-                                  sizeof(float) * index->dim_ext(),
-                                  cluster_centers,
-                                  sizeof(float) * index->dim(),
-                                  sizeof(float) * index->dim(),
-                                  index->n_lists(),
+  RAFT_CUDA_TRY(cudaMemcpy2DAsync(padded_centers,
+                                  sizeof(float) * dim_ext,
+                                  centers,
+                                  sizeof(float) * dim,
+                                  sizeof(float) * dim,
+                                  n_lists,
                                   cudaMemcpyDefault,
                                   stream));
 
-  rmm::device_uvector<float> center_norms(index->n_lists(), stream, device_memory);
+  rmm::device_uvector<float> center_norms(n_lists, stream);
   raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
-    center_norms.data(), cluster_centers, index->dim(), index->n_lists(), stream);
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(index->centers().data_handle() + index->dim(),
-                                  sizeof(float) * index->dim_ext(),
+    center_norms.data(), centers, dim, n_lists, stream);
+  RAFT_CUDA_TRY(cudaMemcpy2DAsync(padded_centers + dim,
+                                  sizeof(float) * dim_ext,
                                   center_norms.data(),
                                   sizeof(float),
                                   sizeof(float),
-                                  index->n_lists(),
+                                  n_lists,
                                   cudaMemcpyDefault,
                                   stream));
+}
 
-  //     Rotate cluster_centers
-  float alpha = 1.0;
-  float beta  = 0.0;
-  raft::linalg::gemm(handle,
-                     true,
-                     false,
-                     index->rot_dim(),
-                     index->n_lists(),
-                     index->dim(),
-                     &alpha,
-                     index->rotation_matrix().data_handle(),
-                     index->dim(),
-                     cluster_centers,
-                     index->dim(),
-                     &beta,
-                     index->centers_rot().data_handle(),
-                     index->rot_dim(),
-                     raft::resource::get_cuda_stream(handle));
+template <typename IdxT>
+void set_centers(raft::resources const& handle,
+                 owning_impl<IdxT>* index,
+                 const float* cluster_centers)
+{
+  pad_centers_with_norms(handle,
+                         cluster_centers,
+                         index->n_lists(),
+                         index->dim(),
+                         index->dim_ext(),
+                         index->centers().data_handle());
+
+  cuvs::neighbors::ivf_pq::helpers::rotate_padded_centers(
+    handle, index->centers(), index->rotation_matrix(), index->centers_rot());
 }
 
 template <typename IdxT>
 void transpose_pq_centers(const raft::resources& handle,
-                          index<IdxT>& index,
+                          owning_impl<IdxT>* impl,
                           const float* pq_centers_source)
 {
   auto stream  = raft::resource::get_cuda_stream(handle);
-  auto extents = index.pq_centers().extents();
+  auto extents = impl->pq_centers().extents();
   static_assert(extents.rank() == 3);
   auto extents_source =
     raft::make_extents<uint32_t>(extents.extent(0), extents.extent(2), extents.extent(1));
   auto span_source = raft::make_mdspan<const float, uint32_t, raft::row_major, false, true>(
     pq_centers_source, extents_source);
   auto pq_centers_view = raft::make_device_vector_view<float, IdxT>(
-    index.pq_centers().data_handle(), index.pq_centers().size());
+    impl->pq_centers().data_handle(), impl->pq_centers().size());
   raft::linalg::map_offset(handle, pq_centers_view, [span_source, extents] __device__(size_t i) {
     uint32_t ii[3];
     for (int r = 2; r > 0; r--) {
@@ -323,7 +323,7 @@ void transpose_pq_centers(const raft::resources& handle,
 
 template <typename IdxT>
 void train_per_subset(raft::resources const& handle,
-                      index<IdxT>& index,
+                      owning_impl<IdxT>* impl,
                       size_t n_rows,
                       const float* trainset,   // [n_rows, dim]
                       const uint32_t* labels,  // [n_rows]
@@ -333,17 +333,17 @@ void train_per_subset(raft::resources const& handle,
   auto stream        = raft::resource::get_cuda_stream(handle);
   auto device_memory = raft::resource::get_workspace_resource(handle);
 
-  rmm::device_uvector<float> pq_centers_tmp(index.pq_centers().size(), stream, device_memory);
+  rmm::device_uvector<float> pq_centers_tmp(impl->pq_centers().size(), stream, device_memory);
   // Subsampling the train set for codebook generation based on max_train_points_per_pq_code.
-  size_t big_enough = max_train_points_per_pq_code * size_t(index.pq_book_size());
+  size_t big_enough = max_train_points_per_pq_code * size_t(impl->pq_book_size());
   auto pq_n_rows    = uint32_t(std::min(big_enough, n_rows));
   rmm::device_uvector<float> sub_trainset(
-    pq_n_rows * size_t(index.pq_len()), stream, device_memory);
+    pq_n_rows * size_t(impl->pq_len()), stream, device_memory);
   rmm::device_uvector<uint32_t> sub_labels(pq_n_rows, stream, device_memory);
 
-  rmm::device_uvector<uint32_t> pq_cluster_sizes(index.pq_book_size(), stream, device_memory);
+  rmm::device_uvector<uint32_t> pq_cluster_sizes(impl->pq_book_size(), stream, device_memory);
 
-  for (uint32_t j = 0; j < index.pq_dim(); j++) {
+  for (uint32_t j = 0; j < impl->pq_dim(); j++) {
     raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> pq_per_subspace_scope(
       "ivf_pq::build::per_subspace[%u]", j);
 
@@ -351,12 +351,12 @@ void train_per_subset(raft::resources const& handle,
     // This will be subtracted from the input vectors afterwards.
     utils::copy_selected<float, float, size_t, uint32_t>(
       pq_n_rows,
-      index.pq_len(),
-      index.centers_rot().data_handle() + index.pq_len() * j,
+      impl->pq_len(),
+      impl->centers_rot().data_handle() + impl->pq_len() * j,
       labels,
-      index.rot_dim(),
+      impl->rot_dim(),
       sub_trainset.data(),
-      index.pq_len(),
+      impl->pq_len(),
       stream);
 
     // sub_trainset is the slice of: rotate(trainset) - centers_rot
@@ -365,30 +365,30 @@ void train_per_subset(raft::resources const& handle,
     raft::linalg::gemm(handle,
                        true,
                        false,
-                       index.pq_len(),
+                       impl->pq_len(),
                        pq_n_rows,
-                       index.dim(),
+                       impl->dim(),
                        &alpha,
-                       index.rotation_matrix().data_handle() + index.dim() * index.pq_len() * j,
-                       index.dim(),
+                       impl->rotation_matrix().data_handle() + impl->dim() * impl->pq_len() * j,
+                       impl->dim(),
                        trainset,
-                       index.dim(),
+                       impl->dim(),
                        &beta,
                        sub_trainset.data(),
-                       index.pq_len(),
+                       impl->pq_len(),
                        stream);
 
     // train PQ codebook for this subspace
     auto sub_trainset_view = raft::make_device_matrix_view<const float, internal_extents_t>(
-      sub_trainset.data(), pq_n_rows, index.pq_len());
+      sub_trainset.data(), pq_n_rows, impl->pq_len());
     auto centers_tmp_view = raft::make_device_matrix_view<float, internal_extents_t>(
-      pq_centers_tmp.data() + index.pq_book_size() * index.pq_len() * j,
-      index.pq_book_size(),
-      index.pq_len());
+      pq_centers_tmp.data() + impl->pq_book_size() * impl->pq_len() * j,
+      impl->pq_book_size(),
+      impl->pq_len());
     auto sub_labels_view =
       raft::make_device_vector_view<uint32_t, internal_extents_t>(sub_labels.data(), pq_n_rows);
     auto cluster_sizes_view = raft::make_device_vector_view<uint32_t, internal_extents_t>(
-      pq_cluster_sizes.data(), index.pq_book_size());
+      pq_cluster_sizes.data(), impl->pq_book_size());
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = kmeans_n_iters;
     kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
@@ -400,12 +400,12 @@ void train_per_subset(raft::resources const& handle,
                                                             cluster_sizes_view,
                                                             utils::mapping<float>{});
   }
-  transpose_pq_centers(handle, index, pq_centers_tmp.data());
+  transpose_pq_centers(handle, impl, pq_centers_tmp.data());
 }
 
 template <typename IdxT>
 void train_per_cluster(raft::resources const& handle,
-                       index<IdxT>& index,
+                       owning_impl<IdxT>* impl,
                        size_t n_rows,
                        const float* trainset,   // [n_rows, dim]
                        const uint32_t* labels,  // [n_rows]
@@ -418,14 +418,14 @@ void train_per_cluster(raft::resources const& handle,
   // performance reasoning behind this, just avoiding the boilerplate of explicit copies.
   rmm::mr::managed_memory_resource managed_memory;
 
-  rmm::device_uvector<float> pq_centers_tmp(index.pq_centers().size(), stream, device_memory);
-  rmm::device_uvector<uint32_t> cluster_sizes(index.n_lists(), stream, managed_memory);
+  rmm::device_uvector<float> pq_centers_tmp(impl->pq_centers().size(), stream, device_memory);
+  rmm::device_uvector<uint32_t> cluster_sizes(impl->n_lists(), stream, managed_memory);
   rmm::device_uvector<IdxT> indices_buf(n_rows, stream, device_memory);
-  rmm::device_uvector<IdxT> offsets_buf(index.n_lists() + 1, stream, managed_memory);
+  rmm::device_uvector<IdxT> offsets_buf(impl->n_lists() + 1, stream, managed_memory);
 
   raft::stats::histogram<uint32_t, size_t>(raft::stats::HistTypeAuto,
                                            reinterpret_cast<int32_t*>(cluster_sizes.data()),
-                                           index.n_lists(),
+                                           impl->n_lists(),
                                            labels,
                                            n_rows,
                                            1,
@@ -434,16 +434,16 @@ void train_per_cluster(raft::resources const& handle,
   auto cluster_offsets      = offsets_buf.data();
   auto indices              = indices_buf.data();
   uint32_t max_cluster_size = calculate_offsets_and_indices(
-    IdxT(n_rows), index.n_lists(), labels, cluster_sizes.data(), cluster_offsets, indices, stream);
+    IdxT(n_rows), impl->n_lists(), labels, cluster_sizes.data(), cluster_offsets, indices, stream);
 
   rmm::device_uvector<uint32_t> pq_labels(
-    size_t(max_cluster_size) * size_t(index.pq_dim()), stream, device_memory);
-  rmm::device_uvector<uint32_t> pq_cluster_sizes(index.pq_book_size(), stream, device_memory);
+    size_t(max_cluster_size) * size_t(impl->pq_dim()), stream, device_memory);
+  rmm::device_uvector<uint32_t> pq_cluster_sizes(impl->pq_book_size(), stream, device_memory);
   rmm::device_uvector<float> rot_vectors(
-    size_t(max_cluster_size) * size_t(index.rot_dim()), stream, device_memory);
+    size_t(max_cluster_size) * size_t(impl->rot_dim()), stream, device_memory);
 
   raft::resource::sync_stream(handle);  // make sure cluster offsets are up-to-date
-  for (uint32_t l = 0; l < index.n_lists(); l++) {
+  for (uint32_t l = 0; l < impl->n_lists(); l++) {
     auto cluster_size = cluster_sizes.data()[l];
     if (cluster_size == 0) continue;
     raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> pq_per_cluster_scope(
@@ -452,10 +452,10 @@ void train_per_cluster(raft::resources const& handle,
     select_residuals(handle,
                      rot_vectors.data(),
                      IdxT(cluster_size),
-                     index.dim(),
-                     index.rot_dim(),
-                     index.rotation_matrix().data_handle(),
-                     index.centers().data_handle() + size_t(l) * size_t(index.dim_ext()),
+                     impl->dim(),
+                     impl->rot_dim(),
+                     impl->rotation_matrix().data_handle(),
+                     impl->centers().data_handle() + size_t(l) * size_t(impl->dim_ext()),
                      trainset,
                      indices + cluster_offsets[l],
                      device_memory);
@@ -464,21 +464,21 @@ void train_per_cluster(raft::resources const& handle,
     // If pq_book_size is less than pq_dim, use max_train_points_per_pq_code per pq_dim instead
     // [sic] we interpret the data as pq_len-dimensional
     size_t big_enough =
-      max_train_points_per_pq_code * std::max<size_t>(index.pq_book_size(), index.pq_dim());
-    size_t available_rows = size_t(cluster_size) * size_t(index.pq_dim());
+      max_train_points_per_pq_code * std::max<size_t>(impl->pq_book_size(), impl->pq_dim());
+    size_t available_rows = size_t(cluster_size) * size_t(impl->pq_dim());
     auto pq_n_rows        = uint32_t(std::min(big_enough, available_rows));
     // train PQ codebook for this cluster
     auto rot_vectors_view = raft::make_device_matrix_view<const float, internal_extents_t>(
-      rot_vectors.data(), pq_n_rows, index.pq_len());
+      rot_vectors.data(), pq_n_rows, impl->pq_len());
     auto centers_tmp_view = raft::make_device_matrix_view<float, internal_extents_t>(
-      pq_centers_tmp.data() + static_cast<size_t>(index.pq_book_size()) *
-                                static_cast<size_t>(index.pq_len()) * static_cast<size_t>(l),
-      index.pq_book_size(),
-      index.pq_len());
+      pq_centers_tmp.data() + static_cast<size_t>(impl->pq_book_size()) *
+                                static_cast<size_t>(impl->pq_len()) * static_cast<size_t>(l),
+      impl->pq_book_size(),
+      impl->pq_len());
     auto pq_labels_view =
       raft::make_device_vector_view<uint32_t, internal_extents_t>(pq_labels.data(), pq_n_rows);
     auto pq_cluster_sizes_view = raft::make_device_vector_view<uint32_t, internal_extents_t>(
-      pq_cluster_sizes.data(), index.pq_book_size());
+      pq_cluster_sizes.data(), impl->pq_book_size());
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = kmeans_n_iters;
     kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
@@ -490,7 +490,7 @@ void train_per_cluster(raft::resources const& handle,
                                                             pq_cluster_sizes_view,
                                                             utils::mapping<float>{});
   }
-  transpose_pq_centers(handle, index, pq_centers_tmp.data());
+  transpose_pq_centers(handle, impl, pq_centers_tmp.data());
 }
 
 /** A consumer for the `run_on_list` and `run_on_vector` that approximates the original input data.
@@ -864,41 +864,41 @@ auto clone(const raft::resources& res, const index<IdxT>& source) -> index<IdxT>
 {
   auto stream = raft::resource::get_cuda_stream(res);
 
-  // Allocate the new index
-  index<IdxT> target(res,
-                     source.metric(),
-                     source.codebook_kind(),
-                     source.n_lists(),
-                     source.dim(),
-                     source.pq_bits(),
-                     source.pq_dim());
+  // Create owning_impl directly to get mutable access for copying
+  auto impl = std::make_unique<owning_impl<IdxT>>(res,
+                                                  source.metric(),
+                                                  source.codebook_kind(),
+                                                  source.n_lists(),
+                                                  source.dim(),
+                                                  source.pq_bits(),
+                                                  source.pq_dim(),
+                                                  source.conservative_memory_allocation());
 
-  // raft::copy the independent parts
-  raft::copy(target.list_sizes().data_handle(),
+  // raft::copy the independent parts using mutable accessors
+  raft::copy(impl->list_sizes().data_handle(),
              source.list_sizes().data_handle(),
              source.list_sizes().size(),
              stream);
-  raft::copy(target.rotation_matrix().data_handle(),
+  raft::copy(impl->rotation_matrix().data_handle(),
              source.rotation_matrix().data_handle(),
              source.rotation_matrix().size(),
              stream);
-  raft::copy(target.pq_centers().data_handle(),
+  raft::copy(impl->pq_centers().data_handle(),
              source.pq_centers().data_handle(),
              source.pq_centers().size(),
              stream);
-  raft::copy(target.centers().data_handle(),
-             source.centers().data_handle(),
-             source.centers().size(),
-             stream);
-  raft::copy(target.centers_rot().data_handle(),
+  raft::copy(
+    impl->centers().data_handle(), source.centers().data_handle(), source.centers().size(), stream);
+  raft::copy(impl->centers_rot().data_handle(),
              source.centers_rot().data_handle(),
              source.centers_rot().size(),
              stream);
 
   // raft::copy shared pointers
-  target.lists() = source.lists();
+  impl->lists() = source.lists();
 
-  // Make sure the device pointers point to the new lists
+  // Wrap in index and recompute internal state
+  index<IdxT> target(std::move(impl));
   ivf::detail::recompute_internal_state(res, target);
 
   return target;
@@ -906,7 +906,7 @@ auto clone(const raft::resources& res, const index<IdxT>& source) -> index<IdxT>
 
 /**
  * Extend the index in-place.
- * See raft::spatial::knn::ivf_pq::extend docs.
+ * See cuvs::spatial::knn::ivf_pq::extend docs.
  */
 template <typename T, typename IdxT>
 void extend(raft::resources const& handle,
@@ -1108,7 +1108,7 @@ void extend(raft::resources const& handle,
 
 /**
  * Create a new index that contains more data.
- * See raft::spatial::knn::ivf_pq::extend docs.
+ * See cuvs::spatial::knn::ivf_pq::extend docs.
  */
 template <typename T, typename IdxT>
 auto extend(raft::resources const& handle,
@@ -1139,20 +1139,28 @@ auto build(raft::resources const& handle,
   RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
 
-  auto stream = raft::resource::get_cuda_stream(handle);
+  auto impl = std::make_unique<cuvs::neighbors::ivf_pq::owning_impl<IdxT>>(
+    handle,
+    params.metric,
+    params.codebook_kind,
+    params.n_lists,
+    dim,
+    params.pq_bits,
+    params.pq_dim == 0 ? index<IdxT>::calculate_pq_dim(dim) : params.pq_dim,
+    params.conservative_memory_allocation);
 
-  index<IdxT> index(handle, params, dim);
+  auto stream = raft::resource::get_cuda_stream(handle);
   utils::memzero(
-    index.accum_sorted_sizes().data_handle(), index.accum_sorted_sizes().size(), stream);
-  utils::memzero(index.list_sizes().data_handle(), index.list_sizes().size(), stream);
-  utils::memzero(index.data_ptrs().data_handle(), index.data_ptrs().size(), stream);
-  utils::memzero(index.inds_ptrs().data_handle(), index.inds_ptrs().size(), stream);
+    impl->accum_sorted_sizes().data_handle(), impl->accum_sorted_sizes().size(), stream);
+  utils::memzero(impl->list_sizes().data_handle(), impl->list_sizes().size(), stream);
+  utils::memzero(impl->data_ptrs().data_handle(), impl->data_ptrs().size(), stream);
+  utils::memzero(impl->inds_ptrs().data_handle(), impl->inds_ptrs().size(), stream);
 
   {
     raft::random::RngState random_state{137};
     auto trainset_ratio = std::max<size_t>(
       1,
-      size_t(n_rows) / std::max<size_t>(params.kmeans_trainset_fraction * n_rows, index.n_lists()));
+      size_t(n_rows) / std::max<size_t>(params.kmeans_trainset_fraction * n_rows, impl->n_lists()));
     size_t n_rows_train = n_rows / trainset_ratio;
 
     rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource(handle);
@@ -1162,7 +1170,7 @@ auto build(raft::resources const& handle,
     constexpr size_t kTolerableRatio = 4;
     rmm::device_async_resource_ref big_memory_resource =
       raft::resource::get_large_workspace_resource(handle);
-    if (sizeof(float) * n_rows_train * index.dim() * kTolerableRatio <
+    if (sizeof(float) * n_rows_train * impl->dim() * kTolerableRatio <
         raft::resource::get_workspace_free_bytes(handle)) {
       big_memory_resource = device_memory;
     }
@@ -1206,18 +1214,18 @@ auto build(raft::resources const& handle,
     // NB: here cluster_centers is used as if it is [n_clusters, data_dim] not [n_clusters,
     // dim_ext]!
     rmm::device_uvector<float> cluster_centers_buf(
-      index.n_lists() * index.dim(), stream, device_memory);
+      impl->n_lists() * impl->dim(), stream, device_memory);
     auto cluster_centers = cluster_centers_buf.data();
 
     // Train balanced hierarchical kmeans clustering
     auto trainset_const_view = raft::make_const_mdspan(trainset.view());
     auto centers_view        = raft::make_device_matrix_view<float, internal_extents_t>(
-      cluster_centers, index.n_lists(), index.dim());
+      cluster_centers, impl->n_lists(), impl->dim());
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
-    kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>((int)index.metric());
+    kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>((int)impl->metric());
 
-    if (index.metric() == distance::DistanceType::CosineExpanded) {
+    if (impl->metric() == distance::DistanceType::CosineExpanded) {
       raft::linalg::row_normalize<raft::linalg::L2Norm>(
         handle, trainset_const_view, trainset.view());
     }
@@ -1226,8 +1234,8 @@ auto build(raft::resources const& handle,
     // Trainset labels are needed for training PQ codebooks
     rmm::device_uvector<uint32_t> labels(n_rows_train, stream, big_memory_resource);
     auto centers_const_view = raft::make_device_matrix_view<const float, internal_extents_t>(
-      cluster_centers, index.n_lists(), index.dim());
-    if (index.metric() == distance::DistanceType::CosineExpanded) {
+      cluster_centers, impl->n_lists(), impl->dim());
+    if (impl->metric() == distance::DistanceType::CosineExpanded) {
       raft::linalg::row_normalize<raft::linalg::L2Norm>(handle, centers_const_view, centers_view);
     }
     auto labels_view =
@@ -1236,15 +1244,15 @@ auto build(raft::resources const& handle,
       handle, kmeans_params, trainset_const_view, centers_const_view, labels_view);
 
     // Make rotation matrix
-    helpers::make_rotation_matrix(handle, &index, params.force_random_rotation);
+    helpers::make_rotation_matrix(handle, impl->rotation_matrix(), params.force_random_rotation);
 
-    helpers::set_centers(handle, &index, centers_const_view);
+    set_centers(handle, impl.get(), cluster_centers);
 
     // Train PQ codebooks
-    switch (index.codebook_kind()) {
+    switch (impl->codebook_kind()) {
       case codebook_gen::PER_SUBSPACE:
         train_per_subset(handle,
-                         index,
+                         impl.get(),
                          n_rows_train,
                          trainset.data_handle(),
                          labels.data(),
@@ -1253,7 +1261,7 @@ auto build(raft::resources const& handle,
         break;
       case codebook_gen::PER_CLUSTER:
         train_per_cluster(handle,
-                          index,
+                          impl.get(),
                           n_rows_train,
                           trainset.data_handle(),
                           labels.data(),
@@ -1263,12 +1271,13 @@ auto build(raft::resources const& handle,
       default: RAFT_FAIL("Unreachable code");
     }
   }
+  index<IdxT> idx(std::move(impl));
 
   // add the data if necessary
   if (params.add_data_on_build) {
-    detail::extend<T, IdxT>(handle, &index, dataset.data_handle(), nullptr, n_rows);
+    detail::extend<T, IdxT>(handle, &idx, dataset.data_handle(), nullptr, n_rows);
   }
-  return index;
+  return idx;
 }
 
 template <typename T, typename IdxT, typename accessor>
@@ -1278,6 +1287,95 @@ void build(raft::resources const& handle,
            index<IdxT>* index)
 {
   *index = build(handle, params, dataset);
+}
+
+template <typename IdxT>
+auto build(raft::resources const& handle,
+           const cuvs::neighbors::ivf_pq::index_params& index_params,
+           const uint32_t dim,
+           raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
+           raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
+           raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot,
+           raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix)
+  -> cuvs::neighbors::ivf_pq::index<IdxT>
+{
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("ivf_pq::build(%u)", dim);
+  auto stream = raft::resource::get_cuda_stream(handle);
+
+  auto pq_dim = index_params.pq_dim == 0 ? index<IdxT>::calculate_pq_dim(dim) : index_params.pq_dim;
+  auto expected_pq_centers_extents = index<IdxT>::make_pq_centers_extents(
+    dim, pq_dim, index_params.pq_bits, index_params.codebook_kind, index_params.n_lists);
+  RAFT_EXPECTS(pq_centers.extent(0) == expected_pq_centers_extents.extent(0) &&
+                 pq_centers.extent(1) == expected_pq_centers_extents.extent(1) &&
+                 pq_centers.extent(2) == expected_pq_centers_extents.extent(2),
+               "pq_centers must have extent [%u, %u, %u]. Got [%u, %u, %u]",
+               expected_pq_centers_extents.extent(0),
+               expected_pq_centers_extents.extent(1),
+               expected_pq_centers_extents.extent(2),
+               pq_centers.extent(0),
+               pq_centers.extent(1),
+               pq_centers.extent(2));
+
+  RAFT_EXPECTS(
+    centers.extent(0) == index_params.n_lists &&
+      centers.extent(1) == raft::round_up_safe(dim + 1, 8u),
+    "centers must have extent [n_lists, round_up(dim + 1, 8)]. Expected [%u, %u], got [%u, %u]",
+    index_params.n_lists,
+    raft::round_up_safe(dim + 1, 8u),
+    centers.extent(0),
+    centers.extent(1));
+
+  auto pq_len = raft::div_rounding_up_unsafe(dim, pq_dim);
+  RAFT_EXPECTS(rotation_matrix.extent(0) == pq_len * pq_dim && rotation_matrix.extent(1) == dim,
+               "rotation_matrix must have extent [rot_dim, dim] = [%u, %u]. Got [%u, %u]",
+               pq_len * pq_dim,
+               dim,
+               rotation_matrix.extent(0),
+               rotation_matrix.extent(1));
+
+  RAFT_EXPECTS(
+    centers_rot.extent(0) == index_params.n_lists && centers_rot.extent(1) == pq_len * pq_dim,
+    "centers_rot must have extent [n_lists, pq_len * pq_dim]. Expected [%u, %u], got [%u, %u]",
+    index_params.n_lists,
+    pq_len * pq_dim,
+    centers_rot.extent(0),
+    centers_rot.extent(1));
+
+  auto impl = std::make_unique<view_impl<IdxT>>(handle,
+                                                index_params.metric,
+                                                index_params.codebook_kind,
+                                                index_params.n_lists,
+                                                dim,
+                                                index_params.pq_bits,
+                                                pq_dim,
+                                                index_params.conservative_memory_allocation,
+                                                pq_centers,
+                                                centers,
+                                                centers_rot,
+                                                rotation_matrix);
+
+  index<IdxT> view_index(std::move(impl));
+
+  utils::memzero(
+    view_index.accum_sorted_sizes().data_handle(), view_index.accum_sorted_sizes().size(), stream);
+  utils::memzero(view_index.list_sizes().data_handle(), view_index.list_sizes().size(), stream);
+  utils::memzero(view_index.data_ptrs().data_handle(), view_index.data_ptrs().size(), stream);
+  utils::memzero(view_index.inds_ptrs().data_handle(), view_index.inds_ptrs().size(), stream);
+
+  return view_index;
+}
+
+template <typename IdxT>
+void build(raft::resources const& handle,
+           const cuvs::neighbors::ivf_pq::index_params& index_params,
+           const uint32_t dim,
+           raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
+           raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
+           raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot,
+           raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix,
+           index<IdxT>* idx)
+{
+  *idx = build<IdxT>(handle, index_params, dim, pq_centers, centers, centers_rot, rotation_matrix);
 }
 
 template <typename T, typename IdxT, typename accessor, typename accessor2>
@@ -1304,6 +1402,7 @@ auto extend(
                 n_rows);
 }
 
+// In-place extend for base class pointer (clones, extends, moves back)
 template <typename T, typename IdxT, typename accessor, typename accessor2>
 void extend(
   raft::resources const& handle,
@@ -1326,6 +1425,123 @@ void extend(
                   new_vectors.data_handle(),
                   new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
                   n_rows);
+}
+
+template <typename IdxT>
+auto build(
+  raft::resources const& handle,
+  const cuvs::neighbors::ivf_pq::index_params& index_params,
+  const uint32_t dim,
+  raft::host_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
+  raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
+  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
+  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix)
+  -> cuvs::neighbors::ivf_pq::index<IdxT>
+{
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
+    "ivf_pq::build_from_host(%u)", dim);
+  auto stream = raft::resource::get_cuda_stream(handle);
+
+  auto pq_dim = index_params.pq_dim == 0 ? index<IdxT>::calculate_pq_dim(dim) : index_params.pq_dim;
+
+  auto impl = std::make_unique<owning_impl<IdxT>>(handle,
+                                                  index_params.metric,
+                                                  index_params.codebook_kind,
+                                                  index_params.n_lists,
+                                                  dim,
+                                                  index_params.pq_bits,
+                                                  pq_dim,
+                                                  index_params.conservative_memory_allocation);
+
+  utils::memzero(
+    impl->accum_sorted_sizes().data_handle(), impl->accum_sorted_sizes().size(), stream);
+  utils::memzero(impl->list_sizes().data_handle(), impl->list_sizes().size(), stream);
+  utils::memzero(impl->data_ptrs().data_handle(), impl->data_ptrs().size(), stream);
+  utils::memzero(impl->inds_ptrs().data_handle(), impl->inds_ptrs().size(), stream);
+
+  RAFT_EXPECTS(
+    (centers.extent(1) == dim || centers.extent(1) == raft::round_up_safe(dim + 1, 8u)) &&
+      centers.extent(0) == impl->n_lists(),
+    "centers must have extent [n_lists, dim] or [n_lists, round_up(dim + 1, 8)]. "
+    "Got centers.extent(1)=%u, expected dim=%u or round_up(dim + 1, 8)=%u, and "
+    "centers.extent(0)=%u, expected n_lists=%u",
+    centers.extent(1),
+    dim,
+    raft::round_up_safe(dim + 1, 8u),
+    centers.extent(0),
+    impl->n_lists());
+
+  if (centers.extent(1) == impl->dim_ext()) {
+    raft::copy(impl->centers().data_handle(),
+               centers.data_handle(),
+               impl->centers().extent(0) * impl->centers().extent(1),
+               stream);
+  } else {
+    cuvs::neighbors::ivf_pq::helpers::pad_centers_with_norms(handle, centers, impl->centers());
+  }
+
+  if (rotation_matrix.has_value()) {
+    RAFT_EXPECTS(rotation_matrix.value().extent(0) == impl->rot_dim() &&
+                   rotation_matrix.value().extent(1) == dim,
+                 "rotation_matrix must have extent [rot_dim, dim] = [%u, %u]. Got [%u, %u]",
+                 impl->rot_dim(),
+                 dim,
+                 rotation_matrix.value().extent(0),
+                 rotation_matrix.value().extent(1));
+    raft::copy(impl->rotation_matrix().data_handle(),
+               rotation_matrix.value().data_handle(),
+               rotation_matrix.value().size(),
+               stream);
+  } else {
+    helpers::make_rotation_matrix(
+      handle, impl->rotation_matrix(), index_params.force_random_rotation);
+  }
+
+  if (centers_rot.has_value()) {
+    RAFT_EXPECTS(centers_rot.value().extent(0) == impl->n_lists() &&
+                   centers_rot.value().extent(1) == impl->rot_dim(),
+                 "centers_rot must have extent [n_lists, rot_dim]. Expected [%u, %u], got [%u, %u]",
+                 impl->n_lists(),
+                 impl->rot_dim(),
+                 centers_rot.value().extent(0),
+                 centers_rot.value().extent(1));
+    raft::copy(impl->centers_rot().data_handle(),
+               centers_rot.value().data_handle(),
+               centers_rot.value().size(),
+               stream);
+  } else {
+    cuvs::neighbors::ivf_pq::helpers::rotate_padded_centers(
+      handle, impl->centers(), impl->rotation_matrix(), impl->centers_rot());
+  }
+
+  RAFT_EXPECTS(pq_centers.extent(0) == impl->pq_centers().extent(0) &&
+                 pq_centers.extent(1) == impl->pq_centers().extent(1) &&
+                 pq_centers.extent(2) == impl->pq_centers().extent(2),
+               "pq_centers must have extent [%u, %u, %u]. Got [%u, %u, %u]",
+               impl->pq_centers().extent(0),
+               impl->pq_centers().extent(1),
+               impl->pq_centers().extent(2),
+               pq_centers.extent(0),
+               pq_centers.extent(1),
+               pq_centers.extent(2));
+  raft::copy(impl->pq_centers().data_handle(), pq_centers.data_handle(), pq_centers.size(), stream);
+
+  // Wrap the impl in an index and return
+  return index<IdxT>(std::move(impl));
+}
+
+template <typename IdxT>
+void build(
+  raft::resources const& handle,
+  const cuvs::neighbors::ivf_pq::index_params& index_params,
+  const uint32_t dim,
+  raft::host_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
+  raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
+  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
+  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix,
+  index<IdxT>* idx)
+{
+  *idx = build<IdxT>(handle, index_params, dim, pq_centers, centers, centers_rot, rotation_matrix);
 }
 
 template <typename output_mdspan_type>

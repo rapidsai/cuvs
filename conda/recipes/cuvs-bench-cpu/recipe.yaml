@@ -77,7 +77,7 @@ requirements:
     - pip
     - python =${{ py_version }}
     - rapids-build-backend>=0.4.0,<0.5.0
-    - setuptools >=64.0.0
+    - setuptools>=77.0.0
     - if: linux64
       then:
         - libaio
@@ -118,5 +118,5 @@ tests:
 
 about:
   homepage: ${{ load_from_file("python/cuvs_bench/pyproject.toml").project.urls.Homepage }}
-  license: ${{ load_from_file("python/cuvs_bench/pyproject.toml").project.license.text }}
+  license: ${{ load_from_file("python/cuvs_bench/pyproject.toml").project.license }}
   summary: cuVS CPU benchmark

@@ -821,7 +821,7 @@ inline auto get_centers(const raft::resources& res, const index<IdxT>& index)
   if constexpr (std::is_same_v<T, int8_t>) { return index.centers_int8(res); }
 }
 
-/** See raft::spatial::knn::ivf_pq::search docs */
+/** See cuvs::spatial::knn::ivf_pq::search docs */
 template <typename T,
           typename IdxT,
           typename IvfSampleFilterT = cuvs::neighbors::filtering::none_sample_filter>

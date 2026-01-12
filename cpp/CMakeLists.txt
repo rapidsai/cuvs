@@ -29,6 +29,9 @@ project(
 )
 set(CMAKE_INSTALL_MESSAGE LAZY)
 
+# Disable C++20 module scanning (not using modules, just C++20 features)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+
 # Write the version header
 rapids_cmake_write_version_file(include/cuvs/version_config.h)
 
@@ -189,6 +192,8 @@ if(NOT BUILD_CPU_ONLY)
   rapids_cpm_cccl(BUILD_EXPORT_SET cuvs-exports INSTALL_EXPORT_SET cuvs-exports)
   include(cmake/thirdparty/get_raft.cmake)
   include(cmake/thirdparty/get_cutlass.cmake)
+  include(${rapids-cmake-dir}/cpm/cuco.cmake)
+  rapids_cpm_cuco()
 endif()
 
 if(BUILD_TESTS OR BUILD_C_TESTS)
@@ -332,14 +337,17 @@ if(NOT BUILD_CPU_ONLY)
   set_target_properties(
     cuvs-cagra-search
     PROPERTIES BUILD_RPATH "\$ORIGIN"
-               CXX_STANDARD 17
+               CXX_STANDARD 20
                CXX_STANDARD_REQUIRED ON
-               CUDA_STANDARD 17
+               CUDA_STANDARD 20
                CUDA_STANDARD_REQUIRED ON
                CUDA_SEPARABLE_COMPILATION ON
                POSITION_INDEPENDENT_CODE ON
   )
-  target_link_libraries(cuvs-cagra-search PRIVATE cuvs::cuvs_cpp_headers)
+  target_link_libraries(
+    cuvs-cagra-search PRIVATE cuvs::cuvs_cpp_headers
+                              $<TARGET_NAME_IF_EXISTS:nvidia::cutlass::cutlass>
+  )
   target_compile_options(
     cuvs-cagra-search PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
                               "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
@@ -516,6 +524,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ivf_pq/detail/ivf_pq_build_extend_half_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_build_extend_int8_t_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_build_extend_uint8_t_int64_t.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_build_precomputed_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_fp8_false.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_fp8_true.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_half.cu
@@ -572,9 +581,9 @@ if(NOT BUILD_CPU_ONLY)
 
   set_target_properties(
     cuvs_objs
-    PROPERTIES CXX_STANDARD 17
+    PROPERTIES CXX_STANDARD 20
                CXX_STANDARD_REQUIRED ON
-               CUDA_STANDARD 17
+               CUDA_STANDARD 20
                CUDA_STANDARD_REQUIRED ON
                POSITION_INDEPENDENT_CODE ON
   )
@@ -590,8 +599,12 @@ if(NOT BUILD_CPU_ONLY)
 
   target_link_libraries(
     cuvs_objs
-    PRIVATE cuvs::cuvs_cpp_headers ${CUVS_CTK_MATH_DEPENDENCIES}
-            $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
+    PRIVATE cuvs::cuvs_cpp_headers
+            cuco::cuco
+            nvidia::cutlass::cutlass
+            ${CUVS_CTK_MATH_DEPENDENCIES}
+            $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+            $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
   )
 
   # Endian detection
@@ -632,9 +645,9 @@ if(NOT BUILD_CPU_ONLY)
       cuvs
       PROPERTIES BUILD_RPATH "\$ORIGIN"
                  INSTALL_RPATH "\$ORIGIN"
-                 CXX_STANDARD 17
+                 CXX_STANDARD 20
                  CXX_STANDARD_REQUIRED ON
-                 CUDA_STANDARD 17
+                 CUDA_STANDARD 20
                  CUDA_STANDARD_REQUIRED ON
                  CUDA_RESOLVE_DEVICE_SYMBOLS ON
                  INTERFACE_POSITION_INDEPENDENT_CODE ON
@@ -661,7 +674,8 @@ if(NOT BUILD_CPU_ONLY)
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
-      PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> ivf_rabitq_lib
+      PRIVATE $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> $<COMPILE_ONLY:nvidia::cutlass::cutlass>
+              $<COMPILE_ONLY:cuco::cuco> ivf_rabitq_lib
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
@@ -687,9 +701,9 @@ SECTIONS
       cuvs_static
       PROPERTIES BUILD_RPATH "\$ORIGIN"
                  INSTALL_RPATH "\$ORIGIN"
-                 CXX_STANDARD 17
+                 CXX_STANDARD 20
                  CXX_STANDARD_REQUIRED ON
-                 CUDA_STANDARD 17
+                 CUDA_STANDARD 20
                  CUDA_STANDARD_REQUIRED ON
                  CUDA_RESOLVE_DEVICE_SYMBOLS ON
                  POSITION_INDEPENDENT_CODE ON
@@ -716,8 +730,8 @@ SECTIONS
              ${CUVS_CTK_MATH_DEPENDENCIES}
              $<TARGET_NAME_IF_EXISTS:NCCL::NCCL> # needs to be public for DT_NEEDED
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>> # header only
-      PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
+      PRIVATE $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
+              $<COMPILE_ONLY:nvidia::cutlass::cutlass> $<COMPILE_ONLY:cuco::cuco>
     )
   endif()
 

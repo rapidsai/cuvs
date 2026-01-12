@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
@@ -250,6 +250,29 @@ cdef class Index:
         check_cuvs(cuvsIvfPqIndexGetDim(self.index, &dim))
         return dim
 
+    @property
+    def pq_dim(self):
+        """ The dimensionality of an encoded vector after compression by PQ """
+        cdef int64_t pq_dim
+        check_cuvs(cuvsIvfPqIndexGetPqDim(self.index, &pq_dim))
+        return pq_dim
+
+    @property
+    def pq_len(self):
+        """ The dimensionality of a subspace, i.e. the number of vector
+        components mapped to a subspace """
+        cdef int64_t pq_len
+        check_cuvs(cuvsIvfPqIndexGetPqLen(self.index, &pq_len))
+        return pq_len
+
+    @property
+    def pq_bits(self):
+        """ The bit length of an encoded vector element after
+        compression by PQ. """
+        cdef int64_t pq_bits
+        check_cuvs(cuvsIvfPqIndexGetPqBits(self.index, &pq_bits))
+        return pq_bits
+
     def __len__(self):
         cdef int64_t size
         check_cuvs(cuvsIvfPqIndexGetSize(self.index, &size))
@@ -282,6 +305,103 @@ cdef class Index:
         check_cuvs(cuvsIvfPqIndexGetPqCenters(self.index, tensor))
         output.parent = self
         return output
+
+    @property
+    def list_sizes(self):
+        """ Get the sizes of each list """
+        if not self.trained:
+            raise ValueError("Index needs to be built before getting"
+                             " list sizes")
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsIvfPqIndexGetListSizes(self.index, tensor))
+        output.parent = self
+        return output
+
+    @auto_sync_resources
+    def lists(self, resources=None):
+        """ Iterates through the pq-encoded list data
+
+        This function returns an iterator over each list,
+        with each value being the pq-encoded data for the
+        entire list
+
+        Parameters
+        ----------
+        {resources_docstring}
+        """
+        list_sizes = self.list_sizes.copy_to_host()
+        for i, list_size in enumerate(list_sizes):
+            indices = self.list_indices(i, n_rows=list_size)
+            list_data = self.list_data(i, n_rows=list_size,
+                                       resources=resources)
+            yield indices, list_data
+
+    @auto_sync_resources
+    def list_data(self, label, n_rows=0, offset=0, out_codes=None,
+                  resources=None):
+        """ Gets unpacked list data for a single list (cluster)
+
+        Parameters
+        ----------
+        label, int:
+            The cluster to get data for
+        n_rows, int:
+            The number of rows to return for the cluster (0 is all rows)
+        offset, int:
+            The row to start getting data at
+        out_codes, CAI
+            Optional buffer to hold memory. Will be created if None
+        {resources_docstring}
+        """
+        if n_rows == 0:
+            n_rows = self.list_sizes.copy_to_host()[label]
+
+        n_cols = int(np.ceil(self.pq_dim * self.pq_bits / 8))
+
+        if out_codes is None:
+            out_codes = device_ndarray.empty((n_rows, n_cols), dtype="ubyte")
+
+        out_codes_cai= wrap_array(out_codes)
+        _check_input_array(out_codes_cai, [np.dtype("ubyte")],
+                           exp_rows=n_rows, exp_cols=n_cols)
+
+        cdef cydlpack.DLManagedTensor* out_codes_dlpack = \
+            cydlpack.dlpack_c(out_codes_cai)
+
+        cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
+        check_cuvs(cuvsIvfPqIndexUnpackContiguousListData(res,
+                                                          self.index,
+                                                          out_codes_dlpack,
+                                                          label,
+                                                          offset))
+        return out_codes
+
+    def list_indices(self, label, n_rows=0):
+        """ Gets indices for a single cluster (list)
+
+        Parameters
+        ----------
+        label, int:
+            The cluster to get data for
+        n_rows, int, optional
+            Number of rows in the list
+        """
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsIvfPqIndexGetListIndices(self.index, label, tensor))
+        output.parent = self
+
+        # the indices tensor being returned here is larger than the number of
+        # rows in the actual list, and the remaining values are padded out
+        # with -1.
+        # fix this by slicing down to the number of rows in the actual list
+        if n_rows == 0:
+            n_rows = self.list_sizes.copy_to_host()[label]
+        return output.slice_rows(0, n_rows)
 
 
 @auto_sync_resources

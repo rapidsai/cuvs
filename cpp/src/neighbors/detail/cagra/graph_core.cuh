@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -1233,11 +1233,12 @@ void optimize(
     bool _use_gpu = use_gpu;
     if (_use_gpu) {
       try {
-        auto d_detour_count =
-          raft::make_device_matrix<uint8_t, int64_t>(res, graph_size, knn_graph_degree);
-        auto d_num_no_detour_edges = raft::make_device_vector<uint32_t, int64_t>(res, graph_size);
-        auto d_input_graph =
-          raft::make_device_matrix<IdxT, int64_t>(res, graph_size, knn_graph_degree);
+        auto d_detour_count = raft::make_device_mdarray<uint8_t>(
+          res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, knn_graph_degree));
+        auto d_num_no_detour_edges = raft::make_device_mdarray<uint32_t>(
+          res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
+        auto d_input_graph = raft::make_device_mdarray<IdxT>(
+          res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, knn_graph_degree));
       } catch (std::bad_alloc& e) {
         RAFT_LOG_DEBUG("Insufficient memory for 2-hop node counting on GPU");
         _use_gpu = false;
