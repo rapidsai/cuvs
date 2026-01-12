@@ -661,6 +661,37 @@ __device__ __forceinline__ void process_4centers_vec(MathT& d0,
   }
 }
 
+template <uint32_t SubWarpSize, typename MathT, typename CodeT, typename GetXFunc>
+__device__ __forceinline__ void process_all_centers(MathT& min_dist,
+                                                    CodeT& code,
+                                                    const MathT* __restrict__ centers_ptr,
+                                                    uint32_t pq_len,
+                                                    GetXFunc get_data_value,
+                                                    uint32_t pq_book_size)
+{
+  // Process 4 centers at a time
+  uint32_t l = raft::Pow2<SubWarpSize>::mod(raft::laneId());
+  for (; l + 3 * SubWarpSize < pq_book_size; l += 4 * SubWarpSize) {
+    MathT d0 = 0.0f, d1 = 0.0f, d2 = 0.0f, d3 = 0.0f;
+    process_4centers_vec<SubWarpSize, MathT>(
+      d0, d1, d2, d3, centers_ptr, l, pq_len, get_data_value);
+    compute_4centers_and_update<SubWarpSize, MathT, CodeT>(min_dist, code, d0, d1, d2, d3, l);
+  }
+
+  // Tail: process 1 center at a time
+  for (; l < pq_book_size; l += SubWarpSize) {
+    MathT d0 = 0.0f;
+    for (uint32_t k = 0; k < pq_len; k++) {
+      MathT diff = get_data_value(k) - centers_ptr[l * pq_len + k];
+      d0 += diff * diff;
+    }
+    if (d0 < min_dist) {
+      min_dist = d0;
+      code     = CodeT(l);
+    }
+  }
+}
+
 template <uint32_t SubWarpSize,
           typename CodeT,
           typename DataT,
@@ -673,6 +704,7 @@ __device__ auto compute_code_subspaces(
   MathT* smem_dataset,
   IdxT row_ix,
   uint32_t j,
+  const bool use_shared_memory,
   LabelT vq_label,
   std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers =
     std::nullopt) -> CodeT
@@ -707,28 +739,9 @@ __device__ auto compute_code_subspaces(
       return raft::shfl(my_dataset_val, k, SubWarpSize, subwarp_mask);
     };
 
-    // Process 4 centers at a time
-    uint32_t l = lane_id;
-    for (; l + 3 * SubWarpSize < pq_book_size; l += 4 * SubWarpSize) {
-      MathT d0 = 0.0f, d1 = 0.0f, d2 = 0.0f, d3 = 0.0f;
-      process_4centers_vec<SubWarpSize, MathT>(
-        d0, d1, d2, d3, centers_ptr, l, pq_len, get_x_shuffle);
-      compute_4centers_and_update<SubWarpSize, MathT, CodeT>(min_dist, code, d0, d1, d2, d3, l);
-    }
-
-    // Tail: process 1 center at a time
-    for (; l < pq_book_size; l += SubWarpSize) {
-      MathT d0 = 0.0f;
-      for (uint32_t k = 0; k < pq_len; k++) {
-        MathT diff = get_x_shuffle(k) - centers_ptr[l * pq_len + k];
-        d0 += diff * diff;
-      }
-      if (d0 < min_dist) {
-        min_dist = d0;
-        code     = CodeT(l);
-      }
-    }
-  } else {
+    process_all_centers<SubWarpSize, MathT, CodeT>(
+      min_dist, code, centers_ptr, pq_len, get_x_shuffle, pq_book_size);
+  } else if (use_shared_memory) {
     // Cooperatively load dataset into shared memory if pq_len > SubWarpSize
     for (uint32_t l = lane_id; l < pq_len; l += SubWarpSize) {
       auto jk = j * pq_len + l;
@@ -737,29 +750,17 @@ __device__ auto compute_code_subspaces(
       smem_dataset[l] = x;
     }
     __syncwarp();
-
-    auto get_x_smem = [&](uint32_t k) { return smem_dataset[k]; };
-
-    // Process 4 centers at a time
-    uint32_t l = lane_id;
-    for (; l + 3 * SubWarpSize < pq_book_size; l += 4 * SubWarpSize) {
-      MathT d0 = 0.0f, d1 = 0.0f, d2 = 0.0f, d3 = 0.0f;
-      process_4centers_vec<SubWarpSize, MathT>(d0, d1, d2, d3, centers_ptr, l, pq_len, get_x_smem);
-      compute_4centers_and_update<SubWarpSize, MathT, CodeT>(min_dist, code, d0, d1, d2, d3, l);
-    }
-
-    // Tail: process 1 center at a time
-    for (; l < pq_book_size; l += SubWarpSize) {
-      MathT d0 = 0.0f;
-      for (uint32_t k = 0; k < pq_len; k++) {
-        MathT diff = smem_dataset[k] - centers_ptr[l * pq_len + k];
-        d0 += diff * diff;
-      }
-      if (d0 < min_dist) {
-        min_dist = d0;
-        code     = CodeT(l);
-      }
-    }
+    auto get_data_value_smem = [&](uint32_t k) { return smem_dataset[k]; };
+    process_all_centers<SubWarpSize, MathT, CodeT>(
+      min_dist, code, centers_ptr, pq_len, get_data_value_smem, pq_book_size);
+  } else {
+    auto get_data_value = [&](uint32_t k) {
+      auto x = data_mapping(dataset_ptr[j * pq_len + k]);
+      if (vq_centers) { x -= vq_centers.value()(vq_label, j * pq_len + k); }
+      return x;
+    };
+    process_all_centers<SubWarpSize, MathT, CodeT>(
+      min_dist, code, centers_ptr, pq_len, get_data_value, pq_book_size);
   }
 
   // Reduce among threads
@@ -787,6 +788,7 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_subspaces_kernel
   raft::device_matrix_view<const DataT, IdxT, raft::row_major> dataset,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
   const uint32_t pq_bits,
+  const bool use_shared_memory,
   std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers =
     std::nullopt,
   std::optional<raft::device_vector_view<const LabelT, IdxT, raft::row_major>> vq_labels =
@@ -819,7 +821,7 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_subspaces_kernel
     auto pq_subspace_view    = raft::make_device_matrix_view(
       pq_centers.data_handle() + subspace_offset, (uint32_t)(1 << pq_bits), pq_centers.extent(1));
     CodeT code = compute_code_subspaces<SubWarpSize, CodeT>(
-      dataset, pq_subspace_view, smem_dataset, row_ix, j, vq_label, vq_centers);
+      dataset, pq_subspace_view, smem_dataset, row_ix, j, use_shared_memory, vq_label, vq_centers);
     if (lane_id == 0) { code_view[j] = code; }
   }
 }
@@ -860,12 +862,17 @@ void process_and_fill_codes_subspaces(
 
   constexpr ix_t kBlockSize              = 512;
   constexpr ix_t kReasonableMaxBatchSize = 131072;  // 128K rows per batch
+  constexpr ix_t kMaxSharedMemorySize    = 16384;
   const ix_t threads_per_vec             = std::min<ix_t>(raft::WarpSize, pq_n_centers);
   const uint32_t num_subwarps            = kBlockSize / threads_per_vec;
   const uint32_t pq_len                  = pq_centers.extent(1);
 
-  const uint32_t shared_memory_size =
+  uint32_t shared_memory_size =
     pq_len <= threads_per_vec ? 0 : num_subwarps * pq_len * sizeof(MathT);
+  if (shared_memory_size > kMaxSharedMemorySize) {
+    // Extreme case: pq_len is too large to fit in shared memory
+    shared_memory_size = 0;
+  }
 
   dim3 threads(kBlockSize, 1, 1);
   auto kernel = [](uint32_t pq_bits) {
@@ -932,6 +939,7 @@ void process_and_fill_codes_subspaces(
       batch_view,
       pq_centers,
       pq_bits,
+      shared_memory_size > 0,
       vq_centers,
       labels_view);
     RAFT_CUDA_TRY(cudaPeekAtLastError());

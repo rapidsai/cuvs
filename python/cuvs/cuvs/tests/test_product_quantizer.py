@@ -76,3 +76,14 @@ def test_product_quantizer(
         cp.array(input1_device) - reconstructed, axis=1
     )
     assert reconstruction_error.mean() < 1
+
+
+def test_extreme_cases():
+    n_samples = 5000
+    n_features = 2048
+    dataset = cp.random.random_sample(
+        (n_samples, n_features), dtype=cp.float32
+    )
+    params = pq.QuantizerParams(pq_bits=8, pq_dim=2)
+    quantizer = pq.train(params, dataset)
+    pq.transform(quantizer, dataset)
