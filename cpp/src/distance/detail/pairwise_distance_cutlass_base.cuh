@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -18,8 +18,8 @@
 #include "pairwise_distance_epilogue_elementwise.h"
 #include "pairwise_distance_gemm.h"
 
+#include "../../util/cutlass_utils.hpp"
 #include "distance_ops/cutlass.cuh"
-#include <raft/util/cutlass_utils.cuh>
 
 #include <rmm/device_uvector.hpp>
 
@@ -157,13 +157,13 @@ std::enable_if_t<ops::has_cutlass_op<OpT>::value> cutlassDistanceKernel(const Da
     // Instantiate CUTLASS kernel depending on templates
     cutlassDist cutlassDist_op;
     // Check the problem size is supported or not
-    RAFT_CUTLASS_TRY(cutlassDist_op.can_implement(arguments));
+    CUVS_CUTLASS_TRY(cutlassDist_op.can_implement(arguments));
 
     // Initialize CUTLASS kernel with arguments and workspace pointer
-    RAFT_CUTLASS_TRY(cutlassDist_op.initialize(arguments, workspace.data(), stream));
+    CUVS_CUTLASS_TRY(cutlassDist_op.initialize(arguments, workspace.data(), stream));
 
     // Launch initialized CUTLASS kernel
-    RAFT_CUTLASS_TRY(cutlassDist_op(stream));
+    CUVS_CUTLASS_TRY(cutlassDist_op(stream));
   }
 }
 
