@@ -15,26 +15,26 @@ namespace helpers {
 
 namespace codepacker {
 
-void unpack(
-  raft::resources const& res,
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
-  uint32_t pq_bits,
-  uint32_t offset,
-  raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> codes)
+void unpack(raft::resources const& res,
+            raft::device_mdspan<const uint8_t,
+                                list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                                raft::row_major> list_data,
+            uint32_t pq_bits,
+            uint32_t offset,
+            raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> codes)
 {
   detail::unpack_list_data(codes, list_data, offset, pq_bits, raft::resource::get_cuda_stream(res));
 }
 
-void unpack_contiguous(
-  raft::resources const& res,
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
-  uint32_t pq_bits,
-  uint32_t offset,
-  uint32_t n_rows,
-  uint32_t pq_dim,
-  uint8_t* codes)
+void unpack_contiguous(raft::resources const& res,
+                       raft::device_mdspan<const uint8_t,
+                                           list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                                           raft::row_major> list_data,
+                       uint32_t pq_bits,
+                       uint32_t offset,
+                       uint32_t n_rows,
+                       uint32_t pq_dim,
+                       uint8_t* codes)
 {
   detail::unpack_contiguous_list_data(
     codes, list_data, n_rows, pq_dim, offset, pq_bits, raft::resource::get_cuda_stream(res));
@@ -43,21 +43,22 @@ void pack(raft::resources const& res,
           raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes,
           uint32_t pq_bits,
           uint32_t offset,
-          raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-            list_data)
+          raft::device_mdspan<uint8_t,
+                              list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                              raft::row_major> list_data)
 {
   detail::pack_list_data(list_data, codes, offset, pq_bits, raft::resource::get_cuda_stream(res));
 }
 
-void pack_contiguous(
-  raft::resources const& res,
-  const uint8_t* codes,
-  uint32_t n_rows,
-  uint32_t pq_dim,
-  uint32_t pq_bits,
-  uint32_t offset,
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data)
+void pack_contiguous(raft::resources const& res,
+                     const uint8_t* codes,
+                     uint32_t n_rows,
+                     uint32_t pq_dim,
+                     uint32_t pq_bits,
+                     uint32_t offset,
+                     raft::device_mdspan<uint8_t,
+                                         list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                                         raft::row_major> list_data)
 {
   detail::pack_contiguous_list_data(
     list_data, codes, n_rows, pq_dim, offset, pq_bits, raft::resource::get_cuda_stream(res));

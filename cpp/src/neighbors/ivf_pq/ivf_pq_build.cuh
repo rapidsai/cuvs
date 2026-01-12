@@ -652,7 +652,7 @@ void reconstruct_list_data(raft::resources const& res,
 }
 
 template <uint32_t BlockSize, uint32_t PqBits>
-__launch_bounds__(BlockSize) static __global__ void encode_list_data_kernel(
+__launch_bounds__(BlockSize) static __global__ void encode_list_data_interleaved_kernel(
   raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
     list_data,
   raft::device_matrix_view<const float, uint32_t, raft::row_major> new_vectors,
@@ -741,11 +741,11 @@ void encode_list_data(raft::resources const& res,
   } else {
     auto kernel = [](uint32_t pq_bits) {
       switch (pq_bits) {
-        case 4: return encode_list_data_kernel<kBlockSize, 4>;
-        case 5: return encode_list_data_kernel<kBlockSize, 5>;
-        case 6: return encode_list_data_kernel<kBlockSize, 6>;
-        case 7: return encode_list_data_kernel<kBlockSize, 7>;
-        case 8: return encode_list_data_kernel<kBlockSize, 8>;
+        case 4: return encode_list_data_interleaved_kernel<kBlockSize, 4>;
+        case 5: return encode_list_data_interleaved_kernel<kBlockSize, 5>;
+        case 6: return encode_list_data_interleaved_kernel<kBlockSize, 6>;
+        case 7: return encode_list_data_interleaved_kernel<kBlockSize, 7>;
+        case 8: return encode_list_data_interleaved_kernel<kBlockSize, 8>;
         default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
       }
     }(index->pq_bits());

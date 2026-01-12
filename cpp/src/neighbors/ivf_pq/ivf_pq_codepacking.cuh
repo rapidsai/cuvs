@@ -89,8 +89,9 @@ struct bitfield_view_t {
  */
 template <uint32_t PqBits, typename Action>
 __device__ void run_on_vector(
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    in_list_data,
+  raft::device_mdspan<const uint8_t,
+                      list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                      raft::row_major> in_list_data,
   uint32_t in_ix,
   uint32_t out_ix,
   uint32_t pq_dim,
@@ -132,8 +133,9 @@ __device__ void run_on_vector(
  */
 template <uint32_t PqBits, uint32_t SubWarpSize, typename IdxT, typename Action>
 __device__ void write_vector_interleaved(
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    out_list_data,
+  raft::device_mdspan<uint8_t,
+                      list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                      raft::row_major> out_list_data,
   uint32_t out_ix,
   IdxT in_ix,
   uint32_t pq_dim,
@@ -206,9 +208,9 @@ __device__ void write_vector_flat(uint8_t* out_flat_codes,
 {
   const uint32_t lane_id = raft::Pow2<SubWarpSize>::mod(threadIdx.x);
 
-  uint8_t* vec_ptr = out_flat_codes + out_ix * bytes_per_vector;
+  uint8_t* out_vec_ptr = out_flat_codes + out_ix * bytes_per_vector;
 
-  bitfield_view_t<PqBits> code_view{vec_ptr};
+  bitfield_view_t<PqBits> code_view{out_vec_ptr};
   for (uint32_t j = 0; j < pq_dim; j++) {
     uint8_t code = action(in_ix, j);
     if (lane_id == 0) { code_view[j] = code; }
@@ -218,8 +220,9 @@ __device__ void write_vector_flat(uint8_t* out_flat_codes,
 /** Process the given indices or a block of a single list (cluster). */
 template <uint32_t PqBits, typename Action>
 __device__ void run_on_list(
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    in_list_data,
+  raft::device_mdspan<const uint8_t,
+                      list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                      raft::row_major> in_list_data,
   std::variant<uint32_t, const uint32_t*> offset_or_indices,
   uint32_t len,
   uint32_t pq_dim,
@@ -236,8 +239,9 @@ __device__ void run_on_list(
 /** Process the given indices or a block of a single list (cluster) - interleaved layout. */
 template <uint32_t PqBits, uint32_t SubWarpSize, typename Action>
 __device__ void write_list(
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    out_list_data,
+  raft::device_mdspan<uint8_t,
+                      list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                      raft::row_major> out_list_data,
   std::variant<uint32_t, const uint32_t*> offset_or_indices,
   uint32_t len,
   uint32_t pq_dim,

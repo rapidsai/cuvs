@@ -229,7 +229,7 @@ template <typename IdxT>
 constexpr static IdxT kOutOfBoundsRecord = std::numeric_limits<IdxT>::max();
 
 template <typename SizeT, typename IdxT>
-struct list_spec {
+struct list_spec_interleaved {
   using value_type = uint8_t;
   using index_type = IdxT;
   /** PQ-encoded data stored in the interleaved format:
@@ -248,20 +248,22 @@ struct list_spec {
   uint32_t pq_bits;
   uint32_t pq_dim;
 
-  constexpr list_spec(uint32_t pq_bits, uint32_t pq_dim, bool conservative_memory_allocation);
+  constexpr list_spec_interleaved(uint32_t pq_bits,
+                                  uint32_t pq_dim,
+                                  bool conservative_memory_allocation);
 
   // Allow casting between different size-types (for safer size and offset calculations)
   template <typename OtherSizeT>
-  constexpr explicit list_spec(const list_spec<OtherSizeT, IdxT>& other_spec);
+  constexpr explicit list_spec_interleaved(
+    const list_spec_interleaved<OtherSizeT, IdxT>& other_spec);
 
   /** Determine the extents of an array enough to hold a given amount of data. */
   constexpr list_extents make_list_extents(SizeT n_rows) const;
 };
 
 template <typename SizeT, typename IdxT>
-constexpr list_spec<SizeT, IdxT>::list_spec(uint32_t pq_bits,
-                                            uint32_t pq_dim,
-                                            bool conservative_memory_allocation)
+constexpr list_spec_interleaved<SizeT, IdxT>::list_spec_interleaved(
+  uint32_t pq_bits, uint32_t pq_dim, bool conservative_memory_allocation)
   : pq_bits(pq_bits),
     pq_dim(pq_dim),
     align_min(kIndexGroupSize),
@@ -271,7 +273,8 @@ constexpr list_spec<SizeT, IdxT>::list_spec(uint32_t pq_bits,
 
 template <typename SizeT, typename IdxT>
 template <typename OtherSizeT>
-constexpr list_spec<SizeT, IdxT>::list_spec(const list_spec<OtherSizeT, IdxT>& other_spec)
+constexpr list_spec_interleaved<SizeT, IdxT>::list_spec_interleaved(
+  const list_spec_interleaved<OtherSizeT, IdxT>& other_spec)
   : pq_bits{other_spec.pq_bits},
     pq_dim{other_spec.pq_dim},
     align_min{other_spec.align_min},
@@ -280,8 +283,8 @@ constexpr list_spec<SizeT, IdxT>::list_spec(const list_spec<OtherSizeT, IdxT>& o
 }
 
 template <typename SizeT, typename IdxT>
-constexpr typename list_spec<SizeT, IdxT>::list_extents list_spec<SizeT, IdxT>::make_list_extents(
-  SizeT n_rows) const
+constexpr typename list_spec_interleaved<SizeT, IdxT>::list_extents
+list_spec_interleaved<SizeT, IdxT>::make_list_extents(SizeT n_rows) const
 {
   // how many elems of pq_dim fit into one kIndexGroupVecLen-byte chunk
   auto pq_chunk = (kIndexGroupVecLen * 8u) / pq_bits;
@@ -290,7 +293,7 @@ constexpr typename list_spec<SizeT, IdxT>::list_extents list_spec<SizeT, IdxT>::
 }
 
 template <typename IdxT, typename SizeT = uint32_t>
-using list_data = ivf::list<list_spec, SizeT, IdxT>;
+using list_data = ivf::list<list_spec_interleaved, SizeT, IdxT>;
 
 /**
  * Flat (non-interleaved) storage specification for PQ-encoded data.
@@ -299,7 +302,7 @@ using list_data = ivf::list<list_spec, SizeT, IdxT>;
  *   [n_rows, bytes_per_vector] where bytes_per_vector = ceildiv(pq_dim * pq_bits, 8)
  */
 template <typename SizeT, typename IdxT>
-struct flat_list_spec {
+struct list_spec_flat {
   using value_type   = uint8_t;
   using index_type   = IdxT;
   using list_extents = raft::matrix_extent<SizeT>;
@@ -309,7 +312,7 @@ struct flat_list_spec {
   uint32_t pq_bits;
   uint32_t pq_dim;
 
-  constexpr flat_list_spec(uint32_t pq_bits, uint32_t pq_dim, bool conservative_memory_allocation)
+  constexpr list_spec_flat(uint32_t pq_bits, uint32_t pq_dim, bool conservative_memory_allocation)
     : pq_bits(pq_bits),
       pq_dim(pq_dim),
       align_min(1),
@@ -331,7 +334,7 @@ struct flat_list_spec {
 };
 
 template <typename IdxT, typename SizeT = uint32_t>
-using flat_list_data = ivf::list<flat_list_spec, SizeT, IdxT>;
+using flat_list_data = ivf::list<list_spec_flat, SizeT, IdxT>;
 
 using pq_centers_extents =
   raft::extents<uint32_t, raft::dynamic_extent, raft::dynamic_extent, raft::dynamic_extent>;
@@ -2526,13 +2529,13 @@ namespace codepacker {
  *   The length `n_take` defines how many records to unpack,
  *   it must be smaller than the list size.
  */
-void unpack(
-  raft::resources const& res,
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
-  uint32_t pq_bits,
-  uint32_t offset,
-  raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> codes);
+void unpack(raft::resources const& res,
+            raft::device_mdspan<const uint8_t,
+                                list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                                raft::row_major> list_data,
+            uint32_t pq_bits,
+            uint32_t offset,
+            raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> codes);
 
 /**
  * @brief Unpack `n_rows` consecutive records of a single list (cluster) in the compressed index
@@ -2566,15 +2569,15 @@ void unpack(
  *   The length `n_rows` defines how many records to unpack,
  *   it must be smaller than the list size.
  */
-void unpack_contiguous(
-  raft::resources const& res,
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
-  uint32_t pq_bits,
-  uint32_t offset,
-  uint32_t n_rows,
-  uint32_t pq_dim,
-  uint8_t* codes);
+void unpack_contiguous(raft::resources const& res,
+                       raft::device_mdspan<const uint8_t,
+                                           list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                                           raft::row_major> list_data,
+                       uint32_t pq_bits,
+                       uint32_t offset,
+                       uint32_t n_rows,
+                       uint32_t pq_dim,
+                       uint8_t* codes);
 
 /**
  * Write flat PQ codes into an existing list by the given offset.
@@ -2602,8 +2605,9 @@ void pack(raft::resources const& res,
           raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes,
           uint32_t pq_bits,
           uint32_t offset,
-          raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-            list_data);
+          raft::device_mdspan<uint8_t,
+                              list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                              raft::row_major> list_data);
 
 /**
  * Write flat PQ codes into an existing list by the given offset. The input codes of a single vector
@@ -2633,15 +2637,15 @@ void pack(raft::resources const& res,
  * @param[in] offset how many records to skip before writing the data into the list
  * @param[in] list_data block to write into
  */
-void pack_contiguous(
-  raft::resources const& res,
-  const uint8_t* codes,
-  uint32_t n_rows,
-  uint32_t pq_dim,
-  uint32_t pq_bits,
-  uint32_t offset,
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data);
+void pack_contiguous(raft::resources const& res,
+                     const uint8_t* codes,
+                     uint32_t n_rows,
+                     uint32_t pq_dim,
+                     uint32_t pq_bits,
+                     uint32_t offset,
+                     raft::device_mdspan<uint8_t,
+                                         list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                                         raft::row_major> list_data);
 
 /**
  * Write flat PQ codes into an existing list by the given offset.
@@ -3142,7 +3146,7 @@ void extract_centers(raft::resources const& res,
  *   ivf_pq::index<int64_t> index(res, index_params, D);
  *   ivf_pq::helpers::reset_index(res, &index);
  *   // resize the first IVF list to hold 5 records
- *   auto spec = list_spec<uint32_t, int64_t>{
+ *   auto spec = list_spec_interleaved<uint32_t, int64_t>{
  *     index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
  *   uint32_t new_size = 5;
  *   ivf::resize_list(res, list, spec, new_size, 0);
