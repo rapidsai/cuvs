@@ -66,7 +66,7 @@ void compare_vectors_l2(const raft::resources& res,
   double mean_dist = 0.0;
   for (uint32_t i = 0; i < n_rows; i++) {
     double d = dist(i);
-    if ((print_data && i < 5) || (d > 1.2 * eps * std::pow(2.0, compression_ratio))) {
+    if ((print_data && i < 5) || (dim > 5 && (d > 1.2 * eps * std::pow(2.0, compression_ratio)))) {
       auto dim_print = std::min<uint32_t>(dim, 10);
       raft::print_vector("original", a.data_handle() + i * dim, dim_print, std::cout);
       raft::print_vector("reconstructed", b.data_handle() + i * dim, dim_print, std::cout);
@@ -246,6 +246,16 @@ const std::vector<ProductQuantizationInputs<T>> inputs = {
   // Extreme cases
   {1, 64, 4, 8, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, true, false, false, 42ULL},
   {512, 1, 8, 1, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, true, true, false, 42ULL},
+  {4096,
+   1024,
+   10,
+   4,
+   cuvs::cluster::kmeans::kmeans_type::KMeansBalanced,
+   0,
+   false,
+   false,
+   false,
+   42ULL},
   {20, 2, 4, 1, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, false, true, false, 42ULL},
   {200, 8, 7, 2, cuvs::cluster::kmeans::kmeans_type::KMeans, 2, false, true, false, 42ULL},
   {299,

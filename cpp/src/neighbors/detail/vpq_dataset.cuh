@@ -361,7 +361,7 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_kernel(
   raft::device_matrix_view<uint8_t, IdxT, raft::row_major> out_codes,
   raft::device_matrix_view<const DataT, IdxT, raft::row_major> dataset,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
-  const uint32_t shared_memory_size,
+  const uint32_t rows_in_shared_memory,
   const uint32_t pq_bits,
   std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers =
     std::nullopt,
@@ -376,7 +376,6 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_kernel(
   const uint32_t pq_dim = raft::div_rounding_up_unsafe(dataset.extent(1), pq_centers.extent(1));
 
   // Copy the pq_centers into shared memory for faster processing
-  const IdxT rows_in_shared_memory = shared_memory_size / (sizeof(MathT) * pq_centers.extent(1));
   for (uint32_t i = threadIdx.x; i < rows_in_shared_memory * pq_centers.extent(1);
        i += blockDim.x) {
     pq_centers_smem[i] = pq_centers.data_handle()[i];
@@ -450,9 +449,10 @@ void process_and_fill_codes(
   constexpr ix_t kReasonableMaxBatchSize = 65536;
   constexpr ix_t kBlockSize              = 256;
   constexpr ix_t kMaxSharedMemorySize    = 16384;
-  const ix_t kSharedMemorySize           = std::min<ix_t>(
-    kMaxSharedMemorySize, pq_centers.extent(0) * pq_centers.extent(1) * sizeof(MathT));
-  const ix_t threads_per_vec = std::min<ix_t>(raft::WarpSize, pq_n_centers);
+  const ix_t rows_in_shared_memory       = std::min<ix_t>(
+    pq_centers.extent(0), kMaxSharedMemorySize / (sizeof(MathT) * pq_centers.extent(1)));
+  const ix_t sharedMemorySize = rows_in_shared_memory * pq_centers.extent(1) * sizeof(MathT);
+  const ix_t threads_per_vec  = std::min<ix_t>(raft::WarpSize, pq_n_centers);
   dim3 threads(kBlockSize, 1, 1);
   ix_t max_batch_size = std::min<ix_t>(n_rows, kReasonableMaxBatchSize);
   auto kernel         = [](uint32_t pq_bits) {
@@ -494,12 +494,12 @@ void process_and_fill_codes(
       labels_view = raft::make_const_mdspan(labels->view());
     }
     dim3 blocks(raft::div_rounding_up_safe<ix_t>(n_rows, kBlockSize / threads_per_vec), 1, 1);
-    kernel<<<blocks, threads, kSharedMemorySize, stream>>>(
+    kernel<<<blocks, threads, sharedMemorySize, stream>>>(
       raft::make_device_matrix_view<uint8_t, IdxT>(
         codes.data_handle() + batch.offset() * codes_rowlen, batch.size(), codes_rowlen),
       batch_view,
       pq_centers,
-      kSharedMemorySize,
+      rows_in_shared_memory,
       pq_bits,
       vq_centers,
       labels_view);
@@ -864,8 +864,7 @@ void process_and_fill_codes_subspaces(
   const uint32_t num_subwarps            = kBlockSize / threads_per_vec;
   const uint32_t pq_len                  = pq_centers.extent(1);
 
-  // Minimal shared memory allocation
-  const uint32_t kSharedMemorySize =
+  const uint32_t shared_memory_size =
     pq_len <= threads_per_vec ? 0 : num_subwarps * pq_len * sizeof(MathT);
 
   dim3 threads(kBlockSize, 1, 1);
@@ -927,7 +926,7 @@ void process_and_fill_codes_subspaces(
       labels_view = raft::make_const_mdspan(labels->view());
     }
     dim3 blocks(raft::div_rounding_up_safe<ix_t>(batch.size(), kBlockSize / threads_per_vec), 1, 1);
-    kernel<<<blocks, threads, kSharedMemorySize, stream>>>(
+    kernel<<<blocks, threads, shared_memory_size, stream>>>(
       raft::make_device_matrix_view<uint8_t, IdxT>(
         codes.data_handle() + batch.offset() * codes_rowlen, batch.size(), codes_rowlen),
       batch_view,

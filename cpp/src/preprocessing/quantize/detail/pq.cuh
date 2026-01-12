@@ -265,7 +265,7 @@ auto reconstruct_vectors(
   auto stream = raft::resource::get_cuda_stream(res);
 
   constexpr ix_t kBlockSize  = 256;
-  const ix_t threads_per_vec = raft::WarpSize;
+  const ix_t threads_per_vec = std::min<ix_t>(raft::WarpSize, pq_n_centers);
   dim3 threads(kBlockSize, 1, 1);
   auto kernel = [](uint32_t pq_bits) {
     if (pq_bits == 4) {
