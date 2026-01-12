@@ -69,7 +69,8 @@ void serialize(raft::resources const& handle_, std::ostream& os, const index<Idx
              raft::resource::get_cuda_stream(handle_));
   raft::resource::sync_stream(handle_);
   raft::serialize_mdspan(handle_, os, sizes_host.view());
-  auto list_store_spec = list_spec<uint32_t, IdxT>{index.pq_bits(), index.pq_dim(), true};
+  auto list_store_spec =
+    list_spec_interleaved<uint32_t, IdxT>{index.pq_bits(), index.pq_dim(), true};
   for (uint32_t label = 0; label < index.n_lists(); label++) {
     ivf::serialize_list(handle_, os, index.lists()[label], list_store_spec, sizes_host(label));
   }
@@ -144,8 +145,8 @@ auto deserialize(raft::resources const& handle_, std::istream& is) -> index<IdxT
   raft::deserialize_mdspan(handle_, is, impl->centers_rot());
   raft::deserialize_mdspan(handle_, is, impl->rotation_matrix());
   raft::deserialize_mdspan(handle_, is, impl->list_sizes());
-  auto list_device_spec = list_spec<uint32_t, IdxT>{pq_bits, pq_dim, cma};
-  auto list_store_spec  = list_spec<uint32_t, IdxT>{pq_bits, pq_dim, true};
+  auto list_device_spec = list_spec_interleaved<uint32_t, IdxT>{pq_bits, pq_dim, cma};
+  auto list_store_spec  = list_spec_interleaved<uint32_t, IdxT>{pq_bits, pq_dim, true};
   for (auto& list : impl->lists()) {
     ivf::deserialize_list(handle_, is, list, list_store_spec, list_device_spec);
   }

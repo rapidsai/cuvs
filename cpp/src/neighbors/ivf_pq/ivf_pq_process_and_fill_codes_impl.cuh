@@ -58,7 +58,8 @@ __launch_bounds__(BlockSize) static __global__ void process_and_fill_codes_kerne
     write_vector_flat<PqBits, kSubWarpSize>(
       data_ptrs[cluster_ix], out_ix, row_ix, pq_dim, bytes_per_vector, encode_action);
   } else {
-    auto pq_extents = list_spec<uint32_t, IdxT>{PqBits, pq_dim, true}.make_list_extents(out_ix + 1);
+    auto pq_extents =
+      list_spec_interleaved<uint32_t, IdxT>{PqBits, pq_dim, true}.make_list_extents(out_ix + 1);
     auto pq_dataset = raft::make_mdspan<uint8_t, uint32_t, raft::row_major, false, true>(
       data_ptrs[cluster_ix], pq_extents);
     write_vector_interleaved<PqBits, kSubWarpSize>(

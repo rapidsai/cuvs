@@ -552,8 +552,9 @@ struct reconstruct_vectors {
 template <uint32_t BlockSize, uint32_t PqBits>
 __launch_bounds__(BlockSize) static __global__ void reconstruct_list_data_kernel(
   raft::device_matrix_view<float, uint32_t, raft::row_major> out_vectors,
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    in_list_data,
+  raft::device_mdspan<const uint8_t,
+                      list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                      raft::row_major> in_list_data,
   raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot,
   codebook_gen codebook_kind,
@@ -653,8 +654,9 @@ void reconstruct_list_data(raft::resources const& res,
 
 template <uint32_t BlockSize, uint32_t PqBits>
 __launch_bounds__(BlockSize) static __global__ void encode_list_data_interleaved_kernel(
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
+  raft::device_mdspan<uint8_t,
+                      list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                      raft::row_major> list_data,
   raft::device_matrix_view<const float, uint32_t, raft::row_major> new_vectors,
   raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
   codebook_gen codebook_kind,
@@ -836,10 +838,16 @@ auto extend_list_prepare(
   uint32_t new_size = offset + n_rows;
   raft::copy(
     index->list_sizes().data_handle() + label, &new_size, 1, raft::resource::get_cuda_stream(res));
-  auto spec = list_spec<uint32_t, IdxT>{
-    index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
   auto& list = index->lists()[label];
-  ivf::resize_list(res, list, spec, new_size, offset);
+  if (index->codes_layout() == list_layout::FLAT) {
+    auto spec = list_spec_flat<uint32_t, IdxT>{
+      index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
+    ivf::resize_list(res, list, spec, new_size, offset);
+  } else {
+    auto spec = list_spec_interleaved<uint32_t, IdxT>{
+      index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
+    ivf::resize_list(res, list, spec, new_size, offset);
+  }
   raft::copy(list->indices.data_handle() + offset,
              new_indices.data_handle(),
              n_rows,
@@ -976,17 +984,21 @@ void extend(raft::resources const& handle,
   rmm::device_async_resource_ref large_memory =
     raft::resource::get_large_workspace_resource(handle);
 
-  // The spec defines how the clusters look like
-  auto spec = list_spec<uint32_t, IdxT>{
-    index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
   // Try to allocate an index with the same parameters and the projected new size
-  // (which can be slightly larger than index->size() + n_rows, due to padding).
+  // (which can be slightly larger than index->size() + n_rows, due to padding for interleaved).
   // If this fails, the index would be too big to fit in the device anyway.
-  std::optional<list_data<IdxT, size_t>> placeholder_list(
-    std::in_place_t{},
-    handle,
-    list_spec<size_t, IdxT>{spec},
-    n_rows + (kIndexGroupSize - 1) * std::min<IdxT>(n_clusters, n_rows));
+  std::optional<list_data<IdxT, size_t>> placeholder_list;
+  if (index->codes_layout() == list_layout::FLAT) {
+    auto spec = list_spec_flat<uint32_t, IdxT>{
+      index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
+    placeholder_list.emplace(handle, list_spec_flat<size_t, IdxT>{spec}, n_rows);
+  } else {
+    auto spec = list_spec_interleaved<uint32_t, IdxT>{
+      index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
+    placeholder_list.emplace(handle,
+                             list_spec_interleaved<size_t, IdxT>{spec},
+                             n_rows + (kIndexGroupSize - 1) * std::min<IdxT>(n_clusters, n_rows));
+  }
 
   // Available device memory
   size_t free_mem = raft::resource::get_workspace_free_bytes(handle);
@@ -1114,9 +1126,20 @@ void extend(raft::resources const& handle,
     raft::copy(new_cluster_sizes.data(), list_sizes, n_clusters, stream);
     raft::copy(old_cluster_sizes.data(), orig_list_sizes.data(), n_clusters, stream);
     raft::resource::sync_stream(handle);
-    for (uint32_t label = 0; label < n_clusters; label++) {
-      ivf::resize_list(
-        handle, index->lists()[label], spec, new_cluster_sizes[label], old_cluster_sizes[label]);
+    if (index->codes_layout() == list_layout::FLAT) {
+      auto spec = list_spec_flat<uint32_t, IdxT>{
+        index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
+      for (uint32_t label = 0; label < n_clusters; label++) {
+        ivf::resize_list(
+          handle, index->lists()[label], spec, new_cluster_sizes[label], old_cluster_sizes[label]);
+      }
+    } else {
+      auto spec = list_spec_interleaved<uint32_t, IdxT>{
+        index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
+      for (uint32_t label = 0; label < n_clusters; label++) {
+        ivf::resize_list(
+          handle, index->lists()[label], spec, new_cluster_sizes[label], old_cluster_sizes[label]);
+      }
     }
   }
 

@@ -313,12 +313,13 @@ struct list_spec_flat {
   uint32_t pq_dim;
 
   constexpr list_spec_flat(uint32_t pq_bits, uint32_t pq_dim, bool conservative_memory_allocation)
-    : pq_bits(pq_bits),
-      pq_dim(pq_dim),
-      align_min(1),
-      align_max(conservative_memory_allocation ? 1 : 256)
+    : pq_bits(pq_bits), pq_dim(pq_dim), align_min(1), align_max(1)
   {
   }
+
+  // Allow casting between different size-types (for safer size and offset calculations)
+  template <typename OtherSizeT>
+  constexpr explicit list_spec_flat(const list_spec_flat<OtherSizeT, IdxT>& other_spec);
 
   /** Number of bytes per encoded vector. */
   constexpr SizeT bytes_per_vector() const
@@ -332,6 +333,17 @@ struct list_spec_flat {
     return list_extents{n_rows, bytes_per_vector()};
   }
 };
+
+template <typename SizeT, typename IdxT>
+template <typename OtherSizeT>
+constexpr list_spec_flat<SizeT, IdxT>::list_spec_flat(
+  const list_spec_flat<OtherSizeT, IdxT>& other_spec)
+  : pq_bits{other_spec.pq_bits},
+    pq_dim{other_spec.pq_dim},
+    align_min{other_spec.align_min},
+    align_max{other_spec.align_max}
+{
+}
 
 template <typename IdxT, typename SizeT = uint32_t>
 using flat_list_data = ivf::list<list_spec_flat, SizeT, IdxT>;
