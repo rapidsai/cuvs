@@ -49,6 +49,7 @@ function(ConfigureTest)
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
             $<TARGET_NAME_IF_EXISTS:conda_env>
             ${_CUVS_TEST_ADDITIONAL_DEP}
+            $<TARGET_NAME_IF_EXISTS:nvidia::cutlass::cutlass>
   )
   set_target_properties(
     ${TEST_NAME}
