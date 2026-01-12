@@ -198,7 +198,7 @@ void create_connectivity_graph(
   cuvs::neighbors::all_neighbors::all_neighbors_params all_neighbors_params{
     .graph_build_params =
       cuvs::neighbors::graph_build_params::brute_force_params{
-        .build_params = {cuvs::distance::DistanceType::L2SqrtExpanded}},
+        .build_params = {{.metric = cuvs::distance::DistanceType::L2SqrtExpanded}}},
     .metric = cuvs::distance::DistanceType::L2SqrtExpanded};
   cuvs::neighbors::all_neighbors::build(handle,
                                         all_neighbors_params,
