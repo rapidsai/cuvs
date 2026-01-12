@@ -566,9 +566,9 @@ auto quantize_all_vectors(raft::resources const& res,
     res,
     ps,
     residuals,
-    std::make_optional(raft::make_const_mdspan(vq_codebook.view())),
     pq_codebook,
-    codes.view());
+    codes.view(),
+    std::make_optional(raft::make_const_mdspan(vq_codebook.view())));
   return codes;
 }
 

@@ -185,17 +185,17 @@ void transform(
       res,
       quantizer.params_quantizer,
       dataset,
-      vq_centers,
       raft::make_const_mdspan(quantizer.vpq_codebooks.pq_code_book.view()),
-      out);
+      out,
+      vq_centers);
   } else {
     cuvs::neighbors::detail::process_and_fill_codes<T, int64_t>(
       res,
       quantizer.params_quantizer,
       dataset,
-      vq_centers,
       raft::make_const_mdspan(quantizer.vpq_codebooks.pq_code_book.view()),
-      out);
+      out,
+      vq_centers);
   }
 }
 

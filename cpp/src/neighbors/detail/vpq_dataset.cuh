@@ -360,11 +360,13 @@ template <uint32_t BlockSize,
 __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_kernel(
   raft::device_matrix_view<uint8_t, IdxT, raft::row_major> out_codes,
   raft::device_matrix_view<const DataT, IdxT, raft::row_major> dataset,
-  std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers,
-  std::optional<raft::device_vector_view<const LabelT, IdxT, raft::row_major>> vq_labels,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
   const uint32_t shared_memory_size,
-  const uint32_t pq_bits)
+  const uint32_t pq_bits,
+  std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers =
+    std::nullopt,
+  std::optional<raft::device_vector_view<const LabelT, IdxT, raft::row_major>> vq_labels =
+    std::nullopt)
 {
   extern __shared__ __align__(256) MathT pq_centers_smem[];
   using subwarp_align = raft::Pow2<SubWarpSize>;
@@ -415,9 +417,10 @@ void process_and_fill_codes(
   const raft::resources& res,
   const vpq_params& params,
   const DatasetT& dataset,
-  std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
-  raft::device_matrix_view<uint8_t, IdxT, raft::row_major> codes)
+  raft::device_matrix_view<uint8_t, IdxT, raft::row_major> codes,
+  std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers =
+    std::nullopt)
 {
   using data_t     = typename DatasetT::value_type;
   using cdataset_t = vpq_dataset<MathT, IdxT>;
@@ -495,11 +498,11 @@ void process_and_fill_codes(
       raft::make_device_matrix_view<uint8_t, IdxT>(
         codes.data_handle() + batch.offset() * codes_rowlen, batch.size(), codes_rowlen),
       batch_view,
-      vq_centers,
-      labels_view,
       pq_centers,
       kSharedMemorySize,
-      pq_bits);
+      pq_bits,
+      vq_centers,
+      labels_view);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
 }
@@ -666,12 +669,13 @@ template <uint32_t SubWarpSize,
           typename LabelT>
 __device__ auto compute_code_subspaces(
   raft::device_matrix_view<const DataT, IdxT, raft::row_major> dataset,
-  std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
   MathT* smem_dataset,
   IdxT row_ix,
   uint32_t j,
-  LabelT vq_label) -> CodeT
+  LabelT vq_label,
+  std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers =
+    std::nullopt) -> CodeT
 {
   static_assert(std::is_same_v<CodeT, uint8_t> || std::is_same_v<CodeT, uint16_t>,
                 "CodeT must be uint8_t or uint16_t");
@@ -781,10 +785,12 @@ template <uint32_t BlockSize,
 __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_subspaces_kernel(
   raft::device_matrix_view<uint8_t, IdxT, raft::row_major> out_codes,
   raft::device_matrix_view<const DataT, IdxT, raft::row_major> dataset,
-  std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers,
-  std::optional<raft::device_vector_view<const LabelT, IdxT, raft::row_major>> vq_labels,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
-  const uint32_t pq_bits)
+  const uint32_t pq_bits,
+  std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers =
+    std::nullopt,
+  std::optional<raft::device_vector_view<const LabelT, IdxT, raft::row_major>> vq_labels =
+    std::nullopt)
 {
   extern __shared__ __align__(256) uint8_t smem_buffer[];
   using subwarp_align = raft::Pow2<SubWarpSize>;
@@ -813,7 +819,7 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_subspaces_kernel
     auto pq_subspace_view    = raft::make_device_matrix_view(
       pq_centers.data_handle() + subspace_offset, (uint32_t)(1 << pq_bits), pq_centers.extent(1));
     CodeT code = compute_code_subspaces<SubWarpSize, CodeT>(
-      dataset, vq_centers, pq_subspace_view, smem_dataset, row_ix, j, vq_label);
+      dataset, pq_subspace_view, smem_dataset, row_ix, j, vq_label, vq_centers);
     if (lane_id == 0) { code_view[j] = code; }
   }
 }
@@ -823,9 +829,10 @@ void process_and_fill_codes_subspaces(
   const raft::resources& res,
   const vpq_params& params,
   const DatasetT& dataset,
-  std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
-  raft::device_matrix_view<uint8_t, IdxT, raft::row_major> codes)
+  raft::device_matrix_view<uint8_t, IdxT, raft::row_major> codes,
+  std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers =
+    std::nullopt)
 {
   using data_t     = typename DatasetT::value_type;
   using cdataset_t = vpq_dataset<MathT, IdxT>;
@@ -924,10 +931,10 @@ void process_and_fill_codes_subspaces(
       raft::make_device_matrix_view<uint8_t, IdxT>(
         codes.data_handle() + batch.offset() * codes_rowlen, batch.size(), codes_rowlen),
       batch_view,
-      vq_centers,
-      labels_view,
       pq_centers,
-      pq_bits);
+      pq_bits,
+      vq_centers,
+      labels_view);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
     vec_batches.prefetch_next_batch();
     raft::resource::sync_stream(res);
@@ -953,12 +960,13 @@ auto vpq_build(const raft::resources& res, const vpq_params& params, const Datas
                                                      ps.pq_dim * ps.pq_bits, 8 * sizeof(label_t)));
 
   auto codes = raft::make_device_matrix<uint8_t, IdxT, raft::row_major>(res, n_rows, codes_rowlen);
-  process_and_fill_codes<MathT, IdxT>(res,
-                                      ps,
-                                      dataset,
-                                      raft::make_const_mdspan(vq_code_book.view()),
-                                      raft::make_const_mdspan(pq_code_book.view()),
-                                      codes.view());
+  process_and_fill_codes<MathT, IdxT>(
+    res,
+    ps,
+    dataset,
+    raft::make_const_mdspan(pq_code_book.view()),
+    codes.view(),
+    std::make_optional(raft::make_const_mdspan(vq_code_book.view())));
 
   return vpq_dataset<MathT, IdxT>{
     std::move(vq_code_book), std::move(pq_code_book), std::move(codes)};
