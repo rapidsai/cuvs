@@ -34,8 +34,8 @@ cdef class IndexParams:
 
     Parameters
     ----------
-    hierarchy : string, default = "none" (optional)
-        The hierarchy of the HNSW index. Valid values are ["none", "cpu"].
+    hierarchy : string, default = "gpu" (optional)
+        The hierarchy of the HNSW index. Valid values are ["none", "cpu", "gpu"].
         - "none": No hierarchy is built.
         - "cpu": Hierarchy is built using CPU.
         - "gpu": Hierarchy is built using GPU.
@@ -61,7 +61,7 @@ cdef class IndexParams:
         check_cuvs(cuvsHnswIndexParamsDestroy(self.params))
 
     def __init__(self, *,
-                 hierarchy="none",
+                 hierarchy="gpu",
                  ef_construction=200,
                  num_threads=0):
         if hierarchy == "none":
@@ -72,7 +72,7 @@ cdef class IndexParams:
             self.params.hierarchy = cuvsHnswHierarchy.GPU
         else:
             raise ValueError("Invalid hierarchy type."
-                             " Valid values are 'none' and 'cpu'.")
+                             " Valid values are 'none', 'cpu', and 'gpu'.")
         self.params.ef_construction = ef_construction
         self.params.num_threads = num_threads
 
