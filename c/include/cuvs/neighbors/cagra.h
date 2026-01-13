@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -127,10 +127,10 @@ typedef struct cuvsIvfPqParams* cuvsIvfPqParams_t;
 
 /**
  * Parameters for ACE (Augmented Core Extraction) graph build.
- * ACE enables building indices for datasets too large to fit in GPU memory by:
+ * ACE enables building indexes for datasets too large to fit in GPU memory by:
  * 1. Partitioning the dataset in core (closest) and augmented (second-closest)
  * partitions using balanced k-means.
- * 2. Building sub-indices for each partition independently
+ * 2. Building sub-indexes for each partition independently
  * 3. Concatenating sub-graphs into a final unified index
  */
 struct cuvsAceParams {
@@ -234,22 +234,6 @@ cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionParams_t* param
  * @return cuvsError_t
  */
 cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t params);
-
-/**
- * @brief Allocate ACE params, and populate with default values
- *
- * @param[in] params cuvsAceParams_t to allocate
- * @return cuvsError_t
- */
-cuvsError_t cuvsAceParamsCreate(cuvsAceParams_t* params);
-
-/**
- * @brief De-allocate ACE params
- *
- * @param[in] params
- * @return cuvsError_t
- */
-cuvsError_t cuvsAceParamsDestroy(cuvsAceParams_t params);
 
 /**
  * @brief Allocate ACE params, and populate with default values
