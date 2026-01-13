@@ -147,8 +147,8 @@ void create_connectivity_graph(
 
   auto stream = raft::resource::get_cuda_stream(handle);
 
-  auto d_indices   = raft::make_device_matrix<int64_t>(handle, n_samples, k_search);
-  auto d_distances = raft::make_device_matrix<float>(handle, n_samples, k_search);
+  auto d_indices   = raft::make_device_matrix<int64_t, int64_t>(handle, n_samples, k_search);
+  auto d_distances = raft::make_device_matrix<float, int64_t>(handle, n_samples, k_search);
 
   cuvs::neighbors::all_neighbors::all_neighbors_params all_neighbors_params{
     .graph_build_params =
