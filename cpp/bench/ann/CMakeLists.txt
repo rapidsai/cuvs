@@ -1,6 +1,6 @@
 # =============================================================================
 # cmake-format: off
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 # =============================================================================
@@ -241,7 +241,6 @@ endif()
 if(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ)
   ConfigureAnnBench(
     NAME CUVS_IVF_PQ PATH src/cuvs/cuvs_benchmark.cu src/cuvs/cuvs_ivf_pq.cu LINKS cuvs
-    ivf_rabitq_lib
   )
 endif()
 
@@ -254,7 +253,7 @@ endif()
 if(CUVS_ANN_BENCH_USE_CUVS_IVF_RABITQ)
   ConfigureAnnBench(
     NAME CUVS_IVF_RABITQ PATH src/cuvs/cuvs_benchmark.cu src/cuvs/cuvs_ivf_rabitq.cu LINKS cuvs
-    ivf_rabitq_lib
+    ivf_rabitq
   )
 endif()
 
@@ -326,7 +325,7 @@ endif()
 if(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_RABITQ)
   ConfigureAnnBench(
     NAME FAISS_CPU_IVF_RABITQ PATH src/faiss/faiss_cpu_benchmark.cpp LINKS ${CUVS_FAISS_TARGETS}
-    cuvs ivf_rabitq_lib
+    cuvs ivf_rabitq
   )
 endif()
 
@@ -439,7 +438,7 @@ endif()
 if(CUVS_ANN_BENCH_USE_CUVS_IVF_RABITQ)
   add_executable(RABITQ_BENCH_TEST src/cuvs/cuvs_ivf_rabitq_test.cu)
 
-  target_link_libraries(RABITQ_BENCH_TEST PRIVATE ivf_rabitq_lib cuvs)
+  target_link_libraries(RABITQ_BENCH_TEST PRIVATE ivf_rabitq cuvs)
 
   target_include_directories(
     RABITQ_BENCH_TEST PUBLIC "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/include>"

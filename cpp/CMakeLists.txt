@@ -225,7 +225,7 @@ if(NOT BUILD_CPU_ONLY)
   target_link_libraries(cuvs_cpp_headers INTERFACE raft::raft rmm::rmm)
 
   add_library(
-    ivf_rabitq_lib STATIC
+    ivf_rabitq STATIC
     src/neighbors/ivf_rabitq/gpu_index/ivf_gpu.cu
     src/neighbors/ivf_rabitq/gpu_index/initializer_gpu.cu
     src/neighbors/ivf_rabitq/gpu_index/quantizer_gpu.cu
@@ -237,19 +237,19 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ivf_rabitq/utils/searcher_gpu_utils.cu
   )
 
-  target_link_libraries(ivf_rabitq_lib PRIVATE OpenMP::OpenMP_CXX CUDA::cudart raft::raft rmm)
+  target_link_libraries(ivf_rabitq PRIVATE OpenMP::OpenMP_CXX CUDA::cudart raft::raft rmm)
 
   target_include_directories(
-    ivf_rabitq_lib PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    ivf_rabitq PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   )
 
   target_compile_options(
-    ivf_rabitq_lib
+    ivf_rabitq
     PRIVATE $<$<COMPILE_LANGUAGE:CUDA>: $<$<CONFIG:Debug>:-G;-g> --extended-lambda
             --expt-relaxed-constexpr -Xcompiler=-fopenmp > $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>
   )
 
-  target_compile_definitions(ivf_rabitq_lib PRIVATE HIGH_ACC_FAST_SCAN)
+  target_compile_definitions(ivf_rabitq PRIVATE HIGH_ACC_FAST_SCAN)
 
   add_library(
     cuvs-cagra-search OBJECT
@@ -675,7 +675,7 @@ if(NOT BUILD_CPU_ONLY)
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
       PRIVATE $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> $<COMPILE_ONLY:nvidia::cutlass::cutlass>
-              $<COMPILE_ONLY:cuco::cuco> ivf_rabitq_lib
+              $<COMPILE_ONLY:cuco::cuco> ivf_rabitq
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
