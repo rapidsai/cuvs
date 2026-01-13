@@ -39,8 +39,6 @@ class BackendRegistry:
     def __init__(self):
         """Initialize the registry with an empty backend mapping."""
         self._backends: Dict[str, Type[BenchmarkBackend]] = {}
-        # Note: Built-in backends will be registered in Phase 2
-        # when we implement CppGoogleBenchmarkBackend
     
     def register(self, name: str, backend_class: Type[BenchmarkBackend]) -> None:
         """
@@ -373,3 +371,105 @@ def get_backend(name: str, config: Dict) -> BenchmarkBackend:
     registry = get_registry()
     return registry.get_backend(name, config)
 
+
+def get_backend_class(name: str) -> Type[BenchmarkBackend]:
+    """
+    Get the backend class (not instance) from the global registry.
+    
+    Parameters
+    ----------
+    name : str
+        Backend name
+        
+    Returns
+    -------
+    Type[BenchmarkBackend]
+        Backend class
+    """
+    registry = get_registry()
+    if name not in registry._backends:
+        available = ", ".join(registry._backends.keys())
+        raise ValueError(
+            f"Backend '{name}' not found. Available backends: {available or '(none)'}"
+        )
+    return registry._backends[name]
+
+
+def list_backends() -> Dict[str, Type[BenchmarkBackend]]:
+    """Return all registered backends."""
+    registry = get_registry()
+    return registry.list_backends()
+
+
+# ============================================================================
+# Config Loader Registry
+# ============================================================================
+
+# Simple module-level registry for config loaders
+# (Config loaders are simpler than backends, don't need full class-based registry)
+_CONFIG_LOADER_REGISTRY: Dict[str, Type] = {}
+
+
+def register_config_loader(name: str, loader_class: Type) -> None:
+    """
+    Register a config loader class.
+    
+    Parameters
+    ----------
+    name : str
+        Backend name (e.g., 'cpp_gbench', 'milvus')
+    loader_class : Type
+        Config loader class to register
+        
+    Examples
+    --------
+    >>> register_config_loader("cpp_gbench", CppGBenchConfigLoader)
+    """
+    _CONFIG_LOADER_REGISTRY[name] = loader_class
+    print(f"[Registry] Registered config loader: {name} ({loader_class.__name__})")
+
+
+def get_config_loader(name: str) -> Type:
+    """
+    Get a registered config loader class by name.
+    
+    Parameters
+    ----------
+    name : str
+        Backend name
+        
+    Returns
+    -------
+    Type
+        Config loader class
+        
+    Raises
+    ------
+    ValueError
+        If config loader is not registered
+    """
+    if name not in _CONFIG_LOADER_REGISTRY:
+        available = ", ".join(_CONFIG_LOADER_REGISTRY.keys()) or "none"
+        raise ValueError(
+            f"Unknown config loader for backend: '{name}'. Available: {available}"
+        )
+    return _CONFIG_LOADER_REGISTRY[name]
+
+
+def list_config_loaders() -> Dict[str, Type]:
+    """Return all registered config loaders."""
+    return dict(_CONFIG_LOADER_REGISTRY)
+
+
+# ============================================================================
+# Auto-register built-in backends
+# ============================================================================
+
+def _register_builtin_backends():
+    """Register built-in backends (CppGoogleBenchmarkBackend)."""
+    from .cpp_gbench import CppGoogleBenchmarkBackend
+    register_backend("cpp_gbench", CppGoogleBenchmarkBackend)
+
+
+# Auto-register when module is imported
+_register_builtin_backends()
