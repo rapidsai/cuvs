@@ -92,6 +92,19 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         BuildResult
             Build timing and metadata
         """
+        # Pre-flight check (GPU, network, etc.)
+        skip_reason = self._pre_flight_check()
+        if skip_reason:
+            return BuildResult(
+                index_path=str(index_path),
+                build_time_seconds=0.0,
+                index_size_bytes=0,
+                algorithm=self.algo,
+                build_params=build_params,
+                metadata={"skipped": True, "reason": skip_reason},
+                success=True
+            )
+        
         # Check if index exists and skip if not forcing
         if index_path.exists() and not force:
             return BuildResult(
@@ -289,6 +302,21 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         SearchResult
             Search timing, recall, and QPS
         """
+        # Pre-flight check (GPU, network, etc.)
+        skip_reason = self._pre_flight_check()
+        if skip_reason:
+            return SearchResult(
+                neighbors=np.array([]),
+                distances=np.array([]),
+                search_time_seconds=0.0,
+                queries_per_second=0.0,
+                recall=0.0,
+                algorithm=self.algo,
+                search_params=search_params,
+                metadata={"skipped": True, "reason": skip_reason},
+                success=True
+            )
+        
         # Note: runners.py doesn't validate and lets C++ fail. We validate here for
         # better Python-side error messages.
         # C++ requires: name, base_file, query_file, distance (see conf.hpp parse_dataset)
@@ -504,9 +532,4 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         algo = exec_name.replace("_ANN_BENCH", "").lower()
         return algo
     
-    @property
-    def supports_gpu(self) -> bool:
-        """Check if this backend uses GPU."""
-        algo_lower = self.algo.lower()
-        return "cuvs" in algo_lower or "faiss_gpu" in algo_lower
 

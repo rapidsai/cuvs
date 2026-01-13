@@ -297,33 +297,80 @@ class BenchmarkBackend(ABC):
         """
         pass
     
-    def initialize(self) -> None: # FIXME: Should this be implemented by subclasses `abstractmethod`?
+    def initialize(self) -> None:
         """
         Initialize backend (called once before any build/search operations).
         
+        Note: C++ backends handle initialization internally via subprocess.
+        
         Use this for:
-        - Establishing persistent connections (for database backends)
-        - Initializing CUDA contexts
-        - Loading shared resources
-        - Pre-allocating memory
+        - Establishing persistent connections (for network backends like Milvus)
+        - Loading shared resources (for Python-native backends)
+        - Pre-allocating memory pools
         
         Default implementation does nothing. Override if needed.
         """
         pass
     
-    def cleanup(self) -> None: # FIXME: Should this be implemented by subclasses?
+    def cleanup(self) -> None:
         """
         Clean up backend resources (called once after all benchmarks complete).
         
+        Note: C++ backends handle cleanup internally via subprocess.
+        
         Use this for:
-        - Closing database connections
-        - Releasing GPU memory
+        - Closing network connections (for backends like Milvus, Elasticsearch)
         - Deleting temporary files
-        - Freeing resources
+        - Freeing shared resources
         
         Default implementation does nothing. Override if needed.
         """
         pass
+    
+    def _check_gpu_available(self) -> bool:
+        """
+        Check if GPU is available (same logic as run.py rmm_present()).
+        
+        Returns
+        -------
+        bool
+            True if RMM/GPU is available, False otherwise
+        """
+        try:
+            import rmm  # noqa: F401
+            return True
+        except ImportError:
+            return False
+    
+    def _check_network_available(self) -> bool:
+        """
+        Check if network is available.
+        
+        Default returns False to ensure network backends implement their own check.
+        Network backends MUST override with actual connectivity checks.
+        
+        Returns
+        -------
+        bool
+            True if network is available, False otherwise
+        """
+        return False
+    
+    def _pre_flight_check(self) -> Optional[str]:
+        """
+        Run pre-flight checks before build/search operations.
+        
+        Returns
+        -------
+        Optional[str]
+            Skip reason if checks fail (e.g., "no_gpu", "no_network"),
+            None if all checks pass and operation should proceed.
+        """
+        if self.supports_gpu and not self._check_gpu_available():
+            return "no_gpu"
+        if self.requires_network and not self._check_network_available():
+            return "no_network"
+        return None
     
     @property
     def name(self) -> str:
@@ -367,26 +414,30 @@ class BenchmarkBackend(ABC):
         pass
     
     @property
-    def supports_gpu(self) -> bool: # FIXME: I think this should be implemented by subclasses.
+    def supports_gpu(self) -> bool:
         """
         Whether this backend uses GPU acceleration.
+        
+        Reads from config["requires_gpu"], matching algorithms.yaml structure.
         
         Returns
         -------
         bool
             True if backend uses GPU, False otherwise (default)
         """
-        return False
+        return self.config.get("requires_gpu", False)
     
     @property
-    def requires_network(self) -> bool: # FIXME: This will never be true for C++ backends and should be implemented by subclasses.
+    def requires_network(self) -> bool:
         """
         Whether this backend requires network connectivity.
+        
+        Reads from config["requires_network"], similar to supports_gpu.
         
         Returns
         -------
         bool
             True if backend needs network (e.g., remote VDB), False otherwise (default)
         """
-        return False
+        return self.config.get("requires_network", False)
 
