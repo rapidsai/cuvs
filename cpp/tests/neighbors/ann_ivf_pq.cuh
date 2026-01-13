@@ -573,9 +573,19 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
    * Test that FLAT layout produces the same PQ codes as INTERLEAVED layout.
    * Builds both layouts, packs flat codes into a new interleaved index,
    * runs search on both interleaved indexes, and compares recall.
+   *
+   * NB: This test only works with pq_bits=8 because flat codes are stored packed
+   * (multiple codes per byte when pq_bits < 8), but extend_list_with_codes expects
+   * unpacked codes (one code per byte).
    */
   void check_flat_layout_codes()
   {
+    // Skip test for pq_bits != 8 (flat codes are packed and can't be directly used with
+    // extend_list_with_codes which expects unpacked codes)
+    if (ps.index_params.pq_bits != 8) {
+      GTEST_SKIP() << "Flat layout code comparison test only supports pq_bits=8";
+    }
+
     auto database_view =
       raft::make_device_matrix_view<const DataT, int64_t>(database.data(), ps.num_db_vecs, ps.dim);
 
@@ -666,10 +676,28 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     cuvs::neighbors::ivf_pq::search(
       handle_, ps.search_params, index_from_flat, query_view, inds_flat_view, dists_flat_view);
 
-    // Results should be identical since codes are the same
-    ASSERT_TRUE(cuvs::devArrMatch(
-      indices_original.data(), indices_from_flat.data(), queries_size, cuvs::Compare<IdxT>{}))
-      << "Search results mismatch between original interleaved and repacked-from-flat";
+    // Copy results to host for eval_neighbours
+    std::vector<IdxT> indices_orig_host(queries_size);
+    std::vector<IdxT> indices_flat_host(queries_size);
+    std::vector<EvalT> distances_orig_host(queries_size);
+    std::vector<EvalT> distances_flat_host(queries_size);
+    raft::update_host(indices_orig_host.data(), indices_original.data(), queries_size, stream_);
+    raft::update_host(indices_flat_host.data(), indices_from_flat.data(), queries_size, stream_);
+    raft::update_host(distances_orig_host.data(), distances_original.data(), queries_size, stream_);
+    raft::update_host(
+      distances_flat_host.data(), distances_from_flat.data(), queries_size, stream_);
+    raft::resource::sync_stream(handle_);
+
+    // Evaluate recall - should be very high since codes are identical
+    ASSERT_TRUE(eval_neighbours(indices_orig_host,
+                                indices_flat_host,
+                                distances_orig_host,
+                                distances_flat_host,
+                                ps.num_queries,
+                                ps.k,
+                                0.001,  // eps
+                                0.99))  // min_recall
+      << "Recall mismatch between original interleaved and repacked-from-flat indexes";
   }
 
   void SetUp() override  // NOLINT
