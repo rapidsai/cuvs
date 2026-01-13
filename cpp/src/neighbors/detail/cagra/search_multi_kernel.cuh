@@ -118,6 +118,8 @@ RAFT_KERNEL random_pickup_kernel(
   if (global_team_index >= num_pickup) { return; }
   extern __shared__ uint8_t smem[];
   dataset_desc = dataset_desc->setup_workspace(smem, queries_ptr, query_id);
+  // Set the resulting random index limit to the modulo wrap value if it is set
+  INDEX_T seed_index_limit = mod_wrap > 0 ? mod_wrap : dataset_desc->size;
   __syncthreads();
 
   const INDEX_T seed_index_limit = graph_size > 0 ? graph_size : dataset_desc->size;

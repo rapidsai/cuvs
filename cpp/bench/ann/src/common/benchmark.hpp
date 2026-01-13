@@ -647,6 +647,7 @@ inline auto run_main(int argc, char** argv) -> int
   char* conf_path = argv[--argc];
   std::ifstream conf_stream(conf_path);
 
+
   for (int i = 1; i < argc; i++) {
     if (parse_bool_flag(argv[i], "--force", force_overwrite) ||
         parse_bool_flag(argv[i], "--build", build_mode) ||

@@ -1972,6 +1972,62 @@ struct mmap_owner {
   size_t size_;
 };
 
+template <typename T, typename IdxT>
+void search_and_optimize(raft::resources const& res,
+                         const cuvs::neighbors::cagra::search_params& search_params,
+                         const index<T, IdxT>& idx,
+                         raft::device_matrix_view<const T, int64_t> dev_query_view,
+                         raft::device_matrix_view<IdxT, int64_t> dev_neighbors,
+                         raft::device_matrix_view<float, int64_t> dev_distances,
+                         raft::host_matrix_view<IdxT, int64_t> neighbors_view,
+                         raft::host_matrix<IdxT, int64_t>& cagra_graph,
+                         size_t curr_query_size,
+                         size_t next_graph_degree,
+                         size_t curr_topk,
+                         uint64_t max_chunk_size,
+                         bool flag_last,
+                         const index_params& params)
+{
+  // Search.
+  // Since there are many queries, divide them into batches and search them.
+  cuvs::spatial::knn::detail::utils::batch_load_iterator<T> query_batch(
+    dev_query_view.data_handle(),
+    curr_query_size,
+    dev_query_view.extent(1),
+    max_chunk_size,
+    raft::resource::get_cuda_stream(res),
+    raft::resource::get_workspace_resource(res));
+  for (const auto& batch : query_batch) {
+    auto batch_dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
+      batch.data(), batch.size(), dev_query_view.extent(1));
+    auto batch_dev_neighbors_view = raft::make_device_matrix_view<IdxT, int64_t>(
+      dev_neighbors.data_handle(), batch.size(), curr_topk);
+    auto batch_dev_distances_view = raft::make_device_matrix_view<float, int64_t>(
+      dev_distances.data_handle(), batch.size(), curr_topk);
+
+    cuvs::neighbors::cagra::search(res,
+                                   search_params,
+                                   idx,
+                                   batch_dev_query_view,
+                                   batch_dev_neighbors_view,
+                                   batch_dev_distances_view);
+
+    auto batch_neighbors_view = raft::make_host_matrix_view<IdxT, int64_t>(
+      neighbors_view.data_handle() + batch.offset() * curr_topk, batch.size(), curr_topk);
+    raft::copy(batch_neighbors_view.data_handle(),
+               batch_dev_neighbors_view.data_handle(),
+               batch_neighbors_view.size(),
+               raft::resource::get_cuda_stream(res));
+  }
+
+  // Optimize graph
+  auto next_graph_size = curr_query_size;
+  cagra_graph          = raft::make_host_matrix<IdxT, int64_t>(0, 0);  // delete existing grahp
+  cagra_graph = raft::make_host_matrix<IdxT, int64_t>(next_graph_size, next_graph_degree);
+  optimize<IdxT>(
+    res, neighbors_view, cagra_graph.view(), flag_last ? params.guarantee_connectivity : 0);
+}
+
 template <typename T,
           typename IdxT = uint32_t,
           typename Accessor =
@@ -2062,6 +2118,24 @@ auto iterative_build_graph(
 
   bool flag_last       = false;
   auto curr_graph_size = initial_graph_size;
+
+  // Generate the compressed index once if compression is enabled
+  std::optional<index<T, IdxT>> idx_opt;
+  if (params.compression.has_value()) {
+    auto start = std::chrono::high_resolution_clock::now();
+    RAFT_EXPECTS(params.metric == cuvs::distance::DistanceType::L2Expanded,
+      "VPQ compression is only supported with L2Expanded distance mertric");
+    idx_opt.emplace(res, params.metric);
+    //idx_opt->update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
+    idx_opt->update_dataset(
+    res,
+    // TODO: hardcoding codebook math to `half`, we can do runtime dispatching later
+    cuvs::neighbors::vpq_build<decltype(dev_dataset), half, int64_t>(
+    res, *params.compression, dev_dataset));
+    auto end = std::chrono::high_resolution_clock::now();
+    auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    RAFT_LOG_INFO("# VPQ compression time: %.3lf sec", (double)elapsed_ms / 1000);
+  }
   while (true) {
     auto start           = std::chrono::high_resolution_clock::now();
     auto curr_query_size = std::min(2 * curr_graph_size, final_graph_size);
@@ -2097,9 +2171,13 @@ auto iterative_build_graph(
     // search results (neighbors).
     auto dev_dataset_view = raft::make_device_matrix_view<const T, int64_t>(
       dev_dataset.data_handle(), (int64_t)curr_graph_size, dev_dataset.extent(1));
-
-    auto idx = index<T, IdxT>(
-      res, params.metric, dev_dataset_view, raft::make_const_mdspan(cagra_graph.view()));
+    // No compression, create mdspan index
+    if (!params.compression.has_value()) {
+      idx_opt.emplace(res, params.metric, dev_dataset_view, raft::make_const_mdspan(cagra_graph.view()));
+    } else {
+      idx_opt->update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
+    }
+    const auto& idx = *idx_opt;
 
     auto dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
       dev_dataset.data_handle(), (int64_t)curr_query_size, dev_dataset.extent(1));
@@ -2107,44 +2185,22 @@ auto iterative_build_graph(
     auto neighbors_view =
       raft::make_host_matrix_view<IdxT, int64_t>(neighbors_ptr, curr_query_size, curr_topk);
 
-    // Search.
-    // Since there are many queries, divide them into batches and search them.
-    cuvs::spatial::knn::detail::utils::batch_load_iterator<T> query_batch(
-      dev_query_view.data_handle(),
-      curr_query_size,
-      dev_query_view.extent(1),
-      max_chunk_size,
-      raft::resource::get_cuda_stream(res),
-      raft::resource::get_workspace_resource(res));
-    for (const auto& batch : query_batch) {
-      auto batch_dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
-        batch.data(), batch.size(), dev_query_view.extent(1));
-      auto batch_dev_neighbors_view = raft::make_device_matrix_view<IdxT, int64_t>(
-        dev_neighbors.data_handle(), batch.size(), curr_topk);
-      auto batch_dev_distances_view = raft::make_device_matrix_view<float, int64_t>(
-        dev_distances.data_handle(), batch.size(), curr_topk);
+    
 
-      cuvs::neighbors::cagra::search(res,
-                                     search_params,
-                                     idx,
-                                     batch_dev_query_view,
-                                     batch_dev_neighbors_view,
-                                     batch_dev_distances_view);
-
-      auto batch_neighbors_view = raft::make_host_matrix_view<IdxT, int64_t>(
-        neighbors_view.data_handle() + batch.offset() * curr_topk, batch.size(), curr_topk);
-      raft::copy(batch_neighbors_view.data_handle(),
-                 batch_dev_neighbors_view.data_handle(),
-                 batch_neighbors_view.size(),
-                 raft::resource::get_cuda_stream(res));
-    }
-
-    // Optimize graph
-    auto next_graph_size = curr_query_size;
-    cagra_graph          = raft::make_host_matrix<IdxT, int64_t>(0, 0);  // delete existing grahp
-    cagra_graph = raft::make_host_matrix<IdxT, int64_t>(next_graph_size, next_graph_degree);
-    optimize<IdxT>(
-      res, neighbors_view, cagra_graph.view(), flag_last ? params.guarantee_connectivity : 0);
+    search_and_optimize(res,
+                        search_params,
+                        idx,
+                        dev_query_view,
+                        dev_neighbors.view(),
+                        dev_distances.view(),
+                        neighbors_view,
+                        cagra_graph,
+                        curr_query_size,
+                        next_graph_degree,
+                        curr_topk,
+                        max_chunk_size,
+                        flag_last,
+                        params);
 
     auto end        = std::chrono::high_resolution_clock::now();
     auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -2152,6 +2208,7 @@ auto iterative_build_graph(
 
     if (flag_last) { break; }
     flag_last       = (curr_graph_size == final_graph_size);
+    auto next_graph_size = curr_query_size;
     curr_graph_size = next_graph_size;
   }
 

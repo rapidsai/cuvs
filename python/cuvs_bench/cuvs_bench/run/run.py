@@ -637,6 +637,8 @@ def run_benchmark(
     conf_file = prepare_conf_file(dataset_conf, subset_size, count, batch_size)
     algos_conf_fs = gather_algorithm_configs(scripts_path, configuration)
 
+    
+
     allowed_algos = algorithms.split(",") if algorithms else None
     allowed_groups = groups.split(",") if groups else None
     allowed_algo_groups = (

@@ -153,6 +153,7 @@ void search_main(raft::resources const& res,
   if (auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index.data());
       strided_dset != nullptr) {
     // Search using a plain (strided) row-major dataset
+    RAFT_LOG_INFO("Searching with strided dataset");
     RAFT_EXPECTS(index.metric() != cuvs::distance::DistanceType::CosineExpanded ||
                    index.dataset_norms().has_value(),
                  "Dataset norms must be provided for CosineExpanded metric");
@@ -179,6 +180,7 @@ void search_main(raft::resources const& res,
     RAFT_FAIL("FP32 VPQ dataset support is coming soon");
   } else if (auto* vpq_dset = dynamic_cast<const vpq_dataset<half, ds_idx_type>*>(&index.data());
              vpq_dset != nullptr) {
+    RAFT_LOG_INFO("Searching with VPQ dataset");
     auto desc = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
       res, params, *vpq_dset, index.metric(), nullptr);
     search_main_core<T, graph_idx_type, DistanceT, CagraSampleFilterT, IdxT, OutputIdxT>(
