@@ -743,7 +743,6 @@ struct list : public list_base<typename SpecT<SizeT, SpecExtraArgs...>::value_ty
   /** Allocate a new list capable of holding at least `n_rows` data records and indices. */
   list(raft::resources const& res, const spec_type& spec, size_type n_rows);
 
-  /** Implement list_base interface. */
   value_type* data_ptr() noexcept override { return data.data_handle(); }
   const value_type* data_ptr() const noexcept override { return data.data_handle(); }
 
@@ -753,7 +752,7 @@ struct list : public list_base<typename SpecT<SizeT, SpecExtraArgs...>::value_ty
   size_type get_size() const noexcept override { return size.load(); }
   void set_size(size_type new_size) noexcept override { size.store(new_size); }
 
-  size_t data_byte_size() const noexcept override { return data.size(); }
+  size_t data_byte_size() const noexcept override { return data.size() * sizeof(value_type); }
   size_type indices_capacity() const noexcept override { return indices.extent(0); }
 };
 

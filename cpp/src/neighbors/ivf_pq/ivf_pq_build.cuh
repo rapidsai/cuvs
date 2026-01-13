@@ -737,7 +737,7 @@ void encode_list_data(raft::resources const& res,
       }
     }(index->pq_bits());
     kernel<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
-      index->lists()[label]->data(),
+      index->lists()[label]->data_ptr(),
       new_vectors_residual.view(),
       index->pq_centers(),
       index->codebook_kind(),
@@ -755,7 +755,7 @@ void encode_list_data(raft::resources const& res,
         default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
       }
     }(index->pq_bits());
-    auto typed_list = std::static_pointer_cast<list_data<IdxT>>(index->lists()[label]);
+    auto typed_list = std::static_pointer_cast<list_data_interleaved<IdxT>>(index->lists()[label]);
     kernel<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
       typed_list->data.view(),
       new_vectors_residual.view(),
@@ -996,7 +996,7 @@ void extend(raft::resources const& handle,
   // Try to allocate an index with the same parameters and the projected new size
   // (which can be slightly larger than index->size() + n_rows, due to padding for interleaved).
   // If this fails, the index would be too big to fit in the device anyway.
-  std::optional<list_data<IdxT, size_t>> placeholder_list_interleaved;
+  std::optional<list_data_interleaved<IdxT, size_t>> placeholder_list_interleaved;
   std::optional<raft::device_matrix<uint8_t, IdxT, raft::row_major>> placeholder_list_flat;
   if (index->codes_layout() == list_layout::FLAT) {
     auto spec = list_spec_flat<uint32_t, IdxT>{

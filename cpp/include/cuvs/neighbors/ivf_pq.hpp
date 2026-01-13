@@ -293,7 +293,7 @@ list_spec_interleaved<SizeT, IdxT>::make_list_extents(SizeT n_rows) const
 }
 
 template <typename IdxT, typename SizeT = uint32_t>
-using list_data = ivf::list<list_spec_interleaved, SizeT, IdxT>;
+using list_data_interleaved = ivf::list<list_spec_interleaved, SizeT, IdxT>;
 
 /**
  * Flat (non-interleaved) storage specification for PQ-encoded data.
