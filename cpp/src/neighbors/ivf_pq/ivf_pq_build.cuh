@@ -1490,7 +1490,7 @@ auto extend(
                 n_rows);
 }
 
-// In-place extend for base class pointer (clones, extends, moves back)
+// True in-place extend (does not clone the index)
 template <typename T, typename IdxT, typename accessor, typename accessor2>
 void extend(
   raft::resources const& handle,
@@ -1508,11 +1508,12 @@ void extend(
            "new_vectors and new_indices have different number of rows");
   }
 
-  *index = extend(handle,
-                  *index,
-                  new_vectors.data_handle(),
-                  new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
-                  n_rows);
+  // Call the true in-place extend (line 972) instead of clone-and-replace
+  extend(handle,
+         index,
+         new_vectors.data_handle(),
+         new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
+         n_rows);
 }
 
 template <typename IdxT>

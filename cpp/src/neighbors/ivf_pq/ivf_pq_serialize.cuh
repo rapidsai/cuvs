@@ -79,8 +79,7 @@ void serialize(raft::resources const& handle_, std::ostream& os, const index<Idx
     auto list_store_spec =
       list_spec_interleaved<uint32_t, IdxT>{index.pq_bits(), index.pq_dim(), true};
     for (uint32_t label = 0; label < index.n_lists(); label++) {
-      auto& typed_list =
-        static_cast<const list_data_interleaved<IdxT>&>(*index.lists()[label]);
+      auto& typed_list = static_cast<const list_data_interleaved<IdxT>&>(*index.lists()[label]);
       ivf::serialize_list(handle_, os, typed_list, list_store_spec, sizes_host(label));
     }
   }

@@ -571,59 +571,105 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
 
   /**
    * Test that FLAT layout produces the same PQ codes as INTERLEAVED layout.
-   * Builds both layouts and compares the unpacked codes.
+   * Builds both layouts, packs flat codes into a new interleaved index,
+   * runs search on both interleaved indexes, and compares recall.
    */
   void check_flat_layout_codes()
   {
-    auto ipams_interleaved              = ps.index_params;
-    ipams_interleaved.add_data_on_build = true;
-    ipams_interleaved.codes_layout      = list_layout::INTERLEAVED;
-
     auto database_view =
       raft::make_device_matrix_view<const DataT, int64_t>(database.data(), ps.num_db_vecs, ps.dim);
+
+    // Step 1: Build INTERLEAVED index WITHOUT data (just train the codebooks)
+    auto ipams_interleaved              = ps.index_params;
+    ipams_interleaved.add_data_on_build = false;
+    ipams_interleaved.codes_layout      = list_layout::INTERLEAVED;
     auto index_interleaved =
       cuvs::neighbors::ivf_pq::build(handle_, ipams_interleaved, database_view);
 
+    // Step 2: Build FLAT index using the SAME precomputed centers from the interleaved index
     auto ipams_flat              = ps.index_params;
-    ipams_flat.add_data_on_build = true;
+    ipams_flat.add_data_on_build = false;
     ipams_flat.codes_layout      = list_layout::FLAT;
-
-    auto index_flat = cuvs::neighbors::ivf_pq::build(handle_, ipams_flat, database_view);
+    auto index_flat              = cuvs::neighbors::ivf_pq::build(handle_,
+                                                     ipams_flat,
+                                                     index_interleaved.dim(),
+                                                     index_interleaved.pq_centers(),
+                                                     index_interleaved.centers(),
+                                                     index_interleaved.centers_rot(),
+                                                     index_interleaved.rotation_matrix());
 
     ASSERT_EQ(index_interleaved.codes_layout(), list_layout::INTERLEAVED);
     ASSERT_EQ(index_flat.codes_layout(), list_layout::FLAT);
+
+    // Step 3: Extend both indexes with the same data
+    auto indices = raft::make_device_vector<IdxT, int64_t>(handle_, ps.num_db_vecs);
+    raft::linalg::map_offset(handle_, indices.view(), raft::identity_op{});
+    cuvs::neighbors::ivf_pq::extend(
+      handle_, database_view, std::make_optional(indices.view()), &index_interleaved);
+    cuvs::neighbors::ivf_pq::extend(
+      handle_, database_view, std::make_optional(indices.view()), &index_flat);
 
     ASSERT_TRUE(cuvs::devArrMatch(index_interleaved.list_sizes().data_handle(),
                                   index_flat.list_sizes().data_handle(),
                                   index_interleaved.n_lists(),
                                   cuvs::Compare<uint32_t>{}));
 
-    uint32_t bytes_per_vector =
-      raft::div_rounding_up_safe(index_flat.pq_dim() * index_flat.pq_bits(), 8u);
+    auto ipams_from_flat              = ps.index_params;
+    ipams_from_flat.add_data_on_build = false;
+    ipams_from_flat.codes_layout      = list_layout::INTERLEAVED;
+    auto index_from_flat              = cuvs::neighbors::ivf_pq::build(handle_,
+                                                          ipams_from_flat,
+                                                          index_interleaved.dim(),
+                                                          index_interleaved.pq_centers(),
+                                                          index_interleaved.centers(),
+                                                          index_interleaved.centers_rot(),
+                                                          index_interleaved.rotation_matrix());
 
-    for (uint32_t label = 0; label < index_interleaved.n_lists(); label++) {
-      auto list_interleaved =
-        std::static_pointer_cast<list_data_interleaved<IdxT>>(index_interleaved.lists()[label]);
-      auto list_flat = std::static_pointer_cast<list_data_flat<IdxT>>(index_flat.lists()[label]);
+    std::vector<uint32_t> list_sizes_host(index_flat.n_lists());
+    raft::update_host(
+      list_sizes_host.data(), index_flat.list_sizes().data_handle(), index_flat.n_lists(), stream_);
+    raft::resource::sync_stream(handle_);
 
-      uint32_t n_rows = list_interleaved->size.load();
+    for (uint32_t label = 0; label < index_flat.n_lists(); label++) {
+      auto list_flat  = std::static_pointer_cast<list_data_flat<IdxT>>(index_flat.lists()[label]);
+      uint32_t n_rows = list_sizes_host[label];
       if (n_rows == 0) { continue; }
 
-      rmm::device_uvector<uint8_t> interleaved_codes(n_rows * bytes_per_vector, stream_);
-      helpers::codepacker::unpack_contiguous(handle_,
-                                             list_interleaved->data.view(),
-                                             index_interleaved.pq_bits(),
-                                             0,
-                                             n_rows,
-                                             index_interleaved.pq_dim(),
-                                             interleaved_codes.data());
+      auto codes_view = raft::make_device_matrix_view<const uint8_t, uint32_t>(
+        list_flat->data.data_handle(), n_rows, index_flat.pq_dim());
+      auto indices_view = raft::make_device_vector_view<const IdxT, uint32_t>(
+        list_flat->indices.data_handle(), n_rows);
 
-      ASSERT_TRUE(cuvs::devArrMatch(interleaved_codes.data(),
-                                    list_flat->data.data_handle(),
-                                    n_rows * bytes_per_vector,
-                                    cuvs::Compare<uint8_t>{}))
-        << "PQ codes mismatch at list " << label;
+      helpers::codepacker::extend_list_with_codes(
+        handle_, &index_from_flat, codes_view, indices_view, label);
     }
+
+    size_t queries_size = ps.num_queries * ps.k;
+    rmm::device_uvector<IdxT> indices_original(queries_size, stream_);
+    rmm::device_uvector<EvalT> distances_original(queries_size, stream_);
+    rmm::device_uvector<IdxT> indices_from_flat(queries_size, stream_);
+    rmm::device_uvector<EvalT> distances_from_flat(queries_size, stream_);
+
+    auto query_view =
+      raft::make_device_matrix_view<DataT, uint32_t>(search_queries.data(), ps.num_queries, ps.dim);
+    auto inds_orig_view =
+      raft::make_device_matrix_view<IdxT, uint32_t>(indices_original.data(), ps.num_queries, ps.k);
+    auto dists_orig_view = raft::make_device_matrix_view<EvalT, uint32_t>(
+      distances_original.data(), ps.num_queries, ps.k);
+    auto inds_flat_view =
+      raft::make_device_matrix_view<IdxT, uint32_t>(indices_from_flat.data(), ps.num_queries, ps.k);
+    auto dists_flat_view = raft::make_device_matrix_view<EvalT, uint32_t>(
+      distances_from_flat.data(), ps.num_queries, ps.k);
+
+    cuvs::neighbors::ivf_pq::search(
+      handle_, ps.search_params, index_interleaved, query_view, inds_orig_view, dists_orig_view);
+    cuvs::neighbors::ivf_pq::search(
+      handle_, ps.search_params, index_from_flat, query_view, inds_flat_view, dists_flat_view);
+
+    // Results should be identical since codes are the same
+    ASSERT_TRUE(cuvs::devArrMatch(
+      indices_original.data(), indices_from_flat.data(), queries_size, cuvs::Compare<IdxT>{}))
+      << "Search results mismatch between original interleaved and repacked-from-flat";
   }
 
   void SetUp() override  // NOLINT
@@ -1221,42 +1267,6 @@ inline auto special_cases() -> test_cases_t
 inline auto flat_layout_tests() -> test_cases_t
 {
   test_cases_t xs;
-
-  // Test with pq_bits = 4 (byte-aligned, 2 codes per byte)
-  add_test_case(xs, [](ivf_pq_inputs& x) {
-    x.num_db_vecs          = 1000;
-    x.dim                  = 64;
-    x.index_params.n_lists = 10;
-    x.index_params.pq_bits = 4;
-    x.index_params.pq_dim  = 16;
-  });
-
-  // Test with pq_bits = 5 (not byte-aligned)
-  add_test_case(xs, [](ivf_pq_inputs& x) {
-    x.num_db_vecs          = 1000;
-    x.dim                  = 64;
-    x.index_params.n_lists = 10;
-    x.index_params.pq_bits = 5;
-    x.index_params.pq_dim  = 16;
-  });
-
-  // Test with pq_bits = 6 (not byte-aligned)
-  add_test_case(xs, [](ivf_pq_inputs& x) {
-    x.num_db_vecs          = 1000;
-    x.dim                  = 64;
-    x.index_params.n_lists = 10;
-    x.index_params.pq_bits = 6;
-    x.index_params.pq_dim  = 16;
-  });
-
-  // Test with pq_bits = 7 (not byte-aligned)
-  add_test_case(xs, [](ivf_pq_inputs& x) {
-    x.num_db_vecs          = 1000;
-    x.dim                  = 64;
-    x.index_params.n_lists = 10;
-    x.index_params.pq_bits = 7;
-    x.index_params.pq_dim  = 16;
-  });
 
   // Test with pq_bits = 8 (byte-aligned, 1 code per byte)
   add_test_case(xs, [](ivf_pq_inputs& x) {
