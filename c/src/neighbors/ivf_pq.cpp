@@ -196,8 +196,16 @@ void _get_list_indices(cuvsIvfPqIndex index,
                        uint32_t label,
                        DLManagedTensor* out_labels)
 {
-  auto index_ptr    = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
-  cuvs::core::to_dlpack(index_ptr->lists()[label]->indices.view(), out_labels);
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
+  if (index_ptr->codes_layout() == cuvs::neighbors::ivf_pq::list_layout::FLAT) {
+    auto& list =
+      static_cast<cuvs::neighbors::ivf_pq::list_data_flat<IdxT>&>(*index_ptr->lists()[label]);
+    cuvs::core::to_dlpack(list.indices.view(), out_labels);
+  } else {
+    auto& list = static_cast<cuvs::neighbors::ivf_pq::list_data_interleaved<IdxT>&>(
+      *index_ptr->lists()[label]);
+    cuvs::core::to_dlpack(list.indices.view(), out_labels);
+  }
 }
 }  // namespace
 

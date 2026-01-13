@@ -857,7 +857,7 @@ auto extend_list_prepare(
     ivf::resize_list(res, typed_list, spec, new_size, offset);
     list_data_base_ptr = typed_list;
   }
-  raft::copy(list_data_base_ptr->indices() + offset,
+  raft::copy(list_data_base_ptr->indices_ptr() + offset,
              new_indices.data_handle(),
              n_rows,
              raft::resource::get_cuda_stream(res));
