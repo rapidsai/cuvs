@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
@@ -128,8 +128,8 @@ cdef class AceParams:
     """
     Parameters for ACE (Augmented Core Extraction) graph building algorithm.
 
-    ACE enables building indices for datasets too large to fit in GPU memory by
-    partitioning the dataset using balanced k-means and building sub-indices
+    ACE enables building indexes for datasets too large to fit in GPU memory by
+    partitioning the dataset using balanced k-means and building sub-indexes
     for each partition independently.
 
     Parameters
