@@ -793,10 +793,10 @@ void ace_load_partition_dataset_from_disk(
 }
 
 // Build CAGRA index using ACE (Augmented Core Extraction) partitioning
-// ACE enables building indices for datasets too large to fit in GPU memory by:
+// ACE enables building indexes for datasets too large to fit in GPU memory by:
 // 1. Partitioning the dataset using balanced k-means in core (non-overlapping) and augmented
 // (second-closest) partitions
-// 2. Building sub-indices for each partition independently
+// 2. Building sub-indexes for each partition independently
 // 3. Concatenating sub-graphs (of core partitions) into a final unified index
 // Supports both in-memory and disk-based modes depending on available host memory.
 // In disk mode, the graph is stored in build_dir and dataset is reordered on disk.
