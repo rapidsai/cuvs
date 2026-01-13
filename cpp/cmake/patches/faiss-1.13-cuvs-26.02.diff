@@ -1,5 +1,5 @@
 diff --git a/faiss/gpu/impl/CuvsIVFPQ.cu b/faiss/gpu/impl/CuvsIVFPQ.cu
-index 1e2fef225..35b388147 100644
+index 1e2fef225..571e49293 100644
 --- a/faiss/gpu/impl/CuvsIVFPQ.cu
 +++ b/faiss/gpu/impl/CuvsIVFPQ.cu
 @@ -129,8 +129,14 @@ void CuvsIVFPQ::updateQuantizer(Index* quantizer) {
@@ -122,6 +122,15 @@ index 1e2fef225..35b388147 100644
      }
 
      setPQCentroids_();
+@@ -404,7 +467,7 @@ void CuvsIVFPQ::copyInvertedListsFrom(const InvertedLists* ivf) {
+     auto& cuvs_index_lists = cuvs_index->lists();
+
+     // conservative memory alloc for cloning cpu inverted lists
+-    cuvs::neighbors::ivf_pq::list_spec<uint32_t, idx_t> ivf_list_spec{
++    cuvs::neighbors::ivf_pq::list_spec_interleaved<uint32_t, idx_t> ivf_list_spec{
+             static_cast<uint32_t>(bitsPerSubQuantizer_),
+             static_cast<uint32_t>(numSubQuantizers_),
+             true};
 @@ -520,7 +583,7 @@ void CuvsIVFPQ::setPQCentroids_() {
      auto stream = resources_->getDefaultStreamCurrentDevice();
 
