@@ -755,7 +755,7 @@ void encode_list_data(raft::resources const& res,
         default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
       }
     }(index->pq_bits());
-    auto typed_list = std::static_pointer_cast<list_data_interleaved<IdxT>>(index->lists()[label]);
+    auto typed_list = std::static_pointer_cast<list_data<IdxT>>(index->lists()[label]);
     kernel<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
       typed_list->data.view(),
       new_vectors_residual.view(),
@@ -847,7 +847,7 @@ auto extend_list_prepare(
   if (index->codes_layout() == list_layout::FLAT) {
     auto spec = list_spec_flat<uint32_t, IdxT>{
       index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
-    auto typed_list = std::static_pointer_cast<list_data_flat_ext<IdxT>>(list_data_base_ptr);
+    auto typed_list = std::static_pointer_cast<list_data_flat<IdxT>>(list_data_base_ptr);
     ivf::resize_list(res, typed_list, spec, new_size, offset);
     list_data_base_ptr = typed_list;
   } else {
@@ -1144,7 +1144,7 @@ void extend(raft::resources const& handle,
         index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
       for (uint32_t label = 0; label < n_clusters; label++) {
         auto& list_data_base_ptr = index->lists()[label];
-        auto typed_list = std::static_pointer_cast<list_data_flat_ext<IdxT>>(list_data_base_ptr);
+        auto typed_list = std::static_pointer_cast<list_data_flat<IdxT>>(list_data_base_ptr);
         ivf::resize_list(
           handle, typed_list, spec, new_cluster_sizes[label], old_cluster_sizes[label]);
         list_data_base_ptr = typed_list;

@@ -605,7 +605,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
       auto list_interleaved =
         std::static_pointer_cast<list_data_interleaved<IdxT>>(index_interleaved.lists()[label]);
       auto list_flat =
-        std::static_pointer_cast<list_data_flat_ext<IdxT>>(index_flat.lists()[label]);
+        std::static_pointer_cast<list_data_flat<IdxT>>(index_flat.lists()[label]);
 
       uint32_t n_rows = list_interleaved->size.load();
       if (n_rows == 0) { continue; }

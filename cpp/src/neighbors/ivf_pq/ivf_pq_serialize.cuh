@@ -73,7 +73,7 @@ void serialize(raft::resources const& handle_, std::ostream& os, const index<Idx
     auto list_store_spec = list_spec_flat<uint32_t, IdxT>{index.pq_bits(), index.pq_dim(), true};
     for (uint32_t label = 0; label < index.n_lists(); label++) {
       auto typed_list =
-        std::static_pointer_cast<const list_data_flat_ext<IdxT>>(index.lists()[label]);
+        std::static_pointer_cast<const list_data_flat<IdxT>>(index.lists()[label]);
       ivf::serialize_list(handle_, os, typed_list, list_store_spec, sizes_host(label));
     }
   } else {
@@ -160,7 +160,7 @@ auto deserialize(raft::resources const& handle_, std::istream& is) -> index<IdxT
     auto list_device_spec = list_spec_flat<uint32_t, IdxT>{pq_bits, pq_dim, cma};
     auto list_store_spec  = list_spec_flat<uint32_t, IdxT>{pq_bits, pq_dim, true};
     for (auto& list_data_base_ptr : impl->lists()) {
-      std::shared_ptr<list_data_flat_ext<IdxT>> typed_list;
+      std::shared_ptr<list_data_flat<IdxT>> typed_list;
       ivf::deserialize_list(handle_, is, typed_list, list_store_spec, list_device_spec);
       list_data_base_ptr = typed_list;
     }
