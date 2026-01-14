@@ -843,6 +843,9 @@ auto extend_list_prepare(
   uint32_t new_size = offset + n_rows;
   raft::copy(
     index->list_sizes().data_handle() + label, &new_size, 1, raft::resource::get_cuda_stream(res));
+  // NOTE: We use static_pointer_cast here because resize_list requires the concrete list type
+  //   to access the spec_type for creating new allocations with proper layout. The base class
+  //   `list_data_base` doesn't carry the spec information needed to instantiate new lists.
   auto& list_data_base_ptr = index->lists()[label];
   if (index->codes_layout() == list_layout::FLAT) {
     auto spec = list_spec_flat<uint32_t, IdxT>{
@@ -1139,6 +1142,8 @@ void extend(raft::resources const& handle,
     raft::copy(new_cluster_sizes.data(), list_sizes, n_clusters, stream);
     raft::copy(old_cluster_sizes.data(), orig_list_sizes.data(), n_clusters, stream);
     raft::resource::sync_stream(handle);
+    // NOTE: We use static_pointer_cast here because resize_list requires the concrete list type
+    // to access the spec_type for creating new allocations with proper layout.
     if (index->codes_layout() == list_layout::FLAT) {
       auto spec = list_spec_flat<uint32_t, IdxT>{
         index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};

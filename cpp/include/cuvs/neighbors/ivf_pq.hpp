@@ -3167,9 +3167,11 @@ void extract_centers(raft::resources const& res,
  *   ivf_pq::helpers::reset_index(res, &index);
  *   // resize the first IVF list to hold 5 records
  *   auto spec = list_spec_interleaved<uint32_t, int64_t>{
- *     index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
+ *     index.pq_bits(), index.pq_dim(), index.conservative_memory_allocation()};
+ *   auto list = std::static_pointer_cast<list_data_interleaved<int64_t>>(index.lists()[0]);
  *   uint32_t new_size = 5;
  *   ivf::resize_list(res, list, spec, new_size, 0);
+ *   index.lists()[0] = list;
  *   raft::update_device(index.list_sizes(), &new_size, 1, stream);
  *   // recompute the internal state of the index
  *   ivf_pq::helpers::recompute_internal_state(res, index);

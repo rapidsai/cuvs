@@ -69,6 +69,8 @@ void serialize(raft::resources const& handle_, std::ostream& os, const index<Idx
              raft::resource::get_cuda_stream(handle_));
   raft::resource::sync_stream(handle_);
   raft::serialize_mdspan(handle_, os, sizes_host.view());
+  // NOTE: We use static_cast here because serialize_list requires the concrete list type
+  // to access the spec_type for determining the serialized data layout.
   if (index.codes_layout() == list_layout::FLAT) {
     auto list_store_spec = list_spec_flat<uint32_t, IdxT>{index.pq_bits(), index.pq_dim(), true};
     for (uint32_t label = 0; label < index.n_lists(); label++) {

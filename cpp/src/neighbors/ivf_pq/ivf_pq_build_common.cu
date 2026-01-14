@@ -378,4 +378,18 @@ void rotate_padded_centers(
 
 }  // namespace helpers
 
+template void resize_list<cuvs::neighbors::ivf_pq::list_data_interleaved<int64_t>>(
+  raft::resources const& res,
+  std::shared_ptr<cuvs::neighbors::ivf_pq::list_data_interleaved<int64_t>>& orig_list,
+  const cuvs::neighbors::ivf_pq::list_data_interleaved<int64_t>::spec_type& spec,
+  cuvs::neighbors::ivf_pq::list_data_interleaved<int64_t>::size_type new_used_size,
+  cuvs::neighbors::ivf_pq::list_data_interleaved<int64_t>::size_type old_used_size);
+
+template void resize_list<cuvs::neighbors::ivf_pq::list_data_flat<int64_t>>(
+  raft::resources const& res,
+  std::shared_ptr<cuvs::neighbors::ivf_pq::list_data_flat<int64_t>>& orig_list,
+  const cuvs::neighbors::ivf_pq::list_data_flat<int64_t>::spec_type& spec,
+  cuvs::neighbors::ivf_pq::list_data_flat<int64_t>::size_type new_used_size,
+  cuvs::neighbors::ivf_pq::list_data_flat<int64_t>::size_type old_used_size);
+
 }  // namespace cuvs::neighbors::ivf_pq

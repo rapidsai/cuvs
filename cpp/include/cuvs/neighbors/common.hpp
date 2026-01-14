@@ -778,6 +778,14 @@ using enable_if_valid_list_t = typename enable_if_valid_list<ListT, T>::type;
 /**
  * Resize a list by the given id, so that it can contain the given number of records;
  * copy the data if necessary.
+ *
+ * @note This function requires the concrete list type (not the base class) because:
+ *       1. It needs access to the spec_type to create new list instances with proper layout
+ *       2. It needs to allocate a new list of the same concrete type when growing
+ *       3. The list's data layout (extents) is determined by the spec, which varies by type
+ *       When calling from code that only has a base class pointer, use std::static_pointer_cast
+ *       to obtain the typed pointer first. The caller must know the concrete type (e.g., by
+ *       checking an index's layout configuration).
  */
 template <typename ListT>
 void resize_list(raft::resources const& res,
@@ -786,6 +794,15 @@ void resize_list(raft::resources const& res,
                  typename ListT::size_type new_used_size,
                  typename ListT::size_type old_used_size);
 
+/**
+ * Serialize a list to an output stream.
+ *
+ * @note This function requires the concrete list type (not the base class) because:
+ *       1. It needs access to the spec_type to determine the data layout for serialization
+ *       2. The serialized format depends on the spec's make_list_extents() method
+ *       When calling from code that only has a base class pointer, use std::static_pointer_cast
+ *       to obtain the typed pointer first.
+ */
 template <typename ListT>
 enable_if_valid_list_t<ListT> serialize_list(
   const raft::resources& handle,
@@ -793,6 +810,7 @@ enable_if_valid_list_t<ListT> serialize_list(
   const ListT& ld,
   const typename ListT::spec_type& store_spec,
   std::optional<typename ListT::size_type> size_override = std::nullopt);
+
 template <typename ListT>
 enable_if_valid_list_t<ListT> serialize_list(
   const raft::resources& handle,
