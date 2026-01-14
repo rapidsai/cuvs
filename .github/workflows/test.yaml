@@ -62,7 +62,7 @@ jobs:
       matrix:
         cuda_version:
           - '12.9.1'
-          - '13.0.2'
+          - '13.1.0'
     with:
       build_type: ${{ inputs.build_type }}
       branch: ${{ inputs.branch }}

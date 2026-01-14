@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -10,6 +10,8 @@
 #include <raft/core/bitset.cuh>
 #include <raft/core/detail/macros.hpp>
 #include <raft/sparse/convert/csr.cuh>
+
+#include <cuda/std/tuple>
 
 #include <cstddef>
 #include <cstdint>
@@ -131,7 +133,7 @@ void bitmap_filter<bitmap_t, index_t>::to_csr(raft::resources const& handle, csr
 
 struct none_filter_args_t {};
 using bitset_filter_args_t =
-  std::tuple<const int64_t* const*, cuvs::core::bitset_view<uint32_t, int64_t>>;
+  cuda::std::tuple<const int64_t* const*, cuvs::core::bitset_view<uint32_t, int64_t>>;
 
 struct ivf_filter_dev {
   filtering::FilterType tag_;

@@ -3,7 +3,7 @@ files:
   all:
     output: conda
     matrix:
-      cuda: ["12.9", "13.0"]
+      cuda: ["12.9", "13.1"]
       arch: [x86_64, aarch64]
     includes:
       - build
@@ -30,7 +30,7 @@ files:
   bench_ann:
     output: conda
     matrix:
-      cuda: ["12.9", "13.0"]
+      cuda: ["12.9", "13.1"]
       arch: [x86_64, aarch64]
     includes:
       - bench
@@ -87,7 +87,7 @@ files:
   rust:
     output: conda
     matrix:
-      cuda: ["12.9", "13.0"]
+      cuda: ["12.9", "13.1"]
       arch: [x86_64, aarch64]
     includes:
       # clang/libclang only needed for bindgen support
@@ -102,7 +102,7 @@ files:
   go:
     output: conda
     matrix:
-      cuda: ["12.9", "13.0"]
+      cuda: ["12.9", "13.1"]
       arch: [x86_64, aarch64]
     includes:
       - clang
@@ -225,10 +225,10 @@ dependencies:
           - &rapids_build_backend rapids-build-backend>=0.4.0,<0.5.0
       - output_types: [conda]
         packages:
-          - scikit-build-core>=0.10.0
+          - scikit-build-core>=0.11.0
       - output_types: [requirements, pyproject]
         packages:
-          - scikit-build-core[pyproject]>=0.10.0
+          - scikit-build-core[pyproject]>=0.11.0
   build_cython:
     common:
       - output_types: [conda, requirements, pyproject]
@@ -263,8 +263,8 @@ dependencies:
       - output_types: [conda, requirements, pyproject]
         packages:
           - *rapids_build_backend
-          - setuptools
-          - wheel
+          - &setuptools setuptools>=77.0.0
+          - &wheel wheel
   build_py_cuvs:
     common:
       - output_types: [conda]
@@ -306,6 +306,10 @@ dependencies:
               cuda: "13.0"
             packages:
               - cuda-version=13.0
+          - matrix:
+              cuda: "13.1"
+            packages:
+              - cuda-version=13.1
   cuda:
     common:
       - output_types: [conda]
@@ -408,8 +412,8 @@ dependencies:
     common:
       - output_types: [requirements, pyproject]
         packages:
-          - wheel
-          - setuptools
+          - *wheel
+          - *setuptools
   py_version:
     specific:
       - output_types: conda
