@@ -10,7 +10,7 @@
 #include "common.hpp"
 
 #include <cuvs/distance/distance.hpp>
-#include <cuvs/neighbors/graph_build_types.hpp>
+#include <cuvs/neighbors/cagra.hpp>
 
 #include "cagra.hpp"
 #include <raft/core/host_mdspan.hpp>
