@@ -41,7 +41,6 @@ __launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL
 
   // Always write output
   constexpr bool write_out = true;
-  constexpr bool use_norms = distance_op.use_norms;
   PairwiseDistances<DataT,
                     OutT,
                     IdxT,
