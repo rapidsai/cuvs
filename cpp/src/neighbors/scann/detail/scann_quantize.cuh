@@ -326,7 +326,7 @@ template <uint32_t BlockSize, typename IdxT>
 __launch_bounds__(BlockSize) RAFT_KERNEL
   quantize_bfloat16_noise_shaped_kernel(raft::device_matrix_view<const float, IdxT> dataset,
                                         raft::device_matrix_view<int16_t, IdxT> bf16_dataset,
-                                        raft::device_vector_view<const float> sq_norms,
+                                        raft::device_vector_view<const float, IdxT> sq_norms,
                                         float noise_shaping_threshold)
 {
   IdxT row_idx = raft::Pow2<32>::div(IdxT{threadIdx.x} + IdxT{BlockSize} * IdxT{blockIdx.x});
@@ -516,8 +516,8 @@ void quantize_bfloat16(raft::resources const& res,
  */
 template <typename T,
           typename LabelT,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 auto sample_training_residuals(
   raft::resources const& res,
   random::RngState random_state,

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,6 +17,7 @@ mod error;
 pub mod ivf_flat;
 pub mod ivf_pq;
 mod resources;
+pub mod vamana;
 
 pub use dlpack::ManagedTensor;
 pub use error::{Error, Result};

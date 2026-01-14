@@ -37,18 +37,31 @@ build:
       - AWS_ACCESS_KEY_ID
       - AWS_SECRET_ACCESS_KEY
       - AWS_SESSION_TOKEN
+      - SCCACHE_DIST_AUTH_TOKEN
     env:
       CMAKE_C_COMPILER_LAUNCHER: ${{ env.get("CMAKE_C_COMPILER_LAUNCHER") }}
       CMAKE_CXX_COMPILER_LAUNCHER: ${{ env.get("CMAKE_CXX_COMPILER_LAUNCHER") }}
       CMAKE_GENERATOR: ${{ env.get("CMAKE_GENERATOR") }}
-      PARALLEL_LEVEL: ${{ env.get("PARALLEL_LEVEL") }}
-      RAPIDS_ARTIFACTS_DIR: ${{ env.get("RAPIDS_ARTIFACTS_DIR") }}
-      SCCACHE_BUCKET: ${{ env.get("SCCACHE_BUCKET") }}
-      SCCACHE_IDLE_TIMEOUT: ${{ env.get("SCCACHE_IDLE_TIMEOUT") }}
-      SCCACHE_REGION: ${{ env.get("SCCACHE_REGION") }}
-      SCCACHE_S3_USE_SSL: ${{ env.get("SCCACHE_S3_USE_SSL") }}
-      SCCACHE_S3_NO_CREDENTIALS: ${{ env.get("SCCACHE_S3_NO_CREDENTIALS") }}
+      NVCC_APPEND_FLAGS: ${{ env.get("NVCC_APPEND_FLAGS", default="") }}
+      PARALLEL_LEVEL: ${{ env.get("PARALLEL_LEVEL", default="8") }}
+      RAPIDS_ARTIFACTS_DIR: ${{ env.get("RAPIDS_ARTIFACTS_DIR", default="") }}
+      SCCACHE_BUCKET: ${{ env.get("SCCACHE_BUCKET", default="") }}
+      SCCACHE_DIST_AUTH_TYPE: ${{ env.get("SCCACHE_DIST_AUTH_TYPE", default="token") }}
+      SCCACHE_DIST_FALLBACK_TO_LOCAL_COMPILE: ${{ env.get("SCCACHE_DIST_FALLBACK_TO_LOCAL_COMPILE", default="false") }}
+      SCCACHE_DIST_MAX_RETRIES: ${{ env.get("SCCACHE_DIST_MAX_RETRIES", default="inf") }}
+      SCCACHE_DIST_REQUEST_TIMEOUT: ${{ env.get("SCCACHE_DIST_REQUEST_TIMEOUT", default="7140") }}
+      SCCACHE_DIST_SCHEDULER_URL: ${{ env.get("SCCACHE_DIST_SCHEDULER_URL", default="") }}
+      SCCACHE_ERROR_LOG: ${{ env.get("SCCACHE_ERROR_LOG", default="/tmp/sccache.log") }}
+      SCCACHE_IDLE_TIMEOUT: ${{ env.get("SCCACHE_IDLE_TIMEOUT", default="0") }}
+      SCCACHE_NO_CACHE: ${{ env.get("SCCACHE_NO_CACHE", default="") }}
+      SCCACHE_RECACHE: ${{ env.get("SCCACHE_RECACHE", default="") }}
+      SCCACHE_REGION: ${{ env.get("SCCACHE_REGION", default="") }}
       SCCACHE_S3_KEY_PREFIX: cuvs-bench-cpu/${{ env.get("RAPIDS_CONDA_ARCH") }}
+      SCCACHE_S3_NO_CREDENTIALS: ${{ env.get("SCCACHE_S3_NO_CREDENTIALS", default="false") }}
+      SCCACHE_S3_PREPROCESSOR_CACHE_KEY_PREFIX: cuvs-bench-cpu/${{ env.get("RAPIDS_CONDA_ARCH") }}/conda/preprocessor-cache
+      SCCACHE_S3_USE_PREPROCESSOR_CACHE_MODE: ${{ env.get("SCCACHE_S3_USE_PREPROCESSOR_CACHE_MODE", default="true") }}
+      SCCACHE_S3_USE_SSL: ${{ env.get("SCCACHE_S3_USE_SSL", default="true") }}
+      SCCACHE_SERVER_LOG: ${{ env.get("SCCACHE_SERVER_LOG", default="sccache=debug") }}
 
 requirements:
   build:
@@ -63,8 +76,8 @@ requirements:
     - openblas
     - pip
     - python =${{ py_version }}
-    - rapids-build-backend>=0.4.0,<0.5.0.dev0
-    - setuptools >=64.0.0
+    - rapids-build-backend>=0.4.0,<0.5.0
+    - setuptools>=77.0.0
     - if: linux64
       then:
         - libaio
@@ -75,7 +88,7 @@ requirements:
     - glog ${{ glog_version }}
     - h5py ${{ h5py_version }}
     - matplotlib-base>=3.9
-    - numpy >=1.23,<3.0a0
+    - numpy >=1.23,<3.0
     - pandas
     - pyyaml
     - python
@@ -105,5 +118,5 @@ tests:
 
 about:
   homepage: ${{ load_from_file("python/cuvs_bench/pyproject.toml").project.urls.Homepage }}
-  license: ${{ load_from_file("python/cuvs_bench/pyproject.toml").project.license.text }}
+  license: ${{ load_from_file("python/cuvs_bench/pyproject.toml").project.license }}
   summary: cuVS CPU benchmark

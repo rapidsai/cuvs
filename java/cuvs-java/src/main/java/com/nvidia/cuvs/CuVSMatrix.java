@@ -17,10 +17,20 @@ import com.nvidia.cuvs.spi.CuVSProvider;
 public interface CuVSMatrix extends AutoCloseable {
 
   enum DataType {
-    FLOAT,
-    INT,
-    UINT,
-    BYTE
+    FLOAT(4),
+    INT(4),
+    UINT(4),
+    BYTE(1);
+
+    private final int bytes;
+
+    DataType(int bytes) {
+      this.bytes = bytes;
+    }
+
+    public int bytes() {
+      return bytes;
+    }
   }
 
   enum MemoryKind {

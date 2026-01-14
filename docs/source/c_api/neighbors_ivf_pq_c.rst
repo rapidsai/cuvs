@@ -7,7 +7,7 @@ The IVF-PQ method is an ANN algorithm. Like IVF-Flat, IVF-PQ splits the points i
    :language: c
    :class: highlight
 
-``#include <raft/neighbors/ivf_pq.h>``
+``#include <cuvs/neighbors/ivf_pq.h>``
 
 Index build parameters
 ----------------------
