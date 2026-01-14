@@ -1323,7 +1323,8 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_p(
                                  small_hash_bitlen,
                                  small_hash_reset_interval,
                                  query_id,
-                                 sample_filter);
+                                 sample_filter,
+                                 0);  // TODO: persistent kernel doesn't support max_node_id yet
 
     // make sure all writes are visible even for the host
     //     (e.g. when result buffers are in pinned memory)

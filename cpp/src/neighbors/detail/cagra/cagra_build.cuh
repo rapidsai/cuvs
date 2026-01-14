@@ -1990,6 +1990,7 @@ void search_and_optimize(raft::resources const& res,
 {
   // Search.
   // Since there are many queries, divide them into batches and search them.
+  RAFT_LOG_DEBUG("search_and_optimize: search_params.max_node_id=%u", search_params.max_node_id);
   cuvs::spatial::knn::detail::utils::batch_load_iterator<T> query_batch(
     dev_query_view.data_handle(),
     curr_query_size,
@@ -2185,7 +2186,10 @@ auto iterative_build_graph(
     auto neighbors_view =
       raft::make_host_matrix_view<IdxT, int64_t>(neighbors_ptr, curr_query_size, curr_topk);
 
-    
+    // Set max_node_id to constrain random seed selection to valid graph nodes
+    search_params.max_node_id = static_cast<uint32_t>(curr_graph_size);
+    RAFT_LOG_DEBUG("iterative_build: Setting search_params.max_node_id=%u (curr_graph_size=%lu)",
+                   search_params.max_node_id, curr_graph_size);
 
     search_and_optimize(res,
                         search_params,

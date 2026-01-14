@@ -178,6 +178,7 @@ void random_pickup(const dataset_descriptor_host<DataT, IndexT, DistanceT>& data
   const auto num_teams_per_threadblock = block_size / dataset_desc.team_size;
   const dim3 grid_size((num_pickup + num_teams_per_threadblock - 1) / num_teams_per_threadblock,
                        num_queries);
+  RAFT_LOG_DEBUG("max_node_id: %d", mod_wrap);
 
   random_pickup_kernel<<<grid_size, block_size, dataset_desc.smem_ws_size_in_bytes, cuda_stream>>>(
     dataset_desc.dev_ptr(cuda_stream),
@@ -833,8 +834,7 @@ struct search
                                             result_buffer_allocation_size,
                                             hashmap.data(),
                                             hash_bitlen,
-                                            stream,
-                                            static_cast<IndexT>(this->dataset_size));
+                                            stream);
 
     unsigned iter = 0;
     while (1) {

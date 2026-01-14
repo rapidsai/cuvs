@@ -247,6 +247,13 @@ struct search_params : cuvs::neighbors::search_params {
   /** Bit mask used for initial random seed node selection. */
   uint64_t rand_xor_mask = 0x128394;
 
+  /** 
+   * Maximum node ID for random seed selection. 
+   * When > 0, random seeds are constrained to [0, max_node_id) instead of [0, dataset_size).
+   * This is useful when the graph is smaller than the dataset (e.g., iterative build with compression).
+   * Default 0 means no constraint (use dataset_size).
+   */
+  uint32_t max_node_id = 0;
   /** Whether to use the persistent version of the kernel (only SINGLE_CTA is supported a.t.m.) */
   bool persistent = false;
   /** Persistent kernel: time in seconds before the kernel stops if no requests received. */
