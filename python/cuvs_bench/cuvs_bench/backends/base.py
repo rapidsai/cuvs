@@ -11,9 +11,12 @@ along with standardized data structures for datasets and results.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, TYPE_CHECKING
 from pathlib import Path
 import numpy as np
+
+if TYPE_CHECKING:
+    from ..orchestrator.config_loaders import IndexConfig
 
 
 @dataclass
@@ -143,8 +146,9 @@ class SearchResult:
         Recall@k metric (0.0 to 1.0)
     algorithm : str
         Algorithm name
-    search_params : Dict[str, Any]
-        Search parameters used (e.g., {"nprobe": 10})
+    search_params : List[Dict[str, Any]]
+        List of search parameter combinations used (e.g., [{"nprobe": 1}, {"nprobe": 5}])
+        All are batched into one C++ command (matches runners.py behavior)
     latency_percentiles : Optional[Dict[str, float]]
         Latency percentiles in milliseconds (p50, p95, p99)
     gpu_time_seconds : Optional[float]
@@ -164,7 +168,7 @@ class SearchResult:
     queries_per_second: float
     recall: float
     algorithm: str
-    search_params: Dict[str, Any]
+    search_params: List[Dict[str, Any]]
     latency_percentiles: Optional[Dict[str, float]] = None
     gpu_time_seconds: Optional[float] = None
     cpu_time_seconds: Optional[float] = None
@@ -188,7 +192,7 @@ class SearchResult:
             "items_per_second": self.queries_per_second,
             "Recall": self.recall,
             "success": self.success,
-            **self.search_params,
+            "search_params": self.search_params,
             **self.metadata
         }
         
@@ -226,23 +230,25 @@ class BenchmarkBackend(ABC):
     def build(
         self,
         dataset: Dataset,
-        build_params: Dict[str, Any],
-        index_path: Path,
-        force: bool = False
+        indexes: List["IndexConfig"],
+        force: bool = False,
+        dry_run: bool = False
     ) -> BuildResult:
         """
-        Build an index from the given dataset.
+        Build indexes from the given dataset.
+        
+        ALL indexes are batched into ONE command execution (matches runners.py).
         
         Parameters
         ----------
         dataset : Dataset
             Dataset with base vectors and metadata
-        build_params : Dict[str, Any]
-            Algorithm-specific build parameters (e.g., {"nlist": 1024, "niter": 20})
-        index_path : Path
-            Path where the built index should be saved
+        indexes : List[IndexConfig]
+            List of index configurations to build together
         force : bool, optional
             If True, rebuild even if index exists; if False, skip if exists
+        dry_run : bool, optional
+            If True, print command without executing
             
         Returns
         -------
@@ -260,30 +266,40 @@ class BenchmarkBackend(ABC):
     def search(
         self,
         dataset: Dataset,
-        search_params: Dict[str, Any],
-        index_path: Path,
+        indexes: List["IndexConfig"],
         k: int,
         batch_size: int = 10000,
-        mode: str = "throughput"
+        mode: str = "latency",
+        force: bool = False,
+        search_threads: Optional[int] = None,
+        dry_run: bool = False
     ) -> SearchResult:
         """
-        Search for nearest neighbors using the built index.
+        Search for nearest neighbors using the built indexes.
+        
+        ALL indexes are batched into ONE command execution (matches runners.py).
+        Each index has its own search_params list, so total benchmarks =
+        sum(len(idx.search_params) for idx in indexes).
         
         Parameters
         ----------
         dataset : Dataset
             Dataset with query vectors and ground truth
-        search_params : Dict[str, Any]
-            Algorithm-specific search parameters (e.g., {"nprobe": 10})
-        index_path : Path
-            Path to the built index
+        indexes : List[IndexConfig]
+            List of index configurations, each with its own search_params
         k : int
             Number of neighbors to return per query
         batch_size : int, optional
             Number of queries to process at once (default: 10000)
         mode : str, optional
             "latency" (measure individual query latency with percentiles) or
-            "throughput" (measure overall QPS) (default: "throughput")
+            "throughput" (measure overall QPS) (default: "latency")
+        force : bool, optional
+            Whether to force the execution regardless of existing results (default: False)
+        search_threads : Optional[int], optional
+            Number of threads to use for searching (default: None)
+        dry_run : bool, optional
+            If True, print command without executing
             
         Returns
         -------
