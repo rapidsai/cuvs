@@ -299,6 +299,17 @@ const std::vector<ProductQuantizationInputs<T>> inputs = {
   {500, 128, 5, 8, cuvs::cluster::kmeans::kmeans_type::KMeans, 0, true, false, false, 42ULL},
 
   // Larger dataset
+  {1000, 320, 8, 64, cuvs::cluster::kmeans::kmeans_type::KMeans, 0, true, true, false, 42ULL},
+  {1000,
+   384,
+   8,
+   64,
+   cuvs::cluster::kmeans::kmeans_type::KMeansBalanced,
+   0,
+   true,
+   true,
+   false,
+   42ULL},
   {1000,
    40,
    4,

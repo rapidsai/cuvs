@@ -544,11 +544,6 @@ struct vec_op<float, 4> {
     return *reinterpret_cast<const type*>(ptr);
   }
 
-  __device__ __forceinline__ static void store(float* ptr, const type& val)
-  {
-    *reinterpret_cast<type*>(ptr) = val;
-  }
-
   __device__ __forceinline__ static float sum_squares(const type& diff)
   {
     return diff.x * diff.x + diff.y * diff.y + diff.z * diff.z + diff.w * diff.w;
@@ -569,11 +564,6 @@ struct vec_op<float, 2> {
   __device__ __forceinline__ static type load(const float* ptr)
   {
     return *reinterpret_cast<const type*>(ptr);
-  }
-
-  __device__ __forceinline__ static void store(float* ptr, const type& val)
-  {
-    *reinterpret_cast<type*>(ptr) = val;
   }
 
   __device__ __forceinline__ static float sum_squares(const type& diff)
@@ -618,32 +608,37 @@ __device__ __forceinline__ void process_4centers_vec(MathT& d0,
                                                      GetXFunc get_x_func)
 {
   uint32_t k = 0;
-  for (; k + 3 < pq_len; k += 4) {
-    using VecOp = vec_op<MathT, 4>;
-    using VecT  = typename VecOp::type;
-    VecT x_vec =
-      VecOp::make(get_x_func(k), get_x_func(k + 1), get_x_func(k + 2), get_x_func(k + 3));
-    VecT c0 = VecOp::load(&centers_ptr[l * pq_len + k]);
-    VecT c1 = VecOp::load(&centers_ptr[(l + SubWarpSize) * pq_len + k]);
-    VecT c2 = VecOp::load(&centers_ptr[(l + 2 * SubWarpSize) * pq_len + k]);
-    VecT c3 = VecOp::load(&centers_ptr[(l + 3 * SubWarpSize) * pq_len + k]);
-    d0 += VecOp::sum_squares(VecOp::sub(x_vec, c0));
-    d1 += VecOp::sum_squares(VecOp::sub(x_vec, c1));
-    d2 += VecOp::sum_squares(VecOp::sub(x_vec, c2));
-    d3 += VecOp::sum_squares(VecOp::sub(x_vec, c3));
-  }
-  for (; k + 1 < pq_len; k += 2) {
-    using VecOp = vec_op<MathT, 2>;
-    using VecT  = typename VecOp::type;
-    VecT x_vec  = VecOp::make(get_x_func(k), get_x_func(k + 1));
-    VecT c0     = VecOp::load(&centers_ptr[l * pq_len + k]);
-    VecT c1     = VecOp::load(&centers_ptr[(l + SubWarpSize) * pq_len + k]);
-    VecT c2     = VecOp::load(&centers_ptr[(l + 2 * SubWarpSize) * pq_len + k]);
-    VecT c3     = VecOp::load(&centers_ptr[(l + 3 * SubWarpSize) * pq_len + k]);
-    d0 += VecOp::sum_squares(VecOp::sub(x_vec, c0));
-    d1 += VecOp::sum_squares(VecOp::sub(x_vec, c1));
-    d2 += VecOp::sum_squares(VecOp::sub(x_vec, c2));
-    d3 += VecOp::sum_squares(VecOp::sub(x_vec, c3));
+  // If pq_len is a power of 2, we can use vectorized loads and stores
+  // Otherwise, we fall back to scalar loads and stores to avoid misaligned accesses
+  bool pq_len_is_pow2 = raft::is_pow2(pq_len);
+  if (pq_len_is_pow2) {
+    for (; k + 3 < pq_len; k += 4) {
+      using VecOp = vec_op<MathT, 4>;
+      using VecT  = typename VecOp::type;
+      VecT x_vec =
+        VecOp::make(get_x_func(k), get_x_func(k + 1), get_x_func(k + 2), get_x_func(k + 3));
+      VecT c0 = VecOp::load(&centers_ptr[l * pq_len + k]);
+      VecT c1 = VecOp::load(&centers_ptr[(l + SubWarpSize) * pq_len + k]);
+      VecT c2 = VecOp::load(&centers_ptr[(l + 2 * SubWarpSize) * pq_len + k]);
+      VecT c3 = VecOp::load(&centers_ptr[(l + 3 * SubWarpSize) * pq_len + k]);
+      d0 += VecOp::sum_squares(VecOp::sub(x_vec, c0));
+      d1 += VecOp::sum_squares(VecOp::sub(x_vec, c1));
+      d2 += VecOp::sum_squares(VecOp::sub(x_vec, c2));
+      d3 += VecOp::sum_squares(VecOp::sub(x_vec, c3));
+    }
+    for (; k + 1 < pq_len; k += 2) {
+      using VecOp = vec_op<MathT, 2>;
+      using VecT  = typename VecOp::type;
+      VecT x_vec  = VecOp::make(get_x_func(k), get_x_func(k + 1));
+      VecT c0     = VecOp::load(&centers_ptr[l * pq_len + k]);
+      VecT c1     = VecOp::load(&centers_ptr[(l + SubWarpSize) * pq_len + k]);
+      VecT c2     = VecOp::load(&centers_ptr[(l + 2 * SubWarpSize) * pq_len + k]);
+      VecT c3     = VecOp::load(&centers_ptr[(l + 3 * SubWarpSize) * pq_len + k]);
+      d0 += VecOp::sum_squares(VecOp::sub(x_vec, c0));
+      d1 += VecOp::sum_squares(VecOp::sub(x_vec, c1));
+      d2 += VecOp::sum_squares(VecOp::sub(x_vec, c2));
+      d3 += VecOp::sum_squares(VecOp::sub(x_vec, c3));
+    }
   }
 
   // Tail loop
