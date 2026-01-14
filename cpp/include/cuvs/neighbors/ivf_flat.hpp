@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -109,12 +109,6 @@ struct list_spec {
 
 template <typename ValueT, typename IdxT, typename SizeT = uint32_t>
 using list_data = ivf::list<list_spec, SizeT, ValueT, IdxT>;
-
-/**
- * Type alias for the polymorphic base class for IVF-Flat list data.
- */
-template <typename ValueT, typename IdxT, typename SizeT = uint32_t>
-using list_data_base = ivf::list_base<ValueT, IdxT, SizeT>;
 
 /**
  * @}
