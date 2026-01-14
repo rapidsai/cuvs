@@ -716,8 +716,8 @@ public class CagraIndexImpl implements CagraIndex {
                 nativeMergeParams.handle(),
                 indexesSegment,
                 indexes.length,
-                mergedIndex,
-                mergeFilter),
+                mergeFilter,
+                mergedIndex),
             "cuvsCagraMerge");
       }
     }
