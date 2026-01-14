@@ -14,11 +14,13 @@ import json
 import tempfile
 import time
 import os
+import uuid
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import numpy as np
 
 from .base import BenchmarkBackend, Dataset, BuildResult, SearchResult
+from ..orchestrator.config_loaders import IndexConfig
 
 
 class CppGoogleBenchmarkBackend(BenchmarkBackend):
@@ -57,6 +59,9 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         self.executable_path = Path(config["executable_path"])
         self.data_prefix = config.get("data_prefix", "")
         self.warmup_time = config.get("warmup_time", 1.0)
+        self.dataset_name = config.get("dataset", "")
+        # Tuple: (build_name, search_name) e.g., ("cuvs_ivf_flat,test", "cuvs_ivf_flat,test,k10,bs1000")
+        self.output_filename = config.get("output_filename", ("", ""))
         
         if not self.executable_path.exists():
             raise FileNotFoundError(
@@ -66,22 +71,22 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
     def build(
         self,
         dataset: Dataset,
-        build_params: Dict[str, Any],
-        index_path: Path,
+        indexes: List[IndexConfig],
         force: bool = False,
         dry_run: bool = False
     ) -> BuildResult:
         """
-        Build index using C++ Google Benchmark executable.
+        Build indexes using C++ Google Benchmark executable.
+        
+        ALL indexes are batched into ONE temp config and ONE C++ command,
+        matching the old workflow (runners.py).
         
         Parameters
         ----------
         dataset : Dataset
             Dataset with base vectors
-        build_params : Dict[str, Any]
-            Build parameters (e.g., {"nlist": 1024, "niter": 20})
-        index_path : Path
-            Path to save the built index
+        indexes : List[IndexConfig]
+            List of index configurations to build together
         force : bool
             Whether to force the execution regardless of existing results.
         dry_run : bool
@@ -90,30 +95,31 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         Returns
         -------
         BuildResult
-            Build timing and metadata
+            Build timing and metadata (aggregated across all indexes)
         """
+        if not indexes:
+            return BuildResult(
+                index_path="",
+                build_time_seconds=0.0,
+                index_size_bytes=0,
+                algorithm="",
+                build_params={},
+                metadata={"skipped": True, "reason": "no_indexes"},
+                success=True
+            )
+        
+        first_index = indexes[0]
+        
         # Pre-flight check (GPU, network, etc.)
         skip_reason = self._pre_flight_check()
         if skip_reason:
             return BuildResult(
-                index_path=str(index_path),
+                index_path=first_index.file,
                 build_time_seconds=0.0,
                 index_size_bytes=0,
-                algorithm=self.algo,
-                build_params=build_params,
+                algorithm=first_index.algo,
+                build_params=first_index.build_param,
                 metadata={"skipped": True, "reason": skip_reason},
-                success=True
-            )
-        
-        # Check if index exists and skip if not forcing
-        if index_path.exists() and not force:
-            return BuildResult(
-                index_path=str(index_path),
-                build_time_seconds=0.0,
-                index_size_bytes=index_path.stat().st_size,
-                algorithm=self.algo,
-                build_params=build_params,
-                metadata={"skipped": True, "reason": "index_exists"},
                 success=True
             )
 
@@ -128,12 +134,9 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         
         # Create temporary JSON config (Google Benchmark format)
         # Structure matches runners.py temp_conf exactly
-        with tempfile.NamedTemporaryFile(
-            mode='w', 
-            suffix='.json', 
-            delete=False,
-            dir='.'
-        ) as f:
+        # Contains ALL indexes in one config (matches old workflow)
+        temp_conf_filename = f"{self.dataset_name}_{self.output_filename[0]}_{uuid.uuid1()}.json"
+        with open(temp_conf_filename, 'w') as f:
             dataset_config = {
                 "name": dataset.name,
                 "base_file": dataset.base_file,
@@ -144,27 +147,37 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             if dataset.groundtruth_neighbors_file:
                 dataset_config["groundtruth_neighbors_file"] = dataset.groundtruth_neighbors_file
             
+            # Build index list from ALL IndexConfig objects (matches runners.py)
+            index_list = [
+                {
+                    "name": idx.name,
+                    "algo": idx.algo,
+                    "build_param": idx.build_param,
+                    "file": idx.file,
+                    "search_params": idx.search_params  # Required by C++ even for build
+                }
+                for idx in indexes
+            ]
+            
             config = {
                 "dataset": dataset_config,
                 "search_basic_param": {
                     "k": 10,
                     "batch_size": 10000
                 },
-                "index": [{
-                    "name": self.name,
-                    "algo": self.algo,
-                    "build_param": build_params,
-                    "file": str(index_path)
-                }]
+                "index": index_list
             }
             json.dump(config, f, indent=2)
-            temp_config_path = f.name
+        temp_config_path = temp_conf_filename
         
-        # Prepare output directory and file
-        output_dir = index_path.parent / "result" / "build"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_json = output_dir / f"{index_path.name}.build.json"
-        temp_output_json = output_dir / f"{output_json.name}.lock"
+        # Prepare output directory and file (matches runners.py path structure)
+        # OLD: {dataset_path}/{dataset}/result/build/{algo},{group}.json.lock
+        result_folder = Path(self.data_prefix) / self.dataset_name / "result"
+        build_folder = result_folder / "build"
+        build_folder.mkdir(parents=True, exist_ok=True)
+        build_file = f"{self.output_filename[0]}.json"
+        temp_build_file = f"{build_file}.lock"
+        benchmark_out = build_folder / temp_build_file
         
         # Construct C++ command
         cmd = [
@@ -173,7 +186,7 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             f"--data_prefix={self.data_prefix}",
             "--benchmark_out_format=json",
             "--benchmark_counters_tabular=true",
-            f"--benchmark_out={temp_output_json}",
+            f"--benchmark_out={benchmark_out}",
         ]
         
         if force:
@@ -183,15 +196,15 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         
         # Dry run: print command and return without executing
         if dry_run:
-            print(f"Benchmark command for {index_path.name}:\n{' '.join(cmd)}\n")
+            print(f"Benchmark command for {self.output_filename[0]}:\n{' '.join(cmd)}\n")
             Path(temp_config_path).unlink(missing_ok=True)
             return BuildResult(
-                index_path=str(index_path),
+                index_path=first_index.file,
                 build_time_seconds=0.0,
                 index_size_bytes=0,
-                algorithm=self.algo,
-                build_params=build_params,
-                metadata={"dry_run": True},
+                algorithm=first_index.algo,
+                build_params=first_index.build_param,
+                metadata={"dry_run": True, "num_indexes": len(indexes)},
                 success=True
             )
         
@@ -204,33 +217,35 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
                 check=True,
                 capture_output=True,
                 text=True,
-                timeout=3600  # 1 hour timeout
+                timeout=3600 * len(indexes)  # Scale timeout with number of indexes
             )
             elapsed_time = time.perf_counter() - start_time
             
             # Parse Google Benchmark JSON output
-            with open(temp_output_json) as f:
+            with open(benchmark_out) as f:
                 gbench_results = json.load(f)
             
             # Merge with existing results (if any)
-            self._merge_build_results(output_json, temp_output_json, gbench_results)
+            self.merge_build_files(str(build_folder), build_file, temp_build_file)
             
             # Extract build metrics
             benchmarks = gbench_results.get("benchmarks", [])
             if not benchmarks:
                 raise ValueError("No benchmarks found in Google Benchmark output")
             
-            benchmark = benchmarks[0]
+            # Return aggregated result
+            total_build_time = sum(b.get("real_time", 0) for b in benchmarks)
             
             return BuildResult(
-                index_path=str(index_path),
-                build_time_seconds=benchmark.get("real_time", elapsed_time),
-                index_size_bytes=index_path.stat().st_size if index_path.exists() else 0,
-                algorithm=self.algo,
-                build_params=build_params,
+                index_path=first_index.file,
+                build_time_seconds=total_build_time,
+                index_size_bytes=0,  # Multiple indexes, can't report single size
+                algorithm=first_index.algo,
+                build_params=first_index.build_param,
                 metadata={
-                    "cpu_time": benchmark.get("cpu_time"),
-                    "gpu_time": benchmark.get("GPU"),
+                    "num_indexes": len(indexes),
+                    "num_benchmarks": len(benchmarks),
+                    "elapsed_time": elapsed_time,
                     "context": gbench_results.get("context", {})
                 },
                 success=True
@@ -238,22 +253,22 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         
         except subprocess.CalledProcessError as e:
             return BuildResult(
-                index_path=str(index_path),
+                index_path=first_index.file,
                 build_time_seconds=time.perf_counter() - start_time,
                 index_size_bytes=0,
-                algorithm=self.algo,
-                build_params=build_params,
+                algorithm=first_index.algo,
+                build_params=first_index.build_param,
                 success=False,
                 error_message=f"Build failed: {e.stderr}"
             )
         
         except Exception as e:
             return BuildResult(
-                index_path=str(index_path),
+                index_path=first_index.file,
                 build_time_seconds=time.perf_counter() - start_time,
                 index_size_bytes=0,
-                algorithm=self.algo,
-                build_params=build_params,
+                algorithm=first_index.algo,
+                build_params=first_index.build_param,
                 success=False,
                 error_message=f"Build error: {str(e)}"
             )
@@ -261,37 +276,41 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         finally:
             # Cleanup temporary files
             Path(temp_config_path).unlink(missing_ok=True)
-            Path(temp_output_json).unlink(missing_ok=True)
+            Path(benchmark_out).unlink(missing_ok=True)
     
     def search(
         self,
         dataset: Dataset,
-        search_params: Dict[str, Any],
-        index_path: Path,
+        indexes: List[IndexConfig],
         k: int,
         batch_size: int = 10000,
-        mode: str = "throughput",
+        mode: str = "latency",
+        force: bool = False,
         search_threads: Optional[int] = None,
         dry_run: bool = False
     ) -> SearchResult:
         """
         Search using C++ Google Benchmark executable.
         
+        ALL indexes are batched into ONE temp config and ONE C++ command,
+        matching the old workflow (runners.py). Each index has its own
+        search_params list, so total benchmarks = sum(len(idx.search_params) for idx).
+        
         Parameters
         ----------
         dataset : Dataset
             Dataset with query vectors and ground truth
-        search_params : Dict[str, Any]
-            Search parameters (e.g., {"nprobe": 10})
-        index_path : Path
-            Path to the built index
+        indexes : List[IndexConfig]
+            List of index configurations, each with its own search_params
         k : int
             The number of nearest neighbors to search for.
         batch_size : int
             The size of each batch for processing.
         mode : str
             The mode of search to perform ('latency' or 'throughput'),
-            by default 'throughput'.
+            by default 'latency'.
+        force : bool
+            Whether to force the execution regardless of existing results.
         search_threads : Optional[int]
             The number of threads to use for searching.
         dry_run : bool
@@ -300,8 +319,23 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         Returns
         -------
         SearchResult
-            Search timing, recall, and QPS
+            Search timing, recall, and QPS (aggregated across all indexes)
         """
+        if not indexes:
+            return SearchResult(
+                neighbors=np.array([]),
+                distances=np.array([]),
+                search_time_seconds=0.0,
+                queries_per_second=0.0,
+                recall=0.0,
+                algorithm="",
+                search_params={},
+                metadata={"skipped": True, "reason": "no_indexes"},
+                success=True
+            )
+        
+        first_index = indexes[0]
+        
         # Pre-flight check (GPU, network, etc.)
         skip_reason = self._pre_flight_check()
         if skip_reason:
@@ -311,8 +345,8 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
                 search_time_seconds=0.0,
                 queries_per_second=0.0,
                 recall=0.0,
-                algorithm=self.algo,
-                search_params=search_params,
+                algorithm=first_index.algo,
+                search_params=first_index.search_params[0] if first_index.search_params else {},
                 metadata={"skipped": True, "reason": skip_reason},
                 success=True
             )
@@ -328,12 +362,9 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         
         # Create temporary JSON config
         # Structure matches runners.py temp_conf exactly
-        with tempfile.NamedTemporaryFile(
-            mode='w', 
-            suffix='.json', 
-            delete=False,
-            dir='.'
-        ) as f:
+        # Contains ALL indexes with their search_params (matches old workflow)
+        temp_conf_filename = f"{self.dataset_name}_{self.output_filename[1]}_{uuid.uuid1()}.json"
+        with open(temp_conf_filename, 'w') as f:
             dataset_config = {
                 "name": dataset.name,
                 "base_file": dataset.base_file,
@@ -344,26 +375,36 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             if dataset.groundtruth_neighbors_file:
                 dataset_config["groundtruth_neighbors_file"] = dataset.groundtruth_neighbors_file
             
+            # Build index list from ALL IndexConfig objects (matches runners.py)
+            index_list = [
+                {
+                    "name": idx.name,
+                    "algo": idx.algo,
+                    "build_param": idx.build_param,
+                    "file": idx.file,
+                    "search_params": idx.search_params
+                }
+                for idx in indexes
+            ]
+            
             config = {
                 "dataset": dataset_config,
                 "search_basic_param": {
                     "k": k,
                     "batch_size": batch_size
                 },
-                "index": [{
-                    "name": self.name,
-                    "algo": self.algo,
-                    "file": str(index_path),
-                    "search_params": [search_params]
-                }]
+                "index": index_list
             }
             json.dump(config, f, indent=2)
-            temp_config_path = f.name
+        temp_config_path = temp_conf_filename
         
-        # Prepare output file
-        output_dir = index_path.parent / "result" / "search"
+        # Prepare output file (matches runners.py path structure)
+        # OLD: {dataset_path}/{dataset}/result/search/{algo},{group},k{k},bs{batch_size}.json
+        result_folder = Path(self.data_prefix) / self.dataset_name / "result"
+        output_dir = result_folder / "search"
         output_dir.mkdir(parents=True, exist_ok=True)
-        output_json = output_dir / f"{index_path.name}.search.json"
+        search_file = f"{self.output_filename[1]}.json"
+        output_json = output_dir / search_file
         
         # Construct C++ command
         cmd = [
@@ -379,14 +420,19 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             f"--benchmark_out={output_json}",
         ]
         
+        if force:
+            cmd.append("--force")
         if search_threads:
             cmd.append(f"--threads={search_threads}")
         
         cmd.append(temp_config_path)
         
+        # Calculate expected number of benchmarks
+        total_search_configs = sum(len(idx.search_params) for idx in indexes)
+        
         # Dry run: print command and return without executing
         if dry_run:
-            print(f"Benchmark command for {index_path.name}:\n{' '.join(cmd)}\n")
+            print(f"Benchmark command for {self.output_filename[1]}:\n{' '.join(cmd)}\n")
             Path(temp_config_path).unlink(missing_ok=True)
             return SearchResult(
                 neighbors=np.array([]),
@@ -394,9 +440,9 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
                 search_time_seconds=0.0,
                 queries_per_second=0.0,
                 recall=0.0,
-                algorithm=self.algo,
-                search_params=search_params,
-                metadata={"dry_run": True},
+                algorithm=first_index.algo,
+                search_params=first_index.search_params,
+                metadata={"dry_run": True, "num_indexes": len(indexes), "total_search_configs": total_search_configs},
                 success=True
             )
         
@@ -409,7 +455,7 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
                 check=True,
                 capture_output=True,
                 text=True,
-                timeout=3600
+                timeout=3600 * len(indexes)  # Scale timeout with number of indexes
             )
             elapsed_time = time.perf_counter() - start_time
             
@@ -421,28 +467,27 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             if not benchmarks:
                 raise ValueError("No benchmarks found in Google Benchmark output")
             
-            benchmark = benchmarks[0]
-            
-            # Extract metrics
-            recall = benchmark.get("Recall", 0.0)
-            qps = benchmark.get("items_per_second", 0.0)
-            search_time = benchmark.get("real_time", elapsed_time)
+            # Aggregate metrics across all benchmarks
+            total_search_time = sum(b.get("real_time", 0) for b in benchmarks)
+            avg_recall = sum(b.get("Recall", 0) for b in benchmarks) / len(benchmarks) if benchmarks else 0
+            avg_qps = sum(b.get("items_per_second", 0) for b in benchmarks) / len(benchmarks) if benchmarks else 0
             
             # Note: C++ Google Benchmark doesn't return actual neighbors/distances
             # This is a limitation of the current system
             return SearchResult(
                 neighbors=np.array([]),  # Not available from C++ benchmark
                 distances=np.array([]),  # Not available from C++ benchmark
-                search_time_seconds=search_time,
-                queries_per_second=qps,
-                recall=recall,
-                algorithm=self.algo,
-                search_params=search_params,
-                gpu_time_seconds=benchmark.get("GPU"),
-                cpu_time_seconds=benchmark.get("cpu_time"),
+                search_time_seconds=total_search_time,
+                queries_per_second=avg_qps,
+                recall=avg_recall,
+                algorithm=first_index.algo,
+                search_params=first_index.search_params,
                 metadata={
-                    "latency_us": benchmark.get("Latency"),
-                    "end_to_end": benchmark.get("end_to_end"),
+                    "num_indexes": len(indexes),
+                    "num_benchmarks": len(benchmarks),
+                    "elapsed_time": elapsed_time,
+                    "latency_us": benchmarks[0].get("Latency") if benchmarks else None,
+                    "end_to_end": benchmarks[0].get("end_to_end") if benchmarks else None,
                     "context": gbench_results.get("context", {})
                 },
                 success=True
@@ -455,8 +500,8 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
                 search_time_seconds=time.perf_counter() - start_time,
                 queries_per_second=0.0,
                 recall=0.0,
-                algorithm=self.algo,
-                search_params=search_params,
+                algorithm=first_index.algo,
+                search_params=first_index.search_params,
                 success=False,
                 error_message=f"Search failed: {e.stderr}"
             )
@@ -468,8 +513,8 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
                 search_time_seconds=time.perf_counter() - start_time,
                 queries_per_second=0.0,
                 recall=0.0,
-                algorithm=self.algo,
-                search_params=search_params,
+                algorithm=first_index.algo,
+                search_params=first_index.search_params,
                 success=False,
                 error_message=f"Search error: {str(e)}"
             )
@@ -478,58 +523,69 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             # Cleanup temporary config
             Path(temp_config_path).unlink(missing_ok=True)
     
-    def _merge_build_results(
-        self, 
-        output_json: Path, 
-        temp_output_json: Path,
-        temp_results: Dict
+    def merge_build_files(
+        self, build_dir: str, build_file: str, temp_build_file: str
     ) -> None:
         """
-        Merge temporary build results with existing results.
-        
-        This replicates the merge_build_files() logic from runners.py.
+        Merge temporary build files into the main build file.
+
+        Parameters
+        ----------
+        build_dir : str
+            The directory of the build files.
+        build_file : str
+            The main build file.
+        temp_build_file : str
+            The temporary build file to merge.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        ValueError
+            If the temporary build file is not found.
         """
-        existing_results = {}
-        
-        # Load existing results if file exists
-        if output_json.exists():
+        build_dict = {}
+
+        # If build file exists, read it
+        build_json_path = os.path.join(build_dir, build_file)
+        tmp_build_json_path = os.path.join(build_dir, temp_build_file)
+        if os.path.isfile(build_json_path):
             try:
-                with open(output_json) as f:
-                    existing_results = json.load(f)
+                with open(build_json_path, "r") as f:
+                    build_dict = json.load(f)
             except Exception as e:
-                print(f"Warning: Error loading existing build file: {e}")
-        
-        # Get benchmarks from both files
-        existing_benchmarks = existing_results.get("benchmarks", [])
-        temp_benchmarks = temp_results.get("benchmarks", [])
-        
-        # Filter out failed builds (real_time == 0)
-        valid_benchmarks = {
-            b["name"]: b 
-            for b in existing_benchmarks 
-            if b.get("real_time", 0) > 0
-        }
-        
-        # Add/update with temp benchmarks
-        for bench in temp_benchmarks:
-            if bench.get("real_time", 0) > 0:
-                valid_benchmarks[bench["name"]] = bench
-        
-        # Write merged results
-        temp_results["benchmarks"] = list(valid_benchmarks.values())
-        with open(output_json, 'w') as f:
-            json.dump(temp_results, f, indent=2)
+                print(
+                    f"Error loading existing build file: {build_json_path} ({e})"
+                )
+
+        temp_build_dict = {}
+        if os.path.isfile(tmp_build_json_path):
+            with open(tmp_build_json_path, "r") as f:
+                temp_build_dict = json.load(f)
+        else:
+            raise ValueError(f"Temp build file not found: {tmp_build_json_path}")
+
+        tmp_benchmarks = temp_build_dict.get("benchmarks", {})
+        benchmarks = build_dict.get("benchmarks", {})
+
+        # If the build time is absolute 0 then an error occurred
+        final_bench_dict = {b["name"]: b for b in benchmarks if b["real_time"] > 0}
+
+        for tmp_bench in tmp_benchmarks:
+            if tmp_bench["real_time"] > 0:
+                final_bench_dict[tmp_bench["name"]] = tmp_bench
+
+        temp_build_dict["benchmarks"] = list(final_bench_dict.values())
+        with open(build_json_path, "w") as f:
+            json_str = json.dumps(temp_build_dict, indent=2)
+            f.write(json_str)
     
     @property
     def algo(self) -> str:
-        """
-        Extract algorithm name from executable path.
-        
-        E.g., "CUVS_IVF_FLAT_ANN_BENCH" → "cuvs_ivf_flat"
-        """
-        exec_name = self.executable_path.stem
-        # Remove _ANN_BENCH suffix and convert to lowercase
-        algo = exec_name.replace("_ANN_BENCH", "").lower()
-        return algo
+        """Algorithm name from config."""
+        return self.config.get("algo", "")
     
 
