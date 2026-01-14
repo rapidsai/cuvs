@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional, Union
 import numpy as np
 
 from ..backends.base import BenchmarkBackend, Dataset, BuildResult, SearchResult
-from .config_loaders import ConfigLoader, BenchmarkConfig, DatasetConfig
+from .config_loaders import ConfigLoader, BenchmarkConfig, DatasetConfig, IndexConfig
 from .registry import get_backend_class, get_config_loader, list_backends
 
 
@@ -84,7 +84,7 @@ class BenchmarkOrchestrator:
         dry_run: bool = False,
         count: int = 10,
         batch_size: int = 10000,
-        search_mode: str = "throughput",
+        search_mode: str = "latency",
         search_threads: Optional[int] = None,
         **loader_kwargs
     ) -> List[Union[BuildResult, SearchResult]]:
@@ -135,15 +135,16 @@ class BenchmarkOrchestrator:
         results: List[Union[BuildResult, SearchResult]] = []
         
         # Run benchmarks
+        # Each config contains ALL indexes for one executable (matches runners.py)
         for config in benchmark_configs:
             # Create backend instance
             backend = self.backend_class(config.backend_config)
             
             if build:
+                # Pass ALL indexes at once - ONE C++ command builds all
                 build_result = backend.build(
                     dataset=bench_dataset,
-                    build_params=config.build_params,
-                    index_path=config.index_path,
+                    indexes=config.indexes,
                     force=force,
                     dry_run=dry_run
                 )
@@ -154,21 +155,23 @@ class BenchmarkOrchestrator:
                     continue
             
             if search:
-                for search_params in config.search_params_list:
-                    search_result = backend.search(
-                        dataset=bench_dataset,
-                        search_params=search_params,
-                        index_path=config.index_path,
-                        k=count,
-                        batch_size=batch_size,
-                        mode=search_mode,
-                        search_threads=search_threads,
-                        dry_run=dry_run
-                    )
-                    results.append(search_result)
-                    
-                    if not search_result.success:
-                        print(f"Search failed for {config.index_name}: {search_result.error_message}")
+                # Pass ALL indexes at once - ONE C++ command searches all
+                # Each index has its own search_params list
+                # Total benchmarks = sum(len(idx.search_params) for idx in indexes)
+                search_result = backend.search(
+                    dataset=bench_dataset,
+                    indexes=config.indexes,
+                    k=count,
+                    batch_size=batch_size,
+                    mode=search_mode,
+                    force=force,
+                    search_threads=search_threads,
+                    dry_run=dry_run
+                )
+                results.append(search_result)
+                
+                if not search_result.success:
+                    print(f"Search failed for {config.index_name}: {search_result.error_message}")
         
         return results
     
@@ -229,7 +232,7 @@ def run_benchmark(
     groups: Optional[str] = None,
     algo_groups: Optional[str] = None,
     force: bool = False,
-    search_mode: str = "throughput",
+    search_mode: str = "latency",
     search_threads: Optional[int] = None,
     dry_run: bool = False,
     data_export: bool = False,

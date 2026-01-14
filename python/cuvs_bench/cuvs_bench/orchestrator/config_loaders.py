@@ -23,35 +23,70 @@ import yaml
 
 
 @dataclass
-class BenchmarkConfig:
+class IndexConfig:
     """
-    Configuration for a single benchmark run.
-    
-    This is the standardized format that all ConfigLoaders produce,
-    regardless of the backend type.
+    Configuration for a single index (one build configuration).
     
     Attributes
     ----------
-    index_name : str
-        User-defined name for this index configuration
+    name : str
+        Index name (e.g., 'cuvs_cagra.graph_degree32.intermediate_graph_degree32')
     algo : str
-        Algorithm name (e.g., 'cuvs_ivf_flat', 'milvus_hnsw')
-    build_params : Dict[str, Any]
-        Build parameters (e.g., {"nlist": 1024})
-    search_params_list : List[Dict[str, Any]]
-        List of search parameter combinations to run
-    index_path : Path
+        Algorithm name (e.g., 'cuvs_cagra')
+    build_param : Dict[str, Any]
+        Build parameters (e.g., {"graph_degree": 32})
+    search_params : List[Dict[str, Any]]
+        List of search parameter combinations for this index
+    file : str
         Path where index will be stored
+    """
+    name: str
+    algo: str
+    build_param: Dict[str, Any]
+    search_params: List[Dict[str, Any]]
+    file: str
+
+
+@dataclass
+class BenchmarkConfig:
+    """
+    Configuration for a benchmark run (may contain multiple indexes).
+    
+    This is the standardized format that all ConfigLoaders produce,
+    regardless of the backend type. For C++ backend, multiple indexes
+    are batched into ONE config and ONE C++ command (matching runners.py).
+    
+    Attributes
+    ----------
+    indexes : List[IndexConfig]
+        List of index configurations to run together
     backend_config : Dict[str, Any]
         Backend-specific configuration (e.g., executable_path for C++,
         host/port for Milvus)
     """
-    index_name: str
-    algo: str
-    build_params: Dict[str, Any]
-    search_params_list: List[Dict[str, Any]]
-    index_path: Path
+    indexes: List[IndexConfig]
     backend_config: Dict[str, Any] = field(default_factory=dict)
+    
+    # Convenience properties for single-index access (backward compatibility)
+    @property
+    def index_name(self) -> str:
+        return self.indexes[0].name if self.indexes else ""
+    
+    @property
+    def algo(self) -> str:
+        return self.indexes[0].algo if self.indexes else ""
+    
+    @property
+    def build_params(self) -> Dict[str, Any]:
+        return self.indexes[0].build_param if self.indexes else {}
+    
+    @property
+    def search_params_list(self) -> List[Dict[str, Any]]:
+        return self.indexes[0].search_params if self.indexes else []
+    
+    @property
+    def index_path(self) -> Path:
+        return Path(self.indexes[0].file) if self.indexes else Path("")
 
 
 @dataclass
@@ -279,10 +314,14 @@ class CppGBenchConfigLoader(ConfigLoader):
         """
         Prepare list of BenchmarkConfig from algorithm configurations.
         
-        This replaces prepare_executables() but returns BenchmarkConfig objects
-        instead of the raw executable dict.
+        This matches the old workflow (run.py prepare_executables) by grouping
+        ALL indexes for the same executable into ONE BenchmarkConfig.
+        This ensures ONE C++ command runs ALL indexes together.
         """
-        benchmark_configs = []
+        # Group indexes by executable (matches run.py executables_to_run structure)
+        # Key: (executable, executable_path, output_filename)
+        # Value: {"index": [...], "algo_info": {...}}
+        executables_to_run = {}
         
         for algo, algo_conf in algos_conf.items():
             if not self.validate_algorithm(algos_yaml, algo, gpu_present):
@@ -313,22 +352,45 @@ class CppGBenchConfigLoader(ConfigLoader):
                     batch_size,
                 )
                 
-                # Convert each index to BenchmarkConfig
-                for index in indexes:
-                    config = BenchmarkConfig(
-                        index_name=index["name"],
-                        algo=algo,
-                        build_params=index["build_param"],
-                        search_params_list=index.get("search_params", [{}]),
-                        index_path=Path(index["file"]),
-                        backend_config={
-                            "name": index["name"],
-                            "executable_path": executable_path,
-                            "requires_gpu": algo_info.get("requires_gpu", False),
-                            "data_prefix": dataset_path
-                        }
-                    )
-                    benchmark_configs.append(config)
+                # Group by executable (matches run.py)
+                key = (executable, executable_path, file_name)
+                if key not in executables_to_run:
+                    executables_to_run[key] = {
+                        "index": [],
+                        "algo_info": algo_info,
+                        "dataset_path": dataset_path,
+                        "dataset": dataset,
+                    }
+                executables_to_run[key]["index"].extend(indexes)
+        
+        # Convert grouped indexes to BenchmarkConfig objects
+        # ONE BenchmarkConfig per executable (with ALL indexes)
+        benchmark_configs = []
+        for (executable, executable_path, file_name), data in executables_to_run.items():
+            # Convert raw index dicts to IndexConfig objects
+            index_configs = [
+                IndexConfig(
+                    name=idx["name"],
+                    algo=idx["algo"],
+                    build_param=idx["build_param"],
+                    search_params=idx.get("search_params", [{}]),
+                    file=idx["file"],
+                )
+                for idx in data["index"]
+            ]
+            
+            config = BenchmarkConfig(
+                indexes=index_configs,
+                backend_config={
+                    "executable_path": executable_path,
+                    "requires_gpu": data["algo_info"].get("requires_gpu", False),
+                    "data_prefix": data["dataset_path"],
+                    "dataset": data["dataset"],
+                    "output_filename": file_name,  # Tuple: (build_name, search_name)
+                    "algo": index_configs[0].algo if index_configs else "",
+                }
+            )
+            benchmark_configs.append(config)
         
         return benchmark_configs
     
