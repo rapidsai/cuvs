@@ -459,17 +459,3 @@ def get_config_loader(name: str) -> Type:
 def list_config_loaders() -> Dict[str, Type]:
     """Return all registered config loaders."""
     return dict(_CONFIG_LOADER_REGISTRY)
-
-
-# ============================================================================
-# Auto-register built-in backends
-# ============================================================================
-
-def _register_builtin_backends():
-    """Register built-in backends (CppGoogleBenchmarkBackend)."""
-    from .cpp_gbench import CppGoogleBenchmarkBackend
-    register_backend("cpp_gbench", CppGoogleBenchmarkBackend)
-
-
-# Auto-register when module is imported
-_register_builtin_backends()
