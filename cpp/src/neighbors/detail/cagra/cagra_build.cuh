@@ -955,9 +955,17 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
       to_gib(mem.sub_graph_size));
 
     // Calculate suggested number of partitions for host memory
+    double available_for_scaling =
+      usable_cpu_memory_fraction * mem.available_host_memory - mem.partition_labels_size -
+      mem.id_mapping_size;
+    RAFT_EXPECTS(available_for_scaling > 0,
+                 "ACE: Host memory insufficient even for constant overhead (labels + id_mapping). "
+                 "Required: %.2f GiB, available: %.2f GiB",
+                 to_gib(mem.partition_labels_size + mem.id_mapping_size),
+                 to_gib(usable_cpu_memory_fraction * mem.available_host_memory));
     host_suggested_partitions = static_cast<size_t>(
-      std::ceil(disk_mode_host_required / (usable_cpu_memory_fraction * mem.available_host_memory) *
-                n_partitions));
+      std::ceil((mem.sub_dataset_size + mem.sub_graph_size) * n_partitions / available_for_scaling));
+    // Ensure we always increase partitions (current count is insufficient by definition)
     host_suggested_partitions = std::max(host_suggested_partitions, n_partitions + 1);
   }
 
@@ -967,12 +975,8 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
   //   - Per-partition graph on GPU: (dataset_size / n_partitions) * (intermediate + final) *
   //   sizeof(IdxT)
   //   - CAGRA build also requires workspace memory. Conservative estimate: dataset size.
-  size_t gpu_sub_dataset_size =
-    imbalance_factor * 2 * (dataset_size / n_partitions) * dataset_dim * sizeof(T);
-  size_t gpu_sub_graph_size = imbalance_factor * 2 * (dataset_size / n_partitions) *
-                              (intermediate_degree + graph_degree) * sizeof(IdxT);
-  size_t gpu_workspace_size     = gpu_sub_dataset_size;
-  size_t disk_mode_gpu_required = gpu_sub_dataset_size + gpu_sub_graph_size + gpu_workspace_size;
+  size_t gpu_workspace_size     = mem.sub_dataset_size;
+  size_t disk_mode_gpu_required = mem.sub_dataset_size + mem.sub_graph_size + gpu_workspace_size;
 
   if (static_cast<size_t>(usable_gpu_memory_fraction * mem.available_gpu_memory) <
       disk_mode_gpu_required) {
@@ -983,8 +987,8 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
       "workspace %.2f GiB",
       to_gib(disk_mode_gpu_required),
       to_gib(mem.available_gpu_memory),
-      to_gib(gpu_sub_dataset_size),
-      to_gib(gpu_sub_graph_size),
+      to_gib(mem.sub_dataset_size),
+      to_gib(mem.sub_graph_size),
       to_gib(gpu_workspace_size));
 
     gpu_suggested_partitions = static_cast<size_t>(
@@ -1076,7 +1080,10 @@ index<T, IdxT> build_ace(raft::resources const& res,
   RAFT_EXPECTS(params.graph_degree > 0, "ACE: Graph degree must be greater than 0");
 
   size_t n_partitions = npartitions;
-  RAFT_EXPECTS(n_partitions > 0, "ACE: npartitions must be greater than 0");
+  if (n_partitions == 0) {
+    // Default: start with 2 partitions and increase if needed (minimum for ACE to make sense).
+    n_partitions = 2;
+  }
 
   size_t min_required_per_partition = 1000;
   if (n_partitions > dataset_size / min_required_per_partition) {
