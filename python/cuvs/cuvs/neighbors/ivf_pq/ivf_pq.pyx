@@ -293,6 +293,22 @@ cdef class Index:
         return output
 
     @property
+    def centers_padded(self):
+        """ Get the padded cluster centers [n_lists, dim_ext]
+        where dim_ext = round_up(dim + 1, 8).
+        This returns contiguous data suitable for build_precomputed. """
+        if not self.trained:
+            raise ValueError("Index needs to be built before getting"
+                             " centers_padded")
+
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsIvfPqIndexGetCentersPadded(self.index, tensor))
+        output.parent = self
+        return output
+
+    @property
     def pq_centers(self):
         """ Get the PQ cluster centers """
         if not self.trained:
@@ -303,6 +319,36 @@ cdef class Index:
         cdef cydlpack.DLManagedTensor * tensor = \
             <cydlpack.DLManagedTensor*><size_t>output.get_handle()
         check_cuvs(cuvsIvfPqIndexGetPqCenters(self.index, tensor))
+        output.parent = self
+        return output
+
+    @property
+    def centers_rot(self):
+        """ Get the rotated cluster centers [n_lists, rot_dim]
+        where rot_dim = pq_len * pq_dim """
+        if not self.trained:
+            raise ValueError("Index needs to be built before getting"
+                             " centers_rot")
+
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsIvfPqIndexGetCentersRot(self.index, tensor))
+        output.parent = self
+        return output
+
+    @property
+    def rotation_matrix(self):
+        """ Get the rotation matrix [rot_dim, dim]
+        Transform matrix (original space -> rotated padded space) """
+        if not self.trained:
+            raise ValueError("Index needs to be built before getting"
+                             " rotation_matrix")
+
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsIvfPqIndexGetRotationMatrix(self.index, tensor))
         output.parent = self
         return output
 
@@ -463,6 +509,122 @@ def build(IndexParams index_params, dataset, resources=None):
             res,
             params,
             dataset_dlpack,
+            idx.index
+        ))
+        idx.trained = True
+
+    return idx
+
+
+@auto_sync_resources
+def build_precomputed(IndexParams index_params, uint32_t dim, pq_centers, centers,
+                      centers_rot, rotation_matrix, resources=None):
+    """
+    Build a view-type IVF-PQ index from precomputed centroids and codebook.
+
+    This function creates a non-owning index that stores a reference to the provided device data.
+    All parameters must be provided with correct extents. The caller is responsible for ensuring
+    the lifetime of the input data exceeds the lifetime of the returned index.
+
+    The index_params must be consistent with the provided matrices. Specifically:
+    - index_params.codebook_kind determines the expected shape of pq_centers
+    - index_params.metric will be stored in the index
+    - index_params.conservative_memory_allocation will be stored in the index
+
+    Parameters
+    ----------
+    index_params : :py:class:`cuvs.neighbors.ivf_pq.IndexParams`
+        Parameters that must be consistent with the provided matrices
+    dim : int
+        Dimensionality of the input data
+    pq_centers : CUDA array interface compliant tensor
+        PQ codebook on device memory with required shape:
+        - codebook_kind PER_SUBSPACE: [pq_dim, pq_len, pq_book_size]
+        - codebook_kind PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
+        Supported dtype: float32
+    centers : CUDA array interface compliant matrix
+        Cluster centers in the original space [n_lists, dim_ext]
+        where dim_ext = round_up(dim + 1, 8).
+        Supported dtype: float32
+    centers_rot : CUDA array interface compliant matrix
+        Rotated cluster centers [n_lists, rot_dim]
+        where rot_dim = pq_len * pq_dim.
+        Supported dtype: float32
+    rotation_matrix : CUDA array interface compliant matrix
+        Transform matrix (original space -> rotated padded space) [rot_dim, dim].
+        Supported dtype: float32
+    {resources_docstring}
+
+    Returns
+    -------
+    index: :py:class:`cuvs.neighbors.ivf_pq.Index`
+
+    Examples
+    --------
+
+    >>> import cupy as cp
+    >>> from cuvs.neighbors import ivf_pq
+    >>> n_lists = 100
+    >>> dim = 128
+    >>> pq_dim = 16
+    >>> pq_bits = 8
+    >>> pq_len = (dim + pq_dim - 1) // pq_dim  # ceil division
+    >>> pq_book_size = 1 << pq_bits
+    >>> rot_dim = pq_len * pq_dim
+    >>> dim_ext = ((dim + 1 + 7) // 8) * 8  # round_up(dim + 1, 8)
+    >>>
+    >>> # Prepare precomputed matrices (example with random data)
+    >>> pq_centers = cp.random.random((pq_dim, pq_len, pq_book_size),
+    ...                               dtype=cp.float32)
+    >>> centers = cp.random.random((n_lists, dim_ext), dtype=cp.float32)
+    >>> centers_rot = cp.random.random((n_lists, rot_dim), dtype=cp.float32)
+    >>> rotation_matrix = cp.random.random((rot_dim, dim), dtype=cp.float32)
+    >>>
+    >>> # Build index from precomputed data
+    >>> build_params = ivf_pq.IndexParams(n_lists=n_lists, pq_dim=pq_dim,
+    ...                                    pq_bits=pq_bits,
+    ...                                    codebook_kind="subspace")
+    >>> index = ivf_pq.build_precomputed(build_params, dim, pq_centers,
+    ...                                   centers, centers_rot, rotation_matrix)
+    """
+    # Wrap and validate inputs
+    pq_centers_ai = wrap_array(pq_centers)
+    _check_input_array(pq_centers_ai, [np.dtype('float32')])
+
+    centers_ai = wrap_array(centers)
+    _check_input_array(centers_ai, [np.dtype('float32')])
+
+    centers_rot_ai = wrap_array(centers_rot)
+    _check_input_array(centers_rot_ai, [np.dtype('float32')])
+
+    rotation_matrix_ai = wrap_array(rotation_matrix)
+    _check_input_array(rotation_matrix_ai, [np.dtype('float32')])
+
+    # Create index
+    cdef Index idx = Index()
+
+    # Convert to DLPack
+    cdef cydlpack.DLManagedTensor* pq_centers_dlpack = \
+        cydlpack.dlpack_c(pq_centers_ai)
+    cdef cydlpack.DLManagedTensor* centers_dlpack = \
+        cydlpack.dlpack_c(centers_ai)
+    cdef cydlpack.DLManagedTensor* centers_rot_dlpack = \
+        cydlpack.dlpack_c(centers_rot_ai)
+    cdef cydlpack.DLManagedTensor* rotation_matrix_dlpack = \
+        cydlpack.dlpack_c(rotation_matrix_ai)
+
+    cdef cuvsIvfPqIndexParams* params = index_params.params
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
+    with cuda_interruptible():
+        check_cuvs(cuvsIvfPqBuildPrecomputed(
+            res,
+            params,
+            dim,
+            pq_centers_dlpack,
+            centers_dlpack,
+            centers_rot_dlpack,
+            rotation_matrix_dlpack,
             idx.index
         ))
         idx.trained = True

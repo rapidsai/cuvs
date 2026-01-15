@@ -92,11 +92,20 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
     cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index,
                                          DLManagedTensor * centers)
 
+    cuvsError_t cuvsIvfPqIndexGetCentersPadded(cuvsIvfPqIndex_t index,
+                                               DLManagedTensor * centers)
+
     cuvsError_t cuvsIvfPqIndexGetListSizes(cuvsIvfPqIndex_t index,
                                            DLManagedTensor * list_sizes)
 
     cuvsError_t cuvsIvfPqIndexGetPqCenters(cuvsIvfPqIndex_t index,
                                            DLManagedTensor * centers)
+
+    cuvsError_t cuvsIvfPqIndexGetCentersRot(cuvsIvfPqIndex_t index,
+                                            DLManagedTensor * centers_rot)
+
+    cuvsError_t cuvsIvfPqIndexGetRotationMatrix(cuvsIvfPqIndex_t index,
+                                                DLManagedTensor * rotation_matrix)
 
     cuvsError_t cuvsIvfPqIndexUnpackContiguousListData(cuvsResources_t res,
                                                        cuvsIvfPqIndex_t index,
@@ -112,6 +121,15 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
                                cuvsIvfPqIndexParams* params,
                                DLManagedTensor* dataset,
                                cuvsIvfPqIndex_t index)
+
+    cuvsError_t cuvsIvfPqBuildPrecomputed(cuvsResources_t res,
+                                          cuvsIvfPqIndexParams_t params,
+                                          uint32_t dim,
+                                          DLManagedTensor* pq_centers,
+                                          DLManagedTensor* centers,
+                                          DLManagedTensor* centers_rot,
+                                          DLManagedTensor* rotation_matrix,
+                                          cuvsIvfPqIndex_t index)
 
     cuvsError_t cuvsIvfPqSearch(cuvsResources_t res,
                                 cuvsIvfPqSearchParams* params,
