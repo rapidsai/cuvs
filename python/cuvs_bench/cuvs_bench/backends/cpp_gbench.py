@@ -44,12 +44,12 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
     >>> config = {
     ...     "name": "ivf_flat_experiment",
     ...     "executable_path": "/path/to/CUVS_IVF_FLAT_ANN_BENCH",
-    ...     "data_prefix": "data/"
+    ...     "data_prefix": "data/",
+    ...     "algo": "cuvs_ivf_flat"
     ... }
     >>> backend = CppGoogleBenchmarkBackend(config)
     >>> print(backend.name)  # "ivf_flat_experiment" (user-defined)
-    >>> print(backend.algo)  # "cuvs_ivf_flat" (from executable)
-    >>> result = backend.build(dataset, {"nlist": 1024}, Path("index/test"))
+    >>> print(backend.algo)  # "cuvs_ivf_flat" (from config)
     """
     
     def __init__(self, config: Dict[str, Any]):

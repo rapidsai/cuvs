@@ -230,7 +230,7 @@ class BenchmarkBackend(ABC):
         - warmup_time : float - Warmup time in seconds (default: 1.0)
         - dataset : str - Dataset name e.g., "sift-128-euclidean" (default: "")
         - output_filename : Tuple[str, str] - (build_name, search_name) (default: ("", ""))
-        - algo : str - Algorithm name e.g., "cuvs_cagra" (default: "")
+        - algo : str - Algorithm name e.g., "cuvs_cagra" (default: "") FIXME: Should this be required?
         - requires_gpu : bool - Whether backend requires GPU (default: False)
         
         Network backend keys (e.g., Milvus, Qdrant):
