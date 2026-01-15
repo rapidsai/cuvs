@@ -1140,132 +1140,18 @@ index<T, IdxT> build_ace(raft::resources const& res,
       // Mark for cleanup if we fail after creating the directory
       cleanup_on_failure = true;
 
-      // Helper lambda to write numpy header to file descriptor
-      auto write_numpy_header = [](int fd,
-                                   const std::vector<size_t>& shape,
-                                   const raft::detail::numpy_serializer::dtype_t& dtype) {
-        std::stringstream ss;
+      // Create numpy files with pre-allocated space
+      std::tie(reordered_fd, reordered_header_size) = cuvs::util::create_numpy_file<T>(
+        build_dir + "/reordered_dataset.npy", {dataset_size, dataset_dim});
 
-        const bool fortran_order                              = false;
-        const raft::detail::numpy_serializer::header_t header = {dtype, fortran_order, shape};
+      std::tie(augmented_fd, augmented_header_size) = cuvs::util::create_numpy_file<T>(
+        build_dir + "/augmented_dataset.npy", {dataset_size, dataset_dim});
 
-        raft::detail::numpy_serializer::write_header(ss, header);
+      std::tie(mapping_fd, mapping_header_size) =
+        cuvs::util::create_numpy_file<IdxT>(build_dir + "/dataset_mapping.npy", {dataset_size});
 
-        std::string header_str = ss.str();
-        ssize_t written        = write(fd, header_str.data(), header_str.size());
-        if (written < 0 || static_cast<size_t>(written) != header_str.size()) {
-          RAFT_FAIL("Failed to write numpy header to file descriptor");
-        }
-        return header_str.size();
-      };
-
-      // Create and allocate dataset file
-      reordered_fd = cuvs::util::file_descriptor(
-        build_dir + "/reordered_dataset.npy", O_CREAT | O_RDWR | O_TRUNC, 0644);
-      {
-        std::stringstream ss;
-        const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<T>();
-        const bool fortran_order = false;
-        const raft::detail::numpy_serializer::header_t header = {
-          dtype, fortran_order, {dataset_size, dataset_dim}};
-        raft::detail::numpy_serializer::write_header(ss, header);
-        reordered_header_size = ss.str().size();
-      }
-      if (posix_fallocate(reordered_fd.get(),
-                          0,
-                          reordered_header_size + dataset_size * dataset_dim * sizeof(T)) != 0) {
-        RAFT_FAIL("Failed to pre-allocate space for reordered dataset file");
-      }
-      {
-        auto dtype_for_dataset = raft::detail::numpy_serializer::get_numpy_dtype<T>();
-        RAFT_LOG_DEBUG("Writing reordered_dataset.npy header: shape=[%zu,%zu], dtype=%c",
-                       dataset_size,
-                       dataset_dim,
-                       dtype_for_dataset.kind);
-        if (lseek(reordered_fd.get(), 0, SEEK_SET) == -1) {
-          RAFT_FAIL("Failed to seek to beginning of reordered dataset file");
-        }
-        write_numpy_header(reordered_fd.get(), {dataset_size, dataset_dim}, dtype_for_dataset);
-      }
-
-      // Create and allocate augmented dataset file
-      augmented_fd = cuvs::util::file_descriptor(
-        build_dir + "/augmented_dataset.npy", O_CREAT | O_RDWR | O_TRUNC, 0644);
-      {
-        std::stringstream ss;
-        const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<T>();
-        const bool fortran_order = false;
-        const raft::detail::numpy_serializer::header_t header = {
-          dtype, fortran_order, {dataset_size, dataset_dim}};
-        raft::detail::numpy_serializer::write_header(ss, header);
-        augmented_header_size = ss.str().size();
-      }
-      if (posix_fallocate(augmented_fd.get(),
-                          0,
-                          augmented_header_size + dataset_size * dataset_dim * sizeof(T)) != 0) {
-        RAFT_FAIL("Failed to pre-allocate space for augmented dataset file");
-      }
-      // Seek to beginning before writing header
-      if (lseek(augmented_fd.get(), 0, SEEK_SET) == -1) {
-        RAFT_FAIL("Failed to seek to beginning of augmented dataset file");
-      }
-      write_numpy_header(augmented_fd.get(),
-                         {dataset_size, dataset_dim},
-                         raft::detail::numpy_serializer::get_numpy_dtype<T>());
-
-      // Create and allocate mapping file
-      mapping_fd = cuvs::util::file_descriptor(
-        build_dir + "/dataset_mapping.npy", O_CREAT | O_RDWR | O_TRUNC, 0644);
-      {
-        std::stringstream ss;
-        const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<IdxT>();
-        const bool fortran_order = false;
-        const raft::detail::numpy_serializer::header_t header = {
-          dtype, fortran_order, {dataset_size}};
-        raft::detail::numpy_serializer::write_header(ss, header);
-        mapping_header_size = ss.str().size();
-      }
-      if (posix_fallocate(mapping_fd.get(), 0, mapping_header_size + dataset_size * sizeof(IdxT)) !=
-          0) {
-        RAFT_FAIL("Failed to pre-allocate space for dataset mapping file");
-      }
-      {
-        auto dtype_for_mapping = raft::detail::numpy_serializer::get_numpy_dtype<IdxT>();
-        RAFT_LOG_DEBUG("Writing dataset_mapping.npy header: shape=[%zu], dtype=%c",
-                       dataset_size,
-                       dtype_for_mapping.kind);
-        if (lseek(mapping_fd.get(), 0, SEEK_SET) == -1) {
-          RAFT_FAIL("Failed to seek to beginning of mapping file");
-        }
-        write_numpy_header(mapping_fd.get(), {dataset_size}, dtype_for_mapping);
-      }
-
-      // Create and allocate graph file
-      graph_fd = cuvs::util::file_descriptor(
-        build_dir + "/cagra_graph.npy", O_CREAT | O_RDWR | O_TRUNC, 0644);
-      {
-        std::stringstream ss;
-        const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<IdxT>();
-        const bool fortran_order = false;
-        const raft::detail::numpy_serializer::header_t header = {
-          dtype, fortran_order, {dataset_size, graph_degree}};
-        raft::detail::numpy_serializer::write_header(ss, header);
-        graph_header_size = ss.str().size();
-      }
-      if (posix_fallocate(graph_fd.get(), 0, graph_header_size + mem.cagra_graph_size) != 0) {
-        RAFT_FAIL("Failed to pre-allocate space for graph file");
-      }
-      {
-        auto dtype_for_graph = raft::detail::numpy_serializer::get_numpy_dtype<IdxT>();
-        RAFT_LOG_DEBUG("Writing cagra_graph.npy header: shape=[%zu,%zu], dtype=%c",
-                       dataset_size,
-                       graph_degree,
-                       dtype_for_graph.kind);
-        if (lseek(graph_fd.get(), 0, SEEK_SET) == -1) {
-          RAFT_FAIL("Failed to seek to beginning of graph file");
-        }
-        write_numpy_header(graph_fd.get(), {dataset_size, graph_degree}, dtype_for_graph);
-      }
+      std::tie(graph_fd, graph_header_size) = cuvs::util::create_numpy_file<IdxT>(
+        build_dir + "/cagra_graph.npy", {dataset_size, graph_degree});
 
       RAFT_LOG_DEBUG(
         "ACE: Wrote numpy headers (reordered: %zu, augmented: %zu, mapping: %zu, graph: %zu bytes)",
