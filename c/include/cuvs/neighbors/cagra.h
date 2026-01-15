@@ -143,11 +143,10 @@ struct cuvsAceParams {
    *
    * Small values might improve recall but potentially degrade performance and
    * increase memory usage. Partitions should not be too small to prevent issues
-   * in KNN graph construction. 100k - 5M vectors per partition is recommended
-   * depending on the available host and GPU memory. The partition size is on
-   * average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because of the
-   * core and augmented vectors. Please account for imbalance in the partition
-   * sizes (up to 3x in our tests).
+   * in KNN graph construction. The partition size is on average 2 * (n_rows /
+   * npartitions) * dim * sizeof(T). 2 is because of the core and augmented
+   * vectors. Please account for imbalance in the partition sizes (up to 3x in
+   * our tests).
    *
    * If the specified number of partitions results in partitions that exceed
    * available memory, the value will be automatically increased to fit memory

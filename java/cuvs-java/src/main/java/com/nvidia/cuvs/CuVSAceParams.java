@@ -24,11 +24,10 @@ public class CuVSAceParams {
    * ensuring the build fits in memory.
    *
    * Small values might improve recall but potentially degrade performance and increase memory usage.
-   * Partitions should not be too small to prevent issues in KNN graph construction. 100k - 5M
-   * vectors per partition is recommended depending on the available host and GPU memory. The
-   * partition size is on average {@code 2 * (n_rows / npartitions) * dim * sizeof(T)}—the factor 2
-   * accounts for core and augmented vectors. Please account for imbalance in the partition sizes
-   * (up to 3x in our tests).
+   * Partitions should not be too small to prevent issues in KNN graph construction. The partition
+   * size is on average {@code 2 * (n_rows / npartitions) * dim * sizeof(T)}—the factor 2 accounts
+   * for core and augmented vectors. Please account for imbalance in the partition sizes (up to 3x in
+   * our tests).
    *
    * If the specified number of partitions results in partitions that exceed
    * available memory, the value will be automatically increased to fit memory

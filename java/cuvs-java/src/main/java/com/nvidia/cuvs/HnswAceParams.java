@@ -114,7 +114,9 @@ public class HnswAceParams {
      * ensuring the build fits in memory.
      *
      * Small values might improve recall but potentially degrade performance.
-     * 100k - 5M vectors per partition is recommended.
+     * The partition size is on average 2 * (n_rows / npartitions) * dim *
+     * sizeof(T). 2 is because of the core and augmented vectors. Please account
+     * for imbalance in the partition sizes (up to 3x in our tests).
      *
      * If the specified number of partitions results in partitions that exceed
      * available memory, the value will be automatically increased to fit memory
