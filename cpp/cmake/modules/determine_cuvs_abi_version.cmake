@@ -69,7 +69,7 @@ Result Variables
 
 #]=======================================================================]
 function(determine_cuvs_abi_version cal_ver MAJOR _CUVS_RAPIDS_MAJOR_VAR MINOR
-         _CUVS_RAPIDS_MINOR_VAR\
+         _CUVS_RAPIDS_MINOR_VAR \
 )
   # major value table
   set(major_table_02 "1")
