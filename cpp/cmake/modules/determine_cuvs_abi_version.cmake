@@ -68,9 +68,12 @@ Result Variables
 
 
 #]=======================================================================]
-function(determine_cuvs_abi_version cal_ver MAJOR _CUVS_RAPIDS_MAJOR_VAR MINOR
-         _CUVS_RAPIDS_MINOR_VAR \
-)
+function(determine_cuvs_abi_version cal_ver)
+  set(options)
+  set(one_value "MAJOR" "MINOR")
+  set(multi_value)
+  cmake_parse_arguments(_CUVS_RAPIDS "${options}" "${one_value}" "${multi_value}" ${ARGN})
+
   # major value table
   set(major_table_02 "1")
   set(major_table_04 "1")
@@ -93,11 +96,11 @@ function(determine_cuvs_abi_version cal_ver MAJOR _CUVS_RAPIDS_MAJOR_VAR MINOR
   math(EXPR computed_abi_major "(${cal_ver_major} - 26) * 2 + ${major_table_${cal_ver_minor}}")
   set(compute_abi_minor "${minor_table_${cal_ver_minor}}")
 
-  set("${_CUVS_RAPIDS_MAJOR_VAR}"
+  set(${_CUVS_RAPIDS_MAJOR}
       ${computed_abi_major}
       PARENT_SCOPE
   )
-  set("${_CUVS_RAPIDS_MINOR_VAR}"
+  set(${_CUVS_RAPIDS_MINOR}
       ${compute_abi_minor}
       PARENT_SCOPE
   )
