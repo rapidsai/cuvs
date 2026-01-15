@@ -39,6 +39,17 @@ struct cuvsProductQuantizerParams {
    */
   uint32_t pq_dim;
   /**
+   * Whether to use subspaces for product quantization (PQ).
+   * When true, one PQ codebook is used for each subspace. Otherwise, a single
+   * PQ codebook is used.
+   */
+  bool use_subspaces;
+  /**
+   * Whether to use Vector Quantization (KMeans) before product quantization (PQ).
+   * When true, VQ is used before PQ. When false, only product quantization is used.
+   */
+  bool use_vq;
+  /**
    * Vector Quantization (VQ) codebook size - number of "coarse cluster centers".
    * When zero, an optimal value is selected using a heuristic.
    * When one, only product quantization is used.
@@ -46,16 +57,6 @@ struct cuvsProductQuantizerParams {
   uint32_t vq_n_centers;
   /** The number of iterations searching for kmeans centers (both VQ & PQ phases). */
   uint32_t kmeans_n_iters;
-  /**
-   * The fraction of data to use during iterative kmeans building (VQ phase).
-   * When zero, an optimal value is selected using a heuristic.
-   */
-  double vq_kmeans_trainset_fraction;
-  /**
-   * The fraction of data to use during iterative kmeans building (PQ phase).
-   * When zero, an optimal value is selected using a heuristic.
-   */
-  double pq_kmeans_trainset_fraction;
   /**
    * The type of kmeans algorithm to use for PQ training.
    */
@@ -68,16 +69,9 @@ struct cuvsProductQuantizerParams {
    */
   uint32_t max_train_points_per_pq_code;
   /**
-   * Whether to use Vector Quantization (KMeans) before product quantization (PQ).
-   * When true, VQ is used before PQ. When false, only product quantization is used.
+   * The max number of data points to use per VQ cluster.
    */
-  bool use_vq;
-  /**
-   * Whether to use subspaces for product quantization (PQ).
-   * When true, one PQ codebook is used for each subspace. Otherwise, a single
-   * PQ codebook is used.
-   */
-  bool use_subspaces;
+  uint32_t max_train_points_per_vq_cluster;
 };
 
 typedef struct cuvsProductQuantizerParams* cuvsProductQuantizerParams_t;

@@ -17,14 +17,13 @@ cdef extern from "cuvs/preprocessing/quantize/pq.h" nogil:
     ctypedef struct cuvsProductQuantizerParams:
         uint32_t pq_bits
         uint32_t pq_dim
+        bool use_subspaces
+        bool use_vq
         uint32_t vq_n_centers
         uint32_t kmeans_n_iters
-        double vq_kmeans_trainset_fraction
-        double pq_kmeans_trainset_fraction
         cuvsKMeansType pq_kmeans_type
         uint32_t max_train_points_per_pq_code
-        bool use_vq
-        bool use_subspaces
+        uint32_t max_train_points_per_vq_cluster
 
     ctypedef cuvsProductQuantizerParams* cuvsProductQuantizerParams_t
 

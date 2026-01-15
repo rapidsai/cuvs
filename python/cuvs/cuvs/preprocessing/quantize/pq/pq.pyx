@@ -33,20 +33,19 @@ cdef class QuantizerParams:
         possible values: within [4, 16]
     pq_dim: int
         specifies the dimensionality of the vector after compression by PQ
+    use_subspaces: bool
+        specifies whether to use subspaces for product quantization (PQ).
+        When true, one PQ codebook is used for each subspace. Otherwise, a
+        single PQ codebook is used.
+    use_vq: bool
+        specifies whether to use Vector Quantization (KMeans) before product
+        quantization (PQ).
     vq_n_centers: int
         specifies the number of centers for the vector quantizer.
         When zero, an optimal value is selected using a heuristic.
         When one, only product quantization is used.
     kmeans_n_iters: int
         specifies the number of iterations searching for kmeans centers
-    vq_kmeans_trainset_fraction: float
-        specifies the fraction of data to use during iterative kmeans building
-        for the vector quantizer. When zero, an optimal value is selected
-        using a heuristic.
-    pq_kmeans_trainset_fraction: float
-        specifies the fraction of data to use during iterative kmeans building
-        for the product quantizer. When zero, an optimal value is selected
-        using a heuristic.
     pq_kmeans_type: str
         specifies the type of kmeans algorithm to use for PQ training
         possible values: "kmeans", "kmeans_balanced"
@@ -54,13 +53,8 @@ cdef class QuantizerParams:
         specifies the max number of data points to use per PQ code during PQ
         codebook training. Using more data points per PQ code may increase the
         quality of PQ codebook but may also increase the build time.
-    use_vq: bool
-        specifies whether to use Vector Quantization (KMeans) before product
-        quantization (PQ).
-    use_subspaces: bool
-        specifies whether to use subspaces for product quantization (PQ).
-        When true, one PQ codebook is used for each subspace. Otherwise, a
-        single PQ codebook is used.
+    max_train_points_per_vq_cluster: int
+        specifies the max number of data points to use per VQ cluster.
     """
 
     cdef cuvsProductQuantizerParams * params
@@ -71,26 +65,23 @@ cdef class QuantizerParams:
     def __dealloc__(self):
         check_cuvs(cuvsProductQuantizerParamsDestroy(self.params))
 
-    def __init__(self, *, pq_bits=8, pq_dim=0, vq_n_centers=0,
-                 kmeans_n_iters=25, vq_kmeans_trainset_fraction=0.0,
-                 pq_kmeans_trainset_fraction=0.0,
+    def __init__(self, *, pq_bits=8, pq_dim=0, use_subspaces=True,
+                 use_vq=False, vq_n_centers=0, kmeans_n_iters=25,
                  pq_kmeans_type="kmeans_balanced",
                  max_train_points_per_pq_code=256,
-                 use_vq=False,
-                 use_subspaces=True):
+                 max_train_points_per_vq_cluster=1024):
         if pq_bits < 4 or pq_bits > 16:
             raise ValueError("pq_bits must be within [4, 16]")
         self.params.pq_bits = pq_bits
         self.params.pq_dim = pq_dim
+        self.params.use_subspaces = use_subspaces
+        self.params.use_vq = use_vq
         self.params.vq_n_centers = vq_n_centers
         self.params.kmeans_n_iters = kmeans_n_iters
-        self.params.vq_kmeans_trainset_fraction = vq_kmeans_trainset_fraction
-        self.params.pq_kmeans_trainset_fraction = pq_kmeans_trainset_fraction
         pq_kmeans_type_c = PQ_KMEANS_TYPES[pq_kmeans_type]
         self.params.pq_kmeans_type = <cuvsKMeansType>pq_kmeans_type_c
         self.params.max_train_points_per_pq_code = max_train_points_per_pq_code
-        self.params.use_vq = use_vq
-        self.params.use_subspaces = use_subspaces
+        self.params.max_train_points_per_vq_cluster = max_train_points_per_vq_cluster
 
     @property
     def pq_bits(self):
@@ -109,20 +100,16 @@ cdef class QuantizerParams:
         return self.params.kmeans_n_iters
 
     @property
-    def vq_kmeans_trainset_fraction(self):
-        return self.params.vq_kmeans_trainset_fraction
-
-    @property
-    def pq_kmeans_trainset_fraction(self):
-        return self.params.pq_kmeans_trainset_fraction
-
-    @property
     def pq_kmeans_type(self):
         return self.params.pq_kmeans_type
 
     @property
     def max_train_points_per_pq_code(self):
         return self.params.max_train_points_per_pq_code
+
+    @property
+    def max_train_points_per_vq_cluster(self):
+        return self.params.max_train_points_per_vq_cluster
 
     @property
     def use_vq(self):

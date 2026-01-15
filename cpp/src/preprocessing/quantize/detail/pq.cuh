@@ -18,6 +18,31 @@
 
 namespace cuvs::preprocessing::quantize::pq::detail {
 
+inline void fill_missing_params_heuristics(cuvs::preprocessing::quantize::pq::params& params,
+                                           size_t n_rows,
+                                           size_t dim)
+{
+  if (params.pq_dim == 0) { params.pq_dim = raft::div_rounding_up_safe(dim, size_t{4}); }
+  if (params.vq_n_centers == 0) {
+    params.vq_n_centers = raft::round_up_safe<uint32_t>(std::sqrt(n_rows), 8);
+  }
+}
+
+inline auto to_vpq_params(const cuvs::preprocessing::quantize::pq::params& params)
+  -> cuvs::neighbors::vpq_params
+{
+  return cuvs::neighbors::vpq_params{
+    .pq_bits                         = params.pq_bits,
+    .pq_dim                          = params.pq_dim,
+    .vq_n_centers                    = params.vq_n_centers,
+    .kmeans_n_iters                  = params.kmeans_n_iters,
+    .vq_kmeans_trainset_fraction     = 1.0,
+    .pq_kmeans_trainset_fraction     = 1.0,
+    .pq_kmeans_type                  = params.pq_kmeans_type,
+    .max_train_points_per_pq_code    = params.max_train_points_per_pq_code,
+    .max_train_points_per_vq_cluster = params.max_train_points_per_vq_cluster};
+}
+
 template <typename MathT, typename DatasetT>
 auto train_pq_subspaces(
   const raft::resources& res,
@@ -34,8 +59,8 @@ auto train_pq_subspaces(
   const ix_t pq_n_centers = ix_t{1} << pq_bits;
   const ix_t pq_len       = raft::div_rounding_up_safe(dim, pq_dim);
   RAFT_EXPECTS((dim % pq_dim) == 0, "Dimension must be divisible by pq_dim");
-  ix_t n_rows_train = n_rows * params.pq_kmeans_trainset_fraction;
-  n_rows_train      = std::min(n_rows_train, params.max_train_points_per_pq_code * pq_n_centers);
+  const ix_t n_rows_train =
+    std::min<ix_t>(n_rows, params.max_train_points_per_pq_code * pq_n_centers);
   RAFT_EXPECTS(
     n_rows_train >= pq_n_centers,
     "The number of training samples must be equal to or greater than the number of PQ centers");
@@ -96,7 +121,7 @@ auto train_pq_subspaces(
       pq_centers.data_handle() + m * pq_n_centers * pq_len, pq_n_centers, pq_len);
     cuvs::neighbors::detail::train_pq_centers<MathT, ix_t>(
       res,
-      params,
+      to_vpq_params(params),
       raft::make_const_mdspan(sub_dataset.view()),
       pq_centers_subspace_view,
       sub_labels_view_opt,
@@ -123,33 +148,32 @@ quantizer<MathT> train(
                "PQ bits must be within [4, 16], got %u",
                params.pq_bits);
 
-  cuvs::preprocessing::quantize::pq::params ps(
-    cuvs::neighbors::detail::fill_missing_params_heuristics(
-      static_cast<const cuvs::neighbors::vpq_params&>(params), dataset),
-    params.use_vq,
-    params.use_subspaces);
+  auto filled_params = params;
+  fill_missing_params_heuristics(filled_params, n_rows, dim);
+  auto vpq_params = to_vpq_params(filled_params);
   std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>>
     vq_code_book_view_opt = std::nullopt;
   std::optional<raft::device_matrix<MathT, uint32_t, raft::row_major>> vq_code_book_opt =
     std::nullopt;
-  if (ps.use_vq) {
-    vq_code_book_opt      = cuvs::neighbors::detail::train_vq<MathT>(res, ps, dataset);
+  if (filled_params.use_vq) {
+    vq_code_book_opt      = cuvs::neighbors::detail::train_vq<MathT>(res, vpq_params, dataset);
     vq_code_book_view_opt = raft::make_const_mdspan(vq_code_book_opt.value().view());
   } else {
     vq_code_book_opt = raft::make_device_matrix<MathT, uint32_t, raft::row_major>(res, 0, 0);
   }
   auto empty_codes = raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(res, 0, 0);
-  if (ps.use_subspaces) {
-    auto pq_code_book = train_pq_subspaces<MathT>(res, ps, dataset, vq_code_book_view_opt);
+  if (filled_params.use_subspaces) {
+    auto pq_code_book =
+      train_pq_subspaces<MathT>(res, filled_params, dataset, vq_code_book_view_opt);
     return {
-      ps,
+      filled_params,
       cuvs::neighbors::vpq_dataset<MathT, int64_t>{
         std::move(vq_code_book_opt.value()), std::move(pq_code_book), std::move(empty_codes)}};
   } else {
     auto pq_code_book =
-      cuvs::neighbors::detail::train_pq<MathT>(res, ps, dataset, vq_code_book_view_opt);
+      cuvs::neighbors::detail::train_pq<MathT>(res, vpq_params, dataset, vq_code_book_view_opt);
     return {
-      ps,
+      filled_params,
       cuvs::neighbors::vpq_dataset<MathT, int64_t>{
         std::move(vq_code_book_opt.value()), std::move(pq_code_book), std::move(empty_codes)}};
   }
@@ -183,7 +207,7 @@ void transform(
   if (quantizer.params_quantizer.use_subspaces) {
     cuvs::neighbors::detail::process_and_fill_codes_subspaces<T, int64_t>(
       res,
-      quantizer.params_quantizer,
+      to_vpq_params(quantizer.params_quantizer),
       dataset,
       raft::make_const_mdspan(quantizer.vpq_codebooks.pq_code_book.view()),
       out,
@@ -191,7 +215,7 @@ void transform(
   } else {
     cuvs::neighbors::detail::process_and_fill_codes<T, int64_t>(
       res,
-      quantizer.params_quantizer,
+      to_vpq_params(quantizer.params_quantizer),
       dataset,
       raft::make_const_mdspan(quantizer.vpq_codebooks.pq_code_book.view()),
       out,

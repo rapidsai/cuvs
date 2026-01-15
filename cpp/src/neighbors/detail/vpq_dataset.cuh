@@ -52,13 +52,14 @@ auto subsample(raft::resources const& res,
   RAFT_EXPECTS(n_samples <= dataset.extent(0),
                "The number of samples must be smaller than the number of input rows in the current "
                "implementation.");
-  size_t dim  = dataset.extent(1);
+  size_t dim            = dataset.extent(1);
+  size_t trainset_ratio = dataset.extent(0) / n_samples;
   auto result = raft::make_device_matrix<value_type, index_type>(res, n_samples, dataset.extent(1));
 
   RAFT_CUDA_TRY(cudaMemcpy2DAsync(result.data_handle(),
                                   sizeof(value_type) * dim,
                                   dataset.data_handle(),
-                                  sizeof(value_type) * dim,
+                                  sizeof(value_type) * dim * trainset_ratio,
                                   sizeof(value_type) * dim,
                                   n_samples,
                                   cudaMemcpyDefault,
@@ -184,7 +185,8 @@ auto train_vq(const raft::resources& res, const vpq_params& params, const Datase
   const ix_t n_rows       = dataset.extent(0);
   const ix_t vq_n_centers = params.vq_n_centers;
   const ix_t dim          = dataset.extent(1);
-  const ix_t n_rows_train = n_rows * params.vq_kmeans_trainset_fraction;
+  const ix_t n_rows_train = std::min<ix_t>(n_rows * params.vq_kmeans_trainset_fraction,
+                                           params.max_train_points_per_vq_cluster * vq_n_centers);
 
   // Subsample the dataset and transform into the required type if necessary
   auto vq_trainset = util::subsample(res, dataset, n_rows_train);

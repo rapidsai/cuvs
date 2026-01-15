@@ -63,11 +63,13 @@ struct vpq_params {
   /**
    * The fraction of data to use during iterative kmeans building (VQ phase).
    * When zero, an optimal value is selected using a heuristic.
+   * @deprecated Prefer using `max_train_points_per_vq_cluster` instead.
    */
   double vq_kmeans_trainset_fraction = 0;
   /**
    * The fraction of data to use during iterative kmeans building (PQ phase).
    * When zero, an optimal value is selected using a heuristic.
+   * @deprecated Prefer using `max_train_points_per_pq_code` instead.
    */
   double pq_kmeans_trainset_fraction = 0;
   /**
@@ -85,6 +87,10 @@ struct vpq_params {
    * points to train each PQ codebook.
    */
   uint32_t max_train_points_per_pq_code = 256;
+  /**
+   * The max number of data points to use per VQ cluster during training.
+   */
+  uint32_t max_train_points_per_vq_cluster = 1024;
 };
 
 /** @} */  // end group cagra_cpp_index_params

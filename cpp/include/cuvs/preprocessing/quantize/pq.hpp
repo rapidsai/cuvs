@@ -19,27 +19,61 @@ namespace cuvs::preprocessing::quantize::pq {
 
 /**
  * @brief Product Quantizer parameters.
- * @see cuvs::neighbors::vpq_params
  */
-struct params : public cuvs::neighbors::vpq_params {
-  params() = default;
-  explicit params(cuvs::neighbors::vpq_params vpq_params,
-                  bool use_vq        = false,
-                  bool use_subspaces = true)
-    : cuvs::neighbors::vpq_params(vpq_params), use_vq(use_vq), use_subspaces(use_subspaces)
-  {
-  }
+struct params {
   /**
-   * Whether to use Vector Quantization (KMeans) before product quantization (PQ).
-   * When true, VQ is used before PQ.
+   * The bit length of the vector element after compression by PQ.
+   *
+   * Possible value range: [4-16].
+   *
+   * Hint: the smaller the 'pq_bits', the smaller the index size and the faster the
+   * fit/transform time, but the lower the recall.
    */
-  bool use_vq = false;
+  uint32_t pq_bits = 8;
+  /**
+   * The dimensionality of the vector after compression by PQ.
+   * When zero, an optimal value is selected using a heuristic.
+   *
+   * TODO: at the moment `dim` must be a multiple `pq_dim`.
+   */
+  uint32_t pq_dim = 0;
   /**
    * Whether to use subspaces for product quantization (PQ).
    * When true, one PQ codebook is used for each subspace. Otherwise, a single
    * PQ codebook is used.
    */
   bool use_subspaces = true;
+  /**
+   * Whether to use Vector Quantization (KMeans) before product quantization (PQ).
+   * When true, VQ is used and PQ is trained on the residuals.
+   */
+  bool use_vq = false;
+  /**
+   * Vector Quantization (VQ) codebook size - number of "coarse cluster centers".
+   * When zero, an optimal value is selected using a heuristic.
+   */
+  uint32_t vq_n_centers = 0;
+  /** The number of iterations searching for kmeans centers (both VQ & PQ phases). */
+  uint32_t kmeans_n_iters = 25;
+  /**
+   * Type of k-means algorithm for PQ training.
+   * Balanced k-means tends to be faster than regular k-means for PQ training, for
+   * problem sets where the number of points per cluster are approximately equal.
+   * Regular k-means may be better for skewed cluster distributions.
+   */
+  cuvs::cluster::kmeans::kmeans_type pq_kmeans_type =
+    cuvs::cluster::kmeans::kmeans_type::KMeansBalanced;
+  /**
+   * The max number of data points to use per PQ code during PQ codebook training. Using more data
+   * points per PQ code may increase the quality of PQ codebook but may also increase the build
+   * time. We will use `pq_n_centers * max_train_points_per_pq_code` training
+   * points to train each PQ codebook.
+   */
+  uint32_t max_train_points_per_pq_code = 256;
+  /**
+   * The max number of data points to use per VQ cluster during training.
+   */
+  uint32_t max_train_points_per_vq_cluster = 1024;
 };
 
 /**

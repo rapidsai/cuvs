@@ -55,19 +55,17 @@ void* _train(cuvsResources_t res,
 
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
 
-  auto quantizer_params                        = cuvs::preprocessing::quantize::pq::params();
-  quantizer_params.pq_bits                     = params->pq_bits;
-  quantizer_params.pq_dim                      = params->pq_dim;
-  quantizer_params.vq_n_centers                = params->vq_n_centers;
-  quantizer_params.kmeans_n_iters              = params->kmeans_n_iters;
-  quantizer_params.pq_kmeans_trainset_fraction = params->pq_kmeans_trainset_fraction;
-  quantizer_params.vq_kmeans_trainset_fraction = params->vq_kmeans_trainset_fraction;
-  quantizer_params.pq_kmeans_type =
-    static_cast<cuvs::cluster::kmeans::kmeans_type>(params->pq_kmeans_type);
-  quantizer_params.max_train_points_per_pq_code = params->max_train_points_per_pq_code;
-  quantizer_params.use_vq = params->use_vq;
-  quantizer_params.use_subspaces = params->use_subspaces;
-
+  auto quantizer_params = cuvs::preprocessing::quantize::pq::params{
+    .pq_bits = params->pq_bits,
+    .pq_dim = params->pq_dim,
+    .use_subspaces = params->use_subspaces,
+    .use_vq = params->use_vq,
+    .vq_n_centers = params->vq_n_centers,
+    .kmeans_n_iters = params->kmeans_n_iters,
+    .pq_kmeans_type = static_cast<cuvs::cluster::kmeans::kmeans_type>(params->pq_kmeans_type),
+    .max_train_points_per_pq_code = params->max_train_points_per_pq_code,
+    .max_train_points_per_vq_cluster = params->max_train_points_per_vq_cluster
+  };
   cuvs::preprocessing::quantize::pq::quantizer<T>* ret = nullptr;
 
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
@@ -116,10 +114,9 @@ extern "C" cuvsError_t cuvsProductQuantizerParamsCreate(cuvsProductQuantizerPara
 {
   return cuvs::core::translate_exceptions([=] {
     *params = new cuvsProductQuantizerParams{
-      .pq_bits = 8, .pq_dim = 0, .vq_n_centers = 0, .kmeans_n_iters = 25,
-      .vq_kmeans_trainset_fraction = 0, .pq_kmeans_trainset_fraction = 0,
-      .pq_kmeans_type = cuvsKMeansType::KMeansBalanced, .max_train_points_per_pq_code = 256,
-      .use_vq = false, .use_subspaces = true}; });
+      .pq_bits = 8, .pq_dim = 0, .use_subspaces = true, .use_vq = false, .vq_n_centers = 0,
+      .kmeans_n_iters = 25, .pq_kmeans_type = cuvsKMeansType::KMeansBalanced,
+      .max_train_points_per_pq_code = 256, .max_train_points_per_vq_cluster = 1024}; });
 }
 
 extern "C" cuvsError_t cuvsProductQuantizerParamsDestroy(cuvsProductQuantizerParams_t params)

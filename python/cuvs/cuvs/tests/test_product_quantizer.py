@@ -8,9 +8,11 @@ import pytest
 from pylibraft.common import device_ndarray
 
 from cuvs.preprocessing.quantize import pq
+from cuvs.neighbors import brute_force
+from cuvs.tests.ann_utils import calc_recall, generate_data
 
 
-@pytest.mark.parametrize("n_rows", [550, 700])
+@pytest.mark.parametrize("n_rows", [700, 1000])
 @pytest.mark.parametrize("n_cols", [64, 128])
 @pytest.mark.parametrize("pq_bits", [7, 9])
 @pytest.mark.parametrize("inplace", [True, False])
@@ -37,11 +39,10 @@ def test_product_quantizer(
     params = pq.QuantizerParams(
         pq_bits=pq_bits,
         pq_dim=pq_dim,
-        vq_n_centers=vq_n_centers,
-        pq_kmeans_trainset_fraction=1,
-        pq_kmeans_type=pq_kmeans_type,
-        use_vq=use_vq,
         use_subspaces=use_subspaces,
+        use_vq=use_vq,
+        vq_n_centers=vq_n_centers,
+        pq_kmeans_type=pq_kmeans_type,
     )
     if device_memory:
         quantizer = pq.train(params, input1_device)
@@ -75,7 +76,7 @@ def test_product_quantizer(
     reconstruction_error = cp.linalg.norm(
         cp.array(input1_device) - reconstructed, axis=1
     )
-    assert reconstruction_error.mean() < 1
+    assert reconstruction_error.mean() < 1.5
 
 
 def test_extreme_cases():
@@ -87,3 +88,41 @@ def test_extreme_cases():
     params = pq.QuantizerParams(pq_bits=8, pq_dim=2)
     quantizer = pq.train(params, dataset)
     pq.transform(quantizer, dataset)
+
+
+@pytest.mark.parametrize("use_vq", [True, False])
+@pytest.mark.parametrize("use_subspaces", [True, False])
+@pytest.mark.parametrize("pq_dim", [64, 128])
+def test_recall(use_vq, use_subspaces, pq_dim):
+    n_samples = 5000
+    n_queries = 150
+    n_features = 256
+    pq_bits = 8
+    pq_kmeans_type = "kmeans_balanced"
+    dataset = generate_data((n_samples, n_features), dtype=np.float32)
+    queries = generate_data((n_queries, n_features), dtype=np.float32)
+    queries_device = device_ndarray(queries)
+    dataset_device = device_ndarray(dataset)
+    params = pq.QuantizerParams(
+        pq_bits=pq_bits,
+        pq_dim=pq_dim,
+        use_subspaces=use_subspaces,
+        use_vq=use_vq,
+        pq_kmeans_type=pq_kmeans_type,
+    )
+    quantizer = pq.train(params, dataset)
+    transformed = pq.transform(quantizer, dataset)
+    reconstructed = pq.inverse_transform(quantizer, transformed)
+
+    index = brute_force.build(reconstructed)
+    distances, indices = brute_force.search(index, queries_device, k=10)
+
+    index_gt = brute_force.build(dataset_device)
+    distances_gt, indices_gt = brute_force.search(
+        index_gt, queries_device, k=10
+    )
+    indices_host = indices.copy_to_host()
+    indices_gt_host = indices_gt.copy_to_host()
+    recall = calc_recall(indices_host, indices_gt_host)
+    expected_recall = 0.5 if pq_dim == 64 else 0.75
+    assert recall > expected_recall
