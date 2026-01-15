@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 # =============================================================================
+include_guard(GLOBAL)
 
 #[=======================================================================[.rst:
 determine_cuvs_abi_version
@@ -67,6 +68,7 @@ Result Variables
       Contains the ABI minor version component
 
 #]=======================================================================]
+# cmake-lint: disable=C0112
 function(determine_cuvs_abi_version cal_ver)
   set(options)
   set(one_value "MAJOR" "MINOR")
