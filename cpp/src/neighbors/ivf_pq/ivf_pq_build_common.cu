@@ -376,20 +376,28 @@ void rotate_padded_centers(
                      stream);
 }
 
+void resize_list(raft::resources const& res,
+                 std::shared_ptr<list_data_base<int64_t, uint32_t>>& orig_list,
+                 const list_spec_flat<uint32_t, int64_t>& spec,
+                 uint32_t new_used_size,
+                 uint32_t old_used_size)
+{
+  auto typed_list = std::static_pointer_cast<list_data_flat<int64_t>>(orig_list);
+  cuvs::neighbors::ivf::resize_list(res, typed_list, spec, new_used_size, old_used_size);
+  orig_list = typed_list;
+}
+
+void resize_list(raft::resources const& res,
+                 std::shared_ptr<list_data_base<int64_t, uint32_t>>& orig_list,
+                 const list_spec_interleaved<uint32_t, int64_t>& spec,
+                 uint32_t new_used_size,
+                 uint32_t old_used_size)
+{
+  auto typed_list = std::static_pointer_cast<list_data_interleaved<int64_t>>(orig_list);
+  cuvs::neighbors::ivf::resize_list(res, typed_list, spec, new_used_size, old_used_size);
+  orig_list = typed_list;
+}
+
 }  // namespace helpers
-
-template void resize_list<cuvs::neighbors::ivf_pq::list_data_interleaved<int64_t>>(
-  raft::resources const& res,
-  std::shared_ptr<cuvs::neighbors::ivf_pq::list_data_interleaved<int64_t>>& orig_list,
-  const cuvs::neighbors::ivf_pq::list_data_interleaved<int64_t>::spec_type& spec,
-  cuvs::neighbors::ivf_pq::list_data_interleaved<int64_t>::size_type new_used_size,
-  cuvs::neighbors::ivf_pq::list_data_interleaved<int64_t>::size_type old_used_size);
-
-template void resize_list<cuvs::neighbors::ivf_pq::list_data_flat<int64_t>>(
-  raft::resources const& res,
-  std::shared_ptr<cuvs::neighbors::ivf_pq::list_data_flat<int64_t>>& orig_list,
-  const cuvs::neighbors::ivf_pq::list_data_flat<int64_t>::spec_type& spec,
-  cuvs::neighbors::ivf_pq::list_data_flat<int64_t>::size_type new_used_size,
-  cuvs::neighbors::ivf_pq::list_data_flat<int64_t>::size_type old_used_size);
 
 }  // namespace cuvs::neighbors::ivf_pq

@@ -138,17 +138,15 @@ index 1e2fef225..2ee40da46 100644
 
      for (size_t i = 0; i < nlist; ++i) {
          size_t listSize = ivf->list_size(i);
-@@ -426,9 +490,12 @@ void CuvsIVFPQ::copyInvertedListsFrom(const InvertedLists* ivf) {
+@@ -426,9 +490,9 @@ void CuvsIVFPQ::copyInvertedListsFrom(const InvertedLists* ivf) {
          // This cuVS list must currently be empty
          FAISS_ASSERT(getListLength(i) == 0);
 
-+        auto typed_list = std::static_pointer_cast<
-+                cuvs::neighbors::ivf_pq::list_data_interleaved<idx_t>>(
-+                cuvs_index_lists[i]);
-         cuvs::neighbors::ivf::resize_list(
+-        cuvs::neighbors::ivf::resize_list(
++        cuvs::neighbors::ivf_pq::helpers::resize_list(
                  raft_handle,
 -                cuvs_index_lists[i],
-+                typed_list,
++                cuvs_index_lists[i],
                  ivf_list_spec,
                  static_cast<uint32_t>(listSize),
                  static_cast<uint32_t>(0));

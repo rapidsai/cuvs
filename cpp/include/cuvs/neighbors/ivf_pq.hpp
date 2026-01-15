@@ -3166,15 +3166,13 @@ void extract_centers(raft::resources const& res,
  *   ivf_pq::index<int64_t> index(res, index_params, D);
  *   ivf_pq::helpers::reset_index(res, &index);
  *   // resize the first IVF list to hold 5 records
- *   auto spec = list_spec_interleaved<uint32_t, int64_t>{
+ *   auto spec = ivf_pq::list_spec_interleaved<uint32_t, int64_t>{
  *     index.pq_bits(), index.pq_dim(), index.conservative_memory_allocation()};
- *   auto list = std::static_pointer_cast<list_data_interleaved<int64_t>>(index.lists()[0]);
  *   uint32_t new_size = 5;
- *   ivf::resize_list(res, list, spec, new_size, 0);
- *   index.lists()[0] = list;
- *   raft::update_device(index.list_sizes(), &new_size, 1, stream);
+ *   ivf_pq::helpers::resize_list(res, index.lists()[0], spec, new_size, 0);
+ *   raft::update_device(index.list_sizes().data_handle(), &new_size, 1, stream);
  *   // recompute the internal state of the index
- *   ivf_pq::helpers::recompute_internal_state(res, index);
+ *   ivf_pq::helpers::recompute_internal_state(res, &index);
  * @endcode
  *
  * @param[in] res raft resource
@@ -3211,6 +3209,68 @@ void make_rotation_matrix(
   raft::resources const& res,
   raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix,
   bool force_random_rotation);
+
+/**
+ * @brief Resize an IVF-PQ list with flat layout.
+ *
+ * This helper resizes an IVF list that uses the flat (non-interleaved) PQ code layout.
+ * If the new size exceeds the current capacity, a new list is allocated and existing
+ * data is copied. The function handles the type casting internally.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   raft::resources res;
+ *   // Assuming index uses FLAT layout
+ *   auto spec = ivf_pq::list_spec_flat<uint32_t, int64_t>{
+ *     index.pq_bits(), index.pq_dim(), index.conservative_memory_allocation()};
+ *   uint32_t old_size = current_list_size;
+ *   uint32_t new_size = old_size + n_new_vectors;
+ *   ivf_pq::helpers::resize_list(res, index.lists()[label], spec, new_size, old_size);
+ * @endcode
+ *
+ * @param[in] res raft resource
+ * @param[inout] orig_list the list to resize (may be replaced with a new allocation)
+ * @param[in] spec the list specification containing pq_bits, pq_dim, and allocation settings
+ * @param[in] new_used_size the new size of the list (number of vectors)
+ * @param[in] old_used_size the current size of the list (data up to this size is preserved)
+ */
+void resize_list(raft::resources const& res,
+                 std::shared_ptr<list_data_base<int64_t, uint32_t>>& orig_list,
+                 const list_spec_flat<uint32_t, int64_t>& spec,
+                 uint32_t new_used_size,
+                 uint32_t old_used_size);
+
+/**
+ * @brief Resize an IVF-PQ list with interleaved layout.
+ *
+ * This helper resizes an IVF list that uses the interleaved PQ code layout (default).
+ * If the new size exceeds the current capacity, a new list is allocated and existing
+ * data is copied. The function handles the type casting internally.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   raft::resources res;
+ *   // Assuming index uses INTERLEAVED layout (default)
+ *   auto spec = ivf_pq::list_spec_interleaved<uint32_t, int64_t>{
+ *     index.pq_bits(), index.pq_dim(), index.conservative_memory_allocation()};
+ *   uint32_t old_size = current_list_size;
+ *   uint32_t new_size = old_size + n_new_vectors;
+ *   ivf_pq::helpers::resize_list(res, index.lists()[label], spec, new_size, old_size);
+ * @endcode
+ *
+ * @param[in] res raft resource
+ * @param[inout] orig_list the list to resize (may be replaced with a new allocation)
+ * @param[in] spec the list specification containing pq_bits, pq_dim, and allocation settings
+ * @param[in] new_used_size the new size of the list (number of vectors)
+ * @param[in] old_used_size the current size of the list (data up to this size is preserved)
+ */
+void resize_list(raft::resources const& res,
+                 std::shared_ptr<list_data_base<int64_t, uint32_t>>& orig_list,
+                 const list_spec_interleaved<uint32_t, int64_t>& spec,
+                 uint32_t new_used_size,
+                 uint32_t old_used_size);
 /**
  * @}
  */
