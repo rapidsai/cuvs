@@ -469,6 +469,126 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
                                   cuvs::Compare<uint8_t>{}));
   }
 
+  void check_flat_layout_codes()
+  {
+    auto database_view =
+      raft::make_device_matrix_view<const DataT, int64_t>(database.data(), ps.num_db_vecs, ps.dim);
+
+    // Step 1: Build INTERLEAVED index WITHOUT data (just train the codebooks)
+    auto ipams_interleaved              = ps.index_params;
+    ipams_interleaved.add_data_on_build = false;
+    ipams_interleaved.codes_layout      = list_layout::INTERLEAVED;
+    auto index_interleaved =
+      cuvs::neighbors::ivf_pq::build(handle_, ipams_interleaved, database_view);
+
+    // Step 2: Build FLAT index using the SAME precomputed centers from the interleaved index
+    auto ipams_flat              = ps.index_params;
+    ipams_flat.add_data_on_build = false;
+    ipams_flat.codes_layout      = list_layout::FLAT;
+    auto index_flat              = cuvs::neighbors::ivf_pq::build(handle_,
+                                                     ipams_flat,
+                                                     index_interleaved.dim(),
+                                                     index_interleaved.pq_centers(),
+                                                     index_interleaved.centers(),
+                                                     index_interleaved.centers_rot(),
+                                                     index_interleaved.rotation_matrix());
+
+    ASSERT_EQ(index_interleaved.codes_layout(), list_layout::INTERLEAVED);
+    ASSERT_EQ(index_flat.codes_layout(), list_layout::FLAT);
+
+    // Step 3: Extend both indexes with the same data
+    auto indices = raft::make_device_vector<IdxT, int64_t>(handle_, ps.num_db_vecs);
+    raft::linalg::map_offset(handle_, indices.view(), raft::identity_op{});
+    cuvs::neighbors::ivf_pq::extend(
+      handle_, database_view, std::make_optional(indices.view()), &index_interleaved);
+    cuvs::neighbors::ivf_pq::extend(
+      handle_, database_view, std::make_optional(indices.view()), &index_flat);
+
+    ASSERT_TRUE(cuvs::devArrMatch(index_interleaved.list_sizes().data_handle(),
+                                  index_flat.list_sizes().data_handle(),
+                                  index_interleaved.n_lists(),
+                                  cuvs::Compare<uint32_t>{}));
+
+    auto ipams_from_flat              = ps.index_params;
+    ipams_from_flat.add_data_on_build = false;
+    ipams_from_flat.codes_layout      = list_layout::INTERLEAVED;
+    auto index_from_flat              = cuvs::neighbors::ivf_pq::build(handle_,
+                                                          ipams_from_flat,
+                                                          index_interleaved.dim(),
+                                                          index_interleaved.pq_centers(),
+                                                          index_interleaved.centers(),
+                                                          index_interleaved.centers_rot(),
+                                                          index_interleaved.rotation_matrix());
+
+    std::vector<uint32_t> list_sizes_host(index_flat.n_lists());
+    raft::update_host(
+      list_sizes_host.data(), index_flat.list_sizes().data_handle(), index_flat.n_lists(), stream_);
+    raft::resource::sync_stream(handle_);
+
+    // Step 4: Copy flat codes to new interleaved index
+    uint32_t bytes_per_vec =
+      raft::div_rounding_up_safe(index_flat.pq_dim() * index_flat.pq_bits(), 8u);
+
+    for (uint32_t label = 0; label < index_flat.n_lists(); label++) {
+      uint32_t n_rows = list_sizes_host[label];
+      if (n_rows == 0) { continue; }
+
+      auto& list      = index_flat.lists()[label];
+      auto codes_view = raft::make_device_matrix_view<const uint8_t, uint32_t>(
+        list->data_ptr(), n_rows, bytes_per_vec);
+      auto indices_view =
+        raft::make_device_vector_view<const IdxT, uint32_t>(list->indices_ptr(), n_rows);
+
+      helpers::codepacker::extend_list_with_contiguous_codes(
+        handle_, &index_from_flat, codes_view, indices_view, label);
+    }
+
+    size_t queries_size = ps.num_queries * ps.k;
+    rmm::device_uvector<IdxT> indices_original(queries_size, stream_);
+    rmm::device_uvector<EvalT> distances_original(queries_size, stream_);
+    rmm::device_uvector<IdxT> indices_from_flat(queries_size, stream_);
+    rmm::device_uvector<EvalT> distances_from_flat(queries_size, stream_);
+
+    auto query_view =
+      raft::make_device_matrix_view<DataT, uint32_t>(search_queries.data(), ps.num_queries, ps.dim);
+    auto inds_orig_view =
+      raft::make_device_matrix_view<IdxT, uint32_t>(indices_original.data(), ps.num_queries, ps.k);
+    auto dists_orig_view = raft::make_device_matrix_view<EvalT, uint32_t>(
+      distances_original.data(), ps.num_queries, ps.k);
+    auto inds_flat_view =
+      raft::make_device_matrix_view<IdxT, uint32_t>(indices_from_flat.data(), ps.num_queries, ps.k);
+    auto dists_flat_view = raft::make_device_matrix_view<EvalT, uint32_t>(
+      distances_from_flat.data(), ps.num_queries, ps.k);
+
+    cuvs::neighbors::ivf_pq::search(
+      handle_, ps.search_params, index_interleaved, query_view, inds_orig_view, dists_orig_view);
+    cuvs::neighbors::ivf_pq::search(
+      handle_, ps.search_params, index_from_flat, query_view, inds_flat_view, dists_flat_view);
+
+    // Copy results to host for eval_neighbours
+    std::vector<IdxT> indices_orig_host(queries_size);
+    std::vector<IdxT> indices_flat_host(queries_size);
+    std::vector<EvalT> distances_orig_host(queries_size);
+    std::vector<EvalT> distances_flat_host(queries_size);
+    raft::update_host(indices_orig_host.data(), indices_original.data(), queries_size, stream_);
+    raft::update_host(indices_flat_host.data(), indices_from_flat.data(), queries_size, stream_);
+    raft::update_host(distances_orig_host.data(), distances_original.data(), queries_size, stream_);
+    raft::update_host(
+      distances_flat_host.data(), distances_from_flat.data(), queries_size, stream_);
+    raft::resource::sync_stream(handle_);
+
+    // Evaluate recall - should be very high since codes are identical
+    ASSERT_TRUE(eval_neighbours(indices_orig_host,
+                                indices_flat_host,
+                                distances_orig_host,
+                                distances_flat_host,
+                                ps.num_queries,
+                                ps.k,
+                                0.001,  // eps
+                                0.99))  // min_recall
+      << "Recall mismatch between original interleaved and repacked-from-flat indexes";
+  }
+
   template <typename BuildIndex>
   void run(BuildIndex build_index)
   {
@@ -571,134 +691,10 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
 
   /**
    * Test that FLAT layout produces the same PQ codes as INTERLEAVED layout.
-   * Builds both layouts, packs flat codes into a new interleaved index,
-   * runs search on both interleaved indexes, and compares recall.
-   *
-   * NB: This test only works with pq_bits=8 because flat codes are stored packed
-   * (multiple codes per byte when pq_bits < 8), but extend_list_with_codes expects
-   * unpacked codes (one code per byte).
+   * Builds both layouts, packs flat codes into a new interleaved index using
+   * pack_contiguous_list_data (which handles any pq_bits value), runs search
+   * on both interleaved indexes, and compares recall.
    */
-  void check_flat_layout_codes()
-  {
-    // Skip test for pq_bits != 8 (flat codes are packed and can't be directly used with
-    // extend_list_with_codes which expects unpacked codes)
-    if (ps.index_params.pq_bits != 8) {
-      GTEST_SKIP() << "Flat layout code comparison test only supports pq_bits=8";
-    }
-
-    auto database_view =
-      raft::make_device_matrix_view<const DataT, int64_t>(database.data(), ps.num_db_vecs, ps.dim);
-
-    // Step 1: Build INTERLEAVED index WITHOUT data (just train the codebooks)
-    auto ipams_interleaved              = ps.index_params;
-    ipams_interleaved.add_data_on_build = false;
-    ipams_interleaved.codes_layout      = list_layout::INTERLEAVED;
-    auto index_interleaved =
-      cuvs::neighbors::ivf_pq::build(handle_, ipams_interleaved, database_view);
-
-    // Step 2: Build FLAT index using the SAME precomputed centers from the interleaved index
-    auto ipams_flat              = ps.index_params;
-    ipams_flat.add_data_on_build = false;
-    ipams_flat.codes_layout      = list_layout::FLAT;
-    auto index_flat              = cuvs::neighbors::ivf_pq::build(handle_,
-                                                     ipams_flat,
-                                                     index_interleaved.dim(),
-                                                     index_interleaved.pq_centers(),
-                                                     index_interleaved.centers(),
-                                                     index_interleaved.centers_rot(),
-                                                     index_interleaved.rotation_matrix());
-
-    ASSERT_EQ(index_interleaved.codes_layout(), list_layout::INTERLEAVED);
-    ASSERT_EQ(index_flat.codes_layout(), list_layout::FLAT);
-
-    // Step 3: Extend both indexes with the same data
-    auto indices = raft::make_device_vector<IdxT, int64_t>(handle_, ps.num_db_vecs);
-    raft::linalg::map_offset(handle_, indices.view(), raft::identity_op{});
-    cuvs::neighbors::ivf_pq::extend(
-      handle_, database_view, std::make_optional(indices.view()), &index_interleaved);
-    cuvs::neighbors::ivf_pq::extend(
-      handle_, database_view, std::make_optional(indices.view()), &index_flat);
-
-    ASSERT_TRUE(cuvs::devArrMatch(index_interleaved.list_sizes().data_handle(),
-                                  index_flat.list_sizes().data_handle(),
-                                  index_interleaved.n_lists(),
-                                  cuvs::Compare<uint32_t>{}));
-
-    auto ipams_from_flat              = ps.index_params;
-    ipams_from_flat.add_data_on_build = false;
-    ipams_from_flat.codes_layout      = list_layout::INTERLEAVED;
-    auto index_from_flat              = cuvs::neighbors::ivf_pq::build(handle_,
-                                                          ipams_from_flat,
-                                                          index_interleaved.dim(),
-                                                          index_interleaved.pq_centers(),
-                                                          index_interleaved.centers(),
-                                                          index_interleaved.centers_rot(),
-                                                          index_interleaved.rotation_matrix());
-
-    std::vector<uint32_t> list_sizes_host(index_flat.n_lists());
-    raft::update_host(
-      list_sizes_host.data(), index_flat.list_sizes().data_handle(), index_flat.n_lists(), stream_);
-    raft::resource::sync_stream(handle_);
-
-    for (uint32_t label = 0; label < index_flat.n_lists(); label++) {
-      auto list_flat  = std::static_pointer_cast<list_data_flat<IdxT>>(index_flat.lists()[label]);
-      uint32_t n_rows = list_sizes_host[label];
-      if (n_rows == 0) { continue; }
-
-      auto codes_view = raft::make_device_matrix_view<const uint8_t, uint32_t>(
-        list_flat->data.data_handle(), n_rows, index_flat.pq_dim());
-      auto indices_view = raft::make_device_vector_view<const IdxT, uint32_t>(
-        list_flat->indices.data_handle(), n_rows);
-
-      helpers::codepacker::extend_list_with_codes(
-        handle_, &index_from_flat, codes_view, indices_view, label);
-    }
-
-    size_t queries_size = ps.num_queries * ps.k;
-    rmm::device_uvector<IdxT> indices_original(queries_size, stream_);
-    rmm::device_uvector<EvalT> distances_original(queries_size, stream_);
-    rmm::device_uvector<IdxT> indices_from_flat(queries_size, stream_);
-    rmm::device_uvector<EvalT> distances_from_flat(queries_size, stream_);
-
-    auto query_view =
-      raft::make_device_matrix_view<DataT, uint32_t>(search_queries.data(), ps.num_queries, ps.dim);
-    auto inds_orig_view =
-      raft::make_device_matrix_view<IdxT, uint32_t>(indices_original.data(), ps.num_queries, ps.k);
-    auto dists_orig_view = raft::make_device_matrix_view<EvalT, uint32_t>(
-      distances_original.data(), ps.num_queries, ps.k);
-    auto inds_flat_view =
-      raft::make_device_matrix_view<IdxT, uint32_t>(indices_from_flat.data(), ps.num_queries, ps.k);
-    auto dists_flat_view = raft::make_device_matrix_view<EvalT, uint32_t>(
-      distances_from_flat.data(), ps.num_queries, ps.k);
-
-    cuvs::neighbors::ivf_pq::search(
-      handle_, ps.search_params, index_interleaved, query_view, inds_orig_view, dists_orig_view);
-    cuvs::neighbors::ivf_pq::search(
-      handle_, ps.search_params, index_from_flat, query_view, inds_flat_view, dists_flat_view);
-
-    // Copy results to host for eval_neighbours
-    std::vector<IdxT> indices_orig_host(queries_size);
-    std::vector<IdxT> indices_flat_host(queries_size);
-    std::vector<EvalT> distances_orig_host(queries_size);
-    std::vector<EvalT> distances_flat_host(queries_size);
-    raft::update_host(indices_orig_host.data(), indices_original.data(), queries_size, stream_);
-    raft::update_host(indices_flat_host.data(), indices_from_flat.data(), queries_size, stream_);
-    raft::update_host(distances_orig_host.data(), distances_original.data(), queries_size, stream_);
-    raft::update_host(
-      distances_flat_host.data(), distances_from_flat.data(), queries_size, stream_);
-    raft::resource::sync_stream(handle_);
-
-    // Evaluate recall - should be very high since codes are identical
-    ASSERT_TRUE(eval_neighbours(indices_orig_host,
-                                indices_flat_host,
-                                distances_orig_host,
-                                distances_flat_host,
-                                ps.num_queries,
-                                ps.k,
-                                0.001,  // eps
-                                0.99))  // min_recall
-      << "Recall mismatch between original interleaved and repacked-from-flat indexes";
-  }
 
   void SetUp() override  // NOLINT
   {
@@ -723,6 +719,14 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
   std::vector<IdxT> indices_ref;              // NOLINT
   std::vector<EvalT> distances_ref;           // NOLINT
 };
+
+/**
+ * Separate test fixture for flat layout tests.
+ * This ensures flat_layout_tests() parameters only run check_flat_layout_codes(),
+ * not all the other tests defined in ivf_pq_test.
+ */
+template <typename EvalT, typename DataT, typename IdxT>
+class ivf_pq_flat_layout_test : public ivf_pq_test<EvalT, DataT, IdxT> {};
 
 template <typename EvalT, typename DataT, typename IdxT>
 class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
@@ -1290,7 +1294,8 @@ inline auto special_cases() -> test_cases_t
 
 /**
  * Test cases for flat layout comparison.
- * These test all pq_bits values (4-8) to ensure correct encoding.
+ * Tests that FLAT layout produces the same PQ codes as INTERLEAVED layout
+ * by packing flat codes into a new interleaved index and comparing search results.
  */
 inline auto flat_layout_tests() -> test_cases_t
 {
@@ -1305,12 +1310,31 @@ inline auto flat_layout_tests() -> test_cases_t
     x.index_params.pq_dim  = 16;
   });
 
-  // Test with PER_CLUSTER codebook
+  // Test with pq_bits = 6 (packed codes)
+  add_test_case(xs, [](ivf_pq_inputs& x) {
+    x.num_db_vecs          = 1000;
+    x.dim                  = 64;
+    x.index_params.n_lists = 10;
+    x.index_params.pq_bits = 6;
+    x.index_params.pq_dim  = 16;
+  });
+
+  // Test with PER_CLUSTER codebook and pq_bits = 8
   add_test_case(xs, [](ivf_pq_inputs& x) {
     x.num_db_vecs                = 1000;
     x.dim                        = 64;
     x.index_params.n_lists       = 10;
     x.index_params.pq_bits       = 8;
+    x.index_params.pq_dim        = 16;
+    x.index_params.codebook_kind = codebook_gen::PER_CLUSTER;
+  });
+
+  // Test with PER_CLUSTER codebook and pq_bits = 6
+  add_test_case(xs, [](ivf_pq_inputs& x) {
+    x.num_db_vecs                = 1000;
+    x.dim                        = 64;
+    x.index_params.n_lists       = 10;
+    x.index_params.pq_bits       = 6;
     x.index_params.pq_dim        = 16;
     x.index_params.codebook_kind = codebook_gen::PER_CLUSTER;
   });

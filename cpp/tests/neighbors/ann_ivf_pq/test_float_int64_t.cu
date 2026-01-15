@@ -7,8 +7,9 @@
 
 namespace cuvs::neighbors::ivf_pq {
 
-using f32_f32_i64        = ivf_pq_test<float, float, int64_t>;
-using f32_f32_i64_filter = ivf_pq_filter_test<float, float, int64_t>;
+using f32_f32_i64             = ivf_pq_test<float, float, int64_t>;
+using f32_f32_i64_flat_layout = ivf_pq_flat_layout_test<float, float, int64_t>;
+using f32_f32_i64_filter      = ivf_pq_filter_test<float, float, int64_t>;
 
 TEST_BUILD_HOST_INPUT_SEARCH(f32_f32_i64)
 TEST_BUILD_HOST_INPUT_OVERLAP_SEARCH(f32_f32_i64)
@@ -19,8 +20,8 @@ INSTANTIATE(f32_f32_i64,
             defaults() + small_dims() + big_dims_moderate_lut() + enum_variety_l2() +
               enum_variety_l2sqrt() + enum_variety_ip() + enum_variety_cosine());
 
-TEST_FLAT_LAYOUT_CODES(f32_f32_i64)
-INSTANTIATE_TEST_SUITE_P(IvfPqFlatLayout, f32_f32_i64, ::testing::ValuesIn(flat_layout_tests()));
+TEST_FLAT_LAYOUT_CODES(f32_f32_i64_flat_layout)
+INSTANTIATE(f32_f32_i64_flat_layout, flat_layout_tests());
 
 TEST_BUILD_SEARCH(f32_f32_i64_filter)
 INSTANTIATE(f32_f32_i64_filter,

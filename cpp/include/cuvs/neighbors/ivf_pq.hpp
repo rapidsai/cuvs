@@ -2995,6 +2995,45 @@ void extend_list_with_codes(
   uint32_t label);
 
 /**
+ * @brief Extend one list of the index in-place, by the list label, skipping the classification and
+ * encoding steps. Uses contiguous/packed codes format.
+ *
+ * This is similar to extend_list_with_codes but takes codes in contiguous packed format
+ * [n_rows, ceildiv(pq_dim * pq_bits, 8)] instead of unpacked format [n_rows, pq_dim].
+ * This works correctly with any pq_bits value.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   // We will extend the fourth cluster
+ *   uint32_t label = 3;
+ *   // We will fill 4 new vectors
+ *   uint32_t n_vec = 4;
+ *   // Indices of the new vectors
+ *   auto indices = raft::make_device_vector<int64_t>(res, n_vec);
+ *   ... fill the indices ...
+ *   // Allocate buffer for packed codes
+ *   uint32_t code_size = raft::ceildiv(index.pq_dim() * index.pq_bits(), 8u);
+ *   auto new_codes = raft::make_device_matrix<uint8_t, uint32_t, row_major>(res, n_vec, code_size);
+ *   ... fill codes ...
+ *   // extend list with new codes
+ *   ivf_pq::helpers::codepacker::extend_list_with_contiguous_codes(
+ *       res, &index, new_codes.view(), indices.view(), label);
+ * @endcode
+ *
+ * @param[in] res
+ * @param[inout] index
+ * @param[in] new_codes flat contiguous PQ codes [n_rows, ceildiv(pq_dim * pq_bits, 8)]
+ * @param[in] new_indices source indices [n_rows]
+ * @param[in] label the id of the target list (cluster).
+ */
+void extend_list_with_contiguous_codes(
+  raft::resources const& res,
+  index<int64_t>* index,
+  raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> new_codes,
+  raft::device_vector_view<const int64_t, uint32_t, raft::row_major> new_indices,
+  uint32_t label);
+
+/**
  * @brief Extend one list of the index in-place, by the list label, skipping the classification
  * step.
  *

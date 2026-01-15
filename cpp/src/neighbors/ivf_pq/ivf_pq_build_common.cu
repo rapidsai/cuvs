@@ -175,6 +175,16 @@ void extend_list_with_codes(
   detail::extend_list_with_codes<int64_t>(res, index, new_codes, new_indices, label);
 }
 
+void extend_list_with_contiguous_codes(
+  raft::resources const& res,
+  index<int64_t>* index,
+  raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> new_codes,
+  raft::device_vector_view<const int64_t, uint32_t, raft::row_major> new_indices,
+  uint32_t label)
+{
+  detail::extend_list_with_contiguous_codes<int64_t>(res, index, new_codes, new_indices, label);
+}
+
 void extend_list(raft::resources const& res,
                  index<int64_t>* index,
                  raft::device_matrix_view<const float, uint32_t, raft::row_major> new_vectors,

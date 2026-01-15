@@ -882,6 +882,25 @@ void extend_list_with_codes(
 }
 
 /**
+ * Extend one list of the index in-place, by the list label, skipping the classification and
+ * encoding steps. Uses contiguous/packed codes format.
+ * See the public interface for the api and usage.
+ */
+template <typename IdxT>
+void extend_list_with_contiguous_codes(
+  raft::resources const& res,
+  index<IdxT>* index,
+  raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> new_codes,
+  raft::device_vector_view<const IdxT, uint32_t, raft::row_major> new_indices,
+  uint32_t label)
+{
+  uint32_t n_rows = new_indices.extent(0);
+  auto offset     = extend_list_prepare(res, index, new_indices, label);
+  pack_contiguous_list_data(res, index, new_codes.data_handle(), n_rows, label, offset);
+  ivf::detail::recompute_internal_state(res, *index);
+}
+
+/**
  * Extend one list of the index in-place, by the list label, skipping the classification step.
  * See the public interface for the api and usage.
  */
