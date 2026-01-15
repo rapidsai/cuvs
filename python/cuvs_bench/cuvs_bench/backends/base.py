@@ -213,13 +213,31 @@ class BenchmarkBackend(ABC):
     Abstract base class for all benchmark backends.
     
     All backends must implement this interface to be compatible with
-    the cuvs-bench orchestration system.
+    the cuvs-bench execution layer.
     
     Parameters
     ----------
     config : Dict[str, Any]
-        Backend-specific configuration (e.g., executable path for C++ backends,
-        host/port for network backends)
+        Backend-specific configuration. Common keys include:
+        
+        Required (enforced by base class):
+        - name : str - User-defined label for this index configuration
+            e.g., "cuvs_ivf_flat_test.nlist1024.ratio1" or "cuvs_cagra.graph_degree64"
+        
+        C++ backend keys (CppGoogleBenchmarkBackend):
+        - executable_path : str - Path to C++ benchmark executable (required)
+        - data_prefix : str - Prefix for dataset paths (default: "")
+        - warmup_time : float - Warmup time in seconds (default: 1.0)
+        - dataset : str - Dataset name e.g., "sift-128-euclidean" (default: "")
+        - output_filename : Tuple[str, str] - (build_name, search_name) (default: ("", ""))
+        - algo : str - Algorithm name e.g., "cuvs_cagra" (default: "")
+        - requires_gpu : bool - Whether backend requires GPU (default: False)
+        
+        Network backend keys (e.g., Milvus, Qdrant):
+        - host : str - Server hostname
+        - port : int - Server port
+        - api_key : str - Authentication key
+        - requires_network : bool - Whether backend requires network (default: False)
     """
     
     def __init__(self, config: Dict[str, Any]):
@@ -244,7 +262,9 @@ class BenchmarkBackend(ABC):
         dataset : Dataset
             Dataset with base vectors and metadata
         indexes : List[IndexConfig]
-            List of index configurations to build together
+            List of index configurations to build together. Internally creates a temp
+            config file and builds all indexes in one command.
+            FIXME: Might be specific to C++ backend.
         force : bool, optional
             If True, rebuild even if index exists; if False, skip if exists
         dry_run : bool, optional
@@ -287,6 +307,7 @@ class BenchmarkBackend(ABC):
             Dataset with query vectors and ground truth
         indexes : List[IndexConfig]
             List of index configurations, each with its own search_params
+            FIXME: Might be specific to C++ backend.
         k : int
             Number of neighbors to return per query
         batch_size : int, optional

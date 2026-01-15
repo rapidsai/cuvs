@@ -96,6 +96,15 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         -------
         BuildResult
             Build timing and metadata (aggregated across all indexes)
+            
+        Example
+        -------
+        >>> indexes = [
+        ...     IndexConfig(name="cagra_32", build_param={"graph_degree": 32}, ...),
+        ...     IndexConfig(name="cagra_64", build_param={"graph_degree": 64}, ...),
+        ... ]
+        >>> result = backend.build(dataset, indexes)
+        # Both indexes built in ONE C++ command (dataset loaded once)
         """
         if not indexes:
             return BuildResult(
