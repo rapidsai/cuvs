@@ -66,7 +66,6 @@ Result Variables
   ``${minor_output_var}``
       Contains the ABI minor version component
 
-
 #]=======================================================================]
 function(determine_cuvs_abi_version cal_ver)
   set(options)
