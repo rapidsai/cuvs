@@ -869,8 +869,9 @@ bool ace_check_use_disk_mode(bool use_disk,
   } else {
     mem.available_gpu_memory = rmm::available_device_memory().second;
   }
-  bool gpu_memory_limited = static_cast<size_t>(usable_gpu_memory_fraction *
-                                                mem.available_gpu_memory) < mem.cagra_graph_size;
+  bool gpu_memory_limited =
+    static_cast<size_t>(usable_gpu_memory_fraction * mem.available_gpu_memory) <
+    std::max(mem.sub_graph_size, mem.sub_dataset_size);
 
   RAFT_LOG_INFO("ACE: Estimated GPU memory required: %.2f GiB, available: %.2f GiB",
                 to_gib(mem.cagra_graph_size),
