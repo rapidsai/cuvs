@@ -68,7 +68,9 @@ Result Variables
 
 
 #]=======================================================================]
-function(determine_cuvs_abi_version cal_ver MAJOR _CUVS_RAPIDS_MAJOR_VAR MINOR _CUVS_RAPIDS_MINOR_VAR)
+function(determine_cuvs_abi_version cal_ver MAJOR _CUVS_RAPIDS_MAJOR_VAR MINOR
+         _CUVS_RAPIDS_MINOR_VAR\
+)
   # major value table
   set(major_table_02 "1")
   set(major_table_04 "1")
@@ -90,7 +92,6 @@ function(determine_cuvs_abi_version cal_ver MAJOR _CUVS_RAPIDS_MAJOR_VAR MINOR _
   # compute the abi version
   math(EXPR computed_abi_major "(${cal_ver_major} - 26) * 2 + ${major_table_${cal_ver_minor}}")
   set(compute_abi_minor "${minor_table_${cal_ver_minor}}")
-
 
   set("${_CUVS_RAPIDS_MAJOR_VAR}"
       ${computed_abi_major}
