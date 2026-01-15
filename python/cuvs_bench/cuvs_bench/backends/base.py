@@ -45,7 +45,7 @@ class Dataset:
     groundtruth_neighbors_file : Optional[str]
         Path to ground truth neighbors file (for C++ backend compatibility)
     metadata : Dict[str, Any]
-        Additional dataset metadata
+        Additional dataset metadata like {"source": "ann-benchmarks"}
     """
     name: str
     base_vectors: np.ndarray
