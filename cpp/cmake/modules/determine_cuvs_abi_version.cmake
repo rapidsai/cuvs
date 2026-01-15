@@ -92,6 +92,12 @@ function(determine_cuvs_abi_version cal_ver MAJOR _CUVS_RAPIDS_MAJOR_VAR MINOR _
   set(compute_abi_minor "${minor_table_${cal_ver_minor}}")
 
 
-  set("${_CUVS_RAPIDS_MAJOR_VAR}" ${computed_abi_major} PARENT_SCOPE)
-  set("${_CUVS_RAPIDS_MINOR_VAR}" ${compute_abi_minor} PARENT_SCOPE)
+  set("${_CUVS_RAPIDS_MAJOR_VAR}"
+      ${computed_abi_major}
+      PARENT_SCOPE
+  )
+  set("${_CUVS_RAPIDS_MINOR_VAR}"
+      ${compute_abi_minor}
+      PARENT_SCOPE
+  )
 endfunction()
