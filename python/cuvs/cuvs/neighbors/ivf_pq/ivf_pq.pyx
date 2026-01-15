@@ -118,7 +118,7 @@ cdef class IndexParams:
         Valid values ["flat", "interleaved"]
 
             - flat: Codes are stored contiguously, one vector's codes after
-              another. Better for building index from precomputed codes.
+              another.
             - interleaved: Codes are interleaved for optimized search
               performance. This is the default and recommended for search
               workloads.
