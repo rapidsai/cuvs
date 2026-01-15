@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <cuvs/neighbors/brute_force.hpp>
+#include <cuvs/neighbors/all_neighbors.hpp>
 #include <cuvs/preprocessing/spectral_embedding.hpp>
 
 #include <raft/core/device_coo_matrix.hpp>
@@ -147,18 +147,19 @@ void create_connectivity_graph(
 
   auto stream = raft::resource::get_cuda_stream(handle);
 
-  cuvs::neighbors::brute_force::search_params search_params;
-  cuvs::neighbors::brute_force::index_params index_params;
-  index_params.metric = cuvs::distance::DistanceType::L2SqrtExpanded;
-
   auto d_indices   = raft::make_device_matrix<int64_t, int64_t>(handle, n_samples, k_search);
   auto d_distances = raft::make_device_matrix<float, int64_t>(handle, n_samples, k_search);
 
-  auto index =
-    cuvs::neighbors::brute_force::build(handle, index_params, raft::make_const_mdspan(dataset));
-
-  cuvs::neighbors::brute_force::search(
-    handle, search_params, index, dataset, d_indices.view(), d_distances.view());
+  cuvs::neighbors::all_neighbors::all_neighbors_params all_neighbors_params{
+    .graph_build_params =
+      cuvs::neighbors::graph_build_params::brute_force_params{
+        .build_params = {{.metric = cuvs::distance::DistanceType::L2SqrtExpanded}}},
+    .metric = cuvs::distance::DistanceType::L2SqrtExpanded};
+  cuvs::neighbors::all_neighbors::build(handle,
+                                        all_neighbors_params,
+                                        raft::make_const_mdspan(dataset),
+                                        d_indices.view(),
+                                        d_distances.view());
 
   auto knn_rows = raft::make_device_vector<int, NNZType>(handle, nnz);
   auto knn_cols = raft::make_device_vector<int, NNZType>(handle, nnz);
