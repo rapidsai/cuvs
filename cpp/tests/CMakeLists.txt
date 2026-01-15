@@ -196,34 +196,6 @@ ConfigureTest(
 )
 
 ConfigureTest(
-  NAME NEIGHBORS_ANN_CAGRA_ACE_FLOAT_UINT32_TEST
-  PATH neighbors/ann_cagra_ace/test_float_uint32_t.cu
-  GPUS 1
-  PERCENT 100
-)
-
-ConfigureTest(
-  NAME NEIGHBORS_ANN_CAGRA_ACE_HALF_UINT32_TEST
-  PATH neighbors/ann_cagra_ace/test_half_uint32_t.cu
-  GPUS 1
-  PERCENT 100
-)
-
-ConfigureTest(
-  NAME NEIGHBORS_ANN_CAGRA_ACE_INT8_UINT32_TEST
-  PATH neighbors/ann_cagra_ace/test_int8_t_uint32_t.cu
-  GPUS 1
-  PERCENT 100
-)
-
-ConfigureTest(
-  NAME NEIGHBORS_ANN_CAGRA_ACE_UINT8_UINT32_TEST
-  PATH neighbors/ann_cagra_ace/test_uint8_t_uint32_t.cu
-  GPUS 1
-  PERCENT 100
-)
-
-ConfigureTest(
   NAME NEIGHBORS_ANN_NN_DESCENT_TEST
   PATH neighbors/ann_nn_descent/test_float_uint32_t.cu
        neighbors/ann_nn_descent/test_int8_t_uint32_t.cu
@@ -279,6 +251,50 @@ if(BUILD_CAGRA_HNSWLIB)
   )
   target_link_libraries(NEIGHBORS_HNSW_TEST PRIVATE hnswlib::hnswlib)
   target_compile_definitions(NEIGHBORS_HNSW_TEST PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
+
+  ConfigureTest(
+    NAME NEIGHBORS_ANN_HNSW_ACE_FLOAT_UINT32_TEST
+    PATH neighbors/ann_hnsw_ace/test_float_uint32_t.cu
+    GPUS 1
+    PERCENT 100
+  )
+  target_link_libraries(NEIGHBORS_ANN_HNSW_ACE_FLOAT_UINT32_TEST PRIVATE hnswlib::hnswlib)
+  target_compile_definitions(
+    NEIGHBORS_ANN_HNSW_ACE_FLOAT_UINT32_TEST PUBLIC CUVS_BUILD_CAGRA_HNSWLIB
+  )
+
+  ConfigureTest(
+    NAME NEIGHBORS_ANN_HNSW_ACE_HALF_UINT32_TEST
+    PATH neighbors/ann_hnsw_ace/test_half_uint32_t.cu
+    GPUS 1
+    PERCENT 100
+  )
+  target_link_libraries(NEIGHBORS_ANN_HNSW_ACE_HALF_UINT32_TEST PRIVATE hnswlib::hnswlib)
+  target_compile_definitions(
+    NEIGHBORS_ANN_HNSW_ACE_HALF_UINT32_TEST PUBLIC CUVS_BUILD_CAGRA_HNSWLIB
+  )
+
+  ConfigureTest(
+    NAME NEIGHBORS_ANN_HNSW_ACE_INT8_UINT32_TEST
+    PATH neighbors/ann_hnsw_ace/test_int8_t_uint32_t.cu
+    GPUS 1
+    PERCENT 100
+  )
+  target_link_libraries(NEIGHBORS_ANN_HNSW_ACE_INT8_UINT32_TEST PRIVATE hnswlib::hnswlib)
+  target_compile_definitions(
+    NEIGHBORS_ANN_HNSW_ACE_INT8_UINT32_TEST PUBLIC CUVS_BUILD_CAGRA_HNSWLIB
+  )
+
+  ConfigureTest(
+    NAME NEIGHBORS_ANN_HNSW_ACE_UINT8_UINT32_TEST
+    PATH neighbors/ann_hnsw_ace/test_uint8_t_uint32_t.cu
+    GPUS 1
+    PERCENT 100
+  )
+  target_link_libraries(NEIGHBORS_ANN_HNSW_ACE_UINT8_UINT32_TEST PRIVATE hnswlib::hnswlib)
+  target_compile_definitions(
+    NEIGHBORS_ANN_HNSW_ACE_UINT8_UINT32_TEST PUBLIC CUVS_BUILD_CAGRA_HNSWLIB
+  )
 endif()
 
 if(BUILD_MG_ALGOS)
