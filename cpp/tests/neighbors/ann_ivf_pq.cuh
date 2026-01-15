@@ -525,7 +525,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
       list_sizes_host.data(), index_flat.list_sizes().data_handle(), index_flat.n_lists(), stream_);
     raft::resource::sync_stream(handle_);
 
-    // Step 4: Copy flat codes to new interleaved index
+    // Step 4: Pack flat codes into the new interleaved index
     uint32_t bytes_per_vec =
       raft::div_rounding_up_safe(index_flat.pq_dim() * index_flat.pq_bits(), 8u);
 
@@ -688,13 +688,6 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
         ps.index_params.n_lists);
     }
   }
-
-  /**
-   * Test that FLAT layout produces the same PQ codes as INTERLEAVED layout.
-   * Builds both layouts, packs flat codes into a new interleaved index using
-   * pack_contiguous_list_data (which handles any pq_bits value), runs search
-   * on both interleaved indexes, and compares recall.
-   */
 
   void SetUp() override  // NOLINT
   {
