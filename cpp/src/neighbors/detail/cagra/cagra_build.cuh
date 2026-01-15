@@ -956,16 +956,15 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
       to_gib(mem.sub_graph_size));
 
     // Calculate suggested number of partitions for host memory
-    double available_for_scaling =
-      usable_cpu_memory_fraction * mem.available_host_memory - mem.partition_labels_size -
-      mem.id_mapping_size;
+    double available_for_scaling = usable_cpu_memory_fraction * mem.available_host_memory -
+                                   mem.partition_labels_size - mem.id_mapping_size;
     RAFT_EXPECTS(available_for_scaling > 0,
                  "ACE: Host memory insufficient even for constant overhead (labels + id_mapping). "
                  "Required: %.2f GiB, available: %.2f GiB",
                  to_gib(mem.partition_labels_size + mem.id_mapping_size),
                  to_gib(usable_cpu_memory_fraction * mem.available_host_memory));
-    host_suggested_partitions = static_cast<size_t>(
-      std::ceil((mem.sub_dataset_size + mem.sub_graph_size) * n_partitions / available_for_scaling));
+    host_suggested_partitions = static_cast<size_t>(std::ceil(
+      (mem.sub_dataset_size + mem.sub_graph_size) * n_partitions / available_for_scaling));
     // Ensure we always increase partitions (current count is insufficient by definition)
     host_suggested_partitions = std::max(host_suggested_partitions, n_partitions + 1);
   }
