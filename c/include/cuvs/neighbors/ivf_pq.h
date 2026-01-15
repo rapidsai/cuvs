@@ -29,6 +29,15 @@ enum codebook_gen {  // NOLINT
 };
 
 /**
+ * @brief A type for specifying the memory layout of IVF-PQ list data
+ *
+ */
+enum list_layout {   // NOLINT
+  FLAT        = 0,   // NOLINT
+  INTERLEAVED = 1,   // NOLINT
+};
+
+/**
  * @brief Supplemental parameters to build IVF-PQ Index
  *
  */
@@ -114,6 +123,15 @@ struct cuvsIvfPqIndexParams {
    * points to train each codebook.
    */
   uint32_t max_train_points_per_pq_code;
+  /**
+   * Memory layout of the IVF-PQ list data.
+   *
+   * - FLAT: Codes are stored contiguously, one vector's codes after another.
+   *   Better for building index from precomputed codes.
+   * - INTERLEAVED: Codes are interleaved for optimized search performance.
+   *   This is the default and recommended for search workloads.
+   */
+  enum list_layout codes_layout;
 };
 
 typedef struct cuvsIvfPqIndexParams* cuvsIvfPqIndexParams_t;

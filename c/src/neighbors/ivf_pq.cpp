@@ -34,6 +34,7 @@ void convert_c_index_params(cuvsIvfPqIndexParams params, cuvs::neighbors::ivf_pq
   out->force_random_rotation          = params.force_random_rotation;
   out->conservative_memory_allocation = params.conservative_memory_allocation;
   out->max_train_points_per_pq_code   = params.max_train_points_per_pq_code;
+  out->codes_layout = static_cast<cuvs::neighbors::ivf_pq::list_layout>((int)params.codes_layout);
 }
 void convert_c_search_params(cuvsIvfPqSearchParams params,
                              cuvs::neighbors::ivf_pq::search_params* out)
@@ -336,7 +337,8 @@ extern "C" cuvsError_t cuvsIvfPqIndexParamsCreate(cuvsIvfPqIndexParams_t* params
                                        .codebook_kind                  = codebook_gen::PER_SUBSPACE,
                                        .force_random_rotation          = false,
                                        .conservative_memory_allocation = false,
-                                       .max_train_points_per_pq_code   = 256};
+                                       .max_train_points_per_pq_code   = 256,
+                                       .codes_layout                   = list_layout::INTERLEAVED};
   });
 }
 

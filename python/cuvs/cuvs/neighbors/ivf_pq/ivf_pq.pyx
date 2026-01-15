@@ -113,6 +113,15 @@ cdef class IndexParams:
         PER_SUBSPACE and PER_CLUSTER. In both cases, we will use
         pq_book_size * max_train_points_per_pq_code training points to
         train each codebook.
+    codes_layout : string, default = "interleaved"
+        Memory layout of the IVF-PQ list data.
+        Valid values ["flat", "interleaved"]
+
+            - flat: Codes are stored contiguously, one vector's codes after
+              another. Better for building index from precomputed codes.
+            - interleaved: Codes are interleaved for optimized search
+              performance. This is the default and recommended for search
+              workloads.
     """
 
     def __cinit__(self):
@@ -134,7 +143,8 @@ cdef class IndexParams:
                  force_random_rotation=False,
                  add_data_on_build=True,
                  conservative_memory_allocation=False,
-                 max_train_points_per_pq_code=256):
+                 max_train_points_per_pq_code=256,
+                 codes_layout="interleaved"):
         self.params.n_lists = n_lists
         self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
         self.params.metric_arg = metric_arg
@@ -154,6 +164,12 @@ cdef class IndexParams:
             conservative_memory_allocation
         self.params.max_train_points_per_pq_code = \
             max_train_points_per_pq_code
+        if codes_layout == "flat":
+            self.params.codes_layout = list_layout.FLAT
+        elif codes_layout == "interleaved":
+            self.params.codes_layout = list_layout.INTERLEAVED
+        else:
+            raise ValueError("Incorrect codes layout %s" % codes_layout)
 
     def get_handle(self):
         return <size_t> self.params
@@ -209,6 +225,13 @@ cdef class IndexParams:
     @property
     def max_train_points_per_pq_code(self):
         return self.params.max_train_points_per_pq_code
+
+    @property
+    def codes_layout(self):
+        if self.params.codes_layout == list_layout.FLAT:
+            return "flat"
+        else:
+            return "interleaved"
 
     def get_handle(self):
         return <size_t>self.params
