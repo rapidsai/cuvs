@@ -10,6 +10,15 @@
           "ADDITIONAL_DEP": "?",
           "PATH": "*"
         }
+      },
+      "embed_jit_lto_fatbin": {
+        "kwargs": {
+          "FATBIN_TARGET": 1,
+          "FATBIN_SOURCE": 1,
+          "EMBEDDED_TARGET": 1,
+          "EMBEDDED_HEADER": 1,
+          "EMBEDDED_ARRAY": 1
+        }
       }
     }
   },
