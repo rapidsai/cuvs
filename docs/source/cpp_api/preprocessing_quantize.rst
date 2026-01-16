@@ -27,3 +27,13 @@ namespace *cuvs::preprocessing::quantize::binary*
 
 .. doxygengroup:: binary
    :project: cuvs
+
+Product Quantizer
+-----------------
+
+``#include <cuvs/preprocessing/quantize/pq.hpp>``
+
+namespace *cuvs::preprocessing::quantize::pq*
+
+.. doxygengroup:: pq
+   :project: cuvs

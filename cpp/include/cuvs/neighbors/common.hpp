@@ -1,11 +1,12 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
 #include <cstdint>
+#include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/device_csr_matrix.hpp>
 #include <raft/core/device_mdarray.hpp>
@@ -29,6 +30,10 @@
 #endif
 
 namespace cuvs::neighbors {
+/**
+ * @addtogroup cagra_cpp_index_params
+ * @{
+ */
 
 /** Parameters for VPQ compression. */
 struct vpq_params {
@@ -58,14 +63,37 @@ struct vpq_params {
   /**
    * The fraction of data to use during iterative kmeans building (VQ phase).
    * When zero, an optimal value is selected using a heuristic.
+   * @deprecated Prefer using `max_train_points_per_vq_cluster` instead.
    */
   double vq_kmeans_trainset_fraction = 0;
   /**
    * The fraction of data to use during iterative kmeans building (PQ phase).
    * When zero, an optimal value is selected using a heuristic.
+   * @deprecated Prefer using `max_train_points_per_pq_code` instead.
    */
   double pq_kmeans_trainset_fraction = 0;
+  /**
+   * Type of k-means algorithm for PQ training.
+   * Balanced k-means tends to be faster than regular k-means for PQ training, for
+   * problem sets where the number of points per cluster are approximately equal.
+   * Regular k-means may be better for skewed cluster distributions.
+   */
+  cuvs::cluster::kmeans::kmeans_type pq_kmeans_type =
+    cuvs::cluster::kmeans::kmeans_type::KMeansBalanced;
+  /**
+   * The max number of data points to use per PQ code during PQ codebook training. Using more data
+   * points per PQ code may increase the quality of PQ codebook but may also increase the build
+   * time. We will use `pq_n_centers * max_train_points_per_pq_code` training
+   * points to train each PQ codebook.
+   */
+  uint32_t max_train_points_per_pq_code = 256;
+  /**
+   * The max number of data points to use per VQ cluster during training.
+   */
+  uint32_t max_train_points_per_vq_cluster = 1024;
 };
+
+/** @} */  // end group cagra_cpp_index_params
 
 /**
  * @defgroup neighbors_index Approximate Nearest Neighbors Types
