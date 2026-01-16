@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -12,10 +12,42 @@
 namespace cuvs::neighbors::cagra {
 template <typename T, typename IdxT>
 struct index;
-struct merge_params;
+struct index_params;
 }  // namespace cuvs::neighbors::cagra
 
 namespace cuvs::neighbors::cagra {
+
+/**
+ * @defgroup cagra_cpp_merge_params CAGRA index merge parameters
+ * @{
+ */
+
+/**
+ * @brief Parameters for merging CAGRA indexes.
+ */
+struct merge_params : cuvs::neighbors::merge_params {
+  merge_params() = default;
+
+  /**
+   * @brief Constructs merge parameters with given index parameters.
+   * @param params Parameters for creating the output index.
+   */
+  explicit merge_params(const cagra::index_params& params) : output_index_params(params) {}
+
+  /// Parameters for creating the output index.
+  cagra::index_params output_index_params;
+
+  /// Strategy for merging. Defaults to `MergeStrategy::MERGE_STRATEGY_PHYSICAL`.
+  cuvs::neighbors::MergeStrategy merge_strategy =
+    cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL;
+
+  /// Implementation of the polymorphic strategy() method
+  cuvs::neighbors::MergeStrategy strategy() const { return merge_strategy; }
+};
+
+/**
+ * @}
+ */
 
 /**
  * @brief Wrapper for CAGRA index implementing IndexWrapper.
