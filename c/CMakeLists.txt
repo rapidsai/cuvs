@@ -1,6 +1,6 @@
 # =============================================================================
 # cmake-format: off
-# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 # =============================================================================
@@ -120,10 +120,10 @@ set_target_properties(
 # Long term goal is that every release that breaks the C ABI will update `cuvs_abi_version` allowing
 # us to have multiple releases of libcuvs_c that don't need consumers to rebuild against
 if(PROJECT_IS_TOP_LEVEL)
-  set(cuvs_abi_version "1")
-  set(cuvs_version "${cuvs_abi_version}.${RAPIDS_VERSION}")
-  set_target_properties(cuvs_c PROPERTIES VERSION "${cuvs_version}")
-  set_target_properties(cuvs_c PROPERTIES SOVERSION "${cuvs_abi_version}")
+  include(../cpp/cmake/modules/determine_cuvs_abi_version.cmake)
+  determine_cuvs_abi_version(${RAPIDS_VERSION} MAJOR abi_major MINOR abi_minor)
+  set_target_properties(cuvs_c PROPERTIES VERSION "${abi_major}.${abi_minor}")
+  set_target_properties(cuvs_c PROPERTIES SOVERSION "${abi_major}")
 endif()
 
 # Encode what optional components we are building
