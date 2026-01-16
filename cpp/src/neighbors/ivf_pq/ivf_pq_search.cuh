@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -859,6 +859,9 @@ inline void search(raft::resources const& handle,
     static_cast<uint64_t>(index.size()));
   RAFT_EXPECTS(params.n_probes > 0,
                "n_probes (number of clusters to probe in the search) must be positive.");
+  RAFT_EXPECTS(index.codes_layout() == list_layout::INTERLEAVED,
+               "IVF-PQ search requires INTERLEAVED codes layout. FLAT layout is not supported for "
+               "GPU search.");
 
   switch (utils::check_pointer_residency(queries, neighbors, distances)) {
     case utils::pointer_residency::device_only:

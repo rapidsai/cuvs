@@ -28,6 +28,10 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
         PER_SUBSPACE
         PER_CLUSTER
 
+    ctypedef enum list_layout:
+        FLAT
+        INTERLEAVED
+
     ctypedef struct cuvsIvfPqIndexParams:
         cuvsDistanceType metric
         float metric_arg
@@ -41,6 +45,7 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
         bool force_random_rotation
         bool conservative_memory_allocation
         uint32_t max_train_points_per_pq_code
+        list_layout codes_layout
 
     ctypedef cuvsIvfPqIndexParams* cuvsIvfPqIndexParams_t
 
