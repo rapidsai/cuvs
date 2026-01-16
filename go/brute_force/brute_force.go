@@ -5,7 +5,6 @@ import "C"
 
 import (
 	"errors"
-	"runtime"
 	"unsafe"
 
 	cuvs "github.com/rapidsai/cuvs/go"
@@ -58,8 +57,6 @@ func BuildIndex[T any](Resources cuvs.Resource, Dataset *cuvs.Tensor[T], metric 
 		return err
 	}
 	index.trained = true
-	runtime.KeepAlive(Dataset.C_tensor)
-	runtime.KeepAlive(Dataset)
 
 	return nil
 }
@@ -84,8 +81,5 @@ func SearchIndex[T any](resources cuvs.Resource, index BruteForceIndex, queries 
 
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsBruteForceSearch(C.ulong(resources.Resource), index.index, (*C.DLManagedTensor)(unsafe.Pointer(queries.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(neighbors.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(distances.C_tensor)), prefilter)))
 
-	runtime.KeepAlive(neighbors.C_tensor)
-	runtime.KeepAlive(distances.C_tensor)
-	runtime.KeepAlive(queries.C_tensor)
 	return err
 }
