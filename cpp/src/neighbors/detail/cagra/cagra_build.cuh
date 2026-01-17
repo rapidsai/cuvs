@@ -38,6 +38,7 @@
 #include <omp.h>
 #include <type_traits>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include <sys/mman.h>
@@ -813,6 +814,50 @@ constexpr double usable_cpu_memory_fraction = 0.8;
 constexpr double usable_gpu_memory_fraction = 0.8;
 constexpr double imbalance_factor           = 3.0;
 
+// Calculate CAGRA optimize workspace memory requirements.
+// This is the working memory on top of the input/output memory usage.
+inline std::pair<size_t, size_t> optimize_workspace_size(size_t n_rows,
+                                                         size_t graph_degree,
+                                                         size_t intermediate_degree,
+                                                         size_t index_size,
+                                                         bool mst_optimize = false)
+{
+  // MST optimization memory (host only)
+  size_t mst_host = n_rows * index_size;  // mst_graph_num_edges
+  if (mst_optimize) {
+    mst_host += n_rows * graph_degree * index_size;  // mst_graph allocated in optimize
+    mst_host += n_rows * graph_degree * index_size;  // mst_graph allocated in mst_optimize
+    mst_host += n_rows * index_size * 7;             // vectors with _max_edges suffix
+    mst_host += (graph_degree - 1) * (graph_degree - 1) * index_size;  // iB_candidates
+  }
+
+  // Prune stage memory
+  // We neglect 8 bytes (both on host and device) for stats
+  size_t prune_host = n_rows * intermediate_degree * sizeof(uint8_t);  // detour count
+
+  size_t prune_dev = n_rows * intermediate_degree * 1;     // detour count (uint8_t)
+  prune_dev += n_rows * sizeof(uint32_t);                  // d_num_detour_edges
+  prune_dev += n_rows * intermediate_degree * index_size;  // d_input_graph
+
+  // Reverse graph stage memory
+  size_t rev_host = n_rows * graph_degree * index_size;  // rev_graph
+  rev_host += n_rows * sizeof(uint32_t);                 // rev_graph_count
+  rev_host += n_rows * index_size;                       // dest_nodes
+
+  size_t rev_dev = n_rows * graph_degree * index_size;  // d_rev_graph
+  rev_dev += n_rows * sizeof(uint32_t);                 // d_rev_graph_count
+  rev_dev += n_rows * sizeof(uint32_t);                 // d_dest_nodes
+
+  // Memory for merging graphs (host only)
+  size_t combine_host =
+    n_rows * sizeof(uint32_t) + graph_degree * sizeof(uint32_t);  // in_edge_count + hist
+
+  size_t total_host = mst_host + std::max({prune_host, rev_host, combine_host});
+  size_t total_dev  = std::max(prune_dev, rev_dev);
+
+  return std::make_pair(total_host, total_dev);
+}
+
 // Check if disk mode should be used for ACE based on memory constraints
 template <typename T, typename IdxT>
 bool ace_check_use_disk_mode(bool use_disk,
@@ -923,6 +968,7 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
                                        size_t dataset_dim,
                                        size_t intermediate_degree,
                                        size_t graph_degree,
+                                       bool guarantee_connectivity,
                                        ace_memory_requirements& mem)
 {
   // In disk mode, we don't need the full dataset or final graph in memory.
@@ -940,20 +986,27 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
   bool host_memory_insufficient    = false;
   bool gpu_memory_insufficient     = false;
 
+  // Compute optimize workspace requirements
+  size_t sub_partition_size =
+    static_cast<size_t>(imbalance_factor * 2 * (dataset_size / n_partitions));
+  auto [host_workspace_size, gpu_workspace_size] = optimize_workspace_size(
+    sub_partition_size, graph_degree, intermediate_degree, sizeof(IdxT), guarantee_connectivity);
+
   // Check host memory requirements
-  size_t disk_mode_host_required =
-    mem.partition_labels_size + mem.id_mapping_size + mem.sub_dataset_size + mem.sub_graph_size;
+  size_t disk_mode_host_required = mem.partition_labels_size + mem.id_mapping_size +
+                                   mem.sub_dataset_size + mem.sub_graph_size + host_workspace_size;
 
   if (static_cast<size_t>(usable_cpu_memory_fraction * mem.available_host_memory) <
       disk_mode_host_required) {
     host_memory_insufficient = true;
     RAFT_LOG_WARN(
       "ACE: Host memory insufficient for disk mode. Required: %.2f GiB, available: %.2f GiB. "
-      "Per-partition breakdown: dataset %.2f GiB, graph %.2f GiB",
+      "Per-partition breakdown: dataset %.2f GiB, graph %.2f GiB, workspace %.2f GiB",
       to_gib(disk_mode_host_required),
       to_gib(mem.available_host_memory),
       to_gib(mem.sub_dataset_size),
-      to_gib(mem.sub_graph_size));
+      to_gib(mem.sub_graph_size),
+      to_gib(host_workspace_size));
 
     // Calculate suggested number of partitions for host memory
     double available_for_scaling = usable_cpu_memory_fraction * mem.available_host_memory -
@@ -963,8 +1016,9 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
                  "Required: %.2f GiB, available: %.2f GiB",
                  to_gib(mem.partition_labels_size + mem.id_mapping_size),
                  to_gib(usable_cpu_memory_fraction * mem.available_host_memory));
-    host_suggested_partitions = static_cast<size_t>(std::ceil(
-      (mem.sub_dataset_size + mem.sub_graph_size) * n_partitions / available_for_scaling));
+    host_suggested_partitions = static_cast<size_t>(
+      std::ceil((mem.sub_dataset_size + mem.sub_graph_size + host_workspace_size) * n_partitions /
+                available_for_scaling));
     // Ensure we always increase partitions (current count is insufficient by definition)
     host_suggested_partitions = std::max(host_suggested_partitions, n_partitions + 1);
   }
@@ -974,8 +1028,7 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
   //   - Per-partition dataset on GPU: 4 * (dataset_size / n_partitions) * dataset_dim * sizeof(T)
   //   - Per-partition graph on GPU: (dataset_size / n_partitions) * (intermediate + final) *
   //   sizeof(IdxT)
-  //   - CAGRA build also requires workspace memory. Conservative estimate: dataset size.
-  size_t gpu_workspace_size     = mem.sub_dataset_size;
+  //   - CAGRA optimize workspace memory (computed from optimize_workspace_size)
   size_t disk_mode_gpu_required = mem.sub_dataset_size + mem.sub_graph_size + gpu_workspace_size;
 
   if (static_cast<size_t>(usable_gpu_memory_fraction * mem.available_gpu_memory) <
@@ -1021,17 +1074,21 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
     mem.total_size = mem.partition_labels_size + mem.id_mapping_size + mem.sub_dataset_size +
                      mem.sub_graph_size + mem.cagra_graph_size;
 
-    size_t new_gpu_dataset =
-      imbalance_factor * 2 * (dataset_size / n_partitions) * dataset_dim * sizeof(T);
-    size_t new_gpu_workspace = new_gpu_dataset;
+    size_t new_sub_partition_size =
+      static_cast<size_t>(imbalance_factor * 2 * (dataset_size / n_partitions));
+    auto [new_opt_host_ws, new_opt_dev_ws] = optimize_workspace_size(new_sub_partition_size,
+                                                                     graph_degree,
+                                                                     intermediate_degree,
+                                                                     sizeof(IdxT),
+                                                                     guarantee_connectivity);
 
     RAFT_LOG_INFO(
-      "ACE: Updated per-partition memory estimates: host dataset %.2f GiB, host graph %.2f "
-      "GiB, GPU dataset %.2f GiB, GPU workspace %.2f GiB",
+      "ACE: Updated per-partition memory estimates: dataset %.2f GiB, graph %.2f GiB, "
+      "host workspace %.2f GiB, GPU workspace %.2f GiB",
       to_gib(mem.sub_dataset_size),
       to_gib(mem.sub_graph_size),
-      to_gib(new_gpu_dataset),
-      to_gib(new_gpu_workspace));
+      to_gib(new_opt_host_ws),
+      to_gib(new_opt_dev_ws));
   }
 }
 
@@ -1126,8 +1183,13 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
     // Validate and adjust partitions if disk mode is enabled
     if (use_disk_mode) {
-      ace_validate_disk_mode_partitions<T, IdxT>(
-        n_partitions, dataset_size, dataset_dim, intermediate_degree, graph_degree, mem);
+      ace_validate_disk_mode_partitions<T, IdxT>(n_partitions,
+                                                 dataset_size,
+                                                 dataset_dim,
+                                                 intermediate_degree,
+                                                 graph_degree,
+                                                 params.guarantee_connectivity,
+                                                 mem);
     }
 
     // Preallocate space for files for better performance and fail early if not enough space.
