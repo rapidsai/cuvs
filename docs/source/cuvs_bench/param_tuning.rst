@@ -217,7 +217,7 @@ CAGRA uses a graph-based index, which creates an intermediate, approximate kNN g
    - N
    - Positive integer >0
    - 1
-   - The number of partitions to use for the ACE build. Small values might improve recall but potentially degrade performance and increase memory usage. Partitions should not be too small to prevent issues in KNN graph construction. 100k - 5M vectors per partition is recommended depending on the available host and GPU memory. The partition size is on average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance in the partition sizes (up to 3x in our tests).
+   - The number of partitions to use for the ACE build. Small values might improve recall but potentially degrade performance and increase memory usage. Partitions should not be too small to prevent issues in KNN graph construction. The partition size is on average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance in the partition sizes (up to 3x in our tests).
 
  * - `build_dir`
    - `build`
@@ -747,7 +747,7 @@ cuVS HNSW builds an HNSW index using the ACE (Augmented Core Extraction) algorit
    - N
    - Positive integer >0
    - 1
-   - Number of partitions to use for the ACE build. Small values might improve recall but potentially degrade performance and increase memory usage. 100k - 5M vectors per partition is recommended depending on the available host and GPU memory.
+   - Number of partitions to use for the ACE build. Small values might improve recall but potentially degrade performance and increase memory usage. The partition size is on average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance in the partition sizes (up to 3x in our tests).
 
  * - `ef_construction`
    - `build`

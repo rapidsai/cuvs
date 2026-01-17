@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -88,10 +88,12 @@ static void _set_graph_build_params(
       cuvs::neighbors::cagra::graph_build_params::ace_params ace_p;
       if (params.graph_build_params) {
         auto ace_params_c             = static_cast<cuvsAceParams*>(params.graph_build_params);
-        ace_p.npartitions     = ace_params_c->npartitions;
-        ace_p.ef_construction = ace_params_c->ef_construction;
-        ace_p.build_dir       = std::string(ace_params_c->build_dir);
-        ace_p.use_disk        = ace_params_c->use_disk;
+        ace_p.npartitions         = ace_params_c->npartitions;
+        ace_p.ef_construction     = ace_params_c->ef_construction;
+        ace_p.build_dir           = std::string(ace_params_c->build_dir);
+        ace_p.use_disk            = ace_params_c->use_disk;
+        ace_p.max_host_memory_gb  = ace_params_c->max_host_memory_gb;
+        ace_p.max_gpu_memory_gb   = ace_params_c->max_gpu_memory_gb;
       }
       out_params = ace_p;
       break;
@@ -778,10 +780,12 @@ extern "C" cuvsError_t cuvsAceParamsCreate(cuvsAceParams_t* params)
     // Allocate and copy the build directory string
     const char* build_dir = strdup(ps.build_dir.c_str());
 
-    *params = new cuvsAceParams{.npartitions     = ps.npartitions,
-                                .ef_construction = ps.ef_construction,
-                                .build_dir       = build_dir,
-                                .use_disk        = ps.use_disk};
+    *params = new cuvsAceParams{.npartitions         = ps.npartitions,
+                                .ef_construction     = ps.ef_construction,
+                                .build_dir           = build_dir,
+                                .use_disk            = ps.use_disk,
+                                .max_host_memory_gb  = ps.max_host_memory_gb,
+                                .max_gpu_memory_gb   = ps.max_gpu_memory_gb};
   });
 }
 

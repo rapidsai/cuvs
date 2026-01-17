@@ -44,10 +44,9 @@ void hnsw_build_search_ace(raft::device_resources const& dev_resources,
   auto ace_params = hnsw::graph_build_params::ace_params();
   // Set the number of partitions. Small values might improve recall but potentially degrade
   // performance and increase memory usage. Partitions should not be too small to prevent issues in
-  // KNN graph construction. 100k - 5M vectors per partition is recommended depending on the
-  // available host and GPU memory. The partition size is on average 2 * (n_rows / npartitions) *
-  // dim * sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance
-  // in the partition sizes (up to 3x in our tests).
+  // KNN graph construction. The partition size is on average 2 * (n_rows / npartitions) * dim *
+  // sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance in the
+  // partition sizes (up to 3x in our tests).
   ace_params.npartitions = 4;
   // Set the directory to store the ACE build artifacts. This should be the fastest disk in the
   // system and hold enough space for twice the dataset, final graph, and label mapping.
