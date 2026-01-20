@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -365,6 +365,9 @@ void multi_gpu_batch_build(const raft::resources& handle,
                raft::resource::get_cuda_stream(handle));
   }
 
+  // Ensure all async copies complete before starting parallel region
+  raft::resource::sync_stream(handle);
+
 #pragma omp parallel for num_threads(num_ranks)
   for (int rank = 0; rank < num_ranks; rank++) {
     auto dev_res = raft::resource::set_current_device_to_rank(handle, rank);
@@ -527,6 +530,39 @@ void batch_build(
   auto global_distances = raft::make_managed_matrix<T, IdxT>(handle, num_rows, k);
 
   reset_global_matrices(handle, params.metric, global_neighbors.view(), global_distances.view());
+
+  // For multi-GPU: sync the stream to ensure fill completes before other GPUs access
+  // the managed memory.
+  if (raft::resource::is_multi_gpu(handle)) {
+    raft::resource::sync_stream(handle);
+
+    // Check if any GPU is Turing (SM 7.5) or older. These architectures have issues with
+    // multi-GPU managed memory coherence for concurrent writes. Force CPU-resident memory
+    // to ensure all GPUs access through host memory, avoiding page migration issues.
+    // Ampere (SM 8.0+) and newer architectures handle this correctly.
+    int num_ranks         = raft::resource::get_num_ranks(handle);
+    bool needs_workaround = false;
+    for (int rank = 0; rank < num_ranks; rank++) {
+      raft::resource::set_current_device_to_rank(handle, rank);
+      int device_id;
+      RAFT_CUDA_TRY(cudaGetDevice(&device_id));
+      int major = 0;
+      RAFT_CUDA_TRY(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device_id));
+      if (major < 8) { needs_workaround = true; }  // Turing is 7.x, Ampere is 8.x
+    }
+
+    if (needs_workaround) {
+      cudaMemLocation cpu_location = {cudaMemLocationTypeHost, 0};
+      RAFT_CUDA_TRY(cudaMemAdvise(global_neighbors.data_handle(),
+                                  num_rows * k * sizeof(IdxT),
+                                  cudaMemAdviseSetPreferredLocation,
+                                  cpu_location));
+      RAFT_CUDA_TRY(cudaMemAdvise(global_distances.data_handle(),
+                                  num_rows * k * sizeof(T),
+                                  cudaMemAdviseSetPreferredLocation,
+                                  cpu_location));
+    }
+  }
 
   if (raft::resource::is_multi_gpu(handle)) {
     multi_gpu_batch_build(handle,
