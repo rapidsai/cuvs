@@ -61,6 +61,8 @@ class Dataset:
     @property
     def dims(self) -> int:
         """Vector dimensionality."""
+        if self.base_vectors.size == 0:
+            return 0
         return self.base_vectors.shape[1]
     
     @property

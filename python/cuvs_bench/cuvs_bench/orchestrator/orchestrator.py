@@ -191,9 +191,13 @@ class BenchmarkOrchestrator:
         """
         return Dataset(
             name=dataset_config.name,
-            # Note: C++ backend loads vectors from files, so we pass empty arrays
-            base_vectors=np.array([]),
-            query_vectors=np.array([]),
+            # C++ backend loads vectors from files; other backends may need actual arrays
+            base_vectors=np.empty((0, 0)),
+            query_vectors=np.empty((0, 0)),
+            # Ground truth arrays - used by Python-native backends for recall calculation
+            groundtruth_neighbors=None,
+            groundtruth_distances=None,
+            # File paths - used by C++ backend
             base_file=dataset_config.base_file,
             query_file=dataset_config.query_file,
             groundtruth_neighbors_file=dataset_config.groundtruth_neighbors_file,
