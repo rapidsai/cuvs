@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -387,19 +387,18 @@ void bench_search(::benchmark::State& state,
           TODO: consider generating the filtered ground truth on-the-fly
           */
           uint32_t filter_pass_count = 0;
+          std::unordered_set<std::int32_t> gt_set;
           for (std::uint32_t l = 0; l < max_k && filter_pass_count < k; l++) {
             auto exp_idx = gt[i_orig_idx * max_k + l];
             if (!filter(exp_idx)) { continue; }
+            gt_set.insert(exp_idx);
             filter_pass_count++;
-            for (std::uint32_t j = 0; j < k; j++) {
-              auto act_idx = static_cast<std::int32_t>(neighbors_host[i_out_idx * k + j]);
-              if (act_idx == exp_idx) {
-                match_count++;
-                break;
-              }
-            }
           }
           total_count += filter_pass_count;
+          for (std::uint32_t j = 0; j < k; j++) {
+            auto act_idx = static_cast<std::int32_t>(neighbors_host[i_out_idx * k + j]);
+            if (gt_set.count(act_idx)) match_count++;
+          }
         }
       }
       out_offset += n_queries;
