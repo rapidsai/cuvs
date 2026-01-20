@@ -55,7 +55,7 @@ class TestCppGoogleBenchmarkBackend:
             }
             backend = CppGoogleBenchmarkBackend(config)
             
-            # Name should come from config, not executable path
+            # Name should come from config
             assert backend.name == "my_custom_backend"
         
         finally:
