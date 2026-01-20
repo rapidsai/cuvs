@@ -338,7 +338,7 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
                 queries_per_second=0.0,
                 recall=0.0,
                 algorithm="",
-                search_params={},
+                search_params=[],
                 metadata={"skipped": True, "reason": "no_indexes"},
                 success=True
             )
@@ -355,7 +355,7 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
                 queries_per_second=0.0,
                 recall=0.0,
                 algorithm=first_index.algo,
-                search_params=first_index.search_params[0] if first_index.search_params else {},
+                search_params=first_index.search_params if first_index.search_params else [],
                 metadata={"skipped": True, "reason": skip_reason},
                 success=True
             )
