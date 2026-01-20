@@ -21,14 +21,7 @@ Convert a calendar version to a cuVS ABI version
 Provides a consistent method to convert calendar-based version strings (YY.MM format) to
 cuVS ABI version components.
 
-The conversion follows this mapping scheme:
-
-- YY.02 releases map to ABI ?.0
-- YY.04 releases map to ABI ?.1
-- YY.06 releases map to ABI ?.2
-- YY.08 releases map to ABI ?+1.0
-- YY.10 releases map to ABI ?+1.1
-- YY.12 releases map to ABI ?+1.2
+Each
 
 ``cal_ver``
     A calendar version string in YY.MM format (e.g., "26.02", "27.08").
@@ -50,11 +43,6 @@ Example on how to properly use :cmake:command:`determine_cuvs_abi_version`:
     determine_cuvs_abi_version(${PROJECT_VERSION} MAJOR abi_major MINOR abi_minor)
     message(STATUS "CalVer ${calver} maps to ABI ${abi_major}.${abi_minor}")
 
-    # Example output for various calendar versions:
-    # 26.02 -> ABI 1.0
-    # 26.08 -> ABI 2.0
-    # 27.04 -> ABI 3.1
-
 
 Result Variables
 ^^^^^^^^^^^^^^^^
@@ -75,27 +63,24 @@ function(determine_cuvs_abi_version cal_ver)
   set(multi_value)
   cmake_parse_arguments(_CUVS_RAPIDS "${options}" "${one_value}" "${multi_value}" ${ARGN})
 
-  # major value table
-  set(major_table_02 "1")
-  set(major_table_04 "1")
-  set(major_table_06 "1")
-  set(major_table_08 "2")
-  set(major_table_10 "2")
-  set(major_table_12 "2")
-  # minor value table
-  set(minor_table_02 "0")
-  set(minor_table_04 "1")
-  set(minor_table_06 "2")
-  set(minor_table_08 "0")
-  set(minor_table_10 "1")
-  set(minor_table_12 "2")
-
   rapids_cmake_parse_version(MAJOR ${cal_ver} cal_ver_major)
   rapids_cmake_parse_version(MINOR ${cal_ver} cal_ver_minor)
 
+  # Encode the last ABI break
+  set(current_major_abi_ver "1") # The current ABI major value
+  set(abi_base_year "26")   # What year the current ABI major occurred in
+  set(abi_base_month "04")  # What month the current ABI major occurred in
   # compute the abi version
-  math(EXPR computed_abi_major "(${cal_ver_major} - 26) * 2 + ${major_table_${cal_ver_minor}}")
-  set(compute_abi_minor "${minor_table_${cal_ver_minor}}")
+  if(cal_ver_major STREQUAL abi_base_year)
+    # If we are in the same year is is pretty easy to compute our abi break
+    math(EXPR computed_abi_minor "(${cal_ver_minor}-${abi_base_month})/2")
+  else()
+    #
+    math(EXPR first_year_count "(12-${abi_base_month})/2")
+    math(EXPR extra_years "(${cal_ver_major} - ${abi_base_year} - 1) * 6")
+    math(EXPR this_year_count "(${cal_ver_minor})/2")
+    math(EXPR computed_abi_minor "${first_year_count} + ${extra_years} + +${this_year_count}")
+  endif()
 
   set(${_CUVS_RAPIDS_MAJOR}
       ${computed_abi_major}
