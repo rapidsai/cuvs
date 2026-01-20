@@ -405,7 +405,7 @@ class BenchmarkBackend(ABC):
             Skip reason if checks fail (e.g., "no_gpu", "no_network"),
             None if all checks pass and operation should proceed.
         """
-        if self.supports_gpu and not self._check_gpu_available():
+        if self.requires_gpu and not self._check_gpu_available():
             return "no_gpu"
         if self.requires_network and not self._check_network_available():
             return "no_network"
@@ -453,16 +453,23 @@ class BenchmarkBackend(ABC):
         pass
     
     @property
-    def supports_gpu(self) -> bool:
+    def requires_gpu(self) -> bool:
         """
-        Whether this backend uses GPU acceleration.
+        Whether this backend requires GPU acceleration.
         
         Reads from config["requires_gpu"], matching algorithms.yaml structure.
+        
+        Note
+        ----
+        If requires_gpu=True and no GPU is available (checked via RMM import),
+        the backend will be skipped during pre-flight checks. This matches the
+        legacy run.py behavior where GPU-requiring algorithms are not executed
+        on CPU-only systems.
         
         Returns
         -------
         bool
-            True if backend uses GPU, False otherwise (default)
+            True if backend requires GPU, False otherwise (default)
         """
         return self.config.get("requires_gpu", False)
     
@@ -471,7 +478,7 @@ class BenchmarkBackend(ABC):
         """
         Whether this backend requires network connectivity.
         
-        Reads from config["requires_network"], similar to supports_gpu.
+        Reads from config["requires_network"], similar to requires_gpu.
         
         Returns
         -------
