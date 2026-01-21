@@ -70,13 +70,12 @@ auto train_pq_subspaces(
     pq_trainset    = cuvs::util::subsample(res, dataset, n_rows_train);
     auto vq_labels = cuvs::neighbors::detail::predict_vq<uint32_t>(
       res, raft::make_const_mdspan(pq_trainset.view()), vq_centers);
-    using index_type = typename DatasetT::index_type;
     raft::linalg::map_offset(
       res,
       pq_trainset.view(),
-      [labels = vq_labels.view(), vq_centers, dim] __device__(index_type off, MathT x) {
-        index_type i = off / dim;
-        index_type j = off % dim;
+      [labels = vq_labels.view(), vq_centers, dim] __device__(ix_t off, MathT x) {
+        ix_t i = off / dim;
+        ix_t j = off % dim;
         return x - vq_centers(labels(i), j);
       },
       raft::make_const_mdspan(pq_trainset.view()));
@@ -88,14 +87,14 @@ auto train_pq_subspaces(
   auto pq_centers =
     raft::make_device_matrix<MathT, uint32_t, raft::row_major>(res, pq_dim * pq_n_centers, pq_len);
   auto trainset_ptr     = !vq_centers.empty() ? pq_trainset.data_handle() : dataset.data_handle();
-  auto sub_labels       = raft::make_device_vector<uint32_t, int64_t>(res, 0);
-  auto pq_cluster_sizes = raft::make_device_vector<uint32_t, int64_t>(res, 0);
+  auto sub_labels       = raft::make_device_vector<uint32_t, ix_t>(res, 0);
+  auto pq_cluster_sizes = raft::make_device_vector<uint32_t, ix_t>(res, 0);
   auto device_memory    = raft::resource::get_workspace_resource(res);
   if (params.pq_kmeans_type == cuvs::cluster::kmeans::kmeans_type::KMeansBalanced) {
     sub_labels = raft::make_device_mdarray<uint32_t>(
-      res, device_memory, raft::make_extents<int64_t>(n_rows_train));
+      res, device_memory, raft::make_extents<ix_t>(n_rows_train));
     pq_cluster_sizes = raft::make_device_mdarray<uint32_t>(
-      res, device_memory, raft::make_extents<int64_t>(pq_n_centers));
+      res, device_memory, raft::make_extents<ix_t>(pq_n_centers));
   }
 
   for (ix_t m = 0; m < pq_dim; m++) {
@@ -210,7 +209,7 @@ __launch_bounds__(BlockSize) RAFT_KERNEL reconstruct_vectors_kernel(
   raft::device_matrix_view<const uint8_t, IdxT, raft::row_major> codes,
   raft::device_matrix_view<DataT, IdxT, raft::row_major> dataset,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
-  raft::device_matrix_view<const DataT, IdxT, raft::row_major> vq_centers,
+  raft::device_matrix_view<const DataT, uint32_t, raft::row_major> vq_centers,
   const uint32_t pq_bits,
   bool use_subspaces)
 {
@@ -252,28 +251,25 @@ auto reconstruct_vectors(
   raft::device_matrix_view<DataT, IdxT, raft::row_major> out_vectors,
   bool use_subspaces)
 {
-  using data_t = DataT;
-  using ix_t   = IdxT;
-
-  const ix_t n_rows       = out_vectors.extent(0);
-  const ix_t dim          = out_vectors.extent(1);
-  const ix_t pq_dim       = params.pq_dim;
-  const ix_t pq_bits      = params.pq_bits;
-  const ix_t pq_n_centers = ix_t{1} << pq_bits;
+  const IdxT n_rows       = out_vectors.extent(0);
+  const IdxT dim          = out_vectors.extent(1);
+  const IdxT pq_dim       = params.pq_dim;
+  const IdxT pq_bits      = params.pq_bits;
+  const IdxT pq_n_centers = IdxT{1} << pq_bits;
 
   auto stream = raft::resource::get_cuda_stream(res);
 
-  constexpr ix_t kBlockSize  = 256;
-  const ix_t threads_per_vec = std::min<ix_t>(raft::WarpSize, pq_n_centers);
+  constexpr IdxT kBlockSize  = 256;
+  const IdxT threads_per_vec = std::min<IdxT>(raft::WarpSize, pq_n_centers);
   dim3 threads(kBlockSize, 1, 1);
   auto kernel = [](uint32_t pq_bits) {
     if (pq_bits == 4) {
-      return reconstruct_vectors_kernel<kBlockSize, 16, uint8_t, data_t, MathT, IdxT, LabelT>;
+      return reconstruct_vectors_kernel<kBlockSize, 16, uint8_t, DataT, MathT, IdxT, LabelT>;
     } else if (pq_bits <= 8) {
       return reconstruct_vectors_kernel<kBlockSize,
                                         raft::WarpSize,
                                         uint8_t,
-                                        data_t,
+                                        DataT,
                                         MathT,
                                         IdxT,
                                         LabelT>;
@@ -281,7 +277,7 @@ auto reconstruct_vectors(
       return reconstruct_vectors_kernel<kBlockSize,
                                         raft::WarpSize,
                                         uint16_t,
-                                        data_t,
+                                        DataT,
                                         MathT,
                                         IdxT,
                                         LabelT>;
@@ -289,7 +285,7 @@ auto reconstruct_vectors(
       RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 16]", pq_bits);
     }
   }(pq_bits);
-  dim3 blocks(raft::div_rounding_up_safe<ix_t>(n_rows, kBlockSize / threads_per_vec), 1, 1);
+  dim3 blocks(raft::div_rounding_up_safe<IdxT>(n_rows, kBlockSize / threads_per_vec), 1, 1);
   kernel<<<blocks, threads, 0, stream>>>(
     codes, out_vectors, pq_centers, vq_centers, pq_bits, use_subspaces);
   RAFT_CUDA_TRY(cudaPeekAtLastError());

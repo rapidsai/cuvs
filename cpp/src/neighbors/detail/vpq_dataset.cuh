@@ -503,55 +503,26 @@ auto vpq_convert_math_type(const raft::resources& res, vpq_dataset<OldMathT, Idx
   return vpq_dataset<NewMathT, IdxT>{
     std::move(vq_code_book), std::move(pq_code_book), std::move(src.data)};
 }
-template <typename MathT, uint8_t PqLenVectorSize>
-struct vec_op {
-  using type = void;
-};
 
-template <>
-struct vec_op<float, 4> {
-  using type = float4;
-
-  __device__ __forceinline__ static type make(float x, float y, float z, float w)
+// Helper for operations using vectorized loads of raft::TxN_t
+template <typename MathT, int VectorSize>
+struct vec_op : raft::TxN_t<MathT, VectorSize> {
+  DI float sum_squares() const
   {
-    return make_float4(x, y, z, w);
+    float sum = 0.0f;
+#pragma unroll
+    for (int i = 0; i < VectorSize; ++i) {
+      sum += this->val.data[i] * this->val.data[i];
+    }
+    return sum;
   }
 
-  __device__ __forceinline__ static type load(const float* ptr)
+  DI void reverse_sub(const vec_op<MathT, VectorSize>& a)
   {
-    return *reinterpret_cast<const type*>(ptr);
-  }
-
-  __device__ __forceinline__ static float sum_squares(const type& diff)
-  {
-    return diff.x * diff.x + diff.y * diff.y + diff.z * diff.z + diff.w * diff.w;
-  }
-
-  __device__ __forceinline__ static type sub(const type& a, const type& b)
-  {
-    return make_float4(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w);
-  }
-};
-
-template <>
-struct vec_op<float, 2> {
-  using type = float2;
-
-  __device__ __forceinline__ static type make(float x, float y) { return make_float2(x, y); }
-
-  __device__ __forceinline__ static type load(const float* ptr)
-  {
-    return *reinterpret_cast<const type*>(ptr);
-  }
-
-  __device__ __forceinline__ static float sum_squares(const type& diff)
-  {
-    return diff.x * diff.x + diff.y * diff.y;
-  }
-
-  __device__ __forceinline__ static type sub(const type& a, const type& b)
-  {
-    return make_float2(a.x - b.x, a.y - b.y);
+#pragma unroll
+    for (int i = 0; i < VectorSize; ++i) {
+      this->val.data[i] = a.val.data[i] - this->val.data[i];
+    }
   }
 };
 
@@ -591,31 +562,40 @@ __device__ __forceinline__ void process_4centers_vec(MathT& d0,
   bool pq_len_is_pow2 = raft::is_pow2(pq_len);
   if (pq_len_is_pow2) {
     for (; k + 3 < pq_len; k += 4) {
-      using VecOp = vec_op<MathT, 4>;
-      using VecT  = typename VecOp::type;
-      VecT x_vec =
-        VecOp::make(get_x_func(k), get_x_func(k + 1), get_x_func(k + 2), get_x_func(k + 3));
-      VecT c0 = VecOp::load(&centers_ptr[l * pq_len + k]);
-      VecT c1 = VecOp::load(&centers_ptr[(l + SubWarpSize) * pq_len + k]);
-      VecT c2 = VecOp::load(&centers_ptr[(l + 2 * SubWarpSize) * pq_len + k]);
-      VecT c3 = VecOp::load(&centers_ptr[(l + 3 * SubWarpSize) * pq_len + k]);
-      d0 += VecOp::sum_squares(VecOp::sub(x_vec, c0));
-      d1 += VecOp::sum_squares(VecOp::sub(x_vec, c1));
-      d2 += VecOp::sum_squares(VecOp::sub(x_vec, c2));
-      d3 += VecOp::sum_squares(VecOp::sub(x_vec, c3));
+      vec_op<MathT, 4> x_vec, c0, c1, c2, c3;
+      x_vec.val.data[0] = get_x_func(k);
+      x_vec.val.data[1] = get_x_func(k + 1);
+      x_vec.val.data[2] = get_x_func(k + 2);
+      x_vec.val.data[3] = get_x_func(k + 3);
+      c0.load(centers_ptr, l * pq_len + k);
+      c1.load(centers_ptr, (l + SubWarpSize) * pq_len + k);
+      c2.load(centers_ptr, (l + 2 * SubWarpSize) * pq_len + k);
+      c3.load(centers_ptr, (l + 3 * SubWarpSize) * pq_len + k);
+      c0.reverse_sub(x_vec);
+      c1.reverse_sub(x_vec);
+      c2.reverse_sub(x_vec);
+      c3.reverse_sub(x_vec);
+      d0 += c0.sum_squares();
+      d1 += c1.sum_squares();
+      d2 += c2.sum_squares();
+      d3 += c3.sum_squares();
     }
     for (; k + 1 < pq_len; k += 2) {
-      using VecOp = vec_op<MathT, 2>;
-      using VecT  = typename VecOp::type;
-      VecT x_vec  = VecOp::make(get_x_func(k), get_x_func(k + 1));
-      VecT c0     = VecOp::load(&centers_ptr[l * pq_len + k]);
-      VecT c1     = VecOp::load(&centers_ptr[(l + SubWarpSize) * pq_len + k]);
-      VecT c2     = VecOp::load(&centers_ptr[(l + 2 * SubWarpSize) * pq_len + k]);
-      VecT c3     = VecOp::load(&centers_ptr[(l + 3 * SubWarpSize) * pq_len + k]);
-      d0 += VecOp::sum_squares(VecOp::sub(x_vec, c0));
-      d1 += VecOp::sum_squares(VecOp::sub(x_vec, c1));
-      d2 += VecOp::sum_squares(VecOp::sub(x_vec, c2));
-      d3 += VecOp::sum_squares(VecOp::sub(x_vec, c3));
+      vec_op<MathT, 2> x_vec, c0, c1, c2, c3;
+      x_vec.val.data[0] = get_x_func(k);
+      x_vec.val.data[1] = get_x_func(k + 1);
+      c0.load(centers_ptr, l * pq_len + k);
+      c1.load(centers_ptr, (l + SubWarpSize) * pq_len + k);
+      c2.load(centers_ptr, (l + 2 * SubWarpSize) * pq_len + k);
+      c3.load(centers_ptr, (l + 3 * SubWarpSize) * pq_len + k);
+      c0.reverse_sub(x_vec);
+      c1.reverse_sub(x_vec);
+      c2.reverse_sub(x_vec);
+      c3.reverse_sub(x_vec);
+      d0 += c0.sum_squares();
+      d1 += c1.sum_squares();
+      d2 += c2.sum_squares();
+      d3 += c3.sum_squares();
     }
   }
 
