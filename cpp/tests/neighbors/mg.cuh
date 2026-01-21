@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -45,7 +45,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       h_index_dataset(0),
       h_queries(0)
   {
-    clique_.set_memory_pool(80);
+    // clique_.set_memory_pool(80);
   }
 
   void testAnnMG()
