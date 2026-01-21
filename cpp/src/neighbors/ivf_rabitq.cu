@@ -57,10 +57,8 @@ void build(raft::resources const& handle,
   auto d_dataset_view =
     raft::make_mdspan(dataset.data_handle(), raft::make_extents<int64_t>(n_rows, dim));
   auto stream = raft::resource::get_cuda_stream(handle);
-  if (utils::check_pointer_residency(dataset.data_handle()) ==
+  if (utils::check_pointer_residency(dataset.data_handle()) !=
       utils::pointer_residency::device_only) {
-    d_dataset_view = dataset;
-  } else {
     try {
       d_dataset_array = raft::make_device_mdarray<T>(
         handle, big_memory_resource, raft::make_extents<int64_t>(n_rows, dim));
@@ -70,8 +68,8 @@ void build(raft::resources const& handle,
         "dataset size, or set large_workspace_resource appropriately.");
       throw;
     }
+    raft::copy(d_dataset_array.data_handle(), dataset.data_handle(), n_rows * dim, stream);
     d_dataset_view = d_dataset_array.view();
-    raft::copy(d_dataset_array.view().data_handle(), dataset.data_handle(), n_rows * dim, stream);
   }
 
   // perform k-means clustering (currently using the entire dataset)
@@ -269,6 +267,14 @@ uint32_t index<IdxT>::dim() const noexcept
 void build(raft::resources const& handle,
            const cuvs::neighbors::ivf_rabitq::index_params& index_params,
            raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
+           cuvs::neighbors::ivf_rabitq::index<int64_t>* idx)
+{
+  cuvs::neighbors::ivf_rabitq::detail::build(handle, index_params, dataset, idx);
+}
+
+void build(raft::resources const& handle,
+           const cuvs::neighbors::ivf_rabitq::index_params& index_params,
+           raft::host_matrix_view<const float, int64_t, raft::row_major> dataset,
            cuvs::neighbors::ivf_rabitq::index<int64_t>* idx)
 {
   cuvs::neighbors::ivf_rabitq::detail::build(handle, index_params, dataset, idx);

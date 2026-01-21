@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -158,7 +158,7 @@ struct index : cuvs::neighbors::index {
  *
  * @param[in] handle
  * @param[in] index_params configure the index building
- * @param[in] dataset a host_matrix_view to a row-major matrix [n_rows, dim]
+ * @param[in] dataset a device_matrix_view to a row-major matrix [n_rows, dim]
  * @param[out] idx reference to ivf_rabitq::index
  *
  */
@@ -167,6 +167,29 @@ void build(raft::resources const& handle,
            raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
            cuvs::neighbors::ivf_rabitq::index<int64_t>* idx);
 
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   ivf_rabitq::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   cuvs::neighbors::ivf_rabitq::index<int64_t> index;
+ *   ivf_rabitq::build(handle, index_params, dataset, &index);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] index_params configure the index building
+ * @param[in] dataset a host_matrix_view to a row-major matrix [n_rows, dim]
+ * @param[out] idx reference to ivf_rabitq::index
+ *
+ */
+void build(raft::resources const& handle,
+           const cuvs::neighbors::ivf_rabitq::index_params& index_params,
+           raft::host_matrix_view<const float, int64_t, raft::row_major> dataset,
+           cuvs::neighbors::ivf_rabitq::index<int64_t>* idx);
 /**
  * @}
  */

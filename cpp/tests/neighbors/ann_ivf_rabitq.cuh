@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -140,9 +140,7 @@ class ivf_rabitq_test : public ::testing::TestWithParam<ivf_rabitq_inputs> {
 
     auto host_database = raft::make_host_matrix<DataT, IdxT>(ps.num_db_vecs, ps.dim);
     raft::copy(host_database.data_handle(), database.data(), ps.num_db_vecs * ps.dim, stream_);
-    // `ivf_rabitq::build` internally distinguishes between device and host pointers. For
-    // convenience, we wrap the host pointer as a device matrix view here.
-    auto database_view = raft::make_device_matrix_view<const DataT, IdxT>(
+    auto database_view = raft::make_host_matrix_view<const DataT, IdxT>(
       host_database.data_handle(), ps.num_db_vecs, ps.dim);
     cuvs::neighbors::ivf_rabitq::index<IdxT> idx(
       handle_, ps.num_db_vecs, ps.dim, ipams.n_lists, ipams.bits_per_dim);
