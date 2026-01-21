@@ -79,7 +79,7 @@ function(determine_cuvs_abi_version cal_ver)
     math(EXPR first_year_count "(12-${abi_base_month})/2")
     math(EXPR extra_years "(${cal_ver_major} - ${abi_base_year} - 1) * 6")
     math(EXPR this_year_count "(${cal_ver_minor})/2")
-    math(EXPR computed_abi_minor "${first_year_count} + ${extra_years} + +${this_year_count}")
+    math(EXPR computed_abi_minor "${first_year_count} + ${extra_years} + ${this_year_count}")
   endif()
 
   set(${_CUVS_RAPIDS_MAJOR}
@@ -87,7 +87,7 @@ function(determine_cuvs_abi_version cal_ver)
       PARENT_SCOPE
   )
   set(${_CUVS_RAPIDS_MINOR}
-      ${compute_abi_minor}
+      ${computed_abi_minor}
       PARENT_SCOPE
   )
 endfunction()
