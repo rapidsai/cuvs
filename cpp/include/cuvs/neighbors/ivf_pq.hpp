@@ -3355,6 +3355,18 @@ void resize_list(raft::resources const& res,
                  const list_spec_interleaved<uint32_t, int64_t>& spec,
                  uint32_t new_used_size,
                  uint32_t old_used_size);
+
+/** Calculate the size of the compressed dataset.
+ *
+ * @param[in] res raft resource
+ * @param[in] dataset shape of the dataset
+ * @param[in] param ivf-pq compression pramas
+ *
+ * @return compressed dataset size in bytes
+ */
+size_t compressed_dataset_size(raft::resources const& res,
+                               raft::matrix_extent<int64_t> dataset,
+                               cuvs::neighbors::ivf_pq::index_params params);
 /**
  * @}
  */

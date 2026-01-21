@@ -1010,6 +1010,7 @@ if(NOT BUILD_CPU_ONLY)
     ${iface_pq_inst_files}
     src/neighbors/detail/cagra/topk_for_cagra/topk.cu
     ${cuvs_cagra_search_cuda_inst_files}
+    src/neighbors/detail/cagra/cagra_helpers.cpp
     src/neighbors/dynamic_batching.cu
     src/neighbors/composite/index.cu
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/cagra.cpp>
