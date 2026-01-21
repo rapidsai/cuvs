@@ -19,6 +19,9 @@ constexpr bool is_const_ptr_v = std::is_const_v<std::remove_pointer_t<T>>;
 /**
  * Bitfield reference for reading/writing from non-const pointers.
  * This type mimics `uint8_t&` or `uint16_t&` for the indexing operator.
+ * Taken from src/neighbors/ivf_pq/ivf_pq_codepacking.cuh with the `bits` template
+ * parameter becoming a member variable.
+ * @param Bits number of bits comprising the value.
  */
 template <typename PtrT = uint8_t*>
 struct bitfield_ref_t {
@@ -86,6 +89,9 @@ struct bitfield_ref_t {
 
 /**
  * View a byte array as an array of unsigned integers of custom small bit size.
+ * Taken from src/neighbors/ivf_pq/ivf_pq_codepacking.cuh with the `bits` template
+ * parameter becoming a member variable.
+ * @param Bits number of bits comprising the value.
  */
 template <typename PtrT = uint8_t*>
 struct bitfield_view_t {

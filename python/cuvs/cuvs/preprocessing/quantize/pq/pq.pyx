@@ -17,8 +17,8 @@ from cuvs.common.resources import auto_sync_resources
 from cuvs.neighbors.common import _check_input_array
 
 PQ_KMEANS_TYPES = {
-    "kmeans" : cuvsKMeansType.KMeans,
-    "kmeans_balanced" : cuvsKMeansType.KMeansBalanced}
+    "kmeans" : cuvsKMeansType.CUVS_KMEANS_TYPE_KMEANS,
+    "kmeans_balanced" : cuvsKMeansType.CUVS_KMEANS_TYPE_KMEANS_BALANCED}
 
 PQ_KMEANS_NAMES = {v: k for k, v in PQ_KMEANS_TYPES.items()}
 

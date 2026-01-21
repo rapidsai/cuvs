@@ -115,7 +115,7 @@ extern "C" cuvsError_t cuvsProductQuantizerParamsCreate(cuvsProductQuantizerPara
   return cuvs::core::translate_exceptions([=] {
     *params = new cuvsProductQuantizerParams{
       .pq_bits = 8, .pq_dim = 0, .use_subspaces = true, .use_vq = false, .vq_n_centers = 0,
-      .kmeans_n_iters = 25, .pq_kmeans_type = cuvsKMeansType::KMeansBalanced,
+      .kmeans_n_iters = 25, .pq_kmeans_type = CUVS_KMEANS_TYPE_KMEANS_BALANCED,
       .max_train_points_per_pq_code = 256, .max_train_points_per_vq_cluster = 1024}; });
 }
 

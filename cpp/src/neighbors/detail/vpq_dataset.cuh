@@ -77,22 +77,10 @@ void train_pq_centers(
   const cuvs::neighbors::vpq_params& params,
   const raft::device_matrix_view<const MathT, IdxT, raft::row_major> pq_trainset_view,
   const raft::device_matrix_view<MathT, uint32_t, raft::row_major> pq_centers_view,
-  std::optional<raft::device_vector_view<uint32_t, IdxT>> sub_labels_view       = std::nullopt,
-  std::optional<raft::device_vector_view<uint32_t, IdxT>> pq_cluster_sizes_view = std::nullopt)
+  raft::device_vector_view<uint32_t, IdxT> sub_labels_view,
+  raft::device_vector_view<uint32_t, IdxT> pq_cluster_sizes_view)
 {
   if (params.pq_kmeans_type == cuvs::cluster::kmeans::kmeans_type::KMeansBalanced) {
-    std::optional<raft::device_vector<uint32_t, IdxT>> sub_labels_opt       = std::nullopt;
-    std::optional<raft::device_vector<uint32_t, IdxT>> pq_cluster_sizes_opt = std::nullopt;
-    if (!sub_labels_view) {
-      sub_labels_opt = std::make_optional(
-        raft::make_device_vector<uint32_t, IdxT>(res, pq_trainset_view.extent(0)));
-      sub_labels_view = std::make_optional(sub_labels_opt.value().view());
-    }
-    if (!pq_cluster_sizes_view) {
-      pq_cluster_sizes_opt = std::make_optional(
-        raft::make_device_vector<uint32_t, IdxT>(res, pq_centers_view.extent(0)));
-      pq_cluster_sizes_view = std::make_optional(pq_cluster_sizes_opt.value().view());
-    }
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
     kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
@@ -108,8 +96,8 @@ void train_pq_centers(
       kmeans_params,
       pq_trainset_view,
       pq_centers_view,
-      sub_labels_view.value(),
-      pq_cluster_sizes_view.value(),
+      sub_labels_view,
+      pq_cluster_sizes_view,
       cuvs::spatial::knn::detail::utils::mapping<MathT>{});
   } else {
     const auto pq_n_centers = pq_centers_view.extent(0);
@@ -233,11 +221,10 @@ auto predict_vq(const raft::resources& res, const DatasetT& dataset, const VqCen
 }
 
 template <typename MathT, typename DatasetT>
-auto train_pq(
-  const raft::resources& res,
-  const vpq_params& params,
-  const DatasetT& dataset,
-  std::optional<const raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers)
+auto train_pq(const raft::resources& res,
+              const vpq_params& params,
+              const DatasetT& dataset,
+              const raft::device_matrix_view<const MathT, uint32_t, raft::row_major> vq_centers)
   -> raft::device_matrix<MathT, uint32_t, raft::row_major>
 {
   const ix_t n_rows       = dataset.extent(0);
@@ -256,14 +243,13 @@ auto train_pq(
   auto pq_trainset = transform_data<MathT>(res, util::subsample(res, dataset, n_rows_train));
 
   // Subtract VQ centers
-  if (vq_centers) {
-    auto vq_labels   = predict_vq<uint32_t>(res, pq_trainset, vq_centers.value());
+  if (!vq_centers.empty()) {
+    auto vq_labels   = predict_vq<uint32_t>(res, pq_trainset, vq_centers);
     using index_type = typename DatasetT::index_type;
     raft::linalg::map_offset(
       res,
       pq_trainset.view(),
-      [labels = vq_labels.view(), centers = vq_centers.value(), dim] __device__(index_type off,
-                                                                                MathT x) {
+      [labels = vq_labels.view(), centers = vq_centers, dim] __device__(index_type off, MathT x) {
         index_type i = off / dim;
         index_type j = off % dim;
         return x - centers(labels(i), j);
@@ -275,7 +261,10 @@ auto train_pq(
     raft::make_device_matrix<MathT, uint32_t, raft::row_major>(res, pq_n_centers, pq_len);
   auto pq_trainset_view = raft::make_device_matrix_view<const MathT, ix_t>(
     pq_trainset.data_handle(), n_rows_train * pq_dim, pq_len);
-  train_pq_centers<MathT, ix_t>(res, params, pq_trainset_view, pq_centers.view());
+  auto sub_labels       = raft::make_device_vector<uint32_t, ix_t>(res, pq_trainset_view.extent(0));
+  auto pq_cluster_sizes = raft::make_device_vector<uint32_t, ix_t>(res, pq_centers.extent(0));
+  train_pq_centers<MathT, ix_t>(
+    res, params, pq_trainset_view, pq_centers.view(), sub_labels.view(), pq_cluster_sizes.view());
 
   return pq_centers;
 }
@@ -288,8 +277,8 @@ template <uint32_t SubWarpSize,
           typename LabelT>
 __device__ auto compute_code(
   raft::device_matrix_view<const DataT, IdxT, raft::row_major> dataset,
-  std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers,
-  std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> pq_centers_smem,
+  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> vq_centers,
+  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers_smem,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
   IdxT i,
   uint32_t j,
@@ -306,15 +295,15 @@ __device__ auto compute_code(
   CodeT code                  = 0;
   // calculate the distance for each PQ cluster, find the minimum for each thread
   uint32_t l = lane_id;
-  if (pq_centers_smem) {
-    for (; l < pq_centers_smem.value().extent(0); l += SubWarpSize) {
+  if (!pq_centers_smem.empty()) {
+    for (; l < pq_centers_smem.extent(0); l += SubWarpSize) {
       // NB: the L2 quantifiers on residuals are always trained on L2 metric.
       float d = 0.0f;
       for (uint32_t k = 0; k < pq_len; k++) {
         auto jk = j * pq_len + k;
         auto x  = data_mapping(dataset(i, jk));
-        if (vq_centers) { x -= vq_centers.value()(vq_label, jk); }
-        auto t = x - pq_centers_smem.value()(l, k);
+        if (!vq_centers.empty()) { x -= vq_centers(vq_label, jk); }
+        auto t = x - pq_centers_smem(l, k);
         d += t * t;
       }
       if (d < min_dist) {
@@ -330,7 +319,7 @@ __device__ auto compute_code(
     for (uint32_t k = 0; k < pq_len; k++) {
       auto jk = j * pq_len + k;
       auto x  = data_mapping(dataset(i, jk));
-      if (vq_centers) { x -= vq_centers.value()(vq_label, jk); }
+      if (!vq_centers.empty()) { x -= vq_centers(vq_label, jk); }
       auto t = x - pq_centers(l, k);
       d += t * t;
     }
@@ -363,12 +352,10 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_kernel(
   raft::device_matrix_view<uint8_t, IdxT, raft::row_major> out_codes,
   raft::device_matrix_view<const DataT, IdxT, raft::row_major> dataset,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
+  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> vq_centers,
+  raft::device_vector_view<const LabelT, IdxT, raft::row_major> vq_labels,
   const uint32_t rows_in_shared_memory,
-  const uint32_t pq_bits,
-  std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers =
-    std::nullopt,
-  std::optional<raft::device_vector_view<const LabelT, IdxT, raft::row_major>> vq_labels =
-    std::nullopt)
+  const uint32_t pq_bits)
 {
   extern __shared__ __align__(256) MathT pq_centers_smem[];
   using subwarp_align = raft::Pow2<SubWarpSize>;
@@ -387,11 +374,11 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_kernel(
   auto pq_centers_smem_view = raft::make_device_matrix_view<const MathT, uint32_t, raft::row_major>(
     pq_centers_smem, rows_in_shared_memory, pq_centers.extent(1));
   const uint32_t lane_id = subwarp_align::mod(threadIdx.x);
-  const LabelT vq_label  = vq_labels ? vq_labels.value()(row_ix) : 0;
+  const LabelT vq_label  = !vq_labels.empty() ? vq_labels(row_ix) : 0;
   auto* out_codes_ptr    = &out_codes(row_ix, 0);
 
   // write label
-  if (vq_centers) {
+  if (!vq_centers.empty()) {
     auto* out_label_ptr = reinterpret_cast<LabelT*>(out_codes_ptr);
     if (lane_id == 0) { *out_label_ptr = vq_label; }
     out_codes_ptr += sizeof(LabelT);
@@ -400,13 +387,8 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_kernel(
   cuvs::preprocessing::quantize::detail::bitfield_view_t code_view{out_codes_ptr, pq_bits};
   for (uint32_t j = 0; j < pq_dim; j++) {
     // find PQ label
-    CodeT code = compute_code<SubWarpSize, CodeT>(dataset,
-                                                  vq_centers,
-                                                  std::make_optional(pq_centers_smem_view),
-                                                  pq_centers,
-                                                  row_ix,
-                                                  j,
-                                                  vq_label);
+    CodeT code = compute_code<SubWarpSize, CodeT>(
+      dataset, vq_centers, pq_centers_smem_view, pq_centers, row_ix, j, vq_label);
     // TODO: this writes in global memory one byte per warp, which is very slow.
     //  It's better to keep the codes in the shared memory or registers and dump them at once.
     if (lane_id == 0) { code_view[j] = code; }
@@ -419,9 +401,8 @@ void process_and_fill_codes(
   const vpq_params& params,
   const DatasetT& dataset,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
-  raft::device_matrix_view<uint8_t, IdxT, raft::row_major> codes,
-  std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers =
-    std::nullopt)
+  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> vq_centers,
+  raft::device_matrix_view<uint8_t, IdxT, raft::row_major> codes)
 {
   using data_t     = typename DatasetT::value_type;
   using cdataset_t = vpq_dataset<MathT, IdxT>;
@@ -433,7 +414,7 @@ void process_and_fill_codes(
   const ix_t pq_bits      = params.pq_bits;
   const ix_t pq_n_centers = ix_t{1} << pq_bits;
   ix_t codes_rowlen       = 0;
-  if (vq_centers.has_value()) {
+  if (!vq_centers.empty()) {
     // NB: codes must be aligned at least to sizeof(label_t) to be able to read labels.
     codes_rowlen = sizeof(label_t) *
                    (1 + raft::div_rounding_up_safe<ix_t>(pq_dim * pq_bits, 8 * sizeof(label_t)));
@@ -488,23 +469,18 @@ void process_and_fill_codes(
          stream,
          rmm::mr::get_current_device_resource())) {
     auto batch_view = raft::make_device_matrix_view(batch.data(), ix_t(batch.size()), dim);
-    std::optional<raft::device_vector<label_t, IdxT, raft::row_major>> labels = std::nullopt;
-    std::optional<raft::device_vector_view<const label_t, IdxT, raft::row_major>> labels_view =
-      std::nullopt;
-    if (vq_centers) {
-      labels      = predict_vq<label_t>(res, batch_view, vq_centers.value());
-      labels_view = raft::make_const_mdspan(labels->view());
-    }
+    auto labels     = raft::make_device_vector<label_t, IdxT, raft::row_major>(res, 0);
+    if (!vq_centers.empty()) { labels = predict_vq<label_t>(res, batch_view, vq_centers); }
     dim3 blocks(raft::div_rounding_up_safe<ix_t>(n_rows, kBlockSize / threads_per_vec), 1, 1);
     kernel<<<blocks, threads, sharedMemorySize, stream>>>(
       raft::make_device_matrix_view<uint8_t, IdxT>(
         codes.data_handle() + batch.offset() * codes_rowlen, batch.size(), codes_rowlen),
       batch_view,
       pq_centers,
-      rows_in_shared_memory,
-      pq_bits,
       vq_centers,
-      labels_view);
+      raft::make_const_mdspan(labels.view()),
+      rows_in_shared_memory,
+      pq_bits);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
 }
@@ -698,13 +674,12 @@ template <uint32_t SubWarpSize,
 __device__ auto compute_code_subspaces(
   raft::device_matrix_view<const DataT, IdxT, raft::row_major> dataset,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
+  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> vq_centers,
   MathT* smem_dataset,
   IdxT row_ix,
   uint32_t j,
   const bool use_shared_memory,
-  LabelT vq_label,
-  std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers =
-    std::nullopt) -> CodeT
+  LabelT vq_label) -> CodeT
 {
   static_assert(std::is_same_v<CodeT, uint8_t> || std::is_same_v<CodeT, uint16_t>,
                 "CodeT must be uint8_t or uint16_t");
@@ -724,7 +699,7 @@ __device__ auto compute_code_subspaces(
     if (lane_id < pq_len) {
       auto jk = j * pq_len + lane_id;
       auto x  = data_mapping(dataset_ptr[jk]);
-      if (vq_centers) { x -= vq_centers.value()(vq_label, jk); }
+      if (!vq_centers.empty()) { x -= vq_centers(vq_label, jk); }
       my_dataset_val = x;
     }
 
@@ -743,7 +718,7 @@ __device__ auto compute_code_subspaces(
     for (uint32_t l = lane_id; l < pq_len; l += SubWarpSize) {
       auto jk = j * pq_len + l;
       auto x  = data_mapping(dataset_ptr[jk]);
-      if (vq_centers) { x -= vq_centers.value()(vq_label, jk); }
+      if (!vq_centers.empty()) { x -= vq_centers(vq_label, jk); }
       smem_dataset[l] = x;
     }
     __syncwarp();
@@ -753,7 +728,7 @@ __device__ auto compute_code_subspaces(
   } else {
     auto get_data_value = [&](uint32_t k) {
       auto x = data_mapping(dataset_ptr[j * pq_len + k]);
-      if (vq_centers) { x -= vq_centers.value()(vq_label, j * pq_len + k); }
+      if (!vq_centers.empty()) { x -= vq_centers(vq_label, j * pq_len + k); }
       return x;
     };
     process_all_centers<SubWarpSize, MathT, CodeT>(
@@ -784,12 +759,10 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_subspaces_kernel
   raft::device_matrix_view<uint8_t, IdxT, raft::row_major> out_codes,
   raft::device_matrix_view<const DataT, IdxT, raft::row_major> dataset,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
+  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> vq_centers,
+  raft::device_vector_view<const LabelT, IdxT, raft::row_major> vq_labels,
   const uint32_t pq_bits,
-  const bool use_shared_memory,
-  std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers =
-    std::nullopt,
-  std::optional<raft::device_vector_view<const LabelT, IdxT, raft::row_major>> vq_labels =
-    std::nullopt)
+  const bool use_shared_memory)
 {
   extern __shared__ __align__(256) uint8_t smem_buffer[];
   using subwarp_align = raft::Pow2<SubWarpSize>;
@@ -801,11 +774,11 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_subspaces_kernel
   const uint32_t pq_dim = raft::div_rounding_up_unsafe(dataset.extent(1), pq_centers.extent(1));
 
   const uint32_t lane_id = subwarp_align::mod(threadIdx.x);
-  const LabelT vq_label  = vq_labels ? vq_labels.value()(row_ix) : 0;
+  const LabelT vq_label  = !vq_labels.empty() ? vq_labels(row_ix) : 0;
   auto* out_codes_ptr    = &out_codes(row_ix, 0);
 
   // write label
-  if (vq_centers) {
+  if (!vq_centers.empty()) {
     auto* out_label_ptr = reinterpret_cast<LabelT*>(out_codes_ptr);
     if (lane_id == 0) { *out_label_ptr = vq_label; }
     out_codes_ptr += sizeof(LabelT);
@@ -818,7 +791,7 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_subspaces_kernel
     auto pq_subspace_view    = raft::make_device_matrix_view(
       pq_centers.data_handle() + subspace_offset, (uint32_t)(1 << pq_bits), pq_centers.extent(1));
     CodeT code = compute_code_subspaces<SubWarpSize, CodeT>(
-      dataset, pq_subspace_view, smem_dataset, row_ix, j, use_shared_memory, vq_label, vq_centers);
+      dataset, pq_subspace_view, vq_centers, smem_dataset, row_ix, j, use_shared_memory, vq_label);
     if (lane_id == 0) { code_view[j] = code; }
   }
 }
@@ -829,9 +802,8 @@ void process_and_fill_codes_subspaces(
   const vpq_params& params,
   const DatasetT& dataset,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
-  raft::device_matrix_view<uint8_t, IdxT, raft::row_major> codes,
-  std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers =
-    std::nullopt)
+  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> vq_centers,
+  raft::device_matrix_view<uint8_t, IdxT, raft::row_major> codes)
 {
   using data_t     = typename DatasetT::value_type;
   using cdataset_t = vpq_dataset<MathT, IdxT>;
@@ -843,7 +815,7 @@ void process_and_fill_codes_subspaces(
   const ix_t pq_bits      = params.pq_bits;
   const ix_t pq_n_centers = ix_t{1} << pq_bits;
   ix_t codes_rowlen       = 0;
-  if (vq_centers.has_value()) {
+  if (!vq_centers.empty()) {
     // NB: codes must be aligned at least to sizeof(label_t) to be able to read labels.
     codes_rowlen = sizeof(label_t) *
                    (1 + raft::div_rounding_up_safe<ix_t>(pq_dim * pq_bits, 8 * sizeof(label_t)));
@@ -922,23 +894,18 @@ void process_and_fill_codes_subspaces(
   vec_batches.prefetch_next_batch();
   for (const auto& batch : vec_batches) {
     auto batch_view = raft::make_device_matrix_view(batch.data(), ix_t(batch.size()), dim);
-    std::optional<raft::device_vector<label_t, IdxT, raft::row_major>> labels = std::nullopt;
-    std::optional<raft::device_vector_view<const label_t, IdxT, raft::row_major>> labels_view =
-      std::nullopt;
-    if (vq_centers) {
-      labels      = predict_vq<label_t>(res, batch_view, vq_centers.value());
-      labels_view = raft::make_const_mdspan(labels->view());
-    }
+    auto labels     = raft::make_device_vector<label_t, IdxT, raft::row_major>(res, 0);
+    if (!vq_centers.empty()) { labels = predict_vq<label_t>(res, batch_view, vq_centers); }
     dim3 blocks(raft::div_rounding_up_safe<ix_t>(batch.size(), kBlockSize / threads_per_vec), 1, 1);
     kernel<<<blocks, threads, shared_memory_size, stream>>>(
       raft::make_device_matrix_view<uint8_t, IdxT>(
         codes.data_handle() + batch.offset() * codes_rowlen, batch.size(), codes_rowlen),
       batch_view,
       pq_centers,
-      pq_bits,
-      shared_memory_size > 0,
       vq_centers,
-      labels_view);
+      raft::make_const_mdspan(labels.view()),
+      pq_bits,
+      shared_memory_size > 0);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
     vec_batches.prefetch_next_batch();
     raft::resource::sync_stream(res);
@@ -955,8 +922,8 @@ auto vpq_build(const raft::resources& res, const vpq_params& params, const Datas
 
   // Train codes
   auto vq_code_book = train_vq<MathT>(res, ps, dataset);
-  auto pq_code_book = train_pq<MathT>(
-    res, ps, dataset, std::make_optional(raft::make_const_mdspan(vq_code_book.view())));
+  auto pq_code_book =
+    train_pq<MathT>(res, ps, dataset, raft::make_const_mdspan(vq_code_book.view()));
 
   // Encode dataset
   const IdxT n_rows       = dataset.extent(0);
@@ -964,13 +931,12 @@ auto vpq_build(const raft::resources& res, const vpq_params& params, const Datas
                                                      ps.pq_dim * ps.pq_bits, 8 * sizeof(label_t)));
 
   auto codes = raft::make_device_matrix<uint8_t, IdxT, raft::row_major>(res, n_rows, codes_rowlen);
-  process_and_fill_codes<MathT, IdxT>(
-    res,
-    ps,
-    dataset,
-    raft::make_const_mdspan(pq_code_book.view()),
-    codes.view(),
-    std::make_optional(raft::make_const_mdspan(vq_code_book.view())));
+  process_and_fill_codes<MathT, IdxT>(res,
+                                      ps,
+                                      dataset,
+                                      raft::make_const_mdspan(pq_code_book.view()),
+                                      raft::make_const_mdspan(vq_code_book.view()),
+                                      codes.view());
 
   return vpq_dataset<MathT, IdxT>{
     std::move(vq_code_book), std::move(pq_code_book), std::move(codes)};

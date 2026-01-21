@@ -124,7 +124,7 @@ cuvsError_t cuvsKMeansParamsDestroy(cuvsKMeansParams_t params);
 /**
  * @brief Type of k-means algorithm.
  */
-typedef enum { KMeans = 0, KMeansBalanced = 1 } cuvsKMeansType;
+typedef enum { CUVS_KMEANS_TYPE_KMEANS = 0, CUVS_KMEANS_TYPE_KMEANS_BALANCED = 1 } cuvsKMeansType;
 
 /**
  * @}

@@ -19,8 +19,8 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
         Array
 
     ctypedef enum cuvsKMeansType:
-        KMeans
-        KMeansBalanced
+        CUVS_KMEANS_TYPE_KMEANS
+        CUVS_KMEANS_TYPE_KMEANS_BALANCED
 
     ctypedef struct cuvsKMeansParams:
         cuvsDistanceType metric,

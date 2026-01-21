@@ -563,12 +563,7 @@ auto quantize_all_vectors(raft::resources const& res,
   auto codes        = raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(
     res, residuals.extent(0), codes_rowlen);
   cuvs::neighbors::detail::process_and_fill_codes_subspaces<float, int64_t>(
-    res,
-    ps,
-    residuals,
-    pq_codebook,
-    codes.view(),
-    std::make_optional(raft::make_const_mdspan(vq_codebook.view())));
+    res, ps, residuals, pq_codebook, raft::make_const_mdspan(vq_codebook.view()), codes.view());
   return codes;
 }
 
