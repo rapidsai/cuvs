@@ -102,7 +102,7 @@ constexpr auto get_post_lambda_name()
 inline uint32_t configure_launch_x(uint32_t numQueries,
                                    uint32_t n_probes,
                                    int32_t sMemSize,
-                                   CUkernel func)
+                                   cudaKernel_t func)
 {
   int dev_id;
   RAFT_CUDA_TRY(cudaGetDevice(&dev_id));
