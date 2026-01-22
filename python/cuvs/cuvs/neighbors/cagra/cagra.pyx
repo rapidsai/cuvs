@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
@@ -128,21 +128,28 @@ cdef class AceParams:
     """
     Parameters for ACE (Augmented Core Extraction) graph building algorithm.
 
-    ACE enables building indices for datasets too large to fit in GPU memory by
-    partitioning the dataset using balanced k-means and building sub-indices
+    ACE enables building indexes for datasets too large to fit in GPU memory by
+    partitioning the dataset using balanced k-means and building sub-indexes
     for each partition independently.
 
     Parameters
     ----------
-    npartitions : int, default = 1
-        Number of partitions for ACE partitioned build. Small values might
-        improve recall but potentially degrade performance and increase memory
-        usage. Partitions should not be too small to prevent issues in KNN
-        graph construction. 100k - 5M vectors per partition is recommended
-        depending on the available host and GPU memory. The partition size is
-        on average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because
-        of the core and augmented vectors. Please account for imbalance in the
-        partition sizes (up to 3x in our tests).
+    npartitions : int, default = 0
+        Number of partitions for ACE partitioned build. When set to 0 (default),
+        the number of partitions is automatically derived based on available
+        host and GPU memory to maximize partition size while ensuring the build
+        fits in memory.
+
+        Small values might improve recall but potentially degrade performance
+        and increase memory usage. Partitions should not be too small to prevent
+        issues in KNN graph construction. The partition size is on average 2 *
+        (n_rows / npartitions) * dim * sizeof(T). 2 is because of the core and
+        augmented vectors. Please account for imbalance in the partition sizes
+        (up to 3x in our tests).
+
+        If the specified number of partitions results in partitions that exceed
+        available memory, the value will be automatically increased to fit
+        memory constraints and a warning will be issued.
     ef_construction : int, default = 120
         The index quality for the ACE build. Bigger values increase the index
         quality. At some point, increasing this will no longer improve the
@@ -156,6 +163,14 @@ cdef class AceParams:
     use_disk : bool, default = False
         Whether to use disk-based storage for ACE build. When true, enables
         disk-based operations for memory-efficient graph construction.
+    max_host_memory_gb : float, default = 0
+        Maximum host memory to use for ACE build in GiB. When set to 0
+        (default), uses available host memory. Useful for testing or
+        when running alongside other memory-intensive processes.
+    max_gpu_memory_gb : float, default = 0
+        Maximum GPU memory to use for ACE build in GiB. When set to 0
+        (default), uses available GPU memory. Useful for testing or
+        when running alongside other memory-intensive processes.
     """
     cdef cuvsAceParams* params
     cdef bytes _build_dir_bytes  # Keep Python bytes alive for property access
@@ -169,13 +184,17 @@ cdef class AceParams:
             check_cuvs(cuvsAceParamsDestroy(self.params))
 
     def __init__(self, *,
-                 npartitions=1,
+                 npartitions=0,
                  ef_construction=120,
                  build_dir="/tmp/ace_build",
-                 use_disk=False):
+                 use_disk=False,
+                 max_host_memory_gb=0,
+                 max_gpu_memory_gb=0):
         self.params.npartitions = npartitions
         self.params.ef_construction = ef_construction
         self.params.use_disk = use_disk
+        self.params.max_host_memory_gb = max_host_memory_gb
+        self.params.max_gpu_memory_gb = max_gpu_memory_gb
 
         # Need to replace the default build_dir allocated by
         # cuvsAceParamsCreate
@@ -206,6 +225,14 @@ cdef class AceParams:
     @property
     def use_disk(self):
         return self.params.use_disk
+
+    @property
+    def max_host_memory_gb(self):
+        return self.params.max_host_memory_gb
+
+    @property
+    def max_gpu_memory_gb(self):
+        return self.params.max_gpu_memory_gb
 
     def get_handle(self):
         return <size_t>self.params
@@ -322,6 +349,8 @@ cdef class IndexParams:
             new_ace_params.npartitions = ace_params.params.npartitions
             new_ace_params.ef_construction = ace_params.params.ef_construction
             new_ace_params.use_disk = ace_params.params.use_disk
+            new_ace_params.max_host_memory_gb = ace_params.params.max_host_memory_gb
+            new_ace_params.max_gpu_memory_gb = ace_params.params.max_gpu_memory_gb
 
             # Copy the build_dir string
             if new_ace_params.build_dir != NULL:
