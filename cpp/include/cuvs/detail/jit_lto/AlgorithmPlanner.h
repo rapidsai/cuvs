@@ -24,6 +24,6 @@ struct AlgorithmPlanner {
  private:
   void add_entrypoint();
   void add_device_functions();
-  std::string get_device_functions_key();
+  std::string get_device_functions_key() const;
   std::shared_ptr<AlgorithmLauncher> build();
 };

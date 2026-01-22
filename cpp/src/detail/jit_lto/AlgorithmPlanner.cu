@@ -34,7 +34,7 @@ void AlgorithmPlanner::add_device_functions()
   }
 }
 
-std::string AlgorithmPlanner::get_device_functions_key()
+std::string AlgorithmPlanner::get_device_functions_key() const
 {
   std::string key = "";
   for (const auto& device_function : this->device_functions) {
