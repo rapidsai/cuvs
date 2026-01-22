@@ -153,9 +153,9 @@ cdef class IndexParams:
         self.params.pq_bits = pq_bits
         self.params.pq_dim = pq_dim
         if codebook_kind == "subspace":
-            self.params.codebook_kind = codebook_gen.PER_SUBSPACE
+            self.params.codebook_kind = cuvsCodebookGen.CUVS_CODEBOOK_GEN_PER_SUBSPACE
         elif codebook_kind == "cluster":
-            self.params.codebook_kind = codebook_gen.PER_CLUSTER
+            self.params.codebook_kind = cuvsCodebookGen.CUVS_CODEBOOK_GEN_PER_CLUSTER
         else:
             raise ValueError("Incorrect codebook kind %s" % codebook_kind)
         self.params.force_random_rotation = force_random_rotation
@@ -165,9 +165,9 @@ cdef class IndexParams:
         self.params.max_train_points_per_pq_code = \
             max_train_points_per_pq_code
         if codes_layout == "flat":
-            self.params.codes_layout = list_layout.FLAT
+            self.params.codes_layout = cuvsListLayout.CUVS_LIST_LAYOUT_FLAT
         elif codes_layout == "interleaved":
-            self.params.codes_layout = list_layout.INTERLEAVED
+            self.params.codes_layout = cuvsListLayout.CUVS_LIST_LAYOUT_INTERLEAVED
         else:
             raise ValueError("Incorrect codes layout %s" % codes_layout)
 
@@ -228,7 +228,7 @@ cdef class IndexParams:
 
     @property
     def codes_layout(self):
-        if self.params.codes_layout == list_layout.FLAT:
+        if self.params.codes_layout == cuvsListLayout.CUVS_LIST_LAYOUT_FLAT:
             return "flat"
         else:
             return "interleaved"
@@ -562,8 +562,8 @@ def build_precomputed(IndexParams index_params, uint32_t dim, pq_centers, center
         Dimensionality of the input data
     pq_centers : CUDA array interface compliant tensor
         PQ codebook on device memory with required shape:
-        - codebook_kind PER_SUBSPACE: [pq_dim, pq_len, pq_book_size]
-        - codebook_kind PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
+        - codebook_kind "subspace": [pq_dim, pq_len, pq_book_size]
+        - codebook_kind "cluster":  [n_lists, pq_len, pq_book_size]
         Supported dtype: float32
     centers : CUDA array interface compliant matrix
         Cluster centers in the original space [n_lists, dim_ext]

@@ -24,13 +24,13 @@ cdef extern from "library_types.h":
 
 cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
 
-    ctypedef enum codebook_gen:
-        PER_SUBSPACE
-        PER_CLUSTER
+    ctypedef enum cuvsCodebookGen:
+        CUVS_CODEBOOK_GEN_PER_SUBSPACE
+        CUVS_CODEBOOK_GEN_PER_CLUSTER
 
-    ctypedef enum list_layout:
-        FLAT
-        INTERLEAVED
+    ctypedef enum cuvsListLayout:
+        CUVS_LIST_LAYOUT_FLAT
+        CUVS_LIST_LAYOUT_INTERLEAVED
 
     ctypedef struct cuvsIvfPqIndexParams:
         cuvsDistanceType metric
@@ -41,11 +41,11 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
         double kmeans_trainset_fraction
         uint32_t pq_bits
         uint32_t pq_dim
-        codebook_gen codebook_kind
+        cuvsCodebookGen codebook_kind
         bool force_random_rotation
         bool conservative_memory_allocation
         uint32_t max_train_points_per_pq_code
-        list_layout codes_layout
+        cuvsListLayout codes_layout
 
     ctypedef cuvsIvfPqIndexParams* cuvsIvfPqIndexParams_t
 
