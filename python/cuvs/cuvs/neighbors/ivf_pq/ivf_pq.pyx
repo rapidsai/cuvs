@@ -153,9 +153,9 @@ cdef class IndexParams:
         self.params.pq_bits = pq_bits
         self.params.pq_dim = pq_dim
         if codebook_kind == "subspace":
-            self.params.codebook_kind = cuvsCodebookGen.CUVS_CODEBOOK_GEN_PER_SUBSPACE
+            self.params.codebook_kind = cuvsIvfPqCodebookGen.CUVS_IVF_PQ_CODEBOOK_GEN_PER_SUBSPACE
         elif codebook_kind == "cluster":
-            self.params.codebook_kind = cuvsCodebookGen.CUVS_CODEBOOK_GEN_PER_CLUSTER
+            self.params.codebook_kind = cuvsIvfPqCodebookGen.CUVS_IVF_PQ_CODEBOOK_GEN_PER_CLUSTER
         else:
             raise ValueError("Incorrect codebook kind %s" % codebook_kind)
         self.params.force_random_rotation = force_random_rotation
@@ -165,9 +165,9 @@ cdef class IndexParams:
         self.params.max_train_points_per_pq_code = \
             max_train_points_per_pq_code
         if codes_layout == "flat":
-            self.params.codes_layout = cuvsListLayout.CUVS_LIST_LAYOUT_FLAT
+            self.params.codes_layout = cuvsIvfPqListLayout.CUVS_IVF_PQ_LIST_LAYOUT_FLAT
         elif codes_layout == "interleaved":
-            self.params.codes_layout = cuvsListLayout.CUVS_LIST_LAYOUT_INTERLEAVED
+            self.params.codes_layout = cuvsIvfPqListLayout.CUVS_IVF_PQ_LIST_LAYOUT_INTERLEAVED
         else:
             raise ValueError("Incorrect codes layout %s" % codes_layout)
 
@@ -228,7 +228,7 @@ cdef class IndexParams:
 
     @property
     def codes_layout(self):
-        if self.params.codes_layout == cuvsListLayout.CUVS_LIST_LAYOUT_FLAT:
+        if self.params.codes_layout == cuvsIvfPqListLayout.CUVS_IVF_PQ_LIST_LAYOUT_FLAT:
             return "flat"
         else:
             return "interleaved"

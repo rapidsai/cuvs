@@ -334,11 +334,11 @@ extern "C" cuvsError_t cuvsIvfPqIndexParamsCreate(cuvsIvfPqIndexParams_t* params
                                        .kmeans_trainset_fraction       = 0.5,
                                        .pq_bits                        = 8,
                                        .pq_dim                         = 0,
-                                       .codebook_kind                  = codebook_gen::PER_SUBSPACE,
+                                       .codebook_kind                  = CUVS_IVF_PQ_CODEBOOK_GEN_PER_SUBSPACE,
                                        .force_random_rotation          = false,
                                        .conservative_memory_allocation = false,
                                        .max_train_points_per_pq_code   = 256,
-                                       .codes_layout                   = list_layout::INTERLEAVED};
+                                       .codes_layout                   = CUVS_IVF_PQ_LIST_LAYOUT_INTERLEAVED};
   });
 }
 
