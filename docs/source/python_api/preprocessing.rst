@@ -19,7 +19,7 @@ Product Quantizer
 .. autoclass:: cuvs.preprocessing.quantize.pq.QuantizerParams
     :members:
 
-.. autofunction:: cuvs.preprocessing.quantize.pq.train
+.. autofunction:: cuvs.preprocessing.quantize.pq.build
 
 .. autofunction:: cuvs.preprocessing.quantize.pq.transform
 

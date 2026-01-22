@@ -221,7 +221,7 @@ def build(QuantizerParams params, dataset, resources=None):
     ...                                   dtype=cp.float32)
     >>> params = pq.QuantizerParams(pq_bits=8, pq_dim=16)
     >>> quantizer = pq.build(params, dataset)
-    >>> transformed = pq.transform(quantizer, dataset)
+    >>> transformed, _ = pq.transform(quantizer, dataset)
     """
     dataset_ai = wrap_array(dataset)
 
@@ -271,7 +271,7 @@ def transform(Quantizer quantizer, dataset, codes_output=None, vq_labels=None, r
     ...                                   dtype=cp.float32)
     >>> params = pq.QuantizerParams(pq_bits=8, pq_dim=16)
     >>> quantizer = pq.build(params, dataset)
-    >>> transformed = pq.transform(quantizer, dataset)
+    >>> transformed, _ = pq.transform(quantizer, dataset)
     """
 
     dataset_ai = wrap_array(dataset)
@@ -335,10 +335,10 @@ def inverse_transform(Quantizer quantizer, codes, output=None, vq_labels=None, r
     >>> n_features = 64
     >>> dataset = cp.random.random_sample((n_samples, n_features),
     ...                                   dtype=cp.float32)
-    >>> params = pq.QuantizerParams(pq_bits=8, pq_dim=16)
+    >>> params = pq.QuantizerParams(pq_bits=8, pq_dim=16, use_vq=True)
     >>> quantizer = pq.build(params, dataset)
-    >>> transformed = pq.transform(quantizer, dataset)
-    >>> reconstructed = pq.inverse_transform(quantizer, transformed)
+    >>> transformed, vq_labels = pq.transform(quantizer, dataset)
+    >>> reconstructed = pq.inverse_transform(quantizer, transformed, vq_labels=vq_labels)
     """
 
     if quantizer.use_vq and vq_labels is None:
