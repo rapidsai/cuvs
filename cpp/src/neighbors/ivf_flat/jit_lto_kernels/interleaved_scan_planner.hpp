@@ -33,13 +33,13 @@ struct InterleavedScanPlanner : AlgorithmPlanner {
 
   void add_filter_device_function(std::string filter_name)
   {
-    auto key = filter_name + "_";
+    auto key = filter_name;
     this->device_functions.push_back(key);
   }
 
   void add_post_lambda_device_function(std::string post_lambda_name)
   {
-    auto key = post_lambda_name + "_";
+    auto key = post_lambda_name;
     this->device_functions.push_back(key);
   }
 };

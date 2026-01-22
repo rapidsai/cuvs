@@ -26,5 +26,6 @@ std::string make_fragment_key()
 {
   std::string result;
   ((result += detail::type_as_string<Ts>() + "_"), ...);
+  if (!result.empty()) { result.pop_back(); }
   return result;
 }

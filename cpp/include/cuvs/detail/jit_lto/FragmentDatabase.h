@@ -25,7 +25,7 @@ class FragmentDatabase {
  private:
   FragmentDatabase();
 
-  bool make_cache_entry(std::string const& name, std::string const& params);
+  bool make_cache_entry(std::string const& key);
 
   friend FragmentDatabase& fragment_database();
 

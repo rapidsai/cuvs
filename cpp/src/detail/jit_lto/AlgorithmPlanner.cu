@@ -38,7 +38,7 @@ std::string AlgorithmPlanner::get_device_functions_key() const
 {
   std::string key = "";
   for (const auto& device_function : this->device_functions) {
-    key += "_" + device_function;
+    key += device_function;
   }
   return key;
 }

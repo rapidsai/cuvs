@@ -9,12 +9,12 @@
 
 #include <cuvs/detail/jit_lto/FragmentEntry.h>
 
-FragmentEntry::FragmentEntry(std::string const& params) : compute_key(params) {}
+FragmentEntry::FragmentEntry(std::string const& key) : compute_key(key) {}
 
-FatbinFragmentEntry::FatbinFragmentEntry(std::string const& params,
+FatbinFragmentEntry::FatbinFragmentEntry(std::string const& key,
                                          unsigned char const* view,
                                          std::size_t size)
-  : FragmentEntry(params), data_size(size), data_view(view)
+  : FragmentEntry(key), data_size(size), data_view(view)
 {
 }
 

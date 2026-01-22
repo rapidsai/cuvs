@@ -13,7 +13,7 @@
 #include <nvJitLink.h>
 
 struct FragmentEntry {
-  FragmentEntry(std::string const& params);
+  FragmentEntry(std::string const& key);
 
   bool operator==(const FragmentEntry& rhs) const { return compute_key == rhs.compute_key; }
 
@@ -23,7 +23,7 @@ struct FragmentEntry {
 };
 
 struct FatbinFragmentEntry final : FragmentEntry {
-  FatbinFragmentEntry(std::string const& params, unsigned char const* view, std::size_t size);
+  FatbinFragmentEntry(std::string const& key, unsigned char const* view, std::size_t size);
 
   virtual bool add_to(nvJitLinkHandle& handle) const;
 
