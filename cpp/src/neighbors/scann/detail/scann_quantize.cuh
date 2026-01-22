@@ -104,7 +104,8 @@ auto process_and_fill_codes_subspaces(
     }
   }(pq_bits);
 
-  auto labels = cuvs::neighbors::detail::predict_vq<label_t>(res, dataset, vq_centers);
+  auto labels = raft::make_device_vector<label_t, IdxT>(res, dataset.extent(0));
+  cuvs::neighbors::detail::predict_vq<label_t>(res, dataset, vq_centers, labels.view());
 
   dim3 blocks(raft::div_rounding_up_safe<ix_t>(n_rows, kBlockSize / threads_per_vec), 1, 1);
 

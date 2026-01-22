@@ -99,7 +99,7 @@ struct quantizer {
  * // Set the workspace memory resource to a pool with 2 GiB upper limit.
  * raft::resource::set_workspace_to_pool_resource(handle, 2 * 1024 * 1024 * 1024ull);
  * cuvs::preprocessing::quantize::pq::params params;
- * auto quantizer = cuvs::preprocessing::quantize::pq::train(handle, params, dataset);
+ * auto quantizer = cuvs::preprocessing::quantize::pq::build(handle, params, dataset);
  * @endcode
  *
  * @param[in] res raft resource
@@ -108,12 +108,12 @@ struct quantizer {
  *
  * @return quantizer
  */
-quantizer<float> train(raft::resources const& res,
+quantizer<float> build(raft::resources const& res,
                        const params params,
                        raft::device_matrix_view<const float, int64_t> dataset);
 
-/** @copydoc train */
-quantizer<float> train(raft::resources const& res,
+/** @copydoc build */
+quantizer<float> build(raft::resources const& res,
                        const params params,
                        raft::host_matrix_view<const float, int64_t> dataset);
 
@@ -124,7 +124,7 @@ quantizer<float> train(raft::resources const& res,
  * @code{.cpp}
  * raft::handle_t handle;
  * cuvs::preprocessing::quantize::pq::params params;
- * auto quantizer = cuvs::preprocessing::quantize::pq::train(handle, params, dataset);
+ * auto quantizer = cuvs::preprocessing::quantize::pq::build(handle, params, dataset);
  * auto quantized_dim = get_quantized_dim(quantizer.params_quantizer);
  * auto quantized_dataset =
  *   raft::make_device_matrix<uint8_t, int64_t>(handle, samples, quantized_dim);
@@ -136,35 +136,32 @@ quantizer<float> train(raft::resources const& res,
  * @param[in] res raft resource
  * @param[in] quant a product quantizer
  * @param[in] dataset a row-major matrix view on device or host
- * @param[out] out a row-major matrix view on device
- *
+ * @param[out] codes_out a row-major matrix view on device containing the PQ codes
+ * @param[out] vq_labels a vector view on device containing the VQ labels when VQ is
+ * used, optional
  */
 void transform(raft::resources const& res,
                const quantizer<float>& quant,
                raft::device_matrix_view<const float, int64_t> dataset,
-               raft::device_matrix_view<uint8_t, int64_t> out);
+               raft::device_matrix_view<uint8_t, int64_t> codes_out,
+               std::optional<raft::device_vector_view<uint32_t, int64_t>> vq_labels = std::nullopt);
 
 /** @copydoc transform */
 void transform(raft::resources const& res,
                const quantizer<float>& quant,
                raft::host_matrix_view<const float, int64_t> dataset,
-               raft::device_matrix_view<uint8_t, int64_t> out);
+               raft::device_matrix_view<uint8_t, int64_t> codes_out,
+               std::optional<raft::device_vector_view<uint32_t, int64_t>> vq_labels = std::nullopt);
 
 /**
- * @brief Get the dimension of the quantized dataset
+ * @brief Get the dimension of the quantized dataset (in bytes)
  *
  * @param[in] config product quantizer parameters
  * @return the dimension of the quantized dataset
  */
 inline int64_t get_quantized_dim(const params& config)
 {
-  using LabelT = uint32_t;
-  if (config.use_vq) {
-    return sizeof(LabelT) * (1 + raft::div_rounding_up_safe<int64_t>(config.pq_dim * config.pq_bits,
-                                                                     8 * sizeof(LabelT)));
-  } else {
-    return raft::div_rounding_up_safe<int64_t>(config.pq_dim * config.pq_bits, 8);
-  }
+  return raft::div_rounding_up_safe<int64_t>(config.pq_dim * config.pq_bits, 8);
 }
 
 /**
@@ -172,14 +169,17 @@ inline int64_t get_quantized_dim(const params& config)
  *
  * @param[in] res raft resource
  * @param[in] quant a product quantizer
- * @param[in] codes a row-major matrix view on device
+ * @param[in] pq_codes a row-major matrix view on device containing the PQ codes
  * @param[out] out a row-major matrix view on device
+ * @param[in] vq_labels a vector view on device containing the VQ labels when VQ is used, optional
  *
  */
-void inverse_transform(raft::resources const& res,
-                       const quantizer<float>& quant,
-                       raft::device_matrix_view<const uint8_t, int64_t> codes,
-                       raft::device_matrix_view<float, int64_t> out);
+void inverse_transform(
+  raft::resources const& res,
+  const quantizer<float>& quant,
+  raft::device_matrix_view<const uint8_t, int64_t> pq_codes,
+  raft::device_matrix_view<float, int64_t> out,
+  std::optional<raft::device_vector_view<const uint32_t, int64_t>> vq_labels = std::nullopt);
 
 /** @} */  // end of group product
 

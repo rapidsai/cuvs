@@ -46,12 +46,14 @@ cdef extern from "cuvs/preprocessing/quantize/pq.h" nogil:
     cuvsError_t cuvsProductQuantizerTransform(cuvsResources_t res,
                                               cuvsProductQuantizer_t quantizer,
                                               DLManagedTensor* dataset,
-                                              DLManagedTensor* out)
+                                              DLManagedTensor* codes_out,
+                                              DLManagedTensor* vq_labels)
     cuvsError_t cuvsProductQuantizerInverseTransform(
         cuvsResources_t res, cuvsProductQuantizer_t quantizer,
-        DLManagedTensor* codes, DLManagedTensor* out)
+        DLManagedTensor* pq_codes, DLManagedTensor* out,
+        DLManagedTensor* vq_labels)
 
-    cuvsError_t cuvsProductQuantizerTrain(cuvsResources_t res,
+    cuvsError_t cuvsProductQuantizerBuild(cuvsResources_t res,
                                           cuvsProductQuantizerParams_t params,
                                           DLManagedTensor* dataset,
                                           cuvsProductQuantizer_t quantizer)
@@ -70,3 +72,6 @@ cdef extern from "cuvs/preprocessing/quantize/pq.h" nogil:
 
     cuvsError_t cuvsProductQuantizerGetEncodedDim(
         cuvsProductQuantizer_t quantizer, uint32_t* encoded_dim)
+
+    cuvsError_t cuvsProductQuantizerGetUseVq(
+        cuvsProductQuantizer_t quantizer, bool* use_vq)

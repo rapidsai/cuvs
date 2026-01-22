@@ -133,6 +133,7 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
 
   void check_reconstruction(const cuvs::preprocessing::quantize::pq::quantizer<T>& quantizer,
                             raft::device_matrix_view<uint8_t, int64_t, raft::row_major> codes,
+                            std::optional<raft::device_vector_view<uint32_t, int64_t>> vq_labels,
                             double compression_ratio,
                             uint32_t n_take)
   {
@@ -144,17 +145,15 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
 
     auto rec_data  = raft::make_device_matrix<T, int64_t>(handle, n_take, dim);
     auto orig_data = raft::make_device_matrix_view<T, int64_t>(dataset_.data_handle(), n_take, dim);
-    std::optional<raft::device_matrix_view<const T, uint32_t, raft::row_major>> vq_centers_opt =
-      std::nullopt;
-    if (params_.n_vq_centers > 1) {
-      vq_centers_opt = raft::make_const_mdspan(quantizer.vpq_codebooks.vq_code_book.view());
-    }
 
+    std::optional<raft::device_vector_view<const uint32_t, int64_t>> vq_labels_view = std::nullopt;
+    if (vq_labels) { vq_labels_view = raft::make_const_mdspan(vq_labels.value()); }
     inverse_transform(handle,
                       quantizer,
                       raft::device_matrix_view<const uint8_t, int64_t>(
                         codes.data_handle(), n_take, codes.extent(1)),
-                      rec_data.view());
+                      rec_data.view(),
+                      vq_labels_view);
 
     compare_vectors_l2(handle, orig_data, rec_data.view(), compression_ratio, 0.04, false);
   }
@@ -174,24 +173,37 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
     raft::resource::sync_stream(handle);
 
     if ((n_samples_ < (1 << params_.pq_bits)) || (n_features_ % params_.pq_dim != 0)) {
-      EXPECT_THROW(train(handle, config_, raft::make_const_mdspan(dataset_host_.view())),
+      EXPECT_THROW(build(handle, config_, raft::make_const_mdspan(dataset_host_.view())),
                    raft::logic_error);
       return;
     }
 
     auto pq = params_.host_dataset
-                ? train(handle, config_, raft::make_const_mdspan(dataset_host_.view()))
-                : train(handle, config_, raft::make_const_mdspan(dataset_.view()));
+                ? build(handle, config_, raft::make_const_mdspan(dataset_host_.view()))
+                : build(handle, config_, raft::make_const_mdspan(dataset_.view()));
 
     auto n_encoded_cols = get_quantized_dim(pq.params_quantizer);
     auto d_quantized_output =
       raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, n_encoded_cols);
+    auto d_vq_labels = raft::make_device_vector<uint32_t, int64_t>(handle, 0);
+    std::optional<raft::device_vector_view<uint32_t, int64_t>> d_vq_labels_view = std::nullopt;
+    if (params_.use_vq) {
+      d_vq_labels      = raft::make_device_vector<uint32_t, int64_t>(handle, n_samples_);
+      d_vq_labels_view = d_vq_labels.view();
+    }
 
     if (params_.host_dataset) {
-      transform(
-        handle, pq, raft::make_const_mdspan(dataset_host_.view()), d_quantized_output.view());
+      transform(handle,
+                pq,
+                raft::make_const_mdspan(dataset_host_.view()),
+                d_quantized_output.view(),
+                d_vq_labels_view);
     } else {
-      transform(handle, pq, raft::make_const_mdspan(dataset_.view()), d_quantized_output.view());
+      transform(handle,
+                pq,
+                raft::make_const_mdspan(dataset_.view()),
+                d_quantized_output.view(),
+                d_vq_labels_view);
     }
 
     // 1. Verify that the quantized output is not all zeros or NaNs
@@ -223,7 +235,7 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
       static_cast<double>(n_features_ * 8) /
       static_cast<double>(pq.params_quantizer.pq_dim * pq.params_quantizer.pq_bits);
 
-    check_reconstruction(pq, d_quantized_output.view(), compression_ratio, 500);
+    check_reconstruction(pq, d_quantized_output.view(), d_vq_labels_view, compression_ratio, 500);
   }
 
  private:

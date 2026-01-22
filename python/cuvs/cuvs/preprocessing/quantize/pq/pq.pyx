@@ -183,15 +183,21 @@ cdef class Quantizer:
                                                      &encoded_dim))
         return encoded_dim
 
+    @property
+    def use_vq(self):
+        cdef bool use_vq
+        check_cuvs(cuvsProductQuantizerGetUseVq(self.quantizer, &use_vq))
+        return use_vq
+
     def __repr__(self):
         return f"pq.Quantizer(pq_bits={self.pq_bits}, " \
                f"pq_dim={self.pq_dim})"
 
 
 @auto_sync_resources
-def train(QuantizerParams params, dataset, resources=None):
+def build(QuantizerParams params, dataset, resources=None):
     """
-    Initializes a Product Quantizer to be used later for quantizing
+    Builds a Product Quantizer to be used later for quantizing
     the dataset.
 
     Parameters
@@ -214,7 +220,7 @@ def train(QuantizerParams params, dataset, resources=None):
     >>> dataset = cp.random.random_sample((n_samples, n_features),
     ...                                   dtype=cp.float32)
     >>> params = pq.QuantizerParams(pq_bits=8, pq_dim=16)
-    >>> quantizer = pq.train(params, dataset)
+    >>> quantizer = pq.build(params, dataset)
     >>> transformed = pq.transform(quantizer, dataset)
     """
     dataset_ai = wrap_array(dataset)
@@ -228,7 +234,7 @@ def train(QuantizerParams params, dataset, resources=None):
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
     cdef Quantizer ret = Quantizer()
 
-    check_cuvs(cuvsProductQuantizerTrain(res,
+    check_cuvs(cuvsProductQuantizerBuild(res,
                                          params.params,
                                          dataset_dlpack,
                                          ret.quantizer))
@@ -238,7 +244,7 @@ def train(QuantizerParams params, dataset, resources=None):
 
 @auto_sync_resources
 @auto_convert_output
-def transform(Quantizer quantizer, dataset, output=None, resources=None):
+def transform(Quantizer quantizer, dataset, codes_output=None, vq_labels=None, resources=None):
     """
     Applies Product Quantization transform to given dataset
 
@@ -246,12 +252,14 @@ def transform(Quantizer quantizer, dataset, output=None, resources=None):
     ----------
     quantizer : trained Quantizer object
     dataset : row major dataset on host or device memory. FP32
-    output : optional preallocated output memory, on device memory
+    codes_output : optional preallocated output memory, on device memory
+    vq_labels : optional preallocated output memory for VQ labels, on device memory
     {resources_docstring}
 
     Returns
     -------
-    output : transformed dataset quantized into a uint8
+    codes_output : transformed dataset quantized into a uint8
+    vq_labels : VQ labels when VQ is used, None otherwise
 
     Examples
     --------
@@ -262,7 +270,7 @@ def transform(Quantizer quantizer, dataset, output=None, resources=None):
     >>> dataset = cp.random.random_sample((n_samples, n_features),
     ...                                   dtype=cp.float32)
     >>> params = pq.QuantizerParams(pq_bits=8, pq_dim=16)
-    >>> quantizer = pq.train(params, dataset)
+    >>> quantizer = pq.build(params, dataset)
     >>> transformed = pq.transform(quantizer, dataset)
     """
 
@@ -271,32 +279,39 @@ def transform(Quantizer quantizer, dataset, output=None, resources=None):
     _check_input_array(dataset_ai,
                        [np.dtype("float32")])
 
-    if output is None:
+    if codes_output is None:
         encoded_cols = quantizer.encoded_dim
-        output = device_ndarray.empty((dataset_ai.shape[0],
+        codes_output = device_ndarray.empty((dataset_ai.shape[0],
                                        encoded_cols), dtype="uint8")
 
-    output_ai = wrap_array(output)
-    _check_input_array(output_ai, [np.dtype("uint8")])
+    codes_output_ai = wrap_array(codes_output)
+    _check_input_array(codes_output_ai, [np.dtype("uint8")])
 
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
     cdef cydlpack.DLManagedTensor* dataset_dlpack = \
         cydlpack.dlpack_c(dataset_ai)
-    cdef cydlpack.DLManagedTensor* output_dlpack = \
-        cydlpack.dlpack_c(output_ai)
+    cdef cydlpack.DLManagedTensor* codes_output_dlpack = \
+        cydlpack.dlpack_c(codes_output_ai)
+    cdef cydlpack.DLManagedTensor* vq_labels_dlpack = NULL
+    if quantizer.use_vq:
+        if vq_labels is None:
+            vq_labels = device_ndarray.empty((dataset_ai.shape[0],), dtype="uint32")
+        _check_input_array(vq_labels, [np.dtype("uint32")])
+        vq_labels_dlpack = cydlpack.dlpack_c(wrap_array(vq_labels))
 
     check_cuvs(cuvsProductQuantizerTransform(res,
                                              quantizer.quantizer,
                                              dataset_dlpack,
-                                             output_dlpack))
+                                             codes_output_dlpack,
+                                             vq_labels_dlpack))
 
-    return output
+    return codes_output, vq_labels
 
 
 @auto_sync_resources
 @auto_convert_output
-def inverse_transform(Quantizer quantizer, codes, output=None, resources=None):
+def inverse_transform(Quantizer quantizer, codes, output=None, vq_labels=None, resources=None):
     """
     Applies Product Quantization inverse transform to given codes
 
@@ -305,6 +320,7 @@ def inverse_transform(Quantizer quantizer, codes, output=None, resources=None):
     quantizer : trained Quantizer object
     codes : row major device codes to inverse transform. uint8
     output : optional preallocated output memory, on device memory
+    vq_labels : optional VQ labels when VQ is used, on device memory
     {resources_docstring}
 
     Returns
@@ -320,11 +336,13 @@ def inverse_transform(Quantizer quantizer, codes, output=None, resources=None):
     >>> dataset = cp.random.random_sample((n_samples, n_features),
     ...                                   dtype=cp.float32)
     >>> params = pq.QuantizerParams(pq_bits=8, pq_dim=16)
-    >>> quantizer = pq.train(params, dataset)
+    >>> quantizer = pq.build(params, dataset)
     >>> transformed = pq.transform(quantizer, dataset)
     >>> reconstructed = pq.inverse_transform(quantizer, transformed)
     """
 
+    if quantizer.use_vq and vq_labels is None:
+        raise ValueError("vq_labels must be provided when VQ is used")
     codes_ai = wrap_array(codes)
 
     _check_input_array(codes_ai, [np.dtype("uint8")])
@@ -337,6 +355,11 @@ def inverse_transform(Quantizer quantizer, codes, output=None, resources=None):
         output = ndarray.empty((codes_ai.shape[0],
                                 original_cols), dtype=pq_cdbk.dtype)
 
+    cdef cydlpack.DLManagedTensor* vq_labels_dlpack = NULL
+
+    if vq_labels is not None:
+        _check_input_array(vq_labels, [np.dtype("uint32")])
+        vq_labels_dlpack = cydlpack.dlpack_c(wrap_array(vq_labels))
     output_ai = wrap_array(output)
     _check_input_array(output_ai, [pq_cdbk.dtype])
 
@@ -350,6 +373,7 @@ def inverse_transform(Quantizer quantizer, codes, output=None, resources=None):
     check_cuvs(cuvsProductQuantizerInverseTransform(res,
                                                     quantizer.quantizer,
                                                     codes_dlpack,
-                                                    output_dlpack))
+                                                    output_dlpack,
+                                                    vq_labels_dlpack))
 
     return output

@@ -45,9 +45,9 @@ def test_product_quantizer(
         pq_kmeans_type=pq_kmeans_type,
     )
     if device_memory:
-        quantizer = pq.train(params, input1_device)
+        quantizer = pq.build(params, input1_device)
     else:
-        quantizer = pq.train(params, input1)
+        quantizer = pq.build(params, input1)
 
     output = (
         np.zeros((n_rows, quantizer.encoded_dim), dtype="uint8")
@@ -55,12 +55,23 @@ def test_product_quantizer(
         else None
     )
     output_device = device_ndarray(output) if inplace else None
+    vq_labels = (
+        np.zeros((n_rows,), dtype="uint32") if inplace and use_vq else None
+    )
+    vq_labels_device = (
+        device_ndarray(vq_labels) if inplace and use_vq else None
+    )
     if device_memory:
-        transformed = pq.transform(
-            quantizer, input1_device, output=output_device
+        transformed, vq_labels_device = pq.transform(
+            quantizer,
+            input1_device,
+            codes_output=output_device,
+            vq_labels=vq_labels_device,
         )
     else:
-        transformed = pq.transform(quantizer, input1, output=output_device)
+        transformed, vq_labels_device = pq.transform(
+            quantizer, input1, codes_output=output_device
+        )
     actual = transformed if not inplace else output_device
     actual = actual.copy_to_host()
 
@@ -70,7 +81,9 @@ def test_product_quantizer(
     assert cp.array(quantizer.pq_codebook).any()
 
     reconstructed = cp.empty((n_rows, n_cols), dtype=dtype)
-    pq.inverse_transform(quantizer, transformed, reconstructed)
+    pq.inverse_transform(
+        quantizer, transformed, reconstructed, vq_labels=vq_labels_device
+    )
     reconstructed = cp.array(reconstructed)
     assert reconstructed.shape == input1.shape
     reconstruction_error = cp.linalg.norm(
@@ -86,7 +99,7 @@ def test_extreme_cases():
         (n_samples, n_features), dtype=cp.float32
     )
     params = pq.QuantizerParams(pq_bits=8, pq_dim=2)
-    quantizer = pq.train(params, dataset)
+    quantizer = pq.build(params, dataset)
     pq.transform(quantizer, dataset)
 
 
@@ -110,9 +123,11 @@ def test_recall(use_vq, use_subspaces, pq_dim):
         use_vq=use_vq,
         pq_kmeans_type=pq_kmeans_type,
     )
-    quantizer = pq.train(params, dataset)
-    transformed = pq.transform(quantizer, dataset)
-    reconstructed = pq.inverse_transform(quantizer, transformed)
+    quantizer = pq.build(params, dataset)
+    transformed, vq_labels = pq.transform(quantizer, dataset)
+    reconstructed = pq.inverse_transform(
+        quantizer, transformed, vq_labels=vq_labels
+    )
 
     index = brute_force.build(reconstructed)
     distances, indices = brute_force.search(index, queries_device, k=10)

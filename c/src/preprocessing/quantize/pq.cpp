@@ -18,7 +18,8 @@ template <typename T, typename OutputT = uint8_t>
 void _transform(cuvsResources_t res,
                 cuvsProductQuantizer_t quantizer,
                 DLManagedTensor* dataset_tensor,
-                DLManagedTensor* out_tensor)
+                DLManagedTensor* codes_out_tensor,
+                DLManagedTensor* vq_labels_tensor)
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   auto q = reinterpret_cast<cuvs::preprocessing::quantize::pq::quantizer<T>*>(quantizer->addr);
@@ -26,12 +27,18 @@ void _transform(cuvsResources_t res,
   auto dataset = dataset_tensor->dl_tensor;
   using mdspan_type     = raft::device_matrix_view<T const, int64_t, raft::row_major>;
   using out_mdspan_type = raft::device_matrix_view<OutputT, int64_t, raft::row_major>;
+  using vq_labels_mdspan_type = raft::device_vector_view<uint32_t, int64_t>;
+  std::optional<vq_labels_mdspan_type> vq_labels = std::nullopt;
+  if (vq_labels_tensor != NULL) {
+    vq_labels = cuvs::core::from_dlpack<vq_labels_mdspan_type>(vq_labels_tensor);
+  }
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
     cuvs::preprocessing::quantize::pq::transform(
       *res_ptr,
       *q,
       cuvs::core::from_dlpack<mdspan_type>(dataset_tensor),
-      cuvs::core::from_dlpack<out_mdspan_type>(out_tensor));
+      cuvs::core::from_dlpack<out_mdspan_type>(codes_out_tensor),
+      vq_labels);
 
   } else if (cuvs::core::is_dlpack_host_compatible(dataset)) {
     using host_mdspan_type     = raft::host_matrix_view<T const, int64_t, raft::row_major>;
@@ -40,14 +47,15 @@ void _transform(cuvsResources_t res,
       *res_ptr,
       *q,
       cuvs::core::from_dlpack<host_mdspan_type>(dataset_tensor),
-      cuvs::core::from_dlpack<out_mdspan_type>(out_tensor));
+      cuvs::core::from_dlpack<out_mdspan_type>(codes_out_tensor),
+      vq_labels);
   } else {
     RAFT_FAIL("dataset must be accessible on host or device memory");
   }
 }
 
 template <typename T>
-void* _train(cuvsResources_t res,
+void* _build(cuvsResources_t res,
              cuvsProductQuantizerParams_t params,
              DLManagedTensor* dataset_tensor)
 {
@@ -72,12 +80,12 @@ void* _train(cuvsResources_t res,
     using mdspan_type = raft::device_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
     ret = new cuvs::preprocessing::quantize::pq::quantizer<T>{
-      cuvs::preprocessing::quantize::pq::train(*res_ptr, quantizer_params, mds)};
+      cuvs::preprocessing::quantize::pq::build(*res_ptr, quantizer_params, mds)};
   } else if (cuvs::core::is_dlpack_host_compatible(dataset)) {
     using host_mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<host_mdspan_type>(dataset_tensor);
     ret = new cuvs::preprocessing::quantize::pq::quantizer<T>{
-      cuvs::preprocessing::quantize::pq::train(*res_ptr, quantizer_params, mds)};
+      cuvs::preprocessing::quantize::pq::build(*res_ptr, quantizer_params, mds)};
   } else {
     RAFT_FAIL("dataset must be accessible on host or device memory");
   }
@@ -87,22 +95,28 @@ void* _train(cuvsResources_t res,
 template <typename DataT, typename QuantT = uint8_t>
 void _inverse_transform(cuvsResources_t res,
                 cuvsProductQuantizer_t quantizer,
-                DLManagedTensor* codes_tensor,
-                DLManagedTensor* out_tensor)
+                DLManagedTensor* pq_codes_tensor,
+                DLManagedTensor* out_tensor,
+                DLManagedTensor* vq_labels_tensor)
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   auto q = reinterpret_cast<cuvs::preprocessing::quantize::pq::quantizer<DataT>*>(quantizer->addr);
 
-  auto codes = codes_tensor->dl_tensor;
+  auto codes = pq_codes_tensor->dl_tensor;
   if (cuvs::core::is_dlpack_device_compatible(codes)) {
     using codes_mdspan_type     = raft::device_matrix_view<QuantT const, int64_t, raft::row_major>;
     using data_mdspan_type = raft::device_matrix_view<DataT, int64_t, raft::row_major>;
-
+    using vq_labels_mdspan_type = raft::device_vector_view<const uint32_t, int64_t>;
+    std::optional<vq_labels_mdspan_type> vq_labels = std::nullopt;
+    if (vq_labels_tensor != NULL) {
+      vq_labels = cuvs::core::from_dlpack<vq_labels_mdspan_type>(vq_labels_tensor);
+    }
     cuvs::preprocessing::quantize::pq::inverse_transform(
       *res_ptr,
       *q,
-      cuvs::core::from_dlpack<codes_mdspan_type>(codes_tensor),
-      cuvs::core::from_dlpack<data_mdspan_type>(out_tensor));
+      cuvs::core::from_dlpack<codes_mdspan_type>(pq_codes_tensor),
+      cuvs::core::from_dlpack<data_mdspan_type>(out_tensor),
+      vq_labels);
 
   } else {
     RAFT_FAIL("codes must be accessible on device memory");
@@ -134,7 +148,7 @@ extern "C" cuvsError_t cuvsProductQuantizerDestroy(cuvsProductQuantizer_t quanti
   return cuvs::core::translate_exceptions([=] { delete quantizer; });
 }
 
-extern "C" cuvsError_t cuvsProductQuantizerTrain(cuvsResources_t res,
+extern "C" cuvsError_t cuvsProductQuantizerBuild(cuvsResources_t res,
                                                  cuvsProductQuantizerParams_t params,
                                                  DLManagedTensor* dataset_tensor,
                                                  cuvsProductQuantizer_t quantizer)
@@ -143,7 +157,7 @@ extern "C" cuvsError_t cuvsProductQuantizerTrain(cuvsResources_t res,
     auto dataset     = dataset_tensor->dl_tensor;
     quantizer->dtype = dataset.dtype;
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
-      quantizer->addr = reinterpret_cast<uintptr_t>(_train<float>(res, params, dataset_tensor));
+      quantizer->addr = reinterpret_cast<uintptr_t>(_build<float>(res, params, dataset_tensor));
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
                 dataset.dtype.code,
@@ -155,12 +169,13 @@ extern "C" cuvsError_t cuvsProductQuantizerTrain(cuvsResources_t res,
 extern "C" cuvsError_t cuvsProductQuantizerTransform(cuvsResources_t res,
                                                      cuvsProductQuantizer_t quantizer,
                                                      DLManagedTensor* dataset_tensor,
-                                                     DLManagedTensor* out_tensor)
+                                                     DLManagedTensor* codes_out_tensor,
+                                                     DLManagedTensor* vq_labels_tensor)
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
-      _transform<float>(res, quantizer, dataset_tensor, out_tensor);
+      _transform<float>(res, quantizer, dataset_tensor, codes_out_tensor, vq_labels_tensor);
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
                 dataset.dtype.code,
@@ -172,12 +187,13 @@ extern "C" cuvsError_t cuvsProductQuantizerTransform(cuvsResources_t res,
 extern "C" cuvsError_t cuvsProductQuantizerInverseTransform(cuvsResources_t res,
                                                             cuvsProductQuantizer_t quantizer,
                                                             DLManagedTensor* codes_tensor,
-                                                            DLManagedTensor* out_tensor)
+                                                            DLManagedTensor* out_tensor,
+                                                            DLManagedTensor* vq_labels_tensor)
 {
   return cuvs::core::translate_exceptions([=] {
     auto out_dtype = out_tensor->dl_tensor.dtype;
     if (out_dtype.code == kDLFloat && out_dtype.bits == 32) {
-      _inverse_transform<float>(res, quantizer, codes_tensor, out_tensor);
+      _inverse_transform<float>(res, quantizer, codes_tensor, out_tensor, vq_labels_tensor);
     } else {
       RAFT_FAIL("Unsupported out DLtensor dtype: %d and bits: %d",
                 out_dtype.code,
@@ -280,6 +296,25 @@ extern "C" cuvsError_t cuvsProductQuantizerGetEncodedDim(cuvsProductQuantizer_t 
       if (quantizer->dtype.code == kDLFloat && quantizer->dtype.bits == 32) {
         *encoded_dim = cuvs::preprocessing::quantize::pq::get_quantized_dim(
           reinterpret_cast<cuvs::preprocessing::quantize::pq::quantizer<float>*>(quant_addr)->params_quantizer);
+      } else {
+        RAFT_FAIL("Unsupported quantizer dtype: %d and bits: %d",
+                  quantizer->dtype.code,
+                  quantizer->dtype.bits);
+      }
+    } else {
+      RAFT_FAIL("quantizer is not initialized");
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsProductQuantizerGetUseVq(
+  cuvsProductQuantizer_t quantizer, bool* use_vq)
+{
+  return cuvs::core::translate_exceptions([=] {
+    if (quantizer != nullptr) {
+      auto quant_addr = quantizer->addr;
+      if (quantizer->dtype.code == kDLFloat && quantizer->dtype.bits == 32) {
+        *use_vq = (reinterpret_cast<cuvs::preprocessing::quantize::pq::quantizer<float>*>(quant_addr))->params_quantizer.use_vq;
       } else {
         RAFT_FAIL("Unsupported quantizer dtype: %d and bits: %d",
                   quantizer->dtype.code,

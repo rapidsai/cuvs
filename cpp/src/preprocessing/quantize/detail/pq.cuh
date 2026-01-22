@@ -68,8 +68,9 @@ auto train_pq_subspaces(
   // Subtract VQ centers
   if (!vq_centers.empty()) {
     pq_trainset    = cuvs::util::subsample(res, dataset, n_rows_train);
-    auto vq_labels = cuvs::neighbors::detail::predict_vq<uint32_t>(
-      res, raft::make_const_mdspan(pq_trainset.view()), vq_centers);
+    auto vq_labels = raft::make_device_vector<uint32_t, ix_t>(res, pq_trainset.extent(0));
+    cuvs::neighbors::detail::predict_vq<uint32_t>(
+      res, raft::make_const_mdspan(pq_trainset.view()), vq_centers, vq_labels.view());
     raft::linalg::map_offset(
       res,
       pq_trainset.view(),
@@ -120,7 +121,7 @@ auto train_pq_subspaces(
 }
 
 template <typename DataT, typename MathT, typename AccessorType>
-quantizer<MathT> train(
+quantizer<MathT> build(
   raft::resources const& res,
   const cuvs::preprocessing::quantize::pq::params params,
   raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, AccessorType> dataset)
@@ -128,7 +129,7 @@ quantizer<MathT> train(
   auto n_rows = dataset.extent(0);
   auto dim    = dataset.extent(1);
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
-    "preprocessing::quantize::pq::train(%zu, %u, %u, %u)",
+    "preprocessing::quantize::pq::build(%zu, %u, %u, %u)",
     size_t(n_rows),
     dim,
     params.pq_bits,
@@ -163,21 +164,24 @@ void transform(
   raft::resources const& res,
   const quantizer<T>& quantizer,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, AccessorType> dataset,
-  raft::device_matrix_view<QuantI, int64_t> out)
+  raft::device_matrix_view<QuantI, int64_t> pq_codes_out,
+  std::optional<raft::device_vector_view<uint32_t, int64_t>> vq_labels = std::nullopt)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "preprocessing::quantize::pq::transform(%zu, %zu, %zu)",
     size_t(dataset.extent(0)),
     size_t(dataset.extent(1)),
-    size_t(out.extent(1)));
-  RAFT_EXPECTS(out.extent(0) == dataset.extent(0),
+    size_t(pq_codes_out.extent(1)));
+  RAFT_EXPECTS(pq_codes_out.extent(0) == dataset.extent(0),
                "Output matrix must have the same number of rows as the input dataset");
-  RAFT_EXPECTS(out.extent(1) == get_quantized_dim(quantizer.params_quantizer),
+  RAFT_EXPECTS(pq_codes_out.extent(1) == get_quantized_dim(quantizer.params_quantizer),
                "Output matrix doesn't have the correct number of columns");
   RAFT_EXPECTS(quantizer.params_quantizer.pq_bits >= 4 && quantizer.params_quantizer.pq_bits <= 16,
                "PQ bits must be within [4, 16]");
   // Encode dataset
-  auto vq_centers = raft::make_const_mdspan(quantizer.vpq_codebooks.vq_code_book.view());
+  auto vq_centers     = raft::make_const_mdspan(quantizer.vpq_codebooks.vq_code_book.view());
+  auto vq_labels_view = raft::make_device_vector_view<uint32_t, int64_t>(nullptr, 0);
+  if (vq_labels.has_value()) { vq_labels_view = vq_labels.value(); }
 
   if (quantizer.params_quantizer.use_subspaces) {
     cuvs::neighbors::detail::process_and_fill_codes_subspaces<T, int64_t>(
@@ -186,7 +190,8 @@ void transform(
       dataset,
       raft::make_const_mdspan(quantizer.vpq_codebooks.pq_code_book.view()),
       vq_centers,
-      out);
+      vq_labels_view,
+      pq_codes_out);
   } else {
     cuvs::neighbors::detail::process_and_fill_codes<T, int64_t>(
       res,
@@ -194,7 +199,8 @@ void transform(
       dataset,
       raft::make_const_mdspan(quantizer.vpq_codebooks.pq_code_book.view()),
       vq_centers,
-      out);
+      vq_labels_view,
+      pq_codes_out);
   }
 }
 
@@ -210,6 +216,7 @@ __launch_bounds__(BlockSize) RAFT_KERNEL reconstruct_vectors_kernel(
   raft::device_matrix_view<DataT, IdxT, raft::row_major> dataset,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
   raft::device_matrix_view<const DataT, uint32_t, raft::row_major> vq_centers,
+  std::optional<raft::device_vector_view<const uint32_t, int64_t>> vq_labels,
   const uint32_t pq_bits,
   bool use_subspaces)
 {
@@ -220,13 +227,9 @@ __launch_bounds__(BlockSize) RAFT_KERNEL reconstruct_vectors_kernel(
   uint32_t lane_id      = subwarp_align::mod(raft::laneId());
   const uint32_t pq_len = raft::div_rounding_up_unsafe(dataset.extent(1), pq_centers.extent(1));
 
-  const uint8_t* out_codes_ptr = &codes(row_ix, 0);
-  LabelT vq_label              = 0;
-  if (!vq_centers.empty()) {
-    vq_label      = *reinterpret_cast<const LabelT*>(out_codes_ptr);
-    out_codes_ptr = (&codes(row_ix, 0)) + sizeof(LabelT);
-  }
-  cuvs::preprocessing::quantize::detail::bitfield_view_t code_view{out_codes_ptr, pq_bits};
+  LabelT vq_label = 0;
+  if (vq_labels.has_value()) { vq_label = vq_labels.value()(row_ix); }
+  cuvs::preprocessing::quantize::detail::bitfield_view_t code_view{&codes(row_ix, 0), pq_bits};
   for (uint32_t j = lane_id; j < pq_len; j += SubWarpSize) {
     const CodeT code = code_view[j];
     for (uint32_t k = 0; k < pq_centers.extent(1); k++) {
@@ -248,6 +251,7 @@ auto reconstruct_vectors(
   raft::device_matrix_view<const uint8_t, IdxT, raft::row_major> codes,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
   raft::device_matrix_view<const DataT, uint32_t, raft::row_major> vq_centers,
+  std::optional<raft::device_vector_view<const uint32_t, int64_t>> vq_labels,
   raft::device_matrix_view<DataT, IdxT, raft::row_major> out_vectors,
   bool use_subspaces)
 {
@@ -287,17 +291,19 @@ auto reconstruct_vectors(
   }(pq_bits);
   dim3 blocks(raft::div_rounding_up_safe<IdxT>(n_rows, kBlockSize / threads_per_vec), 1, 1);
   kernel<<<blocks, threads, 0, stream>>>(
-    codes, out_vectors, pq_centers, vq_centers, pq_bits, use_subspaces);
+    codes, out_vectors, pq_centers, vq_centers, vq_labels, pq_bits, use_subspaces);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   return codes;
 }
 
 template <typename T, typename QuantI = uint8_t>
-void inverse_transform(raft::resources const& res,
-                       const quantizer<T>& quant,
-                       raft::device_matrix_view<const QuantI, int64_t> codes,
-                       raft::device_matrix_view<T, int64_t> out)
+void inverse_transform(
+  raft::resources const& res,
+  const quantizer<T>& quant,
+  raft::device_matrix_view<const QuantI, int64_t> codes,
+  raft::device_matrix_view<T, int64_t> out,
+  std::optional<raft::device_vector_view<const uint32_t, int64_t>> vq_labels = std::nullopt)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "preprocessing::quantize::pq::inverse_transform(%zu, %zu, %zu)",
@@ -318,6 +324,7 @@ void inverse_transform(raft::resources const& res,
     codes,
     raft::make_const_mdspan(quant.vpq_codebooks.pq_code_book.view()),
     raft::make_const_mdspan(quant.vpq_codebooks.vq_code_book.view()),
+    vq_labels,
     out,
     quant.params_quantizer.use_subspaces);
 }

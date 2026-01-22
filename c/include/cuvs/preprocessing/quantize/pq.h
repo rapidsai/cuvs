@@ -122,14 +122,14 @@ cuvsError_t cuvsProductQuantizerCreate(cuvsProductQuantizer_t* quantizer);
 cuvsError_t cuvsProductQuantizerDestroy(cuvsProductQuantizer_t quantizer);
 
 /**
- * @brief Trains a product quantizer to be used later for quantizing the dataset.
+ * @brief Builds a product quantizer to be used later for quantizing the dataset.
  *
  * @param[in] res raft resource
  * @param[in] params Parameters for product quantizer training
  * @param[in] dataset a row-major host or device matrix
  * @param[out] quantizer trained product quantizer
  */
-cuvsError_t cuvsProductQuantizerTrain(cuvsResources_t res,
+cuvsError_t cuvsProductQuantizerBuild(cuvsResources_t res,
                                       cuvsProductQuantizerParams_t params,
                                       DLManagedTensor* dataset,
                                       cuvsProductQuantizer_t quantizer);
@@ -142,12 +142,15 @@ cuvsError_t cuvsProductQuantizerTrain(cuvsResources_t res,
  * @param[in] res raft resource
  * @param[in] quantizer product quantizer
  * @param[in] dataset a row-major host or device matrix to transform
- * @param[out] out a row-major device matrix to store transformed data
+ * @param[out] codes_out a row-major device matrix to store transformed data
+ * @param[out] vq_labels a device vector to store VQ labels.
+ *   Optional, can be NULL.
  */
 cuvsError_t cuvsProductQuantizerTransform(cuvsResources_t res,
                                           cuvsProductQuantizer_t quantizer,
                                           DLManagedTensor* dataset,
-                                          DLManagedTensor* out);
+                                          DLManagedTensor* codes_out,
+                                          DLManagedTensor* vq_labels);
 
 /**
  * @brief Applies product quantization inverse transform to the given quantized codes
@@ -156,13 +159,16 @@ cuvsError_t cuvsProductQuantizerTransform(cuvsResources_t res,
  *
  * @param[in] res raft resource
  * @param[in] quantizer product quantizer
- * @param[in] codes a row-major device matrix of quantized codes
+ * @param[in] pq_codes a row-major device matrix of quantized codes
  * @param[out] out a row-major device matrix to store the original data
+ * @param[out] vq_labels a device vector containing the VQ labels when VQ is used.
+ *   Optional, can be NULL.
  */
  cuvsError_t cuvsProductQuantizerInverseTransform(cuvsResources_t res,
   cuvsProductQuantizer_t quantizer,
-  DLManagedTensor* codes,
-  DLManagedTensor* out);
+  DLManagedTensor* pq_codes,
+  DLManagedTensor* out,
+  DLManagedTensor* vq_labels);
 
 /**
  * @brief Get the bit length of the vector element after compression by PQ.
@@ -206,6 +212,13 @@ cuvsError_t cuvsProductQuantizerGetVqCodebook(cuvsProductQuantizer_t quantizer,
 cuvsError_t cuvsProductQuantizerGetEncodedDim(cuvsProductQuantizer_t quantizer,
                                               uint32_t* encoded_dim);
 
+/**
+ * @brief Get whether VQ is used.
+ *
+ * @param[in] quantizer product quantizer
+ * @param[out] use_vq whether VQ is used
+ */
+cuvsError_t cuvsProductQuantizerGetUseVq(cuvsProductQuantizer_t quantizer, bool* use_vq);
 /**
  * @}
  */
