@@ -690,6 +690,8 @@ constexpr static IdxT kInvalidRecord =
  * @tparam ValueT The data element type (e.g., uint8_t for PQ codes, float for raw vectors)
  * @tparam IdxT The index type for source indices
  * @tparam SizeT The size type
+ *
+ * TODO: Make this struct internal (tracking issue: https://github.com/rapidsai/cuvs/issues/1726)
  */
 template <typename ValueT, typename IdxT, typename SizeT = uint32_t>
 struct list_base {
