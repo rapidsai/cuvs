@@ -397,6 +397,7 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_kernel(
 /**
  * Note: `inline_vq_labels` should only be used for CAGRA-Q compatibility or internal use-cases.
  * Otherwise, vq_labels should be preferred.
+ * Issue: https://github.com/rapidsai/cuvs/issues/1722
  */
 template <typename MathT, typename IdxT, typename DatasetT>
 void process_and_fill_codes(
