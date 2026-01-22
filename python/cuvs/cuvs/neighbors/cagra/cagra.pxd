@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
@@ -63,6 +63,8 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
         size_t ef_construction
         const char* build_dir
         bool use_disk
+        double max_host_memory_gb
+        double max_gpu_memory_gb
     ctypedef cuvsAceParams* cuvsAceParams_t
 
     ctypedef struct cuvsCagraIndexParams:
