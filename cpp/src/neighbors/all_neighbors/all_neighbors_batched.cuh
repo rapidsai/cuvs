@@ -552,6 +552,7 @@ void batch_build(
     RAFT_CUDA_TRY(cudaSetDevice(original_device));
 
     if (needs_workaround) {
+      RAFT_LOG_DEBUG("Applying managed memory workaround for pre-Ampere GPU architecture");
       cudaMemLocation cpu_location = {cudaMemLocationTypeHost, 0};
       RAFT_CUDA_TRY(cudaMemAdvise(global_neighbors.data_handle(),
                                   num_rows * k * sizeof(IdxT),
