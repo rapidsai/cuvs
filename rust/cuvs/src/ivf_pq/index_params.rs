@@ -8,7 +8,8 @@ use crate::error::{check_cuvs, Result};
 use std::fmt;
 use std::io::{stderr, Write};
 
-pub use ffi::codebook_gen;
+pub use ffi::cuvsIvfPqCodebookGen;
+pub use ffi::cuvsIvfPqListLayout;
 
 pub struct IndexParams(pub ffi::cuvsIvfPqIndexParams_t);
 
@@ -88,9 +89,20 @@ impl IndexParams {
         self
     }
 
-    pub fn set_codebook_kind(self, codebook_kind: codebook_gen) -> IndexParams {
+    pub fn set_codebook_kind(self, codebook_kind: cuvsIvfPqCodebookGen) -> IndexParams {
         unsafe {
             (*self.0).codebook_kind = codebook_kind;
+        }
+        self
+    }
+
+    /// Memory layout of the IVF-PQ list data.
+    /// - FLAT: Codes are stored contiguously, one vector's codes after another.
+    /// - INTERLEAVED: Codes are interleaved for optimized search performance.
+    ///   This is the default and recommended for search workloads.
+    pub fn set_codes_layout(self, codes_layout: cuvsIvfPqListLayout) -> IndexParams {
+        unsafe {
+            (*self.0).codes_layout = codes_layout;
         }
         self
     }
