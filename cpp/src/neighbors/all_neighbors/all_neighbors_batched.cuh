@@ -529,27 +529,27 @@ void batch_build(
   auto global_neighbors = raft::make_managed_matrix<IdxT, IdxT>(handle, num_rows, k);
   auto global_distances = raft::make_managed_matrix<T, IdxT>(handle, num_rows, k);
 
-  reset_global_matrices(handle, params.metric, global_neighbors.view(), global_distances.view());
-
-  // For multi-GPU: sync the stream to ensure fill completes before other GPUs access
-  // the managed memory.
   if (raft::resource::is_multi_gpu(handle)) {
-    raft::resource::sync_stream(handle);
-
     // Check if any GPU is Turing (SM 7.5) or older. These architectures have issues with
     // multi-GPU managed memory coherence for concurrent writes. Force CPU-resident memory
     // to ensure all GPUs access through host memory, avoiding page migration issues.
     // Ampere (SM 8.0+) and newer architectures handle this correctly.
     int num_ranks         = raft::resource::get_num_ranks(handle);
     bool needs_workaround = false;
+    int original_device;
+    RAFT_CUDA_TRY(cudaGetDevice(&original_device));
     for (int rank = 0; rank < num_ranks; rank++) {
       raft::resource::set_current_device_to_rank(handle, rank);
       int device_id;
       RAFT_CUDA_TRY(cudaGetDevice(&device_id));
       int major = 0;
       RAFT_CUDA_TRY(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device_id));
-      if (major < 8) { needs_workaround = true; }  // Turing is 7.x, Ampere is 8.x
+      if (major < 8) {
+        needs_workaround = true;
+        break;
+      }  // Turing is 7.x, Ampere is 8.x
     }
+    RAFT_CUDA_TRY(cudaSetDevice(original_device));
 
     if (needs_workaround) {
       cudaMemLocation cpu_location = {cudaMemLocationTypeHost, 0};
@@ -564,7 +564,13 @@ void batch_build(
     }
   }
 
+  reset_global_matrices(handle, params.metric, global_neighbors.view(), global_distances.view());
+
   if (raft::resource::is_multi_gpu(handle)) {
+    // For multi-GPU: sync the stream to ensure fill completes before other GPUs access
+    // the managed memory.
+    raft::resource::sync_stream(handle);
+
     multi_gpu_batch_build(handle,
                           params,
                           dataset,
