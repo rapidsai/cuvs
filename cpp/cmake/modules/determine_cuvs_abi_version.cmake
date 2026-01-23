@@ -69,7 +69,7 @@ function(determine_cuvs_abi_version cal_ver)
   # Encode the last ABI break
   set(current_major_abi_ver "1") # The current ABI major value
   set(abi_base_year "26") # What year the current ABI major occurred in
-  set(abi_base_month "04") # What month the current ABI major occurred in
+  set(abi_base_month "02") # What month the current ABI major occurred in
   # compute the abi version
   if(cal_ver_major STREQUAL abi_base_year)
     # If we are in the same year is is pretty easy to compute our abi break
@@ -83,7 +83,7 @@ function(determine_cuvs_abi_version cal_ver)
   endif()
 
   set(${_CUVS_RAPIDS_MAJOR}
-      ${computed_abi_major}
+      ${current_major_abi_ver}
       PARENT_SCOPE
   )
   set(${_CUVS_RAPIDS_MINOR}
