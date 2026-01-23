@@ -93,7 +93,7 @@ fi
 
 
 rapids-logger "Begin gathering licenses"
-pip install git+https://github.com/rapidsai/spdx-license-builder.git
+rapids-pip-retry install git+https://github.com/rapidsai/spdx-license-builder.git
 license-builder . --output-json c/build/install/licenses.json --output-txt c/build/install/LICENSE
 
 rapids-logger "Begin c tarball creation"
