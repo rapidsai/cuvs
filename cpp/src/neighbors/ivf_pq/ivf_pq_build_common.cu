@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -10,7 +10,8 @@
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <raft/core/mdspan_types.hpp>
 
-namespace cuvs::neighbors::ivf_pq::helpers {
+namespace cuvs::neighbors::ivf_pq {
+namespace helpers {
 
 namespace codepacker {
 
@@ -256,29 +257,6 @@ void make_rotation_matrix(raft::resources const& handle,
   }
 }
 
-void make_rotation_matrix(raft::resources const& res,
-                          index<int64_t>* index,
-                          bool force_random_rotation)
-{
-  make_rotation_matrix(res,
-                       force_random_rotation,
-                       index->rot_dim(),
-                       index->dim(),
-                       index->rotation_matrix().data_handle());
-}
-
-void set_centers(raft::resources const& handle,
-                 index<int64_t>* index,
-                 raft::device_matrix_view<const float, int64_t, raft::row_major> cluster_centers)
-{
-  RAFT_EXPECTS(cluster_centers.extent(0) == index->n_lists(),
-               "Number of rows in the new centers must be equal to the number of IVF lists");
-  RAFT_EXPECTS(cluster_centers.extent(1) == index->dim(),
-               "Number of columns in the new cluster centers and index dim are different");
-  RAFT_EXPECTS(index->size() == 0, "Index must be empty");
-  detail::set_centers(handle, index, cluster_centers.data_handle());
-}
-
 void extract_centers(raft::resources const& res,
                      const cuvs::neighbors::ivf_pq::index<int64_t>& index,
                      raft::device_matrix_view<float, int64_t, raft::row_major> cluster_centers)
@@ -298,4 +276,105 @@ void recompute_internal_state(const raft::resources& res, index<int64_t>* index)
   ivf::detail::recompute_internal_state(res, *index);
 }
 
-}  // namespace cuvs::neighbors::ivf_pq::helpers
+void make_rotation_matrix(
+  raft::resources const& res,
+  raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix,
+  bool force_random_rotation)
+{
+  RAFT_EXPECTS(rotation_matrix.extent(0) > 0 && rotation_matrix.extent(1) > 0,
+               "rotation_matrix must have non-zero extents");
+
+  uint32_t rot_dim = rotation_matrix.extent(0);
+  uint32_t dim     = rotation_matrix.extent(1);
+
+  make_rotation_matrix(res, force_random_rotation, rot_dim, dim, rotation_matrix.data_handle());
+}
+
+void pad_centers_with_norms(
+  raft::resources const& res,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
+  raft::device_matrix_view<float, uint32_t, raft::row_major> padded_centers)
+{
+  RAFT_EXPECTS(padded_centers.extent(1) == raft::round_up_safe(centers.extent(1) + 1, 8u),
+               "padded_centers must have extent(1) == round_up(centers.extent(1) + 1, 8u). Got "
+               "padded_centers.extent(1) = %u, expected %u",
+               padded_centers.extent(1),
+               raft::round_up_safe(centers.extent(1) + 1, 8u));
+  detail::pad_centers_with_norms(res,
+                                 centers.data_handle(),
+                                 centers.extent(0),
+                                 centers.extent(1),
+                                 padded_centers.extent(1),
+                                 padded_centers.data_handle());
+}
+
+void pad_centers_with_norms(
+  raft::resources const& res,
+  raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
+  raft::device_matrix_view<float, uint32_t, raft::row_major> padded_centers)
+{
+  RAFT_EXPECTS(padded_centers.extent(1) == raft::round_up_safe(centers.extent(1) + 1, 8u),
+               "padded_centers must have extent(1) == round_up(centers.extent(1) + 1, 8u). Got "
+               "padded_centers.extent(1) = %u, expected %u",
+               padded_centers.extent(1),
+               raft::round_up_safe(centers.extent(1) + 1, 8u));
+  detail::pad_centers_with_norms(res,
+                                 centers.data_handle(),
+                                 centers.extent(0),
+                                 centers.extent(1),
+                                 padded_centers.extent(1),
+                                 padded_centers.data_handle());
+}
+
+void rotate_padded_centers(
+  raft::resources const& res,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> padded_centers,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix,
+  raft::device_matrix_view<float, uint32_t, raft::row_major> rotated_centers)
+{
+  uint32_t n_lists     = padded_centers.extent(0);
+  uint32_t centers_dim = padded_centers.extent(1);
+  uint32_t rot_dim     = rotation_matrix.extent(0);
+  uint32_t dim         = rotation_matrix.extent(1);
+
+  RAFT_EXPECTS(rotated_centers.extent(0) == n_lists,
+               "centers_rot must have extent(0) == n_lists. Got centers_rot.extent(0) = %u, "
+               "expected %u",
+               rotated_centers.extent(0),
+               n_lists);
+  RAFT_EXPECTS(rotated_centers.extent(1) == rot_dim,
+               "centers_rot must have extent(1) == rot_dim. Got centers_rot.extent(1) = %u, "
+               "expected %u",
+               rotated_centers.extent(1),
+               rot_dim);
+  RAFT_EXPECTS(centers_dim >= dim,
+               "centers must have at least dim columns. Got centers.extent(1) = %u, "
+               "expected >= %u",
+               centers_dim,
+               dim);
+
+  auto stream = raft::resource::get_cuda_stream(res);
+
+  float alpha = 1.0f;
+  float beta  = 0.0f;
+
+  raft::linalg::gemm(res,
+                     true,   // transpose rotation_matrix
+                     false,  // don't transpose centers
+                     rot_dim,
+                     n_lists,
+                     dim,
+                     &alpha,
+                     rotation_matrix.data_handle(),
+                     dim,  // lda (leading dim of rotation_matrix)
+                     padded_centers.data_handle(),
+                     centers_dim,  // ldb (leading dim of centers, accounting for potential padding)
+                     &beta,
+                     rotated_centers.data_handle(),
+                     rot_dim,  // ldc (leading dim of output)
+                     stream);
+}
+
+}  // namespace helpers
+
+}  // namespace cuvs::neighbors::ivf_pq
