@@ -32,15 +32,18 @@ function(find_and_configure_faiss)
   endif()
 
   include(cmake/modules/FindAVX)
+  include(cmake/modules/FindSVE)
   # Link against AVX CPU lib if it exists
   set(CUVS_FAISS_OPT_LEVEL "generic")
   if(CXX_AVX2_FOUND)
     set(CUVS_FAISS_OPT_LEVEL "avx2")
   endif()
-
+  if(CXX_SVE_FOUND)
+      set(CUVS_FAISS_OPT_LEVEL "sve")
+  endif
 
   rapids_cpm_find(faiss ${version} ${find_args}
-    GLOBAL_TARGETS faiss faiss_avx2 faiss_gpu_objs faiss::faiss faiss::faiss_avx2
+    GLOBAL_TARGETS faiss faiss_avx2 faiss_gpu_objs faiss::faiss faiss::faiss_avx2 faiss::faiss_sve
     CPM_ARGS ${cpm_args}
     OPTIONS
     "FAISS_ENABLE_GPU ${PKG_ENABLE_GPU}"
@@ -68,6 +71,12 @@ function(find_and_configure_faiss)
     # faiss will have the conda includes/link dirs
     target_link_libraries(faiss_avx2 PRIVATE $<TARGET_NAME_IF_EXISTS:conda_env>)
   endif()
+  if(TARGET faiss_sve AND NOT TARGET faiss::faiss_sve)
+    add_library(faiss::faiss_sve ALIAS faiss_sve)
+    # We need to ensure that faiss has all the conda information. So we use this approach so that
+    # faiss will have the conda includes/link dirs
+    target_link_libraries(faiss_sve PRIVATE $<TARGET_NAME_IF_EXISTS:conda_env>)
+  endif()
   if(TARGET faiss_gpu_objs AND NOT TARGET faiss::faiss_gpu_objs)
     add_library(faiss::faiss_gpu_objs ALIAS faiss_gpu_objs)
     # We need to ensure that faiss has all the conda information. So we use this approach so that
@@ -92,10 +101,14 @@ function(find_and_configure_faiss)
   # and fail due to invalid compiler flags.
   if(PKG_ENABLE_GPU AND PKG_BUILD_STATIC_LIBS AND CXX_AVX2_FOUND)
     set(CUVS_FAISS_TARGETS "$<LINK_GROUP:RESCAN,$<LINK_LIBRARY:WHOLE_ARCHIVE,faiss_gpu_objs>,faiss::faiss_avx2>" PARENT_SCOPE)
+  elseif(PKG_ENABLE_GPU AND PKG_BUILD_STATIC_LIBS AND CXX_SVE_FOUND)
+    set(CUVS_FAISS_TARGETS "$<LINK_GROUP:RESCAN,$<LINK_LIBRARY:WHOLE_ARCHIVE,faiss_gpu_objs>,faiss::faiss_sve>" PARENT_SCOPE)
   elseif(PKG_ENABLE_GPU AND  PKG_BUILD_STATIC_LIBS)
     set(CUVS_FAISS_TARGETS "$<LINK_GROUP:RESCAN,$<LINK_LIBRARY:WHOLE_ARCHIVE,faiss_gpu_objs>,faiss::faiss>" PARENT_SCOPE)
   elseif(CXX_AVX2_FOUND)
     set(CUVS_FAISS_TARGETS faiss::faiss_avx2 PARENT_SCOPE)
+  elseif(CXX_SVE_FOUND)
+    set(CUVS_FAISS_TARGETS faiss::faiss_sve PARENT_SCOPE)
   else()
     set(CUVS_FAISS_TARGETS faiss::faiss PARENT_SCOPE)
   endif()
