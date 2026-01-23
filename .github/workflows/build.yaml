@@ -34,7 +34,7 @@ concurrency:
 jobs:
   cpp-build:
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-build.yaml@cuda-13.1.0
+    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-build.yaml@main
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
@@ -46,30 +46,33 @@ jobs:
 
   rocky8-clib-standalone-build:
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@cuda-13.1.0
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
     strategy:
       fail-fast: false
       matrix:
         cuda_version:
           - &latest_cuda12 '12.9.1'
           - &latest_cuda13 '13.1.0'
+        arch:
+          - amd64
+          - arm64
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
-      arch: "amd64"
+      arch: "${{matrix.arch}}"
       date: ${{ inputs.date }}
-      container_image: "rapidsai/ci-wheel:26.02-cuda${{ matrix.cuda_version }}-rockylinux8-py3.10"
+      container_image: "rapidsai/ci-wheel:26.04-cuda${{ matrix.cuda_version }}-rockylinux8-py3.10"
       node_type: "cpu16"
       # requires_license_builder: false
       script: "ci/build_standalone_c.sh"
-      artifact-name: "libcuvs_c_${{ matrix.cuda_version }}.tar.gz"
+      artifact-name: "libcuvs_c_${{ matrix.cuda_version }}_${{ matrix.arch }}.tar.gz"
       file_to_upload: "libcuvs_c.tar.gz"
       sha: ${{ inputs.sha }}
       sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
   rust-build:
     needs: cpp-build
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@cuda-13.1.0
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
     # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
     # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
     strategy:
@@ -83,7 +86,7 @@ jobs:
       branch: ${{ inputs.branch }}
       arch: "amd64"
       date: ${{ inputs.date }}
-      container_image: "rapidsai/ci-conda:26.02-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
+      container_image: "rapidsai/ci-conda:26.04-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
       node_type: "gpu-l4-latest-1"
       script: "ci/build_rust.sh"
       sha: ${{ inputs.sha }}
@@ -91,7 +94,7 @@ jobs:
   go-build:
     needs: cpp-build
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@cuda-13.1.0
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
     # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
     # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
     strategy:
@@ -105,14 +108,14 @@ jobs:
       branch: ${{ inputs.branch }}
       arch: "amd64"
       date: ${{ inputs.date }}
-      container_image: "rapidsai/ci-conda:26.02-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
+      container_image: "rapidsai/ci-conda:26.04-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
       node_type: "gpu-l4-latest-1"
       script: "ci/build_go.sh"
       sha: ${{ inputs.sha }}
   java-build:
     needs: cpp-build
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@cuda-13.1.0
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
     # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
     # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
     strategy:
@@ -126,7 +129,7 @@ jobs:
       branch: ${{ inputs.branch }}
       arch: "amd64"
       date: ${{ inputs.date }}
-      container_image: "rapidsai/ci-conda:26.02-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
+      container_image: "rapidsai/ci-conda:26.04-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
       script: "ci/build_java.sh"
       artifact-name: "cuvs-java-cuda${{ matrix.cuda_version }}"
       file_to_upload: "java/cuvs-java/target/"
@@ -135,7 +138,7 @@ jobs:
   python-build:
     needs: [cpp-build]
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-python-build.yaml@cuda-13.1.0
+    uses: rapidsai/shared-workflows/.github/workflows/conda-python-build.yaml@main
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
@@ -146,7 +149,7 @@ jobs:
   upload-conda:
     needs: [cpp-build, python-build]
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-upload-packages.yaml@cuda-13.1.0
+    uses: rapidsai/shared-workflows/.github/workflows/conda-upload-packages.yaml@main
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
@@ -161,19 +164,19 @@ jobs:
     if: github.ref_type == 'branch'
     needs: python-build
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@cuda-13.1.0
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
     with:
       arch: "amd64"
       branch: ${{ inputs.branch }}
       build_type: ${{ inputs.build_type || 'branch' }}
-      container_image: "rapidsai/ci-conda:26.02-latest"
+      container_image: "rapidsai/ci-conda:26.04-latest"
       date: ${{ inputs.date }}
       node_type: "gpu-l4-latest-1"
       script: "ci/build_docs.sh"
       sha: ${{ inputs.sha }}
   wheel-build-libcuvs:
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@cuda-13.1.0
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@main
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
@@ -189,7 +192,7 @@ jobs:
   wheel-publish-libcuvs:
     needs: wheel-build-libcuvs
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-publish.yaml@cuda-13.1.0
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-publish.yaml@main
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
@@ -200,7 +203,7 @@ jobs:
   wheel-build-cuvs:
     needs: wheel-build-libcuvs
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@cuda-13.1.0
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@main
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
@@ -214,7 +217,7 @@ jobs:
   wheel-publish-cuvs:
     needs: wheel-build-cuvs
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-publish.yaml@cuda-13.1.0
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-publish.yaml@main
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}

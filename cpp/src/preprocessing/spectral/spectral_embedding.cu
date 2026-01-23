@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -7,19 +7,23 @@
 
 #include <cuvs/preprocessing/spectral_embedding.hpp>
 
+#include <cstdint>
+
 namespace cuvs::preprocessing::spectral_embedding {
 
-#define CUVS_INST_SPECTRAL_EMBEDDING(DataT)                                             \
-  void transform(raft::resources const& handle,                                         \
-                 params config,                                                         \
-                 raft::device_coo_matrix_view<DataT, int, int, int> connectivity_graph, \
-                 raft::device_matrix_view<DataT, int, raft::col_major> embedding)       \
-  {                                                                                     \
-    detail::transform<DataT>(handle, config, connectivity_graph, embedding);            \
+#define CUVS_INST_SPECTRAL_EMBEDDING(DataT, NNZType)                                        \
+  void transform(raft::resources const& handle,                                             \
+                 params config,                                                             \
+                 raft::device_coo_matrix_view<DataT, int, int, NNZType> connectivity_graph, \
+                 raft::device_matrix_view<DataT, int, raft::col_major> embedding)           \
+  {                                                                                         \
+    detail::transform<DataT, NNZType>(handle, config, connectivity_graph, embedding);       \
   }
 
-CUVS_INST_SPECTRAL_EMBEDDING(float);
-CUVS_INST_SPECTRAL_EMBEDDING(double);
+CUVS_INST_SPECTRAL_EMBEDDING(float, int);
+CUVS_INST_SPECTRAL_EMBEDDING(float, int64_t);
+CUVS_INST_SPECTRAL_EMBEDDING(double, int);
+CUVS_INST_SPECTRAL_EMBEDDING(double, int64_t);
 
 #undef CUVS_INST_SPECTRAL_EMBEDDING
 
