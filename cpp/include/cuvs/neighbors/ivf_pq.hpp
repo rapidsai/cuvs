@@ -1875,6 +1875,12 @@ void search(raft::resources const& handle,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
+void transform(raft::resources const& handle,
+               const cuvs::neighbors::ivf_pq::index<int64_t>& index,
+               raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
+               raft::device_vector_view<uint32_t, int64_t> output_labels,
+               raft::device_matrix_view<uint8_t, int64_t> output_dataset);
+
 /**
  * @}
  */

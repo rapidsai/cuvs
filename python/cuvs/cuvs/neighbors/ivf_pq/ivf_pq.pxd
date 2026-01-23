@@ -151,6 +151,12 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
                                 DLManagedTensor* new_indices,
                                 cuvsIvfPqIndex_t index)
 
+    cuvsError_t cuvsIvfPqTransform(cuvsResources_t res,
+                                   cuvsIvfPqIndex_t index,
+                                   DLManagedTensor* input_dataset,
+                                   DLManagedTensor* output_labels,
+                                   DLManagedTensor* output_dataset)
+
 
 cdef class IndexParams:
     cdef cuvsIvfPqIndexParams* params

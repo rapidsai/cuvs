@@ -334,3 +334,43 @@ def test_build_precomputed(codebook_kind, metric):
         atol=1e-5,
         err_msg="Distances should match closely",
     )
+
+
+def test_transform():
+    n_rows = 5000
+    n_cols = 32
+    n_lists = 50
+    pq_bits = 8
+    pq_dim = 8
+    dtype = np.float32
+
+    # build the ivf-pq index
+    dataset = generate_data((n_rows, n_cols), dtype)
+    dataset_device = device_ndarray(dataset)
+
+    build_params = ivf_pq.IndexParams(
+        n_lists=n_lists,
+        pq_bits=pq_bits,
+        pq_dim=pq_dim,
+    )
+    index = ivf_pq.build(build_params, dataset_device)
+
+    # test out the ivf_pq.transform function - by transforming
+    # the input dataset ,and making sure the transformed data
+    # matches the encoded version stored with the index
+
+    # collect the pq-encoded data from the index for the expected data
+    labels_exp = np.zeros((n_rows), dtype="uint32")
+    transformed_exp = np.zeros((n_rows, pq_dim), dtype="uint8")
+    for cluster_id in range(n_lists):
+        ids = index.list_indices(cluster_id).copy_to_host()
+        labels_exp[ids] = cluster_id
+        transformed_exp[ids] = index.list_data(cluster_id).copy_to_host()
+
+    # call transform to get actual results, and make sure we're equal to expected values
+    labels, transformed = ivf_pq.transform(index, dataset_device)
+
+    np.testing.assert_array_equal(labels.copy_to_host(), labels_exp)
+    np.testing.assert_allclose(
+        transformed.copy_to_host(), transformed_exp, rtol=1e-6
+    )

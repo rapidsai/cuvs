@@ -1038,7 +1038,7 @@ void extend(raft::resources const& handle,
       auto centers_view = raft::make_device_matrix_view<const float, internal_extents_t>(
         cluster_centers.data(), n_clusters, index->dim());
       cuvs::cluster::kmeans::balanced_params kmeans_params;
-      kmeans_params.metric = static_cast<cuvs::distance::DistanceType>((int)index->metric());
+      kmeans_params.metric = index->metric();
       cuvs::cluster::kmeans::predict(
         handle, kmeans_params, batch_data_view, centers_view, batch_labels_view);
       vec_batches.prefetch_next_batch();

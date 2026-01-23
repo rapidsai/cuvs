@@ -584,6 +584,29 @@ cuvsError_t cuvsIvfPqExtend(cuvsResources_t res,
 /**
  * @}
  */
+
+/**
+ * @defgroup ivf_pq_c_index_transform IVF-PQ index transform
+ * @{
+ */
+/**
+ * @brief Transform the input data by applying pq-encoding
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] index IVF-PQ index
+ * @param[in] input_dataset DLManagedTensor* vectors to transform
+ * @param[out] output_labels DLManagedTensor* Vector of cluster labels for each vector in the input
+ * @param[out] output_dataset DLManagedTensor* input vectors after pq-encoding
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfPqTransform(cuvsResources_t res,
+                               cuvsIvfPqIndex_t index,
+                               DLManagedTensor* input_dataset,
+                               DLManagedTensor* output_labels,
+                               DLManagedTensor* output_dataset);
+/**
+ * @}
+ */
 #ifdef __cplusplus
 }
 #endif
