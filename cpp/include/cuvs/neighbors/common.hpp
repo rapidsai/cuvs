@@ -711,11 +711,52 @@ template <typename IdxT>
 constexpr static IdxT kInvalidRecord =
   (std::is_signed_v<IdxT> ? IdxT{0} : std::numeric_limits<IdxT>::max()) - 1;
 
+/**
+ * Abstract base class for IVF list data.
+ * This allows polymorphic access to list data regardless of the underlying layout.
+ *
+ * @tparam ValueT The data element type (e.g., uint8_t for PQ codes, float for raw vectors)
+ * @tparam IdxT The index type for source indices
+ * @tparam SizeT The size type
+ *
+ * TODO: Make this struct internal (tracking issue: https://github.com/rapidsai/cuvs/issues/1726)
+ */
+template <typename ValueT, typename IdxT, typename SizeT = uint32_t>
+struct list_base {
+  using value_type = ValueT;
+  using index_type = IdxT;
+  using size_type  = SizeT;
+
+  virtual ~list_base() = default;
+
+  /** Get the raw data pointer. */
+  virtual value_type* data_ptr() noexcept             = 0;
+  virtual const value_type* data_ptr() const noexcept = 0;
+
+  /** Get the indices pointer. */
+  virtual index_type* indices_ptr() noexcept             = 0;
+  virtual const index_type* indices_ptr() const noexcept = 0;
+
+  /** Get the current size (number of records). */
+  virtual size_type get_size() const noexcept = 0;
+
+  /** Set the current size (number of records). */
+  virtual void set_size(size_type new_size) noexcept = 0;
+
+  /** Get the total size of the data array in bytes. */
+  virtual size_t data_byte_size() const noexcept = 0;
+
+  /** Get the capacity (number of indices that can be stored). */
+  virtual size_type indices_capacity() const noexcept = 0;
+};
+
 /** The data for a single IVF list. */
 template <template <typename, typename...> typename SpecT,
           typename SizeT,
           typename... SpecExtraArgs>
-struct list {
+struct list : public list_base<typename SpecT<SizeT, SpecExtraArgs...>::value_type,
+                               typename SpecT<SizeT, SpecExtraArgs...>::index_type,
+                               SizeT> {
   using size_type    = SizeT;
   using spec_type    = SpecT<size_type, SpecExtraArgs...>;
   using value_type   = typename spec_type::value_type;
@@ -731,6 +772,18 @@ struct list {
 
   /** Allocate a new list capable of holding at least `n_rows` data records and indices. */
   list(raft::resources const& res, const spec_type& spec, size_type n_rows);
+
+  value_type* data_ptr() noexcept override { return data.data_handle(); }
+  const value_type* data_ptr() const noexcept override { return data.data_handle(); }
+
+  index_type* indices_ptr() noexcept override { return indices.data_handle(); }
+  const index_type* indices_ptr() const noexcept override { return indices.data_handle(); }
+
+  size_type get_size() const noexcept override { return size.load(); }
+  void set_size(size_type new_size) noexcept override { size.store(new_size); }
+
+  size_t data_byte_size() const noexcept override { return data.size() * sizeof(value_type); }
+  size_type indices_capacity() const noexcept override { return indices.extent(0); }
 };
 
 template <typename ListT, class T = void>
@@ -755,6 +808,10 @@ using enable_if_valid_list_t = typename enable_if_valid_list<ListT, T>::type;
 /**
  * Resize a list by the given id, so that it can contain the given number of records;
  * copy the data if necessary.
+ *
+ * @note This is an internal function that requires the concrete list type.
+ *       For IVF-PQ indexes, prefer using the helper functions in
+ *       `cuvs::neighbors::ivf_pq::helpers::resize_list` which handle type casting internally.
  */
 template <typename ListT>
 void resize_list(raft::resources const& res,
@@ -763,6 +820,15 @@ void resize_list(raft::resources const& res,
                  typename ListT::size_type new_used_size,
                  typename ListT::size_type old_used_size);
 
+/**
+ * Serialize a list to an output stream.
+ *
+ * @note This function requires the concrete list type (not the base class) because:
+ *       1. It needs access to the spec_type to determine the data layout for serialization
+ *       2. The serialized format depends on the spec's make_list_extents() method
+ *       When calling from code that only has a base class pointer, use std::static_pointer_cast
+ *       to obtain the typed pointer first.
+ */
 template <typename ListT>
 enable_if_valid_list_t<ListT> serialize_list(
   const raft::resources& handle,
@@ -770,6 +836,7 @@ enable_if_valid_list_t<ListT> serialize_list(
   const ListT& ld,
   const typename ListT::spec_type& store_spec,
   std::optional<typename ListT::size_type> size_override = std::nullopt);
+
 template <typename ListT>
 enable_if_valid_list_t<ListT> serialize_list(
   const raft::resources& handle,
