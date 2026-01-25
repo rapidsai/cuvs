@@ -71,6 +71,7 @@ class BenchmarkOrchestrator:
         
         # Get classes from registry
         self.backend_class = get_backend_class(backend_type)
+        # Get the config loader for this specific backend
         loader_class = get_config_loader(backend_type)
         
         # Instantiate config loader

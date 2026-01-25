@@ -163,17 +163,17 @@ class CppGBenchConfigLoader(ConfigLoader):
     All the C++ specific preprocessing logic from run.py is encapsulated here.
     """
     
-    def __init__(self, scripts_path: Optional[str] = None):
+    def __init__(self, config_path: Optional[str] = None):
         """
         Initialize the config loader.
         
         Parameters
         ----------
-        scripts_path : Optional[str]
-            Path to scripts directory. If None, uses default path.
+        config_path : Optional[str]
+            Path to config directory. If None, uses default path.
         """
-        self.scripts_path = scripts_path or os.path.join(
-            os.path.dirname(os.path.realpath(__file__)), "../run"
+        self.config_path = config_path or os.path.join(
+            os.path.dirname(os.path.realpath(__file__)), "../config"
         )
         self._gpu_present: Optional[bool] = None
     
@@ -237,12 +237,12 @@ class CppGBenchConfigLoader(ConfigLoader):
         Tuple[DatasetConfig, List[BenchmarkConfig]]
             Dataset config and list of benchmark configs
         """
-        scripts_path = self.scripts_path
+        config_path = self.config_path
         
         # Load dataset configuration
         dataset_conf_all = self.load_yaml_file(
             dataset_configuration
-            or os.path.join(scripts_path, "../config/datasets", "datasets.yaml")
+            or os.path.join(config_path, "datasets", "datasets.yaml")
         )
         dataset_conf = self.get_dataset_configuration(dataset, dataset_conf_all)
         
@@ -264,7 +264,7 @@ class CppGBenchConfigLoader(ConfigLoader):
         conf_file["search_basic_param"] = {"k": count, "batch_size": batch_size}
         
         # Gather and load algorithm configs
-        algos_conf_fs = self.gather_algorithm_configs(scripts_path, configuration)
+        algos_conf_fs = self.gather_algorithm_configs(config_path, configuration)
         
         allowed_algos = algorithms.split(",") if algorithms else None
         allowed_groups = groups.split(",") if groups else None
@@ -283,7 +283,7 @@ class CppGBenchConfigLoader(ConfigLoader):
         
         # Load algorithms.yaml for executable info
         algos_yaml = self.load_yaml_file(
-            os.path.join(scripts_path, "../config", "algorithms.yaml")
+            os.path.join(config_path, "algorithms.yaml")
         )
         
         # Prepare executables and convert to BenchmarkConfig list
@@ -395,7 +395,7 @@ class CppGBenchConfigLoader(ConfigLoader):
         return benchmark_configs
     
     # =========================================================================
-    # Helper methods (copied from run.py as-is)
+    # `Helper methods (copied from run.py as-is)`
     # =========================================================================
     
     def load_yaml_file(self, file_path: str) -> dict:
@@ -442,15 +442,15 @@ class CppGBenchConfigLoader(ConfigLoader):
         raise ValueError("Could not find a dataset configuration")
     
     def gather_algorithm_configs(
-        self, scripts_path: str, configuration: Optional[str]
+        self, config_path: str, configuration: Optional[str]
     ) -> list:
         """
         Gather the list of algorithm configuration files.
 
         Parameters
         ----------
-        scripts_path : str
-            The path to the script directory.
+        config_path : str
+            The path to the config directory.
         configuration : Optional[str]
             The path to the algorithm configuration directory or file.
 
@@ -460,10 +460,10 @@ class CppGBenchConfigLoader(ConfigLoader):
             A list of paths to the algorithm configuration files.
         """
         algos_conf_fs = os.listdir(
-            os.path.join(scripts_path, "../config", "algos")
+            os.path.join(config_path, "algos")
         )
         algos_conf_fs = [
-            os.path.join(scripts_path, "../config", "algos", f)
+            os.path.join(config_path, "algos", f)
             for f in algos_conf_fs
             if ".json" not in f
             and "constraint" not in f

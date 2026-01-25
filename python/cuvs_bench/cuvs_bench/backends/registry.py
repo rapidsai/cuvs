@@ -448,6 +448,7 @@ def get_config_loader(name: str) -> Type:
     ValueError
         If config loader is not registered
     """
+    # _CONFIG_LOADER_REGISTRY is a dictionary that maps backend names to config loader classes
     if name not in _CONFIG_LOADER_REGISTRY:
         available = ", ".join(_CONFIG_LOADER_REGISTRY.keys()) or "none"
         raise ValueError(
