@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs;
@@ -23,8 +23,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Integration tests for CAGRA index using ACE (Augmented Core Extraction) build algorithm.
- * ACE enables building indices for datasets too large to fit in GPU memory by partitioning
- * the dataset and building sub-indices.
+ * ACE enables building indexes for datasets too large to fit in GPU memory by partitioning
+ * the dataset and building sub-indexes.
  *
  * @since 25.12
  */

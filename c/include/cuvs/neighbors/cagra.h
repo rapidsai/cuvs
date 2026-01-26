@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -127,23 +127,30 @@ typedef struct cuvsIvfPqParams* cuvsIvfPqParams_t;
 
 /**
  * Parameters for ACE (Augmented Core Extraction) graph build.
- * ACE enables building indices for datasets too large to fit in GPU memory by:
+ * ACE enables building indexes for datasets too large to fit in GPU memory by:
  * 1. Partitioning the dataset in core (closest) and augmented (second-closest)
  * partitions using balanced k-means.
- * 2. Building sub-indices for each partition independently
+ * 2. Building sub-indexes for each partition independently
  * 3. Concatenating sub-graphs into a final unified index
  */
 struct cuvsAceParams {
   /**
    * Number of partitions for ACE (Augmented Core Extraction) partitioned build.
    *
+   * When set to 0 (default), the number of partitions is automatically derived
+   * based on available host and GPU memory to maximize partition size while
+   * ensuring the build fits in memory.
+   *
    * Small values might improve recall but potentially degrade performance and
    * increase memory usage. Partitions should not be too small to prevent issues
-   * in KNN graph construction. 100k - 5M vectors per partition is recommended
-   * depending on the available host and GPU memory. The partition size is on
-   * average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because of the
-   * core and augmented vectors. Please account for imbalance in the partition
-   * sizes (up to 3x in our tests).
+   * in KNN graph construction. The partition size is on average 2 * (n_rows /
+   * npartitions) * dim * sizeof(T). 2 is because of the core and augmented
+   * vectors. Please account for imbalance in the partition sizes (up to 3x in
+   * our tests).
+   *
+   * If the specified number of partitions results in partitions that exceed
+   * available memory, the value will be automatically increased to fit memory
+   * constraints and a warning will be issued.
    */
   size_t npartitions;
   /**
@@ -167,6 +174,22 @@ struct cuvsAceParams {
    * When true, enables disk-based operations for memory-efficient graph construction.
    */
   bool use_disk;
+  /**
+   * Maximum host memory to use for ACE build in GiB.
+   *
+   * When set to 0 (default), uses available host memory.
+   * When set to a positive value, limits host memory usage to the specified amount.
+   * Useful for testing or when running alongside other memory-intensive processes.
+   */
+  double max_host_memory_gb;
+  /**
+   * Maximum GPU memory to use for ACE build in GiB.
+   *
+   * When set to 0 (default), uses available GPU memory.
+   * When set to a positive value, limits GPU memory usage to the specified amount.
+   * Useful for testing or when running alongside other memory-intensive processes.
+   */
+  double max_gpu_memory_gb;
 };
 
 typedef struct cuvsAceParams* cuvsAceParams_t;
@@ -234,22 +257,6 @@ cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionParams_t* param
  * @return cuvsError_t
  */
 cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t params);
-
-/**
- * @brief Allocate ACE params, and populate with default values
- *
- * @param[in] params cuvsAceParams_t to allocate
- * @return cuvsError_t
- */
-cuvsError_t cuvsAceParamsCreate(cuvsAceParams_t* params);
-
-/**
- * @brief De-allocate ACE params
- *
- * @param[in] params
- * @return cuvsError_t
- */
-cuvsError_t cuvsAceParamsDestroy(cuvsAceParams_t params);
 
 /**
  * @brief Allocate ACE params, and populate with default values

@@ -5,6 +5,7 @@ channels:
 - rapidsai
 - conda-forge
 dependencies:
+- _go_select *=cgo
 - c-compiler
 - clang-tools==20.1.4
 - clang==20.1.4
@@ -13,19 +14,19 @@ dependencies:
 - cuda-nvcc
 - cuda-nvtx-dev
 - cuda-profiler-api
-- cuda-version=13.0
+- cuda-version=13.1
 - cxx-compiler
+- dlpack>=0.8,<1.0
 - gcc_linux-aarch64=14.*
+- go
 - libclang==20.1.4
 - libcublas-dev
 - libcurand-dev
 - libcusolver-dev
 - libcusparse-dev
-- libcuvs==26.2.*,>=0.0.0a0
-- libraft==26.2.*,>=0.0.0a0
-- make
+- libcuvs==26.4.*,>=0.0.0a0
+- libraft==26.4.*,>=0.0.0a0
 - nccl>=2.19
 - ninja
-- rust
 - sysroot_linux-aarch64==2.28
-name: rust_cuda-130_arch-aarch64
+name: go_cuda-131_arch-aarch64

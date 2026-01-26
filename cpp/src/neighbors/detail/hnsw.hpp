@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -24,6 +24,7 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <new>
 #include <random>
 #include <sys/mman.h>
 #include <thread>
@@ -96,7 +97,11 @@ struct index_impl : index<T> {
   /**
   @brief Set ef for search
   */
-  void set_ef(int ef) const override { appr_alg_->ef_ = ef; }
+  void set_ef(int ef) const override
+  {
+    ensure_loaded();
+    appr_alg_->ef_ = ef;
+  }
 
   /**
   @brief Set index
@@ -136,8 +141,42 @@ struct index_impl : index<T> {
     return "";
   }
 
+  /**
+  @brief Ensure the index is loaded into memory.
+         If the index is disk-backed and not yet loaded, this will load it from the file.
+   */
+  void ensure_loaded() const
+  {
+    if (appr_alg_ != nullptr) { return; }  // Already loaded
+
+    // Check if we have a file descriptor to load from
+    if (!hnsw_fd_.has_value() || !hnsw_fd_->is_valid()) {
+      RAFT_FAIL("Cannot load HNSW index: no file descriptor available and index not in memory");
+    }
+
+    std::string filepath = hnsw_fd_->get_path();
+    RAFT_EXPECTS(!filepath.empty(), "Cannot load HNSW index: file path is empty");
+    RAFT_EXPECTS(std::filesystem::exists(filepath),
+                 "Cannot load HNSW index: file does not exist: %s",
+                 filepath.c_str());
+
+    RAFT_LOG_INFO("Loading HNSW index from disk: %s", filepath.c_str());
+
+    try {
+      appr_alg_ = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
+        space_.get(), filepath);
+      if (this->hierarchy() == HnswHierarchy::NONE) { appr_alg_->base_layer_only = true; }
+    } catch (const std::bad_alloc& e) {
+      RAFT_FAIL(
+        "Failed to load HNSW index from '%s': insufficient host memory. "
+        "The index is too large to fit in available RAM. "
+        "Consider using a machine with more memory or reducing the dataset size.",
+        filepath.c_str());
+    }
+  }
+
  private:
-  std::unique_ptr<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>> appr_alg_;
+  mutable std::unique_ptr<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>> appr_alg_;
   std::unique_ptr<hnswlib::SpaceInterface<typename hnsw_dist_t<T>::type>> space_;
   std::optional<cuvs::util::file_descriptor> hnsw_fd_;
 };
@@ -1090,10 +1129,10 @@ void extend(raft::resources const& res,
             raft::host_matrix_view<const T, int64_t, raft::row_major> additional_dataset,
             index<T>& idx)
 {
+  // If the index is disk-backed, load it into memory first
   auto* idx_impl = dynamic_cast<index_impl<T>*>(&idx);
-  RAFT_EXPECTS(!idx_impl || !idx_impl->file_descriptor().has_value(),
-               "Cannot extend an HNSW index that is stored on disk. "
-               "The index must be deserialized into memory first using hnsw::deserialize().");
+  if (idx_impl) { idx_impl->ensure_loaded(); }
+
   auto* hnswlib_index = reinterpret_cast<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>*>(
     const_cast<void*>(idx.get_index()));
   auto current_element_count = hnswlib_index->getCurrentElementCount();
@@ -1135,10 +1174,9 @@ void search(raft::resources const& res,
             raft::host_matrix_view<uint64_t, int64_t, raft::row_major> neighbors,
             raft::host_matrix_view<float, int64_t, raft::row_major> distances)
 {
+  // If the index is disk-backed, load it into memory first
   auto* idx_impl = dynamic_cast<const index_impl<T>*>(&idx);
-  RAFT_EXPECTS(!idx_impl || !idx_impl->file_descriptor().has_value(),
-               "Cannot search an HNSW index that is stored on disk. "
-               "The index must be deserialized into memory first using hnsw::deserialize().");
+  if (idx_impl) { idx_impl->ensure_loaded(); }
 
   RAFT_EXPECTS(queries.extent(0) == neighbors.extent(0) && queries.extent(0) == distances.extent(0),
                "Number of rows in output neighbors and distances matrices must equal the number of "
@@ -1180,9 +1218,24 @@ template <typename T>
 void serialize(raft::resources const& res, const std::string& filename, const index<T>& idx)
 {
   auto* idx_impl = dynamic_cast<const index_impl<T>*>(&idx);
-  RAFT_EXPECTS(!idx_impl || !idx_impl->file_descriptor().has_value(),
-               "Cannot serialize an HNSW index that is stored on disk. "
-               "The index must be deserialized into memory first using hnsw::deserialize().");
+
+  // Check if this is a disk-based index (created from disk-backed CAGRA)
+  if (idx_impl && idx_impl->file_descriptor().has_value()) {
+    // For disk-based indexes, copy the existing file to the new location
+    std::string source_path = idx_impl->file_path();
+    RAFT_EXPECTS(!source_path.empty(), "Disk-based index has invalid file path");
+    RAFT_EXPECTS(std::filesystem::exists(source_path),
+                 "Disk-based index file does not exist: %s",
+                 source_path.c_str());
+
+    // Copy the file to the new location
+    std::filesystem::copy_file(
+      source_path, filename, std::filesystem::copy_options::overwrite_existing);
+    RAFT_LOG_INFO(
+      "Copied disk-based HNSW index from %s to %s", source_path.c_str(), filename.c_str());
+    return;
+  }
+
   auto* hnswlib_index = reinterpret_cast<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>*>(
     const_cast<void*>(idx.get_index()));
   hnswlib_index->saveIndex(filename);
@@ -1196,12 +1249,71 @@ void deserialize(raft::resources const& res,
                  cuvs::distance::DistanceType metric,
                  index<T>** idx)
 {
-  auto hnsw_index = std::make_unique<index_impl<T>>(dim, metric, params.hierarchy);
-  auto appr_algo  = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
-    hnsw_index->get_space(), filename);
-  if (params.hierarchy == HnswHierarchy::NONE) { appr_algo->base_layer_only = true; }
-  hnsw_index->set_index(std::move(appr_algo));
-  *idx = hnsw_index.release();
+  try {
+    auto hnsw_index = std::make_unique<index_impl<T>>(dim, metric, params.hierarchy);
+    auto appr_algo  = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
+      hnsw_index->get_space(), filename);
+    if (params.hierarchy == HnswHierarchy::NONE) { appr_algo->base_layer_only = true; }
+    hnsw_index->set_index(std::move(appr_algo));
+    *idx = hnsw_index.release();
+  } catch (const std::bad_alloc& e) {
+    RAFT_FAIL(
+      "Failed to deserialize HNSW index from '%s': insufficient host memory. "
+      "The index is too large to fit in available RAM. "
+      "Consider using a machine with more memory or reducing the dataset size.",
+      filename.c_str());
+  }
+}
+
+/**
+ * @brief Build an HNSW index on the GPU using CAGRA graph building algorithm
+ *
+ * This function builds an HNSW index
+ * 1. Converting HNSW parameters to CAGRA parameters (ACE configuration by default)
+ * 2. Building a CAGRA index
+ * 3. Converting the CAGRA index to HNSW format
+ */
+template <typename T>
+std::unique_ptr<index<T>> build(raft::resources const& res,
+                                const index_params& params,
+                                raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)
+{
+  common::nvtx::range<common::nvtx::domain::cuvs> fun_scope("hnsw::build<ACE>");
+
+  // Use provided ACE parameters or default ones if not specified
+  auto ace_params =
+    std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params)
+      ? std::get<graph_build_params::ace_params>(params.graph_build_params)
+      : graph_build_params::ace_params{};
+
+  // Create CAGRA index parameters from HNSW parameters
+  cuvs::neighbors::cagra::index_params cagra_params;
+  cagra_params.metric                    = params.metric;
+  cagra_params.intermediate_graph_degree = params.M * 3;
+  cagra_params.graph_degree              = params.M * 2;
+
+  // Configure ACE parameters for CAGRA
+  cuvs::neighbors::cagra::graph_build_params::ace_params cagra_ace_params;
+  cagra_ace_params.npartitions        = ace_params.npartitions;
+  cagra_ace_params.ef_construction    = params.ef_construction;
+  cagra_ace_params.build_dir          = ace_params.build_dir;
+  cagra_ace_params.use_disk           = ace_params.use_disk;
+  cagra_ace_params.max_host_memory_gb = ace_params.max_host_memory_gb;
+  cagra_ace_params.max_gpu_memory_gb  = ace_params.max_gpu_memory_gb;
+  cagra_params.graph_build_params     = cagra_ace_params;
+
+  RAFT_LOG_INFO(
+    "hnsw::build - Building HNSW index using ACE with %zu partitions, ef_construction=%zu",
+    ace_params.npartitions,
+    ace_params.ef_construction);
+
+  // Build CAGRA index using ACE
+  auto cagra_index = cuvs::neighbors::cagra::build(res, cagra_params, dataset);
+
+  RAFT_LOG_INFO("hnsw::build - Converting CAGRA index to HNSW format");
+
+  // Convert CAGRA index to HNSW index
+  return from_cagra<T>(res, params, cagra_index, dataset);
 }
 
 }  // namespace cuvs::neighbors::hnsw::detail
