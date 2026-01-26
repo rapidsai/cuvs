@@ -129,7 +129,7 @@ struct distance_params {
 /** Specialized parameters to build the Mutual Reachability graph */
 struct mutual_reachability_params {
   /** this neighborhood will be selected for core distances. */
-  int min_samples;
+  int min_samples = 5;
 
   /** weight applied when internal distance is chosen for mutual reachability (value of 1.0 disables
    * the weighting) */
