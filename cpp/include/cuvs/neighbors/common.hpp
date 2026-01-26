@@ -485,7 +485,7 @@ namespace filtering {
 enum class FilterType { None, Bitmap, Bitset };
 
 struct base_filter {
-  ~base_filter()                             = default;
+  virtual ~base_filter()                     = default;
   virtual FilterType get_filter_type() const = 0;
 };
 
@@ -891,7 +891,7 @@ struct mg_index {
   auto operator=(mg_index&&) -> mg_index&      = default;
 
   distribution_mode mode_;
-  int num_ranks_;
+  int num_ranks_ = 0;
   std::vector<iface<AnnIndexType, T, IdxT>> ann_interfaces_;
 
   // for load balancing mechanism
