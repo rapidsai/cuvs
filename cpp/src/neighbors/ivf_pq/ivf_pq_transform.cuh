@@ -59,6 +59,9 @@ void transform(raft::resources const& res,
   RAFT_EXPECTS(output_dataset.extent(1) == index.pq_dim(),
                "incorrect number of cols in output_dataset");
 
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
+    "ivf_pq::transform(n_rows = %u, dim = %u)", n_rows, dataset.extent(1));
+
   rmm::device_async_resource_ref mr = raft::resource::get_workspace_resource(res);
 
   // The cluster centers in the index are stored padded, which is not acceptable by

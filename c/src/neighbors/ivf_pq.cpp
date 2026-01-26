@@ -231,7 +231,7 @@ void _get_list_indices(cuvsIvfPqIndex index,
   }
 }
 
-template <typename IdxT>
+template <typename T, typename IdxT>
 void _transform(cuvsResources_t res,
                                   cuvsIvfPqIndex index,
              DLManagedTensor* input_dataset,
@@ -241,7 +241,7 @@ void _transform(cuvsResources_t res,
   auto index_ptr    = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
   auto res_ptr      = reinterpret_cast<raft::resources*>(res);
 
-  using input_mdspan_type = raft::device_matrix_view<const float, IdxT, raft::row_major>;
+  using input_mdspan_type = raft::device_matrix_view<const T, IdxT, raft::row_major>;
   using labels_mdspan_type = raft::device_vector_view<uint32_t, IdxT, raft::row_major>;
   using output_mdspan_type = raft::device_matrix_view<uint8_t, IdxT, raft::row_major>;
 
@@ -608,16 +608,26 @@ extern "C" cuvsError_t cuvsIvfPqTransform(cuvsResources_t res,
                    "output_dataset should have device compatible memory");
 
       // Verify dtypes of inputs
-      auto& input_dataset_dl = input_dataset->dl_tensor;
-      RAFT_EXPECTS(input_dataset_dl.dtype.code == kDLFloat && input_dataset_dl.dtype.bits == 32,
-                   "input_dataset must have a float32 dtype");
       auto& output_labels_dl = output_labels->dl_tensor;
       RAFT_EXPECTS(output_labels_dl.dtype.code == kDLUInt && output_labels_dl.dtype.bits == 32,
                    "output_labels must have a uint32 dtype ");
       auto& output_dataset_dl = output_dataset->dl_tensor;
       RAFT_EXPECTS(output_dataset_dl.dtype.code == kDLUInt && output_dataset_dl.dtype.bits == 8,
-                   "output_labels must have a uint8 dtype");
+                   "output_dataset must have a uint8 dtype");
 
-      _transform<int64_t>(res, *index, input_dataset, output_labels, output_dataset);
+      auto & dataset = input_dataset->dl_tensor;
+      if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
+        _transform<float, int64_t>(res, *index, input_dataset, output_labels, output_dataset);
+      } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 16) {
+        _transform<half, int64_t>(res, *index, input_dataset, output_labels, output_dataset);
+      } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
+        _transform<int8_t, int64_t>(res, *index, input_dataset, output_labels, output_dataset);
+      } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
+        _transform<uint8_t, int64_t>(res, *index, input_dataset, output_labels, output_dataset);
+      } else {
+        RAFT_FAIL("Unsupported input_dataset DLtensor dtype: %d and bits: %d",
+                  dataset.dtype.code,
+                  dataset.dtype.bits);
+      }
     });
 }

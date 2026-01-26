@@ -986,7 +986,7 @@ def extend(Index index, new_vectors, new_indices, resources=None):
 @auto_sync_resources
 def transform(Index index, input_dataset, output_labels=None, output_dataset=None, resources=None):
     """
-    Transform a dataset by appyling pq-encoded to the vectors.
+    Transform a dataset by applying pq-encoding to the vectors.
 
 
     Parameters
@@ -997,7 +997,7 @@ def transform(Index index, input_dataset, output_labels=None, output_dataset=Non
         Supported dtype [float]
     new_indices : Optional array interface compliant vector shape (n_samples)
         Supported dtype [uint32]
-    output_dataset : Optional array  interface compliant matrix shape (n_samples, pq_dim)
+    output_dataset : Optional array interface compliant matrix shape (n_samples, pq_dim)
         Supported dtype [uint8]
 
     {resources_docstring}
@@ -1009,8 +1009,8 @@ def transform(Index index, input_dataset, output_labels=None, output_dataset=Non
     """
 
     input_dataset_ai = wrap_array(input_dataset)
-    _check_input_array(input_dataset_ai, [np.dtype('float32')])
-
+    _check_input_array(input_dataset_ai, [np.dtype('float32'), np.dtype('float16'),
+                                          np.dtype('int8'), np.dtype('uint8')])
 
     cdef uint32_t n_samples = input_dataset_ai.shape[0]
     cdef uint32_t pq_dim = index.pq_dim
