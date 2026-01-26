@@ -16,8 +16,8 @@ from typing import Any, Dict, List, Optional, Union
 import numpy as np
 
 from ..backends.base import BenchmarkBackend, Dataset, BuildResult, SearchResult
+from ..backends.registry import get_backend_class, get_config_loader, list_backends
 from .config_loaders import ConfigLoader, BenchmarkConfig, DatasetConfig, IndexConfig
-from .registry import get_backend_class, get_config_loader, list_backends
 
 
 class BenchmarkOrchestrator:
