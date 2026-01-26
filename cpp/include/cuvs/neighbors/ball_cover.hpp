@@ -135,7 +135,7 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix<float, int64_t, raft::row_major> X_reordered;
 
  protected:
-  bool index_trained;
+  bool index_trained = false;
 };
 
 /** @} */
