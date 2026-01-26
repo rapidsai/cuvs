@@ -38,12 +38,8 @@ __launch_bounds__(BlockSize) static __global__ void transform_codes_kernel(
     encode_vectors<kSubWarpSize, IdxT>{pq_centers, dataset_residual, codebook_kind, cluster_ix};
   const uint32_t pq_dim = dataset_residual.extent(1) / pq_centers.extent(1);
 
-  for (uint32_t j = 0; j < pq_dim; j++) {
-    uint8_t code = encoder(row_ix, j);
-    if (lane_id == 0) { output_dataset(row_ix, j) = code; }
-
-    // TODO: do we want one code per byte (like here) or do we want tightly packed matrices?
-  }
+  write_vector_flat<PqBits, kSubWarpSize, IdxT>(
+    output_dataset.data_handle(), row_ix, row_ix, pq_dim, output_dataset.extent(1), encoder);
 }
 
 template <typename T, typename IdxT>
@@ -107,7 +103,6 @@ void transform(raft::resources const& res,
                                   index.metric());
 
   // Launch kernel to transform the code output
-  // TODO: incorporate tarang's PR, rather than launch new kernel for this
   constexpr uint32_t kBlockSize  = 256;
   const uint32_t threads_per_vec = std::min<uint32_t>(raft::WarpSize, index.pq_book_size());
   dim3 blocks(raft::div_rounding_up_safe<IdxT>(n_rows, kBlockSize / threads_per_vec), 1, 1);
