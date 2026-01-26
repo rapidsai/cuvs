@@ -1242,7 +1242,7 @@ void extend(
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   auto additional_dataset = raft::make_device_matrix<half, int64_t>(handle,add_size,dim);
  *   // set_additional_dataset(additional_dataset.view());
  *
@@ -1280,7 +1280,7 @@ void extend(
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   auto additional_dataset = raft::make_host_matrix<half, int64_t>(handle,add_size,dim);
  *   // set_additional_dataset(additional_dataset.view());
  *
@@ -1318,7 +1318,7 @@ void extend(
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   auto additional_dataset = raft::make_device_matrix<int8_t, int64_t>(handle,add_size,dim);
  *   // set_additional_dataset(additional_dataset.view());
  *
