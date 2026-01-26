@@ -336,7 +336,8 @@ def test_build_precomputed(codebook_kind, metric):
     )
 
 
-def test_transform():
+@pytest.mark.parametrize("codebook_kind", ["subspace", "cluster"])
+def test_transform(codebook_kind):
     n_rows = 5000
     n_cols = 32
     n_lists = 50
@@ -352,6 +353,7 @@ def test_transform():
         n_lists=n_lists,
         pq_bits=pq_bits,
         pq_dim=pq_dim,
+        codebook_kind=codebook_kind,
     )
     index = ivf_pq.build(build_params, dataset_device)
 
