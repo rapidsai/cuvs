@@ -23,9 +23,18 @@ extern "C" {
  * @brief A type for specifying how PQ codebooks are created
  *
  */
-enum codebook_gen {  // NOLINT
-  PER_SUBSPACE = 0,  // NOLINT
-  PER_CLUSTER  = 1,  // NOLINT
+enum cuvsIvfPqCodebookGen {
+  CUVS_IVF_PQ_CODEBOOK_GEN_PER_SUBSPACE = 0,
+  CUVS_IVF_PQ_CODEBOOK_GEN_PER_CLUSTER  = 1,
+};
+
+/**
+ * @brief A type for specifying the memory layout of IVF-PQ list data
+ *
+ */
+enum cuvsIvfPqListLayout {
+  CUVS_IVF_PQ_LIST_LAYOUT_FLAT        = 0,
+  CUVS_IVF_PQ_LIST_LAYOUT_INTERLEAVED = 1,
 };
 
 /**
@@ -80,7 +89,7 @@ struct cuvsIvfPqIndexParams {
    */
   uint32_t pq_dim;
   /** How PQ codebooks are created. */
-  enum codebook_gen codebook_kind;
+  enum cuvsIvfPqCodebookGen codebook_kind;
   /**
    * Apply a random rotation matrix on the input data and queries even if `dim % pq_dim == 0`.
    *
@@ -114,6 +123,14 @@ struct cuvsIvfPqIndexParams {
    * points to train each codebook.
    */
   uint32_t max_train_points_per_pq_code;
+  /**
+   * Memory layout of the IVF-PQ list data.
+   *
+   * - CUVS_IVF_PQ_LIST_LAYOUT_FLAT: Codes are stored contiguously, one vector's codes after another.
+   * - CUVS_IVF_PQ_LIST_LAYOUT_INTERLEAVED: Codes are interleaved for optimized search performance.
+   *   This is the default and recommended for search workloads.
+   */
+  enum cuvsIvfPqListLayout codes_layout;
 };
 
 typedef struct cuvsIvfPqIndexParams* cuvsIvfPqIndexParams_t;
@@ -294,8 +311,8 @@ cuvsError_t cuvsIvfPqIndexGetCentersPadded(cuvsIvfPqIndex_t index, DLManagedTens
 /**
  * @brief Get the PQ cluster centers
  *
- *   - codebook_gen::PER_SUBSPACE: [pq_dim , pq_len, pq_book_size]
- *   - codebook_gen::PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
+ *   - CUVS_IVF_PQ_CODEBOOK_GEN_PER_SUBSPACE: [pq_dim , pq_len, pq_book_size]
+ *   - CUVS_IVF_PQ_CODEBOOK_GEN_PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
  *
  * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
  * @param[out] pq_centers Output tensor that will be populated with a non-owning view of the data
@@ -443,8 +460,8 @@ cuvsError_t cuvsIvfPqBuild(cuvsResources_t res,
  * matrices)
  * @param[in] dim dimensionality of the input data
  * @param[in] pq_centers PQ codebook on device memory with required shape:
- *   - codebook_kind PER_SUBSPACE: [pq_dim, pq_len, pq_book_size]
- *   - codebook_kind PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
+ *   - codebook_kind CUVS_IVF_PQ_CODEBOOK_GEN_PER_SUBSPACE: [pq_dim, pq_len, pq_book_size]
+ *   - codebook_kind CUVS_IVF_PQ_CODEBOOK_GEN_PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
  * @param[in] centers Cluster centers in the original space [n_lists, dim_ext]
  *   where dim_ext = round_up(dim + 1, 8)
  * @param[in] centers_rot Rotated cluster centers [n_lists, rot_dim]

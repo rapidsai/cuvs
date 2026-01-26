@@ -552,8 +552,9 @@ struct reconstruct_vectors {
 template <uint32_t BlockSize, uint32_t PqBits>
 __launch_bounds__(BlockSize) static __global__ void reconstruct_list_data_kernel(
   raft::device_matrix_view<float, uint32_t, raft::row_major> out_vectors,
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    in_list_data,
+  raft::device_mdspan<const uint8_t,
+                      list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                      raft::row_major> in_list_data,
   raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot,
   codebook_gen codebook_kind,
@@ -577,12 +578,16 @@ void reconstruct_list_data(raft::resources const& res,
 {
   auto n_rows = out_vectors.extent(0);
   if (n_rows == 0) { return; }
-  auto& list = index.lists()[label];
+  // Currently only supports interleaved layout
+  RAFT_EXPECTS(index.codes_layout() == list_layout::INTERLEAVED,
+               "reconstruct_list_data currently only supports INTERLEAVED layout");
+  auto& list_data_base_ptr = index.lists()[label];
+  auto typed_list = std::static_pointer_cast<const list_data_interleaved<IdxT>>(list_data_base_ptr);
   if (std::holds_alternative<uint32_t>(offset_or_indices)) {
     auto n_skip = std::get<uint32_t>(offset_or_indices);
     // sic! I'm using the upper bound `list.size` instead of exact `list_sizes(label)`
     // to avoid an extra device-host data raft::copy and the stream sync.
-    RAFT_EXPECTS(n_skip + n_rows <= list->size.load(),
+    RAFT_EXPECTS(n_skip + n_rows <= typed_list->size.load(),
                  "offset + output size must be not bigger than the cluster size.");
   }
 
@@ -605,7 +610,7 @@ void reconstruct_list_data(raft::resources const& res,
     }
   }(index.pq_bits());
   kernel<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(tmp.view(),
-                                                                       list->data.view(),
+                                                                       typed_list->data.view(),
                                                                        index.pq_centers(),
                                                                        index.centers_rot(),
                                                                        index.codebook_kind(),
@@ -652,9 +657,10 @@ void reconstruct_list_data(raft::resources const& res,
 }
 
 template <uint32_t BlockSize, uint32_t PqBits>
-__launch_bounds__(BlockSize) static __global__ void encode_list_data_kernel(
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
+__launch_bounds__(BlockSize) static __global__ void encode_list_data_interleaved_kernel(
+  raft::device_mdspan<uint8_t,
+                      list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                      raft::row_major> list_data,
   raft::device_matrix_view<const float, uint32_t, raft::row_major> new_vectors,
   raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
   codebook_gen codebook_kind,
@@ -667,6 +673,24 @@ __launch_bounds__(BlockSize) static __global__ void encode_list_data_kernel(
     encode_vectors<kSubWarpSize, uint32_t>{pq_centers, new_vectors, codebook_kind, cluster_ix};
   write_list<PqBits, kSubWarpSize>(
     list_data, offset_or_indices, new_vectors.extent(0), pq_dim, encode_action);
+}
+
+template <uint32_t BlockSize, uint32_t PqBits>
+__launch_bounds__(BlockSize) static __global__ void encode_list_data_flat_kernel(
+  uint8_t* list_data,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> new_vectors,
+  raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
+  codebook_gen codebook_kind,
+  uint32_t cluster_ix,
+  std::variant<uint32_t, const uint32_t*> offset_or_indices,
+  uint32_t bytes_per_vector)
+{
+  constexpr uint32_t kSubWarpSize = std::min<uint32_t>(raft::WarpSize, 1u << PqBits);
+  const uint32_t pq_dim           = new_vectors.extent(1) / pq_centers.extent(1);
+  auto encode_action =
+    encode_vectors<kSubWarpSize, uint32_t>{pq_centers, new_vectors, codebook_kind, cluster_ix};
+  write_list_flat<PqBits, kSubWarpSize>(
+    list_data, offset_or_indices, new_vectors.extent(0), pq_dim, bytes_per_vector, encode_action);
 }
 
 template <typename T, typename IdxT>
@@ -698,23 +722,49 @@ void encode_list_data(raft::resources const& res,
   const uint32_t threads_per_vec = std::min<uint32_t>(raft::WarpSize, index->pq_book_size());
   dim3 blocks(raft::div_rounding_up_safe<uint32_t>(n_rows, kBlockSize / threads_per_vec), 1, 1);
   dim3 threads(kBlockSize, 1, 1);
-  auto kernel = [](uint32_t pq_bits) {
-    switch (pq_bits) {
-      case 4: return encode_list_data_kernel<kBlockSize, 4>;
-      case 5: return encode_list_data_kernel<kBlockSize, 5>;
-      case 6: return encode_list_data_kernel<kBlockSize, 6>;
-      case 7: return encode_list_data_kernel<kBlockSize, 7>;
-      case 8: return encode_list_data_kernel<kBlockSize, 8>;
-      default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
-    }
-  }(index->pq_bits());
-  kernel<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
-    index->lists()[label]->data.view(),
-    new_vectors_residual.view(),
-    index->pq_centers(),
-    index->codebook_kind(),
-    label,
-    offset_or_indices);
+
+  if (index->codes_layout() == list_layout::FLAT) {
+    const uint32_t bytes_per_vector =
+      raft::div_rounding_up_safe(index->pq_dim() * index->pq_bits(), 8u);
+    auto kernel = [](uint32_t pq_bits) {
+      switch (pq_bits) {
+        case 4: return encode_list_data_flat_kernel<kBlockSize, 4>;
+        case 5: return encode_list_data_flat_kernel<kBlockSize, 5>;
+        case 6: return encode_list_data_flat_kernel<kBlockSize, 6>;
+        case 7: return encode_list_data_flat_kernel<kBlockSize, 7>;
+        case 8: return encode_list_data_flat_kernel<kBlockSize, 8>;
+        default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
+      }
+    }(index->pq_bits());
+    kernel<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
+      index->lists()[label]->data_ptr(),
+      new_vectors_residual.view(),
+      index->pq_centers(),
+      index->codebook_kind(),
+      label,
+      offset_or_indices,
+      bytes_per_vector);
+  } else {
+    auto kernel = [](uint32_t pq_bits) {
+      switch (pq_bits) {
+        case 4: return encode_list_data_interleaved_kernel<kBlockSize, 4>;
+        case 5: return encode_list_data_interleaved_kernel<kBlockSize, 5>;
+        case 6: return encode_list_data_interleaved_kernel<kBlockSize, 6>;
+        case 7: return encode_list_data_interleaved_kernel<kBlockSize, 7>;
+        case 8: return encode_list_data_interleaved_kernel<kBlockSize, 8>;
+        default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
+      }
+    }(index->pq_bits());
+    auto typed_list = std::static_pointer_cast<list_data_interleaved<IdxT>>(index->lists()[label]);
+    kernel<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
+      typed_list->data.view(),
+      new_vectors_residual.view(),
+      index->pq_centers(),
+      index->codebook_kind(),
+      label,
+      offset_or_indices);
+  }
+
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
@@ -793,11 +843,17 @@ auto extend_list_prepare(
   uint32_t new_size = offset + n_rows;
   raft::copy(
     index->list_sizes().data_handle() + label, &new_size, 1, raft::resource::get_cuda_stream(res));
-  auto spec = list_spec<uint32_t, IdxT>{
-    index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
-  auto& list = index->lists()[label];
-  ivf::resize_list(res, list, spec, new_size, offset);
-  raft::copy(list->indices.data_handle() + offset,
+  auto& list_data_base_ptr = index->lists()[label];
+  if (index->codes_layout() == list_layout::FLAT) {
+    auto spec = list_spec_flat<uint32_t, IdxT>{
+      index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
+    cuvs::neighbors::ivf_pq::helpers::resize_list(res, list_data_base_ptr, spec, new_size, offset);
+  } else {
+    auto spec = list_spec_interleaved<uint32_t, IdxT>{
+      index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
+    cuvs::neighbors::ivf_pq::helpers::resize_list(res, list_data_base_ptr, spec, new_size, offset);
+  }
+  raft::copy(list_data_base_ptr->indices_ptr() + offset,
              new_indices.data_handle(),
              n_rows,
              raft::resource::get_cuda_stream(res));
@@ -822,6 +878,25 @@ void extend_list_with_codes(
   // Pack the data
   pack_list_data(res, index, new_codes, label, offset);
   // Update the pointers and the sizes
+  ivf::detail::recompute_internal_state(res, *index);
+}
+
+/**
+ * Extend one list of the index in-place, by the list label, skipping the classification and
+ * encoding steps. Uses contiguous/packed codes format.
+ * See the public interface for the api and usage.
+ */
+template <typename IdxT>
+void extend_list_with_contiguous_codes(
+  raft::resources const& res,
+  index<IdxT>* index,
+  raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> new_codes,
+  raft::device_vector_view<const IdxT, uint32_t, raft::row_major> new_indices,
+  uint32_t label)
+{
+  uint32_t n_rows = new_indices.extent(0);
+  auto offset     = extend_list_prepare(res, index, new_indices, label);
+  pack_contiguous_list_data(res, index, new_codes.data_handle(), n_rows, label, offset);
   ivf::detail::recompute_internal_state(res, *index);
 }
 
@@ -872,7 +947,8 @@ auto clone(const raft::resources& res, const index<IdxT>& source) -> index<IdxT>
                                                   source.dim(),
                                                   source.pq_bits(),
                                                   source.pq_dim(),
-                                                  source.conservative_memory_allocation());
+                                                  source.conservative_memory_allocation(),
+                                                  source.codes_layout());
 
   // raft::copy the independent parts using mutable accessors
   raft::copy(impl->list_sizes().data_handle(),
@@ -932,17 +1008,24 @@ void extend(raft::resources const& handle,
   rmm::device_async_resource_ref large_memory =
     raft::resource::get_large_workspace_resource(handle);
 
-  // The spec defines how the clusters look like
-  auto spec = list_spec<uint32_t, IdxT>{
-    index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
   // Try to allocate an index with the same parameters and the projected new size
-  // (which can be slightly larger than index->size() + n_rows, due to padding).
+  // (which can be slightly larger than index->size() + n_rows, due to padding for interleaved).
   // If this fails, the index would be too big to fit in the device anyway.
-  std::optional<list_data<IdxT, size_t>> placeholder_list(
-    std::in_place_t{},
-    handle,
-    list_spec<size_t, IdxT>{spec},
-    n_rows + (kIndexGroupSize - 1) * std::min<IdxT>(n_clusters, n_rows));
+  std::optional<list_data_interleaved<IdxT, size_t>> placeholder_list_interleaved;
+  std::optional<raft::device_matrix<uint8_t, IdxT, raft::row_major>> placeholder_list_flat;
+  if (index->codes_layout() == list_layout::FLAT) {
+    auto spec = list_spec_flat<uint32_t, IdxT>{
+      index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
+    placeholder_list_flat.emplace(raft::make_device_matrix<uint8_t, IdxT>(
+      handle, n_rows, static_cast<IdxT>(spec.bytes_per_vector())));
+  } else {
+    auto spec = list_spec_interleaved<uint32_t, IdxT>{
+      index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
+    placeholder_list_interleaved.emplace(
+      handle,
+      list_spec_interleaved<size_t, IdxT>{spec},
+      n_rows + (kIndexGroupSize - 1) * std::min<IdxT>(n_clusters, n_rows));
+  }
 
   // Available device memory
   size_t free_mem = raft::resource::get_workspace_free_bytes(handle);
@@ -1015,7 +1098,8 @@ void extend(raft::resources const& handle,
   // Release the placeholder memory, because we don't intend to allocate any more long-living
   // temporary buffers before we allocate the index data.
   // This memory could potentially speed up UVM accesses, if any.
-  placeholder_list.reset();
+  placeholder_list_interleaved.reset();
+  placeholder_list_flat.reset();
   {
     // The cluster centers in the index are stored padded, which is not acceptable by
     // the kmeans_balanced::predict. Thus, we need the restructuring raft::copy.
@@ -1070,9 +1154,20 @@ void extend(raft::resources const& handle,
     raft::copy(new_cluster_sizes.data(), list_sizes, n_clusters, stream);
     raft::copy(old_cluster_sizes.data(), orig_list_sizes.data(), n_clusters, stream);
     raft::resource::sync_stream(handle);
-    for (uint32_t label = 0; label < n_clusters; label++) {
-      ivf::resize_list(
-        handle, index->lists()[label], spec, new_cluster_sizes[label], old_cluster_sizes[label]);
+    if (index->codes_layout() == list_layout::FLAT) {
+      auto spec = list_spec_flat<uint32_t, IdxT>{
+        index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
+      for (uint32_t label = 0; label < n_clusters; label++) {
+        cuvs::neighbors::ivf_pq::helpers::resize_list(
+          handle, index->lists()[label], spec, new_cluster_sizes[label], old_cluster_sizes[label]);
+      }
+    } else {
+      auto spec = list_spec_interleaved<uint32_t, IdxT>{
+        index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
+      for (uint32_t label = 0; label < n_clusters; label++) {
+        cuvs::neighbors::ivf_pq::helpers::resize_list(
+          handle, index->lists()[label], spec, new_cluster_sizes[label], old_cluster_sizes[label]);
+      }
     }
   }
 
@@ -1147,7 +1242,8 @@ auto build(raft::resources const& handle,
     dim,
     params.pq_bits,
     params.pq_dim == 0 ? index<IdxT>::calculate_pq_dim(dim) : params.pq_dim,
-    params.conservative_memory_allocation);
+    params.conservative_memory_allocation,
+    params.codes_layout);
 
   auto stream = raft::resource::get_cuda_stream(handle);
   utils::memzero(
@@ -1352,7 +1448,8 @@ auto build(raft::resources const& handle,
                                                 pq_centers,
                                                 centers,
                                                 centers_rot,
-                                                rotation_matrix);
+                                                rotation_matrix,
+                                                index_params.codes_layout);
 
   index<IdxT> view_index(std::move(impl));
 
@@ -1402,7 +1499,7 @@ auto extend(
                 n_rows);
 }
 
-// In-place extend for base class pointer (clones, extends, moves back)
+// True in-place extend (does not clone the index)
 template <typename T, typename IdxT, typename accessor, typename accessor2>
 void extend(
   raft::resources const& handle,
@@ -1420,11 +1517,12 @@ void extend(
            "new_vectors and new_indices have different number of rows");
   }
 
-  *index = extend(handle,
-                  *index,
-                  new_vectors.data_handle(),
-                  new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
-                  n_rows);
+  // Call the true in-place extend (line 972) instead of clone-and-replace
+  extend(handle,
+         index,
+         new_vectors.data_handle(),
+         new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
+         n_rows);
 }
 
 template <typename IdxT>
@@ -1451,7 +1549,8 @@ auto build(
                                                   dim,
                                                   index_params.pq_bits,
                                                   pq_dim,
-                                                  index_params.conservative_memory_allocation);
+                                                  index_params.conservative_memory_allocation,
+                                                  index_params.codes_layout);
 
   utils::memzero(
     impl->accum_sorted_sizes().data_handle(), impl->accum_sorted_sizes().size(), stream);

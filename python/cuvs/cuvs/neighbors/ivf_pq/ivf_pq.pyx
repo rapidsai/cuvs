@@ -113,6 +113,15 @@ cdef class IndexParams:
         PER_SUBSPACE and PER_CLUSTER. In both cases, we will use
         pq_book_size * max_train_points_per_pq_code training points to
         train each codebook.
+    codes_layout : string, default = "interleaved"
+        Memory layout of the IVF-PQ list data.
+        Valid values ["flat", "interleaved"]
+
+            - flat: Codes are stored contiguously, one vector's codes after
+              another.
+            - interleaved: Codes are interleaved for optimized search
+              performance. This is the default and recommended for search
+              workloads.
     """
 
     def __cinit__(self):
@@ -134,7 +143,8 @@ cdef class IndexParams:
                  force_random_rotation=False,
                  add_data_on_build=True,
                  conservative_memory_allocation=False,
-                 max_train_points_per_pq_code=256):
+                 max_train_points_per_pq_code=256,
+                 codes_layout="interleaved"):
         self.params.n_lists = n_lists
         self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
         self.params.metric_arg = metric_arg
@@ -143,9 +153,9 @@ cdef class IndexParams:
         self.params.pq_bits = pq_bits
         self.params.pq_dim = pq_dim
         if codebook_kind == "subspace":
-            self.params.codebook_kind = codebook_gen.PER_SUBSPACE
+            self.params.codebook_kind = cuvsIvfPqCodebookGen.CUVS_IVF_PQ_CODEBOOK_GEN_PER_SUBSPACE
         elif codebook_kind == "cluster":
-            self.params.codebook_kind = codebook_gen.PER_CLUSTER
+            self.params.codebook_kind = cuvsIvfPqCodebookGen.CUVS_IVF_PQ_CODEBOOK_GEN_PER_CLUSTER
         else:
             raise ValueError("Incorrect codebook kind %s" % codebook_kind)
         self.params.force_random_rotation = force_random_rotation
@@ -154,6 +164,12 @@ cdef class IndexParams:
             conservative_memory_allocation
         self.params.max_train_points_per_pq_code = \
             max_train_points_per_pq_code
+        if codes_layout == "flat":
+            self.params.codes_layout = cuvsIvfPqListLayout.CUVS_IVF_PQ_LIST_LAYOUT_FLAT
+        elif codes_layout == "interleaved":
+            self.params.codes_layout = cuvsIvfPqListLayout.CUVS_IVF_PQ_LIST_LAYOUT_INTERLEAVED
+        else:
+            raise ValueError("Incorrect codes layout %s" % codes_layout)
 
     def get_handle(self):
         return <size_t> self.params
@@ -209,6 +225,13 @@ cdef class IndexParams:
     @property
     def max_train_points_per_pq_code(self):
         return self.params.max_train_points_per_pq_code
+
+    @property
+    def codes_layout(self):
+        if self.params.codes_layout == cuvsIvfPqListLayout.CUVS_IVF_PQ_LIST_LAYOUT_FLAT:
+            return "flat"
+        else:
+            return "interleaved"
 
     def get_handle(self):
         return <size_t>self.params
@@ -539,8 +562,8 @@ def build_precomputed(IndexParams index_params, uint32_t dim, pq_centers, center
         Dimensionality of the input data
     pq_centers : CUDA array interface compliant tensor
         PQ codebook on device memory with required shape:
-        - codebook_kind PER_SUBSPACE: [pq_dim, pq_len, pq_book_size]
-        - codebook_kind PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
+        - codebook_kind "subspace": [pq_dim, pq_len, pq_book_size]
+        - codebook_kind "cluster":  [n_lists, pq_len, pq_book_size]
         Supported dtype: float32
     centers : CUDA array interface compliant matrix
         Cluster centers in the original space [n_lists, dim_ext]

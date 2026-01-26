@@ -34,6 +34,7 @@ void convert_c_index_params(cuvsIvfPqIndexParams params, cuvs::neighbors::ivf_pq
   out->force_random_rotation          = params.force_random_rotation;
   out->conservative_memory_allocation = params.conservative_memory_allocation;
   out->max_train_points_per_pq_code   = params.max_train_points_per_pq_code;
+  out->codes_layout = static_cast<cuvs::neighbors::ivf_pq::list_layout>((int)params.codes_layout);
 }
 void convert_c_search_params(cuvsIvfPqSearchParams params,
                              cuvs::neighbors::ivf_pq::search_params* out)
@@ -218,8 +219,16 @@ void _get_list_indices(cuvsIvfPqIndex index,
                        uint32_t label,
                        DLManagedTensor* out_labels)
 {
-  auto index_ptr    = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
-  cuvs::core::to_dlpack(index_ptr->lists()[label]->indices.view(), out_labels);
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
+  if (index_ptr->codes_layout() == cuvs::neighbors::ivf_pq::list_layout::FLAT) {
+    auto& list =
+      static_cast<cuvs::neighbors::ivf_pq::list_data_flat<IdxT>&>(*index_ptr->lists()[label]);
+    cuvs::core::to_dlpack(list.indices.view(), out_labels);
+  } else {
+    auto& list = static_cast<cuvs::neighbors::ivf_pq::list_data_interleaved<IdxT>&>(
+      *index_ptr->lists()[label]);
+    cuvs::core::to_dlpack(list.indices.view(), out_labels);
+  }
 }
 
 template <typename IdxT>
@@ -347,10 +356,11 @@ extern "C" cuvsError_t cuvsIvfPqIndexParamsCreate(cuvsIvfPqIndexParams_t* params
                                        .kmeans_trainset_fraction       = 0.5,
                                        .pq_bits                        = 8,
                                        .pq_dim                         = 0,
-                                       .codebook_kind                  = codebook_gen::PER_SUBSPACE,
+                                       .codebook_kind                  = CUVS_IVF_PQ_CODEBOOK_GEN_PER_SUBSPACE,
                                        .force_random_rotation          = false,
                                        .conservative_memory_allocation = false,
-                                       .max_train_points_per_pq_code   = 256};
+                                       .max_train_points_per_pq_code   = 256,
+                                       .codes_layout                   = CUVS_IVF_PQ_LIST_LAYOUT_INTERLEAVED};
   });
 }
 

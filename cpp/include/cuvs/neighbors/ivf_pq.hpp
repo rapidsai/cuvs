@@ -33,6 +33,14 @@ enum class codebook_gen {  // NOLINT
   PER_CLUSTER  = 1,        // NOLINT
 };
 
+/** A type for specifying the memory layout of PQ codes in IVF lists. */
+enum class list_layout {  // NOLINT
+  /** Flat layout: each vector's PQ codes stored contiguously [n_rows, bytes_per_vector]. */
+  FLAT = 0,  // NOLINT
+  /** Interleaved layout: codes from multiple vectors interleaved for coalesced memory access. */
+  INTERLEAVED = 1,  // NOLINT
+};
+
 struct index_params : cuvs::neighbors::index_params {
   /**
    * The number of inverted lists (clusters)
@@ -69,6 +77,14 @@ struct index_params : cuvs::neighbors::index_params {
   uint32_t pq_dim = 0;
   /** How PQ codebooks are created. */
   codebook_gen codebook_kind = codebook_gen::PER_SUBSPACE;
+  /**
+   * Memory layout of PQ codes in IVF lists.
+   *
+   * - INTERLEAVED (default): Codes from multiple vectors are interleaved for coalesced GPU memory
+   *   access during search. This is optimized for search performance.
+   * - FLAT: Each vector's PQ codes are stored contiguously.
+   */
+  list_layout codes_layout = list_layout::INTERLEAVED;
   /**
    * Apply a random rotation matrix on the input data and queries even if `dim % pq_dim == 0`.
    *
@@ -213,7 +229,7 @@ template <typename IdxT>
 constexpr static IdxT kOutOfBoundsRecord = std::numeric_limits<IdxT>::max();
 
 template <typename SizeT, typename IdxT>
-struct list_spec {
+struct list_spec_interleaved {
   using value_type = uint8_t;
   using index_type = IdxT;
   /** PQ-encoded data stored in the interleaved format:
@@ -232,20 +248,22 @@ struct list_spec {
   uint32_t pq_bits;
   uint32_t pq_dim;
 
-  constexpr list_spec(uint32_t pq_bits, uint32_t pq_dim, bool conservative_memory_allocation);
+  constexpr list_spec_interleaved(uint32_t pq_bits,
+                                  uint32_t pq_dim,
+                                  bool conservative_memory_allocation);
 
   // Allow casting between different size-types (for safer size and offset calculations)
   template <typename OtherSizeT>
-  constexpr explicit list_spec(const list_spec<OtherSizeT, IdxT>& other_spec);
+  constexpr explicit list_spec_interleaved(
+    const list_spec_interleaved<OtherSizeT, IdxT>& other_spec);
 
   /** Determine the extents of an array enough to hold a given amount of data. */
   constexpr list_extents make_list_extents(SizeT n_rows) const;
 };
 
 template <typename SizeT, typename IdxT>
-constexpr list_spec<SizeT, IdxT>::list_spec(uint32_t pq_bits,
-                                            uint32_t pq_dim,
-                                            bool conservative_memory_allocation)
+constexpr list_spec_interleaved<SizeT, IdxT>::list_spec_interleaved(
+  uint32_t pq_bits, uint32_t pq_dim, bool conservative_memory_allocation)
   : pq_bits(pq_bits),
     pq_dim(pq_dim),
     align_min(kIndexGroupSize),
@@ -255,7 +273,8 @@ constexpr list_spec<SizeT, IdxT>::list_spec(uint32_t pq_bits,
 
 template <typename SizeT, typename IdxT>
 template <typename OtherSizeT>
-constexpr list_spec<SizeT, IdxT>::list_spec(const list_spec<OtherSizeT, IdxT>& other_spec)
+constexpr list_spec_interleaved<SizeT, IdxT>::list_spec_interleaved(
+  const list_spec_interleaved<OtherSizeT, IdxT>& other_spec)
   : pq_bits{other_spec.pq_bits},
     pq_dim{other_spec.pq_dim},
     align_min{other_spec.align_min},
@@ -264,8 +283,8 @@ constexpr list_spec<SizeT, IdxT>::list_spec(const list_spec<OtherSizeT, IdxT>& o
 }
 
 template <typename SizeT, typename IdxT>
-constexpr typename list_spec<SizeT, IdxT>::list_extents list_spec<SizeT, IdxT>::make_list_extents(
-  SizeT n_rows) const
+constexpr typename list_spec_interleaved<SizeT, IdxT>::list_extents
+list_spec_interleaved<SizeT, IdxT>::make_list_extents(SizeT n_rows) const
 {
   // how many elems of pq_dim fit into one kIndexGroupVecLen-byte chunk
   auto pq_chunk = (kIndexGroupVecLen * 8u) / pq_bits;
@@ -274,7 +293,68 @@ constexpr typename list_spec<SizeT, IdxT>::list_extents list_spec<SizeT, IdxT>::
 }
 
 template <typename IdxT, typename SizeT = uint32_t>
-using list_data = ivf::list<list_spec, SizeT, IdxT>;
+using list_data_interleaved = ivf::list<list_spec_interleaved, SizeT, IdxT>;
+
+/**
+ * Flat (non-interleaved) storage specification for PQ-encoded data.
+ *
+ * This stores each vector's PQ codes contiguously:
+ *   [n_rows, bytes_per_vector] where bytes_per_vector = ceildiv(pq_dim * pq_bits, 8)
+ */
+template <typename SizeT, typename IdxT>
+struct list_spec_flat {
+  using value_type   = uint8_t;
+  using index_type   = IdxT;
+  using list_extents = raft::matrix_extent<SizeT>;
+
+  SizeT align_max;
+  SizeT align_min;
+  uint32_t pq_bits;
+  uint32_t pq_dim;
+
+  constexpr list_spec_flat(uint32_t pq_bits, uint32_t pq_dim, bool conservative_memory_allocation)
+    : pq_bits(pq_bits), pq_dim(pq_dim), align_min(1), align_max(1)
+  {
+  }
+
+  // Allow casting between different size-types (for safer size and offset calculations)
+  template <typename OtherSizeT>
+  constexpr explicit list_spec_flat(const list_spec_flat<OtherSizeT, IdxT>& other_spec);
+
+  /** Number of bytes per encoded vector. */
+  constexpr SizeT bytes_per_vector() const
+  {
+    return raft::div_rounding_up_safe<SizeT>(pq_dim * pq_bits, 8u);
+  }
+
+  /** Determine the extents of an array enough to hold a given amount of data. */
+  constexpr list_extents make_list_extents(SizeT n_rows) const
+  {
+    return list_extents{n_rows, bytes_per_vector()};
+  }
+};
+
+template <typename SizeT, typename IdxT>
+template <typename OtherSizeT>
+constexpr list_spec_flat<SizeT, IdxT>::list_spec_flat(
+  const list_spec_flat<OtherSizeT, IdxT>& other_spec)
+  : pq_bits{other_spec.pq_bits},
+    pq_dim{other_spec.pq_dim},
+    align_min{other_spec.align_min},
+    align_max{other_spec.align_max}
+{
+}
+
+template <typename IdxT, typename SizeT = uint32_t>
+using list_data_flat = ivf::list<list_spec_flat, SizeT, IdxT>;
+
+/**
+ * Type alias for the polymorphic base class for IVF-PQ list data.
+ * IVF-PQ uses uint8_t for PQ-encoded data.
+ * Both list_data_interleaved and list_data_flat now inherit from this via ivf::list.
+ */
+template <typename IdxT, typename SizeT = uint32_t>
+using list_data_base = ivf::list_base<uint8_t, IdxT, SizeT>;
 
 using pq_centers_extents =
   raft::extents<uint32_t, raft::dynamic_extent, raft::dynamic_extent, raft::dynamic_extent>;
@@ -286,6 +366,7 @@ class index_iface {
 
   virtual cuvs::distance::DistanceType metric() const noexcept  = 0;
   virtual codebook_gen codebook_kind() const noexcept           = 0;
+  virtual list_layout codes_layout() const noexcept             = 0;
   virtual IdxT size() const noexcept                            = 0;
   virtual uint32_t dim() const noexcept                         = 0;
   virtual uint32_t dim_ext() const noexcept                     = 0;
@@ -298,8 +379,8 @@ class index_iface {
   virtual bool conservative_memory_allocation() const noexcept  = 0;
   virtual uint32_t get_list_size_in_bytes(uint32_t label) const = 0;
 
-  virtual std::vector<std::shared_ptr<list_data<IdxT>>>& lists() noexcept             = 0;
-  virtual const std::vector<std::shared_ptr<list_data<IdxT>>>& lists() const noexcept = 0;
+  virtual std::vector<std::shared_ptr<list_data_base<IdxT>>>& lists() noexcept             = 0;
+  virtual const std::vector<std::shared_ptr<list_data_base<IdxT>>>& lists() const noexcept = 0;
 
   virtual raft::device_vector_view<uint32_t, uint32_t, raft::row_major> list_sizes() noexcept = 0;
   virtual raft::device_vector_view<const uint32_t, uint32_t, raft::row_major> list_sizes()
@@ -479,6 +560,9 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
   /** How PQ codebooks are created. */
   codebook_gen codebook_kind() const noexcept override;
 
+  /** Memory layout of PQ codes in IVF lists. */
+  list_layout codes_layout() const noexcept override;
+
   /** Number of clusters/inverted lists (first level quantization). */
   uint32_t n_lists() const noexcept;
 
@@ -497,9 +581,9 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
   raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers()
     const noexcept override;
 
-  /** Lists' data and indices. */
-  std::vector<std::shared_ptr<list_data<IdxT>>>& lists() noexcept override;
-  const std::vector<std::shared_ptr<list_data<IdxT>>>& lists() const noexcept override;
+  /** Lists' data and indices (polymorphic, works for both FLAT and INTERLEAVED layouts). */
+  std::vector<std::shared_ptr<list_data_base<IdxT>>>& lists() noexcept override;
+  const std::vector<std::shared_ptr<list_data_base<IdxT>>>& lists() const noexcept override;
 
   /** Pointers to the inverted lists (clusters) data  [n_lists]. */
   raft::device_vector_view<uint8_t*, uint32_t, raft::row_major> data_ptrs() noexcept override;
@@ -2471,13 +2555,13 @@ namespace codepacker {
  *   The length `n_take` defines how many records to unpack,
  *   it must be smaller than the list size.
  */
-void unpack(
-  raft::resources const& res,
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
-  uint32_t pq_bits,
-  uint32_t offset,
-  raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> codes);
+void unpack(raft::resources const& res,
+            raft::device_mdspan<const uint8_t,
+                                list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                                raft::row_major> list_data,
+            uint32_t pq_bits,
+            uint32_t offset,
+            raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> codes);
 
 /**
  * @brief Unpack `n_rows` consecutive records of a single list (cluster) in the compressed index
@@ -2511,15 +2595,15 @@ void unpack(
  *   The length `n_rows` defines how many records to unpack,
  *   it must be smaller than the list size.
  */
-void unpack_contiguous(
-  raft::resources const& res,
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
-  uint32_t pq_bits,
-  uint32_t offset,
-  uint32_t n_rows,
-  uint32_t pq_dim,
-  uint8_t* codes);
+void unpack_contiguous(raft::resources const& res,
+                       raft::device_mdspan<const uint8_t,
+                                           list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                                           raft::row_major> list_data,
+                       uint32_t pq_bits,
+                       uint32_t offset,
+                       uint32_t n_rows,
+                       uint32_t pq_dim,
+                       uint8_t* codes);
 
 /**
  * Write flat PQ codes into an existing list by the given offset.
@@ -2547,8 +2631,9 @@ void pack(raft::resources const& res,
           raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes,
           uint32_t pq_bits,
           uint32_t offset,
-          raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-            list_data);
+          raft::device_mdspan<uint8_t,
+                              list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                              raft::row_major> list_data);
 
 /**
  * Write flat PQ codes into an existing list by the given offset. The input codes of a single vector
@@ -2578,15 +2663,15 @@ void pack(raft::resources const& res,
  * @param[in] offset how many records to skip before writing the data into the list
  * @param[in] list_data block to write into
  */
-void pack_contiguous(
-  raft::resources const& res,
-  const uint8_t* codes,
-  uint32_t n_rows,
-  uint32_t pq_dim,
-  uint32_t pq_bits,
-  uint32_t offset,
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data);
+void pack_contiguous(raft::resources const& res,
+                     const uint8_t* codes,
+                     uint32_t n_rows,
+                     uint32_t pq_dim,
+                     uint32_t pq_bits,
+                     uint32_t offset,
+                     raft::device_mdspan<uint8_t,
+                                         list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                                         raft::row_major> list_data);
 
 /**
  * Write flat PQ codes into an existing list by the given offset.
@@ -2916,6 +3001,45 @@ void extend_list_with_codes(
   uint32_t label);
 
 /**
+ * @brief Extend one list of the index in-place, by the list label, skipping the classification and
+ * encoding steps. Uses contiguous/packed codes format.
+ *
+ * This is similar to extend_list_with_codes but takes codes in contiguous packed format
+ * [n_rows, ceildiv(pq_dim * pq_bits, 8)] instead of unpacked format [n_rows, pq_dim].
+ * This works correctly with any pq_bits value.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   // We will extend the fourth cluster
+ *   uint32_t label = 3;
+ *   // We will fill 4 new vectors
+ *   uint32_t n_vec = 4;
+ *   // Indices of the new vectors
+ *   auto indices = raft::make_device_vector<int64_t>(res, n_vec);
+ *   ... fill the indices ...
+ *   // Allocate buffer for packed codes
+ *   uint32_t code_size = raft::ceildiv(index.pq_dim() * index.pq_bits(), 8u);
+ *   auto new_codes = raft::make_device_matrix<uint8_t, uint32_t, row_major>(res, n_vec, code_size);
+ *   ... fill codes ...
+ *   // extend list with new codes
+ *   ivf_pq::helpers::codepacker::extend_list_with_contiguous_codes(
+ *       res, &index, new_codes.view(), indices.view(), label);
+ * @endcode
+ *
+ * @param[in] res
+ * @param[inout] index
+ * @param[in] new_codes flat contiguous PQ codes [n_rows, ceildiv(pq_dim * pq_bits, 8)]
+ * @param[in] new_indices source indices [n_rows]
+ * @param[in] label the id of the target list (cluster).
+ */
+void extend_list_with_contiguous_codes(
+  raft::resources const& res,
+  index<int64_t>* index,
+  raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> new_codes,
+  raft::device_vector_view<const int64_t, uint32_t, raft::row_major> new_indices,
+  uint32_t label);
+
+/**
  * @brief Extend one list of the index in-place, by the list label, skipping the classification
  * step.
  *
@@ -3087,13 +3211,13 @@ void extract_centers(raft::resources const& res,
  *   ivf_pq::index<int64_t> index(res, index_params, D);
  *   ivf_pq::helpers::reset_index(res, &index);
  *   // resize the first IVF list to hold 5 records
- *   auto spec = list_spec<uint32_t, int64_t>{
- *     index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
+ *   auto spec = ivf_pq::list_spec_interleaved<uint32_t, int64_t>{
+ *     index.pq_bits(), index.pq_dim(), index.conservative_memory_allocation()};
  *   uint32_t new_size = 5;
- *   ivf::resize_list(res, list, spec, new_size, 0);
- *   raft::update_device(index.list_sizes(), &new_size, 1, stream);
+ *   ivf_pq::helpers::resize_list(res, index.lists()[0], spec, new_size, 0);
+ *   raft::update_device(index.list_sizes().data_handle(), &new_size, 1, stream);
  *   // recompute the internal state of the index
- *   ivf_pq::helpers::recompute_internal_state(res, index);
+ *   ivf_pq::helpers::recompute_internal_state(res, &index);
  * @endcode
  *
  * @param[in] res raft resource
@@ -3130,6 +3254,68 @@ void make_rotation_matrix(
   raft::resources const& res,
   raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix,
   bool force_random_rotation);
+
+/**
+ * @brief Resize an IVF-PQ list with flat layout.
+ *
+ * This helper resizes an IVF list that uses the flat (non-interleaved) PQ code layout.
+ * If the new size exceeds the current capacity, a new list is allocated and existing
+ * data is copied. The function handles the type casting internally.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   raft::resources res;
+ *   // Assuming index uses FLAT layout
+ *   auto spec = ivf_pq::list_spec_flat<uint32_t, int64_t>{
+ *     index.pq_bits(), index.pq_dim(), index.conservative_memory_allocation()};
+ *   uint32_t old_size = current_list_size;
+ *   uint32_t new_size = old_size + n_new_vectors;
+ *   ivf_pq::helpers::resize_list(res, index.lists()[label], spec, new_size, old_size);
+ * @endcode
+ *
+ * @param[in] res raft resource
+ * @param[inout] orig_list the list to resize (may be replaced with a new allocation)
+ * @param[in] spec the list specification containing pq_bits, pq_dim, and allocation settings
+ * @param[in] new_used_size the new size of the list (number of vectors)
+ * @param[in] old_used_size the current size of the list (data up to this size is preserved)
+ */
+void resize_list(raft::resources const& res,
+                 std::shared_ptr<list_data_base<int64_t, uint32_t>>& orig_list,
+                 const list_spec_flat<uint32_t, int64_t>& spec,
+                 uint32_t new_used_size,
+                 uint32_t old_used_size);
+
+/**
+ * @brief Resize an IVF-PQ list with interleaved layout.
+ *
+ * This helper resizes an IVF list that uses the interleaved PQ code layout (default).
+ * If the new size exceeds the current capacity, a new list is allocated and existing
+ * data is copied. The function handles the type casting internally.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   raft::resources res;
+ *   // Assuming index uses INTERLEAVED layout (default)
+ *   auto spec = ivf_pq::list_spec_interleaved<uint32_t, int64_t>{
+ *     index.pq_bits(), index.pq_dim(), index.conservative_memory_allocation()};
+ *   uint32_t old_size = current_list_size;
+ *   uint32_t new_size = old_size + n_new_vectors;
+ *   ivf_pq::helpers::resize_list(res, index.lists()[label], spec, new_size, old_size);
+ * @endcode
+ *
+ * @param[in] res raft resource
+ * @param[inout] orig_list the list to resize (may be replaced with a new allocation)
+ * @param[in] spec the list specification containing pq_bits, pq_dim, and allocation settings
+ * @param[in] new_used_size the new size of the list (number of vectors)
+ * @param[in] old_used_size the current size of the list (data up to this size is preserved)
+ */
+void resize_list(raft::resources const& res,
+                 std::shared_ptr<list_data_base<int64_t, uint32_t>>& orig_list,
+                 const list_spec_interleaved<uint32_t, int64_t>& spec,
+                 uint32_t new_used_size,
+                 uint32_t old_used_size);
 /**
  * @}
  */

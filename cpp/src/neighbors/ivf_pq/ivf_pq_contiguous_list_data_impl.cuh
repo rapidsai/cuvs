@@ -44,8 +44,9 @@ struct unpack_contiguous {
 template <uint32_t BlockSize, uint32_t PqBits>
 __launch_bounds__(BlockSize) static __global__ void unpack_contiguous_list_data_kernel(
   uint8_t* out_codes,
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    in_list_data,
+  raft::device_mdspan<const uint8_t,
+                      list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                      raft::row_major> in_list_data,
   uint32_t n_rows,
   uint32_t pq_dim,
   std::variant<uint32_t, const uint32_t*> offset_or_indices)
@@ -65,8 +66,9 @@ __launch_bounds__(BlockSize) static __global__ void unpack_contiguous_list_data_
  */
 inline void unpack_contiguous_list_data_impl(
   uint8_t* codes,
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
+  raft::device_mdspan<const uint8_t,
+                      list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                      raft::row_major> list_data,
   uint32_t n_rows,
   uint32_t pq_dim,
   std::variant<uint32_t, const uint32_t*> offset_or_indices,
@@ -121,8 +123,9 @@ struct pack_contiguous {
 
 template <uint32_t BlockSize, uint32_t PqBits>
 __launch_bounds__(BlockSize) static __global__ void pack_contiguous_list_data_kernel(
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
+  raft::device_mdspan<uint8_t,
+                      list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                      raft::row_major> list_data,
   const uint8_t* codes,
   uint32_t n_rows,
   uint32_t pq_dim,
@@ -144,8 +147,9 @@ __launch_bounds__(BlockSize) static __global__ void pack_contiguous_list_data_ke
  * @param[in] stream
  */
 inline void pack_contiguous_list_data_impl(
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
+  raft::device_mdspan<uint8_t,
+                      list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                      raft::row_major> list_data,
   const uint8_t* codes,
   uint32_t n_rows,
   uint32_t pq_dim,

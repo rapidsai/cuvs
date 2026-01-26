@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -365,7 +365,7 @@ static void _populate_c_ivf_pq_params(cuvsIvfPqParams* c_ivf_pq,
   c_ivf_pq->ivf_pq_build_params->kmeans_trainset_fraction = bp.kmeans_trainset_fraction;
   c_ivf_pq->ivf_pq_build_params->pq_bits = bp.pq_bits;
   c_ivf_pq->ivf_pq_build_params->pq_dim = bp.pq_dim;
-  c_ivf_pq->ivf_pq_build_params->codebook_kind = static_cast<codebook_gen>(bp.codebook_kind);
+  c_ivf_pq->ivf_pq_build_params->codebook_kind = static_cast<cuvsIvfPqCodebookGen>(bp.codebook_kind);
   c_ivf_pq->ivf_pq_build_params->force_random_rotation = bp.force_random_rotation;
   c_ivf_pq->ivf_pq_build_params->conservative_memory_allocation = bp.conservative_memory_allocation;
   c_ivf_pq->ivf_pq_build_params->max_train_points_per_pq_code = bp.max_train_points_per_pq_code;
