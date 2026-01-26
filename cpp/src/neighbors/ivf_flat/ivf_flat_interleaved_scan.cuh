@@ -1228,7 +1228,7 @@ struct select_interleaved_scan_kernel {
                                               AccT,
                                               IdxT,
                                               IvfSampleFilterT,
-                                              Capacity / 2,
+                                              Capacity / 4,
                                               Veclen>::run(k_max,
                                                            veclen,
                                                            select_min,
