@@ -407,6 +407,8 @@ def list_backends() -> Dict[str, Type[BenchmarkBackend]]:
 
 # Simple module-level registry for config loaders
 # (Config loaders are simpler than backends, don't need full class-based registry)
+# Note: Module level variable that persists for the lifetime of the Python
+# process.
 _CONFIG_LOADER_REGISTRY: Dict[str, Type] = {}
 
 

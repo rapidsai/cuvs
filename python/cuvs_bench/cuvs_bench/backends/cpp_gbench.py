@@ -557,7 +557,7 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             If the temporary build file is not found.
         """
         build_dict = {}
-
+        
         # If build file exists, read it
         build_json_path = os.path.join(build_dir, build_file)
         tmp_build_json_path = os.path.join(build_dir, temp_build_file)
@@ -579,14 +579,14 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
 
         tmp_benchmarks = temp_build_dict.get("benchmarks", {})
         benchmarks = build_dict.get("benchmarks", {})
-
+        
         # If the build time is absolute 0 then an error occurred
         final_bench_dict = {b["name"]: b for b in benchmarks if b["real_time"] > 0}
-
+        
         for tmp_bench in tmp_benchmarks:
             if tmp_bench["real_time"] > 0:
                 final_bench_dict[tmp_bench["name"]] = tmp_bench
-
+        
         temp_build_dict["benchmarks"] = list(final_bench_dict.values())
         with open(build_json_path, "w") as f:
             json_str = json.dumps(temp_build_dict, indent=2)

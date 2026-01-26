@@ -40,6 +40,7 @@ class BenchmarkOrchestrator:
     Examples
     --------
     >>> # For C++ benchmarks
+    >>> from cuvs_bench.orchestrator import BenchmarkOrchestrator
     >>> orchestrator = BenchmarkOrchestrator(backend_type="cpp_gbench")
     >>> results = orchestrator.run_benchmark(
     ...     dataset="glove-100-inner",
