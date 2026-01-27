@@ -469,7 +469,187 @@ struct index : cuvs::neighbors::index {
   {
   }
 
+  /** Construct an index from strided_dataset and knn_graph
+   *
+   * The strided_dataset must already satisfy the alignment requirements (16-byte aligned).
+   * Use make_strided_dataset_zerocopy() or make_strided_dataset_owning() to create a properly
+   * aligned strided_dataset.
+   *
+   * The index stores a non-owning reference to the dataset. It is the caller's responsibility
+   * to ensure that the dataset stays alive as long as the index.
+   *
+   * Usage examples:
+   *
+   * - Cagra index is normally created by the cagra::build
+   * @code{.cpp}
+   *   using namespace cuvs::neighbors;
+   *   auto dataset_matrix = raft::make_host_matrix<float, int64_t>(n_rows, n_cols);
+   *   load_dataset(dataset_matrix.view());
+   *   // Create properly aligned dataset
+   *   auto dataset = make_strided_dataset_owning(res, dataset_matrix.view());
+   *   // use default index parameters
+   *   cagra::index_params index_params;
+   *   // create and fill the index from the strided dataset
+   *   auto index = cagra::build(res, index_params, *dataset);
+   *   // use default search parameters
+   *   cagra::search_params search_params;
+   *   // search K nearest neighbours
+   *   auto neighbors = raft::make_device_matrix<uint32_t, int64_t>(res, n_queries, k);
+   *   auto distances = raft::make_device_matrix<float, int64_t>(res, n_queries, k);
+   *   cagra::search(res, search_params, index, queries, neighbors.view(), distances.view());
+   * @endcode
+   *
+   * - Constructing index using existing knn-graph
+   * @code{.cpp}
+   *   using namespace cuvs::neighbors;
+   *
+   *   auto dataset_matrix = raft::make_device_matrix<float, int64_t>(res, n_rows, n_cols);
+   *   auto knn_graph = raft::make_device_matrix<uint32_t, int64_t>(res, n_rows, graph_degree);
+   *
+   *   // custom loading and graph creation
+   *   // load_dataset(dataset_matrix.view());
+   *   // create_knn_graph(knn_graph.view());
+   *
+   *   // Create strided dataset (zero-copy if aligned, throws if not)
+   *   auto dataset = make_strided_dataset_zerocopy(dataset_matrix.view());
+   *
+   *   // Wrap the existing strided dataset into an index structure
+   *   cagra::index<T, IdxT> index(res, metric, *dataset,
+   *                               raft::make_const_mdspan(knn_graph.view()));
+   *
+   *   // Both dataset and knn_graph objects have to be in scope while the index is used because
+   *   // the index only stores a reference to these.
+   *   cagra::search(res, search_params, index, queries, neighbors, distances);
+   * @endcode
+   */
+  template <typename graph_accessor>
+  index(raft::resources const& res,
+        cuvs::distance::DistanceType metric,
+        strided_dataset<T, int64_t> const& dataset,
+        raft::mdspan<const graph_index_type,
+                     raft::matrix_extent<int64_t>,
+                     raft::row_major,
+                     graph_accessor> knn_graph)
+    : cuvs::neighbors::index(),
+      metric_(metric),
+      graph_(raft::make_device_matrix<graph_index_type, int64_t>(res, 0, 0)),
+      dataset_(new non_owning_dataset<T, int64_t>(dataset.view())),
+      dataset_norms_(std::nullopt)
+  {
+    RAFT_EXPECTS(dataset.n_rows() == knn_graph.extent(0),
+                 "Dataset and knn_graph must have equal number of rows");
+
+    // Validate stride alignment (16-byte alignment)
+    constexpr uint32_t kAlignBytes = 16;
+    RAFT_EXPECTS((dataset.stride() * sizeof(T)) % kAlignBytes == 0,
+                 "Dataset stride must satisfy 16-byte alignment (stride * sizeof(T) must be "
+                 "divisible by 16). Use make_strided_dataset_zerocopy() or "
+                 "make_strided_dataset_owning() to create a properly aligned dataset.");
+
+    update_graph(res, knn_graph);
+
+    if (metric_ == cuvs::distance::DistanceType::CosineExpanded) {
+      if (dataset.n_rows() > 0) { compute_dataset_norms_(res); }
+    }
+
+    raft::resource::sync_stream(res);
+  }
+
+  /** Construct an index from strided_dataset and knn_graph (taking ownership of the dataset object)
+   *
+   * The strided_dataset must already satisfy the alignment requirements (16-byte aligned).
+   * Use make_strided_dataset_zerocopy() or make_strided_dataset_owning() to create a properly
+   * aligned strided_dataset.
+   *
+   * The index takes ownership of the strided_dataset *object* via std::unique_ptr. The caller
+   * transfers ownership using std::move(). Note that:
+   * - If the dataset is an owning_dataset, the index owns both the dataset object and the data.
+   * - If the dataset is a non_owning_dataset, the index owns the dataset object (the view), but
+   *   the caller must still ensure the underlying data remains valid for the index lifetime.
+   *
+   * Usage examples:
+   *
+   * - Cagra index with fully owned dataset (owns both object and data)
+   * @code{.cpp}
+   *   using namespace cuvs::neighbors;
+   *   auto dataset_matrix = raft::make_host_matrix<float, int64_t>(n_rows, n_cols);
+   *   load_dataset(dataset_matrix.view());
+   *   // Create owning dataset (always copies for alignment)
+   *   auto dataset = make_strided_dataset_owning(res, dataset_matrix.view());
+   *   auto knn_graph = raft::make_device_matrix<uint32_t, int64_t>(res, n_rows, graph_degree);
+   *   // create_knn_graph(knn_graph.view());
+   *   // Transfer ownership to the index - index owns everything
+   *   cagra::index<T, IdxT> index(res, metric, std::move(dataset),
+   *                               raft::make_const_mdspan(knn_graph.view()));
+   *   // dataset is now moved-from; dataset_matrix can go out of scope
+   *   cagra::search(res, search_params, index, queries, neighbors, distances);
+   * @endcode
+   *
+   * - Cagra index with non-owning dataset (owns view object but not underlying data)
+   * @code{.cpp}
+   *   using namespace cuvs::neighbors;
+   *
+   *   auto dataset_matrix = raft::make_device_matrix<float, int64_t>(res, n_rows, n_cols);
+   *   auto knn_graph = raft::make_device_matrix<uint32_t, int64_t>(res, n_rows, graph_degree);
+   *
+   *   // custom loading and graph creation
+   *   // load_dataset(dataset_matrix.view());
+   *   // create_knn_graph(knn_graph.view());
+   *
+   *   // Create non-owning dataset (zero-copy)
+   *   auto dataset = make_strided_dataset_zerocopy(dataset_matrix.view());
+   *
+   *   // Transfer ownership of the dataset object to the index
+   *   cagra::index<T, IdxT> index(res, metric, std::move(dataset),
+   *                               raft::make_const_mdspan(knn_graph.view()));
+   *
+   *   // dataset is now moved-from
+   *   // dataset_matrix and knn_graph must remain in scope while the index is used
+   *   cagra::search(res, search_params, index, queries, neighbors, distances);
+   * @endcode
+   */
+  template <typename graph_accessor>
+  index(raft::resources const& res,
+        cuvs::distance::DistanceType metric,
+        std::unique_ptr<strided_dataset<T, int64_t>> dataset,
+        raft::mdspan<const graph_index_type,
+                     raft::matrix_extent<int64_t>,
+                     raft::row_major,
+                     graph_accessor> knn_graph)
+    : cuvs::neighbors::index(),
+      metric_(metric),
+      graph_(raft::make_device_matrix<graph_index_type, int64_t>(res, 0, 0)),
+      dataset_(std::move(dataset)),
+      dataset_norms_(std::nullopt)
+  {
+    RAFT_EXPECTS(dataset_->n_rows() == knn_graph.extent(0),
+                 "Dataset and knn_graph must have equal number of rows");
+
+    // Validate stride alignment (16-byte alignment)
+    constexpr uint32_t kAlignBytes = 16;
+    auto p                         = dynamic_cast<strided_dataset<T, int64_t>*>(dataset_.get());
+    if (p) {
+      RAFT_EXPECTS((p->stride() * sizeof(T)) % kAlignBytes == 0,
+                   "Dataset stride must satisfy 16-byte alignment (stride * sizeof(T) must be "
+                   "divisible by 16). Use make_strided_dataset_zerocopy() or "
+                   "make_strided_dataset_owning() to create a properly aligned dataset.");
+    }
+
+    update_graph(res, knn_graph);
+
+    if (metric_ == cuvs::distance::DistanceType::CosineExpanded) {
+      if (p && p->n_rows() > 0) { compute_dataset_norms_(res); }
+    }
+
+    raft::resource::sync_stream(res);
+  }
+
   /** Construct an index from dataset and knn_graph arrays
+   *
+   * @deprecated This constructor may implicitly copy the dataset if not 16-byte aligned.
+   * Use the constructor that accepts strided_dataset for explicit control over copying.
+   * Create a strided_dataset using make_strided_dataset_zerocopy() or
+   * make_strided_dataset_owning() first.
    *
    * If the dataset and graph is already in GPU memory, then the index is just a thin wrapper around
    * these that stores a non-owning a reference to the arrays.
@@ -552,7 +732,40 @@ struct index : cuvs::neighbors::index {
   }
 
   /**
+   * Replace the dataset with a new strided_dataset (non-owning).
+   *
+   * The strided_dataset must already satisfy the alignment requirements (16-byte aligned).
+   * Use make_strided_dataset_zerocopy() or make_strided_dataset_owning() to create a properly
+   * aligned strided_dataset.
+   *
+   * The index stores only a reference to the dataset. It is the caller's responsibility to ensure
+   * that dataset stays alive as long as the index. It is expected that the same set of vectors are
+   * used for update_dataset and index build.
+   *
+   * Note: This will clear any precomputed dataset norms.
+   */
+  void update_dataset(raft::resources const& res, strided_dataset<T, int64_t> const& dataset)
+  {
+    // Validate stride alignment (16-byte alignment)
+    constexpr uint32_t kAlignBytes = 16;
+    RAFT_EXPECTS((dataset.stride() * sizeof(T)) % kAlignBytes == 0,
+                 "Dataset stride must satisfy 16-byte alignment (stride * sizeof(T) must be "
+                 "divisible by 16). Use make_strided_dataset_zerocopy() or "
+                 "make_strided_dataset_owning() to create a properly aligned dataset.");
+
+    dataset_ = std::make_unique<non_owning_dataset<T, int64_t>>(dataset.view());
+    dataset_norms_.reset();
+
+    if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
+      if (dataset.n_rows() > 0) { compute_dataset_norms_(res); }
+    }
+  }
+
+  /**
    * Replace the dataset with a new dataset.
+   *
+   * @deprecated Use update_dataset(raft::resources const& res, strided_dataset<T, int64_t> const&
+   * dataset) instead.
    *
    * If the new dataset rows are aligned on 16 bytes, then only a reference is stored to the
    * dataset. It is the caller's responsibility to ensure that dataset stays alive as long as the
@@ -571,7 +784,13 @@ struct index : cuvs::neighbors::index {
     }
   }
 
-  /** Set the dataset reference explicitly to a device matrix view with padding. */
+  /**
+   * Set the dataset reference explicitly to a device matrix view with padding.
+   *
+   * @deprecated Use update_dataset(raft::resources const& res, strided_dataset<T, int64_t> const&
+   * dataset) instead.
+   *
+   */
   void update_dataset(raft::resources const& res,
                       raft::device_matrix_view<const T, int64_t, raft::layout_stride> dataset)
   {
@@ -867,6 +1086,45 @@ struct index : cuvs::neighbors::index {
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
+ *   // Create a properly aligned dataset
+ *   auto dataset_matrix = raft::make_device_matrix<float, int64_t>(res, n_rows, dim);
+ *   // load data into dataset_matrix...
+ *   auto dataset = make_strided_dataset_owning(res, dataset_matrix.view());
+ *   // use default index parameters
+ *   cagra::index_params index_params;
+ *   // create and fill the index from the strided dataset
+ *   auto index = cagra::build(res, index_params, *dataset);
+ * @endcode
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a strided dataset
+ *
+ * @return the constructed cagra index
+ */
+auto build(raft::resources const& res,
+           const cuvs::neighbors::cagra::index_params& params,
+           strided_dataset<float, int64_t> const& dataset)
+  -> cuvs::neighbors::cagra::index<float, uint32_t>;
+
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * @deprecated Use build(raft::resources const& res, const cuvs::neighbors::cagra::index_params&
+ * params, strided_dataset<float, int64_t> const& dataset) instead.
+ *
+ * The build consist of two steps: build an intermediate knn-graph, and optimize it to
+ * create the final graph. The index_params struct controls the node degree of these
+ * graphs.
+ *
+ * The following distance metrics are supported:
+ * - L2
+ * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
+ * - CosineExpanded
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   cagra::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
@@ -930,6 +1188,45 @@ auto build(raft::resources const& res,
 
 /**
  * @brief Build the index from the dataset for efficient search.
+ *
+ * The build consist of two steps: build an intermediate knn-graph, and optimize it to
+ * create the final graph. The index_params struct controls the node degree of these
+ * graphs.
+ *
+ * The following distance metrics are supported:
+ * - L2
+ * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
+ * - CosineExpanded
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // Create a properly aligned dataset
+ *   auto dataset_matrix = raft::make_device_matrix<half, int64_t>(res, n_rows, dim);
+ *   // load data into dataset_matrix...
+ *   auto dataset = make_strided_dataset_owning(res, dataset_matrix.view());
+ *   // use default index parameters
+ *   cagra::index_params index_params;
+ *   // create and fill the index from the strided dataset
+ *   auto index = cagra::build(res, index_params, *dataset);
+ * @endcode
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a strided dataset
+ *
+ * @return the constructed cagra index
+ */
+auto build(raft::resources const& res,
+           const cuvs::neighbors::cagra::index_params& params,
+           strided_dataset<half, int64_t> const& dataset)
+  -> cuvs::neighbors::cagra::index<float, uint32_t>;
+
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * @deprecated Use build(raft::resources const& res, const cuvs::neighbors::cagra::index_params&
+ * params, strided_dataset<half, int64_t> const& dataset) instead.
  *
  * The build consist of two steps: build an intermediate knn-graph, and optimize it to
  * create the final graph. The index_params struct controls the node degree of these
@@ -1012,6 +1309,45 @@ auto build(raft::resources const& res,
  *
  * The following distance metrics are supported:
  * - L2
+ * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
+ * - CosineExpanded
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // Create a properly aligned dataset
+ *   auto dataset_matrix = raft::make_device_matrix<int8_t, int64_t>(res, n_rows, dim);
+ *   // load data into dataset_matrix...
+ *   auto dataset = make_strided_dataset_owning(res, dataset_matrix.view());
+ *   // use default index parameters
+ *   cagra::index_params index_params;
+ *   // create and fill the index from the strided dataset
+ *   auto index = cagra::build(res, index_params, *dataset);
+ * @endcode
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a strided dataset
+ *
+ * @return the constructed cagra index
+ */
+auto build(raft::resources const& res,
+           const cuvs::neighbors::cagra::index_params& params,
+           strided_dataset<int8_t, int64_t> const& dataset)
+  -> cuvs::neighbors::cagra::index<float, uint32_t>;
+
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * @deprecated Use build(raft::resources const& res, const cuvs::neighbors::cagra::index_params&
+ * params, strided_dataset<int8_t, int64_t> const& dataset) instead.
+ *
+ * The build consist of two steps: build an intermediate knn-graph, and optimize it to
+ * create the final graph. The index_params struct controls the node degree of these
+ * graphs.
+ *
+ * The following distance metrics are supported:
+ * - L2
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
  *
  * Usage example:
@@ -1080,6 +1416,45 @@ auto build(raft::resources const& res,
 
 /**
  * @brief Build the index from the dataset for efficient search.
+ *
+ * The build consist of two steps: build an intermediate knn-graph, and optimize it to
+ * create the final graph. The index_params struct controls the node degree of these
+ * graphs.
+ *
+ * The following distance metrics are supported:
+ * - L2
+ * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
+ * - CosineExpanded
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // Create a properly aligned dataset
+ *   auto dataset_matrix = raft::make_device_matrix<uint8_t, int64_t>(res, n_rows, dim);
+ *   // load data into dataset_matrix...
+ *   auto dataset = make_strided_dataset_owning(res, dataset_matrix.view());
+ *   // use default index parameters
+ *   cagra::index_params index_params;
+ *   // create and fill the index from the strided dataset
+ *   auto index = cagra::build(res, index_params, *dataset);
+ * @endcode
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a strided dataset
+ *
+ * @return the constructed cagra index
+ */
+auto build(raft::resources const& res,
+           const cuvs::neighbors::cagra::index_params& params,
+           strided_dataset<uint8_t, int64_t> const& dataset)
+  -> cuvs::neighbors::cagra::index<float, uint32_t>;
+
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * @deprecated Use build(raft::resources const& res, const cuvs::neighbors::cagra::index_params&
+ * params, strided_dataset<uint8_t, int64_t> const& dataset) instead.
  *
  * The build consist of two steps: build an intermediate knn-graph, and optimize it to
  * create the final graph. The index_params struct controls the node degree of these

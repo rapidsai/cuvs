@@ -1718,10 +1718,9 @@ template <typename T,
           typename IdxT = uint32_t,
           typename Accessor =
             raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
-auto iterative_build_graph(
-  raft::resources const& res,
-  const index_params& params,
-  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
+auto iterative_build_graph(raft::resources const& res,
+                           const index_params& params,
+                           strided_dataset<T, int64_t> const& dataset)
 {
   size_t intermediate_degree = params.intermediate_graph_degree;
   size_t graph_degree        = params.graph_degree;
@@ -1734,17 +1733,7 @@ auto iterative_build_graph(
   // initially small, and the number of nodes is doubled with each iteration.
   RAFT_LOG_INFO("Iteratively creating/improving graph index using CAGRA's search() and optimize()");
 
-  // If dataset is a host matrix, change it to a device matrix. Also, if the
-  // dimensionality of the dataset does not meet the alighnemt restriction,
-  // add extra dimensions and change it to a strided matrix.
-  std::unique_ptr<strided_dataset<T, int64_t>> dev_aligned_dataset;
-  try {
-    dev_aligned_dataset = make_aligned_dataset(res, dataset);
-  } catch (raft::logic_error& e) {
-    RAFT_LOG_ERROR("Iterative CAGRA graph build requires the dataset to fit GPU memory");
-    throw e;
-  }
-  auto dev_aligned_dataset_view = dev_aligned_dataset.get()->view();
+  auto dev_aligned_dataset_view = dataset.view();
 
   // If the matrix stride and extent do no match, the extra dimensions are
   // also as extent since it cannot be used as query matrix.
@@ -1754,7 +1743,7 @@ auto iterative_build_graph(
                                                     dev_aligned_dataset_view.stride(0));
 
   // Determine initial graph size.
-  uint64_t final_graph_size   = (uint64_t)dataset.extent(0);
+  uint64_t final_graph_size   = (uint64_t)dataset.n_rows();
   uint64_t initial_graph_size = (final_graph_size + 1) / 2;
   while (initial_graph_size > graph_degree * 64) {
     initial_graph_size = (initial_graph_size + 1) / 2;
@@ -1898,6 +1887,112 @@ auto iterative_build_graph(
   }
 
   return cagra_graph;
+}
+
+// Wrapper for mdspan that converts to strided_dataset
+template <typename T,
+          typename IdxT = uint32_t,
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
+auto iterative_build_graph(
+  raft::resources const& res,
+  const index_params& params,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
+{
+  // If dataset is a host matrix, change it to a device matrix. Also, if the
+  // dimensionality of the dataset does not meet the alignment restriction,
+  // add extra dimensions and change it to a strided matrix.
+  std::unique_ptr<strided_dataset<T, int64_t>> dev_aligned_dataset;
+  try {
+    dev_aligned_dataset = make_aligned_dataset(res, dataset);
+  } catch (raft::logic_error& e) {
+    RAFT_LOG_ERROR("Iterative CAGRA graph build requires the dataset to fit GPU memory");
+    throw e;
+  }
+
+  // Delegate to the strided_dataset version
+  return iterative_build_graph<T, IdxT>(res, params, *dev_aligned_dataset);
+}
+
+template <typename T, typename IdxT = uint32_t>
+index<T, IdxT> build(raft::resources const& res,
+                     const index_params& params,
+                     strided_dataset<T, int64_t> const& dataset)
+{
+  size_t intermediate_degree = params.intermediate_graph_degree;
+  size_t graph_degree        = params.graph_degree;
+
+  common::nvtx::range<common::nvtx::domain::cuvs> function_scope(
+    "cagra::build<strided_dataset>(%zu, %zu)", intermediate_degree, graph_degree);
+
+  check_graph_degree<T, IdxT>(intermediate_degree, graph_degree, dataset.n_rows());
+
+  // Validate stride alignment (16-byte alignment required by CAGRA)
+  constexpr uint32_t kAlignBytes = 16;
+  RAFT_EXPECTS((dataset.stride() * sizeof(T)) % kAlignBytes == 0,
+               "CAGRA requires 16-byte aligned datasets. The provided strided_dataset has "
+               "stride=%u, sizeof(T)=%zu, stride_bytes=%zu which does not satisfy 16-byte "
+               "alignment. Create the dataset with make_strided_dataset_zerocopy(res, src, 16) "
+               "or make_strided_dataset_owning(res, src, 16) to ensure proper alignment.",
+               dataset.stride(),
+               sizeof(T),
+               dataset.stride() * sizeof(T));
+
+  // Only iterative CAGRA is supported with strided_dataset - must be explicitly set
+  RAFT_EXPECTS(std::holds_alternative<cagra::graph_build_params::iterative_search_params>(
+                 params.graph_build_params),
+               "strided_dataset currently supports only iterative CAGRA graph build. IVF-PQ and "
+               "NN-Descent require row_major layout. Please set params.graph_build_params = "
+               "cagra::graph_build_params::iterative_search_params(). Use the mdspan build() "
+               "overload with row_major layout for IVF-PQ/NN-Descent support.");
+
+  // Reject VPQ compression for strided_dataset
+  RAFT_EXPECTS(!params.compression.has_value(),
+               "VPQ compression with strided_dataset is currently not supported. VPQ requires "
+               "contiguous row-major layout. Use the mdspan overload of build() with a row_major "
+               "layout for VPQ compression.");
+
+  // Validate metric compatibility
+  RAFT_EXPECTS(params.metric != cuvs::distance::DistanceType::CosineExpanded,
+               "CosineExpanded distance is not supported for iterative CAGRA graph build.");
+
+  // Validate data type for BitwiseHamming metric
+  RAFT_EXPECTS(params.metric != cuvs::distance::DistanceType::BitwiseHamming ||
+                 (std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>),
+               "BitwiseHamming distance is only supported for int8_t and uint8_t data types. "
+               "Current data type is not supported.");
+
+  // Build graph using iterative CAGRA
+  RAFT_LOG_TRACE("Building CAGRA graph using iterative search");
+  auto cagra_graph = iterative_build_graph<T, IdxT>(res, params, dataset);
+
+  RAFT_LOG_TRACE("Graph optimized, creating index");
+
+  // Construct an index from dataset and optimized knn graph
+  if (params.attach_dataset_on_build) {
+    try {
+      // Use non-owning constructor - stores reference to the dataset
+      // User must keep the original strided_dataset alive for the lifetime of the index
+      return index<T, IdxT>(
+        res, params.metric, dataset, raft::make_const_mdspan(cagra_graph.view()));
+    } catch (std::bad_alloc& e) {
+      RAFT_LOG_WARN(
+        "Insufficient GPU memory to construct CAGRA index with dataset on GPU. Only the graph will "
+        "be added to the index");
+      // We just add the graph. User is expected to update dataset separately (e.g allocating in
+      // managed memory).
+    } catch (raft::logic_error& e) {
+      // The memory error can also manifest as logic_error.
+      RAFT_LOG_WARN(
+        "Insufficient GPU memory to construct CAGRA index with dataset on GPU. Only the graph will "
+        "be added to the index");
+    }
+  }
+
+  // Graph-only index (user will attach dataset later if needed)
+  index<T, IdxT> idx(res, params.metric);
+  idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
+  return idx;
 }
 
 template <typename T,

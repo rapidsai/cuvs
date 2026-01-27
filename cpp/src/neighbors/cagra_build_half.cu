@@ -17,6 +17,11 @@ void build_knn_graph(raft::resources const& handle,
   cuvs::neighbors::cagra::build_knn_graph<half, uint32_t>(handle, dataset, knn_graph, params);
 }
 
+template cuvs::neighbors::cagra::index<half, uint32_t> build(
+  raft::resources const& handle,
+  const cuvs::neighbors::cagra::index_params& params,
+  strided_dataset<half, int64_t> const& dataset);
+
 cuvs::neighbors::cagra::index<half, uint32_t> build(
   raft::resources const& handle,
   const cuvs::neighbors::cagra::index_params& params,
