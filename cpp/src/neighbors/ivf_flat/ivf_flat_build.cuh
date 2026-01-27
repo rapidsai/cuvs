@@ -15,6 +15,7 @@
 
 #include "../../cluster/kmeans_balanced.cuh"
 #include "../detail/ann_utils.cuh"
+#include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/mdarray.hpp>
@@ -161,7 +162,7 @@ RAFT_KERNEL build_index_kernel(const LabelT* labels,
   }
 }
 
-/** See raft::neighbors::ivf_flat::extend docs */
+/** See cuvs::neighbors::ivf_flat::extend docs */
 template <typename T, typename IdxT>
 void extend(raft::resources const& handle,
             index<T, IdxT>* index,
@@ -218,12 +219,8 @@ void extend(raft::resources const& handle,
       raft::make_device_matrix_view<const T, IdxT>(batch.data(), batch.size(), index->dim());
     auto batch_labels_view = raft::make_device_vector_view<LabelT, IdxT>(
       new_labels.data_handle() + batch.offset(), batch.size());
-    cuvs::cluster::kmeans_balanced::predict(handle,
-                                            kmeans_params,
-                                            batch_data_view,
-                                            orig_centroids_view,
-                                            batch_labels_view,
-                                            utils::mapping<float>{});
+    cuvs::cluster::kmeans::predict(
+      handle, kmeans_params, batch_data_view, orig_centroids_view, batch_labels_view);
     vec_batches.prefetch_next_batch();
     // User needs to make sure kernel finishes its work before we overwrite batch in the next
     // iteration if different streams are used for kernel and copy.
@@ -364,7 +361,7 @@ void extend(raft::resources const& handle,
   }
 }
 
-/** See raft::neighbors::ivf_flat::extend docs */
+/** See cuvs::neighbors::ivf_flat::extend docs */
 template <typename T, typename IdxT>
 auto extend(raft::resources const& handle,
             const index<T, IdxT>& orig_index,
@@ -377,7 +374,7 @@ auto extend(raft::resources const& handle,
   return ext_index;
 }
 
-/** See raft::neighbors::ivf_flat::build docs */
+/** See cuvs::neighbors::ivf_flat::build docs */
 template <typename T, typename IdxT>
 inline auto build(raft::resources const& handle,
                   const index_params& params,
@@ -425,8 +422,7 @@ inline auto build(raft::resources const& handle,
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
     kmeans_params.metric  = index.metric();
-    cuvs::cluster::kmeans_balanced::fit(
-      handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
+    cuvs::cluster::kmeans::fit(handle, kmeans_params, trainset_const_view, centers_view);
   }
 
   // add the data if necessary
@@ -439,7 +435,7 @@ inline auto build(raft::resources const& handle,
 /**
  * Build an index that can be used in refinement operation.
  *
- * See raft::neighbors::refine for details on the refinement operation.
+ * See cuvs::neighbors::refine for details on the refinement operation.
  *
  * The returned index cannot be used for a regular ivf_flat::search. The index misses information
  * about coarse clusters. Instead, the neighbor candidates are assumed to form clusters, one for

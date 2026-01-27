@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
@@ -28,6 +28,95 @@ from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
 
 
+cdef class AceParams:
+    """
+    Parameters for ACE (Augmented Core Extraction) graph build for HNSW.
+
+    ACE enables building HNSW indices for datasets too large to fit in GPU
+    memory by partitioning the dataset and building sub-indices for each
+    partition independently.
+
+    Parameters
+    ----------
+    npartitions : int, default = 0 (optional)
+        Number of partitions for ACE partitioned build. When set to 0 (default),
+        the number of partitions is automatically derived based on available
+        host and GPU memory to maximize partition size while ensuring the build
+        fits in memory.
+
+        Small values might improve recall but potentially degrade performance
+        and increase memory usage. Partitions should not be too small to prevent
+        issues in KNN graph construction. The partition size is on average 2 *
+        (n_rows / npartitions) * dim * sizeof(T). 2 is because of the core and
+        augmented vectors. Please account for imbalance in the partition sizes
+        (up to 3x in our tests).
+
+        If the specified number of partitions results in partitions that exceed
+        available memory, the value will be automatically increased to fit
+        memory constraints and a warning will be issued.
+    build_dir : string, default = "/tmp/hnsw_ace_build" (optional)
+        Directory to store ACE build artifacts (KNN graph, optimized graph).
+        Used when `use_disk` is true or when the graph does not fit in memory.
+    use_disk : bool, default = False (optional)
+        Whether to use disk-based storage for ACE build. When true, enables
+        disk-based operations for memory-efficient graph construction.
+    max_host_memory_gb : float, default = 0 (optional)
+        Maximum host memory to use for ACE build in GiB. When set to 0
+        (default), uses available host memory. Useful for testing or
+        when running alongside other memory-intensive processes.
+    max_gpu_memory_gb : float, default = 0 (optional)
+        Maximum GPU memory to use for ACE build in GiB. When set to 0
+        (default), uses available GPU memory. Useful for testing or
+        when running alongside other memory-intensive processes.
+    """
+
+    cdef cuvsHnswAceParams* params
+    cdef object _build_dir_bytes
+
+    def __cinit__(self):
+        check_cuvs(cuvsHnswAceParamsCreate(&self.params))
+        self._build_dir_bytes = None
+
+    def __dealloc__(self):
+        if self.params is not NULL:
+            check_cuvs(cuvsHnswAceParamsDestroy(self.params))
+
+    def __init__(self, *,
+                 npartitions=0,
+                 build_dir="/tmp/hnsw_ace_build",
+                 use_disk=False,
+                 max_host_memory_gb=0,
+                 max_gpu_memory_gb=0):
+        self.params.npartitions = npartitions
+        self._build_dir_bytes = build_dir.encode('utf-8')
+        self.params.build_dir = self._build_dir_bytes
+        self.params.use_disk = use_disk
+        self.params.max_host_memory_gb = max_host_memory_gb
+        self.params.max_gpu_memory_gb = max_gpu_memory_gb
+
+    @property
+    def npartitions(self):
+        return self.params.npartitions
+
+    @property
+    def build_dir(self):
+        if self.params.build_dir is not NULL:
+            return self.params.build_dir.decode('utf-8')
+        return "/tmp/hnsw_ace_build"
+
+    @property
+    def use_disk(self):
+        return self.params.use_disk
+
+    @property
+    def max_host_memory_gb(self):
+        return self.params.max_host_memory_gb
+
+    @property
+    def max_gpu_memory_gb(self):
+        return self.params.max_gpu_memory_gb
+
+
 cdef class IndexParams:
     """
     Parameters to build index for HNSW nearest neighbor search
@@ -50,12 +139,23 @@ cdef class IndexParams:
         NOTE: When hierarchy is `gpu`, while the majority of the work is done
         on the GPU, initialization of the HNSW index itself and some other
         work is parallelized with the help of CPU threads.
+    M : int, default = 32 (optional)
+        HNSW M parameter: number of bi-directional links per node
+        (used when building with ACE). graph_degree = m * 2,
+        intermediate_graph_degree = m * 3.
+    metric : string, default = "sqeuclidean" (optional)
+        Distance metric to use. Valid values: ["sqeuclidean", "inner_product"]
+    ace_params : AceParams, default = None (optional)
+        ACE parameters for building HNSW index using ACE algorithm. If set,
+        enables the build() function to use ACE for index construction.
     """
 
     cdef cuvsHnswIndexParams* params
+    cdef AceParams _ace_params
 
     def __cinit__(self):
         check_cuvs(cuvsHnswIndexParamsCreate(&self.params))
+        self._ace_params = None
 
     def __dealloc__(self):
         check_cuvs(cuvsHnswIndexParamsDestroy(self.params))
@@ -63,7 +163,10 @@ cdef class IndexParams:
     def __init__(self, *,
                  hierarchy="none",
                  ef_construction=200,
-                 num_threads=0):
+                 num_threads=0,
+                 M=32,
+                 metric="sqeuclidean",
+                 ace_params=None):
         if hierarchy == "none":
             self.params.hierarchy = cuvsHnswHierarchy.NONE
         elif hierarchy == "cpu":
@@ -72,9 +175,19 @@ cdef class IndexParams:
             self.params.hierarchy = cuvsHnswHierarchy.GPU
         else:
             raise ValueError("Invalid hierarchy type."
-                             " Valid values are 'none' and 'cpu'.")
+                             " Valid values are 'none', 'cpu', and 'gpu'.")
         self.params.ef_construction = ef_construction
         self.params.num_threads = num_threads
+        self.params.M = M
+        self.params.metric = DISTANCE_TYPES[metric]
+
+        if ace_params is not None:
+            if not isinstance(ace_params, AceParams):
+                raise ValueError("ace_params must be an instance of AceParams")
+            self._ace_params = ace_params
+            self.params.ace_params = self._ace_params.params
+        else:
+            self.params.ace_params = NULL
 
     @property
     def hierarchy(self):
@@ -92,6 +205,14 @@ cdef class IndexParams:
     @property
     def num_threads(self):
         return self.params.num_threads
+
+    @property
+    def m(self):
+        return self.params.M
+
+    @property
+    def ace_params(self):
+        return self._ace_params
 
 
 cdef class Index:
@@ -340,6 +461,95 @@ def from_cagra(IndexParams index_params, cagra.Index cagra_index,
         res,
         index_params.params,
         cagra_index.index,
+        hnsw_index.index
+    ))
+
+    hnsw_index.trained = True
+    return hnsw_index
+
+
+@auto_sync_resources
+def build(IndexParams index_params, dataset, resources=None):
+    """
+    Build an HNSW index using the ACE (Augmented Core Extraction) algorithm.
+
+    ACE enables building HNSW indices for datasets too large to fit in GPU
+    memory by partitioning the dataset and building sub-indices for each
+    partition independently.
+
+    NOTE: This function requires `index_params.ace_params` to be set with
+    an instance of AceParams.
+
+    Parameters
+    ----------
+    index_params : IndexParams
+        Parameters for the HNSW index with ACE configuration.
+        Must have `ace_params` set.
+    dataset : Host array interface compliant matrix shape (n_samples, dim)
+        Supported dtype [float32, float16, int8, uint8]
+    {resources_docstring}
+
+    Returns
+    -------
+    index : Index
+        Trained HNSW index ready for search.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from cuvs.neighbors import hnsw
+    >>>
+    >>> n_samples = 50000
+    >>> n_features = 50
+    >>> dataset = np.random.random_sample((n_samples, n_features),
+    ...                                   dtype=np.float32)
+    >>>
+    >>> # Create ACE parameters
+    >>> ace_params = hnsw.AceParams(
+    ...     npartitions=4,
+    ...     use_disk=True,
+    ...     build_dir="/tmp/hnsw_ace_build"
+    ... )
+    >>>
+    >>> # Create index parameters with ACE
+    >>> index_params = hnsw.IndexParams(
+    ...     hierarchy="gpu",
+    ...     ace_params=ace_params,
+    ...     ef_construction=120,
+    ...     M=32,
+    ...     metric="sqeuclidean"
+    ... )
+    >>>
+    >>> # Build the index
+    >>> index = hnsw.build(index_params, dataset)
+    >>>
+    >>> # Search the index
+    >>> queries = np.random.random_sample((10, n_features), dtype=np.float32)
+    >>> distances, neighbors = hnsw.search(
+    ...     hnsw.SearchParams(ef=200),
+    ...     index,
+    ...     queries,
+    ...     k=10
+    ... )
+    """
+    if index_params.ace_params is None:
+        raise ValueError("index_params.ace_params must be set for hnsw.build(). "
+                         "Use AceParams to configure ACE algorithm parameters.")
+
+    dataset_ai = wrap_array(dataset)
+    _check_input_array(dataset_ai, [np.dtype('float32'),
+                                    np.dtype('float16'),
+                                    np.dtype('uint8'),
+                                    np.dtype('int8')])
+
+    cdef cydlpack.DLManagedTensor* dataset_dlpack = cydlpack.dlpack_c(dataset_ai)
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
+    cdef Index hnsw_index = Index()
+    check_cuvs(cuvsHnswBuild(
+        res,
+        index_params.params,
+        dataset_dlpack,
         hnsw_index.index
     ))
 

@@ -13,6 +13,10 @@ from cuvs.distance_type cimport cuvsDistanceType
 
 
 cdef extern from "cuvs/neighbors/nn_descent.h" nogil:
+    enum cuvsNNDescentDistCompDtype:
+        NND_DIST_COMP_AUTO = 0,
+        NND_DIST_COMP_FP32 = 1,
+        NND_DIST_COMP_FP16 = 2
 
     ctypedef struct cuvsNNDescentIndexParams:
         cuvsDistanceType metric
@@ -22,6 +26,7 @@ cdef extern from "cuvs/neighbors/nn_descent.h" nogil:
         size_t max_iterations
         float termination_threshold
         bool return_distances
+        cuvsNNDescentDistCompDtype dist_comp_dtype
 
     ctypedef cuvsNNDescentIndexParams* cuvsNNDescentIndexParams_t
 

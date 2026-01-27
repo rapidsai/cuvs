@@ -33,6 +33,7 @@ void fit_predict(raft::resources const& handle,
   spectral_embedding_config.norm_laplacian = true;
   spectral_embedding_config.drop_first     = false;
   spectral_embedding_config.seed           = config.rng_state.seed;
+  spectral_embedding_config.tolerance      = config.tolerance;
 
   cuvs::cluster::kmeans::params kmeans_config;
   kmeans_config.n_clusters          = config.n_clusters;
@@ -58,6 +59,24 @@ void fit_predict(raft::resources const& handle,
                                      labels,
                                      raft::make_host_scalar_view(&inertia),
                                      raft::make_host_scalar_view(&n_iter));
+}
+
+void fit_predict(raft::resources const& handle,
+                 params config,
+                 raft::device_matrix_view<float, int, raft::row_major> dataset,
+                 raft::device_vector_view<int, int> labels)
+{
+  int n_samples = dataset.extent(0);
+
+  auto graph = raft::make_device_coo_matrix<float, int, int, int>(handle, n_samples, n_samples);
+
+  cuvs::preprocessing::spectral_embedding::params embed_params;
+  embed_params.n_neighbors = config.n_neighbors;
+
+  cuvs::preprocessing::spectral_embedding::helpers::create_connectivity_graph(
+    handle, embed_params, dataset, graph);
+
+  fit_predict(handle, config, graph.view(), labels);
 }
 
 }  // namespace cuvs::cluster::spectral::detail

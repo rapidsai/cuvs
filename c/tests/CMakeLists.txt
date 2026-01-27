@@ -15,6 +15,9 @@ if(PROJECT_IS_TOP_LEVEL)
   rapids_test_init()
 endif()
 
+rapids_cmake_install_lib_dir(lib_dir)
+include(GNUInstallDirs)
+
 include(${rapids-cmake-dir}/cpm/gtest.cmake)
 rapids_cpm_gtest(BUILD_STATIC)
 
@@ -40,13 +43,17 @@ function(ConfigureTest)
 
   add_executable(${TEST_NAME} ${_CUVS_TEST_PATH})
   target_link_libraries(
-    ${TEST_NAME} PRIVATE cuvs::c_api GTest::gtest GTest::gtest_main
-                         $<TARGET_NAME_IF_EXISTS:conda_env>
+    ${TEST_NAME}
+    PRIVATE cuvs::c_api
+            GTest::gtest
+            GTest::gtest_main
+            $<IF:$<BOOL:${CUVSC_STATIC_CUVS_LIBRARY}>,$<COMPILE_ONLY:cuvs::cuvs_static>,cuvs::cuvs>
+            $<TARGET_NAME_IF_EXISTS:conda_env>
   )
   set_target_properties(
     ${TEST_NAME}
     PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<BUILD_INTERFACE:${CUVS_C_BINARY_DIR}/gtests>"
-               INSTALL_RPATH "\$ORIGIN/../../../lib"
+               INSTALL_RPATH "\$ORIGIN/../../../${lib_dir}"
   )
 
   target_include_directories(
@@ -87,6 +94,7 @@ endif()
 
 ConfigureTest(NAME cuvs_c_headers PATH core/headers.c)
 ConfigureTest(NAME cuvs_c_test PATH core/c_api.c)
+target_link_libraries(cuvs_c_test PRIVATE CUDA::cudart)
 ConfigureTest(NAME cuvs_c_neighbors_test PATH neighbors/c_api.c)
 
 # ##################################################################################################

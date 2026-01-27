@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -207,6 +207,23 @@ inline void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::vpq_p
   if (conf.contains("pq_kmeans_trainset_fraction")) {
     param.pq_kmeans_trainset_fraction = conf.at("pq_kmeans_trainset_fraction");
   }
+  if (conf.contains("pq_kmeans_type")) {
+    std::string type = conf.at("pq_kmeans_type");
+    if (type == "KMeans") {
+      param.pq_kmeans_type = cuvs::cluster::kmeans::kmeans_type::KMeans;
+    } else if (type == "KMeansBalanced") {
+      param.pq_kmeans_type = cuvs::cluster::kmeans::kmeans_type::KMeansBalanced;
+    } else {
+      throw std::runtime_error("pq_kmeans_type: '" + type +
+                               "', should be either 'KMeans' or 'KMeansBalanced'");
+    }
+  }
+  if (conf.contains("max_train_points_per_pq_code")) {
+    param.max_train_points_per_pq_code = conf.at("max_train_points_per_pq_code");
+  }
+  if (conf.contains("max_train_points_per_vq_cluster")) {
+    param.max_train_points_per_vq_cluster = conf.at("max_train_points_per_vq_cluster");
+  }
 }
 
 nlohmann::json collect_conf_with_prefix(const nlohmann::json& conf,
@@ -260,6 +277,11 @@ void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::cagra::index
             params.graph_build_params)) {
         params.graph_build_params = cuvs::neighbors::graph_build_params::nn_descent_params{};
       }
+    } else if (conf.at("graph_build_algo") == "ACE") {
+      if (!std::holds_alternative<cuvs::neighbors::graph_build_params::ace_params>(
+            params.graph_build_params)) {
+        params.graph_build_params = cuvs::neighbors::graph_build_params::ace_params{};
+      }
     }
   }
 
@@ -267,12 +289,15 @@ void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::cagra::index
   nlohmann::json ivf_pq_build_conf  = collect_conf_with_prefix(conf, "ivf_pq_build_");
   nlohmann::json ivf_pq_search_conf = collect_conf_with_prefix(conf, "ivf_pq_search_");
   nlohmann::json nn_descent_conf    = collect_conf_with_prefix(conf, "nn_descent_");
+  nlohmann::json ace_conf           = collect_conf_with_prefix(conf, "ace_");
 
   if (std::holds_alternative<std::monostate>(params.graph_build_params)) {
     if (!ivf_pq_build_conf.empty() || !ivf_pq_search_conf.empty()) {
       params.graph_build_params = cuvs::neighbors::graph_build_params::ivf_pq_params{};
     } else if (!nn_descent_conf.empty()) {
       params.graph_build_params = cuvs::neighbors::graph_build_params::nn_descent_params{};
+    } else if (!ace_conf.empty()) {
+      params.graph_build_params = cuvs::neighbors::graph_build_params::ace_params{};
     } else {
       params.graph_build_params = cuvs::neighbors::graph_build_params::iterative_search_params{};
     }
@@ -328,6 +353,20 @@ void parse_build_param(const nlohmann::json& conf,
         cuvs::neighbors::cagra::graph_build_params::nn_descent_params(
           conf.value("intermediate_graph_degree", cagra_params.intermediate_graph_degree),
           dist_type);
+    } else if (conf.value("graph_build_algo", "") == "ACE") {
+      cagra_params.graph_build_params = cuvs::neighbors::cagra::graph_build_params::ace_params{};
+    }
+    // Parse ACE parameters if provided
+    nlohmann::json ace_conf = collect_conf_with_prefix(conf, "ace_");
+    if (!ace_conf.empty()) {
+      auto ace_params = cuvs::neighbors::cagra::graph_build_params::ace_params();
+      if (ace_conf.contains("npartitions")) { ace_params.npartitions = ace_conf.at("npartitions"); }
+      if (ace_conf.contains("build_dir")) { ace_params.build_dir = ace_conf.at("build_dir"); }
+      if (ace_conf.contains("ef_construction")) {
+        ace_params.ef_construction = ace_conf.at("ef_construction");
+      }
+      if (ace_conf.contains("use_disk")) { ace_params.use_disk = ace_conf.at("use_disk"); }
+      cagra_params.graph_build_params = ace_params;
     }
     ::parse_build_param<T, IdxT>(conf, cagra_params);
     return cagra_params;

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -40,7 +40,7 @@
 #include <raft/util/vectorized.cuh>
 
 #include <rmm/cuda_stream_view.hpp>
-#include <rmm/mr/device/per_device_resource.hpp>
+#include <rmm/mr/per_device_resource.hpp>
 
 #include <cub/cub.cuh>
 #include <cuda_fp16.h>
@@ -821,7 +821,7 @@ inline auto get_centers(const raft::resources& res, const index<IdxT>& index)
   if constexpr (std::is_same_v<T, int8_t>) { return index.centers_int8(res); }
 }
 
-/** See raft::spatial::knn::ivf_pq::search docs */
+/** See cuvs::spatial::knn::ivf_pq::search docs */
 template <typename T,
           typename IdxT,
           typename IvfSampleFilterT = cuvs::neighbors::filtering::none_sample_filter>
@@ -859,6 +859,9 @@ inline void search(raft::resources const& handle,
     static_cast<uint64_t>(index.size()));
   RAFT_EXPECTS(params.n_probes > 0,
                "n_probes (number of clusters to probe in the search) must be positive.");
+  RAFT_EXPECTS(index.codes_layout() == list_layout::INTERLEAVED,
+               "IVF-PQ search requires INTERLEAVED codes layout. FLAT layout is not supported for "
+               "GPU search.");
 
   switch (utils::check_pointer_residency(queries, neighbors, distances)) {
     case utils::pointer_residency::device_only:

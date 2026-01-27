@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs;
@@ -10,6 +10,20 @@ package com.nvidia.cuvs;
  * @since 25.02
  */
 public class HnswIndexParams {
+
+  /**
+   * Distance metric types
+   */
+  public enum CuvsDistanceType {
+    L2Expanded(0),
+    InnerProduct(2);
+
+    public final int value;
+
+    private CuvsDistanceType(int value) {
+      this.value = value;
+    }
+  }
 
   /**
    * Hierarchy for HNSW index when converting from CAGRA index
@@ -27,7 +41,12 @@ public class HnswIndexParams {
     /**
      * Full hierarchy is built using the CPU
      */
-    CPU(1);
+    CPU(1),
+
+    /**
+     * Full hierarchy is built using the GPU
+     */
+    GPU(2);
 
     /**
      * The value for the enum choice.
@@ -43,13 +62,25 @@ public class HnswIndexParams {
   private int efConstruction = 200;
   private int numThreads = 2;
   private int vectorDimension;
+  private long m = 32;
+  private CuvsDistanceType metric = CuvsDistanceType.L2Expanded;
+  private HnswAceParams aceParams;
 
   private HnswIndexParams(
-      CuvsHnswHierarchy hierarchy, int efConstruction, int numThreads, int vectorDimension) {
+      CuvsHnswHierarchy hierarchy,
+      int efConstruction,
+      int numThreads,
+      int vectorDimension,
+      long m,
+      CuvsDistanceType metric,
+      HnswAceParams aceParams) {
     this.hierarchy = hierarchy;
     this.efConstruction = efConstruction;
     this.numThreads = numThreads;
     this.vectorDimension = vectorDimension;
+    this.m = m;
+    this.metric = metric;
+    this.aceParams = aceParams;
   }
 
   /**
@@ -84,6 +115,35 @@ public class HnswIndexParams {
     return vectorDimension;
   }
 
+  /**
+   * Gets the HNSW M parameter: number of bi-directional links per node
+   * (used when building with ACE). graph_degree = m * 2,
+   * intermediate_graph_degree = m * 3.
+   *
+   * @return the M parameter
+   */
+  public long getM() {
+    return m;
+  }
+
+  /**
+   * Gets the distance metric type.
+   *
+   * @return the metric type
+   */
+  public CuvsDistanceType getMetric() {
+    return metric;
+  }
+
+  /**
+   * Gets the ACE parameters for building HNSW index using ACE algorithm.
+   *
+   * @return the ACE parameters, or null if not set
+   */
+  public HnswAceParams getAceParams() {
+    return aceParams;
+  }
+
   @Override
   public String toString() {
     return "HnswIndexParams [hierarchy="
@@ -94,6 +154,12 @@ public class HnswIndexParams {
         + numThreads
         + ", vectorDimension="
         + vectorDimension
+        + ", m="
+        + m
+        + ", metric="
+        + metric
+        + ", aceParams="
+        + aceParams
         + "]";
   }
 
@@ -106,6 +172,9 @@ public class HnswIndexParams {
     private int efConstruction = 200;
     private int numThreads = 2;
     private int vectorDimension;
+    private long m = 32;
+    private CuvsDistanceType metric = CuvsDistanceType.L2Expanded;
+    private HnswAceParams aceParams;
 
     /**
      * Constructs this Builder with an instance of Arena.
@@ -164,12 +233,54 @@ public class HnswIndexParams {
     }
 
     /**
+     * Sets the HNSW M parameter: number of bi-directional links per node
+     * (used when building with ACE). graph_degree = m * 2,
+     * intermediate_graph_degree = m * 3.
+     *
+     * @param m the M parameter
+     * @return an instance of Builder
+     */
+    public Builder withM(long m) {
+      this.m = m;
+      return this;
+    }
+
+    /**
+     * Sets the distance metric type.
+     *
+     * @param metric the metric type
+     * @return an instance of Builder
+     */
+    public Builder withMetric(CuvsDistanceType metric) {
+      this.metric = metric;
+      return this;
+    }
+
+    /**
+     * Sets the ACE parameters for building HNSW index using ACE algorithm.
+     *
+     * @param aceParams the ACE parameters
+     * @return an instance of Builder
+     */
+    public Builder withAceParams(HnswAceParams aceParams) {
+      this.aceParams = aceParams;
+      return this;
+    }
+
+    /**
      * Builds an instance of {@link HnswIndexParams}.
      *
      * @return an instance of {@link HnswIndexParams}
      */
     public HnswIndexParams build() {
-      return new HnswIndexParams(hierarchy, efConstruction, numThreads, vectorDimension);
+      return new HnswIndexParams(
+          hierarchy,
+          efConstruction,
+          numThreads,
+          vectorDimension,
+          m,
+          metric,
+          aceParams);
     }
   }
 }

@@ -33,7 +33,7 @@
 
 #include <rmm/cuda_stream.hpp>
 #include <rmm/device_uvector.hpp>
-#include <rmm/mr/device/cuda_memory_resource.hpp>
+#include <rmm/mr/cuda_memory_resource.hpp>
 #include <rmm/mr/pinned_host_memory_resource.hpp>
 
 #include <cuda/atomic>
@@ -1981,7 +1981,12 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
                         worker_handles.data(),
                         num_queries,
                         this->lifetime,
-                        [=](uint32_t job_ix) {
+                        [&job_descriptors = this->job_descriptors,
+                         result_indices_ptr,
+                         result_distances_ptr,
+                         queries_ptr,
+                         top_k,
+                         num_queries](uint32_t job_ix) {
                           auto& jd                = job_descriptors.data()[job_ix].input.value;
                           auto* cflag             = &job_descriptors.data()[job_ix].completion_flag;
                           jd.result_indices_ptr   = result_indices_ptr;

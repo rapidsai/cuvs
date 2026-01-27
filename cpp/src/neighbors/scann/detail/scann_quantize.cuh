@@ -1,9 +1,10 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "../../detail/vpq_dataset.cuh"
+#include "../../ivf_pq/ivf_pq_codepacking.cuh"
 #include <chrono>
 #include <cmath>
 #include <cuvs/neighbors/common.hpp>
@@ -52,8 +53,10 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_subspaces_kernel
     int subspace_offset   = j * pq_centers.extent(1) * (1 << PqBits);
     auto pq_subspace_view = raft::make_device_matrix_view(
       pq_centers.data_handle() + subspace_offset, (uint32_t)(1 << PqBits), pq_centers.extent(1));
-    uint8_t code = cuvs::neighbors::detail::compute_code<kSubWarpSize>(
-      dataset, vq_centers, pq_subspace_view, row_ix, j, vq_label);
+    auto pq_centers_smem =
+      raft::make_device_matrix_view<const MathT, uint32_t, raft::row_major>(nullptr, 0, 0);
+    uint8_t code = cuvs::neighbors::detail::compute_code<kSubWarpSize, uint8_t>(
+      dataset, vq_centers, pq_centers_smem, pq_subspace_view, row_ix, j, vq_label);
     // TODO: this writes in global memory one byte per warp, which is very slow.
     //  It's better to keep the codes in the shared memory or registers and dump them at once.
     if (lane_id == 0) { code_view[j] = code; }
@@ -101,7 +104,8 @@ auto process_and_fill_codes_subspaces(
     }
   }(pq_bits);
 
-  auto labels = cuvs::neighbors::detail::predict_vq<label_t>(res, dataset, vq_centers);
+  auto labels = raft::make_device_vector<label_t, IdxT>(res, dataset.extent(0));
+  cuvs::neighbors::detail::predict_vq<label_t>(res, dataset, vq_centers, labels.view());
 
   dim3 blocks(raft::div_rounding_up_safe<ix_t>(n_rows, kBlockSize / threads_per_vec), 1, 1);
 
@@ -326,7 +330,7 @@ template <uint32_t BlockSize, typename IdxT>
 __launch_bounds__(BlockSize) RAFT_KERNEL
   quantize_bfloat16_noise_shaped_kernel(raft::device_matrix_view<const float, IdxT> dataset,
                                         raft::device_matrix_view<int16_t, IdxT> bf16_dataset,
-                                        raft::device_vector_view<const float> sq_norms,
+                                        raft::device_vector_view<const float, IdxT> sq_norms,
                                         float noise_shaping_threshold)
 {
   IdxT row_idx = raft::Pow2<32>::div(IdxT{threadIdx.x} + IdxT{BlockSize} * IdxT{blockIdx.x});
@@ -516,8 +520,8 @@ void quantize_bfloat16(raft::resources const& res,
  */
 template <typename T,
           typename LabelT,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 auto sample_training_residuals(
   raft::resources const& res,
   random::RngState random_state,
