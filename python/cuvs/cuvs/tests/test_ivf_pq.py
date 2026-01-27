@@ -338,8 +338,8 @@ def test_build_precomputed(codebook_kind, metric):
 
 @pytest.mark.parametrize("codebook_kind", ["subspace", "cluster"])
 @pytest.mark.parametrize("dtype", [np.float32, np.float16, np.int8, np.uint8])
-def test_transform(codebook_kind, dtype):
-    n_rows = 5000
+@pytest.mark.parametrize("n_rows", [500, 100000])
+def test_transform(codebook_kind, dtype, n_rows):
     n_cols = 32
     n_lists = 50
     pq_bits = 8
