@@ -467,6 +467,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/composite/merge.cpp
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/cagra.cpp>
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw.cpp>
+    src/neighbors/ivf_common.cu
     src/neighbors/ivf_flat_index.cpp
     src/neighbors/ivf_flat/ivf_flat_build_extend_float_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_build_extend_half_int64_t.cu
@@ -541,6 +542,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/vamana_serialize_int8.cu
     src/preprocessing/quantize/scalar.cu
     src/preprocessing/quantize/binary.cu
+    src/preprocessing/quantize/pq.cu
     src/preprocessing/spectral/spectral_embedding.cu
     src/selection/select_k_float_int64_t.cu
     src/selection/select_k_float_int32_t.cu

@@ -43,6 +43,8 @@ void _build(cuvsResources_t res,
   ace_params.npartitions          = params->ace_params->npartitions;
   ace_params.build_dir            = params->ace_params->build_dir ? params->ace_params->build_dir : "/tmp/hnsw_ace_build";
   ace_params.use_disk             = params->ace_params->use_disk;
+  ace_params.max_host_memory_gb   = params->ace_params->max_host_memory_gb;
+  ace_params.max_gpu_memory_gb    = params->ace_params->max_gpu_memory_gb;
   cpp_params.graph_build_params   = ace_params;
 
   using dataset_mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
@@ -151,9 +153,11 @@ void* _deserialize(cuvsResources_t res,
 extern "C" cuvsError_t cuvsHnswAceParamsCreate(cuvsHnswAceParams_t* params)
 {
   return cuvs::core::translate_exceptions([=] {
-    *params = new cuvsHnswAceParams{.npartitions     = 1,
-                                    .build_dir       = "/tmp/hnsw_ace_build",
-                                    .use_disk        = false};
+    *params = new cuvsHnswAceParams{.npartitions         = 0,
+                                    .build_dir           = "/tmp/hnsw_ace_build",
+                                    .use_disk            = false,
+                                    .max_host_memory_gb  = 0,
+                                    .max_gpu_memory_gb   = 0};
   });
 }
 
