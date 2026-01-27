@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - "main"
+      - "release/*"
     tags:
       - v[0-9][0-9].[0-9][0-9].[0-9][0-9]
   workflow_dispatch:
@@ -63,7 +64,7 @@ jobs:
       date: ${{ inputs.date }}
       container_image: "rapidsai/ci-wheel:26.02-cuda${{ matrix.cuda_version }}-rockylinux8-py3.10"
       node_type: "cpu16"
-      # requires_license_builder: false
+      requires_license_builder: true
       script: "ci/build_standalone_c.sh"
       artifact-name: "libcuvs_c_${{ matrix.cuda_version }}_${{ matrix.arch }}.tar.gz"
       file_to_upload: "libcuvs_c.tar.gz"
