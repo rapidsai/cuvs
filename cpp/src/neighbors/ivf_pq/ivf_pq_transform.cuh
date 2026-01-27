@@ -33,10 +33,10 @@ __launch_bounds__(BlockSize) static __global__ void transform_codes_kernel(
   if (row_ix >= dataset_residual.extent(0)) { return; }
 
   const uint32_t cluster_ix = output_labels[row_ix];
+  const uint32_t pq_dim     = dataset_residual.extent(1) / pq_centers.extent(1);
 
   auto encoder =
     encode_vectors<kSubWarpSize, IdxT>{pq_centers, dataset_residual, codebook_kind, cluster_ix};
-  const uint32_t pq_dim = dataset_residual.extent(1) / pq_centers.extent(1);
 
   write_vector_flat<PqBits, kSubWarpSize, IdxT>(
     output_dataset.data_handle(), row_ix, row_ix, pq_dim, output_dataset.extent(1), encoder);
@@ -122,15 +122,7 @@ void transform(raft::resources const& res,
 
   auto cluster_centers =
     raft::make_device_mdarray<float>(res, mr, raft::make_extents<IdxT>(n_clusters, index.dim()));
-
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(cluster_centers.data_handle(),
-                                  sizeof(float) * index.dim(),
-                                  index.centers().data_handle(),
-                                  sizeof(float) * index.dim_ext(),
-                                  sizeof(float) * index.dim(),
-                                  n_clusters,
-                                  cudaMemcpyDefault,
-                                  stream));
+  extract_centers(res, index, cluster_centers.view());
 
   // Determine if a stream pool exist and make sure there is at least one stream in it so we
   // could use the stream for kernel/copy overlapping by enabling prefetch.
