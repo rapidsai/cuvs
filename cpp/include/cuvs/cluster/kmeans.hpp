@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -133,6 +133,11 @@ struct balanced_params : base_params {
    */
   bool is_packed_binary = false;
 };
+
+/**
+ * @brief Type of k-means algorithm.
+ */
+enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
 
 /**
  * @}
