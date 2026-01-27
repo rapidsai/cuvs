@@ -389,7 +389,7 @@ void pairwise_distance(
  *
  * auto out = raft::make_device_matrix<float>(handle, x_nrows, y_nrows);
  * auto metric = cuvs::distance::DistanceType::L2Expanded;
- * raft::sparse::distance::pairwise_distance(handle, x.view(), y.view(), out, metric);
+ * cuvs::pairwise_distance(handle, x.view(), y.view(), out, metric);
  * @endcode
  *
  * @param[in] handle raft::resources
@@ -429,7 +429,7 @@ void pairwise_distance(raft::resources const& handle,
  *
  * auto out = raft::make_device_matrix<double>(handle, x_nrows, y_nrows);
  * auto metric = cuvs::distance::DistanceType::L2Expanded;
- * raft::sparse::distance::pairwise_distance(handle, x.view(), y.view(), out, metric);
+ * cuvs::distance::pairwise_distance(handle, x.view(), y.view(), out, metric);
  * @endcode
  *
  * @param[in] handle raft::resources

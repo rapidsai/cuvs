@@ -39,8 +39,8 @@ std::ofstream open_file(std::string file_name)
 // Helper for serializing device/host matrix to a given file
 template <typename T,
           typename IdxT,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 void serialize_matrix(
   raft::resources const& res,
   std::filesystem::path file_path,

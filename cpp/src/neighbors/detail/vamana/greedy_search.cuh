@@ -82,9 +82,9 @@ __global__ void SortPairsKernel(void* query_list_ptr, int num_queries, int topk)
 **********************************************************************************************/
 template <typename T,
           typename accT,
-          typename IdxT     = uint32_t,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename IdxT = uint32_t,
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 __global__ void GreedySearchKernel(
   raft::device_matrix_view<IdxT, int64_t> graph,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,

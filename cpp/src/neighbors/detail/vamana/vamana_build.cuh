@@ -1,19 +1,17 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
 #include "../../../sparse/neighbors/cross_component_nn.cuh"
-#include "../../detail/vpq_dataset.cuh"
+#include "../../detail/ann_utils.cuh"
 #include "greedy_search.cuh"
 #include "robust_prune.cuh"
 #include "vamana_structs.cuh"
 #include <cuvs/neighbors/vamana.hpp>
 
-#include <raft/cluster/kmeans.cuh>
-#include <raft/cluster/kmeans_types.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/error.hpp>
@@ -25,14 +23,13 @@
 #include <raft/linalg/gemm.hpp>
 #include <raft/matrix/copy.cuh>
 #include <raft/matrix/init.cuh>
-#include <raft/matrix/slice.cuh>
-#include <raft/random/make_blobs.cuh>
 
 #include <thrust/device_vector.h>
 #include <thrust/sequence.h>
 #include <thrust/unique.h>
 
 #include <cuvs/distance/distance.hpp>
+#include <cuvs/preprocessing/quantize/pq.hpp>
 
 #include <chrono>
 #include <cstdio>
@@ -94,9 +91,9 @@ __global__ void print_queryIds(void* query_list_ptr)
  *******************************************************************************************/
 template <typename T,
           typename accT,
-          typename IdxT     = uint32_t,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename IdxT = uint32_t,
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 void batched_insert_vamana(
   raft::resources const& res,
   const index_params& params,
@@ -550,26 +547,10 @@ void batched_insert_vamana(
   RAFT_CHECK_CUDA(stream);
 }
 
-template <typename T>
-auto quantize_all_vectors(raft::resources const& res,
-                          raft::device_matrix_view<const T, int64_t> residuals,
-                          raft::device_matrix_view<float, uint32_t, raft::row_major> pq_codebook,
-                          cuvs::neighbors::vpq_params ps)
-  -> raft::device_matrix<uint8_t, int64_t, raft::row_major>
-{
-  auto dim         = residuals.extent(1);
-  auto vq_codebook = raft::make_device_matrix<float, uint32_t, raft::row_major>(res, 1, dim);
-  raft::matrix::fill<float>(res, vq_codebook.view(), 0.0);
-
-  auto codes = cuvs::neighbors::detail::process_and_fill_codes_subspaces<float, int64_t>(
-    res, ps, residuals, raft::make_const_mdspan(vq_codebook.view()), pq_codebook);
-  return codes;
-}
-
 template <typename T,
-          typename IdxT     = uint64_t,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename IdxT = uint64_t,
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 index<T, IdxT> build(
   raft::resources const& res,
   const index_params& params,
@@ -611,9 +592,11 @@ index<T, IdxT> build(
     int pq_codebook_size  = codebook_params.pq_codebook_size;
     int pq_dim            = codebook_params.pq_dim;
 
-    cuvs::neighbors::vpq_params pq_params;
-    pq_params.pq_bits = raft::log2(pq_codebook_size);
-    pq_params.pq_dim  = pq_dim;
+    auto pq_params          = cuvs::preprocessing::quantize::pq::params{};
+    pq_params.pq_bits       = raft::log2(pq_codebook_size);
+    pq_params.pq_dim        = pq_dim;
+    pq_params.use_subspaces = true;
+    pq_params.use_vq        = false;
 
     // transform pq_encoding_table (dimensions: pq_codebook_size x dim_per_subspace * pq_dim ) to
     // pq_codebook (dimensions: pq_codebook_size * pq_dim, dim_per_subspace)
@@ -655,14 +638,16 @@ index<T, IdxT> build(
 
     // process in batches
     const uint32_t n_rows = dataset.extent(0);
-    // codes_rowlen defined as in cuvs::neighbors::detail::process_and_fill_codes_subspaces()
-    const int64_t codes_rowlen =
-      sizeof(uint32_t) *
-      (1 + raft::div_rounding_up_safe<int64_t>(pq_dim * pq_params.pq_bits, 8 * sizeof(uint32_t)));
-    quantized_vectors = raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(
-      res,
-      n_rows,
-      codes_rowlen - 4);  // first 4 columns of output from quantize_all_vectors() to be discarded
+
+    auto quantizer = cuvs::preprocessing::quantize::pq::quantizer<float>(
+      pq_params,
+      cuvs::neighbors::vpq_dataset<float, int64_t>{
+        raft::make_device_matrix<float, uint32_t, raft::row_major>(res, 0, 0),
+        std::move(pq_codebook),
+        raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(res, 0, 0)});
+    const int64_t codes_rowlen = cuvs::preprocessing::quantize::pq::get_quantized_dim(pq_params);
+    quantized_vectors =
+      raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(res, n_rows, codes_rowlen);
     // TODO: with scaling workspace we could choose the batch size dynamically
     constexpr uint32_t kReasonableMaxBatchSize = 65536;
     const uint32_t max_batch_size              = std::min(n_rows, kReasonableMaxBatchSize);
@@ -696,22 +681,15 @@ index<T, IdxT> build(
           res, dataset_float.view(), rotation_matrix_device.view(), dataset_rotated.view());
       }
 
-      // quantize rotated vectors using codebook
-      auto temp_vectors =
-        quantize_all_vectors<float>(res, dataset_rotated.view(), pq_codebook.view(), pq_params);
-
-      // Remove the vector quantization header values
-      raft::matrix::slice_coordinates<int64_t> slice_coords(
-        0, 4, temp_vectors.extent(0), temp_vectors.extent(1));
-
-      raft::matrix::slice(res,
-                          raft::make_const_mdspan(temp_vectors.view()),
-                          raft::make_device_matrix_view<uint8_t, int64_t>(
-                            quantized_vectors.value().data_handle() +
-                              batch.offset() * quantized_vectors.value().extent(1),
-                            batch.size(),
-                            quantized_vectors.value().extent(1)),
-                          slice_coords);
+      cuvs::preprocessing::quantize::pq::transform(
+        res,
+        quantizer,
+        raft::make_const_mdspan(dataset_rotated.view()),
+        raft::make_device_matrix_view<uint8_t, int64_t>(
+          quantized_vectors.value().data_handle() +
+            batch.offset() * quantized_vectors.value().extent(1),
+          batch.size(),
+          quantized_vectors.value().extent(1)));
     }
   }
 

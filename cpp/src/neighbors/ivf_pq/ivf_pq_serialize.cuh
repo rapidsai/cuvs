@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -7,6 +7,7 @@
 
 #include "../ivf_common.cuh"
 #include "../ivf_list.cuh"
+#include "../ivf_pq_impl.hpp"
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <raft/core/host_mdarray.hpp>
@@ -21,11 +22,8 @@
 namespace cuvs::neighbors::ivf_pq::detail {
 
 // Serialization version
-// No backward compatibility yet; that is, can't add additional fields without breaking
-// backward compatibility.
-// TODO(hcho3) Implement next-gen serializer for IVF that allows for expansion in a backward
-//             compatible fashion.
-constexpr int kSerializationVersion = 3;
+// Version 4 adds codes_layout field
+constexpr int kSerializationVersion = 4;
 
 /**
  * Write the index to an output stream
@@ -55,6 +53,7 @@ void serialize(raft::resources const& handle_, std::ostream& os, const index<Idx
 
   raft::serialize_scalar(handle_, os, index.metric());
   raft::serialize_scalar(handle_, os, index.codebook_kind());
+  raft::serialize_scalar(handle_, os, index.codes_layout());
   raft::serialize_scalar(handle_, os, index.n_lists());
 
   raft::serialize_mdspan(handle_, os, index.pq_centers());
@@ -70,9 +69,21 @@ void serialize(raft::resources const& handle_, std::ostream& os, const index<Idx
              raft::resource::get_cuda_stream(handle_));
   raft::resource::sync_stream(handle_);
   raft::serialize_mdspan(handle_, os, sizes_host.view());
-  auto list_store_spec = list_spec<uint32_t, IdxT>{index.pq_bits(), index.pq_dim(), true};
-  for (uint32_t label = 0; label < index.n_lists(); label++) {
-    ivf::serialize_list(handle_, os, index.lists()[label], list_store_spec, sizes_host(label));
+  // NOTE: We use static_cast here because serialize_list requires the concrete list type
+  // to access the spec_type for determining the serialized data layout.
+  if (index.codes_layout() == list_layout::FLAT) {
+    auto list_store_spec = list_spec_flat<uint32_t, IdxT>{index.pq_bits(), index.pq_dim(), true};
+    for (uint32_t label = 0; label < index.n_lists(); label++) {
+      auto& typed_list = static_cast<const list_data_flat<IdxT>&>(*index.lists()[label]);
+      ivf::serialize_list(handle_, os, typed_list, list_store_spec, sizes_host(label));
+    }
+  } else {
+    auto list_store_spec =
+      list_spec_interleaved<uint32_t, IdxT>{index.pq_bits(), index.pq_dim(), true};
+    for (uint32_t label = 0; label < index.n_lists(); label++) {
+      auto& typed_list = static_cast<const list_data_interleaved<IdxT>&>(*index.lists()[label]);
+      ivf::serialize_list(handle_, os, typed_list, list_store_spec, sizes_host(label));
+    }
   }
 }
 
@@ -125,6 +136,7 @@ auto deserialize(raft::resources const& handle_, std::istream& is) -> index<IdxT
 
   auto metric        = raft::deserialize_scalar<cuvs::distance::DistanceType>(handle_, is);
   auto codebook_kind = raft::deserialize_scalar<cuvs::neighbors::ivf_pq::codebook_gen>(handle_, is);
+  auto codes_layout  = raft::deserialize_scalar<cuvs::neighbors::ivf_pq::list_layout>(handle_, is);
   auto n_lists       = raft::deserialize_scalar<std::uint32_t>(handle_, is);
 
   RAFT_LOG_DEBUG("n_rows %zu, dim %d, pq_dim %d, pq_bits %d, n_lists %d",
@@ -134,25 +146,41 @@ auto deserialize(raft::resources const& handle_, std::istream& is) -> index<IdxT
                  static_cast<int>(pq_bits),
                  static_cast<int>(n_lists));
 
-  auto index = cuvs::neighbors::ivf_pq::index<IdxT>(
-    handle_, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, cma);
+  // Create owning_impl directly to get mutable access for deserialization
+  auto impl = std::make_unique<owning_impl<IdxT>>(
+    handle_, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, cma, codes_layout);
 
-  raft::deserialize_mdspan(handle_, is, index.pq_centers());
-  raft::deserialize_mdspan(handle_, is, index.centers());
-  raft::deserialize_mdspan(handle_, is, index.centers_rot());
-  raft::deserialize_mdspan(handle_, is, index.rotation_matrix());
-  raft::deserialize_mdspan(handle_, is, index.list_sizes());
-  auto list_device_spec = list_spec<uint32_t, IdxT>{pq_bits, pq_dim, cma};
-  auto list_store_spec  = list_spec<uint32_t, IdxT>{pq_bits, pq_dim, true};
-  for (auto& list : index.lists()) {
-    ivf::deserialize_list(handle_, is, list, list_store_spec, list_device_spec);
+  // Deserialize center/matrix data using mutable accessors
+  raft::deserialize_mdspan(handle_, is, impl->pq_centers());
+  raft::deserialize_mdspan(handle_, is, impl->centers());
+  raft::deserialize_mdspan(handle_, is, impl->centers_rot());
+  raft::deserialize_mdspan(handle_, is, impl->rotation_matrix());
+  raft::deserialize_mdspan(handle_, is, impl->list_sizes());
+  if (codes_layout == list_layout::FLAT) {
+    auto list_device_spec = list_spec_flat<uint32_t, IdxT>{pq_bits, pq_dim, cma};
+    auto list_store_spec  = list_spec_flat<uint32_t, IdxT>{pq_bits, pq_dim, true};
+    for (auto& list_data_base_ptr : impl->lists()) {
+      std::shared_ptr<list_data_flat<IdxT>> typed_list;
+      ivf::deserialize_list(handle_, is, typed_list, list_store_spec, list_device_spec);
+      list_data_base_ptr = typed_list;
+    }
+  } else {
+    auto list_device_spec = list_spec_interleaved<uint32_t, IdxT>{pq_bits, pq_dim, cma};
+    auto list_store_spec  = list_spec_interleaved<uint32_t, IdxT>{pq_bits, pq_dim, true};
+    for (auto& list_data_base_ptr : impl->lists()) {
+      std::shared_ptr<list_data_interleaved<IdxT>> typed_list;
+      ivf::deserialize_list(handle_, is, typed_list, list_store_spec, list_device_spec);
+      list_data_base_ptr = typed_list;
+    }
   }
+
+  index<IdxT> idx(std::move(impl));
 
   raft::resource::sync_stream(handle_);
 
-  ivf::detail::recompute_internal_state(handle_, index);
+  ivf::detail::recompute_internal_state(handle_, idx);
 
-  return index;
+  return idx;
 }
 
 /**
