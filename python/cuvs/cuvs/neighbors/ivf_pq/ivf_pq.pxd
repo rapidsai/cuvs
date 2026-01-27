@@ -24,9 +24,13 @@ cdef extern from "library_types.h":
 
 cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
 
-    ctypedef enum codebook_gen:
-        PER_SUBSPACE
-        PER_CLUSTER
+    ctypedef enum cuvsIvfPqCodebookGen:
+        CUVS_IVF_PQ_CODEBOOK_GEN_PER_SUBSPACE
+        CUVS_IVF_PQ_CODEBOOK_GEN_PER_CLUSTER
+
+    ctypedef enum cuvsIvfPqListLayout:
+        CUVS_IVF_PQ_LIST_LAYOUT_FLAT
+        CUVS_IVF_PQ_LIST_LAYOUT_INTERLEAVED
 
     ctypedef struct cuvsIvfPqIndexParams:
         cuvsDistanceType metric
@@ -37,10 +41,11 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
         double kmeans_trainset_fraction
         uint32_t pq_bits
         uint32_t pq_dim
-        codebook_gen codebook_kind
+        cuvsIvfPqCodebookGen codebook_kind
         bool force_random_rotation
         bool conservative_memory_allocation
         uint32_t max_train_points_per_pq_code
+        cuvsIvfPqListLayout codes_layout
 
     ctypedef cuvsIvfPqIndexParams* cuvsIvfPqIndexParams_t
 
@@ -150,6 +155,12 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
                                 DLManagedTensor* new_vectors,
                                 DLManagedTensor* new_indices,
                                 cuvsIvfPqIndex_t index)
+
+    cuvsError_t cuvsIvfPqTransform(cuvsResources_t res,
+                                   cuvsIvfPqIndex_t index,
+                                   DLManagedTensor* input_dataset,
+                                   DLManagedTensor* output_labels,
+                                   DLManagedTensor* output_dataset)
 
 
 cdef class IndexParams:
