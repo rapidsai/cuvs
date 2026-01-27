@@ -1975,8 +1975,8 @@ void search(raft::resources const& handle,
  * @param[in] dataset a device matrix view to a row-major matrix [n_rows, index.dim()]
  * @param[out] output_labels a device vector view [n_rows] that will get populaterd with the
  * cluster ids (labels) for each vector in the input dataset
- * @param[out] output_dataset a device matrix view [n_rows, pq_dim] that will get populated with
- * the pq-encoded dataset
+ * @param[out] output_dataset a device matrix view [n_rows, ceildiv(index.pq_dim() *
+ * index.pq_bits(), 8)]] that will get populated with the pq-encoded dataset
  */
 void transform(raft::resources const& handle,
                const cuvs::neighbors::ivf_pq::index<int64_t>& index,

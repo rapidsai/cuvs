@@ -1021,11 +1021,13 @@ def transform(Index index, input_dataset, output_labels=None, output_dataset=Non
     _check_input_array(output_labels_ai, [np.dtype('uint32')],
                        exp_rows=n_samples)
 
+    n_output_cols = int(np.ceil(index.pq_dim * index.pq_bits / 8))
+
     if output_dataset is None:
-        output_dataset = device_ndarray.empty((n_samples, pq_dim), dtype='uint8')
+        output_dataset = device_ndarray.empty((n_samples, n_output_cols), dtype='uint8')
     output_dataset_ai = wrap_array(output_dataset)
     _check_input_array(output_dataset_ai, [np.dtype('uint8')],
-                       exp_rows=n_samples, exp_cols=pq_dim)
+                       exp_rows=n_samples, exp_cols=n_output_cols)
 
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 

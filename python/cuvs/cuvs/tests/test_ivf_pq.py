@@ -339,10 +339,10 @@ def test_build_precomputed(codebook_kind, metric):
 @pytest.mark.parametrize("codebook_kind", ["subspace", "cluster"])
 @pytest.mark.parametrize("dtype", [np.float32, np.float16, np.int8, np.uint8])
 @pytest.mark.parametrize("n_rows", [500, 100000])
-def test_transform(codebook_kind, dtype, n_rows):
+@pytest.mark.parametrize("pq_bits", [6, 8])
+def test_transform(codebook_kind, dtype, n_rows, pq_bits):
     n_cols = 32
     n_lists = 50
-    pq_bits = 8
     pq_dim = 8
 
     # build the ivf-pq index
@@ -363,7 +363,9 @@ def test_transform(codebook_kind, dtype, n_rows):
 
     # collect the pq-encoded data from the index for the expected data
     labels_exp = np.zeros((n_rows), dtype="uint32")
-    transformed_exp = np.zeros((n_rows, pq_dim), dtype="uint8")
+    transformed_exp = np.zeros(
+        (n_rows, int(np.ceil(index.pq_dim * index.pq_bits / 8))), dtype="uint8"
+    )
     for cluster_id in range(n_lists):
         ids = index.list_indices(cluster_id).copy_to_host()
         labels_exp[ids] = cluster_id

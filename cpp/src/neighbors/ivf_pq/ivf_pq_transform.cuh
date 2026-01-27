@@ -107,8 +107,10 @@ void transform(raft::resources const& res,
   IdxT n_rows = dataset.extent(0);
   RAFT_EXPECTS(output_labels.extent(0) == n_rows, "incorrect number of rows in output_labels");
   RAFT_EXPECTS(output_dataset.extent(0) == n_rows, "incorrect number of rows in output_dataset");
-  RAFT_EXPECTS(output_dataset.extent(1) == index.pq_dim(),
-               "incorrect number of cols in output_dataset");
+
+  RAFT_EXPECTS(
+    output_dataset.extent(1) == raft::ceildiv<uint32_t>(index.pq_dim() * index.pq_bits(), 8),
+    "incorrect number of cols in output_dataset");
 
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_pq::transform(n_rows = %u, dim = %u)", n_rows, dataset.extent(1));
