@@ -1964,6 +1964,48 @@ void search(raft::resources const& handle,
  */
 
 /**
+ * @defgroup ivf_pq_cpp_transform IVF-PQ index transform
+ * @{
+ */
+/**
+ * @brief Transform a dataset by applying pq-encoding to each vector
+ *
+ * @param[in] handle
+ * @param[in] index ivf-pq constructed index
+ * @param[in] dataset a device matrix view to a row-major matrix [n_rows, index.dim()]
+ * @param[out] output_labels a device vector view [n_rows] that will get populaterd with the
+ * cluster ids (labels) for each vector in the input dataset
+ * @param[out] output_dataset a device matrix view [n_rows, ceildiv(index.pq_dim() *
+ * index.pq_bits(), 8)]] that will get populated with the pq-encoded dataset
+ */
+void transform(raft::resources const& handle,
+               const cuvs::neighbors::ivf_pq::index<int64_t>& index,
+               raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
+               raft::device_vector_view<uint32_t, int64_t> output_labels,
+               raft::device_matrix_view<uint8_t, int64_t> output_dataset);
+/** @copydoc transform */
+void transform(raft::resources const& handle,
+               const cuvs::neighbors::ivf_pq::index<int64_t>& index,
+               raft::device_matrix_view<const half, int64_t, raft::row_major> dataset,
+               raft::device_vector_view<uint32_t, int64_t> output_labels,
+               raft::device_matrix_view<uint8_t, int64_t> output_dataset);
+/** @copydoc transform */
+void transform(raft::resources const& handle,
+               const cuvs::neighbors::ivf_pq::index<int64_t>& index,
+               raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset,
+               raft::device_vector_view<uint32_t, int64_t> output_labels,
+               raft::device_matrix_view<uint8_t, int64_t> output_dataset);
+/** @copydoc transform */
+void transform(raft::resources const& handle,
+               const cuvs::neighbors::ivf_pq::index<int64_t>& index,
+               raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
+               raft::device_vector_view<uint32_t, int64_t> output_labels,
+               raft::device_matrix_view<uint8_t, int64_t> output_dataset);
+/**
+ * @}
+ */
+
+/**
  * @defgroup ivf_pq_cpp_serialize IVF-PQ index serialize
  * @{
  */
