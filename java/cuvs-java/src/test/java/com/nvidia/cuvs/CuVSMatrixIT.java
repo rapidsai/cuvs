@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs;
 
@@ -20,6 +9,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
+import com.nvidia.cuvs.spi.CuVSProvider;
 import java.lang.foreign.*;
 import java.util.Locale;
 import org.junit.Before;
@@ -49,38 +39,18 @@ public class CuVSMatrixIT extends CuVSTestCase {
     {0, 4, 2}
   };
 
-  private int[][] createIntMatrix() {
-    int rows = randomIntBetween(1, 32);
-    int cols = randomIntBetween(1, 100);
-
-    int[][] result = new int[rows][cols];
-
-    for (int r = 0; r < rows; ++r) {
-      for (int c = 0; c < cols; ++c) {
-        result[r][c] = randomInt();
-      }
-    }
-    return result;
+  @FunctionalInterface
+  interface TestFunction {
+    void apply() throws Throwable;
   }
 
-  private float[][] createFloatMatrix() {
-    int rows = randomIntBetween(1, 32);
-    int cols = randomIntBetween(1, 100);
-
-    return createFloatMatrix(rows, cols);
-  }
-
-  private float[][] createFloatMatrix(int rows, int cols) {
-    float[][] result = new float[rows][cols];
-
-    float value = 1;
-    for (int r = 0; r < rows; ++r) {
-      for (int c = 0; c < cols; ++c) {
-        result[r][c] = value;
-        value += 1;
-      }
+  private static void withPooledMemory(TestFunction testFunction) throws Throwable {
+    try {
+      CuVSProvider.provider().enableRMMManagedPooledMemory(10, 60);
+      testFunction.apply();
+    } finally {
+      CuVSProvider.provider().resetRMMPooledMemory();
     }
-    return result;
   }
 
   private void testByteDatasetRowGetAccess(CuVSMatrix dataset) {
@@ -98,6 +68,11 @@ public class CuVSMatrixIT extends CuVSTestCase {
     try (var matrix = CuVSMatrix.ofArray(byteData)) {
       testByteDatasetRowGetAccess(matrix);
     }
+  }
+
+  @Test
+  public void testPooledByteDeviceDatasetRowGetAccess() throws Throwable {
+    withPooledMemory(this::testByteDeviceDatasetRowGetAccess);
   }
 
   @Test
@@ -134,6 +109,11 @@ public class CuVSMatrixIT extends CuVSTestCase {
   }
 
   @Test
+  public void testPooledByteDeviceDatasetRowCopy() throws Throwable {
+    withPooledMemory(this::testByteDeviceDatasetRowCopy);
+  }
+
+  @Test
   public void testByteDeviceDatasetRowCopy() throws Throwable {
     try (var resources = CheckedCuVSResources.create()) {
       var builder =
@@ -163,6 +143,11 @@ public class CuVSMatrixIT extends CuVSTestCase {
     try (var dataset = CuVSMatrix.ofArray(byteData)) {
       testByteDatasetCopy(dataset);
     }
+  }
+
+  @Test
+  public void testPooledByteDeviceDatasetCopy() throws Throwable {
+    withPooledMemory(this::testByteDeviceDatasetCopy);
   }
 
   @Test
@@ -429,6 +414,11 @@ public class CuVSMatrixIT extends CuVSTestCase {
   }
 
   @Test
+  public void testPooledDeviceToHost() throws Throwable {
+    withPooledMemory(this::testDeviceToHost);
+  }
+
+  @Test
   public void testHostToDevice() throws Throwable {
 
     final int size = 16 * 1024;
@@ -442,6 +432,11 @@ public class CuVSMatrixIT extends CuVSTestCase {
         checkSameData(hostMatrix, deviceMatrix, data, size, columns);
       }
     }
+  }
+
+  @Test
+  public void testPooledHostToDevice() throws Throwable {
+    withPooledMemory(this::testHostToDevice);
   }
 
   @Test
@@ -505,8 +500,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
   }
 
   @Test
-  public void testHostBuilderWithDifferentStrides() throws Throwable {
-
+  public void testHostBuilderWithDifferentStrides() {
     int size = randomIntBetween(1, 32 * 1024);
     int columns = randomIntBetween(16, 2048);
     int rowStride1 = randomIntBetween(columns, columns * 2);
