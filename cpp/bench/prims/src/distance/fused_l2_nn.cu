@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-// #include "common.cuh"
 #include <benchmark/benchmark.h>
 #include <iostream>
 
@@ -48,14 +47,14 @@ __global__ void fill_int8(int8_t* buff, int len)
   }
 }
 
-template <typename DataT, typename AccT, typename OutT, typename IdxT, AlgorithmType algo>
+template <typename DataT, typename AccT, typename OutT, typename IdxT, AlgorithmType algo, bool sqrt, DistanceType metric>
 void benchmark_fusedl2nn(benchmark::State& state)
 {
   const int m               = state.range(0);
   const int n               = state.range(1);
   const int k               = state.range(2);
-  const bool sqrt           = state.range(3);
-  const DistanceType metric = DistanceType(state.range(4));
+  //const bool sqrt           = state.range(3);
+  //const DistanceType metric = DistanceType(state.range(4));
 
   raft::device_resources handle;
   rmm::cuda_stream_view stream;
@@ -234,8 +233,8 @@ static void CustomArguments(benchmark::internal::Benchmark* b)
       }
     }
   }*/
-  b->Args({65536, 256, 128, true, DistanceType::L2Expanded});
-  b->Args({65536, 256, 128, false, DistanceType::CosineExpanded});
+  //b->Args({65536, 256, 128, true, DistanceType::L2Expanded});
+  //b->Args({65536, 256, 128, false, DistanceType::CosineExpanded});
   // b->Args({65536, 10000, 768, false});
 }
 
@@ -270,8 +269,8 @@ int main(int argc, char** argv)
     }
   }
 
-  bool sqrt         = false;
-  DistanceType dist = DistanceType::L2Expanded;
+  constexpr bool sqrt         = false;
+  constexpr DistanceType dist = DistanceType::L2Expanded;
 
   benchmark::internal::Benchmark* bench;
 
@@ -284,8 +283,10 @@ int main(int argc, char** argv)
                                                            float,
                                                            raft::KeyValuePair<int64_t, float>,
                                                            int64_t,
-                                                           AlgorithmType::fused>);
-  bench->Args({M, N, K, sqrt, dist});
+                                                           AlgorithmType::fused,
+                                                           sqrt,
+                                                           dist>);
+  bench->Args({M, N, K});
 
   // Method: unfused, DataT: float, AccT: float
   bench = benchmark::RegisterBenchmark("unfused/float/float",
@@ -293,8 +294,10 @@ int main(int argc, char** argv)
                                                            float,
                                                            raft::KeyValuePair<int64_t, float>,
                                                            int64_t,
-                                                           AlgorithmType::unfused>);
-  bench->Args({M, N, K, sqrt, dist});
+                                                           AlgorithmType::unfused,
+                                                           sqrt,
+                                                           dist>);
+  bench->Args({M, N, K});
 
   // Method: gemm, DataT: float, AccT: float
   bench = benchmark::RegisterBenchmark("gemm/float/float",
@@ -302,8 +305,10 @@ int main(int argc, char** argv)
                                                            float,
                                                            raft::KeyValuePair<int64_t, float>,
                                                            int64_t,
-                                                           AlgorithmType::gemm>);
-  bench->Args({M, N, K, sqrt, dist});
+                                                           AlgorithmType::gemm,
+                                                           sqrt,
+                                                           dist>);
+  bench->Args({M, N, K});
 
   // Method: unfused, DataT: half, AccT: float
   bench = benchmark::RegisterBenchmark("unfused/half/float",
@@ -311,8 +316,10 @@ int main(int argc, char** argv)
                                                            float,
                                                            raft::KeyValuePair<int64_t, float>,
                                                            int64_t,
-                                                           AlgorithmType::unfused>);
-  bench->Args({int(M), int(N), int(K), sqrt, dist});
+                                                           AlgorithmType::unfused,
+                                                           sqrt,
+                                                           dist>);
+  bench->Args({M, N, K});
 
   // Method: gemm, DataT: half, AccT: float
   bench = benchmark::RegisterBenchmark("gemm/half/float",
@@ -320,8 +327,10 @@ int main(int argc, char** argv)
                                                            float,
                                                            raft::KeyValuePair<int64_t, float>,
                                                            int64_t,
-                                                           AlgorithmType::gemm>);
-  bench->Args({int(M), int(N), int(K), sqrt, dist});
+                                                           AlgorithmType::gemm,
+                                                           sqrt,
+                                                           dist>);
+  bench->Args({M, N, K});
 
   // Method: unfused, DataT: half, AccT: half
   bench = benchmark::RegisterBenchmark("unfused/half/half",
@@ -329,8 +338,10 @@ int main(int argc, char** argv)
                                                            half,
                                                            raft::KeyValuePair<int64_t, half>,
                                                            int64_t,
-                                                           AlgorithmType::unfused>);
-  bench->Args({int(M), int(N), int(K), sqrt, dist});
+                                                           AlgorithmType::unfused,
+                                                           sqrt,
+                                                           dist>);
+  bench->Args({M, N, K});
 
   // Method: gemm, DataT: half, AccT: half
   bench = benchmark::RegisterBenchmark("gemm/half/half",
@@ -338,8 +349,10 @@ int main(int argc, char** argv)
                                                            half,
                                                            raft::KeyValuePair<int64_t, half>,
                                                            int64_t,
-                                                           AlgorithmType::gemm>);
-  bench->Args({int(M), int(N), int(K), sqrt, dist});
+                                                           AlgorithmType::gemm,
+                                                           sqrt,
+                                                           dist>);
+  bench->Args({M, N, K});
 
   // Method: unfused, DataT: int8_t, AccT: int32_t
   bench = benchmark::RegisterBenchmark("unfused/int8_t/int32_t",
@@ -347,8 +360,10 @@ int main(int argc, char** argv)
                                                            int32_t,
                                                            raft::KeyValuePair<int64_t, int32_t>,
                                                            int64_t,
-                                                           AlgorithmType::unfused>);
-  bench->Args({int(M), int(N), int(K), sqrt, dist});
+                                                           AlgorithmType::unfused,
+                                                           sqrt,
+                                                           dist>);
+  bench->Args({M, N, K});
 
   // Method: gemm, DataT: int8_t, AccT: int32_t
   bench = benchmark::RegisterBenchmark("gemm/int8_t/int32_t",
@@ -356,8 +371,10 @@ int main(int argc, char** argv)
                                                            int32_t,
                                                            raft::KeyValuePair<int64_t, int32_t>,
                                                            int64_t,
-                                                           AlgorithmType::gemm>);
-  bench->Args({int(M), int(N), int(K), sqrt, dist});
+                                                           AlgorithmType::gemm,
+                                                           sqrt,
+                                                           dist>);
+  bench->Args({M, N, K});
 
   // Initialize benchmark
   ::benchmark::Initialize(&argc, argv);

@@ -194,8 +194,8 @@ const std::vector<NNInputs<IdxT>> input_fp16 = {
   {4096, 4096, 128, DistanceType::CosineExpanded, true, uint64_t(31415926), 0.1},
 };
 
-// Test unfused implementation with fp16
-// Fused implementation has no support for fp16
+// Test unfused implementation with fp16, int8
+// Fused implementation has no support for fp16, int8 so no test for it
 typedef NNTest<half, float, int32_t, ImplType::unfused> NNTest_fp16_unfused;
 TEST_P(NNTest_fp16_unfused, test)
 {
@@ -205,4 +205,22 @@ TEST_P(NNTest_fp16_unfused, test)
 
 INSTANTIATE_TEST_CASE_P(NNTest, NNTest_fp16_unfused, ::testing::ValuesIn(input_fp16<int>));
 
+template <typename IdxT>
+const std::vector<NNInputs<IdxT>> input_int8 = {
+  {4096, 4096, 64, DistanceType::L2Expanded, false, uint64_t(31415926), 0.1},
+  {4096, 4096, 128, DistanceType::L2Expanded, true, uint64_t(31415926), 0.1},
+  {4096, 4096, 64, DistanceType::CosineExpanded, false, uint64_t(31415926), 0.1},
+  {4096, 4096, 128, DistanceType::CosineExpanded, true, uint64_t(31415926), 0.1},
+};
+
+// Test unfused implementation with fp16, int8
+// Fused implementation has no support for fp16, int8 so no test for it
+typedef NNTest<int8, int32_t, int32_t, ImplType::unfused> NNTest_int8_unfused;
+TEST_P(NNTest_int8_unfused, test)
+{
+  this->compute_1nn();
+  this->compare();
+}
+
+INSTANTIATE_TEST_CASE_P(NNTest, NNTest_int8_unfused, ::testing::ValuesIn(input_int8<int>));
 }  // namespace cuvs::neighbors
