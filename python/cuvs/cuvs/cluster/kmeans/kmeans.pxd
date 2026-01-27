@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
@@ -17,6 +17,10 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
         KMeansPlusPlus
         Random
         Array
+
+    ctypedef enum cuvsKMeansType:
+        CUVS_KMEANS_TYPE_KMEANS
+        CUVS_KMEANS_TYPE_KMEANS_BALANCED
 
     ctypedef struct cuvsKMeansParams:
         cuvsDistanceType metric,
