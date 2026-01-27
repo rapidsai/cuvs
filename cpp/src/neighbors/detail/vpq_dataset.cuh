@@ -880,37 +880,4 @@ void process_and_fill_codes_subspaces(
     raft::resource::sync_stream(res);
   }
 }
-/*
-template <typename DatasetT, typename MathT, typename IdxT>
-auto vpq_build(const raft::resources& res, const vpq_params& params, const DatasetT& dataset)
-  -> vpq_dataset<MathT, IdxT>
-{
-  using label_t = uint32_t;
-  // Use a heuristic to impute missing parameters.
-  auto ps = fill_missing_params_heuristics(params, dataset);
-
-  // Train codes
-  auto vq_code_book = train_vq<MathT>(res, ps, dataset);
-  auto pq_code_book =
-    train_pq<MathT>(res, ps, dataset, raft::make_const_mdspan(vq_code_book.view()));
-
-  // Encode dataset
-  const IdxT n_rows       = dataset.extent(0);
-  const IdxT codes_rowlen = sizeof(label_t) * (1 + raft::div_rounding_up_safe<IdxT>(
-                                                     ps.pq_dim * ps.pq_bits, 8 * sizeof(label_t)));
-
-  auto codes = raft::make_device_matrix<uint8_t, IdxT, raft::row_major>(res, n_rows, codes_rowlen);
-  process_and_fill_codes<MathT, IdxT>(res,
-                                      ps,
-                                      dataset,
-                                      raft::make_const_mdspan(pq_code_book.view()),
-                                      raft::make_const_mdspan(vq_code_book.view()),
-                                      raft::make_device_vector_view<label_t, IdxT>(nullptr, 0),
-                                      codes.view(),
-                                      true);
-
-  return vpq_dataset<MathT, IdxT>{
-    std::move(vq_code_book), std::move(pq_code_book), std::move(codes)};
-}*/
-
 }  // namespace cuvs::neighbors::detail
