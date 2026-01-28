@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -295,6 +295,9 @@ void pairwise_distance(raft::resources const& handle,
       break;
     case DistanceType::RusselRaoExpanded:
       dispatch(std::integral_constant<DistanceType, DistanceType::RusselRaoExpanded>{});
+      break;
+    case DistanceType::DiceExpanded:
+      dispatch(std::integral_constant<DistanceType, DistanceType::DiceExpanded>{});
       break;
     default: THROW("Unknown or unsupported distance metric '%d'!", (int)metric);
   };
