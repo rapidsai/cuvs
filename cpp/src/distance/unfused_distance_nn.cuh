@@ -248,20 +248,20 @@ void unfused_distance_nn(raft::resources const& handle,
   RAFT_CUBLAS_TRY(cublasGemmEx(cublas_h,
                                CUBLAS_OP_T,
                                CUBLAS_OP_N,
-                               N,
+                               N, // Dimensions (swapped due to row/col-major difference)
                                M,
-                               K,      // Dimensions (swapped due to row/col-major difference)
-                               alpha,  // alpha
+                               K,
+                               alpha,
                                y,
                                xyType,
-                               K,  // B, its data type, and leading dimension
+                               K,
                                x,
                                xyType,
-                               K,     // A, its data type, and leading dimension
-                               beta,  // beta
+                               K,
+                               beta,
                                workspace,
                                zType,
-                               N,                   // C, its data type, and leading dimension
+                               N,
                                computeType,         // Computation type
                                CUBLAS_GEMM_DEFAULT  // Algorithm selection
                                ));

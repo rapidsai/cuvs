@@ -48,8 +48,6 @@ void benchmark_fusedl2nn(benchmark::State& state)
   const int m = state.range(0);
   const int n = state.range(1);
   const int k = state.range(2);
-  // const bool sqrt           = state.range(3);
-  // const DistanceType metric = DistanceType(state.range(4));
 
   raft::device_resources handle;
   rmm::cuda_stream_view stream;
@@ -79,7 +77,7 @@ void benchmark_fusedl2nn(benchmark::State& state)
 
   // Calculate the workspace size
   // for fused it is m * sizeof(IdxT)
-  // for unfused, gemm and tensor it is m * n * sizeof(AccT);
+  // for unfused and gemm it is m * n * sizeof(AccT);
 
   size_t workspace_size = (algo == AlgorithmType::fused) ? m * sizeof(IdxT) : m * n * sizeof(AccT);
 
@@ -238,6 +236,7 @@ int main(int argc, char** argv)
   IdxT M     = 1024;
   IdxT N     = 1024;
   IdxT K     = 128;
+
   for (int i = 0; i < argc; i++) {
     if (strcmp(argv[i], "-M") == 0) {
       M = std::stoi(argv[i + 1]);
