@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs;
@@ -9,6 +9,7 @@ import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
 import com.nvidia.cuvs.CagraIndexParams.CuvsDistanceType;
+import com.nvidia.cuvs.HnswIndexParams.HnswHierarchy;
 import java.lang.invoke.MethodHandles;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -129,8 +130,9 @@ public class HnswRandomizedIT extends CuVSTestCase {
           index.serializeToHNSW(outputStream); // fails here
         }
 
+        // Use NONE hierarchy since serializeToHNSW creates a base-layer-only index
         HnswIndexParams hnswIndexParams =
-            new HnswIndexParams.Builder().withVectorDimension(dimensions).build();
+            new HnswIndexParams.Builder().withVectorDimension(dimensions).withHierarchy(HnswHierarchy.NONE).build();
 
         try (var inputStreamHNSW = Files.newInputStream(hnswIndexPath)) {
           HnswIndex hnswIndex =
