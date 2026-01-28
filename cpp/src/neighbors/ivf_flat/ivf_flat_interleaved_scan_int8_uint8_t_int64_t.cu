@@ -7,8 +7,8 @@
 
 namespace cuvs::neighbors::ivf_flat::detail {
 
-CUVS_INST_IVF_FLAT_INTERLEAVED_SCAN(uint8_t,
-                                    int64_t,
-                                    filtering::bitset_filter<uint32_t COMMA int64_t>);
+// Combined instantiations for int8_t and uint8_t (same kernel due to byte_array unification)
+CUVS_INST_IVF_FLAT_INTERLEAVED_SCAN(int8_t, int64_t, filtering::none_sample_filter);
+CUVS_INST_IVF_FLAT_INTERLEAVED_SCAN(uint8_t, int64_t, filtering::none_sample_filter);
 
 }  // namespace cuvs::neighbors::ivf_flat::detail
