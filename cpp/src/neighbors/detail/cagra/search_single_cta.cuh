@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -117,7 +117,7 @@ struct search
     //
     // Determine the thread block size
     //
-    constexpr unsigned min_block_size       = 64;  // 32 or 64
+    constexpr unsigned min_block_size       = 64;
     constexpr unsigned min_block_size_radix = 256;
     constexpr unsigned max_block_size       = 1024;
     //
@@ -129,13 +129,17 @@ struct search
       sizeof(std::uint32_t) * topk_ws_size + sizeof(std::uint32_t);
 
     std::uint32_t additional_smem_size = 0;
-    if (num_itopk_candidates > 256) {
-      // Tentatively calculate the required share memory size when radix
-      // sort based topk is used, assuming the block size is the maximum.
+    if (num_itopk_candidates > 256) {  // radix sort
+      // Tentatively calculate the required shared memory size when radix sort based topk is used,
+      // assuming the block size is the maximum.
       if (itopk_size <= 256) {
-        additional_smem_size += topk_by_radix_sort<256, INDEX_T>::smem_size * sizeof(std::uint32_t);
+        constexpr unsigned MAX_ITOPK = 256;
+        additional_smem_size +=
+          topk_by_radix_sort<INDEX_T>::smem_size(MAX_ITOPK) * sizeof(std::uint32_t);
       } else {
-        additional_smem_size += topk_by_radix_sort<512, INDEX_T>::smem_size * sizeof(std::uint32_t);
+        constexpr unsigned MAX_ITOPK = 512;
+        additional_smem_size +=
+          topk_by_radix_sort<INDEX_T>::smem_size(MAX_ITOPK) * sizeof(std::uint32_t);
       }
     }
 
@@ -152,7 +156,7 @@ struct search
     if (block_size == 0) {
       block_size = min_block_size;
 
-      if (num_itopk_candidates > 256) {
+      if (num_itopk_candidates > 256) {  // radix sort
         // radix-based topk is used.
         block_size = min_block_size_radix;
 
@@ -190,19 +194,6 @@ struct search
                  max_block_size);
     thread_block_size = block_size;
 
-    if (num_itopk_candidates <= 256) {
-      RAFT_LOG_DEBUG("# bitonic-sort based topk routine is used");
-    } else {
-      RAFT_LOG_DEBUG("# radix-sort based topk routine is used");
-      smem_size = base_smem_size;
-      if (itopk_size <= 256) {
-        constexpr unsigned MAX_ITOPK = 256;
-        smem_size += topk_by_radix_sort<MAX_ITOPK, INDEX_T>::smem_size * sizeof(std::uint32_t);
-      } else {
-        constexpr unsigned MAX_ITOPK = 512;
-        smem_size += topk_by_radix_sort<MAX_ITOPK, INDEX_T>::smem_size * sizeof(std::uint32_t);
-      }
-    }
     RAFT_LOG_DEBUG("# smem_size: %u", smem_size);
     hashmap_size = 0;
     if (small_hash_bitlen == 0 && !this->persistent) {
