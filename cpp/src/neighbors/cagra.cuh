@@ -261,6 +261,22 @@ void optimize(
   detail::optimize(res, knn_graph, new_graph, guarantee_connectivity);
 }
 
+template <typename T, typename IdxT = uint32_t>
+index<T, IdxT> build(
+  raft::resources const& res,
+  const index_params& params,
+  strided_dataset<T, int64_t> const& dataset)
+{
+  if (std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params)) {
+    RAFT_EXPECTS(false, "ACE build with strided_dataset is not supported");
+  }
+#if 1
+  return index<T, IdxT>(res, params.metric);
+#else
+  return cuvs::neighbors::cagra::detail::build<T, IdxT>(res, params, dataset);
+#endif
+}
+
 template <typename T,
           typename IdxT = uint32_t,
           typename Accessor =
