@@ -275,6 +275,10 @@ dependencies:
       - output_types: [conda, requirements]
         packages:
           - pre-commit
+      # cargo-fmt pre-commit hook requires a C compiler
+      - output_types: [conda]
+        packages:
+          - c-compiler
   clang:
     common:
       - output_types: conda
