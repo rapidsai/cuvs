@@ -107,11 +107,12 @@ jobs:
           - '!ci/test_wheel_cuvs.sh'
           - '!ci/validate_wheel.sh'
           - '!docs/**'
+          - '!go/**'
           - '!img/**'
+          - '!java/**'
           - '!notebooks/**'
           - '!python/**'
           - '!rust/**'
-          - '!go/**'
           - '!thirdparty/LICENSES/**'
         test_java:
           - '**'
