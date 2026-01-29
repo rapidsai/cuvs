@@ -212,4 +212,4 @@ const std::vector<NNInputs<IdxT>> input_int8 = {
 // }
 //
 // INSTANTIATE_TEST_CASE_P(NNTest, NNTest_int8_unfused, ::testing::ValuesIn(input_int8<int>));
- }  // namespace cuvs::neighbors
+}  // namespace cuvs::neighbors
