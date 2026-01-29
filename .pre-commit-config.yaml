@@ -1,4 +1,5 @@
-# Copyright (c) 2022-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 
 repos:
       - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -16,23 +17,13 @@ repos:
                 # project can specify its own first/third-party packages.
                 args: ["--config-root=python/", "--resolve-all-configs"]
                 files: python/.*
-                types_or: [python, cython, pyi]
-      - repo: https://github.com/psf/black
-        rev: 22.3.0
+                types: [cython]
+      - repo: https://github.com/astral-sh/ruff-pre-commit
+        rev: v0.14.3
         hooks:
-              - id: black
-                files: python/.*
-                # Explicitly specify the pyproject.toml at the repo root, not per-project.
-                args: ["--config", "pyproject.toml"]
-      - repo: https://github.com/PyCQA/flake8
-        rev: 7.1.1
-        hooks:
-              - id: flake8
-                args: ["--config=.flake8"]
-                files: python/.*$
-                types: [file]
-                types_or: [python, cython]
-                additional_dependencies: ["flake8-force"]
+              - id: ruff-check
+                args: [--fix]
+              - id: ruff-format
       - repo: https://github.com/pre-commit/mirrors-mypy
         rev: 'v0.971'
         hooks:
@@ -109,19 +100,67 @@ repos:
                     ^CHANGELOG[.]md$|
                     ^cpp/cmake/patches/cutlass/build-export[.]patch$
       - repo: https://github.com/rapidsai/pre-commit-hooks
-        rev: v0.6.0
+        rev: v1.2.1
         hooks:
           - id: verify-copyright
+            name: verify-copyright-cuvs
+            args: [--fix, --spdx]
             files: |
               (?x)
-                  [.](cmake|cpp|cu|cuh|h|hpp|sh|pxd|py|pyx|rs|java)$|
-                  CMakeLists[.]txt$|
-                  CMakeLists_standalone[.]txt$|
-                  meta[.]yaml$
+                [.](cmake|c|cpp|cu|cuh|h|hpp|sh|pxd|py|pyx|rs|java)$|
+                CMakeLists[.]txt$|
+                CMakeLists_standalone[.]txt$|
+                meta[.]yaml$|
+                pyproject[.]toml$|
+                ^python/cuvs_bench/cuvs_bench/split_groundtruth/split_groundtruth[.]pl$|
+                Dockerfile$|
+                pom[.]xml$|
+                ^java/cuvs-java/src/assembly/native-with-deps[.]xml$|
+                ^java/docker-build/build-in-docker$|
+                ^java/docker-build/run-in-docker$|
+                ^[.]flake8$|
+                recipe[.]yaml$|
+                ^[.]pre-commit-config[.]yaml$
             exclude: |
-              (?x)
-                  docs/source/sphinxext/github_link\.py|
-                  cpp/cmake/modules/FindAVX\.cmake
+              (?x)^(
+                docs/source/sphinxext/github_link[.]py$|
+                cpp/cmake/modules/FindAVX[.]cmake$|
+                cpp/src/neighbors/detail/faiss_distance_utils[.]h$|
+                cpp/src/distance/detail/fused_distance_nn/gemm[.]h$|
+                cpp/src/distance/detail/fused_distance_nn/epilogue[.]cuh$|
+                cpp/src/distance/detail/fused_distance_nn/predicated_tile_iterator_normvec_smem[.]h$|
+                cpp/src/distance/detail/fused_distance_nn/persistent_gemm[.]h$|
+                cpp/src/distance/detail/fused_distance_nn/epilogue_elementwise[.]cuh$|
+                cpp/src/distance/detail/fused_distance_nn/predicated_tile_iterator_reduced_vec[.]h$|
+                cpp/src/distance/detail/fused_distance_nn/custom_epilogue_with_broadcast[.]h$
+              )
+          - id: verify-copyright
+            name: verify-copyright-scikit-learn
+            args: [--fix, --spdx, "--spdx-license-identifier=Apache-2.0 AND BSD-3-Clause"]
+            files: |
+              (?x)^(
+                docs/source/sphinxext/github_link[.]py$
+              )
+          - id: verify-copyright
+            name: verify-copyright-cutlass
+            args: [--fix, --spdx, "--spdx-license-identifier=Apache-2.0 AND BSD-3-Clause"]
+            files: |
+              (?x)^(
+                cpp/src/distance/detail/fused_distance_nn/gemm[.]h$|
+                cpp/src/distance/detail/fused_distance_nn/epilogue[.]cuh$|
+                cpp/src/distance/detail/fused_distance_nn/predicated_tile_iterator_normvec_smem[.]h$|
+                cpp/src/distance/detail/fused_distance_nn/persistent_gemm[.]h$|
+                cpp/src/distance/detail/fused_distance_nn/epilogue_elementwise[.]cuh$|
+                cpp/src/distance/detail/fused_distance_nn/predicated_tile_iterator_reduced_vec[.]h$|
+                cpp/src/distance/detail/fused_distance_nn/custom_epilogue_with_broadcast[.]h$
+              )
+          - id: verify-copyright
+            name: verify-copyright-faiss
+            args: [--fix, --spdx, "--spdx-license-identifier=Apache-2.0 AND MIT"]
+            files: |
+              (?x)^(
+                cpp/src/neighbors/detail/faiss_distance_utils[.]h$
+              )
           - id: verify-alpha-spec
           - id: verify-codeowners
             args: [--fix, --project-prefix=cuvs]

@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2023-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
@@ -204,7 +193,7 @@ void InitDataset(const raft::resources& handle,
   if constexpr (std::is_same_v<DataT, float> || std::is_same_v<DataT, half>) {
     GenerateRoundingErrorFreeDataset(handle, datatset_ptr, size, dim, r, true);
 
-    if (metric == InnerProduct) {
+    if (metric == cuvs::distance::DistanceType::InnerProduct) {
       auto dataset_view = raft::make_device_matrix_view(datatset_ptr, size, dim);
       raft::linalg::row_normalize<raft::linalg::L2Norm>(
         handle, raft::make_const_mdspan(dataset_view), dataset_view);
@@ -216,7 +205,7 @@ void InitDataset(const raft::resources& handle,
       raft::random::uniformInt(handle, r, datatset_ptr, size * dim, DataT(1), DataT(20));
     }
 
-    if (metric == InnerProduct) {
+    if (metric == cuvs::distance::DistanceType::InnerProduct) {
       // TODO (enp1s0): Change this once row_normalize supports (u)int8 matrices.
       // https://github.com/rapidsai/raft/issues/2291
 
@@ -293,10 +282,10 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
 {
   const auto metric_str = [](const cuvs::distance::DistanceType dist) -> std::string {
     switch (dist) {
-      case InnerProduct: return "InnerProduct";
-      case L2Expanded: return "L2";
-      case BitwiseHamming: return "BitwiseHamming";
-      case CosineExpanded: return "Cosine";
+      case cuvs::distance::DistanceType::InnerProduct: return "InnerProduct";
+      case cuvs::distance::DistanceType::L2Expanded: return "L2";
+      case cuvs::distance::DistanceType::BitwiseHamming: return "BitwiseHamming";
+      case cuvs::distance::DistanceType::CosineExpanded: return "Cosine";
       default: break;
     }
     return "Unknown";

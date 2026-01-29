@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <cstdint>
@@ -26,6 +15,7 @@
 #include <raft/util/cudart_utils.hpp>
 
 #include <cuvs/core/c_api.h>
+#include <cuvs/distance/distance.h>
 #include <cuvs/neighbors/nn_descent.h>
 #include <cuvs/neighbors/nn_descent.hpp>
 
@@ -53,6 +43,7 @@ void* _build(cuvsResources_t res,
   build_params.max_iterations            = params.max_iterations;
   build_params.termination_threshold     = params.termination_threshold;
   build_params.return_distances          = params.return_distances;
+  build_params.dist_comp_dtype           = static_cast<cuvs::neighbors::nn_descent::DIST_COMP_DTYPE>(static_cast<int>(params.dist_comp_dtype));
 
   using graph_type = raft::host_matrix_view<IdxT, int64_t, raft::row_major>;
   std::optional<graph_type> graph;
@@ -181,13 +172,14 @@ extern "C" cuvsError_t cuvsNNDescentIndexParamsCreate(cuvsNNDescentIndexParams_t
     cuvs::neighbors::nn_descent::index_params cpp_params;
 
     *params = new cuvsNNDescentIndexParams{
-      .metric                    = cpp_params.metric,
+      .metric                    = static_cast<cuvsDistanceType>((int)cpp_params.metric),
       .metric_arg                = cpp_params.metric_arg,
       .graph_degree              = cpp_params.graph_degree,
       .intermediate_graph_degree = cpp_params.intermediate_graph_degree,
       .max_iterations            = cpp_params.max_iterations,
       .termination_threshold     = cpp_params.termination_threshold,
-      .return_distances          = cpp_params.return_distances};
+      .return_distances          = cpp_params.return_distances,
+      .dist_comp_dtype           = static_cast<cuvsNNDescentDistCompDtype>(static_cast<int>(cpp_params.dist_comp_dtype))};
   });
 }
 

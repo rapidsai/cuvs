@@ -1,17 +1,6 @@
 #
-# Copyright (c) 2025, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
 
@@ -21,6 +10,7 @@ from cuvs.common.c_api cimport (
     cuvsMultiGpuResourcesCreate,
     cuvsMultiGpuResourcesCreateWithDeviceIds,
     cuvsMultiGpuResourcesDestroy,
+    cuvsMultiGpuResourcesSetMemoryPool,
     cuvsResources_t,
     cuvsStreamSet,
     cuvsStreamSync,
@@ -99,6 +89,24 @@ cdef class MultiGpuResources:
 
     def sync(self):
         check_cuvs(cuvsStreamSync(self.c_obj))
+
+    def set_memory_pool(self, percent_of_free_memory):
+        """
+        Set a memory pool on all devices managed by these resources.
+
+        Parameters
+        ----------
+        percent_of_free_memory : int
+            Percentage of free device memory to allocate for the pool.
+
+        Examples
+        --------
+        >>> from cuvs.common import MultiGpuResources
+        >>> handle = MultiGpuResources()
+        >>> handle.set_memory_pool(80)  # Use 80% of free memory
+        """
+        check_cuvs(cuvsMultiGpuResourcesSetMemoryPool(
+            self.c_obj, percent_of_free_memory))
 
     def get_c_obj(self):
         """

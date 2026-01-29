@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -25,6 +14,18 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/**
+ * @brief Dtype to use for distance computation
+ * - `NND_DIST_COMP_AUTO`: Automatically determine the best dtype for distance computation based on the dataset dimensions.
+ * - `NND_DIST_COMP_FP32`: Use fp32 distance computation for better precision at the cost of performance and memory usage.
+ * - `NND_DIST_COMP_FP16`: Use fp16 distance computation.
+ */
+typedef enum {
+  NND_DIST_COMP_AUTO = 0,
+  NND_DIST_COMP_FP32 = 1,
+  NND_DIST_COMP_FP16 = 2
+} cuvsNNDescentDistCompDtype;
 
 /**
  * @defgroup nn_descent_c_index_params The nn-descent algorithm parameters.
@@ -45,6 +46,8 @@ extern "C" {
  * `max_iterations`: The number of iterations that nn-descent will refine
  * the graph for. More iterations produce a better quality graph at cost of performance
  * `termination_threshold`: The delta at which nn-descent will terminate its iterations
+ * `return_distances`: Boolean to decide whether to return distances array
+ * `dist_comp_dtype`: dtype to use for distance computation. Defaults to `NND_DIST_COMP_AUTO` which automatically determines the best dtype for distance computation based on the dataset dimensions. Use `NND_DIST_COMP_FP32` for better precision at the cost of performance and memory usage. This option is only valid when data type is fp32. Use `NND_DIST_COMP_FP16` for better performance and memory usage at the cost of precision.
  */
 struct cuvsNNDescentIndexParams {
   cuvsDistanceType metric;
@@ -54,6 +57,7 @@ struct cuvsNNDescentIndexParams {
   size_t max_iterations;
   float termination_threshold;
   bool return_distances;
+  cuvsNNDescentDistCompDtype dist_comp_dtype;
 };
 
 typedef struct cuvsNNDescentIndexParams* cuvsNNDescentIndexParams_t;

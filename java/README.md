@@ -41,6 +41,16 @@ Also, ensure that your panama bindings are up-to-date. They can be re-generated 
 ./panama-bindings/generate-bindings.sh
 ```
 
+Tests run using a randomized runner. Specific failures can be reproduced running a test suite with a specific seed,
+by passing `-Dtests.seed=42FC5CC6B4C6BA8E` (where `42FC5CC6B4C6BA8E` has to be
+replaced with your specific seed). It also possible to re-run a single test, but
+in this case it's necessary to pass the extended seed (suite:method), e.g.
+```shell
+mvn integration-test -Dit.test=com.nvidia.cuvs.CagraBuildAndSearchIT#testFloatIndexing -Dtests.seed=66039A8CAFB9D3C9:449B6310296799E0
+```
+
+It is also possible to ask the test runner to run a specific test or suite multiple
+times, by passing `-Dtests.iters=10` through the command line.
 
 ## Examples
 

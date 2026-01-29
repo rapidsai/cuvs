@@ -1,15 +1,8 @@
 # =============================================================================
-# Copyright (c) 2021-2025, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
-# in compliance with the License. You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software distributed under the License
-# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
-# or implied. See the License for the specific language governing permissions and limitations under
-# the License.
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
 # =============================================================================
 
 # ##################################################################################################
@@ -56,14 +49,15 @@ function(ConfigureTest)
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
             $<TARGET_NAME_IF_EXISTS:conda_env>
             ${_CUVS_TEST_ADDITIONAL_DEP}
+            $<TARGET_NAME_IF_EXISTS:nvidia::cutlass::cutlass>
   )
   set_target_properties(
     ${TEST_NAME}
     PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<BUILD_INTERFACE:${CUVS_BINARY_DIR}/gtests>"
                INSTALL_RPATH "\$ORIGIN/../../../lib"
-               CXX_STANDARD 17
+               CXX_STANDARD 20
                CXX_STANDARD_REQUIRED ON
-               CUDA_STANDARD 17
+               CUDA_STANDARD 20
                CUDA_STANDARD_REQUIRED ON
   )
   target_compile_options(
@@ -124,7 +118,7 @@ ConfigureTest(
 ConfigureTest(
   NAME CLUSTER_TEST
   PATH cluster/kmeans.cu cluster/kmeans_balanced.cu cluster/kmeans_find_k.cu cluster/linkage.cu
-       cluster/connect_knn.cu
+       cluster/connect_knn.cu cluster/spectral.cu
   GPUS 1
   PERCENT 100
 )
@@ -257,6 +251,50 @@ if(BUILD_CAGRA_HNSWLIB)
   )
   target_link_libraries(NEIGHBORS_HNSW_TEST PRIVATE hnswlib::hnswlib)
   target_compile_definitions(NEIGHBORS_HNSW_TEST PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
+
+  ConfigureTest(
+    NAME NEIGHBORS_ANN_HNSW_ACE_FLOAT_UINT32_TEST
+    PATH neighbors/ann_hnsw_ace/test_float_uint32_t.cu
+    GPUS 1
+    PERCENT 100
+  )
+  target_link_libraries(NEIGHBORS_ANN_HNSW_ACE_FLOAT_UINT32_TEST PRIVATE hnswlib::hnswlib)
+  target_compile_definitions(
+    NEIGHBORS_ANN_HNSW_ACE_FLOAT_UINT32_TEST PUBLIC CUVS_BUILD_CAGRA_HNSWLIB
+  )
+
+  ConfigureTest(
+    NAME NEIGHBORS_ANN_HNSW_ACE_HALF_UINT32_TEST
+    PATH neighbors/ann_hnsw_ace/test_half_uint32_t.cu
+    GPUS 1
+    PERCENT 100
+  )
+  target_link_libraries(NEIGHBORS_ANN_HNSW_ACE_HALF_UINT32_TEST PRIVATE hnswlib::hnswlib)
+  target_compile_definitions(
+    NEIGHBORS_ANN_HNSW_ACE_HALF_UINT32_TEST PUBLIC CUVS_BUILD_CAGRA_HNSWLIB
+  )
+
+  ConfigureTest(
+    NAME NEIGHBORS_ANN_HNSW_ACE_INT8_UINT32_TEST
+    PATH neighbors/ann_hnsw_ace/test_int8_t_uint32_t.cu
+    GPUS 1
+    PERCENT 100
+  )
+  target_link_libraries(NEIGHBORS_ANN_HNSW_ACE_INT8_UINT32_TEST PRIVATE hnswlib::hnswlib)
+  target_compile_definitions(
+    NEIGHBORS_ANN_HNSW_ACE_INT8_UINT32_TEST PUBLIC CUVS_BUILD_CAGRA_HNSWLIB
+  )
+
+  ConfigureTest(
+    NAME NEIGHBORS_ANN_HNSW_ACE_UINT8_UINT32_TEST
+    PATH neighbors/ann_hnsw_ace/test_uint8_t_uint32_t.cu
+    GPUS 1
+    PERCENT 100
+  )
+  target_link_libraries(NEIGHBORS_ANN_HNSW_ACE_UINT8_UINT32_TEST PRIVATE hnswlib::hnswlib)
+  target_compile_definitions(
+    NEIGHBORS_ANN_HNSW_ACE_UINT8_UINT32_TEST PUBLIC CUVS_BUILD_CAGRA_HNSWLIB
+  )
 endif()
 
 if(BUILD_MG_ALGOS)
@@ -288,14 +326,8 @@ ConfigureTest(
        distance/gram.cu
        distance/masked_nn.cu
        distance/sparse_distance.cu
+       sparse/gram.cu
        sparse/neighbors/cross_component_nn.cu
-  GPUS 1
-  PERCENT 100
-)
-
-ConfigureTest(
-  NAME SPARSE_TEST
-  PATH sparse/cluster/cluster_solvers.cu sparse/cluster/eigen_solvers.cu sparse/cluster/spectral.cu
   GPUS 1
   PERCENT 100
 )
@@ -303,7 +335,7 @@ ConfigureTest(
 ConfigureTest(
   NAME PREPROCESSING_TEST
   PATH preprocessing/scalar_quantization.cu preprocessing/binary_quantization.cu
-       preprocessing/spectral_embedding.cu
+       preprocessing/spectral_embedding.cu preprocessing/product_quantization.cu
   GPUS 1
   PERCENT 100
 )

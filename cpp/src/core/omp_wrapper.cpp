@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <omp.h>
@@ -35,6 +24,7 @@ int get_max_threads() { return is_omp_enabled() ? omp_get_max_threads() : 1; }
 int get_num_procs() { return is_omp_enabled() ? omp_get_num_procs() : 1; }
 int get_num_threads() { return is_omp_enabled() ? omp_get_num_threads() : 1; }
 int get_thread_num() { return is_omp_enabled() ? omp_get_thread_num() : 0; }
+int get_nested() { return is_omp_enabled() ? omp_get_nested() : 0; }
 
 void set_nested(int v)
 {
@@ -42,14 +32,22 @@ void set_nested(int v)
   if constexpr (is_omp_enabled()) { omp_set_nested(v); }
 }
 
+void set_num_threads(int v)
+{
+  (void)v;
+  if constexpr (is_omp_enabled()) { omp_set_num_threads(v); }
+}
+
 void check_threads(const int requirements)
 {
   const int max_threads = get_max_threads();
   if (max_threads < requirements) {
     RAFT_LOG_WARN(
-      "OpenMP is only allowed %d threads to run %d GPUs. Please increase the number of OpenMP "
-      "threads to avoid NCCL hangs by modifying the environment variable OMP_NUM_THREADS.",
+      "Insufficient OpenMP threads: only %d available but %d required for optimal parallel "
+      "execution across GPUs. Please increase OMP_NUM_THREADS to at least %d to avoid potential "
+      "performance degradation or synchronization issues.",
       max_threads,
+      requirements,
       requirements);
   }
 }

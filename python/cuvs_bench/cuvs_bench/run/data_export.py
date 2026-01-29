@@ -1,17 +1,6 @@
 #
-# Copyright (c) 2024-2025, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 #
 
 import json
@@ -233,9 +222,9 @@ def convert_json_to_csv_search(dataset, dataset_path):
                             write.iloc[s_index, write_ncols] = build_df.iloc[
                                 b_index, 2
                             ]
-                            write.iloc[
-                                s_index, write_ncols + 1 :
-                            ] = build_df.iloc[b_index, 3:]
+                            write.iloc[s_index, write_ncols + 1 :] = (
+                                build_df.iloc[b_index, 3:]
+                            )
                             break
             # Write search data and compute frontiers
             write.to_csv(file.replace(".json", ",raw.csv"), index=False)
@@ -267,8 +256,9 @@ def create_pointset(data, xn, yn):
     xm, ym = metrics[xn], metrics[yn]
     y_col = 4 if yn == "latency" else 3
 
-    rev_x, rev_y = (-1 if xm["worst"] < 0 else 1), (
-        -1 if ym["worst"] < 0 else 1
+    rev_x, rev_y = (
+        (-1 if xm["worst"] < 0 else 1),
+        (-1 if ym["worst"] < 0 else 1),
     )
     # Sort data based on x and y metrics
     data.sort(key=lambda t: (rev_y * t[y_col], rev_x * t[2]))

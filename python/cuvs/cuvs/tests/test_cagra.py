@@ -1,16 +1,5 @@
-# Copyright (c) 2024-2025, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     h ttp://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 #
 
 import tempfile
@@ -172,7 +161,6 @@ def run_cagra_build_search_test(
 def test_cagra_dataset_dtype_host_device(
     dtype, array_type, inplace, build_algo, metric, serialize
 ):
-
     # Note that inner_product tests use normalized input which we cannot
     # represent in int8, therefore we test only sqeuclidean metric here.
     run_cagra_build_search_test(
@@ -194,6 +182,7 @@ def test_filtered_cagra(sparsity):
     "params",
     [
         {
+            "dtype": np.int8,
             "intermediate_graph_degree": 64,
             "graph_degree": 32,
             "test_extend": False,
@@ -202,6 +191,7 @@ def test_filtered_cagra(sparsity):
             "build_algo": "ivf_pq",
         },
         {
+            "dtype": np.float32,
             "intermediate_graph_degree": 32,
             "graph_degree": 16,
             "test_extend": True,
@@ -210,6 +200,7 @@ def test_filtered_cagra(sparsity):
             "build_algo": "ivf_pq",
         },
         {
+            "dtype": np.float32,
             "intermediate_graph_degree": 128,
             "graph_degree": 32,
             "test_extend": False,
@@ -218,6 +209,7 @@ def test_filtered_cagra(sparsity):
             "build_algo": "nn_descent",
         },
         {
+            "dtype": np.float16,
             "intermediate_graph_degree": 64,
             "graph_degree": 32,
             "test_extend": True,
@@ -231,6 +223,7 @@ def test_cagra_index_params(params):
     # Note that inner_product tests use normalized input which we cannot
     # represent in int8, therefore we test only sqeuclidean metric here.
     run_cagra_build_search_test(
+        dtype=params["dtype"],
         test_extend=params["test_extend"],
         k=params["k"],
         metric=params["metric"],

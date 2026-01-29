@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2022-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -19,7 +8,8 @@
 #include "../sample_filter.cuh"  // none_sample_filter
 #include "ivf_pq_fp_8bit.cuh"    // cuvs::neighbors::ivf_pq::detail::fp_8bit
 
-#include <cuvs/distance/distance.hpp>  // cuvs::distance::DistanceType
+#include "ivf_pq_compute_similarity.hpp"  // cuvs::neighbors::ivf_pq::detail::selected
+#include <cuvs/distance/distance.hpp>     // cuvs::distance::DistanceType
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>    // cuvs::neighbors::ivf_pq::codebook_gen
 #include <raft/core/detail/macros.hpp>  // RAFT_WEAK_FUNCTION
@@ -34,48 +24,6 @@ namespace cuvs::neighbors::ivf_pq::detail {
 // -inl.cuh header diverging.
 auto RAFT_WEAK_FUNCTION is_local_topk_feasible(uint32_t k, uint32_t n_probes, uint32_t n_queries)
   -> bool;
-
-template <typename OutT,
-          typename LutT,
-          uint32_t PqBits,
-          int Capacity,
-          bool PrecompBaseDiff,
-          bool EnableSMemLut>
-RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
-                                      uint32_t n_probes,
-                                      uint32_t pq_dim,
-                                      uint32_t n_queries,
-                                      uint32_t queries_offset,
-                                      distance::DistanceType metric,
-                                      codebook_gen codebook_kind,
-                                      uint32_t topk,
-                                      uint32_t max_samples,
-                                      const float* cluster_centers,
-                                      const float* pq_centers,
-                                      const uint8_t* const* pq_dataset,
-                                      const uint32_t* cluster_labels,
-                                      const uint32_t* _chunk_indices,
-                                      const float* queries,
-                                      const uint32_t* index_list,
-                                      float* query_kths,
-                                      filtering::ivf_filter_dev sample_filter,
-                                      LutT* lut_scores,
-                                      OutT* _out_scores,
-                                      uint32_t* _out_indices);
-
-// The signature of the kernel defined by a minimal set of template parameters
-template <typename OutT, typename LutT>
-using compute_similarity_kernel_t =
-  decltype(&compute_similarity_kernel<OutT, LutT, 8, 0, true, true>);
-
-template <typename OutT, typename LutT>
-struct selected {
-  compute_similarity_kernel_t<OutT, LutT> kernel;
-  dim3 grid_dim;
-  dim3 block_dim;
-  size_t smem_size;
-  size_t device_lut_size;
-};
 
 template <typename OutT, typename LutT>
 void compute_similarity_run(selected<OutT, LutT> s,

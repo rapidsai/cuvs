@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -45,7 +34,48 @@ enum cuvsCagraGraphBuildAlgo {
   /* Experimental, use NN-Descent to build all-neighbors knn graph */
   NN_DESCENT = 2,
   /* Experimental, use iterative cagra search and optimize to build the knn graph */
-  ITERATIVE_CAGRA_SEARCH = 3
+  ITERATIVE_CAGRA_SEARCH = 3,
+  /**
+   * Experimental, use ACE (Augmented Core Extraction) to build the graph. ACE partitions the
+   * dataset into core and augmented partitions and builds a sub-index for each partition. This
+   * enables building indices for datasets too large to fit in GPU or host memory.
+   * See cuvsAceParams for more details about the ACE algorithm and its parameters.
+   */
+  ACE = 4
+};
+
+/**
+ * @brief A strategy for selecting the graph build parameters based on similar HNSW index
+ * parameters.
+ *
+ * Define how cuvsCagraIndexParamsFromHnswParams should construct a graph to construct a graph
+ * that is to be converted to (used by) a CPU HNSW index.
+ */
+enum cuvsCagraHnswHeuristicType {
+  /**
+   * Create a graph that is very similar to an HNSW graph in
+   * terms of the number of nodes and search performance. Since HNSW produces a variable-degree
+   * graph (2M being the max graph degree) and CAGRA produces a fixed-degree graph, there's always a
+   * difference in the performance of the two.
+   *
+   * This function attempts to produce such a graph that the QPS and recall of the two graphs being
+   * searched by HNSW are close for any search parameter combination. The CAGRA-produced graph tends
+   * to have a "longer tail" on the low recall side (that is being slightly faster and less
+   * precise).
+   *
+   */
+   CUVS_CAGRA_HEURISTIC_SIMILAR_SEARCH_PERFORMANCE = 0,
+  /**
+   * Create a graph that has the same binary size as an HNSW graph with the given parameters
+   * (graph_degree = 2 * M) while trying to match the search performance as closely as possible.
+   *
+   * The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce
+   * the same recalls and QPS for the same parameter ef. The graphs are different internally. For
+   * the same ef, the from-CAGRA index likely has a slightly higher recall and slightly lower QPS.
+   * However, the Recall-QPS curves should be similar (i.e. the points are just shifted along the
+   * curve).
+   */
+   CUVS_CAGRA_HEURISTIC_SAME_GRAPH_FOOTPRINT = 1
 };
 
 /** Parameters for VPQ compression. */
@@ -96,6 +126,75 @@ struct cuvsIvfPqParams {
 typedef struct cuvsIvfPqParams* cuvsIvfPqParams_t;
 
 /**
+ * Parameters for ACE (Augmented Core Extraction) graph build.
+ * ACE enables building indexes for datasets too large to fit in GPU memory by:
+ * 1. Partitioning the dataset in core (closest) and augmented (second-closest)
+ * partitions using balanced k-means.
+ * 2. Building sub-indexes for each partition independently
+ * 3. Concatenating sub-graphs into a final unified index
+ */
+struct cuvsAceParams {
+  /**
+   * Number of partitions for ACE (Augmented Core Extraction) partitioned build.
+   *
+   * When set to 0 (default), the number of partitions is automatically derived
+   * based on available host and GPU memory to maximize partition size while
+   * ensuring the build fits in memory.
+   *
+   * Small values might improve recall but potentially degrade performance and
+   * increase memory usage. Partitions should not be too small to prevent issues
+   * in KNN graph construction. The partition size is on average 2 * (n_rows /
+   * npartitions) * dim * sizeof(T). 2 is because of the core and augmented
+   * vectors. Please account for imbalance in the partition sizes (up to 3x in
+   * our tests).
+   *
+   * If the specified number of partitions results in partitions that exceed
+   * available memory, the value will be automatically increased to fit memory
+   * constraints and a warning will be issued.
+   */
+  size_t npartitions;
+  /**
+   * The index quality for the ACE build.
+   *
+   * Bigger values increase the index quality. At some point, increasing this will no longer
+   * improve the quality.
+   */
+  size_t ef_construction;
+  /**
+   * Directory to store ACE build artifacts (e.g., KNN graph, optimized graph).
+   *
+   * Used when `use_disk` is true or when the graph does not fit in host and GPU
+   * memory. This should be the fastest disk in the system and hold enough space
+   * for twice the dataset, final graph, and label mapping.
+   */
+  const char* build_dir;
+  /**
+   * Whether to use disk-based storage for ACE build.
+   *
+   * When true, enables disk-based operations for memory-efficient graph construction.
+   */
+  bool use_disk;
+  /**
+   * Maximum host memory to use for ACE build in GiB.
+   *
+   * When set to 0 (default), uses available host memory.
+   * When set to a positive value, limits host memory usage to the specified amount.
+   * Useful for testing or when running alongside other memory-intensive processes.
+   */
+  double max_host_memory_gb;
+  /**
+   * Maximum GPU memory to use for ACE build in GiB.
+   *
+   * When set to 0 (default), uses available GPU memory.
+   * When set to a positive value, limits GPU memory usage to the specified amount.
+   * Useful for testing or when running alongside other memory-intensive processes.
+   */
+  double max_gpu_memory_gb;
+};
+
+typedef struct cuvsAceParams* cuvsAceParams_t;
+
+/**
  * @brief Supplemental parameters to build CAGRA Index
  *
  */
@@ -117,9 +216,12 @@ struct cuvsCagraIndexParams {
    */
   cuvsCagraCompressionParams_t compression;
   /**
-   * Optional: specify ivf pq params when `build_algo = IVF_PQ`
+   * Optional: specify graph build params based on build_algo
+   * - IVF_PQ: cuvsIvfPqParams_t
+   * - ACE: cuvsAceParams_t
+   * - Others: nullptr
    */
-  cuvsIvfPqParams_t graph_build_params;
+  void* graph_build_params;
 };
 
 typedef struct cuvsCagraIndexParams* cuvsCagraIndexParams_t;
@@ -155,6 +257,45 @@ cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionParams_t* param
  * @return cuvsError_t
  */
 cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t params);
+
+/**
+ * @brief Allocate ACE params, and populate with default values
+ *
+ * @param[in] params cuvsAceParams_t to allocate
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsAceParamsCreate(cuvsAceParams_t* params);
+
+/**
+ * @brief De-allocate ACE params
+ *
+ * @param[in] params
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsAceParamsDestroy(cuvsAceParams_t params);
+
+/**
+ * @brief Create CAGRA index parameters similar to an HNSW index
+ *
+ * This factory function creates CAGRA parameters that yield a graph compatible with
+ * an HNSW graph with the given parameters.
+ *
+ * @param[out] params The CAGRA index params to populate
+ * @param[in] n_rows Number of rows in the dataset
+ * @param[in] dim Number of dimensions in the dataset
+ * @param[in] M HNSW index parameter M
+ * @param[in] ef_construction HNSW index parameter ef_construction
+ * @param[in] heuristic Strategy for parameter selection
+ * @param[in] metric Distance metric to use
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraIndexParamsFromHnswParams(cuvsCagraIndexParams_t params,
+                                                int64_t n_rows,
+                                                int64_t dim,
+                                                int M,
+                                                int ef_construction,
+                                                enum cuvsCagraHnswHeuristicType heuristic,
+                                                cuvsDistanceType metric);
 
 /**
  * @}

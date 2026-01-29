@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2021-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -238,6 +227,32 @@ void build_linkage(
   raft::device_vector_view<float, int64_t> out_distances,
   raft::device_vector_view<int64_t, int64_t> out_sizes,
   std::optional<raft::device_vector_view<float, int64_t>> core_dists);
+
+/**
+ * Build dendrogram from a Minimum Spanning Tree (MST).
+ *
+ * This function takes a sorted MST (represented as edges with source, destination, and weights)
+ * and constructs a dendrogram (hierarchical clustering tree) on the host.
+ *
+ * @param[in] handle The raft resources handle
+ * @param[in] rows Source nodes of the MST edges (device memory, size: nnz)
+ * @param[in] cols Destination nodes of the MST edges (device memory, size: nnz)
+ * @param[in] data Edge weights/distances of the MST (device memory, size: nnz)
+ * @param[out] children Output dendrogram children array (device memory, size: nnz * 2)
+ *                      Each pair of consecutive elements represents the two children
+ *                      merged at each step of the hierarchy
+ * @param[out] out_delta Output distances/heights at which clusters are merged (device memory, size:
+ * nnz)
+ * @param[out] out_size Output cluster sizes at each merge step (device memory, size: nnz)
+ */
+void build_dendrogram(raft::resources const& handle,
+                      raft::device_vector_view<const int64_t, int64_t> rows,
+                      raft::device_vector_view<const int64_t, int64_t> cols,
+                      raft::device_vector_view<const float, int64_t> data,
+                      raft::device_matrix_view<int64_t, int64_t, raft::row_major> children,
+                      raft::device_vector_view<float, int64_t> out_delta,
+                      raft::device_vector_view<int64_t, int64_t> out_size);
+
 }  // namespace helpers
 /**
  * @}

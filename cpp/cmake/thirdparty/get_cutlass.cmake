@@ -1,15 +1,8 @@
 # =============================================================================
-# Copyright (c) 2021-2025, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
-# in compliance with the License. You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software distributed under the License
-# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
-# or implied. See the License for the specific language governing permissions and limitations under
-# the License.
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
 # =============================================================================
 
 function(find_and_configure_cutlass)
@@ -31,26 +24,23 @@ function(find_and_configure_cutlass)
       CACHE BOOL "Disable CUTLASS to build with cuBLAS library."
   )
 
-  if (CUDA_STATIC_RUNTIME)
-    set(CUDART_LIBRARY "${CUDA_cudart_static_LIBRARY}" CACHE FILEPATH "fixing cutlass cmake code" FORCE)
-  endif()
+  set(CUDART_LIBRARY "${CUDA_cudart_static_LIBRARY}" CACHE FILEPATH "fixing cutlass cmake code" FORCE)
 
   include("${rapids-cmake-dir}/cpm/package_override.cmake")
   rapids_cpm_package_override("${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../patches/cutlass_override.json")
 
-  include("${rapids-cmake-dir}/cpm/detail/package_details.cmake")
-  rapids_cpm_package_details(cutlass version repository tag shallow exclude)
-
-  include("${rapids-cmake-dir}/cpm/detail/generate_patch_command.cmake")
-  rapids_cpm_generate_patch_command(cutlass ${version} patch_command build_patch_only)
+  include("${rapids-cmake-dir}/cpm/detail/package_info.cmake")
+  rapids_cpm_package_info(cutlass
+    VERSION_VAR version
+    FIND_VAR find_args
+    CPM_VAR cpm_args
+  )
 
   rapids_cpm_find(
-    NvidiaCutlass ${version} ${build_patch_only}
+    NvidiaCutlass ${version} ${find_args}
     GLOBAL_TARGETS nvidia::cutlass::cutlass
-    CPM_ARGS
-    GIT_REPOSITORY ${repository}
-    GIT_TAG ${tag}
-    GIT_SHALLOW ${shallow} ${patch_command}
+    CPM_ARGS ${cpm_args}
+    EXCLUDE_FROM_ALL ON
     OPTIONS "CUDAToolkit_ROOT ${CUDAToolkit_LIBRARY_DIR}"
   )
 
