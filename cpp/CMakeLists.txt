@@ -437,6 +437,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/cagra_build_int8.cu
     src/neighbors/cagra_build_uint8.cu
     src/neighbors/cagra_extend_float.cu
+    src/neighbors/cagra_extend_half.cu
     src/neighbors/cagra_extend_int8.cu
     src/neighbors/cagra_extend_uint8.cu
     src/neighbors/cagra_optimize.cu
@@ -513,6 +514,10 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ivf_pq/detail/ivf_pq_search_half_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_int8_t_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_uint8_t_int64_t.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_transform_float_int64_t.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_transform_half_int64_t.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_transform_int8_t_int64_t.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_transform_uint8_t_int64_t.cu
     src/neighbors/knn_merge_parts.cu
     src/neighbors/nn_descent.cu
     src/neighbors/nn_descent_float.cu
