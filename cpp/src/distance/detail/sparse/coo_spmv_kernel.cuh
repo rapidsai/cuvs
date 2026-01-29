@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -122,7 +122,8 @@ RAFT_KERNEL balanced_coo_generalized_spmv_kernel(strategy_t strategy,
   extern __shared__ char smem[];
 
   void* A = smem;
-  typename warp_reduce::TempStorage* temp_storage = (typename warp_reduce::TempStorage*)((char*)A + dim);
+  typename warp_reduce::TempStorage* temp_storage =
+    (typename warp_reduce::TempStorage*)((char*)A + dim);
 
   auto map_ref = strategy.init_map(A, dim);
 

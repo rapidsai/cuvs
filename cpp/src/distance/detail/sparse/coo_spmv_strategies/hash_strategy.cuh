@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -39,16 +39,16 @@ class hash_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
   static constexpr value_idx empty_key_sentinel = value_idx{-1};
   static constexpr value_t empty_value_sentinel = value_t{0};
   using probing_scheme_type = cuco::linear_probing<1, cuco::murmurhash3_32<value_idx>>;
-  using storage_ref_type = cuco::bucket_storage_ref<cuco::pair<value_idx, value_t>, 1, cuco::extent<int>>;
-  using map_type = cuco::static_map_ref<
-                                       value_idx,
-                                       value_t,
-                                       cuda::thread_scope_block,
-                                       cuda::std::equal_to<value_idx>,
-                                       probing_scheme_type,
-                                       storage_ref_type,
-                                       cuco::op::insert_tag,
-                                       cuco::op::find_tag>;
+  using storage_ref_type =
+    cuco::bucket_storage_ref<cuco::pair<value_idx, value_t>, 1, cuco::extent<int>>;
+  using map_type = cuco::static_map_ref<value_idx,
+                                        value_t,
+                                        cuda::thread_scope_block,
+                                        cuda::std::equal_to<value_idx>,
+                                        probing_scheme_type,
+                                        storage_ref_type,
+                                        cuco::op::insert_tag,
+                                        cuco::op::find_tag>;
 
   hash_strategy(const distances_config_t<value_idx, value_t>& config_,
                 float capacity_threshold_ = 0.5,
@@ -234,15 +234,16 @@ class hash_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
 
   __device__ inline map_type init_map(void* storage, const value_idx& cache_size)
   {
-    auto map_ref = map_type{
-      cuco::empty_key<value_idx>{empty_key_sentinel},
-      cuco::empty_value<value_t>{empty_value_sentinel},
-      cuda::std::equal_to<value_idx>{},
-      probing_scheme_type{},
-      cuco::cuda_thread_scope<cuda::thread_scope_block>{},
-      storage_ref_type{cuco::extent<int>{cache_size}, static_cast<typename storage_ref_type::value_type*>(storage)}};
+    auto map_ref =
+      map_type{cuco::empty_key<value_idx>{empty_key_sentinel},
+               cuco::empty_value<value_t>{empty_value_sentinel},
+               cuda::std::equal_to<value_idx>{},
+               probing_scheme_type{},
+               cuco::cuda_thread_scope<cuda::thread_scope_block>{},
+               storage_ref_type{cuco::extent<int>{cache_size},
+                                static_cast<typename storage_ref_type::value_type*>(storage)}};
     map_ref.initialize(cooperative_groups::this_thread_block());
-    
+
     return map_ref;
   }
 
@@ -251,7 +252,8 @@ class hash_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
     map_ref.insert(cuco::pair{key, value});
   }
 
-  // Note: init_find is now merged with init_map since the new API uses the same ref for both operations
+  // Note: init_find is now merged with init_map since the new API uses the same ref for both
+  // operations
 
   __device__ inline value_t find(map_type& map_ref, const value_idx& key)
   {
