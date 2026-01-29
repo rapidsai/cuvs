@@ -66,7 +66,7 @@ bool use_fused(const raft::resources& handle, IdxT m, IdxT n, IdxT k)
   } else if (prop.major == 9 && (m >= 4096 || n >= 4096)) {
     // On Hopper if m, n are bigger than 4096, use fused
     return true;
-  } else if (prop.major >= 12) {
+  } else if (prop.major >= 10) {
     // On Blackwell onwards, use unfused
     return false;
   }
