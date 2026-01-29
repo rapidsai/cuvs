@@ -19,7 +19,6 @@
 using cuvs::distance::DistanceType;
 using cuvs::distance::fusedDistanceNNMinReduce;
 using cuvs::distance::reduce_min;
-using cuvs::distance::unfused_distance_nn;
 using cuvs::distance::unfusedDistanceNNMinReduce;
 
 enum class AlgorithmType { gemm, unfused, fused };
