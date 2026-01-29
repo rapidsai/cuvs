@@ -18,6 +18,7 @@
 
 using cuvs::distance::DistanceType;
 using cuvs::distance::fusedDistanceNNMinReduce;
+using cuvs::distance::pairwise_distance_gemm;
 using cuvs::distance::reduce_min;
 using cuvs::distance::unfusedDistanceNNMinReduce;
 
@@ -146,22 +147,16 @@ void benchmark_fusedl2nn(benchmark::State& state)
     }
 
     if constexpr (algo == AlgorithmType::gemm) {
-      unfusedDistanceNNMinReduce<DataT, AccT, OutT, IdxT, false>(handle,
-                                                                 out.data_handle(),
-                                                                 x.data_handle(),
-                                                                 y.data_handle(),
-                                                                 x_norm.data_handle(),
-                                                                 y_norm.data_handle(),
-                                                                 static_cast<IdxT>(m),
-                                                                 static_cast<IdxT>(n),
-                                                                 static_cast<IdxT>(k),
-                                                                 (AccT*)workspace.data_handle(),
-                                                                 sqrt,
-                                                                 true,
-                                                                 true,
-                                                                 metric,
-                                                                 float(0.0),
-                                                                 stream);
+      pairwise_distance_gemm<DataT, AccT, OutT, IdxT>(handle,
+                                                      (AccT*)workspace.data_handle(),
+                                                      x.data_handle(),
+                                                      y.data_handle(),
+                                                      static_cast<IdxT>(m),
+                                                      static_cast<IdxT>(n),
+                                                      static_cast<IdxT>(k),
+                                                      x_norm.data_handle(),
+                                                      y_norm.data_handle(),
+                                                      stream);
     }
   }
   RAFT_CUDA_TRY(cudaStreamSynchronize(stream));

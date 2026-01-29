@@ -170,7 +170,7 @@ void reduce_min(OutT* out,
     <<<blocks, TPB, 0, stream>>>(out, z, x_norm, y_norm, m, n, is_sqrt, initOutBuffer);
 }
 
-template <typename DataT, typename AccT, typename OutT, typename IdxT, bool reduce>
+template <typename DataT, typename AccT, typename OutT, typename IdxT>
 void pairwise_distance_gemm(raft::resources const& handle,
                             AccT* z,
                             const DataT* x,
@@ -292,7 +292,7 @@ void pairwise_distance_gemm(raft::resources const& handle,
  * @param[in]  metric_arg    power argument for distances like Minkowski (not supported for now)
  * @param[in]  stream        cuda stream
  */
-template <typename DataT, typename AccT, typename OutT, typename IdxT, bool reduce = true>
+template <typename DataT, typename AccT, typename OutT, typename IdxT>
 void unfusedDistanceNNMinReduce(raft::resources const& handle,
                                 OutT* min,
                                 const DataT* x,
@@ -311,24 +311,22 @@ void unfusedDistanceNNMinReduce(raft::resources const& handle,
                                 cudaStream_t stream)
 {
   ASSERT(isRowMajor, "unfusedDistanceNN only supports row major inputs");
-  pairwise_distance_gemm<DataT, AccT, OutT, IdxT, reduce>(
+  pairwise_distance_gemm<DataT, AccT, OutT, IdxT>(
     handle, (AccT*)workspace, x, y, m, n, k, xn, yn, stream);
 
   ASSERT((metric == DistanceType::CosineExpanded) || (metric == DistanceType::L2Expanded) ||
            (metric == DistanceType::L2SqrtExpanded),
          "Only cosine and L2 distance types are supported");
 
-  if (reduce == true) {
-    if (metric == DistanceType::L2Expanded) {
-      reduce_min<DataT, AccT, OutT, IdxT, DistanceType::L2Expanded>(
-        min, (AccT*)workspace, xn, yn, m, n, stream, is_sqrt, initOutBuffer);
-    } else if (metric == DistanceType::L2SqrtExpanded) {
-      reduce_min<DataT, AccT, OutT, IdxT, DistanceType::L2SqrtExpanded>(
-        min, (AccT*)workspace, xn, yn, m, n, stream, is_sqrt, initOutBuffer);
-    } else if (metric == DistanceType::CosineExpanded) {
-      reduce_min<DataT, AccT, OutT, IdxT, DistanceType::CosineExpanded>(
-        min, (AccT*)workspace, xn, yn, m, n, stream, is_sqrt, initOutBuffer);
-    }
+  if (metric == DistanceType::L2Expanded) {
+    reduce_min<DataT, AccT, OutT, IdxT, DistanceType::L2Expanded>(
+      min, (AccT*)workspace, xn, yn, m, n, stream, is_sqrt, initOutBuffer);
+  } else if (metric == DistanceType::L2SqrtExpanded) {
+    reduce_min<DataT, AccT, OutT, IdxT, DistanceType::L2SqrtExpanded>(
+      min, (AccT*)workspace, xn, yn, m, n, stream, is_sqrt, initOutBuffer);
+  } else if (metric == DistanceType::CosineExpanded) {
+    reduce_min<DataT, AccT, OutT, IdxT, DistanceType::CosineExpanded>(
+      min, (AccT*)workspace, xn, yn, m, n, stream, is_sqrt, initOutBuffer);
   }
 }
 
