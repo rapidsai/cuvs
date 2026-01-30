@@ -316,7 +316,7 @@ inline constexpr bool is_strided_dataset_v = is_strided_dataset<DatasetT>::value
  * @return non-owning (zero-copy) current-device-accessible strided matrix
  */
 template <typename SrcT>
-auto make_strided_dataset_zerocopy(const raft::resources& res, const SrcT& src, uint32_t required_stride)
+auto make_strided_dataset_view(const raft::resources& res, const SrcT& src, uint32_t required_stride)
   -> std::unique_ptr<strided_dataset<typename SrcT::value_type, typename SrcT::index_type>>
 {
   using extents_type = typename SrcT::extents_type;
@@ -405,8 +405,8 @@ auto make_strided_dataset_owning(const raft::resources& res, const SrcT& src, ui
 /**
  * @brief Contstruct a strided matrix from any mdarray or mdspan.
  *
- * @deprecated Use make_strided_dataset_zerocopy (if the input matrix is properly aligned) or
- * make_strided_dataset_copy (if the input matrix is not properly aligned) instead.
+ * @deprecated Use make_strided_dataset_view (if the input matrix is properly aligned) or
+ * make_strided_dataset_owning (if the input matrix is not properly aligned) instead.
  *
  * This function constructs a non-owning view if the input satisfied two conditions:
  *
@@ -597,7 +597,7 @@ auto make_strided_dataset(
  * @return non-owning (zero-copy) current-device-accessible strided matrix
  */
 template <typename SrcT>
-auto make_aligned_dataset_zerocopy(const raft::resources& res, SrcT src, uint32_t align_bytes = 16)
+auto make_aligned_dataset_view(const raft::resources& res, SrcT src, uint32_t align_bytes = 16)
   -> std::unique_ptr<strided_dataset<typename SrcT::value_type, typename SrcT::index_type>>
 {
   using source_type      = std::remove_cv_t<std::remove_reference_t<SrcT>>;
@@ -605,7 +605,7 @@ auto make_aligned_dataset_zerocopy(const raft::resources& res, SrcT src, uint32_
   constexpr size_t kSize = sizeof(value_type);
   uint32_t required_stride =
     raft::round_up_safe<size_t>(src.extent(1) * kSize, std::lcm(align_bytes, kSize)) / kSize;
-  return make_strided_dataset_zerocopy(res, std::forward<SrcT>(src), required_stride);
+  return make_strided_dataset_view(res, std::forward<SrcT>(src), required_stride);
 }
 
 /**
@@ -635,7 +635,7 @@ auto make_aligned_dataset_owning(const raft::resources& res, SrcT src, uint32_t 
 /**
  * @brief Contstruct a strided matrix from any mdarray or mdspan.
  *
- * @deprecated Use make_aligned_dataset_zerocopy or make_aligned_dataset_owning instead.
+ * @deprecated Use make_aligned_dataset_view or make_aligned_dataset_owning instead.
  *
  * A variant `make_strided_dataset` that allows specifying the byte alignment instead of the
  * explicit stride length.
@@ -657,7 +657,7 @@ auto make_aligned_dataset(const raft::resources& res, SrcT src, uint32_t align_b
   uint32_t required_stride =
     raft::round_up_safe<size_t>(src.extent(1) * kSize, std::lcm(align_bytes, kSize)) / kSize;
   if (is_matrix_strided(src, required_stride)) {
-    return make_strided_dataset_zerocopy(res, std::forward<SrcT>(src), required_stride);
+    return make_strided_dataset_view(res, std::forward<SrcT>(src), required_stride);
   } else {
     return make_strided_dataset_owning(res, std::forward<SrcT>(src), required_stride);
   }
