@@ -103,7 +103,7 @@ Memory footprint
 CAGRA builds a nearest-neighbor graph(neighbor IDs) that ultimately ends up on the host while it needs to keep the original dataset(raw vectors) around (can be on host or device)
 
 Baseline Memory Footprint
---------------
+-------------------------
 
 .. math::
 
@@ -121,8 +121,8 @@ Note: Dataset needs to be on GPU during the index build process, however it need
 
 **Example** (1,000,000 vectors, dim = 1024, fp32, graph\_degree = 64, IdxT = int32):
 
-- dataset\_size = 4,096,000,000 B = **3906.25 MiB**
-- graph\_size   = 256,000,000 B = **244.14 MiB**
+- dataset\_size = 4,096,000,000 B = 3906.25 MB
+- graph\_size   = 256,000,000 B = 244.14 MB
 
 Build peak memory usage
 -----------------------
@@ -131,9 +131,10 @@ Index build has two phases: (1) construct a knn graph, then (2) optimize it to r
 The initial knn graph can be built with IVF-PQ or nn-descent. IVF-PQ has the additional benefit that it supports out-of-core construction, allowing CAGRA to be trained on datasets larger than available GPU memory.
 The steps below are sequential with distinct peak memory consumption. The overall peak memory utilization depends on the configured RMM memory resource.
 
-Out-of-core IVF-PQ
+knn graph build phase
+~~~~~~~~~~~~~~~~~~~~~
 
-knn graph constructured with IVF-PQ algorithm involves training the cluster centroids and assigning the vectors to the nearest centroids.
+knn graph constructed with IVF-PQ algorithm involves training the cluster centroids and assigning the vectors to the nearest centroids.
 
 **IVF-PQ Build (centroid training)** — uses a training subset to compute cluster centroids and assignments.
 
@@ -147,7 +148,7 @@ knn graph constructured with IVF-PQ algorithm involves training the cluster cent
    \;+\;
    \frac{n\_{\text{vectors}}}{\text{train\_set\_ratio}} \times \operatorname{sizeof}(\mathrm{uint32\_t})
 
-**Example** (n = 1e6; dim = 1024; n\_clusters = 1024; train\_set\_ratio = 10): **395.01 MiB**
+**Example** (n = 1e6; dim = 1024; n\_clusters = 1024; train\_set\_ratio = 10): 395.01 MB
 
 **IVF-PQ Search (forms the intermediate graph)** — Construct the knn-graph by assigning raw vectors to trained cluster centroids in batches.
 
@@ -161,10 +162,10 @@ knn graph constructured with IVF-PQ algorithm involves training the cluster cent
    \;+\;
    \text{batch\_size} \times \text{intermediate\_degree} \times 4
 
-**Example** (batch = 1024, dim = 1024, intermediate\_degree = 128): **5.00 MiB**
+**Example** (batch = 1024, dim = 1024, intermediate\_degree = 128): 5.00 MB
 
-Optimize phase (device)
-~~~~~~~~~~~~~~~~~~~~~~~
+Optimize phase
+~~~~~~~~~~~~~~
 
 Pruning/reordering the intermediate graph; peak scales linearly with intermediate degree.
 
@@ -175,12 +176,12 @@ Pruning/reordering the intermediate graph; peak scales linearly with intermediat
    n\_{\text{vectors}} \times
    \Big( 4 + \big(\operatorname{sizeof}(\mathrm{IdxT}) + 1\big)\times \text{intermediate\_degree} \Big)
 
-**Example** (n = 1e6, intermediate\_degree = 128, IdxT = int32): **614.17 MiB**
+**Example** (n = 1e6, intermediate\_degree = 128, IdxT = int32): 614.17 MB
 
-Overall Index Build peak (device)
----------------------
+Overall Build Peak Memory Usage
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Depending on the selected memory resource, the overall peak memory footprint on the device would be different. For ``cuda_memory_resource``, peak is the maximum allocation across each step; For ``managed_memory_resource memory``, the
+Depending on the selected memory resource, the overall peak memory footprint on the device would be different. For ``cuda_memory_resource``, peak is the maximum allocation across each step; For ``managed_memory_resource``, the
 peaks from sequential steps are additive;
 
 ``cuda_memory_resource``:
@@ -191,7 +192,7 @@ peaks from sequential steps are additive;
    \;+\;
    \max\!\big(\text{IVFPQ\_build\_peak},\ \text{IVFPQ\_search\_peak},\ \text{optimize\_peak}\big)
 
-**Example:** 3906.25 + max(395.01, 5.00, 614.17) = **4520.42 MiB**
+**Example:** 3906.25 + max(395.01, 5.00, 614.17) = 4520.42 MB
 
 ``managed_memory_resource``:
 
@@ -205,7 +206,7 @@ peaks from sequential steps are additive;
    \;+\;
    \text{optimize\_peak}
 
-**Example:** 3906.25 + 395.01 + 5.00 + 614.17 = **4920.43 MiB**
+**Example:** 3906.25 + 395.01 + 5.00 + 614.17 = 4920.43 MB
 
 Search peak memory usage
 ------------------------
@@ -235,6 +236,6 @@ The below memory estimate assumes just one batch of queries being run at a time 
 
 **Example** (dim = 1024, batch\_size = 100, topk = 10, IdxT = int32):
 
-- query\_size  = 409,600 B = **0.3906 MiB**
-- result\_size = 8,000 B = **0.0076 MiB**
-- **Total search memory** ≈ 3906.25 + 244.14 + 0.3906 + 0.0076 = **4150.79 MiB**
+- query\_size  = 409,600 B = 0.39 MB
+- result\_size = 8,000 B = 0.0076 MB
+- Total search memory ≈ 3906.25 + 244.14 + 0.39 + 0.0076 = 4150.79 MB
