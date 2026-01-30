@@ -34,6 +34,12 @@ class FragmentDatabase {
                                      unsigned char const* blob,
                                      std::size_t size);
 
+  friend void registerNVRTCFragment(std::string const& algo,
+                                    std::string const& params,
+                                    std::string const& mname,
+                                    std::size_t size,
+                                    std::unique_ptr<char[]>&& program);
+
   std::unordered_map<std::string, std::unique_ptr<FragmentEntry>> cache;
 };
 
@@ -43,3 +49,7 @@ void registerFatbinFragment(std::string const& algo,
                             std::string const& params,
                             unsigned char const* blob,
                             std::size_t size);
+
+void registerNVRTCFragment(std::string const& key,
+                           std::size_t size,
+                           std::unique_ptr<char[]>&& program);

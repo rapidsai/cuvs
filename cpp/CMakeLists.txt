@@ -363,6 +363,7 @@ if(NOT BUILD_CPU_ONLY)
         src/detail/jit_lto/FragmentDatabase.cu
         src/detail/jit_lto/FragmentEntry.cu
         src/detail/jit_lto/nvjitlink_checker.cpp
+        src/detail/jit_lto/NVRTCLTOFragmentCompiler.cu
     )
   endif()
 

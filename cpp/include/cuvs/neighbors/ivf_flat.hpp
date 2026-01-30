@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -3035,4 +3035,353 @@ void recompute_internal_state(const raft::resources& res, index<uint8_t, int64_t
  */
 
 }  // namespace helpers
+
+namespace udf {
+
+/**
+ * @brief Wrapper for vector elements that provides both packed and unpacked access.
+ *
+ * For float/half: trivial wrapper around scalar values
+ * For int8/uint8 with Veclen > 1: wraps packed bytes in a 32-bit word
+ *
+ * @tparam T Data type (float, __half, int8_t, uint8_t)
+ * @tparam AccT Storage/accumulator type (float, __half, int32_t, uint32_t)
+ * @tparam Veclen Vector length (1, 2, 4, 8, 16)
+ *
+ * Usage:
+ *   // Helpers deduce Veclen automatically:
+ *   acc += cuvs::udf::squared_diff(x, y);  // No template args!
+ *
+ *   // Array access for custom logic (slower but flexible):
+ *   for (int i = 0; i < x.size(); ++i) {
+ *       acc += x[i] * y[i];
+ *   }
+ *
+ *   // Query packing:
+ *   if constexpr (decltype(x)::is_packed()) { ... }
+ */
+const std::string_view point_code = R"(
+ template <typename T, typename AccT, int Veclen>
+ struct point {
+   using element_type = T;
+   using storage_type = AccT;
+   static constexpr int veclen = Veclen;
+
+   storage_type data_;
+
+   // ============================================================
+   // Constructors
+   // ============================================================
+
+   __device__ __host__ point() = default;
+   __device__ __host__ explicit point(storage_type d) : data_(d) {}
+
+   // ============================================================
+   // Raw access (for power users who need intrinsics)
+   // ============================================================
+
+   __device__ __forceinline__ storage_type raw() const { return data_; }
+   __device__ __forceinline__ storage_type& raw() { return data_; }
+
+   // ============================================================
+   // Compile-time queries
+   // ============================================================
+
+   __device__ __host__ static constexpr int size()
+   {
+     // For packed int8/uint8: 4 elements per storage word
+     if constexpr ((std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) && Veclen > 1) {
+       return 4;
+     } else {
+       return 1;
+     }
+   }
+
+   __device__ __host__ static constexpr bool is_packed()
+   {
+     return (std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) && Veclen > 1;
+   }
+
+   // ============================================================
+   // Element access (unpacks for int8/uint8)
+   // ============================================================
+
+   __device__ __forceinline__ T operator[](int i) const
+   {
+     if constexpr (std::is_same_v<T, int8_t> && Veclen > 1) {
+       // Extract signed byte i from packed int32_t
+       return static_cast<int8_t>((data_ >> (i * 8)) & 0xFF);
+     } else if constexpr (std::is_same_v<T, uint8_t> && Veclen > 1) {
+       // Extract unsigned byte i from packed uint32_t
+       return static_cast<uint8_t>((data_ >> (i * 8)) & 0xFF);
+     } else {
+       // Scalar types: only one element
+       (void)i;  // Unused
+       return static_cast<T>(data_);
+     }
+   }
+ };
+ )";
+// ============================================================
+// Helper Operations - Deduce Veclen from point type!
+// ============================================================
+
+/**
+ * @brief Squared difference: (x - y)²
+ *
+ * Optimized for packed int8/uint8, falls back to scalar for float/half.
+ */
+const std::string_view squared_diff_code = R"(
+ template <typename T, typename AccT, int V>
+ __device__ __forceinline__ AccT squared_diff(point<T, AccT, V> x, point<T, AccT, V> y)
+ {
+   if constexpr (std::is_same_v<T, uint8_t> && V > 1) {
+     // SIMD: 4 packed unsigned bytes
+     auto diff = __vabsdiffu4(x.raw(), y.raw());
+     return __dp4a(diff, diff, AccT{0});
+   } else if constexpr (std::is_same_v<T, int8_t> && V > 1) {
+     // SIMD: 4 packed signed bytes
+     auto diff = __vabsdiffs4(x.raw(), y.raw());
+     return __dp4a(diff, diff, static_cast<uint32_t>(0));
+   } else {
+     // Scalar: float, half, or byte with Veclen==1
+     auto diff = x.raw() - y.raw();
+     return diff * diff;
+   }
+ }
+ )";
+/**
+ * @brief Absolute difference: |x - y|
+ *
+ * For packed types, returns sum of absolute differences.
+ */
+const std::string_view abs_diff_code = R"(
+ template <typename T, typename AccT, int V>
+ __device__ __forceinline__ AccT abs_diff(point<T, AccT, V> x, point<T, AccT, V> y)
+ {
+   if constexpr (std::is_same_v<T, uint8_t> && V > 1) {
+     // SIMD: sum of 4 unsigned absolute differences
+     auto diff = __vabsdiffu4(x.raw(), y.raw());
+     // Sum the 4 bytes
+     return ((diff >> 0) & 0xFF) + ((diff >> 8) & 0xFF) + ((diff >> 16) & 0xFF) +
+            ((diff >> 24) & 0xFF);
+   } else if constexpr (std::is_same_v<T, int8_t> && V > 1) {
+     // SIMD: sum of 4 signed absolute differences
+     auto diff = __vabsdiffs4(x.raw(), y.raw());
+     return ((diff >> 0) & 0xFF) + ((diff >> 8) & 0xFF) + ((diff >> 16) & 0xFF) +
+            ((diff >> 24) & 0xFF);
+   } else {
+     // Scalar
+     auto a = x.raw();
+     auto b = y.raw();
+     return (a > b) ? (a - b) : (b - a);
+   }
+ }
+ )";
+/**
+ * @brief Dot product: x · y
+ *
+ * For packed types, computes sum of element-wise products.
+ */
+const std::string_view dot_product_code = R"(
+ template <typename T, typename AccT, int V>
+ __device__ __forceinline__ AccT dot_product(point<T, AccT, V> x, point<T, AccT, V> y)
+ {
+   if constexpr ((std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>) && V > 1) {
+     // SIMD: dp4a computes dot product of 4 packed bytes
+     return __dp4a(x.raw(), y.raw(), AccT{0});
+   } else {
+     // Scalar
+     return x.raw() * y.raw();
+   }
+ }
+ )";
+/**
+ * @brief Element-wise product: x * y
+ *
+ * For packed types, returns sum of element-wise products (same as dot_product).
+ */
+const std::string_view product_code = R"(
+ template <typename T, typename AccT, int V>
+ __device__ __forceinline__ AccT product(point<T, AccT, V> x, point<T, AccT, V> y)
+ {
+   return dot_product(x, y);
+ }
+ )";
+/**
+ * @brief Element-wise sum: x + y
+ */
+const std::string_view sum_code = R"(
+ template <typename T, typename AccT, int V>
+ __device__ __forceinline__ AccT sum(point<T, AccT, V> x, point<T, AccT, V> y)
+ {
+   if constexpr ((std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>) && V > 1) {
+     // Sum all unpacked elements
+     AccT result = 0;
+     for (int i = 0; i < x.size(); ++i) {
+       result += static_cast<AccT>(x[i]) + static_cast<AccT>(y[i]);
+     }
+     return result;
+   } else {
+     return x.raw() + y.raw();
+   }
+ }
+ )";
+/**
+ * @brief Maximum element: max(x, y)
+ *
+ * For packed types, returns max across all element pairs.
+ */
+const std::string_view max_elem_code = R"(
+ template <typename T, typename AccT, int V>
+ __device__ __forceinline__ AccT max_elem(point<T, AccT, V> x, point<T, AccT, V> y)
+ {
+   if constexpr ((std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>) && V > 1) {
+     AccT result = 0;
+     for (int i = 0; i < x.size(); ++i) {
+       auto xi  = static_cast<AccT>(x[i]);
+       auto yi  = static_cast<AccT>(y[i]);
+       auto val = (xi > yi) ? xi : yi;
+       if (val > result) result = val;
+     }
+     return result;
+   } else {
+     auto a = x.raw();
+     auto b = y.raw();
+     return (a > b) ? a : b;
+   }
+ }
+ )";
+/**
+ * @brief Base interface for custom distance metrics.
+ *
+ * Inherit from this interface to get compile-time enforcement of the
+ * correct operator() signature via the `override` keyword.
+ *
+ * If you forget to implement operator() or use the wrong signature,
+ * you'll get a clear compile error: "does not override any member function"
+ *
+ * @tparam T Data type (float, __half, int8_t, uint8_t)
+ * @tparam AccT Accumulator type (float, __half, int32_t, uint32_t)
+ * @tparam Veclen Vector length (handled by cuVS internally)
+ *
+ * @note x and y are point<T, AccT, Veclen> which provides:
+ *       - .raw()     : packed storage for power users
+ *       - operator[] : unpacked element access
+ *       - ::veclen   : compile-time Veclen
+ *       - ::is_packed() : whether data is packed
+ */
+const std::string_view metric_interface_code = R"(
+ template <typename T, typename AccT, int Veclen = 1>
+ struct metric_interface {
+   using point_type = point<T, AccT, Veclen>;
+
+   /**
+    * @brief Compute distance contribution for one element pair.
+    *
+    * @param[in,out] acc Accumulated distance value
+    * @param[in] x Query vector element (point wrapper)
+    * @param[in] y Database vector element (point wrapper)
+    *
+    * Example:
+    *   // Simple - use helpers (recommended):
+    *   acc += squared_diff(x, y);
+    *
+    *   // Array access for custom logic:
+    *   for (int i = 0; i < x.size(); ++i) {
+    *       acc += x[i] * y[i];
+    *   }
+    *
+    *   // Power user - raw access:
+    *   if constexpr (point_type::is_packed()) {
+    *       acc = __dp4a(x.raw(), y.raw(), acc);
+    *   }
+    */
+   virtual __device__ void operator()(AccT& acc, point_type x, point_type y) = 0;
+
+   virtual __device__ ~metric_interface() = default;
+ };
+ )";
+
+/**
+ * @brief Define a custom distance metric with compile-time validation.
+ *
+ * This macro creates:
+ * 1. A struct that inherits from metric_interface (compile-time validation)
+ * 2. A function NAME_udf() that returns a metric_source for JIT compilation
+ *
+ * @param NAME The name of your metric (becomes struct name and function prefix)
+ * @param BODY The body of operator()(AccT& acc, point_type x, point_type y)
+ *
+ * Available in BODY:
+ *   acc    - Accumulated distance (AccT&, modify in-place)
+ *   x, y   - Vector elements (point<T, AccT, Veclen>)
+ *   T      - Data type (float, __half, int8_t, uint8_t)
+ *   AccT   - Accumulator type
+ *   Veclen - Vector length (compile-time constant)
+ *
+ * x and y provide:
+ *   x.raw()     - Raw packed storage (for power users)
+ *   x[i]        - Unpacked element access
+ *   x.size()    - Number of elements (4 for packed int8, 1 for float)
+ *   x.is_packed() - Whether data is packed (constexpr)
+ *
+ * Helper functions (Veclen deduced automatically!):
+ *   cuvs::udf::squared_diff(x, y) - (x-y)² optimized for all types
+ *   cuvs::udf::abs_diff(x, y)     - |x-y| optimized for all types
+ *   cuvs::udf::dot_product(x, y)  - x·y optimized for all types
+ *   cuvs::udf::product(x, y)      - element-wise product
+ *
+ * Example:
+ *   CUVS_METRIC(my_l2, {
+ *       acc += cuvs::udf::squared_diff(x, y);  // Just works for all types!
+ *   })
+ *
+ *   CUVS_METRIC(my_chebyshev, {
+ *       for (int i = 0; i < x.size(); ++i) {
+ *           auto diff = (x[i] > y[i]) ? (x[i] - y[i]) : (y[i] - x[i]);
+ *           if (diff > acc) acc = diff;
+ *       }
+ *   })
+ */
+#define CUVS_METRIC(NAME, BODY)                                                         \
+  template <typename T, typename AccT, int Veclen>                                      \
+  struct NAME : cuvs::udf::metric_interface<T, AccT, Veclen> {                          \
+    using point_type = cuvs::udf::point<T, AccT, Veclen>;                               \
+    __device__ void operator()(AccT& acc, point_type x, point_type y) override { BODY } \
+  };                                                                                    \
+                                                                                        \
+  inline std::string NAME##_udf()                                                       \
+  {                                                                                     \
+    using namespace cuvs::neighbors::ivf_flat::udf;                                     \
+    std::string result;                                                                 \
+    result += point_code;                                                               \
+    result += squared_diff_code;                                                        \
+    result += abs_diff_code;                                                            \
+    result += dot_product_code;                                                         \
+    result += product_code;                                                             \
+    result += sum_code;                                                                 \
+    result += max_elem_code;                                                            \
+    result += metric_interface_code;                                                    \
+    result += R"(                                                                        \
+template <typename T, typename AccT, int Veclen>                                       \
+struct )" #NAME R"( : metric_interface<T, AccT, Veclen> {                              \
+  using point_type = point<T, AccT, Veclen>;                                           \
+  __device__ void operator()(AccT& acc, point_type x, point_type y) override           \
+)" #BODY R"(                                                                           \
+};                                                                                     \
+                                                                                       \
+template <int Veclen, typename T, typename AccT>                                       \
+__device__ void compute_dist(AccT& acc, AccT x, AccT y)                                \
+{                                                                                      \
+  )" #NAME R"(<T, AccT, Veclen> metric;                                                \
+  metric(acc, point<T, AccT, Veclen>(x), point<T, AccT, Veclen>(y));                   \
+}                                                                                      \
+)";                                                                                     \
+    return result;                                                                      \
+  }
+
+void compile_metric(std::string const& code);
+}  // namespace udf
+
 }  // namespace cuvs::neighbors::ivf_flat

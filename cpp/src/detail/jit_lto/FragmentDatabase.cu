@@ -45,3 +45,13 @@ void registerFatbinFragment(std::string const& algo,
   if (entry_exists) { return; }
   planner.cache[key] = std::make_unique<FatbinFragmentEntry>(key, blob, size);
 }
+
+void registerNVRTCFragment(std::string const& key,
+                           std::unique_ptr<char[]>&& program,
+                           std::size_t size)
+{
+  auto& planner     = fragment_database();
+  auto entry_exists = planner.make_cache_entry(key);
+  if (entry_exists) { return; }
+  planner.cache[key] = std::make_unique<NVRTCFragmentEntry>(key, std::move(program), size);
+}

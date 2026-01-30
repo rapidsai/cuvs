@@ -1,0 +1,74 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <cuvs/detail/jit_lto/FragmentDatabase.h>
+#include <cuvs/detail/jit_lto/NVRTCLTOFragmentCompiler.hpp>
+
+#include <iostream>
+
+#include "cuda.h"
+#include "nvrtc.h"
+
+#define NVRTC_SAFE_CALL(_call)                                                             \
+  do {                                                                                     \
+    nvrtcResult result = _call;                                                            \
+    if (result != NVRTC_SUCCESS) {                                                         \
+      std::cerr << "\nerror: " #_call " failed with error " << nvrtcGetErrorString(result) \
+                << '\n';                                                                   \
+      exit(1);                                                                             \
+    }                                                                                      \
+  } while (0)
+
+NRTCLTOFragmentCompiler::NRTCLTOFragmentCompiler()
+{
+  int device = 0;
+  int major  = 0;
+  int minor  = 0;
+  cudaGetDevice(&device);
+  cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device);
+  cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device);
+
+  this->standard_compile_opts.resize(4);
+
+  std::size_t i = 0;
+  this->standard_compile_opts[i++] =
+    std::string{"-arch=sm_" + std::to_string((major * 10 + minor))};
+  this->standard_compile_opts[i++] = std::string{"-dlto"};
+  this->standard_compile_opts[i++] = std::string{"-rdc=true"};
+  this->standard_compile_opts[i++] = std::string{"-default-device"};
+}
+
+void NRTCLTOFragmentCompiler::compile(std::string const& key, std::string const& code) const
+{
+  nvrtcProgram prog;
+  NVRTC_SAFE_CALL(
+    nvrtcCreateProgram(&prog, code.c_str(), "nvrtc_lto_fragment", 0, nullptr, nullptr));
+
+  nvrtcResult compileResult = nvrtcCompileProgram(prog,                                // prog
+                                                  this->standard_compile_opts.size(),  // numOptions
+                                                  this->standard_compile_opts.data());  // options
+
+  if (compileResult != NVRTC_SUCCESS) {
+    // Obtain compilation log from the program.
+    size_t log_size;
+    NVRTC_SAFE_CALL(nvrtcGetProgramLogSize(prog, &log_size));
+    std::unique_ptr<char[]> log{new char[log_size]};
+    NVRTC_SAFE_CALL(nvrtcGetProgramLog(prog, log.get()));
+    std::cerr << "nvrtrc compile error log: \n";
+    std::cerr << log.get() << '\n';
+    exit(1);
+  }
+
+  // Obtain generated LTO IR from the program.
+  std::size_t ltoIRSize;
+  NVRTC_SAFE_CALL(nvrtcGetLTOIRSize(prog, &ltoIRSize));
+
+  std::unique_ptr<char[]> program = std::make_unique<char[]>(ltoIRSize);
+  nvrtcGetLTOIR(prog, program.get());
+
+  NVRTC_SAFE_CALL(nvrtcDestroyProgram(&prog));
+
+  registerNVRTCFragment(key, std::move(program), ltoIRSize);
+}
