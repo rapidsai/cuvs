@@ -364,6 +364,7 @@ if(NOT BUILD_CPU_ONLY)
         src/detail/jit_lto/FragmentEntry.cu
         src/detail/jit_lto/nvjitlink_checker.cpp
         src/detail/jit_lto/NVRTCLTOFragmentCompiler.cu
+        src/neighbors/ivf_flat/jit_lto_kernels/ivf_flat_udf.cpp
     )
   endif()
 
