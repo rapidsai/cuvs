@@ -1,0 +1,65 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#pragma once
+
+#include <raft/util/cuda_dev_essentials.cuh>  // DI
+
+namespace cuvs::distance::detail::ops {
+
+/**
+ * @brief the expanded dice distance matrix calculation
+ *
+ * It computes the following equation:
+ *
+ * d(x, y) = 1 - 2*(x ⋅ y) / ( Σ(x) + Σ(y) )
+ */
+template <typename DataType, typename AccType, typename IdxType>
+struct dice_distance_op {
+  using DataT = DataType;
+  using AccT  = AccType;
+  using IdxT  = IdxType;
+
+  // Load norms of input data
+  static constexpr bool use_norms = true;
+  // Whether the core function requires so many instructions that it makes sense
+  // to reduce loop unrolling, etc. We do this to keep compile times in check.
+  static constexpr bool expensive_inner_loop = false;
+
+  // Size of shared memory. This is normally decided by the kernel policy, but
+  // some ops such as correlation_distance_op use more.
+  template <typename Policy>
+  static constexpr size_t shared_mem_size()
+  {
+    return Policy::SmemSize + ((Policy::Mblk + Policy::Nblk) * sizeof(AccT));
+  }
+
+  DI void core(AccT& acc, DataT& x, DataT& y) const
+  {
+    if constexpr ((std::is_same_v<AccT, float> && std::is_same_v<DataT, half>)) {
+      acc += __half2float(x) * __half2float(y);
+    } else {
+      acc += x * y;
+    }
+  };
+
+  template <typename Policy>
+  DI void epilog(AccT acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
+                 AccT* regxn,
+                 AccT* regyn,
+                 IdxT gridStrideX,
+                 IdxT gridStrideY) const
+  {
+#pragma unroll
+    for (int i = 0; i < Policy::AccRowsPerTh; ++i) {
+#pragma unroll
+      for (int j = 0; j < Policy::AccColsPerTh; ++j) {
+        acc[i][j] = 1.0 - (2 * acc[i][j] / (regxn[i] + regyn[j]));
+      }
+    }
+  }
+};
+
+}  // namespace cuvs::distance::detail::ops

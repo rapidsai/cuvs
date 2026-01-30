@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -212,6 +212,7 @@ void pairwise_distance(raft::resources const& handle,
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::Canberra);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::CorrelationExpanded);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::CosineExpanded);
+instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::DiceExpanded);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::HammingUnexpanded);
 
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::HellingerExpanded);
@@ -299,6 +300,7 @@ instantiate_cuvs_distance_getWorkspaceSize_by_algo(cuvs::distance::DistanceType:
 instantiate_cuvs_distance_getWorkspaceSize_by_algo(
   cuvs::distance::DistanceType::CorrelationExpanded);
 instantiate_cuvs_distance_getWorkspaceSize_by_algo(cuvs::distance::DistanceType::CosineExpanded);
+instantiate_cuvs_distance_getWorkspaceSize_by_algo(cuvs::distance::DistanceType::DiceExpanded);
 instantiate_cuvs_distance_getWorkspaceSize_by_algo(cuvs::distance::DistanceType::HammingUnexpanded);
 
 instantiate_cuvs_distance_getWorkspaceSize_by_algo(cuvs::distance::DistanceType::HellingerExpanded);

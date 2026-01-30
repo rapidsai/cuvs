@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -84,6 +84,8 @@ instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
   cuvs::distance::detail::ops::correlation_distance_op, int);
 instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
   cuvs::distance::detail::ops::cosine_distance_op, int);
+instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
+  cuvs::distance::detail::ops::dice_distance_op, int);
 instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
   cuvs::distance::detail::ops::hamming_distance_op, int);
 instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(

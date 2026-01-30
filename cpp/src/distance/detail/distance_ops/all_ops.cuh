@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -12,6 +12,7 @@
 #include "../distance_ops/canberra.cuh"
 #include "../distance_ops/correlation.cuh"
 #include "../distance_ops/cosine.cuh"
+#include "../distance_ops/dice.cuh"
 #include "../distance_ops/hamming.cuh"
 #include "../distance_ops/hellinger.cuh"
 #include "../distance_ops/jensen_shannon.cuh"

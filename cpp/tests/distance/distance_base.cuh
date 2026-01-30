@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -127,6 +127,34 @@ RAFT_KERNEL naiveCosineDistanceKernel(OutputType* dist,
 
   // Use 1.0 - (cosine similarity) to calc the distance
   dist[outidx] = (OutputType)1.0 - acc_ab / (raft::sqrt(acc_a) * raft::sqrt(acc_b));
+}
+
+template <typename DataType, typename OutputType = DataType>
+RAFT_KERNEL naiveDiceDistanceKernel(
+  OutputType* dist, const DataType* x, const DataType* y, int m, int n, int k, bool isRowMajor)
+{
+  int midx = threadIdx.x + blockIdx.x * blockDim.x;
+  int nidx = threadIdx.y + blockIdx.y * blockDim.y;
+  if (midx >= m || nidx >= n) { return; }
+
+  OutputType acc_a  = OutputType(0);
+  OutputType acc_b  = OutputType(0);
+  OutputType acc_ab = OutputType(0);
+
+  for (int i = 0; i < k; ++i) {
+    int xidx = isRowMajor ? i + midx * k : i * m + midx;
+    int yidx = isRowMajor ? i + nidx * k : i * n + nidx;
+    auto a   = half2float(x[xidx]);
+    auto b   = half2float(y[yidx]);
+    acc_a += a;
+    acc_b += b;
+    acc_ab += a * b;
+  }
+
+  int outidx = isRowMajor ? midx * n + nidx : midx + m * nidx;
+
+  // Use 1.0 - (dice dissimilarity) to calc the distance
+  dist[outidx] = (OutputType)1.0 - (2 * acc_ab / ((acc_a) + (acc_b)));
 }
 
 template <typename DataType, typename OutputType = DataType>
@@ -432,6 +460,10 @@ void naiveDistance(OutputType* dist,
       naiveCorrelationDistanceKernel<DataType, OutputType>
         <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, isRowMajor);
       break;
+    case cuvs::distance::DistanceType::DiceExpanded:
+      naiveDiceDistanceKernel<DataType, OutputType>
+        <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, isRowMajor);
+      break;
     default: FAIL() << "should be here\n";
   }
   RAFT_CUDA_TRY(cudaPeekAtLastError());
@@ -530,7 +562,8 @@ class DistanceTest : public ::testing::TestWithParam<DistanceInputs<DataType, Ou
       // Hellinger works only on positive numbers
       uniform(handle, r, x.data(), m * k, DataType(0.0), DataType(1.0));
       uniform(handle, r, y.data(), n * k, DataType(0.0), DataType(1.0));
-    } else if (distanceType == cuvs::distance::DistanceType::RusselRaoExpanded) {
+    } else if (distanceType == cuvs::distance::DistanceType::RusselRaoExpanded ||
+               distanceType == cuvs::distance::DistanceType::DiceExpanded) {
       uniform(handle, r, x.data(), m * k, DataType(0.0), DataType(1.0));
       uniform(handle, r, y.data(), n * k, DataType(0.0), DataType(1.0));
       // Russel rao works on boolean values.
@@ -624,7 +657,8 @@ class DistanceTestSameBuffer
         distanceType == cuvs::distance::DistanceType::KLDivergence) {
       // Hellinger works only on positive numbers
       uniform(handle, r, x.data(), m * k, DataType(0.0), DataType(1.0));
-    } else if (distanceType == cuvs::distance::DistanceType::RusselRaoExpanded) {
+    } else if (distanceType == cuvs::distance::DistanceType::RusselRaoExpanded ||
+               distanceType == cuvs::distance::DistanceType::DiceExpanded) {
       uniform(handle, r, x.data(), m * k, DataType(0.0), DataType(1.0));
       // Russel rao works on boolean values.
       bernoulli(handle, r, x.data(), m * k, 0.5f);
