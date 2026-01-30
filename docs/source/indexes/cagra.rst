@@ -100,10 +100,12 @@ The 3 hyper-parameters that are most often tuned are `graph_degree`, `intermedia
 Memory footprint
 ================
 
-CAGRA builds a nearest-neighbor graph(neighbor IDs) that ultimately ends up on the host while it needs to keep the original dataset(raw vectors) around (can be on host or device)
+CAGRA builds a nearest-neighbor graph (stored on host) while keeping the original dataset vectors around. During index build, the dataset must reside in device (GPU) memory. After building, the dataset can optionally be detached from the index — for example, when immediately converting the CAGRA graph to a CPU-based format like HNSW for search.
 
 Baseline Memory Footprint
 -------------------------
+
+The baseline memory footprint after index construction:
 
 .. math::
 
@@ -117,7 +119,7 @@ Baseline Memory Footprint
    \;=\;
    \text{number\_vectors} \times \text{graph\_degree} \times \operatorname{sizeof}\!\big(\mathrm{IdxT}\big)
 
-Note: Dataset needs to be on GPU during the index build process, however it need not be attached to index once build is done.
+Note: The dataset must be in GPU memory during index build, but can be detached afterward if not needed for search.
 
 **Example** (1,000,000 vectors, dim = 1024, fp32, graph\_degree = 64, IdxT = int32):
 
@@ -196,7 +198,7 @@ The overall peak memory footprint on the device is the maximum allocation across
 Search peak memory usage
 ------------------------
 
-CAGRA search requires the dataset and graph to already be resident in GPU memory. Additionally, temporary workspace memory is needed to store the search results for a batch of queries.
+CAGRA search requires the dataset and graph to already be resident in GPU memory. When using CAGRA-Q (compressed/quantized), the original dataset can reside in host memory instead. Additionally, temporary workspace memory is needed to store the search results for a batch of queries.
 If multiple batches are to be launched concurrently or overlapped, separate results buffers will be needed for each. 
 The below memory estimate assumes just one batch of queries being run at a time and reusing the buffers.
 
