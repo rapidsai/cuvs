@@ -9,7 +9,7 @@
 #include <iostream>
 
 #include "cuda.h"
-#include "nvrtc.h"
+#include <nvrtc.h>
 
 #define NVRTC_SAFE_CALL(_call)                                                             \
   do {                                                                                     \
@@ -21,7 +21,7 @@
     }                                                                                      \
   } while (0)
 
-NRTCLTOFragmentCompiler::NRTCLTOFragmentCompiler()
+NVRTCLTOFragmentCompiler::NVRTCLTOFragmentCompiler()
 {
   int device = 0;
   int major  = 0;
@@ -40,15 +40,22 @@ NRTCLTOFragmentCompiler::NRTCLTOFragmentCompiler()
   this->standard_compile_opts[i++] = std::string{"-default-device"};
 }
 
-void NRTCLTOFragmentCompiler::compile(std::string const& key, std::string const& code) const
+void NVRTCLTOFragmentCompiler::compile(std::string const& key, std::string const& code) const
 {
   nvrtcProgram prog;
   NVRTC_SAFE_CALL(
     nvrtcCreateProgram(&prog, code.c_str(), "nvrtc_lto_fragment", 0, nullptr, nullptr));
 
-  nvrtcResult compileResult = nvrtcCompileProgram(prog,                                // prog
-                                                  this->standard_compile_opts.size(),  // numOptions
-                                                  this->standard_compile_opts.data());  // options
+  // Convert std::vector<std::string> to std::vector<const char*> for nvrtc API
+  std::vector<const char*> opts;
+  opts.reserve(this->standard_compile_opts.size());
+  for (const auto& opt : this->standard_compile_opts) {
+    opts.push_back(opt.c_str());
+  }
+
+  nvrtcResult compileResult = nvrtcCompileProgram(prog,          // prog
+                                                  opts.size(),   // numOptions
+                                                  opts.data());  // options
 
   if (compileResult != NVRTC_SUCCESS) {
     // Obtain compilation log from the program.

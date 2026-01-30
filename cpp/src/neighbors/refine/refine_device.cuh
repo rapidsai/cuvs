@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -106,6 +106,7 @@ void refine_device(
 
   cuvs::neighbors::ivf_flat::detail::ivfflat_interleaved_scan<data_t, acc_t, int64_t>(
     refinement_index,
+    cuvs::neighbors::ivf_flat::search_params(),
     queries.data_handle(),
     fake_coarse_idx.data(),
     static_cast<uint32_t>(n_queries),

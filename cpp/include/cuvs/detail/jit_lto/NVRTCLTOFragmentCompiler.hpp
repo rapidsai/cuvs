@@ -5,13 +5,11 @@
 
 #pragma once
 
-#include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
-struct NRTCLTOFragmentCompiler {
-  NRTCLTOFragmentCompiler();
+struct NVRTCLTOFragmentCompiler {
+  NVRTCLTOFragmentCompiler();
 
   void compile(std::string const& key, std::string const& code) const;
 

@@ -14,6 +14,7 @@
 
 #include <cuvs/detail/jit_lto/AlgorithmPlanner.h>
 #include <cuvs/detail/jit_lto/FragmentDatabase.h>
+#include <iostream>
 
 #include "cuda_runtime.h"
 #include "nvJitLink.h"
@@ -73,6 +74,7 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
   check_nvjitlink_result(handle, result);
 
   for (auto& frag : this->fragments) {
+    std::cout << "Adding fragment: " << frag->compute_key << std::endl;
     frag->add_to(handle);
   }
 

@@ -32,7 +32,7 @@ struct FatbinFragmentEntry final : FragmentEntry {
 };
 
 struct NVRTCFragmentEntry final : FragmentEntry {
-  NVRTCFragmentEntry(std::string const& key, std::unique_ptr<char[]>&& program std::size_t size);
+  NVRTCFragmentEntry(std::string const& key, std::unique_ptr<char[]>&& program, std::size_t size);
 
   virtual bool add_to(nvJitLinkHandle& handle) const;
 

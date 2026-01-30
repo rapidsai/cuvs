@@ -364,7 +364,6 @@ if(NOT BUILD_CPU_ONLY)
         src/detail/jit_lto/FragmentEntry.cu
         src/detail/jit_lto/nvjitlink_checker.cpp
         src/detail/jit_lto/NVRTCLTOFragmentCompiler.cu
-        src/neighbors/ivf_flat/jit_lto_kernels/ivf_flat_udf.cpp
     )
   endif()
 
@@ -606,6 +605,7 @@ if(NOT BUILD_CPU_ONLY)
             ${CUVS_CTK_MATH_DEPENDENCIES}
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
             $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
+            $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvrtc>
   )
 
   target_include_directories(
@@ -689,6 +689,7 @@ if(NOT BUILD_CPU_ONLY)
         $<COMPILE_ONLY:nvidia::cutlass::cutlass>
         $<COMPILE_ONLY:cuco::cuco>
         $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
+        $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvrtc>
         $<$<BOOL:${JIT_LTO_COMPILATION}>:$<LINK_LIBRARY:WHOLE_ARCHIVE,cuvs::cuvs_jit_lto_kernels>>
     )
 
@@ -749,6 +750,7 @@ SECTIONS
       PRIVATE
         $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
         $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
+        $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvrtc>
         $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
         $<COMPILE_ONLY:nvidia::cutlass::cutlass>
         $<COMPILE_ONLY:cuco::cuco>
