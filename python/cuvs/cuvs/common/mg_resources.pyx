@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
@@ -125,8 +125,34 @@ resources.
         allocated inside this function and synchronized before the
         function exits. If resources are supplied, you will need to
         explicitly synchronize yourself by calling `resources.sync()`
-        before accessing the output.
+        before accessing the output. Also accepts pylibraft
+        DeviceResourcesSNMG objects.
 """.strip()
+
+
+class _PylibraftSNMGWrapper:
+    """
+    Adapter to use pylibraft DeviceResourcesSNMG with cuVS APIs.
+
+    This allows users to pass a pylibraft multi-GPU handle to cuVS functions
+    that expect a cuVS MultiGpuResources object.
+    """
+
+    def __init__(self, handle):
+        if not hasattr(handle, 'getHandle'):
+            raise TypeError(
+                "resources must be a cuVS MultiGpuResources or pylibraft "
+                "DeviceResourcesSNMG object"
+            )
+        self._handle = handle
+
+    def get_c_obj(self):
+        """Return the pointer to the underlying resources as a size_t"""
+        return self._handle.getHandle()
+
+    def sync(self):
+        """Synchronize the stream."""
+        self._handle.sync()
 
 
 def auto_sync_multi_gpu_resources(f):
@@ -137,6 +163,9 @@ def auto_sync_multi_gpu_resources(f):
     will automatically create a default multi-GPU resources for the function,
     and call sync on that resources when the function exits.
 
+    This also accepts pylibraft DeviceResourcesSNMG objects, which will
+    be wrapped to provide the cuVS MultiGpuResources interface.
+
     This will also insert the appropriate docstring for the resources
     parameter
     """
@@ -145,8 +174,12 @@ def auto_sync_multi_gpu_resources(f):
     @functools.wraps(f)
     def wrapper(*args, resources=None, **kwargs):
         sync_resources = resources is None
-        resources = (resources if resources is not None
-                     else MultiGpuResources())
+
+        if resources is None:
+            resources = MultiGpuResources()
+        elif not hasattr(resources, 'get_c_obj'):
+            # Wrap to provide cuVS interface (e.g., pylibraft DeviceResourcesSNMG)
+            resources = _PylibraftSNMGWrapper(resources)
 
         ret_value = f(*args, resources=resources, **kwargs)
 
