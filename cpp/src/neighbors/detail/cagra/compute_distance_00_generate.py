@@ -30,11 +30,14 @@ using namespace cuvs::distance;
 """
 
 mxdim_team = [(128, 8), (256, 16), (512, 32)]
+vpq_2_4_mxdim_team = [(64, 4), (128, 8), (256, 16), (512, 32)]
+vpq_8_mxdim_team = [(128, 4), (256, 8), (512, 16), (1024, 32)]
+vrq_mxdim_team = [(64, 4), (128, 8), (256, 16), (512, 32)]
 # mxdim_team = [(64, 8), (128, 16), (256, 32)]
 # mxdim_team = [(32, 8), (64, 16), (128, 32)]
 
 pq_bits = [8]
-pq_lens = [2, 4]
+pq_lens = [2, 4, 8]
 
 # rblock = [(256, 4), (512, 2), (1024, 1)]
 # rcandidates = [32]
@@ -76,26 +79,33 @@ for type_path, (data_t, idx_t, distance_t) in search_types.items():
                 f.write(template.format(includes=includes, content=content))
                 cmake_list.append(f"  src/neighbors/detail/cagra/{path}")
 
-        # CAGRA-Q
-        for code_book_t in code_book_types:
-            for pq_len in pq_lens:
+    for pq_len in pq_lens:
+        vpq_mxdim_team = (
+            vpq_8_mxdim_team if pq_len == 8 else vpq_2_4_mxdim_team
+        )
+        for mxdim, team in vpq_mxdim_team:
+            # CAGRA-Q
+            for code_book_t in code_book_types:
                 for pq_bit in pq_bits:
                     for metric in ["L2Expanded"]:
-                        path = f"compute_distance_vpq_{metric}_{type_path}_dim{mxdim}_t{team}_{pq_bit}pq_{pq_len}subd_{code_book_t}.cu"
-                        includes = '#include "compute_distance_vpq-impl.cuh"'
-                        params = f"{metric_prefix}{metric}, {team}, {mxdim}, {pq_bit}, {pq_len}, {code_book_t}, {data_t}, {idx_t}, {distance_t}"
-                        spec = f"vpq_descriptor_spec<{params}>"
-                        content = f"""template struct {spec};"""
-                        specs.append(spec)
-                        with open(path, "w") as f:
-                            f.write(
-                                template.format(
-                                    includes=includes, content=content
+                        for enable_fp8 in ["true", "false"]:
+                            path = f"compute_distance_vpq_{metric}_{type_path}_dim{mxdim}_t{team}_{pq_bit}pq_{pq_len}subd_{code_book_t}_fp8{enable_fp8}.cu"
+                            includes = (
+                                '#include "compute_distance_vpq-impl.cuh"'
+                            )
+                            params = f"{metric_prefix}{metric}, {team}, {mxdim}, {pq_bit}, {pq_len}, {code_book_t}, {data_t}, {idx_t}, {distance_t}, {enable_fp8}"
+                            spec = f"vpq_descriptor_spec<{params}>"
+                            content = f"""template struct {spec};"""
+                            specs.append(spec)
+                            with open(path, "w") as f:
+                                f.write(
+                                    template.format(
+                                        includes=includes, content=content
+                                    )
                                 )
-                            )
-                            cmake_list.append(
-                                f"  src/neighbors/detail/cagra/{path}"
-                            )
+                                cmake_list.append(
+                                    f"  src/neighbors/detail/cagra/{path}"
+                                )
 
 # CAGRA (Binary Hamming distance)
 for mxdim, team in mxdim_team:
