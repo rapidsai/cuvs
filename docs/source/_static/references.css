@@ -21,3 +21,16 @@ dl.citation > dt.label > span::before {
 dl.citation > dt.label > span::after {
   content: "]";
 }
+
+/* Highlight math formulas in a box */
+div.math {
+  background-color: #f8f9fa !important;
+  border-top: 1px solid #e9ecef !important;
+  border-bottom: 1px solid #e9ecef !important;
+  border-left: none !important;
+  border-right: none !important;
+  border-radius: 0 !important;
+  padding: 1rem 1.25rem !important;
+  margin: 1rem 0 !important;
+  overflow-x: auto !important;
+}
