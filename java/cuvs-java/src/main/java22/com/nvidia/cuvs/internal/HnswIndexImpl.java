@@ -222,6 +222,7 @@ public class HnswIndexImpl implements HnswIndex {
    */
   private CloseableHandle segmentFromIndexParams(HnswIndexParams params) {
     var hnswParams = createHnswIndexParams();
+    cuvsHnswIndexParams.hierarchy(hnswParams.handle(), params.getHierarchy().value);
     cuvsHnswIndexParams.ef_construction(hnswParams.handle(), params.getEfConstruction());
     cuvsHnswIndexParams.num_threads(hnswParams.handle(), params.getNumThreads());
     return hnswParams;

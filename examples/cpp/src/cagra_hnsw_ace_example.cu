@@ -80,7 +80,8 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
   // descriptor For in-memory indices: creates HNSW index in memory
   std::cout << "Converting CAGRA index to HNSW" << std::endl;
   hnsw::index_params hnsw_params;
-  auto hnsw_index = hnsw::from_cagra(dev_resources, hnsw_params, index);
+  hnsw_params.hierarchy = hnsw::HnswHierarchy::GPU;  // Offload hierarchy construction to GPU
+  auto hnsw_index       = hnsw::from_cagra(dev_resources, hnsw_params, index);
 
   // HNSW search requires host matrices
   auto queries_host = raft::make_host_matrix<float, int64_t>(n_queries, queries.extent(1));
