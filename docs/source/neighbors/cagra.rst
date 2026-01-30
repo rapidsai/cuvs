@@ -134,9 +134,9 @@ The steps below are sequential with distinct peak memory consumption. The overal
 knn graph build phase
 ~~~~~~~~~~~~~~~~~~~~~
 
-knn graph constructed with IVF-PQ algorithm involves training the cluster centroids and assigning the vectors to the nearest centroids.
+The knn graph can be constructed using the IVF-PQ algorithm, which works in two stages: first, an IVF-PQ index is trained on a subset of vectors to learn cluster centroids; then, the full dataset is queried against this index in batches to find approximate nearest neighbors for each vector.
 
-**IVF-PQ Build (centroid training)** — uses a training subset to compute cluster centroids and assignments.
+**IVF-PQ Build (centroid training)** — uses a training subset to compute cluster centroids and PQ codebooks.
 
 .. math::
 
@@ -150,7 +150,7 @@ knn graph constructed with IVF-PQ algorithm involves training the cluster centro
 
 **Example** (n = 1e6; dim = 1024; n\_clusters = 1024; train\_set\_ratio = 10): 395.01 MB
 
-**IVF-PQ Search (forms the intermediate graph)** — Construct the knn-graph by assigning raw vectors to trained cluster centroids in batches.
+**IVF-PQ Search (forms the intermediate graph)** — Constructs the knn graph in batches by querying the IVF-PQ index for the nearest neighbors of all training points.
 
 .. math::
 
@@ -181,37 +181,22 @@ Pruning/reordering the intermediate graph; peak scales linearly with intermediat
 Overall Build Peak Memory Usage
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Depending on the selected memory resource, the overall peak memory footprint on the device would be different. For ``cuda_memory_resource``, peak is the maximum allocation across each step; For ``managed_memory_resource``, the
-peaks from sequential steps are additive;
-
-``cuda_memory_resource``:
+The overall peak memory footprint on the device is the maximum allocation across each sequential step, since RMM's ``device_memory_resource`` releases memory between steps.
 
 .. math::
 
+   \text{build\_peak}
+   \;=\;
    \text{dataset\_size}
    \;+\;
    \max\!\big(\text{IVFPQ\_build\_peak},\ \text{IVFPQ\_search\_peak},\ \text{optimize\_peak}\big)
 
 **Example:** 3906.25 + max(395.01, 5.00, 614.17) = 4520.42 MB
 
-``managed_memory_resource``:
-
-.. math::
-
-   \text{dataset\_size}
-   \;+\;
-   \text{IVFPQ\_build\_peak}
-   \;+\;
-   \text{IVFPQ\_search\_peak}
-   \;+\;
-   \text{optimize\_peak}
-
-**Example:** 3906.25 + 395.01 + 5.00 + 614.17 = 4920.43 MB
-
 Search peak memory usage
 ------------------------
 
-CAGRA search is performed by having the dataset and graph in GPU memory, and requiring memory to store the search results of a batch of queries. 
+CAGRA search requires the dataset and graph to already be resident in GPU memory. Additionally, temporary workspace memory is needed to store the search results for a batch of queries.
 If multiple batches are to be launched concurrently or overlapped, separate results buffers will be needed for each. 
 The below memory estimate assumes just one batch of queries being run at a time and reusing the buffers.
 
@@ -219,7 +204,9 @@ The below memory estimate assumes just one batch of queries being run at a time 
 
    \text{search\_memory}
    \;=\;
-   \text{dataset\_size} + \text{graph\_size} + \text{query\_size} + \text{result\_size}
+   \text{dataset\_size} + \text{graph\_size} + \text{workspace\_size}
+
+Where ``workspace_size`` is the temporary memory used for query vectors and result storage:
 
 .. math::
 
@@ -238,4 +225,5 @@ The below memory estimate assumes just one batch of queries being run at a time 
 
 - query\_size  = 409,600 B = 0.39 MB
 - result\_size = 8,000 B = 0.0076 MB
-- Total search memory ≈ 3906.25 + 244.14 + 0.39 + 0.0076 = 4150.79 MB
+- workspace\_size = query\_size + result\_size = 0.40 MB
+- Total search memory ≈ 3906.25 + 244.14 + 0.40 = 4150.79 MB
