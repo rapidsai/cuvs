@@ -28,7 +28,9 @@ Currently the following checks are made and flagged by this tool:
 """
 
 import argparse
-from dataclasses import dataclass, InitVar
+import gzip
+
+import msgspec
 import itertools
 import pathlib
 from typing import Optional
@@ -45,11 +47,106 @@ except ImportError:
         return text
 
 
-@dataclass
-class Abi:
-    functions: dict
-    structs: dict
-    enums: dict
+def _is_unnamed_struct(cursor):
+    return (
+        cursor.kind == clang.cindex.CursorKind.STRUCT_DECL
+        and cursor.spelling.startswith("struct ")
+        and "unnamed " in cursor.spelling
+    )
+
+
+class SymbolLocation(msgspec.Struct):
+    filename: str
+    line: int
+    column: int
+
+    @classmethod
+    def from_cursor(cls, cursor, root_path=None):
+        filename = cursor.location.file.name
+        if root_path:
+            filename = str(pathlib.Path(filename).relative_to(root_path))
+        return cls(
+            filename=filename,
+            line=cursor.location.line,
+            column=cursor.location.column,
+        )
+
+
+class FunctionDefinition(msgspec.Struct):
+    name: str
+    return_type: str
+    parameters: list[tuple[str, str]]
+    location: SymbolLocation
+
+    @classmethod
+    def from_cursor(cls, cursor, root_path=None):
+        if cursor.kind != clang.cindex.CursorKind.FUNCTION_DECL:
+            raise ValueError(
+                "FunctionDefinition.from_cursor called with cursor of kind={cursor.kind}"
+            )
+
+        return cls(
+            name=cursor.spelling,
+            return_type=cursor.result_type.spelling,
+            parameters=[
+                (child.type.spelling, child.spelling)
+                for child in cursor.get_children()
+                if child.kind == clang.cindex.CursorKind.PARM_DECL
+            ],
+            location=SymbolLocation.from_cursor(cursor, root_path),
+        )
+
+
+class StructDefinition(msgspec.Struct):
+    name: str
+    members: list[tuple[str, str]]
+    location: SymbolLocation
+
+    @classmethod
+    def from_cursor(cls, cursor, root_path=None):
+        if cursor.kind != clang.cindex.CursorKind.STRUCT_DECL:
+            raise ValueError(
+                "StructDefinition.from_cursor called with cursor of kind={cursor.kind}"
+            )
+
+        return cls(
+            name=cursor.spelling,
+            members=[
+                (child.type.spelling, child.spelling)
+                for child in cursor.get_children()
+                if child.kind == clang.cindex.CursorKind.FIELD_DECL
+            ],
+            location=SymbolLocation.from_cursor(cursor, root_path),
+        )
+
+
+class EnumDefinition(msgspec.Struct):
+    name: str
+    values: list[tuple[str, int]]
+    location: SymbolLocation
+
+    @classmethod
+    def from_cursor(cls, cursor, root_path=None):
+        if cursor.kind != clang.cindex.CursorKind.ENUM_DECL:
+            raise ValueError(
+                "EnumDefinition.from_cursor called with cursor of kind={cursor.kind}"
+            )
+
+        return cls(
+            name=cursor.spelling,
+            values=[
+                (child.spelling, child.enum_value)
+                for child in cursor.get_children()
+                if child.kind == clang.cindex.CursorKind.ENUM_CONSTANT_DECL
+            ],
+            location=SymbolLocation.from_cursor(cursor, root_path),
+        )
+
+
+class Abi(msgspec.Struct):
+    functions: list[FunctionDefinition]
+    structs: list[StructDefinition]
+    enums: list[EnumDefinition]
 
     @classmethod
     def from_include_path(cls, root, header, extra_clang_args=None):
@@ -59,6 +156,9 @@ class Abi:
         path = pathlib.Path(root).resolve()
         all_header = path / header
 
+        if not all_header.is_file():
+            raise ValueError(f"header file '{all_header}' not found")
+
         index = clang.cindex.Index.create()
 
         args = [f"-I{str(path)}"]
@@ -67,7 +167,7 @@ class Abi:
 
         tu = index.parse(all_header, args=args)
 
-        functions, structs, enums = {}, {}, {}
+        functions, structs, enums = [], [], []
 
         # note: we could use tu.cursor.walk_preorder() here instead to recurse through the AST
         # but it is slightly slower to do so (extra 100ms or so) and for the cuvs C-ABI everything
@@ -82,12 +182,16 @@ class Abi:
 
             # break up the AST into symbol -> node for the things we care about
             if child.kind == clang.cindex.CursorKind.FUNCTION_DECL:
-                functions[child.spelling] = child
+                functions.append(
+                    FunctionDefinition.from_cursor(child, root_path=path)
+                )
             elif child.kind == clang.cindex.CursorKind.STRUCT_DECL:
                 # ignore unnamed structs (will get picked up via the typedef)
                 if _is_unnamed_struct(child):
                     continue
-                structs[child.spelling] = child
+                structs.append(
+                    StructDefinition.from_cursor(child, root_path=path)
+                )
             elif child.kind == clang.cindex.CursorKind.TYPEDEF_DECL:
                 # check if this is a typedef to an unnamed struct, if so use the
                 # typedef as the symbolname for the struct
@@ -95,165 +199,152 @@ class Abi:
                 if len(grandchildren) == 1 and _is_unnamed_struct(
                     grandchildren[0]
                 ):
-                    structs[child.spelling] = grandchildren[0]
+                    struct = StructDefinition.from_cursor(
+                        grandchildren[0], root_path=path
+                    )
+                    struct.name = child.spelling
+                    structs.append(struct)
             elif child.kind == clang.cindex.CursorKind.ENUM_DECL:
-                # store the enum values for checking, since we don't actually care if the
-                # enum itself gets renamed for the C-ABI
-                for value in child.get_children():
-                    enums[value.spelling] = value
+                enums.append(EnumDefinition.from_cursor(child, root_path=path))
 
         return cls(functions, structs, enums)
 
 
-@dataclass
-class AbiError:
+class AbiError(msgspec.Struct):
     """Holds information about an ABI breaking error"""
 
     error: str
     symbol: Optional[str] = None
-    filename: Optional[str] = None
-    line: Optional[int] = None
-    column: Optional[int] = None
-    cursor: InitVar[clang.cindex.Cursor | None] = None
-
-    def __post_init__(self, cursor):
-        if cursor:
-            # populate fields from the
-            if self.symbol is None:
-                self.symbol = cursor.spelling
-            if self.filename is None:
-                self.filename = cursor.location.file.name
-            if self.line is None:
-                self.line = cursor.location.line
-            if self.column is None:
-                self.column = cursor.location.column
+    location: Optional[SymbolLocation] = None
 
 
-def _is_unnamed_struct(cursor):
-    return (
-        cursor.kind == clang.cindex.CursorKind.STRUCT_DECL
-        and cursor.spelling.startswith("struct ")
-        and "unnamed " in cursor.spelling
-    )
-
-
-def analyze_c_abi(old_path, new_path, include_file, extra_clang_args=None):
-    old_abi = Abi.from_include_path(old_path, include_file, extra_clang_args)
-    new_abi = Abi.from_include_path(new_path, include_file, extra_clang_args)
-
+def analyze_c_abi(old_abi, new_abi):
     # iterate over every function in the existing abi, and make sure that no functions
-    # have been removed or had function arguments removed, arguments added or the type of any
-    # argument changed. Note: adding new functions to the new abi is allowed
+    # have been removed or had function parameters removed, parameters added or the type of any
+    # parameter changed. Note: adding new functions to the new abi is allowed
     errors = []
-    for name, old_function in old_abi.functions.items():
-        new_function = new_abi.functions.get(name)
+    old_functions = {f.name: f for f in old_abi.functions}
+    new_functions = {f.name: f for f in new_abi.functions}
+
+    for name, old_function in old_functions.items():
+        new_function = new_functions.get(name)
         if new_function is None:
             errors.append(
-                AbiError("Function has been removed", cursor=old_function)
+                AbiError(
+                    "Function has been removed",
+                    symbol=old_function.name,
+                    location=old_function.location,
+                )
             )
             continue
 
-        old_result_type = old_function.result_type.spelling
-        new_result_type = new_function.result_type.spelling
-        if old_result_type != new_result_type:
+        if old_function.return_type != new_function.return_type:
             errors.append(
                 AbiError(
-                    f"Function has return type changed from '{old_result_type}' to '{new_result_type}'",
-                    cursor=new_function,
+                    f"Function has return type changed from '{old_function.return_type}' to '{new_function.return_type}'",
+                    symbol=new_function.name,
+                    location=new_function.location,
                 )
             )
 
-        for old_arg, new_arg in itertools.zip_longest(
-            old_function.get_children(),
-            new_function.get_children(),
+        for old_param, new_param in itertools.zip_longest(
+            old_function.parameters,
+            new_function.parameters,
             fillvalue=None,
         ):
-            if old_arg is None:
+            if old_param is None:
                 errors.append(
                     AbiError(
-                        f"Function has a new argument '{new_arg.type.spelling} {new_arg.spelling}'",
-                        cursor=new_function,
+                        f"Function has a new parameter '{new_param[0]} {new_param[1]}'",
+                        symbol=new_function.name,
+                        location=new_function.location,
                     )
                 )
 
-            elif new_arg is None:
+            elif new_param is None:
                 errors.append(
                     AbiError(
-                        f"Function has a deleted argument '{old_arg.type.spelling} {old_arg.spelling}'",
-                        cursor=old_function,
+                        f"Function has a deleted parameter '{old_param[0]} {old_param[1]}'",
+                        symbol=old_function.name,
+                        location=old_function.location,
                     )
                 )
 
-            elif new_arg.type.spelling != old_arg.type.spelling:
+            elif new_param[0] != old_param[0]:
                 errors.append(
                     AbiError(
-                        f"Function has a changed argument type '{old_arg.type.spelling}' to '{new_arg.type.spelling} for argument '{old_arg.spelling}'",
-                        cursor=new_function,
+                        f"Function has a changed parameter type '{old_param[0]}' to '{new_param[0]} for parameter '{old_param[1]}'",
+                        symbol=new_function.name,
+                        location=new_function.location,
                     )
                 )
 
     # check to see if any existing structures have had items removed, reordered, renamed, or types
     # changed (adding new members is considered to be ok, as long as functions are initialized via
     # a create factory function)
-    for name, old_struct in old_abi.structs.items():
-        new_struct = new_abi.structs.get(name)
+    old_structs = {f.name: f for f in old_abi.structs}
+    new_structs = {f.name: f for f in new_abi.structs}
+
+    for name, old_struct in old_structs.items():
+        new_struct = new_structs.get(name)
         if new_struct is None:
             errors.append(
                 AbiError(
-                    "Struct has been removed", symbol=name, cursor=old_struct
+                    "Struct has been removed",
+                    symbol=name,
+                    location=old_struct.location,
                 )
             )
             continue
 
         for old_member, new_member in itertools.zip_longest(
-            old_struct.get_children(),
-            new_struct.get_children(),
+            old_struct.members,
+            new_struct.members,
             fillvalue=None,
         ):
-            if old_member is None:
+            if new_member is None:
                 errors.append(
                     AbiError(
-                        f"Struct has a new member '{new_member.type.spelling} {new_member.spelling}'",
+                        f"Struct has a deleted member '{old_member[0]} {old_member[1]}'",
                         symbol=name,
-                        cursor=new_member,
+                        location=new_struct.location,
                     )
                 )
 
-            elif new_member is None:
+            elif new_member[0] != old_member[0]:
                 errors.append(
                     AbiError(
-                        f"Struct has a deleted member '{old_member.type.spelling} {old_member.spelling}'",
+                        f"Struct member has changed type '{old_member[0]}' to '{new_member[0]} for member '{old_member[1]}'",
                         symbol=name,
-                        cursor=old_member,
+                        location=new_struct.location,
                     )
                 )
 
-            elif new_member.type.spelling != old_member.type.spelling:
-                errors.append(
-                    AbiError(
-                        f"Struct member has changed type '{old_member.type.spelling}' to '{new_member.type.spelling} for member '{old_member.spelling}'",
-                        symbol=name,
-                        cursor=new_member,
-                    )
-                )
+    # flatten enum values: since values inside an enum in C are in the global scope
+    old_enum_values = {
+        k: (v, enum) for enum in old_abi.enums for k, v in enum.values
+    }
+    new_enum_values = {
+        k: (v, enum) for enum in new_abi.enums for k, v in enum.values
+    }
 
     # check to see if enum values have been removed, or had their numeric values changed
-    for name, old_enum in old_abi.enums.items():
-        new_enum = new_abi.enums.get(name)
+    for name, (old_value, old_enum) in old_enum_values.items():
+        new_value, new_enum = new_enum_values.get(name, (None, None))
         if new_enum is None:
             errors.append(
                 AbiError(
-                    f"Enum value {old_enum.spelling} has been removed",
-                    symbol=old_enum.lexical_parent.spelling,
-                    cursor=old_enum,
+                    f"Enum value {name} has been removed",
+                    symbol=old_enum.name,
+                    location=old_enum.location,
                 )
             )
-        elif new_enum.enum_value != old_enum.enum_value:
+        elif new_value != old_value:
             errors.append(
                 AbiError(
-                    f"Enum value {old_enum.spelling} has been changed from {old_enum.enum_value} to {new_enum.enum_value}",
-                    symbol=old_enum.lexical_parent.spelling,
-                    cursor=new_enum,
+                    f"Enum value {name} has been changed from {old_value} to {new_value}",
+                    symbol=old_enum.name,
+                    location=new_enum.location,
                 )
             )
 
@@ -261,21 +352,62 @@ def analyze_c_abi(old_path, new_path, include_file, extra_clang_args=None):
 
 
 if __name__ == "__main__":
+    default_c_header_path = pathlib.Path("../c/include").resolve()
+
     parser = argparse.ArgumentParser(
         description="Analyze C headers for breaking ABI changes"
     )
-    parser.add_argument(
-        "old", help="Path of existing stable C headers to use a baseline"
+    subparsers = parser.add_subparsers(
+        dest="command", help="Available subcommands"
     )
-    parser.add_argument(
-        "new", help="Path of new C headers to examine for breaking ABI changes"
+
+    parser_extract = subparsers.add_parser(
+        "extract", help="Extract the ABI from a set of header files"
     )
-    parser.add_argument(
+    parser_extract.add_argument(
+        "--output_file",
+        type=str,
+        help="The file to output the ABI into (default: %(default)s)",
+        default="c_abi.json.gz",
+    )
+    parser_extract.add_argument(
+        "--header_path",
+        help="Path of C headers to extract the ABI from (default: %(default)s)",
+        default=str(default_c_header_path),
+    )
+    parser_extract.add_argument(
         "--include_file",
         help="root header file to examine (default: %(default)s)",
         default="cuvs/core/all.h",
     )
+
+    parser_analyze = subparsers.add_parser(
+        "analyze", help="Analyze a set of header files for breaking changes"
+    )
+    parser_analyze.add_argument(
+        "--abi_file",
+        type=str,
+        help="The extracted ABI file to compare against (default: %(default)s)",
+        default="c_abi.json.gz",
+    )
+    parser_analyze.add_argument(
+        "--header_path",
+        help="Path of C headers to analyze (default: %(default)s)",
+        default=str(default_c_header_path),
+    )
+    parser_analyze.add_argument(
+        "--include_file",
+        help="root header file to examine (default: %(default)s)",
+        default="cuvs/core/all.h",
+    )
+
     args = parser.parse_args()
+    if args.command not in ("extract", "analyze"):
+        print(f"unknown command {args.command}")
+        parser.print_help()
+        sys.exit(1)
+
+    header_path = pathlib.Path(args.header_path)
 
     # TODO: better way of specifying the dlpack header source, since missing the dlpack.h
     # header means that we all dlpack types get treated as 'int' which could be misleading
@@ -283,22 +415,39 @@ if __name__ == "__main__":
     # `int` without specifying the dlpack include directory, we won't know that the type has
     # changed)
     dlpack_header_path = (
-        pathlib.Path(args.new).parent.parent
+        header_path.parent.parent
         / "cpp"
         / "build"
         / "_deps"
         / "dlpack-src"
         / "include"
     )
+    if not dlpack_header_path.is_dir():
+        raise ValueError(f"dlpack header {dlpack_header_path} not found")
+
     extra_clang_args = [f"-I{str(dlpack_header_path)}"]
 
-    errors = analyze_c_abi(
-        args.old, args.new, args.include_file, extra_clang_args
-    )
-    for error in errors:
-        print(
-            f"Error: {colored(error.error, attrs=['bold'])}. Symbol {colored(error.symbol, 'red')} from {error.filename}:{error.line}"
+    if args.command == "extract":
+        abi = Abi.from_include_path(
+            header_path, args.include_file, extra_clang_args
         )
+        with open(args.output_file, "wb") as o:
+            o.write(gzip.compress(msgspec.json.encode(abi)))
+        print(f"wrote abi to {args.output_file}")
+    elif args.command == "analyze":
+        old_abi = msgspec.json.decode(
+            gzip.decompress(open(args.abi_file, "rb").read()), type=Abi
+        )
+        new_abi = Abi.from_include_path(
+            header_path, args.include_file, extra_clang_args
+        )
+        errors = analyze_c_abi(old_abi, new_abi)
+        for error in errors:
+            print(
+                f"Error: {colored(error.error, attrs=['bold'])}. Symbol {colored(error.symbol, 'red')} from {error.location.filename}:{error.location.line}"
+            )
 
-    if errors:
-        sys.exit(1)
+        if errors:
+            sys.exit(1)
+        else:
+            print("no breaking abi changes detected")
