@@ -1,17 +1,8 @@
 #=============================================================================
-# Copyright (c) 2024-2025, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
 #=============================================================================
 
 function(find_and_configure_faiss)
@@ -26,13 +17,15 @@ function(find_and_configure_faiss)
     )
 
   set(patch_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../patches")
+  include("${rapids-cmake-dir}/cpm/package_override.cmake")
   rapids_cpm_package_override("${patch_dir}/faiss_override.json")
 
-  include("${rapids-cmake-dir}/cpm/detail/package_details.cmake")
-  rapids_cpm_package_details(faiss version repository tag shallow exclude)
-
-  include("${rapids-cmake-dir}/cpm/detail/generate_patch_command.cmake")
-  rapids_cpm_generate_patch_command(faiss ${version} patch_command build_patch_only)
+  include("${rapids-cmake-dir}/cpm/detail/package_info.cmake")
+  rapids_cpm_package_info(faiss
+    VERSION_VAR version
+    FIND_VAR find_args
+    CPM_VAR cpm_args
+  )
 
   set(BUILD_SHARED_LIBS ON)
   if (PKG_BUILD_STATIC_LIBS)
@@ -40,8 +33,8 @@ function(find_and_configure_faiss)
     set(CPM_DOWNLOAD_faiss ON)
   endif()
 
-  include(cmake/modules/FindAVX)
-  include(cmake/modules/FindSVE)
+  include(${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../modules/FindAVX.cmake)
+  include(${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../modules/FindSVE.cmake)
   # Link against AVX CPU lib if it exists
   set(CUVS_FAISS_OPT_LEVEL "generic")
   if(CXX_AVX2_FOUND)

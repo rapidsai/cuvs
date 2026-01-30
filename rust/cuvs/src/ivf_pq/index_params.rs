@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 use crate::distance_type::DistanceType;
@@ -19,7 +8,8 @@ use crate::error::{check_cuvs, Result};
 use std::fmt;
 use std::io::{stderr, Write};
 
-pub use ffi::codebook_gen;
+pub use ffi::cuvsIvfPqCodebookGen;
+pub use ffi::cuvsIvfPqListLayout;
 
 pub struct IndexParams(pub ffi::cuvsIvfPqIndexParams_t);
 
@@ -99,9 +89,20 @@ impl IndexParams {
         self
     }
 
-    pub fn set_codebook_kind(self, codebook_kind: codebook_gen) -> IndexParams {
+    pub fn set_codebook_kind(self, codebook_kind: cuvsIvfPqCodebookGen) -> IndexParams {
         unsafe {
             (*self.0).codebook_kind = codebook_kind;
+        }
+        self
+    }
+
+    /// Memory layout of the IVF-PQ list data.
+    /// - FLAT: Codes are stored contiguously, one vector's codes after another.
+    /// - INTERLEAVED: Codes are interleaved for optimized search performance.
+    ///   This is the default and recommended for search workloads.
+    pub fn set_codes_layout(self, codes_layout: cuvsIvfPqListLayout) -> IndexParams {
+        unsafe {
+            (*self.0).codes_layout = codes_layout;
         }
         self
     }

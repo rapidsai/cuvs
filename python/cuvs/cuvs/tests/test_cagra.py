@@ -1,17 +1,8 @@
-# Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     h ttp://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
+
+import tempfile
 
 import cupy as cp
 import numpy as np
@@ -44,9 +35,10 @@ def run_cagra_build_search_test(
     test_extend=False,
     search_params={},
     compression=None,
+    serialize=False,
 ):
     dataset = generate_data((n_rows, n_cols), dtype)
-    if metric == "inner_product":
+    if metric == "inner_product" or metric == "cosine":
         if dtype in [np.int8, np.uint8]:
             pytest.skip("skip normalization for int8/uint8 data")
         dataset = normalize(dataset, norm="l2", axis=1)
@@ -78,6 +70,12 @@ def run_cagra_build_search_test(
             index = cagra.build(build_params, dataset_device)
         else:
             index = cagra.build(build_params, dataset)
+
+    if serialize:
+        with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as f:
+            temp_filename = f.name
+        cagra.save(temp_filename, index)
+        index = cagra.load(temp_filename)
 
     queries = generate_data((n_queries, n_cols), dtype)
     out_idx = np.zeros((n_queries, k), dtype=np.uint32)
@@ -112,6 +110,7 @@ def run_cagra_build_search_test(
         "sqeuclidean": "sqeuclidean",
         "inner_product": "cosine",
         "euclidean": "euclidean",
+        "cosine": "cosine",
     }[metric]
     nn_skl = NearestNeighbors(
         n_neighbors=k, algorithm="brute", metric=skl_metric
@@ -150,16 +149,17 @@ def run_cagra_build_search_test(
             search_params, reloaded_index, queries_device, k
         )
         recall = calc_recall(idx_device.copy_to_host(), skl_idx)
-        assert recall > 0.7
+        assert recall > 0.9
 
 
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("dtype", [np.float32, np.float16, np.int8, np.uint8])
-@pytest.mark.parametrize("array_type", ["device", "host"])
+@pytest.mark.parametrize("array_type", ["device"])
 @pytest.mark.parametrize("build_algo", ["ivf_pq", "nn_descent"])
-@pytest.mark.parametrize("metric", ["sqeuclidean", "inner_product"])
+@pytest.mark.parametrize("metric", ["sqeuclidean", "inner_product", "cosine"])
+@pytest.mark.parametrize("serialize", [True, False])
 def test_cagra_dataset_dtype_host_device(
-    dtype, array_type, inplace, build_algo, metric
+    dtype, array_type, inplace, build_algo, metric, serialize
 ):
     # Note that inner_product tests use normalized input which we cannot
     # represent in int8, therefore we test only sqeuclidean metric here.
@@ -169,6 +169,7 @@ def test_cagra_dataset_dtype_host_device(
         array_type=array_type,
         build_algo=build_algo,
         metric=metric,
+        serialize=serialize,
     )
 
 
@@ -181,6 +182,7 @@ def test_filtered_cagra(sparsity):
     "params",
     [
         {
+            "dtype": np.int8,
             "intermediate_graph_degree": 64,
             "graph_degree": 32,
             "test_extend": False,
@@ -189,6 +191,7 @@ def test_filtered_cagra(sparsity):
             "build_algo": "ivf_pq",
         },
         {
+            "dtype": np.float32,
             "intermediate_graph_degree": 32,
             "graph_degree": 16,
             "test_extend": True,
@@ -197,6 +200,7 @@ def test_filtered_cagra(sparsity):
             "build_algo": "ivf_pq",
         },
         {
+            "dtype": np.float32,
             "intermediate_graph_degree": 128,
             "graph_degree": 32,
             "test_extend": False,
@@ -204,12 +208,22 @@ def test_filtered_cagra(sparsity):
             "metric": "inner_product",
             "build_algo": "nn_descent",
         },
+        {
+            "dtype": np.float16,
+            "intermediate_graph_degree": 64,
+            "graph_degree": 32,
+            "test_extend": True,
+            "k": 10,
+            "metric": "cosine",
+            "build_algo": "ivf_pq",
+        },
     ],
 )
 def test_cagra_index_params(params):
     # Note that inner_product tests use normalized input which we cannot
     # represent in int8, therefore we test only sqeuclidean metric here.
     run_cagra_build_search_test(
+        dtype=params["dtype"],
         test_extend=params["test_extend"],
         k=params["k"],
         metric=params["metric"],

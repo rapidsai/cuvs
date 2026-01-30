@@ -1,17 +1,6 @@
 #
-# Copyright (c) 2024-2025, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
 
@@ -28,7 +17,9 @@ from libcpp cimport bool, cast
 from libcpp.string cimport string
 
 from cuvs.common cimport cydlpack
+
 from cuvs.common.device_tensor_view import DeviceTensorView
+
 from cuvs.distance_type cimport cuvsDistanceType
 
 from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
@@ -48,6 +39,8 @@ from libc.stdint cimport (
     uint64_t,
     uintptr_t,
 )
+from libc.stdlib cimport free, malloc
+from libc.string cimport strdup
 
 from cuvs.common.exceptions import check_cuvs
 from cuvs.neighbors import ivf_pq
@@ -77,7 +70,7 @@ cdef class CompressionParams:
     vq_kmeans_trainset_fraction: float
         The fraction of data to use during iterative kmeans building (VQ
         phase). When zero, an optimal value is selected using a heuristic.
-    vq_kmeans_trainset_fraction: float
+    pq_kmeans_trainset_fraction: float
         The fraction of data to use during iterative kmeans building (PQ
         phase). When zero, an optimal value is selected using a heuristic.
     """
@@ -130,6 +123,121 @@ cdef class CompressionParams:
     def get_handle(self):
         return <size_t>self.params
 
+
+cdef class AceParams:
+    """
+    Parameters for ACE (Augmented Core Extraction) graph building algorithm.
+
+    ACE enables building indexes for datasets too large to fit in GPU memory by
+    partitioning the dataset using balanced k-means and building sub-indexes
+    for each partition independently.
+
+    Parameters
+    ----------
+    npartitions : int, default = 0
+        Number of partitions for ACE partitioned build. When set to 0 (default),
+        the number of partitions is automatically derived based on available
+        host and GPU memory to maximize partition size while ensuring the build
+        fits in memory.
+
+        Small values might improve recall but potentially degrade performance
+        and increase memory usage. Partitions should not be too small to prevent
+        issues in KNN graph construction. The partition size is on average 2 *
+        (n_rows / npartitions) * dim * sizeof(T). 2 is because of the core and
+        augmented vectors. Please account for imbalance in the partition sizes
+        (up to 3x in our tests).
+
+        If the specified number of partitions results in partitions that exceed
+        available memory, the value will be automatically increased to fit
+        memory constraints and a warning will be issued.
+    ef_construction : int, default = 120
+        The index quality for the ACE build. Bigger values increase the index
+        quality. At some point, increasing this will no longer improve the
+        quality.
+    build_dir : str, default = "/tmp/ace_build"
+        Directory to store ACE build artifacts (e.g., KNN graph, optimized
+        graph). Used when `use_disk` is true or when the graph does not fit
+        in host and GPU memory. This should be the fastest disk in the system
+        and hold enough space for twice the dataset, final graph, and label
+        mapping.
+    use_disk : bool, default = False
+        Whether to use disk-based storage for ACE build. When true, enables
+        disk-based operations for memory-efficient graph construction.
+    max_host_memory_gb : float, default = 0
+        Maximum host memory to use for ACE build in GiB. When set to 0
+        (default), uses available host memory. Useful for testing or
+        when running alongside other memory-intensive processes.
+    max_gpu_memory_gb : float, default = 0
+        Maximum GPU memory to use for ACE build in GiB. When set to 0
+        (default), uses available GPU memory. Useful for testing or
+        when running alongside other memory-intensive processes.
+    """
+    cdef cuvsAceParams* params
+    cdef bytes _build_dir_bytes  # Keep Python bytes alive for property access
+
+    def __cinit__(self):
+        check_cuvs(cuvsAceParamsCreate(&self.params))
+        self._build_dir_bytes = b""
+
+    def __dealloc__(self):
+        if self.params != NULL:
+            check_cuvs(cuvsAceParamsDestroy(self.params))
+
+    def __init__(self, *,
+                 npartitions=0,
+                 ef_construction=120,
+                 build_dir="/tmp/ace_build",
+                 use_disk=False,
+                 max_host_memory_gb=0,
+                 max_gpu_memory_gb=0):
+        self.params.npartitions = npartitions
+        self.params.ef_construction = ef_construction
+        self.params.use_disk = use_disk
+        self.params.max_host_memory_gb = max_host_memory_gb
+        self.params.max_gpu_memory_gb = max_gpu_memory_gb
+
+        # Need to replace the default build_dir allocated by
+        # cuvsAceParamsCreate
+        # First free the old C string, then allocate new one
+        if self.params.build_dir != NULL:
+            free(<void*>self.params.build_dir)
+
+        # Store Python bytes for property access
+        self._build_dir_bytes = build_dir.encode('utf-8')
+        # Allocate C memory and copy the string (strdup-like behavior)
+        self.params.build_dir = strdup(self._build_dir_bytes)
+
+    @property
+    def npartitions(self):
+        return self.params.npartitions
+
+    @property
+    def ef_construction(self):
+        return self.params.ef_construction
+
+    @property
+    def build_dir(self):
+        if self._build_dir_bytes:
+            return self._build_dir_bytes.decode('utf-8')
+        else:
+            return ""
+
+    @property
+    def use_disk(self):
+        return self.params.use_disk
+
+    @property
+    def max_host_memory_gb(self):
+        return self.params.max_host_memory_gb
+
+    @property
+    def max_gpu_memory_gb(self):
+        return self.params.max_gpu_memory_gb
+
+    def get_handle(self):
+        return <size_t>self.params
+
+
 cdef class IndexParams:
     """
     Parameters to build index for CAGRA nearest neighbor search
@@ -139,18 +247,20 @@ cdef class IndexParams:
 
     metric : str, default = "sqeuclidean"
         String denoting the metric type, valid values for metric are
-        ["sqeuclidean", "inner_product"], where:
+        ["sqeuclidean", "inner_product", "cosine"], where:
 
             - sqeuclidean is the euclidean distance without the square root
               operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2
             - inner_product distance is defined as
               distance(a, b) = \\sum_i a_i * b_i.
+            - cosine distance is defined as
+              distance(a, b) = 1 - \\sum_i a_i * b_i / ( ||a||_2 * ||b||_2).
 
     intermediate_graph_degree : int, default = 128
     graph_degree : int, default = 64
     build_algo: str, default = "ivf_pq"
         string denoting the graph building algorithm to use. Valid values for
-        algo: ["ivf_pq", "nn_descent", "iterative_cagra_search"], where
+        algo: ["ivf_pq", "nn_descent", "iterative_cagra_search", "ace"], where
 
             - ivf_pq will use the IVF-PQ algorithm for building the knn graph
             - nn_descent (experimental) will use the NN-Descent algorithm for
@@ -158,6 +268,8 @@ cdef class IndexParams:
               faster than ivf_pq.
             - iterative_cagra_search will iteratively build the knn graph using
               CAGRA's search() and optimize()
+            - ace will use ACE (Augmented Core Extraction) for building indices
+              for datasets too large to fit in GPU memory
 
     compression: CompressionParams, optional
         If compression is desired should be a CompressionParams object. If None
@@ -168,6 +280,9 @@ cdef class IndexParams:
     ivf_pq_search_params: cuvs.neighbors.ivf_pq.SearchParams, optional
         Parameters for IVF-PQ search. If provided, it will be used for
         searching the graph.
+    ace_params: AceParams, optional
+        Parameters for ACE algorithm. If provided, it will be used for
+        building the graph with ACE partitioning.
     refinement_rate: float, default = 1.0
 
     """
@@ -177,6 +292,7 @@ cdef class IndexParams:
         self.compression = None
         self.ivf_pq_build_params = None
         self.ivf_pq_search_params = None
+        self.ace_params = None
 
     def __dealloc__(self):
         if self.params != NULL:
@@ -191,7 +307,11 @@ cdef class IndexParams:
                  compression=None,
                  ivf_pq_build_params: ivf_pq.IndexParams = None,
                  ivf_pq_search_params: ivf_pq.SearchParams = None,
+                 ace_params: AceParams = None,
                  refinement_rate: float = 1.0):
+        # Declare cdef variables at the top of the function
+        cdef cuvsIvfPqParams_t ivf_pq_params_ptr
+        cdef cuvsAceParams_t new_ace_params
 
         self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
         self.params.intermediate_graph_degree = intermediate_graph_degree
@@ -203,6 +323,8 @@ cdef class IndexParams:
         elif build_algo == "iterative_cagra_search":
             self.params.build_algo = \
                 cuvsCagraGraphBuildAlgo.ITERATIVE_CAGRA_SEARCH
+        elif build_algo == "ace":
+            self.params.build_algo = cuvsCagraGraphBuildAlgo.ACE
         else:
             raise ValueError(f"Unknown build_algo '{build_algo}'")
 
@@ -211,19 +333,58 @@ cdef class IndexParams:
             self.compression = compression
             self.params.compression = \
                 <cuvsCagraCompressionParams_t><size_t>compression.get_handle()
-        if ivf_pq_build_params is not None:
-            if ivf_pq_build_params.metric != self.metric:
-                raise ValueError("Metric mismatch with IVF-PQ build params")
-            self.ivf_pq_build_params = ivf_pq_build_params
-            self.params.graph_build_params.ivf_pq_build_params = \
-                <cuvsIvfPqIndexParams_t><size_t> \
-                ivf_pq_build_params.get_handle()
-        if ivf_pq_search_params is not None:
-            self.ivf_pq_search_params = ivf_pq_search_params
-            self.params.graph_build_params.ivf_pq_search_params = \
-                <cuvsIvfPqSearchParams_t><size_t> \
-                ivf_pq_search_params.get_handle()
-        self.params.graph_build_params.refinement_rate = refinement_rate
+
+        # Handle graph build params based on build algorithm
+        if build_algo == "ace":
+            if ace_params is None:
+                ace_params = AceParams()
+            self.ace_params = ace_params
+
+            # Create a new C-allocated cuvsAceParams that the C API will own
+            # We cannot pass the Python object's pointer directly because
+            # cuvsCagraIndexParamsDestroy will try to delete it
+            check_cuvs(cuvsAceParamsCreate(&new_ace_params))
+
+            # Copy values from Python object to new C struct
+            new_ace_params.npartitions = ace_params.params.npartitions
+            new_ace_params.ef_construction = ace_params.params.ef_construction
+            new_ace_params.use_disk = ace_params.params.use_disk
+            new_ace_params.max_host_memory_gb = ace_params.params.max_host_memory_gb
+            new_ace_params.max_gpu_memory_gb = ace_params.params.max_gpu_memory_gb
+
+            # Copy the build_dir string
+            if new_ace_params.build_dir != NULL:
+                free(<void*>new_ace_params.build_dir)
+            new_ace_params.build_dir = strdup(ace_params.params.build_dir)
+
+            # Pass the new C struct to the index params
+            self.params.graph_build_params = <void*>new_ace_params
+        else:
+            # For IVF-PQ algorithm, handle ivf_pq params
+            # Cast the void* back to cuvsIvfPqParams_t
+            ivf_pq_params_ptr = (
+                <cuvsIvfPqParams_t>self.params.graph_build_params
+            )
+
+            if ivf_pq_build_params is not None:
+                if ivf_pq_build_params.metric != self.metric:
+                    raise ValueError(
+                        "Metric mismatch with IVF-PQ build params"
+                    )
+                self.ivf_pq_build_params = ivf_pq_build_params
+                ivf_pq_params_ptr.ivf_pq_build_params = (
+                    <cuvsIvfPqIndexParams_t><size_t>
+                    ivf_pq_build_params.get_handle()
+                )
+
+            if ivf_pq_search_params is not None:
+                self.ivf_pq_search_params = ivf_pq_search_params
+                ivf_pq_params_ptr.ivf_pq_search_params = (
+                    <cuvsIvfPqSearchParams_t><size_t>
+                    ivf_pq_search_params.get_handle()
+                )
+
+            ivf_pq_params_ptr.refinement_rate = refinement_rate
 
     def get_handle(self):
         return <size_t> self.params
@@ -250,7 +411,15 @@ cdef class IndexParams:
 
     @property
     def refinement_rate(self):
-        return self.params.graph_build_params.refinement_rate
+        # refinement_rate only applies to IVF-PQ builds
+        if self.params.build_algo == cuvsCagraGraphBuildAlgo.IVF_PQ:
+            return (
+                (<cuvsIvfPqParams_t>self.params.graph_build_params)
+                .refinement_rate
+            )
+        else:
+            # For ACE and other algorithms, refinement_rate doesn't apply
+            return 1.0
 
 
 cdef class Index:
@@ -336,15 +505,22 @@ def build(IndexParams index_params, dataset, resources=None):
     It is required that both the dataset and the optimized graph fit the
     GPU memory.
 
+    Note: When using ACE (Augmented Core Extraction) build algorithm, the
+    dataset must be in host memory (CPU). The ACE algorithm is designed for
+    datasets too large to fit in GPU memory.
+
     The following distance metrics are supported:
         - L2
         - InnerProduct
+        - Cosine
 
     Parameters
     ----------
     index_params : IndexParams object
     dataset : CUDA array interface compliant matrix shape (n_samples, dim)
         Supported dtype [float, half, int8, uint8]
+        **Note:** For ACE build algorithm, the dataset MUST be in host memory.
+        Use NumPy arrays or call .get() on CuPy arrays before passing.
     {resources_docstring}
 
     Returns
@@ -364,12 +540,19 @@ def build(IndexParams index_params, dataset, resources=None):
     ...                                   dtype=cp.float32)
     >>> build_params = cagra.IndexParams(metric="sqeuclidean")
     >>> index = cagra.build(build_params, dataset)
+    >>> queries = cp.random.random_sample((n_queries, n_features),
+    ...                                   dtype=cp.float32)
     >>> distances, neighbors = cagra.search(cagra.SearchParams(),
-    ...                                      index, dataset,
+    ...                                      index, queries,
     ...                                      k)
     >>> distances = cp.asarray(distances)
     >>> neighbors = cp.asarray(neighbors)
     """
+
+    # Check if ACE build is requested
+    is_ace_build = (
+        index_params.params.build_algo == cuvsCagraGraphBuildAlgo.ACE
+    )
 
     # todo(dgd): we can make the check of dtype a parameter of wrap_array
     # in RAFT to make this a single call
@@ -378,6 +561,16 @@ def build(IndexParams index_params, dataset, resources=None):
                                     np.dtype('float16'),
                                     np.dtype('byte'),
                                     np.dtype('ubyte')])
+
+    # For ACE, verify dataset is on host
+    if is_ace_build:
+        # Check if data is on device (has __cuda_array_interface__)
+        if hasattr(dataset, '__cuda_array_interface__'):
+            raise ValueError(
+                "ACE build requires dataset to be in host memory. "
+                "Please use NumPy arrays or transfer CuPy arrays to host with "
+                "dataset.get() before calling build()."
+            )
 
     cdef Index idx = Index()
     cdef cydlpack.DLManagedTensor* dataset_dlpack = \

@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2023-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
@@ -86,6 +75,8 @@ class cuvs_cagra_hnswlib : public algo<T>, public algo_gpu {
   build_param build_param_;
   search_param search_param_;
   std::shared_ptr<cuvs::neighbors::hnsw::index<T>> hnsw_index_;
+
+  bool cagra_ace_build_ = false;
 };
 
 template <typename T, typename IdxT>
@@ -121,6 +112,11 @@ void cuvs_cagra_hnswlib<T, IdxT>::build(const T* dataset, size_t nrow)
   // convert the index to HNSW format
   hnsw_index_ = cuvs::neighbors::hnsw::from_cagra(
     handle_, build_param_.hnsw_index_params, cagra_index, opt_dataset_view);
+
+  // special treatment in save/serialize step
+  if (cagra_index.dataset_fd().has_value() && cagra_index.graph_fd().has_value()) {
+    cagra_ace_build_ = true;
+  }
 }
 
 template <typename T, typename IdxT>
@@ -134,7 +130,21 @@ void cuvs_cagra_hnswlib<T, IdxT>::set_search_param(const search_param_base& para
 template <typename T, typename IdxT>
 void cuvs_cagra_hnswlib<T, IdxT>::save(const std::string& file) const
 {
-  cuvs::neighbors::hnsw::serialize(handle_, file, *(hnsw_index_.get()));
+  if (cagra_ace_build_) {
+    std::string index_filename = hnsw_index_->file_path();
+    RAFT_EXPECTS(!index_filename.empty(), "HNSW index file path is not available.");
+    RAFT_EXPECTS(std::filesystem::exists(index_filename),
+                 "Index file '%s' does not exist.",
+                 index_filename.c_str());
+    if (std::filesystem::exists(file)) { std::filesystem::remove(file); }
+    // might fail when using 2 different filesystems
+    std::error_code ec;
+    std::filesystem::rename(index_filename, file, ec);
+    RAFT_EXPECTS(
+      !ec, "Failed to rename index file '%s' to '%s'.", index_filename.c_str(), file.c_str());
+  } else {
+    cuvs::neighbors::hnsw::serialize(handle_, file, *(hnsw_index_.get()));
+  }
 }
 
 template <typename T, typename IdxT>

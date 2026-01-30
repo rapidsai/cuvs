@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -22,6 +11,7 @@
 #include <raft/linalg/add.cuh>
 #include <raft/util/cuda_dev_essentials.cuh>
 
+#include "../../core/omp_wrapper.hpp"
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
@@ -41,10 +31,6 @@ void search(const raft::resources& handle,
             raft::device_matrix_view<searchIdxT, int64_t, row_major> d_neighbors,
             raft::device_matrix_view<float, int64_t, row_major> d_distances);
 }  // namespace cuvs::neighbors
-
-namespace cuvs::neighbors::snmg {
-void check_omp_threads(const int requirements);
-}  // namespace cuvs::neighbors::snmg
 
 namespace cuvs::neighbors::snmg::detail {
 using namespace cuvs::neighbors;
@@ -106,13 +92,31 @@ void build(const raft::resources& clique,
     RAFT_LOG_DEBUG("REPLICATED BUILD: %d*%drows", index.num_ranks_, n_rows);
 
     index.ann_interfaces_.resize(index.num_ranks_);
-#pragma omp parallel for
+
+    // Enable nested parallelism
+    int saved_nested = cuvs::core::omp::get_nested();
+    cuvs::core::omp::set_nested(1);
+
+    int omp_threads      = cuvs::core::omp::get_max_threads();
+    int threads_per_rank = std::max(1, omp_threads / index.num_ranks_);
+
+    cuvs::core::omp::check_threads(index.num_ranks_);
+#pragma omp parallel for num_threads(index.num_ranks_)
     for (int rank = 0; rank < index.num_ranks_; rank++) {
+      // Set thread limit for this rank's nested OpenMP regions
+      cuvs::core::omp::set_num_threads(threads_per_rank);
+
       const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);
       auto& ann_if                   = index.ann_interfaces_[rank];
       cuvs::neighbors::build(dev_res, ann_if, index_params, index_dataset);
       resource::sync_stream(dev_res);
+
+      // Restore to allow full parallelism for potential future nested regions
+      cuvs::core::omp::set_num_threads(omp_threads);
     }
+
+    // Restore original OpenMP settings
+    cuvs::core::omp::set_nested(saved_nested);
   } else if (index.mode_ == SHARDED) {
     int64_t n_rows           = index_dataset.extent(0);
     int64_t n_cols           = index_dataset.extent(1);
@@ -121,8 +125,20 @@ void build(const raft::resources& clique,
     RAFT_LOG_DEBUG("SHARDED BUILD: %d*%drows", index.num_ranks_, n_rows_per_shard);
 
     index.ann_interfaces_.resize(index.num_ranks_);
-#pragma omp parallel for
+
+    // Enable nested parallelism
+    int saved_nested = cuvs::core::omp::get_nested();
+    cuvs::core::omp::set_nested(1);
+
+    int omp_threads      = cuvs::core::omp::get_max_threads();
+    int threads_per_rank = std::max(1, omp_threads / index.num_ranks_);
+
+    cuvs::core::omp::check_threads(index.num_ranks_);
+#pragma omp parallel for num_threads(index.num_ranks_)
     for (int rank = 0; rank < index.num_ranks_; rank++) {
+      // Set thread limit for this rank's nested OpenMP regions
+      cuvs::core::omp::set_num_threads(threads_per_rank);
+
       const raft::resources& dev_res  = raft::resource::set_current_device_to_rank(clique, rank);
       int64_t offset                  = rank * n_rows_per_shard;
       int64_t n_rows_of_current_shard = std::min(n_rows_per_shard, n_rows - offset);
@@ -132,7 +148,13 @@ void build(const raft::resources& clique,
       auto& ann_if = index.ann_interfaces_[rank];
       cuvs::neighbors::build(dev_res, ann_if, index_params, partition);
       resource::sync_stream(dev_res);
+
+      // Restore to allow full parallelism for potential future nested regions
+      cuvs::core::omp::set_num_threads(omp_threads);
     }
+
+    // Restore original OpenMP settings
+    cuvs::core::omp::set_nested(saved_nested);
   }
 }
 
@@ -146,21 +168,49 @@ void extend(const raft::resources& clique,
   if (index.mode_ == REPLICATED) {
     RAFT_LOG_DEBUG("REPLICATED EXTEND: %d*%drows", index.num_ranks_, n_rows);
 
-#pragma omp parallel for
+    // Enable nested parallelism
+    int saved_nested = cuvs::core::omp::get_nested();
+    cuvs::core::omp::set_nested(1);
+
+    int omp_threads      = cuvs::core::omp::get_max_threads();
+    int threads_per_rank = std::max(1, omp_threads / index.num_ranks_);
+
+    cuvs::core::omp::check_threads(index.num_ranks_);
+#pragma omp parallel for num_threads(index.num_ranks_)
     for (int rank = 0; rank < index.num_ranks_; rank++) {
+      // Set thread limit for this rank's nested OpenMP regions
+      cuvs::core::omp::set_num_threads(threads_per_rank);
+
       const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);
       auto& ann_if                   = index.ann_interfaces_[rank];
       cuvs::neighbors::extend(dev_res, ann_if, new_vectors, new_indices);
       resource::sync_stream(dev_res);
+
+      // Restore to allow full parallelism for potential future nested regions
+      cuvs::core::omp::set_num_threads(omp_threads);
     }
+
+    // Restore original OpenMP settings
+    cuvs::core::omp::set_nested(saved_nested);
   } else if (index.mode_ == SHARDED) {
     int64_t n_cols           = new_vectors.extent(1);
     int64_t n_rows_per_shard = raft::ceildiv(n_rows, (int64_t)index.num_ranks_);
 
     RAFT_LOG_DEBUG("SHARDED EXTEND: %d*%drows", index.num_ranks_, n_rows_per_shard);
 
-#pragma omp parallel for
+    // Enable nested parallelism
+    int saved_nested = cuvs::core::omp::get_nested();
+    cuvs::core::omp::set_nested(1);
+
+    int omp_threads      = cuvs::core::omp::get_max_threads();
+    int threads_per_rank = std::max(1, omp_threads / index.num_ranks_);
+
+    cuvs::core::omp::check_threads(index.num_ranks_);
+#pragma omp parallel for num_threads(index.num_ranks_)
     for (int rank = 0; rank < index.num_ranks_; rank++) {
+      // Set thread limit for this rank's nested OpenMP regions
+      cuvs::core::omp::set_num_threads(threads_per_rank);
+
       const raft::resources& dev_res  = raft::resource::set_current_device_to_rank(clique, rank);
       int64_t offset                  = rank * n_rows_per_shard;
       int64_t n_rows_of_current_shard = std::min(n_rows_per_shard, n_rows - offset);
@@ -177,7 +227,13 @@ void extend(const raft::resources& clique,
       auto& ann_if = index.ann_interfaces_[rank];
       cuvs::neighbors::extend(dev_res, ann_if, new_vectors_part, new_indices_part);
       resource::sync_stream(dev_res);
+
+      // Restore to allow full parallelism for potential future nested regions
+      cuvs::core::omp::set_num_threads(omp_threads);
     }
+
+    // Restore original OpenMP settings
+    cuvs::core::omp::set_nested(saved_nested);
   }
 }
 
@@ -215,7 +271,8 @@ void sharded_search_with_direct_merge(
       queries.data_handle() + query_offset, n_rows_of_current_batch, n_cols);
 
     const int& requirements = index.num_ranks_;
-    check_omp_threads(requirements);  // should use at least num_ranks_ threads to avoid NCCL hang
+    cuvs::core::omp::check_threads(
+      requirements);  // should use at least num_ranks_ threads to avoid NCCL hang
 #pragma omp parallel for num_threads(index.num_ranks_)
     for (int rank = 0; rank < index.num_ranks_; rank++) {
       const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);
@@ -335,7 +392,8 @@ void sharded_search_with_tree_merge(
       queries.data_handle() + query_offset, n_rows_of_current_batch, n_cols);
 
     const int& requirements = index.num_ranks_;
-    check_omp_threads(requirements);  // should use at least num_ranks_ threads to avoid NCCL hang
+    cuvs::core::omp::check_threads(
+      requirements);  // should use at least num_ranks_ threads to avoid NCCL hang
 #pragma omp parallel for num_threads(index.num_ranks_)
     for (int rank = 0; rank < index.num_ranks_; rank++) {
       const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);

@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "../common/ann_types.hpp"
@@ -47,9 +36,15 @@ void parse_build_param(const nlohmann::json& conf,
 {
   param.R       = conf.at("R");
   param.L_build = conf.at("L_build");
-  if (conf.contains("alpha")) { param.num_threads = conf.at("alpha"); }
+  if (conf.contains("alpha")) { param.alpha = conf.at("alpha"); }
   if (conf.contains("num_threads")) { param.num_threads = conf.at("num_threads"); }
   if (conf.contains("QD")) { param.QD = conf.at("QD"); }
+  if (conf.contains("build_dram_budget_megabytes")) {
+    param.build_dram_budget_megabytes = conf.at("build_dram_budget_megabytes");
+  }
+  if (conf.contains("search_dram_budget_megabytes")) {
+    param.search_dram_budget_megabytes = conf.at("search_dram_budget_megabytes");
+  }
   param.dataset_base_file = cuvs::bench::configuration::singleton().get_dataset_conf().base_file;
   for (const auto& index : cuvs::bench::configuration::singleton().get_indices()) {
     // The nlohmann::json operator== comparator compares each key and value by content. Reference:

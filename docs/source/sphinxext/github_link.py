@@ -1,19 +1,8 @@
 # This contains code with copyright by the scikit-learn project, subject to the
 # license in /thirdparty/LICENSES/LICENSE.scikit_learn
 #
-# Copyright (c) 2024-2025, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0 AND BSD-3-Clause
 #
 
 import inspect
@@ -21,7 +10,6 @@ import os
 import re
 import subprocess
 import sys
-from functools import partial
 from operator import attrgetter
 
 orig = inspect.isfunction
@@ -29,7 +17,6 @@ orig = inspect.isfunction
 
 # See https://opendreamkit.org/2017/06/09/CythonSphinx/
 def isfunction(obj):
-
     orig_val = orig(obj)
 
     new_val = hasattr(type(obj), "__code__")
@@ -136,7 +123,6 @@ def _linkcode_resolve(domain, info, package, url_fmt, revision):
         try:
             lineno = inspect.getsourcelines(obj)[1]
         except Exception:
-
             # Can happen if its a cyfunction. See if it has `__code__`
             if hasattr(obj, "__code__"):
                 lineno = obj.__code__.co_firstlineno
