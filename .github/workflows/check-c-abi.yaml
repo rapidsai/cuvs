@@ -1,6 +1,7 @@
 name: C ABI Compatibility Check
 
 on:
+  workflow_dispatch:  # Allow manual trigger for bootstrap
   workflow_call:
   pull_request:
     paths:
@@ -21,7 +22,7 @@ concurrency:
 jobs:
   # Extract and store baseline ABI from main branch
   update-baseline:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout main branch
