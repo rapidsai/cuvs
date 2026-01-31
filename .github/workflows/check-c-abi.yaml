@@ -24,6 +24,9 @@ jobs:
   update-baseline:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
+    concurrency:
+      group: abi-baseline-update
+      cancel-in-progress: false  # Queue updates, don't skip
     steps:
       - name: Checkout main branch
         uses: actions/checkout@v4
@@ -65,9 +68,16 @@ jobs:
             --header_path c/include \
             --include_file cuvs/core/all.h \
             --output_file baseline/c_abi.json.gz
-          echo "ABI extracted from main branch"
+          echo "ABI extracted from main branch (commit: ${{ github.sha }})"
           
-      - name: Store main baseline (never expires)
+      - name: Store commit-specific baseline
+        uses: actions/upload-artifact@v4
+        with:
+          name: c-abi-baseline-${{ github.sha }}
+          path: baseline/c_abi.json.gz
+          retention-days: 90  # Keep for 3 months
+          
+      - name: Store main baseline (latest, never expires)
         uses: actions/upload-artifact@v4
         with:
           name: c-abi-baseline-main
@@ -114,8 +124,27 @@ jobs:
             -DBUILD_EXAMPLES=OFF
           echo "Build directory created and dependencies fetched"
           
-      - name: Download baseline ABI from main
-        id: download-baseline
+      - name: Find merge base commit
+        id: merge-base
+        run: |
+          git fetch origin main
+          MERGE_BASE=$(git merge-base HEAD origin/main)
+          echo "merge_base_sha=${MERGE_BASE}" >> $GITHUB_OUTPUT
+          echo "Merge base commit: ${MERGE_BASE}"
+          
+      - name: Try to download baseline for merge-base commit (most accurate)
+        id: download-merge-base
+        continue-on-error: true
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          name: c-abi-baseline-${{ steps.merge-base.outputs.merge_base_sha }}
+          workflow: check-c-abi.yaml
+          commit: ${{ steps.merge-base.outputs.merge_base_sha }}
+          path: baseline/
+          
+      - name: Try to download latest main baseline (fallback 1)
+        id: download-main
+        if: steps.download-merge-base.outcome == 'failure'
         continue-on-error: true
         uses: dawidd6/action-download-artifact@v3
         with:
@@ -124,10 +153,11 @@ jobs:
           branch: main
           path: baseline/
           
-      - name: Extract baseline ABI from main branch (fallback)
-        if: steps.download-baseline.outcome == 'failure'
+      - name: Extract baseline ABI from main branch (fallback 2)
+        if: steps.download-merge-base.outcome == 'failure' && steps.download-main.outcome == 'failure'
         run: |
-          echo "Baseline ABI artifact not found, extracting from main branch..."
+          echo "⚠️ No baseline artifacts found, extracting from main branch..."
+          echo "This is slower but ensures we always have a baseline for comparison."
           git worktree add ../cuvs-main main
           mkdir -p ../cuvs-main/cpp/build
           cd ../cuvs-main/cpp/build
@@ -142,7 +172,17 @@ jobs:
             --header_path ../cuvs-main/c/include \
             --include_file cuvs/core/all.h \
             --output_file baseline/c_abi.json.gz
-          echo "Baseline ABI extracted from main branch"
+          echo "✓ Baseline ABI extracted from main branch"
+          
+      - name: Report baseline source
+        run: |
+          if [ "${{ steps.download-merge-base.outcome }}" == "success" ]; then
+            echo "✓ Using baseline from merge-base commit: ${{ steps.merge-base.outputs.merge_base_sha }}"
+          elif [ "${{ steps.download-main.outcome }}" == "success" ]; then
+            echo "✓ Using latest main baseline (merge-base baseline not yet available)"
+          else
+            echo "✓ Using freshly extracted baseline from main branch"
+          fi
           
       - name: Analyze current branch for ABI breaking changes
         run: |
