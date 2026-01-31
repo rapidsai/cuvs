@@ -1,0 +1,137 @@
+name: C ABI Compatibility Check
+
+on:
+  workflow_call:
+  pull_request:
+    paths:
+      - 'c/include/**'
+      - 'ci/check_c_abi.py'
+      - '.github/workflows/check-c-abi.yaml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-c-abi:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libclang-dev \
+            clang \
+            cmake \
+            ninja-build
+          
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install msgspec libclang termcolor
+          
+      - name: Build C++ project to get dependencies (dlpack)
+        run: |
+          mkdir -p cpp/build
+          cd cpp/build
+          cmake .. \
+            -GNinja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_EXAMPLES=OFF
+          # We only need the configure step to fetch dlpack headers
+          # No need to actually build everything
+          echo "Build directory created and dependencies fetched"
+          
+      - name: Download baseline ABI from artifact store
+        id: download-baseline
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: c-abi-baseline
+          path: baseline/
+          
+      - name: Extract baseline ABI from main branch (if artifact not found)
+        if: steps.download-baseline.outcome == 'failure'
+        run: |
+          echo "Baseline ABI artifact not found, extracting from main branch..."
+          
+          # Checkout main branch to a separate directory
+          git worktree add ../cuvs-main main
+          
+          # Build main branch to get dlpack headers
+          mkdir -p ../cuvs-main/cpp/build
+          cd ../cuvs-main/cpp/build
+          cmake .. \
+            -GNinja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_EXAMPLES=OFF
+          cd ../../..
+          
+          # Extract baseline ABI from main branch
+          mkdir -p baseline
+          python ci/check_c_abi.py extract \
+            --header_path ../cuvs-main/c/include \
+            --include_file cuvs/core/all.h \
+            --output_file baseline/c_abi.json.gz
+          
+          echo "Baseline ABI extracted from main branch"
+          
+      - name: Analyze current branch for ABI breaking changes
+        run: |
+          python ci/check_c_abi.py analyze \
+            --abi_file baseline/c_abi.json.gz \
+            --header_path c/include \
+            --include_file cuvs/core/all.h
+            
+      - name: Comment on PR with results
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## ⚠️ C ABI Breaking Changes Detected
+              
+This PR introduces breaking changes to the C ABI. Please review the changes carefully.
+
+Breaking ABI changes are only allowed in major releases. If this is intentional for a major release, 
+the baseline ABI will need to be updated after merge.
+
+See the job logs for details on what specific changes were detected.
+
+### What are breaking ABI changes?
+
+Breaking ABI changes include:
+- Removing functions from the public API
+- Changing function signatures (parameters or return types)
+- Removing struct members or changing their types
+- Removing or changing enum values
+
+### Next steps
+
+1. Review the changes flagged in the CI logs
+2. If these changes are unintentional, update your PR to maintain ABI compatibility
+3. If these changes are required, ensure:
+   - This is part of a major version release
+   - The changes are documented in the changelog
+   - Migration guide is provided for users
+
+For more information, see the [C ABI documentation](../docs/source/c_developer_guide.md).
+`
+            });

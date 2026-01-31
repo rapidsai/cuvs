@@ -1,0 +1,105 @@
+name: Store C ABI Baseline
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag to store baseline for (e.g., v26.02.00)'
+        required: true
+        type: string
+
+jobs:
+  store-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.version }}
+          
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libclang-dev \
+            clang \
+            cmake \
+            ninja-build
+          
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install msgspec libclang
+          
+      - name: Build C++ project to get dependencies (dlpack)
+        run: |
+          mkdir -p cpp/build
+          cd cpp/build
+          cmake .. \
+            -GNinja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_EXAMPLES=OFF
+            
+      - name: Extract C ABI baseline
+        run: |
+          mkdir -p abi-baselines
+          python ci/check_c_abi.py extract \
+            --header_path c/include \
+            --include_file cuvs/core/all.h \
+            --output_file abi-baselines/c_abi_${{ github.event.release.tag_name || inputs.version }}.json.gz
+          
+      - name: Upload ABI baseline as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: c-abi-baseline-${{ github.event.release.tag_name || inputs.version }}
+          path: abi-baselines/c_abi_*.json.gz
+          retention-days: 400  # ~13 months, enough for patch releases
+          
+      - name: Commit baseline to repository (for long-term storage)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Create a baselines branch if it doesn't exist
+          git fetch origin baselines:baselines || git checkout -b baselines
+          git checkout baselines
+          
+          # Copy the baseline file
+          mkdir -p c-abi-baselines
+          cp abi-baselines/c_abi_*.json.gz c-abi-baselines/
+          
+          # Commit and push
+          git add c-abi-baselines/
+          git commit -m "Add C ABI baseline for ${{ github.event.release.tag_name || inputs.version }}"
+          git push origin baselines
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Create release comment
+        if: github.event_name == 'release'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tagName = context.payload.release.tag_name;
+            
+            github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.payload.release.target_commitish,
+              body: `✅ C ABI baseline stored for release ${tagName}
+
+This baseline will be used to check for breaking ABI changes in future PRs.
+
+The baseline is stored in:
+- Artifact: \`c-abi-baseline-${tagName}\` (available for ~13 months)
+- Branch: \`baselines\` (permanent storage)
+`
+            });
