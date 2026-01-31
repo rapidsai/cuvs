@@ -1,4 +1,4 @@
-name: Store C ABI Baseline
+name: Archive C ABI Baseline for Release
 
 on:
   release:
@@ -6,62 +6,31 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag to store baseline for (e.g., v26.02.00)'
+        description: 'Version tag to archive baseline for (e.g., v26.02.00)'
         required: true
         type: string
 
 jobs:
-  store-baseline:
+  archive-baseline:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout release tag
+      - name: Checkout repository
         uses: actions/checkout@v4
+          
+      - name: Download main baseline artifact
+        uses: dawidd6/action-download-artifact@v3
         with:
-          ref: ${{ github.event.release.tag_name || inputs.version }}
+          name: c-abi-baseline-main
+          workflow: check-c-abi.yaml
+          branch: main
+          path: baseline/
           
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libclang-dev \
-            clang \
-            cmake \
-            ninja-build
-          
-      - name: Install Python dependencies
-        run: |
-          pip install --upgrade pip
-          pip install msgspec libclang
-          
-      - name: Build C++ project to get dependencies (dlpack)
-        run: |
-          mkdir -p cpp/build
-          cd cpp/build
-          cmake .. \
-            -GNinja \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DBUILD_TESTS=OFF \
-            -DBUILD_EXAMPLES=OFF
-            
-      - name: Extract C ABI baseline
-        run: |
-          mkdir -p abi-baselines
-          python ci/check_c_abi.py extract \
-            --header_path c/include \
-            --include_file cuvs/core/all.h \
-            --output_file abi-baselines/c_abi_${{ github.event.release.tag_name || inputs.version }}.json.gz
-          
-      - name: Upload ABI baseline as artifact
+      - name: Archive baseline with release version
         uses: actions/upload-artifact@v4
         with:
           name: c-abi-baseline-${{ github.event.release.tag_name || inputs.version }}
-          path: abi-baselines/c_abi_*.json.gz
-          retention-days: 400  # ~13 months, enough for patch releases
+          path: baseline/c_abi.json.gz
+          retention-days: 400  # ~13 months
           
       - name: Commit baseline to repository (for long-term storage)
         run: |
@@ -69,16 +38,16 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
           # Create a baselines branch if it doesn't exist
-          git fetch origin baselines:baselines || git checkout -b baselines
-          git checkout baselines
+          git fetch origin baselines:baselines 2>/dev/null || git checkout --orphan baselines
+          git checkout baselines 2>/dev/null || true
           
-          # Copy the baseline file
+          # Copy the baseline file with version name
           mkdir -p c-abi-baselines
-          cp abi-baselines/c_abi_*.json.gz c-abi-baselines/
+          cp baseline/c_abi.json.gz c-abi-baselines/c_abi_${{ github.event.release.tag_name || inputs.version }}.json.gz
           
           # Commit and push
           git add c-abi-baselines/
-          git commit -m "Add C ABI baseline for ${{ github.event.release.tag_name || inputs.version }}"
+          git commit -m "Archive C ABI baseline for ${{ github.event.release.tag_name || inputs.version }}"
           git push origin baselines
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -94,9 +63,9 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               commit_sha: context.payload.release.target_commitish,
-              body: `✅ C ABI baseline stored for release ${tagName}
+              body: `✅ C ABI baseline archived for release ${tagName}
 
-This baseline will be used to check for breaking ABI changes in future PRs.
+This baseline has been archived from the main branch and will be available for historical reference.
 
 The baseline is stored in:
 - Artifact: \`c-abi-baseline-${tagName}\` (available for ~13 months)
