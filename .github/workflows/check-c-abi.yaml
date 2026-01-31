@@ -7,13 +7,75 @@ on:
       - 'c/include/**'
       - 'ci/check_c_abi.py'
       - '.github/workflows/check-c-abi.yaml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'c/include/**'
+      - 'ci/check_c_abi.py'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  check-c-abi:
+  # Extract and store baseline ABI from main branch
+  update-baseline:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+          
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libclang-dev \
+            clang \
+            cmake \
+            ninja-build
+          
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install msgspec libclang termcolor
+          
+      - name: Build C++ project to get dependencies (dlpack)
+        run: |
+          mkdir -p cpp/build
+          cd cpp/build
+          cmake .. \
+            -GNinja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_EXAMPLES=OFF
+          echo "Build directory created and dependencies fetched"
+          
+      - name: Extract ABI from main branch
+        run: |
+          mkdir -p baseline
+          python ci/check_c_abi.py extract \
+            --header_path c/include \
+            --include_file cuvs/core/all.h \
+            --output_file baseline/c_abi.json.gz
+          echo "ABI extracted from main branch"
+          
+      - name: Store main baseline (never expires)
+        uses: actions/upload-artifact@v4
+        with:
+          name: c-abi-baseline-main
+          path: baseline/c_abi.json.gz
+          retention-days: 0  # Never expire
+
+  # Check PRs for breaking ABI changes
+  check-pr:
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_call'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR branch
@@ -49,27 +111,23 @@ jobs:
             -DCMAKE_BUILD_TYPE=Debug \
             -DBUILD_TESTS=OFF \
             -DBUILD_EXAMPLES=OFF
-          # We only need the configure step to fetch dlpack headers
-          # No need to actually build everything
           echo "Build directory created and dependencies fetched"
           
-      - name: Download baseline ABI from artifact store
+      - name: Download baseline ABI from main
         id: download-baseline
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: dawidd6/action-download-artifact@v3
         with:
-          name: c-abi-baseline
+          name: c-abi-baseline-main
+          workflow: check-c-abi.yaml
+          branch: main
           path: baseline/
           
-      - name: Extract baseline ABI from main branch (if artifact not found)
+      - name: Extract baseline ABI from main branch (fallback)
         if: steps.download-baseline.outcome == 'failure'
         run: |
           echo "Baseline ABI artifact not found, extracting from main branch..."
-          
-          # Checkout main branch to a separate directory
           git worktree add ../cuvs-main main
-          
-          # Build main branch to get dlpack headers
           mkdir -p ../cuvs-main/cpp/build
           cd ../cuvs-main/cpp/build
           cmake .. \
@@ -78,14 +136,11 @@ jobs:
             -DBUILD_TESTS=OFF \
             -DBUILD_EXAMPLES=OFF
           cd ../../..
-          
-          # Extract baseline ABI from main branch
           mkdir -p baseline
           python ci/check_c_abi.py extract \
             --header_path ../cuvs-main/c/include \
             --include_file cuvs/core/all.h \
             --output_file baseline/c_abi.json.gz
-          
           echo "Baseline ABI extracted from main branch"
           
       - name: Analyze current branch for ABI breaking changes
@@ -96,12 +151,10 @@ jobs:
             --include_file cuvs/core/all.h
             
       - name: Comment on PR with results
-        if: failure()
+        if: failure() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
-            const fs = require('fs');
-            
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
