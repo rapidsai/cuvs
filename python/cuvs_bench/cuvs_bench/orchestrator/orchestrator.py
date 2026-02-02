@@ -137,6 +137,11 @@ class BenchmarkOrchestrator:
         List[Union[BuildResult, SearchResult]]
             List of all build and search results
         """
+        # Validate mode parameter
+        valid_modes = ("sweep", "tune")
+        if mode not in valid_modes:
+            raise ValueError(f"Invalid mode '{mode}'. Must be one of: {valid_modes}")
+        
         # If build and search are not provided, set them to True by default
         if not build and not search:
             build, search = True, True
