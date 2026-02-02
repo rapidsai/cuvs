@@ -80,6 +80,9 @@ class BenchmarkOrchestrator:
     
     def run_benchmark(
         self,
+        mode: str = "sweep",
+        constraints: dict = None,
+        n_trials: int = None,
         build: bool = True,
         search: bool = True,
         force: bool = False,
@@ -95,6 +98,15 @@ class BenchmarkOrchestrator:
         
         Parameters
         ----------
+        mode : str
+            Benchmark mode: "sweep" (default, exhaustive Cartesian product) or
+            "tune" (intelligent search using Optuna)
+        constraints : dict
+            For tune mode: optimization constraints. Metrics with "min" bounds
+            are maximized, metrics with "max" bounds are hard limits.
+            Example: {"recall": {"min": 0.95}, "latency": {"max": 10}}
+        n_trials : int
+            For tune mode: maximum number of Optuna trials. Ignored in sweep mode.
         build : bool
             Whether to build indices
         search : bool
