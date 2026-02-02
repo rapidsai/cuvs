@@ -102,9 +102,13 @@ class BenchmarkOrchestrator:
             Benchmark mode: "sweep" (default, exhaustive Cartesian product) or
             "tune" (intelligent search using Optuna)
         constraints : dict
-            For tune mode: optimization constraints. Metrics with "min" bounds
-            are maximized, metrics with "max" bounds are hard limits.
-            Example: {"recall": {"min": 0.95}, "latency": {"max": 10}}
+            For tune mode: optimization target and hard limits.
+            - One metric should have "maximize" or "minimize" as value (the target)
+            - Other metrics have {"min": X} or {"max": X} as bounds (hard limits)
+            
+            Examples:
+                {"recall": "maximize", "latency": {"max": 10}}
+                {"latency": "minimize", "recall": {"min": 0.95}}
         n_trials : int
             For tune mode: maximum number of Optuna trials. Ignored in sweep mode.
         build : bool
@@ -270,12 +274,236 @@ class BenchmarkOrchestrator:
         Parameters
         ----------
         constraints : dict
-            Optimization constraints. Metrics with "min" bounds are maximized,
-            metrics with "max" bounds are hard limits.
+            Optimization target and hard limits.
+            - One metric should have "maximize" or "minimize" as value
+            - Other metrics have {"min": X} or {"max": X} as bounds
         n_trials : int
             Maximum number of Optuna trials.
         """
-        raise NotImplementedError("Tune mode not yet implemented")
+        # Import Optuna (optional dependency)
+        try:
+            import optuna
+            optuna.logging.set_verbosity(optuna.logging.WARNING)
+        except ImportError:
+            raise ImportError(
+                "Optuna is required for tune mode. Install with: pip install optuna"
+            )
+        
+        from ..backends.search_spaces import get_search_space
+        
+        # Get algorithm from loader_kwargs
+        algorithm = loader_kwargs.get("algorithms")
+        if not algorithm:
+            raise ValueError("'algorithms' must be specified for tune mode")
+        
+        # Get search space for this algorithm
+        search_space = get_search_space(algorithm)
+        
+        # Set default n_trials
+        if n_trials is None:
+            n_trials = 100
+        
+        # Parse constraints to find optimization target and direction
+        if not constraints:
+            raise ValueError(
+                "constraints must be specified for tune mode. "
+                "Example: {'recall': 'maximize', 'latency': {'max': 10}}"
+            )
+        
+        optimize_metric = None
+        direction = None
+        hard_constraints = {}
+        
+        for metric, value in constraints.items():
+            if value == "maximize":
+                optimize_metric = metric
+                direction = "maximize"
+            elif value == "minimize":
+                optimize_metric = metric
+                direction = "minimize"
+            elif isinstance(value, dict):
+                hard_constraints[metric] = value
+            else:
+                raise ValueError(
+                    f"Invalid constraint for '{metric}': {value}. "
+                    "Use 'maximize', 'minimize', or {{'min': X}} / {{'max': X}}"
+                )
+        
+        if not optimize_metric:
+            raise ValueError(
+                "One metric must have 'maximize' or 'minimize' as its value. "
+                "Example: {'recall': 'maximize', 'latency': {'max': 10}}"
+            )
+        
+        # Collect all results for pareto plot
+        all_results: List[Union[BuildResult, SearchResult]] = []
+        
+        def suggest_params(trial, param_space: dict, build_params: dict = None) -> dict:
+            """Suggest parameters from search space using Optuna trial."""
+            params = {}
+            for param, spec in param_space.items():
+                if spec["type"] == "int":
+                    max_val = spec["max"]
+                    # Handle dynamic constraints (e.g., nprobe <= nlist)
+                    if isinstance(max_val, str) and build_params:
+                        max_val = build_params.get(max_val, 1000)
+                    params[param] = trial.suggest_int(
+                        param, spec["min"], max_val, log=spec.get("log", False)
+                    )
+                elif spec["type"] == "float":
+                    params[param] = trial.suggest_float(
+                        param, spec["min"], spec["max"], log=spec.get("log", False)
+                    )
+                elif spec["type"] == "categorical":
+                    params[param] = trial.suggest_categorical(param, spec["choices"])
+            return params
+        
+        def objective(trial) -> float:
+            """Optuna objective function for a single trial."""
+            # Suggest build parameters
+            build_params = suggest_params(trial, search_space.get("build", {}))
+            
+            # Suggest search parameters (may depend on build params)
+            search_params_dict = suggest_params(
+                trial, search_space.get("search", {}), build_params
+            )
+            
+            # Run single trial with these specific parameters
+            result = self._run_trial(
+                algorithm=algorithm,
+                build_params=build_params,
+                search_params=search_params_dict,
+                build=build,
+                search=search,
+                force=force,
+                dry_run=dry_run,
+                count=count,
+                batch_size=batch_size,
+                search_mode=search_mode,
+                search_threads=search_threads,
+                **loader_kwargs
+            )
+            
+            # Store result for pareto plot
+            all_results.append(result)
+            
+            # Check if trial failed
+            if not result.success:
+                raise optuna.TrialPruned()
+            
+            metrics = result.metrics if hasattr(result, 'metrics') else {}
+            
+            # Check hard constraints - prune if violated
+            for metric, bounds in hard_constraints.items():
+                metric_value = metrics.get(metric)
+                if metric_value is None:
+                    continue
+                if "min" in bounds and metric_value < bounds["min"]:
+                    raise optuna.TrialPruned()
+                if "max" in bounds and metric_value > bounds["max"]:
+                    raise optuna.TrialPruned()
+            
+            # Return optimization target
+            return metrics.get(optimize_metric, 0.0)
+        
+        # Create and run Optuna study
+        study = optuna.create_study(direction=direction)
+        
+        print(f"Starting tune mode: {n_trials} trials for '{algorithm}'")
+        print(f"Optimizing: {optimize_metric} ({direction})")
+        print(f"Constraints: {hard_constraints}")
+        
+        study.optimize(objective, n_trials=n_trials, show_progress_bar=True)
+        
+        # Report best results
+        print(f"\nBest trial: #{study.best_trial.number}")
+        print(f"Best params: {study.best_params}")
+        print(f"Best {optimize_metric}: {study.best_value:.4f}")
+        
+        return all_results
+    
+    def _run_trial(
+        self,
+        algorithm: str,
+        build_params: dict,
+        search_params: dict,
+        build: bool,
+        search: bool,
+        force: bool,
+        dry_run: bool,
+        count: int,
+        batch_size: int,
+        search_mode: str,
+        search_threads: Optional[int],
+        **loader_kwargs
+    ) -> Union[BuildResult, SearchResult]:
+        """
+        Run a single benchmark trial with specific parameters.
+        
+        Used by tune mode to evaluate one parameter configuration.
+        
+        Parameters
+        ----------
+        algorithm : str
+            Algorithm name
+        build_params : dict
+            Build parameters suggested by Optuna
+        search_params : dict
+            Search parameters suggested by Optuna
+        """
+        # Override loader_kwargs with tune-specific params
+        tune_kwargs = loader_kwargs.copy()
+        tune_kwargs["_tune_mode"] = True
+        tune_kwargs["_tune_build_params"] = build_params
+        tune_kwargs["_tune_search_params"] = search_params
+        
+        # Load config (config_loader needs to handle _tune_* kwargs)
+        dataset_config, benchmark_configs = self.config_loader.load(
+            count=count,
+            batch_size=batch_size,
+            **tune_kwargs
+        )
+        
+        # Create dataset
+        bench_dataset = self._create_dataset(dataset_config)
+        
+        # Should have exactly one config for single trial
+        if not benchmark_configs:
+            return SearchResult(
+                success=False,
+                error_message="No config generated for trial",
+                metrics={},
+                search_params=[]
+            )
+        
+        config = benchmark_configs[0]
+        backend = self.backend_class(config.backend_config)
+        
+        result = None
+        
+        if build:
+            result = backend.build(
+                dataset=bench_dataset,
+                indexes=config.indexes,
+                force=force,
+                dry_run=dry_run
+            )
+            if not result.success:
+                return result
+        
+        if search:
+            result = backend.search(
+                dataset=bench_dataset,
+                indexes=config.indexes,
+                k=count,
+                batch_size=batch_size,
+                mode=search_mode,
+                force=force,
+                search_threads=search_threads,
+                dry_run=dry_run
+            )
+        
+        return result
     
     def _create_dataset(self, dataset_config: DatasetConfig) -> Dataset:
         """
