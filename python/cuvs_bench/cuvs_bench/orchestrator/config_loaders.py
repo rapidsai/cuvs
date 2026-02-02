@@ -197,7 +197,7 @@ class CppGBenchConfigLoader(ConfigLoader):
         dataset: str,
         dataset_path: str,
         dataset_configuration: Optional[str] = None,
-        configuration: Optional[str] = None,
+        algorithm_configuration: Optional[str] = None,
         algorithms: Optional[str] = None,
         groups: Optional[str] = None,
         algo_groups: Optional[str] = None,
@@ -217,7 +217,7 @@ class CppGBenchConfigLoader(ConfigLoader):
             Path to dataset directory
         dataset_configuration : Optional[str]
             Path to dataset configuration file
-        configuration : Optional[str]
+        algorithm_configuration : Optional[str]
             Path to algorithm configuration directory or file
         algorithms : Optional[str]
             Comma-separated list of algorithms to run
@@ -264,7 +264,7 @@ class CppGBenchConfigLoader(ConfigLoader):
         conf_file["search_basic_param"] = {"k": count, "batch_size": batch_size}
         
         # Gather and load algorithm configs
-        algos_conf_fs = self.gather_algorithm_configs(config_path, configuration)
+        algos_conf_fs = self.gather_algorithm_configs(config_path, algorithm_configuration)
         
         allowed_algos = algorithms.split(",") if algorithms else None
         allowed_groups = groups.split(",") if groups else None
@@ -436,13 +436,13 @@ class CppGBenchConfigLoader(ConfigLoader):
         ValueError
             If the dataset configuration is not found.
         """
-        for dset in dataset_conf_all:
-            if dataset == dset["name"]:
-                return dset
+        for d in dataset_conf_all:
+            if dataset == d["name"]:
+                return d
         raise ValueError("Could not find a dataset configuration")
     
     def gather_algorithm_configs(
-        self, config_path: str, configuration: Optional[str]
+        self, config_path: str, algorithm_configuration: Optional[str]
     ) -> list:
         """
         Gather the list of algorithm configuration files.
@@ -451,7 +451,7 @@ class CppGBenchConfigLoader(ConfigLoader):
         ----------
         config_path : str
             The path to the config directory.
-        configuration : Optional[str]
+        algorithm_configuration : Optional[str]
             The path to the algorithm configuration directory or file.
 
         Returns
@@ -471,15 +471,15 @@ class CppGBenchConfigLoader(ConfigLoader):
             and "__pycache__" not in f
         ]
 
-        if configuration:
-            if os.path.isdir(configuration):
+        if algorithm_configuration:
+            if os.path.isdir(algorithm_configuration):
                 algos_conf_fs += [
-                    os.path.join(configuration, f)
-                    for f in os.listdir(configuration)
+                    os.path.join(algorithm_configuration, f)
+                    for f in os.listdir(algorithm_configuration)
                     if ".json" not in f
                 ]
-            elif os.path.isfile(configuration):
-                algos_conf_fs.append(configuration)
+            elif os.path.isfile(algorithm_configuration):
+                algos_conf_fs.append(algorithm_configuration)
         return algos_conf_fs
     
     def load_algorithms_conf(

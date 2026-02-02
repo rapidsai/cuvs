@@ -112,14 +112,20 @@ class BenchmarkOrchestrator:
         search_threads : Optional[int]
             Number of threads for search
         **loader_kwargs
-            Additional arguments passed to ConfigLoader.load()
-            (e.g., dataset, dataset_path, algorithms for cpp_gbench)
+            Backend-specific arguments passed to ConfigLoader.load().
+            
+            These vary by backend type to keep the orchestrator backend-agnostic:
+            - cpp_gbench: dataset, dataset_path, algorithms, groups, algo_groups,
+              dataset_configuration, algorithm_configuration, subset_size
+            - milvus (future): host, port, collection, api_key
+            - qdrant (future): host, api_key, collection
         
         Returns
         -------
         List[Union[BuildResult, SearchResult]]
             List of all build and search results
         """
+        # If build and search are not provided, set them to True by default
         if not build and not search:
             build, search = True, True
         
