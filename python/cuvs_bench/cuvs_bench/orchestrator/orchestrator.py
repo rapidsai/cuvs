@@ -146,6 +146,52 @@ class BenchmarkOrchestrator:
         if not build and not search:
             build, search = True, True
         
+        # Branch based on mode
+        if mode == "sweep":
+            return self._run_sweep(
+                build=build,
+                search=search,
+                force=force,
+                dry_run=dry_run,
+                count=count,
+                batch_size=batch_size,
+                search_mode=search_mode,
+                search_threads=search_threads,
+                **loader_kwargs
+            )
+        else:  # mode == "tune"
+            return self._run_tune(
+                constraints=constraints,
+                n_trials=n_trials,
+                build=build,
+                search=search,
+                force=force,
+                dry_run=dry_run,
+                count=count,
+                batch_size=batch_size,
+                search_mode=search_mode,
+                search_threads=search_threads,
+                **loader_kwargs
+            )
+    
+    def _run_sweep(
+        self,
+        build: bool,
+        search: bool,
+        force: bool,
+        dry_run: bool,
+        count: int,
+        batch_size: int,
+        search_mode: str,
+        search_threads: Optional[int],
+        **loader_kwargs
+    ) -> List[Union[BuildResult, SearchResult]]:
+        """
+        Run exhaustive sweep over all parameter combinations.
+        
+        This is the default mode that runs all configurations from the
+        Cartesian product of build/search parameters defined in YAML.
+        """
         # Load configurations using the backend-specific loader
         dataset_config, benchmark_configs = self.config_loader.load(
             count=count,
@@ -199,6 +245,37 @@ class BenchmarkOrchestrator:
                     print(f"Search failed for {config.index_name}: {search_result.error_message}")
         
         return results
+    
+    def _run_tune(
+        self,
+        constraints: dict,
+        n_trials: int,
+        build: bool,
+        search: bool,
+        force: bool,
+        dry_run: bool,
+        count: int,
+        batch_size: int,
+        search_mode: str,
+        search_threads: Optional[int],
+        **loader_kwargs
+    ) -> List[Union[BuildResult, SearchResult]]:
+        """
+        Run intelligent parameter tuning using Optuna.
+        
+        Instead of exhaustive sweep, uses Optuna to intelligently explore
+        the parameter space and find optimal configurations based on
+        the provided constraints.
+        
+        Parameters
+        ----------
+        constraints : dict
+            Optimization constraints. Metrics with "min" bounds are maximized,
+            metrics with "max" bounds are hard limits.
+        n_trials : int
+            Maximum number of Optuna trials.
+        """
+        raise NotImplementedError("Tune mode not yet implemented")
     
     def _create_dataset(self, dataset_config: DatasetConfig) -> Dataset:
         """
