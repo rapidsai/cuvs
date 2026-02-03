@@ -120,6 +120,9 @@ auto train_pq_subspaces(
   return pq_centers;
 }
 
+/**
+ * @brief Build an owning quantizer by training on a dataset.
+ */
 template <typename DataT, typename MathT, typename AccessorType>
 quantizer<MathT> build(
   raft::resources const& res,
@@ -159,10 +162,56 @@ quantizer<MathT> build(
             std::move(vq_code_book), std::move(pq_code_book), std::move(empty_codes)}};
 }
 
+/**
+ * @brief Build a view-type quantizer from pre-computed codebooks.
+ */
+template <typename MathT>
+quantizer<MathT> build_view(
+  raft::resources const& res,
+  const params& params,
+  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
+  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> vq_centers)
+{
+  // Validate parameters
+  RAFT_EXPECTS(params.pq_bits >= 4 && params.pq_bits <= 16,
+               "PQ bits must be within [4, 16], got %u",
+               params.pq_bits);
+  RAFT_EXPECTS(params.pq_dim > 0, "pq_dim must be specified for view-type quantizer");
+
+  const uint32_t pq_n_centers = 1u << params.pq_bits;
+
+  // Validate PQ centers shape
+  if (params.use_subspaces) {
+    RAFT_EXPECTS(pq_centers.extent(0) == params.pq_dim * pq_n_centers,
+                 "For use_subspaces=true, pq_centers must have shape [pq_dim * pq_n_centers, "
+                 "pq_len], got [%u, %u]",
+                 pq_centers.extent(0),
+                 pq_centers.extent(1));
+  } else {
+    RAFT_EXPECTS(pq_centers.extent(0) == pq_n_centers,
+                 "For use_subspaces=false, pq_centers must have shape [pq_n_centers, pq_len], got "
+                 "[%u, %u]",
+                 pq_centers.extent(0),
+                 pq_centers.extent(1));
+  }
+
+  // Validate VQ centers
+  if (params.use_vq) {
+    RAFT_EXPECTS(!vq_centers.empty(), "vq_centers must be provided when use_vq=true");
+    RAFT_EXPECTS(vq_centers.extent(0) == params.vq_n_centers,
+                 "vq_centers must have vq_n_centers rows, got %u",
+                 vq_centers.extent(0));
+  }
+
+  // Create view-type vpq_dataset
+  auto empty_data = raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>{};
+  return {params, cuvs::neighbors::vpq_dataset<MathT, int64_t>{vq_centers, pq_centers, empty_data}};
+}
+
 template <typename T, typename QuantI, typename AccessorType>
 void transform(
   raft::resources const& res,
-  const quantizer<T>& quantizer,
+  const quantizer<T>& quant,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, AccessorType> dataset,
   raft::device_matrix_view<QuantI, int64_t> pq_codes_out,
   std::optional<raft::device_vector_view<uint32_t, int64_t>> vq_labels = std::nullopt)
@@ -174,30 +223,32 @@ void transform(
     size_t(pq_codes_out.extent(1)));
   RAFT_EXPECTS(pq_codes_out.extent(0) == dataset.extent(0),
                "Output matrix must have the same number of rows as the input dataset");
-  RAFT_EXPECTS(pq_codes_out.extent(1) == get_quantized_dim(quantizer.params_quantizer),
+  RAFT_EXPECTS(pq_codes_out.extent(1) == get_quantized_dim(quant.params_quantizer),
                "Output matrix doesn't have the correct number of columns");
-  RAFT_EXPECTS(quantizer.params_quantizer.pq_bits >= 4 && quantizer.params_quantizer.pq_bits <= 16,
+  RAFT_EXPECTS(quant.params_quantizer.pq_bits >= 4 && quant.params_quantizer.pq_bits <= 16,
                "PQ bits must be within [4, 16]");
-  // Encode dataset
-  auto vq_centers     = raft::make_const_mdspan(quantizer.vpq_codebooks.vq_code_book.view());
+
+  // Use view accessors from vpq_dataset
+  auto vq_centers     = quant.vpq_codebooks.vq_code_book();
+  auto pq_centers     = quant.vpq_codebooks.pq_code_book();
   auto vq_labels_view = raft::make_device_vector_view<uint32_t, int64_t>(nullptr, 0);
   if (vq_labels.has_value()) { vq_labels_view = vq_labels.value(); }
 
-  if (quantizer.params_quantizer.use_subspaces) {
+  if (quant.params_quantizer.use_subspaces) {
     cuvs::neighbors::detail::process_and_fill_codes_subspaces<T, int64_t>(
       res,
-      to_vpq_params(quantizer.params_quantizer),
+      to_vpq_params(quant.params_quantizer),
       dataset,
-      raft::make_const_mdspan(quantizer.vpq_codebooks.pq_code_book.view()),
+      pq_centers,
       vq_centers,
       vq_labels_view,
       pq_codes_out);
   } else {
     cuvs::neighbors::detail::process_and_fill_codes<T, int64_t>(
       res,
-      to_vpq_params(quantizer.params_quantizer),
+      to_vpq_params(quant.params_quantizer),
       dataset,
-      raft::make_const_mdspan(quantizer.vpq_codebooks.pq_code_book.view()),
+      pq_centers,
       vq_centers,
       vq_labels_view,
       pq_codes_out);
@@ -318,146 +369,13 @@ void inverse_transform(
                "Codes matrix doesn't have the correct number of columns");
   RAFT_EXPECTS(quant.params_quantizer.pq_bits >= 4 && quant.params_quantizer.pq_bits <= 16,
                "PQ bits must be within [4, 16]");
-  reconstruct_vectors<T, T, idx_t, label_t>(
-    res,
-    quant.params_quantizer,
-    codes,
-    raft::make_const_mdspan(quant.vpq_codebooks.pq_code_book.view()),
-    raft::make_const_mdspan(quant.vpq_codebooks.vq_code_book.view()),
-    vq_labels,
-    out,
-    quant.params_quantizer.use_subspaces);
-}
 
-// ============= View-type quantizer functions =============
-
-/**
- * @brief Creates a view-type quantizer from pre-computed codebooks.
- */
-template <typename MathT>
-quantizer_view<MathT> build_view(
-  raft::resources const& res,
-  const params& params,
-  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
-  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> vq_centers)
-{
-  // Validate parameters
-  RAFT_EXPECTS(params.pq_bits >= 4 && params.pq_bits <= 16,
-               "PQ bits must be within [4, 16], got %u",
-               params.pq_bits);
-  RAFT_EXPECTS(params.pq_dim > 0, "pq_dim must be specified for view-type quantizer");
-
-  const uint32_t pq_n_centers = 1u << params.pq_bits;
-
-  // Validate PQ centers shape
-  if (params.use_subspaces) {
-    RAFT_EXPECTS(pq_centers.extent(0) == params.pq_dim * pq_n_centers,
-                 "For use_subspaces=true, pq_centers must have shape [pq_dim * pq_n_centers, "
-                 "pq_len], got [%u, %u]",
-                 pq_centers.extent(0),
-                 pq_centers.extent(1));
-  } else {
-    RAFT_EXPECTS(pq_centers.extent(0) == pq_n_centers,
-                 "For use_subspaces=false, pq_centers must have shape [pq_n_centers, pq_len], got "
-                 "[%u, %u]",
-                 pq_centers.extent(0),
-                 pq_centers.extent(1));
-  }
-
-  // Validate VQ centers
-  if (params.use_vq) {
-    RAFT_EXPECTS(!vq_centers.empty(),
-                 "vq_centers must be provided when use_vq=true");
-    RAFT_EXPECTS(vq_centers.extent(0) == params.vq_n_centers,
-                 "vq_centers must have vq_n_centers rows, got %u",
-                 vq_centers.extent(0));
-  }
-
-  return quantizer_view<MathT>{
-    params, cuvs::neighbors::vpq_codebooks_view<MathT>{vq_centers, pq_centers}};
-}
-
-/**
- * @brief Applies quantization transform using a view-type quantizer.
- */
-template <typename T, typename QuantI, typename AccessorType>
-void transform(
-  raft::resources const& res,
-  const quantizer_view<T>& quantizer,
-  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, AccessorType> dataset,
-  raft::device_matrix_view<QuantI, int64_t> pq_codes_out,
-  std::optional<raft::device_vector_view<uint32_t, int64_t>> vq_labels = std::nullopt)
-{
-  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
-    "preprocessing::quantize::pq::transform_view(%zu, %zu, %zu)",
-    size_t(dataset.extent(0)),
-    size_t(dataset.extent(1)),
-    size_t(pq_codes_out.extent(1)));
-  RAFT_EXPECTS(pq_codes_out.extent(0) == dataset.extent(0),
-               "Output matrix must have the same number of rows as the input dataset");
-  RAFT_EXPECTS(pq_codes_out.extent(1) == get_quantized_dim(quantizer.params_quantizer),
-               "Output matrix doesn't have the correct number of columns");
-  RAFT_EXPECTS(quantizer.params_quantizer.pq_bits >= 4 && quantizer.params_quantizer.pq_bits <= 16,
-               "PQ bits must be within [4, 16]");
-
-  // Use the views directly
-  auto vq_centers     = quantizer.vpq_codebooks.vq_code_book;
-  auto pq_centers     = quantizer.vpq_codebooks.pq_code_book;
-  auto vq_labels_view = raft::make_device_vector_view<uint32_t, int64_t>(nullptr, 0);
-  if (vq_labels.has_value()) { vq_labels_view = vq_labels.value(); }
-
-  if (quantizer.params_quantizer.use_subspaces) {
-    cuvs::neighbors::detail::process_and_fill_codes_subspaces<T, int64_t>(
-      res,
-      to_vpq_params(quantizer.params_quantizer),
-      dataset,
-      pq_centers,
-      vq_centers,
-      vq_labels_view,
-      pq_codes_out);
-  } else {
-    cuvs::neighbors::detail::process_and_fill_codes<T, int64_t>(
-      res,
-      to_vpq_params(quantizer.params_quantizer),
-      dataset,
-      pq_centers,
-      vq_centers,
-      vq_labels_view,
-      pq_codes_out);
-  }
-}
-
-/**
- * @brief Applies inverse quantization transform using a view-type quantizer.
- */
-template <typename T, typename QuantI = uint8_t>
-void inverse_transform(
-  raft::resources const& res,
-  const quantizer_view<T>& quant,
-  raft::device_matrix_view<const QuantI, int64_t> codes,
-  raft::device_matrix_view<T, int64_t> out,
-  std::optional<raft::device_vector_view<const uint32_t, int64_t>> vq_labels = std::nullopt)
-{
-  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
-    "preprocessing::quantize::pq::inverse_transform_view(%zu, %zu, %zu)",
-    size_t(codes.extent(0)),
-    size_t(codes.extent(1)),
-    size_t(out.extent(1)));
-  using label_t = uint32_t;
-  using idx_t   = int64_t;
-  RAFT_EXPECTS(out.extent(0) == codes.extent(0),
-               "Output matrix must have the same number of rows as the input codes");
-  RAFT_EXPECTS(codes.extent(1) == get_quantized_dim(quant.params_quantizer),
-               "Codes matrix doesn't have the correct number of columns");
-  RAFT_EXPECTS(quant.params_quantizer.pq_bits >= 4 && quant.params_quantizer.pq_bits <= 16,
-               "PQ bits must be within [4, 16]");
-
-  // Use the views directly
+  // Use view accessors from vpq_dataset
   reconstruct_vectors<T, T, idx_t, label_t>(res,
                                             quant.params_quantizer,
                                             codes,
-                                            quant.vpq_codebooks.pq_code_book,
-                                            quant.vpq_codebooks.vq_code_book,
+                                            quant.vpq_codebooks.pq_code_book(),
+                                            quant.vpq_codebooks.vq_code_book(),
                                             vq_labels,
                                             out,
                                             quant.params_quantizer.use_subspaces);

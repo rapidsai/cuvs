@@ -131,7 +131,7 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
 
   void TearDown() override {}
 
-  void check_reconstruction(const cuvs::preprocessing::quantize::pq::quantizer<T>& quantizer,
+  void check_reconstruction(const cuvs::preprocessing::quantize::pq::quantizer<T>& quant,
                             raft::device_matrix_view<uint8_t, int64_t, raft::row_major> codes,
                             std::optional<raft::device_vector_view<uint32_t, int64_t>> vq_labels,
                             double compression_ratio,
@@ -149,7 +149,7 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
     std::optional<raft::device_vector_view<const uint32_t, int64_t>> vq_labels_view = std::nullopt;
     if (vq_labels) { vq_labels_view = raft::make_const_mdspan(vq_labels.value()); }
     inverse_transform(handle,
-                      quantizer,
+                      quant,
                       raft::device_matrix_view<const uint8_t, int64_t>(
                         codes.data_handle(), n_take, codes.extent(1)),
                       rec_data.view(),
@@ -161,7 +161,7 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
   void testProductQuantizationFromDataset()
   {
     using LabelT = uint32_t;
-    config_      = cuvs::preprocessing::quantize::pq::params(params_.pq_bits,
+    config_      = cuvs::preprocessing::quantize::pq::params{params_.pq_bits,
                                                         params_.pq_dim,
                                                         params_.use_subspaces,
                                                         params_.use_vq,
@@ -169,7 +169,7 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
                                                         25,
                                                         params_.pq_kmeans_type,
                                                         256,
-                                                        1024);
+                                                        1024};
     raft::resource::sync_stream(handle);
 
     if ((n_samples_ < (1 << params_.pq_bits)) || (n_features_ % params_.pq_dim != 0)) {
@@ -411,22 +411,16 @@ class ProductQuantizationViewTest : public ::testing::Test {
     params config{pq_bits_, pq_dim_, true /* use_subspaces */, false /* use_vq */};
     auto owning_quant = build(handle, config, raft::make_const_mdspan(dataset_.view()));
 
-    // Extract codebook views from owning quantizer
-    auto pq_centers_view = raft::make_device_matrix_view<const float, uint32_t, raft::row_major>(
-      owning_quant.vpq_codebooks.pq_code_book.data_handle(),
-      owning_quant.vpq_codebooks.pq_code_book.extent(0),
-      owning_quant.vpq_codebooks.pq_code_book.extent(1));
-    auto vq_centers_view = raft::make_device_matrix_view<const float, uint32_t, raft::row_major>(
-      owning_quant.vpq_codebooks.vq_code_book.data_handle(),
-      owning_quant.vpq_codebooks.vq_code_book.extent(0),
-      owning_quant.vpq_codebooks.vq_code_book.extent(1));
+    // Extract codebook views from owning quantizer using new accessor methods
+    auto pq_centers_view = owning_quant.vpq_codebooks.pq_code_book();
+    auto vq_centers_view = owning_quant.vpq_codebooks.vq_code_book();
 
     // Create view-type quantizer from the same codebooks
     auto view_quant = build(handle, owning_quant.params_quantizer, pq_centers_view, vq_centers_view);
 
     // Transform using owning quantizer
     auto n_encoded_cols = get_quantized_dim(owning_quant.params_quantizer);
-    auto codes_owning   = raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, n_encoded_cols);
+    auto codes_owning = raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, n_encoded_cols);
     transform(handle,
               owning_quant,
               raft::make_const_mdspan(dataset_.view()),
@@ -460,8 +454,10 @@ class ProductQuantizationViewTest : public ::testing::Test {
     }
 
     // Test inverse_transform
-    auto reconstructed_owning = raft::make_device_matrix<float, int64_t>(handle, n_samples_, n_features_);
-    auto reconstructed_view   = raft::make_device_matrix<float, int64_t>(handle, n_samples_, n_features_);
+    auto reconstructed_owning =
+      raft::make_device_matrix<float, int64_t>(handle, n_samples_, n_features_);
+    auto reconstructed_view =
+      raft::make_device_matrix<float, int64_t>(handle, n_samples_, n_features_);
 
     inverse_transform(handle,
                       owning_quant,
@@ -491,6 +487,11 @@ class ProductQuantizationViewTest : public ::testing::Test {
       ASSERT_FLOAT_EQ(h_rec_owning.data_handle()[i], h_rec_view.data_handle()[i])
         << "Reconstruction mismatch at index " << i;
     }
+
+    // Verify that the owning quantizer reports is_owning() = true
+    // and the view quantizer reports is_owning() = false
+    ASSERT_TRUE(owning_quant.vpq_codebooks.is_owning());
+    ASSERT_FALSE(view_quant.vpq_codebooks.is_owning());
   }
 
   raft::resources handle;

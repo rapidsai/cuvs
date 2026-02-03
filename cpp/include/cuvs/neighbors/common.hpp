@@ -405,6 +405,10 @@ auto make_aligned_dataset(const raft::resources& res, SrcT src, uint32_t align_b
  *   1. Vector Quantization
  *   2. Product Quantization of residuals
  *
+ * This struct can be either owning or non-owning (view-type):
+ * - Owning: owns the codebooks and data matrices (created via move constructor)
+ * - View: stores views to externally-owned data (created via view constructor)
+ *
  * @tparam MathT the type of elements in the codebooks
  * @tparam IdxT type of the vector indices (represent dataset.extent(0))
  *
@@ -413,35 +417,86 @@ template <typename MathT, typename IdxT>
 struct vpq_dataset : public dataset<IdxT> {
   using index_type = IdxT;
   using math_type  = MathT;
-  /** Vector Quantization codebook - "coarse cluster centers". */
-  raft::device_matrix<math_type, uint32_t, raft::row_major> vq_code_book;
-  /** Product Quantization codebook - "fine cluster centers".  */
-  raft::device_matrix<math_type, uint32_t, raft::row_major> pq_code_book;
-  /** Compressed dataset.  */
-  raft::device_matrix<uint8_t, index_type, raft::row_major> data;
 
+  /**
+   * @brief Construct an owning vpq_dataset by moving in the codebooks and data.
+   */
   vpq_dataset(raft::device_matrix<math_type, uint32_t, raft::row_major>&& vq_code_book,
               raft::device_matrix<math_type, uint32_t, raft::row_major>&& pq_code_book,
               raft::device_matrix<uint8_t, index_type, raft::row_major>&& data)
-    : vq_code_book{std::move(vq_code_book)},
-      pq_code_book{std::move(pq_code_book)},
-      data{std::move(data)}
+    : vq_code_book_owned_{std::move(vq_code_book)},
+      pq_code_book_owned_{std::move(pq_code_book)},
+      data_owned_{std::move(data)},
+      vq_code_book_view_{vq_code_book_owned_.view()},
+      pq_code_book_view_{pq_code_book_owned_.view()},
+      data_view_{data_owned_.view()},
+      is_owning_{true}
   {
   }
 
-  [[nodiscard]] auto n_rows() const noexcept -> index_type final { return data.extent(0); }
-  [[nodiscard]] auto dim() const noexcept -> uint32_t final { return vq_code_book.extent(1); }
-  [[nodiscard]] auto is_owning() const noexcept -> bool final { return true; }
+  /**
+   * @brief Construct a view-type vpq_dataset from external codebook views.
+   *
+   * The caller must ensure the lifetime of the underlying data exceeds the lifetime of this object.
+   *
+   * @param vq_code_book_view View of VQ codebook [vq_n_centers, dim]
+   * @param pq_code_book_view View of PQ codebook [pq_dim * pq_n_centers, pq_len] or [pq_n_centers,
+   * pq_len]
+   * @param data_view View of compressed data (can be empty for quantizer-only use)
+   */
+  vpq_dataset(raft::device_matrix_view<const math_type, uint32_t, raft::row_major> vq_code_book_view,
+              raft::device_matrix_view<const math_type, uint32_t, raft::row_major> pq_code_book_view,
+              raft::device_matrix_view<const uint8_t, index_type, raft::row_major> data_view =
+                raft::device_matrix_view<const uint8_t, index_type, raft::row_major>{})
+    : vq_code_book_owned_{},
+      pq_code_book_owned_{},
+      data_owned_{},
+      vq_code_book_view_{vq_code_book_view},
+      pq_code_book_view_{pq_code_book_view},
+      data_view_{data_view},
+      is_owning_{false}
+  {
+  }
+
+  vpq_dataset(const vpq_dataset&)            = delete;
+  vpq_dataset& operator=(const vpq_dataset&) = delete;
+  vpq_dataset(vpq_dataset&&)                 = default;
+  vpq_dataset& operator=(vpq_dataset&&)      = default;
+
+  [[nodiscard]] auto n_rows() const noexcept -> index_type final { return data_view_.extent(0); }
+  [[nodiscard]] auto dim() const noexcept -> uint32_t final { return vq_code_book_view_.extent(1); }
+  [[nodiscard]] auto is_owning() const noexcept -> bool final { return is_owning_; }
+
+  /** Get view of VQ codebook. */
+  [[nodiscard]] auto vq_code_book() const noexcept
+    -> raft::device_matrix_view<const math_type, uint32_t, raft::row_major>
+  {
+    return vq_code_book_view_;
+  }
+
+  /** Get view of PQ codebook. */
+  [[nodiscard]] auto pq_code_book() const noexcept
+    -> raft::device_matrix_view<const math_type, uint32_t, raft::row_major>
+  {
+    return pq_code_book_view_;
+  }
+
+  /** Get view of compressed data. */
+  [[nodiscard]] auto data() const noexcept
+    -> raft::device_matrix_view<const uint8_t, index_type, raft::row_major>
+  {
+    return data_view_;
+  }
 
   /** Row length of the encoded data in bytes. */
   [[nodiscard]] constexpr inline auto encoded_row_length() const noexcept -> uint32_t
   {
-    return data.extent(1);
+    return data_view_.extent(1);
   }
   /** The number of "coarse cluster centers" */
   [[nodiscard]] constexpr inline auto vq_n_centers() const noexcept -> uint32_t
   {
-    return vq_code_book.extent(0);
+    return vq_code_book_view_.extent(0);
   }
   /** The bit length of an encoded vector element after compression by PQ. */
   [[nodiscard]] constexpr inline auto pq_bits() const noexcept -> uint32_t
@@ -474,65 +529,26 @@ struct vpq_dataset : public dataset<IdxT> {
   /** Dimensionality of a subspaces, i.e. the number of vector components mapped to a subspace */
   [[nodiscard]] constexpr inline auto pq_len() const noexcept -> uint32_t
   {
-    return pq_code_book.extent(1);
+    return pq_code_book_view_.extent(1);
   }
   /** The number of vectors in a PQ codebook (`1 << pq_bits`). */
   [[nodiscard]] constexpr inline auto pq_n_centers() const noexcept -> uint32_t
   {
-    return pq_code_book.extent(0);
-  }
-};
-
-/**
- * @brief View-type VPQ codebooks (non-owning).
- *
- * This structure stores views of pre-computed VQ and PQ codebooks without copying.
- * The caller is responsible for ensuring the lifetime of the underlying data
- * exceeds the lifetime of this view.
- *
- * @tparam MathT the type of elements in the codebooks
- *
- */
-template <typename MathT>
-struct vpq_codebooks_view {
-  using math_type = MathT;
-  /** View of Vector Quantization codebook - "coarse cluster centers" [vq_n_centers, dim]. */
-  raft::device_matrix_view<const math_type, uint32_t, raft::row_major> vq_code_book;
-  /** View of Product Quantization codebook - "fine cluster centers".
-   *  - For use_subspaces=true: [pq_dim * pq_n_centers, pq_len]
-   *  - For use_subspaces=false: [pq_n_centers, pq_len]
-   */
-  raft::device_matrix_view<const math_type, uint32_t, raft::row_major> pq_code_book;
-
-  vpq_codebooks_view(
-    raft::device_matrix_view<const math_type, uint32_t, raft::row_major> vq_code_book,
-    raft::device_matrix_view<const math_type, uint32_t, raft::row_major> pq_code_book)
-    : vq_code_book{vq_code_book}, pq_code_book{pq_code_book}
-  {
+    return pq_code_book_view_.extent(0);
   }
 
-  [[nodiscard]] auto is_owning() const noexcept -> bool { return false; }
+ private:
+  // Owning storage (empty when is_owning_ == false)
+  raft::device_matrix<math_type, uint32_t, raft::row_major> vq_code_book_owned_;
+  raft::device_matrix<math_type, uint32_t, raft::row_major> pq_code_book_owned_;
+  raft::device_matrix<uint8_t, index_type, raft::row_major> data_owned_;
 
-  /** Dimensionality of the original vectors. */
-  [[nodiscard]] constexpr inline auto dim() const noexcept -> uint32_t
-  {
-    return vq_code_book.extent(1);
-  }
-  /** The number of "coarse cluster centers" */
-  [[nodiscard]] constexpr inline auto vq_n_centers() const noexcept -> uint32_t
-  {
-    return vq_code_book.extent(0);
-  }
-  /** Dimensionality of a subspace, i.e. the number of vector components mapped to a subspace */
-  [[nodiscard]] constexpr inline auto pq_len() const noexcept -> uint32_t
-  {
-    return pq_code_book.extent(1);
-  }
-  /** The number of vectors in a PQ codebook (`1 << pq_bits`). */
-  [[nodiscard]] constexpr inline auto pq_n_centers() const noexcept -> uint32_t
-  {
-    return pq_code_book.extent(0);
-  }
+  // Views (always valid - either point to owned data or external data)
+  raft::device_matrix_view<const math_type, uint32_t, raft::row_major> vq_code_book_view_;
+  raft::device_matrix_view<const math_type, uint32_t, raft::row_major> pq_code_book_view_;
+  raft::device_matrix_view<const uint8_t, index_type, raft::row_major> data_view_;
+
+  bool is_owning_;
 };
 
 template <typename DatasetT>

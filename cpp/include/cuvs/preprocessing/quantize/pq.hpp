@@ -77,7 +77,9 @@ struct params {
 };
 
 /**
- * @brief Defines and stores VPQ codebooks upon training (owning type)
+ * @brief Defines and stores VPQ codebooks upon training.
+ *
+ * Can be either owning (trained from data) or non-owning (view of external codebooks).
  *
  * @tparam T data element type
  *
@@ -89,23 +91,7 @@ struct quantizer {
 };
 
 /**
- * @brief View-type quantizer that references pre-computed codebooks without copying.
- *
- * This structure stores views of pre-computed VQ and PQ codebooks for inference.
- * The caller is responsible for ensuring the lifetime of the underlying data
- * exceeds the lifetime of this view.
- *
- * @tparam T data element type
- *
- */
-template <typename T>
-struct quantizer_view {
-  params params_quantizer;
-  cuvs::neighbors::vpq_codebooks_view<T> vpq_codebooks;
-};
-
-/**
- * @brief Initializes a product quantizer to be used later for quantizing the dataset.
+ * @brief Initializes a product quantizer by training on the dataset (owning).
  *
  * The use of a pool memory resource is recommended for more consistent training performance.
  *
@@ -119,10 +105,10 @@ struct quantizer_view {
  * @endcode
  *
  * @param[in] res raft resource
- * @param[in] params configure product quantizer, e.g. quantile
+ * @param[in] params configure product quantizer, e.g. pq_bits, pq_dim
  * @param[in] dataset a row-major matrix view on device or host
  *
- * @return quantizer
+ * @return quantizer (owning)
  */
 quantizer<float> build(raft::resources const& res,
                        const params params,
@@ -138,7 +124,7 @@ quantizer<float> build(raft::resources const& res,
  *
  * This function creates a non-owning quantizer that references the provided device data.
  * The caller is responsible for ensuring the lifetime of the input data exceeds
- * the lifetime of the returned quantizer_view.
+ * the lifetime of the returned quantizer.
  *
  * Usage example:
  * @code{.cpp}
@@ -166,7 +152,7 @@ quantizer<float> build(raft::resources const& res,
  *
  * @return A view-type quantizer that references the provided data
  */
-quantizer_view<float> build(
+quantizer<float> build(
   raft::resources const& res,
   const params params,
   raft::device_matrix_view<const float, uint32_t, raft::row_major> pq_centers,
@@ -209,28 +195,6 @@ void transform(raft::resources const& res,
                std::optional<raft::device_vector_view<uint32_t, int64_t>> vq_labels = std::nullopt);
 
 /**
- * @brief Applies quantization transform using a view-type quantizer
- *
- * @param[in] res raft resource
- * @param[in] quant a view-type product quantizer
- * @param[in] dataset a row-major matrix view on device
- * @param[out] codes_out a row-major matrix view on device containing the PQ codes
- * @param[out] vq_labels a vector view on device containing the VQ labels when VQ is used, optional
- */
-void transform(raft::resources const& res,
-               const quantizer_view<float>& quant,
-               raft::device_matrix_view<const float, int64_t> dataset,
-               raft::device_matrix_view<uint8_t, int64_t> codes_out,
-               std::optional<raft::device_vector_view<uint32_t, int64_t>> vq_labels = std::nullopt);
-
-/** @copydoc transform */
-void transform(raft::resources const& res,
-               const quantizer_view<float>& quant,
-               raft::host_matrix_view<const float, int64_t> dataset,
-               raft::device_matrix_view<uint8_t, int64_t> codes_out,
-               std::optional<raft::device_vector_view<uint32_t, int64_t>> vq_labels = std::nullopt);
-
-/**
  * @brief Get the dimension of the quantized dataset (in bytes)
  *
  * @param[in] config product quantizer parameters
@@ -254,23 +218,6 @@ inline int64_t get_quantized_dim(const params& config)
 void inverse_transform(
   raft::resources const& res,
   const quantizer<float>& quant,
-  raft::device_matrix_view<const uint8_t, int64_t> pq_codes,
-  raft::device_matrix_view<float, int64_t> out,
-  std::optional<raft::device_vector_view<const uint32_t, int64_t>> vq_labels = std::nullopt);
-
-/**
- * @brief Applies inverse quantization transform using a view-type quantizer
- *
- * @param[in] res raft resource
- * @param[in] quant a view-type product quantizer
- * @param[in] pq_codes a row-major matrix view on device containing the PQ codes
- * @param[out] out a row-major matrix view on device
- * @param[in] vq_labels a vector view on device containing the VQ labels when VQ is used, optional
- *
- */
-void inverse_transform(
-  raft::resources const& res,
-  const quantizer_view<float>& quant,
   raft::device_matrix_view<const uint8_t, int64_t> pq_codes,
   raft::device_matrix_view<float, int64_t> out,
   std::optional<raft::device_vector_view<const uint32_t, int64_t>> vq_labels = std::nullopt);
