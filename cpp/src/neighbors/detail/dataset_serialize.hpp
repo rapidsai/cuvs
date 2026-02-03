@@ -67,9 +67,9 @@ void serialize(const raft::resources& res,
   raft::serialize_scalar(res, os, dataset.pq_n_centers());
   raft::serialize_scalar(res, os, dataset.pq_len());
   raft::serialize_scalar(res, os, dataset.encoded_row_length());
-  raft::serialize_mdspan(res, os, make_const_mdspan(dataset.vq_code_book.view()));
-  raft::serialize_mdspan(res, os, make_const_mdspan(dataset.pq_code_book.view()));
-  raft::serialize_mdspan(res, os, make_const_mdspan(dataset.data.view()));
+  raft::serialize_mdspan(res, os, dataset.vq_code_book());
+  raft::serialize_mdspan(res, os, dataset.pq_code_book());
+  raft::serialize_mdspan(res, os, dataset.data());
 }
 
 template <typename IdxT>
@@ -154,7 +154,7 @@ auto deserialize_vpq(raft::resources const& res, std::istream& is)
   raft::deserialize_mdspan(res, is, pq_code_book.view());
   raft::deserialize_mdspan(res, is, data.view());
 
-  return std::make_unique<vpq_dataset<MathT, IdxT>>(
+  return std::make_unique<vpq_dataset_owning<MathT, IdxT>>(
     std::move(vq_code_book), std::move(pq_code_book), std::move(data));
 }
 

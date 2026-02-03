@@ -412,15 +412,16 @@ class ProductQuantizationViewTest : public ::testing::Test {
     auto owning_quant = build(handle, config, raft::make_const_mdspan(dataset_.view()));
 
     // Extract codebook views from owning quantizer using new accessor methods
-    auto pq_centers_view = owning_quant.vpq_codebooks.pq_code_book();
-    auto vq_centers_view = owning_quant.vpq_codebooks.vq_code_book();
+    auto pq_centers_view = owning_quant.vpq_codebooks->pq_code_book();
+    auto vq_centers_view = owning_quant.vpq_codebooks->vq_code_book();
 
     // Create view-type quantizer from the same codebooks
     auto view_quant = build(handle, owning_quant.params_quantizer, pq_centers_view, vq_centers_view);
 
     // Transform using owning quantizer
-    auto n_encoded_cols = get_quantized_dim(owning_quant.params_quantizer);
-    auto codes_owning = raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, n_encoded_cols);
+    auto n_encoded_cols   = get_quantized_dim(owning_quant.params_quantizer);
+    auto codes_owning =
+      raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, n_encoded_cols);
     transform(handle,
               owning_quant,
               raft::make_const_mdspan(dataset_.view()),
@@ -490,8 +491,8 @@ class ProductQuantizationViewTest : public ::testing::Test {
 
     // Verify that the owning quantizer reports is_owning() = true
     // and the view quantizer reports is_owning() = false
-    ASSERT_TRUE(owning_quant.vpq_codebooks.is_owning());
-    ASSERT_FALSE(view_quant.vpq_codebooks.is_owning());
+    ASSERT_TRUE(owning_quant.vpq_codebooks->is_owning());
+    ASSERT_FALSE(view_quant.vpq_codebooks->is_owning());
   }
 
   raft::resources handle;

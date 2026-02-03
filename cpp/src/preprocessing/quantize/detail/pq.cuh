@@ -158,8 +158,8 @@ quantizer<MathT> build(
       res, vpq_params, dataset, raft::make_const_mdspan(vq_code_book.view()));
   }
   return {filled_params,
-          cuvs::neighbors::vpq_dataset<MathT, int64_t>{
-            std::move(vq_code_book), std::move(pq_code_book), std::move(empty_codes)}};
+          std::make_unique<cuvs::neighbors::vpq_dataset_owning<MathT, int64_t>>(
+            std::move(vq_code_book), std::move(pq_code_book), std::move(empty_codes))};
 }
 
 /**
@@ -205,7 +205,9 @@ quantizer<MathT> build_view(
 
   // Create view-type vpq_dataset
   auto empty_data = raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>{};
-  return {params, cuvs::neighbors::vpq_dataset<MathT, int64_t>{vq_centers, pq_centers, empty_data}};
+  return {params,
+          std::make_unique<cuvs::neighbors::vpq_dataset_view<MathT, int64_t>>(
+            vq_centers, pq_centers, empty_data)};
 }
 
 template <typename T, typename QuantI, typename AccessorType>
@@ -227,10 +229,11 @@ void transform(
                "Output matrix doesn't have the correct number of columns");
   RAFT_EXPECTS(quant.params_quantizer.pq_bits >= 4 && quant.params_quantizer.pq_bits <= 16,
                "PQ bits must be within [4, 16]");
+  RAFT_EXPECTS(quant.vpq_codebooks != nullptr, "Quantizer codebooks must be initialized");
 
   // Use view accessors from vpq_dataset
-  auto vq_centers     = quant.vpq_codebooks.vq_code_book();
-  auto pq_centers     = quant.vpq_codebooks.pq_code_book();
+  auto vq_centers     = quant.vpq_codebooks->vq_code_book();
+  auto pq_centers     = quant.vpq_codebooks->pq_code_book();
   auto vq_labels_view = raft::make_device_vector_view<uint32_t, int64_t>(nullptr, 0);
   if (vq_labels.has_value()) { vq_labels_view = vq_labels.value(); }
 
@@ -369,13 +372,14 @@ void inverse_transform(
                "Codes matrix doesn't have the correct number of columns");
   RAFT_EXPECTS(quant.params_quantizer.pq_bits >= 4 && quant.params_quantizer.pq_bits <= 16,
                "PQ bits must be within [4, 16]");
+  RAFT_EXPECTS(quant.vpq_codebooks != nullptr, "Quantizer codebooks must be initialized");
 
   // Use view accessors from vpq_dataset
   reconstruct_vectors<T, T, idx_t, label_t>(res,
                                             quant.params_quantizer,
                                             codes,
-                                            quant.vpq_codebooks.pq_code_book(),
-                                            quant.vpq_codebooks.vq_code_book(),
+                                            quant.vpq_codebooks->pq_code_book(),
+                                            quant.vpq_codebooks->vq_code_book(),
                                             vq_labels,
                                             out,
                                             quant.params_quantizer.use_subspaces);
