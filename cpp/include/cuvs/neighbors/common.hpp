@@ -407,12 +407,13 @@ auto make_aligned_dataset(const raft::resources& res, SrcT src, uint32_t align_b
  * @tparam IdxT type of the vector indices (represent dataset.extent(0))
  */
 template <typename MathT, typename IdxT>
-struct vpq_dataset_iface : public dataset<IdxT> {
+class vpq_dataset_iface : public dataset<IdxT> {
   using index_type = IdxT;
   using math_type  = MathT;
 
   ~vpq_dataset_iface() override = default;
 
+ public:
   /** Get view of VQ codebook. */
   [[nodiscard]] virtual auto vq_code_book() const noexcept
     -> raft::device_matrix_view<const math_type, uint32_t, raft::row_major> = 0;
@@ -710,15 +711,6 @@ struct is_vpq_dataset : std::false_type {};
 
 template <typename MathT, typename IdxT>
 struct is_vpq_dataset<vpq_dataset<MathT, IdxT>> : std::true_type {};
-
-template <typename MathT, typename IdxT>
-struct is_vpq_dataset<vpq_dataset_iface<MathT, IdxT>> : std::true_type {};
-
-template <typename MathT, typename IdxT>
-struct is_vpq_dataset<vpq_dataset_owning<MathT, IdxT>> : std::true_type {};
-
-template <typename MathT, typename IdxT>
-struct is_vpq_dataset<vpq_dataset_view<MathT, IdxT>> : std::true_type {};
 
 template <typename DatasetT>
 inline constexpr bool is_vpq_dataset_v = is_vpq_dataset<DatasetT>::value;

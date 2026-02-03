@@ -77,7 +77,7 @@ struct params {
 };
 
 /**
- * @brief Defines and stores VPQ codebooks upon training.
+ * @brief Defines and stores VPQ codebooks upon training
  *
  * The quantizer holds a vpq_dataset, which can be either owning (trained from data)
  * or non-owning (referencing external codebooks).
@@ -88,18 +88,6 @@ template <typename T>
 struct quantizer {
   params params_quantizer;
   cuvs::neighbors::vpq_dataset<T, int64_t> vpq_codebooks;
-
-  quantizer() = default;
-
-  quantizer(params p, cuvs::neighbors::vpq_dataset<T, int64_t>&& codebooks)
-    : params_quantizer(p), vpq_codebooks(std::move(codebooks))
-  {
-  }
-
-  quantizer(const quantizer&)            = delete;
-  quantizer& operator=(const quantizer&) = delete;
-  quantizer(quantizer&&)                 = default;
-  quantizer& operator=(quantizer&&)      = default;
 };
 
 /**
@@ -120,7 +108,7 @@ struct quantizer {
  * @param[in] params configure product quantizer, e.g. pq_bits, pq_dim
  * @param[in] dataset a row-major matrix view on device or host
  *
- * @return quantizer (owning)
+ * @return quantizer
  */
 quantizer<float> build(raft::resources const& res,
                        const params params,
@@ -135,8 +123,6 @@ quantizer<float> build(raft::resources const& res,
  * @brief Creates a view-type product quantizer from pre-computed codebooks.
  *
  * This function creates a non-owning quantizer that references the provided device data.
- * The caller is responsible for ensuring the lifetime of the input data exceeds
- * the lifetime of the returned quantizer.
  *
  * Usage example:
  * @code{.cpp}
