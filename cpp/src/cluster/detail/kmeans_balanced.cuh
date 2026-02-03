@@ -18,7 +18,6 @@
 #include <raft/core/cudart_utils.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/operators.hpp>
-
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/core/resource/device_properties.hpp>
@@ -55,6 +54,9 @@ namespace cuvs::cluster::kmeans::detail {
 
 constexpr static inline float kAdjustCentersWeight = 7.0f;
 
+/**
+ * @brief Returns true is fused implementation should used.
+ */
 template <typename MathT, typename IdxT, typename LabelT>
 bool use_fused(const raft::resources& handle, IdxT m, IdxT n, IdxT k)
 {
@@ -124,7 +126,6 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
         raft::make_device_mdarray<char, IdxT>(handle, mr, raft::make_extents<IdxT>(workspace_size));
       auto minClusterAndDistance = raft::make_device_mdarray<raft::KeyValuePair<IdxT, MathT>, IdxT>(
         handle, mr, raft::make_extents<IdxT>(n_rows));
-
       raft::KeyValuePair<IdxT, MathT> initial_value(0, std::numeric_limits<MathT>::max());
       thrust::fill(raft::resource::get_thrust_policy(handle),
                    minClusterAndDistance.data_handle(),
