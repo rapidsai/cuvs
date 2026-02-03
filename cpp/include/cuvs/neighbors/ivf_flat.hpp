@@ -3445,7 +3445,7 @@ struct )" #NAME R"( : metric_interface<T, AccT, Veclen> {                       
                                                                                        \
 namespace cuvs { namespace neighbors { namespace ivf_flat { namespace detail {         \
 template <int Veclen, typename T, typename AccT>                                       \
-__device__ void compute_dist(AccT& acc, AccT x, AccT y)                                \
+__device__ __forceinline__ void compute_dist(AccT& acc, AccT x, AccT y)                \
 {                                                                                      \
   ::)" #NAME R"(<T, AccT, Veclen> metric;                                              \
   metric(acc, ::point<T, AccT, Veclen>(x), ::point<T, AccT, Veclen>(y));               \

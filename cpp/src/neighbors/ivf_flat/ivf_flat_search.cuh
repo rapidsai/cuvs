@@ -383,6 +383,8 @@ void search_with_filtering(raft::resources const& handle,
   RAFT_EXPECTS(queries.extent(1) == index.dim(),
                "Number of query dimensions should equal number of dimensions in the index.");
 
+  // Save original metric and temporarily set to CustomUDF if using UDF
+  auto original_metric = index.metric();
   if (params.metric_udf.has_value()) {
     const_cast<std::remove_const_t<std::remove_reference_t<decltype(index)>>&>(index).set_metric(
       cuvs::distance::DistanceType::CustomUDF);
@@ -397,6 +399,12 @@ void search_with_filtering(raft::resources const& handle,
                         neighbors.data_handle(),
                         distances.data_handle(),
                         sample_filter);
+
+  // Restore original metric
+  if (params.metric_udf.has_value()) {
+    const_cast<std::remove_const_t<std::remove_reference_t<decltype(index)>>&>(index).set_metric(
+      original_metric);
+  }
 }
 
 template <typename T, typename IdxT>

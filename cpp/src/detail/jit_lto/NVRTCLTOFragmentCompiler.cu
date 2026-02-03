@@ -33,8 +33,9 @@ NVRTCLTOFragmentCompiler::NVRTCLTOFragmentCompiler()
   this->standard_compile_opts.resize(4);
 
   std::size_t i = 0;
-  this->standard_compile_opts[i++] =
-    std::string{"-arch=sm_" + std::to_string((major * 10 + minor))};
+  // this->standard_compile_opts[i++] =
+  //   std::string{"-arch=sm_" + std::to_string((major * 10 + minor))};
+  this->standard_compile_opts[i++] = std::string{"-arch=sm_75"};
   this->standard_compile_opts[i++] = std::string{"-dlto"};
   this->standard_compile_opts[i++] = std::string{"-rdc=true"};
   this->standard_compile_opts[i++] = std::string{"-default-device"};

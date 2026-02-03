@@ -1,6 +1,6 @@
 # =============================================================================
 # cmake-format: off
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 # =============================================================================
@@ -240,6 +240,18 @@ if(CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT)
   ConfigureAnnBench(
     NAME CUVS_IVF_FLAT PATH src/cuvs/cuvs_benchmark.cu src/cuvs/cuvs_ivf_flat.cu LINKS cuvs
   )
+
+  # UDF benchmark - standalone executable
+  add_executable(CUVS_IVF_FLAT_UDF_BENCH src/cuvs/ivf_flat_udf_bench.cu)
+  target_link_libraries(CUVS_IVF_FLAT_UDF_BENCH PRIVATE cuvs)
+  set_target_properties(
+    CUVS_IVF_FLAT_UDF_BENCH
+    PROPERTIES CXX_STANDARD 17
+               CXX_STANDARD_REQUIRED ON
+               CUDA_STANDARD 17
+               CUDA_STANDARD_REQUIRED ON
+  )
+  add_dependencies(CUVS_ANN_BENCH_ALL CUVS_IVF_FLAT_UDF_BENCH)
 endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE)
