@@ -7,7 +7,6 @@
 
 #include "../../distance/fused_distance_nn.cuh"
 #include "../../distance/unfused_distance_nn.cuh"
-
 #include "kmeans_common.cuh"
 #include <cuvs/cluster/kmeans.hpp>
 

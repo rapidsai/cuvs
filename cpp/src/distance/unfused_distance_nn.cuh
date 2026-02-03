@@ -14,51 +14,6 @@
 namespace cuvs {
 namespace distance {
 
-/**
- * \ingroup unfused_distance_nn
- * @{
- */
-/**
- * @brief Unfused distance and 1-nearest-neighbor computation in a single call.
- *
- * Unlike the fused call, here we do explicit gemm call followed by a reduction call.
- * This code path exists because the fused path is sometime not the optimal due to
- * GEMM-like kernel not being optimized yet.
- *
- *
- * @tparam DataT      data type
- * @tparam OutT       output type to either store 1-NN indices and their minimum
- *                    distances or store only the min distances. Accordingly, one
- *                    has to pass an appropriate `ReduceOpT`
- * @tparam IdxT       indexing arithmetic type
- * @tparam ReduceOpT  A struct to perform the final needed reduction operation
- *                    and also to initialize the output array elements with the
- *                    appropriate initial value needed for reduction.
- * @tparam KVPReduceOpT A struct providing functions for key-value pair comparison.
- *
- * @param[out] min           will contain the reduced output (Length = `m`)
- *                           (on device)
- * @param[in]  x             first matrix. Row major. Dim = `m x k`.
- *                           (on device).
- * @param[in]  y             second matrix. Row major. Dim = `n x k`.
- *                           (on device).
- * @param[in]  xn            L2 squared norm of `x`. Length = `m`. (on device).
- * @param[in]  yn            L2 squared norm of `y`. Length = `n`. (on device)
- * @param[in]  m             gemm m
- * @param[in]  n             gemm n
- * @param[in]  k             gemm k
- * @param[in]  workspace     temp workspace. Size = sizeof(int)*m. (on device)
- * @param[in]  redOp         reduction operator in the epilogue
- * @param[in]  pairRedOp     reduction operation on key value pairs
- * @param[in]  sqrt          Whether the output `minDist` should contain L2-sqrt
- * @param[in]  initOutBuffer whether to initialize the output buffer before the
- *                           main kernel launch
- * @param[in]  isRowMajor    whether the input/output is row or column major.
- * @param[in]  metric        Distance metric to be used (supports L2, cosine)
- * @param[in]  metric_arg    power argument for distances like Minkowski (not supported for now)
- * @param[in]  stream        cuda stream
- */
-
 template <typename T>
 __host__ __device__ T max_val()
 {
@@ -259,19 +214,22 @@ void pairwise_distance_gemm(raft::resources const& handle,
                                CUBLAS_GEMM_DEFAULT  // Algorithm selection
                                ));
 }
-//
 
 /**
- * @brief Wrapper around fusedDistanceNN with minimum reduction operators.
+ * \ingroup unfused_distance_nn
+ * @{
+ */
+/**
+ * @brief Unfused distance and 1-nearest-neighbor computation in a single call.
  *
- * fusedDistanceNN cannot be compiled in the distance library due to the lambda
- * operators, so this wrapper covers the most common case (minimum).
+ * Unlike the fused implementation, GEMM and reduction kernel are called separately.
+ * This code path exists because the fused path is sometimes not the optimal choice.
  *
- * @tparam DataT     data type
- * @tparam OutT      output type to either store 1-NN indices and their minimum
- *                   distances (e.g. raft::KeyValuePair<int, float>) or store only the min
- * distances.
- * @tparam IdxT      indexing arithmetic type
+ * @tparam DataT      data type
+ * @tparam OutT       output type to either store 1-NN indices and their minimum
+ *                    distances or store only the min distances.
+ * @tparam IdxT       indexing arithmetic type
+ *
  * @param[out] min           will contain the reduced output (Length = `m`)
  *                           (on device)
  * @param[in]  x             first matrix. Row major. Dim = `m x k`.
@@ -283,8 +241,8 @@ void pairwise_distance_gemm(raft::resources const& handle,
  * @param[in]  m             gemm m
  * @param[in]  n             gemm n
  * @param[in]  k             gemm k
- * @param[in]  workspace     temp workspace. Size = sizeof(int)*m. (on device)
- * @param[in]  sqrt          Whether the output `minDist` should contain L2-sqrt
+ * @param[in]  workspace     temp workspace. Size = sizeof(DataT) * m. (on device)
+ * @param[in]  is_sqrt       Whether the output `min` should contain L2-sqrt
  * @param[in]  initOutBuffer whether to initialize the output buffer before the
  *                           main kernel launch
  * @param[in]  isRowMajor    whether the input/output is row or column major.
