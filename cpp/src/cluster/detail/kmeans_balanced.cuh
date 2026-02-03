@@ -95,11 +95,6 @@ bool use_fused(const raft::resources& handle, IdxT m, IdxT n, IdxT k)
  * @param[out] labels Output predictions [n_rows]
  * @param[inout] mr (optional) Memory resource to use for temporary allocations
  */
-#include <algorithm>
-#include <iostream>
-#include <tuple>
-#include <vector>
-
 template <typename MathT, typename IdxT, typename LabelT>
 inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
   const raft::resources& handle,
