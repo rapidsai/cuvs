@@ -126,6 +126,11 @@ struct balanced_params : base_params {
 };
 
 /**
+ * @brief Type of k-means algorithm.
+ */
+enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
+
+/**
  * @}
  */
 

@@ -34,6 +34,7 @@ void convert_c_index_params(cuvsIvfPqIndexParams params, cuvs::neighbors::ivf_pq
   out->force_random_rotation          = params.force_random_rotation;
   out->conservative_memory_allocation = params.conservative_memory_allocation;
   out->max_train_points_per_pq_code   = params.max_train_points_per_pq_code;
+  out->codes_layout = static_cast<cuvs::neighbors::ivf_pq::list_layout>((int)params.codes_layout);
 }
 void convert_c_search_params(cuvsIvfPqSearchParams params,
                              cuvs::neighbors::ivf_pq::search_params* out)
@@ -218,9 +219,39 @@ void _get_list_indices(cuvsIvfPqIndex index,
                        uint32_t label,
                        DLManagedTensor* out_labels)
 {
-  auto index_ptr    = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
-  cuvs::core::to_dlpack(index_ptr->lists()[label]->indices.view(), out_labels);
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
+  if (index_ptr->codes_layout() == cuvs::neighbors::ivf_pq::list_layout::FLAT) {
+    auto& list =
+      static_cast<cuvs::neighbors::ivf_pq::list_data_flat<IdxT>&>(*index_ptr->lists()[label]);
+    cuvs::core::to_dlpack(list.indices.view(), out_labels);
+  } else {
+    auto& list = static_cast<cuvs::neighbors::ivf_pq::list_data_interleaved<IdxT>&>(
+      *index_ptr->lists()[label]);
+    cuvs::core::to_dlpack(list.indices.view(), out_labels);
+  }
 }
+
+template <typename T, typename IdxT>
+void _transform(cuvsResources_t res,
+                                  cuvsIvfPqIndex index,
+             DLManagedTensor* input_dataset,
+             DLManagedTensor* output_labels,
+             DLManagedTensor* output_dataset)
+{
+  auto index_ptr    = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
+  auto res_ptr      = reinterpret_cast<raft::resources*>(res);
+
+  using input_mdspan_type = raft::device_matrix_view<const T, IdxT, raft::row_major>;
+  using labels_mdspan_type = raft::device_vector_view<uint32_t, IdxT, raft::row_major>;
+  using output_mdspan_type = raft::device_matrix_view<uint8_t, IdxT, raft::row_major>;
+
+  auto input_mds = cuvs::core::from_dlpack<input_mdspan_type>(input_dataset);
+  auto labels_mds = cuvs::core::from_dlpack<labels_mdspan_type>(output_labels);
+  auto output_mds = cuvs::core::from_dlpack<output_mdspan_type>(output_dataset);
+
+  cuvs::neighbors::ivf_pq::transform(*res_ptr, *index_ptr, input_mds, labels_mds, output_mds);
+}
+
 }  // namespace
 
 extern "C" cuvsError_t cuvsIvfPqIndexCreate(cuvsIvfPqIndex_t* index)
@@ -325,10 +356,11 @@ extern "C" cuvsError_t cuvsIvfPqIndexParamsCreate(cuvsIvfPqIndexParams_t* params
                                        .kmeans_trainset_fraction       = 0.5,
                                        .pq_bits                        = 8,
                                        .pq_dim                         = 0,
-                                       .codebook_kind                  = codebook_gen::PER_SUBSPACE,
+                                       .codebook_kind                  = CUVS_IVF_PQ_CODEBOOK_GEN_PER_SUBSPACE,
                                        .force_random_rotation          = false,
                                        .conservative_memory_allocation = false,
-                                       .max_train_points_per_pq_code   = 256};
+                                       .max_train_points_per_pq_code   = 256,
+                                       .codes_layout                   = CUVS_IVF_PQ_LIST_LAYOUT_INTERLEAVED};
   });
 }
 
@@ -558,4 +590,44 @@ extern "C" cuvsError_t cuvsIvfPqIndexGetListIndices(cuvsIvfPqIndex_t index,
 {
   return cuvs::core::translate_exceptions(
     [=] { _get_list_indices<int64_t>(*index, label, out_labels); });
+}
+
+extern "C" cuvsError_t cuvsIvfPqTransform(cuvsResources_t res,
+                                          cuvsIvfPqIndex_t index,
+                                          DLManagedTensor* input_dataset,
+                                          DLManagedTensor* output_labels,
+                                          DLManagedTensor* output_dataset) {
+  return cuvs::core::translate_exceptions(
+    [=] {
+      // Verify all tensors are on device
+      RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(input_dataset->dl_tensor),
+                   "input_dataset should have device compatible memory");
+      RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(output_labels->dl_tensor),
+                   "output_labels should have device compatible memory");
+      RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(output_dataset->dl_tensor),
+                   "output_dataset should have device compatible memory");
+
+      // Verify dtypes of inputs
+      auto& output_labels_dl = output_labels->dl_tensor;
+      RAFT_EXPECTS(output_labels_dl.dtype.code == kDLUInt && output_labels_dl.dtype.bits == 32,
+                   "output_labels must have a uint32 dtype ");
+      auto& output_dataset_dl = output_dataset->dl_tensor;
+      RAFT_EXPECTS(output_dataset_dl.dtype.code == kDLUInt && output_dataset_dl.dtype.bits == 8,
+                   "output_dataset must have a uint8 dtype");
+
+      auto & dataset = input_dataset->dl_tensor;
+      if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
+        _transform<float, int64_t>(res, *index, input_dataset, output_labels, output_dataset);
+      } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 16) {
+        _transform<half, int64_t>(res, *index, input_dataset, output_labels, output_dataset);
+      } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
+        _transform<int8_t, int64_t>(res, *index, input_dataset, output_labels, output_dataset);
+      } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
+        _transform<uint8_t, int64_t>(res, *index, input_dataset, output_labels, output_dataset);
+      } else {
+        RAFT_FAIL("Unsupported input_dataset DLtensor dtype: %d and bits: %d",
+                  dataset.dtype.code,
+                  dataset.dtype.bits);
+      }
+    });
 }
