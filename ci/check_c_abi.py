@@ -31,7 +31,7 @@ import argparse
 import gzip
 
 import msgspec
-import itertools
+from itertools import zip_longest
 import pathlib
 from typing import Optional
 import sys
@@ -82,7 +82,7 @@ class FunctionDefinition(msgspec.Struct):
     def from_cursor(cls, cursor, root_path=None):
         if cursor.kind != clang.cindex.CursorKind.FUNCTION_DECL:
             raise ValueError(
-                "FunctionDefinition.from_cursor called with cursor of kind={cursor.kind}"
+                f"FunctionDefinition.from_cursor called with cursor of kind={cursor.kind}"
             )
 
         return cls(
@@ -106,7 +106,7 @@ class StructDefinition(msgspec.Struct):
     def from_cursor(cls, cursor, root_path=None):
         if cursor.kind != clang.cindex.CursorKind.STRUCT_DECL:
             raise ValueError(
-                "StructDefinition.from_cursor called with cursor of kind={cursor.kind}"
+                f"StructDefinition.from_cursor called with cursor of kind={cursor.kind}"
             )
 
         return cls(
@@ -129,7 +129,7 @@ class EnumDefinition(msgspec.Struct):
     def from_cursor(cls, cursor, root_path=None):
         if cursor.kind != clang.cindex.CursorKind.ENUM_DECL:
             raise ValueError(
-                "EnumDefinition.from_cursor called with cursor of kind={cursor.kind}"
+                f"EnumDefinition.from_cursor called with cursor of kind={cursor.kind}"
             )
 
         return cls(
@@ -175,12 +175,13 @@ class Abi(msgspec.Struct):
         for child in tu.cursor.get_children():
             # ignore things like cuda headers and other files not installed in
             # in the cuvs C path
-            if not child.location.file or not pathlib.Path(
-                child.location.file.name
-            ).is_relative_to(path):
+            if not (
+                child.location.file
+                and pathlib.Path(child.location.file.name).is_relative_to(path)
+            ):
                 continue
 
-            # break up the AST into symbol -> node for the things we care about
+            # Store definitions for each function, struct and enum
             if child.kind == clang.cindex.CursorKind.FUNCTION_DECL:
                 functions.append(
                     FunctionDefinition.from_cursor(child, root_path=path)
@@ -218,17 +219,19 @@ class AbiError(msgspec.Struct):
     location: Optional[SymbolLocation] = None
 
 
-def analyze_c_abi(old_abi, new_abi):
-    # iterate over every function in the existing abi, and make sure that no functions
-    # have been removed or had function parameters removed, parameters added or the type of any
-    # parameter changed. Note: adding new functions to the new abi is allowed
+def _analyze_function_abi(old_abi, new_abi):
+    """This iterates over every function in the existing abi, and make sure that no functions
+    have been removed or had function parameters removed, parameters added or the type of any
+    parameter changed. Note: adding new functions to the new abi is allowed
+    """
     errors = []
     old_functions = {f.name: f for f in old_abi.functions}
     new_functions = {f.name: f for f in new_abi.functions}
 
     for name, old_function in old_functions.items():
-        new_function = new_functions.get(name)
-        if new_function is None:
+        try:
+            new_function = new_functions[name]
+        except KeyError:
             errors.append(
                 AbiError(
                     "Function has been removed",
@@ -247,47 +250,54 @@ def analyze_c_abi(old_abi, new_abi):
                 )
             )
 
-        for old_param, new_param in itertools.zip_longest(
+        for (old_type, old_name), (new_type, new_name) in zip_longest(
             old_function.parameters,
             new_function.parameters,
-            fillvalue=None,
+            fillvalue=(None, None),
         ):
-            if old_param is None:
+            if old_type is None:
                 errors.append(
                     AbiError(
-                        f"Function has a new parameter '{new_param[0]} {new_param[1]}'",
+                        f"Function has a new parameter '{new_type} {new_name}'",
                         symbol=new_function.name,
                         location=new_function.location,
                     )
                 )
 
-            elif new_param is None:
+            elif new_type is None:
                 errors.append(
                     AbiError(
-                        f"Function has a deleted parameter '{old_param[0]} {old_param[1]}'",
+                        f"Function has a deleted parameter '{old_type} {old_name}'",
                         symbol=old_function.name,
                         location=old_function.location,
                     )
                 )
 
-            elif new_param[0] != old_param[0]:
+            elif new_type != old_type:
                 errors.append(
                     AbiError(
-                        f"Function has a changed parameter type '{old_param[0]}' to '{new_param[0]} for parameter '{old_param[1]}'",
+                        f"Function has changed type '{old_type}' to '{new_type}' for parameter '{old_name}'",
                         symbol=new_function.name,
                         location=new_function.location,
                     )
                 )
+    return errors
 
-    # check to see if any existing structures have had items removed, reordered, renamed, or types
-    # changed (adding new members is considered to be ok, as long as functions are initialized via
-    # a create factory function)
+
+def _analyze_struct_abi(old_abi, new_abi):
+    """Checks to see if any existing structures have had items removed, reordered, renamed, or types
+    changed (adding new members is considered to be ok, as long as functions are initialized via
+    a create factory function)
+    """
+    errors = []
+
     old_structs = {f.name: f for f in old_abi.structs}
     new_structs = {f.name: f for f in new_abi.structs}
 
     for name, old_struct in old_structs.items():
-        new_struct = new_structs.get(name)
-        if new_struct is None:
+        try:
+            new_struct = new_structs[name]
+        except KeyError:
             errors.append(
                 AbiError(
                     "Struct has been removed",
@@ -297,29 +307,36 @@ def analyze_c_abi(old_abi, new_abi):
             )
             continue
 
-        for old_member, new_member in itertools.zip_longest(
+        for (old_type, old_name), (new_type, new_name) in zip_longest(
             old_struct.members,
             new_struct.members,
-            fillvalue=None,
+            fillvalue=(None, None),
         ):
-            if new_member is None:
+            if new_type is None:
                 errors.append(
                     AbiError(
-                        f"Struct has a deleted member '{old_member[0]} {old_member[1]}'",
+                        f"Struct has a deleted member '{old_type} {old_name}'",
                         symbol=name,
                         location=new_struct.location,
                     )
                 )
+            elif old_type is None:
+                # adding an item to the end of the struct is allowed here
+                pass
 
-            elif new_member[0] != old_member[0]:
+            elif new_type != old_type:
                 errors.append(
                     AbiError(
-                        f"Struct member has changed type '{old_member[0]}' to '{new_member[0]} for member '{old_member[1]}'",
+                        f"Struct member has changed type '{old_type}' to '{new_type}' for member '{old_name}'",
                         symbol=name,
                         location=new_struct.location,
                     )
                 )
+    return errors
 
+
+def _analyze_enum_abi(old_abi, new_abi):
+    errors = []
     # flatten enum values: since values inside an enum in C are in the global scope
     old_enum_values = {
         k: (v, enum) for enum in old_abi.enums for k, v in enum.values
@@ -330,8 +347,9 @@ def analyze_c_abi(old_abi, new_abi):
 
     # check to see if enum values have been removed, or had their numeric values changed
     for name, (old_value, old_enum) in old_enum_values.items():
-        new_value, new_enum = new_enum_values.get(name, (None, None))
-        if new_enum is None:
+        try:
+            new_value, new_enum = new_enum_values[name]
+        except KeyError:
             errors.append(
                 AbiError(
                     f"Enum value {name} has been removed",
@@ -339,7 +357,9 @@ def analyze_c_abi(old_abi, new_abi):
                     location=old_enum.location,
                 )
             )
-        elif new_value != old_value:
+            continue
+
+        if new_value != old_value:
             errors.append(
                 AbiError(
                     f"Enum value {name} has been changed from {old_value} to {new_value}",
@@ -348,6 +368,14 @@ def analyze_c_abi(old_abi, new_abi):
                 )
             )
 
+    return errors
+
+
+def analyze_c_abi(old_abi, new_abi):
+    errors = []
+    errors.extend(_analyze_function_abi(old_abi, new_abi))
+    errors.extend(_analyze_struct_abi(old_abi, new_abi))
+    errors.extend(_analyze_enum_abi(old_abi, new_abi))
     return errors
 
 
@@ -365,18 +393,18 @@ if __name__ == "__main__":
         "extract", help="Extract the ABI from a set of header files"
     )
     parser_extract.add_argument(
-        "--output_file",
+        "--output-file",
         type=str,
         help="The file to output the ABI into (default: %(default)s)",
         default="c_abi.json.gz",
     )
     parser_extract.add_argument(
-        "--header_path",
+        "--header-path",
         help="Path of C headers to extract the ABI from (default: %(default)s)",
         default=str(default_c_header_path),
     )
     parser_extract.add_argument(
-        "--include_file",
+        "--include-file",
         help="root header file to examine (default: %(default)s)",
         default="cuvs/core/all.h",
     )
@@ -385,27 +413,23 @@ if __name__ == "__main__":
         "analyze", help="Analyze a set of header files for breaking changes"
     )
     parser_analyze.add_argument(
-        "--abi_file",
+        "--abi-file",
         type=str,
         help="The extracted ABI file to compare against (default: %(default)s)",
         default="c_abi.json.gz",
     )
     parser_analyze.add_argument(
-        "--header_path",
+        "--header-path",
         help="Path of C headers to analyze (default: %(default)s)",
         default=str(default_c_header_path),
     )
     parser_analyze.add_argument(
-        "--include_file",
+        "--include-file",
         help="root header file to examine (default: %(default)s)",
         default="cuvs/core/all.h",
     )
 
     args = parser.parse_args()
-    if args.command not in ("extract", "analyze"):
-        print(f"unknown command {args.command}")
-        parser.print_help()
-        sys.exit(1)
 
     header_path = pathlib.Path(args.header_path)
 
