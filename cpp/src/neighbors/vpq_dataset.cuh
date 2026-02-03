@@ -23,13 +23,13 @@ namespace cuvs::neighbors {
  * @param[in] params VQ and PQ parameters for compressing the data
  * @param[in] dataset a row-major mdspan or mdarray (device or host) [n_rows, dim].
  *
- * @return a unique_ptr to the vpq_dataset
+ * @return the vpq_dataset
  */
 template <typename DatasetT,
           typename MathT = typename DatasetT::value_type,
           typename IdxT  = typename DatasetT::index_type>
 auto vpq_build(const raft::resources& res, const vpq_params& params, const DatasetT& dataset)
-  -> std::unique_ptr<vpq_dataset<MathT, IdxT>>
+  -> vpq_dataset<MathT, IdxT>
 {
   if constexpr (std::is_same_v<MathT, half>) {
     return detail::vpq_convert_math_type<half, float, IdxT>(

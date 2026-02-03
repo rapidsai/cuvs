@@ -504,31 +504,32 @@ void process_and_fill_codes(
 }
 
 template <typename NewMathT, typename OldMathT, typename IdxT>
-auto vpq_convert_math_type(const raft::resources& res,
-                           std::unique_ptr<vpq_dataset<OldMathT, IdxT>>&& src)
-  -> std::unique_ptr<vpq_dataset<NewMathT, IdxT>>
+auto vpq_convert_math_type(const raft::resources& res, vpq_dataset<OldMathT, IdxT>&& src)
+  -> vpq_dataset<NewMathT, IdxT>
 {
-  auto vq_code_book = raft::make_device_mdarray<NewMathT>(res, src->vq_code_book().extents());
-  auto pq_code_book = raft::make_device_mdarray<NewMathT>(res, src->pq_code_book().extents());
+  auto vq_code_book = raft::make_device_mdarray<NewMathT>(res, src.vq_code_book().extents());
+  auto pq_code_book = raft::make_device_mdarray<NewMathT>(res, src.pq_code_book().extents());
 
   raft::linalg::map(res,
                     vq_code_book.view(),
                     cuvs::spatial::knn::detail::utils::mapping<NewMathT>{},
-                    src->vq_code_book());
+                    src.vq_code_book());
   raft::linalg::map(res,
                     pq_code_book.view(),
                     cuvs::spatial::knn::detail::utils::mapping<NewMathT>{},
-                    src->pq_code_book());
+                    src.pq_code_book());
 
-  // Get the data from the old dataset - need to cast to owning to move the data
-  auto* owning_src = dynamic_cast<vpq_dataset_owning<OldMathT, IdxT>*>(src.get());
-  RAFT_EXPECTS(owning_src != nullptr, "Cannot convert non-owning vpq_dataset");
+  // Copy the data from the source (data type is uint8_t, independent of MathT)
+  auto data_view = src.data();
+  auto data      = raft::make_device_matrix<uint8_t, IdxT, raft::row_major>(
+    res, data_view.extent(0), data_view.extent(1));
+  raft::copy(data.data_handle(),
+             data_view.data_handle(),
+             data_view.size(),
+             raft::resource::get_cuda_stream(res));
 
-  // Move the data matrix from the source (data type is uint8_t, independent of MathT)
-  auto data = owning_src->release_data();
-
-  return std::make_unique<vpq_dataset_owning<NewMathT, IdxT>>(
-    std::move(vq_code_book), std::move(pq_code_book), std::move(data));
+  return vpq_dataset<NewMathT, IdxT>{std::make_unique<vpq_dataset_owning<NewMathT, IdxT>>(
+    std::move(vq_code_book), std::move(pq_code_book), std::move(data))};
 }
 
 // Helper for operations using vectorized loads of raft::TxN_t
@@ -911,7 +912,7 @@ void process_and_fill_codes_subspaces(
 
 template <typename DatasetT, typename MathT, typename IdxT>
 auto vpq_build(const raft::resources& res, const vpq_params& params, const DatasetT& dataset)
-  -> std::unique_ptr<vpq_dataset<MathT, IdxT>>
+  -> vpq_dataset<MathT, IdxT>
 {
   using label_t = uint32_t;
   // Use a heuristic to impute missing parameters.
@@ -937,8 +938,8 @@ auto vpq_build(const raft::resources& res, const vpq_params& params, const Datas
                                       codes.view(),
                                       true);
 
-  return std::make_unique<vpq_dataset_owning<MathT, IdxT>>(
-    std::move(vq_code_book), std::move(pq_code_book), std::move(codes));
+  return vpq_dataset<MathT, IdxT>{std::make_unique<vpq_dataset_owning<MathT, IdxT>>(
+    std::move(vq_code_book), std::move(pq_code_book), std::move(codes))};
 }
 
 }  // namespace cuvs::neighbors::detail

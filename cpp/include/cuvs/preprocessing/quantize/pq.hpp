@@ -10,8 +10,6 @@
 #include <raft/core/handle.hpp>
 #include <raft/core/host_mdspan.hpp>
 
-#include <memory>
-
 namespace cuvs::preprocessing::quantize::pq {
 
 /**
@@ -81,20 +79,19 @@ struct params {
 /**
  * @brief Defines and stores VPQ codebooks upon training.
  *
- * The quantizer holds a pointer to a vpq_dataset, which can be either
- * owning (vpq_dataset_owning, trained from data) or non-owning
- * (vpq_dataset_view, referencing external codebooks).
+ * The quantizer holds a vpq_dataset, which can be either owning (trained from data)
+ * or non-owning (referencing external codebooks).
  *
  * @tparam T data element type
  */
 template <typename T>
 struct quantizer {
   params params_quantizer;
-  std::unique_ptr<cuvs::neighbors::vpq_dataset<T, int64_t>> vpq_codebooks;
+  cuvs::neighbors::vpq_dataset<T, int64_t> vpq_codebooks;
 
   quantizer() = default;
 
-  quantizer(params p, std::unique_ptr<cuvs::neighbors::vpq_dataset<T, int64_t>> codebooks)
+  quantizer(params p, cuvs::neighbors::vpq_dataset<T, int64_t>&& codebooks)
     : params_quantizer(p), vpq_codebooks(std::move(codebooks))
   {
   }
