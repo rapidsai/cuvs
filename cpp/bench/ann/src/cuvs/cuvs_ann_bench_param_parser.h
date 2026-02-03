@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -191,6 +191,9 @@ void parse_build_param(const nlohmann::json& conf,
 {
   if (conf.contains("nlist")) { param.n_lists = conf.at("nlist"); }
   if (conf.contains("niter")) { param.kmeans_n_iters = conf.at("niter"); }
+  if (conf.contains("ratio")) {
+    param.kmeans_trainset_fraction = 1.0 / static_cast<double>(conf.at("ratio"));
+  }
   if (conf.contains("bits_per_dim")) { param.bits_per_dim = conf.at("bits_per_dim"); }
   if (conf.contains("fast_quantize_flag")) {
     param.fast_quantize_flag = conf.at("fast_quantize_flag");

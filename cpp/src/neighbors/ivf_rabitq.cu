@@ -14,7 +14,7 @@
 #include <raft/core/operators.hpp>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/reduce.cuh>
-
+#include <raft/matrix/sample_rows.cuh>
 #include <raft/util/cudart_utils.hpp>
 
 #include "../cluster/kmeans_balanced_impl_fit_predict.cuh"
@@ -51,12 +51,12 @@ void build(raft::resources const& handle,
     big_memory_resource = device_memory;
   }
 
+  auto stream = raft::resource::get_cuda_stream(handle);
   // create device view of dataset
   auto d_dataset_array =
     raft::make_device_mdarray<T>(handle, big_memory_resource, raft::make_extents<int64_t>(0, 0));
   auto d_dataset_view =
     raft::make_mdspan(dataset.data_handle(), raft::make_extents<int64_t>(n_rows, dim));
-  auto stream = raft::resource::get_cuda_stream(handle);
   if (utils::check_pointer_residency(dataset.data_handle()) !=
       utils::pointer_residency::device_only) {
     try {
@@ -72,27 +72,77 @@ void build(raft::resources const& handle,
     d_dataset_view = d_dataset_array.view();
   }
 
-  // perform k-means clustering (currently using the entire dataset)
-  // NB: here cluster_centers is used as if it is [n_clusters, data_dim] not [n_clusters,
-  // dim_ext]!
-  rmm::device_uvector<float> cluster_centers_buf(params.n_lists * dim, stream, device_memory);
-  auto cluster_centers = cluster_centers_buf.data();
-  auto centers_view =
-    raft::make_device_matrix_view<float, int64_t>(cluster_centers, params.n_lists, dim);
-  cuvs::cluster::kmeans::balanced_params kmeans_params;
-  kmeans_params.n_iters = params.kmeans_n_iters;
-  kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
-  // find cluster labels for dataset vectors
+  auto dataset_const_view = raft::make_const_mdspan(d_dataset_view);
+  rmm::device_uvector<float> cluster_centers(params.n_lists * dim, stream, device_memory);
   rmm::device_uvector<uint32_t> labels(n_rows, stream, big_memory_resource);
-  auto labels_view = raft::make_device_vector_view<uint32_t, int64_t>(labels.data(), n_rows);
-  cuvs::cluster::kmeans_balanced::fit_predict(
-    handle, kmeans_params, d_dataset_view, centers_view, labels_view);
+  // Scope for kmeans training set allocation.
+  {
+    raft::random::RngState random_state{137};
+    auto trainset_ratio = std::max<size_t>(
+      1,
+      size_t(n_rows) / std::max<size_t>(params.kmeans_trainset_fraction * n_rows, params.n_lists));
+    size_t n_rows_train = n_rows / trainset_ratio;
+
+    // Besides just sampling, we transform the input dataset into floats to make it easier
+    // to use gemm operations from cublas.
+    auto trainset =
+      raft::make_device_mdarray<T>(handle, big_memory_resource, raft::make_extents<int64_t>(0, 0));
+    try {
+      trainset = raft::make_device_mdarray<float>(
+        handle, big_memory_resource, raft::make_extents<int64_t>(n_rows_train, dim));
+    } catch (raft::logic_error& e) {
+      RAFT_LOG_ERROR(
+        "Insufficient memory for kmeans training set allocation. Please decrease "
+        "kmeans_trainset_fraction, or set large_workspace_resource appropriately.");
+      throw;
+    }
+    // TODO: a proper sampling
+    if constexpr (std::is_same_v<T, float>) {
+      raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset.view());
+    } else {
+      raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
+        "   ivf_rabitq::build(%zu, %zu)/sample rows with tmp trainset (%zu rows).",
+        size_t(n_rows),
+        size_t(dim),
+        size_t(n_rows_train));
+
+      // TODO(tfeher): Enable codebook generation with any type T, and then remove trainset tmp.
+      auto trainset_tmp = raft::make_device_mdarray<T>(
+        handle, big_memory_resource, raft::make_extents<int64_t>(n_rows_train, dim));
+
+      raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset_tmp.view());
+
+      raft::linalg::unaryOp(trainset.data_handle(),
+                            trainset_tmp.data_handle(),
+                            trainset.size(),
+                            utils::mapping<float>{},
+                            stream);
+    }
+
+    // perform k-means clustering
+    // NB: here cluster_centers is used as if it is [n_clusters, data_dim] not [n_clusters,
+    // dim_ext]!
+    auto centers_view =
+      raft::make_device_matrix_view<float, int64_t>(cluster_centers.data(), params.n_lists, dim);
+    cuvs::cluster::kmeans::balanced_params kmeans_params;
+    kmeans_params.n_iters = params.kmeans_n_iters;
+    kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
+    // find cluster labels for dataset vectors
+    auto labels_view = raft::make_device_vector_view<uint32_t, int64_t>(labels.data(), n_rows);
+    // cuvs::cluster::kmeans_balanced::fit_predict(
+    //   handle, kmeans_params, raft::make_const_mdspan(trainset.view()), centers_view,
+    //   labels_view);
+    auto centers_const_view = raft::make_device_matrix_view<const float, int64_t>(
+      cluster_centers.data(), params.n_lists, dim);
+    cuvs::cluster::kmeans::fit(
+      handle, kmeans_params, raft::make_const_mdspan(trainset.view()), centers_view);
+    cuvs::cluster::kmeans::predict(
+      handle, kmeans_params, dataset_const_view, centers_const_view, labels_view);
+  }
 
   // Call RaBitQ index construct
-  index->rabitq_index().construct_on_gpu(d_dataset_view.data_handle(),
-                                         cluster_centers,
-                                         labels_view.data_handle(),
-                                         params.fast_quantize_flag);
+  index->rabitq_index().construct_on_gpu(
+    d_dataset_view.data_handle(), cluster_centers.data(), labels.data(), params.fast_quantize_flag);
 }
 
 template <typename T, typename IdxT>

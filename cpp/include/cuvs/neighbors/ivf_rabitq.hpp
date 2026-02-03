@@ -52,6 +52,8 @@ struct index_params : cuvs::neighbors::index_params {
   uint32_t bits_per_dim = 3;
   /** The number of iterations searching for kmeans centers (index building). */
   uint32_t kmeans_n_iters = 20;
+  /** The fraction of data to use during iterative kmeans building. */
+  double kmeans_trainset_fraction = 0.5;
   /** Flag for using the fast quantize method */
   bool fast_quantize_flag = false;
 };
