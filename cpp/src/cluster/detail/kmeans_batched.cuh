@@ -140,35 +140,30 @@ void accumulate_batch_centroids(
   raft::device_vector_view<const raft::KeyValuePair<IdxT, DataT>, IdxT> minClusterAndDistance,
   raft::device_vector_view<const DataT, IdxT> sample_weights,
   raft::device_matrix_view<DataT, IdxT> centroid_sums,
-  raft::device_vector_view<DataT, IdxT> cluster_counts,
-  rmm::device_uvector<char>& workspace)
+  raft::device_vector_view<DataT, IdxT> cluster_counts)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   auto n_samples      = batch_data.extent(0);
   auto n_features     = batch_data.extent(1);
   auto n_clusters     = centroid_sums.extent(0);
 
+  // Get workspace from handle
+  auto* workspace_resource = raft::resource::get_workspace_resource(handle);
+  auto workspace = rmm::device_uvector<char>(n_samples, stream, workspace_resource);
+
   // Temporary buffers for this batch's partial results
   auto batch_sums   = raft::make_device_matrix<DataT, IdxT>(handle, n_clusters, n_features);
   auto batch_counts = raft::make_device_vector<DataT, IdxT>(handle, n_clusters);
 
   // Zero the batch temporaries
-  thrust::fill(raft::resource::get_thrust_policy(handle),
-               batch_sums.data_handle(),
-               batch_sums.data_handle() + batch_sums.size(),
-               DataT{0});
-  thrust::fill(raft::resource::get_thrust_policy(handle),
-               batch_counts.data_handle(),
-               batch_counts.data_handle() + batch_counts.size(),
-               DataT{0});
+  raft::matrix::fill(handle, batch_sums.view(), DataT{0});
+  raft::matrix::fill(handle, batch_counts.view(), DataT{0});
 
   // Extract cluster labels from KeyValuePair
   cuvs::cluster::kmeans::detail::KeyValueIndexOp<IdxT, DataT> conversion_op;
   thrust::transform_iterator<cuvs::cluster::kmeans::detail::KeyValueIndexOp<IdxT, DataT>,
                              const raft::KeyValuePair<IdxT, DataT>*>
     labels_itr(minClusterAndDistance.data_handle(), conversion_op);
-
-  workspace.resize(n_samples, stream);
 
   // Compute weighted sum of samples per cluster for this batch
   raft::linalg::reduce_rows_by_key(const_cast<DataT*>(batch_data.data_handle()),
@@ -422,20 +417,11 @@ void fit(raft::resources const& handle,
     // For full-batch mode: zero accumulators at start of each iteration
     // For mini-batch mode: zero total_counts at start of each iteration
     if (!use_minibatch) {
-      thrust::fill(raft::resource::get_thrust_policy(handle),
-                   centroid_sums.data_handle(),
-                   centroid_sums.data_handle() + centroid_sums.size(),
-                   DataT{0});
-      thrust::fill(raft::resource::get_thrust_policy(handle),
-                   cluster_counts.data_handle(),
-                   cluster_counts.data_handle() + cluster_counts.size(),
-                   DataT{0});
+      raft::matrix::fill(handle, centroid_sums.view(), DataT{0});
+      raft::matrix::fill(handle, cluster_counts.view(), DataT{0});
     } else {
       // Mini-batch mode: zero total counts for learning rate calculation
-      thrust::fill(raft::resource::get_thrust_policy(handle),
-                   total_counts.data_handle(),
-                   total_counts.data_handle() + total_counts.size(),
-                   DataT{0});
+      raft::matrix::fill(handle, total_counts.view(), DataT{0});
       // Shuffle sample indices for random batch selection
       std::shuffle(sample_indices.begin(), sample_indices.end(), rng);
     }
@@ -482,10 +468,9 @@ void fit(raft::resources const& handle,
                      stream);
         }
       } else {
-        thrust::fill(raft::resource::get_thrust_policy(handle),
-                     batch_weights.data_handle(),
-                     batch_weights.data_handle() + current_batch_size,
-                     DataT{1});
+        auto batch_weights_fill_view = raft::make_device_vector_view<DataT, IdxT>(
+          batch_weights.data_handle(), current_batch_size);
+        raft::matrix::fill(handle, batch_weights_fill_view, DataT{1});
       }
 
       // Create views for current batch size
@@ -533,14 +518,8 @@ void fit(raft::resources const& handle,
 
       if (use_minibatch) {
         // Mini-batch mode: zero batch accumulators before each batch
-        thrust::fill(raft::resource::get_thrust_policy(handle),
-                     centroid_sums.data_handle(),
-                     centroid_sums.data_handle() + centroid_sums.size(),
-                     DataT{0});
-        thrust::fill(raft::resource::get_thrust_policy(handle),
-                     cluster_counts.data_handle(),
-                     cluster_counts.data_handle() + cluster_counts.size(),
-                     DataT{0});
+        raft::matrix::fill(handle, centroid_sums.view(), DataT{0});
+        raft::matrix::fill(handle, cluster_counts.view(), DataT{0});
       }
 
       accumulate_batch_centroids<DataT, IdxT>(handle,
@@ -548,8 +527,7 @@ void fit(raft::resources const& handle,
                                                 minClusterAndDistance_const,
                                                 batch_weights_view,
                                                 centroid_sums.view(),
-                                                cluster_counts.view(),
-                                                workspace);
+                                                cluster_counts.view());
 
       if (use_minibatch) {
         // Mini-batch mode: update centroids immediately after each batch
