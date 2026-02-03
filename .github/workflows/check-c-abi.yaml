@@ -30,12 +30,12 @@ jobs:
     steps:
       - name: Checkout main branch
         uses: actions/checkout@v4
-          
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -44,12 +44,12 @@ jobs:
             clang \
             cmake \
             ninja-build
-          
+
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
           pip install msgspec libclang termcolor
-          
+
       - name: Build C++ project to get dependencies (dlpack)
         run: |
           mkdir -p cpp/build
@@ -60,23 +60,23 @@ jobs:
             -DBUILD_TESTS=OFF \
             -DBUILD_EXAMPLES=OFF
           echo "Build directory created and dependencies fetched"
-          
+
       - name: Extract ABI from main branch
         run: |
           mkdir -p baseline
           python ci/check_c_abi.py extract \
-            --header_path c/include \
-            --include_file cuvs/core/all.h \
-            --output_file baseline/c_abi.json.gz
+            --header-path c/include \
+            --include-file cuvs/core/all.h \
+            --output-file baseline/c_abi.json.gz
           echo "ABI extracted from main branch (commit: ${{ github.sha }})"
-          
+
       - name: Store commit-specific baseline
         uses: actions/upload-artifact@v4
         with:
           name: c-abi-baseline-${{ github.sha }}
           path: baseline/c_abi.json.gz
           retention-days: 90  # Keep for 3 months
-          
+
       - name: Store main baseline (latest, never expires)
         uses: actions/upload-artifact@v4
         with:
@@ -93,12 +93,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -107,12 +107,12 @@ jobs:
             clang \
             cmake \
             ninja-build
-          
+
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
           pip install msgspec libclang termcolor
-          
+
       - name: Build C++ project to get dependencies (dlpack)
         run: |
           mkdir -p cpp/build
@@ -123,7 +123,7 @@ jobs:
             -DBUILD_TESTS=OFF \
             -DBUILD_EXAMPLES=OFF
           echo "Build directory created and dependencies fetched"
-          
+
       - name: Find merge base commit
         id: merge-base
         run: |
@@ -131,7 +131,7 @@ jobs:
           MERGE_BASE=$(git merge-base HEAD origin/main)
           echo "merge_base_sha=${MERGE_BASE}" >> $GITHUB_OUTPUT
           echo "Merge base commit: ${MERGE_BASE}"
-          
+
       - name: Try to download baseline for merge-base commit (most accurate)
         id: download-merge-base
         continue-on-error: true
@@ -141,7 +141,7 @@ jobs:
           workflow: check-c-abi.yaml
           commit: ${{ steps.merge-base.outputs.merge_base_sha }}
           path: baseline/
-          
+
       - name: Try to download latest main baseline (fallback 1)
         id: download-main
         if: steps.download-merge-base.outcome == 'failure'
@@ -152,7 +152,7 @@ jobs:
           workflow: check-c-abi.yaml
           branch: main
           path: baseline/
-          
+
       - name: Extract baseline ABI from main branch (fallback 2)
         if: steps.download-merge-base.outcome == 'failure' && steps.download-main.outcome == 'failure'
         run: |
@@ -169,11 +169,11 @@ jobs:
           cd ../../..
           mkdir -p baseline
           python ci/check_c_abi.py extract \
-            --header_path ../cuvs-main/c/include \
-            --include_file cuvs/core/all.h \
-            --output_file baseline/c_abi.json.gz
+            --header-path ../cuvs-main/c/include \
+            --include-file cuvs/core/all.h \
+            --output-file baseline/c_abi.json.gz
           echo "✓ Baseline ABI extracted from main branch"
-          
+
       - name: Report baseline source
         run: |
           if [ "${{ steps.download-merge-base.outcome }}" == "success" ]; then
@@ -183,14 +183,14 @@ jobs:
           else
             echo "✓ Using freshly extracted baseline from main branch"
           fi
-          
+
       - name: Analyze current branch for ABI breaking changes
         run: |
           python ci/check_c_abi.py analyze \
-            --abi_file baseline/c_abi.json.gz \
-            --header_path c/include \
-            --include_file cuvs/core/all.h
-            
+            --abi-file baseline/c_abi.json.gz \
+            --header-path c/include \
+            --include-file cuvs/core/all.h
+
       - name: Comment on PR with results
         if: failure() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
@@ -201,10 +201,10 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: `## ⚠️ C ABI Breaking Changes Detected
-              
+
 This PR introduces breaking changes to the C ABI. Please review the changes carefully.
 
-Breaking ABI changes are only allowed in major releases. If this is intentional for a major release, 
+Breaking ABI changes are only allowed in major releases. If this is intentional for a major release,
 the baseline ABI will need to be updated after merge.
 
 See the job logs for details on what specific changes were detected.
