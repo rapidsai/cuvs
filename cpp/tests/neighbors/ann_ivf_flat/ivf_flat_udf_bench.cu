@@ -25,7 +25,7 @@
 // Define custom L2 metric using the CUVS_METRIC macro
 CUVS_METRIC(custom_l2, { acc += squared_diff(x, y); })
 
-// Raw UDF that directly implements compute_dist matching built-in exactly
+// Raw UDF that matches built-in structure exactly (struct with template specializations)
 inline std::string raw_l2_udf()
 {
   return R"(
@@ -35,27 +35,38 @@ using uint8_t = unsigned char;
 using int32_t = int;
 using uint32_t = unsigned int;
 
-/* std::is_same_v for nvrtc */
-namespace std {
-template <typename T, typename U> struct is_same { static constexpr bool value = false; };
-template <typename T> struct is_same<T, T> { static constexpr bool value = true; };
-template <typename T, typename U> inline constexpr bool is_same_v = is_same<T, U>::value;
-}
-
 namespace cuvs { namespace neighbors { namespace ivf_flat { namespace detail {
 
+// Primary template - works for float
 template <int Veclen, typename T, typename AccT>
-__device__ __forceinline__ void compute_dist(AccT& acc, AccT x, AccT y)
-{
-  if constexpr (std::is_same_v<T, int8_t> && Veclen > 1) {
-    // int8 with SIMD - use intrinsics like the built-in
-    const auto diff = __vabsdiffs4(x, y);
-    acc = __dp4a(diff, diff, static_cast<uint32_t>(acc));
-  } else {
-    // float or scalar int - simple formula
+struct euclidean_dist {
+  __device__ __forceinline__ void operator()(AccT& acc, AccT x, AccT y)
+  {
     const auto diff = x - y;
     acc += diff * diff;
   }
+};
+
+// Specialization for int8_t (matching built-in exactly)
+template <int Veclen>
+struct euclidean_dist<Veclen, int8_t, int32_t> {
+  __device__ __forceinline__ void operator()(int32_t& acc, int32_t x, int32_t y)
+  {
+    if constexpr (Veclen > 1) {
+      const auto diff = __vabsdiffs4(x, y);
+      acc = __dp4a(diff, diff, static_cast<uint32_t>(acc));
+    } else {
+      const auto diff = x - y;
+      acc += diff * diff;
+    }
+  }
+};
+
+// No __forceinline__ here - matches built-in
+template <int Veclen, typename T, typename AccT>
+__device__ void compute_dist(AccT& acc, AccT x, AccT y)
+{
+  euclidean_dist<Veclen, T, AccT>{}(acc, x, y);
 }
 
 }}}}

@@ -22,7 +22,7 @@ def plot_benchmark_results(csv_file: str):
     # Create figure with 2x2 subplots
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     fig.suptitle(
-        "IVF-Flat UDF Benchmark: Built-in L2 vs Custom UDF L2\n(1M vectors, 512 dims, 100 queries)",
+        "IVF-Flat UDF Benchmark: Built-in vs Macro UDF vs Raw UDF\n(1M vectors, 512 dims, 100 queries)",
         fontsize=14,
         fontweight="bold",
     )
@@ -30,135 +30,174 @@ def plot_benchmark_results(csv_file: str):
     colors = {"float32": "#2ecc71", "int8": "#3498db"}
 
     # =========================================================================
-    # Plot 1: First search time (JIT compilation cost)
+    # Plot 1: Median search time comparison (float32)
     # =========================================================================
     ax1 = axes[0, 0]
 
-    for dtype in ["float32", "int8"]:
-        data = df[df["dtype"] == dtype]
-        x = np.arange(len(data))
-        width = 0.35
-        offset = -width / 2 if dtype == "float32" else width / 2
+    data_f32 = df[df["dtype"] == "float32"]
+    x = np.arange(len(data_f32))
+    width = 0.25
 
-        ax1.bar(
-            x + offset,
-            data["first_builtin_ms"],
-            width,
-            label=f"{dtype} Built-in",
-            color=colors[dtype],
-            alpha=0.7,
-        )
-        ax1.bar(
-            x + offset,
-            data["first_udf_ms"] - data["first_builtin_ms"],
-            width,
-            bottom=data["first_builtin_ms"],
-            label=f"{dtype} UDF overhead",
-            color=colors[dtype],
-            alpha=0.4,
-            hatch="//",
-        )
+    ax1.bar(
+        x - width,
+        data_f32["median_builtin_ms"],
+        width,
+        label="Built-in",
+        color=colors["float32"],
+        alpha=0.9,
+    )
+    ax1.bar(
+        x,
+        data_f32["median_udf_ms"],
+        width,
+        label="Macro UDF",
+        color=colors["float32"],
+        alpha=0.5,
+        hatch="//",
+    )
+    ax1.bar(
+        x + width,
+        data_f32["median_raw_ms"],
+        width,
+        label="Raw UDF",
+        color=colors["float32"],
+        alpha=0.3,
+        hatch="\\\\",
+    )
 
     ax1.set_xlabel("k (neighbors)")
     ax1.set_ylabel("Time (ms)")
-    ax1.set_title("First Search Time (includes JIT compilation)")
-    ax1.set_xticks(np.arange(len(df[df["dtype"] == "float32"])))
-    ax1.set_xticklabels(df[df["dtype"] == "float32"]["k"])
+    ax1.set_title("Float32: Median Search Time")
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(data_f32["k"])
     ax1.legend(loc="upper left")
     ax1.grid(axis="y", alpha=0.3)
 
     # =========================================================================
-    # Plot 2: JIT overhead
+    # Plot 2: Median search time comparison (int8)
     # =========================================================================
     ax2 = axes[0, 1]
 
-    for dtype in ["float32", "int8"]:
-        data = df[df["dtype"] == dtype]
-        ax2.plot(
-            data["k"],
-            data["jit_overhead_ms"],
-            "o-",
-            label=dtype,
-            color=colors[dtype],
-            linewidth=2,
-            markersize=8,
-        )
+    data_int8 = df[df["dtype"] == "int8"]
+    x = np.arange(len(data_int8))
+
+    ax2.bar(
+        x - width,
+        data_int8["median_builtin_ms"],
+        width,
+        label="Built-in",
+        color=colors["int8"],
+        alpha=0.9,
+    )
+    ax2.bar(
+        x,
+        data_int8["median_udf_ms"],
+        width,
+        label="Macro UDF",
+        color=colors["int8"],
+        alpha=0.5,
+        hatch="//",
+    )
+    ax2.bar(
+        x + width,
+        data_int8["median_raw_ms"],
+        width,
+        label="Raw UDF",
+        color=colors["int8"],
+        alpha=0.3,
+        hatch="\\\\",
+    )
 
     ax2.set_xlabel("k (neighbors)")
-    ax2.set_ylabel("JIT Overhead (ms)")
-    ax2.set_title("UDF JIT Compilation Overhead\n(First UDF - First Built-in)")
-    ax2.legend()
-    ax2.grid(alpha=0.3)
-    ax2.set_xscale("log", base=2)
+    ax2.set_ylabel("Time (ms)")
+    ax2.set_title("Int8: Median Search Time")
+    ax2.set_xticks(x)
+    ax2.set_xticklabels(data_int8["k"])
+    ax2.legend(loc="upper left")
+    ax2.grid(axis="y", alpha=0.3)
 
     # =========================================================================
-    # Plot 3: Median search time (cached)
+    # Plot 3: UDF/Built-in ratio comparison
     # =========================================================================
     ax3 = axes[1, 0]
 
-    width = 0.35
-    for i, dtype in enumerate(["float32", "int8"]):
-        data = df[df["dtype"] == dtype]
-        x = np.arange(len(data))
-        offset = (i - 0.5) * width
-
-        ax3.bar(
-            x + offset - width / 4,
-            data["median_builtin_ms"],
-            width / 2,
-            label=f"{dtype} Built-in",
-            color=colors[dtype],
-            alpha=0.8,
-        )
-        ax3.bar(
-            x + offset + width / 4,
-            data["median_udf_ms"],
-            width / 2,
-            label=f"{dtype} UDF",
-            color=colors[dtype],
-            alpha=0.4,
-            hatch="//",
-        )
-
-    ax3.set_xlabel("k (neighbors)")
-    ax3.set_ylabel("Time (ms)")
-    ax3.set_title("Median Search Time (JIT cached, 20 iterations)")
-    ax3.set_xticks(np.arange(len(df[df["dtype"] == "float32"])))
-    ax3.set_xticklabels(df[df["dtype"] == "float32"]["k"])
-    ax3.legend(loc="upper left")
-    ax3.grid(axis="y", alpha=0.3)
-
-    # =========================================================================
-    # Plot 4: UDF/Built-in ratio
-    # =========================================================================
-    ax4 = axes[1, 1]
-
     for dtype in ["float32", "int8"]:
         data = df[df["dtype"] == dtype]
-        ax4.plot(
+        ax3.plot(
             data["k"],
-            data["udf_builtin_ratio"],
+            data["udf_ratio"],
             "o-",
-            label=dtype,
+            label=f"{dtype} Macro UDF",
             color=colors[dtype],
             linewidth=2,
             markersize=8,
         )
+        ax3.plot(
+            data["k"],
+            data["raw_ratio"],
+            "s--",
+            label=f"{dtype} Raw UDF",
+            color=colors[dtype],
+            linewidth=2,
+            markersize=8,
+            alpha=0.7,
+        )
 
-    ax4.axhline(
+    ax3.axhline(
         y=1.0,
         color="red",
         linestyle="--",
         alpha=0.5,
         label="1.0x (no overhead)",
     )
-    ax4.set_xlabel("k (neighbors)")
-    ax4.set_ylabel("UDF / Built-in Ratio")
-    ax4.set_title("UDF Performance Ratio\n(closer to 1.0 = better)")
-    ax4.legend()
-    ax4.grid(alpha=0.3)
-    ax4.set_xscale("log", base=2)
-    ax4.set_ylim(0.9, max(df["udf_builtin_ratio"].max() * 1.1, 1.2))
+    ax3.set_xlabel("k (neighbors)")
+    ax3.set_ylabel("UDF / Built-in Ratio")
+    ax3.set_title("Performance Ratio (closer to 1.0 = better)")
+    ax3.legend(loc="upper right", fontsize=8)
+    ax3.grid(alpha=0.3)
+    ax3.set_xscale("log", base=2)
+
+    # =========================================================================
+    # Plot 4: Summary bar chart
+    # =========================================================================
+    ax4 = axes[1, 1]
+
+    # Average ratios
+    categories = ["Float32\nMacro", "Float32\nRaw", "Int8\nMacro", "Int8\nRaw"]
+    ratios = [
+        df[df["dtype"] == "float32"]["udf_ratio"].mean(),
+        df[df["dtype"] == "float32"]["raw_ratio"].mean(),
+        df[df["dtype"] == "int8"]["udf_ratio"].mean(),
+        df[df["dtype"] == "int8"]["raw_ratio"].mean(),
+    ]
+    bar_colors = [
+        colors["float32"],
+        colors["float32"],
+        colors["int8"],
+        colors["int8"],
+    ]
+    alphas = [0.7, 0.4, 0.7, 0.4]
+
+    bars = ax4.bar(categories, ratios, color=bar_colors, alpha=0.7)
+    for bar, alpha in zip(bars, alphas):
+        bar.set_alpha(alpha)
+
+    ax4.axhline(y=1.0, color="red", linestyle="--", alpha=0.5)
+    ax4.set_ylabel("Average UDF / Built-in Ratio")
+    ax4.set_title("Average Overhead Summary")
+    ax4.grid(axis="y", alpha=0.3)
+
+    # Add value labels
+    for bar, ratio in zip(bars, ratios):
+        ax4.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 0.05,
+            f"{ratio:.2f}x",
+            ha="center",
+            va="bottom",
+            fontsize=10,
+            fontweight="bold",
+        )
 
     plt.tight_layout()
 
@@ -167,35 +206,39 @@ def plot_benchmark_results(csv_file: str):
     plt.savefig(output_file, dpi=150, bbox_inches="tight")
     print(f"Plot saved to: {output_file}")
 
-    # Also show
-    plt.show()
-
 
 def print_summary(csv_file: str):
     """Print a summary table of results."""
     df = pd.read_csv(csv_file)
 
-    print("\n" + "=" * 80)
+    print("\n" + "=" * 100)
     print("UDF Benchmark Summary")
-    print("=" * 80)
+    print("=" * 100)
     print(
-        f"\n{'dtype':<10} {'k':<6} {'First Builtin':<15} {'First UDF':<15} {'JIT Overhead':<15} {'Median Builtin':<15} {'Median UDF':<15} {'Ratio':<10}"
+        f"\n{'dtype':<10} {'k':<6} {'Built-in (ms)':<15} {'Macro UDF (ms)':<15} {'Raw UDF (ms)':<15} {'Macro Ratio':<12} {'Raw Ratio':<12}"
     )
     print("-" * 100)
 
     for _, row in df.iterrows():
         print(
-            f"{row['dtype']:<10} {row['k']:<6} {row['first_builtin_ms']:<15.2f} {row['first_udf_ms']:<15.2f} {row['jit_overhead_ms']:<15.2f} {row['median_builtin_ms']:<15.2f} {row['median_udf_ms']:<15.2f} {row['udf_builtin_ratio']:<10.3f}"
+            f"{row['dtype']:<10} {row['k']:<6} {row['median_builtin_ms']:<15.2f} {row['median_udf_ms']:<15.2f} {row['median_raw_ms']:<15.2f} {row['udf_ratio']:<12.3f} {row['raw_ratio']:<12.3f}"
         )
 
-    print("\n" + "=" * 80)
+    print("\n" + "=" * 100)
     print("Key Observations:")
-    print(f"  - Average JIT overhead: {df['jit_overhead_ms'].mean():.2f} ms")
     print(
-        f"  - Average UDF/Built-in ratio: {df['udf_builtin_ratio'].mean():.3f}x"
+        f"  - Float32 Macro UDF avg ratio: {df[df['dtype'] == 'float32']['udf_ratio'].mean():.3f}x"
     )
-    print(f"  - Max UDF/Built-in ratio: {df['udf_builtin_ratio'].max():.3f}x")
-    print("=" * 80 + "\n")
+    print(
+        f"  - Float32 Raw UDF avg ratio:   {df[df['dtype'] == 'float32']['raw_ratio'].mean():.3f}x"
+    )
+    print(
+        f"  - Int8 Macro UDF avg ratio:    {df[df['dtype'] == 'int8']['udf_ratio'].mean():.3f}x"
+    )
+    print(
+        f"  - Int8 Raw UDF avg ratio:      {df[df['dtype'] == 'int8']['raw_ratio'].mean():.3f}x"
+    )
+    print("=" * 100 + "\n")
 
 
 if __name__ == "__main__":

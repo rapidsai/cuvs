@@ -30,15 +30,19 @@ NVRTCLTOFragmentCompiler::NVRTCLTOFragmentCompiler()
   cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device);
   cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device);
 
-  this->standard_compile_opts.resize(4);
+  this->standard_compile_opts.resize(7);
 
   std::size_t i = 0;
-  // this->standard_compile_opts[i++] =
-  //   std::string{"-arch=sm_" + std::to_string((major * 10 + minor))};
-  this->standard_compile_opts[i++] = std::string{"-arch=sm_75"};
+  // Use actual GPU architecture for optimal code generation
+  this->standard_compile_opts[i++] =
+    std::string{"-arch=sm_" + std::to_string((major * 10 + minor))};
   this->standard_compile_opts[i++] = std::string{"-dlto"};
   this->standard_compile_opts[i++] = std::string{"-rdc=true"};
   this->standard_compile_opts[i++] = std::string{"-default-device"};
+  this->standard_compile_opts[i++] = std::string{"--gen-opt-lto"};
+  // Optimization flags - NVRTC uses different syntax than nvcc
+  this->standard_compile_opts[i++] = std::string{"--use_fast_math"};
+  this->standard_compile_opts[i++] = std::string{"--extra-device-vectorization"};
 }
 
 void NVRTCLTOFragmentCompiler::compile(std::string const& key, std::string const& code) const
