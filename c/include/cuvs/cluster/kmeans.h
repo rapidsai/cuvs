@@ -37,6 +37,25 @@ typedef enum {
 } cuvsKMeansInitMethod;
 
 /**
+ * @brief Centroid update mode for k-means algorithm
+ */
+typedef enum {
+  /**
+   * Standard k-means (Lloyd's algorithm): accumulate assignments over the
+   * entire dataset, then update centroids once per iteration.
+   * More accurate but requires full pass over data before each update.
+   */
+  CUVS_KMEANS_UPDATE_FULL_BATCH = 0,
+
+  /**
+   * Mini-batch k-means: update centroids after each randomly sampled batch.
+   * Faster convergence for large datasets, but may have slightly lower accuracy.
+   * Uses streaming/online centroid updates with learning rate decay.
+   */
+  CUVS_KMEANS_UPDATE_MINI_BATCH = 1
+} cuvsKMeansCentroidUpdateMode;
+
+/**
  * @brief Hyper-parameters for the kmeans algorithm
  */
 struct cuvsKMeansParams {
@@ -89,6 +108,13 @@ struct cuvsKMeansParams {
    * if 0 then batch_centroids = n_clusters
    */
   int batch_centroids;
+
+  /**
+   * Centroid update mode:
+   *  - CUVS_KMEANS_UPDATE_FULL_BATCH: Standard Lloyd's algorithm, update after full dataset pass
+   *  - CUVS_KMEANS_UPDATE_MINI_BATCH: Mini-batch k-means, update after each batch
+   */
+  cuvsKMeansCentroidUpdateMode update_mode;
 
   bool inertia_check;
 

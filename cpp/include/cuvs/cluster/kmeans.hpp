@@ -49,6 +49,25 @@ struct params : base_params {
   };
 
   /**
+   * Centroid update mode determines when centroids are updated during training.
+   */
+  enum CentroidUpdateMode {
+    /**
+     * Standard k-means (Lloyd's algorithm): accumulate assignments over the
+     * entire dataset, then update centroids once per iteration.
+     * More accurate but requires full pass over data before each update.
+     */
+    FullBatch,
+
+    /**
+     * Mini-batch k-means: update centroids after each randomly sampled batch.
+     * Faster convergence for large datasets, but may have slightly lower accuracy.
+     * Uses streaming/online centroid updates with learning rate decay.
+     */
+    MiniBatch
+  };
+
+  /**
    * The number of clusters to form as well as the number of centroids to generate (default:8).
    */
   int n_clusters = 8;
@@ -104,7 +123,14 @@ struct params : base_params {
   /**
    * if 0 then batch_centroids = n_clusters
    */
-  int batch_centroids = 0;  //
+  int batch_centroids = 0;
+
+  /**
+   * Centroid update mode:
+   *  - FullBatch: Standard Lloyd's algorithm, update centroids after full dataset pass
+   *  - MiniBatch: Mini-batch k-means, update centroids after each batch
+   */
+  CentroidUpdateMode update_mode = FullBatch;
 
   bool inertia_check = false;
 };

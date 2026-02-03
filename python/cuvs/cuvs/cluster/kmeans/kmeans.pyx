@@ -44,6 +44,12 @@ INIT_METHOD_TYPES = {
 
 INIT_METHOD_NAMES = {v: k for k, v in INIT_METHOD_TYPES.items()}
 
+UPDATE_MODE_TYPES = {
+    "full_batch": cuvsKMeansCentroidUpdateMode.CUVS_KMEANS_UPDATE_FULL_BATCH,
+    "mini_batch": cuvsKMeansCentroidUpdateMode.CUVS_KMEANS_UPDATE_MINI_BATCH}
+
+UPDATE_MODE_NAMES = {v: k for k, v in UPDATE_MODE_TYPES.items()}
+
 cdef class KMeansParams:
     """
     Hyper-parameters for the kmeans algorithm
@@ -70,6 +76,20 @@ cdef class KMeansParams:
         Number of instance k-means algorithm will be run with different seeds
     oversampling_factor : double
         Oversampling factor for use in the k-means|| algorithm
+    batch_samples : int
+        Number of samples to process in each batch for tiled 1NN computation.
+        Useful to optimize/control memory footprint. Default tile is
+        [batch_samples x n_clusters].
+    batch_centroids : int
+        Number of centroids to process in each batch. If 0, uses n_clusters.
+    update_mode : str
+        Centroid update strategy. One of:
+        "full_batch" : Standard Lloyd's algorithm - accumulate assignments over
+            the entire dataset, then update centroids once per iteration.
+            More accurate but requires full pass over data before each update.
+        "mini_batch" : Mini-batch k-means - update centroids after each batch.
+            Faster convergence for large datasets, but may have slightly lower
+            accuracy. Uses online centroid updates with learning rate decay.
     hierarchical : bool
         Whether to use hierarchical (balanced) kmeans or not
     hierarchical_n_iters : int
@@ -92,6 +112,9 @@ cdef class KMeansParams:
                  tol=None,
                  n_init=None,
                  oversampling_factor=None,
+                 batch_samples=None,
+                 batch_centroids=None,
+                 update_mode=None,
                  hierarchical=None,
                  hierarchical_n_iters=None):
         if metric is not None:
@@ -109,6 +132,13 @@ cdef class KMeansParams:
             self.params.n_init = n_init
         if oversampling_factor is not None:
             self.params.oversampling_factor = oversampling_factor
+        if batch_samples is not None:
+            self.params.batch_samples = batch_samples
+        if batch_centroids is not None:
+            self.params.batch_centroids = batch_centroids
+        if update_mode is not None:
+            c_mode = UPDATE_MODE_TYPES[update_mode]
+            self.params.update_mode = <cuvsKMeansCentroidUpdateMode>c_mode
         if hierarchical is not None:
             self.params.hierarchical = hierarchical
         if hierarchical_n_iters is not None:
@@ -144,6 +174,18 @@ cdef class KMeansParams:
     @property
     def oversampling_factor(self):
         return self.params.oversampling_factor
+
+    @property
+    def batch_samples(self):
+        return self.params.batch_samples
+
+    @property
+    def batch_centroids(self):
+        return self.params.batch_centroids
+
+    @property
+    def update_mode(self):
+        return UPDATE_MODE_NAMES[self.params.update_mode]
 
     @property
     def hierarchical(self):
