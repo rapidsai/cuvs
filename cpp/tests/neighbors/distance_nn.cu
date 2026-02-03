@@ -4,7 +4,7 @@
  */
 
 #include "../test_utils.cuh"
-#include "1_nn_helper.cuh"
+#include "distance_nn_helper.cuh"
 
 #include "../../src/distance/fused_distance_nn.cuh"
 #include "../../src/distance/unfused_distance_nn.cuh"

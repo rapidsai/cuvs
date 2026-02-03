@@ -110,7 +110,7 @@ endif()
 
 if(CUVS_PRIMS_BENCH_USE_FUSED_L2_NN)
   ConfigurePrimsBench(
-    NAME FUSED_L2_NN PATH src/distance/distance_nn.cu
+    NAME DISTANCE_NN PATH src/distance/distance_nn.cu
     LINKS CUDA::cublas rmm::rmm $<TARGET_NAME_IF_EXISTS:nvidia::cutlass::cutlass>
   )
 endif()
