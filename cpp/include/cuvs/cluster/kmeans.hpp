@@ -55,14 +55,11 @@ struct params : base_params {
     /**
      * Standard k-means (Lloyd's algorithm): accumulate assignments over the
      * entire dataset, then update centroids once per iteration.
-     * More accurate but requires full pass over data before each update.
      */
     FullBatch,
 
     /**
      * Mini-batch k-means: update centroids after each randomly sampled batch.
-     * Faster convergence for large datasets, but may have slightly lower accuracy.
-     * Uses streaming/online centroid updates with learning rate decay.
      */
     MiniBatch
   };

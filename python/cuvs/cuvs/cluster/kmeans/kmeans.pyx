@@ -86,10 +86,7 @@ cdef class KMeansParams:
         Centroid update strategy. One of:
         "full_batch" : Standard Lloyd's algorithm - accumulate assignments over
             the entire dataset, then update centroids once per iteration.
-            More accurate but requires full pass over data before each update.
         "mini_batch" : Mini-batch k-means - update centroids after each batch.
-            Faster convergence for large datasets, but may have slightly lower
-            accuracy. Uses online centroid updates with learning rate decay.
     hierarchical : bool
         Whether to use hierarchical (balanced) kmeans or not
     hierarchical_n_iters : int
