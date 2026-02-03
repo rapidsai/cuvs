@@ -483,6 +483,58 @@ struct vpq_dataset : public dataset<IdxT> {
   }
 };
 
+/**
+ * @brief View-type VPQ codebooks (non-owning).
+ *
+ * This structure stores views of pre-computed VQ and PQ codebooks without copying.
+ * The caller is responsible for ensuring the lifetime of the underlying data
+ * exceeds the lifetime of this view.
+ *
+ * @tparam MathT the type of elements in the codebooks
+ *
+ */
+template <typename MathT>
+struct vpq_codebooks_view {
+  using math_type = MathT;
+  /** View of Vector Quantization codebook - "coarse cluster centers" [vq_n_centers, dim]. */
+  raft::device_matrix_view<const math_type, uint32_t, raft::row_major> vq_code_book;
+  /** View of Product Quantization codebook - "fine cluster centers".
+   *  - For use_subspaces=true: [pq_dim * pq_n_centers, pq_len]
+   *  - For use_subspaces=false: [pq_n_centers, pq_len]
+   */
+  raft::device_matrix_view<const math_type, uint32_t, raft::row_major> pq_code_book;
+
+  vpq_codebooks_view(
+    raft::device_matrix_view<const math_type, uint32_t, raft::row_major> vq_code_book,
+    raft::device_matrix_view<const math_type, uint32_t, raft::row_major> pq_code_book)
+    : vq_code_book{vq_code_book}, pq_code_book{pq_code_book}
+  {
+  }
+
+  [[nodiscard]] auto is_owning() const noexcept -> bool { return false; }
+
+  /** Dimensionality of the original vectors. */
+  [[nodiscard]] constexpr inline auto dim() const noexcept -> uint32_t
+  {
+    return vq_code_book.extent(1);
+  }
+  /** The number of "coarse cluster centers" */
+  [[nodiscard]] constexpr inline auto vq_n_centers() const noexcept -> uint32_t
+  {
+    return vq_code_book.extent(0);
+  }
+  /** Dimensionality of a subspace, i.e. the number of vector components mapped to a subspace */
+  [[nodiscard]] constexpr inline auto pq_len() const noexcept -> uint32_t
+  {
+    return pq_code_book.extent(1);
+  }
+  /** The number of vectors in a PQ codebook (`1 << pq_bits`). */
+  [[nodiscard]] constexpr inline auto pq_n_centers() const noexcept -> uint32_t
+  {
+    return pq_code_book.extent(0);
+  }
+};
+
 template <typename DatasetT>
 struct is_vpq_dataset : std::false_type {};
 

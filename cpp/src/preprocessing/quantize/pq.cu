@@ -52,4 +52,44 @@ CUVS_INST_QUANTIZATION(float, uint8_t);
 
 #undef CUVS_INST_QUANTIZATION
 
+// View-type quantizer instantiations
+#define CUVS_INST_QUANTIZATION_VIEW(T, QuantI)                                              \
+  auto build(raft::resources const& res,                                                    \
+             const params params,                                                           \
+             raft::device_matrix_view<const T, uint32_t, raft::row_major> pq_centers,       \
+             raft::device_matrix_view<const T, uint32_t, raft::row_major> vq_centers)       \
+    ->quantizer_view<T>                                                                     \
+  {                                                                                         \
+    return detail::build_view<T>(res, params, pq_centers, vq_centers);                      \
+  }                                                                                         \
+  void transform(raft::resources const& res,                                                \
+                 const quantizer_view<T>& quantizer,                                        \
+                 raft::device_matrix_view<const T, int64_t> dataset,                        \
+                 raft::device_matrix_view<QuantI, int64_t> codes_out,                       \
+                 std::optional<raft::device_vector_view<uint32_t, int64_t>> vq_labels)      \
+  {                                                                                         \
+    detail::transform(res, quantizer, dataset, codes_out, vq_labels);                       \
+  }                                                                                         \
+  void transform(raft::resources const& res,                                                \
+                 const quantizer_view<T>& quantizer,                                        \
+                 raft::host_matrix_view<const T, int64_t> dataset,                          \
+                 raft::device_matrix_view<QuantI, int64_t> codes_out,                       \
+                 std::optional<raft::device_vector_view<uint32_t, int64_t>> vq_labels)      \
+  {                                                                                         \
+    detail::transform(res, quantizer, dataset, codes_out, vq_labels);                       \
+  }                                                                                         \
+  void inverse_transform(                                                                   \
+    raft::resources const& res,                                                             \
+    const quantizer_view<T>& quantizer,                                                     \
+    raft::device_matrix_view<const QuantI, int64_t> pq_codes,                               \
+    raft::device_matrix_view<T, int64_t> out,                                               \
+    std::optional<raft::device_vector_view<const uint32_t, int64_t>> vq_labels)             \
+  {                                                                                         \
+    detail::inverse_transform(res, quantizer, pq_codes, out, vq_labels);                    \
+  }
+
+CUVS_INST_QUANTIZATION_VIEW(float, uint8_t);
+
+#undef CUVS_INST_QUANTIZATION_VIEW
+
 }  // namespace cuvs::preprocessing::quantize::pq
