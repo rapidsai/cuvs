@@ -43,7 +43,7 @@ template <typename DataT,
           AlgorithmType algo,
           bool sqrt,
           DistanceType metric>
-void benchmark_fusedl2nn(benchmark::State& state)
+void benchmark_distance_nn(benchmark::State& state)
 {
   const int m = state.range(0);
   const int n = state.range(1);
@@ -172,41 +172,6 @@ void benchmark_fusedl2nn(benchmark::State& state)
 
   cudaEventDestroy(start);
   cudaEventDestroy(stop);
-  //  if constexpr (algo == AlgorithmType::gemm) {
-  //    if (metric == DistanceType::L2Expanded) {
-  //      reduce_min<DataT, AccT, OutT, IdxT, DistanceType::L2Expanded>(out.data_handle(),
-  //                                                                    (AccT*)workspace.data_handle(),
-  //                                                                    x_norm.data_handle(),
-  //                                                                    y_norm.data_handle(),
-  //                                                                    m,
-  //                                                                    n,
-  //                                                                    stream,
-  //                                                                    sqrt,
-  //                                                                    true);
-  //    } else if (metric == DistanceType::L2SqrtExpanded) {
-  //      reduce_min<DataT, AccT, OutT, IdxT, DistanceType::L2SqrtExpanded>(
-  //        out.data_handle(),
-  //        (AccT*)workspace.data_handle(),
-  //        x_norm.data_handle(),
-  //        y_norm.data_handle(),
-  //        m,
-  //        n,
-  //        stream,
-  //        sqrt,
-  //        true);
-  //    } else if (metric == DistanceType::CosineExpanded) {
-  //      reduce_min<DataT, AccT, OutT, IdxT, DistanceType::CosineExpanded>(
-  //        out.data_handle(),
-  //        (AccT*)workspace.data_handle(),
-  //        x_norm.data_handle(),
-  //        y_norm.data_handle(),
-  //        m,
-  //        n,
-  //        stream,
-  //        sqrt,
-  //        true);
-  //    }
-  //  }
 
   state.counters["M"] = m;
   state.counters["N"] = n;
@@ -217,27 +182,7 @@ void benchmark_fusedl2nn(benchmark::State& state)
 }
 
 template <typename IdxT>
-static void CustomArguments(benchmark::internal::Benchmark* b)
-{
-  /*constexpr int K             = 1024;
-  std::vector<int64_t> m_list = {4 * K, 8 * K};
-  std::vector<int64_t> n_list = {4 * K, 8 * K, 16 * K};
-  // std::vector<int64_t> k_list = {128, 512, 1024, 1536};
-  std::vector<int64_t> k_list = {128, 256, 512};
-  for (auto k : k_list) {
-    for (auto m : m_list) {
-      for (auto n : n_list) {
-        b->Args({m, n, k});
-      }
-    }
-  }*/
-  // b->Args({65536, 256, 128, true, DistanceType::L2Expanded});
-  // b->Args({65536, 256, 128, false, DistanceType::CosineExpanded});
-  //  b->Args({65536, 10000, 768, false});
-}
-
-template <typename IdxT>
-static void add_all_configs(IdxT M, IdxT N, IdxT K)
+static void register_configs(IdxT M, IdxT N, IdxT K)
 {
   benchmark::internal::Benchmark* bench;
 
@@ -248,102 +193,102 @@ static void add_all_configs(IdxT M, IdxT N, IdxT K)
   constexpr DistanceType dist = DistanceType::L2Expanded;
   // Method: Fused, DataT: float, AccT: float
   bench = benchmark::RegisterBenchmark("fused/float/float",
-                                       benchmark_fusedl2nn<float,
-                                                           float,
-                                                           raft::KeyValuePair<int64_t, float>,
-                                                           int64_t,
-                                                           AlgorithmType::fused,
-                                                           sqrt,
-                                                           dist>);
+                                       benchmark_distance_nn<float,
+                                                             float,
+                                                             raft::KeyValuePair<int64_t, float>,
+                                                             int64_t,
+                                                             AlgorithmType::fused,
+                                                             sqrt,
+                                                             dist>);
   bench->Args({M, N, K})->UseManualTime();
 
   // Method: unfused, DataT: float, AccT: float
   bench = benchmark::RegisterBenchmark("unfused/float/float",
-                                       benchmark_fusedl2nn<float,
-                                                           float,
-                                                           raft::KeyValuePair<int64_t, float>,
-                                                           int64_t,
-                                                           AlgorithmType::unfused,
-                                                           sqrt,
-                                                           dist>);
+                                       benchmark_distance_nn<float,
+                                                             float,
+                                                             raft::KeyValuePair<int64_t, float>,
+                                                             int64_t,
+                                                             AlgorithmType::unfused,
+                                                             sqrt,
+                                                             dist>);
   bench->Args({M, N, K})->UseManualTime();
 
   // Method: gemm, DataT: float, AccT: float
   bench = benchmark::RegisterBenchmark("gemm/float/float",
-                                       benchmark_fusedl2nn<float,
-                                                           float,
-                                                           raft::KeyValuePair<int64_t, float>,
-                                                           int64_t,
-                                                           AlgorithmType::gemm,
-                                                           sqrt,
-                                                           dist>);
+                                       benchmark_distance_nn<float,
+                                                             float,
+                                                             raft::KeyValuePair<int64_t, float>,
+                                                             int64_t,
+                                                             AlgorithmType::gemm,
+                                                             sqrt,
+                                                             dist>);
   bench->Args({M, N, K})->UseManualTime();
 
-  // // Method: unfused, DataT: half, AccT: float
-  // bench = benchmark::RegisterBenchmark("unfused/half/float",
-  //                                      benchmark_fusedl2nn<half,
-  //                                                          float,
-  //                                                          raft::KeyValuePair<int64_t, float>,
-  //                                                          int64_t,
-  //                                                          AlgorithmType::unfused,
-  //                                                          sqrt,
-  //                                                          dist>);
-  // bench->Args({M, N, K});
+  // Method: unfused, DataT: half, AccT: float
+  bench = benchmark::RegisterBenchmark("unfused/half/float",
+                                       benchmark_distance_nn<half,
+                                                             float,
+                                                             raft::KeyValuePair<int64_t, float>,
+                                                             int64_t,
+                                                             AlgorithmType::unfused,
+                                                             sqrt,
+                                                             dist>);
+  bench->Args({M, N, K})->UseManualTime();
 
-  // // Method: gemm, DataT: half, AccT: float
-  // bench = benchmark::RegisterBenchmark("gemm/half/float",
-  //                                      benchmark_fusedl2nn<half,
-  //                                                          float,
-  //                                                          raft::KeyValuePair<int64_t, float>,
-  //                                                          int64_t,
-  //                                                          AlgorithmType::gemm,
-  //                                                          sqrt,
-  //                                                          dist>);
-  // bench->Args({M, N, K});
+  // Method: gemm, DataT: half, AccT: float
+  bench = benchmark::RegisterBenchmark("gemm/half/float",
+                                       benchmark_distance_nn<half,
+                                                             float,
+                                                             raft::KeyValuePair<int64_t, float>,
+                                                             int64_t,
+                                                             AlgorithmType::gemm,
+                                                             sqrt,
+                                                             dist>);
+  bench->Args({M, N, K})->UseManualTime();
 
-  // // Method: unfused, DataT: half, AccT: half
-  // bench = benchmark::RegisterBenchmark("unfused/half/half",
-  //                                      benchmark_fusedl2nn<half,
-  //                                                          half,
-  //                                                          raft::KeyValuePair<int64_t, half>,
-  //                                                          int64_t,
-  //                                                          AlgorithmType::unfused,
-  //                                                          sqrt,
-  //                                                          dist>);
-  // bench->Args({M, N, K});
+  // Method: unfused, DataT: half, AccT: half
+  bench = benchmark::RegisterBenchmark("unfused/half/half",
+                                       benchmark_distance_nn<half,
+                                                             half,
+                                                             raft::KeyValuePair<int64_t, half>,
+                                                             int64_t,
+                                                             AlgorithmType::unfused,
+                                                             sqrt,
+                                                             dist>);
+  bench->Args({M, N, K})->UseManualTime();
 
-  // // Method: gemm, DataT: half, AccT: half
-  // bench = benchmark::RegisterBenchmark("gemm/half/half",
-  //                                      benchmark_fusedl2nn<half,
-  //                                                          half,
-  //                                                          raft::KeyValuePair<int64_t, half>,
-  //                                                          int64_t,
-  //                                                          AlgorithmType::gemm,
-  //                                                          sqrt,
-  //                                                          dist>);
-  // bench->Args({M, N, K});
+  // Method: gemm, DataT: half, AccT: half
+  bench = benchmark::RegisterBenchmark("gemm/half/half",
+                                       benchmark_distance_nn<half,
+                                                             half,
+                                                             raft::KeyValuePair<int64_t, half>,
+                                                             int64_t,
+                                                             AlgorithmType::gemm,
+                                                             sqrt,
+                                                             dist>);
+  bench->Args({M, N, K})->UseManualTime();
 
-  // // Method: unfused, DataT: int8_t, AccT: int32_t
-  // bench = benchmark::RegisterBenchmark("unfused/int8_t/int32_t",
-  //                                      benchmark_fusedl2nn<int8_t,
-  //                                                          int32_t,
-  //                                                          raft::KeyValuePair<int64_t, int32_t>,
-  //                                                          int64_t,
-  //                                                          AlgorithmType::unfused,
-  //                                                          sqrt,
-  //                                                          dist>);
-  // bench->Args({M, N, K});
+  // Method: unfused, DataT: int8_t, AccT: int32_t
+  bench = benchmark::RegisterBenchmark("unfused/int8_t/int32_t",
+                                       benchmark_distance_nn<int8_t,
+                                                             int32_t,
+                                                             raft::KeyValuePair<int64_t, int32_t>,
+                                                             int64_t,
+                                                             AlgorithmType::unfused,
+                                                             sqrt,
+                                                             dist>);
+  bench->Args({M, N, K})->UseManualTime();
 
-  // // Method: gemm, DataT: int8_t, AccT: int32_t
-  // bench = benchmark::RegisterBenchmark("gemm/int8_t/int32_t",
-  //                                      benchmark_fusedl2nn<int8_t,
-  //                                                          int32_t,
-  //                                                          raft::KeyValuePair<int64_t, int32_t>,
-  //                                                          int64_t,
-  //                                                          AlgorithmType::gemm,
-  //                                                          sqrt,
-  //                                                          dist>);
-  // bench->Args({M, N, K});
+  // Method: gemm, DataT: int8_t, AccT: int32_t
+  bench = benchmark::RegisterBenchmark("gemm/int8_t/int32_t",
+                                       benchmark_distance_nn<int8_t,
+                                                             int32_t,
+                                                             raft::KeyValuePair<int64_t, int32_t>,
+                                                             int64_t,
+                                                             AlgorithmType::gemm,
+                                                             sqrt,
+                                                             dist>);
+  bench->Args({M, N, K})->UseManualTime();
 }
 
 int main(int argc, char** argv)
@@ -379,12 +324,12 @@ int main(int argc, char** argv)
   }
 
   if (M == 0 && N == 0 && K == 0) {
-    M = 16 * 1024;
-    N = 4 * 1024;
-    K = 128;
-    add_all_configs<IdxT>(M, N, K);
+    register_configs<IdxT>(16 * 1024, 4 * 1024, 128);
+    register_configs<IdxT>(16 * 1024, 4 * 1024, 64);
+    register_configs<IdxT>(8 * 1024, 2 * 1024, 64);
+    register_configs<IdxT>(4 * 1024, 1024, 64);
   } else {
-    add_all_configs<IdxT>(M, N, K);
+    register_configs<IdxT>(M, N, K);
   }
 
   // Initialize benchmark
