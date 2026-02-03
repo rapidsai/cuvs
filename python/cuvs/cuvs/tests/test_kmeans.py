@@ -69,3 +69,83 @@ def test_cluster_cost(n_rows, n_cols, n_clusters, dtype):
     # need reduced tolerance for float32
     tol = 1e-3 if dtype == np.float32 else 1e-6
     assert np.allclose(inertia, sum(cluster_distances), rtol=tol, atol=tol)
+
+
+@pytest.mark.parametrize("n_rows", [1000])
+@pytest.mark.parametrize("n_cols", [10])
+@pytest.mark.parametrize("n_clusters", [8])
+@pytest.mark.parametrize("dtype", [np.float32])
+@pytest.mark.parametrize(
+    "batch_samples_list",
+    [
+        [32, 64, 128, 256, 512],  # various batch sizes
+    ],
+)
+def test_kmeans_batch_size_determinism(
+    n_rows, n_cols, n_clusters, dtype, batch_samples_list
+):
+    """
+    Test that different batch sizes produce identical centroids.
+
+    When starting from the same initial centroids, the k-means algorithm
+    should produce identical final centroids regardless of the batch_samples
+    parameter. This is because the accumulated adjustments to centroids after
+    the entire dataset pass should be the same.
+    """
+    # Use fixed seed for reproducibility
+    rng = np.random.default_rng(42)
+
+    # Generate random data
+    X_host = rng.random((n_rows, n_cols)).astype(dtype)
+    X = device_ndarray(X_host)
+
+    # Generate fixed initial centroids (using first n_clusters rows)
+    initial_centroids_host = X_host[:n_clusters].copy()
+
+    # Store results from each batch size
+    results = []
+
+    for batch_samples in batch_samples_list:
+        # Create fresh copy of initial centroids for each run
+        centroids = device_ndarray(initial_centroids_host.copy())
+
+        params = KMeansParams(
+            n_clusters=n_clusters,
+            init_method="Array",  # Use provided centroids
+            max_iter=100,
+            tol=1e-10,  # Very small tolerance to ensure convergence
+            batch_samples=batch_samples,
+        )
+
+        centroids_out, inertia, n_iter = fit(params, X, centroids)
+        results.append(
+            {
+                "batch_samples": batch_samples,
+                "centroids": centroids_out.copy_to_host(),
+                "inertia": inertia,
+                "n_iter": n_iter,
+            }
+        )
+
+    # Compare all results against the first one
+    reference = results[0]
+    for result in results[1:]:
+        # Centroids should be identical (or very close due to float precision)
+        assert np.allclose(
+            reference["centroids"],
+            result["centroids"],
+            rtol=1e-5,
+            atol=1e-5,
+        ), (
+            f"Centroids differ between batch_samples="
+            f"{reference['batch_samples']} and {result['batch_samples']}"
+        )
+
+        # Inertia should also be identical
+        assert np.allclose(
+            reference["inertia"], result["inertia"], rtol=1e-5, atol=1e-5
+        ), (
+            f"Inertia differs between batch_samples="
+            f"{reference['batch_samples']} and {result['batch_samples']}: "
+            f"{reference['inertia']} vs {result['inertia']}"
+        )
