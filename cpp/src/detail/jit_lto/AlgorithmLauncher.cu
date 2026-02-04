@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <cuvs/detail/jit_lto/AlgorithmLauncher.h>
+#include <cuvs/detail/jit_lto/AlgorithmLauncher.hpp>
 
 #include <raft/util/cuda_rt_essentials.hpp>
 

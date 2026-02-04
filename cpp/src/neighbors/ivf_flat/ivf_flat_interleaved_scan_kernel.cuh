@@ -38,52 +38,6 @@ template <typename T>
 extern __device__ T post_process(T val);
 
 /**
- * @brief Copy `n` elements per block from one place to another.
- *
- * @param[out] out target pointer (unique per block)
- * @param[in] in source pointer
- * @param n number of elements to copy
- */
-template <int VecBytes = 16, typename T>
-__device__ inline void copy_vectorized(T* out, const T* in, uint32_t n)
-{
-  constexpr int VecElems = VecBytes / sizeof(T);  // NOLINT
-  using align_bytes      = raft::Pow2<(size_t)VecBytes>;
-  if constexpr (VecElems > 1) {
-    using align_elems = raft::Pow2<VecElems>;
-    if (!align_bytes::areSameAlignOffsets(out, in)) {
-      return copy_vectorized<(VecBytes >> 1), T>(out, in, n);
-    }
-    {  // process unaligned head
-      uint32_t head = align_bytes::roundUp(in) - in;
-      if (head > 0) {
-        copy_vectorized<sizeof(T), T>(out, in, head);
-        n -= head;
-        in += head;
-        out += head;
-      }
-    }
-    {  // process main part vectorized
-      using vec_t = typename raft::IOType<T, VecElems>::Type;
-      copy_vectorized<sizeof(vec_t), vec_t>(
-        reinterpret_cast<vec_t*>(out), reinterpret_cast<const vec_t*>(in), align_elems::div(n));
-    }
-    {  // process unaligned tail
-      uint32_t tail = align_elems::mod(n);
-      if (tail > 0) {
-        n -= tail;
-        copy_vectorized<sizeof(T), T>(out + n, in + n, tail);
-      }
-    }
-  }
-  if constexpr (VecElems <= 1) {
-    for (int i = threadIdx.x; i < n; i += blockDim.x) {
-      out[i] = in[i];
-    }
-  }
-}
-
-/**
  * @brief Load a part of a vector from the index and from query, compute the (part of the) distance
  * between them, and aggregate it using the provided Lambda; one structure per thread, per query,
  * and per index item.

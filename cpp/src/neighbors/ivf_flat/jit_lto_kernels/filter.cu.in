@@ -18,7 +18,7 @@ template __device__ bool sample_filter<int64_t>(int64_t* const* const, const uin
 
 #else
 
-#include <cuvs/detail/jit_lto/RegisterKernelFragment.h>
+#include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
 #include "@filter_name@.h"
 
 __attribute__((__constructor__)) static void register_@filter_name@()

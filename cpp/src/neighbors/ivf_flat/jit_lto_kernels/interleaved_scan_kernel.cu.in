@@ -21,7 +21,7 @@ template __global__ void interleaved_scan_kernel<@capacity@, @veclen@, @ascendin
 
 #else
 
-#include <cuvs/detail/jit_lto/RegisterKernelFragment.h>
+#include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
 #include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>
 #include "interleaved_scan_kernel_@capacity@_@veclen@_@ascending@_@compute_norm@_@type_abbrev@_@acc_abbrev@_@idx_abbrev@.h"
 

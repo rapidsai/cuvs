@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <cuvs/detail/jit_lto/FragmentDatabase.h>
-#include <cuvs/detail/jit_lto/FragmentEntry.h>
+#include <cuvs/detail/jit_lto/FragmentDatabase.hpp>
+#include <cuvs/detail/jit_lto/FragmentEntry.hpp>
 
 #include <raft/core/error.hpp>
 

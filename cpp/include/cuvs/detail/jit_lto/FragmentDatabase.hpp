@@ -9,8 +9,8 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "FragmentEntry.h"
-#include "MakeFragmentKey.h"
+#include "FragmentEntry.hpp"
+#include "MakeFragmentKey.hpp"
 
 class FragmentDatabase {
  public:

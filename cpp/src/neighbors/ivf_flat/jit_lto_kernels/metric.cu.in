@@ -18,7 +18,7 @@ template __device__ void compute_dist<@veclen@, @data_type@, @acc_type@>(@acc_ty
 
 #else
 
-#include <cuvs/detail/jit_lto/RegisterKernelFragment.h>
+#include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
 #include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>
 #include "metric_@metric_name@_@veclen@_@type_abbrev@_@acc_abbrev@.h"
 

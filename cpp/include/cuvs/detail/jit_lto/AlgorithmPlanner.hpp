@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#include "AlgorithmLauncher.h"
+#include "AlgorithmLauncher.hpp"
 
 struct FragmentEntry;
 

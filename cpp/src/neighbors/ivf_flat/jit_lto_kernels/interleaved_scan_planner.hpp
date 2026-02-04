@@ -5,9 +5,9 @@
 
 #pragma once
 
-#include <cuvs/detail/jit_lto/AlgorithmPlanner.h>
-#include <cuvs/detail/jit_lto/FragmentDatabase.h>
-#include <cuvs/detail/jit_lto/MakeFragmentKey.h>
+#include <cuvs/detail/jit_lto/AlgorithmPlanner.hpp>
+#include <cuvs/detail/jit_lto/FragmentDatabase.hpp>
+#include <cuvs/detail/jit_lto/MakeFragmentKey.hpp>
 #include <iostream>
 #include <string>
 

@@ -8,12 +8,13 @@
 #include <chrono>
 #include <iterator>
 #include <memory>
+#include <mutex>
 #include <new>
 #include <string>
 #include <vector>
 
-#include <cuvs/detail/jit_lto/AlgorithmPlanner.h>
-#include <cuvs/detail/jit_lto/FragmentDatabase.h>
+#include <cuvs/detail/jit_lto/AlgorithmPlanner.hpp>
+#include <cuvs/detail/jit_lto/FragmentDatabase.hpp>
 
 #include "cuda_runtime.h"
 #include "nvJitLink.h"
@@ -47,6 +48,9 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::get_launcher()
 {
   auto& launchers = get_cached_launchers();
   auto launch_key = this->entrypoint + this->get_device_functions_key();
+
+  static std::mutex cache_mutex;
+  std::lock_guard<std::mutex> lock(cache_mutex);
   if (launchers.count(launch_key) == 0) {
     add_entrypoint();
     add_device_functions();

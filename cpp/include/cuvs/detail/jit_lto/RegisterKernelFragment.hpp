@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "MakeFragmentKey.h"
+#include "MakeFragmentKey.hpp"
 
 void registerFatbinFragment(std::string const& algo,
                             std::string const& params,
