@@ -5,7 +5,7 @@
 
 #include "ivf_common.cuh"
 
-#include <raft/core/cudart_utils.hpp>
+#include <raft/util/cudart_utils.hpp>
 #include <raft/util/pow2_utils.cuh>
 
 #include <cub/cub.cuh>

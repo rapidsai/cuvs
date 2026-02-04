@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,8 +8,8 @@
 #include "../test_utils.cuh"
 
 #include <cuvs/distance/distance.hpp>   // cuvs::distance::DistanceType
-#include <raft/common/nvtx.hpp>         // raft::common::nvtx::range
 #include <raft/core/device_mdspan.hpp>  //raft::make_device_matrix_view
+#include <raft/core/nvtx.hpp>           // raft::core::nvtx::range
 #include <raft/core/operators.hpp>      // raft::sqrt
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>  // raft::resources
