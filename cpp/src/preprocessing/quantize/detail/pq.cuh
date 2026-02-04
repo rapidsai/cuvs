@@ -334,9 +334,6 @@ void vpq_convert_math_type(const raft::resources& res,
                            const cuvs::neighbors::vpq_dataset<OldMathT, IdxT>& src,
                            cuvs::neighbors::vpq_dataset<NewMathT, IdxT>& dst)
 {
-  /*auto vq_code_book = raft::make_device_mdarray<NewMathT>(res, src.vq_code_book.extents());
-  auto pq_code_book = raft::make_device_mdarray<NewMathT>(res, src.pq_code_book.extents());*/
-
   raft::linalg::map(res,
                     dst.vq_code_book.view(),
                     cuvs::spatial::knn::detail::utils::mapping<NewMathT>{},
@@ -345,8 +342,6 @@ void vpq_convert_math_type(const raft::resources& res,
                     dst.pq_code_book.view(),
                     cuvs::spatial::knn::detail::utils::mapping<NewMathT>{},
                     raft::make_const_mdspan(src.pq_code_book.view()));
-  /*return cuvs::neighbors::vpq_dataset<NewMathT, IdxT>{
-    std::move(vq_code_book), std::move(pq_code_book), std::move(src.data)};*/
 }
 
 template <typename DatasetT, typename MathT, typename IdxT>
