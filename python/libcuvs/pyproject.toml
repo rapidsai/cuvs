@@ -17,7 +17,7 @@ authors = [
     { name = "NVIDIA Corporation" },
 ]
 license = "Apache-2.0"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "cuda-toolkit[cublas,curand,cusolver,cusparse]>=12,<14",
     "libraft==26.4.*,>=0.0.0a0",
@@ -90,8 +90,6 @@ matrix-entry = "cuda_suffixed=true;use_cuda_wheels=true"
 
 [tool.pydistcheck]
 select = [
+    # note: max_allowed_size_compressed is set as a command-line arg
     "distro-too-large-compressed",
 ]
-
-# detect when package size grows significantly
-max_allowed_size_compressed = '950M'
