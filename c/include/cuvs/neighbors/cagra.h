@@ -564,33 +564,6 @@ cuvsError_t cuvsCagraIndexGetGraph(cuvsCagraIndex_t index, DLManagedTensor* grap
  */
 
 /**
- * @defgroup cagra_c_merge_params C API for CUDA ANN Graph-based nearest neighbor search
- * @{
- */
-
-/**
- * @brief Supplemental parameters to merge CAGRA index
- *
- */
-
-struct cuvsCagraMergeParams {
-  cuvsCagraIndexParams_t output_index_params;
-  cuvsMergeStrategy strategy;
-};
-
-typedef struct cuvsCagraMergeParams* cuvsCagraMergeParams_t;
-
-/** Allocate CAGRA merge params with default values */
-cuvsError_t cuvsCagraMergeParamsCreate(cuvsCagraMergeParams_t* params);
-
-/** De-allocate CAGRA merge params */
-cuvsError_t cuvsCagraMergeParamsDestroy(cuvsCagraMergeParams_t params);
-
-/**
- * @}
- */
-
-/**
  * @defgroup cagra_c_index_build C API for CUDA ANN Graph-based nearest neighbor search
  * @{
  */
@@ -859,7 +832,7 @@ cuvsError_t cuvsCagraIndexFromArgs(cuvsResources_t res,
  *
  * All input indices must have been built with the same data type (`index.dtype`) and
  * have the same dimensionality (`index.dims`). The merged index uses the output
- * parameters specified in `cuvsCagraMergeParams`.
+ * parameters specified in `cuvsCagraIndexParams`.
  *
  * Input indices must have:
  *  - `index.dtype.code` and `index.dtype.bits` matching across all indices.
@@ -886,29 +859,31 @@ cuvsError_t cuvsCagraIndexFromArgs(cuvsResources_t res,
  *
  * // Assume index1 and index2 have been built using cuvsCagraBuild
  *
- * cuvsCagraMergeParams_t merge_params;
- * cuvsError_t params_create_status = cuvsCagraMergeParamsCreate(&merge_params);
+ * cuvsCagraIndexParams_t merge_params;
+ * cuvsError_t params_create_status = cuvsCagraIndexParamsCreate(&merge_params);
  *
  * cuvsError_t merge_status = cuvsCagraMerge(res, merge_params, (cuvsCagraIndex_t[]){index1,
  * index2}, 2, merged_index);
  *
  * // Use merged_index for search operations
  *
- * cuvsError_t params_destroy_status = cuvsCagraMergeParamsDestroy(merge_params);
+ * cuvsError_t params_destroy_status = cuvsCagraIndexParamsDestroy(merge_params);
  * cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
  * @endcode
  *
  * @param[in] res cuvsResources_t opaque C handle
- * @param[in] params cuvsCagraMergeParams_t parameters controlling merge behavior
+ * @param[in] params cuvsCagraIndexParams_t parameters controlling merge behavior
  * @param[in] indices Array of input cuvsCagraIndex_t handles to merge
  * @param[in] num_indices Number of input indices
+ * @param[in] filter Filter that can be used to filter out vectors from the merged index
  * @param[out] output_index Output handle that will store the merged index.
  *                          Must be initialized using `cuvsCagraIndexCreate` before use.
  */
 cuvsError_t cuvsCagraMerge(cuvsResources_t res,
-                           cuvsCagraMergeParams_t params,
+                           cuvsCagraIndexParams_t params,
                            cuvsCagraIndex_t* indices,
                            size_t num_indices,
+                           cuvsFilter filter,
                            cuvsCagraIndex_t output_index);
 
 /**
