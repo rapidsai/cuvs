@@ -1,8 +1,10 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
+
+// #define _CLK_BREAKDOWN
 
 #include "hashmap.hpp"
 #include "utils.hpp"
@@ -175,6 +177,9 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
   const IndexT* __restrict__ parent_indices,
   const IndexT* __restrict__ internal_topk_list,
   const uint32_t search_width,
+#ifdef _CLK_BREAKDOWN
+  std::uint64_t& clk_compute_actual_distance,
+#endif
   int* __restrict__ result_position = nullptr,
   const int max_result_position     = 0)
 {
@@ -227,16 +232,59 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
     // > const auto child_dist = dataset_desc.compute_distance(child_id, child_id != invalid_index);
     // Instead, we manually inline this function for performance reasons.
     // This allows us to move the fetching of the arguments from shared memory out of the loop.
+#ifdef _CLK_BREAKDOWN
+    const auto start_clock = clock64();
+#endif
     const DistanceT child_dist = device::team_sum(
       (child_id != invalid_index) ? compute_distance(args, child_id)
                                   : (lead_lane ? raft::upper_bound<DistanceT>() : 0),
       team_size_bits);
     __syncwarp();
+#ifdef _CLK_BREAKDOWN
+    clk_compute_actual_distance += clock64() - start_clock;
+#endif
 
     // Store the distance
     if (valid_i && lead_lane) { result_child_distances_ptr[j] = child_dist; }
   }
 }
+
+template <uint32_t Bit>
+struct uintN_t {};
+template <>
+struct uintN_t<32> {
+  using type = uint32_t;
+};
+template <>
+struct uintN_t<64> {
+  using type = uint64_t;
+};
+
+template <uint32_t NumPacked, uint32_t ExpBits>
+struct fp8xN {};
+
+template <uint32_t NumPacked>
+struct fp8xN<NumPacked, 5> {
+  using uint_t                           = typename uintN_t<8 * NumPacked>::type;
+  using unit_t                           = __nv_fp8_e5m2;
+  using x2_t                             = __nv_fp8x2_storage_t;
+  static constexpr uint32_t num_elements = NumPacked;
+
+  union {
+    unit_t x1[num_elements];
+    x2_t x2[num_elements / 2];
+    uint_t u;
+  } data;
+
+  HDI fp8xN() { data.u = 0; }
+
+  HDI uint_t& as_uint() { return data.u; }
+  HDI uint_t as_uint() const { return data.u; }
+  HDI half2 as_half2(const uint32_t i) const
+  {
+    return __nv_cvt_fp8x2_to_halfraw2(data.x2[i], __NV_E5M2);
+  }
+};
 
 RAFT_DEVICE_INLINE_FUNCTION void lds(float& x, uint32_t addr)
 {
@@ -282,6 +330,11 @@ RAFT_DEVICE_INLINE_FUNCTION void lds(uint32_t& x, uint32_t addr)
   asm volatile("ld.shared.u32 {%0}, [%1];" : "=r"(x) : "r"(addr));
 }
 
+RAFT_DEVICE_INLINE_FUNCTION void lds(uint64_t& x, uint32_t addr)
+{
+  asm volatile("ld.shared.u64 {%0}, [%1];" : "=l"(x) : "r"(addr));
+}
+
 RAFT_DEVICE_INLINE_FUNCTION void lds(uint32_t& x, const uint32_t* addr)
 {
   lds(x, uint32_t(__cvta_generic_to_shared(addr)));
@@ -297,6 +350,16 @@ RAFT_DEVICE_INLINE_FUNCTION void lds(uint4& x, uint32_t addr)
 RAFT_DEVICE_INLINE_FUNCTION void lds(uint4& x, const uint4* addr)
 {
   lds(x, uint32_t(__cvta_generic_to_shared(addr)));
+}
+
+RAFT_DEVICE_INLINE_FUNCTION void sts(uint32_t addr, const uint32_t& x)
+{
+  asm volatile("st.shared.u32 [%0], %1;" : : "r"(addr), "r"(reinterpret_cast<const uint32_t&>(x)));
+}
+
+RAFT_DEVICE_INLINE_FUNCTION void sts(uint32_t addr, const uint64_t& x)
+{
+  asm volatile("st.shared.u64 [%0], %1;" : : "r"(addr), "l"(reinterpret_cast<const uint64_t&>(x)));
 }
 
 RAFT_DEVICE_INLINE_FUNCTION void sts(uint32_t addr, const half2& x)
