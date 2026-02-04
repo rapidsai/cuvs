@@ -112,8 +112,8 @@ public class CuVSProviderIT extends CuVSTestCase {
           Please upgrade your software, or install a previous version of libcuvs_c.\
           """,
           ex.getMessage());
-      // rapids-pre-commit-hooks: enable[verify-hardcoded-version]
       System.setProperty("cuvs.max_version", "26.12.0");
+      // rapids-pre-commit-hooks: enable[verify-hardcoded-version]
       checkCuVSVersionMatching("25.12.0", 26, 12, 0);
     } catch (ProviderInitializationException e) {
       throw new AssertionError(e);
