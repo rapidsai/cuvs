@@ -8,39 +8,34 @@ import numpy as np
 import pytest
 from pylibraft.common import DeviceResources, device_ndarray
 
-from cuvs.common.resources import _PylibraftHandleWrapper
+from cuvs.common import Resources
 from cuvs.neighbors import brute_force
 
 
-# --- Pylibraft Handle Wrapper Tests ---
+def test_resources_from_pylibraft_handle():
+    """Test creating Resources from a pylibraft DeviceResources handle."""
+    pylibraft_handle = DeviceResources()
+
+    # Create cuVS Resources from pylibraft handle
+    resources = Resources(handle=pylibraft_handle.getHandle())
+
+    # Should have get_c_obj method that returns the same pointer
+    assert hasattr(resources, "get_c_obj")
+    assert hasattr(resources, "sync")
+    assert resources.get_c_obj() == pylibraft_handle.getHandle()
 
 
-def test_wrapper_with_device_resources():
-    """Test that wrapper correctly wraps DeviceResources."""
-    handle = DeviceResources()
-    wrapper = _PylibraftHandleWrapper(handle)
-
-    # Should have get_c_obj method
-    assert hasattr(wrapper, "get_c_obj")
-    assert hasattr(wrapper, "sync")
-
-    # get_c_obj should return the same pointer as getHandle
-    assert wrapper.get_c_obj() == handle.getHandle()
-
-
-def test_wrapper_rejects_invalid_object():
-    """Test that wrapper raises TypeError for invalid objects."""
-    with pytest.raises(TypeError, match="cuVS Resources or pylibraft"):
-        _PylibraftHandleWrapper("invalid")
+def test_auto_sync_rejects_invalid_object():
+    """Test that auto_sync_resources raises TypeError for invalid objects."""
+    n_samples, n_features = 10, 4
+    dataset = np.random.random((n_samples, n_features)).astype(np.float32)
+    dataset_device = device_ndarray(dataset)
 
     with pytest.raises(TypeError, match="cuVS Resources or pylibraft"):
-        _PylibraftHandleWrapper(123)
+        brute_force.build(dataset_device, resources="invalid")
 
     with pytest.raises(TypeError, match="cuVS Resources or pylibraft"):
-        _PylibraftHandleWrapper(None)
-
-
-# --- Pylibraft DeviceResources Compatibility Tests ---
+        brute_force.build(dataset_device, resources=123)
 
 
 def test_brute_force_build_with_pylibraft_handle():
@@ -61,25 +56,19 @@ def test_brute_force_build_with_pylibraft_handle():
     assert index.trained
 
 
-# --- Multi-GPU Tests ---
+def test_multi_gpu_resources_from_pylibraft_snmg_handle():
+    """Test creating MultiGpuResources from a pylibraft DeviceResourcesSNMG."""
+    from pylibraft.common import DeviceResourcesSNMG
+    from cuvs.common import MultiGpuResources
 
+    pylibraft_handle = DeviceResourcesSNMG()
 
-def test_snmg_wrapper_with_device_resources_snmg():
-    """Test that SNMG wrapper correctly wraps DeviceResourcesSNMG."""
-    try:
-        from pylibraft.common import DeviceResourcesSNMG
-    except ImportError:
-        pytest.skip("DeviceResourcesSNMG not available")
+    # Create cuVS MultiGpuResources from pylibraft handle
+    resources = MultiGpuResources(handle=pylibraft_handle.getHandle())
 
-    from cuvs.common.mg_resources import _PylibraftSNMGWrapper
-
-    # This test can run on single GPU - just testing the wrapper
-    handle = DeviceResourcesSNMG()
-    wrapper = _PylibraftSNMGWrapper(handle)
-
-    assert hasattr(wrapper, "get_c_obj")
-    assert hasattr(wrapper, "sync")
-    assert wrapper.get_c_obj() == handle.getHandle()
+    assert hasattr(resources, "get_c_obj")
+    assert hasattr(resources, "sync")
+    assert resources.get_c_obj() == pylibraft_handle.getHandle()
 
 
 def test_mg_algorithm_with_pylibraft_snmg_handle():
@@ -104,14 +93,3 @@ def test_mg_algorithm_with_pylibraft_snmg_handle():
     handle.sync()
 
     assert index.trained
-
-
-def test_snmg_wrapper_rejects_invalid_object():
-    """Test that SNMG wrapper raises TypeError for invalid objects."""
-    from cuvs.common.mg_resources import _PylibraftSNMGWrapper
-
-    with pytest.raises(TypeError, match="MultiGpuResources or pylibraft"):
-        _PylibraftSNMGWrapper("invalid")
-
-    with pytest.raises(TypeError, match="MultiGpuResources or pylibraft"):
-        _PylibraftSNMGWrapper(123)

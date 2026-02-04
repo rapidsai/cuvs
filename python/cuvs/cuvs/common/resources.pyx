@@ -52,8 +52,15 @@ cdef class Resources:
     >>> handle = Resources(stream=cupy_stream.ptr)
     """
 
-    def __cinit__(self, stream=None):
-        check_cuvs(cuvsResourcesCreate(&self.c_obj))
+    def __cinit__(self, stream=None, handle=None):
+        if handle is not None:
+            # Use existing handle (e.g., from pylibraft)
+            self.c_obj = <cuvsResources_t><size_t>handle
+            self._owns_resource = False
+        else:
+            check_cuvs(cuvsResourcesCreate(&self.c_obj))
+            self._owns_resource = True
+
         if stream:
             check_cuvs(cuvsStreamSet(self.c_obj, <cudaStream_t>stream))
 
@@ -67,7 +74,8 @@ cdef class Resources:
         return <size_t> self.c_obj
 
     def __dealloc__(self):
-        check_cuvs(cuvsResourcesDestroy(self.c_obj))
+        if self._owns_resource:
+            check_cuvs(cuvsResourcesDestroy(self.c_obj))
 
 
 _resources_param_string = """
@@ -79,31 +87,6 @@ _resources_param_string = """
         before accessing the output. Also accepts pylibraft
         DeviceResources or Handle objects.
 """.strip()
-
-
-class _PylibraftHandleWrapper:
-    """
-    Adapter to use pylibraft DeviceResources/Handle with cuVS APIs.
-
-    This allows users to pass a pylibraft handle to cuVS functions
-    that expect a cuVS Resources object.
-    """
-
-    def __init__(self, handle):
-        if not hasattr(handle, 'getHandle'):
-            raise TypeError(
-                "resources must be a cuVS Resources or pylibraft "
-                "DeviceResources/Handle object"
-            )
-        self._handle = handle
-
-    def get_c_obj(self):
-        """Return the pointer to the underlying resources as a size_t"""
-        return self._handle.getHandle()
-
-    def sync(self):
-        """Synchronize the stream."""
-        self._handle.sync()
 
 
 def auto_sync_resources(f):
@@ -126,9 +109,14 @@ def auto_sync_resources(f):
 
         if resources is None:
             resources = Resources()
-        elif not hasattr(resources, 'get_c_obj'):
-            # Wrap to provide cuVS interface (e.g., pylibraft DeviceResources)
-            resources = _PylibraftHandleWrapper(resources)
+        elif not isinstance(resources, Resources):
+            # Create a Resources instance from pylibraft DeviceResources/Handle
+            if not hasattr(resources, 'getHandle'):
+                raise TypeError(
+                    "resources must be a cuVS Resources or pylibraft "
+                    "DeviceResources/Handle object"
+                )
+            resources = Resources(handle=resources.getHandle())
 
         ret_value = f(*args, resources=resources, **kwargs)
 
