@@ -12,8 +12,10 @@
 #include <string>
 #include <vector>
 
+#include <cstdlib>
 #include <cuvs/detail/jit_lto/AlgorithmPlanner.h>
 #include <cuvs/detail/jit_lto/FragmentDatabase.h>
+#include <fstream>
 #include <iostream>
 
 #include "cuda_runtime.h"
@@ -74,7 +76,6 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
   check_nvjitlink_result(handle, result);
 
   for (auto& frag : this->fragments) {
-    std::cout << "Adding fragment: " << frag->compute_key << std::endl;
     frag->add_to(handle);
   }
 
@@ -82,6 +83,10 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
   // modules perform any optimizations and generate cubin from it.
   result = nvJitLinkComplete(handle);
   check_nvjitlink_result(handle, result);
+
+  // Dump CUBIN if CUVS_DUMP_CUBIN is set
+  static int dump_counter = 0;
+  bool dump_cubin         = std::getenv("CUVS_DUMP_CUBIN") != nullptr;
 
   // get cubin from nvJitLink
   size_t cubin_size;
@@ -91,6 +96,14 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
   std::unique_ptr<char[]> cubin{new char[cubin_size]};
   result = nvJitLinkGetLinkedCubin(handle, cubin.get());
   check_nvjitlink_result(handle, result);
+
+  // Dump CUBIN for analysis with cuobjdump
+  if (dump_cubin) {
+    std::string filename = "/tmp/jit_kernel_" + std::to_string(dump_counter++) + ".cubin";
+    std::ofstream out(filename, std::ios::binary);
+    out.write(cubin.get(), cubin_size);
+    std::cerr << "Dumped CUBIN to: " << filename << " (" << cubin_size << " bytes)" << std::endl;
+  }
 
   result = nvJitLinkDestroy(&handle);
   check_nvjitlink_result(handle, result);

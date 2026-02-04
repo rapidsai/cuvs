@@ -19,8 +19,14 @@ def plot_benchmark_results(csv_file: str):
     # Read data
     df = pd.read_csv(csv_file)
 
-    # Create figure with 2x2 subplots
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    # Check if first_* columns exist (new format)
+    has_first_times = "first_builtin_ms" in df.columns
+
+    # Create figure with 2x3 subplots if we have first times, else 2x2
+    if has_first_times:
+        fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+    else:
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     fig.suptitle(
         "IVF-Flat UDF Benchmark: Built-in vs Macro UDF vs Raw UDF\n(1M vectors, 512 dims, 100 queries)",
         fontsize=14,
@@ -199,6 +205,92 @@ def plot_benchmark_results(csv_file: str):
             fontweight="bold",
         )
 
+    # =========================================================================
+    # Plot 5 & 6: First-run JIT times (if available)
+    # =========================================================================
+    if has_first_times:
+        ax5 = axes[0, 2]
+        ax6 = axes[1, 2]
+
+        # Float32 first-run times
+        data_f32 = df[df["dtype"] == "float32"]
+        x = np.arange(len(data_f32))
+        width = 0.25
+
+        ax5.bar(
+            x - width,
+            data_f32["first_builtin_ms"],
+            width,
+            label="Built-in",
+            color=colors["float32"],
+            alpha=0.9,
+        )
+        ax5.bar(
+            x,
+            data_f32["first_udf_ms"],
+            width,
+            label="Macro UDF",
+            color=colors["float32"],
+            alpha=0.5,
+            hatch="//",
+        )
+        ax5.bar(
+            x + width,
+            data_f32["first_raw_ms"],
+            width,
+            label="Raw UDF",
+            color=colors["float32"],
+            alpha=0.3,
+            hatch="\\\\",
+        )
+
+        ax5.set_xlabel("k (neighbors)")
+        ax5.set_ylabel("Time (ms)")
+        ax5.set_title("Float32: First Run (incl. JIT)")
+        ax5.set_xticks(x)
+        ax5.set_xticklabels(data_f32["k"])
+        ax5.legend(loc="upper left")
+        ax5.grid(axis="y", alpha=0.3)
+
+        # Int8 first-run times
+        data_int8 = df[df["dtype"] == "int8"]
+        x = np.arange(len(data_int8))
+
+        ax6.bar(
+            x - width,
+            data_int8["first_builtin_ms"],
+            width,
+            label="Built-in",
+            color=colors["int8"],
+            alpha=0.9,
+        )
+        ax6.bar(
+            x,
+            data_int8["first_udf_ms"],
+            width,
+            label="Macro UDF",
+            color=colors["int8"],
+            alpha=0.5,
+            hatch="//",
+        )
+        ax6.bar(
+            x + width,
+            data_int8["first_raw_ms"],
+            width,
+            label="Raw UDF",
+            color=colors["int8"],
+            alpha=0.3,
+            hatch="\\\\",
+        )
+
+        ax6.set_xlabel("k (neighbors)")
+        ax6.set_ylabel("Time (ms)")
+        ax6.set_title("Int8: First Run (incl. JIT)")
+        ax6.set_xticks(x)
+        ax6.set_xticklabels(data_int8["k"])
+        ax6.legend(loc="upper left")
+        ax6.grid(axis="y", alpha=0.3)
+
     plt.tight_layout()
 
     # Save figure
@@ -210,12 +302,26 @@ def plot_benchmark_results(csv_file: str):
 def print_summary(csv_file: str):
     """Print a summary table of results."""
     df = pd.read_csv(csv_file)
+    has_first_times = "first_builtin_ms" in df.columns
 
-    print("\n" + "=" * 100)
+    print("\n" + "=" * 120)
     print("UDF Benchmark Summary")
-    print("=" * 100)
+    print("=" * 120)
+
+    if has_first_times:
+        print("\n--- First Run (includes JIT compilation) ---")
+        print(
+            f"{'dtype':<10} {'k':<6} {'Built-in (ms)':<15} {'Macro UDF (ms)':<15} {'Raw UDF (ms)':<15}"
+        )
+        print("-" * 60)
+        for _, row in df.iterrows():
+            print(
+                f"{row['dtype']:<10} {row['k']:<6} {row['first_builtin_ms']:<15.1f} {row['first_udf_ms']:<15.1f} {row['first_raw_ms']:<15.1f}"
+            )
+
+    print("\n--- Median (cached, 20 iterations) ---")
     print(
-        f"\n{'dtype':<10} {'k':<6} {'Built-in (ms)':<15} {'Macro UDF (ms)':<15} {'Raw UDF (ms)':<15} {'Macro Ratio':<12} {'Raw Ratio':<12}"
+        f"{'dtype':<10} {'k':<6} {'Built-in (ms)':<15} {'Macro UDF (ms)':<15} {'Raw UDF (ms)':<15} {'Macro Ratio':<12} {'Raw Ratio':<12}"
     )
     print("-" * 100)
 
@@ -224,7 +330,7 @@ def print_summary(csv_file: str):
             f"{row['dtype']:<10} {row['k']:<6} {row['median_builtin_ms']:<15.2f} {row['median_udf_ms']:<15.2f} {row['median_raw_ms']:<15.2f} {row['udf_ratio']:<12.3f} {row['raw_ratio']:<12.3f}"
         )
 
-    print("\n" + "=" * 100)
+    print("\n" + "=" * 120)
     print("Key Observations:")
     print(
         f"  - Float32 Macro UDF avg ratio: {df[df['dtype'] == 'float32']['udf_ratio'].mean():.3f}x"
@@ -238,7 +344,7 @@ def print_summary(csv_file: str):
     print(
         f"  - Int8 Raw UDF avg ratio:      {df[df['dtype'] == 'int8']['raw_ratio'].mean():.3f}x"
     )
-    print("=" * 100 + "\n")
+    print("=" * 120 + "\n")
 
 
 if __name__ == "__main__":

@@ -452,27 +452,31 @@ int main(int argc, char** argv)
 
   // Write CSV
   std::ofstream csv(output_file);
-  csv << "dtype,k,median_builtin_ms,median_udf_ms,median_raw_ms,udf_ratio,raw_ratio\n";
+  csv << "dtype,k,first_builtin_ms,first_udf_ms,first_raw_ms,median_builtin_ms,median_udf_ms,"
+         "median_raw_ms,udf_ratio,raw_ratio\n";
 
   for (const auto& r : results) {
     double udf_ratio = r.median_udf_ms / r.median_builtin_ms;
     double raw_ratio = r.median_raw_ms / r.median_builtin_ms;
 
-    csv << r.dtype << "," << r.k << "," << std::fixed << std::setprecision(3) << r.median_builtin_ms
-        << "," << r.median_udf_ms << "," << r.median_raw_ms << "," << std::setprecision(4)
-        << udf_ratio << "," << raw_ratio << "\n";
+    csv << r.dtype << "," << r.k << "," << std::fixed << std::setprecision(3) << r.first_builtin_ms
+        << "," << r.first_udf_ms << "," << r.first_raw_ms << "," << r.median_builtin_ms << ","
+        << r.median_udf_ms << "," << r.median_raw_ms << "," << std::setprecision(4) << udf_ratio
+        << "," << raw_ratio << "\n";
   }
 
   csv.close();
   std::cerr << "\nResults written to: " << output_file << "\n";
 
   // Also print to stdout for convenience
-  std::cout << "dtype,k,median_builtin_ms,median_udf_ms,median_raw_ms,udf_ratio,raw_ratio\n";
+  std::cout << "dtype,k,first_builtin_ms,first_udf_ms,first_raw_ms,median_builtin_ms,median_udf_ms,"
+               "median_raw_ms,udf_ratio,raw_ratio\n";
   for (const auto& r : results) {
     double udf_ratio = r.median_udf_ms / r.median_builtin_ms;
     double raw_ratio = r.median_raw_ms / r.median_builtin_ms;
 
     std::cout << r.dtype << "," << r.k << "," << std::fixed << std::setprecision(3)
+              << r.first_builtin_ms << "," << r.first_udf_ms << "," << r.first_raw_ms << ","
               << r.median_builtin_ms << "," << r.median_udf_ms << "," << r.median_raw_ms << ","
               << std::setprecision(4) << udf_ratio << "," << raw_ratio << "\n";
   }

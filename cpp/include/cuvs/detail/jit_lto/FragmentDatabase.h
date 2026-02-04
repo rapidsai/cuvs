@@ -21,6 +21,7 @@ class FragmentDatabase {
   FragmentDatabase& operator=(FragmentDatabase const&) = delete;
 
   FragmentEntry* get_fragment(std::string const& key);
+  bool has_fragment(std::string const& key) const;
 
  private:
   FragmentDatabase();

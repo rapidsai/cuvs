@@ -47,6 +47,9 @@ NVRTCLTOFragmentCompiler::NVRTCLTOFragmentCompiler()
 
 void NVRTCLTOFragmentCompiler::compile(std::string const& key, std::string const& code) const
 {
+  // Check if this fragment is already cached - avoid expensive NVRTC compilation
+  if (fragment_database().has_fragment(key)) { return; }
+
   nvrtcProgram prog;
   NVRTC_SAFE_CALL(
     nvrtcCreateProgram(&prog, code.c_str(), "nvrtc_lto_fragment", 0, nullptr, nullptr));

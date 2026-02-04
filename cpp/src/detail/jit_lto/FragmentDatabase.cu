@@ -25,6 +25,8 @@ FragmentDatabase& fragment_database()
   return database;
 }
 
+bool FragmentDatabase::has_fragment(std::string const& key) const { return cache.count(key) > 0; }
+
 FragmentEntry* FragmentDatabase::get_fragment(std::string const& key)
 {
   auto& db = fragment_database();
