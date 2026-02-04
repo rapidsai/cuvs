@@ -26,6 +26,7 @@
 
 // TODO: This shouldn't be invoking anything from spatial/knn
 #include "../ann_utils.cuh"
+#include "../smem_utils.cuh"
 
 #include <raft/util/cuda_rt_essentials.hpp>
 #include <raft/util/integer_utils.hpp>
@@ -1880,7 +1881,7 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
     auto* dd_dev_ptr = dd_host.dev_ptr(stream);
 
     // set kernel attributes same as in normal kernel
-    optionally_set_larger_max_smem_size(smem_size, kernel);
+    cuvs::neighbors::detail::optionally_set_larger_max_smem_size(smem_size, kernel);
 
     // set kernel launch parameters
     dim3 gs = calc_coop_grid_size(block_size, smem_size, persistent_device_usage);
@@ -2112,29 +2113,6 @@ auto get_runner(Args... args) -> std::shared_ptr<RunnerT>
   return runner;
 }
 
-/**
- * @brief Optionally set the larger max dynamic shared memory size for the kernel.
- * This is required because `cudaFuncSetAttribute` is not thread-safe.
- * In the event of concurrent calls, we'd like to accommodate the largest requested size.
- * @tparam KernelT The type of the kernel.
- * @param smem_size The size of the dynamic shared memory to be set.
- * @param kernel The kernel to be set.
- */
-template <typename KernelT>  // inline
-void optionally_set_larger_max_smem_size(uint32_t smem_size, KernelT& kernel)
-{
-  static auto mutex                 = std::mutex{};
-  static auto running_max_smem_size = uint32_t{0};
-  if (smem_size > running_max_smem_size) {
-    auto guard = std::lock_guard<std::mutex>{mutex};
-    if (smem_size > running_max_smem_size) {
-      running_max_smem_size = smem_size;
-      RAFT_CUDA_TRY(cudaFuncSetAttribute(
-        kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, running_max_smem_size));
-    }
-  }
-}
-
 template <typename DataT,
           typename IndexT,
           typename DistanceT,
@@ -2198,7 +2176,7 @@ control is returned in this thread (in persistent_runner_t constructor), so we'r
     using descriptor_base_type = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
     auto kernel = search_kernel_config<false, descriptor_base_type, SourceIndexT, SampleFilterT>::
       choose_itopk_and_mx_candidates(ps.itopk_size, num_itopk_candidates, block_size);
-    optionally_set_larger_max_smem_size(smem_size, kernel);
+    cuvs::neighbors::detail::optionally_set_larger_max_smem_size(smem_size, kernel);
     dim3 thread_dims(block_size, 1, 1);
     dim3 block_dims(1, num_queries, 1);
     RAFT_LOG_DEBUG(
