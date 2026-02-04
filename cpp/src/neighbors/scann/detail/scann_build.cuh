@@ -216,6 +216,8 @@ index<T, IdxT> build(
     cuvs::preprocessing::quantize::pq::transform(
       res, pq_quantizer, raft::make_const_mdspan(soar_residuals.view()), soar_quant.view());
 
+    // Prefetch next batch
+    dataset_vec_batches.prefetch_next_batch();
     // unpack codes
     if (pq_quantizer.params_quantizer.pq_bits == 8) {
       // Copy unpacked codes to host
@@ -259,17 +261,11 @@ index<T, IdxT> build(
     // quantize dataset to bfloat16, if enabled. Similar to SOAR, quantization
     // is performed in this loop to improve locality
     // TODO (rmaschal): Might be more efficient to do on CPU, to avoid DtoH copy
-    auto bf16_dataset = raft::make_device_matrix<int16_t, int64_t>(res, batch_view.extent(0), dim);
-
     if (params.reordering_bf16) {
+      auto bf16_dataset =
+        raft::make_device_matrix<int16_t, int64_t>(res, batch_view.extent(0), dim);
       quantize_bfloat16(
         res, batch_view, bf16_dataset.view(), params.reordering_noise_shaping_threshold);
-    }
-
-    // Prefetch next batch
-    dataset_vec_batches.prefetch_next_batch();
-
-    if (params.reordering_bf16) {
       raft::copy(idx.bf16_dataset().data_handle() + batch.offset() * dim,
                  bf16_dataset.data_handle(),
                  bf16_dataset.size(),

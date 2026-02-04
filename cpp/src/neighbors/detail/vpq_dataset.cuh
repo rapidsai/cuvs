@@ -839,14 +839,18 @@ void process_and_fill_codes_subspaces(
     }
   }(pq_bits);
 
-  ix_t max_batch_size  = std::min<ix_t>(n_rows, kReasonableMaxBatchSize);
-  auto copy_stream     = raft::resource::get_cuda_stream(res);  // Using the main stream by default
-  bool enable_prefetch = false;
-  if (res.has_resource_factory(raft::resource::resource_type::CUDA_STREAM_POOL)) {
-    if (raft::resource::get_stream_pool_size(res) >= 1) {
-      enable_prefetch = true;
-      copy_stream     = raft::resource::get_stream_from_stream_pool(res);
-    }
+  ix_t max_batch_size = std::min<ix_t>(n_rows, kReasonableMaxBatchSize);
+  auto copy_stream    = raft::resource::get_cuda_stream(res);  // Using the main stream by default
+  bool enable_prefetch_stream = false;
+  bool has_cuda_stream_pool_resource =
+    res.has_resource_factory(raft::resource::resource_type::CUDA_STREAM_POOL) &&
+    raft::resource::get_stream_pool_size(res) >= 1;
+  bool need_copy_to_device =
+    cuvs::spatial::knn::detail::utils::check_pointer_residency(dataset.data_handle()) ==
+    cuvs::spatial::knn::detail::utils::pointer_residency::host_only;
+  if (has_cuda_stream_pool_resource && need_copy_to_device) {
+    enable_prefetch_stream = true;
+    copy_stream            = raft::resource::get_stream_from_stream_pool(res);
   }
   auto vec_batches = cuvs::spatial::knn::detail::utils::batch_load_iterator(
     dataset.data_handle(),
@@ -855,7 +859,7 @@ void process_and_fill_codes_subspaces(
     max_batch_size,
     copy_stream,
     raft::resource::get_workspace_resource(res),
-    enable_prefetch);
+    enable_prefetch_stream);
   vec_batches.prefetch_next_batch();
   for (const auto& batch : vec_batches) {
     auto batch_view   = raft::make_device_matrix_view(batch.data(), ix_t(batch.size()), dim);
@@ -876,8 +880,10 @@ void process_and_fill_codes_subspaces(
       pq_bits,
       shared_memory_size > 0);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
-    vec_batches.prefetch_next_batch();
-    raft::resource::sync_stream(res);
+    if (enable_prefetch_stream) {
+      vec_batches.prefetch_next_batch();
+      raft::resource::sync_stream(res);
+    }
   }
 }
 }  // namespace cuvs::neighbors::detail

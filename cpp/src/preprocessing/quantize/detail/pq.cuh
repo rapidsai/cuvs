@@ -330,23 +330,23 @@ void inverse_transform(
 }
 
 template <typename NewMathT, typename OldMathT, typename IdxT>
-auto vpq_convert_math_type(const raft::resources& res,
-                           cuvs::neighbors::vpq_dataset<OldMathT, IdxT>&& src)
-  -> cuvs::neighbors::vpq_dataset<NewMathT, IdxT>
+void vpq_convert_math_type(const raft::resources& res,
+                           const cuvs::neighbors::vpq_dataset<OldMathT, IdxT>& src,
+                           cuvs::neighbors::vpq_dataset<NewMathT, IdxT>& dst)
 {
-  auto vq_code_book = raft::make_device_mdarray<NewMathT>(res, src.vq_code_book.extents());
-  auto pq_code_book = raft::make_device_mdarray<NewMathT>(res, src.pq_code_book.extents());
+  /*auto vq_code_book = raft::make_device_mdarray<NewMathT>(res, src.vq_code_book.extents());
+  auto pq_code_book = raft::make_device_mdarray<NewMathT>(res, src.pq_code_book.extents());*/
 
   raft::linalg::map(res,
-                    vq_code_book.view(),
+                    dst.vq_code_book.view(),
                     cuvs::spatial::knn::detail::utils::mapping<NewMathT>{},
                     raft::make_const_mdspan(src.vq_code_book.view()));
   raft::linalg::map(res,
-                    pq_code_book.view(),
+                    dst.pq_code_book.view(),
                     cuvs::spatial::knn::detail::utils::mapping<NewMathT>{},
                     raft::make_const_mdspan(src.pq_code_book.view()));
-  return cuvs::neighbors::vpq_dataset<NewMathT, IdxT>{
-    std::move(vq_code_book), std::move(pq_code_book), std::move(src.data)};
+  /*return cuvs::neighbors::vpq_dataset<NewMathT, IdxT>{
+    std::move(vq_code_book), std::move(pq_code_book), std::move(src.data)};*/
 }
 
 template <typename DatasetT, typename MathT, typename IdxT>
@@ -388,7 +388,12 @@ auto vpq_build_half(const raft::resources& res,
                     const cuvs::neighbors::vpq_params& params,
                     const DatasetT& dataset) -> cuvs::neighbors::vpq_dataset<half, int64_t>
 {
-  return vpq_convert_math_type<half, float, int64_t>(
-    res, vpq_build<decltype(dataset), float, int64_t>(res, params, dataset));
+  auto old_type = vpq_build<decltype(dataset), float, int64_t>(res, params, dataset);
+  auto new_type = cuvs::neighbors::vpq_dataset<half, int64_t>{
+    raft::make_device_mdarray<half>(res, old_type.vq_code_book.extents()),
+    raft::make_device_mdarray<half>(res, old_type.pq_code_book.extents()),
+    std::move(old_type.data)};
+  vpq_convert_math_type<half, float, int64_t>(res, old_type, new_type);
+  return new_type;
 }
 }  // namespace cuvs::preprocessing::quantize::pq::detail
