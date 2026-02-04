@@ -23,7 +23,11 @@ struct ivf_rabitq_inputs {
   cuvs::neighbors::ivf_rabitq::search_params search_params;
 
   // Set some default parameters for tests
-  ivf_rabitq_inputs() { index_params.n_lists = max(32u, min(1024u, num_db_vecs / 128u)); }
+  ivf_rabitq_inputs()
+  {
+    index_params.n_lists                  = max(32u, min(1024u, num_db_vecs / 128u));
+    index_params.kmeans_trainset_fraction = 1.0;
+  }
 };
 
 inline auto operator<<(std::ostream& os, const ivf_rabitq::search_mode& p) -> std::ostream&
