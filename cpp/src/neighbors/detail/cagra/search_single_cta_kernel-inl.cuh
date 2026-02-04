@@ -1880,8 +1880,7 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
     auto* dd_dev_ptr = dd_host.dev_ptr(stream);
 
     // set kernel attributes same as in normal kernel
-    RAFT_CUDA_TRY(
-      cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
+    optionally_set_larger_max_smem_size(smem_size, kernel);
 
     // set kernel launch parameters
     dim3 gs = calc_coop_grid_size(block_size, smem_size, persistent_device_usage);
