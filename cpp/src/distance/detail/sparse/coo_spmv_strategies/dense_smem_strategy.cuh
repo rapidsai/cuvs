@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -7,7 +7,7 @@
 
 #include "base_strategy.cuh"
 
-#include <raft/util/cuda_dev_essentials.cuh>  // raft::ceildiv
+#include <raft/util/cuda_dev_essentials.cuh>
 
 namespace cuvs {
 namespace distance {
@@ -17,9 +17,7 @@ namespace sparse {
 template <typename value_idx, typename value_t, int tpb>
 class dense_smem_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
  public:
-  using smem_type   = value_t*;
-  using insert_type = smem_type;
-  using find_type   = smem_type;
+  using map_type = value_t*;
 
   dense_smem_strategy(const distances_config_t<value_idx, value_t>& config_)
     : coo_spmv_strategy<value_idx, value_t, tpb>(config_)
@@ -83,25 +81,21 @@ class dense_smem_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
                              n_blocks_per_row);
   }
 
-  __device__ inline insert_type init_insert(smem_type cache, const value_idx& cache_size)
+  __device__ inline map_type init_map(void* storage, const value_idx& cache_size)
   {
+    auto cache = static_cast<value_t*>(storage);
     for (int k = threadIdx.x; k < cache_size; k += blockDim.x) {
       cache[k] = 0.0;
     }
     return cache;
   }
 
-  __device__ inline void insert(insert_type cache, const value_idx& key, const value_t& value)
+  __device__ inline void insert(map_type& cache, const value_idx& key, const value_t& value)
   {
     cache[key] = value;
   }
 
-  __device__ inline find_type init_find(smem_type cache, const value_idx& cache_size)
-  {
-    return cache;
-  }
-
-  __device__ inline value_t find(find_type cache, const value_idx& key) { return cache[key]; }
+  __device__ inline value_t find(map_type& cache, const value_idx& key) { return cache[key]; }
 };
 
 }  // namespace sparse

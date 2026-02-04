@@ -14,7 +14,6 @@
 #include "../../distance/distance.cuh"
 
 #include <cuvs/distance/distance.hpp>
-#include <raft/core/cudart_utils.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -32,6 +31,7 @@
 #include <raft/matrix/argmin.cuh>
 #include <raft/matrix/gather.cuh>
 #include <raft/util/cuda_utils.cuh>
+#include <raft/util/cudart_utils.hpp>
 #include <raft/util/device_atomics.cuh>
 #include <raft/util/integer_utils.hpp>
 
