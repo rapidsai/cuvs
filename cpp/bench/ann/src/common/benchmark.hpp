@@ -13,6 +13,8 @@
 #include <benchmark/benchmark.h>
 #include <unistd.h>
 
+#include <omp.h>
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -369,36 +371,47 @@ void bench_search(::benchmark::State& state,
     // We go through the groundtruth with same stride as the benchmark loop.
     size_t out_offset   = 0;
     size_t batch_offset = (state.thread_index() * n_queries) % query_set_size;
+    // Avoid CPU oversubscription when calculating match_count with OMP
+    uint32_t num_probe_threads = std::thread::hardware_concurrency() / benchmark_n_threads;
     while (out_offset < rows) {
+#pragma omp parallel for reduction(+ : match_count, total_count) num_threads(num_probe_threads)
       for (std::size_t i = 0; i < n_queries; i++) {
         size_t i_orig_idx = batch_offset + i;
         size_t i_out_idx  = out_offset + i;
         if (i_out_idx < rows) {
           /* NOTE: recall correctness & filtering
 
-          In the loop below, we filter the ground truth values on-the-fly.
-          We need enough ground truth values to compute recall correctly though.
-          But the ground truth file only contains `max_k` values per row; if there are less valid
-          values than k among them, we overestimate the recall. Essentially, we compare the first
-          `filter_pass_count` values of the algorithm output, and this counter can be less than `k`.
-          In the extreme case of very high filtering rate, we may be bypassing entire rows of
-          results. However, this is still better than no recall estimate at all.
+          In the `call_once` call below, we generate the filtered ground truth values as needed and
+          cache them to avoid recomputing them for the same queries. We need enough ground truth
+          values to compute recall correctly though. But the ground truth file only contains `max_k`
+          values per row; if there are less valid values than k among them, we overestimate the
+          recall. Essentially, we compare the first `filter_pass_count` values of the algorithm
+          output, and this counter can be less than `k`. In the extreme case of very high filtering
+          rate, we may be bypassing entire rows of results. However, this is still better than no
+          recall estimate at all.
 
-          TODO: consider generating the filtered ground truth on-the-fly
           */
-          uint32_t filter_pass_count = 0;
-          std::unordered_set<std::int32_t> gt_set;
-          for (std::uint32_t l = 0; l < max_k && filter_pass_count < k; l++) {
-            auto exp_idx = gt[i_orig_idx * max_k + l];
-            if (!filter(exp_idx)) { continue; }
-            gt_set.insert(exp_idx);
-            filter_pass_count++;
-          }
+          auto& flag              = dataset->gt_set_cache(i_orig_idx).flag;
+          auto& gt_set            = dataset->gt_set_cache(i_orig_idx).gt_set;
+          auto& filter_pass_count = dataset->gt_set_cache(i_orig_idx).filter_pass_count;
+          std::call_once(flag, [&]() {
+            filter_pass_count = 0;
+            for (std::uint32_t l = 0; l < max_k && filter_pass_count < k; l++) {
+              auto exp_idx = gt[i_orig_idx * max_k + l];
+              if (!filter(exp_idx)) { continue; }
+              gt_set.insert(exp_idx);
+              filter_pass_count++;
+            }
+          });
+
           total_count += filter_pass_count;
+
+          size_t match_count_local = 0;
           for (std::uint32_t j = 0; j < k; j++) {
             auto act_idx = static_cast<std::int32_t>(neighbors_host[i_out_idx * k + j]);
-            if (gt_set.count(act_idx)) match_count++;
+            if (gt_set.count(act_idx)) match_count_local++;
           }
+          match_count += match_count_local;
         }
       }
       out_offset += n_queries;

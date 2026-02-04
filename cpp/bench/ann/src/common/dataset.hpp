@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -46,6 +46,13 @@ struct dataset {
   blob<DataT> query_set_;
   std::optional<blob<IdxT>> ground_truth_set_;
   std::optional<blob<bitset_carrier_type>> filter_bitset_;
+  // Cache the ground truth set for each query index to avoid recomputing it for the same queries.
+  struct gt_set_cache_entry_t {
+    std::once_flag flag;
+    std::unordered_set<IdxT> gt_set;
+    uint32_t filter_pass_count;
+  };
+  mutable std::vector<gt_set_cache_entry_t> gt_set_cache_;
 
   // Protects the lazy mutations of the blobs accessed by multiple threads
   mutable std::mutex mutex_;
@@ -76,7 +83,8 @@ struct dataset {
       query_set_{query_file},
       ground_truth_set_{groundtruth_neighbors_file.has_value()
                           ? std::make_optional<blob<IdxT>>(groundtruth_neighbors_file.value())
-                          : std::nullopt}
+                          : std::nullopt},
+      gt_set_cache_(query_set_size())
   {
     if (filtering_rate.has_value()) {
       // Generate a random bitset for filtering
@@ -194,6 +202,11 @@ struct dataset {
       return filter_bitset_->data(memory_type, request_hugepages_2mb);
     }
     return nullptr;
+  }
+
+  [[nodiscard]] auto gt_set_cache(size_t query_idx) const -> gt_set_cache_entry_t&
+  {
+    return gt_set_cache_[query_idx];
   }
 };
 
