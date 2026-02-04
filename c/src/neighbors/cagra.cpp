@@ -293,23 +293,23 @@ void* _deserialize(cuvsResources_t res, const char* filename)
 
 template <typename T>
 void* _merge(cuvsResources_t res,
-             cuvsCagraMergeParams params,
+             cuvsCagraIndexParams params,
              cuvsCagraIndex_t* indices,
-             size_t num_indices)
+             size_t num_indices,
+             cuvsFilter filter)
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
-  cuvs::neighbors::cagra::merge_params merge_params_cpp;
-  auto& out_idx_params = *params.output_index_params;
+  cuvs::neighbors::cagra::index_params params_cpp;
 
-  merge_params_cpp.output_index_params.metric =
-    static_cast<cuvs::distance::DistanceType>((int)out_idx_params.metric);
-  merge_params_cpp.output_index_params.intermediate_graph_degree =
-    out_idx_params.intermediate_graph_degree;
-  merge_params_cpp.output_index_params.graph_degree = out_idx_params.graph_degree;
+  params_cpp.metric =
+    static_cast<cuvs::distance::DistanceType>((int)params.metric);
+  params_cpp.intermediate_graph_degree =
+    params.intermediate_graph_degree;
+  params_cpp.graph_degree = params.graph_degree;
 
   int64_t total_size = 0;
   int64_t dim        = 0;
-  if (out_idx_params.build_algo == cuvsCagraGraphBuildAlgo::IVF_PQ) {
+  if (params.build_algo == cuvsCagraGraphBuildAlgo::IVF_PQ) {
     auto first_idx_ptr =
       reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(indices[0]->addr);
     dim = first_idx_ptr->dim();
@@ -320,9 +320,9 @@ void* _merge(cuvsResources_t res,
     }
   }
 
-  _set_graph_build_params(merge_params_cpp.output_index_params.graph_build_params,
-                          out_idx_params,
-                          out_idx_params.build_algo,
+  _set_graph_build_params(params_cpp.graph_build_params,
+                          params,
+                          params.build_algo,
                           total_size,
                           dim);
 
@@ -333,10 +333,21 @@ void* _merge(cuvsResources_t res,
     index_ptrs.push_back(idx_ptr);
   }
 
-  auto merged_index = new cuvs::neighbors::cagra::index<T, uint32_t>(
-    cuvs::neighbors::cagra::merge(*res_ptr, merge_params_cpp, index_ptrs));
-
-  return merged_index;
+  if (filter.type == NO_FILTER) {
+    return new cuvs::neighbors::cagra::index<T, uint32_t>(
+      cuvs::neighbors::cagra::merge(*res_ptr, params_cpp, index_ptrs));
+  } else if (filter.type == BITSET) {
+    using filter_mdspan_type    = raft::device_vector_view<std::uint32_t, int64_t, raft::row_major>;
+    auto removed_indices_tensor = reinterpret_cast<DLManagedTensor*>(filter.addr);
+    auto removed_indices = cuvs::core::from_dlpack<filter_mdspan_type>(removed_indices_tensor);
+    cuvs::core::bitset_view<std::uint32_t, int64_t> removed_indices_bitset(
+      removed_indices, total_size);
+    auto bitset_filter_obj = cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset);
+    return new cuvs::neighbors::cagra::index<T, uint32_t>(
+      cuvs::neighbors::cagra::merge(*res_ptr, params_cpp, index_ptrs, bitset_filter_obj));
+  } else {
+    RAFT_FAIL("Unsupported filter type: BITMAP");
+  }
 }
 
 template <typename T, typename IdxT>
@@ -618,6 +629,8 @@ extern "C" cuvsError_t cuvsCagraExtend(cuvsResources_t res,
 
     if ((dataset.dtype.code == kDLFloat) && (dataset.dtype.bits == 32)) {
       _extend<float>(res, *params, index, additional_dataset_tensor);
+    } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 16) {
+      _extend<half>(res, *params, index, additional_dataset_tensor);
     } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
       _extend<int8_t>(res, *params, index, additional_dataset_tensor);
     } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
@@ -678,14 +691,17 @@ extern "C" cuvsError_t cuvsCagraSearch(cuvsResources_t res,
 }
 
 extern "C" cuvsError_t cuvsCagraMerge(cuvsResources_t res,
-                                      cuvsCagraMergeParams_t params,
+                                      cuvsCagraIndexParams_t params,
                                       cuvsCagraIndex_t* indices,
                                       size_t num_indices,
+                                      cuvsFilter filter,
                                       cuvsCagraIndex_t output_index)
 {
   return cuvs::core::translate_exceptions([=] {
     // Basic checks on inputs
     RAFT_EXPECTS(indices != nullptr && num_indices > 0, "indices array cannot be null or empty");
+    RAFT_EXPECTS(params != nullptr, "params cannot be null");
+
     // Use first index dtype as reference
     auto dtype = (*indices[0]).dtype;
     for (size_t i = 1; i < num_indices; ++i) {
@@ -698,16 +714,16 @@ extern "C" cuvsError_t cuvsCagraMerge(cuvsResources_t res,
     // Dispatch based on data type
     if (dtype.code == kDLFloat && dtype.bits == 32) {
       output_index->addr =
-        reinterpret_cast<uintptr_t>(_merge<float>(res, *params, indices, num_indices));
+        reinterpret_cast<uintptr_t>(_merge<float>(res, *params, indices, num_indices, filter));
     } else if (dtype.code == kDLFloat && dtype.bits == 16) {
       output_index->addr =
-        reinterpret_cast<uintptr_t>(_merge<half>(res, *params, indices, num_indices));
+        reinterpret_cast<uintptr_t>(_merge<half>(res, *params, indices, num_indices, filter));
     } else if (dtype.code == kDLInt && dtype.bits == 8) {
       output_index->addr =
-        reinterpret_cast<uintptr_t>(_merge<int8_t>(res, *params, indices, num_indices));
+        reinterpret_cast<uintptr_t>(_merge<int8_t>(res, *params, indices, num_indices, filter));
     } else if (dtype.code == kDLUInt && dtype.bits == 8) {
       output_index->addr =
-        reinterpret_cast<uintptr_t>(_merge<uint8_t>(res, *params, indices, num_indices));
+        reinterpret_cast<uintptr_t>(_merge<uint8_t>(res, *params, indices, num_indices, filter));
     } else {
       RAFT_FAIL("Unsupported index data type: code=%d, bits=%d", dtype.code, dtype.bits);
     }
@@ -848,24 +864,6 @@ extern "C" cuvsError_t cuvsCagraSearchParamsCreate(cuvsCagraSearchParams_t* para
 extern "C" cuvsError_t cuvsCagraSearchParamsDestroy(cuvsCagraSearchParams_t params)
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
-}
-
-extern "C" cuvsError_t cuvsCagraMergeParamsCreate(cuvsCagraMergeParams_t* params)
-{
-  return cuvs::core::translate_exceptions([=] {
-    cuvsCagraIndexParams_t idx_params;
-    cuvsCagraIndexParamsCreate(&idx_params);
-    *params = new cuvsCagraMergeParams{.output_index_params = idx_params,
-                                       .strategy            = MERGE_STRATEGY_PHYSICAL};
-  });
-}
-
-extern "C" cuvsError_t cuvsCagraMergeParamsDestroy(cuvsCagraMergeParams_t params)
-{
-  return cuvs::core::translate_exceptions([=] {
-    cuvsCagraIndexParamsDestroy(params->output_index_params);
-    delete params;
-  });
 }
 
 extern "C" cuvsError_t cuvsCagraDeserialize(cuvsResources_t res,
