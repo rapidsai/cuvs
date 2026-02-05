@@ -157,12 +157,14 @@ func NewTensorOnDevice[T TensorNumberType](res *Resource, shape []int64) (Tensor
 func (t *Tensor[T]) Close() error {
 	if t.C_tensor.dl_tensor.device.device_type == C.kDLCUDA {
 		bytes := t.sizeInBytes()
-		if t.resource != nil {
-			return  errors.New("resource not found")
+		if t.resource == nil {
+			return errors.New("resource not found")
 		}
 		err := CheckCuvs(CuvsError(C.cuvsRMMFree(t.resource.Resource, t.C_tensor.dl_tensor.data, C.size_t(bytes))))
-
-		return err
+		if err != nil {
+			return err
+		}
+		t.C_tensor.dl_tensor.data = nil
 	} else if t.C_tensor.dl_tensor.device.device_type == C.kDLCPU {
 		if t.C_tensor.dl_tensor.data != nil {
 			C.free(t.C_tensor.dl_tensor.data)
