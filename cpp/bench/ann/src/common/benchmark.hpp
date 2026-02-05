@@ -396,6 +396,9 @@ void bench_search(::benchmark::State& state,
           auto& filter_pass_count = dataset->gt_set_cache(i_orig_idx).filter_pass_count;
           std::call_once(flag, [&]() {
             filter_pass_count = 0;
+            // If filtering is not enabled, we can pre-allocate the ground truth set to avoid
+            // rehashing.
+            if (!filter_bitset) { gt_set.reserve(max_k); }
             for (std::uint32_t l = 0; l < max_k && filter_pass_count < k; l++) {
               auto exp_idx = gt[i_orig_idx * max_k + l];
               if (!filter(exp_idx)) { continue; }
