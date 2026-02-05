@@ -17,7 +17,16 @@ func TestIvfFlat(t *testing.T) {
 		nList       = 512
 	)
 
-	resource, _ := cuvs.NewResource(nil)
+	cudaStream, err := cuvs.NewCudaStream()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cudaStream.Close()
+
+	resource, err := cuvs.NewResource(cudaStream)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer resource.Close()
 
 	testDataset := make([][]float32, nDataPoints)
@@ -42,7 +51,7 @@ func TestIvfFlat(t *testing.T) {
 
 	indexParams.SetNLists(nList)
 
-	index, _ := CreateIndex(indexParams, &dataset)
+	index, _ := CreateIndex[float32](indexParams)
 	defer index.Close()
 
 	// use the first 4 points from the dataset as queries : will test that we get them back

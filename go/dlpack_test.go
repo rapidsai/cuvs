@@ -10,7 +10,13 @@ import (
 )
 
 func TestDlPack(t *testing.T) {
-	resource, _ := cuvs.NewResource(nil)
+	cudaStream, err := cuvs.NewCudaStream()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cudaStream.Close()
+
+	resource, err := cuvs.NewResource(cudaStream)
 	rand.Seed(time.Now().UnixNano())
 	NDataPoints := 256
 	NFeatures := 16
@@ -106,10 +112,13 @@ func TestEmptyTensor(t *testing.T) {
 }
 
 func TestDeviceOperations(t *testing.T) {
-	resource, err := cuvs.NewResource(nil)
+	cudaStream, err := cuvs.NewCudaStream()
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cudaStream.Close()
+
+	resource, err := cuvs.NewResource(cudaStream)
 
 	// Create test data
 	data := make([][]float32, 10)

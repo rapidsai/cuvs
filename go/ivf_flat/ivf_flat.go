@@ -6,6 +6,7 @@ import "C"
 import (
 	"errors"
 	"unsafe"
+	"runtime"
 
 	cuvs "github.com/rapidsai/cuvs/go"
 )
@@ -17,14 +18,13 @@ type IvfFlatIndex struct {
 }
 
 // Creates a new empty IvfFlatIndex
-func CreateIndex[T any](params *IndexParams, dataset *cuvs.Tensor[T]) (*IvfFlatIndex, error) {
+func CreateIndex[T any](params *IndexParams) (*IvfFlatIndex, error) {
 	var index C.cuvsIvfFlatIndex_t
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatIndexCreate(&index)))
 	if err != nil {
 		return nil, err
 	}
-
-	return &IvfFlatIndex{index: index}, nil
+	return &IvfFlatIndex{index: index, trained: false}, nil
 }
 
 // Builds an IvfFlatIndex from the dataset for efficient search.
@@ -41,6 +41,11 @@ func BuildIndex[T any](Resources cuvs.Resource, params *IndexParams, dataset *cu
 		return err
 	}
 	index.trained = true
+	runtime.KeepAlive(Resources)
+	runtime.KeepAlive(params)
+	runtime.KeepAlive(dataset)
+	runtime.KeepAlive(index)
+
 	return nil
 }
 
@@ -63,7 +68,7 @@ func (index *IvfFlatIndex) Close() error {
 // * `queries` - A tensor in device memory to query for
 // * `neighbors` - Tensor in device memory that receives the indices of the nearest neighbors
 // * `distances` - Tensor in device memory that receives the distances of the nearest neighbors
-func SearchIndex[T any](Resources cuvs.Resource, params *SearchParams, index *IvfFlatIndex, queries *cuvs.Tensor[T], neighbors *cuvs.Tensor[int64], distances *cuvs.Tensor[T]) error {
+func SearchIndex[T any](Resources cuvs.Resource, params *SearchParams, index *IvfFlatIndex, queries *cuvs.Tensor[T], neighbors *cuvs.Tensor[int64], distances *cuvs.Tensor[float32]) error {
 	if !index.trained {
 		return errors.New("index needs to be built before calling search")
 	}

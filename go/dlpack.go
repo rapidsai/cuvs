@@ -155,34 +155,34 @@ func NewTensorOnDevice[T TensorNumberType](res *Resource, shape []int64) (Tensor
 
 // Destroys Tensor, freeing the memory it was allocated on.
 func (t *Tensor[T]) Close() error {
-	if t.C_tensor.dl_tensor.device.device_type == C.kDLCUDA {
-		bytes := t.sizeInBytes()
-		if t.resource == nil {
-			return errors.New("resource not found")
-		}
-		err := CheckCuvs(CuvsError(C.cuvsRMMFree(t.resource.Resource, t.C_tensor.dl_tensor.data, C.size_t(bytes))))
-		if err != nil {
-			return err
-		}
-		t.C_tensor.dl_tensor.data = nil
-	} else if t.C_tensor.dl_tensor.device.device_type == C.kDLCPU {
-		if t.C_tensor.dl_tensor.data != nil {
-			C.free(t.C_tensor.dl_tensor.data)
-			t.C_tensor.dl_tensor.data = nil
-		}
-	}
-
-	if t.C_tensor.dl_tensor.shape != nil {
-		C.free(unsafe.Pointer(t.C_tensor.dl_tensor.shape))
-		t.C_tensor.dl_tensor.shape = nil
-	}
-
 	if t.C_tensor != nil {
+		if t.C_tensor.dl_tensor.device.device_type == C.kDLCUDA {
+			bytes := t.sizeInBytes()
+			if t.resource == nil {
+				// We cannot free device memory without the resource,
+				// so we must return an error here.
+				return errors.New("resource not found for CUDA tensor")
+			}
+			err := CheckCuvs(CuvsError(C.cuvsRMMFree(t.resource.Resource, t.C_tensor.dl_tensor.data, C.size_t(bytes))))
+			if err != nil {
+				return err
+			}
+			t.C_tensor.dl_tensor.data = nil
+		} else if t.C_tensor.dl_tensor.device.device_type == C.kDLCPU {
+			if t.C_tensor.dl_tensor.data != nil {
+				C.free(t.C_tensor.dl_tensor.data)
+				t.C_tensor.dl_tensor.data = nil
+			}
+		}
+
+		if t.C_tensor.dl_tensor.shape != nil {
+			C.free(unsafe.Pointer(t.C_tensor.dl_tensor.shape))
+			t.C_tensor.dl_tensor.shape = nil
+		}
+
 		C.free(unsafe.Pointer(t.C_tensor))
 		t.C_tensor = nil
 	}
-
-	t.C_tensor = nil
 	return nil
 }
 
@@ -289,16 +289,21 @@ func (t *Tensor[T]) Expand(res *Resource, newData [][]T) (*Tensor[T], error) {
 		return nil, err
 	}
 
-	shape := make([]int64, 2)
-	shape[0] = int64(*t.C_tensor.dl_tensor.shape) + int64(len(newData))
+	oldShapePtr := t.C_tensor.dl_tensor.shape
+	newShapePtr := C.malloc(C.size_t(2 * int(unsafe.Sizeof(C.int64_t(0)))))
+	newShapeSlice := unsafe.Slice((*C.int64_t)(newShapePtr), 2)
+	newShapeSlice[0] = C.int64_t(int64(*t.C_tensor.dl_tensor.shape) + int64(len(newData)))
+	newShapeSlice[1] = C.int64_t(newShape[1])
 
-	shape[1] = newShape[1]
-
-	t.shape = shape
+	t.shape = []int64{int64(newShapeSlice[0]), int64(newShapeSlice[1])}
 
 	t.C_tensor.dl_tensor.data = NewDeviceDataPointer
-	t.C_tensor.dl_tensor.shape = (*C.int64_t)(unsafe.Pointer(&shape[0]))
+	t.C_tensor.dl_tensor.shape = (*C.int64_t)(newShapePtr)
 	t.resource = res
+
+	if oldShapePtr != nil {
+		C.free(unsafe.Pointer(oldShapePtr))
+	}
 
 	return t, nil
 }
@@ -329,7 +334,7 @@ func (t *Tensor[T]) ToHost(res *Resource) (*Tensor[T], error) {
 
 	t.C_tensor.dl_tensor.device.device_type = C.kDLCPU
 	t.C_tensor.dl_tensor.data = addr
-	t.resource = res
+	t.resource = nil
 
 	return t, nil
 }
@@ -392,11 +397,12 @@ func (t *Tensor[T]) sizeInBytes() int64 {
 
 func calculateBytes(shape []int64, dtype C.DLDataType) int64 {
 	bytes := int64(1)
-	for dim := range shape {
-		bytes *= (shape[dim])
+	for _, dim := range shape {
+		bytes *= dim
 	}
 
 	bytes *= int64(dtype.bits) / 8
+
 
 	return bytes
 }
