@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -10,7 +10,6 @@
 #include "compute_distance-ext.cuh"
 #include <cuvs/neighbors/common.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-// #include "search_single_cta_inst.cuh"
 // #include "topk_for_cagra/topk.h"
 
 #include <raft/core/device_mdspan.hpp>
@@ -64,13 +63,13 @@ struct lightweight_uvector {
     auto& [r, s] = std::get<rmm_res_type>(res_);
     T* new_ptr   = nullptr;
     if (new_size > 0) {
-      new_ptr = reinterpret_cast<T*>(r.allocate_async(new_size * sizeof(T), kAlign, s));
+      new_ptr = reinterpret_cast<T*>(r.allocate(s, new_size * sizeof(T), kAlign));
     }
     auto copy_size = std::min(size_, new_size);
     if (copy_size > 0) {
       cudaMemcpyAsync(new_ptr, ptr_, copy_size * sizeof(T), cudaMemcpyDefault, s);
     }
-    if (size_ > 0) { r.deallocate_async(ptr_, size_ * sizeof(T), kAlign, s); }
+    if (size_ > 0) { r.deallocate(s, ptr_, size_ * sizeof(T), kAlign); }
     ptr_  = new_ptr;
     size_ = new_size;
   }
@@ -91,7 +90,7 @@ struct lightweight_uvector {
   {
     if (size_ > 0) {
       auto& [r, s] = std::get<rmm_res_type>(res_);
-      r.deallocate_async(ptr_, size_ * sizeof(T), kAlign, s);
+      r.deallocate(s, ptr_, size_ * sizeof(T), kAlign);
     }
   }
 };

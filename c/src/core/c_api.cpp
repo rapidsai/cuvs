@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -14,11 +14,11 @@
 #include <raft/util/cudart_utils.hpp>
 #include <rapids_logger/logger.hpp>
 #include <rmm/cuda_stream_view.hpp>
-#include <rmm/mr/device/device_memory_resource.hpp>
-#include <rmm/mr/device/managed_memory_resource.hpp>
-#include <rmm/mr/device/owning_wrapper.hpp>
-#include <rmm/mr/device/per_device_resource.hpp>
-#include <rmm/mr/device/pool_memory_resource.hpp>
+#include <rmm/mr/device_memory_resource.hpp>
+#include <rmm/mr/managed_memory_resource.hpp>
+#include <rmm/mr/owning_wrapper.hpp>
+#include <rmm/mr/per_device_resource.hpp>
+#include <rmm/mr/pool_memory_resource.hpp>
 #include <rmm/mr/pinned_host_memory_resource.hpp>
 
 #include "../core/exceptions.hpp"
@@ -87,6 +87,15 @@ extern "C" cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res)
   });
 }
 
+extern "C" cuvsError_t cuvsMultiGpuResourcesSetMemoryPool(cuvsResources_t res,
+                                                          int percent_of_free_memory)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto res_ptr = reinterpret_cast<raft::device_resources_snmg*>(res);
+    res_ptr->set_memory_pool(percent_of_free_memory);
+  });
+}
+
 extern "C" cuvsError_t cuvsStreamSet(cuvsResources_t res, cudaStream_t stream)
 {
   return cuvs::core::translate_exceptions([=] {
@@ -124,7 +133,7 @@ extern "C" cuvsError_t cuvsRMMAlloc(cuvsResources_t res, void** ptr, size_t byte
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
     auto mr      = rmm::mr::get_current_device_resource();
-    *ptr         = mr->allocate(bytes, raft::resource::get_cuda_stream(*res_ptr));
+    *ptr         = mr->allocate(raft::resource::get_cuda_stream(*res_ptr), bytes);
   });
 }
 
@@ -133,7 +142,7 @@ extern "C" cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes)
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
     auto mr      = rmm::mr::get_current_device_resource();
-    mr->deallocate(ptr, bytes, raft::resource::get_cuda_stream(*res_ptr));
+    mr->deallocate(raft::resource::get_cuda_stream(*res_ptr), ptr, bytes);
   });
 }
 
@@ -176,7 +185,7 @@ extern "C" cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_per
 extern "C" cuvsError_t cuvsRMMMemoryResourceReset()
 {
   return cuvs::core::translate_exceptions([=] {
-    rmm::mr::set_current_device_resource(nullptr);
+    rmm::mr::set_current_device_resource(rmm::mr::detail::initial_resource());
     pool_mr.reset();
   });
 }
@@ -187,13 +196,13 @@ extern "C" cuvsError_t cuvsRMMHostAlloc(void** ptr, size_t bytes)
 {
   return cuvs::core::translate_exceptions([=] {
     if (pinned_mr == nullptr) { pinned_mr = std::make_unique<rmm::mr::pinned_host_memory_resource>(); }
-    *ptr = pinned_mr->allocate(bytes);
+    *ptr = pinned_mr->allocate_sync(bytes);
   });
 }
 
 extern "C" cuvsError_t cuvsRMMHostFree(void* ptr, size_t bytes)
 {
-  return cuvs::core::translate_exceptions([=] { pinned_mr->deallocate(ptr, bytes); });
+  return cuvs::core::translate_exceptions([=] { pinned_mr->deallocate_sync(ptr, bytes); });
 }
 
 thread_local std::string last_error_text = "";
@@ -205,7 +214,32 @@ extern "C" const char* cuvsGetLastErrorText()
 
 extern "C" void cuvsSetLogLevel(cuvsLogLevel_t verbosity)
 {
-  raft::default_logger().set_level(static_cast<rapids_logger::level_enum>(verbosity));
+  rapids_logger::level_enum level = rapids_logger::level_enum::trace;
+  switch (verbosity) {
+    case CUVS_LOG_LEVEL_TRACE:
+      level = rapids_logger::level_enum::trace;
+      break;
+    case CUVS_LOG_LEVEL_DEBUG:
+      level = rapids_logger::level_enum::debug;
+      break;
+    case CUVS_LOG_LEVEL_INFO:
+      level = rapids_logger::level_enum::info;
+      break;
+    case CUVS_LOG_LEVEL_WARN:
+      level = rapids_logger::level_enum::warn;
+      break;
+    case CUVS_LOG_LEVEL_ERROR:
+      level = rapids_logger::level_enum::error;
+      break;
+    case CUVS_LOG_LEVEL_CRITICAL:
+      level = rapids_logger::level_enum::critical;
+      break;
+    case CUVS_LOG_LEVEL_OFF:
+      level = rapids_logger::level_enum::off;
+      break;
+    default: RAFT_FAIL("Unsupported cuvsLogLevel_t value provided");
+  }
+  raft::default_logger().set_level(level);
 }
 
 extern "C" cuvsLogLevel_t cuvsGetLogLevel()
@@ -229,18 +263,33 @@ void _copy_matrix(cuvsResources_t res, DLManagedTensor* src_managed, DLManagedTe
 {
   DLTensor& src = src_managed->dl_tensor;
   DLTensor& dst = dst_managed->dl_tensor;
+  auto res_ptr  = reinterpret_cast<raft::resources*>(res);
+  auto stream   = raft::resource::get_cuda_stream(*res_ptr);
 
-  int64_t src_row_stride = src.strides == nullptr ? src.shape[1] : src.strides[0];
-  int64_t dst_row_stride = dst.strides == nullptr ? dst.shape[1] : dst.strides[0];
-  auto res_ptr           = reinterpret_cast<raft::resources*>(res);
+  if (src.ndim == 2) {
+    // use raft::copy_matrix for 2D tensors - this will handle copying from strided to non-strided
+    // views well
+    int64_t src_row_stride = src.strides == nullptr ? src.shape[1] : src.strides[0];
+    int64_t dst_row_stride = dst.strides == nullptr ? dst.shape[1] : dst.strides[0];
 
-  raft::copy_matrix<T>(static_cast<T*>(dst.data),
-                       dst_row_stride,
-                       static_cast<const T*>(src.data),
-                       src_row_stride,
-                       src.shape[1],
-                       src.shape[0],
-                       raft::resource::get_cuda_stream(*res_ptr));
+    raft::copy_matrix<T>(static_cast<T*>(dst.data),
+                         dst_row_stride,
+                         static_cast<const T*>(src.data),
+                         src_row_stride,
+                         src.shape[1],
+                         src.shape[0],
+                         stream);
+  } else {
+    // Otherwise use cudaMemcpyAsync - and assert that we don't have strided data
+    RAFT_EXPECTS(src.strides == nullptr, "cuvsCopyMatrix only supports strides with 2D inputs");
+    RAFT_EXPECTS(dst.strides == nullptr, "cuvsCopyMatrix only supports strides with 2D inputs");
+
+    size_t elements = 1;
+    for (int64_t i = 0; i < src.ndim; ++i) {
+      elements *= src.shape[i];
+    }
+    raft::copy<T>(static_cast<T*>(dst.data), static_cast<const T*>(src.data), elements, stream);
+  }
 }
 }  // namespace
 
@@ -252,8 +301,7 @@ extern "C" cuvsError_t cuvsMatrixCopy(cuvsResources_t res,
     DLTensor& src = src_managed->dl_tensor;
     DLTensor& dst = dst_managed->dl_tensor;
 
-    RAFT_EXPECTS(src.ndim == 2, "src should be a 2 dimensional tensor");
-    RAFT_EXPECTS(dst.ndim == 2, "dst should be a 2 dimensional tensor");
+    RAFT_EXPECTS(src.ndim == dst.ndim, "src and dst tensors should have the same dimensions");
 
     for (int64_t i = 0; i < src.ndim; ++i) {
       RAFT_EXPECTS(src.shape[i] == dst.shape[i], "shape mismatch between src and dst tensors");
@@ -316,21 +364,26 @@ extern "C" cuvsError_t cuvsMatrixSliceRows(cuvsResources_t res,
 
     DLTensor& src = src_managed->dl_tensor;
     DLTensor& dst = dst_managed->dl_tensor;
-    RAFT_EXPECTS(src.ndim == 2, "src should be a 2 dimensional tensor");
+    RAFT_EXPECTS(src.ndim <= 2, "src should be a 1 or 2 dimensional tensor");
     RAFT_EXPECTS(src.shape != nullptr, "shape should be initialized in the src tensor");
 
     dst.dtype    = src.dtype;
     dst.device   = src.device;
-    dst.ndim     = 2;
-    dst.shape    = new int64_t[2];
+    dst.ndim     = src.ndim;
+    dst.shape    = new int64_t[dst.ndim];
     dst.shape[0] = end - start;
-    dst.shape[1] = src.shape[1];
 
-    int64_t row_strides = dst.shape[1];
-    if (src.strides) {
-      dst.strides = new int64_t[2];
-      row_strides = dst.strides[0] = src.strides[0];
-      dst.strides[1]               = src.strides[1];
+    int64_t row_strides = 1;
+
+    if (dst.ndim == 2) {
+      dst.shape[1] = src.shape[1];
+      row_strides = dst.shape[1];
+
+      if (src.strides) {
+        dst.strides = new int64_t[2];
+        row_strides = dst.strides[0] = src.strides[0];
+        dst.strides[1]               = src.strides[1];
+      }
     }
 
     dst.data = static_cast<char*>(src.data) + start * row_strides * (dst.dtype.bits / 8);

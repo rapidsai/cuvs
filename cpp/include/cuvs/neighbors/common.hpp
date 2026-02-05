@@ -1,11 +1,12 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
 #include <cstdint>
+#include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/device_csr_matrix.hpp>
 #include <raft/core/device_mdarray.hpp>
@@ -29,6 +30,10 @@
 #endif
 
 namespace cuvs::neighbors {
+/**
+ * @addtogroup cagra_cpp_index_params
+ * @{
+ */
 
 /** Parameters for VPQ compression. */
 struct vpq_params {
@@ -58,14 +63,37 @@ struct vpq_params {
   /**
    * The fraction of data to use during iterative kmeans building (VQ phase).
    * When zero, an optimal value is selected using a heuristic.
+   * @deprecated Prefer using `max_train_points_per_vq_cluster` instead.
    */
   double vq_kmeans_trainset_fraction = 0;
   /**
    * The fraction of data to use during iterative kmeans building (PQ phase).
    * When zero, an optimal value is selected using a heuristic.
+   * @deprecated Prefer using `max_train_points_per_pq_code` instead.
    */
   double pq_kmeans_trainset_fraction = 0;
+  /**
+   * Type of k-means algorithm for PQ training.
+   * Balanced k-means tends to be faster than regular k-means for PQ training, for
+   * problem sets where the number of points per cluster are approximately equal.
+   * Regular k-means may be better for skewed cluster distributions.
+   */
+  cuvs::cluster::kmeans::kmeans_type pq_kmeans_type =
+    cuvs::cluster::kmeans::kmeans_type::KMeansBalanced;
+  /**
+   * The max number of data points to use per PQ code during PQ codebook training. Using more data
+   * points per PQ code may increase the quality of PQ codebook but may also increase the build
+   * time. We will use `pq_n_centers * max_train_points_per_pq_code` training
+   * points to train each PQ codebook.
+   */
+  uint32_t max_train_points_per_pq_code = 256;
+  /**
+   * The max number of data points to use per VQ cluster during training.
+   */
+  uint32_t max_train_points_per_vq_cluster = 1024;
 };
+
+/** @} */  // end group cagra_cpp_index_params
 
 /**
  * @defgroup neighbors_index Approximate Nearest Neighbors Types
@@ -248,7 +276,7 @@ auto make_strided_dataset(const raft::resources& res, const SrcT& src, uint32_t 
   }
   // Something is wrong: have to make a copy and produce an owning dataset
   auto out_layout =
-    raft::make_strided_layout(src.extents(), std::array<index_type, 2>{required_stride, 1});
+    raft::make_strided_layout(src.extents(), cuda::std::array<index_type, 2>{required_stride, 1});
   auto out_array =
     raft::make_device_matrix<value_type, index_type>(res, src.extent(0), required_stride);
 
@@ -310,7 +338,7 @@ auto make_strided_dataset(
   const bool stride_matches = required_stride == src_stride;
 
   auto out_layout =
-    raft::make_strided_layout(src.extents(), std::array<index_type, 2>{required_stride, 1});
+    raft::make_strided_layout(src.extents(), cuda::std::array<index_type, 2>{required_stride, 1});
 
   using out_mdarray_type          = raft::device_matrix<value_type, index_type>;
   using out_layout_type           = typename out_mdarray_type::layout_type;
@@ -683,11 +711,52 @@ template <typename IdxT>
 constexpr static IdxT kInvalidRecord =
   (std::is_signed_v<IdxT> ? IdxT{0} : std::numeric_limits<IdxT>::max()) - 1;
 
+/**
+ * Abstract base class for IVF list data.
+ * This allows polymorphic access to list data regardless of the underlying layout.
+ *
+ * @tparam ValueT The data element type (e.g., uint8_t for PQ codes, float for raw vectors)
+ * @tparam IdxT The index type for source indices
+ * @tparam SizeT The size type
+ *
+ * TODO: Make this struct internal (tracking issue: https://github.com/rapidsai/cuvs/issues/1726)
+ */
+template <typename ValueT, typename IdxT, typename SizeT = uint32_t>
+struct list_base {
+  using value_type = ValueT;
+  using index_type = IdxT;
+  using size_type  = SizeT;
+
+  virtual ~list_base() = default;
+
+  /** Get the raw data pointer. */
+  virtual value_type* data_ptr() noexcept             = 0;
+  virtual const value_type* data_ptr() const noexcept = 0;
+
+  /** Get the indices pointer. */
+  virtual index_type* indices_ptr() noexcept             = 0;
+  virtual const index_type* indices_ptr() const noexcept = 0;
+
+  /** Get the current size (number of records). */
+  virtual size_type get_size() const noexcept = 0;
+
+  /** Set the current size (number of records). */
+  virtual void set_size(size_type new_size) noexcept = 0;
+
+  /** Get the total size of the data array in bytes. */
+  virtual size_t data_byte_size() const noexcept = 0;
+
+  /** Get the capacity (number of indices that can be stored). */
+  virtual size_type indices_capacity() const noexcept = 0;
+};
+
 /** The data for a single IVF list. */
 template <template <typename, typename...> typename SpecT,
           typename SizeT,
           typename... SpecExtraArgs>
-struct list {
+struct list : public list_base<typename SpecT<SizeT, SpecExtraArgs...>::value_type,
+                               typename SpecT<SizeT, SpecExtraArgs...>::index_type,
+                               SizeT> {
   using size_type    = SizeT;
   using spec_type    = SpecT<size_type, SpecExtraArgs...>;
   using value_type   = typename spec_type::value_type;
@@ -703,6 +772,18 @@ struct list {
 
   /** Allocate a new list capable of holding at least `n_rows` data records and indices. */
   list(raft::resources const& res, const spec_type& spec, size_type n_rows);
+
+  value_type* data_ptr() noexcept override { return data.data_handle(); }
+  const value_type* data_ptr() const noexcept override { return data.data_handle(); }
+
+  index_type* indices_ptr() noexcept override { return indices.data_handle(); }
+  const index_type* indices_ptr() const noexcept override { return indices.data_handle(); }
+
+  size_type get_size() const noexcept override { return size.load(); }
+  void set_size(size_type new_size) noexcept override { size.store(new_size); }
+
+  size_t data_byte_size() const noexcept override { return data.size() * sizeof(value_type); }
+  size_type indices_capacity() const noexcept override { return indices.extent(0); }
 };
 
 template <typename ListT, class T = void>
@@ -727,6 +808,10 @@ using enable_if_valid_list_t = typename enable_if_valid_list<ListT, T>::type;
 /**
  * Resize a list by the given id, so that it can contain the given number of records;
  * copy the data if necessary.
+ *
+ * @note This is an internal function that requires the concrete list type.
+ *       For IVF-PQ indexes, prefer using the helper functions in
+ *       `cuvs::neighbors::ivf_pq::helpers::resize_list` which handle type casting internally.
  */
 template <typename ListT>
 void resize_list(raft::resources const& res,
@@ -735,6 +820,15 @@ void resize_list(raft::resources const& res,
                  typename ListT::size_type new_used_size,
                  typename ListT::size_type old_used_size);
 
+/**
+ * Serialize a list to an output stream.
+ *
+ * @note This function requires the concrete list type (not the base class) because:
+ *       1. It needs access to the spec_type to determine the data layout for serialization
+ *       2. The serialized format depends on the spec's make_list_extents() method
+ *       When calling from code that only has a base class pointer, use std::static_pointer_cast
+ *       to obtain the typed pointer first.
+ */
 template <typename ListT>
 enable_if_valid_list_t<ListT> serialize_list(
   const raft::resources& handle,
@@ -742,6 +836,7 @@ enable_if_valid_list_t<ListT> serialize_list(
   const ListT& ld,
   const typename ListT::spec_type& store_spec,
   std::optional<typename ListT::size_type> size_override = std::nullopt);
+
 template <typename ListT>
 enable_if_valid_list_t<ListT> serialize_list(
   const raft::resources& handle,

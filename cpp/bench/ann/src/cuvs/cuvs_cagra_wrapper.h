@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -22,8 +22,6 @@
 #include <raft/core/logger.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/linalg/unary_op.cuh>
-// #include <raft/neighbors/dataset.hpp>
-// #include <raft/neighbors/detail/cagra/cagra_build.cuh>
 #include <raft/util/cudart_utils.hpp>
 
 #include <rmm/device_uvector.hpp>
@@ -223,9 +221,6 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
       sub_indices_.push_back(std::move(sub_index_shared));
     }
     if (index_params_.merge_type == CagraMergeType::kPhysical) {
-      cuvs::neighbors::cagra::merge_params merge_params{params};
-      merge_params.merge_strategy = cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL;
-
       std::vector<cuvs::neighbors::cagra::index<T, IdxT>*> indices;
       indices.reserve(sub_indices_.size());
       for (auto& ptr : sub_indices_) {
@@ -233,7 +228,7 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
       }
 
       index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(
-        std::move(cuvs::neighbors::cagra::merge(handle_, merge_params, indices)));
+        std::move(cuvs::neighbors::cagra::merge(handle_, params, indices)));
     }
   }
 }

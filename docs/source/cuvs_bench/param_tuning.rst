@@ -201,7 +201,7 @@ CAGRA uses a graph-based index, which creates an intermediate, approximate kNN g
  * - `graph_build_algo`
    - `build`
    - `N`
-   - [`IVF_PQ`, `NN_DESCENT`]
+   - [`IVF_PQ`, `NN_DESCENT`, `ACE`]
    - `IVF_PQ`
    - Algorithm to use for building the initial kNN graph, from which CAGRA will optimize into the navigable CAGRA graph
 
@@ -211,6 +211,34 @@ CAGRA uses a graph-based index, which creates an intermediate, approximate kNN g
    - [`device`, `host`, `mmap`]
    - `mmap`
    - Where should the dataset reside?
+
+ * - `npartitions`
+   - `build`
+   - N
+   - Positive integer >0
+   - 1
+   - The number of partitions to use for the ACE build. Small values might improve recall but potentially degrade performance and increase memory usage. Partitions should not be too small to prevent issues in KNN graph construction. The partition size is on average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance in the partition sizes (up to 3x in our tests).
+
+ * - `build_dir`
+   - `build`
+   - N
+   - String
+   - "/tmp/ace_build"
+   - The directory to use for the ACE build. Must be specified when using ACE build. This should be the fastest disk in the system and hold enough space for twice the dataset, final graph, and label mapping.
+
+ * - `ef_construction`
+   - `build`
+   - Y
+   - Positive integer >0
+   - 120
+   - Controls index time and accuracy when using ACE build. Bigger values increase the index quality. At some point, increasing this will no longer improve the quality.
+
+ * - `use_disk`
+   - `build`
+   - N
+   - Boolean
+   - `false`
+   - Whether to use disk-based storage for ACE build. When true, forces ACE to use disk-based storage even if the graph fits in host and GPU memory. When false, ACE will use in-memory storage if the graph fits in host and GPU memory and disk-based storage otherwise.
 
  * - `query_memory_type`
    - `search`
@@ -672,6 +700,90 @@ Use FAISS IVF-PQ index on CPU
 HNSW
 ====
 
+cuvs_hnsw
+---------
+
+cuVS HNSW builds an HNSW index using the ACE (Augmented Core Extraction) algorithm, which enables GPU-accelerated HNSW index construction for datasets too large to fit in GPU memory.
+
+.. list-table::
+
+ * - Parameter
+   - Type
+   - Required
+   - Data Type
+   - Default
+   - Description
+
+ * - `hierarchy`
+   - `build`
+   - N
+   - [`NONE`, `CPU`, `GPU`]
+   - `NONE`
+   - Type of HNSW hierarchy to build. `NONE` creates a base-layer-only index, `CPU` builds full hierarchy on CPU, `GPU` builds full hierarchy on GPU.
+
+ * - `efConstruction`
+   - `build`
+   - Y
+   - Positive integer >0
+   -
+   - Controls index time and accuracy. Bigger values increase the index quality. At some point, increasing this will no longer improve the quality.
+
+ * - `M`
+   - `build`
+   - Y
+   - Positive integer. Often between 2-100
+   -
+   - Number of bi-directional links create for every new element during construction. Higher values work for higher intrinsic dimensionality and/or high recall, low values can work for datasets with low intrinsic dimensionality and/or low recalls. Also affects the algorithm's memory consumption.
+
+ * - `numThreads`
+   - `build`
+   - N
+   - Positive integer >0
+   - 1
+   - Number of threads to use to build the index.
+
+ * - `npartitions`
+   - `build`
+   - N
+   - Positive integer >0
+   - 1
+   - Number of partitions to use for the ACE build. Small values might improve recall but potentially degrade performance and increase memory usage. The partition size is on average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance in the partition sizes (up to 3x in our tests).
+
+ * - `ef_construction`
+   - `build`
+   - N
+   - Positive integer >0
+   - 120
+   - Controls index time and accuracy when using ACE build. Bigger values increase the index quality. At some point, increasing this will no longer improve the quality.
+
+ * - `build_dir`
+   - `build`
+   - N
+   - String
+   - "/tmp/ace_build"
+   - The directory to use for the ACE build. This should be the fastest disk in the system and hold enough space for twice the dataset, final graph, and label mapping.
+
+ * - `use_disk`
+   - `build`
+   - N
+   - Boolean
+   - `false`
+   - Whether to use disk-based storage for ACE build. When true, forces ACE to use disk-based storage even if the graph fits in host and GPU memory. When false, ACE will use in-memory storage if the graph fits in host and GPU memory and disk-based storage otherwise.
+
+ * - `ef`
+   - `search`
+   - Y
+   - Positive integer >0
+   -
+   - Size of the dynamic list for the nearest neighbors used for search. Higher value leads to more accurate but slower search. Cannot be lower than `k`.
+
+ * - `numThreads`
+   - `search`
+   - N
+   - Positive integer >0
+   - 1
+   - Number of threads to use for queries.
+
 hnswlib
 -------
 
@@ -696,7 +808,7 @@ hnswlib
    - Y
    - Positive integer. Often between 2-100
    -
-   - umber of bi-directional links create for every new element during construction. Higher values work for higher intrinsic dimensionality and/or high recall, low values can work for datasets with low intrinsic dimensionality and/or low recalls. Also affects the algorithm's memory consumption.
+   - Number of bi-directional links create for every new element during construction. Higher values work for higher intrinsic dimensionality and/or high recall, low values can work for datasets with low intrinsic dimensionality and/or low recalls. Also affects the algorithm's memory consumption.
 
  * - `numThreads`
    - `build`

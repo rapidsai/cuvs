@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.spi;
@@ -113,6 +113,28 @@ public interface CuVSProvider {
   HnswIndex.Builder newHnswIndexBuilder(CuVSResources cuVSResources)
       throws UnsupportedOperationException;
 
+  /**
+   * Creates an HNSW index from an existing CAGRA index.
+   *
+   * @param hnswParams Parameters for the HNSW index
+   * @param cagraIndex The CAGRA index to convert from
+   * @return A new HNSW index
+   * @throws Throwable if an error occurs during conversion
+   */
+  HnswIndex hnswIndexFromCagra(HnswIndexParams hnswParams, CagraIndex cagraIndex) throws Throwable;
+
+  /**
+   * Builds an HNSW index using the ACE (Augmented Core Extraction) algorithm.
+   *
+   * @param resources The CuVS resources
+   * @param hnswParams Parameters for the HNSW index with ACE configuration
+   * @param dataset The dataset to build the index from
+   * @return A new HNSW index ready for search
+   * @throws Throwable if an error occurs during building
+   */
+  HnswIndex hnswIndexBuild(CuVSResources resources, HnswIndexParams hnswParams, CuVSMatrix dataset)
+      throws Throwable;
+
   /** Creates a new TieredIndex Builder. */
   TieredIndex.Builder newTieredIndexBuilder(CuVSResources cuVSResources)
       throws UnsupportedOperationException;
@@ -134,7 +156,7 @@ public interface CuVSProvider {
    * @return A new merged CAGRA index
    * @throws Throwable if an error occurs during the merge operation
    */
-  default CagraIndex mergeCagraIndexes(CagraIndex[] indexes, CagraMergeParams mergeParams)
+  default CagraIndex mergeCagraIndexes(CagraIndex[] indexes, CagraIndexParams mergeParams)
       throws Throwable {
     // Default implementation falls back to the method without parameters
     return mergeCagraIndexes(indexes);
@@ -146,6 +168,29 @@ public interface CuVSProvider {
   void setLogLevel(java.util.logging.Level level);
 
   java.util.logging.Level getLogLevel();
+
+  /**
+   * Switch RMM allocations (used internally by various cuVS algorithms and by the default implementation of
+   * {@link CuVSDeviceMatrix}) to use pooled memory.
+   * This operation has a global effect, and will affect all resources on the current device.
+   *
+   * @param initialPoolSizePercent The initial pool size, in percentage of the total GPU memory
+   * @param maxPoolSizePercent The maximum pool size, in percentage of the total GPU memory
+   */
+  void enableRMMPooledMemory(int initialPoolSizePercent, int maxPoolSizePercent);
+
+  /**
+   * Switch RMM allocations (used internally by various cuVS algorithms and by the default implementation of
+   * {@link CuVSDeviceMatrix}) to use pooled memory.
+   * This operation has a global effect, and will affect all resources on the current device.
+   *
+   * @param initialPoolSizePercent The initial pool size, in percentage of the total GPU memory
+   * @param maxPoolSizePercent The maximum pool size, in percentage of the total GPU memory
+   */
+  void enableRMMManagedPooledMemory(int initialPoolSizePercent, int maxPoolSizePercent);
+
+  /** Disables pooled memory on the current device, reverting back to the default setting.  */
+  void resetRMMPooledMemory();
 
   /** Retrieves the system-wide provider. */
   static CuVSProvider provider() {

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
 import datetime
@@ -59,6 +59,23 @@ search_macro = """
   }
 """
 
+transform_include_macro = """
+#include "../ivf_pq_transform.cuh"
+"""
+
+transform_macro = """
+#define CUVS_INST_IVF_PQ_TRANSFORM(T, IdxT)                                            \\
+  void transform(raft::resources const& handle,                                        \\
+              const cuvs::neighbors::ivf_pq::index<IdxT>& index,                       \\
+              raft::device_matrix_view<const T, IdxT, raft::row_major> dataset,        \\
+              raft::device_vector_view<uint32_t, IdxT> output_labels,                  \\
+              raft::device_matrix_view<uint8_t, IdxT, raft::row_major> output_dataset) \\
+  {                                                                                    \\
+    cuvs::neighbors::ivf_pq::detail::transform(                                        \\
+      handle, index, dataset, output_labels, output_dataset);                          \\
+  }
+"""
+
 macros = dict(
     build_extend=dict(
         include=build_include_macro,
@@ -70,6 +87,11 @@ macros = dict(
         definition=search_macro,
         name="CUVS_INST_IVF_PQ_SEARCH",
     ),
+    transform=dict(
+        include=transform_include_macro,
+        definition=transform_macro,
+        name="CUVS_INST_IVF_PQ_TRANSFORM",
+    ),
 )
 
 for type_path, (T, IdxT) in types.items():
@@ -77,7 +99,7 @@ for type_path, (T, IdxT) in types.items():
         path = f"ivf_pq_{macro_path}_{type_path}.cu"
         with open(path, "w") as f:
             f.write(header)
-            f.write(macro['include'])
+            f.write(macro["include"])
             f.write(namespace_macro)
             f.write(macro["definition"])
             f.write(f"{macro['name']}({T}, {IdxT});\n\n")

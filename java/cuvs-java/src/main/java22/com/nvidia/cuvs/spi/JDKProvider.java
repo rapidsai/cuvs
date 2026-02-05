@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.spi;
@@ -33,6 +33,73 @@ import java.util.jar.Manifest;
 import java.util.logging.Level;
 
 final class JDKProvider implements CuVSProvider {
+
+  record CuVSVersion(short major, short minor, short patch) {
+    private static final int MAX_VERSION_DISTANCE = 3;
+
+    static CuVSVersion fromString(String versionString) {
+      var tokens = versionString.split("\\.");
+      final short major = parseToken(tokens, 0);
+      final short minor = parseToken(tokens, 1);
+      final short patch = parseToken(tokens, 2);
+      if (major == 0 || minor == 0) {
+        return null;
+      }
+      return new CuVSVersion(major, minor, patch);
+    }
+
+    private static short parseToken(String[] tokens, int index) {
+      if (index < tokens.length) {
+        try {
+          return Short.parseShort(tokens[index]);
+        } catch (NumberFormatException _) {
+        }
+      }
+      return 0;
+    }
+
+    static boolean isCuVSMoreRecent(CuVSVersion mavenVersion, CuVSVersion cuvsVersion) {
+      return (cuvsVersion.major == mavenVersion.major && cuvsVersion.minor >= mavenVersion.minor)
+          || cuvsVersion.major > mavenVersion.major;
+    }
+
+    static boolean isCuVSWithinMaxRange(CuVSVersion mavenVersion, CuVSVersion cuvsVersion)
+        throws ProviderInitializationException {
+      var maxVersionFromSyspropString = System.getProperty("cuvs.max_version");
+
+      final CuVSVersion maxVersion;
+      if (maxVersionFromSyspropString != null) {
+        maxVersion = fromString(maxVersionFromSyspropString);
+        if (maxVersion == null) {
+          throw new ProviderInitializationException(
+              "System property 'cuvs.max_version' is not a valid cuVS version: "
+                  + maxVersionFromSyspropString);
+        }
+      } else {
+        maxVersion = addReleases(mavenVersion, MAX_VERSION_DISTANCE);
+      }
+
+      return cuvsVersion.major < maxVersion.major
+          || (cuvsVersion.major == maxVersion.major && cuvsVersion.minor <= maxVersion.minor);
+    }
+
+    private static CuVSVersion addReleases(CuVSVersion currentVersion, int numberOfReleases) {
+      short candidateMinor = (short) (currentVersion.minor + numberOfReleases * 2);
+      short releaseMinor = (short) (candidateMinor % 12);
+      short releaseMajor = (short) (currentVersion.major + (candidateMinor / 12));
+      if (releaseMinor == 0) {
+        releaseMinor = 12;
+        releaseMajor -= 1;
+      }
+
+      return new CuVSVersion(releaseMajor, releaseMinor, (short) 0);
+    }
+
+    @Override
+    public String toString() {
+      return String.format(Locale.ROOT, "%02d.%02d.%d", major, minor, patch);
+    }
+  }
 
   private static final MethodHandle createNativeDataset$mh;
   private static final MethodHandle createNativeDatasetWithStrides$mh;
@@ -68,14 +135,15 @@ final class JDKProvider implements CuVSProvider {
     }
   }
 
+  private final cuvsRMMMemoryResourceReset cuvsRMMMemoryResourceResetInvoker =
+      cuvsRMMMemoryResourceReset.makeInvoker();
+
   private final cuvsGetLogLevel GET_LOG_LEVEL_INVOKER = cuvsGetLogLevel.makeInvoker();
 
   private JDKProvider() {}
 
   static CuVSProvider create() throws ProviderInitializationException {
     NativeDependencyLoader.loadLibraries();
-
-    var mavenVersion = readCuVSVersionFromManifest();
 
     try (var localArena = Arena.ofConfined()) {
       var majorPtr = localArena.allocate(uint16_t);
@@ -86,17 +154,41 @@ final class JDKProvider implements CuVSProvider {
       var minor = minorPtr.get(uint16_t, 0);
       var patch = patchPtr.get(uint16_t, 0);
 
-      var cuvsVersionString = String.format(Locale.ROOT, "%02d.%02d.%d", major, minor, patch);
-      if (mavenVersion != null && !cuvsVersionString.equals(mavenVersion)) {
+      var mavenVersionString = readCuVSVersionFromManifest();
+      checkCuVSVersionMatching(mavenVersionString, major, minor, patch);
+    }
+    return new JDKProvider();
+  }
+
+  static void checkCuVSVersionMatching(
+      String mavenVersionString, short major, short minor, short patch)
+      throws ProviderInitializationException {
+    var mavenVersion = CuVSVersion.fromString(mavenVersionString);
+    var cuvsVersion = new CuVSVersion(major, minor, patch);
+
+    if (mavenVersion != null) {
+      if (!CuVSVersion.isCuVSMoreRecent(mavenVersion, cuvsVersion)) {
         throw new ProviderInitializationException(
             String.format(
                 Locale.ROOT,
-                "libcuvs_c version mismatch: expected [%s], found [%s]",
-                mavenVersion,
-                cuvsVersionString));
+                """
+                Version mismatch: outdated libcuvs_c (libcuvs_c [%s], cuvs-java version [%s]).\
+                 Please upgrade your libcuvs_c installation to match at lease the cuvs-java\
+                 version.\
+                """,
+                cuvsVersion,
+                mavenVersion));
+      }
+      if (!CuVSVersion.isCuVSWithinMaxRange(mavenVersion, cuvsVersion)) {
+        throw new ProviderInitializationException(
+            String.format(
+                Locale.ROOT,
+                "Version mismatch: unsupported libcuvs_c (libcuvs_c [%s], cuvs-java version [%s]). "
+                    + "Please upgrade your software, or install a previous version of libcuvs_c.",
+                cuvsVersion,
+                mavenVersion));
       }
     }
-    return new JDKProvider();
   }
 
   /**
@@ -157,6 +249,18 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
+  public HnswIndex hnswIndexFromCagra(HnswIndexParams hnswParams, CagraIndex cagraIndex)
+      throws Throwable {
+    return HnswIndexImpl.fromCagra(hnswParams, cagraIndex);
+  }
+
+  @Override
+  public HnswIndex hnswIndexBuild(CuVSResources resources, HnswIndexParams hnswParams, CuVSMatrix dataset)
+      throws Throwable {
+    return HnswIndexImpl.build(resources, hnswParams, dataset);
+  }
+
+  @Override
   public TieredIndex.Builder newTieredIndexBuilder(CuVSResources cuVSResources) {
     return TieredIndexImpl.newBuilder(Objects.requireNonNull(cuVSResources));
   }
@@ -170,7 +274,7 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes, CagraMergeParams mergeParams) {
+  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes, CagraIndexParams mergeParams) {
     if (indexes == null || indexes.length == 0) {
       throw new IllegalArgumentException("At least one index must be provided for merging");
     }
@@ -333,6 +437,25 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
+  public void enableRMMPooledMemory(int initialPoolSizePercent, int maxPoolSizePercent) {
+    checkCuVSError(
+        cuvsRMMPoolMemoryResourceEnable(initialPoolSizePercent, maxPoolSizePercent, false),
+        "cuvsRMMPoolMemoryResourceEnable");
+  }
+
+  @Override
+  public void enableRMMManagedPooledMemory(int initialPoolSizePercent, int maxPoolSizePercent) {
+    checkCuVSError(
+        cuvsRMMPoolMemoryResourceEnable(initialPoolSizePercent, maxPoolSizePercent, true),
+        "cuvsRMMPoolMemoryResourceEnable");
+  }
+
+  @Override
+  public void resetRMMPooledMemory() {
+    checkCuVSError(cuvsRMMMemoryResourceResetInvoker.apply(), "cuvsRMMMemoryResourceReset");
+  }
+
+  @Override
   public CuVSMatrix.Builder<CuVSHostMatrix> newHostMatrixBuilder(
       long size, long columns, CuVSMatrix.DataType dataType) {
 
@@ -349,7 +472,10 @@ final class JDKProvider implements CuVSProvider {
   @Override
   public CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
       CuVSResources resources, long size, long columns, CuVSMatrix.DataType dataType) {
-    return new DeviceMatrixBuilder(resources, size, columns, dataType);
+    var rowBytes = columns * dataType.bytes();
+    return rowBytes > PinnedMemoryBuffer.CHUNK_BYTES
+        ? new DirectDeviceMatrixBuilder(resources, size, columns, dataType)
+        : new BufferedDeviceMatrixBuilder(resources, size, columns, dataType);
   }
 
   @Override
@@ -360,7 +486,11 @@ final class JDKProvider implements CuVSProvider {
       int rowStride,
       int columnStride,
       CuVSMatrix.DataType dataType) {
-    return new DeviceMatrixBuilder(resources, size, columns, rowStride, columnStride, dataType);
+    var rowBytes = columns * dataType.bytes();
+    return rowBytes > PinnedMemoryBuffer.CHUNK_BYTES
+        ? new DirectDeviceMatrixBuilder(resources, size, columns, rowStride, columnStride, dataType)
+        : new BufferedDeviceMatrixBuilder(
+            resources, size, columns, rowStride, columnStride, dataType);
   }
 
   @Override
@@ -480,26 +610,26 @@ final class JDKProvider implements CuVSProvider {
    * This {@link CuVSDeviceMatrix} builder implementation returns a {@link CuVSDeviceMatrix} backed by managed RMM
    * device memory. It uses a {@link PinnedMemoryBuffer} to batch data before copying it to the GPU.
    */
-  private static final class DeviceMatrixBuilder extends MatrixBuilder<CuVSDeviceMatrixImpl>
+  private static final class BufferedDeviceMatrixBuilder extends MatrixBuilder<CuVSDeviceMatrixImpl>
       implements CuVSMatrix.Builder<CuVSDeviceMatrix> {
 
     private final MemorySegment stream;
 
-    private final PinnedMemoryBuffer hostBuffer;
+    private final CuVSResources resources;
     private final long bufferRowCount;
     private int currentBufferRow;
 
-    private DeviceMatrixBuilder(
+    private BufferedDeviceMatrixBuilder(
         CuVSResources resources, long size, long columns, CuVSMatrix.DataType dataType) {
       super(CuVSDeviceMatrixRMMImpl.create(resources, size, columns, dataType), size, columns);
       this.stream = Util.getStream(resources);
+      this.resources = resources;
 
-      this.hostBuffer = new PinnedMemoryBuffer(size, columns, matrix.valueLayout());
-      this.bufferRowCount = Math.min((hostBuffer.size() / rowBytes), size);
+      this.bufferRowCount = Math.min((PinnedMemoryBuffer.CHUNK_BYTES / rowBytes), size);
       this.currentBufferRow = 0;
     }
 
-    private DeviceMatrixBuilder(
+    private BufferedDeviceMatrixBuilder(
         CuVSResources resources,
         long size,
         long columns,
@@ -514,9 +644,9 @@ final class JDKProvider implements CuVSProvider {
           rowStride);
 
       this.stream = Util.getStream(resources);
+      this.resources = resources;
 
-      this.hostBuffer = new PinnedMemoryBuffer(size, columns, matrix.valueLayout());
-      this.bufferRowCount = Math.min((hostBuffer.size() / rowBytes), size);
+      this.bufferRowCount = Math.min((PinnedMemoryBuffer.CHUNK_BYTES / rowBytes), size);
       this.currentBufferRow = 0;
     }
 
@@ -526,16 +656,19 @@ final class JDKProvider implements CuVSProvider {
         throw new ArrayIndexOutOfBoundsException();
       }
       var hostBufferOffset = currentBufferRow * rowBytes;
-      MemorySegment.copy(vector, 0, hostBuffer.address(), hostBufferOffset, rowBytes);
+      try (var access = resources.access()) {
+        var hostBuffer = CuVSResourcesImpl.getHostBuffer(access);
+        MemorySegment.copy(vector, 0, hostBuffer, hostBufferOffset, rowBytes);
 
-      currentRow++;
-      currentBufferRow++;
-      if (currentBufferRow == bufferRowCount) {
-        flushBuffer();
+        currentRow++;
+        currentBufferRow++;
+        if (currentBufferRow == bufferRowCount) {
+          flushBuffer(hostBuffer);
+        }
       }
     }
 
-    private void flushBuffer() {
+    private void flushBuffer(MemorySegment hostBuffer) {
       if (currentBufferRow > 0) {
         var deviceMemoryOffset = (currentRow - currentBufferRow) * rowSize;
         var dst = matrix.memorySegment().asSlice(deviceMemoryOffset);
@@ -543,7 +676,7 @@ final class JDKProvider implements CuVSProvider {
             cudaMemcpy2DAsync(
                 dst,
                 rowSize,
-                hostBuffer.address(),
+                hostBuffer,
                 rowBytes,
                 rowBytes,
                 currentBufferRow,
@@ -558,8 +691,65 @@ final class JDKProvider implements CuVSProvider {
 
     @Override
     public CuVSDeviceMatrix build() {
-      flushBuffer();
-      hostBuffer.close();
+      try (var access = resources.access()) {
+        var hostBuffer = CuVSResourcesImpl.getHostBuffer(access);
+        flushBuffer(hostBuffer);
+      }
+      return matrix;
+    }
+  }
+
+  /**
+   * This {@link CuVSDeviceMatrix} builder implementation returns a {@link CuVSDeviceMatrix} backed by managed RMM
+   * device memory. It uses a {@link PinnedMemoryBuffer} to batch data before copying it to the GPU.
+   */
+  private static final class DirectDeviceMatrixBuilder extends MatrixBuilder<CuVSDeviceMatrixImpl>
+      implements CuVSMatrix.Builder<CuVSDeviceMatrix> {
+
+    private final MemorySegment stream;
+
+    private int currentRow;
+
+    private DirectDeviceMatrixBuilder(
+        CuVSResources resources, long size, long columns, CuVSMatrix.DataType dataType) {
+      super(CuVSDeviceMatrixRMMImpl.create(resources, size, columns, dataType), size, columns);
+      this.stream = Util.getStream(resources);
+      this.currentRow = 0;
+    }
+
+    private DirectDeviceMatrixBuilder(
+        CuVSResources resources,
+        long size,
+        long columns,
+        int rowStride,
+        int columnStride,
+        CuVSMatrix.DataType dataType) {
+      super(
+          CuVSDeviceMatrixRMMImpl.create(
+              resources, size, columns, rowStride, columnStride, dataType),
+          size,
+          columns,
+          rowStride);
+
+      this.stream = Util.getStream(resources);
+      this.currentRow = 0;
+    }
+
+    @Override
+    protected void internalAddVector(MemorySegment vector) {
+      if (currentRow >= size) {
+        throw new ArrayIndexOutOfBoundsException();
+      }
+
+      var deviceMemoryOffset = currentRow * rowSize;
+      var dst = matrix.memorySegment().asSlice(deviceMemoryOffset);
+      Util.cudaMemcpyAsync(dst, vector, rowBytes, CudaMemcpyKind.HOST_TO_DEVICE, stream);
+      checkCudaError(cudaStreamSynchronize(stream), "cudaStreamSynchronize");
+      currentRow++;
+    }
+
+    @Override
+    public CuVSDeviceMatrix build() {
       return matrix;
     }
   }

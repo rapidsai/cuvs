@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs;
@@ -12,7 +12,7 @@ import static org.junit.Assert.*;
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
 import com.nvidia.cuvs.CagraIndexParams.CuvsDistanceType;
-import com.nvidia.cuvs.CagraMergeParams.MergeStrategy;
+import com.nvidia.cuvs.spi.CuVSProvider;
 import java.lang.foreign.Arena;
 import java.lang.foreign.Linker;
 import java.lang.foreign.MemoryLayout;
@@ -31,10 +31,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import java.util.function.LongToIntFunction;
 import java.util.function.Supplier;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
@@ -52,12 +52,16 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     log.trace("Random context initialized for test.");
   }
 
-  private static void runConcurrently(int nThreads, Supplier<Runnable> runnableSupplier)
+  private static void runConcurrently(
+      boolean usePooledMemory, int nThreads, Function<Integer, Runnable> runnableSupplier)
       throws ExecutionException, InterruptedException, TimeoutException {
     try (ExecutorService parallelExecutor = Executors.newFixedThreadPool(nThreads)) {
+      if (usePooledMemory) {
+        CuVSProvider.provider().enableRMMPooledMemory(10, 60);
+      }
       var futures = new CompletableFuture[nThreads];
       for (int j = 0; j < nThreads; j++) {
-        futures[j] = CompletableFuture.runAsync(runnableSupplier.get(), parallelExecutor);
+        futures[j] = CompletableFuture.runAsync(runnableSupplier.apply(j), parallelExecutor);
       }
 
       CompletableFuture.allOf(futures)
@@ -68,6 +72,15 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
                 return null;
               })
           .get(2000, TimeUnit.SECONDS);
+
+      parallelExecutor.shutdown();
+      assertTrue(
+          "Timeout waiting for parallelExecutor to finish",
+          parallelExecutor.awaitTermination(10, TimeUnit.SECONDS));
+    } finally {
+      if (usePooledMemory) {
+        CuVSProvider.provider().resetRMMPooledMemory();
+      }
     }
   }
 
@@ -181,6 +194,15 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
    */
   @Test
   public void testIndexingAndSearchingFlowConcurrently() throws Throwable {
+    testIndexingAndSearchingFlowConcurrently(false);
+  }
+
+  @Test
+  public void testIndexingAndSearchingFlowConcurrentlyWithPooledMemory() throws Throwable {
+    testIndexingAndSearchingFlowConcurrently(true);
+  }
+
+  private void testIndexingAndSearchingFlowConcurrently(boolean usePooledMemory) throws Throwable {
     final float[][] dataset = createSampleData();
     float[][] queries = createSampleQueries();
     List<Map<Integer, Float>> expectedResults = getExpectedResults();
@@ -188,13 +210,18 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     int numTestsRuns = 10;
 
     runConcurrently(
+        usePooledMemory,
         numTestsRuns,
-        () ->
+        threadIdx ->
             () -> {
+              log.debug("Indexing threadIdx:{}-{}", threadIdx, Thread.currentThread().getName());
               try (CuVSResources resources = CheckedCuVSResources.create();
-                  var index = indexOnce(CuVSMatrix.ofArray(dataset), resources)) {
+                  var matrix = CuVSMatrix.ofArray(dataset);
+                  var index = indexOnce(matrix, resources)) {
                 var indexPath = serializeOnce(index);
                 try (var loadedIndex = deserializeOnce(indexPath, resources)) {
+                  log.debug(
+                      "Querying threadIdx:{}-{}", threadIdx, Thread.currentThread().getName());
                   queryAndCompare(
                       index,
                       loadedIndex,
@@ -208,13 +235,14 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
               } catch (Throwable e) {
                 throw new RuntimeException(e);
               }
+              log.debug("Done threadIdx:{}-{}", threadIdx, Thread.currentThread().getName());
             });
   }
 
-  @Ignore // https://github.com/rapidsai/cuvs/issues/1467
   @Test
   public void testFloatIndexing() throws Throwable {
     testIndexing(
+        false,
         () ->
             CuVSMatrix.ofArray(
                 createFloatMatrix(randomIntBetween(2, 1024), randomIntBetween(2, 2048))));
@@ -223,33 +251,65 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
   @Test
   public void testByteIndexing() throws Throwable {
     testIndexing(
+        false,
         () ->
             CuVSMatrix.ofArray(
                 createByteMatrix(randomIntBetween(2, 1024), randomIntBetween(2, 2048))));
   }
 
-  private void testIndexing(Supplier<CuVSMatrix> matrixFactory) throws Exception {
+  @Test
+  public void testFloatIndexingWithPooledMemory() throws Throwable {
+    testIndexing(
+        true,
+        () ->
+            CuVSMatrix.ofArray(
+                createFloatMatrix(randomIntBetween(2, 1024), randomIntBetween(2, 2048))));
+  }
+
+  @Test
+  public void testByteIndexingWithPooledMemory() throws Throwable {
+    testIndexing(
+        true,
+        () ->
+            CuVSMatrix.ofArray(
+                createByteMatrix(randomIntBetween(2, 1024), randomIntBetween(2, 2048))));
+  }
+
+  private void testIndexing(boolean usePooledMemory, Supplier<CuVSMatrix> matrixFactory)
+      throws Exception {
     for (int i = 0; i < 10; ++i) {
-      var dataset = matrixFactory.get();
-      int numTestsRuns = 4;
-      runConcurrently(
-          numTestsRuns,
-          () ->
-              () -> {
-                try (CuVSResources resources = CheckedCuVSResources.create()) {
-                  var index = indexOnce(dataset, resources);
-                  index.close();
-                } catch (Throwable e) {
-                  throw new RuntimeException(e);
-                }
-              });
+      try (var dataset = matrixFactory.get()) {
+        int numRunners = 4;
+        final int iteration = i;
+        runConcurrently(
+            usePooledMemory,
+            numRunners,
+            threadIdx ->
+                () -> {
+                  try (CuVSResources resources = CheckedCuVSResources.create()) {
+                    // Create a local reference to the dataset, as index will close the dataset too
+                    // when it gets closed.
+                    var indexDatasetReference = dataset.toHost();
+                    log.debug(
+                        "Indexing iteration:{} threadIdx:{} dataset:{}",
+                        iteration,
+                        threadIdx,
+                        dataset);
+                    var index = indexOnce(indexDatasetReference, resources);
+                    log.debug("Done {} {}", iteration, threadIdx);
+                    index.close();
+                  } catch (Throwable e) {
+                    throw new RuntimeException(e);
+                  }
+                });
+      }
     }
   }
 
-  @Ignore // https://github.com/rapidsai/cuvs/issues/1467
   @Test
   public void testFloatSerialization() throws Throwable {
     testSerialization(
+        false,
         () ->
             CuVSMatrix.ofArray(
                 createFloatMatrix(randomIntBetween(2, 1024), randomIntBetween(2, 2048))));
@@ -258,33 +318,59 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
   @Test
   public void testByteSerialization() throws Throwable {
     testSerialization(
+        false,
         () ->
             CuVSMatrix.ofArray(
                 createByteMatrix(randomIntBetween(2, 1024), randomIntBetween(2, 2048))));
   }
 
-  private void testSerialization(Supplier<CuVSMatrix> matrixFactory) throws Throwable {
+  @Test
+  public void testFloatSerializationWithPooledMemory() throws Throwable {
+    testSerialization(
+        true,
+        () ->
+            CuVSMatrix.ofArray(
+                createFloatMatrix(randomIntBetween(2, 1024), randomIntBetween(2, 2048))));
+  }
+
+  @Test
+  public void testByteSerializationWithPooledMemory() throws Throwable {
+    testSerialization(
+        true,
+        () ->
+            CuVSMatrix.ofArray(
+                createByteMatrix(randomIntBetween(2, 1024), randomIntBetween(2, 2048))));
+  }
+
+  private void testSerialization(boolean usePooledMemory, Supplier<CuVSMatrix> matrixFactory)
+      throws Throwable {
     for (int i = 0; i < 10; ++i) {
-      final var dataset = matrixFactory.get();
-      int numTestsRuns = 4;
-      runConcurrently(
-          numTestsRuns,
-          () ->
-              () -> {
-                try (CuVSResources resources = CheckedCuVSResources.create();
-                    var index = indexOnce(dataset, resources)) {
-                  var indexPath = serializeOnce(index);
-                  Files.deleteIfExists(indexPath);
-                } catch (Throwable e) {
-                  throw new RuntimeException(e);
-                }
-              });
+      try (final var dataset = matrixFactory.get()) {
+        int numRunners = 4;
+        runConcurrently(
+            usePooledMemory,
+            numRunners,
+            threadIdx ->
+                () -> {
+                  // Create a local reference to the dataset, as index will close the dataset too
+                  // when it gets closed.
+                  var indexDatasetReference = dataset.toHost();
+                  try (CuVSResources resources = CheckedCuVSResources.create();
+                      var index = indexOnce(indexDatasetReference, resources)) {
+                    var indexPath = serializeOnce(index);
+                    Files.deleteIfExists(indexPath);
+                  } catch (Throwable e) {
+                    throw new RuntimeException(e);
+                  }
+                });
+      }
     }
   }
 
   @Test
   public void testFloatDeserialization() throws Throwable {
     testDeserialization(
+        false,
         () ->
             CuVSMatrix.ofArray(
                 createFloatMatrix(randomIntBetween(2, 1024), randomIntBetween(2, 2048))));
@@ -293,12 +379,32 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
   @Test
   public void testByteDeserialization() throws Throwable {
     testDeserialization(
+        false,
         () ->
             CuVSMatrix.ofArray(
                 createByteMatrix(randomIntBetween(2, 1024), randomIntBetween(2, 2048))));
   }
 
-  private void testDeserialization(Supplier<CuVSMatrix> matrixFactory) throws Throwable {
+  @Test
+  public void testFloatDeserializationWithPooledMemory() throws Throwable {
+    testDeserialization(
+        true,
+        () ->
+            CuVSMatrix.ofArray(
+                createFloatMatrix(randomIntBetween(2, 1024), randomIntBetween(2, 2048))));
+  }
+
+  @Test
+  public void testByteDeserializationWithPooledMemory() throws Throwable {
+    testDeserialization(
+        true,
+        () ->
+            CuVSMatrix.ofArray(
+                createByteMatrix(randomIntBetween(2, 1024), randomIntBetween(2, 2048))));
+  }
+
+  private void testDeserialization(boolean usePooledMemory, Supplier<CuVSMatrix> matrixFactory)
+      throws Throwable {
     Path indexPath;
     try (var dataset = matrixFactory.get()) {
       indexPath = createSerializedIndex(dataset);
@@ -307,8 +413,9 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
       for (int i = 0; i < 10; ++i) {
         int numTestsRuns = 4;
         runConcurrently(
+            usePooledMemory,
             numTestsRuns,
-            () ->
+            threadIdx ->
                 () -> {
                   try (CuVSResources resources = CheckedCuVSResources.create()) {
                     deserializeOnce(indexPath, resources).close();
@@ -785,15 +892,9 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
               .withMetric(CuvsDistanceType.L2Expanded)
               .build();
 
-      CagraMergeParams physicalMergeParams =
-          new CagraMergeParams.Builder()
-              .withOutputIndexParams(outputIndexParams)
-              .withStrategy(MergeStrategy.PHYSICAL)
-              .build();
-
       log.trace("Merging indexes with PHYSICAL strategy...");
       try (CagraIndex physicalMergedIndex =
-          CagraIndex.merge(new CagraIndex[] {index1, index2}, physicalMergeParams)) {
+          CagraIndex.merge(new CagraIndex[] {index1, index2}, outputIndexParams)) {
         log.trace("Physical merge completed successfully");
 
         CagraSearchParams searchParams = new CagraSearchParams.Builder().build();

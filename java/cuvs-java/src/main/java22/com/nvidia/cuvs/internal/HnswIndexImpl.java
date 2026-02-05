@@ -1,9 +1,10 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.internal;
 
+import static com.nvidia.cuvs.internal.CuVSParamsHelper.createHnswAceParamsNative;
 import static com.nvidia.cuvs.internal.CuVSParamsHelper.createHnswIndexParams;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
@@ -12,7 +13,10 @@ import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
 import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
+import com.nvidia.cuvs.CagraIndex;
+import com.nvidia.cuvs.CuVSMatrix;
 import com.nvidia.cuvs.CuVSResources;
+import com.nvidia.cuvs.HnswAceParams;
 import com.nvidia.cuvs.HnswIndex;
 import com.nvidia.cuvs.HnswIndexParams;
 import com.nvidia.cuvs.HnswQuery;
@@ -20,6 +24,7 @@ import com.nvidia.cuvs.HnswSearchParams;
 import com.nvidia.cuvs.SearchResults;
 import com.nvidia.cuvs.internal.common.CloseableHandle;
 import com.nvidia.cuvs.internal.panama.DLDataType;
+import com.nvidia.cuvs.internal.panama.cuvsHnswAceParams;
 import com.nvidia.cuvs.internal.panama.cuvsHnswIndex;
 import com.nvidia.cuvs.internal.panama.cuvsHnswIndexParams;
 import com.nvidia.cuvs.internal.panama.cuvsHnswSearchParams;
@@ -57,6 +62,20 @@ public class HnswIndexImpl implements HnswIndex {
     this.hnswIndexParams = hnswIndexParams;
     this.resources = resources;
     this.hnswIndexReference = deserialize(inputStream);
+  }
+
+  /**
+   * Constructor for creating index from an existing IndexReference
+   *
+   * @param indexReference the index reference
+   * @param resources      an instance of {@link CuVSResources}
+   * @param hnswIndexParams an instance of {@link HnswIndexParams}
+   */
+  private HnswIndexImpl(
+      IndexReference indexReference, CuVSResources resources, HnswIndexParams hnswIndexParams) {
+    this.hnswIndexParams = hnswIndexParams;
+    this.resources = resources;
+    this.hnswIndexReference = indexReference;
   }
 
   /**
@@ -220,6 +239,186 @@ public class HnswIndexImpl implements HnswIndex {
 
   public static HnswIndex.Builder newBuilder(CuVSResources cuvsResources) {
     return new HnswIndexImpl.Builder(Objects.requireNonNull(cuvsResources));
+  }
+
+  /**
+   * Builds an HNSW index using the ACE algorithm.
+   *
+   * @param resources The CuVS resources
+   * @param hnswParams Parameters for the HNSW index with ACE configuration
+   * @param dataset The dataset to build the index from
+   * @return A new HNSW index ready for search
+   * @throws Throwable if an error occurs during building
+   */
+  public static HnswIndex build(CuVSResources resources, HnswIndexParams hnswParams, CuVSMatrix dataset)
+      throws Throwable {
+    Objects.requireNonNull(resources);
+    Objects.requireNonNull(hnswParams);
+    Objects.requireNonNull(dataset);
+    Objects.requireNonNull(hnswParams.getAceParams(), "ACE parameters must be set for build()");
+
+    // Create HNSW index
+    MemorySegment hnswIndex = createHnswIndexHandle();
+    initializeIndexDType(hnswIndex, dataset);
+
+    try (var localArena = Arena.ofConfined();
+        var hnswParamsHandle = createHnswIndexParamsForBuild(localArena, hnswParams);
+        var aceParamsHandle = createHnswAceParams(localArena, hnswParams.getAceParams())) {
+
+      MemorySegment hnswParamsMemorySegment = hnswParamsHandle.handle();
+
+      // Link ACE params to HNSW index params
+      cuvsHnswIndexParams.ace_params(hnswParamsMemorySegment, aceParamsHandle.handle());
+
+      // Prepare dataset tensor
+      MemorySegment datasetTensor = prepareTensorFromMatrix(localArena, dataset);
+
+      try (var resourcesAccessor = resources.access()) {
+        var cuvsRes = resourcesAccessor.handle();
+
+        // Call cuvsHnswBuild
+        int returnValue = cuvsHnswBuild(cuvsRes, hnswParamsMemorySegment, datasetTensor, hnswIndex);
+        checkCuVSError(returnValue, "cuvsHnswBuild");
+
+        returnValue = cuvsStreamSync(cuvsRes);
+        checkCuVSError(returnValue, "cuvsStreamSync");
+      }
+    }
+    return new HnswIndexImpl(new IndexReference(hnswIndex), resources, hnswParams);
+  }
+
+  private static CloseableHandle createHnswIndexParamsForBuild(Arena arena, HnswIndexParams params) {
+    var hnswParams = createHnswIndexParams();
+    MemorySegment seg = hnswParams.handle();
+
+    cuvsHnswIndexParams.hierarchy(seg, params.getHierarchy().value);
+    cuvsHnswIndexParams.ef_construction(seg, params.getEfConstruction());
+    cuvsHnswIndexParams.num_threads(seg, params.getNumThreads());
+    cuvsHnswIndexParams.M(seg, params.getM());
+    cuvsHnswIndexParams.metric(seg, params.getMetric().value);
+
+    return hnswParams;
+  }
+
+  private static CloseableHandle createHnswAceParams(Arena arena, HnswAceParams aceParams) {
+    var params = createHnswAceParamsNative();
+    MemorySegment seg = params.handle();
+
+    cuvsHnswAceParams.npartitions(seg, aceParams.getNpartitions());
+    cuvsHnswAceParams.use_disk(seg, aceParams.isUseDisk());
+    cuvsHnswAceParams.max_host_memory_gb(seg, aceParams.getMaxHostMemoryGb());
+    cuvsHnswAceParams.max_gpu_memory_gb(seg, aceParams.getMaxGpuMemoryGb());
+
+    String buildDir = aceParams.getBuildDir();
+    if (buildDir != null) {
+      MemorySegment buildDirSeg = arena.allocateFrom(buildDir);
+      cuvsHnswAceParams.build_dir(seg, buildDirSeg);
+    }
+
+    return params;
+  }
+
+  private static MemorySegment prepareTensorFromMatrix(Arena arena, CuVSMatrix dataset) {
+    if (dataset instanceof CuVSMatrixInternal matrixInternal) {
+      return prepareTensor(
+          arena,
+          matrixInternal.memorySegment(),
+          new long[]{dataset.size(), dataset.columns()},
+          matrixInternal.code(),
+          matrixInternal.bits(),
+          kDLCPU());
+    }
+    throw new IllegalArgumentException("Unsupported matrix type for build");
+  }
+
+  /**
+   * Creates an HNSW index from an existing CAGRA index.
+   *
+   * @param hnswParams Parameters for the HNSW index
+   * @param cagraIndex The CAGRA index to convert from
+   * @return A new HNSW index for in-memory indexes, or null for disk-based indexes
+   * @throws Throwable if an error occurs during conversion
+   */
+  public static HnswIndex fromCagra(HnswIndexParams hnswParams, CagraIndex cagraIndex)
+      throws Throwable {
+    Objects.requireNonNull(hnswParams);
+    Objects.requireNonNull(cagraIndex);
+
+    // Get the CAGRA index implementation to access internals
+    if (!(cagraIndex instanceof CagraIndexImpl)) {
+      throw new IllegalArgumentException("Invalid CagraIndex implementation");
+    }
+    CagraIndexImpl cagraImpl = (CagraIndexImpl) cagraIndex;
+    CuVSResources resources = cagraImpl.getCuVSResources();
+
+    // Create HNSW index
+    MemorySegment hnswIndex = createHnswIndexHandle();
+
+    initializeIndexDType(hnswIndex, cagraImpl.getDatasetForConversion());
+
+    try (var localArena = Arena.ofConfined();
+        var hnswParamsHandle = createHnswIndexParams()) {
+      MemorySegment hnswParamsMemorySegment = hnswParamsHandle.handle();
+
+      // Set HNSW params
+      cuvsHnswIndexParams.hierarchy(hnswParamsMemorySegment, hnswParams.getHierarchy().value);
+      cuvsHnswIndexParams.ef_construction(hnswParamsMemorySegment, hnswParams.getEfConstruction());
+      cuvsHnswIndexParams.num_threads(hnswParamsMemorySegment, hnswParams.getNumThreads());
+
+      try (var resourcesAccessor = resources.access()) {
+        var cuvsRes = resourcesAccessor.handle();
+
+        // Call cuvsHnswFromCagra
+        int returnValue =
+            cuvsHnswFromCagra(
+                cuvsRes, hnswParamsMemorySegment, cagraImpl.getCagraIndexReference(), hnswIndex);
+        checkCuVSError(returnValue, "cuvsHnswFromCagra");
+
+        returnValue = cuvsStreamSync(cuvsRes);
+        checkCuVSError(returnValue, "cuvsStreamSync");
+      }
+    }
+    return new HnswIndexImpl(new IndexReference(hnswIndex), resources, hnswParams);
+  }
+
+  /**
+   * Creates a new HNSW index handle.
+   */
+  private static MemorySegment createHnswIndexHandle() {
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment indexPtrPtr = localArena.allocate(cuvsHnswIndex_t);
+      var returnValue = cuvsHnswIndexCreate(indexPtrPtr);
+      checkCuVSError(returnValue, "cuvsHnswIndexCreate");
+      return indexPtrPtr.get(cuvsHnswIndex_t, 0);
+    }
+  }
+
+  private static void initializeIndexDType(MemorySegment hnswIndex, CuVSMatrix dataset) {
+    int bits = 32;
+    int code = kDLFloat();
+
+    if (dataset instanceof CuVSMatrixInternal matrixInternal) {
+      bits = matrixInternal.bits();
+      code = matrixInternal.code();
+    } else if (dataset != null) {
+      bits = bitsFromDataType(dataset.dataType());
+      code = CuVSMatrixInternal.code(dataset.dataType());
+    }
+
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment dtype = DLDataType.allocate(localArena);
+      DLDataType.bits(dtype, (byte) bits);
+      DLDataType.code(dtype, (byte) code);
+      DLDataType.lanes(dtype, (byte) 1);
+      cuvsHnswIndex.dtype(hnswIndex, dtype);
+    }
+  }
+
+  private static int bitsFromDataType(CuVSMatrix.DataType dataType) {
+    return switch (dataType) {
+      case BYTE -> 8;
+      default -> 32;
+    };
   }
 
   /**

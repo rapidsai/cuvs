@@ -1,18 +1,18 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "../test_utils.cuh"
 
 #include <cuvs/cluster/kmeans.hpp>
-#include <raft/core/cudart_utils.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/random/make_blobs.cuh>
 #include <raft/stats/adjusted_rand_index.cuh>
 #include <raft/util/cuda_utils.cuh>
+#include <raft/util/cudart_utils.hpp>
 
 #include <rmm/device_uvector.hpp>
 
@@ -256,7 +256,7 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
     d_labels_ref.resize(n_samples, stream);
     d_centroids.resize(params.n_clusters * n_features, stream);
 
-    std::optional<raft::device_vector_view<const T>> d_sw = std::nullopt;
+    std::optional<raft::device_vector_view<const T, int>> d_sw = std::nullopt;
     auto d_centroids_view =
       raft::make_device_matrix_view<T, int>(d_centroids.data(), params.n_clusters, n_features);
     if (testparams.weighted) {

@@ -7,7 +7,7 @@
 #include "cuvs_vamana_wrapper.h"
 
 #include <rmm/cuda_device.hpp>
-#include <rmm/mr/device/pool_memory_resource.hpp>
+#include <rmm/mr/pool_memory_resource.hpp>
 #include <rmm/resource_ref.hpp>
 
 namespace cuvs::bench {

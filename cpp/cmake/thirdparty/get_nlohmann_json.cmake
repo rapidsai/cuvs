@@ -18,10 +18,10 @@ function(find_and_configure_nlohmann_json)
             EXCLUDE_FROM_ALL       ${PKG_EXCLUDE_FROM_ALL}
             )
 
-    if(glog_ADDED)
-        message(VERBOSE "cuVS: Using glog located in ${glog_SOURCE_DIR}")
+    if(nlohmann_json_ADDED)
+        message(VERBOSE "cuVS: Using nlohmann_json located in ${nlohmann_json_SOURCE_DIR}")
     else()
-        message(VERBOSE "cuVS: Using glog located in ${glog_DIR}")
+        message(VERBOSE "cuVS: Using nlohmann_json located in ${nlohmann_json_DIR}")
     endif()
 
 endfunction()

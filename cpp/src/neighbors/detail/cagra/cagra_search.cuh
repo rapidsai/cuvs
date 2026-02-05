@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,7 +9,6 @@
 #include "factory.cuh"
 #include "sample_filter_utils.cuh"
 #include "search_plan.cuh"
-#include "search_single_cta_inst.cuh"
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>
@@ -142,6 +141,11 @@ void search_main(raft::resources const& res,
                  raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
                  CagraSampleFilterT sample_filter = CagraSampleFilterT())
 {
+  RAFT_EXPECTS(!index.dataset_fd().has_value(),
+               "Cannot search a CAGRA index that is stored on disk. "
+               "Use cuvs::neighbors::hnsw::from_cagra() to convert the index and "
+               "cuvs::neighbors::hnsw::deserialize() to load it into memory before searching.");
+
   // n_rows has the same type as the dataset index (the array extents type)
   using ds_idx_type    = decltype(index.data().n_rows());
   using graph_idx_type = uint32_t;

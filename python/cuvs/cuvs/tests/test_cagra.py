@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 
@@ -161,7 +161,6 @@ def run_cagra_build_search_test(
 def test_cagra_dataset_dtype_host_device(
     dtype, array_type, inplace, build_algo, metric, serialize
 ):
-
     # Note that inner_product tests use normalized input which we cannot
     # represent in int8, therefore we test only sqeuclidean metric here.
     run_cagra_build_search_test(
@@ -183,6 +182,7 @@ def test_filtered_cagra(sparsity):
     "params",
     [
         {
+            "dtype": np.int8,
             "intermediate_graph_degree": 64,
             "graph_degree": 32,
             "test_extend": False,
@@ -191,6 +191,7 @@ def test_filtered_cagra(sparsity):
             "build_algo": "ivf_pq",
         },
         {
+            "dtype": np.float32,
             "intermediate_graph_degree": 32,
             "graph_degree": 16,
             "test_extend": True,
@@ -199,6 +200,7 @@ def test_filtered_cagra(sparsity):
             "build_algo": "ivf_pq",
         },
         {
+            "dtype": np.float32,
             "intermediate_graph_degree": 128,
             "graph_degree": 32,
             "test_extend": False,
@@ -207,6 +209,7 @@ def test_filtered_cagra(sparsity):
             "build_algo": "nn_descent",
         },
         {
+            "dtype": np.float16,
             "intermediate_graph_degree": 64,
             "graph_degree": 32,
             "test_extend": True,
@@ -220,6 +223,7 @@ def test_cagra_index_params(params):
     # Note that inner_product tests use normalized input which we cannot
     # represent in int8, therefore we test only sqeuclidean metric here.
     run_cagra_build_search_test(
+        dtype=params["dtype"],
         test_extend=params["test_extend"],
         k=params["k"],
         metric=params["metric"],
