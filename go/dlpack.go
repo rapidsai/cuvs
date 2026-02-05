@@ -20,6 +20,7 @@ type TensorNumberType interface {
 type Tensor[T any] struct {
 	C_tensor *C.DLManagedTensor
 	shape    []int64
+	resource *Resource
 }
 
 // Creates a new Tensor on the host and copies the data into it.
@@ -148,6 +149,7 @@ func NewTensorOnDevice[T TensorNumberType](res *Resource, shape []int64) (Tensor
 	return Tensor[T]{
 		C_tensor: dlm,
 		shape:    shapeCopy,
+		resource: res,
 	}, nil
 }
 
@@ -155,11 +157,10 @@ func NewTensorOnDevice[T TensorNumberType](res *Resource, shape []int64) (Tensor
 func (t *Tensor[T]) Close() error {
 	if t.C_tensor.dl_tensor.device.device_type == C.kDLCUDA {
 		bytes := t.sizeInBytes()
-		res, err := NewResource(nil)
-		if err != nil {
-			return err
+		if t.resource != nil {
+			return  errors.New("resource not found")
 		}
-		err = CheckCuvs(CuvsError(C.cuvsRMMFree(res.Resource, t.C_tensor.dl_tensor.data, C.size_t(bytes))))
+		err := CheckCuvs(CuvsError(C.cuvsRMMFree(t.resource.Resource, t.C_tensor.dl_tensor.data, C.size_t(bytes))))
 
 		return err
 	} else if t.C_tensor.dl_tensor.device.device_type == C.kDLCPU {
@@ -213,6 +214,7 @@ func (t *Tensor[T]) ToDevice(res *Resource) (*Tensor[T], error) {
 
 	t.C_tensor.dl_tensor.device.device_type = C.kDLCUDA
 	t.C_tensor.dl_tensor.data = DeviceDataPointer
+	t.resource = res
 
 	return t, nil
 }
@@ -294,6 +296,7 @@ func (t *Tensor[T]) Expand(res *Resource, newData [][]T) (*Tensor[T], error) {
 
 	t.C_tensor.dl_tensor.data = NewDeviceDataPointer
 	t.C_tensor.dl_tensor.shape = (*C.int64_t)(unsafe.Pointer(&shape[0]))
+	t.resource = res
 
 	return t, nil
 }
@@ -324,6 +327,7 @@ func (t *Tensor[T]) ToHost(res *Resource) (*Tensor[T], error) {
 
 	t.C_tensor.dl_tensor.device.device_type = C.kDLCPU
 	t.C_tensor.dl_tensor.data = addr
+	t.resource = res
 
 	return t, nil
 }
