@@ -3,6 +3,10 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+# FIXME: Search spaces are currently hardcoded in Python.
+# Future: Load tune mode parameter ranges from YAML files (similar to how
+# sweep mode loads discrete values from config/algos/*.yaml).
+
 """
 Default search spaces for hyperparameter tuning.
 
