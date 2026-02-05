@@ -110,7 +110,9 @@ class BenchmarkOrchestrator:
                 {"recall": "maximize", "latency": {"max": 10}}
                 {"latency": "minimize", "recall": {"min": 0.95}}
         n_trials : int
-            For tune mode: maximum number of Optuna trials. Ignored in sweep mode.
+            For tune mode: maximum number of Optuna trials per parameter configuration.
+            default is 100.
+            Ignored in sweep mode.
         build : bool
             Whether to build indices
         search : bool
@@ -278,7 +280,19 @@ class BenchmarkOrchestrator:
             - One metric should have "maximize" or "minimize" as value
             - Other metrics have {"min": X} or {"max": X} as bounds
         n_trials : int
-            Maximum number of Optuna trials.
+            Maximum number of Optuna trials (default: 100 if not provided).
+        **loader_kwargs
+            Backend-specific arguments passed to ConfigLoader.load().
+            Required for tune mode:
+            - algorithms : str - Algorithm name (e.g., "cuvs_ivf_flat")
+            - dataset : str - Dataset name
+            - dataset_path : str - Path to dataset directory
+            
+            Optional:
+            - groups, algo_groups, dataset_configuration, algorithm_configuration
+            
+            Note: Internally, tune mode adds _tune_mode, _tune_build_params,
+            and _tune_search_params to these kwargs for each Optuna trial.
         """
         # Import Optuna (optional dependency)
         try:

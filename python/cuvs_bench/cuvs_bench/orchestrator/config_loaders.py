@@ -231,11 +231,26 @@ class CppGBenchConfigLoader(ConfigLoader):
             Batch size for search
         subset_size : Optional[int]
             Dataset subset size
+        **kwargs
+            Additional keyword arguments. In tune mode, the orchestrator
+            passes these internal kwargs:
+            
+            - _tune_mode : bool
+                If True, returns single config with exact params instead of
+                Cartesian product expansion from YAML.
+            - _tune_build_params : dict
+                Exact build parameters suggested by Optuna
+                (e.g., {"nlist": 5347})
+            - _tune_search_params : dict
+                Exact search parameters suggested by Optuna
+                (e.g., {"nprobe": 73})
             
         Returns
         -------
         Tuple[DatasetConfig, List[BenchmarkConfig]]
-            Dataset config and list of benchmark configs
+            Dataset config and list of benchmark configs.
+            - Sweep mode: Multiple configs (Cartesian product of YAML params)
+            - Tune mode: Single config (exact Optuna-suggested params)
         """
         config_path = self.config_path
         
