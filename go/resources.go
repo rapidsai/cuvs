@@ -1,6 +1,7 @@
 package cuvs
 
 // #include <cuvs/core/c_api.h>
+// #include <cuvs/version_config.h>
 import "C"
 
 type cuvsResource C.cuvsResources_t
@@ -10,6 +11,12 @@ type cuvsResource C.cuvsResources_t
 // resources that are expensive to create.
 type Resource struct {
 	Resource C.cuvsResources_t
+}
+
+func NewCudaStream() C.cudaStream_t {
+	var stream C.cudaStream_t
+  	C.cudaStreamCreate(&stream)
+	return stream
 }
 
 // Returns a new Resource object

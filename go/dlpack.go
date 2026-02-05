@@ -33,19 +33,10 @@ func NewTensor[T TensorNumberType](data [][]T) (Tensor[T], error) {
 	totalElements := len(data) * len(data[0])
 
 	dataPtr := C.malloc(C.size_t(totalElements * int(unsafe.Sizeof(T(0)))))
-	if dataPtr == nil {
-		return Tensor[T]{}, errors.New("data memory allocation failed")
-	}
-
 	dataSlice := unsafe.Slice((*T)(dataPtr), totalElements)
 	flattenData(data, dataSlice)
 
 	shapePtr := C.malloc(C.size_t(2 * int(unsafe.Sizeof(C.int64_t(0)))))
-	if shapePtr == nil {
-		C.free(dataPtr)
-		return Tensor[T]{}, errors.New("shape memory allocation failed")
-	}
-
 	shapeSlice := unsafe.Slice((*C.int64_t)(shapePtr), 2)
 	shapeSlice[0] = C.int64_t(len(data))
 	shapeSlice[1] = C.int64_t(len(data[0]))
@@ -85,18 +76,10 @@ func NewVector[T TensorNumberType](data []T) (Tensor[T], error) {
 	totalElements := len(data)
 
 	dataPtr := C.malloc(C.size_t(totalElements * int(unsafe.Sizeof(T(0)))))
-	if dataPtr == nil {
-		return Tensor[T]{}, errors.New("data memory allocation failed")
-	}
-
 	dataSlice := unsafe.Slice((*T)(dataPtr), totalElements)
 	copy(dataSlice, data)
 
 	shapePtr := C.malloc(C.size_t(int(unsafe.Sizeof(C.int64_t(0)))))
-	if shapePtr == nil {
-		C.free(dataPtr)
-		return Tensor[T]{}, errors.New("shape memory allocation failed")
-	}
 
 	shapeSlice := unsafe.Slice((*C.int64_t)(shapePtr), 1)
 	shapeSlice[0] = C.int64_t(len(data))
@@ -133,19 +116,12 @@ func NewTensorOnDevice[T TensorNumberType](res *Resource, shape []int64) (Tensor
 	}
 
 	shapePtr := C.malloc(C.size_t(len(shape) * int(unsafe.Sizeof(C.int64_t(0)))))
-	if shapePtr == nil {
-		return Tensor[T]{}, errors.New("shape memory allocation failed")
-	}
-
 	shapeSlice := unsafe.Slice((*C.int64_t)(shapePtr), len(shape))
 	for i, dim := range shape {
 		shapeSlice[i] = C.int64_t(dim)
 	}
 
 	dlm := (*C.DLManagedTensor)(C.malloc(C.size_t(unsafe.Sizeof(C.DLManagedTensor{}))))
-	if dlm == nil {
-		return Tensor[T]{}, errors.New("tensor allocation failed")
-	}
 	dtype := getDLDataType[T]()
 
 	var deviceDataPtr unsafe.Pointer
@@ -233,6 +209,12 @@ func (t *Tensor[T]) ToDevice(res *Resource) (*Tensor[T], error) {
 		C.cuvsRMMFree(res.Resource, DeviceDataPointer, C.size_t(bytes))
 		return nil, err
 	}
+
+	if t.C_tensor.dl_tensor.data != nil {
+		C.free(t.C_tensor.dl_tensor.data)
+		t.C_tensor.dl_tensor.data = nil
+	}
+
 	t.C_tensor.dl_tensor.device.device_type = C.kDLCUDA
 	t.C_tensor.dl_tensor.data = DeviceDataPointer
 
@@ -325,10 +307,6 @@ func (t *Tensor[T]) ToHost(res *Resource) (*Tensor[T], error) {
 	bytes := t.sizeInBytes()
 
 	addr := (C.malloc(C.size_t(bytes)))
-	if addr == nil {
-		return nil, errors.New("memory allocation failed")
-	}
-
 	err := CheckCuda(
 		C.cudaMemcpy(
 			addr,
@@ -337,12 +315,14 @@ func (t *Tensor[T]) ToHost(res *Resource) (*Tensor[T], error) {
 			C.cudaMemcpyDeviceToHost,
 		))
 	if err != nil {
+		C.free(addr)
 		return nil, err
 	}
 
 	err = CheckCuvs(CuvsError(
 		C.cuvsRMMFree(res.Resource, t.C_tensor.dl_tensor.data, C.size_t(bytes))))
 	if err != nil {
+		C.free(addr)
 		return nil, err
 	}
 
