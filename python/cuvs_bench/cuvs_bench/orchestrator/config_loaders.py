@@ -252,6 +252,11 @@ class CppGBenchConfigLoader(ConfigLoader):
             - Sweep mode: Multiple configs (Cartesian product of YAML params)
             - Tune mode: Single config (exact Optuna-suggested params)
         """
+        # Extract tune mode kwargs (passed by orchestrator._run_trial)
+        tune_mode = kwargs.pop("_tune_mode", False)
+        tune_build_params = kwargs.pop("_tune_build_params", None)
+        tune_search_params = kwargs.pop("_tune_search_params", None)
+        
         config_path = self.config_path
         
         # Load dataset configuration
@@ -311,6 +316,9 @@ class CppGBenchConfigLoader(ConfigLoader):
             dataset,
             count,
             batch_size,
+            tune_mode=tune_mode,
+            tune_build_params=tune_build_params,
+            tune_search_params=tune_search_params,
         )
         
         return dataset_config, benchmark_configs
@@ -325,6 +333,9 @@ class CppGBenchConfigLoader(ConfigLoader):
         dataset: str,
         count: int,
         batch_size: int,
+        tune_mode: bool = False,
+        tune_build_params: dict = None,
+        tune_search_params: dict = None,
     ) -> List[BenchmarkConfig]:
         """
         Prepare list of BenchmarkConfig from algorithm configurations.
@@ -332,6 +343,9 @@ class CppGBenchConfigLoader(ConfigLoader):
         This matches the old workflow (run.py prepare_executables) by grouping
         ALL indexes for the same executable into ONE BenchmarkConfig.
         This ensures ONE C++ command runs ALL indexes together.
+        
+        In tune mode, generates a single config with exact Optuna-suggested params
+        instead of Cartesian product expansion.
         """
         # Group indexes by executable (matches run.py executables_to_run structure)
         # Key: (executable, executable_path, output_filename)
@@ -365,6 +379,9 @@ class CppGBenchConfigLoader(ConfigLoader):
                     dataset,
                     count,
                     batch_size,
+                    tune_mode=tune_mode,
+                    tune_build_params=tune_build_params,
+                    tune_search_params=tune_search_params,
                 )
                 
                 # Group by executable (matches run.py)
@@ -656,6 +673,9 @@ class CppGBenchConfigLoader(ConfigLoader):
         dataset: str,
         count: int,
         batch_size: int,
+        tune_mode: bool = False,
+        tune_build_params: dict = None,
+        tune_search_params: dict = None,
     ) -> list:
         """
         Prepare the index configurations for the given algorithm and group.
@@ -678,41 +698,75 @@ class CppGBenchConfigLoader(ConfigLoader):
             The number of nearest neighbors to search for.
         batch_size : int
             The size of each batch for processing.
+        tune_mode : bool
+            If True, use exact params from Optuna instead of Cartesian product.
+        tune_build_params : dict
+            Exact build parameters from Optuna (e.g., {"nlist": 5347}).
+        tune_search_params : dict
+            Exact search parameters from Optuna (e.g., {"nprobe": 73}).
 
         Returns
         -------
         list
             A list of index configurations.
+            - Sweep mode: Multiple indexes (Cartesian product)
+            - Tune mode: Single index (Optuna params)
         """
         indexes = []
         build_params = group_conf.get("build", {})
         search_params = group_conf.get("search", {})
-        all_build_params = itertools.product(*build_params.values())
-        search_param_names, search_param_lists = (
-            zip(*search_params.items()) if search_params else ([], [])
-        )
-        param_names = list(build_params.keys())
+        
+        if tune_mode and tune_build_params is not None:
+            # TUNE MODE: Use exact params from Optuna (single config)
+            param_names = list(tune_build_params.keys())
+            all_build_params = [tuple(tune_build_params.values())]
+            # For search params, use tune_search_params keys/values
+            if tune_search_params:
+                search_param_names = tuple(tune_search_params.keys())
+                search_param_lists = [[v] for v in tune_search_params.values()]
+            else:
+                search_param_names, search_param_lists = [], []
+        else:
+            # SWEEP MODE: Cartesian product of all YAML params
+            all_build_params = itertools.product(*build_params.values())
+            search_param_names, search_param_lists = (
+                zip(*search_params.items()) if search_params else ([], [])
+            )
+            param_names = list(build_params.keys())
         for params in all_build_params:
-            index = {
-                "algo": algo,
-                "build_param": dict(zip(build_params.keys(), params)),
-            }
+            # Build the build_param dict using appropriate keys
+            if tune_mode and tune_build_params is not None:
+                # Tune mode: use exact params from Optuna
+                index = {
+                    "algo": algo,
+                    "build_param": tune_build_params.copy(),
+                }
+            else:
+                # Sweep mode: use YAML param names
+                index = {
+                    "algo": algo,
+                    "build_param": dict(zip(build_params.keys(), params)),
+                }
+            
+            # Build index name from params
             index_name = f"{algo}_{group}" if group != "base" else f"{algo}"
             for i in range(len(params)):
                 index["build_param"][param_names[i]] = params[i]
                 index_name += "." + f"{param_names[i]}{params[i]}"
 
-            if not self.validate_constraints(
-                algos_conf,
-                algo,
-                "build",
-                index["build_param"],
-                None,
-                conf_file["dataset"].get("dims"),
-                count,
-                batch_size,
-            ):
-                continue
+            # Skip constraint validation in tune mode (Optuna handles bounds)
+            if not tune_mode:
+                if not self.validate_constraints(
+                    algos_conf,
+                    algo,
+                    "build",
+                    index["build_param"],
+                    None,
+                    conf_file["dataset"].get("dims"),
+                    count,
+                    batch_size,
+                ):
+                    continue
 
             index_filename = (
                 index_name if len(index_name) < 128 else str(hash(index_name))
@@ -721,17 +775,25 @@ class CppGBenchConfigLoader(ConfigLoader):
             index["file"] = os.path.join(
                 dataset_path, dataset, "index", index_filename
             )
-            index["search_params"] = self.validate_search_params(
-                itertools.product(*search_param_lists),
-                search_param_names,
-                index["build_param"],
-                algo,
-                group_conf,
-                algos_conf,
-                conf_file,
-                count,
-                batch_size,
-            )
+            
+            # Handle search params
+            if tune_mode and tune_search_params is not None:
+                # Tune mode: use exact search params from Optuna (as single-item list)
+                index["search_params"] = [tune_search_params.copy()]
+            else:
+                # Sweep mode: validate and expand search params
+                index["search_params"] = self.validate_search_params(
+                    itertools.product(*search_param_lists),
+                    search_param_names,
+                    index["build_param"],
+                    algo,
+                    group_conf,
+                    algos_conf,
+                    conf_file,
+                    count,
+                    batch_size,
+                )
+            
             if index["search_params"]:
                 indexes.append(index)
         return indexes
