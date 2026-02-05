@@ -73,7 +73,7 @@ void compute_eigenpairs(raft::resources const& handle,
   auto eigenvectors =
     raft::make_device_matrix<DataT, int, raft::col_major>(handle, n_samples, config.n_components);
 
-  raft::sparse::solver::lanczos_compute_smallest_eigenvectors<int, DataT>(
+  raft::sparse::solver::lanczos_compute_eigenpairs<int, DataT>(
     handle, config, laplacian_view, std::nullopt, eigenvalues.view(), eigenvectors.view());
 
   if (spectral_embedding_config.norm_laplacian) {
