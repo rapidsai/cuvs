@@ -69,7 +69,8 @@ void fit(const raft::resources& handle,
          raft::device_matrix_view<MathT, IndexT> centroids,
          MappingOpT mapping_op = raft::identity_op())
 {
-  RAFT_EXPECTS(X.extent(1) == centroids.extent(1),
+  RAFT_EXPECTS(X.extent(1) == centroids.extent(1) ||
+                 (params.is_packed_binary && X.extent(1) * 8 == centroids.extent(1)),
                "Number of features in dataset and centroids are different");
   RAFT_EXPECTS(static_cast<uint64_t>(X.extent(0)) * static_cast<uint64_t>(X.extent(1)) <=
                  static_cast<uint64_t>(std::numeric_limits<IndexT>::max()),
@@ -279,14 +280,16 @@ void calc_centers_and_sizes(const raft::resources& handle,
                             raft::device_matrix_view<MathT, IndexT> centroids,
                             raft::device_vector_view<CounterT, IndexT> cluster_sizes,
                             bool reset_counters   = true,
+                            bool is_packed_binary = false,
                             MappingOpT mapping_op = raft::identity_op())
 {
   RAFT_EXPECTS(X.extent(0) == labels.extent(0),
                "Number of rows in dataset and labels are different");
-  RAFT_EXPECTS(X.extent(1) == centroids.extent(1),
-               "Number of features in dataset and centroids are different");
+  RAFT_EXPECTS(
+    is_packed_binary ? X.extent(1) * 8 == centroids.extent(1) : X.extent(1) == centroids.extent(1),
+    "Number of features in dataset and centroids are different");
   RAFT_EXPECTS(centroids.extent(0) == cluster_sizes.extent(0),
-               "Number of rows in centroids and clusyer_sizes are different");
+               "Number of rows in centroids and cluster_sizes are different");
 
   cuvs::cluster::kmeans::detail::calc_centers_and_sizes(
     handle,
@@ -298,6 +301,7 @@ void calc_centers_and_sizes(const raft::resources& handle,
     X.extent(0),
     labels.data_handle(),
     reset_counters,
+    is_packed_binary,
     mapping_op,
     raft::resource::get_workspace_resource(handle));
 }

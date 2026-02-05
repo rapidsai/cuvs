@@ -1,9 +1,13 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <cstdint>
+#include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
+#include <raft/core/logger.hpp>
+#include <type_traits>
 
 namespace cuvs::neighbors::ivf_flat {
 
@@ -38,12 +42,23 @@ index<T, IdxT>::index(raft::resources const& res,
     conservative_memory_allocation_{conservative_memory_allocation},
     lists_{n_lists},
     list_sizes_{raft::make_device_vector<uint32_t, uint32_t>(res, n_lists)},
-    centers_(raft::make_device_matrix<float, uint32_t>(res, n_lists, dim)),
+    centers_(metric != cuvs::distance::DistanceType::BitwiseHamming
+               ? raft::make_device_matrix<float, uint32_t>(res, n_lists, dim)
+               : raft::make_device_matrix<float, uint32_t>(res, 0, 0)),
+    binary_centers_(metric != cuvs::distance::DistanceType::BitwiseHamming
+                      ? raft::make_device_matrix<uint8_t, int64_t>(res, 0, 0)
+                      : raft::make_device_matrix<uint8_t, int64_t>(res, n_lists, dim)),
     center_norms_(std::nullopt),
     data_ptrs_{raft::make_device_vector<T*, uint32_t>(res, n_lists)},
     inds_ptrs_{raft::make_device_vector<IdxT*, uint32_t>(res, n_lists)},
-    accum_sorted_sizes_{raft::make_host_vector<IdxT, uint32_t>(n_lists + 1)}
+    accum_sorted_sizes_{raft::make_host_vector<IdxT, uint32_t>(n_lists + 1)},
+    binary_index_(metric == cuvs::distance::DistanceType::BitwiseHamming)
 {
+  if (metric == cuvs::distance::DistanceType::BitwiseHamming && !std::is_same_v<T, uint8_t>) {
+    RAFT_FAIL("BitwiseHamming distance is only supported with uint8_t data type, got %s",
+              typeid(T).name());
+  }
+
   check_consistency();
   accum_sorted_sizes_(n_lists) = 0;
 }
@@ -92,6 +107,19 @@ raft::device_matrix_view<const float, uint32_t, raft::row_major> index<T, IdxT>:
 }
 
 template <typename T, typename IdxT>
+raft::device_matrix_view<uint8_t, int64_t, raft::row_major>
+index<T, IdxT>::binary_centers() noexcept
+{
+  return binary_centers_.view();
+}
+
+template <typename T, typename IdxT>
+raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> index<T, IdxT>::binary_centers()
+  const noexcept
+{
+  return binary_centers_.view();
+}
+template <typename T, typename IdxT>
 std::optional<raft::device_vector_view<float, uint32_t>> index<T, IdxT>::center_norms() noexcept
 {
   if (center_norms_.has_value()) {
@@ -135,7 +163,11 @@ IdxT index<T, IdxT>::size() const noexcept
 template <typename T, typename IdxT>
 uint32_t index<T, IdxT>::dim() const noexcept
 {
-  return centers_.extent(1);
+  if (binary_index_) {
+    return binary_centers_.extent(1);
+  } else {
+    return centers_.extent(1);
+  }
 }
 
 template <typename T, typename IdxT>
@@ -209,10 +241,21 @@ void index<T, IdxT>::check_consistency()
   RAFT_EXPECTS(list_sizes_.extent(0) == n_lists, "inconsistent list size");
   RAFT_EXPECTS(data_ptrs_.extent(0) == n_lists, "inconsistent list size");
   RAFT_EXPECTS(inds_ptrs_.extent(0) == n_lists, "inconsistent list size");
-  RAFT_EXPECTS(                                       //
-    (centers_.extent(0) == list_sizes_.extent(0)) &&  //
-      (!center_norms_.has_value() || centers_.extent(0) == center_norms_->extent(0)),
-    "inconsistent number of lists (clusters)");
+  if (binary_index_) {
+    RAFT_EXPECTS(binary_centers_.extent(0) == list_sizes_.extent(0),
+                 "inconsistent number of lists (clusters)");
+  } else {
+    RAFT_EXPECTS(                                       //
+      (centers_.extent(0) == list_sizes_.extent(0)) &&  //
+        (!center_norms_.has_value() || centers_.extent(0) == center_norms_->extent(0)),
+      "inconsistent number of lists (clusters)");
+  }
+}
+
+template <typename T, typename IdxT>
+bool index<T, IdxT>::binary_index() const noexcept
+{
+  return binary_index_;
 }
 
 template struct index<float, uint32_t>;  // Used for refine function

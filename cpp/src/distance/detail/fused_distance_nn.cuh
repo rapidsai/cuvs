@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -7,6 +7,7 @@
 
 #include "distance_ops/l2_exp.cuh"  // ops::l2_exp_distance_op
 #include "fused_distance_nn/cutlass_base.cuh"
+#include "fused_distance_nn/fused_bitwise_hamming_nn.cuh"
 #include "fused_distance_nn/fused_cosine_nn.cuh"
 #include "fused_distance_nn/fused_l2_nn.cuh"
 #include "fused_distance_nn/helper_structs.cuh"
@@ -68,16 +69,31 @@ void fusedDistanceNNImpl(OutT* min,
 
   switch (metric) {
     case cuvs::distance::DistanceType::CosineExpanded:
-      fusedCosineNN<DataT, OutT, IdxT, P, ReduceOpT, KVPReduceOpT>(
-        min, x, y, xn, yn, m, n, k, workspace, redOp, pairRedOp, sqrt, stream);
+      if constexpr (std::is_same_v<DataT, uint8_t> || std::is_same_v<DataT, int8_t>) {
+        RAFT_FAIL("Cosine distance is not supported for uint8_t/int8_t data types");
+      } else {
+        fusedCosineNN<DataT, OutT, IdxT, P, ReduceOpT, KVPReduceOpT>(
+          min, x, y, xn, yn, m, n, k, workspace, redOp, pairRedOp, sqrt, stream);
+      }
       break;
     case cuvs::distance::DistanceType::L2SqrtExpanded:
     case cuvs::distance::DistanceType::L2Expanded:
-      // initOutBuffer is take care by fusedDistanceNNImpl() so we set it false to fusedL2NNImpl.
-      fusedL2NNImpl<DataT, OutT, IdxT, P, ReduceOpT, KVPReduceOpT>(
-        min, x, y, xn, yn, m, n, k, workspace, redOp, pairRedOp, sqrt, false, stream);
+      if constexpr (std::is_same_v<DataT, uint8_t> || std::is_same_v<DataT, int8_t>) {
+        RAFT_FAIL("L2 distance is not supported for uint8_t/int8_t data types");
+      } else {
+        fusedL2NNImpl<DataT, OutT, IdxT, P, ReduceOpT, KVPReduceOpT>(
+          min, x, y, xn, yn, m, n, k, workspace, redOp, pairRedOp, sqrt, false, stream);
+      }
       break;
-    default: assert("only cosine/l2 metric is supported with fusedDistanceNN\n"); break;
+    case cuvs::distance::DistanceType::BitwiseHamming:
+      if constexpr (std::is_same_v<DataT, uint8_t>) {
+        fusedBitwiseHammingNN<DataT, OutT, IdxT, P, ReduceOpT, KVPReduceOpT>(
+          min, x, y, xn, yn, m, n, k, workspace, redOp, pairRedOp, sqrt, stream);
+      } else {
+        RAFT_FAIL("BitwiseHamming distance only supports uint8_t data type");
+      }
+      break;
+    default: RAFT_FAIL("only cosine/l2/bitwise hamming metric is supported with fusedDistanceNN");
   }
 }
 
