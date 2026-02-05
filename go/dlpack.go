@@ -43,10 +43,6 @@ func NewTensor[T TensorNumberType](data [][]T) (Tensor[T], error) {
 
 	// Create DLManagedTensor
 	dlm := (*C.DLManagedTensor)(C.malloc(C.size_t(unsafe.Sizeof(C.DLManagedTensor{}))))
-	if dlm == nil {
-		return Tensor[T]{}, errors.New("tensor allocation failed")
-	}
-
 	dlm.dl_tensor.data = dataPtr
 	dlm.dl_tensor.device = C.DLDevice{
 		device_type: C.DLDeviceType(C.kDLCPU),
