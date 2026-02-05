@@ -247,7 +247,7 @@ class TestCppBackendBuildSearch:
             assert result.success is True
             assert result.metadata.get("skipped") is True
             assert result.metadata.get("reason") == "no_indexes"
-            assert result.search_time_seconds == 0.0
+            assert result.search_time_ms == 0.0
             assert result.search_params == []  # Should be empty list, not dict
         
         finally:

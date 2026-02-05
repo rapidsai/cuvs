@@ -43,7 +43,7 @@ class DummyBackend(BenchmarkBackend):
         return SearchResult(
             neighbors=neighbors,
             distances=distances,
-            search_time_seconds=0.1,
+            search_time_ms=0.1,
             queries_per_second=n_queries / 0.1,
             recall=0.95,
             algorithm=self.name,
@@ -77,7 +77,7 @@ class AnotherDummyBackend(BenchmarkBackend):
         return SearchResult(
             neighbors=neighbors,
             distances=distances,
-            search_time_seconds=0.2,
+            search_time_ms=0.2,
             queries_per_second=n_queries / 0.2,
             recall=0.90,
             algorithm=self.name,
@@ -178,7 +178,7 @@ class TestSearchResult:
         result = SearchResult(
             neighbors=neighbors,
             distances=distances,
-            search_time_seconds=0.1,
+            search_time_ms=0.1,
             queries_per_second=20.0,
             recall=0.95,
             algorithm="test_algo",
@@ -197,7 +197,7 @@ class TestSearchResult:
         result = SearchResult(
             neighbors=neighbors,
             distances=distances,
-            search_time_seconds=0.05,
+            search_time_ms=0.05,
             queries_per_second=20.0,
             recall=0.95,
             algorithm="test_algo",

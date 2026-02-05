@@ -141,7 +141,12 @@ class BenchmarkOrchestrator:
         Returns
         -------
         List[Union[BuildResult, SearchResult]]
-            List of all build and search results
+            List of result objects, one per benchmark run:
+            - sweep mode: One result per IndexConfig (Cartesian product of params)
+            - tune mode: One result per Optuna trial (n_trials total)
+            
+            Each SearchResult contains: recall, search_time_ms, 
+            queries_per_second, success, metadata, etc.
         """
         # Validate mode parameter
         valid_modes = ("sweep", "tune")
@@ -383,6 +388,7 @@ class BenchmarkOrchestrator:
             )
             
             # Run single trial with these specific parameters
+            # First trial (trial.number=0) overwrites, subsequent trials append
             result = self._run_trial(
                 algorithm=algorithm,
                 build_params=build_params,
@@ -395,6 +401,7 @@ class BenchmarkOrchestrator:
                 batch_size=batch_size,
                 search_mode=search_mode,
                 search_threads=search_threads,
+                append_results=(trial.number > 0),
                 **loader_kwargs
             )
             
@@ -405,7 +412,19 @@ class BenchmarkOrchestrator:
             if not result.success:
                 raise optuna.TrialPruned()
             
-            metrics = result.metrics if hasattr(result, 'metrics') else {}
+            # Build metrics dict from SearchResult attributes
+            # No fallbacks - if metrics are missing, let it fail loudly so we can fix the root cause
+            metrics = {
+                "recall": result.recall,
+                "latency": result.search_time_ms,
+                "throughput": result.queries_per_second,
+            }
+            # Also include latency from metadata if available (in microseconds)
+            if hasattr(result, "metadata") and result.metadata:
+                if "latency_us" in result.metadata and result.metadata["latency_us"]:
+                    metrics["latency_us"] = result.metadata["latency_us"]
+                metrics.update({k: v for k, v in result.metadata.items() 
+                               if k not in metrics and v is not None})
             
             # Check hard constraints - prune if violated
             for metric, bounds in hard_constraints.items():
@@ -418,7 +437,7 @@ class BenchmarkOrchestrator:
                     raise optuna.TrialPruned()
             
             # Return optimization target
-            return metrics.get(optimize_metric, 0.0)
+            return metrics[optimize_metric]
         
         # Create and run Optuna study
         study = optuna.create_study(direction=direction)
@@ -429,10 +448,14 @@ class BenchmarkOrchestrator:
         
         study.optimize(objective, n_trials=n_trials, show_progress_bar=True)
         
-        # Report best results
-        print(f"\nBest trial: #{study.best_trial.number}")
-        print(f"Best params: {study.best_params}")
-        print(f"Best {optimize_metric}: {study.best_value:.4f}")
+        # Report best results (handle case where all trials were pruned)
+        try:
+            print(f"\nBest trial: #{study.best_trial.number}")
+            print(f"Best params: {study.best_params}")
+            print(f"Best {optimize_metric}: {study.best_value:.4f}")
+        except ValueError:
+            print(f"\n⚠️ All {n_trials} trials were pruned (constraints not met)")
+            print(f"   Consider relaxing constraints: {hard_constraints}")
         
         return all_results
     
@@ -449,6 +472,7 @@ class BenchmarkOrchestrator:
         batch_size: int,
         search_mode: str,
         search_threads: Optional[int],
+        append_results: bool = False,
         **loader_kwargs
     ) -> Union[BuildResult, SearchResult]:
         """
@@ -464,6 +488,8 @@ class BenchmarkOrchestrator:
             Build parameters suggested by Optuna
         search_params : dict
             Search parameters suggested by Optuna
+        append_results : bool
+            If True, append results to existing JSON file.
         """
         # Override loader_kwargs with tune-specific params
         tune_kwargs = loader_kwargs.copy()
@@ -514,7 +540,8 @@ class BenchmarkOrchestrator:
                 mode=search_mode,
                 force=force,
                 search_threads=search_threads,
-                dry_run=dry_run
+                dry_run=dry_run,
+                append_results=append_results
             )
         
         return result

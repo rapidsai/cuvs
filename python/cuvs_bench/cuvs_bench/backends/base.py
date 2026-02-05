@@ -140,8 +140,8 @@ class SearchResult:
         Neighbor IDs returned by search, shape (n_queries, k)
     distances : np.ndarray
         Distances to neighbors, shape (n_queries, k)
-    search_time_seconds : float
-        Total search time (seconds)
+    search_time_ms : float
+        Total search time (milliseconds)
     queries_per_second : float
         Query throughput (QPS)
     recall : float
@@ -166,7 +166,7 @@ class SearchResult:
     """
     neighbors: np.ndarray
     distances: np.ndarray
-    search_time_seconds: float
+    search_time_ms: float
     queries_per_second: float
     recall: float
     algorithm: str
@@ -189,7 +189,7 @@ class SearchResult:
         """
         result = {
             "name": f"{self.algorithm}/search",
-            "real_time": self.search_time_seconds,
+            "real_time": self.search_time_ms,
             "time_unit": "s",
             "items_per_second": self.queries_per_second,
             "Recall": self.recall,

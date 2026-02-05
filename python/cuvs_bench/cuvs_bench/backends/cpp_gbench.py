@@ -296,7 +296,8 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         mode: str = "latency",
         force: bool = False,
         search_threads: Optional[int] = None,
-        dry_run: bool = False
+        dry_run: bool = False,
+        append_results: bool = False
     ) -> SearchResult:
         """
         Search using C++ Google Benchmark executable.
@@ -324,6 +325,9 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             The number of threads to use for searching.
         dry_run : bool
             Whether to perform a dry run without actual execution.
+        append_results : bool
+            If True, append results to existing JSON file.
+            If False, overwrite existing results (default).
             
         Returns
         -------
@@ -334,7 +338,7 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             return SearchResult(
                 neighbors=np.array([]),
                 distances=np.array([]),
-                search_time_seconds=0.0,
+                search_time_ms=0.0,
                 queries_per_second=0.0,
                 recall=0.0,
                 algorithm="",
@@ -351,7 +355,7 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             return SearchResult(
                 neighbors=np.array([]),
                 distances=np.array([]),
-                search_time_seconds=0.0,
+                search_time_ms=0.0,
                 queries_per_second=0.0,
                 recall=0.0,
                 algorithm=first_index.algo,
@@ -415,6 +419,9 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         search_file = f"{self.output_filename[1]}.json"
         output_json = output_dir / search_file
         
+        # Use temp file for C++ output, then merge into accumulated results
+        temp_output_json = output_dir / f"{self.output_filename[1]}_temp.json"
+        
         # Construct C++ command
         cmd = [
             str(self.executable_path),
@@ -426,7 +433,7 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             f"--override_kv=n_queries:{batch_size}",
             "--benchmark_out_format=json",
             "--benchmark_counters_tabular=true",
-            f"--benchmark_out={output_json}",
+            f"--benchmark_out={temp_output_json}",
         ]
         
         if force:
@@ -446,7 +453,7 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             return SearchResult(
                 neighbors=np.array([]),
                 distances=np.array([]),
-                search_time_seconds=0.0,
+                search_time_ms=0.0,
                 queries_per_second=0.0,
                 recall=0.0,
                 algorithm=first_index.algo,
@@ -468,11 +475,29 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             )
             elapsed_time = time.perf_counter() - start_time
             
-            # Parse results
-            with open(output_json) as f:
+            # Parse results from temp file
+            with open(temp_output_json) as f:
                 gbench_results = json.load(f)
             
-            benchmarks = gbench_results.get("benchmarks", [])
+            new_benchmarks = gbench_results.get("benchmarks", [])
+            
+            # Handle result accumulation based on append_results flag
+            if append_results and output_json.exists():
+                # Append new benchmarks to accumulated file (tune mode)
+                with open(output_json) as f:
+                    accumulated = json.load(f)
+                accumulated["benchmarks"].extend(new_benchmarks)
+                with open(output_json, "w") as f:
+                    json.dump(accumulated, f, indent=2)
+            else:
+                # Overwrite with new results (sweep mode, or first tune trial)
+                with open(output_json, "w") as f:
+                    json.dump(gbench_results, f, indent=2)
+            
+            # Clean up temp file
+            temp_output_json.unlink(missing_ok=True)
+            
+            benchmarks = new_benchmarks
             if not benchmarks:
                 raise ValueError("No benchmarks found in Google Benchmark output")
             
@@ -486,7 +511,7 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             return SearchResult(
                 neighbors=np.array([]),  # Not available from C++ benchmark
                 distances=np.array([]),  # Not available from C++ benchmark
-                search_time_seconds=total_search_time,
+                search_time_ms=total_search_time,
                 queries_per_second=avg_qps,
                 recall=avg_recall,
                 algorithm=first_index.algo,
@@ -506,7 +531,7 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             return SearchResult(
                 neighbors=np.array([]),
                 distances=np.array([]),
-                search_time_seconds=time.perf_counter() - start_time,
+                search_time_ms=time.perf_counter() - start_time,
                 queries_per_second=0.0,
                 recall=0.0,
                 algorithm=first_index.algo,
@@ -519,7 +544,7 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             return SearchResult(
                 neighbors=np.array([]),
                 distances=np.array([]),
-                search_time_seconds=time.perf_counter() - start_time,
+                search_time_ms=time.perf_counter() - start_time,
                 queries_per_second=0.0,
                 recall=0.0,
                 algorithm=first_index.algo,
