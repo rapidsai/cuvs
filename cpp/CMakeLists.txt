@@ -1,6 +1,6 @@
 # =============================================================================
 # cmake-format: off
-# SPDX-FileCopyrightText: Copyright (c) 2020-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2020-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
@@ -189,9 +189,11 @@ rapids_cpm_init()
 if(NOT BUILD_CPU_ONLY)
   # We must find CCCL ourselves before raft so that we get the right version.
   include(${rapids-cmake-dir}/cpm/cccl.cmake)
-  rapids_cpm_cccl(BUILD_EXPORT_SET cuvs-exports INSTALL_EXPORT_SET cuvs-exports)
+  rapids_cpm_cccl()
   include(cmake/thirdparty/get_raft.cmake)
   include(cmake/thirdparty/get_cutlass.cmake)
+  include(${rapids-cmake-dir}/cpm/cuco.cmake)
+  rapids_cpm_cuco()
 endif()
 
 if(BUILD_TESTS OR BUILD_C_TESTS)
@@ -315,7 +317,10 @@ if(NOT BUILD_CPU_ONLY)
                CUDA_SEPARABLE_COMPILATION ON
                POSITION_INDEPENDENT_CODE ON
   )
-  target_link_libraries(cuvs-cagra-search PRIVATE cuvs::cuvs_cpp_headers)
+  target_link_libraries(
+    cuvs-cagra-search PRIVATE cuvs::cuvs_cpp_headers
+                              $<TARGET_NAME_IF_EXISTS:nvidia::cutlass::cutlass>
+  )
   target_compile_options(
     cuvs-cagra-search PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
                               "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
@@ -432,6 +437,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/cagra_build_int8.cu
     src/neighbors/cagra_build_uint8.cu
     src/neighbors/cagra_extend_float.cu
+    src/neighbors/cagra_extend_half.cu
     src/neighbors/cagra_extend_int8.cu
     src/neighbors/cagra_extend_uint8.cu
     src/neighbors/cagra_optimize.cu
@@ -462,6 +468,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/composite/merge.cpp
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/cagra.cpp>
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw.cpp>
+    src/neighbors/ivf_common.cu
     src/neighbors/ivf_flat_index.cpp
     src/neighbors/ivf_flat/ivf_flat_build_extend_float_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_build_extend_half_int64_t.cu
@@ -492,6 +499,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ivf_pq/detail/ivf_pq_build_extend_half_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_build_extend_int8_t_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_build_extend_uint8_t_int64_t.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_build_precomputed_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_fp8_false.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_fp8_true.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_half.cu
@@ -506,6 +514,10 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ivf_pq/detail/ivf_pq_search_half_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_int8_t_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_uint8_t_int64_t.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_transform_float_int64_t.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_transform_half_int64_t.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_transform_int8_t_int64_t.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_transform_uint8_t_int64_t.cu
     src/neighbors/knn_merge_parts.cu
     src/neighbors/nn_descent.cu
     src/neighbors/nn_descent_float.cu
@@ -535,6 +547,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/vamana_serialize_int8.cu
     src/preprocessing/quantize/scalar.cu
     src/preprocessing/quantize/binary.cu
+    src/preprocessing/quantize/pq.cu
     src/preprocessing/spectral/spectral_embedding.cu
     src/selection/select_k_float_int64_t.cu
     src/selection/select_k_float_int32_t.cu
@@ -565,8 +578,12 @@ if(NOT BUILD_CPU_ONLY)
 
   target_link_libraries(
     cuvs_objs
-    PRIVATE cuvs::cuvs_cpp_headers ${CUVS_CTK_MATH_DEPENDENCIES}
-            $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
+    PRIVATE cuvs::cuvs_cpp_headers
+            cuco::cuco
+            nvidia::cutlass::cutlass
+            ${CUVS_CTK_MATH_DEPENDENCIES}
+            $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+            $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
   )
 
   # Endian detection
@@ -636,7 +653,8 @@ if(NOT BUILD_CPU_ONLY)
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
-      PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+      PRIVATE $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> $<COMPILE_ONLY:nvidia::cutlass::cutlass>
+              $<COMPILE_ONLY:cuco::cuco>
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
@@ -691,8 +709,8 @@ SECTIONS
              ${CUVS_CTK_MATH_DEPENDENCIES}
              $<TARGET_NAME_IF_EXISTS:NCCL::NCCL> # needs to be public for DT_NEEDED
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>> # header only
-      PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
+      PRIVATE $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
+              $<COMPILE_ONLY:nvidia::cutlass::cutlass> $<COMPILE_ONLY:cuco::cuco>
     )
   endif()
 

@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - "main"
+      - "release/*"
     tags:
       - v[0-9][0-9].[0-9][0-9].[0-9][0-9]
   workflow_dispatch:
@@ -52,17 +53,20 @@ jobs:
       matrix:
         cuda_version:
           - &latest_cuda12 '12.9.1'
-          - &latest_cuda13 '13.0.2'
+          - &latest_cuda13 '13.1.1'
+        arch:
+          - amd64
+          - arm64
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
-      arch: "amd64"
+      arch: "${{matrix.arch}}"
       date: ${{ inputs.date }}
-      container_image: "rapidsai/ci-wheel:26.02-cuda${{ matrix.cuda_version }}-rockylinux8-py3.10"
+      container_image: "rapidsai/ci-wheel:26.04-cuda${{ matrix.cuda_version }}-rockylinux8-py3.11"
       node_type: "cpu16"
-      # requires_license_builder: false
+      requires_license_builder: true
       script: "ci/build_standalone_c.sh"
-      artifact-name: "libcuvs_c_${{ matrix.cuda_version }}.tar.gz"
+      artifact-name: "libcuvs_c_${{ matrix.cuda_version }}_${{ matrix.arch }}.tar.gz"
       file_to_upload: "libcuvs_c.tar.gz"
       sha: ${{ inputs.sha }}
       sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
@@ -83,7 +87,7 @@ jobs:
       branch: ${{ inputs.branch }}
       arch: "amd64"
       date: ${{ inputs.date }}
-      container_image: "rapidsai/ci-conda:26.02-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
+      container_image: "rapidsai/ci-conda:26.04-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
       node_type: "gpu-l4-latest-1"
       script: "ci/build_rust.sh"
       sha: ${{ inputs.sha }}
@@ -105,7 +109,7 @@ jobs:
       branch: ${{ inputs.branch }}
       arch: "amd64"
       date: ${{ inputs.date }}
-      container_image: "rapidsai/ci-conda:26.02-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
+      container_image: "rapidsai/ci-conda:26.04-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
       node_type: "gpu-l4-latest-1"
       script: "ci/build_go.sh"
       sha: ${{ inputs.sha }}
@@ -126,7 +130,7 @@ jobs:
       branch: ${{ inputs.branch }}
       arch: "amd64"
       date: ${{ inputs.date }}
-      container_image: "rapidsai/ci-conda:26.02-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
+      container_image: "rapidsai/ci-conda:26.04-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
       script: "ci/build_java.sh"
       artifact-name: "cuvs-java-cuda${{ matrix.cuda_version }}"
       file_to_upload: "java/cuvs-java/target/"
@@ -166,7 +170,7 @@ jobs:
       arch: "amd64"
       branch: ${{ inputs.branch }}
       build_type: ${{ inputs.build_type || 'branch' }}
-      container_image: "rapidsai/ci-conda:26.02-latest"
+      container_image: "rapidsai/ci-conda:26.04-latest"
       date: ${{ inputs.date }}
       node_type: "gpu-l4-latest-1"
       script: "ci/build_docs.sh"
