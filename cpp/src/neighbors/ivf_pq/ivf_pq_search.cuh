@@ -15,7 +15,6 @@
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/selection/select_k.hpp>
-#include <raft/core/cudart_utils.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/operators.hpp>
@@ -34,6 +33,7 @@
 #include <raft/matrix/select_k.cuh>
 #include <raft/util/cache.hpp>
 #include <raft/util/cuda_utils.cuh>
+#include <raft/util/cudart_utils.hpp>
 #include <raft/util/device_atomics.cuh>
 #include <raft/util/device_loads_stores.cuh>
 #include <raft/util/pow2_utils.cuh>
