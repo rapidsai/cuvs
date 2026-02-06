@@ -193,7 +193,8 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
   const uint32_t min_iteration,
   const uint32_t max_iteration,
   uint32_t* const num_executed_iterations, /* stats */
-  SAMPLE_FILTER_T sample_filter)
+  SAMPLE_FILTER_T sample_filter,
+  const typename DATASET_DESCRIPTOR_T::INDEX_T max_node_id = 0)
 {
   using DATA_T     = typename DATASET_DESCRIPTOR_T::DATA_T;
   using INDEX_T    = typename DATASET_DESCRIPTOR_T::INDEX_T;
@@ -281,7 +282,8 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
                                            local_traversed_hashmap_ptr,
                                            traversed_hash_bitlen,
                                            block_id,
-                                           num_blocks);
+                                           num_blocks,
+                                           max_node_id);
   __syncthreads();
   _CLK_REC(clk_compute_1st_distance);
 
@@ -627,7 +629,8 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
                                                        ps.min_iterations,
                                                        ps.max_iterations,
                                                        num_executed_iterations,
-                                                       sample_filter);
+                                                       sample_filter,
+                                                       ps.max_node_id);
 }
 
 }  // namespace multi_cta_search
