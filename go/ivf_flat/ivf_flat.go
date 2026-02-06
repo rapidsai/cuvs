@@ -5,8 +5,8 @@ import "C"
 
 import (
 	"errors"
-	"unsafe"
 	"runtime"
+	"unsafe"
 
 	cuvs "github.com/rapidsai/cuvs/go"
 )
@@ -77,6 +77,14 @@ func SearchIndex[T any](Resources cuvs.Resource, params *SearchParams, index *Iv
 		_type: C.NO_FILTER,
 	}
 
+	defer func() {
+		runtime.KeepAlive(Resources)
+		runtime.KeepAlive(params)
+		runtime.KeepAlive(index)
+		runtime.KeepAlive(queries)
+		runtime.KeepAlive(neighbors)
+		runtime.KeepAlive(distances)
+	}()
 	return cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatSearch(C.cuvsResources_t(Resources.Resource), params.params, index.index, (*C.DLManagedTensor)(unsafe.Pointer(queries.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(neighbors.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(distances.C_tensor)), prefilter)))
 }
 
@@ -90,7 +98,7 @@ func GetNLists(index *IvfFlatIndex) (nlist int64, err error) {
 	if err != nil {
 		return
 	}
-
+	runtime.KeepAlive(index)
 	nlist = int64(ret)
 	return
 }
@@ -105,7 +113,7 @@ func GetDim(index *IvfFlatIndex) (dim int64, err error) {
 	if err != nil {
 		return
 	}
-
+	runtime.KeepAlive(index)
 	dim = int64(ret)
 	return
 }
@@ -116,5 +124,7 @@ func GetCenters[T any](index *IvfFlatIndex, centers *cuvs.Tensor[T]) error {
 	}
 
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatIndexGetCenters(index.index, (*C.DLManagedTensor)(unsafe.Pointer(centers.C_tensor)))))
+	runtime.KeepAlive(index)
+	runtime.KeepAlive(centers)
 	return err
 }

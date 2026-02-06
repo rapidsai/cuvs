@@ -5,8 +5,8 @@ import "C"
 
 import (
 	"errors"
-	"unsafe"
 	"runtime"
+	"unsafe"
 
 	cuvs "github.com/rapidsai/cuvs/go"
 )
@@ -35,6 +35,7 @@ func (index *BruteForceIndex) Close() error {
 	if err != nil {
 		return err
 	}
+	runtime.KeepAlive(index)
 	return nil
 }
 
