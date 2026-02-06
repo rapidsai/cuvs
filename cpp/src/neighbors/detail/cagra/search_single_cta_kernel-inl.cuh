@@ -703,7 +703,7 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
   const std::uint32_t small_hash_reset_interval,
   const std::uint32_t query_id,
   SAMPLE_FILTER_T sample_filter,
-  const typename DATASET_DESCRIPTOR_T::INDEX_T max_node_id = 0)
+  const typename DATASET_DESCRIPTOR_T::INDEX_T graph_size = 0)
 {
   using LOAD_T = device::LOAD_128BIT_T;
 
@@ -795,7 +795,7 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
                                            0,
                                            0,
                                            1,
-                                           max_node_id);
+                                           graph_size);
   __syncthreads();
   _CLK_REC(clk_compute_1st_distance);
 
@@ -1129,7 +1129,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
   const std::uint32_t small_hash_bitlen,
   const std::uint32_t small_hash_reset_interval,
   SAMPLE_FILTER_T sample_filter,
-  const typename DATASET_DESCRIPTOR_T::INDEX_T max_node_id = 0)
+  const typename DATASET_DESCRIPTOR_T::INDEX_T graph_size = 0)
 {
   const auto query_id = blockIdx.y;
   search_core<TOPK_BY_BITONIC_SORT,
@@ -1161,7 +1161,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
                                small_hash_reset_interval,
                                query_id,
                                sample_filter,
-                               max_node_id);
+                               graph_size);
 }
 
 // To make sure we avoid false sharing on both CPU and GPU, we enforce cache line size to the
@@ -1323,8 +1323,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_p(
                                  small_hash_bitlen,
                                  small_hash_reset_interval,
                                  query_id,
-                                 sample_filter,
-                                 0);  // TODO: persistent kernel doesn't support max_node_id yet
+                                 sample_filter);
 
     // make sure all writes are visible even for the host
     //     (e.g. when result buffers are in pinned memory)
@@ -2349,7 +2348,7 @@ control is returned in this thread (in persistent_runner_t constructor), so we'r
                                                            small_hash_bitlen,
                                                            small_hash_reset_interval,
                                                            sample_filter,
-                                                           ps.max_node_id);
+                                                           static_cast<uint32_t>(graph.extent(0)));
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
 }
