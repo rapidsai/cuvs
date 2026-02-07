@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -31,7 +31,7 @@
 #include <raft/matrix/init.cuh>
 #include <raft/sparse/convert/coo.cuh>
 #include <raft/sparse/convert/csr.cuh>
-#include <raft/sparse/linalg/masked_matmul.hpp>
+#include <raft/sparse/linalg/masked_matmul.cuh>
 #include <raft/sparse/matrix/select_k.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
