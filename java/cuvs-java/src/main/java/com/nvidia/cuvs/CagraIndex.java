@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs;
@@ -176,7 +176,7 @@ public interface CagraIndex extends AutoCloseable {
    * @return A new merged CAGRA index
    * @throws Throwable if an error occurs during the merge operation
    */
-  static CagraIndex merge(CagraIndex[] indexes, CagraMergeParams mergeParams) throws Throwable {
+  static CagraIndex merge(CagraIndex[] indexes, CagraIndexParams mergeParams) throws Throwable {
     if (indexes == null || indexes.length == 0) {
       throw new IllegalArgumentException("At least one index must be provided for merging");
     }
