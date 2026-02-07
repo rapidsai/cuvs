@@ -5,6 +5,7 @@ import "C"
 
 import (
 	"errors"
+	"runtime"
 	"unsafe"
 )
 
@@ -65,6 +66,13 @@ func PairwiseDistance[T any](Resources Resource, x *Tensor[T], y *Tensor[T], dis
 	if !exists {
 		return errors.New("cuvs: invalid distance metric")
 	}
+
+	defer func() {
+		runtime.KeepAlive(Resources)
+		runtime.KeepAlive(x)
+		runtime.KeepAlive(y)
+		runtime.KeepAlive(distances)
+	}()
 
 	return CheckCuvs(CuvsError(C.cuvsPairwiseDistance(C.cuvsResources_t(Resources.Resource), (*C.DLManagedTensor)(unsafe.Pointer(x.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(y.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(distances.C_tensor)), C.cuvsDistanceType(CMetric), C.float(metric_arg))))
 }

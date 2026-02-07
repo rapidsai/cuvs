@@ -63,6 +63,9 @@ func BuildIndex[T any](Resources cuvs.Resource, Dataset *cuvs.Tensor[T], metric 
 	runtime.KeepAlive(index)
 	runtime.KeepAlive(Dataset)
 	runtime.KeepAlive(Resources)
+	runtime.KeepAlive(metric_arg)
+	runtime.KeepAlive(metric)
+	runtime.KeepAlive(CMetric)
 	return nil
 }
 

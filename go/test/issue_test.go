@@ -3,6 +3,7 @@ package test
 import (
 	//"fmt"
 	"math/rand/v2"
+	"runtime"
 	"sync"
 	"testing"
 	//"os"
@@ -25,6 +26,7 @@ func getCenters(vecs [][]float32, dim int, clusterCnt int, distanceType cuvs.Dis
 		return nil, err
 	}
 	defer resource.Close()
+	defer runtime.KeepAlive(resource)
 
 	indexParams, err := ivf_flat.CreateIndexParams()
 	if err != nil {
@@ -99,6 +101,7 @@ func Search(datasetvec [][]float32, queriesvec [][]float32, limit uint, distance
 		return
 	}
 	defer resource.Close()
+	defer runtime.KeepAlive(resource)
 
 	dataset, err := cuvs.NewTensor(datasetvec)
 	if err != nil {
@@ -204,7 +207,35 @@ func Search(datasetvec [][]float32, queriesvec [][]float32, limit uint, distance
 	return
 }
 
+
+func TestIssueGpu(t *testing.T) {
+        runtime.LockOSThread()
+        defer runtime.UnlockOSThread()
+
+        dimension := uint(128)
+        /*
+                ncpu := uint(1)
+                elemsz := uint(4) // float32
+        */
+
+        dsize := 100000
+        nlist := 128
+        vecs := make([][]float32, dsize)
+        for i := range vecs {
+                vecs[i] = make([]float32, dimension)
+                for j := range vecs[i] {
+                        vecs[i][j] = rand.Float32()
+                }
+        }
+
+        _, err := getCenters(vecs, int(dimension), nlist, cuvs.DistanceL2, 10)
+        require.NoError(t, err)
+}
+
 func TestIvfAndBruteForceForIssue(t *testing.T) {
+
+	runtime.LockOSThread()
+	defer runtime.LockOSThread()
 
 	dimension := uint(128)
 	limit := uint(1)
@@ -233,6 +264,9 @@ func TestIvfAndBruteForceForIssue(t *testing.T) {
 
 		wg.Add(1)
 		go func() {
+			runtime.LockOSThread()
+			defer runtime.UnlockOSThread()
+
 			defer wg.Done()
 			for i := 0; i < 1000; i++ {
 				_, _, err := Search(centers, queries, limit, cuvs.DistanceL2)

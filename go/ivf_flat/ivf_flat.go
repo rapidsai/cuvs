@@ -24,6 +24,7 @@ func CreateIndex[T any](params *IndexParams) (*IvfFlatIndex, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer runtime.KeepAlive(index)
 	return &IvfFlatIndex{index: index, trained: false}, nil
 }
 
@@ -55,6 +56,7 @@ func (index *IvfFlatIndex) Close() error {
 	if err != nil {
 		return err
 	}
+	runtime.KeepAlive(index)
 	return nil
 }
 
