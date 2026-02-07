@@ -189,7 +189,7 @@ rapids_cpm_init()
 if(NOT BUILD_CPU_ONLY)
   # We must find CCCL ourselves before raft so that we get the right version.
   include(${rapids-cmake-dir}/cpm/cccl.cmake)
-  rapids_cpm_cccl(BUILD_EXPORT_SET cuvs-exports INSTALL_EXPORT_SET cuvs-exports)
+  rapids_cpm_cccl()
   include(cmake/thirdparty/get_raft.cmake)
   include(cmake/thirdparty/get_cutlass.cmake)
   include(${rapids-cmake-dir}/cpm/cuco.cmake)
@@ -437,6 +437,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/cagra_build_int8.cu
     src/neighbors/cagra_build_uint8.cu
     src/neighbors/cagra_extend_float.cu
+    src/neighbors/cagra_extend_half.cu
     src/neighbors/cagra_extend_int8.cu
     src/neighbors/cagra_extend_uint8.cu
     src/neighbors/cagra_optimize.cu
@@ -467,6 +468,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/composite/merge.cpp
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/cagra.cpp>
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw.cpp>
+    src/neighbors/ivf_common.cu
     src/neighbors/ivf_flat_index.cpp
     src/neighbors/ivf_flat/ivf_flat_build_extend_float_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_build_extend_half_int64_t.cu
@@ -512,6 +514,10 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ivf_pq/detail/ivf_pq_search_half_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_int8_t_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_uint8_t_int64_t.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_transform_float_int64_t.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_transform_half_int64_t.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_transform_int8_t_int64_t.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_transform_uint8_t_int64_t.cu
     src/neighbors/knn_merge_parts.cu
     src/neighbors/nn_descent.cu
     src/neighbors/nn_descent_float.cu
@@ -541,6 +547,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/vamana_serialize_int8.cu
     src/preprocessing/quantize/scalar.cu
     src/preprocessing/quantize/binary.cu
+    src/preprocessing/quantize/pq.cu
     src/preprocessing/spectral/spectral_embedding.cu
     src/selection/select_k_float_int64_t.cu
     src/selection/select_k_float_int32_t.cu

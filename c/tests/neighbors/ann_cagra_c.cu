@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -503,13 +503,15 @@ TEST(CagraC, BuildMergeSearch)
   ASSERT_EQ(cuvsCagraBuild(res, build_params, &main_dataset_tensor, index_main), CUVS_SUCCESS);
   ASSERT_EQ(cuvsCagraBuild(res, build_params, &additional_dataset_tensor, index_add), CUVS_SUCCESS);
 
-  cuvsCagraMergeParams_t merge_params;
-  cuvsCagraMergeParamsCreate(&merge_params);
   cuvsCagraIndex_t index_merged;
   cuvsCagraIndexCreate(&index_merged);
 
+  cuvsFilter filter;
+  filter.type = NO_FILTER;
+  filter.addr = 0;
+
   cuvsCagraIndex_t index_array[2] = {index_main, index_add};
-  ASSERT_EQ(cuvsCagraMerge(res, merge_params, index_array, 2, index_merged), CUVS_SUCCESS);
+  ASSERT_EQ(cuvsCagraMerge(res, build_params, index_array, 2, filter, index_merged), CUVS_SUCCESS);
 
   int64_t merged_dim = -1;
   ASSERT_EQ(cuvsCagraIndexGetDims(index_merged, &merged_dim), CUVS_SUCCESS);
@@ -541,9 +543,6 @@ TEST(CagraC, BuildMergeSearch)
   cuvsCagraSearchParamsCreate(&search_params);
   (*search_params).itopk_size = 1;
 
-  cuvsFilter filter;
-  filter.type = NO_FILTER;
-  filter.addr = 0;
   ASSERT_EQ(cuvsCagraSearch(res,
                             search_params,
                             index_merged,
@@ -563,7 +562,6 @@ TEST(CagraC, BuildMergeSearch)
   EXPECT_NEAR(distance_host, 0.0f, 1e-6);
 
   cuvsCagraSearchParamsDestroy(search_params);
-  cuvsCagraMergeParamsDestroy(merge_params);
   cuvsCagraIndexParamsDestroy(build_params);
   cuvsCagraIndexDestroy(index_merged);
   cuvsCagraIndexDestroy(index_add);
