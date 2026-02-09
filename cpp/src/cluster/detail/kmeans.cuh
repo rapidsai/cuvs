@@ -280,31 +280,16 @@ void update_centroids(raft::resources const& handle,
                       rmm::device_uvector<char>& workspace)
 {
   auto n_clusters = centroids.extent(0);
-  auto n_samples  = X.extent(0);
 
-  workspace.resize(n_samples, raft::resource::get_cuda_stream(handle));
-
-  // Calculates weighted sum of all the samples assigned to cluster-i and stores the
-  // result in new_centroids[i]
-  raft::linalg::reduce_rows_by_key((DataT*)X.data_handle(),
-                                   X.extent(1),
-                                   cluster_labels,
-                                   sample_weights.data_handle(),
-                                   workspace.data(),
-                                   X.extent(0),
-                                   X.extent(1),
-                                   n_clusters,
-                                   new_centroids.data_handle(),
-                                   raft::resource::get_cuda_stream(handle));
-
-  // Reduce weights by key to compute weight in each cluster
-  raft::linalg::reduce_cols_by_key(sample_weights.data_handle(),
-                                   cluster_labels,
-                                   weight_per_cluster.data_handle(),
-                                   (IndexT)1,
-                                   (IndexT)sample_weights.extent(0),
-                                   (IndexT)n_clusters,
-                                   raft::resource::get_cuda_stream(handle));
+  // Compute weighted sums and counts per cluster
+  cuvs::cluster::kmeans::detail::compute_centroid_adjustments(handle,
+                                                              X,
+                                                              sample_weights,
+                                                              cluster_labels,
+                                                              static_cast<IndexT>(n_clusters),
+                                                              new_centroids,
+                                                              weight_per_cluster,
+                                                              workspace);
 
   // Computes new_centroids[i] = new_centroids[i]/weight_per_cluster[i] where
   //   new_centroids[n_clusters x n_features] - 2D array, new_centroids[i] has sum of all the
