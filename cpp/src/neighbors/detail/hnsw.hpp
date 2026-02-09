@@ -599,14 +599,14 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
 
   RAFT_LOG_INFO("Writing base level");
   size_t bytes_written = 0;
-  float GiB            = 1 << 30;
+  float gib            = 1 << 30;
   IdxT zero            = 0;
   RAFT_EXPECTS(appr_algo->size_data_per_element_ ==
                  dim * sizeof(T) + appr_algo->maxM0_ * sizeof(IdxT) + sizeof(int) + sizeof(size_t),
                "Size data per element mismatch");
 
   // Helper lambda for parallel reading of batches
-  auto read_batch = [&](int64_t start_row, int64_t rows_to_read) {
+  auto read_batch = [&](int64_t start_row, int64_t rows_to_read) -> void {
     const size_t graph_bytes   = rows_to_read * graph_degree_int * sizeof(IdxT);
     const size_t dataset_bytes = rows_to_read * dim * sizeof(T);
     const size_t label_bytes   = rows_to_read * sizeof(uint32_t);
@@ -715,9 +715,9 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
         const auto time =
           std::chrono::duration_cast<std::chrono::microseconds>(end_clock - start_clock).count() *
           1e-6;
-        float throughput      = bytes_written / GiB / time;
+        float throughput      = bytes_written / gib / time;
         float rows_throughput = i / time;
-        float ETA             = (n_rows - i) / rows_throughput;
+        float eta             = (n_rows - i) / rows_throughput;
         RAFT_LOG_INFO(
           "# Writing rows %12lu / %12lu (%3.2f %%), %3.2f GiB/sec, ETA %d:%3.1f, written %3.2f "
           "GiB\r",
@@ -725,9 +725,9 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
           n_rows,
           i / static_cast<double>(n_rows) * 100,
           throughput,
-          int(ETA / 60),
-          std::fmod(ETA, 60.0f),
-          bytes_written / GiB);
+          static_cast<int>(eta / 60),
+          std::fmod(eta, 60.0f),
+          bytes_written / gib);
       }
     }
   }
@@ -764,11 +764,11 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
 
   for (int64_t i = 0; i < n_rows; i++) {
     size_t cur_level = create_hierarchy ? levels[i] : 0;
-    unsigned int linkListSize =
+    unsigned int link_list_size =
       create_hierarchy && cur_level > 0 ? appr_algo->size_links_per_element_ * cur_level : 0;
-    os.write(reinterpret_cast<char*>(&linkListSize), sizeof(int));
+    os.write(reinterpret_cast<char*>(&link_list_size), sizeof(int));
     bytes_written += sizeof(int);
-    if (linkListSize) {
+    if (link_list_size) {
       for (size_t pt_level = 1; pt_level <= cur_level; pt_level++) {
         auto neighbor_view = host_neighbors[pt_level - 1].view();
         auto my_row        = order_bw[i] - offsets[pt_level - 1];
@@ -797,18 +797,18 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
       const auto time =
         std::chrono::duration_cast<std::chrono::microseconds>(end_clock - start_clock).count() *
         1e-6;
-      float throughput      = bytes_written / GiB / time;
+      float throughput      = bytes_written / gib / time;
       float rows_throughput = i / time;
-      float ETA             = (n_rows - i) / rows_throughput;
+      float eta             = (n_rows - i) / rows_throughput;
       RAFT_LOG_INFO(
         "# Writing rows %12lu / %12lu (%3.2f %%), %3.2f GiB/sec, ETA %d:%3.1f, written %3.2f GiB\r",
         i,
         n_rows,
         i / static_cast<double>(n_rows) * 100,
         throughput,
-        int(ETA / 60),
-        std::fmod(ETA, 60.0f),
-        bytes_written / GiB);
+        static_cast<int>(eta / 60),
+        std::fmod(eta, 60.0f),
+        bytes_written / gib);
     }
   }
 

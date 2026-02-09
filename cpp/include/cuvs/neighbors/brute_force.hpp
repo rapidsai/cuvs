@@ -619,7 +619,8 @@ struct sparse_index {
   /** Metric argument */
   auto metric_arg() const noexcept -> T { return metric_arg_; }
 
-  auto dataset() const noexcept -> raft::device_csr_matrix_view<const T, IdxT, IdxT, IdxT>
+  [[nodiscard]] auto dataset() const noexcept
+    -> raft::device_csr_matrix_view<const T, IdxT, IdxT, IdxT>
   {
     return dataset_;
   }

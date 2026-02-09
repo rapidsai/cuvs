@@ -31,14 +31,14 @@ namespace detail {
 template <typename DC, typename DistanceT, typename DataT>
 auto euclidean_distance_squared_generic(DataT const* a, DataT const* b, size_t n) -> DistanceT
 {
-  size_t constexpr max_vreg_len = 512 / (8 * sizeof(DistanceT));
+  size_t constexpr kMaxVregLen = 512 / (8 * sizeof(DistanceT));
 
-  // max_vreg_len is a power of two
-  size_t n_rounded                             = n - (n % max_vreg_len);
-  std::array<DistanceT, max_vreg_len> distance = {0};
+  // kMaxVregLen is a power of two
+  size_t n_rounded                            = n - (n % kMaxVregLen);
+  std::array<DistanceT, kMaxVregLen> distance = {0};
 
-  for (size_t i = 0; i < n_rounded; i += max_vreg_len) {
-    for (size_t j = 0; j < max_vreg_len; ++j) {
+  for (size_t i = 0; i < n_rounded; i += kMaxVregLen) {
+    for (size_t j = 0; j < kMaxVregLen; ++j) {
       distance[j] += DC::template eval<DistanceT>(a[i + j], b[i + j]);
     }
   }
@@ -47,7 +47,7 @@ auto euclidean_distance_squared_generic(DataT const* a, DataT const* b, size_t n
     distance[i - n_rounded] += DC::template eval<DistanceT>(a[i], b[i]);
   }
 
-  for (size_t i = 1; i < max_vreg_len; ++i) {
+  for (size_t i = 1; i < kMaxVregLen; ++i) {
     distance[0] += distance[i];
   }
 
@@ -335,19 +335,19 @@ inline float euclidean_distance_squared<distance_comp_inner, float, ::std::uint8
 template <typename DistanceT, typename DataT>
 inline auto cosine_distance(DataT const* a, DataT const* b, size_t n) -> DistanceT
 {
-  using AccT = double;
-  AccT dot   = AccT{0};
-  AccT na2   = AccT{0};
-  AccT nb2   = AccT{0};
+  using acc_t = double;
+  auto dot    = acc_t{0};
+  auto na2    = acc_t{0};
+  auto nb2    = acc_t{0};
   for (size_t i = 0; i < n; ++i) {
-    AccT va = static_cast<AccT>(a[i]);
-    AccT vb = static_cast<AccT>(b[i]);
+    auto va = static_cast<acc_t>(a[i]);
+    auto vb = static_cast<acc_t>(b[i]);
     dot += va * vb;
     na2 += va * va;
     nb2 += vb * vb;
   }
-  AccT denom = std::sqrt(na2) * std::sqrt(nb2);
-  AccT dist  = denom > AccT{0} ? AccT{1} - (dot / denom) : AccT{1};
+  acc_t denom = std::sqrt(na2) * std::sqrt(nb2);
+  acc_t dist  = denom > acc_t{0} ? acc_t{1} - (dot / denom) : acc_t{1};
   return static_cast<DistanceT>(dist);
 }
 
@@ -542,15 +542,14 @@ template <typename IdxT, typename DataT, typename DistanceT, typename ExtentsT>
 
 }  // namespace detail
 
-template <typename idx_t, typename data_t, typename distance_t, typename matrix_idx>
-void refine_impl(
-  raft::resources const& handle,
-  raft::host_matrix_view<const data_t, matrix_idx, raft::row_major> dataset,
-  raft::host_matrix_view<const data_t, matrix_idx, raft::row_major> queries,
-  raft::host_matrix_view<const idx_t, matrix_idx, raft::row_major> neighbor_candidates,
-  raft::host_matrix_view<idx_t, matrix_idx, raft::row_major> indices,
-  raft::host_matrix_view<distance_t, matrix_idx, raft::row_major> distances,
-  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded)
+template <typename IdxT, typename DataT, typename DistanceT, typename MatrixIdx>
+void refine_impl(raft::resources const& handle,
+                 raft::host_matrix_view<const DataT, MatrixIdx, raft::row_major> dataset,
+                 raft::host_matrix_view<const DataT, MatrixIdx, raft::row_major> queries,
+                 raft::host_matrix_view<const IdxT, MatrixIdx, raft::row_major> neighbor_candidates,
+                 raft::host_matrix_view<IdxT, MatrixIdx, raft::row_major> indices,
+                 raft::host_matrix_view<DistanceT, MatrixIdx, raft::row_major> distances,
+                 cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded)
 {
   detail::refine_host(dataset, queries, neighbor_candidates, indices, distances, metric);
 }

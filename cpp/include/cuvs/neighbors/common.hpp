@@ -882,8 +882,8 @@ struct iface {
   [[nodiscard]] auto size() const -> const IdxT { return index_.value().size(); }
 
   std::optional<AnnIndexType> index_;  // NOLINT(readability-identifier-naming)
-  std::shared_ptr<std::mutex> mutex_ =
-    std::make_shared<std::mutex>();  // NOLINT(readability-identifier-naming)
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  std::shared_ptr<std::mutex> mutex_ = std::make_shared<std::mutex>();
 };
 
 template <typename AnnIndexType, typename T, typename IdxT, typename Accessor>

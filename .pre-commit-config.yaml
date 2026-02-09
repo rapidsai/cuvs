@@ -47,6 +47,12 @@ repos:
                 args: ["-fallback-style=none", "-style=file", "-i"]
       - repo: local
         hooks:
+              - id: clang-tidy
+                name: clang-tidy
+                entry: ./cpp/scripts/run-clang-tidy-hook.sh
+                language: system
+                types_or: [c++]
+                verbose: true
               - id: no-deprecationwarning
                 name: no-deprecationwarning
                 description: 'Enforce that DeprecationWarning is not introduced (use FutureWarning instead)'
