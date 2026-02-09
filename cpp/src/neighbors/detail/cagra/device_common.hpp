@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -76,11 +76,11 @@ template <typename T>
 RAFT_DEVICE_INLINE_FUNCTION auto team_sum(T x, uint32_t team_size_bitshift) -> T
 {
   switch (team_size_bitshift) {
-    case 5: x += raft::shfl_xor(x, 16);
-    case 4: x += raft::shfl_xor(x, 8);
-    case 3: x += raft::shfl_xor(x, 4);
-    case 2: x += raft::shfl_xor(x, 2);
-    case 1: x += raft::shfl_xor(x, 1);
+    case 5: x += raft::shfl_xor(x, 16); [[fallthrough]];
+    case 4: x += raft::shfl_xor(x, 8); [[fallthrough]];
+    case 3: x += raft::shfl_xor(x, 4); [[fallthrough]];
+    case 2: x += raft::shfl_xor(x, 2); [[fallthrough]];
+    case 1: x += raft::shfl_xor(x, 1); [[fallthrough]];
     default: return x;
   }
 }
@@ -117,7 +117,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
     DistanceT best_norm2_team_local = raft::upper_bound<DistanceT>();
     for (uint32_t j = 0; j < num_distilation; j++) {
       // Select a node randomly and compute the distance to it
-      IndexT seed_index;
+      IndexT seed_index = 0;
       if (valid_i) {
         // uint32_t gid = i + (num_pickup * (j + (num_distilation * block_id)));
         uint32_t gid = block_id + (num_blocks * (i + (num_pickup * j)));
