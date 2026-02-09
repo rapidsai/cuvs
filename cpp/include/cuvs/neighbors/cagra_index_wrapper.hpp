@@ -67,7 +67,8 @@ struct merge_params : cuvs::neighbors::merge_params {
  * the unified interface from the start.
  */
 template <typename T, typename IdxT, typename OutputIdxT = IdxT>
-class IndexWrapper : public cuvs::neighbors::IndexWrapper<T, IdxT, OutputIdxT> {
+class IndexWrapper  // NOLINT(readability-identifier-naming)
+  : public cuvs::neighbors::IndexWrapper<T, IdxT, OutputIdxT> {
  public:
   using base_type         = cuvs::neighbors::IndexWrapper<T, IdxT, OutputIdxT>;
   using value_type        = typename base_type::value_type;

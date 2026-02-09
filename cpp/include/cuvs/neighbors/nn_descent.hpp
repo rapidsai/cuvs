@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -32,7 +32,11 @@ namespace cuvs::neighbors::nn_descent {
  * memory usage.
  * - `FP16`: Use fp16 distance computation.
  */
-enum class DIST_COMP_DTYPE { AUTO = 0, FP32 = 1, FP16 = 2 };
+enum class DIST_COMP_DTYPE {
+  AUTO = 0,
+  FP32 = 1,
+  FP16 = 2
+};  // NOLINT(readability-identifier-naming)
 
 /**
  * @brief Parameters used to build an nn-descent index

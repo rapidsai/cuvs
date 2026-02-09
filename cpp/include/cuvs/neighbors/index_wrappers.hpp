@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -38,7 +38,8 @@ namespace cuvs::neighbors {
  * @tparam OutputIdxT Output index type, defaults to IdxT
  */
 template <typename T, typename IdxT, typename OutputIdxT = IdxT>
-class IndexWrapper : public IndexBase<T, IdxT, OutputIdxT> {
+class IndexWrapper
+  : public IndexBase<T, IdxT, OutputIdxT> {  // NOLINT(readability-identifier-naming)
  public:
   /** Type definitions inherited from base class */
   using value_type        = typename IndexBase<T, IdxT, OutputIdxT>::value_type;

@@ -37,10 +37,10 @@ namespace graph_build_params = cuvs::neighbors::graph_build_params;
  *
  * NOTE: When the value is `NONE`, the HNSW index is built as a base-layer-only index.
  */
-enum class HnswHierarchy {
-  NONE,  // base-layer-only index
-  CPU,   // full index with CPU-built hierarchy
-  GPU    // full index with GPU-built hierarchy
+enum class HnswHierarchy {  // NOLINT(readability-identifier-naming)
+  NONE,                     // base-layer-only index
+  CPU,                      // full index with CPU-built hierarchy
+  GPU                       // full index with GPU-built hierarchy
 };
 
 struct index_params : cuvs::neighbors::index_params {

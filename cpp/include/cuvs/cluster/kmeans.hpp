@@ -30,6 +30,7 @@ struct base_params {
  * Simple object to specify hyper-parameters to the kmeans algorithm.
  */
 struct params : base_params {
+  // NOLINTBEGIN(readability-identifier-naming)
   enum InitMethod {
 
     /**
@@ -47,6 +48,7 @@ struct params : base_params {
      */
     Array
   };
+  // NOLINTEND(readability-identifier-naming)
 
   /**
    * The number of clusters to form as well as the number of centroids to generate (default:8).
@@ -128,7 +130,7 @@ struct balanced_params : base_params {
 /**
  * @brief Type of k-means algorithm.
  */
-enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
+enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };  // NOLINT(readability-identifier-naming)
 
 /**
  * @}

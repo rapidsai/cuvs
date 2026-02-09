@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -14,6 +14,7 @@
 namespace cuvs::distance {
 
 /** enum to tell how to compute distance */
+// NOLINTBEGIN(readability-identifier-naming)
 enum class DistanceType : int {
 
   /** evaluate as dist_ij = sum(x_ik^2) + sum(y_ij)^2 - 2*sum(x_ik * y_jk) */
@@ -61,6 +62,7 @@ enum class DistanceType : int {
   /** Precomputed (special value) **/
   Precomputed = 100
 };
+// NOLINTEND(readability-identifier-naming)
 
 /**
  * Whether minimal distance corresponds to similar elements (using the given metric).
@@ -81,7 +83,7 @@ inline bool is_min_close(DistanceType metric)
 }
 
 namespace kernels {
-enum KernelType { LINEAR, POLYNOMIAL, RBF, TANH };
+enum KernelType { LINEAR, POLYNOMIAL, RBF, TANH };  // NOLINT(readability-identifier-naming)
 
 /**
  * Parameters for kernel matrices.
@@ -91,7 +93,7 @@ enum KernelType { LINEAR, POLYNOMIAL, RBF, TANH };
  * - RBF \f[ K(x_1, x_2) = \exp(- \gamma |x_1-x_2|^2) \f]
  * - TANH \f[ K(x_1, x_2) = \tanh(\gamma <x_1,x_2> + \mathrm{coef0}) \f]
  */
-struct KernelParams {
+struct KernelParams {  // NOLINT(readability-identifier-naming)
   // Kernel function parameters
   KernelType kernel;  //!< Type of the kernel function
   int degree;         //!< Degree of polynomial kernel (ignored by others)

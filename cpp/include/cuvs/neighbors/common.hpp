@@ -119,7 +119,7 @@ struct search_params {};
  * This enum is declared separately to avoid namespace pollution when including common.hpp.
  * It provides a generic merge strategy that can be used across different index types.
  */
-enum class MergeStrategy {
+enum class MergeStrategy {  // NOLINT(readability-identifier-naming)
   /** Merge indices physically by combining their data structures */
   MERGE_STRATEGY_PHYSICAL = 0,
   /** Merge indices logically by creating a composite wrapper */
@@ -225,7 +225,8 @@ struct is_strided_dataset<owning_dataset<DataT, IdxT, LayoutPolicy, ContainerPol
   : std::true_type {};
 
 template <typename DatasetT>
-inline constexpr bool is_strided_dataset_v = is_strided_dataset<DatasetT>::value;
+inline constexpr bool is_strided_dataset_v =  // NOLINT(readability-identifier-naming)
+  is_strided_dataset<DatasetT>::value;
 
 /**
  * @brief Contstruct a strided matrix from any mdarray or mdspan.
@@ -490,7 +491,8 @@ template <typename MathT, typename IdxT>
 struct is_vpq_dataset<vpq_dataset<MathT, IdxT>> : std::true_type {};
 
 template <typename DatasetT>
-inline constexpr bool is_vpq_dataset_v = is_vpq_dataset<DatasetT>::value;
+inline constexpr bool is_vpq_dataset_v =  // NOLINT(readability-identifier-naming)
+  is_vpq_dataset<DatasetT>::value;
 
 namespace filtering {
 
@@ -499,7 +501,8 @@ namespace filtering {
  * @{
  */
 
-enum class FilterType { None, Bitmap, Bitset };
+// NOLINTNEXTLINE(readability-identifier-naming)
+enum class FilterType { None, Bitmap, Bitset };  // NOLINT(readability-identifier-naming)
 
 struct base_filter {
   ~base_filter()                             = default;
@@ -853,7 +856,7 @@ enable_if_valid_list_t<ListT> deserialize_list(const raft::resources& handle,
                                                const typename ListT::spec_type& device_spec);
 }  // namespace ivf
 
-using namespace raft;
+using namespace raft;  // NOLINT(google-global-names-in-headers)
 
 template <typename AnnIndexType, typename T, typename IdxT>
 struct iface {

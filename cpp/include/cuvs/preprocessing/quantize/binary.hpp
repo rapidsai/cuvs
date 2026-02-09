@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -24,7 +24,7 @@ namespace cuvs::preprocessing::quantize::binary {
  * @brief quantizer algorithms. The mean and sampling_median thresholds are calculated separately
  * for each dimension.
  */
-enum class bit_threshold { zero, mean, sampling_median };
+enum class bit_threshold { zero, mean, sampling_median };  // NOLINT(readability-identifier-naming)
 
 /**
  * @brief quantizer parameters.

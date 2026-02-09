@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,7 +17,7 @@
 namespace cuvs::cluster::agglomerative {
 
 // constant to indirectly control the number of neighbors. k = sqrt(n) + c. default to 15
-constexpr int DEFAULT_CONST_C = 15;
+constexpr int DEFAULT_CONST_C = 15;  // NOLINT(readability-identifier-naming)
 
 /**
  * @defgroup agglomerative_params agglomerative clustering hyperparameters
@@ -27,7 +27,7 @@ constexpr int DEFAULT_CONST_C = 15;
 /**
  * Determines the method for computing the minimum spanning tree (MST)
  */
-enum Linkage {
+enum Linkage {  // NOLINT(readability-identifier-naming)
 
   /**
    * Use a pairwise distance matrix as input to the mst. This

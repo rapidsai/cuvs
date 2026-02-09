@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -60,6 +60,7 @@ struct index : cuvs::neighbors::index {
   {
   }
 
+  // NOLINTBEGIN(readability-identifier-naming)
   auto get_R_indptr() const -> raft::device_vector_view<const idx_t, int64_t>
   {
     return R_indptr.view();
@@ -103,6 +104,7 @@ struct index : cuvs::neighbors::index {
     return X_reordered.view();
   }
   raft::device_matrix_view<const float, int64_t, raft::row_major> get_X() const { return X; }
+  // NOLINTEND(readability-identifier-naming)
 
   cuvs::distance::DistanceType get_metric() const { return metric; }
 
@@ -118,7 +120,8 @@ struct index : cuvs::neighbors::index {
   int64_t n;
   int64_t n_landmarks;
 
-  raft::device_matrix_view<const float, idx_t, raft::row_major> X;
+  raft::device_matrix_view<const float, idx_t, raft::row_major>
+    X;  // NOLINT(readability-identifier-naming)
 
   cuvs::distance::DistanceType metric;
 

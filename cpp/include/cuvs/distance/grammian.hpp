@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -34,10 +34,10 @@ using csr_input_matrix_view_t = raft::device_csr_matrix_view<const math_t, int, 
  * from the x2 set.
  */
 template <typename math_t>
-class GramMatrixBase {
+class GramMatrixBase {  // NOLINT(readability-identifier-naming)
  protected:
-  cublasHandle_t cublas_handle;
-  bool legacy_interface;
+  cublasHandle_t cublas_handle;  // NOLINT(readability-identifier-naming)
+  bool legacy_interface;         // NOLINT(readability-identifier-naming)
 
  public:
   GramMatrixBase() : legacy_interface(false) {};
@@ -289,7 +289,7 @@ class GramMatrixBase {
 };
 
 template <typename math_t>
-class KernelFactory {
+class KernelFactory {  // NOLINT(readability-identifier-naming)
  public:
   static GramMatrixBase<math_t>* create(KernelParams params);
   [[deprecated]] static GramMatrixBase<math_t>* create(KernelParams params, cublasHandle_t handle);
@@ -299,7 +299,7 @@ class KernelFactory {
  * Create a kernel matrix using polynomial kernel function.
  */
 template <typename math_t, typename exp_t>
-class PolynomialKernel : public GramMatrixBase<math_t> {
+class PolynomialKernel : public GramMatrixBase<math_t> {  // NOLINT(readability-identifier-naming)
   exp_t exponent;
   math_t gain;
   math_t offset;
@@ -417,7 +417,7 @@ class PolynomialKernel : public GramMatrixBase<math_t> {
  * Create a kernel matrix using tanh kernel function.
  */
 template <typename math_t>
-class TanhKernel : public GramMatrixBase<math_t> {
+class TanhKernel : public GramMatrixBase<math_t> {  // NOLINT(readability-identifier-naming)
   math_t gain, offset;
 
   void applyKernel(
@@ -530,7 +530,7 @@ class TanhKernel : public GramMatrixBase<math_t> {
  * Create a kernel matrix using RBF kernel function.
  */
 template <typename math_t>
-class RBFKernel : public GramMatrixBase<math_t> {
+class RBFKernel : public GramMatrixBase<math_t> {  // NOLINT(readability-identifier-naming)
   math_t gain;
 
   void applyKernel(math_t* inout,
@@ -556,11 +556,11 @@ class RBFKernel : public GramMatrixBase<math_t> {
   [[deprecated]] RBFKernel(math_t gain, cublasHandle_t handle)
     : GramMatrixBase<math_t>(handle), gain(gain) {};
 
-  void matrixRowNormL2(raft::resources const& handle,
+  void matrixRowNormL2(raft::resources const& handle,  // NOLINT(readability-identifier-naming)
                        dense_input_matrix_view_t<math_t> matrix,
                        math_t* target);
 
-  void matrixRowNormL2(raft::resources const& handle,
+  void matrixRowNormL2(raft::resources const& handle,  // NOLINT(readability-identifier-naming)
                        csr_input_matrix_view_t<math_t> matrix,
                        math_t* target);
 

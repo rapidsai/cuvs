@@ -16,7 +16,12 @@ namespace cuvs::neighbors {
  * @{
  */
 
-enum GRAPH_BUILD_ALGO { BRUTE_FORCE = 0, IVF_PQ = 1, NN_DESCENT = 2, ACE = 3 };
+enum GRAPH_BUILD_ALGO {
+  BRUTE_FORCE = 0,
+  IVF_PQ      = 1,
+  NN_DESCENT  = 2,
+  ACE         = 3
+};  // NOLINT(readability-identifier-naming)
 
 namespace graph_build_params {
 
