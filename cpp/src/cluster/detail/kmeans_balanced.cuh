@@ -1062,8 +1062,8 @@ void build_hierarchical(const raft::resources& handle,
 
   /* Temporary workaround to cub::DeviceHistogram not supporting any type that isn't natively
    * supported by atomicAdd: find a supported CounterT based on the IdxT. */
-  typedef typename std::conditional_t<sizeof(IdxT) == 8, unsigned long long int, unsigned int>
-    CounterT;
+  using CounterT =
+    typename std::conditional_t<sizeof(IdxT) == 8, unsigned long long int, unsigned int>;
 
   // build coarse clusters (mesoclusters)
   rmm::device_uvector<LabelT> mesocluster_labels_buf(n_rows, stream, &managed_memory);

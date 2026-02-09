@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -60,7 +60,7 @@ struct PairwiseDistances : public BaseClass {
   using AccT = typename OpT::AccT;
 
  private:
-  typedef Policy P;
+  using P = Policy;
   const OutT* xn;
   const OutT* yn;
   const DataT* const yBase;

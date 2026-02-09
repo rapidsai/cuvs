@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -21,7 +21,7 @@
 namespace {
 
 template <typename T>
-void* _build(cuvsResources_t res, cuvsVamanaIndexParams* params, DLManagedTensor* dataset_tensor)
+auto _build(cuvsResources_t res, cuvsVamanaIndexParams* params, DLManagedTensor* dataset_tensor) -> void*
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
 
@@ -65,7 +65,7 @@ void _serialize(cuvsResources_t res,
 
 }  // namespace
 
-extern "C" cuvsError_t cuvsVamanaIndexCreate(cuvsVamanaIndex_t* index)
+extern "C" auto cuvsVamanaIndexCreate(cuvsVamanaIndex_t* index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     *index          = new cuvsVamanaIndex{};
@@ -74,7 +74,7 @@ extern "C" cuvsError_t cuvsVamanaIndexCreate(cuvsVamanaIndex_t* index)
   });
 }
 
-extern "C" cuvsError_t cuvsVamanaIndexDestroy(cuvsVamanaIndex_t index_c_ptr)
+extern "C" auto cuvsVamanaIndexDestroy(cuvsVamanaIndex_t index_c_ptr) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto index = *index_c_ptr;
@@ -93,7 +93,7 @@ extern "C" cuvsError_t cuvsVamanaIndexDestroy(cuvsVamanaIndex_t index_c_ptr)
   });
 }
 
-extern "C" cuvsError_t cuvsVamanaIndexGetDims(cuvsVamanaIndex_t index, int* dim)
+extern "C" auto cuvsVamanaIndexGetDims(cuvsVamanaIndex_t index, int* dim) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
@@ -112,10 +112,10 @@ extern "C" cuvsError_t cuvsVamanaIndexGetDims(cuvsVamanaIndex_t index, int* dim)
   });
 }
 
-extern "C" cuvsError_t cuvsVamanaBuild(cuvsResources_t res,
+extern "C" auto cuvsVamanaBuild(cuvsResources_t res,
                                        cuvsVamanaIndexParams_t params,
                                        DLManagedTensor* dataset_tensor,
-                                       cuvsVamanaIndex_t index)
+                                       cuvsVamanaIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
@@ -135,10 +135,10 @@ extern "C" cuvsError_t cuvsVamanaBuild(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsVamanaSerialize(cuvsResources_t res,
+extern "C" auto cuvsVamanaSerialize(cuvsResources_t res,
                                            const char* filename,
                                            cuvsVamanaIndex_t index,
-                                           bool include_dataset)
+                                           bool include_dataset) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
@@ -154,7 +154,7 @@ extern "C" cuvsError_t cuvsVamanaSerialize(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsVamanaIndexParamsCreate(cuvsVamanaIndexParams_t* params)
+extern "C" auto cuvsVamanaIndexParamsCreate(cuvsVamanaIndexParams_t* params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     *params                      = new cuvsVamanaIndexParams{};
@@ -170,7 +170,7 @@ extern "C" cuvsError_t cuvsVamanaIndexParamsCreate(cuvsVamanaIndexParams_t* para
   });
 }
 
-extern "C" cuvsError_t cuvsVamanaIndexParamsDestroy(cuvsVamanaIndexParams_t params)
+extern "C" auto cuvsVamanaIndexParamsDestroy(cuvsVamanaIndexParams_t params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
 }

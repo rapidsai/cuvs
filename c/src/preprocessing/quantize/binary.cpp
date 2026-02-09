@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -50,9 +50,9 @@ void _transform(cuvsResources_t res,
 }
 
 template <typename T>
-void* _train(cuvsResources_t res,
+auto _train(cuvsResources_t res,
              cuvsBinaryQuantizerParams_t params,
-             DLManagedTensor* dataset_tensor)
+             DLManagedTensor* dataset_tensor) -> void*
 {
   auto dataset = dataset_tensor->dl_tensor;
 
@@ -92,7 +92,7 @@ void* _train(cuvsResources_t res,
 
 }  // namespace
 
-extern "C" cuvsError_t cuvsBinaryQuantizerParamsCreate(cuvsBinaryQuantizerParams_t* params)
+extern "C" auto cuvsBinaryQuantizerParamsCreate(cuvsBinaryQuantizerParams_t* params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     *params =
@@ -100,25 +100,25 @@ extern "C" cuvsError_t cuvsBinaryQuantizerParamsCreate(cuvsBinaryQuantizerParams
   });
 }
 
-extern "C" cuvsError_t cuvsBinaryQuantizerParamsDestroy(cuvsBinaryQuantizerParams_t params)
+extern "C" auto cuvsBinaryQuantizerParamsDestroy(cuvsBinaryQuantizerParams_t params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
 }
 
-extern "C" cuvsError_t cuvsBinaryQuantizerCreate(cuvsBinaryQuantizer_t* quantizer)
+extern "C" auto cuvsBinaryQuantizerCreate(cuvsBinaryQuantizer_t* quantizer) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { *quantizer = new cuvsBinaryQuantizer; });
 }
 
-extern "C" cuvsError_t cuvsBinaryQuantizerDestroy(cuvsBinaryQuantizer_t quantizer)
+extern "C" auto cuvsBinaryQuantizerDestroy(cuvsBinaryQuantizer_t quantizer) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { delete quantizer; });
 }
 
-extern "C" cuvsError_t cuvsBinaryQuantizerTrain(cuvsResources_t res,
+extern "C" auto cuvsBinaryQuantizerTrain(cuvsResources_t res,
                                                 cuvsBinaryQuantizerParams_t params,
                                                 DLManagedTensor* dataset_tensor,
-                                                cuvsBinaryQuantizer_t quantizer)
+                                                cuvsBinaryQuantizer_t quantizer) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset     = dataset_tensor->dl_tensor;
@@ -137,10 +137,10 @@ extern "C" cuvsError_t cuvsBinaryQuantizerTrain(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsBinaryQuantizerTransformWithParams(cuvsResources_t res,
+extern "C" auto cuvsBinaryQuantizerTransformWithParams(cuvsResources_t res,
                                                               cuvsBinaryQuantizer_t quantizer,
                                                               DLManagedTensor* dataset_tensor,
-                                                              DLManagedTensor* out_tensor)
+                                                              DLManagedTensor* out_tensor) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
@@ -158,9 +158,9 @@ extern "C" cuvsError_t cuvsBinaryQuantizerTransformWithParams(cuvsResources_t re
   });
 }
 
-extern "C" cuvsError_t cuvsBinaryQuantizerTransform(cuvsResources_t res,
+extern "C" auto cuvsBinaryQuantizerTransform(cuvsResources_t res,
                                                     DLManagedTensor* dataset_tensor,
-                                                    DLManagedTensor* out_tensor)
+                                                    DLManagedTensor* out_tensor) -> cuvsError_t
 {
   cuvsBinaryQuantizerParams_t params;
   cuvsBinaryQuantizerParamsCreate(&params);

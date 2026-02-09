@@ -52,7 +52,7 @@ void convert_c_search_params(cuvsIvfPqSearchParams params,
 namespace {
 
 template <typename T, typename IdxT>
-void* _build(cuvsResources_t res, cuvsIvfPqIndexParams params, DLManagedTensor* dataset_tensor)
+auto _build(cuvsResources_t res, cuvsIvfPqIndexParams params, DLManagedTensor* dataset_tensor) -> void*
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
 
@@ -111,7 +111,7 @@ void _serialize(cuvsResources_t res, const char* filename, cuvsIvfPqIndex index)
 }
 
 template <typename IdxT>
-void* _deserialize(cuvsResources_t res, const char* filename)
+auto _deserialize(cuvsResources_t res, const char* filename) -> void*
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   auto index   = new cuvs::neighbors::ivf_pq::index<IdxT>(*res_ptr);
@@ -254,12 +254,12 @@ void _transform(cuvsResources_t res,
 
 }  // namespace
 
-extern "C" cuvsError_t cuvsIvfPqIndexCreate(cuvsIvfPqIndex_t* index)
+extern "C" auto cuvsIvfPqIndexCreate(cuvsIvfPqIndex_t* index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { *index = new cuvsIvfPqIndex{}; });
 }
 
-extern "C" cuvsError_t cuvsIvfPqIndexDestroy(cuvsIvfPqIndex_t index_c_ptr)
+extern "C" auto cuvsIvfPqIndexDestroy(cuvsIvfPqIndex_t index_c_ptr) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto index = *index_c_ptr;
@@ -270,10 +270,10 @@ extern "C" cuvsError_t cuvsIvfPqIndexDestroy(cuvsIvfPqIndex_t index_c_ptr)
   });
 }
 
-extern "C" cuvsError_t cuvsIvfPqBuild(cuvsResources_t res,
+extern "C" auto cuvsIvfPqBuild(cuvsResources_t res,
                                       cuvsIvfPqIndexParams_t params,
                                       DLManagedTensor* dataset_tensor,
-                                      cuvsIvfPqIndex_t index)
+                                      cuvsIvfPqIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset      = dataset_tensor->dl_tensor;
@@ -300,12 +300,12 @@ extern "C" cuvsError_t cuvsIvfPqBuild(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsIvfPqSearch(cuvsResources_t res,
+extern "C" auto cuvsIvfPqSearch(cuvsResources_t res,
                                        cuvsIvfPqSearchParams_t params,
                                        cuvsIvfPqIndex_t index_c_ptr,
                                        DLManagedTensor* queries_tensor,
                                        DLManagedTensor* neighbors_tensor,
-                                       DLManagedTensor* distances_tensor)
+                                       DLManagedTensor* distances_tensor) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto queries   = queries_tensor->dl_tensor;
@@ -345,7 +345,7 @@ extern "C" cuvsError_t cuvsIvfPqSearch(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsIvfPqIndexParamsCreate(cuvsIvfPqIndexParams_t* params)
+extern "C" auto cuvsIvfPqIndexParamsCreate(cuvsIvfPqIndexParams_t* params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     *params = new cuvsIvfPqIndexParams{.metric                         = L2Expanded,
@@ -364,12 +364,12 @@ extern "C" cuvsError_t cuvsIvfPqIndexParamsCreate(cuvsIvfPqIndexParams_t* params
   });
 }
 
-extern "C" cuvsError_t cuvsIvfPqIndexParamsDestroy(cuvsIvfPqIndexParams_t params)
+extern "C" auto cuvsIvfPqIndexParamsDestroy(cuvsIvfPqIndexParams_t params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
 }
 
-extern "C" cuvsError_t cuvsIvfPqSearchParamsCreate(cuvsIvfPqSearchParams_t* params)
+extern "C" auto cuvsIvfPqSearchParamsCreate(cuvsIvfPqSearchParams_t* params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     *params = new cuvsIvfPqSearchParams{.n_probes                 = 20,
@@ -381,30 +381,30 @@ extern "C" cuvsError_t cuvsIvfPqSearchParamsCreate(cuvsIvfPqSearchParams_t* para
   });
 }
 
-extern "C" cuvsError_t cuvsIvfPqSearchParamsDestroy(cuvsIvfPqSearchParams_t params)
+extern "C" auto cuvsIvfPqSearchParamsDestroy(cuvsIvfPqSearchParams_t params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
 }
 
-extern "C" cuvsError_t cuvsIvfPqDeserialize(cuvsResources_t res,
+extern "C" auto cuvsIvfPqDeserialize(cuvsResources_t res,
                                             const char* filename,
-                                            cuvsIvfPqIndex_t index)
+                                            cuvsIvfPqIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions(
     [=] { index->addr = reinterpret_cast<uintptr_t>(_deserialize<int64_t>(res, filename)); });
 }
 
-extern "C" cuvsError_t cuvsIvfPqSerialize(cuvsResources_t res,
+extern "C" auto cuvsIvfPqSerialize(cuvsResources_t res,
                                           const char* filename,
-                                          cuvsIvfPqIndex_t index)
+                                          cuvsIvfPqIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { _serialize<int64_t>(res, filename, *index); });
 }
 
-extern "C" cuvsError_t cuvsIvfPqExtend(cuvsResources_t res,
+extern "C" auto cuvsIvfPqExtend(cuvsResources_t res,
                                        DLManagedTensor* new_vectors,
                                        DLManagedTensor* new_indices,
-                                       cuvsIvfPqIndex_t index)
+                                       cuvsIvfPqIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto vectors = new_vectors->dl_tensor;
@@ -429,7 +429,7 @@ extern "C" cuvsError_t cuvsIvfPqExtend(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index, int64_t* n_lists)
+extern "C" auto cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index, int64_t* n_lists) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
@@ -437,7 +437,7 @@ extern "C" cuvsError_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index, int64_t* 
   });
 }
 
-extern "C" cuvsError_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index, int64_t* dim)
+extern "C" auto cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index, int64_t* dim) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
@@ -445,7 +445,7 @@ extern "C" cuvsError_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index, int64_t* dim
   });
 }
 
-extern "C" cuvsError_t cuvsIvfPqIndexGetSize(cuvsIvfPqIndex_t index, int64_t* size)
+extern "C" auto cuvsIvfPqIndexGetSize(cuvsIvfPqIndex_t index, int64_t* size) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
@@ -453,7 +453,7 @@ extern "C" cuvsError_t cuvsIvfPqIndexGetSize(cuvsIvfPqIndex_t index, int64_t* si
   });
 }
 
-extern "C" cuvsError_t cuvsIvfPqIndexGetPqDim(cuvsIvfPqIndex_t index, int64_t* pq_dim)
+extern "C" auto cuvsIvfPqIndexGetPqDim(cuvsIvfPqIndex_t index, int64_t* pq_dim) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
@@ -461,7 +461,7 @@ extern "C" cuvsError_t cuvsIvfPqIndexGetPqDim(cuvsIvfPqIndex_t index, int64_t* p
   });
 }
 
-extern "C" cuvsError_t cuvsIvfPqIndexGetPqBits(cuvsIvfPqIndex_t index, int64_t* pq_bits)
+extern "C" auto cuvsIvfPqIndexGetPqBits(cuvsIvfPqIndex_t index, int64_t* pq_bits) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
@@ -469,7 +469,7 @@ extern "C" cuvsError_t cuvsIvfPqIndexGetPqBits(cuvsIvfPqIndex_t index, int64_t* 
   });
 }
 
-extern "C" cuvsError_t cuvsIvfPqIndexGetPqLen(cuvsIvfPqIndex_t index, int64_t* pq_len)
+extern "C" auto cuvsIvfPqIndexGetPqLen(cuvsIvfPqIndex_t index, int64_t* pq_len) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
@@ -477,44 +477,44 @@ extern "C" cuvsError_t cuvsIvfPqIndexGetPqLen(cuvsIvfPqIndex_t index, int64_t* p
   });
 }
 
-extern "C" cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index, DLManagedTensor* centers)
+extern "C" auto cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index, DLManagedTensor* centers) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { _get_centers<int64_t>(*index, centers); });
 }
 
-extern "C" cuvsError_t cuvsIvfPqIndexGetCentersPadded(cuvsIvfPqIndex_t index,
-                                                      DLManagedTensor* centers)
+extern "C" auto cuvsIvfPqIndexGetCentersPadded(cuvsIvfPqIndex_t index,
+                                                      DLManagedTensor* centers) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { _get_centers_padded<int64_t>(*index, centers); });
 }
 
-extern "C" cuvsError_t cuvsIvfPqIndexGetPqCenters(cuvsIvfPqIndex_t index,
-                                                  DLManagedTensor* pq_centers)
+extern "C" auto cuvsIvfPqIndexGetPqCenters(cuvsIvfPqIndex_t index,
+                                                  DLManagedTensor* pq_centers) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { _get_pq_centers<int64_t>(*index, pq_centers); });
 }
 
-extern "C" cuvsError_t cuvsIvfPqIndexGetCentersRot(cuvsIvfPqIndex_t index,
-                                                   DLManagedTensor* centers_rot)
+extern "C" auto cuvsIvfPqIndexGetCentersRot(cuvsIvfPqIndex_t index,
+                                                   DLManagedTensor* centers_rot) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { _get_centers_rot<int64_t>(*index, centers_rot); });
 }
 
-extern "C" cuvsError_t cuvsIvfPqIndexGetRotationMatrix(cuvsIvfPqIndex_t index,
-                                                       DLManagedTensor* rotation_matrix)
+extern "C" auto cuvsIvfPqIndexGetRotationMatrix(cuvsIvfPqIndex_t index,
+                                                       DLManagedTensor* rotation_matrix) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions(
     [=] { _get_rotation_matrix<int64_t>(*index, rotation_matrix); });
 }
 
-extern "C" cuvsError_t cuvsIvfPqBuildPrecomputed(cuvsResources_t res,
+extern "C" auto cuvsIvfPqBuildPrecomputed(cuvsResources_t res,
                                                   cuvsIvfPqIndexParams_t params,
                                                   uint32_t dim,
                                                   DLManagedTensor* pq_centers_tensor,
                                                   DLManagedTensor* centers_tensor,
                                                   DLManagedTensor* centers_rot_tensor,
                                                   DLManagedTensor* rotation_matrix_tensor,
-                                                  cuvsIvfPqIndex_t index)
+                                                  cuvsIvfPqIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
@@ -568,35 +568,35 @@ extern "C" cuvsError_t cuvsIvfPqBuildPrecomputed(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsIvfPqIndexGetListSizes(cuvsIvfPqIndex_t index,
-                                                  DLManagedTensor* list_sizes)
+extern "C" auto cuvsIvfPqIndexGetListSizes(cuvsIvfPqIndex_t index,
+                                                  DLManagedTensor* list_sizes) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { _get_list_sizes<int64_t>(*index, list_sizes); });
 }
 
-extern "C" cuvsError_t cuvsIvfPqIndexUnpackContiguousListData(cuvsResources_t res,
+extern "C" auto cuvsIvfPqIndexUnpackContiguousListData(cuvsResources_t res,
                                                               cuvsIvfPqIndex_t index,
                                                               DLManagedTensor* out_codes,
                                                               uint32_t label,
-                                                              uint32_t offset)
+                                                              uint32_t offset) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions(
     [=] { _unpack_contiguous_list_data<int64_t>(res, *index, out_codes, label, offset); });
 }
 
-extern "C" cuvsError_t cuvsIvfPqIndexGetListIndices(cuvsIvfPqIndex_t index,
+extern "C" auto cuvsIvfPqIndexGetListIndices(cuvsIvfPqIndex_t index,
                                                     uint32_t label,
-                                                    DLManagedTensor* out_labels)
+                                                    DLManagedTensor* out_labels) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions(
     [=] { _get_list_indices<int64_t>(*index, label, out_labels); });
 }
 
-extern "C" cuvsError_t cuvsIvfPqTransform(cuvsResources_t res,
+extern "C" auto cuvsIvfPqTransform(cuvsResources_t res,
                                           cuvsIvfPqIndex_t index,
                                           DLManagedTensor* input_dataset,
                                           DLManagedTensor* output_labels,
-                                          DLManagedTensor* output_dataset) {
+                                          DLManagedTensor* output_dataset) -> cuvsError_t {
   return cuvs::core::translate_exceptions(
     [=] {
       // Verify all tensors are on device

@@ -524,8 +524,8 @@ auto build(raft::resources const& res,
  * @return true if enough GPU memory can be allocated
  * @return false otherwise
  */
-bool has_enough_device_memory(raft::resources const& res,
+auto has_enough_device_memory(raft::resources const& res,
                               raft::matrix_extent<int64_t> dataset,
-                              size_t idx_size = 4);
+                              size_t idx_size = 4) -> bool;
 
 }  // namespace cuvs::neighbors::nn_descent

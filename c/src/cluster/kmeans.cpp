@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -15,7 +15,7 @@
 
 namespace {
 
-cuvs::cluster::kmeans::params convert_params(const cuvsKMeansParams& params)
+auto convert_params(const cuvsKMeansParams& params) -> cuvs::cluster::kmeans::params
 {
   auto kmeans_params       = cuvs::cluster::kmeans::params();
   kmeans_params.metric     = static_cast<cuvs::distance::DistanceType>(params.metric);
@@ -30,7 +30,7 @@ cuvs::cluster::kmeans::params convert_params(const cuvsKMeansParams& params)
   return kmeans_params;
 }
 
-cuvs::cluster::kmeans::balanced_params convert_balanced_params(const cuvsKMeansParams& params)
+auto convert_balanced_params(const cuvsKMeansParams& params) -> cuvs::cluster::kmeans::balanced_params
 {
   auto kmeans_params    = cuvs::cluster::kmeans::balanced_params();
   kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>(params.metric);
@@ -55,7 +55,7 @@ void _fit(cuvsResources_t res,
     using mdspan_type       = raft::device_matrix_view<T, IdxT, raft::row_major>;
 
     if (params.hierarchical) {
-      if (sample_weight_tensor != NULL) {
+      if (sample_weight_tensor != nullptr) {
         RAFT_FAIL("sample_weight cannot be used with hierarchical kmeans");
       }
 
@@ -76,7 +76,7 @@ void _fit(cuvsResources_t res,
       IdxT n_iter_temp;
 
       std::optional<raft::device_vector_view<T const, IdxT>> sample_weight;
-      if (sample_weight_tensor != NULL) {
+      if (sample_weight_tensor != nullptr) {
         sample_weight =
           cuvs::core::from_dlpack<raft::device_vector_view<T const, IdxT>>(sample_weight_tensor);
       }
@@ -115,7 +115,7 @@ void _predict(cuvsResources_t res,
     using const_mdspan_type  = raft::device_matrix_view<T const, IdxT, raft::row_major>;
 
     if (params.hierarchical) {
-      if (sample_weight_tensor != NULL) {
+      if (sample_weight_tensor != nullptr) {
         RAFT_FAIL("sample_weight cannot be used with hierarchical kmeans");
       }
 
@@ -134,7 +134,7 @@ void _predict(cuvsResources_t res,
       auto kmeans_params = convert_params(params);
       T inertia_temp;
       std::optional<raft::device_vector_view<T const, IdxT>> sample_weight;
-      if (sample_weight_tensor != NULL) {
+      if (sample_weight_tensor != nullptr) {
         sample_weight =
           cuvs::core::from_dlpack<raft::device_vector_view<T const, IdxT>>(sample_weight_tensor);
       }
@@ -179,7 +179,7 @@ void _cluster_cost(cuvsResources_t res,
 }
 }  // namespace
 
-extern "C" cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params)
+extern "C" auto cuvsKMeansParamsCreate(cuvsKMeansParams_t* params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     cuvs::cluster::kmeans::params cpp_params;
@@ -198,18 +198,18 @@ extern "C" cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params)
   });
 }
 
-extern "C" cuvsError_t cuvsKMeansParamsDestroy(cuvsKMeansParams_t params)
+extern "C" auto cuvsKMeansParamsDestroy(cuvsKMeansParams_t params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
 }
 
-extern "C" cuvsError_t cuvsKMeansFit(cuvsResources_t res,
+extern "C" auto cuvsKMeansFit(cuvsResources_t res,
                                      cuvsKMeansParams_t params,
                                      DLManagedTensor* X,
                                      DLManagedTensor* sample_weight,
                                      DLManagedTensor* centroids,
                                      double* inertia,
-                                     int* n_iter)
+                                     int* n_iter) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = X->dl_tensor;
@@ -225,14 +225,14 @@ extern "C" cuvsError_t cuvsKMeansFit(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsKMeansPredict(cuvsResources_t res,
+extern "C" auto cuvsKMeansPredict(cuvsResources_t res,
                                          cuvsKMeansParams_t params,
                                          DLManagedTensor* X,
                                          DLManagedTensor* sample_weight,
                                          DLManagedTensor* centroids,
                                          DLManagedTensor* labels,
                                          bool normalize_weight,
-                                         double* inertia)
+                                         double* inertia) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = X->dl_tensor;
@@ -249,10 +249,10 @@ extern "C" cuvsError_t cuvsKMeansPredict(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsKMeansClusterCost(cuvsResources_t res,
+extern "C" auto cuvsKMeansClusterCost(cuvsResources_t res,
                                              DLManagedTensor* X,
                                              DLManagedTensor* centroids,
-                                             double* cost)
+                                             double* cost) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = X->dl_tensor;

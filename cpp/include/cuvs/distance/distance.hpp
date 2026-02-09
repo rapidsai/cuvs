@@ -67,7 +67,7 @@ enum class DistanceType : int {
 /**
  * Whether minimal distance corresponds to similar elements (using the given metric).
  */
-inline bool is_min_close(DistanceType metric)
+inline auto is_min_close(DistanceType metric) -> bool
 {
   bool select_min;
   switch (metric) {

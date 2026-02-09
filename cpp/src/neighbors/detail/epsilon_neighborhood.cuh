@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,7 +17,7 @@ template <typename DataT,
           typename BaseClass = raft::linalg::Contractions_NT<DataT, IdxT, Policy>>
 struct EpsUnexpL2SqNeighborhood : public BaseClass {
  private:
-  typedef Policy P;
+  using P = Policy;
 
   bool* adj;
   DataT eps;
@@ -176,7 +176,7 @@ void epsUnexpL2SqNeighImpl(bool* adj,
                            DataT eps,
                            cudaStream_t stream)
 {
-  typedef typename raft::linalg::Policy4x4<DataT, VecLen>::Policy Policy;
+  using Policy = typename raft::linalg::Policy4x4<DataT, VecLen>::Policy;
   dim3 grid(raft::ceildiv<int>(m, Policy::Mblk), raft::ceildiv<int>(n, Policy::Nblk));
   dim3 blk(Policy::Nthreads);
   epsUnexpL2SqNeighKernel<DataT, IdxT, Policy>

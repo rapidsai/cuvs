@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -37,8 +37,8 @@ void convert_nn_descent_params(cuvsNNDescentIndexParams params,
   out->return_distances          = params.return_distances;
 }
 
-static cuvs::neighbors::all_neighbors::all_neighbors_params convert_params(
-  cuvsAllNeighborsIndexParams_t params_ptr, int64_t n_rows, int64_t n_cols)
+static auto convert_params(
+  cuvsAllNeighborsIndexParams_t params_ptr, int64_t n_rows, int64_t n_cols) -> cuvs::neighbors::all_neighbors::all_neighbors_params
 {
   using namespace cuvs::neighbors;
   cuvs::neighbors::all_neighbors::all_neighbors_params out{};
@@ -211,7 +211,7 @@ void _build_device(cuvsResources_t device_res,
 
 }  // namespace
 
-extern "C" cuvsError_t cuvsAllNeighborsIndexParamsCreate(cuvsAllNeighborsIndexParams_t* params)
+extern "C" auto cuvsAllNeighborsIndexParamsCreate(cuvsAllNeighborsIndexParams_t* params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     *params                      = new cuvsAllNeighborsIndexParams{};
@@ -224,7 +224,7 @@ extern "C" cuvsError_t cuvsAllNeighborsIndexParamsCreate(cuvsAllNeighborsIndexPa
   });
 }
 
-extern "C" cuvsError_t cuvsAllNeighborsIndexParamsDestroy(cuvsAllNeighborsIndexParams_t params)
+extern "C" auto cuvsAllNeighborsIndexParamsDestroy(cuvsAllNeighborsIndexParams_t params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (params != nullptr) {
@@ -237,13 +237,13 @@ extern "C" cuvsError_t cuvsAllNeighborsIndexParamsDestroy(cuvsAllNeighborsIndexP
   });
 }
 
-extern "C" cuvsError_t cuvsAllNeighborsBuild(cuvsResources_t res,
+extern "C" auto cuvsAllNeighborsBuild(cuvsResources_t res,
                                              cuvsAllNeighborsIndexParams_t params,
                                              DLManagedTensor* dataset_tensor,
                                              DLManagedTensor* indices_tensor,
                                              DLManagedTensor* distances_tensor,
                                              DLManagedTensor* core_distances_tensor,
-                                             float alpha)
+                                             float alpha) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;

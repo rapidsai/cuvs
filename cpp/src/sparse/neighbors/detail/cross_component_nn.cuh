@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2018-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -58,7 +58,7 @@ struct FixConnectivitiesRedOp {
 
   FixConnectivitiesRedOp(value_idx m_) : m(m_) {};
 
-  typedef typename raft::KeyValuePair<value_idx, value_t> KVP;
+  using KVP = typename raft::KeyValuePair<value_idx, value_t>;
   DI void operator()(value_idx rit, KVP* out, const KVP& other) const
   {
     if (rit < m && other.value < out->value) {
@@ -107,7 +107,7 @@ struct MutualReachabilityFixConnectivitiesRedOp {
   MutualReachabilityFixConnectivitiesRedOp(value_t* core_dists, value_idx m)
     : core_dists(core_dists), m(m) {};
 
-  typedef typename raft::KeyValuePair<value_idx, value_t> KVP;
+  using KVP = typename raft::KeyValuePair<value_idx, value_t>;
   DI void operator()(value_idx rit, KVP* out, const KVP& other) const
   {
     if (rit < m && other.value < std::numeric_limits<value_t>::max()) {
@@ -208,7 +208,7 @@ struct TupleComp {
 
 template <typename LabelT, typename DataT>
 struct CubKVPMinReduce {
-  typedef raft::KeyValuePair<LabelT, DataT> KVP;
+  using KVP = raft::KeyValuePair<LabelT, DataT>;
 
   DI KVP
 

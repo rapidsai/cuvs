@@ -92,7 +92,7 @@ void countLabels(raft::resources const& handle,
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
   // CUB::DeviceHistogram requires a signed index type
-  typedef typename std::make_signed_t<IndexT> CubIndexT;
+  using CubIndexT = typename std::make_signed_t<IndexT>;
 
   CubIndexT num_levels  = n_clusters + 1;
   CubIndexT lower_level = 0;

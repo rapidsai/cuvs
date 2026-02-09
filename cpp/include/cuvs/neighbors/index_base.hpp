@@ -79,14 +79,14 @@ struct IndexBase {  // NOLINT(readability-identifier-naming)
    *
    * @return Number of indexed vectors
    */
-  virtual index_type size() const noexcept = 0;
+  [[nodiscard]] virtual auto size() const noexcept -> index_type = 0;
 
   /**
    * @brief Get the distance metric used by the index.
    *
    * @return Distance metric type (e.g., L2, InnerProduct)
    */
-  virtual cuvs::distance::DistanceType metric() const noexcept = 0;
+  [[nodiscard]] virtual auto metric() const noexcept -> cuvs::distance::DistanceType = 0;
 };
 
 }  // namespace cuvs::neighbors

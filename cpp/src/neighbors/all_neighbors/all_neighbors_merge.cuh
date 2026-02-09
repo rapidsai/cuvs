@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -30,8 +30,8 @@ RAFT_KERNEL merge_subgraphs_kernel(IdxT* cluster_data_indices,
                                    bool select_min)
 {
   size_t batch_row = blockIdx.x;
-  typedef cub::BlockMergeSort<raft::KeyValuePair<float, IdxT>, BLOCK_SIZE, ITEMS_PER_THREAD>
-    BlockMergeSortType;
+  using BlockMergeSortType =
+    cub::BlockMergeSort<raft::KeyValuePair<float, IdxT>, BLOCK_SIZE, ITEMS_PER_THREAD>;
   __shared__ typename cub::BlockMergeSort<raft::KeyValuePair<float, IdxT>,
                                           BLOCK_SIZE,
                                           ITEMS_PER_THREAD>::TempStorage tmpSmem;

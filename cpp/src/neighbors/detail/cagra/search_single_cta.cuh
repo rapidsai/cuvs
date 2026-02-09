@@ -106,7 +106,7 @@ struct search
     num_itopk_candidates = search_width * graph_degree;
     result_buffer_size   = itopk_size + num_itopk_candidates;
 
-    typedef raft::Pow2<32> AlignBytes;
+    using AlignBytes               = raft::Pow2<32>;
     unsigned result_buffer_size_32 = AlignBytes::roundUp(result_buffer_size);
 
     constexpr unsigned max_itopk = 512;

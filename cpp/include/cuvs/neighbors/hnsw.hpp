@@ -112,11 +112,11 @@ struct index_params : cuvs::neighbors::index_params {
  * @endcode
  */
 [[deprecated("Use cagra::index_params::from_hnsw_params instead")]]
-cuvs::neighbors::cagra::index_params to_cagra_params(
-  raft::matrix_extent<int64_t> dataset,
-  int M,
-  int ef_construction,
-  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
+auto to_cagra_params(raft::matrix_extent<int64_t> dataset,
+                     int M,
+                     int ef_construction,
+                     cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
+  -> cuvs::neighbors::cagra::index_params;
 
 /**
  * @}
@@ -145,18 +145,18 @@ struct index : cuvs::neighbors::index {
   {
   }
 
-  virtual ~index() {}
+  virtual ~index() = default;
 
   /**
   @brief Get underlying index
   */
-  virtual void const* get_index() const = 0;
+  [[nodiscard]] virtual auto get_index() const -> void const* = 0;
 
-  auto dim() const -> int const { return dim_; }
+  [[nodiscard]] auto dim() const -> int const { return dim_; }
 
-  auto metric() const -> cuvs::distance::DistanceType { return metric_; }
+  [[nodiscard]] auto metric() const -> cuvs::distance::DistanceType { return metric_; }
 
-  auto hierarchy() const -> HnswHierarchy { return hierarchy_; }
+  [[nodiscard]] auto hierarchy() const -> HnswHierarchy { return hierarchy_; }
 
   /**
   @brief Set ef for search
@@ -166,7 +166,7 @@ struct index : cuvs::neighbors::index {
   /**
   @brief Get file path for disk-backed index
   */
-  virtual std::string file_path() const { return ""; }
+  [[nodiscard]] virtual auto file_path() const -> std::string { return ""; }
 
  private:
   int dim_;
@@ -251,10 +251,10 @@ struct extend_params {
  *   hnsw::serialize(res, "index.bin", *hnsw_index);
  * @endcode
  */
-std::unique_ptr<index<float>> build(
-  raft::resources const& res,
-  const index_params& params,
-  raft::host_matrix_view<const float, int64_t, raft::row_major> dataset);
+auto build(raft::resources const& res,
+           const index_params& params,
+           raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
+  -> std::unique_ptr<index<float>>;
 
 /**
  * @brief Build an HNSW index on the GPU
@@ -309,10 +309,10 @@ std::unique_ptr<index<float>> build(
  *   hnsw::serialize(res, "index.bin", *hnsw_index);
  * @endcode
  */
-std::unique_ptr<index<half>> build(
-  raft::resources const& res,
-  const index_params& params,
-  raft::host_matrix_view<const half, int64_t, raft::row_major> dataset);
+auto build(raft::resources const& res,
+           const index_params& params,
+           raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
+  -> std::unique_ptr<index<half>>;
 
 /**
  * @brief Build an HNSW index on the GPU
@@ -367,10 +367,10 @@ std::unique_ptr<index<half>> build(
  *   hnsw::serialize(res, "index.bin", *hnsw_index);
  * @endcode
  */
-std::unique_ptr<index<uint8_t>> build(
-  raft::resources const& res,
-  const index_params& params,
-  raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset);
+auto build(raft::resources const& res,
+           const index_params& params,
+           raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
+  -> std::unique_ptr<index<uint8_t>>;
 
 /**
  * @brief Build an HNSW index on the GPU
@@ -425,10 +425,10 @@ std::unique_ptr<index<uint8_t>> build(
  *   hnsw::serialize(res, "index.bin", *hnsw_index);
  * @endcode
  */
-std::unique_ptr<index<int8_t>> build(
-  raft::resources const& res,
-  const index_params& params,
-  raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset);
+auto build(raft::resources const& res,
+           const index_params& params,
+           raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
+  -> std::unique_ptr<index<int8_t>>;
 
 /**
  * @}
@@ -468,12 +468,11 @@ std::unique_ptr<index<int8_t>> build(
  *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
  * @endcode
  */
-std::unique_ptr<index<float>> from_cagra(
-  raft::resources const& res,
-  const index_params& params,
-  const cuvs::neighbors::cagra::index<float, uint32_t>& cagra_index,
-  std::optional<raft::host_matrix_view<const float, int64_t, raft::row_major>> dataset =
-    std::nullopt);
+auto from_cagra(raft::resources const& res,
+                const index_params& params,
+                const cuvs::neighbors::cagra::index<float, uint32_t>& cagra_index,
+                std::optional<raft::host_matrix_view<const float, int64_t, raft::row_major>>
+                  dataset = std::nullopt) -> std::unique_ptr<index<float>>;
 
 /**
  * @brief Construct an hnswlib index from a CAGRA index
@@ -504,12 +503,11 @@ std::unique_ptr<index<float>> from_cagra(
  *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
  * @endcode
  */
-std::unique_ptr<index<half>> from_cagra(
-  raft::resources const& res,
-  const index_params& params,
-  const cuvs::neighbors::cagra::index<half, uint32_t>& cagra_index,
-  std::optional<raft::host_matrix_view<const half, int64_t, raft::row_major>> dataset =
-    std::nullopt);
+auto from_cagra(raft::resources const& res,
+                const index_params& params,
+                const cuvs::neighbors::cagra::index<half, uint32_t>& cagra_index,
+                std::optional<raft::host_matrix_view<const half, int64_t, raft::row_major>>
+                  dataset = std::nullopt) -> std::unique_ptr<index<half>>;
 
 /**
  * @brief Construct an hnswlib index from a CAGRA index
@@ -540,12 +538,11 @@ std::unique_ptr<index<half>> from_cagra(
  *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
  * @endcode
  */
-std::unique_ptr<index<uint8_t>> from_cagra(
-  raft::resources const& res,
-  const index_params& params,
-  const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& cagra_index,
-  std::optional<raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>> dataset =
-    std::nullopt);
+auto from_cagra(raft::resources const& res,
+                const index_params& params,
+                const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& cagra_index,
+                std::optional<raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>>
+                  dataset = std::nullopt) -> std::unique_ptr<index<uint8_t>>;
 
 /**
  * @brief Construct an hnswlib index from a CAGRA index
@@ -576,12 +573,11 @@ std::unique_ptr<index<uint8_t>> from_cagra(
  *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
  * @endcode
  */
-std::unique_ptr<index<int8_t>> from_cagra(
-  raft::resources const& res,
-  const index_params& params,
-  const cuvs::neighbors::cagra::index<int8_t, uint32_t>& cagra_index,
-  std::optional<raft::host_matrix_view<const int8_t, int64_t, raft::row_major>> dataset =
-    std::nullopt);
+auto from_cagra(raft::resources const& res,
+                const index_params& params,
+                const cuvs::neighbors::cagra::index<int8_t, uint32_t>& cagra_index,
+                std::optional<raft::host_matrix_view<const int8_t, int64_t, raft::row_major>>
+                  dataset = std::nullopt) -> std::unique_ptr<index<int8_t>>;
 
 /**
  * @}

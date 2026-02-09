@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -73,7 +73,7 @@ RAFT_KERNEL faster_dot_on_csr_kernel(dot_t* __restrict__ dot,
         }
       }
 
-      typedef cub::WarpReduce<dot_t> WarpReduce;
+      using WarpReduce = cub::WarpReduce<dot_t>;
       __shared__ typename WarpReduce::TempStorage temp_storage;
       dot_t warp_sum = WarpReduce(temp_storage).Sum(l_dot_);
 

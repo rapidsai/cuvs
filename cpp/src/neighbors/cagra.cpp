@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -31,11 +31,11 @@ inline auto graph_params_heuristic(raft::matrix_extent<int64_t> dataset,
   }
 }
 
-cagra::index_params index_params::from_hnsw_params(raft::matrix_extent<int64_t> dataset,
-                                                   int M,
-                                                   int ef_construction,
-                                                   hnsw_heuristic_type heuristic,
-                                                   cuvs::distance::DistanceType metric)
+auto index_params::from_hnsw_params(raft::matrix_extent<int64_t> dataset,
+                                    int M,
+                                    int ef_construction,
+                                    hnsw_heuristic_type heuristic,
+                                    cuvs::distance::DistanceType metric) -> cagra::index_params
 {
   cagra::index_params params;
   switch (heuristic) {

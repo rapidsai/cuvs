@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -33,9 +33,9 @@ ________________________________________________________________________________
 #else
 #include <cstdint>
 
-typedef void* cudaStream_t;
-typedef void* cudaEvent_t;
-typedef uint16_t half;
+using cudaStream_t = void*;
+using cudaEvent_t  = void*;
+using half         = uint16_t;
 #endif
 
 namespace cuvs::bench {

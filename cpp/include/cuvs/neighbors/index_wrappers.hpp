@@ -48,7 +48,7 @@ class IndexWrapper
   using matrix_index_type = typename IndexBase<T, IdxT, OutputIdxT>::matrix_index_type;
 
   /** Virtual destructor to enable proper cleanup of derived classes */
-  virtual ~IndexWrapper() = default;
+  ~IndexWrapper() override = default;
 
   /**
    * @brief Merge this index with other indices (optional functionality).
@@ -63,11 +63,11 @@ class IndexWrapper
    * @param[in] other_indices Vector of other indices to merge with this one
    * @return Shared pointer to merged index
    */
-  virtual std::shared_ptr<IndexBase<value_type, index_type, out_index_type>> merge(
+  [[nodiscard]] virtual auto merge(
     const raft::resources& handle,
     const cuvs::neighbors::merge_params& params,
     const std::vector<std::shared_ptr<IndexBase<value_type, index_type, out_index_type>>>&
-      other_indices) const
+      other_indices) const -> std::shared_ptr<IndexBase<value_type, index_type, out_index_type>>
   {
     // Default implementation: not supported
     RAFT_FAIL("Merge operation not supported for this index type");
@@ -84,7 +84,8 @@ class IndexWrapper
    * @param[in] params Search parameters to convert
    * @return Converted search parameters
    */
-  virtual const search_params& convert_search_params(const search_params& params) const
+  [[nodiscard]] virtual auto convert_search_params(const search_params& params) const
+    -> const search_params&
   {
     return params;
   }

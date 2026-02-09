@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -85,11 +85,11 @@ class faiss_cpu : public algo<T> {
 
   // TODO(snanditale): if the number of results is less than k, the remaining elements of
   // 'neighbors' will be filled with (size_t)-1
-  virtual void search(const T* queries,
-                      int batch_size,
-                      int k,
-                      algo_base::index_type* neighbors,
-                      float* distances) const;
+  void search(const T* queries,
+              int batch_size,
+              int k,
+              algo_base::index_type* neighbors,
+              float* distances) const override;
 
   [[nodiscard]] auto get_preference() const -> algo_property override
   {
@@ -140,7 +140,7 @@ void faiss_cpu<T>::build(const T* dataset, size_t nrow)
     index_ivf->cp.max_points_per_centroid = max_ppc;
     index_ivf->cp.min_points_per_centroid = min_ppc;
   }
-  faiss::IndexHNSWFlat* hnsw_index = dynamic_cast<faiss::IndexHNSWFlat*>(index_.get());
+  auto* hnsw_index = dynamic_cast<faiss::IndexHNSWFlat*>(index_.get());
   index_->train(nrow, dataset);  // faiss::IndexFlat::train() will do nothing
   assert(index_->is_trained);
   index_->add(nrow, dataset);
@@ -206,7 +206,7 @@ class faiss_cpu_ivf_flat : public faiss_cpu<T> {
   }
   void load(const std::string& file) override { this->template load_<faiss::IndexIVFFlat>(file); }
 
-  std::unique_ptr<algo<T>> copy()
+  auto copy() -> std::unique_ptr<algo<T>> override
   {
     return std::make_unique<faiss_cpu_ivf_flat<T>>(*this);  // use copy constructor
   }
@@ -235,7 +235,7 @@ class faiss_cpu_ivfpq : public faiss_cpu<T> {
   }
   void load(const std::string& file) override { this->template load_<faiss::IndexIVFPQ>(file); }
 
-  std::unique_ptr<algo<T>> copy()
+  auto copy() -> std::unique_ptr<algo<T>> override
   {
     return std::make_unique<faiss_cpu_ivfpq<T>>(*this);  // use copy constructor
   }
@@ -277,7 +277,7 @@ class faiss_cpu_ivfsq : public faiss_cpu<T> {
     this->template load_<faiss::IndexIVFScalarQuantizer>(file);
   }
 
-  std::unique_ptr<algo<T>> copy()
+  auto copy() -> std::unique_ptr<algo<T>> override
   {
     return std::make_unique<faiss_cpu_ivfsq<T>>(*this);  // use copy constructor
   }
@@ -306,7 +306,7 @@ class faiss_cpu_flat : public faiss_cpu<T> {
   }
   void load(const std::string& file) override { this->template load_<faiss::IndexFlat>(file); }
 
-  std::unique_ptr<algo<T>> copy()
+  auto copy() -> std::unique_ptr<algo<T>> override
   {
     return std::make_unique<faiss_cpu_flat<T>>(*this);  // use copy constructor
   }
@@ -325,9 +325,9 @@ class faiss_cpu_hnsw_flat : public faiss_cpu<T> {
   faiss_cpu_hnsw_flat(Metric metric, int dim, const build_param& param)
     : faiss_cpu<T>(metric, dim, param)
   {
-    this->index_ = std::make_shared<faiss::IndexHNSWFlat>(dim, param.M, this->metric_type_);
-    faiss::IndexHNSWFlat* hnsw_index = static_cast<faiss::IndexHNSWFlat*>(this->index_.get());
-    hnsw_index->hnsw.efConstruction  = param.efConstruction;
+    this->index_     = std::make_shared<faiss::IndexHNSWFlat>(dim, param.M, this->metric_type_);
+    auto* hnsw_index = static_cast<faiss::IndexHNSWFlat*>(this->index_.get());
+    hnsw_index->hnsw.efConstruction = param.efConstruction;
   }
 
   void set_search_param(const typename algo<T>::search_param& param,
@@ -344,7 +344,7 @@ class faiss_cpu_hnsw_flat : public faiss_cpu<T> {
   }
   void load(const std::string& file) override { this->template load_<faiss::IndexHNSWFlat>(file); }
 
-  std::unique_ptr<algo<T>> copy()
+  auto copy() -> std::unique_ptr<algo<T>> override
   {
     return std::make_unique<faiss_cpu_hnsw_flat<T>>(*this);  // use copy constructor
   }

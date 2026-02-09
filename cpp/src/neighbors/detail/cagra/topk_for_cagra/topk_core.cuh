@@ -173,32 +173,32 @@ RAFT_DEVICE_INLINE_FUNCTION void block_scan(const T input, T& output)
 {
   switch (blockDim.x) {
     case 32: {
-      typedef cub::BlockScan<T, 32> BlockScanT;
+      using BlockScanT = cub::BlockScan<T, 32>;
       __shared__ typename BlockScanT::TempStorage temp_storage;
       BlockScanT(temp_storage).InclusiveSum(input, output);
     } break;
     case 64: {
-      typedef cub::BlockScan<T, 64> BlockScanT;
+      using BlockScanT = cub::BlockScan<T, 64>;
       __shared__ typename BlockScanT::TempStorage temp_storage;
       BlockScanT(temp_storage).InclusiveSum(input, output);
     } break;
     case 128: {
-      typedef cub::BlockScan<T, 128> BlockScanT;
+      using BlockScanT = cub::BlockScan<T, 128>;
       __shared__ typename BlockScanT::TempStorage temp_storage;
       BlockScanT(temp_storage).InclusiveSum(input, output);
     } break;
     case 256: {
-      typedef cub::BlockScan<T, 256> BlockScanT;
+      using BlockScanT = cub::BlockScan<T, 256>;
       __shared__ typename BlockScanT::TempStorage temp_storage;
       BlockScanT(temp_storage).InclusiveSum(input, output);
     } break;
     case 512: {
-      typedef cub::BlockScan<T, 512> BlockScanT;
+      using BlockScanT = cub::BlockScan<T, 512>;
       __shared__ typename BlockScanT::TempStorage temp_storage;
       BlockScanT(temp_storage).InclusiveSum(input, output);
     } break;
     case 1024: {
-      typedef cub::BlockScan<T, 1024> BlockScanT;
+      using BlockScanT = cub::BlockScan<T, 1024>;
       __shared__ typename BlockScanT::TempStorage temp_storage;
       BlockScanT(temp_storage).InclusiveSum(input, output);
     } break;
@@ -329,7 +329,7 @@ RAFT_DEVICE_INLINE_FUNCTION void select_best_index_for_next_threshold_core(
   const uint32_t shift,
   const uint32_t topk)
 {
-  typedef cub::BlockScan<uint32_t, blockDim_x> BlockScanT;
+  using BlockScanT = cub::BlockScan<uint32_t, blockDim_x>;
   __shared__ typename BlockScanT::TempStorage temp_storage;
   if (num_bins == 2048) {
     constexpr int n_data = 2048 / blockDim_x;
@@ -621,14 +621,14 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t topk,
   const uint32_t thread_id   = threadIdx.x;
   uint32_t nx                = len_x;
   const uint32_t* const x    = _x;
-  const ValT* in_vals        = NULL;
+  const ValT* in_vals        = nullptr;
   if (_in_vals) { in_vals = _in_vals; }
-  uint32_t* y = NULL;
+  uint32_t* y = nullptr;
   if (_y) { y = _y; }
-  ValT* out_vals = NULL;
+  ValT* out_vals = nullptr;
   if (_out_vals) { out_vals = _out_vals; }
   uint8_t* state      = _state;
-  const uint32_t hint = (_hint == NULL ? ~0u : *_hint);
+  const uint32_t hint = (_hint == nullptr ? ~0u : *_hint);
 
   // Initialize shared memory
   for (int i = 2 * maxTopk + thread_id; i < 2 * maxTopk + 2048 + 8; i += num_threads) {
@@ -676,7 +676,7 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t topk,
     if (nx_below_threshold == topk) break;
   }
 
-  if ((_hint != NULL) && (thread_id == 0)) { *_hint = min(threshold, hint); }
+  if ((_hint != nullptr) && (thread_id == 0)) { *_hint = min(threshold, hint); }
 
   //
   // Output index that satisfies "x[i] < threshold".
@@ -890,12 +890,12 @@ __launch_bounds__(1024, 1) RAFT_KERNEL
   topk_cta_11_core<stateBitLen, vecLen, maxTopk, numSortThreads, ValT>(
     topk,
     len_x,
-    (_x == NULL ? NULL : _x + i_batch * ld_x),
-    (_in_vals == NULL ? NULL : _in_vals + i_batch * ld_iv),
-    (_y == NULL ? NULL : _y + i_batch * ld_y),
-    (_out_vals == NULL ? NULL : _out_vals + i_batch * ld_ov),
-    (_state == NULL ? NULL : _state + i_batch * get_state_size<stateBitLen>(len_x)),
-    (_hints == NULL ? NULL : _hints + i_batch),
+    (_x == nullptr ? nullptr : _x + i_batch * ld_x),
+    (_in_vals == nullptr ? nullptr : _in_vals + i_batch * ld_iv),
+    (_y == nullptr ? nullptr : _y + i_batch * ld_y),
+    (_out_vals == nullptr ? nullptr : _out_vals + i_batch * ld_ov),
+    (_state == nullptr ? nullptr : _state + i_batch * get_state_size<stateBitLen>(len_x)),
+    (_hints == nullptr ? nullptr : _hints + i_batch),
     sort,
     _smem);
 }

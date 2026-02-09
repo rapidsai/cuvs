@@ -7,6 +7,7 @@
 
 #include <cuvs/neighbors/index_wrappers.hpp>
 #include <memory>
+#include <utility>
 
 // Forward declarations to avoid circular dependencies
 namespace cuvs::neighbors::cagra {
@@ -32,7 +33,7 @@ struct merge_params : cuvs::neighbors::merge_params {
    * @brief Constructs merge parameters with given index parameters.
    * @param params Parameters for creating the output index.
    */
-  explicit merge_params(const cagra::index_params& params) : output_index_params(params) {}
+  explicit merge_params(cagra::index_params params) : output_index_params(std::move(params)) {}
 
   /// Parameters for creating the output index.
   cagra::index_params output_index_params;
@@ -42,7 +43,10 @@ struct merge_params : cuvs::neighbors::merge_params {
     cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL;
 
   /// Implementation of the polymorphic strategy() method
-  cuvs::neighbors::MergeStrategy strategy() const { return merge_strategy; }
+  [[nodiscard]] auto strategy() const -> cuvs::neighbors::MergeStrategy override
+  {
+    return merge_strategy;
+  }
 };
 
 /**
@@ -87,9 +91,9 @@ class IndexWrapper  // NOLINT(readability-identifier-naming)
     const cuvs::neighbors::filtering::base_filter& filter =
       cuvs::neighbors::filtering::none_sample_filter{}) const override;
 
-  index_type size() const noexcept override;
+  auto size() const noexcept -> index_type override;
 
-  cuvs::distance::DistanceType metric() const noexcept override;
+  [[nodiscard]] auto metric() const noexcept -> cuvs::distance::DistanceType override;
 
   /**
    * @brief Merge this CAGRA index with other CAGRA indices.
@@ -103,16 +107,16 @@ class IndexWrapper  // NOLINT(readability-identifier-naming)
    * @param[in] other_indices Vector of other indices to merge with this one
    * @return Shared pointer to merged index
    */
-  std::shared_ptr<cuvs::neighbors::IndexBase<value_type, index_type, out_index_type>> merge(
-    const raft::resources& handle,
-    const cuvs::neighbors::merge_params& params,
-    const std::vector<
-      std::shared_ptr<cuvs::neighbors::IndexBase<value_type, index_type, out_index_type>>>&
-      other_indices) const override;
+  auto merge(const raft::resources& handle,
+             const cuvs::neighbors::merge_params& params,
+             const std::vector<
+               std::shared_ptr<cuvs::neighbors::IndexBase<value_type, index_type, out_index_type>>>&
+               other_indices) const
+    -> std::shared_ptr<cuvs::neighbors::IndexBase<value_type, index_type, out_index_type>> override;
 
  protected:
-  const cuvs::neighbors::search_params& convert_search_params(
-    const cuvs::neighbors::search_params& params) const override
+  [[nodiscard]] auto convert_search_params(const cuvs::neighbors::search_params& params) const
+    -> const cuvs::neighbors::search_params& override
   {
     // For CAGRA, we expect the params to be cagra::search_params
     // This is handled in the search method via static_cast

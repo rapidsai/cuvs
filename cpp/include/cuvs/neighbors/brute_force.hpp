@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -39,11 +39,11 @@ struct index : cuvs::neighbors::index {
   using value_type         = T;
 
  public:
-  index(const index&)            = delete;
-  index(index&&)                 = default;
-  index& operator=(const index&) = delete;
-  index& operator=(index&&)      = default;
-  ~index()                       = default;
+  index(const index&)                    = delete;
+  index(index&&)                         = default;
+  auto operator=(const index&) -> index& = delete;
+  auto operator=(index&&) -> index&      = default;
+  ~index()                               = default;
 
   /**
    * @brief Construct an empty index.
@@ -129,31 +129,33 @@ struct index : cuvs::neighbors::index {
                       raft::host_matrix_view<const T, int64_t, raft::row_major> dataset);
 
   /** Distance metric used for retrieval */
-  cuvs::distance::DistanceType metric() const noexcept { return metric_; }
+  [[nodiscard]] auto metric() const noexcept -> cuvs::distance::DistanceType { return metric_; }
 
   /** Metric argument */
-  DistT metric_arg() const noexcept { return metric_arg_; }
+  [[nodiscard]] auto metric_arg() const noexcept -> DistT { return metric_arg_; }
 
   /** Total length of the index (number of vectors). */
-  size_t size() const noexcept { return dataset_view_.extent(0); }
+  [[nodiscard]] auto size() const noexcept -> size_t { return dataset_view_.extent(0); }
 
   /** Dimensionality of the data. */
-  size_t dim() const noexcept { return dataset_view_.extent(1); }
+  [[nodiscard]] auto dim() const noexcept -> size_t { return dataset_view_.extent(1); }
 
   /** Dataset [size, dim] */
-  raft::device_matrix_view<const T, int64_t, raft::row_major> dataset() const noexcept
+  [[nodiscard]] auto dataset() const noexcept
+    -> raft::device_matrix_view<const T, int64_t, raft::row_major>
   {
     return dataset_view_;
   }
 
   /** Dataset norms */
-  raft::device_vector_view<const DistT, int64_t, raft::row_major> norms() const
+  [[nodiscard]] auto norms() const
+    -> raft::device_vector_view<const DistT, int64_t, raft::row_major>
   {
     return norms_view_.value();
   }
 
   /** Whether ot not this index has dataset norms */
-  inline bool has_norms() const noexcept { return norms_view_.has_value(); }
+  [[nodiscard]] inline auto has_norms() const noexcept -> bool { return norms_view_.has_value(); }
 
  private:
   cuvs::distance::DistanceType metric_;
@@ -599,11 +601,11 @@ void search(raft::resources const& handle,
 template <typename T, typename IdxT>
 struct sparse_index {
  public:
-  sparse_index(const sparse_index&)            = delete;
-  sparse_index(sparse_index&&)                 = default;
-  sparse_index& operator=(const sparse_index&) = delete;
-  sparse_index& operator=(sparse_index&&)      = default;
-  ~sparse_index()                              = default;
+  sparse_index(const sparse_index&)                    = delete;
+  sparse_index(sparse_index&&)                         = default;
+  auto operator=(const sparse_index&) -> sparse_index& = delete;
+  auto operator=(sparse_index&&) -> sparse_index&      = default;
+  ~sparse_index()                                      = default;
 
   /** Construct a sparse brute force sparse_index from dataset */
   sparse_index(raft::resources const& res,
@@ -612,12 +614,12 @@ struct sparse_index {
                T metric_arg);
 
   /** Distance metric used for retrieval */
-  cuvs::distance::DistanceType metric() const noexcept { return metric_; }
+  [[nodiscard]] auto metric() const noexcept -> cuvs::distance::DistanceType { return metric_; }
 
   /** Metric argument */
-  T metric_arg() const noexcept { return metric_arg_; }
+  auto metric_arg() const noexcept -> T { return metric_arg_; }
 
-  raft::device_csr_matrix_view<const T, IdxT, IdxT, IdxT> dataset() const noexcept
+  auto dataset() const noexcept -> raft::device_csr_matrix_view<const T, IdxT, IdxT, IdxT>
   {
     return dataset_;
   }

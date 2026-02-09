@@ -69,9 +69,9 @@ struct quantizer {
  *
  * @return quantizer
  */
-quantizer<double> train(raft::resources const& res,
-                        const params params,
-                        raft::device_matrix_view<const double, int64_t> dataset);
+auto train(raft::resources const& res,
+           const params params,
+           raft::device_matrix_view<const double, int64_t> dataset) -> quantizer<double>;
 
 /**
  * @brief Initializes a binary quantizer to be used later for quantizing the dataset.
@@ -89,9 +89,9 @@ quantizer<double> train(raft::resources const& res,
  *
  * @return quantizer
  */
-quantizer<double> train(raft::resources const& res,
-                        const params params,
-                        raft::host_matrix_view<const double, int64_t> dataset);
+auto train(raft::resources const& res,
+           const params params,
+           raft::host_matrix_view<const double, int64_t> dataset) -> quantizer<double>;
 
 /**
  * @brief Applies binary quantization transform to given dataset. If a dataset element is positive,
@@ -163,9 +163,9 @@ void transform(raft::resources const& res,
  *
  * @return quantizer
  */
-quantizer<float> train(raft::resources const& res,
-                       const params params,
-                       raft::device_matrix_view<const float, int64_t> dataset);
+auto train(raft::resources const& res,
+           const params params,
+           raft::device_matrix_view<const float, int64_t> dataset) -> quantizer<float>;
 
 /**
  * @brief Initializes a binary quantizer to be used later for quantizing the dataset.
@@ -183,9 +183,9 @@ quantizer<float> train(raft::resources const& res,
  *
  * @return quantizer
  */
-quantizer<float> train(raft::resources const& res,
-                       const params params,
-                       raft::host_matrix_view<const float, int64_t> dataset);
+auto train(raft::resources const& res,
+           const params params,
+           raft::host_matrix_view<const float, int64_t> dataset) -> quantizer<float>;
 
 /**
  * @brief Applies binary quantization transform to given dataset. If a dataset element is positive,
@@ -261,9 +261,9 @@ void transform(raft::resources const& res,
  *
  * @return quantizer
  */
-quantizer<half> train(raft::resources const& res,
-                      const params params,
-                      raft::device_matrix_view<const half, int64_t> dataset);
+auto train(raft::resources const& res,
+           const params params,
+           raft::device_matrix_view<const half, int64_t> dataset) -> quantizer<half>;
 
 /**
  * @brief Initializes a binary quantizer to be used later for quantizing the dataset.
@@ -281,9 +281,9 @@ quantizer<half> train(raft::resources const& res,
  *
  * @return quantizer
  */
-quantizer<half> train(raft::resources const& res,
-                      const params params,
-                      raft::host_matrix_view<const half, int64_t> dataset);
+auto train(raft::resources const& res,
+           const params params,
+           raft::host_matrix_view<const half, int64_t> dataset) -> quantizer<half>;
 
 /**
  * @brief Applies binary quantization transform to given dataset.

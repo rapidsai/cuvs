@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -59,13 +59,13 @@ void _refine(bool on_device,
 }
 }  // namespace
 
-extern "C" cuvsError_t cuvsRefine(cuvsResources_t res,
+extern "C" auto cuvsRefine(cuvsResources_t res,
                                   DLManagedTensor* dataset_tensor,
                                   DLManagedTensor* queries_tensor,
                                   DLManagedTensor* candidates_tensor,
                                   cuvsDistanceType metric,
                                   DLManagedTensor* indices_tensor,
-                                  DLManagedTensor* distances_tensor)
+                                  DLManagedTensor* distances_tensor) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset    = dataset_tensor->dl_tensor;

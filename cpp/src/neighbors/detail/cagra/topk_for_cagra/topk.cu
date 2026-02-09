@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -53,7 +53,7 @@ void _cuann_find_topk(uint32_t topK,
   constexpr int stateBitLen = STATE_BIT_LENGTH;
   assert(stateBitLen == 0 || stateBitLen == 8);
 
-  uint8_t* state = NULL;
+  uint8_t* state = nullptr;
   if (stateBitLen == 8) { state = (uint8_t*)workspace; }
 
   dim3 threads(numThreads, 1, 1);

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -13,6 +13,7 @@
 #include <raft/util/integer_utils.hpp>
 
 #include <algorithm>
+#include <utility>
 
 #if defined(__arm__) || defined(__aarch64__)
 #include <arm_neon.h>
@@ -27,7 +28,7 @@ namespace detail {
 // -----------------------------------------------------------------------------
 
 template <typename DC, typename DistanceT, typename DataT>
-DistanceT euclidean_distance_squared_generic(DataT const* a, DataT const* b, size_t n)
+auto euclidean_distance_squared_generic(DataT const* a, DataT const* b, size_t n) -> DistanceT
 {
   size_t constexpr max_vreg_len = 512 / (8 * sizeof(DistanceT));
 
@@ -62,7 +63,7 @@ struct distance_comp_cosine;
 
 // fallback
 template <typename DC, typename DistanceT, typename DataT>
-DistanceT euclidean_distance_squared(DataT const* a, DataT const* b, size_t n)
+auto euclidean_distance_squared(DataT const* a, DataT const* b, size_t n) -> DistanceT
 {
   return euclidean_distance_squared_generic<DC, DistanceT, DataT>(a, b, n);
 }
@@ -331,7 +332,7 @@ inline float euclidean_distance_squared<distance_comp_inner, float, ::std::uint8
 
 // Cosine distance: 1 - (a·b)/(||a||·||b||)
 template <typename DistanceT, typename DataT>
-inline DistanceT cosine_distance(DataT const* a, DataT const* b, size_t n)
+inline auto cosine_distance(DataT const* a, DataT const* b, size_t n) -> DistanceT
 {
   using AccT = double;
   AccT dot   = AccT{0};
@@ -372,7 +373,7 @@ template <typename DC, typename IdxT, typename DataT, typename DistanceT, typena
   // If the number of queries is small, separate the distance calculation and
   // the top-k calculation into separate loops, and apply finer-grained thread
   // parallelism to the distance calculation loop.
-  if (n_queries < size_t(suggested_n_threads)) {
+  if (std::cmp_less(n_queries, suggested_n_threads)) {
     std::vector<std::vector<std::tuple<DistanceT, IdxT>>> refined_pairs(
       n_queries, std::vector<std::tuple<DistanceT, IdxT>>(orig_k));
 
@@ -422,7 +423,7 @@ template <typename DC, typename IdxT, typename DataT, typename DistanceT, typena
     return;
   }
 
-  if (size_t(suggested_n_threads) > n_queries) { suggested_n_threads = n_queries; }
+  if (std::cmp_greater(suggested_n_threads, n_queries)) { suggested_n_threads = n_queries; }
 
   {
     std::vector<std::vector<std::tuple<DistanceT, IdxT>>> refined_pairs(

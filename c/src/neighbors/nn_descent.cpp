@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -27,10 +27,10 @@
 namespace {
 
 template <typename T, typename IdxT = uint32_t>
-void* _build(cuvsResources_t res,
+auto _build(cuvsResources_t res,
              cuvsNNDescentIndexParams params,
              DLManagedTensor* dataset_tensor,
-             DLManagedTensor* graph_tensor)
+             DLManagedTensor* graph_tensor) -> void*
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   auto dataset = dataset_tensor->dl_tensor;
@@ -47,7 +47,7 @@ void* _build(cuvsResources_t res,
 
   using graph_type = raft::host_matrix_view<IdxT, int64_t, raft::row_major>;
   std::optional<graph_type> graph;
-  if (graph_tensor != NULL) { graph = cuvs::core::from_dlpack<graph_type>(graph_tensor); }
+  if (graph_tensor != nullptr) { graph = cuvs::core::from_dlpack<graph_type>(graph_tensor); }
 
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
     using dataset_type = raft::device_matrix_view<T const, int64_t, raft::row_major>;
@@ -115,12 +115,12 @@ void _get_distances(cuvsResources_t res, cuvsNNDescentIndex_t index, DLManagedTe
 }
 }  // namespace
 
-extern "C" cuvsError_t cuvsNNDescentIndexCreate(cuvsNNDescentIndex_t* index)
+extern "C" auto cuvsNNDescentIndexCreate(cuvsNNDescentIndex_t* index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { *index = new cuvsNNDescentIndex{}; });
 }
 
-extern "C" cuvsError_t cuvsNNDescentIndexDestroy(cuvsNNDescentIndex_t index_c_ptr)
+extern "C" auto cuvsNNDescentIndexDestroy(cuvsNNDescentIndex_t index_c_ptr) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto index = *index_c_ptr;
@@ -135,11 +135,11 @@ extern "C" cuvsError_t cuvsNNDescentIndexDestroy(cuvsNNDescentIndex_t index_c_pt
   });
 }
 
-extern "C" cuvsError_t cuvsNNDescentBuild(cuvsResources_t res,
+extern "C" auto cuvsNNDescentBuild(cuvsResources_t res,
                                           cuvsNNDescentIndexParams_t params,
                                           DLManagedTensor* dataset_tensor,
                                           DLManagedTensor* graph_tensor,
-                                          cuvsNNDescentIndex_t index)
+                                          cuvsNNDescentIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     index->dtype.code = kDLUInt;
@@ -165,7 +165,7 @@ extern "C" cuvsError_t cuvsNNDescentBuild(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsNNDescentIndexParamsCreate(cuvsNNDescentIndexParams_t* params)
+extern "C" auto cuvsNNDescentIndexParamsCreate(cuvsNNDescentIndexParams_t* params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     // get defaults from cpp parameters struct
@@ -183,14 +183,14 @@ extern "C" cuvsError_t cuvsNNDescentIndexParamsCreate(cuvsNNDescentIndexParams_t
   });
 }
 
-extern "C" cuvsError_t cuvsNNDescentIndexParamsDestroy(cuvsNNDescentIndexParams_t params)
+extern "C" auto cuvsNNDescentIndexParamsDestroy(cuvsNNDescentIndexParams_t params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
 }
 
-extern "C" cuvsError_t cuvsNNDescentIndexGetGraph(cuvsResources_t res,
+extern "C" auto cuvsNNDescentIndexGetGraph(cuvsResources_t res,
                                                   cuvsNNDescentIndex_t index,
-                                                  DLManagedTensor* graph)
+                                                  DLManagedTensor* graph) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (cuvs::core::is_dlpack_device_compatible(graph->dl_tensor)) {
@@ -203,9 +203,9 @@ extern "C" cuvsError_t cuvsNNDescentIndexGetGraph(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsNNDescentIndexGetDistances(cuvsResources_t res,
+extern "C" auto cuvsNNDescentIndexGetDistances(cuvsResources_t res,
                                                       cuvsNNDescentIndex_t index,
-                                                      DLManagedTensor* distances)
+                                                      DLManagedTensor* distances) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (cuvs::core::is_dlpack_device_compatible(distances->dl_tensor)) {

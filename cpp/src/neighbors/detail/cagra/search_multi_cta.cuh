@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -121,8 +121,8 @@ struct search
     RAFT_LOG_DEBUG("global_itopk_size: %lu", (uint64_t)global_itopk_size);
     num_cta_per_query =
       max(params.search_width, raft::ceildiv(global_itopk_size, (size_t)multi_cta_itopk_size));
-    result_buffer_size = itopk_size + (search_width * graph_degree);
-    typedef raft::Pow2<32> AlignBytes;
+    result_buffer_size             = itopk_size + (search_width * graph_degree);
+    using AlignBytes               = raft::Pow2<32>;
     unsigned result_buffer_size_32 = AlignBytes::roundUp(result_buffer_size);
     // constexpr unsigned max_result_buffer_size = 256;
     RAFT_EXPECTS(result_buffer_size_32 <= 256, "Result buffer size cannot exceed 256");
@@ -258,7 +258,7 @@ struct search
                      topk,
                      topk_workspace.data(),
                      true,
-                     NULL,
+                     nullptr,
                      stream);
     if (source_indices_ptr != nullptr) {
       raft::linalg::map(

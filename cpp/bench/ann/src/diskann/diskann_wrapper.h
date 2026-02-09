@@ -24,7 +24,7 @@
 
 namespace cuvs::bench {
 
-diskann::Metric parse_metric_to_diskann(cuvs::bench::Metric metric)
+auto parse_metric_to_diskann(cuvs::bench::Metric metric) -> diskann::Metric
 {
   if (metric == cuvs::bench::Metric::kInnerProduct) {
     return diskann::Metric::INNER_PRODUCT;
@@ -67,7 +67,10 @@ class diskann_memory : public algo<T> {
   void save(const std::string& index_file) const override;
   void load(const std::string& index_file) override;
   diskann_memory(const diskann_memory<T>& other) = default;
-  std::unique_ptr<algo<T>> copy() override { return std::make_unique<diskann_memory<T>>(*this); }
+  auto copy() -> std::unique_ptr<algo<T>> override
+  {
+    return std::make_unique<diskann_memory<T>>(*this);
+  }
 
   [[nodiscard]] auto get_preference() const -> algo_property override
   {
@@ -206,7 +209,10 @@ class diskann_ssd : public algo<T> {
   void save(const std::string& index_file) const override;
   void load(const std::string& index_file) override;
   diskann_ssd(const diskann_ssd<T>& other) = default;
-  std::unique_ptr<algo<T>> copy() override { return std::make_unique<diskann_ssd<T>>(*this); }
+  auto copy() -> std::unique_ptr<algo<T>> override
+  {
+    return std::make_unique<diskann_ssd<T>>(*this);
+  }
 
   [[nodiscard]] auto get_preference() const -> algo_property override
   {

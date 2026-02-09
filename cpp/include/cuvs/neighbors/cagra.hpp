@@ -176,12 +176,13 @@ struct index_params : cuvs::neighbors::index_params {
    *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, cagra_index);
    * @endcode
    */
-  static cagra::index_params from_hnsw_params(
+  static auto from_hnsw_params(
     raft::matrix_extent<int64_t> dataset,
     int M,
     int ef_construction,
     hnsw_heuristic_type heuristic       = hnsw_heuristic_type::SIMILAR_SEARCH_PERFORMANCE,
-    cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
+    cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
+    -> cagra::index_params;
 };
 
 /**

@@ -102,7 +102,7 @@ RAFT_KERNEL balanced_coo_generalized_spmv_kernel(strategy_t strategy,
                                                  accum_f accum_func,
                                                  write_f write_func)
 {
-  typedef cub::WarpReduce<value_t> warp_reduce;
+  using warp_reduce = cub::WarpReduce<value_t>;
 
   value_idx cur_row_a        = indptrA.get_row_idx(n_blocks_per_row);
   value_idx cur_chunk_offset = blockIdx.x % n_blocks_per_row;

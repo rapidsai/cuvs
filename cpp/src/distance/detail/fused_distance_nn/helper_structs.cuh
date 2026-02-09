@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -26,7 +26,7 @@ namespace detail {
 
 template <typename LabelT, typename DataT>
 struct KVPMinReduceImpl {
-  typedef raft::KeyValuePair<LabelT, DataT> KVP;
+  using KVP = raft::KeyValuePair<LabelT, DataT>;
   DI KVP operator()(LabelT rit, const KVP& a, const KVP& b) { return b.value < a.value ? b : a; }
   DI KVP operator()(const KVP& a, const KVP& b) { return b.value < a.value ? b : a; }
 
@@ -34,7 +34,7 @@ struct KVPMinReduceImpl {
 
 template <typename LabelT, typename DataT>
 struct MinAndDistanceReduceOpImpl {
-  typedef typename raft::KeyValuePair<LabelT, DataT> KVP;
+  using KVP = typename raft::KeyValuePair<LabelT, DataT>;
 
   DI void operator()(LabelT rid, KVP* out, const KVP& other) const
   {
@@ -87,7 +87,7 @@ struct MinAndDistanceReduceOpImpl {
 
 template <typename LabelT, typename DataT>
 struct MinReduceOpImpl {
-  typedef typename raft::KeyValuePair<LabelT, DataT> KVP;
+  using KVP = typename raft::KeyValuePair<LabelT, DataT>;
   DI void operator()(LabelT rid, DataT* out, const KVP& other)
   {
     if (other.value < *out) { *out = other.value; }
@@ -116,7 +116,7 @@ void initialize(OutT* min, IdxT m, DataT maxVal, ReduceOpT redOp, cudaStream_t s
 // store_with_byte_offset() passed to cg::reduce() & select_reduce.
 template <typename AccType, typename Index, typename OutType>
 struct kvp_cg_min_reduce_op {
-  typedef typename raft::KeyValuePair<Index, AccType> KVP;
+  using KVP = typename raft::KeyValuePair<Index, AccType>;
 
   __host__ __device__ kvp_cg_min_reduce_op() noexcept {};
 

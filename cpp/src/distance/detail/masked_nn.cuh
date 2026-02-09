@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -52,7 +52,7 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL masked_l2_nn_kernel(OutT* min,
 {
   extern __shared__ char smem[];
 
-  typedef raft::KeyValuePair<IdxT, DataT> KVPair;
+  using KVPair = raft::KeyValuePair<IdxT, DataT>;
   KVPair val[P::AccRowsPerTh];
 #pragma unroll
   for (int i = 0; i < P::AccRowsPerTh; ++i) {
@@ -240,7 +240,7 @@ void masked_l2_nn_impl(raft::resources const& handle,
                        bool sqrt,
                        bool initOutBuffer)
 {
-  typedef typename raft::linalg::Policy4x4<DataT, 1>::Policy P;
+  using P = typename raft::linalg::Policy4x4<DataT, 1>::Policy;
 
   static_assert(P::Mblk == 64, "masked_l2_nn_impl only supports a policy with 64 rows per block.");
 

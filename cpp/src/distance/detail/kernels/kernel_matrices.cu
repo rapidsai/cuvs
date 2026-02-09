@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2019-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2019-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -705,7 +705,7 @@ template <typename math_t>
                                     n1,
                                     n2,
                                     n_cols,
-                                    NULL,
+                                    nullptr,
                                     0,
                                     fin_op,
                                     is_row_major);

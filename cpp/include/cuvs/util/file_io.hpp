@@ -33,7 +33,7 @@ class fd_streambuf : public std::streambuf {
   size_t buffer_size_;
 
  protected:
-  int_type underflow() override
+  auto underflow() -> int_type override
   {
     if (gptr() < egptr()) return traits_type::to_int_type(*gptr());
     ssize_t n = ::read(fd_, buffer_.get(), buffer_size_);
@@ -49,15 +49,15 @@ class fd_streambuf : public std::streambuf {
     setg(buffer_.get(), buffer_.get(), buffer_.get());
   }
 
-  ~fd_streambuf()
+  ~fd_streambuf() override
   {
     if (fd_ != -1) ::close(fd_);
   }
 
-  fd_streambuf(const fd_streambuf&)                = delete;
-  fd_streambuf& operator=(const fd_streambuf&)     = delete;
-  fd_streambuf(fd_streambuf&&) noexcept            = default;
-  fd_streambuf& operator=(fd_streambuf&&) noexcept = default;
+  fd_streambuf(const fd_streambuf&)                        = delete;
+  auto operator=(const fd_streambuf&) -> fd_streambuf&     = delete;
+  fd_streambuf(fd_streambuf&&) noexcept                    = default;
+  auto operator=(fd_streambuf&&) noexcept -> fd_streambuf& = default;
 };
 
 /**
@@ -69,15 +69,15 @@ class fd_istream : public std::istream {
  public:
   explicit fd_istream(int fd) : std::istream(&buf_), buf_(fd) {}
 
-  fd_istream(const fd_istream&)            = delete;
-  fd_istream& operator=(const fd_istream&) = delete;
+  fd_istream(const fd_istream&)                    = delete;
+  auto operator=(const fd_istream&) -> fd_istream& = delete;
 
   fd_istream(fd_istream&& o) noexcept : std::istream(std::move(o)), buf_(std::move(o.buf_))
   {
     rdbuf(&buf_);
   }
 
-  fd_istream& operator=(fd_istream&& o) noexcept
+  auto operator=(fd_istream&& o) noexcept -> fd_istream&
   {
     std::istream::operator=(std::move(o));
     buf_ = std::move(o.buf_);
@@ -104,15 +104,15 @@ class file_descriptor {
     }
   }
 
-  file_descriptor(const file_descriptor&)            = delete;
-  file_descriptor& operator=(const file_descriptor&) = delete;
+  file_descriptor(const file_descriptor&)                    = delete;
+  auto operator=(const file_descriptor&) -> file_descriptor& = delete;
 
   file_descriptor(file_descriptor&& other) noexcept
     : fd_{std::exchange(other.fd_, -1)}, path_{std::move(other.path_)}
   {
   }
 
-  file_descriptor& operator=(file_descriptor&& other) noexcept
+  auto operator=(file_descriptor&& other) noexcept -> file_descriptor&
   {
     std::swap(this->fd_, other.fd_);
     std::swap(this->path_, other.path_);
@@ -121,8 +121,8 @@ class file_descriptor {
 
   ~file_descriptor() noexcept { close(); }
 
-  [[nodiscard]] int get() const noexcept { return fd_; }
-  [[nodiscard]] bool is_valid() const noexcept { return fd_ != -1; }
+  [[nodiscard]] auto get() const noexcept -> int { return fd_; }
+  [[nodiscard]] auto is_valid() const noexcept -> bool { return fd_ != -1; }
 
   void close() noexcept
   {
@@ -132,14 +132,14 @@ class file_descriptor {
     }
   }
 
-  [[nodiscard]] int release() noexcept
+  [[nodiscard]] auto release() noexcept -> int
   {
     const int fd = fd_;
     fd_          = -1;
     return fd;
   }
 
-  [[nodiscard]] std::string get_path() const { return path_; }
+  [[nodiscard]] auto get_path() const -> std::string { return path_; }
 
   /**
    * @brief Create an input stream from this file descriptor
@@ -150,7 +150,7 @@ class file_descriptor {
    *
    * @return fd_istream (movable istream)
    */
-  [[nodiscard]] fd_istream make_istream() const
+  [[nodiscard]] auto make_istream() const -> fd_istream
   {
     RAFT_EXPECTS(is_valid(), "Invalid file descriptor");
 
@@ -180,8 +180,8 @@ class file_descriptor {
  * @return Pair of (file_descriptor, header_size)
  */
 template <typename T>
-std::pair<file_descriptor, size_t> create_numpy_file(const std::string& path,
-                                                     const std::vector<size_t>& shape)
+auto create_numpy_file(const std::string& path, const std::vector<size_t>& shape)
+  -> std::pair<file_descriptor, size_t>
 {
   // Open file
   file_descriptor fd(path, O_CREAT | O_RDWR | O_TRUNC, 0644);
@@ -261,9 +261,7 @@ void write_large_file(const file_descriptor& fd,
  */
 class buffered_ofstream {
  public:
-  buffered_ofstream(std::ostream* os, size_t buffer_size) : os_(os), buffer_(buffer_size), pos_(0)
-  {
-  }
+  buffered_ofstream(std::ostream* os, size_t buffer_size) : os_(os), buffer_(buffer_size) {}
 
   ~buffered_ofstream() noexcept { flush(); }
 
@@ -291,7 +289,7 @@ class buffered_ofstream {
  private:
   std::vector<char> buffer_;
   std::ostream* os_;
-  size_t pos_;
+  size_t pos_{0};
 };
 
 }  // namespace cuvs::util

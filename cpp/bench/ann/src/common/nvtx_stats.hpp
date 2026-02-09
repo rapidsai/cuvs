@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -33,7 +33,7 @@ namespace detail {
 
 // Strip parameters from NVTX range names for grouping
 // Removes everything inside and including (), <>, and {}
-inline std::string strip_nvtx_parameters(const std::string& name)
+inline auto strip_nvtx_parameters(const std::string& name) -> std::string
 {
   if (name.empty()) { return ""; }
 
@@ -208,8 +208,8 @@ inline auto extract_cpu_gpu_stats(sqlite3* db,
 }
 
 // Common setup: open database, register functions, find domain ID, discover GPU tables
-inline std::tuple<sqlite3*, int64_t, std::vector<std::string>> setup_nvtx_database(
-  const std::string& sqlite_file)
+inline auto setup_nvtx_database(const std::string& sqlite_file)
+  -> std::tuple<sqlite3*, int64_t, std::vector<std::string>>
 {
   sqlite3* db = nullptr;
   int rc      = sqlite3_open_v2(sqlite_file.c_str(), &db, SQLITE_OPEN_READONLY, nullptr);
@@ -274,7 +274,7 @@ inline std::tuple<sqlite3*, int64_t, std::vector<std::string>> setup_nvtx_databa
             sqlite3_finalize(cols_stmt);
           }
 
-          if (has_start && has_end && has_corr) { activity_tables.push_back(table_name); }
+          if (has_start && has_end && has_corr) { activity_tables.emplace_back(table_name); }
         }
       }
       sqlite3_finalize(tables_stmt);
@@ -321,7 +321,7 @@ inline auto filter_stats(const std::map<std::string, std::tuple<int64_t, int64_t
 }
 
 // Get process name from PID
-inline std::string get_process_name(pid_t pid)
+inline auto get_process_name(pid_t pid) -> std::string
 {
   std::ifstream comm_file("/proc/" + std::to_string(pid) + "/comm");
   std::string name;
@@ -330,7 +330,7 @@ inline std::string get_process_name(pid_t pid)
 }
 
 // Get process executable path from PID
-inline std::string get_process_exe_path(pid_t pid)
+inline auto get_process_exe_path(pid_t pid) -> std::string
 {
   char buffer[PATH_MAX];
   ssize_t len =
@@ -343,7 +343,7 @@ inline std::string get_process_exe_path(pid_t pid)
 }
 
 // Get parent PID from a given PID
-inline pid_t get_parent_pid(pid_t pid)
+inline auto get_parent_pid(pid_t pid) -> pid_t
 {
   std::ifstream stat_file("/proc/" + std::to_string(pid) + "/stat");
   if (stat_file.is_open()) {
@@ -364,7 +364,7 @@ inline pid_t get_parent_pid(pid_t pid)
 }
 
 // Check if a process has 'launch' in its command line
-inline bool has_launch_arg(pid_t pid)
+inline auto has_launch_arg(pid_t pid) -> bool
 {
   std::ifstream cmdline_file("/proc/" + std::to_string(pid) + "/cmdline");
   if (cmdline_file.is_open()) {
@@ -378,7 +378,7 @@ inline bool has_launch_arg(pid_t pid)
 
 // Detect if the program was launched by nsys with 'launch' subcommand
 // by walking up the process tree
-inline std::optional<std::string> detect_nsys_launch()
+inline auto detect_nsys_launch() -> std::optional<std::string>
 {
   pid_t parent_pid = getppid();
 
@@ -414,13 +414,13 @@ struct nsys_launcher {
     nsys_exe = detail::detect_nsys_launch();
   }
 
-  bool is_enabled() const
+  auto is_enabled() const -> bool
   {
     std::lock_guard<std::mutex> lock(mtx);
     return nsys_exe.has_value();
   }
 
-  bool start(const std::string& output_path) const
+  auto start(const std::string& output_path) const -> bool
   {
     std::lock_guard<std::mutex> lock(mtx);
     if (nsys_exe.has_value()) {
@@ -438,7 +438,7 @@ struct nsys_launcher {
     return false;
   }
 
-  bool stop() const
+  auto stop() const -> bool
   {
     std::lock_guard<std::mutex> lock(mtx);
     if (nsys_exe.has_value()) {
@@ -467,7 +467,7 @@ struct nsys_launcher {
  * Returns std::nullopt for 'nsys profile' or other modes to avoid interference.
  *
  */
-inline const nsys_launcher& get_nsys_launcher()
+inline auto get_nsys_launcher() -> const nsys_launcher&
 {
   static const nsys_launcher nsys_launcher;
   return nsys_launcher;

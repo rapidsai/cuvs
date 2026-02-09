@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -203,12 +203,12 @@ __launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL fusedL2kNN(const DataT* x,
   using AccT = typename OpT::AccT;
   extern __shared__ char smem[];
 
-  typedef cub::KeyValuePair<uint32_t, AccT> Pair;
+  using Pair              = cub::KeyValuePair<uint32_t, AccT>;
   constexpr auto identity = std::numeric_limits<AccT>::max();
   constexpr auto keyMax   = std::numeric_limits<uint32_t>::max();
   constexpr auto Dir      = false;
   using namespace cuvs::neighbors::detail::faiss_select;
-  typedef WarpSelect<AccT, uint32_t, Dir, Comparator<AccT>, NumWarpQ, NumThreadQ, 32> myWarpSelect;
+  using myWarpSelect = WarpSelect<AccT, uint32_t, Dir, Comparator<AccT>, NumWarpQ, NumThreadQ, 32>;
 
   auto rowEpilog_lambda =
     [m, n, &distance_op, numOfNN, out_dists, out_inds, mutexes] __device__(IdxT gridStrideY) {
@@ -525,16 +525,16 @@ void fusedL2UnexpKnnImpl(const DataT* x,
                          void* workspace,
                          size_t& worksize)
 {
-  typedef typename raft::linalg::Policy2x8<AccT, 1>::Policy RowPolicy;
-  typedef typename raft::linalg::Policy4x4<AccT, VecLen>::ColPolicy ColPolicy;
+  using RowPolicy = typename raft::linalg::Policy2x8<AccT, 1>::Policy;
+  using ColPolicy = typename raft::linalg::Policy4x4<AccT, VecLen>::ColPolicy;
 
-  typedef typename std::conditional<true, RowPolicy, ColPolicy>::type KPolicy;
+  using KPolicy = typename std::conditional<true, RowPolicy, ColPolicy>::type;
 
   ASSERT(isRowMajor, "Only Row major inputs are allowed");
 
   dim3 blk(KPolicy::Nthreads);
   // Accumulation operation lambda
-  typedef cub::KeyValuePair<uint32_t, AccT> Pair;
+  using Pair = cub::KeyValuePair<uint32_t, AccT>;
 
   cuvs::distance::detail::ops::l2_unexp_distance_op<DataT, AccT, IdxT> distance_op{sqrt};
   raft::identity_op fin_op{};
@@ -710,10 +710,10 @@ void fusedL2ExpKnnImpl(const DataT* x,
                        void* workspace,
                        size_t& worksize)
 {
-  typedef typename raft::linalg::Policy2x8<AccT, 1>::Policy RowPolicy;
-  typedef typename raft::linalg::Policy4x4<AccT, VecLen>::ColPolicy ColPolicy;
+  using RowPolicy = typename raft::linalg::Policy2x8<AccT, 1>::Policy;
+  using ColPolicy = typename raft::linalg::Policy4x4<AccT, VecLen>::ColPolicy;
 
-  typedef typename std::conditional<true, RowPolicy, ColPolicy>::type KPolicy;
+  using KPolicy = typename std::conditional<true, RowPolicy, ColPolicy>::type;
 
   ASSERT(isRowMajor, "Only Row major inputs are allowed");
 
@@ -723,7 +723,7 @@ void fusedL2ExpKnnImpl(const DataT* x,
 
   dim3 blk(KPolicy::Nthreads);
 
-  typedef cub::KeyValuePair<uint32_t, AccT> Pair;
+  using Pair = cub::KeyValuePair<uint32_t, AccT>;
 
   cuvs::distance::detail::ops::l2_exp_distance_op<DataT, AccT, IdxT> distance_op{sqrt};
   raft::identity_op fin_op{};
@@ -945,8 +945,8 @@ void fusedL2Knn(size_t D,
                 bool rowMajorQuery,
                 cudaStream_t stream,
                 cuvs::distance::DistanceType metric,
-                const distance_t* index_norms = NULL,
-                const distance_t* query_norms = NULL)
+                const distance_t* index_norms = nullptr,
+                const distance_t* query_norms = nullptr)
 {
   // Validate the input data
   ASSERT(k > 0, "l2Knn: k must be > 0");

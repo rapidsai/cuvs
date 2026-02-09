@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -371,7 +371,7 @@ inline auto host_info()
   int host_processors_configured = sysconf(_SC_NPROCESSORS_CONF);
   props.emplace_back("host_processors_sysconf", std::to_string(host_processors_configured));
   std::vector<uint8_t> affinity_mask_buf(CPU_ALLOC_SIZE(host_processors_configured));
-  cpu_set_t* affinity_mask = reinterpret_cast<cpu_set_t*>(affinity_mask_buf.data());
+  auto* affinity_mask = reinterpret_cast<cpu_set_t*>(affinity_mask_buf.data());
   sched_getaffinity(0, affinity_mask_buf.size(), affinity_mask);
   uint64_t cpu_freq_min    = 0;
   uint64_t cpu_freq_max    = 0;

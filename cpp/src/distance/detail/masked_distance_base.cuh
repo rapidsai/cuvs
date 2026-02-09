@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -73,7 +73,7 @@ template <bool useNorms,
           typename BaseClass = raft::linalg::Contractions_NT<DataT, IdxT, Policy, isRowMajor>>
 struct MaskedDistances : public BaseClass {
  private:
-  typedef Policy P;
+  using P = Policy;
   const DataT* xn;
   const DataT* yn;
   const DataT* const yBase;

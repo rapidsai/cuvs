@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #include <cstddef>
@@ -31,10 +31,11 @@ namespace cuvs::neighbors::composite {
  * @return Shared pointer to merged composite index
  */
 template <typename T, typename IdxT, typename OutputIdxT>
-std::shared_ptr<cuvs::neighbors::IndexBase<T, IdxT, OutputIdxT>> merge(
+auto merge(
   const raft::resources& handle,
   const cuvs::neighbors::merge_params& params,
   std::vector<std::shared_ptr<cuvs::neighbors::IndexWrapper<T, IdxT, OutputIdxT>>>& indices)
+  -> std::shared_ptr<cuvs::neighbors::IndexBase<T, IdxT, OutputIdxT>>
 {
   if (indices.empty()) { RAFT_FAIL("Cannot merge empty indices vector"); }
 

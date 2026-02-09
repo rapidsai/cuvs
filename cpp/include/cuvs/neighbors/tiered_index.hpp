@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -43,10 +43,10 @@ struct index : cuvs::neighbors::index {
   explicit index(const index<UpstreamT>& other) : state(other.state) {}
 
   /** Total length of the index. */
-  int64_t size() const noexcept;
+  auto size() const noexcept -> int64_t;
 
   /** Dimensionality of the data. */
-  int64_t dim() const noexcept;
+  auto dim() const noexcept -> int64_t;
 };
 
 template <typename upstream_index_params_type>

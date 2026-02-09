@@ -37,7 +37,7 @@ namespace {
 inline double cur_time(void)
 {
   struct timeval tv;
-  gettimeofday(&tv, NULL);
+  gettimeofday(&tv, nullptr);
   return ((double)tv.tv_sec + (double)tv.tv_usec * 1e-6);
 }
 

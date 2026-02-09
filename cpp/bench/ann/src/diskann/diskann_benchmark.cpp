@@ -75,9 +75,8 @@ void parse_search_param(const nlohmann::json& conf,
 }
 
 template <typename T, template <typename> class Algo>
-std::unique_ptr<cuvs::bench::algo<T>> make_algo(cuvs::bench::Metric metric,
-                                                int dim,
-                                                const nlohmann::json& conf)
+auto make_algo(cuvs::bench::Metric metric, int dim, const nlohmann::json& conf)
+  -> std::unique_ptr<cuvs::bench::algo<T>>
 {
   typename Algo<T>::build_param param;
   parse_build_param<T>(conf, param);
@@ -107,8 +106,8 @@ auto create_algo(const std::string& algo_name,
 }
 
 template <typename T>
-std::unique_ptr<typename cuvs::bench::algo<T>::search_param> create_search_param(
-  const std::string& algo_name, const nlohmann::json& conf)
+auto create_search_param(const std::string& algo_name, const nlohmann::json& conf)
+  -> std::unique_ptr<typename cuvs::bench::algo<T>::search_param>
 {
   if (algo_name == "diskann_memory") {
     auto param = std::make_unique<typename cuvs::bench::diskann_memory<T>::search_param>();
@@ -130,5 +129,5 @@ REGISTER_ALGO_INSTANCE(std::uint8_t);
 
 #ifdef ANN_BENCH_BUILD_MAIN
 #include "../common/benchmark.hpp"
-int main(int argc, char** argv) { return cuvs::bench::run_main(argc, argv); }
+auto main(int argc, char** argv) -> int { return cuvs::bench::run_main(argc, argv); }
 #endif

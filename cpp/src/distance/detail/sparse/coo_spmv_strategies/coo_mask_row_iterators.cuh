@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -25,14 +25,14 @@ class mask_row_it {
  public:
   mask_row_it(const value_idx* full_indptr_,
               const value_idx& n_rows_,
-              value_idx* mask_row_idx_ = NULL)
+              value_idx* mask_row_idx_ = nullptr)
     : full_indptr(full_indptr_), mask_row_idx(mask_row_idx_), n_rows(n_rows_)
   {
   }
 
   __device__ inline value_idx get_row_idx(const int& n_blocks_nnz_b)
   {
-    if (mask_row_idx != NULL) {
+    if (mask_row_idx != nullptr) {
       return mask_row_idx[blockIdx.x / n_blocks_nnz_b];
     } else {
       return blockIdx.x / n_blocks_nnz_b;
