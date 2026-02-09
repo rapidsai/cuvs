@@ -26,7 +26,7 @@ namespace cuvs::neighbors::ivf_flat {
 void convert_c_index_params(cuvsIvfFlatIndexParams params,
                             cuvs::neighbors::ivf_flat::index_params* out)
 {
-  out->metric                   = static_cast<cuvs::distance::DistanceType>((int)params.metric),
+  out->metric                   = static_cast<cuvs::distance::DistanceType>(static_cast<int>(params.metric)),
   out->metric_arg               = params.metric_arg;
   out->add_data_on_build        = params.add_data_on_build;
   out->n_lists                  = params.n_lists;

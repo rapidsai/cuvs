@@ -21,7 +21,7 @@
 namespace cuvs::neighbors::ivf_pq {
 void convert_c_index_params(cuvsIvfPqIndexParams params, cuvs::neighbors::ivf_pq::index_params* out)
 {
-  out->metric                   = static_cast<cuvs::distance::DistanceType>((int)params.metric),
+  out->metric                   = static_cast<cuvs::distance::DistanceType>(static_cast<int>(params.metric)),
   out->metric_arg               = params.metric_arg;
   out->add_data_on_build        = params.add_data_on_build;
   out->n_lists                  = params.n_lists;
@@ -30,11 +30,11 @@ void convert_c_index_params(cuvsIvfPqIndexParams params, cuvs::neighbors::ivf_pq
   out->pq_bits                  = params.pq_bits;
   out->pq_dim                   = params.pq_dim;
   out->codebook_kind =
-    static_cast<cuvs::neighbors::ivf_pq::codebook_gen>((int)params.codebook_kind);
+    static_cast<cuvs::neighbors::ivf_pq::codebook_gen>(static_cast<int>(params.codebook_kind));
   out->force_random_rotation          = params.force_random_rotation;
   out->conservative_memory_allocation = params.conservative_memory_allocation;
   out->max_train_points_per_pq_code   = params.max_train_points_per_pq_code;
-  out->codes_layout = static_cast<cuvs::neighbors::ivf_pq::list_layout>((int)params.codes_layout);
+  out->codes_layout = static_cast<cuvs::neighbors::ivf_pq::list_layout>(static_cast<int>(params.codes_layout));
 }
 void convert_c_search_params(cuvsIvfPqSearchParams params,
                              cuvs::neighbors::ivf_pq::search_params* out)

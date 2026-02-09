@@ -36,7 +36,7 @@ auto _build(cuvsResources_t res,
   auto dataset = dataset_tensor->dl_tensor;
 
   auto build_params         = cuvs::neighbors::nn_descent::index_params();
-  build_params.metric       = static_cast<cuvs::distance::DistanceType>((int)params.metric),
+  build_params.metric       = static_cast<cuvs::distance::DistanceType>(static_cast<int>(params.metric)),
   build_params.metric_arg   = params.metric_arg;
   build_params.graph_degree = params.graph_degree;
   build_params.intermediate_graph_degree = params.intermediate_graph_degree;

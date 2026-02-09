@@ -40,7 +40,7 @@ static void _set_graph_build_params(
   int64_t dim)
 
 {
-  auto metric = static_cast<cuvs::distance::DistanceType>((int)params.metric);
+  auto metric = static_cast<cuvs::distance::DistanceType>(static_cast<int>(params.metric));
   switch (algo) {
     case cuvsCagraGraphBuildAlgo::AUTO_SELECT: break;
     case cuvsCagraGraphBuildAlgo::IVF_PQ: {
@@ -135,7 +135,7 @@ auto _from_args(cuvsResources_t res,
                  DLManagedTensor* graph_tensor,
                  DLManagedTensor* dataset_tensor) -> void*
 {
-  auto metric  = static_cast<cuvs::distance::DistanceType>((int)_metric);
+  auto metric  = static_cast<cuvs::distance::DistanceType>(static_cast<int>(_metric));
   auto dataset = dataset_tensor->dl_tensor;
   auto graph   = graph_tensor->dl_tensor;
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
@@ -179,7 +179,7 @@ void _extend(cuvsResources_t res,
   auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(index.addr);
   auto res_ptr   = reinterpret_cast<raft::resources*>(res);
 
-  // TODO: use C struct here (see issue #487)
+  // TODO(achirkin): use C struct here (see issue #487)
   auto extend_params           = cuvs::neighbors::cagra::extend_params();
   extend_params.max_chunk_size = params.max_chunk_size;
 
@@ -302,7 +302,7 @@ auto _merge(cuvsResources_t res,
   cuvs::neighbors::cagra::index_params params_cpp;
 
   params_cpp.metric =
-    static_cast<cuvs::distance::DistanceType>((int)params.metric);
+    static_cast<cuvs::distance::DistanceType>(static_cast<int>(params.metric));
   params_cpp.intermediate_graph_degree =
     params.intermediate_graph_degree;
   params_cpp.graph_degree = params.graph_degree;
@@ -440,7 +440,7 @@ void convert_c_index_params(cuvsCagraIndexParams params,
                             int64_t dim,
                             cuvs::neighbors::cagra::index_params* out)
 {
-  out->metric                    = static_cast<cuvs::distance::DistanceType>((int)params.metric);
+  out->metric                    = static_cast<cuvs::distance::DistanceType>(static_cast<int>(params.metric));
   out->intermediate_graph_degree = params.intermediate_graph_degree;
   out->graph_degree              = params.graph_degree;
   _set_graph_build_params(out->graph_build_params, params, params.build_algo, n_rows, dim);

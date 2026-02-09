@@ -27,7 +27,7 @@ auto _build(cuvsResources_t res, cuvsVamanaIndexParams* params, DLManagedTensor*
 
   auto dataset = dataset_tensor->dl_tensor;
   cuvs::neighbors::vamana::index_params index_params;
-  index_params.metric            = static_cast<cuvs::distance::DistanceType>((int)params->metric);
+  index_params.metric            = static_cast<cuvs::distance::DistanceType>(static_cast<int>(params->metric));
   index_params.graph_degree      = params->graph_degree;
   index_params.visited_size      = params->visited_size;
   index_params.vamana_iters      = params->vamana_iters;

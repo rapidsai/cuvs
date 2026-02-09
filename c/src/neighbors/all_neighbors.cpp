@@ -28,7 +28,7 @@ namespace {
 void convert_nn_descent_params(cuvsNNDescentIndexParams params,
                                cuvs::neighbors::nn_descent::index_params* out)
 {
-  out->metric                    = static_cast<cuvs::distance::DistanceType>((int)params.metric);
+  out->metric                    = static_cast<cuvs::distance::DistanceType>(static_cast<int>(params.metric));
   out->metric_arg                = params.metric_arg;
   out->graph_degree              = params.graph_degree;
   out->intermediate_graph_degree = params.intermediate_graph_degree;
@@ -40,22 +40,24 @@ void convert_nn_descent_params(cuvsNNDescentIndexParams params,
 static auto convert_params(
   cuvsAllNeighborsIndexParams_t params_ptr, int64_t n_rows, int64_t n_cols) -> cuvs::neighbors::all_neighbors::all_neighbors_params
 {
-  using namespace cuvs::neighbors;
+  using cuvs::neighbors::graph_build_params::brute_force_params;
+  using cuvs::neighbors::graph_build_params::ivf_pq_params;
+  using cuvs::neighbors::graph_build_params::nn_descent_params;
   cuvs::neighbors::all_neighbors::all_neighbors_params out{};
   auto& p            = *params_ptr;
-  out.metric         = static_cast<cuvs::distance::DistanceType>((int)p.metric);
+  out.metric         = static_cast<cuvs::distance::DistanceType>(static_cast<int>(p.metric));
   out.overlap_factor = p.overlap_factor;
   out.n_clusters     = p.n_clusters;
 
   switch (p.algo) {
     case CUVS_ALL_NEIGHBORS_ALGO_BRUTE_FORCE: {
-      graph_build_params::brute_force_params b{};
+      brute_force_params b{};
       b.build_params.metric  = out.metric;
       out.graph_build_params = b;
       break;
     }
     case CUVS_ALL_NEIGHBORS_ALGO_NN_DESCENT: {
-      graph_build_params::nn_descent_params n{};
+      nn_descent_params n{};
       n.metric = out.metric;
       // Use nn_descent_params if provided, otherwise use defaults
       if (p.nn_descent_params != nullptr) { convert_nn_descent_params(*p.nn_descent_params, &n); }
@@ -64,7 +66,7 @@ static auto convert_params(
     }
     case CUVS_ALL_NEIGHBORS_ALGO_IVF_PQ: {
       auto dataset_extents = raft::matrix_extent<int64_t>{n_rows, n_cols};
-      graph_build_params::ivf_pq_params ivf(dataset_extents, out.metric);
+      ivf_pq_params ivf(dataset_extents, out.metric);
       // Use ivf_pq_params if provided, otherwise use defaults
       if (p.ivf_pq_params != nullptr) {
         cuvs::neighbors::ivf_pq::convert_c_index_params(*p.ivf_pq_params, &ivf.build_params);

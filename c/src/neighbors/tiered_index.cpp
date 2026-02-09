@@ -27,7 +27,10 @@
 #include "ivf_pq.hpp"
 
 namespace {
-using namespace cuvs::neighbors;
+namespace tiered_index = cuvs::neighbors::tiered_index;
+namespace cagra        = cuvs::neighbors::cagra;
+namespace ivf_flat     = cuvs::neighbors::ivf_flat;
+namespace ivf_pq       = cuvs::neighbors::ivf_pq;
 
 template <typename T>
 void convert_c_index_params(cuvsTieredIndexParams params,
@@ -37,7 +40,7 @@ void convert_c_index_params(cuvsTieredIndexParams params,
 {
   out->min_ann_rows               = params.min_ann_rows;
   out->create_ann_index_on_extend = params.create_ann_index_on_extend;
-  out->metric                     = static_cast<cuvs::distance::DistanceType>((int)params.metric);
+  out->metric                     = static_cast<cuvs::distance::DistanceType>(static_cast<int>(params.metric));
 
   if constexpr (std::is_same_v<T, cagra::index_params>) {
     if (params.cagra_params != nullptr) {

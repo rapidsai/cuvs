@@ -37,7 +37,7 @@ auto _build(cuvsResources_t res,
   auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
 
   cuvs::neighbors::brute_force::index_params params;
-  params.metric     = static_cast<cuvs::distance::DistanceType>((int)metric);
+  params.metric     = static_cast<cuvs::distance::DistanceType>(static_cast<int>(metric));
   params.metric_arg = metric_arg;
 
   auto index_on_stack = cuvs::neighbors::brute_force::build(*res_ptr, params, mds);
@@ -80,7 +80,7 @@ void _search(cuvsResources_t res,
     auto prefilter_ptr       = reinterpret_cast<DLManagedTensor*>(prefilter.addr);
     auto prefilter_mds       = cuvs::core::from_dlpack<prefilter_mds_type>(prefilter_ptr);
     const auto prefilter     = cuvs::neighbors::filtering::bitmap_filter(
-      prefilter_bmp_type((uint32_t*)prefilter_mds.data_handle(),
+      prefilter_bmp_type(static_cast<uint32_t*>(prefilter_mds.data_handle()),
                          queries_mds.extent(0),
                          index_ptr->dataset().extent(0)));
     cuvs::neighbors::brute_force::search(
@@ -90,7 +90,7 @@ void _search(cuvsResources_t res,
     auto prefilter_ptr       = reinterpret_cast<DLManagedTensor*>(prefilter.addr);
     auto prefilter_mds       = cuvs::core::from_dlpack<prefilter_mds_type>(prefilter_ptr);
     const auto prefilter     = cuvs::neighbors::filtering::bitset_filter(
-      prefilter_bst_type((uint32_t*)prefilter_mds.data_handle(), index_ptr->dataset().extent(0)));
+      prefilter_bst_type(static_cast<uint32_t*>(prefilter_mds.data_handle()), index_ptr->dataset().extent(0)));
     cuvs::neighbors::brute_force::search(
       *res_ptr, params, *index_ptr, queries_mds, neighbors_mds, distances_mds, prefilter);
   } else {
