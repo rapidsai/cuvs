@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2020-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -56,7 +56,7 @@ struct csr_batcher_t {
     batch_rows_ = (batch_stop_ - batch_start_) + 1;
   }
 
-  value_idx get_batch_csr_indptr_nnz(value_idx* batch_indptr, cudaStream_t stream)
+  auto get_batch_csr_indptr_nnz(value_idx* batch_indptr, cudaStream_t stream) -> value_idx
   {
     raft::sparse::op::csr_row_slice_indptr(batch_start_,
                                            batch_stop_,
@@ -80,11 +80,11 @@ struct csr_batcher_t {
                                              stream);
   }
 
-  value_idx batch_rows() const { return batch_rows_; }
+  auto batch_rows() const -> value_idx { return batch_rows_; }
 
-  value_idx batch_start() const { return batch_start_; }
+  auto batch_start() const -> value_idx { return batch_start_; }
 
-  value_idx batch_stop() const { return batch_stop_; }
+  auto batch_stop() const -> value_idx { return batch_stop_; }
 
  private:
   value_idx batch_size_;
@@ -225,8 +225,8 @@ class sparse_knn_t {
         /**
          * Compute distances
          */
-        uint64_t dense_size =
-          (uint64_t)idx_batcher.batch_rows() * (uint64_t)query_batcher.batch_rows();
+        uint64_t dense_size = static_cast<uint64_t>(idx_batcher.batch_rows()) *
+                              static_cast<uint64_t>(query_batcher.batch_rows());
         rmm::device_uvector<value_t> batch_dists(dense_size,
                                                  raft::resource::get_cuda_stream(handle));
 

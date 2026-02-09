@@ -60,8 +60,8 @@ struct SamplingOp {
   {
   }
 
-  __host__ __device__ __forceinline__ bool operator()(
-    const raft::KeyValuePair<ptrdiff_t, DataT>& a) const
+  __host__ __device__ __forceinline__ auto operator()(
+    const raft::KeyValuePair<ptrdiff_t, DataT>& a) const -> bool
   {
     DataT prob_threshold = (DataT)rnd[a.key];
 
@@ -73,8 +73,8 @@ struct SamplingOp {
 
 template <typename IndexT, typename DataT>
 struct KeyValueIndexOp {
-  __host__ __device__ __forceinline__ IndexT
-  operator()(const raft::KeyValuePair<IndexT, DataT>& a) const
+  __host__ __device__ __forceinline__ auto operator()(
+    const raft::KeyValuePair<IndexT, DataT>& a) const -> IndexT
   {
     return a.key;
   }
@@ -163,14 +163,14 @@ void checkWeight(raft::resources const& handle,
 }
 
 template <typename IndexT>
-IndexT getDataBatchSize(int batch_samples, IndexT n_samples)
+auto getDataBatchSize(int batch_samples, IndexT n_samples) -> IndexT
 {
   auto minVal = std::min(static_cast<IndexT>(batch_samples), n_samples);
   return (minVal == 0) ? n_samples : minVal;
 }
 
 template <typename IndexT>
-IndexT getCentroidsBatchSize(int batch_centroids, IndexT n_local_clusters)
+auto getCentroidsBatchSize(int batch_centroids, IndexT n_local_clusters) -> IndexT
 {
   auto minVal = std::min(static_cast<IndexT>(batch_centroids), n_local_clusters);
   return (minVal == 0) ? n_local_clusters : minVal;

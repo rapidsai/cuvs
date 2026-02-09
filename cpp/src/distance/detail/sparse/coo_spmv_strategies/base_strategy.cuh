@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -22,7 +22,8 @@ namespace sparse {
 template <typename value_idx, typename value_t, int tpb>
 class coo_spmv_strategy {
  public:
-  coo_spmv_strategy(const distances_config_t<value_idx, value_t>& config_) : config(config_)
+  explicit coo_spmv_strategy(const distances_config_t<value_idx, value_t>& config_)
+    : config(config_)
   {
     smem = raft::getSharedMemPerBlock();
   }

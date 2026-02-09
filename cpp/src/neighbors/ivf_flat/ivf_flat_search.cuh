@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -52,7 +52,8 @@ void search_impl(raft::resources const& handle,
 {
   auto stream = raft::resource::get_cuda_stream(handle);
 
-  std::size_t n_queries_probes = std::size_t(n_queries) * std::size_t(n_probes);
+  std::size_t n_queries_probes =
+    static_cast<std::size_t>(n_queries) * static_cast<std::size_t>(n_probes);
 
   // The norm of query
   rmm::device_uvector<float> query_norm_dev(n_queries, stream, search_mr);
@@ -109,9 +110,9 @@ void search_impl(raft::resources const& handle,
                                                         static_cast<IdxT>(n_queries),
                                                         stream);
       utils::outer_add(query_norm_dev.data(),
-                       (IdxT)n_queries,
+                       static_cast<IdxT>(n_queries),
                        index.center_norms()->data_handle(),
-                       (IdxT)index.n_lists(),
+                       static_cast<IdxT>(index.n_lists()),
                        distance_buffer_dev.data(),
                        stream);
       RAFT_LOG_TRACE_VEC(index.center_norms()->data_handle(), std::min<uint32_t>(20, index.dim()));
@@ -218,7 +219,8 @@ void search_impl(raft::resources const& handle,
   if constexpr (sizeof(IdxT) == sizeof(uint32_t)) {
     neighbors_uint32 = reinterpret_cast<uint32_t*>(neighbors);
   } else {
-    neighbors_uint32_buf.resize(std::size_t(n_queries) * std::size_t(k), stream);
+    neighbors_uint32_buf.resize(static_cast<std::size_t>(n_queries) * static_cast<std::size_t>(k),
+                                stream);
     neighbors_uint32 = neighbors_uint32_buf.data();
   }
 
@@ -226,7 +228,8 @@ void search_impl(raft::resources const& handle,
 
   bool manage_local_topk = is_local_topk_feasible(k);
   if (!manage_local_topk || grid_dim_x > 1) {
-    auto target_size = std::size_t(n_queries) * (manage_local_topk ? grid_dim_x * k : max_samples);
+    auto target_size =
+      static_cast<std::size_t>(n_queries) * (manage_local_topk ? grid_dim_x * k : max_samples);
 
     distances_tmp_dev.resize(target_size, stream);
     if (manage_local_topk) indices_tmp_dev.resize(target_size, stream);

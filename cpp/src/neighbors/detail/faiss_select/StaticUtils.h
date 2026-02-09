@@ -1,6 +1,6 @@
 /**
  * SPDX-FileCopyrightText: Copyright (c) Facebook, Inc. and its affiliates.
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 /*
@@ -24,7 +24,7 @@
 namespace cuvs::neighbors::detail::faiss_select::utils {
 
 template <typename T>
-constexpr __host__ __device__ bool isPowerOf2(T v)
+constexpr __host__ __device__ auto isPowerOf2(T v) -> bool
 {
   return (v && !(v & (v - 1)));
 }
@@ -33,9 +33,9 @@ static_assert(isPowerOf2(2048), "isPowerOf2");
 static_assert(!isPowerOf2(3333), "isPowerOf2");
 
 template <typename T>
-constexpr __host__ __device__ T nextHighestPowerOf2(T v)
+constexpr __host__ __device__ auto nextHighestPowerOf2(T v) -> T
 {
-  return (isPowerOf2(v) ? (T)2 * v : ((T)1 << (raft::log2(v) + 1)));
+  return (isPowerOf2(v) ? static_cast<T>(2) * v : (static_cast<T>(1) << (raft::log2(v) + 1)));
 }
 
 static_assert(nextHighestPowerOf2(1) == 2, "nextHighestPowerOf2");

@@ -31,10 +31,10 @@
 namespace cuvs::preprocessing::spectral_embedding::detail {
 
 template <typename DataT, typename OutSparseMatrixType, typename InSparseMatrixViewType>
-OutSparseMatrixType create_laplacian(raft::resources const& handle,
-                                     params spectral_embedding_config,
-                                     InSparseMatrixViewType sparse_matrix_view,
-                                     raft::device_vector_view<DataT, int> diagonal)
+auto create_laplacian(raft::resources const& handle,
+                      params spectral_embedding_config,
+                      InSparseMatrixViewType sparse_matrix_view,
+                      raft::device_vector_view<DataT, int> diagonal) -> OutSparseMatrixType
 {
   auto laplacian =
     spectral_embedding_config.norm_laplacian
@@ -90,7 +90,7 @@ void compute_eigenpairs(raft::resources const& handle,
     spectral_embedding_config.drop_first ? config.n_components - 1 : config.n_components;
   auto col_indices = raft::make_device_vector<int>(handle, config.n_components);
 
-  // TODO: https://github.com/rapidsai/raft/issues/2661
+  // TODO(snanditale): https://github.com/rapidsai/raft/issues/2661
   thrust::sequence(thrust::device,
                    col_indices.data_handle(),
                    col_indices.data_handle() + config.n_components,

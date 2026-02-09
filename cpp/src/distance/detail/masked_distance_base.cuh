@@ -210,7 +210,7 @@ struct MaskedDistances : public BaseClass {
   }
 
  private:
-  DI uint64_t get_block_adjacency(const uint64_t* adj, IdxT tile_idx_m, IdxT idx_group)
+  DI auto get_block_adjacency(const uint64_t* adj, IdxT tile_idx_m, IdxT idx_group) -> uint64_t
   {
     // A single element of `adj` contains exactly enough bits to indicate which
     // rows in the current tile to skip and which to compute.
@@ -221,7 +221,7 @@ struct MaskedDistances : public BaseClass {
     return adj[block_flag_idx * this->num_groups + idx_group];
   }
 
-  DI uint32_t compute_thread_adjacency(const uint64_t block_adj)
+  DI auto compute_thread_adjacency(const uint64_t block_adj) -> uint32_t
   {
     // thread_adj is a bitfield that contains a 1 at location i iff we must
     // compute row i of acc (the accumulator register tile). It is described in

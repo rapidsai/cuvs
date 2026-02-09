@@ -170,7 +170,7 @@ struct search_plan_impl : public search_plan_impl_base {
     RAFT_LOG_DEBUG("# algo = %d", static_cast<int>(algo));
   }
 
-  virtual ~search_plan_impl() {}
+  virtual ~search_plan_impl() = default;
 
   virtual void operator()(
     raft::resources const& res,
@@ -198,7 +198,7 @@ struct search_plan_impl : public search_plan_impl_base {
       }
       int64_t num_reachable_nodes = 1;
       while (num_reachable_nodes < dataset_size) {
-        num_reachable_nodes *= max((int64_t)2, graph_degree / 2);
+        num_reachable_nodes *= max(static_cast<int64_t>(2), graph_degree / 2);
         _max_iterations += 1;
       }
     }

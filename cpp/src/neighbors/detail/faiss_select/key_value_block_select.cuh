@@ -1,6 +1,6 @@
 /**
  * SPDX-FileCopyrightText: Copyright (c) Facebook, Inc. and its affiliates.
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 /*
@@ -15,9 +15,9 @@
 #include "MergeNetworkUtils.cuh"
 #include "Select.cuh"
 
-// TODO: Need to think further about the impact (and new boundaries created) on the registers
-// because this will change the max k that can be processed. One solution might be to break
-// up k into multiple batches for larger k.
+// TODO(snanditale): Need to think further about the impact (and new boundaries created) on the
+// registers because this will change the max k that can be processed. One solution might be to
+// break up k into multiple batches for larger k.
 
 namespace cuvs::neighbors::detail::faiss_select {
 

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -53,8 +53,8 @@ namespace cuvs::cluster::kmeans::mg::detail {
 
 template <typename IndexT, typename DataT>
 struct KeyValueIndexOp {
-  __host__ __device__ __forceinline__ IndexT
-  operator()(const raft::KeyValuePair<IndexT, DataT>& a) const
+  __host__ __device__ __forceinline__ auto operator()(
+    const raft::KeyValuePair<IndexT, DataT>& a) const -> IndexT
   {
     return a.key;
   }
@@ -660,10 +660,11 @@ void fit(const raft::resources& handle,
       raft::make_const_mdspan(wtInCluster.view()),
       newCentroids.view(),
       cuda::proclaim_return_type<DataT>([=] __device__(DataT mat, DataT vec) {
-        if (vec == 0)
+        if (vec == 0) {
           return DataT(0);
-        else
+        } else {
           return mat / vec;
+        }
       }));
 
     // copy the centroids[i] to newCentroids[i] when wtInCluster[i] is 0
@@ -679,10 +680,11 @@ void fit(const raft::resources& handle,
       cuda::proclaim_return_type<bool>(
         [=] __device__(raft::KeyValuePair<ptrdiff_t, DataT> map) {  // predicate
           // copy when the # of samples in the cluster is 0
-          if (map.value == 0)
+          if (map.value == 0) {
             return true;
-          else
+          } else {
             return false;
+          }
         }),
       cuda::proclaim_return_type<ptrdiff_t>(
         [=] __device__(raft::KeyValuePair<ptrdiff_t, DataT> map) {  // map

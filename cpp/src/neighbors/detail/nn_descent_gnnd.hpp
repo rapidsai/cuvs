@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -27,7 +27,7 @@ constexpr int counter_interval{100};
 template <typename Index_t>
 struct InternalID_t;
 
-inline size_t roundUp32(size_t num) { return (num + 31) / 32 * 32; }
+inline auto roundUp32(size_t num) -> size_t { return (num + 31) / 32 * 32; }
 
 // InternalID_t uses 1 bit for marking (new or old).
 template <>
@@ -37,9 +37,9 @@ struct InternalID_t<int> {
   Index_t id_{std::numeric_limits<Index_t>::max()};
 
  public:
-  inline _RAFT_HOST_DEVICE bool is_new() const { return id_ >= 0; }
-  inline _RAFT_HOST_DEVICE Index_t& id_with_flag() { return id_; }
-  inline _RAFT_HOST_DEVICE Index_t id() const
+  [[nodiscard]] inline _RAFT_HOST_DEVICE auto is_new() const -> bool { return id_ >= 0; }
+  inline _RAFT_HOST_DEVICE auto id_with_flag() -> Index_t& { return id_; }
+  [[nodiscard]] inline _RAFT_HOST_DEVICE auto id() const -> Index_t
   {
     if (is_new()) return id_;
     return -id_ - 1;
@@ -48,7 +48,7 @@ struct InternalID_t<int> {
   {
     if (id_ >= 0) id_ = -id_ - 1;
   }
-  inline _RAFT_HOST_DEVICE bool operator==(const InternalID_t<int>& other) const
+  inline _RAFT_HOST_DEVICE auto operator==(const InternalID_t<int>& other) const -> bool
   {
     return id() == other.id();
   }
@@ -94,7 +94,7 @@ class BloomFilter {
 
   void set_nrow(size_t nrow) { nrow_ = nrow; }
 
-  bool check(size_t list_id, Index_t key)
+  auto check(size_t list_id, Index_t key) -> bool
   {
     bool is_present       = true;
     uint32_t hash         = hash_0(key);
@@ -122,7 +122,7 @@ class BloomFilter {
   }
 
  private:
-  uint32_t hash_0(uint32_t value)
+  auto hash_0(uint32_t value) -> uint32_t
   {
     value *= 1103515245;
     value += 12345;
@@ -132,7 +132,7 @@ class BloomFilter {
     return value;
   }
 
-  uint32_t hash_1(uint32_t value)
+  auto hash_1(uint32_t value) -> uint32_t
   {
     value *= 1664525;
     value += 1013904223;
@@ -170,16 +170,17 @@ struct GnndGraph {
   raft::pinned_vector<int2, size_t> h_list_sizes_old;
   BloomFilter<Index_t> bloom_filter;
 
-  GnndGraph(const GnndGraph&)            = delete;
-  GnndGraph& operator=(const GnndGraph&) = delete;
+  GnndGraph(const GnndGraph&)                    = delete;
+  auto operator=(const GnndGraph&) -> GnndGraph& = delete;
   GnndGraph(raft::resources const& res,
             const size_t nrow,
             const size_t node_degree,
             const size_t internal_node_degree,
             const size_t num_samples);
   void init_random_graph();
-  // TODO: Create a generic bloom filter utility https://github.com/rapidsai/raft/issues/1827
-  // Use Bloom filter to sample "new" neighbors for local joining
+  // TODO(snanditale): Create a generic bloom filter utility
+  // https://github.com/rapidsai/raft/issues/1827 Use Bloom filter to sample "new" neighbors for
+  // local joining
   void sample_graph_new(InternalID_t<Index_t>* new_neighbors, const size_t width);
   void sample_graph(bool sample_new);
   void update_graph(const InternalID_t<Index_t>* new_neighbors,
@@ -195,8 +196,8 @@ template <typename Data_t = float, typename Index_t = int>
 class GNND {
  public:
   GNND(raft::resources const& res, const BuildConfig& build_config);
-  GNND(const GNND&)            = delete;
-  GNND& operator=(const GNND&) = delete;
+  GNND(const GNND&)                    = delete;
+  auto operator=(const GNND&) -> GNND& = delete;
 
   template <typename DistEpilogue_t = raft::identity_op>
   void build(Data_t* data,
@@ -214,10 +215,10 @@ class GNND {
                          Index_t* h_rev_graph_ptr,
                          Index_t* d_rev_graph_ptr,
                          int2* list_sizes,
-                         cudaStream_t stream = 0);
+                         cudaStream_t stream = nullptr);
 
   template <typename DistEpilogue_t = raft::identity_op>
-  void local_join(cudaStream_t stream = 0, DistEpilogue_t dist_epilogue = DistEpilogue_t{});
+  void local_join(cudaStream_t stream = nullptr, DistEpilogue_t dist_epilogue = DistEpilogue_t{});
 
   raft::resources const& res;
 
@@ -249,13 +250,13 @@ class GNND {
   raft::device_vector<int2, size_t> d_list_sizes_old_;
 };
 
-inline BuildConfig get_build_config(raft::resources const& res,
-                                    const index_params& params,
-                                    size_t num_rows,
-                                    size_t num_cols,
-                                    const cuvs::distance::DistanceType metric,
-                                    size_t& extended_graph_degree,
-                                    size_t& graph_degree)
+inline auto get_build_config(raft::resources const& res,
+                             const index_params& params,
+                             size_t num_rows,
+                             size_t num_cols,
+                             const cuvs::distance::DistanceType metric,
+                             size_t& extended_graph_degree,
+                             size_t& graph_degree) -> BuildConfig
 {
   RAFT_EXPECTS(num_rows < std::numeric_limits<int>::max() - 1,
                "The dataset size for GNND should be less than %d",

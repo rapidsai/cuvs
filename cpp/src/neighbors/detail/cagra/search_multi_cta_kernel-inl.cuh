@@ -11,7 +11,7 @@
 #include "device_common.hpp"
 #include "hashmap.hpp"
 #include "search_plan.cuh"
-#include "topk_for_cagra/topk.h"  // TODO replace with raft topk if possible
+#include "topk_for_cagra/topk.h"  // TODO(snanditale): replace with raft topk if possible
 #include "utils.hpp"
 
 #include <raft/core/device_mdspan.hpp>
@@ -24,7 +24,7 @@
 
 #include <cuvs/neighbors/common.hpp>
 
-// TODO: This shouldn't be invoking anything from spatial/knn
+// TODO(snanditale): This shouldn't be invoking anything from spatial/knn
 #include "../ann_utils.cuh"
 
 #include <raft/util/cuda_rt_essentials.hpp>

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -113,15 +113,15 @@ void run_knn(const raft::resources& h,
  * @return Trustworthiness score
  */
 template <typename math_t>
-double trustworthiness_score(const raft::resources& h,
-                             const math_t* X,
-                             math_t* X_embedded,
-                             cuvs::distance::DistanceType metric,
-                             int n,
-                             int m,
-                             int d,
-                             int n_neighbors,
-                             int batchSize = 512)
+auto trustworthiness_score(const raft::resources& h,
+                           const math_t* X,
+                           math_t* X_embedded,
+                           cuvs::distance::DistanceType metric,
+                           int n,
+                           int m,
+                           int d,
+                           int n_neighbors,
+                           int batchSize = 512) -> double
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(h);
 

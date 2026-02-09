@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -92,7 +92,7 @@ struct distance_graph_impl<Linkage::KNN_GRAPH, value_idx, value_t> {
     raft::sparse::convert::sorted_coo_to_csr(
       knn_graph_coo.rows(), knn_graph_coo.nnz, indptr.data(), m + 1, stream);
 
-    // TODO: Wouldn't need to copy here if we could compute knn
+    // TODO(snanditale): Wouldn't need to copy here if we could compute knn
     // graph directly on the device uvectors
     // ref: https://github.com/rapidsai/raft/issues/227
     raft::copy_async(indices.data(), knn_graph_coo.cols(), knn_graph_coo.nnz, stream);
@@ -146,7 +146,7 @@ void pairwise_distances(const raft::resources& handle,
 
   raft::update_device(indptr + m, &nnz, 1, stream);
 
-  // TODO: It would ultimately be nice if the MST could accept
+  // TODO(snanditale): It would ultimately be nice if the MST could accept
   // dense inputs directly so we don't need to double the memory
   // usage to hand it a sparse array here.
   auto X_view = raft::make_device_matrix_view<const value_t, value_idx>(X, m, n);

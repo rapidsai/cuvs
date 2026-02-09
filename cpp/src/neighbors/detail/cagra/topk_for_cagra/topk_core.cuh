@@ -19,7 +19,7 @@
 
 namespace cuvs::neighbors::cagra::detail {
 //
-RAFT_DEVICE_INLINE_FUNCTION constexpr uint32_t convert(uint32_t x)
+RAFT_DEVICE_INLINE_FUNCTION constexpr auto convert(uint32_t x) -> uint32_t
 {
   if (x & 0x80000000) {
     return x ^ 0xffffffff;
@@ -29,7 +29,7 @@ RAFT_DEVICE_INLINE_FUNCTION constexpr uint32_t convert(uint32_t x)
 }
 
 //
-RAFT_DEVICE_INLINE_FUNCTION constexpr uint16_t convert(uint16_t x)
+RAFT_DEVICE_INLINE_FUNCTION constexpr auto convert(uint16_t x) -> uint16_t
 {
   if (x & 0x8000) {
     return x ^ 0xffff;
@@ -86,84 +86,92 @@ RAFT_DEVICE_INLINE_FUNCTION void load_u16_vector(struct u16_vector& vec, const u
 
 //
 template <int vecLen>
-RAFT_DEVICE_INLINE_FUNCTION uint32_t get_element_from_u32_vector(struct u32_vector& vec, int i)
+RAFT_DEVICE_INLINE_FUNCTION auto get_element_from_u32_vector(struct u32_vector& vec, int i)
+  -> uint32_t
 {
   uint32_t xi;
   if (vecLen == 1) {
     xi = convert(vec.x1.x);
   } else if (vecLen == 2) {
-    if (i == 0)
+    if (i == 0) {
       xi = convert(vec.x2.x);
-    else
+    } else {
       xi = convert(vec.x2.y);
+    }
   } else if (vecLen == 4) {
-    if (i == 0)
+    if (i == 0) {
       xi = convert(vec.x4.x);
-    else if (i == 1)
+    } else if (i == 1) {
       xi = convert(vec.x4.y);
-    else if (i == 2)
+    } else if (i == 2) {
       xi = convert(vec.x4.z);
-    else
+    } else {
       xi = convert(vec.x4.w);
+    }
   } else if (vecLen == 8) {
-    if (i == 0)
-      xi = convert((uint32_t)(vec.x8.x & 0xffffffff));
-    else if (i == 1)
-      xi = convert((uint32_t)(vec.x8.x >> 32));
-    else if (i == 2)
-      xi = convert((uint32_t)(vec.x8.y & 0xffffffff));
-    else if (i == 3)
-      xi = convert((uint32_t)(vec.x8.y >> 32));
-    else if (i == 4)
-      xi = convert((uint32_t)(vec.x8.z & 0xffffffff));
-    else if (i == 5)
-      xi = convert((uint32_t)(vec.x8.z >> 32));
-    else if (i == 6)
-      xi = convert((uint32_t)(vec.x8.w & 0xffffffff));
-    else
-      xi = convert((uint32_t)(vec.x8.w >> 32));
+    if (i == 0) {
+      xi = convert(static_cast<uint32_t>(vec.x8.x & 0xffffffff));
+    } else if (i == 1) {
+      xi = convert(static_cast<uint32_t>(vec.x8.x >> 32));
+    } else if (i == 2) {
+      xi = convert(static_cast<uint32_t>(vec.x8.y & 0xffffffff));
+    } else if (i == 3) {
+      xi = convert(static_cast<uint32_t>(vec.x8.y >> 32));
+    } else if (i == 4) {
+      xi = convert(static_cast<uint32_t>(vec.x8.z & 0xffffffff));
+    } else if (i == 5) {
+      xi = convert(static_cast<uint32_t>(vec.x8.z >> 32));
+    } else if (i == 6) {
+      xi = convert(static_cast<uint32_t>(vec.x8.w & 0xffffffff));
+    } else {
+      xi = convert(static_cast<uint32_t>(vec.x8.w >> 32));
+    }
   }
   return xi;
 }
 
 //
 template <int vecLen>
-RAFT_DEVICE_INLINE_FUNCTION uint16_t get_element_from_u16_vector(struct u16_vector& vec, int i)
+RAFT_DEVICE_INLINE_FUNCTION auto get_element_from_u16_vector(struct u16_vector& vec, int i)
+  -> uint16_t
 {
   uint16_t xi;
   if (vecLen == 1) {
     xi = convert(vec.x1.x);
   } else if (vecLen == 2) {
-    if (i == 0)
+    if (i == 0) {
       xi = convert(vec.x2.x);
-    else
+    } else {
       xi = convert(vec.x2.y);
+    }
   } else if (vecLen == 4) {
-    if (i == 0)
+    if (i == 0) {
       xi = convert(vec.x4.x);
-    else if (i == 1)
+    } else if (i == 1) {
       xi = convert(vec.x4.y);
-    else if (i == 2)
+    } else if (i == 2) {
       xi = convert(vec.x4.z);
-    else
+    } else {
       xi = convert(vec.x4.w);
+    }
   } else if (vecLen == 8) {
-    if (i == 0)
-      xi = convert((uint16_t)(vec.x8.x & 0xffff));
-    else if (i == 1)
-      xi = convert((uint16_t)(vec.x8.x >> 16));
-    else if (i == 2)
-      xi = convert((uint16_t)(vec.x8.y & 0xffff));
-    else if (i == 3)
-      xi = convert((uint16_t)(vec.x8.y >> 16));
-    else if (i == 4)
-      xi = convert((uint16_t)(vec.x8.z & 0xffff));
-    else if (i == 5)
-      xi = convert((uint16_t)(vec.x8.z >> 16));
-    else if (i == 6)
-      xi = convert((uint16_t)(vec.x8.w & 0xffff));
-    else
-      xi = convert((uint16_t)(vec.x8.w >> 16));
+    if (i == 0) {
+      xi = convert(static_cast<uint16_t>(vec.x8.x & 0xffff));
+    } else if (i == 1) {
+      xi = convert(static_cast<uint16_t>(vec.x8.x >> 16));
+    } else if (i == 2) {
+      xi = convert(static_cast<uint16_t>(vec.x8.y & 0xffff));
+    } else if (i == 3) {
+      xi = convert(static_cast<uint16_t>(vec.x8.y >> 16));
+    } else if (i == 4) {
+      xi = convert(static_cast<uint16_t>(vec.x8.z & 0xffff));
+    } else if (i == 5) {
+      xi = convert(static_cast<uint16_t>(vec.x8.z >> 16));
+    } else if (i == 6) {
+      xi = convert(static_cast<uint16_t>(vec.x8.w & 0xffff));
+    } else {
+      xi = convert(static_cast<uint16_t>(vec.x8.w >> 16));
+    }
   }
   return xi;
 }
@@ -265,7 +273,7 @@ RAFT_DEVICE_INLINE_FUNCTION void update_histogram(int itr,
     uint8_t iState = 0;
     if ((stateBitLen == 8) && (itr > 0)) {
       iState = state[thread_id + (num_threads * ii)];
-      if (iState == (uint8_t)0xff) continue;
+      if (iState == static_cast<uint8_t>(0xff)) continue;
     }
 #pragma unroll
     for (int v = 0; v < max(vecLen, stateBitLen); v += vecLen) {
@@ -284,7 +292,7 @@ RAFT_DEVICE_INLINE_FUNCTION void update_histogram(int itr,
         const int ivu = iv + u;
         if (ivu >= nx) break;
 
-        uint8_t mask = (uint8_t)0x1 << (v + u);
+        uint8_t mask = static_cast<uint8_t>(0x1) << (v + u);
         if ((stateBitLen == 8) && (iState & mask)) continue;
 
         uint32_t xi;
@@ -481,7 +489,7 @@ RAFT_DEVICE_INLINE_FUNCTION void output_index_below_threshold(const uint32_t top
     uint8_t iState = 0;
     if (stateBitLen == 8) {
       iState = state[thread_id + (num_threads * ii)];
-      if (iState == (uint8_t)0xff) continue;
+      if (iState == static_cast<uint8_t>(0xff)) continue;
     }
 #pragma unroll
     for (int v = 0; v < max(vecLen, stateBitLen); v += vecLen) {
@@ -500,7 +508,7 @@ RAFT_DEVICE_INLINE_FUNCTION void output_index_below_threshold(const uint32_t top
         const int ivu = iv + u;
         if (ivu >= nx) break;
 
-        const uint8_t mask = (uint8_t)0x1 << (v + u);
+        const uint8_t mask = static_cast<uint8_t>(0x1) << (v + u);
         if ((stateBitLen == 8) && (iState & mask)) continue;
 
         uint32_t xi;
@@ -534,7 +542,7 @@ RAFT_DEVICE_INLINE_FUNCTION constexpr void swap(T& val1, T& val2)
 
 //
 template <typename K>
-RAFT_DEVICE_INLINE_FUNCTION constexpr bool swap_if_needed(K& key1, K& key2)
+RAFT_DEVICE_INLINE_FUNCTION constexpr auto swap_if_needed(K& key1, K& key2) -> bool
 {
   if (key1 > key2) {
     swap<K>(key1, key2);
@@ -545,7 +553,8 @@ RAFT_DEVICE_INLINE_FUNCTION constexpr bool swap_if_needed(K& key1, K& key2)
 
 //
 template <typename K, typename V>
-RAFT_DEVICE_INLINE_FUNCTION constexpr bool swap_if_needed(K& key1, K& key2, V& val1, V& val2)
+RAFT_DEVICE_INLINE_FUNCTION constexpr auto swap_if_needed(K& key1, K& key2, V& val1, V& val2)
+  -> bool
 {
   if (key1 > key2) {
     swap<K>(key1, key2);
@@ -557,8 +566,8 @@ RAFT_DEVICE_INLINE_FUNCTION constexpr bool swap_if_needed(K& key1, K& key2, V& v
 
 //
 template <typename K, typename V>
-RAFT_DEVICE_INLINE_FUNCTION constexpr bool swap_if_needed(
-  K& key1, K& key2, V& val1, V& val2, bool ascending)
+RAFT_DEVICE_INLINE_FUNCTION constexpr auto swap_if_needed(
+  K& key1, K& key2, V& val1, V& val2, bool ascending) -> bool
 {
   if (key1 == key2) { return false; }
   if ((key1 > key2) == ascending) {
@@ -571,20 +580,20 @@ RAFT_DEVICE_INLINE_FUNCTION constexpr bool swap_if_needed(
 
 //
 template <typename T>
-RAFT_DEVICE_INLINE_FUNCTION T max_value_of();
+RAFT_DEVICE_INLINE_FUNCTION auto max_value_of() -> T;
 template <>
-RAFT_DEVICE_INLINE_FUNCTION float max_value_of<float>()
+RAFT_DEVICE_INLINE_FUNCTION auto max_value_of<float>() -> float
 {
   return FLT_MAX;
 }
 template <>
-RAFT_DEVICE_INLINE_FUNCTION uint32_t max_value_of<uint32_t>()
+RAFT_DEVICE_INLINE_FUNCTION auto max_value_of<uint32_t>() -> uint32_t
 {
   return ~0u;
 }
 
 template <int stateBitLen, unsigned BLOCK_SIZE = 0>
-RAFT_INLINE_FUNCTION constexpr uint32_t get_state_size(uint32_t len_x)
+RAFT_INLINE_FUNCTION constexpr auto get_state_size(uint32_t len_x) -> uint32_t
 {
 #ifdef __CUDA_ARCH__
   const uint32_t num_threads = blockDim.x;
@@ -852,9 +861,9 @@ constexpr std::uint32_t MAX_VEC_LENGTH   = 4;     // 1, 2, 4 or 8
 
 //
 //
-int _get_vecLen(uint32_t maxSamples, int maxVecLen = MAX_VEC_LENGTH)
+auto _get_vecLen(uint32_t maxSamples, int maxVecLen = MAX_VEC_LENGTH) -> int
 {
-  int vecLen = min(maxVecLen, (int)MAX_VEC_LENGTH);
+  int vecLen = min(maxVecLen, static_cast<int>(MAX_VEC_LENGTH));
   while ((maxSamples % vecLen) != 0) {
     vecLen /= 2;
   }

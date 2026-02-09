@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -77,10 +77,10 @@ struct local_waiter {
 class cuda_event {
  public:
   cuda_event(cuda_event&&)            = default;
-  cuda_event& operator=(cuda_event&&) = default;
+  cuda_event& operator=(cuda_event&&) = default;  // NOLINT(modernize-use-trailing-return-type)
   ~cuda_event()                       = default;
   cuda_event(cuda_event const&)       = delete;  // Copying disallowed: one event one owner
-  cuda_event& operator=(cuda_event&)  = delete;
+  cuda_event& operator=(cuda_event&)  = delete;  // NOLINT(modernize-use-trailing-return-type)
 
   cuda_event()
     : event_{[]() {
@@ -95,7 +95,7 @@ class cuda_event {
   {
   }
 
-  cudaEvent_t value() const { return *event_; }
+  [[nodiscard]] auto value() const -> cudaEvent_t { return *event_; }
 
  private:
   std::unique_ptr<cudaEvent_t, std::function<void(cudaEvent_t*)>> event_;
@@ -893,9 +893,9 @@ class batch_runner {
             res, upstream_params, upstream_index, queries, neighbors, distances, *sample_filter);
         }
       }},
-      k_{uint32_t(params.k)},
+      k_{static_cast<uint32_t>(params.k)},
       dim_{uint32_t(upstream_index.dim())},
-      max_batch_size_{uint32_t(params.max_batch_size)},
+      max_batch_size_{static_cast<uint32_t>(params.max_batch_size)},
       n_queues_{uint32_t(params.n_queues)},
       batch_queue_{res_, params.conservative_dispatch},
       completion_events_(n_queues_),
@@ -956,7 +956,7 @@ class batch_runner {
     }
 
     if (neighbors.extent(1) != int64_t(k_)) {
-      // TODO: the check can be relaxed to `neighbors.extent(1) > int64_t(k_)`;
+      // TODO(snanditale): the check can be relaxed to `neighbors.extent(1) > int64_t(k_)`;
       //       this, however, would require an extra bounds check per-query in the scatter kernel.
       RAFT_LOG_WARN(
         "The requested number of neighbors (%zd) doesn't match the configured "
@@ -1101,7 +1101,8 @@ class batch_runner {
 
       if (n_queries == 0) { return; }
       // If not all queries were committed, continue in the loop.
-      // TODO: it could potentially be more efficient to first commit everything and only then
+      // TODO(snanditale): it could potentially be more efficient to first commit everything and
+      // only then
       //        submit the work/wait for the event
       local_io_offset += queries_committed;
       to_commit.reset(
@@ -1137,7 +1138,7 @@ class batch_runner {
    * represents offset at which new queries are committed if successful), the number of committed
    * queries, or whether the ring buffer appears to be busy (on unsuccessful commit).
    */
-  auto try_commit(seq_order_id seq_id, uint32_t n_queries) const
+  [[nodiscard]] auto try_commit(seq_order_id seq_id, uint32_t n_queries) const
     -> std::variant<std::tuple<batch_token, uint32_t>, bool>
   {
     auto& batch_token_ref            = batch_queue_.token(seq_id);

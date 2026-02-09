@@ -11,9 +11,12 @@ namespace single_cta_search {
 
 struct topk_by_radix_sort_base {
   static constexpr std::uint32_t state_bit_length = 0;
-  static constexpr std::uint32_t vecLen           = 2;  // TODO
+  static constexpr std::uint32_t vecLen           = 2;  // TODO(snanditale):
 
-  static constexpr uint32_t smem_size(uint32_t max_itopk) { return max_itopk * 2 + 2048 + 8; }
+  static constexpr auto smem_size(uint32_t max_itopk) -> uint32_t
+  {
+    return max_itopk * 2 + 2048 + 8;
+  }
 };
 
 RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core_wrapper_256(uint32_t topk,

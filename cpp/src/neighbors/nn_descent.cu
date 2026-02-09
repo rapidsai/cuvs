@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -19,9 +19,9 @@ namespace cuvs::neighbors::nn_descent {
  * @return true if enough GPU memory could be allocated
  * @return false otherwise
  */
-bool has_enough_device_memory(raft::resources const& res,
+auto has_enough_device_memory(raft::resources const& res,
                               raft::matrix_extent<int64_t> dataset,
-                              size_t idx_size)
+                              size_t idx_size) -> bool
 {
   using DistData_t = float;
   try {

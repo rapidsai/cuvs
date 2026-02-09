@@ -71,7 +71,7 @@ class CompositeIndex  // NOLINT(readability-identifier-naming)
     const cuvs::neighbors::filtering::base_filter& filter =
       cuvs::neighbors::filtering::none_sample_filter{}) const override;
 
-  index_type size() const noexcept override
+  auto size() const noexcept -> index_type override
   {
     index_type total = 0;
     for (const auto& c : children_) {
@@ -80,7 +80,7 @@ class CompositeIndex  // NOLINT(readability-identifier-naming)
     return total;
   }
 
-  cuvs::distance::DistanceType metric() const noexcept override
+  [[nodiscard]] auto metric() const noexcept -> cuvs::distance::DistanceType override
   {
     return children_.empty() ? cuvs::distance::DistanceType::L2Expanded
                              : children_.front()->metric();

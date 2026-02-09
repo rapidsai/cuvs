@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -65,7 +65,7 @@ RAFT_KERNEL populateAKernel(DataT* sampleToClusterSumOfDistances,
 
   LabelT sampleCluster = labels[sampleIndex];
 
-  int sampleClusterIndex = (int)sampleCluster;
+  int sampleClusterIndex = static_cast<int>(sampleCluster);
 
   if (binCountArray[sampleClusterIndex] - 1 <= 0) {
     d_aArray[sampleIndex] = -1;
@@ -137,12 +137,13 @@ void countLabels(const LabelT* labels,
  */
 template <typename DataT>
 struct DivOp {
-  HDI DataT operator()(DataT a, int b, int c)
+  HDI auto operator()(DataT a, int b, int c) -> DataT
   {
-    if (b == 0)
+    if (b == 0) {
       return ULLONG_MAX;
-    else
+    } else {
       return a / b;
+    }
   }
 };
 
@@ -152,16 +153,17 @@ struct DivOp {
  */
 template <typename DataT>
 struct SilOp {
-  HDI DataT operator()(DataT a, DataT b)
+  HDI auto operator()(DataT a, DataT b) -> DataT
   {
-    if (a == 0 && b == 0 || a == b)
+    if (a == 0 && b == 0 || a == b) {
       return 0;
-    else if (a == -1)
+    } else if (a == -1) {
       return 0;
-    else if (a > b)
+    } else if (a > b) {
       return (b - a) / a;
-    else
+    } else {
       return (b - a) / b;
+    }
   }
 };
 
@@ -182,7 +184,7 @@ struct SilOp {
  * calculations
  */
 template <typename DataT, typename LabelT>
-DataT silhouette_score(
+auto silhouette_score(
   raft::resources const& handle,
   const DataT* X_in,
   int nRows,
@@ -191,7 +193,7 @@ DataT silhouette_score(
   int nLabels,
   DataT* silhouette_scorePerSample,
   cudaStream_t stream,
-  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded)
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded) -> DataT
 {
   ASSERT(nLabels >= 2 && nLabels <= (nRows - 1),
          "silhouette Score not defined for the given number of labels!");
@@ -276,10 +278,11 @@ DataT silhouette_score(
     binCountArrayView,
     averageDistanceBetweenSampleAndClusterView,
     [] __device__(DataT a, DataT b) {
-      if (b == 0)
+      if (b == 0) {
         return static_cast<DataT>(ULLONG_MAX);
-      else
+      } else {
         return a / b;
+      }
     });
 
   // calculating row-wise minimum

@@ -19,23 +19,23 @@
 namespace cuvs::neighbors::filtering {
 
 /* A filter that filters nothing. This is the default behavior. */
-constexpr __forceinline__ _RAFT_HOST_DEVICE bool none_sample_filter::operator()(
+constexpr __forceinline__ _RAFT_HOST_DEVICE auto none_sample_filter::operator()(
   // query index
   const uint32_t query_ix,
   // the current inverted list index
   const uint32_t cluster_ix,
   // the index of the current sample inside the current inverted list
-  const uint32_t sample_ix) const
+  const uint32_t sample_ix) const -> bool
 {
   return true;
 }
 
 /* A filter that filters nothing. This is the default behavior. */
-constexpr __forceinline__ _RAFT_HOST_DEVICE bool none_sample_filter::operator()(
+constexpr __forceinline__ _RAFT_HOST_DEVICE auto none_sample_filter::operator()(
   // query index
   const uint32_t query_ix,
   // the index of the current sample
-  const uint32_t sample_ix) const
+  const uint32_t sample_ix) const -> bool
 {
   return true;
 }
@@ -68,13 +68,13 @@ ivf_to_sample_filter<index_t, filter_t>::ivf_to_sample_filter(const index_t* con
  * index.
  */
 template <typename index_t, typename filter_t>
-inline _RAFT_HOST_DEVICE bool ivf_to_sample_filter<index_t, filter_t>::operator()(
+inline _RAFT_HOST_DEVICE auto ivf_to_sample_filter<index_t, filter_t>::operator()(
   // query index
   const uint32_t query_ix,
   // the current inverted list index
   const uint32_t cluster_ix,
   // the index of the current sample inside the current inverted list
-  const uint32_t sample_ix) const
+  const uint32_t sample_ix) const -> bool
 {
   if constexpr (takes_three_args<filter_t>::value) {
     return next_filter_(query_ix, cluster_ix, sample_ix);
@@ -91,11 +91,11 @@ _RAFT_HOST_DEVICE bitset_filter<bitset_t, index_t>::bitset_filter(
 }
 
 template <typename bitset_t, typename index_t>
-constexpr __forceinline__ _RAFT_HOST_DEVICE bool bitset_filter<bitset_t, index_t>::operator()(
+constexpr __forceinline__ _RAFT_HOST_DEVICE auto bitset_filter<bitset_t, index_t>::operator()(
   // query index
   const uint32_t query_ix,
   // the index of the current sample
-  const uint32_t sample_ix) const
+  const uint32_t sample_ix) const -> bool
 {
   return bitset_view_.test(sample_ix);
 }
@@ -115,11 +115,11 @@ bitmap_filter<bitmap_t, index_t>::bitmap_filter(
 }
 
 template <typename bitmap_t, typename index_t>
-inline _RAFT_HOST_DEVICE bool bitmap_filter<bitmap_t, index_t>::operator()(
+inline _RAFT_HOST_DEVICE auto bitmap_filter<bitmap_t, index_t>::operator()(
   // query index
   const uint32_t query_ix,
   // the index of the current sample
-  const uint32_t sample_ix) const
+  const uint32_t sample_ix) const -> bool
 {
   return bitmap_view_.test(query_ix, sample_ix);
 }
@@ -153,15 +153,15 @@ struct ivf_filter_dev {
     }
   } args_;
 
-  _RAFT_HOST_DEVICE ivf_filter_dev(none_filter_args_t args = {})
-    : tag_(FilterType::None), args_(args) {};
+  _RAFT_HOST_DEVICE explicit ivf_filter_dev(none_filter_args_t args = {})
+    : tag_(FilterType::None), args_(args){};
 
-  _RAFT_HOST_DEVICE ivf_filter_dev(bitset_filter_args_t args)
-    : tag_(FilterType::Bitset), args_(args) {};
+  _RAFT_HOST_DEVICE explicit ivf_filter_dev(bitset_filter_args_t args)
+    : tag_(FilterType::Bitset), args_(args){};
 
-  constexpr __forceinline__ _RAFT_HOST_DEVICE bool operator()(const uint32_t query_ix,
+  constexpr __forceinline__ _RAFT_HOST_DEVICE auto operator()(const uint32_t query_ix,
                                                               const uint32_t cluster_ix,
-                                                              const uint32_t sample_ix)
+                                                              const uint32_t sample_ix) -> bool
   {
     switch (tag_) {
       case FilterType::None:

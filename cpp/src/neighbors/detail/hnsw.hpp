@@ -115,7 +115,7 @@ struct index_impl : index<T> {
   /**
   @brief Get space
    */
-  auto get_space() const -> hnswlib::SpaceInterface<typename hnsw_dist_t<T>::type>*
+  [[nodiscard]] auto get_space() const -> hnswlib::SpaceInterface<typename hnsw_dist_t<T>::type>*
   {
     return space_.get();
   }
@@ -1150,7 +1150,7 @@ void extend(raft::resources const& res,
 #pragma omp parallel for num_threads(num_threads)
   for (int64_t i = 0; i < additional_dataset.extent(0); i++) {
     hnswlib_index->addPoint(
-      (void*)(additional_dataset.data_handle() + i * additional_dataset.extent(1)),
+      static_cast<const void*>(additional_dataset.data_handle() + i * additional_dataset.extent(1)),
       current_element_count + i);
   }
 }

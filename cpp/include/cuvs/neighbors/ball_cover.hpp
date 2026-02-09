@@ -61,31 +61,34 @@ struct index : cuvs::neighbors::index {
   }
 
   // NOLINTBEGIN(readability-identifier-naming)
-  auto get_R_indptr() const -> raft::device_vector_view<const idx_t, int64_t>
+  [[nodiscard]] auto get_R_indptr() const -> raft::device_vector_view<const idx_t, int64_t>
   {
     return R_indptr.view();
   }
-  auto get_R_1nn_cols() const -> raft::device_vector_view<const idx_t, int64_t>
+  [[nodiscard]] auto get_R_1nn_cols() const -> raft::device_vector_view<const idx_t, int64_t>
   {
     return R_1nn_cols.view();
   }
-  auto get_R_1nn_dists() const -> raft::device_vector_view<const float, int64_t>
+  [[nodiscard]] auto get_R_1nn_dists() const -> raft::device_vector_view<const float, int64_t>
   {
     return R_1nn_dists.view();
   }
-  auto get_R_radius() const -> raft::device_vector_view<const float, int64_t>
+  [[nodiscard]] auto get_R_radius() const -> raft::device_vector_view<const float, int64_t>
   {
     return R_radius.view();
   }
-  auto get_R() const -> raft::device_matrix_view<const float, int64_t, raft::row_major>
+  [[nodiscard]] auto get_R() const
+    -> raft::device_matrix_view<const float, int64_t, raft::row_major>
   {
     return R.view();
   }
-  auto get_R_closest_landmark_dists() const -> raft::device_vector_view<const float, int64_t>
+  [[nodiscard]] auto get_R_closest_landmark_dists() const
+    -> raft::device_vector_view<const float, int64_t>
   {
     return R_closest_landmark_dists.view();
   }
-  auto get_X_reordered() const -> raft::device_matrix_view<const float, int64_t, raft::row_major>
+  [[nodiscard]] auto get_X_reordered() const
+    -> raft::device_matrix_view<const float, int64_t, raft::row_major>
   {
     return X_reordered.view();
   }
@@ -103,13 +106,16 @@ struct index : cuvs::neighbors::index {
   {
     return X_reordered.view();
   }
-  raft::device_matrix_view<const float, int64_t, raft::row_major> get_X() const { return X; }
+  [[nodiscard]] raft::device_matrix_view<const float, int64_t, raft::row_major> get_X() const
+  {
+    return X;
+  }
   // NOLINTEND(readability-identifier-naming)
 
-  cuvs::distance::DistanceType get_metric() const { return metric; }
+  [[nodiscard]] auto get_metric() const -> cuvs::distance::DistanceType { return metric; }
 
-  int get_n_landmarks() const { return n_landmarks; }
-  bool is_index_trained() const { return index_trained; };
+  [[nodiscard]] auto get_n_landmarks() const -> int { return n_landmarks; }
+  [[nodiscard]] auto is_index_trained() const -> bool { return index_trained; };
 
   // This should only be set by internal functions
   void set_index_trained() { index_trained = true; }

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2018-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -126,7 +126,7 @@ void distance_impl(raft::resources const& handle,
   AccT* y_norm    = workspace;
   AccT* sq_x_norm = workspace;
   AccT* sq_y_norm = workspace;
-  // TODO: Column major case looks to have lower accuracy for X == Y,
+  // TODO(snanditale): Column major case looks to have lower accuracy for X == Y,
   // perhaps the use of stridedSummationKernel could be causing this,
   // need to investigate and fix.
   if (x == y && is_row_major) {
@@ -193,7 +193,7 @@ void distance_impl(raft::resources const& handle,
 
   OutT* x_norm = reinterpret_cast<OutT*>(workspace);
   OutT* y_norm = reinterpret_cast<OutT*>(workspace);
-  // TODO: Column major case looks to have lower accuracy for X == Y,
+  // TODO(snanditale): Column major case looks to have lower accuracy for X == Y,
   // perhaps the use of stridedSummationKernel could be causing this,
   // need to investigate and fix.
   if (x == y && is_row_major) {
@@ -472,14 +472,14 @@ void distance_impl_l2_expanded(  // NOTE: different name
   ASSERT(!(worksize < (m + n) * sizeof(AccT)), "workspace size error");
   ASSERT(workspace != nullptr, "workspace is null");
 
-  // TODO: May we have a better method to avoid misalignment?
+  // TODO(snanditale): May we have a better method to avoid misalignment?
   uintptr_t offset = alignof(OutT) - (reinterpret_cast<uintptr_t>(workspace) % alignof(OutT));
   if (offset == alignof(OutT)) { offset = 0; }
   OutT* x_norm = reinterpret_cast<OutT*>(reinterpret_cast<char*>(workspace) + offset);
 
   offset       = (reinterpret_cast<uintptr_t>(x_norm) % alignof(OutT));
   OutT* y_norm = x_norm;
-  // TODO: Column major case looks to have lower accuracy for X == Y,
+  // TODO(snanditale): Column major case looks to have lower accuracy for X == Y,
   // perhaps the use of stridedSummationKernel could be causing this,
   // need to investigate and fix.
   if ((x == y) && is_row_major) {
@@ -819,8 +819,8 @@ size_t getWorkspaceSize(const InType* x, const InType* y, Index_ m, Index_ n, In
     (distanceType == cuvs::distance::DistanceType::CorrelationExpanded) ? 2 : 1;
 
   if (is_allocated) {
-    // TODO : when X == Y allocate std::max(m, n) instead of m + n when column major input
-    // accuracy issue is resolved until then we allocate as m + n.
+    // TODO(snanditale): when X == Y allocate std::max(m, n) instead of m + n when column major
+    // input accuracy issue is resolved until then we allocate as m + n.
     worksize += numOfBuffers * m * sizeof(AccType);
     worksize += numOfBuffers * n * sizeof(AccType);
   }

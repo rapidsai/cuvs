@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -23,7 +23,7 @@ struct hamming_distance_op {
 
   IdxT k;
 
-  hamming_distance_op(IdxT k_) noexcept : k(k_) {}
+  explicit hamming_distance_op(IdxT k_) noexcept : k(k_) {}
 
   // Load norms of input data
   static constexpr bool use_norms = false;

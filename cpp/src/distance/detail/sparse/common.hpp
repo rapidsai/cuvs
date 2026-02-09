@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -14,7 +14,7 @@ namespace sparse {
 
 template <typename value_idx, typename value_t>
 struct distances_config_t {
-  distances_config_t(raft::resources const& handle_) : handle(handle_) {}
+  explicit distances_config_t(raft::resources const& handle_) : handle(handle_) {}
 
   // left side
   value_idx a_nrows;

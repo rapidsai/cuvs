@@ -17,7 +17,7 @@ namespace cuvs {
 namespace distance {
 namespace detail {
 
-// TODO: specialize this function for MinAndDistanceReduceOp<int, float>
+// TODO(snanditale): specialize this function for MinAndDistanceReduceOp<int, float>
 // with atomicCAS of 64 bit which will eliminate mutex and shfls
 template <typename P, typename OutT, typename IdxT, typename KVPair, typename ReduceOpT>
 DI void updateReducedVal(
@@ -36,8 +36,9 @@ DI void updateReducedVal(
         auto rid = gridStrideY + accrowid + i * P::AccThRows;
         if (rid < m) {
           auto value = val[i];
-          while (atomicCAS(mutex + rid, 0, 1) == 1)
+          while (atomicCAS(mutex + rid, 0, 1) == 1) {
             ;
+          }
           __threadfence();
           red_op(rid, min + rid, value);
           __threadfence();
@@ -88,7 +89,7 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedDistanceNNkernel(OutT* min,
                          DataT * regxn,
                          DataT * regyn,
                          IdxT gridStrideX,
-                         IdxT gridStrideY) {
+                         IdxT gridStrideY) -> void {
     KVPReduceOpT pairRed_op(pairRedOp);
 
     // intra thread reduce
@@ -108,35 +109,35 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedDistanceNNkernel(OutT* min,
   };
 
   auto rowEpilog_lambda =
-    [m, mutex, min, pairRedOp, redOp, &val, maxVal] __device__(IdxT gridStrideY) {
-      KVPReduceOpT pairRed_op(pairRedOp);
-      ReduceOpT red_op(redOp);
+    [m, mutex, min, pairRedOp, redOp, &val, maxVal] __device__(IdxT gridStrideY) -> void {
+    KVPReduceOpT pairRed_op(pairRedOp);
+    ReduceOpT red_op(redOp);
 
-      const auto accrowid = threadIdx.x / P::AccThCols;
-      const auto lid      = raft::laneId();
+    const auto accrowid = threadIdx.x / P::AccThCols;
+    const auto lid      = raft::laneId();
 
     // reduce
 #pragma unroll
-      for (int i = 0; i < P::AccRowsPerTh; ++i) {
+    for (int i = 0; i < P::AccRowsPerTh; ++i) {
 #pragma unroll
-        for (int j = P::AccThCols / 2; j > 0; j >>= 1) {
-          // Actually, the srcLane (lid +j) should be (lid +j) % P:AccThCols,
-          // but the shfl op applies the modulo internally.
-          auto tmpkey   = raft::shfl(val[i].key, lid + j, P::AccThCols);
-          auto tmpvalue = raft::shfl(val[i].value, lid + j, P::AccThCols);
-          KVPair tmp    = {tmpkey, tmpvalue};
-          val[i]        = pairRed_op(accrowid + i * P::AccThRows + gridStrideY, tmp, val[i]);
-        }
+      for (int j = P::AccThCols / 2; j > 0; j >>= 1) {
+        // Actually, the srcLane (lid +j) should be (lid +j) % P:AccThCols,
+        // but the shfl op applies the modulo internally.
+        auto tmpkey   = raft::shfl(val[i].key, lid + j, P::AccThCols);
+        auto tmpvalue = raft::shfl(val[i].value, lid + j, P::AccThCols);
+        KVPair tmp    = {tmpkey, tmpvalue};
+        val[i]        = pairRed_op(accrowid + i * P::AccThRows + gridStrideY, tmp, val[i]);
       }
+    }
 
-      updateReducedVal<P, OutT, IdxT, KVPair, ReduceOpT>(mutex, min, val, red_op, m, gridStrideY);
+    updateReducedVal<P, OutT, IdxT, KVPair, ReduceOpT>(mutex, min, val, red_op, m, gridStrideY);
 
     // reset the val array.
 #pragma unroll
-      for (int i = 0; i < P::AccRowsPerTh; ++i) {
-        val[i] = {0, maxVal};
-      }
-    };
+    for (int i = 0; i < P::AccRowsPerTh; ++i) {
+      val[i] = {0, maxVal};
+    }
+  };
 
   IdxT lda = k, ldb = k, ldd = n;
   constexpr bool row_major = true;

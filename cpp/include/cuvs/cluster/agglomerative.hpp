@@ -62,7 +62,7 @@ class single_linkage_output {
   idx_t n_leaves;
   idx_t n_connected_components;
 
-  // TODO: These will be made private in a future release
+  // TODO(snanditale): These will be made private in a future release
   idx_t* labels;    // size: m
   idx_t* children;  // size: (m-1, 2)
 

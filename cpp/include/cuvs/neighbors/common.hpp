@@ -506,8 +506,8 @@ enum class FilterType { None, Bitmap, Bitset };  // NOLINT(readability-identifie
 
 struct base_filter {
   ~base_filter() = default;
-  [[nodiscard]] virtual FilterType get_filter_type()
-    const = 0;  // NOLINT(modernize-use-trailing-return-type)
+  // NOLINTNEXTLINE(modernize-use-trailing-return-type)
+  [[nodiscard]] virtual FilterType get_filter_type() const = 0;
 };
 
 /* A filter that filters nothing. This is the default behavior. */

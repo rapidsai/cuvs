@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -12,13 +12,13 @@ namespace cuvs {
 namespace stats {
 namespace {
 template <typename value_t, typename label_t, typename idx_t>
-value_t _silhouette_score(
+auto _silhouette_score(
   raft::resources const& handle,
   raft::device_matrix_view<const value_t, idx_t, raft::row_major> X_in,
   raft::device_vector_view<const label_t, idx_t> labels,
   std::optional<raft::device_vector_view<value_t, idx_t>> silhouette_score_per_sample,
   idx_t n_unique_labels,
-  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded)
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded) -> value_t
 {
   RAFT_EXPECTS(labels.extent(0) == X_in.extent(0), "Size mismatch between labels and data");
 
@@ -40,14 +40,14 @@ value_t _silhouette_score(
 }
 
 template <typename value_t, typename label_t, typename idx_t>
-value_t _silhouette_score_batched(
+auto _silhouette_score_batched(
   raft::resources const& handle,
   raft::device_matrix_view<const value_t, idx_t, raft::row_major> X,
   raft::device_vector_view<const label_t, idx_t> labels,
   std::optional<raft::device_vector_view<value_t, idx_t>> silhouette_score_per_sample,
   idx_t n_unique_labels,
   idx_t batch_size,
-  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded)
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded) -> value_t
 {
   static_assert(std::is_integral_v<idx_t>,
                 "silhouette_score_batched: The index type "
@@ -74,51 +74,51 @@ value_t _silhouette_score_batched(
 }
 }  // namespace
 
-float silhouette_score(
+auto silhouette_score(
   raft::resources const& handle,
   raft::device_matrix_view<const float, int64_t, raft::row_major> X_in,
   raft::device_vector_view<const int, int64_t> labels,
   std::optional<raft::device_vector_view<float, int64_t>> silhouette_score_per_sample,
   int64_t n_unique_labels,
-  cuvs::distance::DistanceType metric)
+  cuvs::distance::DistanceType metric) -> float
 {
   return _silhouette_score(
     handle, X_in, labels, silhouette_score_per_sample, n_unique_labels, metric);
 }
 
-double silhouette_score(
+auto silhouette_score(
   raft::resources const& handle,
   raft::device_matrix_view<const double, int64_t, raft::row_major> X_in,
   raft::device_vector_view<const int, int64_t> labels,
   std::optional<raft::device_vector_view<double, int64_t>> silhouette_score_per_sample,
   int64_t n_unique_labels,
-  cuvs::distance::DistanceType metric)
+  cuvs::distance::DistanceType metric) -> double
 {
   return _silhouette_score(
     handle, X_in, labels, silhouette_score_per_sample, n_unique_labels, metric);
 }
 
-float silhouette_score_batched(
+auto silhouette_score_batched(
   raft::resources const& handle,
   raft::device_matrix_view<const float, int64_t, raft::row_major> X,
   raft::device_vector_view<const int, int64_t> labels,
   std::optional<raft::device_vector_view<float, int64_t>> silhouette_score_per_sample,
   int64_t n_unique_labels,
   int64_t batch_size,
-  cuvs::distance::DistanceType metric)
+  cuvs::distance::DistanceType metric) -> float
 {
   return _silhouette_score_batched(
     handle, X, labels, silhouette_score_per_sample, n_unique_labels, batch_size, metric);
 }
 
-double silhouette_score_batched(
+auto silhouette_score_batched(
   raft::resources const& handle,
   raft::device_matrix_view<const double, int64_t, raft::row_major> X,
   raft::device_vector_view<const int, int64_t> labels,
   std::optional<raft::device_vector_view<double, int64_t>> silhouette_score_per_sample,
   int64_t n_unique_labels,
   int64_t batch_size,
-  cuvs::distance::DistanceType metric)
+  cuvs::distance::DistanceType metric) -> double
 {
   return _silhouette_score_batched(
     handle, X, labels, silhouette_score_per_sample, n_unique_labels, batch_size, metric);

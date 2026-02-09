@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -395,22 +395,22 @@ template <cuvs::distance::DistanceType Metric,
           typename DataT,
           typename IndexT,
           typename DistanceT>
-dataset_descriptor_host<DataT, IndexT, DistanceT>
-vpq_descriptor_spec<Metric,
-                    TeamSize,
-                    DatasetBlockDim,
-                    PqBits,
-                    PqLen,
-                    CodebookT,
-                    DataT,
-                    IndexT,
-                    DistanceT>::init_(const cagra::search_params& params,
-                                      const std::uint8_t* encoded_dataset_ptr,
-                                      uint32_t encoded_dataset_dim,
-                                      const CodebookT* vq_code_book_ptr,
-                                      const CodebookT* pq_code_book_ptr,
-                                      IndexT size,
-                                      uint32_t dim)
+auto vpq_descriptor_spec<Metric,
+                         TeamSize,
+                         DatasetBlockDim,
+                         PqBits,
+                         PqLen,
+                         CodebookT,
+                         DataT,
+                         IndexT,
+                         DistanceT>::init_(const cagra::search_params& params,
+                                           const std::uint8_t* encoded_dataset_ptr,
+                                           uint32_t encoded_dataset_dim,
+                                           const CodebookT* vq_code_book_ptr,
+                                           const CodebookT* pq_code_book_ptr,
+                                           IndexT size,
+                                           uint32_t dim)
+  -> dataset_descriptor_host<DataT, IndexT, DistanceT>
 {
   using desc_type = cagra_q_dataset_descriptor_t<Metric,
                                                  TeamSize,

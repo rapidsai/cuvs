@@ -67,7 +67,7 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL masked_l2_nn_kernel(OutT* min,
                          DataT* regyn,
                          IdxT tile_idx_n,
                          IdxT tile_idx_m,
-                         IdxT tile_end_n) {
+                         IdxT tile_end_n) -> void {
     KVPReduceOpT pairRed_op(pairRedOp);
 
 #pragma unroll
@@ -114,32 +114,32 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL masked_l2_nn_kernel(OutT* min,
   };
 
   auto rowEpilog_lambda =
-    [m, mutex, min, pairRedOp, redOp, &val, maxVal] __device__(IdxT tile_idx_m) {
-      KVPReduceOpT pairRed_op(pairRedOp);
-      ReduceOpT red_op(redOp);
+    [m, mutex, min, pairRedOp, redOp, &val, maxVal] __device__(IdxT tile_idx_m) -> void {
+    KVPReduceOpT pairRed_op(pairRedOp);
+    ReduceOpT red_op(redOp);
 
-      const auto accrowid = threadIdx.x / P::AccThCols;
-      const auto lid      = raft::laneId();
+    const auto accrowid = threadIdx.x / P::AccThCols;
+    const auto lid      = raft::laneId();
     // reduce
 #pragma unroll
-      for (int i = 0; i < P::AccRowsPerTh; ++i) {
+    for (int i = 0; i < P::AccRowsPerTh; ++i) {
 #pragma unroll
-        for (int j = P::AccThCols / 2; j > 0; j >>= 1) {
-          auto tmpkey   = raft::shfl(val[i].key, lid + j);
-          auto tmpvalue = raft::shfl(val[i].value, lid + j);
-          KVPair tmp    = {tmpkey, tmpvalue};
-          val[i]        = pairRed_op(accrowid + i * P::AccThRows + tile_idx_m, tmp, val[i]);
-        }
+      for (int j = P::AccThCols / 2; j > 0; j >>= 1) {
+        auto tmpkey   = raft::shfl(val[i].key, lid + j);
+        auto tmpvalue = raft::shfl(val[i].value, lid + j);
+        KVPair tmp    = {tmpkey, tmpvalue};
+        val[i]        = pairRed_op(accrowid + i * P::AccThRows + tile_idx_m, tmp, val[i]);
       }
+    }
 
-      updateReducedVal<P, OutT, IdxT, KVPair, ReduceOpT>(mutex, min, val, red_op, m, tile_idx_m);
+    updateReducedVal<P, OutT, IdxT, KVPair, ReduceOpT>(mutex, min, val, red_op, m, tile_idx_m);
 
     // reset the val array.
 #pragma unroll
-      for (int i = 0; i < P::AccRowsPerTh; ++i) {
-        val[i] = {-1, maxVal};
-      }
-    };
+    for (int i = 0; i < P::AccRowsPerTh; ++i) {
+      val[i] = {-1, maxVal};
+    }
+  };
 
   IdxT lda = k, ldb = k, ldd = n;
   MaskedDistances<true,

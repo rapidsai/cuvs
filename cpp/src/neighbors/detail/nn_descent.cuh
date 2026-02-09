@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -60,42 +60,42 @@ class ResultItem<int> {
     : id_(std::numeric_limits<Index_t>::max()), dist_(std::numeric_limits<DistData_t>::max()) {};
   __host__ __device__ ResultItem(const Index_t id_with_flag, const DistData_t dist)
     : id_(id_with_flag), dist_(dist) {};
-  __host__ __device__ bool is_new() const { return id_ >= 0; }
-  __host__ __device__ Index_t& id_with_flag() { return id_; }
-  __host__ __device__ Index_t id() const
+  __host__ __device__ [[nodiscard]] auto is_new() const -> bool { return id_ >= 0; }
+  __host__ __device__ auto id_with_flag() -> Index_t& { return id_; }
+  __host__ __device__ [[nodiscard]] auto id() const -> Index_t
   {
     if (is_new()) return id_;
     return -id_ - 1;
   }
-  __host__ __device__ DistData_t& dist() { return dist_; }
+  __host__ __device__ auto dist() -> DistData_t& { return dist_; }
 
   __host__ __device__ void mark_old()
   {
     if (id_ >= 0) id_ = -id_ - 1;
   }
 
-  __host__ __device__ bool operator<(const ResultItem<Index_t>& other) const
+  __host__ __device__ auto operator<(const ResultItem<Index_t>& other) const -> bool
   {
     if (dist_ == other.dist_) return id() < other.id();
     return dist_ < other.dist_;
   }
-  __host__ __device__ bool operator==(const ResultItem<Index_t>& other) const
+  __host__ __device__ auto operator==(const ResultItem<Index_t>& other) const -> bool
   {
     return id() == other.id();
   }
-  __host__ __device__ bool operator>=(const ResultItem<Index_t>& other) const
+  __host__ __device__ auto operator>=(const ResultItem<Index_t>& other) const -> bool
   {
     return !(*this < other);
   }
-  __host__ __device__ bool operator<=(const ResultItem<Index_t>& other) const
+  __host__ __device__ auto operator<=(const ResultItem<Index_t>& other) const -> bool
   {
     return (*this == other) || (*this < other);
   }
-  __host__ __device__ bool operator>(const ResultItem<Index_t>& other) const
+  __host__ __device__ auto operator>(const ResultItem<Index_t>& other) const -> bool
   {
     return !(*this <= other);
   }
-  __host__ __device__ bool operator!=(const ResultItem<Index_t>& other) const
+  __host__ __device__ auto operator!=(const ResultItem<Index_t>& other) const -> bool
   {
     return !(*this == other);
   }
@@ -104,7 +104,7 @@ class ResultItem<int> {
 using align32 = raft::Pow2<32>;
 
 template <typename T>
-int get_batch_size(const int it_now, const T nrow, const int batch_size)
+auto get_batch_size(const int it_now, const T nrow, const int batch_size) -> int
 {
   int it_total = raft::ceildiv(nrow, batch_size);
   return (it_now == it_total - 1) ? nrow - it_now * batch_size : batch_size;
@@ -112,7 +112,7 @@ int get_batch_size(const int it_now, const T nrow, const int batch_size)
 
 // for avoiding bank conflict
 template <typename T>
-constexpr __host__ __device__ __forceinline__ int skew_dim(int ndim)
+constexpr __host__ __device__ __forceinline__ auto skew_dim(int ndim) -> int
 {
   // all "4"s are for alignment
   if constexpr (std::is_same<T, float>::value) {
@@ -122,7 +122,7 @@ constexpr __host__ __device__ __forceinline__ int skew_dim(int ndim)
 }
 
 template <typename T>
-__device__ __forceinline__ ResultItem<T> xor_swap(ResultItem<T> x, int mask, int dir)
+__device__ __forceinline__ auto xor_swap(ResultItem<T> x, int mask, int dir) -> ResultItem<T>
 {
   ResultItem<T> y;
   y.dist() = __shfl_xor_sync(raft::warp_full_mask(), x.dist(), mask, raft::warp_size());
@@ -131,14 +131,14 @@ __device__ __forceinline__ ResultItem<T> xor_swap(ResultItem<T> x, int mask, int
   return x < y == dir ? y : x;
 }
 
-__device__ __forceinline__ int xor_swap(int x, int mask, int dir)
+__device__ __forceinline__ auto xor_swap(int x, int mask, int dir) -> int
 {
   int y = __shfl_xor_sync(raft::warp_full_mask(), x, mask, raft::warp_size());
   return x < y == dir ? y : x;
 }
 
-// TODO: Move to RAFT utils https://github.com/rapidsai/raft/issues/1827
-__device__ __forceinline__ uint bfe(uint lane_id, uint pos)
+// TODO(snanditale): Move to RAFT utils https://github.com/rapidsai/raft/issues/1827
+__device__ __forceinline__ auto bfe(uint lane_id, uint pos) -> uint
 {
   uint res;
   asm("bfe.u32 %0,%1,%2,%3;" : "=r"(res) : "r"(lane_id), "r"(pos), "r"(1));
@@ -205,9 +205,10 @@ __device__ __forceinline__ void load_vec(Data_t* vec_buffer,
       for (int step = 0; step < raft::ceildiv(padding_dims, num_load_elems_per_warp); step++) {
         int idx_in_vec = step * num_load_elems_per_warp + lane_id * 4;
         if (idx_in_vec + 4 <= load_dims) {
-          *(float2*)(vec_buffer + idx_in_vec) = *(float2*)(d_vec + idx_in_vec);
+          *reinterpret_cast<float2*>(vec_buffer + idx_in_vec) =
+            *reinterpret_cast<const float2*>(d_vec + idx_in_vec);
         } else if (idx_in_vec + 4 <= padding_dims) {
-          *(float2*)(vec_buffer + idx_in_vec) = float2({0.0f, 0.0f});
+          *reinterpret_cast<float2*>(vec_buffer + idx_in_vec) = float2({0.0f, 0.0f});
         }
       }
     } else {
@@ -224,7 +225,7 @@ __device__ __forceinline__ void load_vec(Data_t* vec_buffer,
   }
 }
 
-// TODO: Replace with RAFT utilities https://github.com/rapidsai/raft/issues/1827
+// TODO(snanditale): Replace with RAFT utilities https://github.com/rapidsai/raft/issues/1827
 /** Calculate L2 norm, and cast data to Output_t */
 template <typename Data_t, typename Output_t = __half>
 RAFT_KERNEL preprocess_data_kernel(
@@ -237,7 +238,7 @@ RAFT_KERNEL preprocess_data_kernel(
 {
   extern __shared__ char buffer[];
   __shared__ float l2_norm;
-  Data_t* s_vec  = (Data_t*)buffer;
+  Data_t* s_vec  = reinterpret_cast<Data_t*>(buffer);
   size_t list_id = list_offset + blockIdx.x;
 
   load_vec(s_vec,
@@ -392,11 +393,11 @@ __device__ void insert_to_global_graph(ResultItem<Index_t> elem,
 }
 
 template <typename Index_t>
-__device__ ResultItem<Index_t> get_min_item(const Index_t id,
-                                            const int idx_in_list,
-                                            const Index_t* neighbs,
-                                            const DistData_t* distances,
-                                            const bool find_in_row = true)
+__device__ auto get_min_item(const Index_t id,
+                             const int idx_in_list,
+                             const Index_t* neighbs,
+                             const DistData_t* distances,
+                             const bool find_in_row = true) -> ResultItem<Index_t>
 {
   int lane_id = threadIdx.x % raft::warp_size();
 
@@ -511,7 +512,7 @@ __device__ __forceinline__ void calculate_metric(float* s_distances,
         s_distances[i] = 0.0;
         int n1         = row_neighbors[row_id];
         int n2         = col_neighbors[col_id];
-        // TODO: https://github.com/rapidsai/cuvs/issues/1127
+        // TODO(snanditale): https://github.com/rapidsai/cuvs/issues/1127
         const uint8_t* data_n1 = reinterpret_cast<const uint8_t*>(data) + n1 * data_dim;
         const uint8_t* data_n2 = reinterpret_cast<const uint8_t*>(data) + n2 * data_dim;
         for (int d = 0; d < data_dim; d++) {
@@ -1067,11 +1068,11 @@ __launch_bounds__(BLOCK_SIZE)
 
 namespace {
 template <typename Index_t>
-int insert_to_ordered_list(InternalID_t<Index_t>* list,
-                           DistData_t* dist_list,
-                           const int width,
-                           const InternalID_t<Index_t> neighb_id,
-                           const DistData_t dist)
+auto insert_to_ordered_list(InternalID_t<Index_t>* list,
+                            DistData_t* dist_list,
+                            const int width,
+                            const InternalID_t<Index_t> neighb_id,
+                            const DistData_t dist) -> int
 {
   if (dist > dist_list[width - 1]) { return width; }
 
@@ -1435,7 +1436,7 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
   graph_.nrow         = nrow;
   graph_.bloom_filter.set_nrow(nrow);
   update_counter_ = 0;
-  graph_.h_graph  = (InternalID_t<Index_t>*)output_graph;
+  graph_.h_graph  = reinterpret_cast<InternalID_t<Index_t>*>(output_graph);
 
   if (d_data_float_.has_value()) {
     raft::matrix::fill(res, d_data_float_.value().view(), static_cast<float>(0));
@@ -1608,7 +1609,7 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
     raft::resource::sync_stream(res);
   }
 
-  Index_t* graph_shrink_buffer = (Index_t*)graph_.h_dists.data_handle();
+  Index_t* graph_shrink_buffer = reinterpret_cast<Index_t*>(graph_.h_dists.data_handle());
 
 #pragma omp parallel for
   for (size_t i = 0; i < (size_t)nrow_; i++) {
@@ -1684,10 +1685,10 @@ template <typename T,
           typename IdxT = uint32_t,
           typename Accessor =
             raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
-index<IdxT> build(
-  raft::resources const& res,
-  const index_params& params,
-  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
+auto build(raft::resources const& res,
+           const index_params& params,
+           raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
+  -> index<IdxT>
 {
   size_t intermediate_degree = params.intermediate_graph_degree;
   size_t graph_degree        = params.graph_degree;

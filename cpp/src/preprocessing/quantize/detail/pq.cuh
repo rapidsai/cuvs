@@ -121,10 +121,11 @@ auto train_pq_subspaces(
 }
 
 template <typename DataT, typename MathT, typename AccessorType>
-quantizer<MathT> build(
+auto build(
   raft::resources const& res,
   const cuvs::preprocessing::quantize::pq::params params,
   raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, AccessorType> dataset)
+  -> quantizer<MathT>
 {
   auto n_rows = dataset.extent(0);
   auto dim    = dataset.extent(1);

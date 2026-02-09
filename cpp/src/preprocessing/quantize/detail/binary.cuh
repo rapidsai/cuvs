@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -20,13 +20,13 @@
 namespace cuvs::preprocessing::quantize::detail {
 
 template <class T>
-_RAFT_HOST_DEVICE bool is_positive(const T& a)
+_RAFT_HOST_DEVICE auto is_positive(const T& a) -> bool
 {
   return a > 0;
 }
 
 template <>
-_RAFT_HOST_DEVICE bool is_positive<half>(const half& a)
+_RAFT_HOST_DEVICE auto is_positive<half>(const half& a) -> bool
 {
   return is_positive(static_cast<float>(a));
 }

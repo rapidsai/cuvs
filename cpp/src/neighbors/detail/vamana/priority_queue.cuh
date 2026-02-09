@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -155,9 +155,9 @@ class PriorityQueue {
   }
 
   // Return value of the root of the heap (largest value)
-  __device__ accT top() { return vals[0].dist; }
+  __device__ auto top() -> accT { return vals[0].dist; }
 
-  __device__ IdxT top_node() { return vals[0].idx; }
+  __device__ auto top_node() -> IdxT { return vals[0].idx; }
 
   __device__ void insert_back(accT newDist, IdxT newIdx)
   {
@@ -173,7 +173,7 @@ class PriorityQueue {
   }
 
   // Pop root node off and heapify
-  __device__ DistPair<IdxT, accT> pop()
+  __device__ auto pop() -> DistPair<IdxT, accT>
   {
     DistPair<IdxT, accT> result;
     result.dist  = vals[0].dist;
@@ -199,20 +199,20 @@ class __align__(16) Node {
 
 // Less-than operator between two Nodes.
 template <typename SUMTYPE>
-__host__ __device__ bool operator<(const Node<SUMTYPE>& first, const Node<SUMTYPE>& other)
+__host__ __device__ auto operator<(const Node<SUMTYPE>& first, const Node<SUMTYPE>& other) -> bool
 {
   return first.distance < other.distance;
 }
 
 // Less-than operator between two Nodes.
 template <typename SUMTYPE>
-__host__ __device__ bool operator>(const Node<SUMTYPE>& first, const Node<SUMTYPE>& other)
+__host__ __device__ auto operator>(const Node<SUMTYPE>& first, const Node<SUMTYPE>& other) -> bool
 {
   return first.distance > other.distance;
 }
 
 template <typename accT>
-__device__ bool check_duplicate(const Node<accT>* pq, const int size, Node<accT> new_node)
+__device__ auto check_duplicate(const Node<accT>* pq, const int size, Node<accT> new_node) -> bool
 {
   bool found = false;
   for (int i = threadIdx.x; i < size; i += blockDim.x) {
@@ -224,11 +224,12 @@ __device__ bool check_duplicate(const Node<accT>* pq, const int size, Node<accT>
 
   unsigned mask = raft::ballot(found);
 
-  if (mask == 0)
+  if (mask == 0) {
     return false;
 
-  else
+  } else {
     return true;
+  }
 }
 
 /*

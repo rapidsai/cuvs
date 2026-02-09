@@ -49,8 +49,9 @@ struct fp_8bit {
   HDI explicit operator half() const { return fp_8bit2half(*this); }
 
  private:
-  static constexpr float kMin = 1.0f / float(1u << ExpMask);
-  static constexpr float kMax = float(1u << (ExpMask + 1)) * (2.0f - 1.0f / float(1u << ValBits));
+  static constexpr float kMin = 1.0f / static_cast<float>(1u << ExpMask);
+  static constexpr float kMax =
+    static_cast<float>(1u << (ExpMask + 1)) * (2.0f - 1.0f / static_cast<float>(1u << ValBits));
 
   static HDI auto float2fp_8bit(float v) -> fp_8bit<ExpBits, Signed>
   {

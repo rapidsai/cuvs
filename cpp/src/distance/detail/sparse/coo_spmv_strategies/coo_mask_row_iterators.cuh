@@ -30,7 +30,7 @@ class mask_row_it {
   {
   }
 
-  __device__ inline value_idx get_row_idx(const int& n_blocks_nnz_b)
+  __device__ inline auto get_row_idx(const int& n_blocks_nnz_b) -> value_idx
   {
     if (mask_row_idx != nullptr) {
       return mask_row_idx[blockIdx.x / n_blocks_nnz_b];
@@ -62,9 +62,9 @@ class mask_row_it {
     // do nothing;
   }
 
-  __device__ constexpr inline bool check_indices_bounds(value_idx& start_index_a,
+  __device__ constexpr inline auto check_indices_bounds(value_idx& start_index_a,
                                                         value_idx& stop_index_a,
-                                                        value_idx& index_b)
+                                                        value_idx& index_b) -> bool
   {
     return true;
   }
@@ -132,7 +132,7 @@ class chunked_mask_row_it : public mask_row_it<value_idx> {
     fill_chunk_indices(n_rows, n_chunks_per_row, chunk_indices, stream);
   }
 
-  __device__ inline value_idx get_row_idx(const int& n_blocks_nnz_b)
+  __device__ inline auto get_row_idx(const int& n_blocks_nnz_b) -> value_idx
   {
     return this->mask_row_idx[chunk_indices[blockIdx.x / n_blocks_nnz_b]];
   }
@@ -172,9 +172,9 @@ class chunked_mask_row_it : public mask_row_it<value_idx> {
     stop_index  = last_a_chunk ? stop_index : indices[stop_offset];
   }
 
-  __device__ inline bool check_indices_bounds(value_idx& start_index_a,
+  __device__ inline auto check_indices_bounds(value_idx& start_index_a,
                                               value_idx& stop_index_a,
-                                              value_idx& index_b)
+                                              value_idx& index_b) -> bool
   {
     return (index_b >= start_index_a && index_b <= stop_index_a);
   }
@@ -191,7 +191,7 @@ class chunked_mask_row_it : public mask_row_it<value_idx> {
     {
     }
 
-    __host__ __device__ value_idx operator()(const value_idx& i)
+    __host__ __device__ auto operator()(const value_idx& i) -> value_idx
     {
       auto degree = indptr[i + 1] - indptr[i];
       return raft::ceildiv(degree, (value_idx)row_chunk_size);

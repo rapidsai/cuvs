@@ -22,55 +22,59 @@ class index_impl : public index_iface<IdxT> {
              bool conservative_memory_allocation,
              list_layout codes_layout = list_layout::INTERLEAVED);
 
-  ~index_impl()                            = default;
-  index_impl(index_impl&&)                 = default;
-  index_impl& operator=(index_impl&&)      = default;
-  index_impl(const index_impl&)            = delete;
-  index_impl& operator=(const index_impl&) = delete;
+  ~index_impl()                                    = default;
+  index_impl(index_impl&&)                         = default;
+  auto operator=(index_impl&&) -> index_impl&      = default;
+  index_impl(const index_impl&)                    = delete;
+  auto operator=(const index_impl&) -> index_impl& = delete;
 
-  cuvs::distance::DistanceType metric() const noexcept override;
-  codebook_gen codebook_kind() const noexcept override;
-  list_layout codes_layout() const noexcept override;
-  IdxT size() const noexcept override;
-  uint32_t dim() const noexcept override;
-  uint32_t dim_ext() const noexcept override;
-  uint32_t rot_dim() const noexcept override;
-  uint32_t pq_bits() const noexcept override;
-  uint32_t pq_dim() const noexcept override;
-  uint32_t pq_len() const noexcept override;
-  uint32_t pq_book_size() const noexcept override;
-  uint32_t n_lists() const noexcept override;
-  bool conservative_memory_allocation() const noexcept override;
+  [[nodiscard]] auto metric() const noexcept -> cuvs::distance::DistanceType override;
+  [[nodiscard]] auto codebook_kind() const noexcept -> codebook_gen override;
+  [[nodiscard]] auto codes_layout() const noexcept -> list_layout override;
+  auto size() const noexcept -> IdxT override;
+  [[nodiscard]] auto dim() const noexcept -> uint32_t override;
+  [[nodiscard]] auto dim_ext() const noexcept -> uint32_t override;
+  [[nodiscard]] auto rot_dim() const noexcept -> uint32_t override;
+  [[nodiscard]] auto pq_bits() const noexcept -> uint32_t override;
+  [[nodiscard]] auto pq_dim() const noexcept -> uint32_t override;
+  [[nodiscard]] auto pq_len() const noexcept -> uint32_t override;
+  [[nodiscard]] auto pq_book_size() const noexcept -> uint32_t override;
+  [[nodiscard]] auto n_lists() const noexcept -> uint32_t override;
+  [[nodiscard]] auto conservative_memory_allocation() const noexcept -> bool override;
 
-  std::vector<std::shared_ptr<list_data_base<IdxT>>>& lists() noexcept override;
-  const std::vector<std::shared_ptr<list_data_base<IdxT>>>& lists() const noexcept override;
+  auto lists() noexcept -> std::vector<std::shared_ptr<list_data_base<IdxT>>>& override;
+  [[nodiscard]] auto lists() const noexcept
+    -> const std::vector<std::shared_ptr<list_data_base<IdxT>>>& override;
 
-  raft::device_vector_view<uint32_t, uint32_t, raft::row_major> list_sizes() noexcept override;
-  raft::device_vector_view<const uint32_t, uint32_t, raft::row_major> list_sizes()
-    const noexcept override;
+  auto list_sizes() noexcept
+    -> raft::device_vector_view<uint32_t, uint32_t, raft::row_major> override;
+  [[nodiscard]] auto list_sizes() const noexcept
+    -> raft::device_vector_view<const uint32_t, uint32_t, raft::row_major> override;
 
-  raft::device_vector_view<uint8_t*, uint32_t, raft::row_major> data_ptrs() noexcept override;
-  raft::device_vector_view<const uint8_t* const, uint32_t, raft::row_major> data_ptrs()
-    const noexcept override;
+  auto data_ptrs() noexcept
+    -> raft::device_vector_view<uint8_t*, uint32_t, raft::row_major> override;
+  [[nodiscard]] auto data_ptrs() const noexcept
+    -> raft::device_vector_view<const uint8_t* const, uint32_t, raft::row_major> override;
 
-  raft::device_vector_view<IdxT*, uint32_t, raft::row_major> inds_ptrs() noexcept override;
-  raft::device_vector_view<const IdxT* const, uint32_t, raft::row_major> inds_ptrs()
-    const noexcept override;
+  auto inds_ptrs() noexcept -> raft::device_vector_view<IdxT*, uint32_t, raft::row_major> override;
+  [[nodiscard]] auto inds_ptrs() const noexcept
+    -> raft::device_vector_view<const IdxT* const, uint32_t, raft::row_major> override;
 
-  raft::host_vector_view<IdxT, uint32_t, raft::row_major> accum_sorted_sizes() noexcept override;
-  raft::host_vector_view<const IdxT, uint32_t, raft::row_major> accum_sorted_sizes()
-    const noexcept override;
+  auto accum_sorted_sizes() noexcept
+    -> raft::host_vector_view<IdxT, uint32_t, raft::row_major> override;
+  [[nodiscard]] auto accum_sorted_sizes() const noexcept
+    -> raft::host_vector_view<const IdxT, uint32_t, raft::row_major> override;
 
-  raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> rotation_matrix_int8(
-    const raft::resources& res) const override;
-  raft::device_matrix_view<const half, uint32_t, raft::row_major> rotation_matrix_half(
-    const raft::resources& res) const override;
-  raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> centers_int8(
-    const raft::resources& res) const override;
-  raft::device_matrix_view<const half, uint32_t, raft::row_major> centers_half(
-    const raft::resources& res) const override;
+  [[nodiscard]] auto rotation_matrix_int8(const raft::resources& res) const
+    -> raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> override;
+  [[nodiscard]] auto rotation_matrix_half(const raft::resources& res) const
+    -> raft::device_matrix_view<const half, uint32_t, raft::row_major> override;
+  [[nodiscard]] auto centers_int8(const raft::resources& res) const
+    -> raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> override;
+  [[nodiscard]] auto centers_half(const raft::resources& res) const
+    -> raft::device_matrix_view<const half, uint32_t, raft::row_major> override;
 
-  uint32_t get_list_size_in_bytes(uint32_t label) const override;
+  [[nodiscard]] auto get_list_size_in_bytes(uint32_t label) const -> uint32_t override;
 
  protected:
   cuvs::distance::DistanceType metric_;
@@ -115,27 +119,27 @@ class owning_impl : public index_impl<IdxT> {
               bool conservative_memory_allocation,
               list_layout codes_layout = list_layout::INTERLEAVED);
 
-  ~owning_impl()                             = default;
-  owning_impl(owning_impl&&)                 = default;
-  owning_impl& operator=(owning_impl&&)      = default;
-  owning_impl(const owning_impl&)            = delete;
-  owning_impl& operator=(const owning_impl&) = delete;
+  ~owning_impl()                                     = default;
+  owning_impl(owning_impl&&)                         = default;
+  auto operator=(owning_impl&&) -> owning_impl&      = default;
+  owning_impl(const owning_impl&)                    = delete;
+  auto operator=(const owning_impl&) -> owning_impl& = delete;
 
-  raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers() noexcept;
-  raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers()
-    const noexcept override;
+  auto pq_centers() noexcept -> raft::device_mdspan<float, pq_centers_extents, raft::row_major>;
+  [[nodiscard]] auto pq_centers() const noexcept
+    -> raft::device_mdspan<const float, pq_centers_extents, raft::row_major> override;
 
-  raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept;
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers()
-    const noexcept override;
+  auto centers() noexcept -> raft::device_matrix_view<float, uint32_t, raft::row_major>;
+  [[nodiscard]] auto centers() const noexcept
+    -> raft::device_matrix_view<const float, uint32_t, raft::row_major> override;
 
-  raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() noexcept;
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot()
-    const noexcept override;
+  auto centers_rot() noexcept -> raft::device_matrix_view<float, uint32_t, raft::row_major>;
+  [[nodiscard]] auto centers_rot() const noexcept
+    -> raft::device_matrix_view<const float, uint32_t, raft::row_major> override;
 
-  raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix() noexcept;
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix()
-    const noexcept override;
+  auto rotation_matrix() noexcept -> raft::device_matrix_view<float, uint32_t, raft::row_major>;
+  [[nodiscard]] auto rotation_matrix() const noexcept
+    -> raft::device_matrix_view<const float, uint32_t, raft::row_major> override;
 
  private:
   raft::device_mdarray<float, pq_centers_extents, raft::row_major> pq_centers_;
@@ -161,23 +165,23 @@ class view_impl : public index_impl<IdxT> {
             raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix_view,
             list_layout codes_layout = list_layout::INTERLEAVED);
 
-  ~view_impl()                           = default;
-  view_impl(view_impl&&)                 = default;
-  view_impl& operator=(view_impl&&)      = default;
-  view_impl(const view_impl&)            = delete;
-  view_impl& operator=(const view_impl&) = delete;
+  ~view_impl()                                   = default;
+  view_impl(view_impl&&)                         = default;
+  auto operator=(view_impl&&) -> view_impl&      = default;
+  view_impl(const view_impl&)                    = delete;
+  auto operator=(const view_impl&) -> view_impl& = delete;
 
-  raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers()
-    const noexcept override;
+  [[nodiscard]] auto pq_centers() const noexcept
+    -> raft::device_mdspan<const float, pq_centers_extents, raft::row_major> override;
 
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers()
-    const noexcept override;
+  [[nodiscard]] auto centers() const noexcept
+    -> raft::device_matrix_view<const float, uint32_t, raft::row_major> override;
 
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot()
-    const noexcept override;
+  [[nodiscard]] auto centers_rot() const noexcept
+    -> raft::device_matrix_view<const float, uint32_t, raft::row_major> override;
 
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix()
-    const noexcept override;
+  [[nodiscard]] auto rotation_matrix() const noexcept
+    -> raft::device_matrix_view<const float, uint32_t, raft::row_major> override;
 
  private:
   raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers_view_;

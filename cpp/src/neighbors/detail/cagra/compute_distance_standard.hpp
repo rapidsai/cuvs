@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -26,7 +26,7 @@ struct standard_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT>
   using typename base_type::index_type;
 
   template <typename DatasetT>
-  constexpr static inline bool accepts_dataset()
+  constexpr static inline auto accepts_dataset() -> bool
   {
     return is_strided_dataset_v<DatasetT>;
   }
@@ -58,13 +58,13 @@ struct standard_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT>
   }
 
  private:
-  static dataset_descriptor_host<DataT, IndexT, DistanceT> init_(
-    const cagra::search_params& params,
-    const DataT* ptr,
-    IndexT size,
-    uint32_t dim,
-    uint32_t ld,
-    const DistanceT* dataset_norms = nullptr);
+  static auto init_(const cagra::search_params& params,
+                    const DataT* ptr,
+                    IndexT size,
+                    uint32_t dim,
+                    uint32_t ld,
+                    const DistanceT* dataset_norms = nullptr)
+    -> dataset_descriptor_host<DataT, IndexT, DistanceT>;
 };
 
 }  // namespace cuvs::neighbors::cagra::detail

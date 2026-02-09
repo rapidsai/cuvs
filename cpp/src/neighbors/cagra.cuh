@@ -50,7 +50,7 @@ void index<T, IdxT>::compute_dataset_norms_(raft::resources const& res)
                                                       dataset_view.data_handle(),
                                                       dataset_view.stride(0),
                                                       dataset_view.extent(0),
-                                                      (float)0,
+                                                      static_cast<float>(0),
                                                       raft::resource::get_cuda_stream(res),
                                                       false,
                                                       scaled_sq_op,
@@ -265,10 +265,10 @@ template <typename T,
           typename IdxT = uint32_t,
           typename Accessor =
             raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
-index<T, IdxT> build(
-  raft::resources const& res,
-  const index_params& params,
-  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
+auto build(raft::resources const& res,
+           const index_params& params,
+           raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
+  -> index<T, IdxT>
 {
   // Check if ACE dispatch is requested via graph_build_params
   if (std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params)) {
@@ -397,10 +397,10 @@ void extend(
 }
 
 template <class T, class IdxT>
-index<T, IdxT> merge(raft::resources const& handle,
-                     const cagra::index_params& params,
-                     std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,
-                     const cuvs::neighbors::filtering::base_filter& row_filter)
+auto merge(raft::resources const& handle,
+           const cagra::index_params& params,
+           std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,
+           const cuvs::neighbors::filtering::base_filter& row_filter) -> index<T, IdxT>
 {
   return cagra::detail::merge<T, IdxT>(handle, params, indices, row_filter);
 }

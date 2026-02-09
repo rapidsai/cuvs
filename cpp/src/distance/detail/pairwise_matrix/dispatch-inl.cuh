@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -102,7 +102,7 @@ void pairwise_matrix_dispatch(OpT distance_op,
     void* kernel_ptr  = reinterpret_cast<void*>(sm60_wrapper.kernel_ptr);
     auto runtime_arch = arch::kernel_virtual_arch(kernel_ptr);
 
-    // TODO: the cutlass doesn't support the odd `k` on half DataT.
+    // TODO(snanditale): the cutlass doesn't support the odd `k` on half DataT.
     bool if_unsupported_on_half = (sizeof(DataT) == 2) && ((k % 2) != 0);
 
     if (if_unsupported_on_half) {

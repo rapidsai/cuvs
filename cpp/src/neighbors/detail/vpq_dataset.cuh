@@ -230,7 +230,7 @@ auto train_pq(const raft::resources& res,
   const ix_t pq_bits      = params.pq_bits;
   const ix_t pq_n_centers = ix_t{1} << pq_bits;
   const ix_t pq_len       = raft::div_rounding_up_safe(dim, pq_dim);
-  const ix_t n_rows_train = std::min((ix_t)(n_rows * params.pq_kmeans_trainset_fraction),
+  const ix_t n_rows_train = std::min(static_cast<ix_t>(n_rows * params.pq_kmeans_trainset_fraction),
                                      params.max_train_points_per_pq_code * pq_n_centers);
   RAFT_EXPECTS(
     n_rows_train >= pq_n_centers,
@@ -388,7 +388,7 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_kernel(
     // find PQ label
     CodeT code = compute_code<SubWarpSize, CodeT>(
       dataset, vq_centers, pq_centers_smem_view, pq_centers, row_ix, j, vq_label);
-    // TODO: this writes in global memory one byte per warp, which is very slow.
+    // TODO(snanditale): this writes in global memory one byte per warp, which is very slow.
     //  It's better to keep the codes in the shared memory or registers and dump them at once.
     if (lane_id == 0) { code_view[j] = code; }
   }
@@ -434,7 +434,7 @@ void process_and_fill_codes(
 
   auto stream = raft::resource::get_cuda_stream(res);
 
-  // TODO: with scaling workspace we could choose the batch size dynamically
+  // TODO(snanditale): with scaling workspace we could choose the batch size dynamically
   constexpr ix_t kReasonableMaxBatchSize = 65536;
   constexpr ix_t kBlockSize              = 256;
   constexpr ix_t kMaxSharedMemorySize    = 16384;
@@ -525,7 +525,7 @@ auto vpq_convert_math_type(const raft::resources& res, vpq_dataset<OldMathT, Idx
 // Helper for operations using vectorized loads of raft::TxN_t
 template <typename MathT, int VectorSize>
 struct vec_op : raft::TxN_t<MathT, VectorSize> {
-  DI float sum_squares() const
+  DI auto sum_squares() const -> float
   {
     float sum = 0.0f;
 #pragma unroll

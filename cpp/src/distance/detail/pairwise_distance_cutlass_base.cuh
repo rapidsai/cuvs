@@ -132,22 +132,22 @@ std::enable_if_t<ops::has_cutlass_op<OpT>::value> cutlassDistanceKernel(const Da
       epilog_op_param,
       a,
       b,
-      xn,                   // C matrix eq vector param, which here is A norm
-      nullptr,              // tensor_Z,
-      (OutT*)yn + offsetN,  // this is broadcast vec, which is required to be non-const param
-      dOutput + offsetN,    // Output distance matrix
-      (int64_t)0,           // batch stride A
-      (int64_t)0,           // batch stride B
-      (int64_t)0,           // batch stride Norm A
-      (int64_t)0,
-      (int64_t)0,  // batch stride Norm B
-      (int64_t)0,  // batch stride Output
-      gemm_lda,    // stride A
-      gemm_ldb,    // stride B
-      1,           // stride A norm
-      0,           // this is no-op for Z
-      0,           // This must be zero
-      ldd          // stride Output matrix
+      xn,                       // C matrix eq vector param, which here is A norm
+      nullptr,                  // tensor_Z,
+      (OutT*)yn + offsetN,      // this is broadcast vec, which is required to be non-const param
+      dOutput + offsetN,        // Output distance matrix
+      static_cast<int64_t>(0),  // batch stride A
+      static_cast<int64_t>(0),  // batch stride B
+      static_cast<int64_t>(0),  // batch stride Norm A
+      static_cast<int64_t>(0),
+      static_cast<int64_t>(0),  // batch stride Norm B
+      static_cast<int64_t>(0),  // batch stride Output
+      gemm_lda,                 // stride A
+      gemm_ldb,                 // stride B
+      1,                        // stride A norm
+      0,                        // this is no-op for Z
+      0,                        // This must be zero
+      ldd                       // stride Output matrix
     };
 
     // Using the arguments, query for extra workspace required for matrix multiplication computation

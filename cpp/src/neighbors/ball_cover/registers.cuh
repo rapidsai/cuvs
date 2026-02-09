@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -74,7 +74,7 @@ RAFT_KERNEL perform_post_filter_registers(const value_t* X,
 
   __syncthreads();
 
-  // TODO: Would it be faster to use L1 for this?
+  // TODO(snanditale): Would it be faster to use L1 for this?
   value_t local_x_ptr[MAX_COL_Q];
   for (value_int j = 0; j < n_cols; ++j) {
     local_x_ptr[j] = X[n_cols * blockIdx.x + j];
@@ -313,7 +313,7 @@ RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
   __shared__ value_t shared_memK[kNumWarps * warp_q];
   __shared__ raft::KeyValuePair<value_t, value_idx> shared_memV[kNumWarps * warp_q];
 
-  // TODO: Separate kernels for different widths:
+  // TODO(snanditale): Separate kernels for different widths:
   // 1. Very small (between 3 and 32) just use registers for columns of "blockIdx.x"
   // 2. Can fit comfortably in shared memory (32 to a few thousand?)
   // 3. Load each time individually.
@@ -436,7 +436,7 @@ RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
 }
 
 template <typename value_t>
-__device__ value_t squared(const value_t& a)
+__device__ auto squared(const value_t& a) -> value_t
 {
   return a * a;
 }

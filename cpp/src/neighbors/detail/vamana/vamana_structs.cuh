@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -57,7 +57,8 @@ __device__ __host__ void swap(DistPair<IdxT, accT>* a, DistPair<IdxT, accT>* b)
 // Structure to sort by distance
 template <typename IdxT, typename accT>
 struct CmpDist {
-  __device__ bool operator()(const DistPair<IdxT, accT>& lhs, const DistPair<IdxT, accT>& rhs)
+  __device__ auto operator()(const DistPair<IdxT, accT>& lhs, const DistPair<IdxT, accT>& rhs)
+    -> bool
   {
     return lhs.dist < rhs.dist;
   }
@@ -66,7 +67,7 @@ struct CmpDist {
 // Used to sort reverse edges by destination
 template <typename IdxT>
 struct CmpEdge {
-  __device__ bool operator()(const IdxT& lhs, const IdxT& rhs) { return lhs < rhs; }
+  __device__ auto operator()(const IdxT& lhs, const IdxT& rhs) -> bool { return lhs < rhs; }
 };
 
 /*********************************************************************
@@ -81,7 +82,7 @@ class Point {
   int Dim;
   T* coords;
 
-  __host__ __device__ Point& operator=(const Point& other)
+  __host__ __device__ auto operator=(const Point& other) -> Point&
   {
     for (int i = 0; i < Dim; i++) {
       coords[i] = other.coords[i];
@@ -93,7 +94,7 @@ class Point {
 
 /* L2 fallback for low dimension when ILP is not possible */
 template <typename T, typename SUMTYPE>
-__device__ SUMTYPE l2_SEQ(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_vec)
+__device__ auto l2_SEQ(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_vec) -> SUMTYPE
 {
   SUMTYPE partial_sum = 0;
 
@@ -111,7 +112,7 @@ __device__ SUMTYPE l2_SEQ(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_vec
 
 /* L2 optimized with 2-way ILP for DIM >= 64 */
 template <typename T, typename SUMTYPE>
-__device__ SUMTYPE l2_ILP2(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_vec)
+__device__ auto l2_ILP2(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_vec) -> SUMTYPE
 {
   T temp_dst[2]          = {0, 0};
   SUMTYPE partial_sum[2] = {0, 0};
@@ -121,10 +122,11 @@ __device__ SUMTYPE l2_ILP2(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_ve
 
     partial_sum[0] = fmaf(
       (src_vec[0].coords[i] - temp_dst[0]), (src_vec[0].coords[i] - temp_dst[0]), partial_sum[0]);
-    if (i + 32 < src_vec->Dim)
+    if (i + 32 < src_vec->Dim) {
       partial_sum[1] = fmaf((src_vec[0].coords[i + 32] - temp_dst[1]),
                             (src_vec[0].coords[i + 32] - temp_dst[1]),
                             partial_sum[1]);
+    }
   }
   partial_sum[0] += partial_sum[1];
 
@@ -136,7 +138,7 @@ __device__ SUMTYPE l2_ILP2(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_ve
 
 /* L2 optimized with 4-way ILP for optimal performance for DIM >= 128 */
 template <typename T, typename SUMTYPE>
-__device__ SUMTYPE l2_ILP4(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_vec)
+__device__ auto l2_ILP4(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_vec) -> SUMTYPE
 {
   T temp_dst[4]          = {0, 0, 0, 0};
   SUMTYPE partial_sum[4] = {0, 0, 0, 0};
@@ -148,18 +150,21 @@ __device__ SUMTYPE l2_ILP4(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_ve
 
     partial_sum[0] = fmaf(
       (src_vec[0].coords[i] - temp_dst[0]), (src_vec[0].coords[i] - temp_dst[0]), partial_sum[0]);
-    if (i + 32 < src_vec->Dim)
+    if (i + 32 < src_vec->Dim) {
       partial_sum[1] = fmaf((src_vec[0].coords[i + 32] - temp_dst[1]),
                             (src_vec[0].coords[i + 32] - temp_dst[1]),
                             partial_sum[1]);
-    if (i + 64 < src_vec->Dim)
+    }
+    if (i + 64 < src_vec->Dim) {
       partial_sum[2] = fmaf((src_vec[0].coords[i + 64] - temp_dst[2]),
                             (src_vec[0].coords[i + 64] - temp_dst[2]),
                             partial_sum[2]);
-    if (i + 96 < src_vec->Dim)
+    }
+    if (i + 96 < src_vec->Dim) {
       partial_sum[3] = fmaf((src_vec[0].coords[i + 96] - temp_dst[3]),
                             (src_vec[0].coords[i + 96] - temp_dst[3]),
                             partial_sum[3]);
+    }
   }
   partial_sum[0] += partial_sum[1] + partial_sum[2] + partial_sum[3];
 
@@ -172,7 +177,8 @@ __device__ SUMTYPE l2_ILP4(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_ve
 
 /* Selects ILP optimization level based on dimension */
 template <typename T, typename SUMTYPE>
-__forceinline__ __device__ SUMTYPE l2(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_vec)
+__forceinline__ __device__ auto l2(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_vec)
+  -> SUMTYPE
 {
   if (src_vec->Dim >= 128) {
     return l2_ILP4<T, SUMTYPE>(src_vec, dst_vec);
@@ -185,7 +191,7 @@ __forceinline__ __device__ SUMTYPE l2(Point<T, SUMTYPE>* src_vec, Point<T, SUMTY
 
 /* Convert vectors to point structure to performance distance comparison */
 template <typename T, typename SUMTYPE>
-__host__ __device__ SUMTYPE l2(const T* src, const T* dest, int dim)
+__host__ __device__ auto l2(const T* src, const T* dest, int dim) -> SUMTYPE
 {
   Point<T, SUMTYPE> src_p;
   src_p.coords = const_cast<T*>(src);
@@ -199,8 +205,10 @@ __host__ __device__ SUMTYPE l2(const T* src, const T* dest, int dim)
 
 // Currently only L2Expanded is supported
 template <typename T, typename SUMTYPE>
-__host__ __device__ SUMTYPE
-dist(const T* src, const T* dest, int dim, cuvs::distance::DistanceType metric)
+__host__ __device__ auto dist(const T* src,
+                              const T* dest,
+                              int dim,
+                              cuvs::distance::DistanceType metric) -> SUMTYPE
 {
   return l2<T, SUMTYPE>(src, dest, dim);
 }
@@ -227,7 +235,7 @@ struct QueryCandidates {
   }
 
   // Checks current list to see if a node as previously been visited
-  __inline__ __device__ bool check_visited(IdxT target, accT dist)
+  __inline__ __device__ auto check_visited(IdxT target, accT dist) -> bool
   {
     __syncthreads();
     __shared__ bool found;
@@ -319,7 +327,7 @@ __global__ void set_query_ids(void* query_list_ptr, IdxT* d_query_ids, int step_
 }
 
 // Compute prefix sums on sizes. Currently only works with 1 thread
-// TODO replace with parallel version
+// TODO(snanditale): replace with parallel version
 template <typename accT, typename IdxT = uint32_t>
 __global__ void prefix_sums_sizes(QueryCandidates<IdxT, accT>* query_list,
                                   int num_queries,

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -19,7 +19,7 @@
 namespace cuvs::core::detail {
 
 template <typename AccessorType>
-DLDevice accessor_type_to_DLDevice()
+auto accessor_type_to_DLDevice() -> DLDevice
 {
   if constexpr (AccessorType::is_host_accessible and AccessorType::is_device_accessible) {
     return DLDevice{kDLCUDAManaged};
@@ -31,7 +31,7 @@ DLDevice accessor_type_to_DLDevice()
 }
 
 template <typename T>
-DLDataType data_type_to_DLDataType()
+auto data_type_to_DLDataType() -> DLDataType
 {
   uint8_t const bits{sizeof(T) * 8};
   uint16_t const lanes{1};
@@ -46,19 +46,19 @@ DLDataType data_type_to_DLDataType()
   }
 }
 
-inline bool is_dlpack_device_compatible(DLTensor tensor)
+inline auto is_dlpack_device_compatible(DLTensor tensor) -> bool
 {
   return tensor.device.device_type == kDLCUDAManaged || tensor.device.device_type == kDLCUDAHost ||
          tensor.device.device_type == kDLCUDA;
 }
 
-inline bool is_dlpack_host_compatible(DLTensor tensor)
+inline auto is_dlpack_host_compatible(DLTensor tensor) -> bool
 {
   return tensor.device.device_type == kDLCUDAManaged || tensor.device.device_type == kDLCUDAHost ||
          tensor.device.device_type == kDLCPU;
 }
 
-inline bool is_f_contiguous(DLManagedTensor* managed_tensor)
+inline auto is_f_contiguous(DLManagedTensor* managed_tensor) -> bool
 {
   auto tensor = managed_tensor->dl_tensor;
 
@@ -72,7 +72,7 @@ inline bool is_f_contiguous(DLManagedTensor* managed_tensor)
   return true;
 }
 
-inline bool is_c_contiguous(DLManagedTensor* managed_tensor)
+inline auto is_c_contiguous(DLManagedTensor* managed_tensor) -> bool
 {
   auto tensor = managed_tensor->dl_tensor;
 
@@ -91,7 +91,7 @@ inline bool is_c_contiguous(DLManagedTensor* managed_tensor)
 }
 
 template <typename MdspanType, typename = raft::is_mdspan_t<MdspanType>>
-inline MdspanType from_dlpack(DLManagedTensor* managed_tensor)
+inline auto from_dlpack(DLManagedTensor* managed_tensor) -> MdspanType
 {
   auto tensor = managed_tensor->dl_tensor;
 

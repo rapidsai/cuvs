@@ -93,7 +93,8 @@ void select_residuals(raft::resources const& handle,
   // need to know it, any strictly positive number would work.
   thrust::transform_iterator<utils::mapping<float>, const T*, thrust::use_default, float>
     mapping_itr(dataset, utils::mapping<float>{});
-  raft::matrix::gather(mapping_itr, (IdxT)dim, n_rows, row_ids, n_rows, tmp.data(), stream);
+  raft::matrix::gather(
+    mapping_itr, static_cast<IdxT>(dim), n_rows, row_ids, n_rows, tmp.data(), stream);
 
   raft::matrix::linewise_op<raft::Apply::ALONG_ROWS>(
     handle,
@@ -1284,7 +1285,7 @@ auto build(raft::resources const& handle,
         "kmeans_trainset_fraction, or set large_workspace_resource appropriately.");
       throw;
     }
-    // TODO: a proper sampling
+    // TODO(snanditale): a proper sampling
     if constexpr (std::is_same_v<T, float>) {
       raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset.view());
     } else {
@@ -1319,7 +1320,8 @@ auto build(raft::resources const& handle,
       cluster_centers, impl->n_lists(), impl->dim());
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
-    kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>((int)impl->metric());
+    kmeans_params.metric =
+      static_cast<cuvs::distance::DistanceType>(static_cast<int>(impl->metric()));
 
     if (impl->metric() == distance::DistanceType::CosineExpanded) {
       raft::linalg::row_normalize<raft::linalg::L2Norm>(

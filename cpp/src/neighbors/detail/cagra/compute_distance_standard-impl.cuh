@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -276,14 +276,13 @@ template <cuvs::distance::DistanceType Metric,
           typename DataT,
           typename IndexT,
           typename DistanceT>
-dataset_descriptor_host<DataT, IndexT, DistanceT>
-standard_descriptor_spec<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>::init_(
+auto standard_descriptor_spec<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>::init_(
   const cagra::search_params& params,
   const DataT* ptr,
   IndexT size,
   uint32_t dim,
   uint32_t ld,
-  const DistanceT* dataset_norms)
+  const DistanceT* dataset_norms) -> dataset_descriptor_host<DataT, IndexT, DistanceT>
 {
   using desc_type =
     standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -106,10 +106,10 @@ RAFT_KERNEL compute_chunked_a_b_kernel(value_t* a,
 }
 
 template <typename value_idx, typename label_idx>
-rmm::device_uvector<value_idx> get_cluster_counts(raft::resources const& handle,
-                                                  const label_idx* y,
-                                                  value_idx& n_rows,
-                                                  label_idx& n_labels)
+auto get_cluster_counts(raft::resources const& handle,
+                        const label_idx* y,
+                        value_idx& n_rows,
+                        label_idx& n_labels) -> rmm::device_uvector<value_idx>
 {
   auto stream = raft::resource::get_cuda_stream(handle);
 
@@ -123,14 +123,14 @@ rmm::device_uvector<value_idx> get_cluster_counts(raft::resources const& handle,
 }
 
 template <typename value_t, typename value_idx>
-rmm::device_uvector<value_t> get_pairwise_distance(raft::resources const& handle,
-                                                   const value_t* left_begin,
-                                                   const value_t* right_begin,
-                                                   value_idx& n_left_rows,
-                                                   value_idx& n_right_rows,
-                                                   value_idx& n_cols,
-                                                   cuvs::distance::DistanceType metric,
-                                                   cudaStream_t stream)
+auto get_pairwise_distance(raft::resources const& handle,
+                           const value_t* left_begin,
+                           const value_t* right_begin,
+                           value_idx& n_left_rows,
+                           value_idx& n_right_rows,
+                           value_idx& n_cols,
+                           cuvs::distance::DistanceType metric,
+                           cudaStream_t stream) -> rmm::device_uvector<value_t>
 {
   rmm::device_uvector<value_t> distances(n_left_rows * n_right_rows, stream);
 
@@ -159,15 +159,15 @@ void compute_chunked_a_b(raft::resources const& handle,
                          cudaStream_t stream)
 {
   dim3 block_size(std::min(dist_rows, 32), std::min(dist_cols, 32));
-  dim3 grid_size(raft::ceildiv(dist_rows, (value_idx)block_size.x),
-                 raft::ceildiv(dist_cols, (value_idx)block_size.y));
+  dim3 grid_size(raft::ceildiv(dist_rows, static_cast<value_idx>(block_size.x)),
+                 raft::ceildiv(dist_cols, static_cast<value_idx>(block_size.y)));
 
   detail::compute_chunked_a_b_kernel<<<grid_size, block_size, 0, stream>>>(
     a, b, row_offset, col_offset, y, n_labels, cluster_counts, distances, dist_rows, dist_cols);
 }
 
 template <typename value_t, typename value_idx, typename label_idx>
-value_t silhouette_score(
+auto silhouette_score(
   raft::resources const& handle,
   const value_t* X,
   value_idx n_rows,
@@ -176,7 +176,7 @@ value_t silhouette_score(
   label_idx n_labels,
   value_t* scores,
   value_idx chunk,
-  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded)
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded) -> value_t
 {
   ASSERT(n_labels >= 2 && n_labels <= (n_rows - 1),
          "silhouette Score not defined for the given number of labels!");
@@ -205,8 +205,8 @@ value_t silhouette_score(
   thrust::fill(policy, a_ptr, a_ptr + n_rows, 0);
 
   dim3 block_size(std::min(n_rows, 32), std::min(n_labels, 32));
-  dim3 grid_size(raft::ceildiv(n_rows, (value_idx)block_size.x),
-                 raft::ceildiv(n_labels, (label_idx)block_size.y));
+  dim3 grid_size(raft::ceildiv(n_rows, static_cast<value_idx>(block_size.x)),
+                 raft::ceildiv(n_labels, static_cast<label_idx>(block_size.y)));
   detail::fill_b_kernel<<<grid_size, block_size, 0, stream>>>(
     b_ptr, y, n_rows, n_labels, cluster_counts.data());
 

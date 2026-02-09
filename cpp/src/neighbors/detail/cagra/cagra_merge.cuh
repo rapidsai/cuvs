@@ -30,10 +30,10 @@
 namespace cuvs::neighbors::cagra::detail {
 
 template <class T, class IdxT>
-index<T, IdxT> merge(raft::resources const& handle,
-                     const cagra::index_params& params,
-                     std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,
-                     const cuvs::neighbors::filtering::base_filter& row_filter)
+auto merge(raft::resources const& handle,
+           const cagra::index_params& params,
+           std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,
+           const cuvs::neighbors::filtering::base_filter& row_filter) -> index<T, IdxT>
 {
   using cagra_index_t = cuvs::neighbors::cagra::index<T, IdxT>;
   using ds_idx_type   = typename cagra_index_t::dataset_index_type;
@@ -86,8 +86,8 @@ index<T, IdxT> merge(raft::resources const& handle,
   };
 
   try {
-    auto updated_dataset =
-      raft::make_device_matrix<T, int64_t>(handle, int64_t(new_dataset_size), int64_t(dim));
+    auto updated_dataset = raft::make_device_matrix<T, int64_t>(
+      handle, static_cast<int64_t>(new_dataset_size), static_cast<int64_t>(dim));
 
     merge_dataset(updated_dataset.data_handle());
 
@@ -155,8 +155,8 @@ index<T, IdxT> merge(raft::resources const& handle,
 
     RAFT_LOG_DEBUG("cagra::merge: using host memory for merged dataset");
 
-    auto updated_dataset =
-      raft::make_host_matrix<T, std::int64_t>(std::int64_t(new_dataset_size), std::int64_t(dim));
+    auto updated_dataset = raft::make_host_matrix<T, std::int64_t>(
+      static_cast<std::int64_t>(new_dataset_size), static_cast<std::int64_t>(dim));
 
     merge_dataset(updated_dataset.data_handle());
 

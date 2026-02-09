@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -405,7 +405,7 @@ class cluster_loader {
   int64_t cur_idx_  = -1;
   int64_t copy_idx_ = -1;
 
-  size_t cluster_size(LabelT idx)
+  auto cluster_size(LabelT idx) -> size_t
   {
     if (idx + 1 < h_cluster_offsets_.extent(0)) {
       return h_cluster_offsets_(idx + 1) - h_cluster_offsets_(idx);
@@ -485,7 +485,8 @@ class cluster_loader {
    * @param cluster_idx: the index of the cluster to be loaded
    * @return device_matrix_view of the cluster vectors
    */
-  raft::device_matrix_view<T, int64_t> load_cluster(raft::resources const& res, LabelT cluster_idx)
+  auto load_cluster(raft::resources const& res, LabelT cluster_idx)
+    -> raft::device_matrix_view<T, int64_t>
   {
     size_t size = cluster_size(cluster_idx);
 

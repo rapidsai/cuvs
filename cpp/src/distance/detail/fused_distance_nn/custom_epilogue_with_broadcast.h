@@ -1,7 +1,7 @@
 // clang-format off
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2017 - 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0 AND BSD-3-Clause
  */
 // clang-format on
@@ -126,10 +126,10 @@ struct EpilogueWithBroadcastOpBaseCustom {
   //
 
   /// Constructor from Params
-  EpilogueWithBroadcastOpBaseCustom(Params const& params_) {}
+  explicit EpilogueWithBroadcastOpBaseCustom(Params const& params_) {}
 
   /// Determine if the source is needed. May return false if
-  bool is_source_needed() const { return true; }
+  [[nodiscard]] auto is_source_needed() const -> bool { return true; }
 
   CUTLASS_HOST_DEVICE
   void set_k_partition(int k_partition, int k_partition_count) {}

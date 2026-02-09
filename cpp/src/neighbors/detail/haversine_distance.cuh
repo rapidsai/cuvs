@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2020-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -15,7 +15,7 @@
 
 namespace cuvs::neighbors::detail {
 template <typename value_t, typename distance_t>
-DI distance_t compute_haversine(value_t x1, value_t y1, value_t x2, value_t y2)
+DI auto compute_haversine(value_t x1, value_t y1, value_t x2, value_t y2) -> distance_t
 {
   if constexpr ((std::is_same_v<distance_t, float> && std::is_same_v<value_t, half>)) {
     distance_t _x1 = __half2float(x1);

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -83,7 +83,7 @@ class PairwiseDistanceEpilogueElementwise {
     Params(DistanceOp_ dist_op, FinalOp final_op) : final_op_(final_op), dist_op_(dist_op) {}
 
     CUTLASS_HOST_DEVICE
-    Params() {}
+    Params() = default;
   };
 
  private:
@@ -100,14 +100,13 @@ class PairwiseDistanceEpilogueElementwise {
 
   /// Constructor from Params
   CUTLASS_HOST_DEVICE
-  PairwiseDistanceEpilogueElementwise(Params const& params)
+  explicit PairwiseDistanceEpilogueElementwise(Params const& params)
     : final_op(params.final_op_), elementwise_op(params.dist_op_)
   {
   }
 
   /// Returns true if source is needed
-  CUTLASS_HOST_DEVICE
-  bool is_source_needed() const
+  [[nodiscard]] CUTLASS_HOST_DEVICE auto is_source_needed() const -> bool
   {
     // we use for making sure C matrix path is used for A mat norm.
     return true;

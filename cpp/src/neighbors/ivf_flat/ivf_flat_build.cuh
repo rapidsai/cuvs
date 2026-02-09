@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -406,7 +406,7 @@ inline auto build(raft::resources const& handle,
     auto n_rows_train = n_rows / trainset_ratio;
     rmm::device_uvector<T> trainset(
       n_rows_train * index.dim(), stream, raft::resource::get_large_workspace_resource(handle));
-    // TODO: a proper sampling
+    // TODO(snanditale): a proper sampling
     RAFT_CUDA_TRY(cudaMemcpy2DAsync(trainset.data(),
                                     sizeof(T) * index.dim(),
                                     dataset,
@@ -480,7 +480,8 @@ inline void fill_refinement_index(raft::resources const& handle,
   auto& lists = refinement_index->lists();
   list_spec<uint32_t, T, IdxT> list_device_spec{refinement_index->dim(), false};
   for (uint32_t label = 0; label < n_lists; label++) {
-    ivf::resize_list(handle, lists[label], list_device_spec, n_candidates, uint32_t(0));
+    ivf::resize_list(
+      handle, lists[label], list_device_spec, n_candidates, static_cast<uint32_t>(0));
   }
   // Update the pointers and the sizes
   ivf::detail::recompute_internal_state(handle, *refinement_index);

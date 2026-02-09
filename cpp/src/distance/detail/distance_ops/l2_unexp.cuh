@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -26,7 +26,7 @@ struct l2_unexp_distance_op {
 
   bool sqrt;
 
-  l2_unexp_distance_op(bool sqrt_) noexcept : sqrt(sqrt_) {}
+  explicit l2_unexp_distance_op(bool sqrt_) noexcept : sqrt(sqrt_) {}
 
   // Do not load norms of data, the computation of L1 distance does not use them.
   static constexpr bool use_norms = false;

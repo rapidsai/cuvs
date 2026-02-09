@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -36,7 +36,7 @@ class ip_distances_t : public distances_t<value_t> {
    * Computes simple sparse inner product distances as sum(x_y * y_k)
    * @param[in] config specifies inputs, outputs, and sizes
    */
-  ip_distances_t(const distances_config_t<value_idx, value_t>& config)
+  explicit ip_distances_t(const distances_config_t<value_idx, value_t>& config)
     : config_(&config), coo_rows_b(config.b_nnz, raft::resource::get_cuda_stream(config.handle))
   {
     raft::sparse::convert::csr_to_coo(config_->b_indptr,
@@ -63,9 +63,9 @@ class ip_distances_t : public distances_t<value_t> {
                                                                raft::atomic_add_op());
   }
 
-  value_idx* b_rows_coo() { return coo_rows_b.data(); }
+  auto b_rows_coo() -> value_idx* { return coo_rows_b.data(); }
 
-  value_t* b_data_coo() { return config_->b_data; }
+  auto b_data_coo() -> value_t* { return config_->b_data; }
 
  private:
   const distances_config_t<value_idx, value_t>* config_;

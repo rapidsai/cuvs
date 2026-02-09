@@ -12,7 +12,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 
-// TODO: This shouldn't be invoking anything from spatial/knn
+// TODO(snanditale): This shouldn't be invoking anything from spatial/knn
 #include "../../../core/nvtx.hpp"
 #include "../../../core/omp_wrapper.hpp"
 #include "../ann_utils.cuh"
@@ -34,11 +34,11 @@ namespace cuvs::neighbors::cagra::detail::graph {
 
 // unnamed namespace to avoid multiple definition error
 namespace {
-inline double cur_time(void)
+inline auto cur_time(void) -> double
 {
   struct timeval tv;
   gettimeofday(&tv, nullptr);
-  return ((double)tv.tv_sec + (double)tv.tv_usec * 1e-6);
+  return (static_cast<double>(tv.tv_sec) + static_cast<double>(tv.tv_usec) * 1e-6);
 }
 
 template <typename T>
@@ -50,7 +50,7 @@ __device__ inline void swap(T& val1, T& val2)
 }
 
 template <typename K, typename V>
-__device__ inline bool swap_if_needed(K& key1, K& key2, V& val1, V& val2, bool ascending)
+__device__ inline auto swap_if_needed(K& key1, K& key2, V& val1, V& val2, bool ascending) -> bool
 {
   if (key1 == key2) { return false; }
   if ((key1 > key2) == ascending) {
@@ -173,7 +173,7 @@ __global__ void kern_prune(const IdxT* const knn_graph,  // [graph_chunk_size, g
   if (iA >= graph_size) { return; }
   for (uint32_t k = threadIdx.x; k < graph_degree; k += blockDim.x) {
     smem_num_detour[k] = 0;
-    if (knn_graph[k + ((uint64_t)graph_degree * iA)] == iA) {
+    if (knn_graph[k + (static_cast<uint64_t>(graph_degree) * iA)] == iA) {
       // Lower the priority of self-edge
       smem_num_detour[k] = graph_degree;
     }
@@ -185,7 +185,7 @@ __global__ void kern_prune(const IdxT* const knn_graph,  // [graph_chunk_size, g
     const uint64_t iD = knn_graph[kAD + (graph_degree * iA)];
     if (iD >= graph_size) { continue; }
     for (uint32_t kDB = threadIdx.x; kDB < graph_degree; kDB += blockDim.x) {
-      const uint64_t iB_candidate = knn_graph[kDB + ((uint64_t)graph_degree * iD)];
+      const uint64_t iB_candidate = knn_graph[kDB + (static_cast<uint64_t>(graph_degree) * iD)];
       for (uint32_t kAB = kAD + 1; kAB < graph_degree; kAB++) {
         // if ( kDB < kAB )
         {
@@ -202,7 +202,7 @@ __global__ void kern_prune(const IdxT* const knn_graph,  // [graph_chunk_size, g
 
   uint32_t num_edges_no_detour = 0;
   for (uint32_t k = threadIdx.x; k < graph_degree; k += blockDim.x) {
-    detour_count[k + (graph_degree * iA)] = min(smem_num_detour[k], (uint32_t)255);
+    detour_count[k + (graph_degree * iA)] = min(smem_num_detour[k], static_cast<uint32_t>(255));
     if (smem_num_detour[k] == 0) { num_edges_no_detour++; }
   }
   num_edges_no_detour += __shfl_xor_sync(0xffffffff, num_edges_no_detour, 1);
@@ -214,8 +214,11 @@ __global__ void kern_prune(const IdxT* const knn_graph,  // [graph_chunk_size, g
 
   if (threadIdx.x == 0) {
     num_no_detour_edges[iA] = num_edges_no_detour;
-    atomicAdd((unsigned long long int*)num_retain, (unsigned long long int)num_edges_no_detour);
-    if (num_edges_no_detour >= degree) { atomicAdd((unsigned long long int*)num_full, 1); }
+    atomicAdd(reinterpret_cast<unsigned long long int*>(num_retain),
+              static_cast<unsigned long long int>(num_edges_no_detour));
+    if (num_edges_no_detour >= degree) {
+      atomicAdd(reinterpret_cast<unsigned long long int*>(num_full), 1);
+    }
   }
 }
 
@@ -234,12 +237,12 @@ __global__ void kern_make_rev_graph(const IdxT* const dest_nodes,     // [graph_
     if (dest_id >= graph_size) continue;
 
     const uint32_t pos = atomicAdd(rev_graph_count + dest_id, 1);
-    if (pos < degree) { rev_graph[pos + ((uint64_t)degree * dest_id)] = src_id; }
+    if (pos < degree) { rev_graph[pos + (static_cast<uint64_t>(degree) * dest_id)] = src_id; }
   }
 }
 
 template <class IdxT, class LabelT>
-__device__ __host__ LabelT get_root_label(IdxT i, const LabelT* label)
+__device__ __host__ auto get_root_label(IdxT i, const LabelT* label) -> LabelT
 {
   LabelT l = label[i];
   while (l != label[l]) {
@@ -297,7 +300,7 @@ __global__ void kern_mst_opt_update_graph(IdxT* mst_graph,  // [graph_size, grap
     }
   }
   if (ret > 0) {
-    atomicAdd((unsigned long long int*)stats + ret, 1);
+    atomicAdd(reinterpret_cast<unsigned long long int*>(stats) + ret, 1);
     return;
   }
 
@@ -334,7 +337,7 @@ __global__ void kern_mst_opt_update_graph(IdxT* mst_graph,  // [graph_size, grap
       break;
     }
   }
-  if (ret > 0) { atomicAdd((unsigned long long int*)stats + ret, 1); }
+  if (ret > 0) { atomicAdd(reinterpret_cast<unsigned long long int*>(stats) + ret, 1); }
 }
 
 template <class IdxT>
@@ -390,7 +393,7 @@ __global__ void kern_mst_opt_cluster_size(IdxT* cluster_size,  // [graph_size]
 
   IdxT ri = get_root_label(i, label);
   if (ri == i) {
-    atomicAdd((unsigned long long int*)smem_num_clusters, 1);
+    atomicAdd(reinterpret_cast<unsigned long long int*>(smem_num_clusters), 1);
   } else {
     atomicAdd(cluster_size + ri, cluster_size[i]);
     cluster_size[i] = 0;
@@ -398,7 +401,8 @@ __global__ void kern_mst_opt_cluster_size(IdxT* cluster_size,  // [graph_size]
 
   __syncthreads();
   if ((threadIdx.x == 0) && (smem_num_clusters[0] > 0)) {
-    atomicAdd((unsigned long long int*)stats, (unsigned long long int)(smem_num_clusters[0]));
+    atomicAdd(reinterpret_cast<unsigned long long int*>(stats),
+              static_cast<unsigned long long int>(smem_num_clusters[0]));
   }
 }
 
@@ -435,19 +439,19 @@ __global__ void kern_mst_opt_postprocessing(IdxT* outgoing_num_edges,  // [graph
   // Calculate min/max of cluster_size
   if (cluster_size[i] > 0) {
     if (smem_cluster_size_min[0] > cluster_size[i]) {
-      atomicMin((unsigned long long int*)smem_cluster_size_min,
+      atomicMin(reinterpret_cast<unsigned long long int*>(smem_cluster_size_min),
                 (unsigned long long int)(cluster_size[i]));
     }
     if (smem_cluster_size_max[0] < cluster_size[i]) {
-      atomicMax((unsigned long long int*)smem_cluster_size_max,
+      atomicMax(reinterpret_cast<unsigned long long int*>(smem_cluster_size_max),
                 (unsigned long long int)(cluster_size[i]));
     }
   }
 
   // Calculate total number of outgoing/incoming edges
-  atomicAdd((unsigned long long int*)smem_total_outgoing_edges,
+  atomicAdd(reinterpret_cast<unsigned long long int*>(smem_total_outgoing_edges),
             (unsigned long long int)(outgoing_num_edges[i]));
-  atomicAdd((unsigned long long int*)smem_total_incoming_edges,
+  atomicAdd(reinterpret_cast<unsigned long long int*>(smem_total_incoming_edges),
             (unsigned long long int)(incoming_num_edges[i]));
 
   // Adjust incoming/outgoing_max_edges
@@ -460,19 +464,19 @@ __global__ void kern_mst_opt_postprocessing(IdxT* outgoing_num_edges,  // [graph
 
   __syncthreads();
   if (threadIdx.x == 0) {
-    atomicMin((unsigned long long int*)stats + 0,
-              (unsigned long long int)(smem_cluster_size_min[0]));
-    atomicMax((unsigned long long int*)stats + 1,
-              (unsigned long long int)(smem_cluster_size_max[0]));
-    atomicAdd((unsigned long long int*)stats + 2,
-              (unsigned long long int)(smem_total_outgoing_edges[0]));
-    atomicAdd((unsigned long long int*)stats + 3,
-              (unsigned long long int)(smem_total_incoming_edges[0]));
+    atomicMin(reinterpret_cast<unsigned long long int*>(stats) + 0,
+              static_cast<unsigned long long int>(smem_cluster_size_min[0]));
+    atomicMax(reinterpret_cast<unsigned long long int*>(stats) + 1,
+              static_cast<unsigned long long int>(smem_cluster_size_max[0]));
+    atomicAdd(reinterpret_cast<unsigned long long int*>(stats) + 2,
+              static_cast<unsigned long long int>(smem_total_outgoing_edges[0]));
+    atomicAdd(reinterpret_cast<unsigned long long int*>(stats) + 3,
+              static_cast<unsigned long long int>(smem_total_incoming_edges[0]));
   }
 }
 
 template <class T>
-uint64_t pos_in_array(T val, const T* array, uint64_t num)
+auto pos_in_array(T val, const T* array, uint64_t num) -> uint64_t
 {
   for (uint64_t i = 0; i < num; i++) {
     if (val == array[i]) { return i; }

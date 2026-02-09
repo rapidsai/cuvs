@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -32,7 +32,7 @@ void _cuann_find_topk(uint32_t topK,
                       void* workspace,
                       bool sort           = false,
                       uint32_t* hint      = NULL,
-                      cudaStream_t stream = 0);
+                      cudaStream_t stream = nullptr);
 
 #ifdef __CUDA_ARCH__
 #define CUDA_DEVICE_HOST_FUNC __device__

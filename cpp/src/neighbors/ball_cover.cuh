@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -431,7 +431,7 @@ void knn_query(raft::resources const& handle,
 
 /** @} */
 
-// TODO: implement functions for:
+// TODO(snanditale): implement functions for:
 //  4. rbc_eps_neigh() - given a populated index, perform query against different query array
 //  5. rbc_all_eps_neigh() - populate a cuvs::neighbors::ball_cover::index and query against
 //  training data

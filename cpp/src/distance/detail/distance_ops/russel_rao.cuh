@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -25,7 +25,7 @@ struct russel_rao_distance_op {
   IdxT k;
   const float one_over_k;
 
-  russel_rao_distance_op(IdxT k_) noexcept : k(k_), one_over_k(1.0f / k_) {}
+  explicit russel_rao_distance_op(IdxT k_) noexcept : k(k_), one_over_k(1.0f / k_) {}
 
   // Load norms of input data
   static constexpr bool use_norms = false;

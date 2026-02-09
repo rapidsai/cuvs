@@ -282,7 +282,7 @@ struct PairwiseDistances : public BaseClass {
 };  // struct PairwiseDistances
 
 template <typename P, typename IdxT, typename T>
-dim3 launchConfigGenerator(IdxT m, IdxT n, std::size_t sMemSize, T func)
+auto launchConfigGenerator(IdxT m, IdxT n, std::size_t sMemSize, T func) -> dim3
 {
   int devId;
   RAFT_CUDA_TRY(cudaGetDevice(&devId));

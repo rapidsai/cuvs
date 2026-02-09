@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2018-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -30,7 +30,7 @@ using MutualReachabilityFixConnectivitiesRedOp =
  * @return total number of components
  */
 template <typename value_idx>
-value_idx get_n_components(value_idx* colors, size_t n_rows, cudaStream_t stream)
+auto get_n_components(value_idx* colors, size_t n_rows, cudaStream_t stream) -> value_idx
 {
   return detail::get_n_components(colors, n_rows, stream);
 }

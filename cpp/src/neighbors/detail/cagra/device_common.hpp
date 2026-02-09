@@ -9,7 +9,7 @@
 
 #include <cuvs/distance/distance.hpp>
 
-// TODO: This shouldn't be invoking anything in detail APIs outside of cuvs/neighbors
+// TODO(snanditale): This shouldn't be invoking anything in detail APIs outside of cuvs/neighbors
 #include <raft/core/detail/macros.hpp>
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/warp_primitives.cuh>
@@ -30,7 +30,7 @@ using LOAD_128BIT_T = uint4;
 using LOAD_64BIT_T  = uint64_t;
 
 template <class LOAD_T, class DATA_T>
-RAFT_DEVICE_INLINE_FUNCTION constexpr unsigned get_vlen()
+RAFT_DEVICE_INLINE_FUNCTION constexpr auto get_vlen() -> unsigned
 {
   return utils::size_of<LOAD_T>() / utils::size_of<DATA_T>();
 }
@@ -39,7 +39,7 @@ RAFT_DEVICE_INLINE_FUNCTION constexpr unsigned get_vlen()
  *
  * See https://en.wikipedia.org/wiki/Xorshift#xorshift for reference.
  */
-_RAFT_HOST_DEVICE inline uint64_t xorshift64(uint64_t u)
+_RAFT_HOST_DEVICE inline auto xorshift64(uint64_t u) -> uint64_t
 {
   u ^= u >> 12;
   u ^= u << 25;

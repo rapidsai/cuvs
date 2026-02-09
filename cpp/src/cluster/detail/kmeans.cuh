@@ -273,7 +273,7 @@ void update_centroids(raft::resources const& handle,
                       raft::device_vector_view<const DataT, IndexT> sample_weights,
                       raft::device_matrix_view<const DataT, IndexT, raft::row_major> centroids,
 
-                      // TODO: Figure out how to best wrap iterator types in mdspan
+                      // TODO(snanditale): Figure out how to best wrap iterator types in mdspan
                       LabelsIterator cluster_labels,
                       raft::device_vector_view<DataT, IndexT> weight_per_cluster,
                       raft::device_matrix_view<DataT, IndexT, raft::row_major> new_centroids,
@@ -337,7 +337,7 @@ void update_centroids(raft::resources const& handle,
     raft::resource::get_cuda_stream(handle));
 }
 
-// TODO: Resizing is needed to use mdarray instead of rmm::device_uvector
+// TODO(snanditale): Resizing is needed to use mdarray instead of rmm::device_uvector
 template <typename DataT, typename IndexT>
 void kmeans_fit_main(raft::resources const& handle,
                      const cuvs::cluster::kmeans::params& params,
@@ -501,7 +501,7 @@ void kmeans_fit_main(raft::resources const& handle,
     params.batch_centroids,
     workspace);
 
-  // TODO: add different templates for InType of binaryOp to avoid thrust transform
+  // TODO(snanditale): add different templates for InType of binaryOp to avoid thrust transform
   thrust::transform(raft::resource::get_thrust_policy(handle),
                     minClusterAndDistance.data_handle(),
                     minClusterAndDistance.data_handle() + minClusterAndDistance.size(),
@@ -812,9 +812,10 @@ void kmeans_fit(raft::resources const& handle,
   auto n_clusters     = pams.n_clusters;
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   // Check that parameters are valid
-  if (sample_weight.has_value())
+  if (sample_weight.has_value()) {
     RAFT_EXPECTS(sample_weight.value().extent(0) == n_samples,
                  "invalid parameter (sample_weight!=n_samples)");
+  }
   RAFT_EXPECTS(n_clusters > 0, "invalid parameter (n_clusters<=0)");
   RAFT_EXPECTS(pams.tol > 0, "invalid parameter (tol<=0)");
   RAFT_EXPECTS(pams.oversampling_factor >= 0, "invalid parameter (oversampling_factor<0)");
@@ -849,13 +850,14 @@ void kmeans_fit(raft::resources const& handle,
   // Allocate memory
   rmm::device_uvector<char> workspace(0, stream);
   auto weight = raft::make_device_vector<DataT>(handle, n_samples);
-  if (sample_weight.has_value())
+  if (sample_weight.has_value()) {
     raft::copy(weight.data_handle(), sample_weight.value().data_handle(), n_samples, stream);
-  else
+  } else {
     thrust::fill(raft::resource::get_thrust_policy(handle),
                  weight.data_handle(),
                  weight.data_handle() + weight.size(),
                  1);
+  }
 
   // check if weights sum up to n_samples
   checkWeight<DataT>(handle, weight.view(), workspace);
@@ -896,12 +898,13 @@ void kmeans_fit(raft::resources const& handle,
         "k-means++ algorithm.",
         seed_iter + 1,
         n_init);
-      if (iter_params.oversampling_factor == 0)
+      if (iter_params.oversampling_factor == 0) {
         cuvs::cluster::kmeans::detail::kmeansPlusPlus<DataT, IndexT>(
           handle, iter_params, X, centroidsRawData.view(), workspace);
-      else
+      } else {
         cuvs::cluster::kmeans::detail::initScalableKMeansPlusPlus<DataT, IndexT>(
           handle, iter_params, X, centroidsRawData.view(), workspace);
+      }
     } else if (iter_params.init == cuvs::cluster::kmeans::params::InitMethod::Array) {
       RAFT_LOG_DEBUG(
         "KMeans.fit (Iteration-%d/%d): initialize cluster centers from "
@@ -979,9 +982,10 @@ void kmeans_predict(raft::resources const& handle,
   auto n_features     = X.extent(1);
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   // Check that parameters are valid
-  if (sample_weight.has_value())
+  if (sample_weight.has_value()) {
     RAFT_EXPECTS(sample_weight.value().extent(0) == n_samples,
                  "invalid parameter (sample_weight!=n_samples)");
+  }
   RAFT_EXPECTS(pams.n_clusters > 0, "invalid parameter (n_clusters<=0)");
   RAFT_EXPECTS(pams.tol > 0, "invalid parameter (tol<=0)");
   RAFT_EXPECTS(pams.oversampling_factor >= 0, "invalid parameter (oversampling_factor<0)");
@@ -997,13 +1001,14 @@ void kmeans_predict(raft::resources const& handle,
   // Device-accessible allocation of expandable storage used as temporary buffers
   rmm::device_uvector<char> workspace(0, stream);
   auto weight = raft::make_device_vector<DataT, IndexT>(handle, n_samples);
-  if (sample_weight.has_value())
+  if (sample_weight.has_value()) {
     raft::copy(weight.data_handle(), sample_weight.value().data_handle(), n_samples, stream);
-  else
+  } else {
     thrust::fill(raft::resource::get_thrust_policy(handle),
                  weight.data_handle(),
                  weight.data_handle() + weight.size(),
                  1);
+  }
 
   // check if weights sum up to n_samples
   if (normalize_weight) checkWeight(handle, weight.view(), workspace);
@@ -1041,7 +1046,7 @@ void kmeans_predict(raft::resources const& handle,
 
   // calculate cluster cost phi_x(C)
   rmm::device_scalar<DataT> clusterCostD(stream);
-  // TODO: add different templates for InType of binaryOp to avoid thrust transform
+  // TODO(snanditale): add different templates for InType of binaryOp to avoid thrust transform
   thrust::transform(raft::resource::get_thrust_policy(handle),
                     minClusterAndDistance.data_handle(),
                     minClusterAndDistance.data_handle() + minClusterAndDistance.size(),

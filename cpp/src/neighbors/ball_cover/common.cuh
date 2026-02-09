@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -14,7 +14,7 @@ namespace cuvs::neighbors::ball_cover::detail {
 
 struct NNComp {
   template <typename one, typename two>
-  __host__ __device__ bool operator()(const one& t1, const two& t2)
+  __host__ __device__ auto operator()(const one& t1, const two& t2) -> bool
   {
     // sort first by each sample's reference landmark,
     if (thrust::get<0>(t1) < thrust::get<0>(t2)) return true;
@@ -45,7 +45,7 @@ __device__ inline void _zero_bit(std::uint32_t* arr, std::uint32_t h)
  * Returns whether or not bit at location h is nonzero in a one-hot
  * encoded 32-bit in array.
  */
-__device__ inline bool _get_val(std::uint32_t* arr, std::uint32_t h)
+__device__ inline auto _get_val(std::uint32_t* arr, std::uint32_t h) -> bool
 {
   int bit = h % 32;
   int idx = h / 32;

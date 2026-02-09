@@ -1,6 +1,6 @@
 /**
  * SPDX-FileCopyrightText: Copyright (c) Facebook, Inc. and its affiliates.
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 /*
@@ -15,7 +15,7 @@
 namespace cuvs::neighbors::detail::faiss_select {
 
 template <typename T>
-inline __device__ void swap(bool swap, T& x, T& y)
+inline __device__ auto swap(bool swap, T& x, T& y) -> void
 {
   T tmp = x;
   x     = swap ? y : x;
@@ -23,7 +23,7 @@ inline __device__ void swap(bool swap, T& x, T& y)
 }
 
 template <typename T>
-inline __device__ void assign(bool assign, T& x, T y)
+inline __device__ auto assign(bool assign, T& x, T y) -> void
 {
   x = assign ? y : x;
 }

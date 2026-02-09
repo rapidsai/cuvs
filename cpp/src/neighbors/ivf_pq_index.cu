@@ -44,91 +44,92 @@ index_impl<IdxT>::index_impl(raft::resources const& handle,
 }
 
 template <typename IdxT>
-cuvs::distance::DistanceType index_impl<IdxT>::metric() const noexcept
+auto index_impl<IdxT>::metric() const noexcept -> cuvs::distance::DistanceType
 {
   return metric_;
 }
 
 template <typename IdxT>
-codebook_gen index_impl<IdxT>::codebook_kind() const noexcept
+auto index_impl<IdxT>::codebook_kind() const noexcept -> codebook_gen
 {
   return codebook_kind_;
 }
 
 template <typename IdxT>
-list_layout index_impl<IdxT>::codes_layout() const noexcept
+auto index_impl<IdxT>::codes_layout() const noexcept -> list_layout
 {
   return codes_layout_;
 }
 
 template <typename IdxT>
-IdxT index_impl<IdxT>::size() const noexcept
+auto index_impl<IdxT>::size() const noexcept -> IdxT
 {
   return accum_sorted_sizes_(n_lists());
 }
 
 template <typename IdxT>
-uint32_t index_impl<IdxT>::dim() const noexcept
+auto index_impl<IdxT>::dim() const noexcept -> uint32_t
 {
   return dim_;
 }
 
 template <typename IdxT>
-uint32_t index_impl<IdxT>::dim_ext() const noexcept
+auto index_impl<IdxT>::dim_ext() const noexcept -> uint32_t
 {
   return raft::round_up_safe(dim_ + 1, 8u);
 }
 
 template <typename IdxT>
-uint32_t index_impl<IdxT>::rot_dim() const noexcept
+auto index_impl<IdxT>::rot_dim() const noexcept -> uint32_t
 {
   return pq_len() * pq_dim_;
 }
 
 template <typename IdxT>
-uint32_t index_impl<IdxT>::pq_bits() const noexcept
+auto index_impl<IdxT>::pq_bits() const noexcept -> uint32_t
 {
   return pq_bits_;
 }
 
 template <typename IdxT>
-uint32_t index_impl<IdxT>::pq_dim() const noexcept
+auto index_impl<IdxT>::pq_dim() const noexcept -> uint32_t
 {
   return pq_dim_;
 }
 
 template <typename IdxT>
-uint32_t index_impl<IdxT>::pq_len() const noexcept
+auto index_impl<IdxT>::pq_len() const noexcept -> uint32_t
 {
   return raft::div_rounding_up_unsafe(dim_, pq_dim_);
 }
 
 template <typename IdxT>
-uint32_t index_impl<IdxT>::pq_book_size() const noexcept
+auto index_impl<IdxT>::pq_book_size() const noexcept -> uint32_t
 {
   return 1 << pq_bits_;
 }
 
 template <typename IdxT>
-uint32_t index_impl<IdxT>::n_lists() const noexcept
+auto index_impl<IdxT>::n_lists() const noexcept -> uint32_t
 {
   return lists_.size();
 }
 
 template <typename IdxT>
-bool index_impl<IdxT>::conservative_memory_allocation() const noexcept
+auto index_impl<IdxT>::conservative_memory_allocation() const noexcept -> bool
 {
   return conservative_memory_allocation_;
 }
 
 template <typename IdxT>
-std::vector<std::shared_ptr<list_data_base<IdxT>>>& index_impl<IdxT>::lists() noexcept
+auto index_impl<IdxT>::lists() noexcept -> std::vector<std::shared_ptr<list_data_base<IdxT>>>&
 {
   return lists_;
 }
 
 template <typename IdxT>
-const std::vector<std::shared_ptr<list_data_base<IdxT>>>& index_impl<IdxT>::lists() const noexcept
+auto index_impl<IdxT>::lists() const noexcept
+  -> const std::vector<std::shared_ptr<list_data_base<IdxT>>>&
 {
   return lists_;
 }
@@ -417,79 +418,79 @@ index<IdxT>::index(raft::resources const& handle, const index_params& params, ui
 
 // Delegation methods - forward to impl accessor methods
 template <typename IdxT>
-IdxT index<IdxT>::size() const noexcept
+auto index<IdxT>::size() const noexcept -> IdxT
 {
   return impl_->size();
 }
 
 template <typename IdxT>
-uint32_t index<IdxT>::dim() const noexcept
+auto index<IdxT>::dim() const noexcept -> uint32_t
 {
   return impl_->dim();
 }
 
 template <typename IdxT>
-uint32_t index<IdxT>::dim_ext() const noexcept
+auto index<IdxT>::dim_ext() const noexcept -> uint32_t
 {
   return impl_->dim_ext();
 }
 
 template <typename IdxT>
-uint32_t index<IdxT>::rot_dim() const noexcept
+auto index<IdxT>::rot_dim() const noexcept -> uint32_t
 {
   return impl_->rot_dim();
 }
 
 template <typename IdxT>
-uint32_t index<IdxT>::pq_bits() const noexcept
+auto index<IdxT>::pq_bits() const noexcept -> uint32_t
 {
   return impl_->pq_bits();
 }
 
 template <typename IdxT>
-uint32_t index<IdxT>::pq_dim() const noexcept
+auto index<IdxT>::pq_dim() const noexcept -> uint32_t
 {
   return impl_->pq_dim();
 }
 
 template <typename IdxT>
-uint32_t index<IdxT>::pq_len() const noexcept
+auto index<IdxT>::pq_len() const noexcept -> uint32_t
 {
   return impl_->pq_len();
 }
 
 template <typename IdxT>
-uint32_t index<IdxT>::pq_book_size() const noexcept
+auto index<IdxT>::pq_book_size() const noexcept -> uint32_t
 {
   return impl_->pq_book_size();
 }
 
 template <typename IdxT>
-cuvs::distance::DistanceType index<IdxT>::metric() const noexcept
+auto index<IdxT>::metric() const noexcept -> cuvs::distance::DistanceType
 {
   return impl_->metric();
 }
 
 template <typename IdxT>
-codebook_gen index<IdxT>::codebook_kind() const noexcept
+auto index<IdxT>::codebook_kind() const noexcept -> codebook_gen
 {
   return impl_->codebook_kind();
 }
 
 template <typename IdxT>
-list_layout index<IdxT>::codes_layout() const noexcept
+auto index<IdxT>::codes_layout() const noexcept -> list_layout
 {
   return impl_->codes_layout();
 }
 
 template <typename IdxT>
-uint32_t index<IdxT>::n_lists() const noexcept
+auto index<IdxT>::n_lists() const noexcept -> uint32_t
 {
   return impl_->n_lists();
 }
 
 template <typename IdxT>
-bool index<IdxT>::conservative_memory_allocation() const noexcept
+auto index<IdxT>::conservative_memory_allocation() const noexcept -> bool
 {
   return impl_->conservative_memory_allocation();
 }
@@ -523,13 +524,14 @@ raft::device_matrix_view<const float, uint32_t, raft::row_major> index<IdxT>::ro
 }
 
 template <typename IdxT>
-std::vector<std::shared_ptr<list_data_base<IdxT>>>& index<IdxT>::lists() noexcept
+auto index<IdxT>::lists() noexcept -> std::vector<std::shared_ptr<list_data_base<IdxT>>>&
 {
   return impl_->lists();
 }
 
 template <typename IdxT>
-const std::vector<std::shared_ptr<list_data_base<IdxT>>>& index<IdxT>::lists() const noexcept
+auto index<IdxT>::lists() const noexcept
+  -> const std::vector<std::shared_ptr<list_data_base<IdxT>>>&
 {
   return impl_->lists();
 }
@@ -589,7 +591,7 @@ raft::device_vector_view<const uint32_t, uint32_t, raft::row_major> index<IdxT>:
 // centers() and centers_rot() are now pure virtual and implemented in derived classes
 
 template <typename IdxT>
-uint32_t index<IdxT>::get_list_size_in_bytes(uint32_t label) const
+auto index<IdxT>::get_list_size_in_bytes(uint32_t label) const -> uint32_t
 {
   return impl_->get_list_size_in_bytes(label);
 }
@@ -608,7 +610,7 @@ void index_impl<IdxT>::check_consistency()
 }
 
 template <typename IdxT>
-uint32_t index<IdxT>::calculate_pq_dim(uint32_t dim)
+auto index<IdxT>::calculate_pq_dim(uint32_t dim) -> uint32_t
 {
   if (dim >= 128) { dim /= 2; }
   auto r = raft::round_down_safe<uint32_t>(dim, 32);
@@ -621,7 +623,7 @@ uint32_t index<IdxT>::calculate_pq_dim(uint32_t dim)
 }
 
 template <typename IdxT>
-uint32_t index_impl<IdxT>::get_list_size_in_bytes(uint32_t label) const
+auto index_impl<IdxT>::get_list_size_in_bytes(uint32_t label) const -> uint32_t
 {
   RAFT_EXPECTS(label < lists_.size(),
                "Expected label to be less than number of lists in the index");

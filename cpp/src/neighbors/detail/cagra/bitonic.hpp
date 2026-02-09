@@ -1,10 +1,10 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
-// TODO: This shouldn't be calling RAFT detail APIs
+// TODO(snanditale): This shouldn't be calling RAFT detail APIs
 #include <raft/core/detail/macros.hpp>
 
 #include <cstdint>

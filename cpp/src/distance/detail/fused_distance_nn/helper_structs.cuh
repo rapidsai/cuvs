@@ -27,8 +27,11 @@ namespace detail {
 template <typename LabelT, typename DataT>
 struct KVPMinReduceImpl {
   using KVP = raft::KeyValuePair<LabelT, DataT>;
-  DI KVP operator()(LabelT rit, const KVP& a, const KVP& b) { return b.value < a.value ? b : a; }
-  DI KVP operator()(const KVP& a, const KVP& b) { return b.value < a.value ? b : a; }
+  DI auto operator()(LabelT rit, const KVP& a, const KVP& b) -> KVP
+  {
+    return b.value < a.value ? b : a;
+  }
+  DI auto operator()(const KVP& a, const KVP& b) -> KVP { return b.value < a.value ? b : a; }
 
 };  // KVPMinReduce
 
@@ -81,8 +84,8 @@ struct MinAndDistanceReduceOpImpl {
   DI void init_key(DataT& out, LabelT idx) const { return; }
   DI void init_key(KVP& out, LabelT idx) const { out.key = idx; }
 
-  DI DataT get_value(KVP& out) const { return out.value; }
-  DI DataT get_value(DataT& out) const { return out; }
+  DI auto get_value(KVP& out) const -> DataT { return out.value; }
+  DI auto get_value(DataT& out) const -> DataT { return out; }
 };
 
 template <typename LabelT, typename DataT>
@@ -118,16 +121,22 @@ template <typename AccType, typename Index, typename OutType>
 struct kvp_cg_min_reduce_op {
   using KVP = typename raft::KeyValuePair<Index, AccType>;
 
-  __host__ __device__ kvp_cg_min_reduce_op() noexcept {};
+  __host__ __device__ kvp_cg_min_reduce_op() noexcept = default;
 
   using AccTypeT = AccType;
   using IndexT   = Index;
   // functor signature.
-  __host__ __device__ KVP operator()(KVP a, KVP b) const { return a.value < b.value ? a : b; }
+  __host__ __device__ auto operator()(KVP a, KVP b) const -> KVP
+  {
+    return a.value < b.value ? a : b;
+  }
 
-  __host__ __device__ AccType operator()(AccType a, AccType b) const { return min(a, b); }
+  __host__ __device__ auto operator()(AccType a, AccType b) const -> AccType { return min(a, b); }
 
-  __host__ __device__ bool isAmin(AccType a, AccType b) const { return a < b ? true : false; }
+  __host__ __device__ auto isAmin(AccType a, AccType b) const -> bool
+  {
+    return a < b ? true : false;
+  }
 };
 
 }  // namespace detail

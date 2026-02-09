@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,18 +17,18 @@ void build_knn_graph(raft::resources const& handle,
   cuvs::neighbors::cagra::build_knn_graph<half, uint32_t>(handle, dataset, knn_graph, params);
 }
 
-cuvs::neighbors::cagra::index<half, uint32_t> build(
-  raft::resources const& handle,
-  const cuvs::neighbors::cagra::index_params& params,
-  raft::device_matrix_view<const half, int64_t, raft::row_major> dataset)
+auto build(raft::resources const& handle,
+           const cuvs::neighbors::cagra::index_params& params,
+           raft::device_matrix_view<const half, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::cagra::index<half, uint32_t>
 {
   return cuvs::neighbors::cagra::build<half, uint32_t>(handle, params, dataset);
 }
 
-cuvs::neighbors::cagra::index<half, uint32_t> build(
-  raft::resources const& handle,
-  const cuvs::neighbors::cagra::index_params& params,
-  raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
+auto build(raft::resources const& handle,
+           const cuvs::neighbors::cagra::index_params& params,
+           raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::cagra::index<half, uint32_t>
 {
   return cuvs::neighbors::cagra::build<half, uint32_t>(handle, params, dataset);
 }

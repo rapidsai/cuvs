@@ -26,7 +26,7 @@ struct unpack_codes {
    *
    * @param[out] out_codes the destination for the read codes.
    */
-  __device__ inline unpack_codes(
+  __device__ inline explicit unpack_codes(
     raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> out_codes)
     : out_codes{out_codes}
   {
@@ -103,7 +103,7 @@ struct pass_codes {
    *
    * @param[in] codes the source codes.
    */
-  __device__ inline pass_codes(
+  __device__ inline explicit pass_codes(
     raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes)
     : codes{codes}
   {

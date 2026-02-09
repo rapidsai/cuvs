@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -42,7 +42,7 @@ size_t alignment_of_2d_array(const DataT* x, size_t stride)
  * @param params  Kernel parameters
  */
 template <typename IdxT, typename DataT, typename OutT, typename FinOpT>
-int determine_vec_len(pairwise_matrix_params<IdxT, DataT, OutT, FinOpT> params)
+auto determine_vec_len(pairwise_matrix_params<IdxT, DataT, OutT, FinOpT> params) -> int
 {
   size_t align_x        = alignment_of_2d_array(params.x, params.ldx);
   size_t align_y        = alignment_of_2d_array(params.y, params.ldy);

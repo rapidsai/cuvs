@@ -10,7 +10,7 @@
 #include "hashmap.hpp"
 #include "search_multi_cta_kernel.cuh"
 #include "search_plan.cuh"
-#include "topk_for_cagra/topk.h"  // TODO replace with raft topk if possible
+#include "topk_for_cagra/topk.h"  // TODO(snanditale): replace with raft topk if possible
 #include "utils.hpp"
 
 #include <raft/core/detail/macros.hpp>
@@ -24,7 +24,7 @@
 
 #include <raft/linalg/map.cuh>
 
-// TODO: This shouldn't be invoking anything in spatial/knn
+// TODO(snanditale): This shouldn't be invoking anything in spatial/knn
 #include "../ann_utils.cuh"
 
 #include <raft/util/cuda_rt_essentials.hpp>
@@ -200,7 +200,7 @@ struct search
                  topk);
   }
 
-  ~search() {}
+  ~search() = default;
 
   void operator()(
     raft::resources const& res,

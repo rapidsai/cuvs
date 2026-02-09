@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -78,14 +78,13 @@ struct vpq_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
   }
 
  private:
-  static dataset_descriptor_host<DataT, IndexT, DistanceT> init_(
-    const cagra::search_params& params,
-    const std::uint8_t* encoded_dataset_ptr,
-    uint32_t encoded_dataset_dim,
-    const CodebookT* vq_code_book_ptr,
-    const CodebookT* pq_code_book_ptr,
-    IndexT size,
-    uint32_t dim);
+  static auto init_(const cagra::search_params& params,
+                    const std::uint8_t* encoded_dataset_ptr,
+                    uint32_t encoded_dataset_dim,
+                    const CodebookT* vq_code_book_ptr,
+                    const CodebookT* pq_code_book_ptr,
+                    IndexT size,
+                    uint32_t dim) -> dataset_descriptor_host<DataT, IndexT, DistanceT>;
 };
 
 }  // namespace cuvs::neighbors::cagra::detail

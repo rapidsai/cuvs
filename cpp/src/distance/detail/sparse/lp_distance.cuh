@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -71,7 +71,8 @@ void unexpanded_lp_distances(value_t* out_dists,
 template <typename value_idx = int, typename value_t = float>
 class l1_unexpanded_distances_t : public distances_t<value_t> {
  public:
-  l1_unexpanded_distances_t(const distances_config_t<value_idx, value_t>& config) : config_(&config)
+  explicit l1_unexpanded_distances_t(const distances_config_t<value_idx, value_t>& config)
+    : config_(&config)
   {
   }
 
@@ -88,7 +89,8 @@ class l1_unexpanded_distances_t : public distances_t<value_t> {
 template <typename value_idx = int, typename value_t = float>
 class l2_unexpanded_distances_t : public distances_t<value_t> {
  public:
-  l2_unexpanded_distances_t(const distances_config_t<value_idx, value_t>& config) : config_(&config)
+  explicit l2_unexpanded_distances_t(const distances_config_t<value_idx, value_t>& config)
+    : config_(&config)
   {
   }
 
@@ -105,7 +107,7 @@ class l2_unexpanded_distances_t : public distances_t<value_t> {
 template <typename value_idx = int, typename value_t = float>
 class l2_sqrt_unexpanded_distances_t : public l2_unexpanded_distances_t<value_idx, value_t> {
  public:
-  l2_sqrt_unexpanded_distances_t(const distances_config_t<value_idx, value_t>& config)
+  explicit l2_sqrt_unexpanded_distances_t(const distances_config_t<value_idx, value_t>& config)
     : l2_unexpanded_distances_t<value_idx, value_t>(config)
   {
   }

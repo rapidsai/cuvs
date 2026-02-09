@@ -41,10 +41,10 @@ class GramMatrixBase {  // NOLINT(readability-identifier-naming)
 
  public:
   GramMatrixBase() : legacy_interface(false) {};
-  [[deprecated]] GramMatrixBase(cublasHandle_t cublas_handle)
+  [[deprecated]] explicit GramMatrixBase(cublasHandle_t cublas_handle)
     : cublas_handle(cublas_handle), legacy_interface(true) {};
 
-  virtual ~GramMatrixBase() {};
+  virtual ~GramMatrixBase() = default;
 
   /** Convenience function to evaluate the Gram matrix for two vector sets.
    *  Vector sets are provided in Matrix format
@@ -234,10 +234,10 @@ class GramMatrixBase {  // NOLINT(readability-identifier-naming)
                              int ld_out);
 
  protected:
-  bool get_is_row_major(dense_output_matrix_view_t<math_t> matrix);
-  bool get_is_row_major(dense_input_matrix_view_t<math_t> matrix);
-  bool get_is_col_major(dense_output_matrix_view_t<math_t> matrix);
-  bool get_is_col_major(dense_input_matrix_view_t<math_t> matrix);
+  auto get_is_row_major(dense_output_matrix_view_t<math_t> matrix) -> bool;
+  auto get_is_row_major(dense_input_matrix_view_t<math_t> matrix) -> bool;
+  auto get_is_col_major(dense_output_matrix_view_t<math_t> matrix) -> bool;
+  auto get_is_col_major(dense_input_matrix_view_t<math_t> matrix) -> bool;
 
   /** Calculates the Gram matrix using simple dot product between vector sets.
    *
@@ -291,8 +291,9 @@ class GramMatrixBase {  // NOLINT(readability-identifier-naming)
 template <typename math_t>
 class KernelFactory {  // NOLINT(readability-identifier-naming)
  public:
-  static GramMatrixBase<math_t>* create(KernelParams params);
-  [[deprecated]] static GramMatrixBase<math_t>* create(KernelParams params, cublasHandle_t handle);
+  static auto create(KernelParams params) -> GramMatrixBase<math_t>*;
+  [[deprecated]] static auto create(KernelParams params, cublasHandle_t handle)
+    -> GramMatrixBase<math_t>*;
 };
 
 /**
@@ -551,7 +552,7 @@ class RBFKernel : public GramMatrixBase<math_t> {  // NOLINT(readability-identif
    * @tparam math_t floating point type
    * @param gain
    */
-  RBFKernel(math_t gain) : GramMatrixBase<math_t>(), gain(gain) {};
+  explicit RBFKernel(math_t gain) : GramMatrixBase<math_t>(), gain(gain) {};
 
   [[deprecated]] RBFKernel(math_t gain, cublasHandle_t handle)
     : GramMatrixBase<math_t>(handle), gain(gain) {};

@@ -242,7 +242,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
                            IndexType item_idx = (g_idx) >> 5;
                            uint32_t bit_idx   = (g_idx) & 31;
                            uint32_t filter    = filter_bits[item_idx];
-                           if ((filter & (uint32_t(1) << bit_idx)) == 0) {
+                           if ((filter & (static_cast<uint32_t>(1) << bit_idx)) == 0) {
                              distances_ptr[idx] = masked_distance;
                            }
                          });
@@ -763,11 +763,10 @@ void search(raft::resources const& res,
 }
 
 template <typename T, typename DistT, typename AccessorT, typename LayoutT = raft::row_major>
-cuvs::neighbors::brute_force::index<T, DistT> build(
-  raft::resources const& res,
-  mdspan<const T, matrix_extent<int64_t>, LayoutT, AccessorT> dataset,
-  cuvs::distance::DistanceType metric,
-  DistT metric_arg)
+auto build(raft::resources const& res,
+           mdspan<const T, matrix_extent<int64_t>, LayoutT, AccessorT> dataset,
+           cuvs::distance::DistanceType metric,
+           DistT metric_arg) -> cuvs::neighbors::brute_force::index<T, DistT>
 {
   // certain distance metrics can benefit by pre-calculating the norms for the index dataset
   // which lets us avoid calculating these at query time

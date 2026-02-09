@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -144,28 +144,29 @@ inline void knn_merge_parts(const value_t* inK,
                             cudaStream_t stream,
                             value_idx* translations)
 {
-  if (k == 1)
+  if (k == 1) {
     knn_merge_parts_impl<value_idx, value_t, 1, 1>(
       inK, inV, outK, outV, n_samples, n_parts, k, stream, translations);
-  else if (k <= 32)
+  } else if (k <= 32) {
     knn_merge_parts_impl<value_idx, value_t, 32, 2>(
       inK, inV, outK, outV, n_samples, n_parts, k, stream, translations);
-  else if (k <= 64)
+  } else if (k <= 64) {
     knn_merge_parts_impl<value_idx, value_t, 64, 3>(
       inK, inV, outK, outV, n_samples, n_parts, k, stream, translations);
-  else if (k <= 128)
+  } else if (k <= 128) {
     knn_merge_parts_impl<value_idx, value_t, 128, 3>(
       inK, inV, outK, outV, n_samples, n_parts, k, stream, translations);
-  else if (k <= 256)
+  } else if (k <= 256) {
     knn_merge_parts_impl<value_idx, value_t, 256, 4>(
       inK, inV, outK, outV, n_samples, n_parts, k, stream, translations);
-  else if (k <= 512)
+  } else if (k <= 512) {
     knn_merge_parts_impl<value_idx, value_t, 512, 8>(
       inK, inV, outK, outV, n_samples, n_parts, k, stream, translations);
-  else if (k <= 1024)
+  } else if (k <= 1024) {
     knn_merge_parts_impl<value_idx, value_t, 1024, 8>(
       inK, inV, outK, outV, n_samples, n_parts, k, stream, translations);
-  else
+  } else {
     THROW("Unimplemented for k=%d, knn_merge_parts works for k<=1024", k);
+  }
 }
 }  // namespace cuvs::neighbors::detail

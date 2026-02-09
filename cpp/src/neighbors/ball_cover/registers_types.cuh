@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -14,9 +14,9 @@ namespace cuvs::neighbors::ball_cover::detail {
 
 template <typename value_t, typename value_int>
 struct DistFunc {
-  virtual __device__ __host__ __forceinline__ value_t operator()(const value_t* a,
-                                                                 const value_t* b,
-                                                                 const value_int n_dims)
+  virtual __device__ __host__ __forceinline__ auto operator()(const value_t* a,
+                                                              const value_t* b,
+                                                              const value_int n_dims) -> value_t
   {
     return -1;
   };
@@ -24,9 +24,9 @@ struct DistFunc {
 
 template <typename value_t, typename value_int>
 struct HaversineFunc : public DistFunc<value_t, value_int> {
-  __device__ __host__ __forceinline__ value_t operator()(const value_t* a,
-                                                         const value_t* b,
-                                                         const value_int n_dims) override
+  __device__ __host__ __forceinline__ auto operator()(const value_t* a,
+                                                      const value_t* b,
+                                                      const value_int n_dims) -> value_t override
   {
     return cuvs::neighbors::detail::compute_haversine<value_t, value_t>(a[0], b[0], a[1], b[1]);
   }
@@ -34,9 +34,9 @@ struct HaversineFunc : public DistFunc<value_t, value_int> {
 
 template <typename value_t, typename value_int>
 struct EuclideanFunc : public DistFunc<value_t, value_int> {
-  __device__ __host__ __forceinline__ value_t operator()(const value_t* a,
-                                                         const value_t* b,
-                                                         const value_int n_dims) override
+  __device__ __host__ __forceinline__ auto operator()(const value_t* a,
+                                                      const value_t* b,
+                                                      const value_int n_dims) -> value_t override
   {
     value_t sum_sq = 0;
     for (value_int i = 0; i < n_dims; ++i) {
@@ -50,9 +50,9 @@ struct EuclideanFunc : public DistFunc<value_t, value_int> {
 
 template <typename value_t, typename value_int>
 struct EuclideanSqFunc : public DistFunc<value_t, value_int> {
-  __device__ __host__ __forceinline__ value_t operator()(const value_t* a,
-                                                         const value_t* b,
-                                                         const value_int n_dims) override
+  __device__ __host__ __forceinline__ auto operator()(const value_t* a,
+                                                      const value_t* b,
+                                                      const value_int n_dims) -> value_t override
   {
     value_t sum_sq = 0;
     for (value_int i = 0; i < n_dims; ++i) {
@@ -65,8 +65,9 @@ struct EuclideanSqFunc : public DistFunc<value_t, value_int> {
 
 // Direct distance function for use in kernels that need metric information
 template <typename value_t, typename value_int>
-__device__ __host__ __forceinline__ value_t compute_distance_by_metric(
+__device__ __host__ __forceinline__ auto compute_distance_by_metric(
   const value_t* a, const value_t* b, const value_int n_dims, cuvs::distance::DistanceType metric)
+  -> value_t
 {
   if (metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
       metric == cuvs::distance::DistanceType::L2SqrtUnexpanded) {

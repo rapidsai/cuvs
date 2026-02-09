@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -113,7 +113,7 @@ struct index : cuvs::neighbors::index {
   }
 
   /** Total length of the index (number of vectors). */
-  IdxT size() const noexcept;
+  auto size() const noexcept -> IdxT;
 
   /** Dimensionality of the data. */
   [[nodiscard]] constexpr inline auto dim() const noexcept -> uint32_t { return dim_; }
@@ -181,32 +181,33 @@ struct index : cuvs::neighbors::index {
 
   raft::device_matrix_view<float, IdxT> centers() noexcept { return centers_.view(); }
 
-  raft::device_matrix_view<const float, IdxT> centers() const noexcept
+  [[nodiscard]] raft::device_matrix_view<const float, IdxT> centers() const noexcept
   {
     return raft::make_const_mdspan(centers_.view());
   }
 
   raft::device_vector_view<uint32_t, IdxT> labels() noexcept { return labels_.view(); }
 
-  raft::device_vector_view<const uint32_t, IdxT> labels() const noexcept
+  [[nodiscard]] raft::device_vector_view<const uint32_t, IdxT> labels() const noexcept
   {
     return raft::make_const_mdspan(labels_.view());
   }
 
   raft::device_vector_view<uint32_t, IdxT> soar_labels() noexcept { return soar_labels_.view(); }
 
-  raft::device_vector_view<const uint32_t, IdxT> soar_labels() const noexcept
+  [[nodiscard]] raft::device_vector_view<const uint32_t, IdxT> soar_labels() const noexcept
   {
     return raft::make_const_mdspan(soar_labels_.view());
   }
 
-  uint32_t n_rows() const noexcept { return n_rows_; }
+  [[nodiscard]] auto n_rows() const noexcept -> uint32_t { return n_rows_; }
 
-  uint32_t n_leaves() const noexcept { return n_leaves_; }
+  [[nodiscard]] auto n_leaves() const noexcept -> uint32_t { return n_leaves_; }
 
-  uint32_t pq_dim() const noexcept { return pq_dim_; }
+  [[nodiscard]] auto pq_dim() const noexcept -> uint32_t { return pq_dim_; }
 
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> pq_codebook() const noexcept
+  [[nodiscard]] raft::device_matrix_view<const float, uint32_t, raft::row_major> pq_codebook()
+    const noexcept
   {
     return raft::make_const_mdspan(pq_codebook_.view());
   }
@@ -216,7 +217,8 @@ struct index : cuvs::neighbors::index {
     return pq_codebook_.view();
   }
 
-  raft::host_matrix_view<const uint8_t, IdxT, raft::row_major> quantized_residuals() const noexcept
+  [[nodiscard]] raft::host_matrix_view<const uint8_t, IdxT, raft::row_major> quantized_residuals()
+    const noexcept
   {
     return raft::make_const_mdspan(quantized_residuals_.view());
   }
@@ -226,8 +228,8 @@ struct index : cuvs::neighbors::index {
     return quantized_residuals_.view();
   }
 
-  raft::host_matrix_view<const uint8_t, IdxT, raft::row_major> quantized_soar_residuals()
-    const noexcept
+  [[nodiscard]] raft::host_matrix_view<const uint8_t, IdxT, raft::row_major>
+  quantized_soar_residuals() const noexcept
   {
     return raft::make_const_mdspan(quantized_soar_residuals_.view());
   }
@@ -242,7 +244,8 @@ struct index : cuvs::neighbors::index {
     return bf16_dataset_.view();
   }
 
-  raft::host_matrix_view<const int16_t, IdxT, raft::row_major> bf16_dataset() const noexcept
+  [[nodiscard]] raft::host_matrix_view<const int16_t, IdxT, raft::row_major> bf16_dataset()
+    const noexcept
   {
     return raft::make_const_mdspan(bf16_dataset_.view());
   }

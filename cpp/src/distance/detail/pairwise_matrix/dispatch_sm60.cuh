@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -18,10 +18,10 @@ template <typename OpT,
           typename OutT,
           typename FinOpT,
           typename SM_compat_t>
-pairwise_matrix_sm60_wrapper<OpT, IdxT, DataT, OutT, FinOpT> pairwise_matrix_sm60_get_wrapper(
-  OpT distance_op,
-  pairwise_matrix_params<IdxT, DataT, OutT, FinOpT> params,
-  SM_compat_t sm_compat_range)
+auto pairwise_matrix_sm60_get_wrapper(OpT distance_op,
+                                      pairwise_matrix_params<IdxT, DataT, OutT, FinOpT> params,
+                                      SM_compat_t sm_compat_range)
+  -> pairwise_matrix_sm60_wrapper<OpT, IdxT, DataT, OutT, FinOpT>
 {
   int vec_len = determine_vec_len(params);
 

@@ -17,7 +17,7 @@ namespace cuvs {
 namespace distance {
 namespace detail {
 namespace sparse {
-__device__ __inline__ unsigned int get_lowest_peer(unsigned int peer_group)
+__device__ __inline__ auto get_lowest_peer(unsigned int peer_group) -> unsigned int
 {
   return __ffs(peer_group) - 1;
 }
