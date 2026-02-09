@@ -150,7 +150,8 @@ struct index : cuvs::neighbors::index {
   /**
   @brief Get underlying index
   */
-  [[nodiscard]] virtual auto get_index() const -> void const* = 0;
+  [[nodiscard]] virtual void const* get_index()
+    const = 0;  // NOLINT(modernize-use-trailing-return-type)
 
   [[nodiscard]] auto dim() const -> int const { return dim_; }
 

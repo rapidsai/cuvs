@@ -505,8 +505,9 @@ namespace filtering {
 enum class FilterType { None, Bitmap, Bitset };  // NOLINT(readability-identifier-naming)
 
 struct base_filter {
-  ~base_filter()                                                   = default;
-  [[nodiscard]] virtual auto get_filter_type() const -> FilterType = 0;
+  ~base_filter() = default;
+  [[nodiscard]] virtual FilterType get_filter_type()
+    const = 0;  // NOLINT(modernize-use-trailing-return-type)
 };
 
 /* A filter that filters nothing. This is the default behavior. */
