@@ -16,8 +16,8 @@ namespace graph_build_params = cuvs::neighbors::graph_build_params;
  * @{
  */
 
-using GraphBuildParams =
-  std::variant<graph_build_params::ivf_pq_params,  // NOLINT(readability-identifier-naming)
+using GraphBuildParams =  // NOLINT(readability-identifier-naming)
+  std::variant<graph_build_params::ivf_pq_params,
                graph_build_params::nn_descent_params,
                graph_build_params::brute_force_params>;
 

@@ -16,12 +16,12 @@ namespace cuvs::neighbors {
  * @{
  */
 
-enum GRAPH_BUILD_ALGO {
+enum GRAPH_BUILD_ALGO {  // NOLINT(readability-identifier-naming)
   BRUTE_FORCE = 0,
   IVF_PQ      = 1,
   NN_DESCENT  = 2,
   ACE         = 3
-};  // NOLINT(readability-identifier-naming)
+};
 
 namespace graph_build_params {
 
@@ -47,8 +47,9 @@ struct ivf_pq_params {
    *   pq_params.kmeans_trainset_fraction = 0.1;
    * @endcode
    */
-  ivf_pq_params(raft::matrix_extent<int64_t> dataset_extents,
-                cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
+  ivf_pq_params(  // NOLINT(google-explicit-constructor)
+    raft::matrix_extent<int64_t> dataset_extents,
+    cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
   {
     build_params    = ivf_pq::index_params::from_dataset(dataset_extents, metric);
     auto n_rows     = dataset_extents.extent(0);
@@ -72,7 +73,7 @@ struct ivf_pq_params {
     build_params.n_lists        = std::max<uint32_t>(1, n_rows / 2000);
     build_params.kmeans_n_iters = 10;
 
-    const double kMinPointsPerCluster         = 32;
+    const double kMinPointsPerCluster         = 32;  // NOLINT(readability-identifier-naming)
     const double min_kmeans_trainset_points   = kMinPointsPerCluster * build_params.n_lists;
     const double max_kmeans_trainset_fraction = 1.0;
     const double min_kmeans_trainset_fraction =

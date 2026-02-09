@@ -42,8 +42,8 @@ struct params {
  */
 template <typename T>
 struct quantizer {
-  T min_;
-  T max_;
+  T min_;  // NOLINT(readability-identifier-naming)
+  T max_;  // NOLINT(readability-identifier-naming)
 };
 
 /**

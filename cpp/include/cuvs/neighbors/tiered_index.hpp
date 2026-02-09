@@ -40,7 +40,8 @@ struct index : cuvs::neighbors::index {
   mutable std::shared_mutex ann_mutex;
 
   explicit index(std::shared_ptr<detail::index_state<UpstreamT>> state) : state(state) {}
-  explicit index(const index<UpstreamT>& other) : state(other.state) {}
+  index(const index<UpstreamT>& other)
+    : state(other.state) {}  // NOLINT(google-explicit-constructor)
 
   /** Total length of the index. */
   auto size() const noexcept -> int64_t;
@@ -49,6 +50,7 @@ struct index : cuvs::neighbors::index {
   auto dim() const noexcept -> int64_t;
 };
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 template <typename upstream_index_params_type>
 struct index_params : upstream_index_params_type {
   /** The minimum number of rows necessary in the index to create an

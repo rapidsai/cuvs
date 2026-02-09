@@ -495,7 +495,7 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
    * Constructs an empty index. This index will either need to be trained with `build`
    * or loaded from a saved copy with `deserialize`
    */
-  index(raft::resources const& handle);
+  index(raft::resources const& handle);  // NOLINT(google-explicit-constructor)
 
   /**
    * @brief Construct an index with specified parameters.

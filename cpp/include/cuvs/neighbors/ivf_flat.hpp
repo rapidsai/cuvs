@@ -147,7 +147,7 @@ struct index : cuvs::neighbors::index {
    * Constructs an empty index. This index will either need to be trained with `build`
    * or loaded from a saved copy with `deserialize`
    */
-  index(raft::resources const& res);
+  index(raft::resources const& res);  // NOLINT(google-explicit-constructor)
 
   /** Construct an empty index. It needs to be trained and then populated. */
   index(raft::resources const& res, const index_params& params, uint32_t dim);
@@ -280,8 +280,8 @@ struct index : cuvs::neighbors::index {
 
   static auto calculate_veclen(uint32_t dim) -> uint32_t
   {
-    // TODO: consider padding the dimensions and fixing veclen to its maximum possible value as a
-    // template parameter (https://github.com/rapidsai/raft/issues/711)
+    // TODO(cuvs): consider padding the dimensions and fixing veclen to its maximum possible value
+    // as a template parameter (https://github.com/rapidsai/raft/issues/711)
 
     // NOTE: keep this consistent with the select_interleaved_scan_kernel logic
     // in detail/ivf_flat_interleaved_scan-inl.cuh.

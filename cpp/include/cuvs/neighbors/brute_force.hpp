@@ -51,7 +51,7 @@ struct index : cuvs::neighbors::index {
    * Constructs an empty index. This index will either need to be trained with `build`
    * or loaded from a saved copy with `deserialize`
    */
-  index(raft::resources const& handle);
+  index(raft::resources const& handle);  // NOLINT(google-explicit-constructor)
 
   /** Construct a brute force index from dataset
    *

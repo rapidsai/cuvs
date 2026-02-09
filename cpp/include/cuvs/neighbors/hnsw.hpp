@@ -59,7 +59,7 @@ struct index_params : cuvs::neighbors::index_params {
 
   /** HNSW M parameter: number of bi-directional links per node (used when building with ACE).
    */
-  size_t M = 32;
+  size_t M = 32;  // NOLINT(readability-identifier-naming)
 
   /** Parameters to fine tune GPU graph building. By default we select the parameters based on
    * dataset shape and HNSW build parameters. You can override these parameters to fine tune the
@@ -743,7 +743,7 @@ struct search_params : cuvs::neighbors::search_params {
  * @}
  */
 
-// TODO: Filtered Search APIs: https://github.com/rapidsai/cuvs/issues/363
+// TODO(cuvs): Filtered Search APIs: https://github.com/rapidsai/cuvs/issues/363
 
 /**
  * @defgroup hnsw_cpp_index_search Search hnswlib index

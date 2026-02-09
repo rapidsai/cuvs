@@ -537,10 +537,10 @@ struct none_sample_filter : public base_filter {
  * @tparam index_t Indexing type
  * @tparam filter_t
  */
-template <typename index_t, typename filter_t>
+template <typename index_t, typename filter_t>  // NOLINT(readability-identifier-naming)
 struct ivf_to_sample_filter : public base_filter {
-  const index_t* const* inds_ptrs_;
-  const filter_t next_filter_;
+  const index_t* const* inds_ptrs_;  // NOLINT(readability-identifier-naming)
+  const filter_t next_filter_;       // NOLINT(readability-identifier-naming)
 
   ivf_to_sample_filter(const index_t* const* inds_ptrs, const filter_t next_filter);
 
@@ -570,14 +570,14 @@ struct ivf_to_sample_filter : public base_filter {
  * @tparam bitmap_t Data type of the bitmap
  * @tparam index_t Indexing type
  */
-template <typename bitmap_t, typename index_t>
+template <typename bitmap_t, typename index_t>  // NOLINT(readability-identifier-naming)
 struct bitmap_filter : public base_filter {
   using view_t = cuvs::core::bitmap_view<bitmap_t, index_t>;
 
   // View of the bitset to use as a filter
-  const view_t bitmap_view_;
+  const view_t bitmap_view_;  // NOLINT(readability-identifier-naming)
 
-  bitmap_filter(const view_t bitmap_for_filtering);
+  bitmap_filter(const view_t bitmap_for_filtering);  // NOLINT(google-explicit-constructor)
   /** \cond */
   inline _RAFT_HOST_DEVICE auto operator()(
     // query index
@@ -590,7 +590,7 @@ struct bitmap_filter : public base_filter {
 
   [[nodiscard]] auto view() const -> view_t { return bitmap_view_; }
 
-  template <typename csr_matrix_t>
+  template <typename csr_matrix_t>  // NOLINT(readability-identifier-naming)
   void to_csr(raft::resources const& handle, csr_matrix_t& csr);
 };
 
@@ -600,15 +600,16 @@ struct bitmap_filter : public base_filter {
  * @tparam bitset_t Data type of the bitset
  * @tparam index_t Indexing type
  */
-template <typename bitset_t, typename index_t>
+template <typename bitset_t, typename index_t>  // NOLINT(readability-identifier-naming)
 struct bitset_filter : public base_filter {
   using view_t = cuvs::core::bitset_view<bitset_t, index_t>;
 
   // View of the bitset to use as a filter
-  const view_t bitset_view_;
+  const view_t bitset_view_;  // NOLINT(readability-identifier-naming)
 
   /** \cond */
-  _RAFT_HOST_DEVICE bitset_filter(const view_t bitset_for_filtering);
+  _RAFT_HOST_DEVICE bitset_filter(  // NOLINT(google-explicit-constructor)
+    const view_t bitset_for_filtering);
   constexpr __forceinline__ _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,
@@ -620,7 +621,7 @@ struct bitset_filter : public base_filter {
 
   [[nodiscard]] auto view() const -> view_t { return bitset_view_; }
 
-  template <typename csr_matrix_t>
+  template <typename csr_matrix_t>  // NOLINT(readability-identifier-naming)
   void to_csr(raft::resources const& handle, csr_matrix_t& csr);
 };
 
@@ -872,7 +873,7 @@ auto deserialize_list(const raft::resources& handle,
   -> enable_if_valid_list_t<ListT>;
 }  // namespace ivf
 
-using namespace raft;  // NOLINT(google-global-names-in-headers)
+using namespace raft;  // NOLINT(google-build-using-namespace,google-global-names-in-headers)
 
 template <typename AnnIndexType, typename T, typename IdxT>
 struct iface {
@@ -880,8 +881,8 @@ struct iface {
 
   [[nodiscard]] auto size() const -> const IdxT { return index_.value().size(); }
 
-  std::optional<AnnIndexType> index_;
-  std::shared_ptr<std::mutex> mutex_;
+  std::optional<AnnIndexType> index_;  // NOLINT(readability-identifier-naming)
+  std::shared_ptr<std::mutex> mutex_;  // NOLINT(readability-identifier-naming)
 };
 
 template <typename AnnIndexType, typename T, typename IdxT, typename Accessor>
@@ -898,6 +899,7 @@ void extend(
   std::optional<raft::mdspan<const IdxT, vector_extent<int64_t>, layout_c_contiguous, Accessor2>>
     new_indices);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 template <typename AnnIndexType, typename T, typename IdxT, typename searchIdxT>
 void search(const raft::resources& handle,
             const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
@@ -958,7 +960,10 @@ template <typename Upstream>
 struct mg_index_params : public Upstream {
   mg_index_params() {}
 
-  mg_index_params(const Upstream& sp) : Upstream(sp) {}
+  mg_index_params(const Upstream& sp)  // NOLINT(google-explicit-constructor)
+    : Upstream(sp)
+  {
+  }
 
   /** Distribution mode */
   cuvs::neighbors::distribution_mode mode = SHARDED;
@@ -970,7 +975,10 @@ template <typename Upstream>
 struct mg_search_params : public Upstream {
   mg_search_params() {}
 
-  mg_search_params(const Upstream& sp) : Upstream(sp) {}
+  mg_search_params(const Upstream& sp)  // NOLINT(google-explicit-constructor)
+    : Upstream(sp)
+  {
+  }
 
   /** Replicated search mode */
   cuvs::neighbors::replicated_search_mode search_mode = LOAD_BALANCER;
@@ -990,12 +998,14 @@ struct mg_index {
   auto operator=(const mg_index&) -> mg_index& = delete;
   auto operator=(mg_index&&) -> mg_index&      = default;
 
-  distribution_mode mode_;
-  int num_ranks_;
-  std::vector<iface<AnnIndexType, T, IdxT>> ann_interfaces_;
+  distribution_mode mode_;  // NOLINT(readability-identifier-naming)
+  int num_ranks_;           // NOLINT(readability-identifier-naming)
+  std::vector<iface<AnnIndexType, T, IdxT>>
+    ann_interfaces_;  // NOLINT(readability-identifier-naming)
 
   // for load balancing mechanism
-  std::shared_ptr<std::atomic<int64_t>> round_robin_counter_;
+  std::shared_ptr<std::atomic<int64_t>>
+    round_robin_counter_;  // NOLINT(readability-identifier-naming)
 };
 
 }  // namespace cuvs::neighbors

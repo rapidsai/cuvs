@@ -50,7 +50,10 @@ template <typename T>
 struct quantizer {
   raft::device_vector<T, int64_t> threshold;
 
-  quantizer(raft::resources const& res) : threshold(raft::make_device_vector<T, int64_t>(res, 0)) {}
+  quantizer(raft::resources const& res)  // NOLINT(google-explicit-constructor)
+    : threshold(raft::make_device_vector<T, int64_t>(res, 0))
+  {
+  }
 };
 
 /**

@@ -38,8 +38,8 @@ namespace cuvs::neighbors {
  * @tparam OutputIdxT Output index type, defaults to IdxT
  */
 template <typename T, typename IdxT, typename OutputIdxT = IdxT>
-class IndexWrapper
-  : public IndexBase<T, IdxT, OutputIdxT> {  // NOLINT(readability-identifier-naming)
+class IndexWrapper  // NOLINT(readability-identifier-naming)
+  : public IndexBase<T, IdxT, OutputIdxT> {
  public:
   /** Type definitions inherited from base class */
   using value_type        = typename IndexBase<T, IdxT, OutputIdxT>::value_type;
