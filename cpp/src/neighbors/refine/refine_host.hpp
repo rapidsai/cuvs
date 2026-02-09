@@ -13,6 +13,7 @@
 #include <raft/util/integer_utils.hpp>
 
 #include <algorithm>
+#include <array>
 #include <utility>
 
 #if defined(__arm__) || defined(__aarch64__)
@@ -33,8 +34,8 @@ auto euclidean_distance_squared_generic(DataT const* a, DataT const* b, size_t n
   size_t constexpr max_vreg_len = 512 / (8 * sizeof(DistanceT));
 
   // max_vreg_len is a power of two
-  size_t n_rounded                 = n - (n % max_vreg_len);
-  DistanceT distance[max_vreg_len] = {0};
+  size_t n_rounded                             = n - (n % max_vreg_len);
+  std::array<DistanceT, max_vreg_len> distance = {0};
 
   for (size_t i = 0; i < n_rounded; i += max_vreg_len) {
     for (size_t j = 0; j < max_vreg_len; ++j) {
@@ -380,14 +381,14 @@ template <typename DC, typename IdxT, typename DataT, typename DistanceT, typena
     // For efficiency, each thread should read a certain amount of array
     // elements. The number of threads for distance computation is determined
     // taking this into account.
-    auto n_elements    = std::max(size_t(512), dim);
+    auto n_elements    = std::max(static_cast<size_t>(512), dim);
     auto max_n_threads = raft::div_rounding_up_safe<size_t>(n_queries * orig_k * dim, n_elements);
     [[maybe_unused]] auto suggested_n_threads_for_distance =
-      std::min(size_t(suggested_n_threads), max_n_threads);
+      std::min(static_cast<size_t>(suggested_n_threads), max_n_threads);
 
     // The max number of threads for topk computation is the number of queries.
     [[maybe_unused]] auto suggested_n_threads_for_topk =
-      std::min(size_t(suggested_n_threads), n_queries);
+      std::min(static_cast<size_t>(suggested_n_threads), n_queries);
 
     // Compute the refined distance using original dataset vectors
 #pragma omp parallel for collapse(2) num_threads(suggested_n_threads_for_distance)
@@ -416,7 +417,7 @@ template <typename DC, typename IdxT, typename DataT, typename DistanceT, typena
       for (size_t j = 0; j < refined_k; j++) {
         indices(i, j) = std::get<1>(refined_pairs[i][j]);
         if (distances.data_handle() != nullptr) {
-          distances(i, j) = DC::template postprocess(std::get<0>(refined_pairs[i][j]));
+          distances(i, j) = DC::template postprocess<DistanceT>(std::get<0>(refined_pairs[i][j]));
         }
       }
     }
@@ -455,7 +456,8 @@ template <typename DC, typename IdxT, typename DataT, typename DistanceT, typena
         for (size_t j = 0; j < refined_k; j++) {
           indices(i, j) = std::get<1>(refined_pairs[tid][j]);
           if (distances.data_handle() != nullptr) {
-            distances(i, j) = DC::template postprocess(std::get<0>(refined_pairs[tid][j]));
+            distances(i, j) =
+              DC::template postprocess<DistanceT>(std::get<0>(refined_pairs[tid][j]));
           }
         }
       }

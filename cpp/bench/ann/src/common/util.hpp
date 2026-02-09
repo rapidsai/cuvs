@@ -18,6 +18,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -362,9 +363,11 @@ inline auto host_info()
   struct sysinfo sys_info;
   if (sysinfo(&sys_info) != -1) {
     props.emplace_back("host_total_ram_size",
-                       std::to_string(size_t(sys_info.totalram) * size_t(sys_info.mem_unit)));
+                       std::to_string(static_cast<size_t>(sys_info.totalram) *
+                                      static_cast<size_t>(sys_info.mem_unit)));
     props.emplace_back("host_total_swap_size",
-                       std::to_string(size_t(sys_info.totalswap) * size_t(sys_info.mem_unit)));
+                       std::to_string(static_cast<size_t>(sys_info.totalswap) *
+                                      static_cast<size_t>(sys_info.mem_unit)));
   }
 
   // CPU info
@@ -666,14 +669,14 @@ inline auto combine_path(const std::string& dir, const std::string& path)
 template <typename... Ts>
 void log_with_level(const char* level, const Ts&... vs)
 {
-  char buf[20];
+  std::array<char, 20> buf{};
   auto now    = std::chrono::system_clock::now();
   auto now_tt = std::chrono::system_clock::to_time_t(now);
   size_t millis =
     std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count() %
     1000000ULL;
-  std::strftime(buf, sizeof(buf), "%H:%M:%S", std::localtime(&now_tt));
-  printf("[%s] [%s.%06zu] ", level, buf, millis);
+  std::strftime(buf.data(), buf.size(), "%H:%M:%S", std::localtime(&now_tt));
+  printf("[%s] [%s.%06zu] ", level, buf.data(), millis);
   if constexpr (sizeof...(Ts) == 1) {
     printf("%s", vs...);
   } else {

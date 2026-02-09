@@ -20,6 +20,7 @@
 #include <hnswlib/hnswalg.h>
 #include <hnswlib/hnswlib.h>
 
+#include <array>
 #include <fcntl.h>
 #include <filesystem>
 #include <fstream>
@@ -92,7 +93,7 @@ struct index_impl : index<T> {
   /**
   @brief Get hnswlib index
   */
-  auto get_index() const -> void const* override { return appr_alg_.get(); }
+  [[nodiscard]] auto get_index() const -> void const* override { return appr_alg_.get(); }
 
   /**
   @brief Set ef for search
@@ -127,7 +128,7 @@ struct index_impl : index<T> {
   /**
   @brief Get file descriptor
    */
-  auto file_descriptor() const -> const std::optional<cuvs::util::file_descriptor>&
+  [[nodiscard]] auto file_descriptor() const -> const std::optional<cuvs::util::file_descriptor>&
   {
     return hnsw_fd_;
   }
@@ -135,7 +136,7 @@ struct index_impl : index<T> {
   /**
   @brief Get file path for disk-backed index
    */
-  auto file_path() const -> std::string override
+  [[nodiscard]] auto file_path() const -> std::string override
   {
     if (hnsw_fd_.has_value() && hnsw_fd_->is_valid()) { return hnsw_fd_->get_path(); }
     return "";
@@ -281,7 +282,7 @@ auto from_cagra(raft::resources const& res,
     auto hnsw_internal_id = appr_algo->label_lookup_.find(i)->second;
     auto ll_i             = appr_algo->get_linklist0(hnsw_internal_id);
     appr_algo->setListCount(ll_i, host_graph_view.extent(1));
-    auto* data = (uint32_t*)(ll_i + 1);
+    auto* data = reinterpret_cast<uint32_t*>(ll_i + 1);
     for (size_t j = 0; j < static_cast<size_t>(host_graph_view.extent(1)); ++j) {
       auto neighbor_internal_id = appr_algo->label_lookup_.find(host_graph(i, j))->second;
       data[j]                   = neighbor_internal_id;
@@ -312,9 +313,11 @@ auto initialize_point_in_hnsw(hnswlib::HierarchicalNSW<DistT>* appr_algo,
          appr_algo->data_size_);
 
   if (curlevel) {
-    appr_algo->linkLists_[cur_c] = (char*)malloc(appr_algo->size_links_per_element_ * curlevel + 1);
-    if (appr_algo->linkLists_[cur_c] == nullptr)
+    appr_algo->linkLists_[cur_c] =
+      static_cast<char*>(malloc(appr_algo->size_links_per_element_ * curlevel + 1));
+    if (appr_algo->linkLists_[cur_c] == nullptr) {
       throw std::runtime_error("Not enough memory: addPoint failed to allocate linklist");
+    }
     memset(appr_algo->linkLists_[cur_c], 0, appr_algo->size_links_per_element_ * curlevel + 1);
   }
   return cur_c;
@@ -336,7 +339,7 @@ void all_neighbors_graph(raft::resources const& res,
     nn_params.return_distances          = false;
     auto nn_index                       = nn_descent::build(res, nn_params, dataset, neighbors);
   } else {
-    // TODO: choose parameters to minimize memory consumption
+    // TODO(cuvs): choose parameters to minimize memory consumption
     cagra::graph_build_params::ivf_pq_params ivfpq_params(dataset.extents(), metric);
     cagra::build_knn_graph(res, dataset, neighbors, ivfpq_params);
   }
@@ -516,8 +519,9 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
     RAFT_LOG_INFO("Sort points by levels");
     for (int64_t i = 0; i < n_rows; i++) {
       auto pt_level = appr_algo->getRandomLevel(appr_algo->mult_);
-      while (pt_level >= static_cast<int32_t>(hist.size()))
+      while (pt_level >= static_cast<int32_t>(hist.size())) {
         hist.push_back(0);
+      }
       hist[pt_level]++;
       levels[i] = pt_level;
     }
@@ -556,7 +560,7 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
   // offset_level_0
   os.write(reinterpret_cast<char*>(&appr_algo->offsetLevel0_), sizeof(std::size_t));
   // 8 max_element - override with n_rows
-  auto num_elements = (size_t)n_rows;
+  auto num_elements = static_cast<size_t>(n_rows);
   os.write(reinterpret_cast<char*>(&num_elements), sizeof(std::size_t));
   // 16 curr_element_count - override with n_rows
   os.write(reinterpret_cast<char*>(&num_elements), sizeof(std::size_t));
@@ -895,7 +899,7 @@ auto from_cagra(raft::resources const& res,
     const int64_t max_batch_size =
       device_copy ? raft::div_rounding_up_safe<int64_t>(64 * 1024 * 1024, source_stride * sizeof(T))
                   : n_rows;
-    T* bufs[2]                                                  = {nullptr, nullptr};
+    std::array<T*, 2> bufs                                      = {nullptr, nullptr};
     std::optional<raft::pinned_matrix<T, int64_t>> bufs_storage = std::nullopt;
     if (device_copy) {
       bufs_storage.emplace(
@@ -937,9 +941,10 @@ auto from_cagra(raft::resources const& res,
         levels[i]                        = curlevel;
         if (curlevel) {
           appr_algo->linkLists_[i] =
-            (char*)malloc(appr_algo->size_links_per_element_ * curlevel + 1);
-          if (appr_algo->linkLists_[i] == nullptr)
+            static_cast<char*>(malloc(appr_algo->size_links_per_element_ * curlevel + 1));
+          if (appr_algo->linkLists_[i] == nullptr) {
             throw std::runtime_error("Not enough memory: addPoint failed to allocate linklist");
+          }
           memset(appr_algo->linkLists_[i], 0, appr_algo->size_links_per_element_ * curlevel + 1);
         }
       }
@@ -952,8 +957,9 @@ auto from_cagra(raft::resources const& res,
   std::vector<size_t> order(n_rows);
   for (int64_t i = 0; i < n_rows; i++) {
     auto pt_level = levels[i];
-    while (pt_level >= static_cast<int32_t>(hist.size()))
+    while (pt_level >= static_cast<int32_t>(hist.size())) {
       hist.push_back(0);
+    }
     hist[pt_level]++;
   }
 
@@ -987,7 +993,7 @@ auto from_cagra(raft::resources const& res,
 
     // gather points from dataset to form query set on host
     auto host_query_set = raft::make_host_matrix<T, int64_t>(num_pts, dim);
-    // TODO: Use `raft::matrix::gather` when available as a public API
+    // TODO(cuvs): Use `raft::matrix::gather` when available as a public API
     // Issue: https://github.com/rapidsai/raft/issues/2572
 #pragma omp parallel for num_threads(num_threads)
     for (auto i = start_idx; i < end_idx; i++) {
@@ -1013,7 +1019,7 @@ auto from_cagra(raft::resources const& res,
         auto pt_id  = order[i];
         auto ll_cur = appr_algo->get_linklist(pt_id, pt_level);
         appr_algo->setListCount(ll_cur, host_neighbors.extent(1));
-        auto* data     = (uint32_t*)(ll_cur + 1);
+        auto* data     = reinterpret_cast<uint32_t*>(ll_cur + 1);
         auto neighbors = &host_neighbors(i - start_idx, 0);
         for (auto j = 0; j < host_neighbors.extent(1); j++) {
           data[j] = order[neighbors[j] + start_idx];
@@ -1041,7 +1047,7 @@ auto from_cagra(raft::resources const& res,
     for (int64_t i = 0; i < n_rows; i++) {
       auto ll_i = appr_algo->get_linklist0(i);
       appr_algo->setListCount(ll_i, degree);
-      auto* data = (uint32_t*)(ll_i + 1);
+      auto* data = reinterpret_cast<uint32_t*>(ll_i + 1);
       for (int64_t j = 0; j < degree; j++) {
         data[j] = graph_ptr[i * degree + j];
       }

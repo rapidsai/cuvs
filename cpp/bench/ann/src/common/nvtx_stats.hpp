@@ -9,6 +9,7 @@
 
 #include <benchmark/benchmark.h>
 
+#include <array>
 #include <cctype>
 #include <chrono>
 #include <climits>
@@ -332,12 +333,12 @@ inline auto get_process_name(pid_t pid) -> std::string
 // Get process executable path from PID
 inline auto get_process_exe_path(pid_t pid) -> std::string
 {
-  char buffer[PATH_MAX];
+  std::array<char, PATH_MAX> buffer{};
   ssize_t len =
-    readlink(("/proc/" + std::to_string(pid) + "/exe").c_str(), buffer, sizeof(buffer) - 1);
+    readlink(("/proc/" + std::to_string(pid) + "/exe").c_str(), buffer.data(), buffer.size() - 1);
   if (len != -1) {
     buffer[len] = '\0';
-    return std::string(buffer);
+    return {buffer.data()};
   }
   return "";
 }

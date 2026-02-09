@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -78,7 +78,7 @@ class mmap_error : public std::runtime_error {
   int errno_;
 
  public:
-  mmap_error(std::string extra_msg)
+  explicit mmap_error(std::string extra_msg)
     : std::runtime_error("cuvs::bench::mmap_owner: `mmap` error: Value of errno " +
                          std::to_string(errno) + ", " + std::string(strerror(errno)) + ". " +
                          extra_msg),

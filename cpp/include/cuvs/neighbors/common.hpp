@@ -512,19 +512,19 @@ struct base_filter {
 /* A filter that filters nothing. This is the default behavior. */
 struct none_sample_filter : public base_filter {
   /** \cond */
-  constexpr __forceinline__ _RAFT_HOST_DEVICE bool operator()(
+  constexpr __forceinline__ _RAFT_HOST_DEVICE auto operator()(
     // query index
     const uint32_t query_ix,
     // the current inverted list index
     const uint32_t cluster_ix,
     // the index of the current sample inside the current inverted list
-    const uint32_t sample_ix) const;
+    const uint32_t sample_ix) const -> bool;
 
-  constexpr __forceinline__ _RAFT_HOST_DEVICE bool operator()(
+  constexpr __forceinline__ _RAFT_HOST_DEVICE auto operator()(
     // query index
     const uint32_t query_ix,
     // the index of the current sample
-    const uint32_t sample_ix) const;
+    const uint32_t sample_ix) const -> bool;
   /** \endcond */
   [[nodiscard]] auto get_filter_type() const -> FilterType override { return FilterType::None; }
 };
@@ -610,11 +610,11 @@ struct bitset_filter : public base_filter {
   /** \cond */
   _RAFT_HOST_DEVICE bitset_filter(  // NOLINT(google-explicit-constructor)
     const view_t bitset_for_filtering);
-  constexpr __forceinline__ _RAFT_HOST_DEVICE bool operator()(
+  constexpr __forceinline__ _RAFT_HOST_DEVICE auto operator()(
     // query index
     const uint32_t query_ix,
     // the index of the current sample
-    const uint32_t sample_ix) const;
+    const uint32_t sample_ix) const -> bool;
   /** \endcond */
 
   [[nodiscard]] auto get_filter_type() const -> FilterType override { return FilterType::Bitset; }
@@ -877,12 +877,13 @@ using namespace raft;  // NOLINT(google-build-using-namespace,google-global-name
 
 template <typename AnnIndexType, typename T, typename IdxT>
 struct iface {
-  iface() : mutex_(std::make_shared<std::mutex>()) {}
+  iface() = default;
 
   [[nodiscard]] auto size() const -> const IdxT { return index_.value().size(); }
 
   std::optional<AnnIndexType> index_;  // NOLINT(readability-identifier-naming)
-  std::shared_ptr<std::mutex> mutex_;  // NOLINT(readability-identifier-naming)
+  std::shared_ptr<std::mutex> mutex_ =
+    std::make_shared<std::mutex>();  // NOLINT(readability-identifier-naming)
 };
 
 template <typename AnnIndexType, typename T, typename IdxT, typename Accessor>
@@ -958,7 +959,7 @@ enum sharded_merge_mode {
 /// \ingroup mg_cpp_index_params
 template <typename Upstream>
 struct mg_index_params : public Upstream {
-  mg_index_params() {}
+  mg_index_params() = default;
 
   mg_index_params(const Upstream& sp)  // NOLINT(google-explicit-constructor)
     : Upstream(sp)
@@ -973,7 +974,7 @@ struct mg_index_params : public Upstream {
 /// \ingroup mg_cpp_search_params
 template <typename Upstream>
 struct mg_search_params : public Upstream {
-  mg_search_params() {}
+  mg_search_params() = default;
 
   mg_search_params(const Upstream& sp)  // NOLINT(google-explicit-constructor)
     : Upstream(sp)

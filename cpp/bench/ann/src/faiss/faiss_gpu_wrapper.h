@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -250,7 +250,7 @@ void faiss_gpu<T>::search(
                               candidates_host.view(),
                               neighbors_host.view(),
                               distances_host.view(),
-                              parse_metric_type(this->metric_));
+                              detail::parse_metric_type(this->metric_));
       handle_.sync_stream();
 
       raft::copy(

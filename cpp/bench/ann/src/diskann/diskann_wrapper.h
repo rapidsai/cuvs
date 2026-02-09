@@ -7,6 +7,7 @@
 #include "../common/ann_types.hpp"
 #include "../common/util.hpp"
 
+#include <array>
 #include <limits>
 
 #include <disk_utils.h>
@@ -244,12 +245,12 @@ diskann_ssd<T>::diskann_ssd(Metric metric, int dim, const build_param& param) : 
   // Currently set the indexing RAM budget and the search RAM budget to max value to avoid sharding
   float build_dram_budget  = static_cast<float>(param.build_dram_budget_megabytes) / 1024.0f;
   float search_dram_budget = static_cast<float>(param.search_dram_budget_megabytes) / 1024.0f;
-  char search_buf[16];
-  char build_buf[16];
-  std::snprintf(search_buf, sizeof(search_buf), "%.2f", search_dram_budget);
-  std::snprintf(build_buf, sizeof(build_buf), "%.2f", build_dram_budget);
-  const std::string search_dram_budget_gb(search_buf);
-  const std::string build_dram_budget_gb(build_buf);
+  std::array<char, 16> search_buf{};
+  std::array<char, 16> build_buf{};
+  std::snprintf(search_buf.data(), search_buf.size(), "%.2f", search_dram_budget);
+  std::snprintf(build_buf.data(), build_buf.size(), "%.2f", build_dram_budget);
+  const std::string search_dram_budget_gb(search_buf.data());
+  const std::string build_dram_budget_gb(build_buf.data());
   index_build_params_str =
     std::string(std::to_string(param.R)) + " " + std::string(std::to_string(param.L_build)) + " " +
     search_dram_budget_gb + " " + build_dram_budget_gb + " " +
@@ -290,7 +291,7 @@ template <typename T>
 void diskann_ssd<T>::search(
   const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
-  for (int64_t i = 0; i < (int64_t)batch_size; i++) {
+  for (int64_t i = 0; i < static_cast<int64_t>(batch_size); i++) {
     p_flash_index_->cached_beam_search(queries + (i * this->dim_),
                                        static_cast<size_t>(k),
                                        L_search_,

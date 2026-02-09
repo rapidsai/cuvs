@@ -26,13 +26,13 @@ auto to_cagra_params(raft::matrix_extent<int64_t> dataset,
     metric);
 }
 
-#define CUVS_INST_HNSW_BUILD(T)                                        \
-  std::unique_ptr<index<T>> build(                                     \
-    raft::resources const& res,                                        \
-    const index_params& params,                                        \
-    raft::host_matrix_view<const T, int64_t, raft::row_major> dataset) \
-  {                                                                    \
-    return detail::build<T>(res, params, dataset);                     \
+#define CUVS_INST_HNSW_BUILD(T)                                                 \
+  auto build(raft::resources const& res,                                        \
+             const index_params& params,                                        \
+             raft::host_matrix_view<const T, int64_t, raft::row_major> dataset) \
+    -> std::unique_ptr<index<T>>                                                \
+  {                                                                             \
+    return detail::build<T>(res, params, dataset);                              \
   }
 
 CUVS_INST_HNSW_BUILD(float);
@@ -43,11 +43,12 @@ CUVS_INST_HNSW_BUILD(int8_t);
 #undef CUVS_INST_HNSW_BUILD
 
 #define CUVS_INST_HNSW_FROM_CAGRA(T)                                                  \
-  std::unique_ptr<index<T>> from_cagra(                                               \
+  auto from_cagra(                                                                    \
     raft::resources const& res,                                                       \
     const index_params& params,                                                       \
     const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,                    \
     std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset) \
+    -> std::unique_ptr<index<T>>                                                      \
   {                                                                                   \
     return detail::from_cagra<T>(res, params, cagra_index, dataset);                  \
   }

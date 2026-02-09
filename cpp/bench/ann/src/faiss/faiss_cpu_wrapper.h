@@ -21,9 +21,9 @@
 #include <string>
 #include <type_traits>
 
-namespace {
+namespace cuvs::bench::detail {
 
-auto parse_metric_type(cuvs::bench::Metric metric) -> faiss::MetricType
+inline auto parse_metric_type(cuvs::bench::Metric metric) -> faiss::MetricType
 {
   if (metric == cuvs::bench::Metric::kInnerProduct) {
     return faiss::METRIC_INNER_PRODUCT;
@@ -33,7 +33,7 @@ auto parse_metric_type(cuvs::bench::Metric metric) -> faiss::MetricType
     throw std::runtime_error("faiss supports only metric type of inner product and L2");
   }
 }
-}  // namespace
+}  // namespace cuvs::bench::detail
 
 namespace cuvs::bench {
 
@@ -63,7 +63,7 @@ class faiss_cpu : public algo<T> {
 
   faiss_cpu(Metric metric, int dim, const build_param& param)
     : algo<T>(metric, dim),
-      metric_type_(parse_metric_type(metric)),
+      metric_type_(detail::parse_metric_type(metric)),
       nlist_{param.nlist},
       training_sample_fraction_{1.0 / double(param.ratio)}
   {

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -11,6 +11,7 @@
 #include <hnswlib/hnswlib.h>
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cassert>
 #include <cmath>
@@ -150,10 +151,10 @@ void hnsw_lib<T>::build(const T* dataset, size_t nrow)
   thread_pool_->submit(
     [&](size_t i) {
       if (i < items_per_thread && i % 10000 == 0) {
-        char buf[20];
+        std::array<char, 20> buf{};
         std::time_t now = std::time(nullptr);
-        std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
-        printf("%s building %zu / %zu\n", buf, i, items_per_thread);
+        std::strftime(buf.data(), buf.size(), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
+        printf("%s building %zu / %zu\n", buf.data(), i, items_per_thread);
         fflush(stdout);
       }
 
