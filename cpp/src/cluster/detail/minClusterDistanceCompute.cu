@@ -31,7 +31,7 @@ void minClusterAndDistanceCompute(  // NOLINT(readability-identifier-naming)
   bool is_fused = metric == cuvs::distance::DistanceType::L2Expanded ||
                   metric == cuvs::distance::DistanceType::L2SqrtExpanded;
   auto dataBatchSize =
-    is_fused ? (IndexT)n_samples
+    is_fused ? static_cast<IndexT>(n_samples)
              : getDataBatchSize(
                  batch_samples,
                  n_samples);  // NOLINT(google-readability-casting,readability-identifier-naming)
@@ -46,7 +46,7 @@ void minClusterAndDistanceCompute(  // NOLINT(readability-identifier-naming)
                                                       centroids.extent(0),
                                                       stream);
   } else {
-    // TODO: Unless pool allocator is used, passing in a workspace for this  //
+    // TODO(cuvs): Unless pool allocator is used, passing in a workspace for this  //
     // NOLINT(google-readability-todo) isn't really increasing performance because this needs to do
     // a re-allocation anyways. ref https://github.com/rapidsai/raft/issues/930
     L2NormBuf_OR_DistBuf.resize(dataBatchSize * centroidsBatchSize, stream);
@@ -118,7 +118,7 @@ void minClusterAndDistanceCompute(  // NOLINT(readability-identifier-naming)
       for (IndexT cIdx = 0; cIdx < n_clusters;
            cIdx += centroidsBatchSize) {  // NOLINT(readability-identifier-naming)
         // # of centroids for the current batch
-        auto nc = std::min((IndexT)centroidsBatchSize,
+        auto nc = std::min(static_cast<IndexT>(centroidsBatchSize),
                            n_clusters - cIdx);  // NOLINT(google-readability-casting)
 
         // centroidsView [nc x n_features] - view representing the current batch
@@ -205,7 +205,7 @@ void minClusterDistanceCompute(
   bool is_fused = metric == cuvs::distance::DistanceType::L2Expanded ||
                   metric == cuvs::distance::DistanceType::L2SqrtExpanded;
   auto dataBatchSize =
-    is_fused ? (IndexT)n_samples
+    is_fused ? static_cast<IndexT>(n_samples)
              : getDataBatchSize(
                  batch_samples,
                  n_samples);  // NOLINT(google-readability-casting,readability-identifier-naming)
@@ -286,7 +286,7 @@ void minClusterDistanceCompute(
       for (IndexT cIdx = 0; cIdx < n_clusters;
            cIdx += centroidsBatchSize) {  // NOLINT(readability-identifier-naming)
         // # of centroids for the current batch
-        auto nc = std::min((IndexT)centroidsBatchSize,
+        auto nc = std::min(static_cast<IndexT>(centroidsBatchSize),
                            n_clusters - cIdx);  // NOLINT(google-readability-casting)
 
         // centroidsView [nc x n_features] - view representing the current batch

@@ -139,8 +139,8 @@ double compute_rand_index(T* firstClusterArray,  // NOLINT(modernize-use-trailin
   uint64_t nChooseTwo = size * (size - 1) / 2;  // NOLINT(readability-identifier-naming)
 
   // calculating the rand_index
-  return (double)(((double)(ab_host[0] + ab_host[1])) /
-                  (double)nChooseTwo);  // NOLINT(google-readability-casting)
+  return static_cast<double>(static_cast<double>(ab_host[0] + ab_host[1]) /
+                             static_cast<double>(nChooseTwo));
 }
 
 template <typename T, typename IdxT>

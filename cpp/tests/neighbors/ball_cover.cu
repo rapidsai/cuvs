@@ -231,9 +231,9 @@ class BallCoverKNNQueryTest
     auto X2_view =
       raft::make_device_matrix_view<const value_t,
                                     value_int>(  // NOLINT(readability-identifier-naming)
-        (const value_t*)X2.data(),
+        static_cast<const value_t*>(X2.data()),
         params.n_query,
-        params.n_cols);  // NOLINT(google-readability-casting)
+        params.n_cols);
 
     auto d_pred_I_view =  // NOLINT(readability-identifier-naming)
       raft::make_device_matrix_view<value_idx, value_int>(d_pred_I.data(), params.n_query, k);
@@ -318,9 +318,9 @@ class BallCoverAllKNNTest
     auto X_view =
       raft::make_device_matrix_view<const value_t,
                                     value_int>(  // NOLINT(readability-identifier-naming)
-        (const value_t*)X.data(),
+        static_cast<const value_t*>(X.data()),
         params.n_rows,
-        params.n_cols);  // NOLINT(google-readability-casting)
+        params.n_cols);
 
     if (metric == cuvs::distance::DistanceType::Haversine) {
       raft::linalg::unaryOp(

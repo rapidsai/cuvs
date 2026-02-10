@@ -31,8 +31,8 @@ std::ostream& operator<<(
 {
   return os << "quantization_quantile:<" << inputs.quantization_params.quantile
             << "> rows:" << inputs.rows << " cols:" << inputs.cols
-            << " min:" << (double)inputs.min   // NOLINT(google-readability-casting)
-            << " max:" << (double)inputs.max;  // NOLINT(google-readability-casting)
+            << " min:" << (double)inputs.min 
+            << " max:" << (double)inputs.max;
 }
 
 template <typename T, typename QuantI>
@@ -103,8 +103,8 @@ class QuantizationTest : public ::testing::TestWithParam<
     // train quantizer_1 on device
     auto quantizer_1 =
       cuvs::preprocessing::quantize::scalar::train(handle, params_.quantization_params, dataset);
-    std::cerr << "Q1: min = " << (double)quantizer_1.min_
-              << ", max = " << (double)quantizer_1.max_  // NOLINT(google-readability-casting)
+    std::cerr << "Q1: min = " << static_cast<double>(quantizer_1.min_)
+              << ", max = " << static_cast<double>(quantizer_1.max_)
               << std::endl;
 
     {
@@ -165,16 +165,16 @@ class QuantizationTest : public ::testing::TestWithParam<
     // train quantizer_2 on host
     auto quantizer_2 =
       cuvs::preprocessing::quantize::scalar::train(handle, params_.quantization_params, dataset_h);
-    std::cerr << "Q2: min = " << (double)quantizer_2.min_
-              << ", max = " << (double)quantizer_2.max_  // NOLINT(google-readability-casting)
+    std::cerr << "Q2: min = " << static_cast<double>(quantizer_2.min_)
+              << ", max = " << static_cast<double>(quantizer_2.max_)
               << std::endl;
 
     // check both quantizers are the same (valid if sampling is identical)
     if (input_.size() <= 1000000) {
-      ASSERT_TRUE((double)quantizer_1.min_ ==
-                  (double)quantizer_2.min_);  // NOLINT(google-readability-casting)
-      ASSERT_TRUE((double)quantizer_1.max_ ==
-                  (double)quantizer_2.max_);  // NOLINT(google-readability-casting)
+      ASSERT_TRUE(static_cast<double>(quantizer_1.min_) ==
+                  static_cast<double>(quantizer_2.min_));
+      ASSERT_TRUE(static_cast<double>(quantizer_1.max_) ==
+                  static_cast<double>(quantizer_2.max_));
     }
 
     {

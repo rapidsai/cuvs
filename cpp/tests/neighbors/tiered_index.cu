@@ -122,9 +122,9 @@ class ANNTieredIndexTest : public ::testing::TestWithParam<
       // include 50% of the rows in the initial build
       auto initial_rows  = ps.n_rows / 2;
       auto database_view = raft::make_device_matrix_view<const value_type, int64_t>(
-        (const value_type*)database.data(),
+        static_cast<const value_type*>(database.data()),
         initial_rows,
-        ps.dim);  // NOLINT(google-readability-casting)
+        ps.dim);
       auto index = cuvs::neighbors::tiered_index::build(handle_, build_params, database_view);
 
       std::optional<cuvs::neighbors::tiered_index::index<UpstreamT>> final_index;
@@ -135,7 +135,7 @@ class ANNTieredIndexTest : public ::testing::TestWithParam<
           cuvs::neighbors::tiered_index::extend(
             handle_,
             raft::make_device_matrix_view<const value_type, int64_t>(
-              (const value_type*)database.data() + i * ps.dim, 1, ps.dim),
+              static_cast<const value_type*>(database.data()) + i * ps.dim, 1, ps.dim),
             &index);
         }
         final_index.emplace(index);
@@ -143,7 +143,7 @@ class ANNTieredIndexTest : public ::testing::TestWithParam<
         // test merge by creating a new index with the remaining vectors and then merge into the
         // main index
         auto database_view2 = raft::make_device_matrix_view<const value_type, int64_t>(
-          (const value_type*)database.data() + initial_rows * ps.dim,
+          static_cast<const value_type*>(database.data()) + initial_rows * ps.dim,
           ps.n_rows - initial_rows,
           ps.dim);
         auto index2 = cuvs::neighbors::tiered_index::build(handle_, build_params, database_view2);
@@ -157,20 +157,20 @@ class ANNTieredIndexTest : public ::testing::TestWithParam<
       raft::resource::sync_stream(handle_);
 
       auto queries_view = raft::make_device_matrix_view<const value_type, int64_t>(
-        (const value_type*)queries.data(),
+        static_cast<const value_type*>(queries.data()),
         ps.n_queries,
-        ps.dim);  // NOLINT(google-readability-casting)
+        ps.dim);
       rmm::device_uvector<value_type> distances_tiered_dev(ps.n_queries * ps.k, stream_);
       rmm::device_uvector<int64_t> indices_tiered_dev(ps.n_queries * ps.k, stream_);
 
       auto distances_view = raft::make_device_matrix_view<value_type, int64_t>(
-        (value_type*)distances_tiered_dev.data(),
+        static_cast<value_type*>(distances_tiered_dev.data()),
         ps.n_queries,
-        ps.k);  // NOLINT(google-readability-casting)
+        ps.k);
       auto indices_view = raft::make_device_matrix_view<int64_t, int64_t>(
-        (int64_t*)indices_tiered_dev.data(),
+        static_cast<int64_t*>(indices_tiered_dev.data()),
         ps.n_queries,
-        ps.k);  // NOLINT(google-readability-casting)
+        ps.k);
 
       cuvs::neighbors::tiered_index::search(
         handle_, search_params, *final_index, queries_view, indices_view, distances_view);

@@ -47,8 +47,8 @@ class cagra_extreme_inputs_oob_test : public ::testing::Test {
                          r,
                          dataset->data_handle(),
                          n_samples * n_dim,
-                         data_type(0),
-                         data_type(1e20));  // NOLINT(google-readability-casting)
+                         static_cast<data_type>(0),
+                         static_cast<data_type>(1e20));
     raft::resource::sync_stream(res);
   }
 

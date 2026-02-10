@@ -178,14 +178,13 @@ class PrefilteredBruteForceOnBitmapTest  // NOLINT(readability-identifier-naming
                                         float sparsity,
                                         rmm::device_uvector<bitmap_t>& filter_d)
   {
-    IndexT r_scale = (IndexT)std::log2(m);  // NOLINT(google-readability-casting,modernize-use-auto)
-    IndexT c_scale = (IndexT)std::log2(n);  // NOLINT(google-readability-casting,modernize-use-auto)
-    IndexT n_edges =
-      (IndexT)(m * n * 1.0f * sparsity);  // NOLINT(google-readability-casting,modernize-use-auto)
+    auto r_scale = static_cast<IndexT>(std::log2(m));
+    auto c_scale = static_cast<IndexT>(std::log2(n));
+    auto n_edges = static_cast<IndexT>(m * n * 1.0f * sparsity);
     IndexT max_scale = std::max(r_scale, c_scale);
 
-    rmm::device_uvector<IndexT> out_src{(unsigned long)n_edges, stream};
-    rmm::device_uvector<IndexT> out_dst{(unsigned long)n_edges, stream};
+    rmm::device_uvector<IndexT> out_src{static_cast<unsigned long>(n_edges), stream};
+    rmm::device_uvector<IndexT> out_dst{static_cast<unsigned long>(n_edges), stream};
     rmm::device_uvector<float> theta{(unsigned long)(4 * max_scale), stream};
 
     raft::random::RngState state{2024ULL, raft::random::GeneratorType::GenPC};
@@ -610,14 +609,13 @@ class PrefilteredBruteForceOnBitsetTest  // NOLINT(readability-identifier-naming
                                         float sparsity,
                                         rmm::device_uvector<bitset_t>& filter_d)
   {
-    IndexT r_scale = (IndexT)std::log2(m);  // NOLINT(google-readability-casting,modernize-use-auto)
-    IndexT c_scale = (IndexT)std::log2(n);  // NOLINT(google-readability-casting,modernize-use-auto)
-    IndexT n_edges =
-      (IndexT)(m * n * 1.0f * sparsity);  // NOLINT(google-readability-casting,modernize-use-auto)
+    auto r_scale = static_cast<IndexT>(std::log2(m));
+    auto c_scale = static_cast<IndexT>(std::log2(n));
+    auto n_edges = static_cast<IndexT>(m * n * 1.0f * sparsity);
     IndexT max_scale = std::max(r_scale, c_scale);
 
-    rmm::device_uvector<IndexT> out_src{(unsigned long)n_edges, stream};
-    rmm::device_uvector<IndexT> out_dst{(unsigned long)n_edges, stream};
+    rmm::device_uvector<IndexT> out_src{static_cast<unsigned long>(n_edges), stream};
+    rmm::device_uvector<IndexT> out_dst{static_cast<unsigned long>(n_edges), stream};
     rmm::device_uvector<float> theta{(unsigned long)(4 * max_scale), stream};
 
     raft::random::RngState state{2024ULL, raft::random::GeneratorType::GenPC};

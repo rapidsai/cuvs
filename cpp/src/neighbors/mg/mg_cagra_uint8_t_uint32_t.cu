@@ -16,7 +16,6 @@
 
 #define CUVS_INST_MG_CAGRA(T, IdxT)                                                          \
   namespace cuvs::neighbors::cagra {                                                         \
-  using namespace cuvs::neighbors;                                                           \
                                                                                              \
   cuvs::neighbors::mg_index<cagra::index<T, IdxT>, T, IdxT> build(                           \
     const raft::resources& res,                                                              \

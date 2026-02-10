@@ -26,7 +26,6 @@ include_macro = """
 flat_macro = """
 #define CUVS_INST_MG_FLAT(T, IdxT)                                                                                   \\
 namespace cuvs::neighbors::ivf_flat {                                                                                \\
-  using namespace cuvs::neighbors;                                                                                   \\
                                                                                                                      \\
   cuvs::neighbors::mg_index<ivf_flat::index<T, IdxT>, T, IdxT> build(                                                \\
     const raft::resources& res,                                                                                      \\
@@ -91,7 +90,6 @@ namespace cuvs::neighbors::ivf_flat {                                           
 pq_macro = """
 #define CUVS_INST_MG_PQ(T, IdxT)                                                                                \\
 namespace cuvs::neighbors::ivf_pq {                                                                             \\
-  using namespace cuvs::neighbors;                                                                              \\
                                                                                                                 \\
   cuvs::neighbors::mg_index<ivf_pq::index<IdxT>, T, IdxT> build(                                                \\
     const raft::resources& res,                                                                                 \\
@@ -156,7 +154,6 @@ namespace cuvs::neighbors::ivf_pq {                                             
 cagra_macro = """
 #define CUVS_INST_MG_CAGRA(T, IdxT)                                                                               \\
 namespace cuvs::neighbors::cagra {                                                                                \\
-  using namespace cuvs::neighbors;                                                                                \\
                                                                                                                   \\
   cuvs::neighbors::mg_index<cagra::index<T, IdxT>, T, IdxT> build(                                                \\
     const raft::resources& res,                                                                                   \\

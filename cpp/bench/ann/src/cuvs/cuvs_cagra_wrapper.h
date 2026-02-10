@@ -452,7 +452,7 @@ void cuvs_cagra<T, IdxT>::search_base(
         handle_, search_params_, *index_, queries_view, neighbors_view, distances_view, *filter_);
     } else {
       if (index_params_.merge_type == CagraMergeType::kLogical) {
-        // TODO: index merge must happen outside of search, otherwise what are we benchmarking?  //
+        // TODO(cuvs): index merge must happen outside of search, otherwise what are we benchmarking?  //
         // NOLINT(google-readability-todo)
         cuvs::neighbors::cagra::merge_params merge_params{cuvs::neighbors::cagra::index_params{}};
         merge_params.merge_strategy = cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL;

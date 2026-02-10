@@ -16,7 +16,6 @@
 
 #define CUVS_INST_MG_CAGRA(T, IdxT)                                                          \
   namespace cuvs::neighbors::cagra {                                                         \
-  using namespace cuvs::neighbors;                                                           \
                                                                                              \
   cuvs::neighbors::mg_index<cagra::index<T, IdxT>, T, IdxT> build(                           \
     const raft::resources& res,                                                              \
@@ -97,6 +96,6 @@
   }                                                                                          \
   }  // namespace cuvs::neighbors::cagra
 CUVS_INST_MG_CAGRA(
-  float, uint32_t);  // NOLINT(google-build-using-namespace,modernize-use-trailing-return-type)
+  float, uint32_t);  // NOLINT(modernize-use-trailing-return-type)
 
 #undef CUVS_INST_MG_CAGRA

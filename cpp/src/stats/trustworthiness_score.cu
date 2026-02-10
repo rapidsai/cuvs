@@ -21,7 +21,7 @@ double trustworthiness_score(  // NOLINT(modernize-use-trailing-return-type)
   RAFT_EXPECTS(X.extent(0) == X_embedded.extent(0), "Size mismatch between X and X_embedded");
   RAFT_EXPECTS(X.extent(0) <= std::numeric_limits<int>::max(), "Index type not supported");
 
-  // TODO: Change the underlying implementation to remove the need to const_cast X_embedded.  //
+  // TODO(cuvs): Change the underlying implementation to remove the need to const_cast X_embedded.  //
   // NOLINT(google-readability-todo)
   return detail::trustworthiness_score<float>(handle,
                                               X.data_handle(),

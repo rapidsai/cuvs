@@ -16,7 +16,6 @@
 
 #define CUVS_INST_MG_PQ(T, IdxT)                                                           \
   namespace cuvs::neighbors::ivf_pq {                                                      \
-  using namespace cuvs::neighbors;                                                         \
                                                                                            \
   cuvs::neighbors::mg_index<ivf_pq::index<IdxT>, T, IdxT> build(                           \
     const raft::resources& res,                                                            \
@@ -81,6 +80,6 @@
   }                                                                                        \
   }  // namespace cuvs::neighbors::ivf_pq
 CUVS_INST_MG_PQ(
-  int8_t, int64_t);  // NOLINT(google-build-using-namespace,modernize-use-trailing-return-type)
+  int8_t, int64_t);  // NOLINT(modernize-use-trailing-return-type)
 
 #undef CUVS_INST_MG_PQ

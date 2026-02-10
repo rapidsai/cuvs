@@ -39,8 +39,8 @@ inline ::std::ostream& operator<<(
 {
   os << "dataset shape=" << p.n_rows << "x" << p.dim << ", graph_degree=" << p.graph_degree
      << ", metric="
-     << cuvs::neighbors::print_metric{static_cast<cuvs::distance::DistanceType>((int)p.metric)}
-     // NOLINT(google-readability-casting)
+     << cuvs::neighbors::print_metric{
+          static_cast<cuvs::distance::DistanceType>(static_cast<int>(p.metric))}
      << ", ef=" << (p.ef) << std::endl;
   return os;
 }

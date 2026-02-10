@@ -16,7 +16,6 @@
 
 #define CUVS_INST_MG_FLAT(T, IdxT)                                                              \
   namespace cuvs::neighbors::ivf_flat {                                                         \
-  using namespace cuvs::neighbors;                                                              \
                                                                                                 \
   cuvs::neighbors::mg_index<ivf_flat::index<T, IdxT>, T, IdxT> build(                           \
     const raft::resources& res,                                                                 \

@@ -8,10 +8,10 @@
 // cuvs::sparse::neighbors::cross_component_nn<value_idx, value_t>(
 //   handle, out_edges, data.data(), colors.data(), params.n_row, params.n_col, red_op);
 //
-// TODO: consider adding this to libraft.so or creating an instance in a  //
+// TODO(cuvs): consider adding this to libraft.so or creating an instance in a  //
 // NOLINT(google-readability-todo) separate translation unit for this test.
 //
-// TODO: edge case testing. Reference: https://github.com/rapidsai/raft/issues/1669  //
+// TODO(cuvs): edge case testing. Reference: https://github.com/rapidsai/raft/issues/1669  //
 // NOLINT(google-readability-todo)
 
 #include "../../test_utils.cuh"
