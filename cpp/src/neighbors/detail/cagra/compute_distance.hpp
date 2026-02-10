@@ -257,11 +257,11 @@ struct dataset_descriptor_host {
       if (std::holds_alternative<init_f>(value)) {
         auto& [fun, size]     = std::get<init_f>(value);
         dev_descriptor_t* ptr = nullptr;
+        RAFT_CUDA_TRY(cudaEventCreateWithFlags(&init_event, cudaEventDisableTiming));
         RAFT_CUDA_TRY(cudaMallocAsync(&ptr, size, stream));
         fun(ptr, stream);
         // Record an event after initialization so that other streams can establish
         // a GPU-side dependency without expensive host synchronization.
-        RAFT_CUDA_TRY(cudaEventCreateWithFlags(&init_event, cudaEventDisableTiming));
         RAFT_CUDA_TRY(cudaEventRecord(init_event, stream));
         value = std::make_tuple(ptr, stream);
         ready.store(true, std::memory_order_release);
