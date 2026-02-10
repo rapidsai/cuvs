@@ -54,6 +54,7 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::get_launcher()
   if (launchers.count(launch_key) == 0) {
     add_entrypoint();
     add_device_functions();
+    RAFT_LOG_INFO("JIT compiling launcher for key: %s", launch_key.c_str());
     launchers[launch_key] = this->build();
   }
   return launchers[launch_key];
