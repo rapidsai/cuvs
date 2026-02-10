@@ -163,11 +163,7 @@ function(generate_jit_lto_kernels target)
       endforeach()
 
       foreach(metric_name IN LISTS metric_configs)
-        if(metric_name STREQUAL "euclidean")
-          set(header_file "neighbors/ivf_flat/jit_lto_kernels/metric_euclidean_dist.cuh")
-        elseif(metric_name STREQUAL "inner_prod")
-          set(header_file "neighbors/ivf_flat/jit_lto_kernels/metric_inner_product.cuh")
-        endif()
+        set(header_file "neighbors/ivf_flat/jit_lto_kernels/metric_${metric_name}.cuh")
 
         set(kernel_name "metric_${metric_name}_${veclen}_${type_abbrev}_${acc_abbrev}")
         set(filename "${generated_kernels_dir}/metric_device_functions/fatbin_${kernel_name}.cu")
