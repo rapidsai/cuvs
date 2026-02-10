@@ -7,7 +7,7 @@
 
 #include <cstring>
 
-#include <cuvs/detail/jit_lto/FragmentEntry.h>
+#include <cuvs/detail/jit_lto/FragmentEntry.hpp>
 
 FragmentEntry::FragmentEntry(std::string const& key) : compute_key(key) {}
 
