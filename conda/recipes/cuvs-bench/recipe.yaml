@@ -62,7 +62,7 @@ requirements:
 tests:
   - package_contents:
       files:
-        - lib/python*/site-packages/cuvs_bench/config/datasets/datasets.yaml
+        - site-packages/cuvs_bench/config/datasets/datasets.yaml
   - python:
       imports:
         - cuvs_bench
