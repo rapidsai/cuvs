@@ -91,7 +91,7 @@ class IndexWrapper  // NOLINT(readability-identifier-naming)
     const cuvs::neighbors::filtering::base_filter& filter =
       cuvs::neighbors::filtering::none_sample_filter{}) const override;
 
-  auto size() const noexcept -> index_type override;
+  [[nodiscard]] auto size() const noexcept -> index_type override;
 
   [[nodiscard]] auto metric() const noexcept -> cuvs::distance::DistanceType override;
 
@@ -107,11 +107,12 @@ class IndexWrapper  // NOLINT(readability-identifier-naming)
    * @param[in] other_indices Vector of other indices to merge with this one
    * @return Shared pointer to merged index
    */
-  auto merge(const raft::resources& handle,
-             const cuvs::neighbors::merge_params& params,
-             const std::vector<
-               std::shared_ptr<cuvs::neighbors::IndexBase<value_type, index_type, out_index_type>>>&
-               other_indices) const
+  [[nodiscard]] auto merge(
+    const raft::resources& handle,
+    const cuvs::neighbors::merge_params& params,
+    const std::vector<
+      std::shared_ptr<cuvs::neighbors::IndexBase<value_type, index_type, out_index_type>>>&
+      other_indices) const
     -> std::shared_ptr<cuvs::neighbors::IndexBase<value_type, index_type, out_index_type>> override;
 
  protected:

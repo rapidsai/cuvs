@@ -71,7 +71,7 @@ class CompositeIndex  // NOLINT(readability-identifier-naming)
     const cuvs::neighbors::filtering::base_filter& filter =
       cuvs::neighbors::filtering::none_sample_filter{}) const override;
 
-  auto size() const noexcept -> index_type override
+  [[nodiscard]] auto size() const noexcept -> index_type override
   {
     index_type total = 0;
     for (const auto& c : children_) {

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -16,7 +16,8 @@ index<T, DistT>::index(raft::resources const& res)
   // this constructor is just for a temporary index, for use in the deserialization
   // api. all the parameters here will get replaced with loaded values - that aren't
   // necessarily known ahead of time before deserialization.
-  // TODO: do we even need a handle here - could just construct one?
+  // TODO: do we even need a handle here - could just construct one?  //
+  // NOLINT(google-readability-todo)
   : cuvs::neighbors::index(),
     metric_(cuvs::distance::DistanceType::L2Expanded),
     dataset_(raft::make_device_matrix<T, int64_t>(res, 0, 0)),

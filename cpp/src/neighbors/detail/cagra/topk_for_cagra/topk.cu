@@ -8,13 +8,14 @@
 namespace cuvs::neighbors::cagra::detail {
 
 //
-size_t _cuann_find_topk_bufferSize(uint32_t topK,
-                                   uint32_t sizeBatch,
-                                   uint32_t numElements,
-                                   cudaDataType_t sampleDtype)
+size_t _cuann_find_topk_bufferSize(
+  uint32_t topK,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  uint32_t sizeBatch,
+  uint32_t numElements,
+  cudaDataType_t sampleDtype)
 {
-  constexpr int numThreads  = NUM_THREADS;
-  constexpr int stateBitLen = STATE_BIT_LENGTH;
+  constexpr int numThreads  = NUM_THREADS;       // NOLINT(readability-identifier-naming)
+  constexpr int stateBitLen = STATE_BIT_LENGTH;  // NOLINT(readability-identifier-naming)
   assert(stateBitLen == 0 || stateBitLen == 8);
 
   size_t workspaceSize = 1;
@@ -28,7 +29,7 @@ size_t _cuann_find_topk_bufferSize(uint32_t topK,
 }
 
 template <class ValT>
-void _cuann_find_topk(uint32_t topK,
+void _cuann_find_topk(uint32_t topK,  // NOLINT(readability-identifier-naming)
                       uint32_t sizeBatch,
                       uint32_t numElements,
                       const float* inputKeys,  // [sizeBatch, ldIK,]
@@ -49,12 +50,12 @@ void _cuann_find_topk(uint32_t topK,
   assert(ldOK >= topK);
   assert(ldOV >= topK);
 
-  constexpr int numThreads  = NUM_THREADS;
+  constexpr int numThreads  = NUM_THREADS;  // NOLINT(readability-identifier-naming)
   constexpr int stateBitLen = STATE_BIT_LENGTH;
   assert(stateBitLen == 0 || stateBitLen == 8);
 
   uint8_t* state = nullptr;
-  if (stateBitLen == 8) { state = (uint8_t*)workspace; }
+  if (stateBitLen == 8) { state = (uint8_t*)workspace; }  // NOLINT(google-readability-casting)
 
   dim3 threads(numThreads, 1, 1);
   dim3 blocks(sizeBatch, 1, 1);
@@ -116,7 +117,7 @@ void _cuann_find_topk(uint32_t topK,
     }                                                        \
   } while (0)
 
-  int _vecLen = _get_vecLen(ldIK, 2);
+  int _vecLen = _get_vecLen(ldIK, 2);  // NOLINT(readability-identifier-naming)
   if (_vecLen == 2) {
     SET_KERNEL_V(2, ValT);
   } else if (_vecLen == 1) {

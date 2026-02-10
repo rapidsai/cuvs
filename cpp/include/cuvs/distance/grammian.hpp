@@ -33,8 +33,8 @@ using csr_input_matrix_view_t = raft::device_csr_matrix_view<const math_t, int, 
  * where x1_j is the j-th vector from the x1 set and x2_k is the k-th vector
  * from the x2 set.
  */
-template <typename math_t>
-class GramMatrixBase {  // NOLINT(readability-identifier-naming)
+template <typename math_t>  // NOLINT(readability-identifier-naming)
+class GramMatrixBase {      // NOLINT(readability-identifier-naming)
  protected:
   cublasHandle_t cublas_handle;  // NOLINT(readability-identifier-naming)
   bool legacy_interface;         // NOLINT(readability-identifier-naming)
@@ -288,8 +288,8 @@ class GramMatrixBase {  // NOLINT(readability-identifier-naming)
               dense_output_matrix_view_t<math_t> out);
 };
 
-template <typename math_t>
-class KernelFactory {  // NOLINT(readability-identifier-naming)
+template <typename math_t>  // NOLINT(readability-identifier-naming)
+class KernelFactory {       // NOLINT(readability-identifier-naming)
  public:
   static auto create(KernelParams params) -> GramMatrixBase<math_t>*;
   [[deprecated]] static auto create(KernelParams params, cublasHandle_t handle)
@@ -299,14 +299,19 @@ class KernelFactory {  // NOLINT(readability-identifier-naming)
 /**
  * Create a kernel matrix using polynomial kernel function.
  */
-template <typename math_t, typename exp_t>
+template <typename math_t, typename exp_t>                // NOLINT(readability-identifier-naming)
 class PolynomialKernel : public GramMatrixBase<math_t> {  // NOLINT(readability-identifier-naming)
-  exp_t exponent;
-  math_t gain;
-  math_t offset;
+  exp_t exponent;                                         // NOLINT(readability-identifier-naming)
+  math_t gain;                                            // NOLINT(readability-identifier-naming)
+  math_t offset;                                          // NOLINT(readability-identifier-naming)
 
-  void applyKernel(
-    math_t* inout, int ld, int rows, int cols, bool is_row_major, cudaStream_t stream);
+  void applyKernel(  // NOLINT(readability-identifier-naming)
+    math_t* inout,
+    int ld,
+    int rows,
+    int cols,
+    bool is_row_major,
+    cudaStream_t stream);
 
  public:
   /**
@@ -417,12 +422,17 @@ class PolynomialKernel : public GramMatrixBase<math_t> {  // NOLINT(readability-
 /**
  * Create a kernel matrix using tanh kernel function.
  */
-template <typename math_t>
+template <typename math_t>                          // NOLINT(readability-identifier-naming)
 class TanhKernel : public GramMatrixBase<math_t> {  // NOLINT(readability-identifier-naming)
-  math_t gain, offset;
+  math_t gain, offset;                              // NOLINT(readability-identifier-naming)
 
-  void applyKernel(
-    math_t* inout, int ld, int rows, int cols, bool is_row_major, cudaStream_t stream);
+  void applyKernel(  // NOLINT(readability-identifier-naming)
+    math_t* inout,
+    int ld,
+    int rows,
+    int cols,
+    bool is_row_major,
+    cudaStream_t stream);
 
  public:
   /**
@@ -530,11 +540,11 @@ class TanhKernel : public GramMatrixBase<math_t> {  // NOLINT(readability-identi
 /**
  * Create a kernel matrix using RBF kernel function.
  */
-template <typename math_t>
+template <typename math_t>                         // NOLINT(readability-identifier-naming)
 class RBFKernel : public GramMatrixBase<math_t> {  // NOLINT(readability-identifier-naming)
-  math_t gain;
+  math_t gain;                                     // NOLINT(readability-identifier-naming)
 
-  void applyKernel(math_t* inout,
+  void applyKernel(math_t* inout,  // NOLINT(readability-identifier-naming)
                    int ld,
                    int rows,
                    int cols,

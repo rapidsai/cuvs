@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -15,14 +15,14 @@
 #include <cusparse_v2.h>
 #include <gtest/gtest.h>
 
-namespace cuvs {
+namespace cuvs {  // NOLINT(modernize-concat-nested-namespaces)
 namespace distance {
 
-using namespace raft;
-using namespace raft::sparse;
+using namespace raft;          // NOLINT(google-build-using-namespace)
+using namespace raft::sparse;  // NOLINT(google-build-using-namespace)
 
-template <typename value_idx, typename value_t>
-struct SparseDistanceInputs {
+template <typename value_idx, typename value_t>  // NOLINT(readability-identifier-naming)
+struct SparseDistanceInputs {                    // NOLINT(readability-identifier-naming)
   value_idx n_cols;
 
   std::vector<value_idx> indptr_h;
@@ -36,14 +36,16 @@ struct SparseDistanceInputs {
   float metric_arg = 0.0;
 };
 
-template <typename value_idx, typename value_t>
-::std::ostream& operator<<(::std::ostream& os, const SparseDistanceInputs<value_idx, value_t>& dims)
+template <typename value_idx, typename value_t>  // NOLINT(readability-identifier-naming)
+::std::ostream& operator<<(::std::ostream& os,
+                           const SparseDistanceInputs<value_idx, value_t>&
+                             dims)  // NOLINT(modernize-use-trailing-return-type)
 {
   return os;
 }
 
-template <typename value_idx, typename value_t>
-class SparseDistanceTest
+template <typename value_idx, typename value_t>  // NOLINT(readability-identifier-naming)
+class SparseDistanceTest                         // NOLINT(readability-identifier-naming)
   : public ::testing::TestWithParam<SparseDistanceInputs<value_idx, value_t>> {
  public:
   SparseDistanceTest()
@@ -56,7 +58,7 @@ class SparseDistanceTest
   {
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     make_data();
 
@@ -117,19 +119,20 @@ class SparseDistanceTest
                   resource::get_cuda_stream(handle));
   }
 
-  raft::resources handle;
+  raft::resources handle;  // NOLINT(readability-identifier-naming)
 
   // input data
-  rmm::device_uvector<value_idx> indptr, indices;
-  rmm::device_uvector<value_t> data;
+  rmm::device_uvector<value_idx> indptr, indices;  // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<value_t> data;               // NOLINT(readability-identifier-naming)
 
   // output data
-  rmm::device_uvector<value_t> out_dists, out_dists_ref;
+  rmm::device_uvector<value_t> out_dists, out_dists_ref;  // NOLINT(readability-identifier-naming)
 
-  SparseDistanceInputs<value_idx, value_t> params;
+  SparseDistanceInputs<value_idx, value_t> params;  // NOLINT(readability-identifier-naming)
 };
 
 const std::vector<SparseDistanceInputs<int, float>> inputs_i32_f = {
+  // NOLINT(readability-identifier-naming)
   {5,
    {0, 0, 1, 2},
 
@@ -829,11 +832,16 @@ const std::vector<SparseDistanceInputs<int, float>> inputs_i32_f = {
 
 };
 
-typedef SparseDistanceTest<int, float> SparseDistanceTestF;
-TEST_P(SparseDistanceTestF, Result) { compare(); }
-INSTANTIATE_TEST_CASE_P(SparseDistanceTests,
-                        SparseDistanceTestF,
-                        ::testing::ValuesIn(inputs_i32_f));
+typedef SparseDistanceTest<int, float>
+  SparseDistanceTestF;  // NOLINT(modernize-use-using,readability-identifier-naming)
+TEST_P(SparseDistanceTestF, Result)
+{
+  compare();
+}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(
+  SparseDistanceTests,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  SparseDistanceTestF,
+  ::testing::ValuesIn(inputs_i32_f));
 
 }  // end namespace distance
 }  // end namespace cuvs

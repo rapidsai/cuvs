@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -55,7 +55,9 @@ namespace cuvs::neighbors::epsilon_neighborhood {
  *                    squared when using L2Unexpanded metric)
  * @param[in]  metric distance metric to use. Currently only L2Unexpanded is supported.
  */
-template <typename value_t, typename idx_t, typename matrix_idx_t>
+template <typename value_t,
+          typename idx_t,
+          typename matrix_idx_t>  // NOLINT(readability-identifier-naming)
 void compute(raft::resources const& handle,
              raft::device_matrix_view<const value_t, matrix_idx_t, raft::row_major> x,
              raft::device_matrix_view<const value_t, matrix_idx_t, raft::row_major> y,

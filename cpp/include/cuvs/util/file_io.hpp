@@ -8,9 +8,9 @@
 #include <raft/core/serialize.hpp>
 
 #include <algorithm>
+#include <climits>
 #include <cstring>
 #include <istream>
-#include <limits.h>
 #include <memory>
 #include <ostream>
 #include <sstream>
@@ -19,7 +19,7 @@
 #include <utility>
 #include <vector>
 
-#include <errno.h>
+#include <cerrno>
 #include <fcntl.h>
 #include <unistd.h>
 

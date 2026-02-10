@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -75,7 +75,7 @@ class fixed_thread_pool {
     std::atomic<IdxT> cnt(items_per_thread * num_threads);
 
     // Wrap function
-    auto wrapped_f = [&](IdxT start, IdxT end) {
+    auto wrapped_f = [&](IdxT start, IdxT end) {  // NOLINT(modernize-use-trailing-return-type)
       for (IdxT i = start; i < end; ++i) {
         f(i);
       }
@@ -94,7 +94,9 @@ class fixed_thread_pool {
       auto& task = tasks_[i];
       {
         [[maybe_unused]] std::lock_guard lock(task.mtx);
-        task.task = std::packaged_task<void()>([=] { wrapped_f(start, start + items_per_thread); });
+        task.task = std::packaged_task<void()>([=] {
+          wrapped_f(start, start + items_per_thread);
+        });  // NOLINT(modernize-use-trailing-return-type)
         futures.push_back(task.task.get_future());
         task.has_task = true;
       }

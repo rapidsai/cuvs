@@ -7,9 +7,17 @@
 
 namespace cuvs::neighbors::hnsw {
 
-typedef AnnHnswAceTest<float, half, uint32_t> AnnHnswAceTest_half;
-TEST_P(AnnHnswAceTest_half, AnnHnswAceBuild) { this->testHnswAceBuild(); }
+typedef AnnHnswAceTest<float, half, uint32_t>
+  AnnHnswAceTest_half;  // NOLINT(modernize-use-using,readability-identifier-naming)
+TEST_P(AnnHnswAceTest_half, AnnHnswAceBuild)
+{
+  this->testHnswAceBuild();
+}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(AnnHnswAceTest, AnnHnswAceTest_half, ::testing::ValuesIn(hnsw_ace_inputs));
+INSTANTIATE_TEST_CASE_P(
+  AnnHnswAceTest,
+  AnnHnswAceTest_half,
+  ::testing::ValuesIn(
+    hnsw_ace_inputs));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
 }  // namespace cuvs::neighbors::hnsw

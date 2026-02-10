@@ -179,23 +179,35 @@ struct index : cuvs::neighbors::index {
                  "PQ subspace dimension (pq_dim) must divide the dataset dimension");
   }
 
-  raft::device_matrix_view<float, IdxT> centers() noexcept { return centers_.view(); }
+  raft::device_matrix_view<float, IdxT> centers() noexcept
+  {
+    return centers_.view();
+  }  // NOLINT(modernize-use-trailing-return-type)
 
-  [[nodiscard]] raft::device_matrix_view<const float, IdxT> centers() const noexcept
+  [[nodiscard]] raft::device_matrix_view<const float, IdxT> centers()
+    const noexcept  // NOLINT(modernize-use-trailing-return-type)
   {
     return raft::make_const_mdspan(centers_.view());
   }
 
-  raft::device_vector_view<uint32_t, IdxT> labels() noexcept { return labels_.view(); }
+  raft::device_vector_view<uint32_t, IdxT> labels() noexcept
+  {
+    return labels_.view();
+  }  // NOLINT(modernize-use-trailing-return-type)
 
-  [[nodiscard]] raft::device_vector_view<const uint32_t, IdxT> labels() const noexcept
+  [[nodiscard]] raft::device_vector_view<const uint32_t, IdxT> labels()
+    const noexcept  // NOLINT(modernize-use-trailing-return-type)
   {
     return raft::make_const_mdspan(labels_.view());
   }
 
-  raft::device_vector_view<uint32_t, IdxT> soar_labels() noexcept { return soar_labels_.view(); }
+  raft::device_vector_view<uint32_t, IdxT> soar_labels() noexcept
+  {
+    return soar_labels_.view();
+  }  // NOLINT(modernize-use-trailing-return-type)
 
-  [[nodiscard]] raft::device_vector_view<const uint32_t, IdxT> soar_labels() const noexcept
+  [[nodiscard]] raft::device_vector_view<const uint32_t, IdxT> soar_labels()
+    const noexcept  // NOLINT(modernize-use-trailing-return-type)
   {
     return raft::make_const_mdspan(soar_labels_.view());
   }
@@ -206,45 +218,52 @@ struct index : cuvs::neighbors::index {
 
   [[nodiscard]] auto pq_dim() const noexcept -> uint32_t { return pq_dim_; }
 
-  [[nodiscard]] raft::device_matrix_view<const float, uint32_t, raft::row_major> pq_codebook()
+  [[nodiscard]] raft::device_matrix_view<const float, uint32_t, raft::row_major>
+  pq_codebook()  // NOLINT(modernize-use-trailing-return-type)
     const noexcept
   {
     return raft::make_const_mdspan(pq_codebook_.view());
   }
 
-  raft::device_matrix_view<float, uint32_t, raft::row_major> pq_codebook() noexcept
+  raft::device_matrix_view<float, uint32_t, raft::row_major>
+  pq_codebook() noexcept  // NOLINT(modernize-use-trailing-return-type)
   {
     return pq_codebook_.view();
   }
 
-  [[nodiscard]] raft::host_matrix_view<const uint8_t, IdxT, raft::row_major> quantized_residuals()
+  [[nodiscard]] raft::host_matrix_view<const uint8_t, IdxT, raft::row_major>
+  quantized_residuals()  // NOLINT(modernize-use-trailing-return-type)
     const noexcept
   {
     return raft::make_const_mdspan(quantized_residuals_.view());
   }
 
-  raft::host_matrix_view<uint8_t, IdxT, raft::row_major> quantized_residuals() noexcept
+  raft::host_matrix_view<uint8_t, IdxT, raft::row_major>
+  quantized_residuals() noexcept  // NOLINT(modernize-use-trailing-return-type)
   {
     return quantized_residuals_.view();
   }
 
   [[nodiscard]] raft::host_matrix_view<const uint8_t, IdxT, raft::row_major>
-  quantized_soar_residuals() const noexcept
+  quantized_soar_residuals() const noexcept  // NOLINT(modernize-use-trailing-return-type)
   {
     return raft::make_const_mdspan(quantized_soar_residuals_.view());
   }
 
-  raft::host_matrix_view<uint8_t, IdxT, raft::row_major> quantized_soar_residuals() noexcept
+  raft::host_matrix_view<uint8_t, IdxT, raft::row_major>
+  quantized_soar_residuals() noexcept  // NOLINT(modernize-use-trailing-return-type)
   {
     return quantized_soar_residuals_.view();
   }
 
-  raft::host_matrix_view<int16_t, IdxT, raft::row_major> bf16_dataset() noexcept
+  raft::host_matrix_view<int16_t, IdxT, raft::row_major>
+  bf16_dataset() noexcept  // NOLINT(modernize-use-trailing-return-type)
   {
     return bf16_dataset_.view();
   }
 
-  [[nodiscard]] raft::host_matrix_view<const int16_t, IdxT, raft::row_major> bf16_dataset()
+  [[nodiscard]] raft::host_matrix_view<const int16_t, IdxT, raft::row_major>
+  bf16_dataset()  // NOLINT(modernize-use-trailing-return-type)
     const noexcept
   {
     return raft::make_const_mdspan(bf16_dataset_.view());

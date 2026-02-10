@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2020-2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,6 +9,9 @@
 
 namespace raft {
 
-TEST(Raft, print) { std::cout << test_raft() << std::endl; }
+TEST(Raft, print)
+{
+  std::cout << test_raft() << std::endl;
+}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
 }  // namespace raft

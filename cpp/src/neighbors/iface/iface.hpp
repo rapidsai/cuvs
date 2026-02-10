@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,7 +17,7 @@
 
 namespace cuvs::neighbors {
 
-using namespace raft;
+using namespace raft;  // NOLINT(google-build-using-namespace)
 
 template <typename AnnIndexType, typename T, typename IdxT, typename Accessor>
 void build(const raft::resources& handle,
@@ -67,7 +67,10 @@ void extend(
   resource::sync_stream(handle);
 }
 
-template <typename AnnIndexType, typename T, typename IdxT, typename searchIdxT>
+template <typename AnnIndexType,
+          typename T,
+          typename IdxT,
+          typename searchIdxT>  // NOLINT(readability-identifier-naming)
 void search(const raft::resources& handle,
             const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
             const cuvs::neighbors::search_params* search_params,
@@ -103,7 +106,10 @@ void search(const raft::resources& handle,
 }
 
 // for MG ANN only
-template <typename AnnIndexType, typename T, typename IdxT, typename searchIdxT>
+template <typename AnnIndexType,
+          typename T,
+          typename IdxT,
+          typename searchIdxT>  // NOLINT(readability-identifier-naming)
 void search(const raft::resources& handle,
             const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
             const cuvs::neighbors::search_params* search_params,

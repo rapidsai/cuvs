@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -35,7 +35,8 @@ struct selected {
   friend auto get_kernel(selected<O, L> s) -> const void*;
 
  private:
-  const void* kernel;  // Type-erased kernel pointer (compatible with any __global__ function)
+  const void* kernel;  // Type-erased kernel pointer (compatible with any __global__ function)  //
+                       // NOLINT(readability-identifier-naming)
 };
 
 }  // namespace cuvs::neighbors::ivf_pq::detail

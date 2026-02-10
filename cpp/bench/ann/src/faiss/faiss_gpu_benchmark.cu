@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,9 +17,10 @@
 #include <utility>
 
 namespace {
-nlohmann::json collect_conf_with_prefix(const nlohmann::json& conf,
-                                        const std::string& prefix,
-                                        bool remove_prefix = true)
+nlohmann::json collect_conf_with_prefix(
+  const nlohmann::json& conf,  // NOLINT(modernize-use-trailing-return-type)
+  const std::string& prefix,
+  bool remove_prefix = true)
 {
   nlohmann::json out;
   for (auto& i : conf.items()) {

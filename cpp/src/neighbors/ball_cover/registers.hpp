@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -12,7 +12,7 @@
 
 namespace cuvs::neighbors::ball_cover::detail {
 
-template <typename value_idx, typename value_t>
+template <typename value_idx, typename value_t>  // NOLINT(readability-identifier-naming)
 void rbc_low_dim_pass_one(raft::resources const& handle,
                           const cuvs::neighbors::ball_cover::index<value_idx, value_t>& index,
                           const value_t* query,
@@ -25,7 +25,7 @@ void rbc_low_dim_pass_one(raft::resources const& handle,
                           float weight,
                           int dims);
 
-template <typename value_idx, typename value_t>
+template <typename value_idx, typename value_t>  // NOLINT(readability-identifier-naming)
 void rbc_low_dim_pass_two(raft::resources const& handle,
                           const cuvs::neighbors::ball_cover::index<value_idx, value_t>& index,
                           const value_t* query,
@@ -38,7 +38,9 @@ void rbc_low_dim_pass_two(raft::resources const& handle,
                           float weight,
                           int dims);
 
-template <typename value_idx, typename value_t, typename dist_func>
+template <typename value_idx,
+          typename value_t,
+          typename dist_func>  // NOLINT(readability-identifier-naming)
 void rbc_eps_pass(raft::resources const& handle,
                   const cuvs::neighbors::ball_cover::index<value_idx, value_t>& index,
                   const value_t* query,
@@ -49,7 +51,9 @@ void rbc_eps_pass(raft::resources const& handle,
                   bool* adj,
                   value_idx* vd);
 
-template <typename value_idx, typename value_t, typename dist_func>
+template <typename value_idx,
+          typename value_t,
+          typename dist_func>  // NOLINT(readability-identifier-naming)
 void rbc_eps_pass(raft::resources const& handle,
                   const cuvs::neighbors::ball_cover::index<value_idx, value_t>& index,
                   const value_t* query,

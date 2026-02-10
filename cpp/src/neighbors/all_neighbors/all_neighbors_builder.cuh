@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -483,9 +483,9 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
   }
 
   nn_descent::index_params nnd_params;
-  nn_descent::detail::BuildConfig build_config;
+  nn_descent::detail::build_config build_config;
 
-  std::optional<nn_descent::detail::GNND<const T, int>> nnd_builder;
+  std::optional<nn_descent::detail::gnnd<const T, int>> nnd_builder;
   std::optional<raft::host_matrix<int, IdxT>> int_graph;
 
   DistEpilogueT dist_epilogue;

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -18,18 +18,19 @@
 namespace cuvs {
 namespace stats {
 
-class TrustworthinessScoreTest : public ::testing::Test {
+class trustworthiness_score_test : public ::testing::Test {
  public:
-  TrustworthinessScoreTest()
+  trustworthiness_score_test()  // NOLINT(modernize-use-equals-default)
     : d_X(0, raft::resource::get_cuda_stream(handle)),
       d_X_embedded(0, raft::resource::get_cuda_stream(handle))
   {
   }
 
  protected:
-  void basicTest()
+  void basicTest()  // NOLINT(readability-identifier-naming)
   {
     std::vector<float> X = {
+      // NOLINT(readability-identifier-naming)
       5.6142087,   8.59787,     -4.382763,   -3.6452143,  -5.8816037,  -0.6330313,  4.6920023,
       -0.79210913, 0.6106314,   2.1210914,   5.919943,    -8.43784,    -6.4819884,  0.41001374,
       -6.1052523,  -4.0825715,  -5.314755,   -2.834671,   5.751696,    -6.5012555,  -0.4719201,
@@ -247,6 +248,7 @@ class TrustworthinessScoreTest : public ::testing::Test {
       5.3101015,   -4.2400866};
 
     std::vector<float> X_embedded = {
+      // NOLINT(readability-identifier-naming)
       -0.41849962, -0.53906363, 0.46958843,  -0.35832694, -0.23779503, -0.29751351, -0.01072748,
       -0.21353109, -0.54769957, -0.55086273, 0.37093949,  -0.12714292, -0.06639574, -0.36098689,
       -0.13060696, -0.07362658, -1.01205945, -0.39285606, 0.2864089,   -0.32031146, -0.19595343,
@@ -326,20 +328,21 @@ class TrustworthinessScoreTest : public ::testing::Test {
       cuvs::distance::DistanceType::L2SqrtUnexpanded);
   }
 
-  void SetUp() override { basicTest(); }
+  void SetUp() override { basicTest(); }  // NOLINT(readability-identifier-naming)
 
-  void TearDown() override {}
+  void TearDown() override {}  // NOLINT(readability-identifier-naming)
 
  protected:
-  raft::resources handle;
+  raft::resources handle;  // NOLINT(readability-identifier-naming)
 
-  rmm::device_uvector<float> d_X;
-  rmm::device_uvector<float> d_X_embedded;
+  rmm::device_uvector<float> d_X;           // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<float> d_X_embedded;  // NOLINT(readability-identifier-naming)
 
-  double score;
+  double score;  // NOLINT(readability-identifier-naming)
 };
 
-typedef TrustworthinessScoreTest TrustworthinessScoreTestF;
-TEST_F(TrustworthinessScoreTestF, Result) { ASSERT_TRUE(0.9375 < score && score < 0.9379); }
+using trustworthiness_score_test_f = trustworthiness_score_test;
+// NOLINTNEXTLINE(modernize-use-trailing-return-type,readability-identifier-naming)
+TEST_F(trustworthiness_score_test_f, Result) { ASSERT_TRUE(0.9375 < score && score < 0.9379); }
 };  // namespace stats
 };  // namespace cuvs

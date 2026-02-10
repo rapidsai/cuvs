@@ -1,25 +1,26 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "../test_utils.cuh"
 #include "distance_base.cuh"
 
-namespace cuvs {
+namespace cuvs {  // NOLINT(modernize-concat-nested-namespaces)
 namespace distance {
 
 template <typename DataType, typename OutputType = DataType>
-class DistanceExpCos
+class DistanceExpCos  // NOLINT(readability-identifier-naming)
   : public DistanceTest<cuvs::distance::DistanceType::CosineExpanded, DataType, OutputType> {};
 
 template <typename DataType, typename OutputType = DataType>
-class DistanceExpCosXequalY
+class DistanceExpCosXequalY  // NOLINT(readability-identifier-naming)
   : public DistanceTestSameBuffer<cuvs::distance::DistanceType::CosineExpanded,
                                   DataType,
                                   OutputType> {};
 
 const std::vector<DistanceInputs<float>> inputsf = {
+  // NOLINT(readability-identifier-naming)
   {0.001f, 128, (65536 + 128) * 128, 8, true, 1234ULL},
   {0.001f, 1024, 1024, 32, true, 1234ULL},
   {0.001f, 1024, 32, 1024, true, 1234ULL},
@@ -33,6 +34,7 @@ const std::vector<DistanceInputs<float>> inputsf = {
 };
 
 const std::vector<DistanceInputs<float>> inputsXeqYf = {
+  // NOLINT(readability-identifier-naming)
   {0.01f, 1024, 1024, 32, true, 1234ULL},
   {0.01f, 1024, 32, 1024, true, 1234ULL},
   {0.01f, 32, 1024, 1024, true, 1234ULL},
@@ -44,6 +46,7 @@ const std::vector<DistanceInputs<float>> inputsXeqYf = {
 };
 
 const std::vector<DistanceInputs<half, float>> inputsh = {
+  // NOLINT(readability-identifier-naming)
   {0.001f, 128, (65536 + 128) * 128, 8, true, 1234ULL},
   {0.001f, 1024, 1024, 32, true, 1234ULL},
   {0.001f, 1024, 32, 1024, true, 1234ULL},
@@ -57,6 +60,7 @@ const std::vector<DistanceInputs<half, float>> inputsh = {
 };
 
 const std::vector<DistanceInputs<half, float>> inputsXeqYh = {
+  // NOLINT(readability-identifier-naming)
   {0.01f, 1024, 1024, 32, true, 1234ULL},
   {0.01f, 1024, 32, 1024, true, 1234ULL},
   {0.01f, 32, 1024, 1024, true, 1234ULL},
@@ -67,28 +71,42 @@ const std::vector<DistanceInputs<half, float>> inputsXeqYh = {
   {0.03f, 1024, 1024, 1024, false, 1234ULL},
 };
 
-typedef DistanceExpCos<float> DistanceExpCosF;
-TEST_P(DistanceExpCosF, Result)
+typedef DistanceExpCos<float>
+  DistanceExpCosF;  // NOLINT(modernize-use-using,readability-identifier-naming)
+TEST_P(DistanceExpCosF,
+       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
   int m = params.isRowMajor ? params.m : params.n;
   int n = params.isRowMajor ? params.n : params.m;
   ASSERT_TRUE(devArrMatch(
     dist_ref.data(), dist.data(), m, n, cuvs::CompareApprox<float>(params.tolerance), stream));
 }
-INSTANTIATE_TEST_CASE_P(DistanceTests, DistanceExpCosF, ::testing::ValuesIn(inputsf));
+INSTANTIATE_TEST_CASE_P(
+  DistanceTests,
+  DistanceExpCosF,
+  ::testing::ValuesIn(
+    inputsf));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-typedef DistanceExpCos<half, float> DistanceExpCosH;
-TEST_P(DistanceExpCosH, Result)
+typedef DistanceExpCos<half, float>
+  DistanceExpCosH;  // NOLINT(modernize-use-using,readability-identifier-naming)
+TEST_P(DistanceExpCosH,
+       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
   int m = params.isRowMajor ? params.m : params.n;
   int n = params.isRowMajor ? params.n : params.m;
   ASSERT_TRUE(devArrMatch(
     dist_ref.data(), dist.data(), m, n, cuvs::CompareApprox<float>(params.tolerance), stream));
 }
-INSTANTIATE_TEST_CASE_P(DistanceTests, DistanceExpCosH, ::testing::ValuesIn(inputsh));
+INSTANTIATE_TEST_CASE_P(
+  DistanceTests,
+  DistanceExpCosH,
+  ::testing::ValuesIn(
+    inputsh));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-typedef DistanceExpCosXequalY<float> DistanceExpCosXequalYF;
-TEST_P(DistanceExpCosXequalYF, Result)
+typedef DistanceExpCosXequalY<float>
+  DistanceExpCosXequalYF;  // NOLINT(modernize-use-using,readability-identifier-naming)
+TEST_P(DistanceExpCosXequalYF,
+       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
   int m = params.m;
   int n = params.m;
@@ -108,10 +126,16 @@ TEST_P(DistanceExpCosXequalYF, Result)
                                 cuvs::CompareApprox<float>(params.tolerance),
                                 stream));
 }
-INSTANTIATE_TEST_CASE_P(DistanceTests, DistanceExpCosXequalYF, ::testing::ValuesIn(inputsXeqYf));
+INSTANTIATE_TEST_CASE_P(
+  DistanceTests,
+  DistanceExpCosXequalYF,
+  ::testing::ValuesIn(
+    inputsXeqYf));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-typedef DistanceExpCosXequalY<half, float> DistanceExpCosXequalYH;
-TEST_P(DistanceExpCosXequalYH, Result)
+typedef DistanceExpCosXequalY<half, float>
+  DistanceExpCosXequalYH;  // NOLINT(modernize-use-using,readability-identifier-naming)
+TEST_P(DistanceExpCosXequalYH,
+       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
   int m = params.m;
   int n = params.m;
@@ -131,9 +155,14 @@ TEST_P(DistanceExpCosXequalYH, Result)
                                 cuvs::CompareApprox<float>(params.tolerance),
                                 stream));
 }
-INSTANTIATE_TEST_CASE_P(DistanceTests, DistanceExpCosXequalYH, ::testing::ValuesIn(inputsXeqYh));
+INSTANTIATE_TEST_CASE_P(
+  DistanceTests,
+  DistanceExpCosXequalYH,
+  ::testing::ValuesIn(
+    inputsXeqYh));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
 const std::vector<DistanceInputs<double>> inputsd = {
+  // NOLINT(readability-identifier-naming)
   {0.001, 1024, 1024, 32, true, 1234ULL},
   {0.001, 1024, 32, 1024, true, 1234ULL},
   {0.001, 32, 1024, 1024, true, 1234ULL},
@@ -143,18 +172,26 @@ const std::vector<DistanceInputs<double>> inputsd = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceExpCos<double> DistanceExpCosD;
-TEST_P(DistanceExpCosD, Result)
+typedef DistanceExpCos<double>
+  DistanceExpCosD;  // NOLINT(modernize-use-using,readability-identifier-naming)
+TEST_P(DistanceExpCosD,
+       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
   int m = params.isRowMajor ? params.m : params.n;
   int n = params.isRowMajor ? params.n : params.m;
   ASSERT_TRUE(devArrMatch(
     dist_ref.data(), dist.data(), m, n, cuvs::CompareApprox<double>(params.tolerance), stream));
 }
-INSTANTIATE_TEST_CASE_P(DistanceTests, DistanceExpCosD, ::testing::ValuesIn(inputsd));
+INSTANTIATE_TEST_CASE_P(
+  DistanceTests,
+  DistanceExpCosD,
+  ::testing::ValuesIn(
+    inputsd));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-class BigMatrixCos : public BigMatrixDistanceTest<cuvs::distance::DistanceType::CosineExpanded> {};
-TEST_F(BigMatrixCos, Result) {}
+class BigMatrixCos : public BigMatrixDistanceTest<cuvs::distance::DistanceType::CosineExpanded> {
+};  // NOLINT(readability-identifier-naming)
+TEST_F(BigMatrixCos, Result) {
+}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
 }  // end namespace distance
 }  // namespace cuvs

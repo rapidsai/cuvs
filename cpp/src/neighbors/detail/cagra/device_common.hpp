@@ -19,17 +19,17 @@
 #include <cfloat>
 #include <cstdint>
 
-namespace cuvs::neighbors::cagra::detail {
+namespace cuvs::neighbors::cagra::detail {  // NOLINT(modernize-concat-nested-namespaces)
 namespace device {
 
 // warpSize for compile time calculation
-constexpr unsigned warp_size = 32;
+constexpr unsigned warp_size = 32;  // NOLINT(readability-identifier-naming)
 
 // using LOAD_256BIT_T = ulonglong4;
 using LOAD_128BIT_T = uint4;
-using LOAD_64BIT_T  = uint64_t;
+using LOAD_64BIT_T  = uint64_t;  // NOLINT(readability-identifier-naming)
 
-template <class LOAD_T, class DATA_T>
+template <class LOAD_T, class DATA_T>  // NOLINT(readability-identifier-naming)
 RAFT_DEVICE_INLINE_FUNCTION constexpr auto get_vlen() -> unsigned
 {
   return utils::size_of<LOAD_T>() / utils::size_of<DATA_T>();
@@ -87,7 +87,7 @@ RAFT_DEVICE_INLINE_FUNCTION auto team_sum(T x, uint32_t team_size_bitshift) -> T
 
 template <typename IndexT,
           typename DistanceT,
-          typename DATASET_DESCRIPTOR_T>
+          typename DATASET_DESCRIPTOR_T>  // NOLINT(readability-identifier-naming)
 RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
   IndexT* __restrict__ result_indices_ptr,       // [num_pickup]
   DistanceT* __restrict__ result_distances_ptr,  // [num_pickup]
@@ -156,7 +156,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
 
 template <typename IndexT,
           typename DistanceT,
-          typename DATASET_DESCRIPTOR_T,
+          typename DATASET_DESCRIPTOR_T,  // NOLINT(readability-identifier-naming)
           int STATIC_RESULT_POSITION = 1>
 RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
   IndexT* __restrict__ result_child_indices_ptr,
@@ -177,8 +177,10 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
   int* __restrict__ result_position = nullptr,
   const int max_result_position     = 0)
 {
-  constexpr IndexT index_msb_1_mask = utils::gen_index_msb_1_mask<IndexT>::value;
-  constexpr IndexT invalid_index    = ~static_cast<IndexT>(0);
+  constexpr IndexT index_msb_1_mask =
+    utils::gen_index_msb_1_mask<IndexT>::value;  // NOLINT(readability-identifier-naming)
+  constexpr IndexT invalid_index =
+    ~static_cast<IndexT>(0);  // NOLINT(readability-identifier-naming)
 
   // Read child indices of parents from knn graph and check if the distance
   // computaiton is necessary.

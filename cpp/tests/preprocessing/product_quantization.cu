@@ -18,7 +18,7 @@
 namespace cuvs::preprocessing::quantize::pq {
 
 template <typename T>
-struct ProductQuantizationInputs {
+struct ProductQuantizationInputs {                    // NOLINT(readability-identifier-naming)
   int n_samples;                                      // Number of samples in the dataset
   int n_features;                                     // Number of features in the dataset
   uint32_t pq_bits;                                   // PQ bits
@@ -32,11 +32,13 @@ struct ProductQuantizationInputs {
 };
 
 template <typename T>
-std::ostream& operator<<(std::ostream& os, const ProductQuantizationInputs<T>& inputs)
+auto operator<<(  // NOLINT(modernize-use-trailing-return-type)
+  std::ostream& os,
+  const ProductQuantizationInputs<T>& inputs) -> std::ostream&
 {
   return os << "n_samples:" << inputs.n_samples << " n_features:" << inputs.n_features
-            << " pq_bits:" << inputs.pq_bits << " pq_dim:" << inputs.pq_dim
-            << " pq_kmeans_type:" << (int)inputs.pq_kmeans_type
+            << " pq_bits:" << inputs.pq_bits << " pq_dim:" << inputs.pq_dim << " pq_kmeans_type:"
+            << (int)inputs.pq_kmeans_type  // NOLINT(google-readability-casting)
             << " n_vq_centers:" << inputs.n_vq_centers << " use_vq:" << inputs.use_vq
             << " host_dataset:" << inputs.host_dataset << " seed:" << inputs.seed;
 }
@@ -54,7 +56,7 @@ void compare_vectors_l2(const raft::resources& res,
   rmm::mr::managed_memory_resource managed_memory;
   auto dist =
     raft::make_device_mdarray<double>(res, &managed_memory, raft::make_extents<uint32_t>(n_rows));
-  raft::linalg::map_offset(res, dist.view(), [a, b, dim] __device__(uint32_t i) {
+  raft::linalg::map_offset(res, dist.view(), [a, b, dim] __device__(uint32_t i) -> double {
     double d = 0.0f;
     for (uint32_t j = 0; j < dim; j++) {
       double t = static_cast<float>(a(i, j)) - static_cast<float>(b(i, j));
@@ -89,9 +91,11 @@ void compare_vectors_l2(const raft::resources& res,
 }
 
 template <typename T>
-class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizationInputs<T>> {
+class product_quantization_test
+  : public ::testing::TestWithParam<
+      ProductQuantizationInputs<T>> {  // NOLINT(readability-identifier-naming)
  public:
-  ProductQuantizationTest()
+  product_quantization_test()
     : params_(::testing::TestWithParam<ProductQuantizationInputs<T>>::GetParam()),
       stream(raft::resource::get_cuda_stream(handle)),
       dataset_(raft::make_device_matrix<T, int64_t, raft::row_major>(
@@ -104,18 +108,18 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
   }
 
  protected:
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     if constexpr (std::is_same_v<T, half>) {
       raft::random::RngState r(params_.seed);
       raft::random::uniform(
         handle, r, dataset_.data_handle(), n_samples_ * n_features_, T(0.1), T(2.0));
     } else {
-      auto labels_ = raft::make_device_vector<int64_t, int64_t>(handle, n_samples_);
+      auto labels = raft::make_device_vector<int64_t, int64_t>(handle, n_samples_);
       raft::random::make_blobs<T, int64_t, raft::row_major>(
         handle,
         dataset_.view(),
-        labels_.view(),
+        labels.view(),
         5,                      // Number of clusters
         std::nullopt,           // Generate random centers
         std::nullopt,           // Use scalar std
@@ -129,7 +133,7 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
       dataset_host_.data_handle(), dataset_.data_handle(), n_samples_ * n_features_, stream);
   }
 
-  void TearDown() override {}
+  void TearDown() override {}  // NOLINT(readability-identifier-naming)
 
   void check_reconstruction(const cuvs::preprocessing::quantize::pq::quantizer<T>& quantizer,
                             raft::device_matrix_view<uint8_t, int64_t, raft::row_major> codes,
@@ -158,9 +162,9 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
     compare_vectors_l2(handle, orig_data, rec_data.view(), compression_ratio, 0.04, false);
   }
 
-  void testProductQuantizationFromDataset()
+  void testProductQuantizationFromDataset()  // NOLINT(readability-identifier-naming)
   {
-    using LabelT = uint32_t;
+    using LabelT = uint32_t;  // NOLINT(readability-identifier-naming)
     config_      = cuvs::preprocessing::quantize::pq::params(params_.pq_bits,
                                                         params_.pq_dim,
                                                         params_.use_subspaces,
@@ -239,8 +243,8 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
   }
 
  private:
-  raft::resources handle;
-  cudaStream_t stream;
+  raft::resources handle;  // NOLINT(readability-identifier-naming)
+  cudaStream_t stream;     // NOLINT(readability-identifier-naming)
 
   ProductQuantizationInputs<T> params_;
   int n_samples_;
@@ -253,7 +257,7 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
 
 // Define test cases with different parameters
 template <typename T>
-const std::vector<ProductQuantizationInputs<T>> inputs = {
+const std::vector<ProductQuantizationInputs<T>> inputs = {  // NOLINT(readability-identifier-naming)
   // Extreme cases
   {1, 64, 4, 8, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, true, false, false, 42ULL},
   {512, 1, 8, 1, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, true, true, false, 42ULL},
@@ -365,11 +369,16 @@ const std::vector<ProductQuantizationInputs<T>> inputs = {
    true,
    42ULL}};
 
-typedef ProductQuantizationTest<float> ProductQuantizationTestF;
-TEST_P(ProductQuantizationTestF, Result) { this->testProductQuantizationFromDataset(); }
+using ProductQuantizationTestF =
+  product_quantization_test<float>;  // NOLINT(readability-identifier-naming)
+TEST_P(ProductQuantizationTestF, Result)
+{
+  this->testProductQuantizationFromDataset();
+}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(ProductQuantizationTests,
-                        ProductQuantizationTestF,
-                        ::testing::ValuesIn(inputs<float>));
+INSTANTIATE_TEST_CASE_P(
+  ProductQuantizationTests,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  ProductQuantizationTestF,
+  ::testing::ValuesIn(inputs<float>));
 
 }  // namespace cuvs::preprocessing::quantize::pq

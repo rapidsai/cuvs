@@ -17,7 +17,7 @@
 // #pragma GCC diagnostic push
 // #pragma GCC diagnostic ignored
 // #pragma GCC diagnostic pop
-namespace cuvs::neighbors::cagra::detail {
+namespace cuvs::neighbors::cagra::detail {  // NOLINT(modernize-concat-nested-namespaces)
 namespace hashmap {
 
 RAFT_INLINE_FUNCTION auto get_size(const uint32_t bitlen) -> uint32_t { return 1U << bitlen; }
@@ -43,13 +43,13 @@ RAFT_DEVICE_INLINE_FUNCTION auto insert(IdxT* const table, const uint32_t bitlen
 #ifdef HASHMAP_LINEAR_PROBING
   // Linear probing
   IdxT index                = (key ^ (key >> bitlen)) & bit_mask;
-  constexpr uint32_t stride = 1;
+  constexpr uint32_t stride = 1;  // NOLINT(readability-identifier-naming)
 #else
   // Double hashing
   uint32_t index        = key & bit_mask;
   const uint32_t stride = (key >> bitlen) * 2 + 1;
 #endif
-  constexpr IdxT hashval_empty = ~static_cast<IdxT>(0);
+  constexpr IdxT hashval_empty = ~static_cast<IdxT>(0);  // NOLINT(readability-identifier-naming)
   const IdxT removed_key       = key | utils::gen_index_msb_1_mask<IdxT>::value;
   for (unsigned i = 0; i < size; i++) {
     const IdxT old = atomicCAS(&table[index], hashval_empty, key);
@@ -80,13 +80,13 @@ RAFT_DEVICE_INLINE_FUNCTION auto search(IdxT* table, const uint32_t bitlen, cons
 #ifdef HASHMAP_LINEAR_PROBING
   // Linear probing
   IdxT index                = (key ^ (key >> bitlen)) & bit_mask;
-  constexpr uint32_t stride = 1;
+  constexpr uint32_t stride = 1;  // NOLINT(readability-identifier-naming)
 #else
   // Double hashing
   IdxT index            = key & bit_mask;
   const uint32_t stride = (key >> bitlen) * 2 + 1;
 #endif
-  constexpr IdxT hashval_empty = ~static_cast<IdxT>(0);
+  constexpr IdxT hashval_empty = ~static_cast<IdxT>(0);  // NOLINT(readability-identifier-naming)
   const IdxT removed_key       = key | utils::gen_index_msb_1_mask<IdxT>::value;
   for (unsigned i = 0; i < size; i++) {
     const IdxT val = table[index];
@@ -112,13 +112,13 @@ RAFT_DEVICE_INLINE_FUNCTION auto remove(IdxT* table, const uint32_t bitlen, cons
 #ifdef HASHMAP_LINEAR_PROBING
   // Linear probing
   IdxT index                = (key ^ (key >> bitlen)) & bit_mask;
-  constexpr uint32_t stride = 1;
+  constexpr uint32_t stride = 1;  // NOLINT(readability-identifier-naming)
 #else
   // Double hashing
   IdxT index            = key & bit_mask;
   const uint32_t stride = (key >> bitlen) * 2 + 1;
 #endif
-  constexpr IdxT hashval_empty = ~static_cast<IdxT>(0);
+  constexpr IdxT hashval_empty = ~static_cast<IdxT>(0);  // NOLINT(readability-identifier-naming)
   const IdxT removed_key       = key | utils::gen_index_msb_1_mask<IdxT>::value;
   for (unsigned i = 0; i < size; i++) {
     // To remove a key, set the MSB to 1.

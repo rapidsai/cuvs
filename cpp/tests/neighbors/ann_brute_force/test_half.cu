@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -10,10 +10,14 @@
 namespace cuvs::neighbors::brute_force {
 
 using AnnBruteForceTest_half_float = AnnBruteForceTest<float, half, std::int64_t>;
-TEST_P(AnnBruteForceTest_half_float, AnnBruteForce) { this->testBruteForce(); }
+TEST_P(AnnBruteForceTest_half_float, AnnBruteForce)
+{
+  this->testBruteForce();
+}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(AnnBruteForceTest,
-                        AnnBruteForceTest_half_float,
-                        ::testing::ValuesIn(inputs));
+INSTANTIATE_TEST_CASE_P(
+  AnnBruteForceTest,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  AnnBruteForceTest_half_float,
+  ::testing::ValuesIn(inputs));
 
 }  // namespace cuvs::neighbors::brute_force

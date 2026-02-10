@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #include <cuvs/distance/distance.hpp>
@@ -23,7 +23,7 @@ struct print_metric {
   cuvs::distance::DistanceType value;
 };
 
-struct RandomKNNInputs {
+struct RandomKNNInputs {  // NOLINT(readability-identifier-naming)
   int num_queries;
   int num_db_vecs;
   int dim;
@@ -61,7 +61,8 @@ inline auto operator<<(std::ostream& os, const print_metric& p) -> std::ostream&
   return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const RandomKNNInputs& input)
+std::ostream& operator<<(
+  std::ostream& os, const RandomKNNInputs& input)  // NOLINT(modernize-use-trailing-return-type)
 {
   return os << "num_queries:" << input.num_queries << " num_vecs:" << input.num_db_vecs
             << " dim:" << input.dim << " k:" << input.k << " metric:" << print_metric{input.metric}
@@ -69,7 +70,7 @@ std::ostream& operator<<(std::ostream& os, const RandomKNNInputs& input)
 }
 
 template <typename T, typename DistT = T>
-class BruteForceKNNBenchmark {
+class BruteForceKNNBenchmark {  // NOLINT(readability-identifier-naming)
  public:
   BruteForceKNNBenchmark(const RandomKNNInputs& params, const std::string& type_str)
     : stream_(raft::resource::get_cuda_stream(handle_)),
@@ -94,7 +95,7 @@ class BruteForceKNNBenchmark {
       DistT{0.0});
   }
 
-  void runBenchmark()
+  void runBenchmark()  // NOLINT(readability-identifier-naming)
   {
     DistT metric_arg = 3.0;
     rmm::device_uvector<char> workspace(0, stream_);
@@ -203,9 +204,9 @@ class BruteForceKNNBenchmark {
     printResult(params_, build_dur.count(), search_dur.count(), total_dur, throughput);
   }
 
-  void setUp()
+  void setUp()  // NOLINT(readability-identifier-naming)
   {
-    unsigned long long int seed = 1234ULL;
+    unsigned long long int seed = 1234ULL;  // NOLINT(google-runtime-int)
     raft::random::RngState r(seed);
 
     // JensenShannon distance requires positive values
@@ -225,7 +226,7 @@ class BruteForceKNNBenchmark {
     RAFT_CUDA_TRY(cudaMemsetAsync(scratch_buf_.data(), 0, scratch_buf_.size(), stream_));
   };
 
-  void printResult(const RandomKNNInputs& params,
+  void printResult(const RandomKNNInputs& params,  // NOLINT(readability-identifier-naming)
                    double build_time,
                    double search_time,
                    double total_time,
@@ -243,18 +244,19 @@ class BruteForceKNNBenchmark {
   raft::resources handle_;
   cudaStream_t stream_ = 0;
   RandomKNNInputs params_;
-  rmm::device_uvector<T> database;
-  rmm::device_uvector<T> search_queries;
+  rmm::device_uvector<T> database;        // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<T> search_queries;  // NOLINT(readability-identifier-naming)
   rmm::device_uvector<int64_t> cuvs_indices_;
   rmm::device_uvector<DistT> cuvs_distances_;
   rmm::device_buffer scratch_buf_;
   std::string type_str_;
 };
 
-static std::vector<RandomKNNInputs> getInputs()
+static std::vector<RandomKNNInputs>
+getInputs()  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
   std::vector<RandomKNNInputs> param_vec;
-  struct TestParams {
+  struct TestParams {  // NOLINT(readability-identifier-naming)
     int num_queries;
     int num_db_vecs;
     int dim;
@@ -264,10 +266,10 @@ static std::vector<RandomKNNInputs> getInputs()
   };
 
   const std::vector<TestParams> params_group = raft::util::itertools::product<TestParams>(
-    {int(10), int(100), int(1024)},
-    {int(1000000)},
-    {int(32), int(256), int(1024)},
-    {int(128), int(1024)},
+    {int(10), int(100), int(1024)},  // NOLINT(google-readability-casting)
+    {int(1000000)},                  // NOLINT(google-readability-casting)
+    {int(32), int(256), int(1024)},  // NOLINT(google-readability-casting)
+    {int(128), int(1024)},           // NOLINT(google-readability-casting)
     {cuvs::distance::DistanceType::InnerProduct, cuvs::distance::DistanceType::L2SqrtExpanded},
     {true, false});
 
@@ -283,7 +285,7 @@ static std::vector<RandomKNNInputs> getInputs()
   return param_vec;
 }
 
-void printHeader()
+void printHeader()  // NOLINT(readability-identifier-naming)
 {
   std::cout << std::left << std::setw(15) << "Type" << std::setw(10) << "Queries" << std::setw(10)
             << "Vectors" << std::setw(10) << "Dim" << std::setw(10) << "K" << std::setw(20)
@@ -295,7 +297,7 @@ void printHeader()
   std::cout << std::string(165, '-') << "\n";
 }
 
-void runBenchmarkForType()
+void runBenchmarkForType()  // NOLINT(readability-identifier-naming)
 {
   auto selected_inputs = getInputs();
   for (const auto& input : selected_inputs) {
@@ -314,7 +316,7 @@ void runBenchmarkForType()
 
 }  // namespace cuvs::neighbors::brute_force
 
-int main()
+int main()  // NOLINT(modernize-use-trailing-return-type)
 {
   cuvs::neighbors::brute_force::printHeader();
   cuvs::neighbors::brute_force::runBenchmarkForType();

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,9 +9,17 @@
 
 namespace cuvs::neighbors::vamana {
 
-typedef AnnVamanaTest<float, int8_t, std::uint32_t> AnnVamanaTestI8_U32;
-TEST_P(AnnVamanaTestI8_U32, AnnVamana) { this->testVamana(); }
+typedef AnnVamanaTest<float, int8_t, std::uint32_t>
+  AnnVamanaTestI8_U32;  // NOLINT(modernize-use-using,readability-identifier-naming)
+TEST_P(AnnVamanaTestI8_U32, AnnVamana)
+{
+  this->testVamana();
+}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(AnnVamanaTest, AnnVamanaTestI8_U32, ::testing::ValuesIn(inputs));
+INSTANTIATE_TEST_CASE_P(
+  AnnVamanaTest,
+  AnnVamanaTestI8_U32,
+  ::testing::ValuesIn(
+    inputs));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
 }  // namespace cuvs::neighbors::vamana

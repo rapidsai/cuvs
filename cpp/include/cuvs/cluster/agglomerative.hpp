@@ -53,7 +53,7 @@ enum Linkage {  // NOLINT(readability-identifier-naming)
  * Scikit-learn's AgglomerativeClustering estimator.
  * @tparam idx_t
  */
-template <typename idx_t>
+template <typename idx_t>  // NOLINT(readability-identifier-naming)
 class single_linkage_output {
  public:
   idx_t m;
@@ -66,12 +66,12 @@ class single_linkage_output {
   idx_t* labels;    // size: m
   idx_t* children;  // size: (m-1, 2)
 
-  raft::device_vector_view<idx_t> get_labels()
+  auto get_labels() -> raft::device_vector_view<idx_t>
   {
     return raft::make_device_vector_view<idx_t>(labels, m);
   }
 
-  raft::device_matrix_view<idx_t> get_children()
+  auto get_children() -> raft::device_matrix_view<idx_t>
   {
     return raft::make_device_matrix_view<idx_t>(children, m - 1, 2);
   }

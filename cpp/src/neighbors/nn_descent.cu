@@ -7,7 +7,7 @@
 #include <cuvs/neighbors/nn_descent.hpp>
 #include <raft/core/logger.hpp>
 
-using namespace raft;
+using namespace raft;  // NOLINT(google-build-using-namespace)
 namespace cuvs::neighbors::nn_descent {
 
 /**
@@ -23,21 +23,35 @@ auto has_enough_device_memory(raft::resources const& res,
                               raft::matrix_extent<int64_t> dataset,
                               size_t idx_size) -> bool
 {
-  using DistData_t = float;
+  using DistData_t = float;  // NOLINT(readability-identifier-naming)
   try {
-    auto d_data_ = raft::make_device_matrix<__half, size_t, raft::row_major>(
-      res, dataset.extent(0), dataset.extent(1));
-    auto l2_norms_     = raft::make_device_vector<DistData_t, size_t>(res, dataset.extent(0));
-    auto graph_buffer_ = raft::make_device_vector<uint32_t, size_t>(
-      res, dataset.extent(0) * idx_size * detail::DEGREE_ON_DEVICE);
+    auto d_data_ = raft::
+      make_device_matrix<__half, size_t, raft::row_major>(  // NOLINT(readability-identifier-naming)
+        res,
+        dataset.extent(0),
+        dataset.extent(1));
+    auto l2_norms_ = raft::make_device_vector<DistData_t, size_t>(
+      res, dataset.extent(0));  // NOLINT(readability-identifier-naming)
+    auto graph_buffer_ =
+      raft::make_device_vector<uint32_t, size_t>(  // NOLINT(readability-identifier-naming)
+        res,
+        dataset.extent(0) * idx_size * detail::kDegreeOnDevice);
 
-    auto dists_buffer_ = raft::make_device_matrix<DistData_t, size_t, raft::row_major>(
-      res, dataset.extent(0), detail::DEGREE_ON_DEVICE);
+    auto dists_buffer_ =
+      raft::make_device_matrix<DistData_t,
+                               size_t,
+                               raft::row_major>(  // NOLINT(readability-identifier-naming)
+        res,
+        dataset.extent(0),
+        detail::kDegreeOnDevice);
 
-    auto d_locks_ = raft::make_device_vector<int, size_t>(res, dataset.extent(0));
+    auto d_locks_ = raft::make_device_vector<int, size_t>(
+      res, dataset.extent(0));  // NOLINT(readability-identifier-naming)
 
-    auto d_list_sizes_new_ = raft::make_device_vector<int2, size_t>(res, dataset.extent(0));
-    auto d_list_sizes_old_ = raft::make_device_vector<int2, size_t>(res, dataset.extent(0));
+    auto d_list_sizes_new_ = raft::make_device_vector<int2, size_t>(
+      res, dataset.extent(0));  // NOLINT(readability-identifier-naming)
+    auto d_list_sizes_old_ = raft::make_device_vector<int2, size_t>(
+      res, dataset.extent(0));  // NOLINT(readability-identifier-naming)
     RAFT_LOG_DEBUG("Sufficient memory for NN descent");
     return true;
   } catch (std::bad_alloc& e) {

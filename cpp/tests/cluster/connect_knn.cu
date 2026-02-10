@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -23,14 +23,14 @@
 #include <raft/core/operators.hpp>
 #include <rmm/device_uvector.hpp>
 
+#include <cstdio>
 #include <gtest/gtest.h>
-#include <stdio.h>
 #include <test_utils.h>
 #include <vector>
 
 namespace cuvs {
 
-struct ConnectKNNInputs {
+struct ConnectKNNInputs {  // NOLINT(readability-identifier-naming)
   int n_rows;
   int dim;
   int n_clusters;
@@ -40,16 +40,17 @@ struct ConnectKNNInputs {
 };
 
 template <typename T>
-class ConnectKNNTest : public ::testing::TestWithParam<ConnectKNNInputs> {
+class ConnectKNNTest
+  : public ::testing::TestWithParam<ConnectKNNInputs> {  // NOLINT(readability-identifier-naming)
  public:
-  ConnectKNNTest()
+  ConnectKNNTest()  // NOLINT(modernize-use-equals-default)
     : stream(handle.get_stream()),
       ps(::testing::TestWithParam<ConnectKNNInputs>::GetParam()),
       database(0, stream)
   {
   }
 
-  void basicTest()
+  void basicTest()  // NOLINT(readability-identifier-naming)
   {
     int queries_size = ps.n_rows * ps.k;
     rmm::device_uvector<T> dists(queries_size, stream);
@@ -168,7 +169,7 @@ class ConnectKNNTest : public ::testing::TestWithParam<ConnectKNNInputs> {
     ASSERT_TRUE(n_components == 1);
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream);
     auto database_view =
@@ -179,23 +180,32 @@ class ConnectKNNTest : public ::testing::TestWithParam<ConnectKNNInputs> {
   }
 
  protected:
-  raft::handle_t handle;
-  cudaStream_t stream;
-  ConnectKNNInputs ps;
-  rmm::device_uvector<T> database;
+  raft::handle_t handle;            // NOLINT(readability-identifier-naming)
+  cudaStream_t stream;              // NOLINT(readability-identifier-naming)
+  ConnectKNNInputs ps;              // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<T> database;  // NOLINT(readability-identifier-naming)
 };
 
-const std::vector<ConnectKNNInputs> inputs = raft::util::itertools::product<ConnectKNNInputs>(
-  {5000, 7151},                                    // n_rows
-  {64, 137},                                       // dim
-  {5, 10},                                         // n_clusters of make_blobs data
-  {16},                                            // k
-  {cuvs::distance::DistanceType::L2SqrtExpanded},  // metric
-  {true, false});                                  // mutual_reach
+const std::vector<ConnectKNNInputs> inputs =
+  raft::util::itertools::product<ConnectKNNInputs>(  // NOLINT(readability-identifier-naming)
+    {5000, 7151},                                    // n_rows
+    {64, 137},                                       // dim
+    {5, 10},                                         // n_clusters of make_blobs data
+    {16},                                            // k
+    {cuvs::distance::DistanceType::L2SqrtExpanded},  // metric
+    {true, false});                                  // mutual_reach
 
-typedef ConnectKNNTest<float> ConnectKNNTestF;
-TEST_P(ConnectKNNTestF, ConnectKNN) { this->basicTest(); }
+typedef ConnectKNNTest<float>
+  ConnectKNNTestF;  // NOLINT(modernize-use-using,readability-identifier-naming)
+TEST_P(ConnectKNNTestF, ConnectKNN)
+{
+  this->basicTest();
+}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(ConnectKNNTests, ConnectKNNTestF, ::testing::ValuesIn(inputs));
+INSTANTIATE_TEST_CASE_P(
+  ConnectKNNTests,
+  ConnectKNNTestF,
+  ::testing::ValuesIn(
+    inputs));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
 }  // end namespace cuvs

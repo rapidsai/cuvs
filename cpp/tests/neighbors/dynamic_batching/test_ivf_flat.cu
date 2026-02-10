@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,7 +17,8 @@ using ivf_flat_i8 = dynamic_batching_test<uint8_t,
                                           ivf_flat::build,
                                           ivf_flat::search>;
 
-TEST_P(ivf_flat_i8, defaults)
+TEST_P(ivf_flat_i8,
+       defaults)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
   build_params_upsm.n_lists = std::round(std::sqrt(ps.n_rows));
   search_params_upsm.n_probes =
@@ -28,6 +29,8 @@ TEST_P(ivf_flat_i8, defaults)
   check_neighbors();
 }
 
-INSTANTIATE_TEST_CASE_P(dynamic_batching, ivf_flat_i8, ::testing::ValuesIn(inputs));
+INSTANTIATE_TEST_CASE_P(dynamic_batching,
+                        ivf_flat_i8,
+                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
 
 }  // namespace cuvs::neighbors::dynamic_batching

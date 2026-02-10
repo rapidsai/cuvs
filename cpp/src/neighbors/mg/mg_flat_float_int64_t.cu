@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -80,6 +80,6 @@
     return idx;                                                                                 \
   }                                                                                             \
   }  // namespace cuvs::neighbors::ivf_flat
-CUVS_INST_MG_FLAT(float, int64_t);
+CUVS_INST_MG_FLAT(float, int64_t);  // NOLINT(google-build-using-namespace)
 
 #undef CUVS_INST_MG_FLAT

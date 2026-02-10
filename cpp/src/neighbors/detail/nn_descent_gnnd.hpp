@@ -20,26 +20,26 @@
 
 namespace cuvs::neighbors::nn_descent::detail {
 
-using DistData_t = float;
-constexpr int DEGREE_ON_DEVICE{32};
-constexpr int SEGMENT_SIZE{32};
-constexpr int counter_interval{100};
-template <typename Index_t>
+using dist_data_t = float;
+constexpr int kDegreeOnDevice{32};
+constexpr int kSegmentSize{32};
+constexpr int kCounterInterval{100};
+template <typename IndexT>
 struct InternalID_t;
 
-inline auto roundUp32(size_t num) -> size_t { return (num + 31) / 32 * 32; }
+inline auto round_up_32(size_t num) -> size_t { return (num + 31) / 32 * 32; }
 
 // InternalID_t uses 1 bit for marking (new or old).
 template <>
 struct InternalID_t<int> {
  private:
-  using Index_t = int;
-  Index_t id_{std::numeric_limits<Index_t>::max()};
+  using index_t = int;
+  index_t id_{std::numeric_limits<index_t>::max()};
 
  public:
   [[nodiscard]] inline _RAFT_HOST_DEVICE auto is_new() const -> bool { return id_ >= 0; }
-  inline _RAFT_HOST_DEVICE auto id_with_flag() -> Index_t& { return id_; }
-  [[nodiscard]] inline _RAFT_HOST_DEVICE auto id() const -> Index_t
+  inline _RAFT_HOST_DEVICE auto id_with_flag() -> index_t& { return id_; }
+  [[nodiscard]] inline _RAFT_HOST_DEVICE auto id() const -> index_t
   {
     if (is_new()) return id_;
     return -id_ - 1;
@@ -54,7 +54,7 @@ struct InternalID_t<int> {
   }
 };
 
-struct BuildConfig {
+struct build_config {
   size_t max_dataset_size;
   size_t dataset_dim;
   size_t node_degree{64};
@@ -68,44 +68,44 @@ struct BuildConfig {
     cuvs::neighbors::nn_descent::DIST_COMP_DTYPE::AUTO};
 };
 
-template <typename Index_t>
-class BloomFilter {
+template <typename IndexT>
+class bloom_filter {
  public:
-  BloomFilter(size_t nrow, size_t num_sets_per_list, size_t num_hashs)
+  bloom_filter(size_t nrow, size_t num_sets_per_list, size_t num_hashs)
     : nrow_(nrow),
       num_sets_per_list_(num_sets_per_list),
       num_hashs_(num_hashs),
-      bitsets_(nrow * num_bits_per_set_ * num_sets_per_list)
+      bitsets_(nrow * kNumBitsPerSet * num_sets_per_list)
   {
   }
 
-  void add(size_t list_id, Index_t key)
+  void add(size_t list_id, IndexT key)
   {
-    if (is_cleared) { is_cleared = false; }
-    uint32_t hash         = hash_0(key);
-    size_t global_set_idx = list_id * num_bits_per_set_ * num_sets_per_list_ +
-                            key % num_sets_per_list_ * num_bits_per_set_;
-    bitsets_[global_set_idx + hash % num_bits_per_set_] = 1;
+    if (is_cleared_) { is_cleared_ = false; }
+    uint32_t hash = hash_0(key);
+    size_t global_set_idx =
+      list_id * kNumBitsPerSet * num_sets_per_list_ + key % num_sets_per_list_ * kNumBitsPerSet;
+    bitsets_[global_set_idx + hash % kNumBitsPerSet] = 1;
     for (size_t i = 1; i < num_hashs_; i++) {
-      hash                                                = hash + hash_1(key);
-      bitsets_[global_set_idx + hash % num_bits_per_set_] = 1;
+      hash                                             = hash + hash_1(key);
+      bitsets_[global_set_idx + hash % kNumBitsPerSet] = 1;
     }
   }
 
   void set_nrow(size_t nrow) { nrow_ = nrow; }
 
-  auto check(size_t list_id, Index_t key) -> bool
+  auto check(size_t list_id, IndexT key) -> bool
   {
-    bool is_present       = true;
-    uint32_t hash         = hash_0(key);
-    size_t global_set_idx = list_id * num_bits_per_set_ * num_sets_per_list_ +
-                            key % num_sets_per_list_ * num_bits_per_set_;
-    is_present &= bitsets_[global_set_idx + hash % num_bits_per_set_];
+    bool is_present = true;
+    uint32_t hash   = hash_0(key);
+    size_t global_set_idx =
+      list_id * kNumBitsPerSet * num_sets_per_list_ + key % num_sets_per_list_ * kNumBitsPerSet;
+    is_present &= bitsets_[global_set_idx + hash % kNumBitsPerSet];
 
     if (!is_present) return false;
     for (size_t i = 1; i < num_hashs_; i++) {
       hash = hash + hash_1(key);
-      is_present &= bitsets_[global_set_idx + hash % num_bits_per_set_];
+      is_present &= bitsets_[global_set_idx + hash % kNumBitsPerSet];
       if (!is_present) return false;
     }
     return true;
@@ -113,12 +113,12 @@ class BloomFilter {
 
   void clear()
   {
-    if (is_cleared) return;
+    if (is_cleared_) return;
 #pragma omp parallel for
-    for (size_t i = 0; i < nrow_ * num_bits_per_set_ * num_sets_per_list_; i++) {
+    for (size_t i = 0; i < nrow_ * kNumBitsPerSet * num_sets_per_list_; i++) {
       bitsets_[i] = 0;
     }
-    is_cleared = true;
+    is_cleared_ = true;
   }
 
  private:
@@ -142,88 +142,88 @@ class BloomFilter {
     return value;
   }
 
-  static constexpr int num_bits_per_set_ = 512;
-  bool is_cleared{true};
+  static constexpr int kNumBitsPerSet = 512;
+  bool is_cleared_{true};
   std::vector<bool> bitsets_;
   size_t nrow_;
   size_t num_sets_per_list_;
   size_t num_hashs_;
 };
 
-template <typename Index_t>
-struct GnndGraph {
+template <typename IndexT>
+struct gnnd_graph {
   raft::resources const& res;
-  static constexpr int segment_size = 32;
-  InternalID_t<Index_t>* h_graph;
+  static constexpr int kSegmentSize = 32;
+  InternalID_t<IndexT>* h_graph;
 
   size_t nrow;
   size_t node_degree;
   int num_samples;
   int num_segments;
 
-  raft::host_matrix<DistData_t, size_t, raft::row_major> h_dists;
+  raft::host_matrix<dist_data_t, size_t, raft::row_major> h_dists;
 
-  raft::pinned_matrix<Index_t, size_t> h_graph_new;
+  raft::pinned_matrix<IndexT, size_t> h_graph_new;
   raft::pinned_vector<int2, size_t> h_list_sizes_new;
 
-  raft::pinned_matrix<Index_t, size_t> h_graph_old;
+  raft::pinned_matrix<IndexT, size_t> h_graph_old;
   raft::pinned_vector<int2, size_t> h_list_sizes_old;
-  BloomFilter<Index_t> bloom_filter;
+  bloom_filter<IndexT> bloom_filter;
 
-  GnndGraph(const GnndGraph&)                    = delete;
-  auto operator=(const GnndGraph&) -> GnndGraph& = delete;
-  GnndGraph(raft::resources const& res,
-            const size_t nrow,
-            const size_t node_degree,
-            const size_t internal_node_degree,
-            const size_t num_samples);
+  gnnd_graph(const gnnd_graph&)                    = delete;
+  auto operator=(const gnnd_graph&) -> gnnd_graph& = delete;
+  gnnd_graph(raft::resources const& res,
+             const size_t nrow,
+             const size_t node_degree,
+             const size_t internal_node_degree,
+             const size_t num_samples);
   void init_random_graph();
   // TODO(snanditale): Create a generic bloom filter utility
   // https://github.com/rapidsai/raft/issues/1827 Use Bloom filter to sample "new" neighbors for
   // local joining
-  void sample_graph_new(InternalID_t<Index_t>* new_neighbors, const size_t width);
+  void sample_graph_new(InternalID_t<IndexT>* new_neighbors, const size_t width);
   void sample_graph(bool sample_new);
-  void update_graph(const InternalID_t<Index_t>* new_neighbors,
-                    const DistData_t* new_dists,
+  void update_graph(const InternalID_t<IndexT>* new_neighbors,
+                    const dist_data_t* new_dists,
                     const size_t width,
                     std::atomic<int64_t>& update_counter);
   void sort_lists();
   void clear();
-  ~GnndGraph();
+  ~gnnd_graph();
 };
 
-template <typename Data_t = float, typename Index_t = int>
-class GNND {
+template <typename DataT = float, typename IndexT = int>
+class gnnd {
  public:
-  GNND(raft::resources const& res, const BuildConfig& build_config);
-  GNND(const GNND&)                    = delete;
-  auto operator=(const GNND&) -> GNND& = delete;
+  gnnd(raft::resources const& res, const build_config& build_config);
+  gnnd(const gnnd&)                    = delete;
+  auto operator=(const gnnd&) -> gnnd& = delete;
 
-  template <typename DistEpilogue_t = raft::identity_op>
-  void build(Data_t* data,
-             const Index_t nrow,
-             Index_t* output_graph,
+  template <typename DistEpilogueT = raft::identity_op>
+  void build(DataT* data,
+             const IndexT nrow,
+             IndexT* output_graph,
              bool return_distances,
-             DistData_t* output_distances,
-             DistEpilogue_t dist_epilogue = DistEpilogue_t{});
-  ~GNND()    = default;
-  using ID_t = InternalID_t<Index_t>;
+             dist_data_t* output_distances,
+             DistEpilogueT dist_epilogue = DistEpilogueT{});
+  ~gnnd()    = default;
+  using id_t = InternalID_t<IndexT>;
   void reset(raft::resources const& res);
 
  private:
-  void add_reverse_edges(Index_t* graph_ptr,
-                         Index_t* h_rev_graph_ptr,
-                         Index_t* d_rev_graph_ptr,
+  void add_reverse_edges(IndexT* graph_ptr,
+                         IndexT* h_rev_graph_ptr,
+                         IndexT* d_rev_graph_ptr,
                          int2* list_sizes,
                          cudaStream_t stream = nullptr);
 
-  template <typename DistEpilogue_t = raft::identity_op>
-  void local_join(cudaStream_t stream = nullptr, DistEpilogue_t dist_epilogue = DistEpilogue_t{});
+  template <typename DistEpilogueT = raft::identity_op>
+  void local_join(cudaStream_t stream = nullptr, DistEpilogueT dist_epilogue = DistEpilogueT{});
 
-  raft::resources const& res;
+  raft::resources const& res_;
 
-  BuildConfig build_config_;
-  GnndGraph<Index_t> graph_;
+  build_config build_config_;
+  gnnd_graph<IndexT> graph_;
   std::atomic<int64_t> update_counter_;
 
   size_t nrow_;
@@ -231,19 +231,19 @@ class GNND {
 
   std::optional<raft::device_matrix<float, size_t, raft::row_major>> d_data_float_;
   std::optional<raft::device_matrix<half, size_t, raft::row_major>> d_data_half_;
-  raft::device_vector<DistData_t, size_t> l2_norms_;
+  raft::device_vector<dist_data_t, size_t> l2_norms_;
 
-  raft::device_matrix<ID_t, size_t, raft::row_major> graph_buffer_;
-  raft::device_matrix<DistData_t, size_t, raft::row_major> dists_buffer_;
+  raft::device_matrix<id_t, size_t, raft::row_major> graph_buffer_;
+  raft::device_matrix<dist_data_t, size_t, raft::row_major> dists_buffer_;
 
-  raft::pinned_matrix<ID_t, size_t> graph_host_buffer_;
-  raft::pinned_matrix<DistData_t, size_t> dists_host_buffer_;
+  raft::pinned_matrix<id_t, size_t> graph_host_buffer_;
+  raft::pinned_matrix<dist_data_t, size_t> dists_host_buffer_;
 
   raft::device_vector<int, size_t> d_locks_;
 
-  raft::pinned_matrix<Index_t, size_t> h_rev_graph_new_;
-  raft::pinned_matrix<Index_t, size_t> h_graph_old_;
-  raft::pinned_matrix<Index_t, size_t> h_rev_graph_old_;
+  raft::pinned_matrix<IndexT, size_t> h_rev_graph_new_;
+  raft::pinned_matrix<IndexT, size_t> h_graph_old_;
+  raft::pinned_matrix<IndexT, size_t> h_rev_graph_old_;
   // int2.x is the number of forward edges, int2.y is the number of reverse edges
 
   raft::device_vector<int2, size_t> d_list_sizes_new_;
@@ -256,10 +256,10 @@ inline auto get_build_config(raft::resources const& res,
                              size_t num_cols,
                              const cuvs::distance::DistanceType metric,
                              size_t& extended_graph_degree,
-                             size_t& graph_degree) -> BuildConfig
+                             size_t& graph_degree) -> build_config
 {
   RAFT_EXPECTS(num_rows < std::numeric_limits<int>::max() - 1,
-               "The dataset size for GNND should be less than %d",
+               "The dataset size for gnnd should be less than %d",
                std::numeric_limits<int>::max() - 1);
   auto allowed_metrics = params.metric == cuvs::distance::DistanceType::L2Expanded ||
                          params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
@@ -295,19 +295,19 @@ inline auto get_build_config(raft::resources const& res,
   // to mitigate bucket collisions. `intermediate_degree` is OK to larger than
   // extended_graph_degree.
   extended_graph_degree =
-    roundUp32(static_cast<size_t>(graph_degree * (graph_degree <= 32 ? 1.0 : 1.3)));
+    round_up_32(static_cast<size_t>(graph_degree * (graph_degree <= 32 ? 1.0 : 1.3)));
   size_t extended_intermediate_degree =
-    roundUp32(static_cast<size_t>(intermediate_degree * (intermediate_degree <= 32 ? 1.0 : 1.3)));
+    round_up_32(static_cast<size_t>(intermediate_degree * (intermediate_degree <= 32 ? 1.0 : 1.3)));
 
-  BuildConfig build_config{.max_dataset_size      = num_rows,
-                           .dataset_dim           = num_cols,
-                           .node_degree           = extended_graph_degree,
-                           .internal_node_degree  = extended_intermediate_degree,
-                           .max_iterations        = params.max_iterations,
-                           .termination_threshold = params.termination_threshold,
-                           .output_graph_degree   = params.graph_degree,
-                           .metric                = params.metric,
-                           .dist_comp_dtype       = params.dist_comp_dtype};
+  build_config build_config{.max_dataset_size      = num_rows,
+                            .dataset_dim           = num_cols,
+                            .node_degree           = extended_graph_degree,
+                            .internal_node_degree  = extended_intermediate_degree,
+                            .max_iterations        = params.max_iterations,
+                            .termination_threshold = params.termination_threshold,
+                            .output_graph_degree   = params.graph_degree,
+                            .metric                = params.metric,
+                            .dist_comp_dtype       = params.dist_comp_dtype};
   return build_config;
 }
 
