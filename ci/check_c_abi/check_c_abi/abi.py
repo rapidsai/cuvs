@@ -35,7 +35,9 @@ class SymbolLocation(msgspec.Struct):
 
     @classmethod
     def from_cursor(
-        cls, cursor: clang.cindex.Cursor, root_path: str = None
+        cls,
+        cursor: clang.cindex.Cursor,
+        root_path: Optional[str | os.PathLike] = None,
     ) -> Self:
         filename = cursor.location.file.name
         if root_path:
@@ -55,7 +57,9 @@ class FunctionDefinition(msgspec.Struct):
 
     @classmethod
     def from_cursor(
-        cls, cursor: clang.cindex.Cursor, root_path: str = None
+        cls,
+        cursor: clang.cindex.Cursor,
+        root_path: Optional[str | os.PathLike] = None,
     ) -> Self:
         if cursor.kind != clang.cindex.CursorKind.FUNCTION_DECL:
             raise ValueError(
@@ -81,7 +85,9 @@ class StructDefinition(msgspec.Struct):
 
     @classmethod
     def from_cursor(
-        cls, cursor: clang.cindex.Cursor, root_path: str = None
+        cls,
+        cursor: clang.cindex.Cursor,
+        root_path: Optional[str | os.PathLike] = None,
     ) -> Self:
         if cursor.kind != clang.cindex.CursorKind.STRUCT_DECL:
             raise ValueError(
@@ -106,7 +112,9 @@ class EnumDefinition(msgspec.Struct):
 
     @classmethod
     def from_cursor(
-        cls, cursor: clang.cindex.Cursor, root_path: str = None
+        cls,
+        cursor: clang.cindex.Cursor,
+        root_path: Optional[str | os.PathLike] = None,
     ) -> Self:
         if cursor.kind != clang.cindex.CursorKind.ENUM_DECL:
             raise ValueError(
