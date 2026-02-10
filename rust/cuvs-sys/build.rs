@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -79,7 +79,7 @@ fn main() {
         // Only generate bindings for cuvs/cagra types and functions
         .allowlist_type("(cuvs|bruteForce|cagra|DL).*")
         .allowlist_function("(cuvs|bruteForce|cagra).*")
-        .rustified_enum("(cuvs|cagra|DL|DistanceType|codebook_gen|cudaDataType_t).*")
+        .rustified_enum("(cuvs|cagra|DL|DistanceType|cudaDataType_t).*")
         // also need some basic cuda mem functions for copying data
         .allowlist_function("(cudaMemcpyAsync|cudaMemcpy)")
         .rustified_enum("cudaError")
