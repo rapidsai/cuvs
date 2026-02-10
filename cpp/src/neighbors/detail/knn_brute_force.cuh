@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -31,8 +31,7 @@
 #include <raft/matrix/init.cuh>
 #include <raft/sparse/convert/coo.cuh>
 #include <raft/sparse/convert/csr.cuh>
-#include <raft/sparse/distance/detail/utils.cuh>
-#include <raft/sparse/linalg/masked_matmul.hpp>
+#include <raft/sparse/linalg/masked_matmul.cuh>
 #include <raft/sparse/matrix/select_k.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
@@ -519,7 +518,7 @@ void brute_force_knn_impl(
       raft::make_device_matrix_view<const IdxType, int64_t>(out_I, n, input.size() * k),
       raft::make_device_matrix_view<DistType, int64_t>(res_D, n, k),
       raft::make_device_matrix_view<IdxType, int64_t>(res_I, n, k),
-      raft::make_device_vector_view<IdxType>(trans.data(), input.size()));
+      raft::make_device_vector_view<IdxType, int64_t>(trans.data(), input.size()));
   }
 };
 

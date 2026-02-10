@@ -8,12 +8,11 @@
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_resources.hpp>
 #include <raft/random/make_blobs.cuh>
-#include <raft/sparse/neighbors/cross_component_nn.cuh>
 
 #include <cuvs/neighbors/scann.hpp>
 
-#include <rmm/mr/device/device_memory_resource.hpp>
-#include <rmm/mr/device/pool_memory_resource.hpp>
+#include <rmm/mr/device_memory_resource.hpp>
+#include <rmm/mr/pool_memory_resource.hpp>
 
 #include "common.cuh"
 

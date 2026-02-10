@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -118,12 +118,7 @@ void build_knn_graph(
     raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, accessor>(
       dataset.data_handle(), dataset.extent(0), dataset.extent(1));
 
-  cagra::detail::build_knn_graph(res,
-                                 dataset_internal,
-                                 knn_graph_internal,
-                                 ivf_pq_params.refinement_rate,
-                                 ivf_pq_params.build_params,
-                                 ivf_pq_params.search_params);
+  cagra::detail::build_knn_graph(res, dataset_internal, knn_graph_internal, ivf_pq_params);
 }
 
 /**
@@ -168,7 +163,7 @@ void build_knn_graph(
  */
 template <typename DataT,
           typename IdxT     = uint32_t,
-          typename accessor = raft::host_device_accessor<std::experimental::default_accessor<DataT>,
+          typename accessor = raft::host_device_accessor<cuda::std::default_accessor<DataT>,
                                                          raft::memory_type::device>>
 void build_knn_graph(
   raft::resources const& res,
@@ -211,13 +206,12 @@ void build_knn_graph(
  * @param[in,out] knn_graph a matrix view (host or device) of the input knn graph [n_rows,
  * knn_graph_degree]
  */
-template <
-  typename DataT,
-  typename IdxT       = uint32_t,
-  typename d_accessor = raft::host_device_accessor<std::experimental::default_accessor<DataT>,
-                                                   raft::memory_type::device>,
-  typename g_accessor =
-    raft::host_device_accessor<std::experimental::default_accessor<IdxT>, raft::memory_type::host>>
+template <typename DataT,
+          typename IdxT       = uint32_t,
+          typename d_accessor = raft::host_device_accessor<cuda::std::default_accessor<DataT>,
+                                                           raft::memory_type::device>,
+          typename g_accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<IdxT>, raft::memory_type::host>>
 void sort_knn_graph(
   raft::resources const& res,
   cuvs::distance::DistanceType metric,
@@ -227,8 +221,7 @@ void sort_knn_graph(
   using internal_IdxT = typename std::make_unsigned<IdxT>::type;
 
   using g_accessor_internal =
-    raft::host_device_accessor<std::experimental::default_accessor<internal_IdxT>,
-                               g_accessor::mem_type>;
+    raft::host_device_accessor<cuda::std::default_accessor<internal_IdxT>, g_accessor::mem_type>;
   auto knn_graph_internal =
     raft::mdspan<internal_IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor_internal>(
       reinterpret_cast<internal_IdxT*>(knn_graph.data_handle()),
@@ -256,10 +249,9 @@ void sort_knn_graph(
  * knn_graph_degree]
  * @param[out] new_graph a host matrix view of the optimized knn graph [n_rows, graph_degree]
  */
-template <
-  typename IdxT = uint32_t,
-  typename g_accessor =
-    raft::host_device_accessor<std::experimental::default_accessor<IdxT>, raft::memory_type::host>>
+template <typename IdxT = uint32_t,
+          typename g_accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<IdxT>, raft::memory_type::host>>
 void optimize(
   raft::resources const& res,
   raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph,
@@ -270,14 +262,23 @@ void optimize(
 }
 
 template <typename T,
-          typename IdxT     = uint32_t,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename IdxT = uint32_t,
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 index<T, IdxT> build(
   raft::resources const& res,
   const index_params& params,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
 {
+  // Check if ACE dispatch is requested via graph_build_params
+  if (std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params)) {
+    // ACE expects the dataset to be on host due to the large dataset size
+    RAFT_EXPECTS(raft::get_device_for_address(dataset.data_handle()) == -1,
+                 "ACE: Dataset must be on host for ACE build");
+    auto dataset_view = raft::make_host_matrix_view<const T, int64_t, row_major>(
+      dataset.data_handle(), dataset.extent(0), dataset.extent(1));
+    return cuvs::neighbors::cagra::detail::build_ace<T, IdxT>(res, params, dataset_view);
+  }
   return cuvs::neighbors::cagra::detail::build<T, IdxT, Accessor>(res, params, dataset);
 }
 
@@ -397,12 +398,23 @@ void extend(
 
 template <class T, class IdxT>
 index<T, IdxT> merge(raft::resources const& handle,
-                     const cagra::merge_params& params,
-                     std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices)
+                     const cagra::index_params& params,
+                     std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,
+                     const cuvs::neighbors::filtering::base_filter& row_filter)
 {
-  return cagra::detail::merge<T, IdxT>(handle, params, indices);
+  return cagra::detail::merge<T, IdxT>(handle, params, indices, row_filter);
 }
 
 /** @} */  // end group cagra
 
 }  // namespace cuvs::neighbors::cagra
+
+#define CUVS_INST_CAGRA_MERGE(T, IdxT)                                                  \
+  auto merge(raft::resources const& handle,                                             \
+             const cuvs::neighbors::cagra::index_params& params,                        \
+             std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,             \
+             const cuvs::neighbors::filtering::base_filter& row_filter)                 \
+    -> cuvs::neighbors::cagra::index<T, IdxT>                                           \
+  {                                                                                     \
+    return cuvs::neighbors::cagra::merge<T, IdxT>(handle, params, indices, row_filter); \
+  }

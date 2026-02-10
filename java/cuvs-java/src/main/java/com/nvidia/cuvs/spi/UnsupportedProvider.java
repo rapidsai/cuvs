@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.spi;
@@ -41,6 +41,18 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
+  public HnswIndex hnswIndexFromCagra(HnswIndexParams hnswParams, CagraIndex cagraIndex)
+      throws Throwable {
+    throw new UnsupportedOperationException(reasons);
+  }
+
+  @Override
+  public HnswIndex hnswIndexBuild(CuVSResources resources, HnswIndexParams hnswParams, CuVSMatrix dataset)
+      throws Throwable {
+    throw new UnsupportedOperationException(reasons);
+  }
+
+  @Override
   public TieredIndex.Builder newTieredIndexBuilder(CuVSResources cuVSResources) {
     throw new UnsupportedOperationException(reasons);
   }
@@ -74,12 +86,38 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
+  public CagraIndexParams cagraIndexParamsFromHnswParams(
+      long rows,
+      long dim,
+      int m,
+      int efConstruction,
+      CagraIndexParams.HnswHeuristicType heuristic,
+      CagraIndexParams.CuvsDistanceType metric) {
+    throw new UnsupportedOperationException(reasons);
+  }
+
+  @Override
   public void setLogLevel(Level level) {
     throw new UnsupportedOperationException(reasons);
   }
 
   @Override
   public Level getLogLevel() {
+    throw new UnsupportedOperationException(reasons);
+  }
+
+  @Override
+  public void enableRMMPooledMemory(int initialPoolSizePercent, int maxPoolSizePercent) {
+    throw new UnsupportedOperationException(reasons);
+  }
+
+  @Override
+  public void enableRMMManagedPooledMemory(int initialPoolSizePercent, int maxPoolSizePercent) {
+    throw new UnsupportedOperationException(reasons);
+  }
+
+  @Override
+  public void resetRMMPooledMemory() {
     throw new UnsupportedOperationException(reasons);
   }
 

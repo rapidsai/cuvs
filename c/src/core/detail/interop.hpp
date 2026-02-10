@@ -58,46 +58,6 @@ inline bool is_dlpack_host_compatible(DLTensor tensor)
          tensor.device.device_type == kDLCPU;
 }
 
-template <typename MdspanType, typename = raft::is_mdspan_t<MdspanType>>
-inline MdspanType from_dlpack(DLManagedTensor* managed_tensor)
-{
-  auto tensor = managed_tensor->dl_tensor;
-
-  auto to_data_type = data_type_to_DLDataType<typename MdspanType::value_type>();
-  RAFT_EXPECTS(to_data_type.code == tensor.dtype.code,
-               "code mismatch between return mdspan (%i) and DLTensor (%i)",
-               to_data_type.code,
-               tensor.dtype.code);
-  RAFT_EXPECTS(to_data_type.bits == tensor.dtype.bits,
-               "bits mismatch between return mdspan (%i) and DLTensor (%i)",
-               to_data_type.bits,
-               tensor.dtype.bits);
-  RAFT_EXPECTS(to_data_type.lanes == tensor.dtype.lanes,
-               "lanes mismatch between return mdspan and DLTensor");
-  RAFT_EXPECTS(tensor.dtype.lanes == 1, "More than 1 DLTensor lanes not supported");
-
-  auto to_device = accessor_type_to_DLDevice<typename MdspanType::accessor_type>();
-  if (to_device.device_type == kDLCUDA) {
-    RAFT_EXPECTS(is_dlpack_device_compatible(tensor),
-                 "device_type mismatch between return mdspan and DLTensor");
-  } else if (to_device.device_type == kDLCPU) {
-    RAFT_EXPECTS(is_dlpack_host_compatible(tensor),
-                 "device_type mismatch between return mdspan and DLTensor");
-  }
-
-  RAFT_EXPECTS(MdspanType::extents_type::rank() == tensor.ndim,
-               "ndim mismatch between return mdspan and DLTensor");
-
-  // auto exts = typename MdspanType::extents_type{tensor.shape};
-  std::array<int64_t, MdspanType::extents_type::rank()> shape{};
-  for (int64_t i = 0; i < tensor.ndim; ++i) {
-    shape[i] = tensor.shape[i];
-  }
-  auto exts = typename MdspanType::extents_type{shape};
-
-  return MdspanType{reinterpret_cast<typename MdspanType::data_handle_type>(tensor.data), exts};
-}
-
 inline bool is_f_contiguous(DLManagedTensor* managed_tensor)
 {
   auto tensor = managed_tensor->dl_tensor;
@@ -128,6 +88,54 @@ inline bool is_c_contiguous(DLManagedTensor* managed_tensor)
   }
 
   return true;
+}
+
+template <typename MdspanType, typename = raft::is_mdspan_t<MdspanType>>
+inline MdspanType from_dlpack(DLManagedTensor* managed_tensor)
+{
+  auto tensor = managed_tensor->dl_tensor;
+
+  if constexpr (std::is_same_v<typename MdspanType::layout_type, raft::row_major>) {
+    RAFT_EXPECTS(is_c_contiguous(managed_tensor), "Expected a row-major matrix");
+  }
+
+  if constexpr (std::is_same_v<typename MdspanType::layout_type, raft::col_major>) {
+    RAFT_EXPECTS(is_f_contiguous(managed_tensor), "Expected a col-major matrix");
+  }
+
+  auto to_data_type = data_type_to_DLDataType<typename MdspanType::value_type>();
+  RAFT_EXPECTS(to_data_type.code == tensor.dtype.code,
+               "code mismatch between return mdspan (%i) and DLTensor (%i)",
+               to_data_type.code,
+               tensor.dtype.code);
+  RAFT_EXPECTS(to_data_type.bits == tensor.dtype.bits,
+               "bits mismatch between return mdspan (%i) and DLTensor (%i)",
+               to_data_type.bits,
+               tensor.dtype.bits);
+  RAFT_EXPECTS(to_data_type.lanes == tensor.dtype.lanes,
+               "lanes mismatch between return mdspan and DLTensor");
+  RAFT_EXPECTS(tensor.dtype.lanes == 1, "More than 1 DLTensor lanes not supported");
+
+  auto to_device = accessor_type_to_DLDevice<typename MdspanType::accessor_type>();
+  if (to_device.device_type == kDLCUDA) {
+    RAFT_EXPECTS(is_dlpack_device_compatible(tensor),
+                 "device_type mismatch between return mdspan and DLTensor");
+  } else if (to_device.device_type == kDLCPU) {
+    RAFT_EXPECTS(is_dlpack_host_compatible(tensor),
+                 "device_type mismatch between return mdspan and DLTensor");
+  }
+
+  RAFT_EXPECTS(MdspanType::extents_type::rank() == tensor.ndim,
+               "ndim mismatch between return mdspan and DLTensor");
+
+  // auto exts = typename MdspanType::extents_type{tensor.shape};
+  cuda::std::array<int64_t, MdspanType::extents_type::rank()> shape{};
+  for (int64_t i = 0; i < tensor.ndim; ++i) {
+    shape[i] = tensor.shape[i];
+  }
+  auto exts = typename MdspanType::extents_type{shape};
+
+  return MdspanType{reinterpret_cast<typename MdspanType::data_handle_type>(tensor.data), exts};
 }
 
 #pragma GCC diagnostic push

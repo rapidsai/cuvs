@@ -7,14 +7,60 @@
 
 #include <cstdint>
 #include <cuda_fp16.h>
-#include <cuvs/distance/distance.h>
 #include <raft/core/device_csr_matrix.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 
 namespace cuvs::distance {
 
-using DistanceType = cuvsDistanceType;
+/** enum to tell how to compute distance */
+enum class DistanceType : int {
+
+  /** evaluate as dist_ij = sum(x_ik^2) + sum(y_ij)^2 - 2*sum(x_ik * y_jk) */
+  L2Expanded = 0,
+  /** same as above, but inside the epilogue, perform square root operation */
+  L2SqrtExpanded = 1,
+  /** cosine distance */
+  CosineExpanded = 2,
+  /** L1 distance */
+  L1 = 3,
+  /** evaluate as dist_ij += (x_ik - y-jk)^2 */
+  L2Unexpanded = 4,
+  /** same as above, but inside the epilogue, perform square root operation */
+  L2SqrtUnexpanded = 5,
+  /** basic inner product **/
+  InnerProduct = 6,
+  /** Chebyshev (Linf) distance **/
+  Linf = 7,
+  /** Canberra distance **/
+  Canberra = 8,
+  /** Generalized Minkowski distance **/
+  LpUnexpanded = 9,
+  /** Correlation distance **/
+  CorrelationExpanded = 10,
+  /** Jaccard distance **/
+  JaccardExpanded = 11,
+  /** Hellinger distance **/
+  HellingerExpanded = 12,
+  /** Haversine distance **/
+  Haversine = 13,
+  /** Bray-Curtis distance **/
+  BrayCurtis = 14,
+  /** Jensen-Shannon distance**/
+  JensenShannon = 15,
+  /** Hamming distance **/
+  HammingUnexpanded = 16,
+  /** KLDivergence **/
+  KLDivergence = 17,
+  /** RusselRao **/
+  RusselRaoExpanded = 18,
+  /** Dice-Sorensen distance **/
+  DiceExpanded = 19,
+  /** Bitstring Hamming distance **/
+  BitwiseHamming = 20,
+  /** Precomputed (special value) **/
+  Precomputed = 100
+};
 
 /**
  * Whether minimal distance corresponds to similar elements (using the given metric).
@@ -343,7 +389,7 @@ void pairwise_distance(
  *
  * auto out = raft::make_device_matrix<float>(handle, x_nrows, y_nrows);
  * auto metric = cuvs::distance::DistanceType::L2Expanded;
- * raft::sparse::distance::pairwise_distance(handle, x.view(), y.view(), out, metric);
+ * cuvs::pairwise_distance(handle, x.view(), y.view(), out, metric);
  * @endcode
  *
  * @param[in] handle raft::resources
@@ -383,7 +429,7 @@ void pairwise_distance(raft::resources const& handle,
  *
  * auto out = raft::make_device_matrix<double>(handle, x_nrows, y_nrows);
  * auto metric = cuvs::distance::DistanceType::L2Expanded;
- * raft::sparse::distance::pairwise_distance(handle, x.view(), y.view(), out, metric);
+ * cuvs::distance::pairwise_distance(handle, x.view(), y.view(), out, metric);
  * @endcode
  *
  * @param[in] handle raft::resources

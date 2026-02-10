@@ -9,7 +9,6 @@
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/spatial/knn/detail/ann_utils.cuh>
 #include <raft/stats/histogram.cuh>
 
 #include <rmm/device_buffer.hpp>
@@ -357,6 +356,11 @@ void extend_core(
   std::optional<raft::device_matrix_view<T, int64_t, raft::layout_stride>> new_dataset_buffer_view,
   std::optional<raft::device_matrix_view<IdxT, int64_t>> new_graph_buffer_view)
 {
+  RAFT_EXPECTS(!index.dataset_fd().has_value(),
+               "Cannot extend a disk-backed CAGRA index. Convert it with "
+               "cuvs::neighbors::hnsw::from_cagra() and load it into memory via "
+               "cuvs::neighbors::hnsw::deserialize() before calling extend().");
+
   if (dynamic_cast<const non_owning_dataset<T, IdxT>*>(&index.data()) != nullptr &&
       !new_dataset_buffer_view.has_value()) {
     RAFT_LOG_WARN(
@@ -459,7 +463,7 @@ void extend_core(
       using out_owning_type =
         owning_dataset<T, int64_t, out_layout_type, out_container_policy_type>;
       auto out_layout = raft::make_strided_layout(updated_dataset_view.extents(),
-                                                  std::array<int64_t, 2>{stride, 1});
+                                                  cuda::std::array<int64_t, 2>{stride, 1});
 
       index.update_dataset(handle, out_owning_type{std::move(updated_dataset), out_layout});
     }

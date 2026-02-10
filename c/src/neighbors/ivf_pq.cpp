@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -34,6 +34,7 @@ void convert_c_index_params(cuvsIvfPqIndexParams params, cuvs::neighbors::ivf_pq
   out->force_random_rotation          = params.force_random_rotation;
   out->conservative_memory_allocation = params.conservative_memory_allocation;
   out->max_train_points_per_pq_code   = params.max_train_points_per_pq_code;
+  out->codes_layout = static_cast<cuvs::neighbors::ivf_pq::list_layout>((int)params.codes_layout);
 }
 void convert_c_search_params(cuvsIvfPqSearchParams params,
                              cuvs::neighbors::ivf_pq::search_params* out)
@@ -162,11 +163,95 @@ void _get_centers(cuvsIvfPqIndex index, DLManagedTensor* output)
 }
 
 template <typename IdxT>
+void _get_centers_padded(cuvsIvfPqIndex index, DLManagedTensor* output)
+{
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
+  // Return the full padded centers [n_lists, dim_ext] as a contiguous array
+  cuvs::core::to_dlpack(index_ptr->centers(), output);
+}
+
+template <typename IdxT>
 void _get_pq_centers(cuvsIvfPqIndex index, DLManagedTensor* centers)
 {
   auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
   cuvs::core::to_dlpack(index_ptr->pq_centers(), centers);
 }
+
+template <typename IdxT>
+void _get_centers_rot(cuvsIvfPqIndex index, DLManagedTensor* centers_rot)
+{
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
+  cuvs::core::to_dlpack(index_ptr->centers_rot(), centers_rot);
+}
+
+template <typename IdxT>
+void _get_rotation_matrix(cuvsIvfPqIndex index, DLManagedTensor* rotation_matrix)
+{
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
+  cuvs::core::to_dlpack(index_ptr->rotation_matrix(), rotation_matrix);
+}
+
+template <typename IdxT>
+void _get_list_sizes(cuvsIvfPqIndex index, DLManagedTensor* list_sizes)
+{
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
+  cuvs::core::to_dlpack(index_ptr->list_sizes(), list_sizes);
+}
+
+template <typename IdxT>
+void _unpack_contiguous_list_data(cuvsResources_t res,
+                                  cuvsIvfPqIndex index,
+                                  DLManagedTensor* out_codes,
+                                  uint32_t label,
+                                  uint32_t offset)
+{
+  auto index_ptr    = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
+  using mdspan_type = raft::device_matrix_view<uint8_t, uint32_t, raft::row_major>;
+  auto mds          = cuvs::core::from_dlpack<mdspan_type>(out_codes);
+  auto res_ptr      = reinterpret_cast<raft::resources*>(res);
+
+  cuvs::neighbors::ivf_pq::helpers::codepacker::unpack_contiguous_list_data(
+    *res_ptr, *index_ptr, mds.data_handle(), mds.extent(0), label, offset);
+}
+
+template <typename IdxT>
+void _get_list_indices(cuvsIvfPqIndex index,
+                       uint32_t label,
+                       DLManagedTensor* out_labels)
+{
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
+  if (index_ptr->codes_layout() == cuvs::neighbors::ivf_pq::list_layout::FLAT) {
+    auto& list =
+      static_cast<cuvs::neighbors::ivf_pq::list_data_flat<IdxT>&>(*index_ptr->lists()[label]);
+    cuvs::core::to_dlpack(list.indices.view(), out_labels);
+  } else {
+    auto& list = static_cast<cuvs::neighbors::ivf_pq::list_data_interleaved<IdxT>&>(
+      *index_ptr->lists()[label]);
+    cuvs::core::to_dlpack(list.indices.view(), out_labels);
+  }
+}
+
+template <typename T, typename IdxT>
+void _transform(cuvsResources_t res,
+                                  cuvsIvfPqIndex index,
+             DLManagedTensor* input_dataset,
+             DLManagedTensor* output_labels,
+             DLManagedTensor* output_dataset)
+{
+  auto index_ptr    = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
+  auto res_ptr      = reinterpret_cast<raft::resources*>(res);
+
+  using input_mdspan_type = raft::device_matrix_view<const T, IdxT, raft::row_major>;
+  using labels_mdspan_type = raft::device_vector_view<uint32_t, IdxT, raft::row_major>;
+  using output_mdspan_type = raft::device_matrix_view<uint8_t, IdxT, raft::row_major>;
+
+  auto input_mds = cuvs::core::from_dlpack<input_mdspan_type>(input_dataset);
+  auto labels_mds = cuvs::core::from_dlpack<labels_mdspan_type>(output_labels);
+  auto output_mds = cuvs::core::from_dlpack<output_mdspan_type>(output_dataset);
+
+  cuvs::neighbors::ivf_pq::transform(*res_ptr, *index_ptr, input_mds, labels_mds, output_mds);
+}
+
 }  // namespace
 
 extern "C" cuvsError_t cuvsIvfPqIndexCreate(cuvsIvfPqIndex_t* index)
@@ -271,10 +356,11 @@ extern "C" cuvsError_t cuvsIvfPqIndexParamsCreate(cuvsIvfPqIndexParams_t* params
                                        .kmeans_trainset_fraction       = 0.5,
                                        .pq_bits                        = 8,
                                        .pq_dim                         = 0,
-                                       .codebook_kind                  = codebook_gen::PER_SUBSPACE,
+                                       .codebook_kind                  = CUVS_IVF_PQ_CODEBOOK_GEN_PER_SUBSPACE,
                                        .force_random_rotation          = false,
                                        .conservative_memory_allocation = false,
-                                       .max_train_points_per_pq_code   = 256};
+                                       .max_train_points_per_pq_code   = 256,
+                                       .codes_layout                   = CUVS_IVF_PQ_LIST_LAYOUT_INTERLEAVED};
   });
 }
 
@@ -323,6 +409,12 @@ extern "C" cuvsError_t cuvsIvfPqExtend(cuvsResources_t res,
   return cuvs::core::translate_exceptions([=] {
     auto vectors = new_vectors->dl_tensor;
 
+    // Set the index dtype if not already set (e.g., for view-type indices built from precomputed data)
+    if (index->dtype.code == 0 && index->dtype.bits == 0) {
+      index->dtype.code = vectors.dtype.code;
+      index->dtype.bits = vectors.dtype.bits;
+    }
+
     if (vectors.dtype.code == kDLFloat && vectors.dtype.bits == 32) {
       _extend<float, int64_t>(res, new_vectors, new_indices, *index);
     } else if (vectors.dtype.code == kDLFloat && vectors.dtype.bits == 16) {
@@ -361,13 +453,181 @@ extern "C" cuvsError_t cuvsIvfPqIndexGetSize(cuvsIvfPqIndex_t index, int64_t* si
   });
 }
 
+extern "C" cuvsError_t cuvsIvfPqIndexGetPqDim(cuvsIvfPqIndex_t index, int64_t* pq_dim)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
+    *pq_dim        = index_ptr->pq_dim();
+  });
+}
+
+extern "C" cuvsError_t cuvsIvfPqIndexGetPqBits(cuvsIvfPqIndex_t index, int64_t* pq_bits)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
+    *pq_bits       = index_ptr->pq_bits();
+  });
+}
+
+extern "C" cuvsError_t cuvsIvfPqIndexGetPqLen(cuvsIvfPqIndex_t index, int64_t* pq_len)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
+    *pq_len        = index_ptr->pq_len();
+  });
+}
+
 extern "C" cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index, DLManagedTensor* centers)
 {
   return cuvs::core::translate_exceptions([=] { _get_centers<int64_t>(*index, centers); });
+}
+
+extern "C" cuvsError_t cuvsIvfPqIndexGetCentersPadded(cuvsIvfPqIndex_t index,
+                                                      DLManagedTensor* centers)
+{
+  return cuvs::core::translate_exceptions([=] { _get_centers_padded<int64_t>(*index, centers); });
 }
 
 extern "C" cuvsError_t cuvsIvfPqIndexGetPqCenters(cuvsIvfPqIndex_t index,
                                                   DLManagedTensor* pq_centers)
 {
   return cuvs::core::translate_exceptions([=] { _get_pq_centers<int64_t>(*index, pq_centers); });
+}
+
+extern "C" cuvsError_t cuvsIvfPqIndexGetCentersRot(cuvsIvfPqIndex_t index,
+                                                   DLManagedTensor* centers_rot)
+{
+  return cuvs::core::translate_exceptions([=] { _get_centers_rot<int64_t>(*index, centers_rot); });
+}
+
+extern "C" cuvsError_t cuvsIvfPqIndexGetRotationMatrix(cuvsIvfPqIndex_t index,
+                                                       DLManagedTensor* rotation_matrix)
+{
+  return cuvs::core::translate_exceptions(
+    [=] { _get_rotation_matrix<int64_t>(*index, rotation_matrix); });
+}
+
+extern "C" cuvsError_t cuvsIvfPqBuildPrecomputed(cuvsResources_t res,
+                                                  cuvsIvfPqIndexParams_t params,
+                                                  uint32_t dim,
+                                                  DLManagedTensor* pq_centers_tensor,
+                                                  DLManagedTensor* centers_tensor,
+                                                  DLManagedTensor* centers_rot_tensor,
+                                                  DLManagedTensor* rotation_matrix_tensor,
+                                                  cuvsIvfPqIndex_t index)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto res_ptr = reinterpret_cast<raft::resources*>(res);
+
+    auto build_params = cuvs::neighbors::ivf_pq::index_params();
+    convert_c_index_params(*params, &build_params);
+
+    // Verify all tensors are on device
+    RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(pq_centers_tensor->dl_tensor),
+                 "pq_centers should have device compatible memory");
+    RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(centers_tensor->dl_tensor),
+                 "centers should have device compatible memory");
+    RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(centers_rot_tensor->dl_tensor),
+                 "centers_rot should have device compatible memory");
+    RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(rotation_matrix_tensor->dl_tensor),
+                 "rotation_matrix should have device compatible memory");
+
+    // Verify all tensors are float32
+    auto& pq_centers_dl = pq_centers_tensor->dl_tensor;
+    auto& centers_dl    = centers_tensor->dl_tensor;
+    auto& centers_rot_dl = centers_rot_tensor->dl_tensor;
+    auto& rotation_matrix_dl = rotation_matrix_tensor->dl_tensor;
+
+    RAFT_EXPECTS(pq_centers_dl.dtype.code == kDLFloat && pq_centers_dl.dtype.bits == 32,
+                 "pq_centers must be float32");
+    RAFT_EXPECTS(centers_dl.dtype.code == kDLFloat && centers_dl.dtype.bits == 32,
+                 "centers must be float32");
+    RAFT_EXPECTS(centers_rot_dl.dtype.code == kDLFloat && centers_rot_dl.dtype.bits == 32,
+                 "centers_rot must be float32");
+    RAFT_EXPECTS(rotation_matrix_dl.dtype.code == kDLFloat && rotation_matrix_dl.dtype.bits == 32,
+                 "rotation_matrix must be float32");
+
+    // Convert DLPack tensors to mdspan views
+    using pq_centers_mdspan_type = raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major>;
+    using matrix_mdspan_type = raft::device_matrix_view<const float, uint32_t, raft::row_major>;
+
+    auto pq_centers_mds = cuvs::core::from_dlpack<pq_centers_mdspan_type>(pq_centers_tensor);
+    auto centers_mds = cuvs::core::from_dlpack<matrix_mdspan_type>(centers_tensor);
+    auto centers_rot_mds = cuvs::core::from_dlpack<matrix_mdspan_type>(centers_rot_tensor);
+    auto rotation_matrix_mds = cuvs::core::from_dlpack<matrix_mdspan_type>(rotation_matrix_tensor);
+
+    // Build the index
+    auto* idx = new cuvs::neighbors::ivf_pq::index<int64_t>(
+      cuvs::neighbors::ivf_pq::build(
+        *res_ptr, build_params, dim, pq_centers_mds, centers_mds, centers_rot_mds, rotation_matrix_mds));
+
+    index->addr = reinterpret_cast<uintptr_t>(idx);
+    // Leave dtype unset (0) - it will be set when extend() is called with actual data
+    index->dtype.code = 0;
+    index->dtype.bits = 0;
+  });
+}
+
+extern "C" cuvsError_t cuvsIvfPqIndexGetListSizes(cuvsIvfPqIndex_t index,
+                                                  DLManagedTensor* list_sizes)
+{
+  return cuvs::core::translate_exceptions([=] { _get_list_sizes<int64_t>(*index, list_sizes); });
+}
+
+extern "C" cuvsError_t cuvsIvfPqIndexUnpackContiguousListData(cuvsResources_t res,
+                                                              cuvsIvfPqIndex_t index,
+                                                              DLManagedTensor* out_codes,
+                                                              uint32_t label,
+                                                              uint32_t offset)
+{
+  return cuvs::core::translate_exceptions(
+    [=] { _unpack_contiguous_list_data<int64_t>(res, *index, out_codes, label, offset); });
+}
+
+extern "C" cuvsError_t cuvsIvfPqIndexGetListIndices(cuvsIvfPqIndex_t index,
+                                                    uint32_t label,
+                                                    DLManagedTensor* out_labels)
+{
+  return cuvs::core::translate_exceptions(
+    [=] { _get_list_indices<int64_t>(*index, label, out_labels); });
+}
+
+extern "C" cuvsError_t cuvsIvfPqTransform(cuvsResources_t res,
+                                          cuvsIvfPqIndex_t index,
+                                          DLManagedTensor* input_dataset,
+                                          DLManagedTensor* output_labels,
+                                          DLManagedTensor* output_dataset) {
+  return cuvs::core::translate_exceptions(
+    [=] {
+      // Verify all tensors are on device
+      RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(input_dataset->dl_tensor),
+                   "input_dataset should have device compatible memory");
+      RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(output_labels->dl_tensor),
+                   "output_labels should have device compatible memory");
+      RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(output_dataset->dl_tensor),
+                   "output_dataset should have device compatible memory");
+
+      // Verify dtypes of inputs
+      auto& output_labels_dl = output_labels->dl_tensor;
+      RAFT_EXPECTS(output_labels_dl.dtype.code == kDLUInt && output_labels_dl.dtype.bits == 32,
+                   "output_labels must have a uint32 dtype ");
+      auto& output_dataset_dl = output_dataset->dl_tensor;
+      RAFT_EXPECTS(output_dataset_dl.dtype.code == kDLUInt && output_dataset_dl.dtype.bits == 8,
+                   "output_dataset must have a uint8 dtype");
+
+      auto & dataset = input_dataset->dl_tensor;
+      if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
+        _transform<float, int64_t>(res, *index, input_dataset, output_labels, output_dataset);
+      } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 16) {
+        _transform<half, int64_t>(res, *index, input_dataset, output_labels, output_dataset);
+      } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
+        _transform<int8_t, int64_t>(res, *index, input_dataset, output_labels, output_dataset);
+      } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
+        _transform<uint8_t, int64_t>(res, *index, input_dataset, output_labels, output_dataset);
+      } else {
+        RAFT_FAIL("Unsupported input_dataset DLtensor dtype: %d and bits: %d",
+                  dataset.dtype.code,
+                  dataset.dtype.bits);
+      }
+    });
 }
