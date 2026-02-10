@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -35,21 +35,21 @@
 
 namespace cuvs::neighbors::brute_force {
 
-template <typename index_t>
-struct PrefilteredBruteForceInputs {
-  index_t n_queries;
-  index_t n_dataset;
-  index_t dim;
-  index_t top_k;
+template <typename IndexT>
+struct PrefilteredBruteForceInputs {  // NOLINT(readability-identifier-naming)
+  IndexT n_queries;
+  IndexT n_dataset;
+  IndexT dim;
+  IndexT top_k;
   float sparsity;
   cuvs::distance::DistanceType metric;
   bool select_min = true;
 };
 
 template <typename T>
-struct CompareApproxWithInf {
-  CompareApproxWithInf(T eps_) : eps(eps_) {}
-  bool operator()(const T& a, const T& b) const
+struct CompareApproxWithInf {                  // NOLINT(readability-identifier-naming)
+  CompareApproxWithInf(T eps_) : eps(eps_) {}  // NOLINT(google-explicit-constructor)
+  auto operator()(const T& a, const T& b) const -> bool
   {
     if (std::isinf(a) && std::isinf(b)) return true;
     T diff  = std::abs(a - b);
@@ -60,7 +60,7 @@ struct CompareApproxWithInf {
   }
 
  private:
-  T eps;
+  T eps;  // NOLINT(readability-identifier-naming)
 };
 
 template <typename OutT, typename InT>
@@ -86,7 +86,10 @@ RAFT_KERNEL normalize_kernel(
 }
 
 struct float_to_half {
-  __host__ __device__ __half operator()(const float x) const { return __float2half(x); }
+  __host__ __device__ auto operator()(const float x) const -> __half
+  {
+    return __float2half(x);
+  }  // NOLINT(readability-identifier-naming)
 };
 
 template <typename OutT, typename InT>
@@ -103,37 +106,37 @@ void normalize(OutT* theta,
   RAFT_CUDA_TRY(cudaGetLastError());
 }
 
-template <typename index_t, typename bitmap_t = uint32_t>
+template <typename IndexT, typename bitmap_t = uint32_t>  // NOLINT(readability-identifier-naming)
 RAFT_KERNEL set_bitmap_kernel(
-  const index_t* src, const index_t* dst, bitmap_t* bitmap, index_t n_edges, index_t n_cols)
+  const IndexT* src, const IndexT* dst, bitmap_t* bitmap, IndexT n_edges, IndexT n_cols)
 {
   size_t idx = threadIdx.x + blockDim.x * blockIdx.x;
   if (idx < n_edges) {
-    index_t row      = src[idx];
-    index_t col      = dst[idx];
-    index_t g_idx    = row * n_cols + col;
-    index_t item_idx = (g_idx) >> 5;
+    IndexT row       = src[idx];
+    IndexT col       = dst[idx];
+    IndexT g_idx     = row * n_cols + col;
+    IndexT item_idx  = (g_idx) >> 5;
     uint32_t bit_idx = (g_idx) & 31;
-    atomicOr(bitmap + item_idx, (uint32_t(1) << bit_idx));
+    atomicOr(bitmap + item_idx, (static_cast<uint32_t>(1) << bit_idx));
   }
 }
 
-template <typename index_t, typename bitmap_t = uint32_t>
-void set_bitmap(const index_t* src,
-                const index_t* dst,
+template <typename IndexT, typename bitmap_t = uint32_t>  // NOLINT(readability-identifier-naming)
+void set_bitmap(const IndexT* src,
+                const IndexT* dst,
                 bitmap_t* bitmap,
-                index_t n_edges,
-                index_t n_cols,
+                IndexT n_edges,
+                IndexT n_cols,
                 cudaStream_t stream)
 {
   int block_size = 256;
-  int blocks     = raft::ceildiv<index_t>(n_edges, block_size);
-  set_bitmap_kernel<index_t, bitmap_t>
+  int blocks     = raft::ceildiv<IndexT>(n_edges, block_size);
+  set_bitmap_kernel<IndexT, bitmap_t>
     <<<blocks, block_size, 0, stream>>>(src, dst, bitmap, n_edges, n_cols);
   RAFT_CUDA_TRY(cudaGetLastError());
 }
 
-bool isCuSparseVersionGreaterThan_12_0_1()
+auto isCuSparseVersionGreaterThan_12_0_1() -> bool  // NOLINT(readability-identifier-naming)
 {
   int version;
   cusparseHandle_t handle;
@@ -149,13 +152,16 @@ bool isCuSparseVersionGreaterThan_12_0_1()
   return (major > 12) || (major == 12 && minor > 0) || (major == 12 && minor == 0 && patch >= 2);
 }
 
-template <typename value_t, typename dist_t, typename index_t, typename bitmap_t = uint32_t>
-class PrefilteredBruteForceOnBitmapTest
-  : public ::testing::TestWithParam<PrefilteredBruteForceInputs<index_t>> {
+template <typename value_t,
+          typename dist_t,
+          typename IndexT,
+          typename bitmap_t = uint32_t>  // NOLINT(readability-identifier-naming)
+class PrefilteredBruteForceOnBitmapTest  // NOLINT(readability-identifier-naming)
+  : public ::testing::TestWithParam<PrefilteredBruteForceInputs<IndexT>> {
  public:
-  PrefilteredBruteForceOnBitmapTest()
+  PrefilteredBruteForceOnBitmapTest()  // NOLINT(modernize-use-equals-default)
     : stream(raft::resource::get_cuda_stream(handle)),
-      params(::testing::TestWithParam<PrefilteredBruteForceInputs<index_t>>::GetParam()),
+      params(::testing::TestWithParam<PrefilteredBruteForceInputs<IndexT>>::GetParam()),
       filter_d(0, stream),
       dataset_d(0, stream),
       queries_d(0, stream),
@@ -167,18 +173,18 @@ class PrefilteredBruteForceOnBitmapTest
   }
 
  protected:
-  index_t create_sparse_matrix_with_rmat(index_t m,
-                                         index_t n,
-                                         float sparsity,
-                                         rmm::device_uvector<bitmap_t>& filter_d)
+  auto create_sparse_matrix_with_rmat(IndexT m,
+                                      IndexT n,
+                                      float sparsity,
+                                      rmm::device_uvector<bitmap_t>& filter_d) -> IndexT
   {
-    index_t r_scale   = (index_t)std::log2(m);
-    index_t c_scale   = (index_t)std::log2(n);
-    index_t n_edges   = (index_t)(m * n * 1.0f * sparsity);
-    index_t max_scale = std::max(r_scale, c_scale);
+    auto r_scale     = static_cast<IndexT>(std::log2(m));
+    auto c_scale     = static_cast<IndexT>(std::log2(n));
+    auto n_edges     = static_cast<IndexT>(m * n * 1.0f * sparsity);
+    IndexT max_scale = std::max(r_scale, c_scale);
 
-    rmm::device_uvector<index_t> out_src{(unsigned long)n_edges, stream};
-    rmm::device_uvector<index_t> out_dst{(unsigned long)n_edges, stream};
+    rmm::device_uvector<IndexT> out_src{static_cast<unsigned long>(n_edges), stream};
+    rmm::device_uvector<IndexT> out_dst{static_cast<unsigned long>(n_edges), stream};
     rmm::device_uvector<float> theta{(unsigned long)(4 * max_scale), stream};
 
     raft::random::RngState state{2024ULL, raft::random::GeneratorType::GenPC};
@@ -186,7 +192,7 @@ class PrefilteredBruteForceOnBitmapTest
     raft::random::uniform<float>(handle, state, theta.data(), theta.size(), 0.0f, 1.0f);
     normalize<float, float>(
       theta.data(), theta.data(), max_scale, r_scale, c_scale, r_scale != c_scale, true, stream);
-    raft::random::rmat_rectangular_gen((index_t*)nullptr,
+    raft::random::rmat_rectangular_gen(static_cast<IndexT*>(nullptr),
                                        out_src.data(),
                                        out_dst.data(),
                                        theta.data(),
@@ -196,17 +202,17 @@ class PrefilteredBruteForceOnBitmapTest
                                        stream,
                                        state);
 
-    index_t nnz_h = 0;
+    IndexT nnz_h = 0;
     {
       auto src    = out_src.data();
       auto dst    = out_dst.data();
       auto bitmap = filter_d.data();
-      rmm::device_scalar<index_t> nnz(0, stream);
-      auto nnz_view = raft::make_device_scalar_view<index_t>(nnz.data());
+      rmm::device_scalar<IndexT> nnz(0, stream);
+      auto nnz_view = raft::make_device_scalar_view<IndexT>(nnz.data());
       auto filter_view =
-        raft::make_device_vector_view<const uint32_t, index_t>(filter_d.data(), filter_d.size());
-      index_t size_h = m * n;
-      auto size_view = raft::make_host_scalar_view<const index_t, index_t>(&size_h);
+        raft::make_device_vector_view<const uint32_t, IndexT>(filter_d.data(), filter_d.size());
+      IndexT size_h  = m * n;
+      auto size_view = raft::make_host_scalar_view<const IndexT, IndexT>(&size_h);
 
       set_bitmap(src, dst, bitmap, n_edges, n, stream);
 
@@ -220,46 +226,46 @@ class PrefilteredBruteForceOnBitmapTest
   }
 
   void cpu_convert_to_csr(std::vector<bitmap_t>& bitmap,
-                          index_t rows,
-                          index_t cols,
-                          std::vector<index_t>& indices,
-                          std::vector<index_t>& indptr)
+                          IndexT rows,
+                          IndexT cols,
+                          std::vector<IndexT>& indices,
+                          std::vector<IndexT>& indptr)
   {
-    index_t offset_indptr   = 0;
-    index_t offset_values   = 0;
+    IndexT offset_indptr    = 0;
+    IndexT offset_values    = 0;
     indptr[offset_indptr++] = 0;
 
-    index_t index        = 0;
-    bitmap_t element     = 0;
-    index_t bit_position = 0;
+    IndexT index        = 0;
+    bitmap_t element    = 0;
+    IndexT bit_position = 0;
 
-    for (index_t i = 0; i < rows; ++i) {
-      for (index_t j = 0; j < cols; ++j) {
+    for (IndexT i = 0; i < rows; ++i) {
+      for (IndexT j = 0; j < cols; ++j) {
         index        = i * cols + j;
         element      = bitmap[index / (8 * sizeof(bitmap_t))];
         bit_position = index % (8 * sizeof(bitmap_t));
 
         if (((element >> bit_position) & 1)) {
-          indices[offset_values] = static_cast<index_t>(j);
+          indices[offset_values] = static_cast<IndexT>(j);
           offset_values++;
         }
       }
-      indptr[offset_indptr++] = static_cast<index_t>(offset_values);
+      indptr[offset_indptr++] = static_cast<IndexT>(offset_values);
     }
   }
 
   void cpu_sddmm(const std::vector<dist_t>& A,
                  const std::vector<dist_t>& B,
                  std::vector<dist_t>& vals,
-                 const std::vector<index_t>& cols,
-                 const std::vector<index_t>& row_ptrs,
+                 const std::vector<IndexT>& cols,
+                 const std::vector<IndexT>& row_ptrs,
                  bool is_row_major_A,
                  bool is_row_major_B,
                  dist_t alpha = 1.0,
                  dist_t beta  = 0.0)
   {
-    if (params.n_queries * params.dim != static_cast<index_t>(A.size()) ||
-        params.dim * params.n_dataset != static_cast<index_t>(B.size())) {
+    if (params.n_queries * params.dim != static_cast<IndexT>(A.size()) ||
+        params.dim * params.n_dataset != static_cast<IndexT>(B.size())) {
       std::cerr << "Matrix dimensions and vector size do not match!" << std::endl;
       return;
     }
@@ -267,17 +273,17 @@ class PrefilteredBruteForceOnBitmapTest
     bool trans_a = is_row_major_A;
     bool trans_b = is_row_major_B;
 
-    for (index_t i = 0; i < params.n_queries; ++i) {
-      for (index_t j = row_ptrs[i]; j < row_ptrs[i + 1]; ++j) {
+    for (IndexT i = 0; i < params.n_queries; ++i) {
+      for (IndexT j = row_ptrs[i]; j < row_ptrs[i + 1]; ++j) {
         dist_t sum     = 0;
-        dist_t norms_A = 0;
-        dist_t norms_B = 0;
+        dist_t norms_A = 0;  // NOLINT(readability-identifier-naming)
+        dist_t norms_B = 0;  // NOLINT(readability-identifier-naming)
 
-        for (index_t l = 0; l < params.dim; ++l) {
-          index_t a_index = trans_a ? i * params.dim + l : l * params.n_queries + i;
-          index_t b_index = trans_b ? l * params.n_dataset + cols[j] : cols[j] * params.dim + l;
-          dist_t A_v;
-          dist_t B_v;
+        for (IndexT l = 0; l < params.dim; ++l) {
+          IndexT a_index = trans_a ? i * params.dim + l : l * params.n_queries + i;
+          IndexT b_index = trans_b ? l * params.n_dataset + cols[j] : cols[j] * params.dim + l;
+          dist_t A_v;  // NOLINT(readability-identifier-naming)
+          dist_t B_v;  // NOLINT(readability-identifier-naming)
           if constexpr (sizeof(value_t) == 2) {
             A_v = __half2float(__float2half(A[a_index]));
             B_v = __half2float(__float2half(B[b_index]));
@@ -303,49 +309,49 @@ class PrefilteredBruteForceOnBitmapTest
     }
   }
 
-  void cpu_select_k(const std::vector<index_t>& indptr_h,
-                    const std::vector<index_t>& indices_h,
+  void cpu_select_k(const std::vector<IndexT>& indptr_h,
+                    const std::vector<IndexT>& indices_h,
                     const std::vector<dist_t>& values_h,
-                    std::optional<std::vector<index_t>>& in_idx_h,
-                    index_t n_queries,
-                    index_t n_dataset,
-                    index_t top_k,
+                    std::optional<std::vector<IndexT>>& in_idx_h,
+                    IndexT n_queries,
+                    IndexT n_dataset,
+                    IndexT top_k,
                     std::vector<dist_t>& out_values_h,
-                    std::vector<index_t>& out_indices_h,
+                    std::vector<IndexT>& out_indices_h,
                     bool select_min = true)
   {
-    auto comp = [select_min](const std::pair<dist_t, index_t>& a,
-                             const std::pair<dist_t, index_t>& b) {
+    auto comp = [select_min](const std::pair<dist_t, IndexT>& a,
+                             const std::pair<dist_t, IndexT>& b) -> auto {
       return select_min ? a.first < b.first : a.first >= b.first;
     };
 
-    for (index_t row = 0; row < n_queries; ++row) {
-      std::priority_queue<std::pair<dist_t, index_t>,
-                          std::vector<std::pair<dist_t, index_t>>,
+    for (IndexT row = 0; row < n_queries; ++row) {
+      std::priority_queue<std::pair<dist_t, IndexT>,
+                          std::vector<std::pair<dist_t, IndexT>>,
                           decltype(comp)>
         pq(comp);
-      for (index_t idx = indptr_h[row]; idx < indptr_h[row + 1]; ++idx) {
+      for (IndexT idx = indptr_h[row]; idx < indptr_h[row + 1]; ++idx) {
         pq.push({values_h[idx], (in_idx_h.has_value()) ? (*in_idx_h)[idx] : indices_h[idx]});
         if (pq.size() > size_t(top_k)) { pq.pop(); }
       }
 
-      std::vector<std::pair<dist_t, index_t>> row_pairs;
+      std::vector<std::pair<dist_t, IndexT>> row_pairs;
       while (!pq.empty()) {
         row_pairs.push_back(pq.top());
         pq.pop();
       }
 
       if (select_min) {
-        std::sort(row_pairs.begin(), row_pairs.end(), [](const auto& a, const auto& b) {
+        std::sort(row_pairs.begin(), row_pairs.end(), [](const auto& a, const auto& b) -> auto {
           return a.first <= b.first;
         });
       } else {
-        std::sort(row_pairs.begin(), row_pairs.end(), [](const auto& a, const auto& b) {
+        std::sort(row_pairs.begin(), row_pairs.end(), [](const auto& a, const auto& b) -> auto {
           return a.first >= b.first;
         });
       }
-      for (index_t col = 0; col < top_k; col++) {
-        if (col < index_t(row_pairs.size())) {
+      for (IndexT col = 0; col < top_k; col++) {
+        if (col < IndexT(row_pairs.size())) {
           out_values_h[row * top_k + col]  = row_pairs[col].first;
           out_indices_h[row * top_k + col] = row_pairs[col].second;
         }
@@ -353,13 +359,13 @@ class PrefilteredBruteForceOnBitmapTest
     }
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     if (std::is_same_v<value_t, half> && !isCuSparseVersionGreaterThan_12_0_1()) {
       GTEST_SKIP() << "Skipping all tests for half-float as cuSparse doesn't support it.";
     }
-    index_t element =
-      raft::ceildiv(params.n_queries * params.n_dataset, index_t(sizeof(bitmap_t) * 8));
+    IndexT element =
+      raft::ceildiv(params.n_queries * params.n_dataset, IndexT(sizeof(bitmap_t) * 8));
     std::vector<bitmap_t> filter_h(element);
     filter_d.resize(element, stream);
 
@@ -369,8 +375,8 @@ class PrefilteredBruteForceOnBitmapTest
     raft::update_host(filter_h.data(), filter_d.data(), filter_d.size(), stream);
     raft::resource::sync_stream(handle, stream);
 
-    index_t dataset_size = params.n_dataset * params.dim;
-    index_t queries_size = params.n_queries * params.dim;
+    IndexT dataset_size = params.n_dataset * params.dim;
+    IndexT queries_size = params.n_queries * params.dim;
 
     std::vector<dist_t> dataset_h(dataset_size);
     std::vector<dist_t> queries_h(queries_size);
@@ -379,26 +385,11 @@ class PrefilteredBruteForceOnBitmapTest
     queries_d.resize(queries_size, stream);
 
     auto blobs_in_val =
-      raft::make_device_matrix<dist_t, index_t>(handle, 1, dataset_size + queries_size);
-    auto labels = raft::make_device_vector<index_t, index_t>(handle, 1);
+      raft::make_device_matrix<dist_t, IndexT>(handle, 1, dataset_size + queries_size);
+    auto labels = raft::make_device_vector<IndexT, IndexT>(handle, 1);
 
     if constexpr (!std::is_same_v<value_t, half>) {
-      raft::random::make_blobs<value_t, index_t>(blobs_in_val.data_handle(),
-                                                 labels.data_handle(),
-                                                 1,
-                                                 dataset_size + queries_size,
-                                                 1,
-                                                 stream,
-                                                 false,
-                                                 nullptr,
-                                                 nullptr,
-                                                 value_t(1.0),
-                                                 false,
-                                                 value_t(-1.0f),
-                                                 value_t(1.0f),
-                                                 uint64_t(2024));
-    } else {
-      raft::random::make_blobs<dist_t, index_t>(blobs_in_val.data_handle(),
+      raft::random::make_blobs<value_t, IndexT>(blobs_in_val.data_handle(),
                                                 labels.data_handle(),
                                                 1,
                                                 dataset_size + queries_size,
@@ -407,11 +398,26 @@ class PrefilteredBruteForceOnBitmapTest
                                                 false,
                                                 nullptr,
                                                 nullptr,
-                                                dist_t(1.0),
+                                                value_t(1.0),
                                                 false,
-                                                dist_t(-1.0f),
-                                                dist_t(1.0f),
-                                                uint64_t(2024));
+                                                value_t(-1.0f),
+                                                value_t(1.0f),
+                                                static_cast<uint64_t>(2024));
+    } else {
+      raft::random::make_blobs<dist_t, IndexT>(blobs_in_val.data_handle(),
+                                               labels.data_handle(),
+                                               1,
+                                               dataset_size + queries_size,
+                                               1,
+                                               stream,
+                                               false,
+                                               nullptr,
+                                               nullptr,
+                                               dist_t(1.0),
+                                               false,
+                                               dist_t(-1.0f),
+                                               dist_t(1.0f),
+                                               static_cast<uint64_t>(2024));
     }
 
     raft::copy(dataset_h.data(), blobs_in_val.data_handle(), dataset_size, stream);
@@ -437,8 +443,8 @@ class PrefilteredBruteForceOnBitmapTest
     raft::resource::sync_stream(handle);
 
     std::vector<dist_t> values_h(nnz);
-    std::vector<index_t> indices_h(nnz);
-    std::vector<index_t> indptr_h(params.n_queries + 1);
+    std::vector<IndexT> indices_h(nnz);
+    std::vector<IndexT> indptr_h(params.n_queries + 1);
 
     cpu_convert_to_csr(filter_h, params.n_queries, params.n_dataset, indices_h, indptr_h);
 
@@ -449,7 +455,7 @@ class PrefilteredBruteForceOnBitmapTest
     std::vector<dist_t> out_val_h(
       params.n_queries * params.top_k,
       select_min ? std::numeric_limits<dist_t>::infinity() : std::numeric_limits<dist_t>::lowest());
-    std::vector<index_t> out_idx_h(params.n_queries * params.top_k, static_cast<index_t>(0));
+    std::vector<IndexT> out_idx_h(params.n_queries * params.top_k, static_cast<IndexT>(0));
 
     out_val_d.resize(params.n_queries * params.top_k, stream);
     out_idx_d.resize(params.n_queries * params.top_k, stream);
@@ -459,7 +465,7 @@ class PrefilteredBruteForceOnBitmapTest
 
     raft::resource::sync_stream(handle);
 
-    std::optional<std::vector<index_t>> optional_indices_h = std::nullopt;
+    std::optional<std::vector<IndexT>> optional_indices_h = std::nullopt;
     cpu_select_k(indptr_h,
                  indices_h,
                  values_h,
@@ -479,22 +485,25 @@ class PrefilteredBruteForceOnBitmapTest
     raft::resource::sync_stream(handle);
   }
 
-  void Run()
+  void Run()  // NOLINT(readability-identifier-naming)
   {
-    auto dataset_raw = raft::make_device_matrix_view<const value_t, index_t, raft::row_major>(
-      (const value_t*)dataset_d.data(), params.n_dataset, params.dim);
+    auto dataset_raw = raft::make_device_matrix_view<const value_t, IndexT, raft::row_major>(
+      static_cast<const value_t*>(dataset_d.data()), params.n_dataset, params.dim);
 
-    auto queries = raft::make_device_matrix_view<const value_t, index_t, raft::row_major>(
-      (const value_t*)queries_d.data(), params.n_queries, params.dim);
+    auto queries = raft::make_device_matrix_view<const value_t, IndexT, raft::row_major>(
+      static_cast<const value_t*>(queries_d.data()), params.n_queries, params.dim);
 
     auto dataset = brute_force::build(handle, dataset_raw, params.metric);
 
-    auto filter = cuvs::core::bitmap_view<bitmap_t, index_t>(
-      (bitmap_t*)filter_d.data(), params.n_queries, params.n_dataset);
+    auto filter =
+      cuvs::core::bitmap_view<bitmap_t, IndexT>(  // NOLINT(readability-identifier-naming)
+        (bitmap_t*)filter_d.data(),
+        params.n_queries,
+        params.n_dataset);
 
-    auto out_val = raft::make_device_matrix_view<dist_t, index_t, raft::row_major>(
+    auto out_val = raft::make_device_matrix_view<dist_t, IndexT, raft::row_major>(
       out_val_d.data(), params.n_queries, params.top_k);
-    auto out_idx = raft::make_device_matrix_view<index_t, index_t, raft::row_major>(
+    auto out_idx = raft::make_device_matrix_view<IndexT, IndexT, raft::row_major>(
       out_idx_d.data(), params.n_queries, params.top_k);
 
     brute_force::search(handle,
@@ -521,31 +530,34 @@ class PrefilteredBruteForceOnBitmapTest
   }
 
  protected:
-  raft::resources handle;
-  cudaStream_t stream;
+  raft::resources handle;  // NOLINT(readability-identifier-naming)
+  cudaStream_t stream;     // NOLINT(readability-identifier-naming)
 
-  PrefilteredBruteForceInputs<index_t> params;
+  PrefilteredBruteForceInputs<IndexT> params;  // NOLINT(readability-identifier-naming)
 
-  index_t nnz;
+  IndexT nnz;  // NOLINT(readability-identifier-naming)
 
-  rmm::device_uvector<value_t> dataset_d;
-  rmm::device_uvector<value_t> queries_d;
-  rmm::device_uvector<bitmap_t> filter_d;
+  rmm::device_uvector<value_t> dataset_d;  // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<value_t> queries_d;  // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<bitmap_t> filter_d;  // NOLINT(readability-identifier-naming)
 
-  rmm::device_uvector<dist_t> out_val_d;
-  rmm::device_uvector<dist_t> out_val_expected_d;
+  rmm::device_uvector<dist_t> out_val_d;           // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<dist_t> out_val_expected_d;  // NOLINT(readability-identifier-naming)
 
-  rmm::device_uvector<index_t> out_idx_d;
-  rmm::device_uvector<index_t> out_idx_expected_d;
+  rmm::device_uvector<IndexT> out_idx_d;           // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<IndexT> out_idx_expected_d;  // NOLINT(readability-identifier-naming)
 };
 
-template <typename value_t, typename dist_t, typename index_t, typename bitset_t = uint32_t>
-class PrefilteredBruteForceOnBitsetTest
-  : public ::testing::TestWithParam<PrefilteredBruteForceInputs<index_t>> {
+template <typename value_t,
+          typename dist_t,
+          typename IndexT,
+          typename bitset_t = uint32_t>  // NOLINT(readability-identifier-naming)
+class PrefilteredBruteForceOnBitsetTest  // NOLINT(readability-identifier-naming)
+  : public ::testing::TestWithParam<PrefilteredBruteForceInputs<IndexT>> {
  public:
-  PrefilteredBruteForceOnBitsetTest()
+  PrefilteredBruteForceOnBitsetTest()  // NOLINT(modernize-use-equals-default)
     : stream(raft::resource::get_cuda_stream(handle)),
-      params(::testing::TestWithParam<PrefilteredBruteForceInputs<index_t>>::GetParam()),
+      params(::testing::TestWithParam<PrefilteredBruteForceInputs<IndexT>>::GetParam()),
       filter_d(0, stream),
       dataset_d(0, stream),
       queries_d(0, stream),
@@ -585,18 +597,18 @@ class PrefilteredBruteForceOnBitsetTest
     }
   }
 
-  index_t create_sparse_matrix_with_rmat(index_t m,
-                                         index_t n,
-                                         float sparsity,
-                                         rmm::device_uvector<bitset_t>& filter_d)
+  auto create_sparse_matrix_with_rmat(IndexT m,
+                                      IndexT n,
+                                      float sparsity,
+                                      rmm::device_uvector<bitset_t>& filter_d) -> IndexT
   {
-    index_t r_scale   = (index_t)std::log2(m);
-    index_t c_scale   = (index_t)std::log2(n);
-    index_t n_edges   = (index_t)(m * n * 1.0f * sparsity);
-    index_t max_scale = std::max(r_scale, c_scale);
+    auto r_scale     = static_cast<IndexT>(std::log2(m));
+    auto c_scale     = static_cast<IndexT>(std::log2(n));
+    auto n_edges     = static_cast<IndexT>(m * n * 1.0f * sparsity);
+    IndexT max_scale = std::max(r_scale, c_scale);
 
-    rmm::device_uvector<index_t> out_src{(unsigned long)n_edges, stream};
-    rmm::device_uvector<index_t> out_dst{(unsigned long)n_edges, stream};
+    rmm::device_uvector<IndexT> out_src{static_cast<unsigned long>(n_edges), stream};
+    rmm::device_uvector<IndexT> out_dst{static_cast<unsigned long>(n_edges), stream};
     rmm::device_uvector<float> theta{(unsigned long)(4 * max_scale), stream};
 
     raft::random::RngState state{2024ULL, raft::random::GeneratorType::GenPC};
@@ -604,7 +616,7 @@ class PrefilteredBruteForceOnBitsetTest
     raft::random::uniform<float>(handle, state, theta.data(), theta.size(), 0.0f, 1.0f);
     normalize<float, float>(
       theta.data(), theta.data(), max_scale, r_scale, c_scale, r_scale != c_scale, true, stream);
-    raft::random::rmat_rectangular_gen((index_t*)nullptr,
+    raft::random::rmat_rectangular_gen(static_cast<IndexT*>(nullptr),
                                        out_src.data(),
                                        out_dst.data(),
                                        theta.data(),
@@ -614,17 +626,17 @@ class PrefilteredBruteForceOnBitsetTest
                                        stream,
                                        state);
 
-    index_t nnz_h = 0;
+    IndexT nnz_h = 0;
     {
       auto src    = out_src.data();
       auto dst    = out_dst.data();
       auto bitset = filter_d.data();
-      rmm::device_scalar<index_t> nnz(0, stream);
-      auto nnz_view = raft::make_device_scalar_view<index_t>(nnz.data());
+      rmm::device_scalar<IndexT> nnz(0, stream);
+      auto nnz_view = raft::make_device_scalar_view<IndexT>(nnz.data());
       auto filter_view =
-        raft::make_device_vector_view<const uint32_t, index_t>(filter_d.data(), filter_d.size());
-      index_t size_h = m * n;
-      auto size_view = raft::make_host_scalar_view<const index_t, index_t>(&size_h);
+        raft::make_device_vector_view<const uint32_t, IndexT>(filter_d.data(), filter_d.size());
+      IndexT size_h  = m * n;
+      auto size_view = raft::make_host_scalar_view<const IndexT, IndexT>(&size_h);
 
       set_bitmap(src, dst, bitset, n_edges, n, stream);
 
@@ -638,46 +650,46 @@ class PrefilteredBruteForceOnBitsetTest
   }
 
   void cpu_convert_to_csr(std::vector<bitset_t>& bitset,
-                          index_t rows,
-                          index_t cols,
-                          std::vector<index_t>& indices,
-                          std::vector<index_t>& indptr)
+                          IndexT rows,
+                          IndexT cols,
+                          std::vector<IndexT>& indices,
+                          std::vector<IndexT>& indptr)
   {
-    index_t offset_indptr   = 0;
-    index_t offset_values   = 0;
+    IndexT offset_indptr    = 0;
+    IndexT offset_values    = 0;
     indptr[offset_indptr++] = 0;
 
-    index_t index        = 0;
-    bitset_t element     = 0;
-    index_t bit_position = 0;
+    IndexT index        = 0;
+    bitset_t element    = 0;
+    IndexT bit_position = 0;
 
-    for (index_t i = 0; i < rows; ++i) {
-      for (index_t j = 0; j < cols; ++j) {
+    for (IndexT i = 0; i < rows; ++i) {
+      for (IndexT j = 0; j < cols; ++j) {
         index        = i * cols + j;
         element      = bitset[index / (8 * sizeof(bitset_t))];
         bit_position = index % (8 * sizeof(bitset_t));
 
         if (((element >> bit_position) & 1)) {
-          indices[offset_values] = static_cast<index_t>(j);
+          indices[offset_values] = static_cast<IndexT>(j);
           offset_values++;
         }
       }
-      indptr[offset_indptr++] = static_cast<index_t>(offset_values);
+      indptr[offset_indptr++] = static_cast<IndexT>(offset_values);
     }
   }
 
   void cpu_sddmm(const std::vector<dist_t>& A,
                  const std::vector<dist_t>& B,
                  std::vector<dist_t>& vals,
-                 const std::vector<index_t>& cols,
-                 const std::vector<index_t>& row_ptrs,
+                 const std::vector<IndexT>& cols,
+                 const std::vector<IndexT>& row_ptrs,
                  bool is_row_major_A,
                  bool is_row_major_B,
                  dist_t alpha = 1.0,
                  dist_t beta  = 0.0)
   {
-    if (params.n_queries * params.dim != static_cast<index_t>(A.size()) ||
-        params.dim * params.n_dataset != static_cast<index_t>(B.size())) {
+    if (params.n_queries * params.dim != static_cast<IndexT>(A.size()) ||
+        params.dim * params.n_dataset != static_cast<IndexT>(B.size())) {
       std::cerr << "Matrix dimensions and vector size do not match!" << std::endl;
       return;
     }
@@ -685,17 +697,17 @@ class PrefilteredBruteForceOnBitsetTest
     bool trans_a = is_row_major_A;
     bool trans_b = is_row_major_B;
 
-    for (index_t i = 0; i < params.n_queries; ++i) {
-      for (index_t j = row_ptrs[i]; j < row_ptrs[i + 1]; ++j) {
+    for (IndexT i = 0; i < params.n_queries; ++i) {
+      for (IndexT j = row_ptrs[i]; j < row_ptrs[i + 1]; ++j) {
         dist_t sum     = 0;
-        dist_t norms_A = 0;
-        dist_t norms_B = 0;
+        dist_t norms_A = 0;  // NOLINT(readability-identifier-naming)
+        dist_t norms_B = 0;  // NOLINT(readability-identifier-naming)
 
-        for (index_t l = 0; l < params.dim; ++l) {
-          index_t a_index = trans_a ? i * params.dim + l : l * params.n_queries + i;
-          index_t b_index = trans_b ? l * params.n_dataset + cols[j] : cols[j] * params.dim + l;
-          dist_t A_v;
-          dist_t B_v;
+        for (IndexT l = 0; l < params.dim; ++l) {
+          IndexT a_index = trans_a ? i * params.dim + l : l * params.n_queries + i;
+          IndexT b_index = trans_b ? l * params.n_dataset + cols[j] : cols[j] * params.dim + l;
+          dist_t A_v;  // NOLINT(readability-identifier-naming)
+          dist_t B_v;  // NOLINT(readability-identifier-naming)
           if constexpr (sizeof(value_t) == 2) {
             A_v = __half2float(__float2half(A[a_index]));
             B_v = __half2float(__float2half(B[b_index]));
@@ -721,49 +733,49 @@ class PrefilteredBruteForceOnBitsetTest
     }
   }
 
-  void cpu_select_k(const std::vector<index_t>& indptr_h,
-                    const std::vector<index_t>& indices_h,
+  void cpu_select_k(const std::vector<IndexT>& indptr_h,
+                    const std::vector<IndexT>& indices_h,
                     const std::vector<dist_t>& values_h,
-                    std::optional<std::vector<index_t>>& in_idx_h,
-                    index_t n_queries,
-                    index_t n_dataset,
-                    index_t top_k,
+                    std::optional<std::vector<IndexT>>& in_idx_h,
+                    IndexT n_queries,
+                    IndexT n_dataset,
+                    IndexT top_k,
                     std::vector<dist_t>& out_values_h,
-                    std::vector<index_t>& out_indices_h,
+                    std::vector<IndexT>& out_indices_h,
                     bool select_min = true)
   {
-    auto comp = [select_min](const std::pair<dist_t, index_t>& a,
-                             const std::pair<dist_t, index_t>& b) {
+    auto comp = [select_min](const std::pair<dist_t, IndexT>& a,
+                             const std::pair<dist_t, IndexT>& b) -> auto {
       return select_min ? a.first < b.first : a.first >= b.first;
     };
 
-    for (index_t row = 0; row < n_queries; ++row) {
-      std::priority_queue<std::pair<dist_t, index_t>,
-                          std::vector<std::pair<dist_t, index_t>>,
+    for (IndexT row = 0; row < n_queries; ++row) {
+      std::priority_queue<std::pair<dist_t, IndexT>,
+                          std::vector<std::pair<dist_t, IndexT>>,
                           decltype(comp)>
         pq(comp);
-      for (index_t idx = indptr_h[row]; idx < indptr_h[row + 1]; ++idx) {
+      for (IndexT idx = indptr_h[row]; idx < indptr_h[row + 1]; ++idx) {
         pq.push({values_h[idx], (in_idx_h.has_value()) ? (*in_idx_h)[idx] : indices_h[idx]});
         if (pq.size() > size_t(top_k)) { pq.pop(); }
       }
 
-      std::vector<std::pair<dist_t, index_t>> row_pairs;
+      std::vector<std::pair<dist_t, IndexT>> row_pairs;
       while (!pq.empty()) {
         row_pairs.push_back(pq.top());
         pq.pop();
       }
 
       if (select_min) {
-        std::sort(row_pairs.begin(), row_pairs.end(), [](const auto& a, const auto& b) {
+        std::sort(row_pairs.begin(), row_pairs.end(), [](const auto& a, const auto& b) -> auto {
           return a.first <= b.first;
         });
       } else {
-        std::sort(row_pairs.begin(), row_pairs.end(), [](const auto& a, const auto& b) {
+        std::sort(row_pairs.begin(), row_pairs.end(), [](const auto& a, const auto& b) -> auto {
           return a.first >= b.first;
         });
       }
-      for (index_t col = 0; col < top_k; col++) {
-        if (col < index_t(row_pairs.size())) {
+      for (IndexT col = 0; col < top_k; col++) {
+        if (col < IndexT(row_pairs.size())) {
           out_values_h[row * top_k + col]  = row_pairs[col].first;
           out_indices_h[row * top_k + col] = row_pairs[col].second;
         }
@@ -771,12 +783,12 @@ class PrefilteredBruteForceOnBitsetTest
     }
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     if (std::is_same_v<value_t, half> && !isCuSparseVersionGreaterThan_12_0_1()) {
       GTEST_SKIP() << "Skipping all tests for half-float as cuSparse doesn't support it.";
     }
-    index_t element = raft::ceildiv(1 * params.n_dataset, index_t(sizeof(bitset_t) * 8));
+    IndexT element = raft::ceildiv(1 * params.n_dataset, IndexT(sizeof(bitset_t) * 8));
     std::vector<bitset_t> filter_h(element);
     std::vector<bitset_t> filter_repeat_h(element * params.n_queries);
 
@@ -790,8 +802,8 @@ class PrefilteredBruteForceOnBitsetTest
       filter_h, size_t(params.n_dataset), size_t(params.n_queries), filter_repeat_h);
     nnz *= params.n_queries;
 
-    index_t dataset_size = params.n_dataset * params.dim;
-    index_t queries_size = params.n_queries * params.dim;
+    IndexT dataset_size = params.n_dataset * params.dim;
+    IndexT queries_size = params.n_queries * params.dim;
 
     std::vector<dist_t> dataset_h(dataset_size);
     std::vector<dist_t> queries_h(queries_size);
@@ -800,26 +812,11 @@ class PrefilteredBruteForceOnBitsetTest
     queries_d.resize(queries_size, stream);
 
     auto blobs_in_val =
-      raft::make_device_matrix<dist_t, index_t>(handle, 1, dataset_size + queries_size);
-    auto labels = raft::make_device_vector<index_t, index_t>(handle, 1);
+      raft::make_device_matrix<dist_t, IndexT>(handle, 1, dataset_size + queries_size);
+    auto labels = raft::make_device_vector<IndexT, IndexT>(handle, 1);
 
     if constexpr (!std::is_same_v<value_t, half>) {
-      raft::random::make_blobs<value_t, index_t>(blobs_in_val.data_handle(),
-                                                 labels.data_handle(),
-                                                 1,
-                                                 dataset_size + queries_size,
-                                                 1,
-                                                 stream,
-                                                 false,
-                                                 nullptr,
-                                                 nullptr,
-                                                 value_t(1.0),
-                                                 false,
-                                                 value_t(-1.0f),
-                                                 value_t(1.0f),
-                                                 uint64_t(2024));
-    } else {
-      raft::random::make_blobs<dist_t, index_t>(blobs_in_val.data_handle(),
+      raft::random::make_blobs<value_t, IndexT>(blobs_in_val.data_handle(),
                                                 labels.data_handle(),
                                                 1,
                                                 dataset_size + queries_size,
@@ -828,11 +825,26 @@ class PrefilteredBruteForceOnBitsetTest
                                                 false,
                                                 nullptr,
                                                 nullptr,
-                                                dist_t(1.0),
+                                                value_t(1.0),
                                                 false,
-                                                dist_t(-1.0f),
-                                                dist_t(1.0f),
-                                                uint64_t(2024));
+                                                value_t(-1.0f),
+                                                value_t(1.0f),
+                                                static_cast<uint64_t>(2024));
+    } else {
+      raft::random::make_blobs<dist_t, IndexT>(blobs_in_val.data_handle(),
+                                               labels.data_handle(),
+                                               1,
+                                               dataset_size + queries_size,
+                                               1,
+                                               stream,
+                                               false,
+                                               nullptr,
+                                               nullptr,
+                                               dist_t(1.0),
+                                               false,
+                                               dist_t(-1.0f),
+                                               dist_t(1.0f),
+                                               static_cast<uint64_t>(2024));
     }
 
     raft::copy(dataset_h.data(), blobs_in_val.data_handle(), dataset_size, stream);
@@ -858,8 +870,8 @@ class PrefilteredBruteForceOnBitsetTest
     raft::resource::sync_stream(handle);
 
     std::vector<dist_t> values_h(nnz);
-    std::vector<index_t> indices_h(nnz);
-    std::vector<index_t> indptr_h(params.n_queries + 1);
+    std::vector<IndexT> indices_h(nnz);
+    std::vector<IndexT> indptr_h(params.n_queries + 1);
 
     cpu_convert_to_csr(filter_repeat_h, params.n_queries, params.n_dataset, indices_h, indptr_h);
 
@@ -870,7 +882,7 @@ class PrefilteredBruteForceOnBitsetTest
     std::vector<dist_t> out_val_h(
       params.n_queries * params.top_k,
       select_min ? std::numeric_limits<dist_t>::infinity() : std::numeric_limits<dist_t>::lowest());
-    std::vector<index_t> out_idx_h(params.n_queries * params.top_k, static_cast<index_t>(0));
+    std::vector<IndexT> out_idx_h(params.n_queries * params.top_k, static_cast<IndexT>(0));
 
     out_val_d.resize(params.n_queries * params.top_k, stream);
     out_idx_d.resize(params.n_queries * params.top_k, stream);
@@ -880,7 +892,7 @@ class PrefilteredBruteForceOnBitsetTest
 
     raft::resource::sync_stream(handle);
 
-    std::optional<std::vector<index_t>> optional_indices_h = std::nullopt;
+    std::optional<std::vector<IndexT>> optional_indices_h = std::nullopt;
     cpu_select_k(indptr_h,
                  indices_h,
                  values_h,
@@ -900,22 +912,24 @@ class PrefilteredBruteForceOnBitsetTest
     raft::resource::sync_stream(handle);
   }
 
-  void Run()
+  void Run()  // NOLINT(readability-identifier-naming)
   {
-    auto dataset_raw = raft::make_device_matrix_view<const value_t, index_t, raft::row_major>(
-      (const value_t*)dataset_d.data(), params.n_dataset, params.dim);
+    auto dataset_raw = raft::make_device_matrix_view<const value_t, IndexT, raft::row_major>(
+      static_cast<const value_t*>(dataset_d.data()), params.n_dataset, params.dim);
 
-    auto queries = raft::make_device_matrix_view<const value_t, index_t, raft::row_major>(
-      (const value_t*)queries_d.data(), params.n_queries, params.dim);
+    auto queries = raft::make_device_matrix_view<const value_t, IndexT, raft::row_major>(
+      static_cast<const value_t*>(queries_d.data()), params.n_queries, params.dim);
 
     auto dataset = brute_force::build(handle, dataset_raw, params.metric);
 
     auto filter =
-      cuvs::core::bitset_view<bitset_t, index_t>((bitset_t*)filter_d.data(), params.n_dataset);
+      cuvs::core::bitset_view<bitset_t, IndexT>(  // NOLINT(readability-identifier-naming)
+        (bitset_t*)filter_d.data(),
+        params.n_dataset);
 
-    auto out_val = raft::make_device_matrix_view<dist_t, index_t, raft::row_major>(
+    auto out_val = raft::make_device_matrix_view<dist_t, IndexT, raft::row_major>(
       out_val_d.data(), params.n_queries, params.top_k);
-    auto out_idx = raft::make_device_matrix_view<index_t, index_t, raft::row_major>(
+    auto out_idx = raft::make_device_matrix_view<IndexT, IndexT, raft::row_major>(
       out_idx_d.data(), params.n_queries, params.top_k);
 
     brute_force::search(handle,
@@ -942,103 +956,120 @@ class PrefilteredBruteForceOnBitsetTest
   }
 
  protected:
-  raft::resources handle;
-  cudaStream_t stream;
+  raft::resources handle;  // NOLINT(readability-identifier-naming)
+  cudaStream_t stream;     // NOLINT(readability-identifier-naming)
 
-  PrefilteredBruteForceInputs<index_t> params;
+  PrefilteredBruteForceInputs<IndexT> params;  // NOLINT(readability-identifier-naming)
 
-  index_t nnz;
+  IndexT nnz;  // NOLINT(readability-identifier-naming)
 
-  rmm::device_uvector<value_t> dataset_d;
-  rmm::device_uvector<value_t> queries_d;
-  rmm::device_uvector<bitset_t> filter_d;
+  rmm::device_uvector<value_t> dataset_d;  // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<value_t> queries_d;  // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<bitset_t> filter_d;  // NOLINT(readability-identifier-naming)
 
-  rmm::device_uvector<dist_t> out_val_d;
-  rmm::device_uvector<dist_t> out_val_expected_d;
+  rmm::device_uvector<dist_t> out_val_d;           // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<dist_t> out_val_expected_d;  // NOLINT(readability-identifier-naming)
 
-  rmm::device_uvector<index_t> out_idx_d;
-  rmm::device_uvector<index_t> out_idx_expected_d;
+  rmm::device_uvector<IndexT> out_idx_d;           // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<IndexT> out_idx_expected_d;  // NOLINT(readability-identifier-naming)
 };
 
 using PrefilteredBruteForceTestOnBitmap_float_int64 =
   PrefilteredBruteForceOnBitmapTest<float, float, int64_t>;
-TEST_P(PrefilteredBruteForceTestOnBitmap_float_int64, Result) { Run(); }
+TEST_P(PrefilteredBruteForceTestOnBitmap_float_int64,
+       Result)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  Run();
+}  // NOLINT(readability-identifier-naming)
 
 using PrefilteredBruteForceTestOnBitmap_half_int64 =
   PrefilteredBruteForceOnBitmapTest<half, float, int64_t>;
-TEST_P(PrefilteredBruteForceTestOnBitmap_half_int64, Result) { Run(); }
+TEST_P(PrefilteredBruteForceTestOnBitmap_half_int64,
+       Result)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  Run();
+}  // NOLINT(readability-identifier-naming)
 
 using PrefilteredBruteForceTestOnBitset_float_int64 =
   PrefilteredBruteForceOnBitsetTest<float, float, int64_t>;
-TEST_P(PrefilteredBruteForceTestOnBitset_float_int64, Result) { Run(); }
+TEST_P(PrefilteredBruteForceTestOnBitset_float_int64,
+       Result)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  Run();
+}  // NOLINT(readability-identifier-naming)
 
 using PrefilteredBruteForceTestOnBitset_half_int64 =
   PrefilteredBruteForceOnBitsetTest<half, float, int64_t>;
-TEST_P(PrefilteredBruteForceTestOnBitset_half_int64, Result) { Run(); }
+TEST_P(PrefilteredBruteForceTestOnBitset_half_int64,
+       Result)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  Run();
+}  // NOLINT(readability-identifier-naming)
 
-template <typename index_t>
-const std::vector<PrefilteredBruteForceInputs<index_t>> selectk_inputs = {
-  {8, 131072, 255, 255, 0.01, cuvs::distance::DistanceType::L2Expanded},
-  {8, 131072, 255, 255, 0.01, cuvs::distance::DistanceType::InnerProduct},
-  {8, 131072, 255, 255, 0.01, cuvs::distance::DistanceType::L2SqrtExpanded},
-  {8, 131072, 255, 255, 0.01, cuvs::distance::DistanceType::CosineExpanded},
-  {2, 131072, 255, 255, 0.4, cuvs::distance::DistanceType::L2Expanded},
+template <typename IndexT>  // NOLINT(readability-identifier-naming)
+const std::vector<PrefilteredBruteForceInputs<IndexT>> kSelectkInputs =
+  {  // NOLINT(modernize-use-using)
+    {8, 131072, 255, 255, 0.01, cuvs::distance::DistanceType::L2Expanded},
+    {8, 131072, 255, 255, 0.01, cuvs::distance::DistanceType::InnerProduct},
+    {8, 131072, 255, 255, 0.01, cuvs::distance::DistanceType::L2SqrtExpanded},
+    {8, 131072, 255, 255, 0.01, cuvs::distance::DistanceType::CosineExpanded},
+    {2, 131072, 255, 255, 0.4, cuvs::distance::DistanceType::L2Expanded},
 
-  {8, 131072, 512, 16, 0.5, cuvs::distance::DistanceType::L2Expanded},
-  {16, 131072, 2052, 16, 0.2, cuvs::distance::DistanceType::L2Expanded},
-  {2, 8192, 255, 16, 0.01, cuvs::distance::DistanceType::InnerProduct},
-  {2, 8192, 255, 16, 0.4, cuvs::distance::DistanceType::InnerProduct},
-  {16, 8192, 512, 16, 0.5, cuvs::distance::DistanceType::InnerProduct},
+    {8, 131072, 512, 16, 0.5, cuvs::distance::DistanceType::L2Expanded},
+    {16, 131072, 2052, 16, 0.2, cuvs::distance::DistanceType::L2Expanded},
+    {2, 8192, 255, 16, 0.01, cuvs::distance::DistanceType::InnerProduct},
+    {2, 8192, 255, 16, 0.4, cuvs::distance::DistanceType::InnerProduct},
+    {16, 8192, 512, 16, 0.5, cuvs::distance::DistanceType::InnerProduct},
 
-  {128, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::InnerProduct},
-  {1024, 8192, 1, 0, 0.1, cuvs::distance::DistanceType::L2Expanded},
-  {1024, 8192, 3, 0, 0.1, cuvs::distance::DistanceType::InnerProduct},
-  {1024, 8192, 5, 0, 0.1, cuvs::distance::DistanceType::L2SqrtExpanded},
-  {1024, 8192, 8, 0, 0.1, cuvs::distance::DistanceType::CosineExpanded},
+    {128, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::InnerProduct},
+    {1024, 8192, 1, 0, 0.1, cuvs::distance::DistanceType::L2Expanded},
+    {1024, 8192, 3, 0, 0.1, cuvs::distance::DistanceType::InnerProduct},
+    {1024, 8192, 5, 0, 0.1, cuvs::distance::DistanceType::L2SqrtExpanded},
+    {1024, 8192, 8, 0, 0.1, cuvs::distance::DistanceType::CosineExpanded},
 
-  {1024, 8192, 1, 1, 0.1, cuvs::distance::DistanceType::L2Expanded},
-  {1024, 8192, 3, 1, 0.1, cuvs::distance::DistanceType::InnerProduct},
-  {1024, 8192, 5, 1, 0.1, cuvs::distance::DistanceType::L2SqrtExpanded},
-  {1024, 8192, 8, 1, 0.1, cuvs::distance::DistanceType::CosineExpanded},
-  {1024, 8192, 2050, 16, 0.4, cuvs::distance::DistanceType::L2Expanded},
+    {1024, 8192, 1, 1, 0.1, cuvs::distance::DistanceType::L2Expanded},
+    {1024, 8192, 3, 1, 0.1, cuvs::distance::DistanceType::InnerProduct},
+    {1024, 8192, 5, 1, 0.1, cuvs::distance::DistanceType::L2SqrtExpanded},
+    {1024, 8192, 8, 1, 0.1, cuvs::distance::DistanceType::CosineExpanded},
+    {1024, 8192, 2050, 16, 0.4, cuvs::distance::DistanceType::L2Expanded},
 
-  {1024, 8192, 2051, 16, 0.5, cuvs::distance::DistanceType::L2Expanded},
-  {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::L2Expanded},
-  {1024, 8192, 2050, 16, 0.4, cuvs::distance::DistanceType::InnerProduct},
-  {1024, 8192, 2051, 16, 0.5, cuvs::distance::DistanceType::InnerProduct},
-  {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::InnerProduct},
+    {1024, 8192, 2051, 16, 0.5, cuvs::distance::DistanceType::L2Expanded},
+    {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::L2Expanded},
+    {1024, 8192, 2050, 16, 0.4, cuvs::distance::DistanceType::InnerProduct},
+    {1024, 8192, 2051, 16, 0.5, cuvs::distance::DistanceType::InnerProduct},
+    {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::InnerProduct},
 
-  {1024, 8192, 2050, 16, 0.4, cuvs::distance::DistanceType::L2SqrtExpanded},
-  {1024, 8192, 2051, 16, 0.5, cuvs::distance::DistanceType::L2SqrtExpanded},
-  {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::L2SqrtExpanded},
-  {1024, 8192, 2050, 16, 0.4, cuvs::distance::DistanceType::CosineExpanded},
-  {1024, 8192, 2051, 16, 0.5, cuvs::distance::DistanceType::CosineExpanded},
+    {1024, 8192, 2050, 16, 0.4, cuvs::distance::DistanceType::L2SqrtExpanded},
+    {1024, 8192, 2051, 16, 0.5, cuvs::distance::DistanceType::L2SqrtExpanded},
+    {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::L2SqrtExpanded},
+    {1024, 8192, 2050, 16, 0.4, cuvs::distance::DistanceType::CosineExpanded},
+    {1024, 8192, 2051, 16, 0.5, cuvs::distance::DistanceType::CosineExpanded},
 
-  {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::CosineExpanded},
-  {1024, 8192, 1, 16, 0.5, cuvs::distance::DistanceType::L2Expanded},
-  {1024, 8192, 2, 16, 0.2, cuvs::distance::DistanceType::L2Expanded},
+    {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::CosineExpanded},
+    {1024, 8192, 1, 16, 0.5, cuvs::distance::DistanceType::L2Expanded},
+    {1024, 8192, 2, 16, 0.2, cuvs::distance::DistanceType::L2Expanded},
 
-  {1024, 8192, 3, 16, 0.4, cuvs::distance::DistanceType::InnerProduct},
-  {1024, 8192, 4, 16, 0.5, cuvs::distance::DistanceType::InnerProduct},
-  {1024, 8192, 5, 16, 0.2, cuvs::distance::DistanceType::L2SqrtExpanded},
-  {1024, 8192, 8, 16, 0.4, cuvs::distance::DistanceType::L2SqrtExpanded},
-  {1024, 8192, 5, 16, 0.5, cuvs::distance::DistanceType::CosineExpanded},
-  {1024, 8192, 8, 16, 0.2, cuvs::distance::DistanceType::CosineExpanded}};
+    {1024, 8192, 3, 16, 0.4, cuvs::distance::DistanceType::InnerProduct},
+    {1024, 8192, 4, 16, 0.5, cuvs::distance::DistanceType::InnerProduct},
+    {1024, 8192, 5, 16, 0.2, cuvs::distance::DistanceType::L2SqrtExpanded},
+    {1024, 8192, 8, 16, 0.4, cuvs::distance::DistanceType::L2SqrtExpanded},
+    {1024, 8192, 5, 16, 0.5, cuvs::distance::DistanceType::CosineExpanded},
+    {1024, 8192, 8, 16, 0.2, cuvs::distance::DistanceType::CosineExpanded}};
 
-INSTANTIATE_TEST_CASE_P(PrefilteredBruteForceOnBitmapTest,
+INSTANTIATE_TEST_CASE_P(PrefilteredBruteForceOnBitmapTest,  // NOLINT(readability-identifier-naming)
                         PrefilteredBruteForceTestOnBitmap_float_int64,
-                        ::testing::ValuesIn(selectk_inputs<int64_t>));
+                        ::testing::ValuesIn(kSelectkInputs<int64_t>));
 
-INSTANTIATE_TEST_CASE_P(PrefilteredBruteForceOnBitmapTest,
+INSTANTIATE_TEST_CASE_P(PrefilteredBruteForceOnBitmapTest,  // NOLINT(readability-identifier-naming)
                         PrefilteredBruteForceTestOnBitmap_half_int64,
-                        ::testing::ValuesIn(selectk_inputs<int64_t>));
+                        ::testing::ValuesIn(kSelectkInputs<int64_t>));
 
-INSTANTIATE_TEST_CASE_P(PrefilteredBruteForceOnBitsetTest,
+INSTANTIATE_TEST_CASE_P(PrefilteredBruteForceOnBitsetTest,  // NOLINT(readability-identifier-naming)
                         PrefilteredBruteForceTestOnBitset_float_int64,
-                        ::testing::ValuesIn(selectk_inputs<int64_t>));
+                        ::testing::ValuesIn(kSelectkInputs<int64_t>));
 
-INSTANTIATE_TEST_CASE_P(PrefilteredBruteForceOnBitsetTest,
+INSTANTIATE_TEST_CASE_P(PrefilteredBruteForceOnBitsetTest,  // NOLINT(readability-identifier-naming)
                         PrefilteredBruteForceTestOnBitset_half_int64,
-                        ::testing::ValuesIn(selectk_inputs<int64_t>));
+                        ::testing::ValuesIn(kSelectkInputs<int64_t>));
 
 }  // namespace cuvs::neighbors::brute_force

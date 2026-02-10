@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -52,7 +52,7 @@ struct correlation_distance_op {
   // Size of shared memory. This is normally decided by the kernel policy, but
   // some ops such as correlation_distance_op use more.
   template <typename Policy>
-  static constexpr size_t shared_mem_size()
+  static constexpr auto shared_mem_size() -> size_t
   {
     return Policy::SmemSize + (2 * (Policy::Mblk + Policy::Nblk) * sizeof(AccT));
   }
@@ -76,7 +76,8 @@ struct correlation_distance_op {
 
     AccT regx2n[Policy::AccRowsPerTh], regy2n[Policy::AccColsPerTh];
 
-    AccT* sx2Norm = (AccT*)(&smem[Policy::SmemSize + (Policy::Mblk + Policy::Nblk) * sizeof(AccT)]);
+    AccT* sx2Norm = reinterpret_cast<AccT*>(
+      &smem[Policy::SmemSize + (Policy::Mblk + Policy::Nblk) * sizeof(AccT)]);
     AccT* sy2Norm = (&sx2Norm[Policy::Mblk]);
 
     // Load x & y norms required by this threadblock in shmem buffer

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,7 +8,7 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 
-namespace cuvs {
+namespace cuvs {  // NOLINT(modernize-concat-nested-namespaces)
 namespace stats {
 /**
  * @defgroup stats_trustworthiness Trustworthiness
@@ -27,13 +27,13 @@ namespace stats {
  * @note The constness of the data in X_embedded is currently casted away and the data is slightly
  * modified.
  */
-double trustworthiness_score(
+auto trustworthiness_score(
   raft::resources const& handle,
   raft::device_matrix_view<const float, int64_t, raft::row_major> X,
   raft::device_matrix_view<const float, int64_t, raft::row_major> X_embedded,
   int n_neighbors,
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2SqrtUnexpanded,
-  int batch_size                      = 512);
+  int batch_size                      = 512) -> double;
 
 /** @} */  // end group stats_trustworthiness
 }  // namespace stats

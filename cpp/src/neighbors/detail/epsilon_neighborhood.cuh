@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,7 +17,7 @@ template <typename DataT,
           typename BaseClass = raft::linalg::Contractions_NT<DataT, IdxT, Policy>>
 struct EpsUnexpL2SqNeighborhood : public BaseClass {
  private:
-  typedef Policy P;
+  using P = Policy;
 
   bool* adj;
   DataT eps;
@@ -149,16 +149,25 @@ struct EpsUnexpL2SqNeighborhood : public BaseClass {
   DI void atomicUpdate(IdxT addrId, IdxT val)
   {
     if (sizeof(IdxT) == 4) {
-      raft::myAtomicAdd<unsigned>((unsigned*)(vd + addrId), val);
+      raft::myAtomicAdd<unsigned>(reinterpret_cast<unsigned*>((vd + addrId)), val);
     } else if (sizeof(IdxT) == 8) {
-      raft::myAtomicAdd<unsigned long long>((unsigned long long*)(vd + addrId), val);
+      raft::myAtomicAdd<unsigned long long>(reinterpret_cast<unsigned long long*>((vd + addrId)),
+                                            val);
     }
   }
 };  // struct EpsUnexpL2SqNeighborhood
 
 template <typename DataT, typename IdxT, typename Policy>
-__launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL epsUnexpL2SqNeighKernel(
-  bool* adj, IdxT* vd, const DataT* x, const DataT* y, IdxT m, IdxT n, IdxT k, DataT eps)
+__launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL
+  epsUnexpL2SqNeighKernel(  // NOLINT(readability-identifier-naming)
+    bool* adj,
+    IdxT* vd,
+    const DataT* x,
+    const DataT* y,
+    IdxT m,
+    IdxT n,
+    IdxT k,
+    DataT eps)
 {
   extern __shared__ char smem[];
   EpsUnexpL2SqNeighborhood<DataT, IdxT, Policy> obj(adj, vd, x, y, m, n, k, eps, smem);
@@ -176,7 +185,7 @@ void epsUnexpL2SqNeighImpl(bool* adj,
                            DataT eps,
                            cudaStream_t stream)
 {
-  typedef typename raft::linalg::Policy4x4<DataT, VecLen>::Policy Policy;
+  using Policy = typename raft::linalg::Policy4x4<DataT, VecLen>::Policy;
   dim3 grid(raft::ceildiv<int>(m, Policy::Mblk), raft::ceildiv<int>(n, Policy::Nblk));
   dim3 blk(Policy::Nthreads);
   epsUnexpL2SqNeighKernel<DataT, IdxT, Policy>

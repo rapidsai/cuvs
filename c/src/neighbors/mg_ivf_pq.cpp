@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,8 +17,8 @@
 
 #include <fstream>
 
-extern "C" cuvsError_t cuvsMultiGpuIvfPqIndexParamsCreate(
-  cuvsMultiGpuIvfPqIndexParams_t* index_params)
+extern "C" auto cuvsMultiGpuIvfPqIndexParamsCreate(
+  cuvsMultiGpuIvfPqIndexParams_t* index_params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     // Create base IVF-PQ parameters
@@ -33,8 +33,8 @@ extern "C" cuvsError_t cuvsMultiGpuIvfPqIndexParamsCreate(
   });
 }
 
-extern "C" cuvsError_t cuvsMultiGpuIvfPqIndexParamsDestroy(
-  cuvsMultiGpuIvfPqIndexParams_t index_params)
+extern "C" auto cuvsMultiGpuIvfPqIndexParamsDestroy(
+  cuvsMultiGpuIvfPqIndexParams_t index_params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (index_params) {
@@ -44,7 +44,7 @@ extern "C" cuvsError_t cuvsMultiGpuIvfPqIndexParamsDestroy(
   });
 }
 
-extern "C" cuvsError_t cuvsMultiGpuIvfPqSearchParamsCreate(cuvsMultiGpuIvfPqSearchParams_t* params)
+extern "C" auto cuvsMultiGpuIvfPqSearchParamsCreate(cuvsMultiGpuIvfPqSearchParams_t* params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     // Create base IVF-PQ search parameters
@@ -61,7 +61,7 @@ extern "C" cuvsError_t cuvsMultiGpuIvfPqSearchParamsCreate(cuvsMultiGpuIvfPqSear
   });
 }
 
-extern "C" cuvsError_t cuvsMultiGpuIvfPqSearchParamsDestroy(cuvsMultiGpuIvfPqSearchParams_t params)
+extern "C" auto cuvsMultiGpuIvfPqSearchParamsDestroy(cuvsMultiGpuIvfPqSearchParams_t params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (params) {
@@ -71,12 +71,12 @@ extern "C" cuvsError_t cuvsMultiGpuIvfPqSearchParamsDestroy(cuvsMultiGpuIvfPqSea
   });
 }
 
-extern "C" cuvsError_t cuvsMultiGpuIvfPqIndexCreate(cuvsMultiGpuIvfPqIndex_t* index)
+extern "C" auto cuvsMultiGpuIvfPqIndexCreate(cuvsMultiGpuIvfPqIndex_t* index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { *index = new cuvsMultiGpuIvfPqIndex{}; });
 }
 
-extern "C" cuvsError_t cuvsMultiGpuIvfPqIndexDestroy(cuvsMultiGpuIvfPqIndex_t index)
+extern "C" auto cuvsMultiGpuIvfPqIndexDestroy(cuvsMultiGpuIvfPqIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (index) {
@@ -137,9 +137,9 @@ void convert_c_mg_search_params(
 namespace {
 
 template <typename T>
-void* _mg_build(cuvsResources_t res,
+auto _mg_build(cuvsResources_t res,
                 cuvsMultiGpuIvfPqIndexParams params,
-                DLManagedTensor* dataset_tensor)
+                DLManagedTensor* dataset_tensor) -> void*
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
 
@@ -217,7 +217,7 @@ void _mg_serialize(cuvsResources_t res, cuvsMultiGpuIvfPqIndex index, const char
 }
 
 template <typename T>
-void* _mg_deserialize(cuvsResources_t res, const char* filename)
+auto _mg_deserialize(cuvsResources_t res, const char* filename) -> void*
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   auto mg_index =
@@ -228,7 +228,7 @@ void* _mg_deserialize(cuvsResources_t res, const char* filename)
 }
 
 template <typename T>
-void* _mg_distribute(cuvsResources_t res, const char* filename)
+auto _mg_distribute(cuvsResources_t res, const char* filename) -> void*
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   auto mg_index =
@@ -240,10 +240,10 @@ void* _mg_distribute(cuvsResources_t res, const char* filename)
 
 }  // anonymous namespace
 
-extern "C" cuvsError_t cuvsMultiGpuIvfPqBuild(cuvsResources_t res,
+extern "C" auto cuvsMultiGpuIvfPqBuild(cuvsResources_t res,
                                               cuvsMultiGpuIvfPqIndexParams_t params,
                                               DLManagedTensor* dataset_tensor,
-                                              cuvsMultiGpuIvfPqIndex_t index)
+                                              cuvsMultiGpuIvfPqIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
@@ -271,12 +271,12 @@ extern "C" cuvsError_t cuvsMultiGpuIvfPqBuild(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsMultiGpuIvfPqSearch(cuvsResources_t res,
+extern "C" auto cuvsMultiGpuIvfPqSearch(cuvsResources_t res,
                                                cuvsMultiGpuIvfPqSearchParams_t params,
                                                cuvsMultiGpuIvfPqIndex_t index,
                                                DLManagedTensor* queries_tensor,
                                                DLManagedTensor* neighbors_tensor,
-                                               DLManagedTensor* distances_tensor)
+                                               DLManagedTensor* distances_tensor) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto queries   = queries_tensor->dl_tensor;
@@ -319,10 +319,10 @@ extern "C" cuvsError_t cuvsMultiGpuIvfPqSearch(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsMultiGpuIvfPqExtend(cuvsResources_t res,
+extern "C" auto cuvsMultiGpuIvfPqExtend(cuvsResources_t res,
                                                cuvsMultiGpuIvfPqIndex_t index,
                                                DLManagedTensor* new_vectors_tensor,
-                                               DLManagedTensor* new_indices_tensor)
+                                               DLManagedTensor* new_indices_tensor) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto vectors = new_vectors_tensor->dl_tensor;
@@ -362,9 +362,9 @@ extern "C" cuvsError_t cuvsMultiGpuIvfPqExtend(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsMultiGpuIvfPqSerialize(cuvsResources_t res,
+extern "C" auto cuvsMultiGpuIvfPqSerialize(cuvsResources_t res,
                                                   cuvsMultiGpuIvfPqIndex_t index,
-                                                  const char* filename)
+                                                  const char* filename) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
@@ -381,9 +381,9 @@ extern "C" cuvsError_t cuvsMultiGpuIvfPqSerialize(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsMultiGpuIvfPqDeserialize(cuvsResources_t res,
+extern "C" auto cuvsMultiGpuIvfPqDeserialize(cuvsResources_t res,
                                                     const char* filename,
-                                                    cuvsMultiGpuIvfPqIndex_t index)
+                                                    cuvsMultiGpuIvfPqIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     std::ifstream is(filename, std::ios::in | std::ios::binary);
@@ -412,9 +412,9 @@ extern "C" cuvsError_t cuvsMultiGpuIvfPqDeserialize(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsMultiGpuIvfPqDistribute(cuvsResources_t res,
+extern "C" auto cuvsMultiGpuIvfPqDistribute(cuvsResources_t res,
                                                    const char* filename,
-                                                   cuvsMultiGpuIvfPqIndex_t index)
+                                                   cuvsMultiGpuIvfPqIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     index->dtype.code = kDLFloat;

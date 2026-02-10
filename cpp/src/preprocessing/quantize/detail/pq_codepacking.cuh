@@ -31,16 +31,16 @@ struct bitfield_ref_t {
 
   __host__ __device__ operator uint8_t() const  // NOLINT
   {
-    const uint8_t mask = static_cast<uint8_t>((1u << bits) - 1u);
-    uint32_t pair      = static_cast<uint32_t>(ptr[0]);
+    const auto mask = static_cast<uint8_t>((1u << bits) - 1u);
+    auto pair       = static_cast<uint32_t>(ptr[0]);
     if (offset + bits > 8) { pair |= static_cast<uint32_t>(ptr[1]) << 8; }
     return static_cast<uint8_t>((pair >> offset) & mask);
   }
 
   __host__ __device__ operator uint16_t() const  // NOLINT
   {
-    const uint16_t mask = static_cast<uint16_t>((1u << bits) - 1u);
-    uint32_t pair       = static_cast<uint32_t>(ptr[0]);
+    const auto mask = static_cast<uint16_t>((1u << bits) - 1u);
+    auto pair       = static_cast<uint32_t>(ptr[0]);
     if (offset + bits > 8) { pair |= static_cast<uint32_t>(ptr[1]) << 8; }
     if (offset + bits > 16) { pair |= static_cast<uint32_t>(ptr[2]) << 16; }
     return static_cast<uint16_t>((pair >> offset) & mask);
@@ -50,7 +50,7 @@ struct bitfield_ref_t {
   __host__ __device__ auto operator=(uint8_t code)
     -> std::enable_if_t<!is_const_ptr_v<T>, bitfield_ref_t&>
   {
-    const uint8_t mask = static_cast<uint8_t>((1u << bits) - 1u);
+    const auto mask = static_cast<uint8_t>((1u << bits) - 1u);
 
     if (offset + bits > 8) {
       auto pair = static_cast<uint16_t>(ptr[0]);
@@ -69,10 +69,10 @@ struct bitfield_ref_t {
   __host__ __device__ auto operator=(uint16_t code)
     -> std::enable_if_t<!is_const_ptr_v<T>, bitfield_ref_t&>
   {
-    const uint16_t mask = static_cast<uint16_t>((1u << bits) - 1u);
+    const auto mask = static_cast<uint16_t>((1u << bits) - 1u);
 
     // General case for multi-byte operations
-    uint32_t pair = static_cast<uint32_t>(ptr[0]);
+    auto pair = static_cast<uint32_t>(ptr[0]);
     pair |= static_cast<uint32_t>(ptr[1]) << 8;
     if (offset + bits > 16) { pair |= static_cast<uint32_t>(ptr[2]) << 16; }
 

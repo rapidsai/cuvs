@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,8 +9,8 @@
 
 namespace cuvs::neighbors::epsilon_neighborhood {
 
-template <typename value_t, typename idx_t>
-void epsUnexpL2SqNeighborhood(bool* adj,
+template <typename value_t, typename idx_t>  // NOLINT(readability-identifier-naming)
+void epsUnexpL2SqNeighborhood(bool* adj,     // NOLINT(readability-identifier-naming)
                               idx_t* vd,
                               const value_t* x,
                               const value_t* y,
@@ -23,7 +23,9 @@ void epsUnexpL2SqNeighborhood(bool* adj,
   detail::epsUnexpL2SqNeighborhood<value_t, idx_t>(adj, vd, x, y, m, n, k, eps, stream);
 }
 
-template <typename value_t, typename idx_t, typename matrix_idx_t>
+template <typename value_t,
+          typename idx_t,
+          typename matrix_idx_t>  // NOLINT(readability-identifier-naming)
 void compute(raft::resources const& handle,
              raft::device_matrix_view<const value_t, matrix_idx_t, raft::row_major> x,
              raft::device_matrix_view<const value_t, matrix_idx_t, raft::row_major> y,

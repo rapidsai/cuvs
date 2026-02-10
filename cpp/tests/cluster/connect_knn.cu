@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -23,14 +23,14 @@
 #include <raft/core/operators.hpp>
 #include <rmm/device_uvector.hpp>
 
+#include <cstdio>
 #include <gtest/gtest.h>
-#include <stdio.h>
 #include <test_utils.h>
 #include <vector>
 
 namespace cuvs {
 
-struct ConnectKNNInputs {
+struct ConnectKNNInputs {  // NOLINT(readability-identifier-naming)
   int n_rows;
   int dim;
   int n_clusters;
@@ -40,16 +40,17 @@ struct ConnectKNNInputs {
 };
 
 template <typename T>
-class ConnectKNNTest : public ::testing::TestWithParam<ConnectKNNInputs> {
+class ConnectKNNTest
+  : public ::testing::TestWithParam<ConnectKNNInputs> {  // NOLINT(readability-identifier-naming)
  public:
-  ConnectKNNTest()
+  ConnectKNNTest()  // NOLINT(modernize-use-equals-default)
     : stream(handle.get_stream()),
       ps(::testing::TestWithParam<ConnectKNNInputs>::GetParam()),
       database(0, stream)
   {
   }
 
-  void basicTest()
+  void basicTest()  // NOLINT(readability-identifier-naming)
   {
     int queries_size = ps.n_rows * ps.k;
     rmm::device_uvector<T> dists(queries_size, stream);
@@ -111,8 +112,8 @@ class ConnectKNNTest : public ::testing::TestWithParam<ConnectKNNInputs> {
                                      coo_rows.data(),
                                      inds.data(),
                                      dists.data(),
-                                     (int64_t)ps.n_rows,
-                                     (int64_t)ps.n_rows,
+                                     static_cast<int64_t>(ps.n_rows),
+                                     static_cast<int64_t>(ps.n_rows),
                                      static_cast<size_t>(queries_size),
                                      knn_coo);
 
@@ -121,16 +122,17 @@ class ConnectKNNTest : public ::testing::TestWithParam<ConnectKNNInputs> {
 
     // run mst solver
     rmm::device_uvector<int64_t> color(ps.n_rows, stream);
-    auto mst_coo = raft::sparse::solver::mst<int64_t, int64_t, T, double>(handle,
-                                                                          indptr.data(),
-                                                                          knn_coo.cols(),
-                                                                          knn_coo.vals(),
-                                                                          (int64_t)ps.n_rows,
-                                                                          knn_coo.nnz,
-                                                                          color.data(),
-                                                                          stream,
-                                                                          false,
-                                                                          true);
+    auto mst_coo =
+      raft::sparse::solver::mst<int64_t, int64_t, T, double>(handle,
+                                                             indptr.data(),
+                                                             knn_coo.cols(),
+                                                             knn_coo.vals(),
+                                                             static_cast<int64_t>(ps.n_rows),
+                                                             knn_coo.nnz,
+                                                             color.data(),
+                                                             stream,
+                                                             false,
+                                                             true);
 
     // connect knn graph on host and checking final n_components
     // because the dataset is a blobs dataset, original n_components results in n_clusters of the
@@ -142,7 +144,7 @@ class ConnectKNNTest : public ::testing::TestWithParam<ConnectKNNInputs> {
 
     if (ps.mutual_reach) {
       cuvs::sparse::neighbors::MutualReachabilityFixConnectivitiesRedOp<int64_t, T> reduction_op(
-        core_dists.data(), (int64_t)ps.n_rows);
+        core_dists.data(), static_cast<int64_t>(ps.n_rows));
       cuvs::cluster::agglomerative::detail::connect_knn_graph<int64_t, T>(
         handle,
         raft::make_const_mdspan(database_h.view()),
@@ -168,34 +170,38 @@ class ConnectKNNTest : public ::testing::TestWithParam<ConnectKNNInputs> {
     ASSERT_TRUE(n_components == 1);
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream);
     auto database_view =
       raft::make_device_matrix_view<T, int64_t>(database.data(), ps.n_rows, ps.dim);
     auto labels = raft::make_device_vector<int64_t, int64_t>(handle, ps.n_rows);
-    raft::random::make_blobs(handle, database_view, labels.view(), (int64_t)ps.n_clusters);
+    raft::random::make_blobs(
+      handle, database_view, labels.view(), static_cast<int64_t>(ps.n_clusters));
     raft::resource::sync_stream(handle);
   }
 
  protected:
-  raft::handle_t handle;
-  cudaStream_t stream;
-  ConnectKNNInputs ps;
-  rmm::device_uvector<T> database;
+  raft::handle_t handle;            // NOLINT(readability-identifier-naming)
+  cudaStream_t stream;              // NOLINT(readability-identifier-naming)
+  ConnectKNNInputs ps;              // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<T> database;  // NOLINT(readability-identifier-naming)
 };
 
-const std::vector<ConnectKNNInputs> inputs = raft::util::itertools::product<ConnectKNNInputs>(
-  {5000, 7151},                                    // n_rows
-  {64, 137},                                       // dim
-  {5, 10},                                         // n_clusters of make_blobs data
-  {16},                                            // k
-  {cuvs::distance::DistanceType::L2SqrtExpanded},  // metric
-  {true, false});                                  // mutual_reach
+const std::vector<ConnectKNNInputs> inputs =
+  raft::util::itertools::product<ConnectKNNInputs>(  // NOLINT(readability-identifier-naming)
+    {5000, 7151},                                    // n_rows
+    {64, 137},                                       // dim
+    {5, 10},                                         // n_clusters of make_blobs data
+    {16},                                            // k
+    {cuvs::distance::DistanceType::L2SqrtExpanded},  // metric
+    {true, false});                                  // mutual_reach
 
-typedef ConnectKNNTest<float> ConnectKNNTestF;
-TEST_P(ConnectKNNTestF, ConnectKNN) { this->basicTest(); }
+using ConnectKNNTestF = ConnectKNNTest<float>;              // NOLINT(readability-identifier-naming)
+TEST_P(ConnectKNNTestF, ConnectKNN) { this->basicTest(); }  // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(ConnectKNNTests, ConnectKNNTestF, ::testing::ValuesIn(inputs));
+INSTANTIATE_TEST_CASE_P(ConnectKNNTests,
+                        ConnectKNNTestF,
+                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
 
 }  // end namespace cuvs

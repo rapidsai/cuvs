@@ -93,7 +93,8 @@ void select_residuals(raft::resources const& handle,
   // need to know it, any strictly positive number would work.
   thrust::transform_iterator<utils::mapping<float>, const T*, thrust::use_default, float>
     mapping_itr(dataset, utils::mapping<float>{});
-  raft::matrix::gather(mapping_itr, (IdxT)dim, n_rows, row_ids, n_rows, tmp.data(), stream);
+  raft::matrix::gather(
+    mapping_itr, static_cast<IdxT>(dim), n_rows, row_ids, n_rows, tmp.data(), stream);
 
   raft::matrix::linewise_op<raft::Apply::ALONG_ROWS>(
     handle,
@@ -157,13 +158,13 @@ void flat_compute_residuals(
     raft::linalg::row_normalize<raft::linalg::L2Norm>(
       handle, raft::make_const_mdspan(tmp_matrix_view), tmp_matrix_view);
   } else {
-    raft::linalg::map_offset(handle, tmp_view, [dataset, dim] __device__(size_t i) {
+    raft::linalg::map_offset(handle, tmp_view, [dataset, dim] __device__(size_t i) -> float {
       return utils::mapping<float>{}(dataset[i]);
     });
   }
 
   raft::linalg::map_offset(
-    handle, tmp_view, [centers, tmp = tmp.data(), labels, dim] __device__(size_t i) {
+    handle, tmp_view, [centers, tmp = tmp.data(), labels, dim] __device__(size_t i) -> float {
       auto row_ix = i / dim;
       auto el_ix  = i % dim;
       auto label  = std::holds_alternative<uint32_t>(labels)
@@ -310,15 +311,16 @@ void transpose_pq_centers(const raft::resources& handle,
     pq_centers_source, extents_source);
   auto pq_centers_view = raft::make_device_vector_view<float, IdxT>(
     impl->pq_centers().data_handle(), impl->pq_centers().size());
-  raft::linalg::map_offset(handle, pq_centers_view, [span_source, extents] __device__(size_t i) {
-    uint32_t ii[3];
-    for (int r = 2; r > 0; r--) {
-      ii[r] = i % extents.extent(r);
-      i /= extents.extent(r);
-    }
-    ii[0] = i;
-    return span_source(ii[0], ii[2], ii[1]);
-  });
+  raft::linalg::map_offset(
+    handle, pq_centers_view, [span_source, extents] __device__(size_t i) -> float {
+      uint32_t ii[3];
+      for (int r = 2; r > 0; r--) {
+        ii[r] = i % extents.extent(r);
+        i /= extents.extent(r);
+      }
+      ii[0] = i;
+      return span_source(ii[0], ii[2], ii[1]);
+    });
 }
 
 template <typename IdxT>
@@ -599,7 +601,7 @@ void reconstruct_list_data(raft::resources const& res,
   constexpr uint32_t kBlockSize = 256;
   dim3 blocks(raft::div_rounding_up_safe<uint32_t>(n_rows, kBlockSize), 1, 1);
   dim3 threads(kBlockSize, 1, 1);
-  auto kernel = [](uint32_t pq_bits) {
+  auto kernel = [](uint32_t pq_bits) -> auto {
     switch (pq_bits) {
       case 4: return reconstruct_list_data_kernel<kBlockSize, 4>;
       case 5: return reconstruct_list_data_kernel<kBlockSize, 5>;
@@ -726,7 +728,7 @@ void encode_list_data(raft::resources const& res,
   if (index->codes_layout() == list_layout::FLAT) {
     const uint32_t bytes_per_vector =
       raft::div_rounding_up_safe(index->pq_dim() * index->pq_bits(), 8u);
-    auto kernel = [](uint32_t pq_bits) {
+    auto kernel = [](uint32_t pq_bits) -> auto {
       switch (pq_bits) {
         case 4: return encode_list_data_flat_kernel<kBlockSize, 4>;
         case 5: return encode_list_data_flat_kernel<kBlockSize, 5>;
@@ -745,7 +747,7 @@ void encode_list_data(raft::resources const& res,
       offset_or_indices,
       bytes_per_vector);
   } else {
-    auto kernel = [](uint32_t pq_bits) {
+    auto kernel = [](uint32_t pq_bits) -> auto {
       switch (pq_bits) {
         case 4: return encode_list_data_interleaved_kernel<kBlockSize, 4>;
         case 5: return encode_list_data_interleaved_kernel<kBlockSize, 5>;
@@ -1284,7 +1286,7 @@ auto build(raft::resources const& handle,
         "kmeans_trainset_fraction, or set large_workspace_resource appropriately.");
       throw;
     }
-    // TODO: a proper sampling
+    // TODO(snanditale): a proper sampling
     if constexpr (std::is_same_v<T, float>) {
       raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset.view());
     } else {
@@ -1319,7 +1321,8 @@ auto build(raft::resources const& handle,
       cluster_centers, impl->n_lists(), impl->dim());
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
-    kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>((int)impl->metric());
+    kmeans_params.metric =
+      static_cast<cuvs::distance::DistanceType>(static_cast<int>(impl->metric()));
 
     if (impl->metric() == distance::DistanceType::CosineExpanded) {
       raft::linalg::row_normalize<raft::linalg::L2Norm>(

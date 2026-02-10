@@ -19,10 +19,10 @@ namespace cuvs::neighbors::vamana::detail {
  */
 
 // Parse pq_pivots file.
-inline std::vector<float> parse_pq_pivots_file(const std::string& path,
-                                               const int vector_dim,
-                                               int32_t& pq_codebook_size,
-                                               int32_t& pq_dim)
+inline auto parse_pq_pivots_file(const std::string& path,
+                                 const int vector_dim,
+                                 int32_t& pq_codebook_size,
+                                 int32_t& pq_dim) -> std::vector<float>
 {
   std::ifstream pivots_if(path, std::ios::in | std::ios::binary);
   RAFT_EXPECTS(pivots_if, "Cannot open file %s", path.c_str());
@@ -36,8 +36,8 @@ inline std::vector<float> parse_pq_pivots_file(const std::string& path,
 
   // check metadata
   int32_t num_offsets, num_dims;
-  pivots_if.read((char*)&num_offsets, sizeof(int32_t));
-  pivots_if.read((char*)&num_dims, sizeof(int32_t));
+  pivots_if.read(reinterpret_cast<char*>(&num_offsets), sizeof(int32_t));
+  pivots_if.read(reinterpret_cast<char*>(&num_dims), sizeof(int32_t));
   RAFT_EXPECTS(num_offsets == 4,
                "Error reading pq_pivots file %s. # offsets = %ld; expected 4.",
                path.c_str(),
@@ -48,7 +48,7 @@ inline std::vector<float> parse_pq_pivots_file(const std::string& path,
                (long)num_dims);
 
   std::vector<int64_t> offset(num_offsets);
-  pivots_if.read((char*)offset.data(), sizeof(int64_t) * num_offsets);
+  pivots_if.read(reinterpret_cast<char*>(offset.data()), sizeof(int64_t) * num_offsets);
 
   // check file size meets minimum for all required data and metadata
   RAFT_EXPECTS(
@@ -58,13 +58,13 @@ inline std::vector<float> parse_pq_pivots_file(const std::string& path,
     (unsigned long)length);
 
   pivots_if.seekg(offset[2], std::ios_base::beg);
-  pivots_if.read((char*)&pq_dim, sizeof(int32_t));
+  pivots_if.read(reinterpret_cast<char*>(&pq_dim), sizeof(int32_t));
   --pq_dim;
 
   pivots_if.seekg(offset[0], std::ios_base::beg);
-  pivots_if.read((char*)&pq_codebook_size, sizeof(int32_t));
+  pivots_if.read(reinterpret_cast<char*>(&pq_codebook_size), sizeof(int32_t));
   int32_t pq_dim_times_codebookDim;
-  pivots_if.read((char*)&pq_dim_times_codebookDim, sizeof(int32_t));
+  pivots_if.read(reinterpret_cast<char*>(&pq_dim_times_codebookDim), sizeof(int32_t));
 
   int32_t codebookDim = vector_dim / pq_dim;
   RAFT_EXPECTS(pq_dim * codebookDim == pq_dim_times_codebookDim,
@@ -73,7 +73,7 @@ inline std::vector<float> parse_pq_pivots_file(const std::string& path,
   // parse pq_encoding_table
   std::vector<float> pq_encoding_table(vector_dim * pq_codebook_size);
   for (int i = 0; i < vector_dim * pq_codebook_size; i++) {
-    pivots_if.read((char*)&pq_encoding_table[i],
+    pivots_if.read(reinterpret_cast<char*>(&pq_encoding_table[i]),
                    4);  // Reconstruct type of the overall quantizer is int8 but because it's OPQ,
                         // need to read it as float
   }
@@ -82,7 +82,8 @@ inline std::vector<float> parse_pq_pivots_file(const std::string& path,
 }
 
 // Parse rotation matrix file.
-inline std::vector<float> parse_rotation_matrix_file(const std::string& path, const int vector_dim)
+inline auto parse_rotation_matrix_file(const std::string& path, const int vector_dim)
+  -> std::vector<float>
 {
   std::ifstream mat_if(path, std::ios::in | std::ios::binary);
   if (!mat_if) { RAFT_FAIL("Cannot open file %s", path.c_str()); }
@@ -96,8 +97,8 @@ inline std::vector<float> parse_rotation_matrix_file(const std::string& path, co
 
   // check metadata
   int32_t nr, nc;
-  mat_if.read((char*)&nr, sizeof(int32_t));
-  mat_if.read((char*)&nc, sizeof(int32_t));
+  mat_if.read(reinterpret_cast<char*>(&nr), sizeof(int32_t));
+  mat_if.read(reinterpret_cast<char*>(&nc), sizeof(int32_t));
   RAFT_EXPECTS(vector_dim == nr,
                "Unexpected #rows in rotation matrix file. Expected: %ld Actual: %ld",
                (long)vector_dim,
@@ -118,14 +119,14 @@ inline std::vector<float> parse_rotation_matrix_file(const std::string& path, co
   std::vector<float> mat(nr * nc);
   for (int iRow = 0; iRow < nr; iRow++) {
     for (int iCol = 0; iCol < nc; iCol++) {
-      mat_if.read((char*)&mat[iRow * vector_dim + iCol], 4);
+      mat_if.read(reinterpret_cast<char*>(&mat[iRow * vector_dim + iCol]), 4);
     }
   }
   return mat;
 }
 
 template <typename T>
-codebook_params<T> deserialize_codebooks(const std::string& codebook_prefix, const int dim)
+auto deserialize_codebooks(const std::string& codebook_prefix, const int dim) -> codebook_params<T>
 {
   codebook_params<T> codebooks;
   codebooks.pq_encoding_table = parse_pq_pivots_file(

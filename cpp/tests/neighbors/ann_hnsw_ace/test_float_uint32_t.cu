@@ -7,19 +7,30 @@
 
 namespace cuvs::neighbors::hnsw {
 
-typedef AnnHnswAceTest<float, float, uint32_t> AnnHnswAceTest_float;
-TEST_P(AnnHnswAceTest_float, AnnHnswAceBuild) { this->testHnswAceBuild(); }
+using AnnHnswAceTest_float =
+  AnnHnswAceTest<float, float, uint32_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(AnnHnswAceTest_float,
+       AnnHnswAceBuild)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  this->testHnswAceBuild();
+}  // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(AnnHnswAceTest, AnnHnswAceTest_float, ::testing::ValuesIn(hnsw_ace_inputs));
+INSTANTIATE_TEST_CASE_P(
+  AnnHnswAceTest,
+  AnnHnswAceTest_float,
+  ::testing::ValuesIn(hnsw_ace_inputs));  // NOLINT(readability-identifier-naming)
 
 // Test for memory limit fallback to disk mode
-typedef AnnHnswAceTest<float, float, uint32_t> AnnHnswAceMemoryFallbackTest_float;
-TEST_P(AnnHnswAceMemoryFallbackTest_float, AnnHnswAceMemoryLimitFallback)
+using AnnHnswAceMemoryFallbackTest_float =
+  AnnHnswAceTest<float, float, uint32_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(
+  AnnHnswAceMemoryFallbackTest_float,  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+  AnnHnswAceMemoryLimitFallback)       // NOLINT(readability-identifier-naming)
 {
   this->testHnswAceMemoryLimitFallback();
 }
 
-INSTANTIATE_TEST_CASE_P(AnnHnswAceMemoryFallbackTest,
+INSTANTIATE_TEST_CASE_P(AnnHnswAceMemoryFallbackTest,  // NOLINT(readability-identifier-naming)
                         AnnHnswAceMemoryFallbackTest_float,
                         ::testing::ValuesIn(hnsw_ace_memory_fallback_inputs));
 

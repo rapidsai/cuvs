@@ -60,10 +60,10 @@ struct SamplingOp {
   {
   }
 
-  __host__ __device__ __forceinline__ bool operator()(
-    const raft::KeyValuePair<ptrdiff_t, DataT>& a) const
+  __host__ __device__ __forceinline__ auto operator()(
+    const raft::KeyValuePair<ptrdiff_t, DataT>& a) const -> bool
   {
-    DataT prob_threshold = (DataT)rnd[a.key];
+    auto prob_threshold = static_cast<DataT>(rnd[a.key]);
 
     DataT prob_x = ((oversampling_factor * n_clusters * a.value) / cluster_cost);
 
@@ -73,8 +73,8 @@ struct SamplingOp {
 
 template <typename IndexT, typename DataT>
 struct KeyValueIndexOp {
-  __host__ __device__ __forceinline__ IndexT
-  operator()(const raft::KeyValuePair<IndexT, DataT>& a) const
+  __host__ __device__ __forceinline__ auto operator()(
+    const raft::KeyValuePair<IndexT, DataT>& a) const -> IndexT
   {
     return a.key;
   }
@@ -92,7 +92,7 @@ void countLabels(raft::resources const& handle,
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
   // CUB::DeviceHistogram requires a signed index type
-  typedef typename std::make_signed_t<IndexT> CubIndexT;
+  using CubIndexT = typename std::make_signed_t<IndexT>;
 
   CubIndexT num_levels  = n_clusters + 1;
   CubIndexT lower_level = 0;
@@ -163,14 +163,14 @@ void checkWeight(raft::resources const& handle,
 }
 
 template <typename IndexT>
-IndexT getDataBatchSize(int batch_samples, IndexT n_samples)
+auto getDataBatchSize(int batch_samples, IndexT n_samples) -> IndexT
 {
   auto minVal = std::min(static_cast<IndexT>(batch_samples), n_samples);
   return (minVal == 0) ? n_samples : minVal;
 }
 
 template <typename IndexT>
-IndexT getCentroidsBatchSize(int batch_centroids, IndexT n_local_clusters)
+auto getCentroidsBatchSize(int batch_centroids, IndexT n_local_clusters) -> IndexT
 {
   auto minVal = std::min(static_cast<IndexT>(batch_centroids), n_local_clusters);
   return (minVal == 0) ? n_local_clusters : minVal;
@@ -260,13 +260,13 @@ void sampleCentroids(raft::resources const& handle,
   thrust::for_each_n(raft::resource::get_thrust_policy(handle),
                      sampledMinClusterDistance.data_handle(),
                      nPtsSampledInRank,
-                     [=] __device__(raft::KeyValuePair<ptrdiff_t, DataT> val) {
+                     [=] __device__(raft::KeyValuePair<ptrdiff_t, DataT> val) -> void {
                        rawPtr_isSampleCentroid[val.key] = 1;
                      });
 
   inRankCp.resize(nPtsSampledInRank * n_features, stream);
 
-  raft::matrix::gather((DataT*)X.data_handle(),
+  raft::matrix::gather(const_cast<DataT*>(X.data_handle()),
                        X.extent(1),
                        X.extent(0),
                        sampledMinClusterDistance.data_handle(),
@@ -331,12 +331,12 @@ void shuffleAndGather(raft::resources const& handle,
   raft::random::permute<DataT, IndexT, IndexT>(indices.data_handle(),
                                                nullptr,
                                                nullptr,
-                                               (IndexT)in.extent(1),
-                                               (IndexT)in.extent(0),
+                                               static_cast<IndexT>(in.extent(1)),
+                                               static_cast<IndexT>(in.extent(0)),
                                                true,
                                                stream);
 
-  raft::matrix::gather((DataT*)in.data_handle(),
+  raft::matrix::gather(const_cast<DataT*>(in.data_handle()),
                        in.extent(1),
                        in.extent(0),
                        indices.data_handle(),
@@ -465,8 +465,8 @@ void countSamplesInCluster(raft::resources const& handle,
   countLabels(handle,
               itr,
               sampleCountInCluster.data_handle(),
-              (IndexT)n_samples,
-              (IndexT)n_clusters,
+              static_cast<IndexT>(n_samples),
+              static_cast<IndexT>(n_clusters),
               workspace);
 }
 }  // namespace cuvs::cluster::kmeans::detail

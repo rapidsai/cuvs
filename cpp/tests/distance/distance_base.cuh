@@ -19,13 +19,12 @@
 
 #include <gtest/gtest.h>
 
-namespace cuvs {
-namespace distance {
+namespace cuvs::distance {
 
 template <typename T>
 _RAFT_DEVICE inline auto half2float(T& a)
 {
-  if constexpr (std::is_same_v<typename std::remove_const<T>::type, half>) {
+  if constexpr (std::is_same_v<std::remove_const_t<T>, half>) {
     return __half2float(a);
   } else {
     return a;
@@ -53,8 +52,9 @@ RAFT_KERNEL naiveDistanceKernel(OutputType* dist,
     acc += diff * diff;
   }
   if (type == cuvs::distance::DistanceType::L2SqrtExpanded ||
-      type == cuvs::distance::DistanceType::L2SqrtUnexpanded)
+      type == cuvs::distance::DistanceType::L2SqrtUnexpanded) {
     acc = raft::sqrt(acc);
+  }
   std::int64_t outidx = isRowMajor ? midx * n + nidx : midx + m * nidx;
   dist[outidx]        = acc;
 }
@@ -126,7 +126,7 @@ RAFT_KERNEL naiveCosineDistanceKernel(OutputType* dist,
   std::int64_t outidx = isRowMajor ? midx * n + nidx : midx + m * nidx;
 
   // Use 1.0 - (cosine similarity) to calc the distance
-  dist[outidx] = (OutputType)1.0 - acc_ab / (raft::sqrt(acc_a) * raft::sqrt(acc_b));
+  dist[outidx] = static_cast<OutputType>(1.0) - acc_ab / (raft::sqrt(acc_a) * raft::sqrt(acc_b));
 }
 
 template <typename DataType, typename OutputType = DataType>
@@ -377,10 +377,12 @@ void naiveDistance(OutputType* dist,
                    cuvs::distance::DistanceType type,
                    bool isRowMajor,
                    OutputType metric_arg = 2.0f,
-                   cudaStream_t stream   = 0)
+                   cudaStream_t stream   = nullptr)
 {
   static const dim3 TPB(4, 256, 1);
-  dim3 nblks(raft::ceildiv(m, (std::int64_t)TPB.x), raft::ceildiv(n, (std::int64_t)TPB.y), 1);
+  dim3 nblks(raft::ceildiv(m, static_cast<std::int64_t>(TPB.x)),
+             raft::ceildiv(n, static_cast<std::int64_t>(TPB.y)),
+             1);
 
   switch (type) {
     case cuvs::distance::DistanceType::Canberra:
@@ -447,26 +449,26 @@ struct DistanceInputs {
 };
 
 template <typename DataType>
-::std::ostream& operator<<(::std::ostream& os, const DistanceInputs<DataType>& dims)
+auto operator<<(::std::ostream& os, const DistanceInputs<DataType>& dims) -> ::std::ostream&
 {
   return os;
 }
 
-// TODO: Remove when mdspan-based raft::runtime::distance::pairwise_distance is
+// TODO(cuvs): Remove when mdspan-based raft::runtime::distance::pairwise_distance is
 // implemented.
 //
 // Context:
 // https://github.com/rapidsai/raft/issues/1338
 template <typename layout>
-constexpr bool layout_to_row_major();
+constexpr auto layout_to_row_major() -> bool;
 
 template <>
-constexpr bool layout_to_row_major<raft::layout_c_contiguous>()
+constexpr auto layout_to_row_major<raft::layout_c_contiguous>() -> bool
 {
   return true;
 }
 template <>
-constexpr bool layout_to_row_major<raft::layout_f_contiguous>()
+constexpr auto layout_to_row_major<raft::layout_f_contiguous>() -> bool
 {
   return false;
 }
@@ -694,9 +696,11 @@ class DistanceTestSameBuffer
 template <cuvs::distance::DistanceType distanceType>
 class BigMatrixDistanceTest : public ::testing::Test {
  public:
-  BigMatrixDistanceTest()
+  BigMatrixDistanceTest()  // NOLINT(modernize-use-equals-default)
     : x(m * k, raft::resource::get_cuda_stream(handle)),
-      dist(std::size_t(m) * m, raft::resource::get_cuda_stream(handle)) {};
+      dist(std::size_t(m) * m, raft::resource::get_cuda_stream(handle))
+  {
+  }
   void SetUp() override
   {
     auto testInfo = testing::UnitTest::GetInstance()->current_test_info();
@@ -720,5 +724,4 @@ class BigMatrixDistanceTest : public ::testing::Test {
   std::int64_t k = 1;
   rmm::device_uvector<float> x, dist;
 };
-}  // end namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance

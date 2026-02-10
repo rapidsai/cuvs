@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -14,12 +14,12 @@ namespace cuvs::distance::detail::ops {
 // Epilogue operator for CUTLASS based kernel
 template <typename DataT, typename AccT>
 struct cosine_cutlass_op {
-  __device__ cosine_cutlass_op() noexcept {}
-  __device__ AccT operator()(AccT& aNorm, const AccT& bNorm, AccT& accVal) const noexcept
+  __device__ cosine_cutlass_op() noexcept = default;
+  __device__ auto operator()(AccT& aNorm, const AccT& bNorm, AccT& accVal) const noexcept -> AccT
   {
     return static_cast<AccT>(1.0) - static_cast<AccT>(accVal / (aNorm * bNorm));
   }
-  __device__ AccT operator()(DataT aData) const noexcept { return raft::to_float(aData); }
+  __device__ auto operator()(DataT aData) const noexcept -> AccT { return raft::to_float(aData); }
 };
 
 /**
@@ -44,7 +44,7 @@ struct cosine_distance_op {
   // Size of shared memory. This is normally decided by the kernel policy, but
   // some ops such as correlation_distance_op use more.
   template <typename Policy>
-  static constexpr size_t shared_mem_size()
+  static constexpr auto shared_mem_size() -> size_t
   {
     return Policy::SmemSize + ((Policy::Mblk + Policy::Nblk) * sizeof(AccT));
   }
@@ -78,7 +78,7 @@ struct cosine_distance_op {
     }
   }
 
-  constexpr cosine_cutlass_op<DataT, AccT> get_cutlass_op() const
+  constexpr auto get_cutlass_op() const -> cosine_cutlass_op<DataT, AccT>
   {
     return cosine_cutlass_op<DataT, AccT>();
   }

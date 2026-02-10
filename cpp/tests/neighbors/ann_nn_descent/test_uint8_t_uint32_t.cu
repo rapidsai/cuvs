@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,8 +9,15 @@
 
 namespace cuvs::neighbors::nn_descent {
 
-typedef AnnNNDescentTest<float, uint8_t, std::uint32_t> AnnNNDescentTestUI8_U32;
-TEST_P(AnnNNDescentTestUI8_U32, AnnNNDescent) { this->testNNDescent(); }
+using AnnNNDescentTestUI8_U32 =
+  AnnNNDescentTest<float, uint8_t, std::uint32_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(AnnNNDescentTestUI8_U32,
+       AnnNNDescent)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  this->testNNDescent();
+}  // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(AnnNNDescentTest, AnnNNDescentTestUI8_U32, ::testing::ValuesIn(inputs));
+INSTANTIATE_TEST_CASE_P(AnnNNDescentTest,
+                        AnnNNDescentTestUI8_U32,
+                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
 }  // namespace   cuvs::neighbors::nn_descent

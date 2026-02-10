@@ -108,14 +108,14 @@ struct quantizer {
  *
  * @return quantizer
  */
-quantizer<float> build(raft::resources const& res,
-                       const params params,
-                       raft::device_matrix_view<const float, int64_t> dataset);
+auto build(raft::resources const& res,
+           const params params,
+           raft::device_matrix_view<const float, int64_t> dataset) -> quantizer<float>;
 
 /** @copydoc build */
-quantizer<float> build(raft::resources const& res,
-                       const params params,
-                       raft::host_matrix_view<const float, int64_t> dataset);
+auto build(raft::resources const& res,
+           const params params,
+           raft::host_matrix_view<const float, int64_t> dataset) -> quantizer<float>;
 
 /**
  * @brief Applies quantization transform to given dataset
@@ -159,7 +159,7 @@ void transform(raft::resources const& res,
  * @param[in] config product quantizer parameters
  * @return the dimension of the quantized dataset
  */
-inline int64_t get_quantized_dim(const params& config)
+inline auto get_quantized_dim(const params& config) -> int64_t
 {
   return raft::div_rounding_up_safe<int64_t>(config.pq_dim * config.pq_bits, 8);
 }

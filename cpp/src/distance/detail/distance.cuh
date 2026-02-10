@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2018-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -126,12 +126,19 @@ void distance_impl(raft::resources const& handle,
   AccT* y_norm    = workspace;
   AccT* sq_x_norm = workspace;
   AccT* sq_y_norm = workspace;
-  // TODO: Column major case looks to have lower accuracy for X == Y,
+  // TODO(snanditale): Column major case looks to have lower accuracy for X == Y,
   // perhaps the use of stridedSummationKernel could be causing this,
   // need to investigate and fix.
   if (x == y && is_row_major) {
-    raft::linalg::reduce<true, true>(
-      x_norm, x, k, std::max(m, n), (AccT)0, stream, false, raft::identity_op(), raft::add_op());
+    raft::linalg::reduce<true, true>(x_norm,
+                                     x,
+                                     k,
+                                     std::max(m, n),
+                                     static_cast<AccT>(0),
+                                     stream,
+                                     false,
+                                     raft::identity_op(),
+                                     raft::add_op());
     sq_x_norm += std::max(m, n);
     sq_y_norm = sq_x_norm;
     raft::linalg::rowNorm<raft::linalg::L2Norm, true>(sq_x_norm, x, k, std::max(m, n), stream);
@@ -139,14 +146,14 @@ void distance_impl(raft::resources const& handle,
     y_norm += m;
     if (is_row_major) {
       raft::linalg::reduce<true, true>(
-        x_norm, x, k, m, (AccT)0, stream, false, raft::identity_op(), raft::add_op());
+        x_norm, x, k, m, static_cast<AccT>(0), stream, false, raft::identity_op(), raft::add_op());
       raft::linalg::reduce<true, true>(
-        y_norm, y, k, n, (AccT)0, stream, false, raft::identity_op(), raft::add_op());
+        y_norm, y, k, n, static_cast<AccT>(0), stream, false, raft::identity_op(), raft::add_op());
     } else {
       raft::linalg::reduce<false, true>(
-        x_norm, x, k, m, (AccT)0, stream, false, raft::identity_op(), raft::add_op());
+        x_norm, x, k, m, static_cast<AccT>(0), stream, false, raft::identity_op(), raft::add_op());
       raft::linalg::reduce<false, true>(
-        y_norm, y, k, n, (AccT)0, stream, false, raft::identity_op(), raft::add_op());
+        y_norm, y, k, n, static_cast<AccT>(0), stream, false, raft::identity_op(), raft::add_op());
     }
 
     sq_x_norm += (m + n);
@@ -193,7 +200,7 @@ void distance_impl(raft::resources const& handle,
 
   OutT* x_norm = reinterpret_cast<OutT*>(workspace);
   OutT* y_norm = reinterpret_cast<OutT*>(workspace);
-  // TODO: Column major case looks to have lower accuracy for X == Y,
+  // TODO(snanditale): Column major case looks to have lower accuracy for X == Y,
   // perhaps the use of stridedSummationKernel could be causing this,
   // need to investigate and fix.
   if (x == y && is_row_major) {
@@ -297,15 +304,15 @@ void distance_impl(raft::resources const& handle,
 
   if (!arrays_overlap) {
     // Arrays don't overlap: sqrt each array independently
-    raft_sqrt((DataT*)x, x, m * k, raft::sqrt_op{}, stream);
-    raft_sqrt((DataT*)y, y, n * k, raft::sqrt_op{}, stream);
+    raft_sqrt(const_cast<DataT*>(x), x, m * k, raft::sqrt_op{}, stream);
+    raft_sqrt(const_cast<DataT*>(y), y, n * k, raft::sqrt_op{}, stream);
   } else {
     // Arrays overlap: sqrt the union of both arrays exactly once
     const DataT* start = (x < y) ? x : y;
     const DataT* end   = (x_end > y_end) ? x_end : y_end;
     IdxT union_size    = end - start;
 
-    raft_sqrt((DataT*)start, start, union_size, raft::sqrt_op{}, stream);
+    raft_sqrt(const_cast<DataT*>(start), start, union_size, raft::sqrt_op{}, stream);
   }
 
   // Calculate Hellinger distance
@@ -320,15 +327,15 @@ void distance_impl(raft::resources const& handle,
   // Restore arrays by squaring back
   if (!arrays_overlap) {
     // Arrays don't overlap: square each array independently
-    raft_sq((DataT*)x, x, m * k, raft::sq_op{}, stream);
-    raft_sq((DataT*)y, y, n * k, raft::sq_op{}, stream);
+    raft_sq(const_cast<DataT*>(x), x, m * k, raft::sq_op{}, stream);
+    raft_sq(const_cast<DataT*>(y), y, n * k, raft::sq_op{}, stream);
   } else {
     // Arrays overlap: square the union back
     const DataT* start = (x < y) ? x : y;
     const DataT* end   = (x_end > y_end) ? x_end : y_end;
     IdxT union_size    = end - start;
 
-    raft_sq((DataT*)start, start, union_size, raft::sq_op{}, stream);
+    raft_sq(const_cast<DataT*>(start), start, union_size, raft::sq_op{}, stream);
   }
 
   RAFT_CUDA_TRY(cudaGetLastError());
@@ -377,7 +384,7 @@ void distance_impl(raft::resources const& handle,
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
-  auto unaryOp_lambda = [] __device__(DataT input) {
+  auto unaryOp_lambda = [] __device__(DataT input) -> DataT {
     auto input_       = raft::to_float(input);
     const bool x_zero = (input_ == 0);
     if constexpr (std::is_same_v<DataT, half>) {
@@ -387,7 +394,7 @@ void distance_impl(raft::resources const& handle,
     }
   };
 
-  auto unaryOp_lambda_reverse = [] __device__(DataT input) {
+  auto unaryOp_lambda_reverse = [] __device__(DataT input) -> DataT {
     // reverse previous log (x) back to x using (e ^ log(x))
     auto input_       = raft::to_float(input);
     const bool x_zero = (input_ == 0);
@@ -400,7 +407,7 @@ void distance_impl(raft::resources const& handle,
 
   if (x != y) {
     raft::linalg::unaryOp<DataT, decltype(unaryOp_lambda), IdxT>(
-      (DataT*)y, y, n * k, unaryOp_lambda, stream);
+      const_cast<DataT*>(y), y, n * k, unaryOp_lambda, stream);
   }
 
   const OutT* x_norm = nullptr;
@@ -416,7 +423,7 @@ void distance_impl(raft::resources const& handle,
   if (x != y) {
     // Now reverse previous log (x) back to x using (e ^ log(x))
     raft::linalg::unaryOp<DataT, decltype(unaryOp_lambda_reverse), IdxT>(
-      (DataT*)y, y, n * k, unaryOp_lambda_reverse, stream);
+      const_cast<DataT*>(y), y, n * k, unaryOp_lambda_reverse, stream);
   }
 }
 
@@ -472,14 +479,14 @@ void distance_impl_l2_expanded(  // NOTE: different name
   ASSERT(!(worksize < (m + n) * sizeof(AccT)), "workspace size error");
   ASSERT(workspace != nullptr, "workspace is null");
 
-  // TODO: May we have a better method to avoid misalignment?
+  // TODO(snanditale): May we have a better method to avoid misalignment?
   uintptr_t offset = alignof(OutT) - (reinterpret_cast<uintptr_t>(workspace) % alignof(OutT));
   if (offset == alignof(OutT)) { offset = 0; }
   OutT* x_norm = reinterpret_cast<OutT*>(reinterpret_cast<char*>(workspace) + offset);
 
   offset       = (reinterpret_cast<uintptr_t>(x_norm) % alignof(OutT));
   OutT* y_norm = x_norm;
-  // TODO: Column major case looks to have lower accuracy for X == Y,
+  // TODO(snanditale): Column major case looks to have lower accuracy for X == Y,
   // perhaps the use of stridedSummationKernel could be causing this,
   // need to investigate and fix.
   if ((x == y) && is_row_major) {
@@ -810,7 +817,7 @@ template <cuvs::distance::DistanceType distanceType,
           typename AccType,
           typename OutType,
           typename Index_ = int>
-size_t getWorkspaceSize(const InType* x, const InType* y, Index_ m, Index_ n, Index_ k)
+auto getWorkspaceSize(const InType* x, const InType* y, Index_ m, Index_ n, Index_ k) -> size_t
 {
   size_t worksize             = 0;
   constexpr bool is_allocated = (distanceType <= cuvs::distance::DistanceType::CosineExpanded) ||
@@ -819,8 +826,8 @@ size_t getWorkspaceSize(const InType* x, const InType* y, Index_ m, Index_ n, In
     (distanceType == cuvs::distance::DistanceType::CorrelationExpanded) ? 2 : 1;
 
   if (is_allocated) {
-    // TODO : when X == Y allocate std::max(m, n) instead of m + n when column major input
-    // accuracy issue is resolved until then we allocate as m + n.
+    // TODO(snanditale): when X == Y allocate std::max(m, n) instead of m + n when column major
+    // input accuracy issue is resolved until then we allocate as m + n.
     worksize += numOfBuffers * m * sizeof(AccType);
     worksize += numOfBuffers * n * sizeof(AccType);
   }

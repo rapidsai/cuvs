@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -21,7 +21,7 @@
 #include <thrust/fill.h>
 #include <thrust/scan.h>
 
-#include <limits.h>
+#include <climits>
 
 #include <cstdint>
 
@@ -74,7 +74,7 @@ RAFT_KERNEL perform_post_filter_registers(const value_t* X,
 
   __syncthreads();
 
-  // TODO: Would it be faster to use L1 for this?
+  // TODO(snanditale): Would it be faster to use L1 for this?
   value_t local_x_ptr[MAX_COL_Q];
   for (value_int j = 0; j < n_cols; ++j) {
     local_x_ptr[j] = X[n_cols * blockIdx.x + j];
@@ -166,7 +166,8 @@ RAFT_KERNEL compute_final_dists_registers(const value_t* X_reordered,
     local_x_ptr[j] = x_ptr[j];
   }
 
-  using namespace cuvs::neighbors::detail::faiss_select;
+  using cuvs::neighbors::detail::faiss_select::Comparator;
+  using cuvs::neighbors::detail::faiss_select::KeyValueBlockSelect;
   KeyValueBlockSelect<value_t, value_idx, false, Comparator<value_t>, warp_q, thread_q, tpb> heap(
     std::numeric_limits<value_t>::max(),
     std::numeric_limits<value_t>::max(),
@@ -313,7 +314,7 @@ RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
   __shared__ value_t shared_memK[kNumWarps * warp_q];
   __shared__ raft::KeyValuePair<value_t, value_idx> shared_memV[kNumWarps * warp_q];
 
-  // TODO: Separate kernels for different widths:
+  // TODO(snanditale): Separate kernels for different widths:
   // 1. Very small (between 3 and 32) just use registers for columns of "blockIdx.x"
   // 2. Can fit comfortably in shared memory (32 to a few thousand?)
   // 3. Load each time individually.
@@ -326,7 +327,8 @@ RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
   }
 
   // Each warp works on 1 R
-  using namespace cuvs::neighbors::detail::faiss_select;
+  using cuvs::neighbors::detail::faiss_select::Comparator;
+  using cuvs::neighbors::detail::faiss_select::KeyValueBlockSelect;
   KeyValueBlockSelect<value_t, value_idx, false, Comparator<value_t>, warp_q, thread_q, tpb> heap(
     std::numeric_limits<value_t>::max(),
     std::numeric_limits<value_t>::max(),
@@ -436,7 +438,7 @@ RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
 }
 
 template <typename value_t>
-__device__ value_t squared(const value_t& a)
+__device__ auto squared(const value_t& a) -> value_t
 {
   return a * a;
 }
@@ -701,7 +703,7 @@ template <typename value_idx = std::int64_t,
           typename value_t,
           int tpb = 128,
           typename distance_func>
-RAFT_KERNEL __launch_bounds__(tpb)
+RAFT_KERNEL __launch_bounds__(tpb)  // NOLINT(readability-identifier-naming)
   block_rbc_kernel_eps_csr_pass_xd(const value_t* __restrict__ X_reordered,
                                    const value_t* __restrict__ X,
                                    const int64_t n_queries,
@@ -1367,7 +1369,7 @@ void rbc_eps_pass(raft::resources const& handle,
                              vd_ptr,
                              vd_ptr + n_query_rows + 1,
                              adj_ia,
-                             (value_idx)0);
+                             static_cast<value_idx>(0));
 
     } else {
       // pass 2 -> fill in adj_ja
@@ -1443,7 +1445,7 @@ void rbc_eps_pass(raft::resources const& handle,
     int64_t actual_max = thrust::reduce(raft::resource::get_thrust_policy(handle),
                                         vd_ptr,
                                         vd_ptr + n_query_rows,
-                                        (value_idx)0,
+                                        static_cast<value_idx>(0),
                                         thrust::maximum<value_idx>());
 
     if (actual_max > max_k_in) {
@@ -1452,7 +1454,7 @@ void rbc_eps_pass(raft::resources const& handle,
         vd_ptr,
         vd_ptr,
         n_query_rows,
-        [max_k_in] __device__(value_idx vd_count) {
+        [max_k_in] __device__(value_idx vd_count) -> value_idx {
           return vd_count > max_k_in ? max_k_in : vd_count;
         },
         raft::resource::get_cuda_stream(handle));
@@ -1462,7 +1464,7 @@ void rbc_eps_pass(raft::resources const& handle,
                            vd_ptr,
                            vd_ptr + n_query_rows + 1,
                            adj_ia,
-                           (value_idx)0);
+                           static_cast<value_idx>(0));
 
     block_rbc_kernel_eps_max_k_copy<value_idx, 32>
       <<<n_query_rows, 32, 0, raft::resource::get_cuda_stream(handle)>>>(

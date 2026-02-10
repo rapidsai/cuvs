@@ -33,7 +33,7 @@
 namespace cuvs {
 
 template <typename MathT, typename IdxT>
-struct KmeansBalancedInputs {
+struct KmeansBalancedInputs {  // NOLINT(readability-identifier-naming)
   IdxT n_rows;
   IdxT n_cols;
   IdxT n_clusters;
@@ -42,7 +42,7 @@ struct KmeansBalancedInputs {
 };
 
 template <typename MathT, typename IdxT>
-::std::ostream& operator<<(::std::ostream& os, const KmeansBalancedInputs<MathT, IdxT>& p)
+auto operator<<(::std::ostream& os, const KmeansBalancedInputs<MathT, IdxT>& p) -> ::std::ostream&
 {
   os << "{ " << p.n_rows << ", " << p.n_cols << ", " << p.n_clusters << ", " << p.kb_params.n_iters
      << static_cast<int>(p.kb_params.metric) << '}' << std::endl;
@@ -55,9 +55,11 @@ template <typename DataT,
           typename IdxT,
           typename MappingOpT,
           bool SeparateFitPredict>
-class KmeansBalancedTest : public ::testing::TestWithParam<KmeansBalancedInputs<MathT, IdxT>> {
+class KmeansBalancedTest
+  : public ::testing::TestWithParam<
+      KmeansBalancedInputs<MathT, IdxT>> {  // NOLINT(readability-identifier-naming)
  protected:
-  KmeansBalancedTest()
+  KmeansBalancedTest()  // NOLINT(modernize-use-equals-default)
     : stream(raft::resource::get_cuda_stream(handle)),
       d_labels(0, stream),
       d_labels_ref(0, stream),
@@ -65,13 +67,14 @@ class KmeansBalancedTest : public ::testing::TestWithParam<KmeansBalancedInputs<
   {
   }
 
-  void basicTest()
+  void basicTest()  // NOLINT(readability-identifier-naming)
   {
     MappingOpT op{};
 
     auto p = ::testing::TestWithParam<KmeansBalancedInputs<MathT, IdxT>>::GetParam();
 
-    auto X           = raft::make_device_matrix<DataT, IdxT>(handle, p.n_rows, p.n_cols);
+    auto X = raft::make_device_matrix<DataT, IdxT>(
+      handle, p.n_rows, p.n_cols);  // NOLINT(readability-identifier-naming)
     auto blob_labels = raft::make_device_vector<IdxT, IdxT>(handle, p.n_rows);
 
     MathT* blobs_ptr;
@@ -96,7 +99,7 @@ class KmeansBalancedTest : public ::testing::TestWithParam<KmeansBalancedInputs<
                                           true,
                                           MathT{-1},
                                           MathT{1},
-                                          (uint64_t)1234);
+                                          static_cast<uint64_t>(1234));
 
     // Convert blobs dataset to DataT if necessary
     if constexpr (!std::is_same_v<DataT, MathT>) {
@@ -111,7 +114,7 @@ class KmeansBalancedTest : public ::testing::TestWithParam<KmeansBalancedInputs<
     raft::linalg::unaryOp(
       d_labels_ref.data(), blob_labels.data_handle(), p.n_rows, raft::cast_op<LabelT>(), stream);
 
-    auto X_view =
+    auto X_view =  // NOLINT(readability-identifier-naming)
       raft::make_device_matrix_view<const DataT, IdxT>(X.data_handle(), X.extent(0), X.extent(1));
     auto d_centroids_view =
       raft::make_device_matrix_view<MathT, IdxT>(d_centroids.data(), p.n_clusters, p.n_cols);
@@ -142,19 +145,19 @@ class KmeansBalancedTest : public ::testing::TestWithParam<KmeansBalancedInputs<
     }
   }
 
-  void SetUp() override { basicTest(); }
+  void SetUp() override { basicTest(); }  // NOLINT(readability-identifier-naming)
 
  protected:
-  raft::handle_t handle;
-  cudaStream_t stream;
-  rmm::device_uvector<LabelT> d_labels;
-  rmm::device_uvector<LabelT> d_labels_ref;
-  rmm::device_uvector<MathT> d_centroids;
-  double score;
+  raft::handle_t handle;                     // NOLINT(readability-identifier-naming)
+  cudaStream_t stream;                       // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<LabelT> d_labels;      // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<LabelT> d_labels_ref;  // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<MathT> d_centroids;    // NOLINT(readability-identifier-naming)
+  double score;                              // NOLINT(readability-identifier-naming)
 };
 
 template <typename MathT, typename IdxT>
-std::vector<KmeansBalancedInputs<MathT, IdxT>> get_kmeans_balanced_inputs()
+auto get_kmeans_balanced_inputs() -> std::vector<KmeansBalancedInputs<MathT, IdxT>>
 {
   std::vector<KmeansBalancedInputs<MathT, IdxT>> out;
   KmeansBalancedInputs<MathT, IdxT> p;
@@ -179,9 +182,11 @@ std::vector<KmeansBalancedInputs<MathT, IdxT>> get_kmeans_balanced_inputs()
   return out;
 }
 
-const auto inputsf_i32 = get_kmeans_balanced_inputs<float, int>();
+const auto inputsf_i32 =
+  get_kmeans_balanced_inputs<float, int>();  // NOLINT(readability-identifier-naming)
 // const auto inputsd_i32 = get_kmeans_balanced_inputs<double, int>();
-const auto inputsf_i64 = get_kmeans_balanced_inputs<float, int64_t>();
+const auto inputsf_i64 =
+  get_kmeans_balanced_inputs<float, int64_t>();  // NOLINT(readability-identifier-naming)
 // const auto inputsd_i64 = get_kmeans_balanced_inputs<double, int64_t>();
 
 #define KB_TEST(test_type, test_name, test_inputs)         \
@@ -196,18 +201,20 @@ const auto inputsf_i64 = get_kmeans_balanced_inputs<float, int64_t>();
 KB_TEST((KmeansBalancedTest<float, float, uint32_t, int, raft::identity_op, false>),
         KmeansBalancedTestFFU32I32,
         inputsf_i32);
-KB_TEST((KmeansBalancedTest<float, float, int, int, raft::identity_op, true>),
-        KmeansBalancedTestFFI32I32_SEP,
-        inputsf_i32);
+KB_TEST(
+  (KmeansBalancedTest<float, float, int, int, raft::identity_op, true>),
+  KmeansBalancedTestFFI32I32_SEP,  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+  inputsf_i32);
 // KB_TEST((KmeansBalancedTest<double, double, uint32_t, int, raft::identity_op>),
 //         KmeansBalancedTestDDU32I32,
 //         inputsd_i32);
 KB_TEST((KmeansBalancedTest<float, float, uint32_t, int64_t, raft::identity_op, false>),
         KmeansBalancedTestFFU32I64,
         inputsf_i64);
-KB_TEST((KmeansBalancedTest<float, float, int, int64_t, raft::identity_op, true>),
-        KmeansBalancedTestFFI32I64_SEP,
-        inputsf_i64);
+KB_TEST(
+  (KmeansBalancedTest<float, float, int, int64_t, raft::identity_op, true>),
+  KmeansBalancedTestFFI32I64_SEP,  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+  inputsf_i64);
 // KB_TEST((KmeansBalancedTest<double, double, uint32_t, int64_t, raft::identity_op>),
 //         KmeansBalancedTestDDU32I64,
 //         inputsd_i64);
@@ -243,8 +250,9 @@ struct i2f_scaler {
 KB_TEST((KmeansBalancedTest<int8_t, float, uint32_t, int, i2f_scaler<int8_t, float>, false>),
         KmeansBalancedTestFI8U32I32,
         inputsf_i32);
-KB_TEST((KmeansBalancedTest<int8_t, float, int, int, i2f_scaler<int8_t, float>, true>),
-        KmeansBalancedTestFI8I32I32_SEP,
-        inputsf_i32);
+KB_TEST(
+  (KmeansBalancedTest<int8_t, float, int, int, i2f_scaler<int8_t, float>, true>),
+  KmeansBalancedTestFI8I32I32_SEP,  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+  inputsf_i32);
 
 }  // namespace cuvs

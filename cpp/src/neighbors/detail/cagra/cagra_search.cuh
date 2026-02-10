@@ -20,12 +20,12 @@
 
 #include <cuvs/neighbors/cagra.hpp>
 
-// TODO: Fix these when ivf methods are moved over
+// TODO(snanditale): Fix these when ivf methods are moved over
 #include "../../ivf_common.cuh"
 #include "../../ivf_pq/ivf_pq_search.cuh"
 #include <cuvs/neighbors/common.hpp>
 
-// TODO: This shouldn't be calling spatial/knn apis
+// TODO(snanditale): This shouldn't be calling spatial/knn apis
 #include "../ann_utils.cuh"
 
 #include <raft/linalg/matrix_vector_op.cuh>

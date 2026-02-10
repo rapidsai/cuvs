@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 import datetime
 import os
@@ -19,14 +19,14 @@ template += """
  *
  */
 
-{{includes}}
+{includes}
 
-namespace cuvs::neighbors::cagra::detail {{{{
+namespace cuvs::neighbors::cagra::detail {{
 
-using namespace cuvs::distance;
-{{content}}
+using cuvs::distance::DistanceType;
+{content}
 
-}}}}  // namespace cuvs::neighbors::cagra::detail
+}}  // namespace cuvs::neighbors::cagra::detail
 """
 
 mxdim_team = [(128, 8), (256, 16), (512, 32)]

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2019-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2019-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -21,10 +21,10 @@
 
 namespace cuvs::distance::kernels {
 
-struct GramMatrixInputs {
-  int n1;      // feature vectors in matrix 1
-  int n2;      // featuer vectors in matrix 2
-  int n_cols;  // number of elements in a feature vector
+struct GramMatrixInputs {  // NOLINT(readability-identifier-naming)
+  int n1;                  // feature vectors in matrix 1
+  int n2;                  // featuer vectors in matrix 2
+  int n_cols;              // number of elements in a feature vector
   bool is_row_major;
   KernelParams kernel;
   int ld1;
@@ -34,7 +34,7 @@ struct GramMatrixInputs {
   // The reference output is calculated by a custom kernel.
 };
 
-std::ostream& operator<<(std::ostream& os, const GramMatrixInputs& p)
+auto operator<<(std::ostream& os, const GramMatrixInputs& p) -> std::ostream&
 {
   std::vector<std::string> kernel_names{"linear", "poly", "rbf", "tanh"};
   os << "/" << p.n1 << "x" << p.n2 << "x" << p.n_cols << "/"
@@ -43,7 +43,7 @@ std::ostream& operator<<(std::ostream& os, const GramMatrixInputs& p)
   return os;
 }
 
-const std::vector<GramMatrixInputs> inputs = {
+const std::vector<GramMatrixInputs> kInputs = {
   {42, 137, 2, false, {KernelType::LINEAR}},
   {42, 137, 2, true, {KernelType::LINEAR}},
   {42, 137, 2, false, {KernelType::LINEAR}, 64, 179, 181},
@@ -64,8 +64,9 @@ const std::vector<GramMatrixInputs> inputs = {
   // {42, 137, 2, true, {KernelType::RBF, 0, 0.5}, 64, 155, 143},
 };
 
-template <typename math_t>
-class GramMatrixTest : public ::testing::TestWithParam<GramMatrixInputs> {
+template <typename math_t>  // NOLINT(readability-identifier-naming)
+class GramMatrixTest        // NOLINT(readability-identifier-naming)
+  : public ::testing::TestWithParam<GramMatrixInputs> {
  protected:
   GramMatrixTest()
     : params(GetParam()),
@@ -97,9 +98,9 @@ class GramMatrixTest : public ::testing::TestWithParam<GramMatrixInputs> {
     raft::random::uniform(handle, rng, x2.data(), x2.size(), math_t(0), math_t(1));
   }
 
-  ~GramMatrixTest() override {}
+  ~GramMatrixTest() override {}  // NOLINT(modernize-use-equals-default)
 
-  void runTest()
+  void runTest()  // NOLINT(readability-identifier-naming)
   {
     std::unique_ptr<GramMatrixBase<math_t>> kernel =
       std::unique_ptr<GramMatrixBase<math_t>>(KernelFactory<math_t>::create(params.kernel));
@@ -144,20 +145,27 @@ class GramMatrixTest : public ::testing::TestWithParam<GramMatrixInputs> {
       gram_host.data(), gram.data(), gram.size(), cuvs::CompareApprox<math_t>(1e-6f), stream));
   }
 
-  GramMatrixInputs params;
-  raft::resources handle;
+  GramMatrixInputs params;  // NOLINT(readability-identifier-naming)
+  raft::resources handle;   // NOLINT(readability-identifier-naming)
 
-  rmm::device_uvector<math_t> x1;
-  rmm::device_uvector<math_t> x2;
-  rmm::device_uvector<math_t> gram;
+  rmm::device_uvector<math_t> x1;    // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<math_t> x2;    // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<math_t> gram;  // NOLINT(readability-identifier-naming)
 
-  std::vector<math_t> gram_host;
+  std::vector<math_t> gram_host;  // NOLINT(readability-identifier-naming)
 };
 
-typedef GramMatrixTest<float> GramMatrixTestFloat;
-typedef GramMatrixTest<double> GramMatrixTestDouble;
+using GramMatrixTestFloat  = GramMatrixTest<float>;   // NOLINT(readability-identifier-naming)
+using GramMatrixTestDouble = GramMatrixTest<double>;  // NOLINT(readability-identifier-naming)
 
-TEST_P(GramMatrixTestFloat, Gram) { runTest(); }
+TEST_P(GramMatrixTestFloat, Gram)
+{
+  runTest();
+}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-INSTANTIATE_TEST_SUITE_P(GramMatrixTests, GramMatrixTestFloat, ::testing::ValuesIn(inputs));
+INSTANTIATE_TEST_SUITE_P(
+  GramMatrixTests,
+  GramMatrixTestFloat,
+  ::testing::ValuesIn(
+    kInputs));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 };  // namespace cuvs::distance::kernels

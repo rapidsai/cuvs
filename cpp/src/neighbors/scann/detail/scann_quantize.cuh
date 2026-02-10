@@ -12,7 +12,9 @@
 #include <raft/matrix/gather.cuh>
 
 #include "scann_common.cuh"
-using namespace cuvs::neighbors;
+using cuvs::neighbors::dataset;
+using cuvs::neighbors::vpq_dataset;
+using cuvs::neighbors::vpq_params;
 
 namespace cuvs::neighbors::experimental::scann::detail {
 
@@ -57,7 +59,7 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_subspaces_kernel
       raft::make_device_matrix_view<const MathT, uint32_t, raft::row_major>(nullptr, 0, 0);
     uint8_t code = cuvs::neighbors::detail::compute_code<kSubWarpSize, uint8_t>(
       dataset, vq_centers, pq_centers_smem, pq_subspace_view, row_ix, j, vq_label);
-    // TODO: this writes in global memory one byte per warp, which is very slow.
+    // TODO(snanditale): this writes in global memory one byte per warp, which is very slow.
     //  It's better to keep the codes in the shared memory or registers and dump them at once.
     if (lane_id == 0) { code_view[j] = code; }
   }
@@ -89,12 +91,12 @@ auto process_and_fill_codes_subspaces(
 
   auto stream = raft::resource::get_cuda_stream(res);
 
-  // TODO: with scaling workspace we could choose the batch size dynamically
+  // TODO(snanditale): with scaling workspace we could choose the batch size dynamically
   constexpr ix_t kBlockSize  = 256;
   const ix_t threads_per_vec = std::min<ix_t>(raft::WarpSize, pq_n_centers);
   dim3 threads(kBlockSize, 1, 1);
 
-  auto kernel = [](uint32_t pq_bits) {
+  auto kernel = [](uint32_t pq_bits) -> auto {
     switch (pq_bits) {
       case 4:
         return process_and_fill_codes_subspaces_kernel<kBlockSize, 4, data_t, MathT, IdxT, label_t>;
@@ -130,7 +132,7 @@ auto create_pq_codebook(raft::resources const& res,
   // Create codebooks (vq initialized to 0s since we don't need here)
   auto vq_code_book =
     raft::make_device_matrix<T, uint32_t, raft::row_major>(res, 1, residuals.extent(1));
-  raft::linalg::map_offset(res, vq_code_book.view(), [] __device__(size_t i) { return 0; });
+  raft::linalg::map_offset(res, vq_code_book.view(), [] __device__(size_t i) -> T { return 0; });
 
   auto pq_code_book = cuvs::neighbors::detail::train_pq<T>(
     res, ps, residuals, raft::make_const_mdspan(vq_code_book.view()));
@@ -164,7 +166,7 @@ auto compute_residuals(raft::resources const& res,
 
   // compute residuals for AVQ assignments
   raft::linalg::map_offset(
-    res, residuals.view(), [dataset, centers, labels, dim] __device__(size_t i) {
+    res, residuals.view(), [dataset, centers, labels, dim] __device__(size_t i) -> T {
       int row_idx = i / dim;
       int el_idx  = i % dim;
       return dataset(row_idx, el_idx) - centers(labels(row_idx), el_idx);
@@ -243,7 +245,7 @@ void unpack_codes(raft::resources const& res,
 {
   if (pq_bits == 4) {
     raft::linalg::map_offset(
-      res, unpacked_codes_view, [codes_view, num_subspaces] __device__(size_t i) {
+      res, unpacked_codes_view, [codes_view, num_subspaces] __device__(size_t i) -> uint8_t {
         int64_t row_idx             = i / num_subspaces;
         int64_t subspace_idx        = i % num_subspaces;
         int64_t packed_subspace_idx = 4 + subspace_idx / 2;
@@ -272,7 +274,8 @@ void unpack_codes(raft::resources const& res,
  * @return eta
  */
 template <typename IdxT>
-__device__ inline float compute_avq_eta(IdxT dim, const float sq_norm, const float threshold)
+__device__ inline auto compute_avq_eta(IdxT dim, const float sq_norm, const float threshold)
+  -> float
 {
   return (dim - 1) * (threshold * threshold / sq_norm) / (1 - threshold * threshold / sq_norm);
 }
@@ -283,7 +286,7 @@ __device__ inline float compute_avq_eta(IdxT dim, const float sq_norm, const flo
  * @param f the float value
  * @return the bflaot16 value (as int16_t)
  */
-__device__ inline int16_t float_to_bfloat16(const float& f)
+__device__ inline auto float_to_bfloat16(const float& f) -> int16_t
 {
   nv_bfloat16 val = __float2bfloat16(f);
   return reinterpret_cast<int16_t&>(val);
@@ -295,7 +298,7 @@ __device__ inline int16_t float_to_bfloat16(const float& f)
  * @param bf16 the bf16 value (represented as int16_t)
  * @return the float value
  */
-__device__ inline float bfloat16_to_float(int16_t& bf16)
+__device__ inline auto bfloat16_to_float(int16_t& bf16) -> float
 {
   nv_bfloat16 nv_bf16 = reinterpret_cast<nv_bfloat16&>(bf16);
   return __bfloat162float(nv_bf16);
@@ -316,9 +319,9 @@ __device__ inline float bfloat16_to_float(int16_t& bf16)
  * @param current the current quantized dimension
  * @return the other possible quantized value
  */
-__device__ inline int16_t bfloat16_next_delta(float& res, int16_t& current)
+__device__ inline auto bfloat16_next_delta(float& res, int16_t& current) -> int16_t
 {
-  uint32_t res_sign  = ((int32_t)res & (1u << 31) >> 31);
+  uint32_t res_sign  = (static_cast<int32_t>(res) & (1u << 31) >> 31);
   uint32_t curr_sign = (current & (1 << 15)) >> 15;
 
   if (res_sign == curr_sign) { return current - 1; }
@@ -499,7 +502,7 @@ void quantize_bfloat16(raft::resources const& res,
       bf16_dataset.data_handle(),
       dataset.data_handle(),
       dataset.size(),
-      [] __device__(float x) { return float_to_bfloat16(x); },
+      [] __device__(float x) -> nv_bfloat16 { return float_to_bfloat16(x); },
       resource::get_cuda_stream(res));
   }
 }

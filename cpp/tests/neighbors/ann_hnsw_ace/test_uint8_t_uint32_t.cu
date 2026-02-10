@@ -7,10 +7,15 @@
 
 namespace cuvs::neighbors::hnsw {
 
-typedef AnnHnswAceTest<float, uint8_t, uint32_t> AnnHnswAceTest_uint8_t;
-TEST_P(AnnHnswAceTest_uint8_t, AnnHnswAceBuild) { this->testHnswAceBuild(); }
+using AnnHnswAceTest_uint8_t =
+  AnnHnswAceTest<float, uint8_t, uint32_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(AnnHnswAceTest_uint8_t,
+       AnnHnswAceBuild)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  this->testHnswAceBuild();
+}  // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(AnnHnswAceTest,
+INSTANTIATE_TEST_CASE_P(AnnHnswAceTest,  // NOLINT(readability-identifier-naming)
                         AnnHnswAceTest_uint8_t,
                         ::testing::ValuesIn(hnsw_ace_inputs));
 

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -121,31 +121,31 @@ void _inverse_transform(cuvsResources_t res,
 }
 }  // namespace
 
-extern "C" cuvsError_t cuvsScalarQuantizerParamsCreate(cuvsScalarQuantizerParams_t* params)
+extern "C" auto cuvsScalarQuantizerParamsCreate(cuvsScalarQuantizerParams_t* params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions(
     [=] { *params = new cuvsScalarQuantizerParams{.quantile = 0.99}; });
 }
 
-extern "C" cuvsError_t cuvsScalarQuantizerParamsDestroy(cuvsScalarQuantizerParams_t params)
+extern "C" auto cuvsScalarQuantizerParamsDestroy(cuvsScalarQuantizerParams_t params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
 }
 
-extern "C" cuvsError_t cuvsScalarQuantizerCreate(cuvsScalarQuantizer_t* quantizer)
+extern "C" auto cuvsScalarQuantizerCreate(cuvsScalarQuantizer_t* quantizer) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { *quantizer = new cuvsScalarQuantizer{}; });
 }
 
-extern "C" cuvsError_t cuvsScalarQuantizerDestroy(cuvsScalarQuantizer_t quantizer)
+extern "C" auto cuvsScalarQuantizerDestroy(cuvsScalarQuantizer_t quantizer) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { delete quantizer; });
 }
 
-extern "C" cuvsError_t cuvsScalarQuantizerTrain(cuvsResources_t res,
+extern "C" auto cuvsScalarQuantizerTrain(cuvsResources_t res,
                                                 cuvsScalarQuantizerParams_t params,
                                                 DLManagedTensor* dataset_tensor,
-                                                cuvsScalarQuantizer_t quantizer)
+                                                cuvsScalarQuantizer_t quantizer) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
@@ -163,10 +163,10 @@ extern "C" cuvsError_t cuvsScalarQuantizerTrain(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsScalarQuantizerTransform(cuvsResources_t res,
+extern "C" auto cuvsScalarQuantizerTransform(cuvsResources_t res,
                                                     cuvsScalarQuantizer_t quantizer,
                                                     DLManagedTensor* dataset_tensor,
-                                                    DLManagedTensor* out_tensor)
+                                                    DLManagedTensor* out_tensor) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
@@ -184,10 +184,10 @@ extern "C" cuvsError_t cuvsScalarQuantizerTransform(cuvsResources_t res,
   });
 }
 
-cuvsError_t cuvsScalarQuantizerInverseTransform(cuvsResources_t res,
+auto cuvsScalarQuantizerInverseTransform(cuvsResources_t res,
                                                 cuvsScalarQuantizer_t quantizer,
                                                 DLManagedTensor* dataset,
-                                                DLManagedTensor* out)
+                                                DLManagedTensor* out) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto dtype = out->dl_tensor.dtype;

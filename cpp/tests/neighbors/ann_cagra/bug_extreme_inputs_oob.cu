@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -39,30 +39,40 @@ class cagra_extreme_inputs_oob_test : public ::testing::Test {
     FAIL();
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     dataset.emplace(raft::make_device_matrix<data_type, int64_t>(res, n_samples, n_dim));
     raft::random::RngState r(1234ULL);
-    raft::random::normal(
-      res, r, dataset->data_handle(), n_samples * n_dim, data_type(0), data_type(1e20));
+    raft::random::normal(res,
+                         r,
+                         dataset->data_handle(),
+                         n_samples * n_dim,
+                         static_cast<data_type>(0),
+                         static_cast<data_type>(1e20));
     raft::resource::sync_stream(res);
   }
 
-  void TearDown() override
+  void TearDown() override  // NOLINT(readability-identifier-naming)
   {
     dataset.reset();
     raft::resource::sync_stream(res);
   }
 
  private:
-  raft::resources res;
+  raft::resources res;  // NOLINT(readability-identifier-naming)
   std::optional<raft::device_matrix<data_type, int64_t>> dataset = std::nullopt;
 
-  constexpr static int64_t n_samples                   = 100000;
-  constexpr static int64_t n_dim                       = 200;
-  constexpr static cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded;
+  constexpr static int64_t n_samples = 100000;  // NOLINT(readability-identifier-naming)
+  constexpr static int64_t n_dim     = 200;     // NOLINT(readability-identifier-naming)
+  constexpr static cuvs::distance::DistanceType metric =
+    cuvs::distance::DistanceType::L2Expanded;  // NOLINT(readability-identifier-naming)
 };
 
-TEST_F(cagra_extreme_inputs_oob_test, cagra_extreme_inputs_oob_test) { this->run(); }
+TEST_F(
+  cagra_extreme_inputs_oob_test,
+  cagra_extreme_inputs_oob_test)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  this->run();
+}  // NOLINT(readability-identifier-naming)
 
 }  // namespace cuvs::neighbors::cagra

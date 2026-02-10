@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -16,15 +16,15 @@
 
 namespace cuvs::neighbors {
 template <typename T, typename DistT>
-testing::AssertionResult devArrMatchKnnPair(const T* expected_idx,
-                                            const T* actual_idx,
-                                            const DistT* expected_dist,
-                                            const DistT* actual_dist,
-                                            size_t rows,
-                                            size_t cols,
-                                            const DistT eps,
-                                            cudaStream_t stream = 0,
-                                            bool sort_inputs    = false)
+auto devArrMatchKnnPair(const T* expected_idx,
+                        const T* actual_idx,
+                        const DistT* expected_dist,
+                        const DistT* actual_dist,
+                        size_t rows,
+                        size_t cols,
+                        const DistT eps,
+                        cudaStream_t stream = nullptr,
+                        bool sort_inputs    = false) -> testing::AssertionResult
 {
   size_t size = rows * cols;
   std::unique_ptr<T[]> exp_idx_h(new T[size]);

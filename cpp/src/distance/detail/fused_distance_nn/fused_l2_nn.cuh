@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -19,10 +19,7 @@
 #include <cstddef>  // size_t
 #include <limits>   // std::numeric_limits
 
-namespace cuvs {
-namespace distance {
-
-namespace detail {
+namespace cuvs::distance::detail {
 
 template <typename DataT,
           typename OutT,
@@ -46,12 +43,12 @@ void fusedL2NNImpl(OutT* min,
                    cudaStream_t stream)
 {
   // The kernel policy is determined by fusedL2NN.
-  typedef Policy P;
+  using P = Policy;
 
   dim3 blk(P::Nthreads);
   auto nblks            = raft::ceildiv<int>(m, P::Nthreads);
   constexpr auto maxVal = std::numeric_limits<DataT>::max();
-  typedef raft::KeyValuePair<IdxT, DataT> KVPair;
+  using KVPair          = raft::KeyValuePair<IdxT, DataT>;
 
   if (initOutBuffer) {
     initKernel<DataT, OutT, IdxT, ReduceOpT>
@@ -129,6 +126,4 @@ void fusedL2NNImpl(OutT* min,
   }
 }
 
-}  // namespace detail
-}  // namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance::detail

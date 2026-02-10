@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -16,7 +16,7 @@ inline auto graph_params_heuristic(raft::matrix_extent<int64_t> dataset,
                                    cuvs::distance::DistanceType metric)
   -> decltype(index_params::graph_build_params)
 {
-  if (dataset.extent(0) < int64_t(1e6)) {
+  if (dataset.extent(0) < static_cast<int64_t>(1e6)) {
     // Use NN descent for smaller datasets
     auto nn_descent_params =
       graph_build_params::nn_descent_params(intermediate_graph_degree, metric);
@@ -31,11 +31,12 @@ inline auto graph_params_heuristic(raft::matrix_extent<int64_t> dataset,
   }
 }
 
-cagra::index_params index_params::from_hnsw_params(raft::matrix_extent<int64_t> dataset,
-                                                   int M,
-                                                   int ef_construction,
-                                                   hnsw_heuristic_type heuristic,
-                                                   cuvs::distance::DistanceType metric)
+// NOLINTNEXTLINE(readability-identifier-naming)
+auto index_params::from_hnsw_params(raft::matrix_extent<int64_t> dataset,
+                                    int M,
+                                    int ef_construction,
+                                    hnsw_heuristic_type heuristic,
+                                    cuvs::distance::DistanceType metric) -> cagra::index_params
 {
   cagra::index_params params;
   switch (heuristic) {

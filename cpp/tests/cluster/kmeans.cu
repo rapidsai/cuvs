@@ -27,7 +27,7 @@
 namespace cuvs {
 
 template <typename T>
-struct KmeansInputs {
+struct KmeansInputs {  // NOLINT(readability-identifier-naming)
   int n_row;
   int n_col;
   int n_clusters;
@@ -46,7 +46,8 @@ struct KmeansInputs {
 // }
 
 template <typename T>
-class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
+class KmeansTest
+  : public ::testing::TestWithParam<KmeansInputs<T>> {  // NOLINT(readability-identifier-naming)
  protected:
   KmeansTest()
     : d_labels(0, raft::resource::get_cuda_stream(handle)),
@@ -221,7 +222,7 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
   //                            CompareApprox<T>(params.tol)));
   //  }
 
-  void basicTest()
+  void basicTest()  // NOLINT(readability-identifier-naming)
   {
     testparams = ::testing::TestWithParam<KmeansInputs<T>>::GetParam();
 
@@ -233,7 +234,8 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
     params.rng_state.seed      = 1;
     params.oversampling_factor = 0;
 
-    auto X      = raft::make_device_matrix<T, int>(handle, n_samples, n_features);
+    auto X = raft::make_device_matrix<T, int>(
+      handle, n_samples, n_features);  // NOLINT(readability-identifier-naming)
     auto labels = raft::make_device_vector<int, int>(handle, n_samples);
     auto stream = raft::resource::get_cuda_stream(handle);
 
@@ -248,9 +250,9 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
                                      nullptr,
                                      T(1.0),
                                      false,
-                                     (T)-10.0f,
-                                     (T)10.0f,
-                                     (uint64_t)1234);
+                                     (T)-10.0f,        // NOLINT(google-readability-casting)
+                                     (T)10.0f,         // NOLINT(google-readability-casting)
+                                     (uint64_t)1234);  // NOLINT(google-readability-casting)
 
     d_labels.resize(n_samples, stream);
     d_labels_ref.resize(n_samples, stream);
@@ -273,7 +275,7 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
 
     T inertia   = 0;
     int n_iter  = 0;
-    auto X_view = raft::make_const_mdspan(X.view());
+    auto X_view = raft::make_const_mdspan(X.view());  // NOLINT(readability-identifier-naming)
 
     cuvs::cluster::kmeans::fit_predict(
       handle,
@@ -301,49 +303,58 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
     }
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     basicTest();
     //    apiTest();
   }
 
  protected:
-  raft::resources handle;
-  KmeansInputs<T> testparams;
-  rmm::device_uvector<int> d_labels;
-  rmm::device_uvector<int> d_labels_ref;
-  rmm::device_uvector<T> d_centroids;
-  rmm::device_uvector<T> d_sample_weight;
-  double score;
-  cuvs::cluster::kmeans::params params;
+  raft::resources handle;                  // NOLINT(readability-identifier-naming)
+  KmeansInputs<T> testparams;              // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<int> d_labels;       // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<int> d_labels_ref;   // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<T> d_centroids;      // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<T> d_sample_weight;  // NOLINT(readability-identifier-naming)
+  double score;                            // NOLINT(readability-identifier-naming)
+  cuvs::cluster::kmeans::params params;    // NOLINT(readability-identifier-naming)
 };
 
-const std::vector<KmeansInputs<float>> inputsf2 = {{1000, 32, 5, 0.0001f, true},
-                                                   {1000, 32, 5, 0.0001f, false},
-                                                   {1000, 100, 20, 0.0001f, true},
-                                                   {1000, 100, 20, 0.0001f, false},
-                                                   {10000, 32, 10, 0.0001f, true},
-                                                   {10000, 32, 10, 0.0001f, false},
-                                                   {10000, 100, 50, 0.0001f, true},
-                                                   {10000, 100, 50, 0.0001f, false},
-                                                   {10000, 500, 100, 0.0001f, true},
-                                                   {10000, 500, 100, 0.0001f, false}};
+const std::vector<KmeansInputs<float>> inputsf2 = {
+  {1000, 32, 5, 0.0001f, true},  // NOLINT(readability-identifier-naming)
+  {1000, 32, 5, 0.0001f, false},
+  {1000, 100, 20, 0.0001f, true},
+  {1000, 100, 20, 0.0001f, false},
+  {10000, 32, 10, 0.0001f, true},
+  {10000, 32, 10, 0.0001f, false},
+  {10000, 100, 50, 0.0001f, true},
+  {10000, 100, 50, 0.0001f, false},
+  {10000, 500, 100, 0.0001f, true},
+  {10000, 500, 100, 0.0001f, false}};
 
-const std::vector<KmeansInputs<double>> inputsd2 = {{1000, 32, 5, 0.0001, true},
-                                                    {1000, 32, 5, 0.0001, false},
-                                                    {1000, 100, 20, 0.0001, true},
-                                                    {1000, 100, 20, 0.0001, false},
-                                                    {10000, 32, 10, 0.0001, true},
-                                                    {10000, 32, 10, 0.0001, false},
-                                                    {10000, 100, 50, 0.0001, true},
-                                                    {10000, 100, 50, 0.0001, false},
-                                                    {10000, 500, 100, 0.0001, true},
-                                                    {10000, 500, 100, 0.0001, false}};
+const std::vector<KmeansInputs<double>> inputsd2 = {
+  {1000, 32, 5, 0.0001, true},  // NOLINT(readability-identifier-naming)
+  {1000, 32, 5, 0.0001, false},
+  {1000, 100, 20, 0.0001, true},
+  {1000, 100, 20, 0.0001, false},
+  {10000, 32, 10, 0.0001, true},
+  {10000, 32, 10, 0.0001, false},
+  {10000, 100, 50, 0.0001, true},
+  {10000, 100, 50, 0.0001, false},
+  {10000, 500, 100, 0.0001, true},
+  {10000, 500, 100, 0.0001, false}};
 
-typedef KmeansTest<float> KmeansTestF;
+typedef KmeansTest<float> KmeansTestF;  // NOLINT(modernize-use-using,readability-identifier-naming)
 
-TEST_P(KmeansTestF, Result) { ASSERT_TRUE(score == 1.0); }
+TEST_P(KmeansTestF, Result)
+{
+  ASSERT_TRUE(score == 1.0);
+}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(KmeansTests, KmeansTestF, ::testing::ValuesIn(inputsf2));
+INSTANTIATE_TEST_CASE_P(
+  KmeansTests,
+  KmeansTestF,
+  ::testing::ValuesIn(
+    inputsf2));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
 }  // namespace cuvs

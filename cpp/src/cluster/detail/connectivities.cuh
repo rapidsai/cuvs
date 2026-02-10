@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -81,7 +81,7 @@ struct distance_graph_impl<Linkage::KNN_GRAPH, value_idx, value_t> {
     raft::linalg::map(
       handle,
       vals_out_view,
-      [=] __device__(const value_idx row, const value_idx col, const value_t val) {
+      [=] __device__(const value_idx row, const value_idx col, const value_t val) -> value_t {
         bool self_loop = row == col;
         return (self_loop * std::numeric_limits<value_t>::max()) + (!self_loop * val);
       },
@@ -92,7 +92,7 @@ struct distance_graph_impl<Linkage::KNN_GRAPH, value_idx, value_t> {
     raft::sparse::convert::sorted_coo_to_csr(
       knn_graph_coo.rows(), knn_graph_coo.nnz, indptr.data(), m + 1, stream);
 
-    // TODO: Wouldn't need to copy here if we could compute knn
+    // TODO(snanditale): Wouldn't need to copy here if we could compute knn
     // graph directly on the device uvectors
     // ref: https://github.com/rapidsai/raft/issues/227
     raft::copy_async(indices.data(), knn_graph_coo.cols(), knn_graph_coo.nnz, stream);
@@ -137,16 +137,16 @@ void pairwise_distances(const raft::resources& handle,
 
   value_idx nnz = m * m;
 
-  value_idx blocks = raft::ceildiv(nnz, (value_idx)256);
+  value_idx blocks = raft::ceildiv(nnz, static_cast<value_idx>(256));
   fill_indices2<value_idx><<<blocks, 256, 0, stream>>>(indices, m, nnz);
 
   raft::linalg::map_offset(handle,
                            raft::make_device_vector_view<value_idx, value_idx>(indptr, m),
-                           [=] __device__(value_idx idx) { return idx * m; });
+                           [=] __device__(value_idx idx) -> value_idx { return idx * m; });
 
   raft::update_device(indptr + m, &nnz, 1, stream);
 
-  // TODO: It would ultimately be nice if the MST could accept
+  // TODO(snanditale): It would ultimately be nice if the MST could accept
   // dense inputs directly so we don't need to double the memory
   // usage to hand it a sparse array here.
   auto X_view = raft::make_device_matrix_view<const value_t, value_idx>(X, m, n);
@@ -157,7 +157,7 @@ void pairwise_distances(const raft::resources& handle,
   // self-loops get max distance
   auto data_view = raft::make_device_vector_view<value_t, value_idx>(data, nnz);
 
-  raft::linalg::map_offset(handle, data_view, [=] __device__(value_idx idx) {
+  raft::linalg::map_offset(handle, data_view, [=] __device__(value_idx idx) -> value_t {
     value_t val    = data[idx];
     bool self_loop = idx % m == idx / m;
     return (self_loop * std::numeric_limits<value_t>::max()) + (!self_loop * val);

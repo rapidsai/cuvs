@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -47,7 +47,7 @@ struct AnnNNDescentBatchInputs {
   bool host_dataset;
 };
 
-inline ::std::ostream& operator<<(::std::ostream& os, const AnnNNDescentInputs& p)
+inline auto operator<<(::std::ostream& os, const AnnNNDescentInputs& p) -> ::std::ostream&
 {
   os << "dataset shape=" << p.n_rows << "x" << p.dim << ", graph_degree=" << p.graph_degree
      << ", metric=" << static_cast<int>(p.metric) << (p.host_dataset ? ", host" : ", device")
@@ -55,7 +55,7 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AnnNNDescentInputs& 
   return os;
 }
 
-inline ::std::ostream& operator<<(::std::ostream& os, const AnnNNDescentBatchInputs& p)
+inline auto operator<<(::std::ostream& os, const AnnNNDescentBatchInputs& p) -> ::std::ostream&
 {
   os << "dataset shape=" << p.n_rows << "x" << p.dim << ", graph_degree=" << p.graph_degree
      << ", metric=" << static_cast<int>(p.metric) << (p.host_dataset ? ", host" : ", device")
@@ -113,7 +113,7 @@ class AnnNNDescentTest : public ::testing::TestWithParam<AnnNNDescentInputs> {
         index_params.return_distances          = true;
 
         auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
-          (const DataT*)database.data(), ps.n_rows, ps.dim);
+          reinterpret_cast<const DataT*>(database.data()), ps.n_rows, ps.dim);
 
         {
           if (ps.host_dataset) {
@@ -121,7 +121,7 @@ class AnnNNDescentTest : public ::testing::TestWithParam<AnnNNDescentInputs> {
             raft::copy(database_host.data_handle(), database.data(), database.size(), stream_);
             raft::resource::sync_stream(handle_);
             auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
-              (const DataT*)database_host.data_handle(), ps.n_rows, ps.dim);
+              reinterpret_cast<const DataT*>(database_host.data_handle()), ps.n_rows, ps.dim);
             auto index = nn_descent::build(handle_, index_params, database_host_view);
             raft::copy(
               indices_NNDescent.data(), index.graph().data_handle(), queries_size, stream_);
@@ -159,7 +159,7 @@ class AnnNNDescentTest : public ::testing::TestWithParam<AnnNNDescentInputs> {
     }
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     raft::random::RngState r(1234ULL);
@@ -174,7 +174,7 @@ class AnnNNDescentTest : public ::testing::TestWithParam<AnnNNDescentInputs> {
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override
+  void TearDown() override  // NOLINT(readability-identifier-naming)
   {
     raft::resource::sync_stream(handle_);
     database.resize(0, stream_);
@@ -273,7 +273,7 @@ class AnnNNDescentDistEpiTest : public ::testing::TestWithParam<AnnNNDescentInpu
       raft::copy(database_host.data_handle(), database.data(), database.size(), stream_);
       raft::resource::sync_stream(handle_);
       auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
-        (const DataT*)database_host.data_handle(), ps.n_rows, ps.dim);
+        reinterpret_cast<const DataT*>(database_host.data_handle()), ps.n_rows, ps.dim);
       auto index = nn_descent::build(handle_, index_params, database_host_view);
 
       rmm::device_uvector<DistanceT> core_dists_dev(ps.n_rows, stream_);
@@ -288,7 +288,7 @@ class AnnNNDescentDistEpiTest : public ::testing::TestWithParam<AnnNNDescentInpu
       size_t extended_graph_degree, graph_degree;
       auto build_config = nn_descent::detail::get_build_config(
         handle_, index_params, ps.n_rows, ps.dim, ps.metric, extended_graph_degree, graph_degree);
-      auto gnnd      = nn_descent::detail::GNND<const DataT, int>(handle_, build_config);
+      auto gnnd      = nn_descent::detail::gnnd<const DataT, int>(handle_, build_config);
       auto int_graph = raft::make_host_matrix<int, IdxT, row_major>(
         ps.n_rows, static_cast<IdxT>(extended_graph_degree));
 
@@ -324,7 +324,7 @@ class AnnNNDescentDistEpiTest : public ::testing::TestWithParam<AnnNNDescentInpu
                                 min_recall));
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     raft::random::RngState r(1234ULL);
@@ -332,7 +332,7 @@ class AnnNNDescentDistEpiTest : public ::testing::TestWithParam<AnnNNDescentInpu
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override
+  void TearDown() override  // NOLINT(readability-identifier-naming)
   {
     raft::resource::sync_stream(handle_);
     database.resize(0, stream_);
@@ -391,14 +391,14 @@ class AnnNNDescentBatchTest : public ::testing::TestWithParam<AnnNNDescentBatchI
         index_params.return_distances          = true;
 
         auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
-          (const DataT*)database.data(), ps.n_rows, ps.dim);
+          reinterpret_cast<const DataT*>(database.data()), ps.n_rows, ps.dim);
 
         {
           if (ps.host_dataset) {
             auto database_host = raft::make_host_matrix<DataT, int64_t>(ps.n_rows, ps.dim);
             raft::copy(database_host.data_handle(), database.data(), database.size(), stream_);
             auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
-              (const DataT*)database_host.data_handle(), ps.n_rows, ps.dim);
+              reinterpret_cast<const DataT*>(database_host.data_handle()), ps.n_rows, ps.dim);
             auto index = nn_descent::build(handle_, index_params, database_host_view);
             raft::copy(
               indices_NNDescent.data(), index.graph().data_handle(), queries_size, stream_);
@@ -437,7 +437,7 @@ class AnnNNDescentBatchTest : public ::testing::TestWithParam<AnnNNDescentBatchI
     }
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     raft::random::RngState r(1234ULL);
@@ -450,7 +450,7 @@ class AnnNNDescentBatchTest : public ::testing::TestWithParam<AnnNNDescentBatchI
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override
+  void TearDown() override  // NOLINT(readability-identifier-naming)
   {
     raft::resource::sync_stream(handle_);
     database.resize(0, stream_);

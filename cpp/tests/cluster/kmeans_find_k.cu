@@ -23,7 +23,7 @@
 namespace cuvs::cluster::kmeans {
 
 template <typename T>
-struct KmeansFindKInputs {
+struct KmeansFindKInputs {  // NOLINT(readability-identifier-naming)
   int n_row;
   int n_col;
   int n_clusters;
@@ -32,14 +32,15 @@ struct KmeansFindKInputs {
 };
 
 template <typename T>
-class KmeansFindKTest : public ::testing::TestWithParam<KmeansFindKInputs<T>> {
+class KmeansFindKTest : public ::testing::TestWithParam<
+                          KmeansFindKInputs<T>> {  // NOLINT(readability-identifier-naming)
  protected:
-  KmeansFindKTest()
+  KmeansFindKTest()  // NOLINT(modernize-use-equals-default)
     : stream(raft::resource::get_cuda_stream(handle)), best_k(raft::make_host_scalar<int>(0))
   {
   }
 
-  void basicTest()
+  void basicTest()  // NOLINT(readability-identifier-naming)
   {
     testparams = ::testing::TestWithParam<KmeansFindKInputs<T>>::GetParam();
 
@@ -47,7 +48,8 @@ class KmeansFindKTest : public ::testing::TestWithParam<KmeansFindKInputs<T>> {
     int n_features = testparams.n_col;
     int n_clusters = testparams.n_clusters;
 
-    auto X      = raft::make_device_matrix<T, int>(handle, n_samples, n_features);
+    auto X = raft::make_device_matrix<T, int>(
+      handle, n_samples, n_features);  // NOLINT(readability-identifier-naming)
     auto labels = raft::make_device_vector<int, int>(handle, n_samples);
 
     raft::random::make_blobs<T, int>(X.data_handle(),
@@ -61,14 +63,14 @@ class KmeansFindKTest : public ::testing::TestWithParam<KmeansFindKInputs<T>> {
                                      nullptr,
                                      T(.001),
                                      false,
-                                     (T)-10.0f,
-                                     (T)10.0f,
-                                     (uint64_t)1234);
+                                     (T)-10.0f,        // NOLINT(google-readability-casting)
+                                     (T)10.0f,         // NOLINT(google-readability-casting)
+                                     (uint64_t)1234);  // NOLINT(google-readability-casting)
 
     auto inertia = raft::make_host_scalar<T>(0);
     auto n_iter  = raft::make_host_scalar<int>(0);
 
-    auto X_view =
+    auto X_view =  // NOLINT(readability-identifier-naming)
       raft::make_device_matrix_view<const T, int>(X.data_handle(), X.extent(0), X.extent(1));
 
     cuvs::cluster::kmeans::helpers::find_k(
@@ -77,28 +79,30 @@ class KmeansFindKTest : public ::testing::TestWithParam<KmeansFindKInputs<T>> {
     raft::resource::sync_stream(handle, stream);
   }
 
-  void SetUp() override { basicTest(); }
+  void SetUp() override { basicTest(); }  // NOLINT(readability-identifier-naming)
 
  protected:
-  raft::resources handle;
-  cudaStream_t stream;
-  KmeansFindKInputs<T> testparams;
-  raft::host_scalar<int> best_k;
+  raft::resources handle;           // NOLINT(readability-identifier-naming)
+  cudaStream_t stream;              // NOLINT(readability-identifier-naming)
+  KmeansFindKInputs<T> testparams;  // NOLINT(readability-identifier-naming)
+  raft::host_scalar<int> best_k;    // NOLINT(readability-identifier-naming)
 };
 
-const std::vector<KmeansFindKInputs<float>> inputsf2 = {{1000, 32, 8, 0.001f, true},
-                                                        {1000, 32, 8, 0.001f, false},
-                                                        {1000, 100, 20, 0.001f, true},
-                                                        {1000, 100, 20, 0.001f, false},
-                                                        {10000, 32, 10, 0.001f, true},
-                                                        {10000, 32, 10, 0.001f, false},
-                                                        {10000, 100, 50, 0.001f, true},
-                                                        {10000, 100, 50, 0.001f, false},
-                                                        {10000, 500, 100, 0.001f, true},
-                                                        {10000, 500, 100, 0.001f, false}};
+const std::vector<KmeansFindKInputs<float>> inputsf2 = {
+  {1000, 32, 8, 0.001f, true},  // NOLINT(readability-identifier-naming)
+  {1000, 32, 8, 0.001f, false},
+  {1000, 100, 20, 0.001f, true},
+  {1000, 100, 20, 0.001f, false},
+  {10000, 32, 10, 0.001f, true},
+  {10000, 32, 10, 0.001f, false},
+  {10000, 100, 50, 0.001f, true},
+  {10000, 100, 50, 0.001f, false},
+  {10000, 500, 100, 0.001f, true},
+  {10000, 500, 100, 0.001f, false}};
 
-typedef KmeansFindKTest<float> KmeansFindKTestF;
-TEST_P(KmeansFindKTestF, Result)
+using KmeansFindKTestF = KmeansFindKTest<float>;  // NOLINT(readability-identifier-naming)
+TEST_P(KmeansFindKTestF,
+       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
   if (best_k.view()[0] != testparams.n_clusters) {
     std::cout << best_k.view()[0] << " " << testparams.n_clusters << std::endl;
@@ -106,6 +110,10 @@ TEST_P(KmeansFindKTestF, Result)
   ASSERT_TRUE(best_k.view()[0] == testparams.n_clusters);
 }
 
-INSTANTIATE_TEST_CASE_P(KmeansFindKTests, KmeansFindKTestF, ::testing::ValuesIn(inputsf2));
+INSTANTIATE_TEST_CASE_P(
+  KmeansFindKTests,
+  KmeansFindKTestF,
+  ::testing::ValuesIn(
+    inputsf2));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
 }  // namespace cuvs::cluster::kmeans

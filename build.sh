@@ -224,7 +224,7 @@ function gpuArch {
 
     # Check for gpu-arch option
     if [[ -n $(echo "$ARGS" | { grep -E "\-\-gpu\-arch" || true; } ) ]]; then
-        GPU_ARCH_ARG=$(echo "$ARGS" | { grep -Eo "\-\-gpu\-arch=.+( |$)" || true; })
+        GPU_ARCH_ARG=$(echo "$ARGS" | { grep -Eo "\-\-gpu\-arch=[^ ]+" || true; })
         if [[ -n ${GPU_ARCH_ARG} ]]; then
             # Remove the full argument from ARGS
             ARGS=${ARGS//$GPU_ARCH_ARG/}
@@ -313,7 +313,9 @@ fi
 
 if hasArg tests || (( NUMARGS == 0 )); then
     BUILD_TESTS=ON
-    CMAKE_TARGET+=("${TEST_TARGETS}")
+    if [[ -n "${TEST_TARGETS}" ]]; then
+        CMAKE_TARGET+=("${TEST_TARGETS}")
+    fi
 fi
 
 if hasArg bench-ann || (( NUMARGS == 0 )); then
@@ -322,7 +324,9 @@ if hasArg bench-ann || (( NUMARGS == 0 )); then
         BUILD_TESTS=OFF
     fi
     COMPILE_LIBRARY=OFF
-    CMAKE_TARGET+=("${ANN_BENCH_TARGETS}")
+    if [[ -n "${ANN_BENCH_TARGETS}" ]]; then
+        CMAKE_TARGET+=("${ANN_BENCH_TARGETS}")
+    fi
     if hasArg --cpu-only; then
         BUILD_CPU_ONLY=ON
         BUILD_SHARED_LIBS=OFF
@@ -351,10 +355,6 @@ if hasArg --incl-cache-stats; then
     BUILD_REPORT_INCL_CACHE_STATS=ON
 fi
 
-if [[ ${#CMAKE_TARGET} -eq 0 ]]; then
-    CMAKE_TARGET=("all")
-fi
-
 # If clean given, run it prior to any other steps
 if (( CLEAN == 1 )); then
     # If the dirs to clean are mounted dirs in a container, the
@@ -371,10 +371,25 @@ fi
 
 ################################################################################
 # Configure for building all C++ targets
-if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg bench-prims || hasArg bench-ann; then
+if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg bench-prims || hasArg bench-ann || hasArg examples; then
     COMPILE_LIBRARY=ON
     if [[ "${BUILD_SHARED_LIBS}" != "OFF" ]]; then
         CMAKE_TARGET+=("cuvs")
+        if hasArg examples; then
+            CMAKE_TARGET+=("cuvs_c")
+        fi
+    fi
+
+    # Filter out empty elements from CMAKE_TARGET array
+    mapfile -t CMAKE_TARGET < <(printf '%s\n' "${CMAKE_TARGET[@]}" | grep -v '^$')
+
+    # If no specific targets were added (no limits specified), use "all" to build everything
+    # This ensures all tests and benchmarks are built when no limits are specified
+    if [[ ${#CMAKE_TARGET[@]} -eq 0 ]]; then
+        CMAKE_TARGET=("all")
+    elif [[ ${BUILD_TESTS} == "ON" ]] && [[ -z "${TEST_TARGETS}" ]] && [[ ${BUILD_CUVS_BENCH} == "ON" ]] && [[ -z "${ANN_BENCH_TARGETS}" ]]; then
+        # Building all tests and benchmarks without limits - use "all" to build everything
+        CMAKE_TARGET=("all")
     fi
 
     # get the current count before the compile starts

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -15,7 +15,7 @@
 namespace cuvs::preprocessing::quantize::scalar {
 
 template <typename T>
-struct QuantizationInputs {
+struct QuantizationInputs {  // NOLINT(readability-identifier-naming)
   cuvs::preprocessing::quantize::scalar::params quantization_params;
   int rows;
   int cols;
@@ -25,24 +25,29 @@ struct QuantizationInputs {
 };
 
 template <typename T>
-std::ostream& operator<<(std::ostream& os, const QuantizationInputs<T>& inputs)
+auto operator<<(std::ostream& os, const QuantizationInputs<T>& inputs) -> std::ostream&
 {
   return os << "quantization_quantile:<" << inputs.quantization_params.quantile
-            << "> rows:" << inputs.rows << " cols:" << inputs.cols << " min:" << (double)inputs.min
-            << " max:" << (double)inputs.max;
+            << "> rows:" << inputs.rows << " cols:" << inputs.cols
+            << " min:" << static_cast<double>(inputs.min)
+            << " max:" << static_cast<double>(inputs.max);
 }
 
 template <typename T, typename QuantI>
-class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> {
+class QuantizationTest : public ::testing::TestWithParam<
+                           QuantizationInputs<T>> {  // NOLINT(readability-identifier-naming)
  public:
-  QuantizationTest()
+  QuantizationTest()  // NOLINT(modernize-use-equals-default)
     : params_(::testing::TestWithParam<QuantizationInputs<T>>::GetParam()),
       stream(raft::resource::get_cuda_stream(handle)),
       input_(0, stream)
   {
   }
 
-  double getRelativeErrorStddev(const T* array_a, const T* array_b, size_t size, float quantile)
+  auto getRelativeErrorStddev(const T* array_a,
+                              const T* array_b,
+                              size_t size,
+                              float quantile) -> double  // NOLINT(readability-identifier-naming)
   {
     // relative error elementwise
     rmm::device_uvector<double> relative_error(size, stream);
@@ -51,7 +56,7 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
       array_a,
       array_b,
       size,
-      [] __device__(double a, double b) {
+      [] __device__(double a, double b) -> double {
         return a != b ? (raft::abs(a - b) / raft::max(raft::abs(a), raft::abs(b))) : 0;
       },
       stream);
@@ -82,11 +87,11 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
   }
 
  protected:
-  void testScalarQuantization()
+  void testScalarQuantization()  // NOLINT(readability-identifier-naming)
   {
     // dataset identical on host / device
     auto dataset = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
-      (const T*)(input_.data()), rows_, cols_);
+      reinterpret_cast<const T*>((input_.data())), rows_, cols_);
     auto dataset_h = raft::make_host_matrix_view<const T, int64_t, raft::row_major>(
       (const T*)(host_input_.data()), rows_, cols_);
 
@@ -95,8 +100,8 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
     // train quantizer_1 on device
     auto quantizer_1 =
       cuvs::preprocessing::quantize::scalar::train(handle, params_.quantization_params, dataset);
-    std::cerr << "Q1: min = " << (double)quantizer_1.min_ << ", max = " << (double)quantizer_1.max_
-              << std::endl;
+    std::cerr << "Q1: min = " << static_cast<double>(quantizer_1.min_)
+              << ", max = " << static_cast<double>(quantizer_1.max_) << std::endl;
 
     {
       auto quantized_input_h = raft::make_host_matrix<QuantI, int64_t>(rows_, cols_);
@@ -156,13 +161,13 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
     // train quantizer_2 on host
     auto quantizer_2 =
       cuvs::preprocessing::quantize::scalar::train(handle, params_.quantization_params, dataset_h);
-    std::cerr << "Q2: min = " << (double)quantizer_2.min_ << ", max = " << (double)quantizer_2.max_
-              << std::endl;
+    std::cerr << "Q2: min = " << static_cast<double>(quantizer_2.min_)
+              << ", max = " << static_cast<double>(quantizer_2.max_) << std::endl;
 
     // check both quantizers are the same (valid if sampling is identical)
     if (input_.size() <= 1000000) {
-      ASSERT_TRUE((double)quantizer_1.min_ == (double)quantizer_2.min_);
-      ASSERT_TRUE((double)quantizer_1.max_ == (double)quantizer_2.max_);
+      ASSERT_TRUE(static_cast<double>(quantizer_1.min_) == static_cast<double>(quantizer_2.min_));
+      ASSERT_TRUE(static_cast<double>(quantizer_1.max_) == static_cast<double>(quantizer_2.max_));
     }
 
     {
@@ -213,7 +218,7 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
     }
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     rows_ = params_.rows;
     cols_ = params_.cols;
@@ -223,7 +228,7 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
     host_input_.resize(n_elements);
 
     // random input
-    unsigned long long int seed = 1234ULL;
+    unsigned long long int seed = 1234ULL;  // NOLINT(google-runtime-int)
     raft::random::RngState r(seed);
     uniform(handle, r, input_.data(), input_.size(), params_.min, params_.max);
 
@@ -233,8 +238,8 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
   }
 
  private:
-  raft::resources handle;
-  cudaStream_t stream;
+  raft::resources handle;  // NOLINT(readability-identifier-naming)
+  cudaStream_t stream;     // NOLINT(readability-identifier-naming)
 
   QuantizationInputs<T> params_;
   int rows_;
@@ -245,6 +250,7 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
 
 template <typename T>
 const std::vector<QuantizationInputs<T>> inputs = {
+  // NOLINT(readability-identifier-naming)
   {{1.0}, 5, 5, T(0.0), T(1.0)},
   {{0.98}, 10, 20, T(0.0), T(1.0)},
   {{0.90}, 1000, 1500, T(-500.0), T(100.0)},
@@ -257,22 +263,37 @@ const std::vector<QuantizationInputs<T>> inputs = {
   {{0.95}, 10, 20, T(5.0), T(5.0)},
 };
 
-typedef QuantizationTest<float, int8_t> QuantizationTest_float_int8t;
-TEST_P(QuantizationTest_float_int8t, ScalarQuantizationTest) { this->testScalarQuantization(); }
+using QuantizationTest_float_int8t =
+  QuantizationTest<float, int8_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(QuantizationTest_float_int8t,
+       ScalarQuantizationTest)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  this->testScalarQuantization();
+}  // NOLINT(readability-identifier-naming)
 
-typedef QuantizationTest<double, int8_t> QuantizationTest_double_int8t;
-TEST_P(QuantizationTest_double_int8t, ScalarQuantizationTest) { this->testScalarQuantization(); }
+using QuantizationTest_double_int8t =
+  QuantizationTest<double, int8_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(QuantizationTest_double_int8t,
+       ScalarQuantizationTest)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  this->testScalarQuantization();
+}  // NOLINT(readability-identifier-naming)
 
-typedef QuantizationTest<half, int8_t> QuantizationTest_half_int8t;
-TEST_P(QuantizationTest_half_int8t, ScalarQuantizationTest) { this->testScalarQuantization(); }
+using QuantizationTest_half_int8t =
+  QuantizationTest<half, int8_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(QuantizationTest_half_int8t,
+       ScalarQuantizationTest)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  this->testScalarQuantization();
+}  // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(QuantizationTest,
+INSTANTIATE_TEST_CASE_P(QuantizationTest,  // NOLINT(readability-identifier-naming)
                         QuantizationTest_float_int8t,
                         ::testing::ValuesIn(inputs<float>));
-INSTANTIATE_TEST_CASE_P(QuantizationTest,
+INSTANTIATE_TEST_CASE_P(QuantizationTest,  // NOLINT(readability-identifier-naming)
                         QuantizationTest_double_int8t,
                         ::testing::ValuesIn(inputs<double>));
-INSTANTIATE_TEST_CASE_P(QuantizationTest,
+INSTANTIATE_TEST_CASE_P(QuantizationTest,  // NOLINT(readability-identifier-naming)
                         QuantizationTest_half_int8t,
                         ::testing::ValuesIn(inputs<half>));
 

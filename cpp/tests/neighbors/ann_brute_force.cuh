@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -29,7 +29,7 @@ struct AnnBruteForceInputs {
 };
 
 template <typename T, typename IdxT>
-::std::ostream& operator<<(::std::ostream& os, const AnnBruteForceInputs<IdxT>& p)
+auto operator<<(::std::ostream& os, const AnnBruteForceInputs<IdxT>& p) -> ::std::ostream&
 {
   os << "{ " << p.num_queries << ", " << p.num_db_vecs << ", " << p.dim << ", " << p.k << ", "
      << static_cast<int>(p.metric) << static_cast<T>(p.metric_arg) << '}' << std::endl;
@@ -71,9 +71,9 @@ class AnnBruteForceTest : public ::testing::TestWithParam<AnnBruteForceInputs<Id
       rmm::device_uvector<T> distances_bruteforce_dev(queries_size, stream_);
       rmm::device_uvector<IdxT> indices_bruteforce_dev(queries_size, stream_);
 
-      auto idx = [this]() {
+      auto idx = [this]() -> auto {
         auto database_view = raft::make_device_matrix_view<const DataT, IdxT>(
-          (const DataT*)database.data(), ps.num_db_vecs, ps.dim);
+          reinterpret_cast<const DataT*>(database.data()), ps.num_db_vecs, ps.dim);
 
         return brute_force::build(handle_, database_view, ps.metric, ps.metric_arg);
       }();

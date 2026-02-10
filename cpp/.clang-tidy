@@ -1,8 +1,8 @@
 ---
 # Refer to the following link for the explanation of each params:
 #  https://releases.llvm.org/8.0.1/tools/clang/tools/extra/docs/clang-tidy/checks/list.html
-Checks:          'clang-diagnostic-*,clang-analyzer-*,modernize-*,-modernize-make-*,-modernize-raw-string-literal,google-*,-google-default-arguments,-clang-diagnostic-#pragma-messages,readability-identifier-naming,-*,modernize-*,-modernize-make-*,-modernize-raw-string-literal,google-*,-google-default-arguments,-clang-diagnostic-#pragma-messages,readability-identifier-naming'
-WarningsAsErrors: ''
+Checks:          '-*,modernize-*,-modernize-make-*,-modernize-raw-string-literal,-modernize-avoid-c-arrays,-modernize-use-integer-sign-comparison,-modernize-macro-to-enum,-modernize-use-constraints,google-*,-google-default-arguments,-google-runtime-int,readability-identifier-naming'
+WarningsAsErrors: '*'
 HeaderFilterRegex: ''
 FormatStyle:     none
 User:            snanditale
@@ -35,8 +35,6 @@ CheckOptions:
     value:           ''
   - key:             google-runtime-int.UnsignedTypePrefix
     value:           uint
-  - key:             google-runtime-references.WhiteListTypes
-    value:           ''
   - key:             modernize-loop-convert.MaxCopySize
     value:           '16'
   - key:             modernize-loop-convert.MinConfidence
@@ -128,15 +126,15 @@ CheckOptions:
   - key:             readability-identifier-naming.ConstexprVariableSuffix
     value:           ''
   - key:             readability-identifier-naming.EnumCase
-    value:           CamelCase
+    value:           lower_case
   - key:             readability-identifier-naming.EnumPrefix
     value:           ''
   - key:             readability-identifier-naming.EnumSuffix
     value:           ''
   - key:             readability-identifier-naming.EnumConstantCase
-    value:           CamelCase
+    value:           UPPER_CASE
   - key:             readability-identifier-naming.EnumConstantPrefix
-    value:           'k'
+    value:           ''
   - key:             readability-identifier-naming.EnumConstantSuffix
     value:           ''
   - key:             readability-identifier-naming.FunctionCase
@@ -189,6 +187,12 @@ CheckOptions:
     value:           ''
   - key:             readability-identifier-naming.ProtectedMemberSuffix
     value:           '_'
+  - key:             readability-identifier-naming.PublicMemberCase
+    value:           lower_case
+  - key:             readability-identifier-naming.PublicMemberPrefix
+    value:           ''
+  - key:             readability-identifier-naming.PublicMemberSuffix
+    value:           ''
   - key:             readability-identifier-naming.StaticConstantCase
     value:           CamelCase
   - key:             readability-identifier-naming.StaticConstantPrefix

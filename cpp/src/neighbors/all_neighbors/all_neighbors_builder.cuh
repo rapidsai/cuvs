@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -27,7 +27,6 @@
 #include <raft/util/cudart_utils.hpp>
 
 namespace cuvs::neighbors::all_neighbors::detail {
-using namespace cuvs::neighbors;
 
 template <typename T, typename IdxT = int64_t>
 struct all_neighbors_builder {
@@ -483,9 +482,9 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
   }
 
   nn_descent::index_params nnd_params;
-  nn_descent::detail::BuildConfig build_config;
+  nn_descent::detail::build_config build_config;
 
-  std::optional<nn_descent::detail::GNND<const T, int>> nnd_builder;
+  std::optional<nn_descent::detail::gnnd<const T, int>> nnd_builder;
   std::optional<raft::host_matrix<int, IdxT>> int_graph;
 
   DistEpilogueT dist_epilogue;
@@ -682,7 +681,7 @@ struct all_neighbors_builder_brute_force : public all_neighbors_builder<T, IdxT>
 };
 
 template <typename T, typename IdxT, typename DistEpilogueT = raft::identity_op>
-std::unique_ptr<all_neighbors_builder<T, IdxT>> get_knn_builder(
+auto get_knn_builder(
   const raft::resources& handle,
   const all_neighbors_params& params,
   size_t min_cluster_size,
@@ -690,7 +689,7 @@ std::unique_ptr<all_neighbors_builder<T, IdxT>> get_knn_builder(
   size_t k,
   std::optional<raft::device_matrix_view<IdxT, IdxT, row_major>> indices = std::nullopt,
   std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances  = std::nullopt,
-  DistEpilogueT dist_epilogue                                            = DistEpilogueT{})
+  DistEpilogueT dist_epilogue = DistEpilogueT{}) -> std::unique_ptr<all_neighbors_builder<T, IdxT>>
 {
   if (std::holds_alternative<graph_build_params::brute_force_params>(params.graph_build_params)) {
     auto brute_force_params =

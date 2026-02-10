@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -38,8 +38,9 @@ namespace cuvs {
  * @{
  */
 template <typename T, typename L>
-testing::AssertionResult devArrMatch(
-  const T* expected, const T* actual, size_t size, L eq_compare, cudaStream_t stream = 0)
+auto devArrMatch(
+  const T* expected, const T* actual, size_t size, L eq_compare, cudaStream_t stream = nullptr)
+  -> testing::AssertionResult
 {
   std::unique_ptr<T[]> exp_h(new T[size]);
   std::unique_ptr<T[]> act_h(new T[size]);
@@ -63,8 +64,9 @@ testing::AssertionResult devArrMatch(
 }
 
 template <typename T, typename L>
-testing::AssertionResult devArrMatch(
-  T expected, const T* actual, size_t size, L eq_compare, cudaStream_t stream = 0)
+auto devArrMatch(
+  T expected, const T* actual, size_t size, L eq_compare, cudaStream_t stream = nullptr)
+  -> testing::AssertionResult
 {
   std::unique_ptr<T[]> act_h(new T[size]);
   raft::update_host<T>(act_h.get(), actual, size, stream);
@@ -80,12 +82,12 @@ testing::AssertionResult devArrMatch(
 }
 
 template <typename T, typename L>
-testing::AssertionResult devArrMatch(const T* expected,
-                                     const T* actual,
-                                     size_t rows,
-                                     size_t cols,
-                                     L eq_compare,
-                                     cudaStream_t stream = 0)
+auto devArrMatch(const T* expected,
+                 const T* actual,
+                 size_t rows,
+                 size_t cols,
+                 L eq_compare,
+                 cudaStream_t stream = nullptr) -> testing::AssertionResult
 {
   size_t size = rows * cols;
   std::unique_ptr<T[]> exp_h(new T[size]);
@@ -108,8 +110,12 @@ testing::AssertionResult devArrMatch(const T* expected,
 }
 
 template <typename T, typename L>
-testing::AssertionResult devArrMatch(
-  T expected, const T* actual, size_t rows, size_t cols, L eq_compare, cudaStream_t stream = 0)
+auto devArrMatch(T expected,
+                 const T* actual,
+                 size_t rows,
+                 size_t cols,
+                 L eq_compare,
+                 cudaStream_t stream = nullptr) -> testing::AssertionResult
 {
   size_t size = rows * cols;
   std::unique_ptr<T[]> act_h(new T[size]);
@@ -140,8 +146,9 @@ testing::AssertionResult devArrMatch(
  * @return the testing assertion to be later used by ASSERT_TRUE/EXPECT_TRUE
  */
 template <typename T, typename L>
-testing::AssertionResult devArrMatchHost(
-  const T* expected_h, const T* actual_d, size_t size, L eq_compare, cudaStream_t stream = 0)
+auto devArrMatchHost(
+  const T* expected_h, const T* actual_d, size_t size, L eq_compare, cudaStream_t stream = nullptr)
+  -> testing::AssertionResult
 {
   std::unique_ptr<T[]> act_h(new T[size]);
   raft::update_host<T>(act_h.get(), actual_d, size, stream);
@@ -170,15 +177,15 @@ testing::AssertionResult devArrMatchHost(
  * @return the testing assertion to be later used by ASSERT_TRUE/EXPECT_TRUE
  */
 template <typename T, typename L>
-testing::AssertionResult hostVecMatch(const std::vector<T>& expected_h,
-                                      const std::vector<T>& actual_h,
-                                      L eq_compare)
+auto hostVecMatch(const std::vector<T>& expected_h, const std::vector<T>& actual_h, L eq_compare)
+  -> testing::AssertionResult
 {
   auto n = actual_h.size();
-  if (n != expected_h.size())
+  if (n != expected_h.size()) {
     return testing::AssertionFailure()
            << "vector sizez mismatch: "
            << "actual=" << n << " != expected=" << expected_h.size() << "; ";
+  }
   for (size_t i = 0; i < n; ++i) {
     auto exp = expected_h[i];
     auto act = actual_h[i];
@@ -201,8 +208,12 @@ testing::AssertionResult hostVecMatch(const std::vector<T>& expected_h,
  * @return the testing assertion to be later used by ASSERT_TRUE/EXPECT_TRUE
  */
 template <typename T, typename L>
-testing::AssertionResult diagonalMatch(
-  T expected, const T* actual, size_t rows, size_t cols, L eq_compare, cudaStream_t stream = 0)
+auto diagonalMatch(T expected,
+                   const T* actual,
+                   size_t rows,
+                   size_t cols,
+                   L eq_compare,
+                   cudaStream_t stream = nullptr) -> testing::AssertionResult
 {
   size_t size = rows * cols;
   std::unique_ptr<T[]> act_h(new T[size]);
@@ -223,23 +234,23 @@ testing::AssertionResult diagonalMatch(
 }
 
 template <typename T, typename IdxT>
-typename std::enable_if_t<std::is_floating_point_v<T>> gen_uniform(const raft::resources& handle,
-                                                                   T* out,
-                                                                   raft::random::RngState& rng,
-                                                                   IdxT len,
-                                                                   T range_min = T(-1),
-                                                                   T range_max = T(1))
+auto gen_uniform(const raft::resources& handle,
+                 T* out,
+                 raft::random::RngState& rng,
+                 IdxT len,
+                 T range_min = T(-1),
+                 T range_max = T(1)) -> std::enable_if_t<std::is_floating_point_v<T>>
 {
   raft::random::uniform(handle, rng, out, len, range_min, range_max);
 }
 
 template <typename T, typename IdxT>
-typename std::enable_if_t<std::is_integral_v<T>> gen_uniform(const raft::resources& handle,
-                                                             T* out,
-                                                             raft::random::RngState& rng,
-                                                             IdxT len,
-                                                             T range_min = T(0),
-                                                             T range_max = T(100))
+auto gen_uniform(const raft::resources& handle,
+                 T* out,
+                 raft::random::RngState& rng,
+                 IdxT len,
+                 T range_min = T(0),
+                 T range_max = T(100)) -> std::enable_if_t<std::is_integral_v<T>>
 {
   raft::random::uniformInt(handle, rng, out, len, range_min, range_max);
 }
@@ -263,7 +274,7 @@ void gen_uniform(const raft::resources& handle,
   thrust::for_each(rmm::exec_policy(stream),
                    counting,
                    counting + len,
-                   [out, d_keys, d_values] __device__(int idx) {
+                   [out, d_keys, d_values] __device__(int idx) -> void {
                      out[idx].key   = d_keys[idx];
                      out[idx].value = d_values[idx];
                    });
@@ -288,7 +299,7 @@ void gen_uniform(const raft::resources& handle,
     ms /= args.runs;                                       \
   } while (0)
 
-inline std::vector<float> read_csv(std::string filename, bool skip_first_n_columns = 1)
+inline auto read_csv(std::string filename, bool skip_first_n_columns = true) -> std::vector<float>
 {
   std::vector<float> result;
   std::ifstream myFile(filename);

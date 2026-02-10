@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -8,7 +8,7 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 
-namespace cuvs {
+namespace cuvs {  // NOLINT(modernize-concat-nested-namespaces)
 namespace stats {
 
 /**
@@ -28,13 +28,13 @@ namespace stats {
  * @param[in]  metric: Distance metric to use. Euclidean (L2) is used by default
  * @return: The silhouette score.
  */
-float silhouette_score(
+auto silhouette_score(
   raft::resources const& handle,
   raft::device_matrix_view<const float, int64_t, raft::row_major> X_in,
   raft::device_vector_view<const int, int64_t> labels,
   std::optional<raft::device_vector_view<float, int64_t>> silhouette_score_per_sample,
   int64_t n_unique_labels,
-  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded);
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded) -> float;
 
 /**
  * @brief function that returns the average silhouette score for a given set of data and its
@@ -51,14 +51,14 @@ float silhouette_score(
  * the calculations
  * @return: The silhouette score.
  */
-float silhouette_score_batched(
+auto silhouette_score_batched(
   raft::resources const& handle,
   raft::device_matrix_view<const float, int64_t, raft::row_major> X,
   raft::device_vector_view<const int, int64_t> labels,
   std::optional<raft::device_vector_view<float, int64_t>> silhouette_score_per_sample,
   int64_t n_unique_labels,
   int64_t batch_size,
-  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded);
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded) -> float;
 
 /**
  * @brief main function that returns the average silhouette score for a given set of data and its
@@ -74,13 +74,13 @@ float silhouette_score_batched(
  * the calculations
  * @return: The silhouette score.
  */
-double silhouette_score(
+auto silhouette_score(
   raft::resources const& handle,
   raft::device_matrix_view<const double, int64_t, raft::row_major> X_in,
   raft::device_vector_view<const int, int64_t> labels,
   std::optional<raft::device_vector_view<double, int64_t>> silhouette_score_per_sample,
   int64_t n_unique_labels,
-  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded);
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded) -> double;
 
 /**
  * @brief function that returns the average silhouette score for a given set of data and its
@@ -97,14 +97,14 @@ double silhouette_score(
  * the calculations
  * @return: The silhouette score.
  */
-double silhouette_score_batched(
+auto silhouette_score_batched(
   raft::resources const& handle,
   raft::device_matrix_view<const double, int64_t, raft::row_major> X,
   raft::device_vector_view<const int, int64_t> labels,
   std::optional<raft::device_vector_view<double, int64_t>> silhouette_score_per_sample,
   int64_t n_unique_labels,
   int64_t batch_size,
-  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded);
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded) -> double;
 
 }  // namespace stats
 }  // namespace cuvs

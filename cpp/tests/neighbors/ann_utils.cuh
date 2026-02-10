@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -211,10 +211,11 @@ auto eval_recall(const std::vector<T>& expected_idx,
            << "actual recall (" << actual_recall << ") is lower than the minimum expected recall ("
            << min_recall << "); eps = " << eps << ". ";
   }
-  if (test_unique)
+  if (test_unique) {
     return check_unique_indices(actual_idx, rows, cols);
-  else
+  } else {
     return testing::AssertionSuccess();
+  }
 }
 
 /** Overload of calc_recall to account for distances
@@ -283,10 +284,11 @@ auto eval_neighbours(const std::vector<T>& expected_idx,
            << "actual recall (" << actual_recall << ") is lower than the minimum expected recall ("
            << min_recall << "); eps = " << eps << ". ";
   }
-  if (test_unique)
+  if (test_unique) {
     return check_unique_indices(actual_idx, rows, cols, max_duplicates);
-  else
+  } else {
     return testing::AssertionSuccess();
+  }
 }
 
 template <typename T, typename DistT, typename IdxT>

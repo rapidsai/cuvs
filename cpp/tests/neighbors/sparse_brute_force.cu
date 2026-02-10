@@ -1,11 +1,12 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "../test_utils.cuh"
 
 #include <cuvs/neighbors/brute_force.hpp>
+#include <numbers>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/util/cudart_utils.hpp>
 
@@ -15,11 +16,11 @@
 namespace cuvs {
 namespace neighbors {
 
-using namespace raft;
-using namespace raft::sparse;
+using raft::update_device;
+namespace resource = raft::resource;
 
-template <typename value_idx, typename value_t>
-struct SparseKNNInputs {
+template <typename value_idx, typename value_t>  // NOLINT(readability-identifier-naming)
+struct SparseKNNInputs {                         // NOLINT(readability-identifier-naming)
   value_idx n_cols;
 
   std::vector<value_idx> indptr_h;
@@ -37,14 +38,17 @@ struct SparseKNNInputs {
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2SqrtExpanded;
 };
 
-template <typename value_idx, typename value_t>
-::std::ostream& operator<<(::std::ostream& os, const SparseKNNInputs<value_idx, value_t>& dims)
+template <typename value_idx, typename value_t>  // NOLINT(readability-identifier-naming)
+auto operator<<(::std::ostream& os, const SparseKNNInputs<value_idx, value_t>& dims)
+  -> ::std::ostream&
 {
   return os;
 }
 
-template <typename value_idx, typename value_t>
-class SparseKNNTest : public ::testing::TestWithParam<SparseKNNInputs<value_idx, value_t>> {
+template <typename value_idx, typename value_t>  // NOLINT(readability-identifier-naming)
+class SparseKNNTest
+  : public ::testing::TestWithParam<
+      SparseKNNInputs<value_idx, value_t>> {  // NOLINT(readability-identifier-naming)
  public:
   SparseKNNTest()
     : params(::testing::TestWithParam<SparseKNNInputs<value_idx, value_t>>::GetParam()),
@@ -59,7 +63,7 @@ class SparseKNNTest : public ::testing::TestWithParam<SparseKNNInputs<value_idx,
   }
 
  protected:
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     n_rows = params.indptr_h.size() - 1;
     nnz    = params.indices_h.size();
@@ -127,38 +131,42 @@ class SparseKNNTest : public ::testing::TestWithParam<SparseKNNInputs<value_idx,
     out_indices.resize(n_rows * k, stream);
   }
 
-  raft::resources handle;
+  raft::resources handle;  // NOLINT(readability-identifier-naming)
 
-  int n_rows, nnz, k;
+  int n_rows, nnz, k;  // NOLINT(readability-identifier-naming)
 
   // input data
-  rmm::device_uvector<value_idx> indptr, indices;
-  rmm::device_uvector<value_t> data;
+  rmm::device_uvector<value_idx> indptr, indices;  // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<value_t> data;               // NOLINT(readability-identifier-naming)
 
   // output data
-  rmm::device_uvector<value_idx> out_indices;
-  rmm::device_uvector<value_t> out_dists;
+  rmm::device_uvector<value_idx> out_indices;  // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<value_t> out_dists;      // NOLINT(readability-identifier-naming)
 
-  rmm::device_uvector<value_idx> out_indices_ref;
-  rmm::device_uvector<value_t> out_dists_ref;
+  rmm::device_uvector<value_idx> out_indices_ref;  // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<value_t> out_dists_ref;      // NOLINT(readability-identifier-naming)
 
-  SparseKNNInputs<value_idx, value_t> params;
+  SparseKNNInputs<value_idx, value_t> params;  // NOLINT(readability-identifier-naming)
 };
 
-const std::vector<SparseKNNInputs<int, float>> inputs_i32_f = {
-  {9,                                                 // ncols
-   {0, 2, 4, 6, 8},                                   // indptr
-   {0, 4, 0, 3, 0, 2, 0, 8},                          // indices
-   {0.0f, 1.0f, 5.0f, 6.0f, 5.0f, 6.0f, 0.0f, 1.0f},  // data
-   {0, 1.41421, 0, 7.87401, 0, 7.87401, 0, 1.41421},  // dists
-   {0, 3, 1, 0, 2, 0, 3, 0},                          // inds
-   2,
-   2,
-   2,
-   cuvs::distance::DistanceType::L2SqrtExpanded}};
-typedef SparseKNNTest<int, float> SparseKNNTestF;
-TEST_P(SparseKNNTestF, Result) { compare(); }
-INSTANTIATE_TEST_CASE_P(SparseKNNTest, SparseKNNTestF, ::testing::ValuesIn(inputs_i32_f));
+const std::vector<SparseKNNInputs<int, float>> inputs_i32_f =
+  {                                                     // NOLINT(readability-identifier-naming)
+    {9,                                                 // ncols
+     {0, 2, 4, 6, 8},                                   // indptr
+     {0, 4, 0, 3, 0, 2, 0, 8},                          // indices
+     {0.0f, 1.0f, 5.0f, 6.0f, 5.0f, 6.0f, 0.0f, 1.0f},  // data
+     {0, std::numbers::sqrt2, 0, 7.87401, 0, 7.87401, 0, std::numbers::sqrt2},  // dists
+     {0, 3, 1, 0, 2, 0, 3, 0},                                                  // inds
+     2,
+     2,
+     2,
+     cuvs::distance::DistanceType::L2SqrtExpanded}};
+using SparseKNNTestF = SparseKNNTest<int, float>;  // NOLINT(readability-identifier-naming)
+TEST_P(SparseKNNTestF, Result) { compare(); }      // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(
+  SparseKNNTest,
+  SparseKNNTestF,
+  ::testing::ValuesIn(inputs_i32_f));  // NOLINT(readability-identifier-naming)
 
 };  // end namespace neighbors
 };  // end namespace cuvs

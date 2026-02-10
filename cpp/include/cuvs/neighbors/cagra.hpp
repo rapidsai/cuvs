@@ -176,12 +176,13 @@ struct index_params : cuvs::neighbors::index_params {
    *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, cagra_index);
    * @endcode
    */
-  static cagra::index_params from_hnsw_params(
+  static auto from_hnsw_params(
     raft::matrix_extent<int64_t> dataset,
     int M,
     int ef_construction,
     hnsw_heuristic_type heuristic       = hnsw_heuristic_type::SIMILAR_SEARCH_PERFORMANCE,
-    cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
+    cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
+    -> cagra::index_params;
 };
 
 /**
@@ -427,7 +428,7 @@ struct index : cuvs::neighbors::index {
   /** \endcond */
 
   /** Construct an empty index. */
-  index(raft::resources const& res,
+  index(raft::resources const& res,  // NOLINT(google-explicit-constructor)
         cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
     : cuvs::neighbors::index(),
       metric_(metric),
@@ -490,6 +491,7 @@ struct index : cuvs::neighbors::index {
    *   cagra::search(res, search_params, index, queries, neighbors, distances);
    * @endcode
    */
+  // NOLINTNEXTLINE(readability-identifier-naming)
   template <typename data_accessor, typename graph_accessor>
   index(raft::resources const& res,
         cuvs::distance::DistanceType metric,
@@ -806,7 +808,7 @@ struct index : cuvs::neighbors::index {
   std::optional<cuvs::util::file_descriptor> graph_fd_;
   std::optional<cuvs::util::file_descriptor> mapping_fd_;
 
-  void compute_dataset_norms_(raft::resources const& res);
+  void compute_dataset_norms_(raft::resources const& res);  // NOLINT(readability-identifier-naming)
   size_t n_rows_       = 0;
   size_t dim_          = 0;
   size_t graph_degree_ = 0;

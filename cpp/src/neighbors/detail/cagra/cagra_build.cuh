@@ -27,7 +27,7 @@
 #include <cuvs/util/file_io.hpp>
 #include <cuvs/util/host_memory.hpp>
 
-// TODO: This shouldn't be calling spatial/knn APIs
+// TODO(snanditale): This shouldn't be calling spatial/knn APIs
 #include "../ann_utils.cuh"
 
 #include <rmm/resource_ref.hpp>
@@ -47,8 +47,8 @@
 namespace cuvs::neighbors::cagra::detail {
 
 // Helpers to convert bytes to MiB and GiB
-constexpr double to_mib(size_t bytes) { return static_cast<double>(bytes) / (1 << 20); }
-constexpr double to_gib(size_t bytes) { return static_cast<double>(bytes) / (1 << 30); }
+constexpr auto to_mib(size_t bytes) -> double { return static_cast<double>(bytes) / (1 << 20); }
+constexpr auto to_gib(size_t bytes) -> double { return static_cast<double>(bytes) / (1 << 30); }
 
 template <typename T, typename IdxT>
 void check_graph_degree(size_t& intermediate_degree, size_t& graph_degree, size_t dataset_size)
@@ -534,7 +534,7 @@ void ace_reorder_and_store_dataset(
   const size_t free_memory = cuvs::util::get_free_host_memory();
   // Conservatively allocate 50% of free memory per partition. Accounts for internal buffers and
   // overhead.
-  // TODO: Adjust overhead if needed.
+  // TODO(snanditale): Adjust overhead if needed.
   const size_t memory_per_partition = 0.5 * free_memory / (n_partitions * 2);
   size_t disk_write_size            = raft::bound_by_power_of_two<size_t>(memory_per_partition);
   // 64MB should be enough to saturate typical NVMe SSDs.
@@ -560,7 +560,7 @@ void ace_reorder_and_store_dataset(
     core_buffer_counts(p)      = 0;
     augmented_buffer_counts(p) = 0;
   }
-  auto flush_core_buffer = [&](size_t partition_id) {
+  auto flush_core_buffer = [&](size_t partition_id) -> auto {
     const size_t count = core_buffer_counts(partition_id);
     if (count > 0) {
       const size_t bytes_to_write = count * vector_size;
@@ -576,7 +576,7 @@ void ace_reorder_and_store_dataset(
     }
   };
 
-  auto flush_augmented_buffer = [&](size_t partition_id) {
+  auto flush_augmented_buffer = [&](size_t partition_id) -> auto {
     const size_t count = augmented_buffer_counts(partition_id);
     if (count > 0) {
       const size_t bytes_to_write = count * vector_size;
@@ -809,18 +809,18 @@ struct ace_memory_requirements {
   size_t available_gpu_memory;
 };
 
-// TODO: Adjust overhead factor if needed. Very conservative for now.
+// TODO(snanditale): Adjust overhead factor if needed. Very conservative for now.
 constexpr double usable_cpu_memory_fraction = 0.8;
 constexpr double usable_gpu_memory_fraction = 0.8;
 constexpr double imbalance_factor           = 3.0;
 
 // Calculate CAGRA optimize workspace memory requirements.
 // This is the working memory on top of the input/output memory usage.
-inline std::pair<size_t, size_t> optimize_workspace_size(size_t n_rows,
-                                                         size_t graph_degree,
-                                                         size_t intermediate_degree,
-                                                         size_t index_size,
-                                                         bool mst_optimize = false)
+inline auto optimize_workspace_size(size_t n_rows,
+                                    size_t graph_degree,
+                                    size_t intermediate_degree,
+                                    size_t index_size,
+                                    bool mst_optimize = false) -> std::pair<size_t, size_t>
 {
   // MST optimization memory (host only)
   size_t mst_host = n_rows * index_size;  // mst_graph_num_edges
@@ -860,7 +860,7 @@ inline std::pair<size_t, size_t> optimize_workspace_size(size_t n_rows,
 
 // Check if disk mode should be used for ACE based on memory constraints
 template <typename T, typename IdxT>
-bool ace_check_use_disk_mode(bool use_disk,
+auto ace_check_use_disk_mode(bool use_disk,
                              std::string& build_dir,
                              size_t dataset_size,
                              size_t dataset_dim,
@@ -869,7 +869,7 @@ bool ace_check_use_disk_mode(bool use_disk,
                              size_t graph_degree,
                              std::optional<double> max_host_memory_gb,
                              std::optional<double> max_gpu_memory_gb,
-                             ace_memory_requirements& mem)
+                             ace_memory_requirements& mem) -> bool
 {
   // Use overridden memory limits if provided (> 0), otherwise query actual system memory
   if (max_host_memory_gb.has_value() && max_host_memory_gb.value() > 0) {
@@ -907,7 +907,7 @@ bool ace_check_use_disk_mode(bool use_disk,
 
   // GPU is mostly limited by the index size (update_graph() in the end of this routine).
   // Check if GPU has enough memory for the final graph or use disk mode instead.
-  // TODO: Extend model or use managed memory if running out of GPU memory.
+  // TODO(snanditale): Extend model or use managed memory if running out of GPU memory.
   if (max_gpu_memory_gb.has_value() && max_gpu_memory_gb.value() > 0) {
     mem.available_gpu_memory = static_cast<size_t>(max_gpu_memory_gb.value() * (1ULL << 30));
     RAFT_LOG_INFO("ACE: Using overridden GPU memory limit: %.2f GiB", max_gpu_memory_gb.value());
@@ -1102,9 +1102,9 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
 // In disk mode, the graph is stored in build_dir and dataset is reordered on disk.
 // The returned index is not usable for search. Use the created files for search instead.
 template <typename T, typename IdxT>
-index<T, IdxT> build_ace(raft::resources const& res,
-                         const index_params& params,
-                         raft::host_matrix_view<const T, int64_t, row_major> dataset)
+auto build_ace(raft::resources const& res,
+               const index_params& params,
+               raft::host_matrix_view<const T, int64_t, row_major> dataset) -> index<T, IdxT>
 {
   // Extract ACE parameters from graph_build_params
   RAFT_EXPECTS(
@@ -1624,7 +1624,7 @@ void build_knn_graph(
     node_degree);
 
   // Make model name
-  const std::string model_name = [&]() {
+  const std::string model_name = [&]() -> auto {
     char model_name[1024];
     sprintf(model_name,
             "%s-%lux%lu.cluster_%u.pq_%u.%ubit.itr_%u.metric_%d.pqcenter_%u",
@@ -1883,7 +1883,7 @@ void build_knn_graph(
   std::optional<raft::host_matrix_view<IdxT, int64_t, row_major>> graph_view = knn_graph;
   auto nn_descent_idx = cuvs::neighbors::nn_descent::build(res, build_params, dataset, graph_view);
 
-  using internal_IdxT = typename std::make_unsigned<IdxT>::type;
+  using internal_IdxT = std::make_unsigned_t<IdxT>;
   using g_accessor    = typename decltype(nn_descent_idx.graph())::accessor_type;
   using g_accessor_internal =
     raft::host_device_accessor<cuda::std::default_accessor<internal_IdxT>, g_accessor::mem_type>;
@@ -1907,7 +1907,7 @@ void optimize(
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph,
   const bool guarantee_connectivity = false)
 {
-  using internal_IdxT = typename std::make_unsigned<IdxT>::type;
+  using internal_IdxT = std::make_unsigned_t<IdxT>;
 
   auto new_graph_internal = raft::make_host_matrix_view<internal_IdxT, int64_t>(
     reinterpret_cast<internal_IdxT*>(new_graph.data_handle()),
@@ -1929,7 +1929,7 @@ void optimize(
 // RAII wrapper for allocating memory with Transparent HugePage
 struct mmap_owner {
   // Allocate a new memory (not backed by a file)
-  mmap_owner(size_t size) : size_{size}
+  explicit mmap_owner(size_t size) : size_{size}
   {
     int flags = MAP_ANONYMOUS | MAP_PRIVATE;
     ptr_      = mmap(nullptr, size, PROT_READ | PROT_WRITE, flags, -1, 0);
@@ -2027,7 +2027,8 @@ auto iterative_build_graph(
 
   // Determine graph degree and number of search results while increasing
   // graph size.
-  auto small_graph_degree = std::max(graph_degree / 2, std::min(graph_degree, (uint64_t)24));
+  auto small_graph_degree =
+    std::max(graph_degree / 2, std::min(graph_degree, static_cast<uint64_t>(24)));
   RAFT_LOG_DEBUG("# small_graph_degree = %lu", (uint64_t)small_graph_degree);
   RAFT_LOG_DEBUG("# graph_degree = %lu", (uint64_t)graph_degree);
   RAFT_LOG_DEBUG("# topk = %lu", (uint64_t)topk);
@@ -2041,7 +2042,8 @@ auto iterative_build_graph(
     } else {
       offset(j) = offset(j - 1) + 1;
     }
-    IdxT ofst = pow((double)(initial_graph_size - 1) / 2, (double)(j + 1) / small_graph_degree);
+    IdxT ofst = pow(static_cast<double>(initial_graph_size - 1) / 2,
+                    static_cast<double>(j + 1) / small_graph_degree);
     if (offset(j) < ofst) { offset(j) = ofst; }
     RAFT_LOG_DEBUG("# offset(%lu) = %lu", (uint64_t)j, (uint64_t)offset(j));
   }
@@ -2057,7 +2059,7 @@ auto iterative_build_graph(
   size_t byte_size          = sizeof(IdxT) * final_graph_size * topk;
   if (byte_size % thp_size) { byte_size += thp_size - (byte_size % thp_size); }
   mmap_owner neighbors_list(byte_size);
-  IdxT* neighbors_ptr = (IdxT*)neighbors_list.data();
+  IdxT* neighbors_ptr = reinterpret_cast<IdxT*>(neighbors_list.data());
   memset(neighbors_ptr, 0, byte_size);
 
   bool flag_last       = false;
@@ -2096,13 +2098,13 @@ auto iterative_build_graph(
     // Create an index (idx), a query view (dev_query_view), and a mdarray for
     // search results (neighbors).
     auto dev_dataset_view = raft::make_device_matrix_view<const T, int64_t>(
-      dev_dataset.data_handle(), (int64_t)curr_graph_size, dev_dataset.extent(1));
+      dev_dataset.data_handle(), static_cast<int64_t>(curr_graph_size), dev_dataset.extent(1));
 
     auto idx = index<T, IdxT>(
       res, params.metric, dev_dataset_view, raft::make_const_mdspan(cagra_graph.view()));
 
     auto dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
-      dev_dataset.data_handle(), (int64_t)curr_query_size, dev_dataset.extent(1));
+      dev_dataset.data_handle(), static_cast<int64_t>(curr_query_size), dev_dataset.extent(1));
 
     auto neighbors_view =
       raft::make_host_matrix_view<IdxT, int64_t>(neighbors_ptr, curr_query_size, curr_topk);
@@ -2162,10 +2164,10 @@ template <typename T,
           typename IdxT = uint32_t,
           typename Accessor =
             raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
-index<T, IdxT> build(
-  raft::resources const& res,
-  const index_params& params,
-  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
+auto build(raft::resources const& res,
+           const index_params& params,
+           raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
+  -> index<T, IdxT>
 {
   size_t intermediate_degree = params.intermediate_graph_degree;
   size_t graph_degree        = params.graph_degree;
@@ -2280,7 +2282,7 @@ index<T, IdxT> build(
     idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
     idx.update_dataset(
       res,
-      // TODO: hardcoding codebook math to `half`, we can do runtime dispatching later
+      // TODO(snanditale): hardcoding codebook math to `half`, we can do runtime dispatching later
       cuvs::neighbors::vpq_build<decltype(dataset), half, int64_t>(
         res, *params.compression, dataset));
 

@@ -9,39 +9,71 @@
 
 namespace cuvs::neighbors::cagra {
 
-typedef AnnCagraTest<float, float, std::uint32_t> AnnCagraTestF_U32;
-TEST_P(AnnCagraTestF_U32, AnnCagra_U32) { this->testCagra<uint32_t>(); }
-TEST_P(AnnCagraTestF_U32, AnnCagra_I64) { this->testCagra<int64_t>(); }
+using AnnCagraTestF_U32 =
+  AnnCagraTest<float, float, std::uint32_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(AnnCagraTestF_U32,
+       AnnCagra_U32)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  this->testCagra<uint32_t>();
+}  // NOLINT(readability-identifier-naming)
+TEST_P(AnnCagraTestF_U32,
+       AnnCagra_I64)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  this->testCagra<int64_t>();
+}  // NOLINT(readability-identifier-naming)
 
-typedef AnnCagraAddNodesTest<float, float, std::uint32_t> AnnCagraAddNodesTestF_U32;
-TEST_P(AnnCagraAddNodesTestF_U32, AnnCagraAddNodes) { this->testCagra(); }
+using AnnCagraAddNodesTestF_U32 =
+  AnnCagraAddNodesTest<float, float, std::uint32_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(AnnCagraAddNodesTestF_U32,
+       AnnCagraAddNodes)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  this->testCagra();
+}  // NOLINT(readability-identifier-naming)
 
-typedef AnnCagraFilterTest<float, float, std::uint32_t> AnnCagraFilterTestF_U32;
-TEST_P(AnnCagraFilterTestF_U32, AnnCagra) { this->testCagra(); }
+using AnnCagraFilterTestF_U32 =
+  AnnCagraFilterTest<float, float, std::uint32_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(AnnCagraFilterTestF_U32,
+       AnnCagra)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  this->testCagra();
+}  // NOLINT(readability-identifier-naming)
 
-typedef AnnCagraIndexMergeTest<float, float, std::uint32_t> AnnCagraIndexMergeTestF_U32;
-TEST_P(AnnCagraIndexMergeTestF_U32, AnnCagraIndexMerge_U32) { this->testCagra<uint32_t>(); }
-TEST_P(AnnCagraIndexMergeTestF_U32, AnnCagraIndexMerge_I64) { this->testCagra<int64_t>(); }
+using AnnCagraIndexMergeTestF_U32 =
+  AnnCagraIndexMergeTest<float, float, std::uint32_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(AnnCagraIndexMergeTestF_U32,
+       AnnCagraIndexMerge_U32)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  this->testCagra<uint32_t>();
+}  // NOLINT(readability-identifier-naming)
+TEST_P(AnnCagraIndexMergeTestF_U32,
+       AnnCagraIndexMerge_I64)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  this->testCagra<int64_t>();
+}  // NOLINT(readability-identifier-naming)
 
-typedef AnnCagraIndexFilteredMergeTest<float, float, std::uint32_t>
-  AnnCagraIndexFilteredMergeTestF_U32;
-TEST_P(AnnCagraIndexFilteredMergeTestF_U32, AnnCagraIndexFilteredMerge_U32)
+typedef AnnCagraIndexFilteredMergeTest<float, float, std::uint32_t>  // NOLINT(modernize-use-using)
+  AnnCagraIndexFilteredMergeTestF_U32;  // NOLINT(readability-identifier-naming)
+TEST_P(
+  AnnCagraIndexFilteredMergeTestF_U32,  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+  AnnCagraIndexFilteredMerge_U32)  // NOLINT(readability-identifier-naming,google-readability-avoid-underscore-in-googletest-name)
 {
   this->testCagra<uint32_t>();
 }
 
-INSTANTIATE_TEST_CASE_P(AnnCagraTest, AnnCagraTestF_U32, ::testing::ValuesIn(inputs));
-INSTANTIATE_TEST_CASE_P(AnnCagraAddNodesTest,
+INSTANTIATE_TEST_CASE_P(AnnCagraTest,
+                        AnnCagraTestF_U32,
+                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(AnnCagraAddNodesTest,          // NOLINT(readability-identifier-naming)
                         AnnCagraAddNodesTestF_U32,
                         ::testing::ValuesIn(inputs_addnode));
-INSTANTIATE_TEST_CASE_P(AnnCagraFilterTest,
+INSTANTIATE_TEST_CASE_P(AnnCagraFilterTest,  // NOLINT(readability-identifier-naming)
                         AnnCagraFilterTestF_U32,
                         ::testing::ValuesIn(inputs_filtering));
-INSTANTIATE_TEST_CASE_P(AnnCagraIndexMergeTest,
+INSTANTIATE_TEST_CASE_P(AnnCagraIndexMergeTest,  // NOLINT(readability-identifier-naming)
                         AnnCagraIndexMergeTestF_U32,
                         ::testing::ValuesIn(inputs));
 
-INSTANTIATE_TEST_CASE_P(AnnCagraIndexFilteredMergeTest,
+INSTANTIATE_TEST_CASE_P(AnnCagraIndexFilteredMergeTest,  // NOLINT(readability-identifier-naming)
                         AnnCagraIndexFilteredMergeTestF_U32,
                         ::testing::ValuesIn(inputs));
 

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -132,7 +132,7 @@ template <cuvs::distance::DistanceType DistT,
           typename AccT,
           typename OutT,
           typename IdxT = int>
-size_t getWorkspaceSize(const DataT* x, const DataT* y, IdxT m, IdxT n, IdxT k)
+auto getWorkspaceSize(const DataT* x, const DataT* y, IdxT m, IdxT n, IdxT k) -> size_t
 {
   return detail::getWorkspaceSize<DistT, DataT, AccT, OutT, IdxT>(x, y, m, n, k);
 }
@@ -157,8 +157,8 @@ template <cuvs::distance::DistanceType DistT,
           typename OutT,
           typename IdxT = int,
           typename layout>
-size_t getWorkspaceSize(raft::device_matrix_view<DataT, IdxT, layout> const& x,
-                        raft::device_matrix_view<DataT, IdxT, layout> const& y)
+auto getWorkspaceSize(raft::device_matrix_view<DataT, IdxT, layout> const& x,
+                      raft::device_matrix_view<DataT, IdxT, layout> const& y) -> size_t
 {
   RAFT_EXPECTS(x.extent(1) == y.extent(1), "Number of columns must be equal.");
 
@@ -240,7 +240,7 @@ void pairwise_distance(raft::resources const& handle,
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
-  auto dispatch = [&](auto distance_type) {
+  auto dispatch = [&](auto distance_type) -> auto {
     auto worksize = getWorkspaceSize<distance_type(), Type, DistT, DistT, IdxT>(x, y, m, n, k);
     workspace.resize(worksize, stream);
     detail::distance<distance_type(), Type, DistT, DistT, IdxT>(

@@ -11,7 +11,7 @@
 #include "search_plan.cuh"
 #include "search_single_cta_kernel.cuh"
 #include "topk_by_radix.cuh"
-#include "topk_for_cagra/topk.h"  // TODO replace with raft topk
+#include "topk_for_cagra/topk.h"  // TODO(snanditale): replace with raft topk
 #include "utils.hpp"
 
 #include <raft/core/device_mdspan.hpp>
@@ -20,7 +20,7 @@
 #include <raft/core/resource/device_properties.hpp>
 #include <raft/core/resources.hpp>
 
-// TODO: This shouldn't be invoking anything from spatial/knn
+// TODO(snanditale): This shouldn't be invoking anything from spatial/knn
 #include "../ann_utils.cuh"
 
 #include <raft/util/cuda_rt_essentials.hpp>
@@ -99,14 +99,14 @@ struct search
     set_params(res);
   }
 
-  ~search() {}
+  ~search() = default;
 
   inline void set_params(raft::resources const& res)
   {
     num_itopk_candidates = search_width * graph_degree;
     result_buffer_size   = itopk_size + num_itopk_candidates;
 
-    typedef raft::Pow2<32> AlignBytes;
+    using AlignBytes               = raft::Pow2<32>;
     unsigned result_buffer_size_32 = AlignBytes::roundUp(result_buffer_size);
 
     constexpr unsigned max_itopk = 512;

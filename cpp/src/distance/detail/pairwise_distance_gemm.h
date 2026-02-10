@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -19,9 +19,7 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-namespace cuvs {
-namespace gemm {
-namespace kernel {
+namespace cuvs::gemm::kernel {
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -78,15 +76,14 @@ struct PairwiseDistanceGemm {
   // we keep this same layout even for column major inputs
   using LayoutOutput = cutlass::layout::RowMajor;
 
-  typedef typename std::conditional<isRowMajor,
-                                    cutlass::layout::RowMajor,
-                                    cutlass::layout::ColumnMajor>::type NormXLayout;
+  using NormXLayout =
+    std::conditional_t<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>;
 
-  typedef typename std::
-    conditional<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>::type LayoutA_;
+  using LayoutA_ =
+    std::conditional_t<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>;
 
-  typedef typename std::
-    conditional<isRowMajor, cutlass::layout::ColumnMajor, cutlass::layout::RowMajor>::type LayoutB_;
+  using LayoutB_ =
+    std::conditional_t<isRowMajor, cutlass::layout::ColumnMajor, cutlass::layout::RowMajor>;
 
   using GemmBase =
     typename cutlass::gemm::kernel::DefaultGemmUniversal<ElementA_,
@@ -179,15 +176,14 @@ struct PairwiseDistanceGemm<double,
   // we keep this same layout even for column major inputs
   using LayoutOutput = cutlass::layout::RowMajor;
 
-  typedef typename std::conditional<isRowMajor,
-                                    cutlass::layout::RowMajor,
-                                    cutlass::layout::ColumnMajor>::type NormXLayout;
+  using NormXLayout =
+    std::conditional_t<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>;
 
-  typedef typename std::
-    conditional<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>::type LayoutA_;
+  using LayoutA_ =
+    std::conditional_t<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>;
 
-  typedef typename std::
-    conditional<isRowMajor, cutlass::layout::ColumnMajor, cutlass::layout::RowMajor>::type LayoutB_;
+  using LayoutB_ =
+    std::conditional_t<isRowMajor, cutlass::layout::ColumnMajor, cutlass::layout::RowMajor>;
 
   using GemmBase =
     typename cutlass::gemm::kernel::DefaultGemmUniversal<double,
@@ -280,15 +276,14 @@ struct PairwiseDistanceGemm<half,
   // we keep this same layout even for column major inputs
   using LayoutOutput = cutlass::layout::RowMajor;
 
-  typedef typename std::conditional<isRowMajor,
-                                    cutlass::layout::RowMajor,
-                                    cutlass::layout::ColumnMajor>::type NormXLayout;
+  using NormXLayout =
+    std::conditional_t<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>;
 
-  typedef typename std::
-    conditional<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>::type LayoutA_;
+  using LayoutA_ =
+    std::conditional_t<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>;
 
-  typedef typename std::
-    conditional<isRowMajor, cutlass::layout::ColumnMajor, cutlass::layout::RowMajor>::type LayoutB_;
+  using LayoutB_ =
+    std::conditional_t<isRowMajor, cutlass::layout::ColumnMajor, cutlass::layout::RowMajor>;
 
   using GemmBase = typename cutlass::gemm::device::GemmUniversal<cutlass::half_t,
                                                                  LayoutA_,
@@ -327,6 +322,4 @@ struct PairwiseDistanceGemm<half,
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-}  // namespace kernel
-}  // namespace gemm
-}  // namespace cuvs
+}  // namespace cuvs::gemm::kernel

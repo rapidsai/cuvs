@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -22,11 +22,13 @@
 namespace cuvs::neighbors::detail {
 
 template <typename value_idx>
-value_idx build_k(value_idx n_samples, int c)
+auto build_k(value_idx n_samples, int c) -> value_idx
 {
   // from "kNN-MST-Agglomerative: A fast & scalable graph-based data clustering
   // approach on GPU"
-  return std::min(n_samples, std::max((value_idx)2, (value_idx)floor(raft::log2(n_samples)) + c));
+  return std::min(
+    n_samples,
+    std::max(static_cast<value_idx>(2), static_cast<value_idx>(floor(raft::log2(n_samples))) + c));
 }
 /**
  * Constructs a (symmetrized) knn graph edge list from
@@ -65,7 +67,8 @@ void knn_graph(raft::resources const& res,
 
   auto rows_view = raft::make_device_vector_view<value_idx, nnz_t>(rows.data(), nnz);
 
-  raft::linalg::map_offset(res, rows_view, [k] __device__(nnz_t i) { return value_idx(i / k); });
+  raft::linalg::map_offset(
+    res, rows_view, [k] __device__(nnz_t i) -> value_idx { return value_idx(i / k); });
 
   cuvs::neighbors::all_neighbors::all_neighbors_params params;
   params.metric = metric;

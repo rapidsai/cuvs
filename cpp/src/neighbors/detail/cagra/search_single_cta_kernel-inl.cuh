@@ -12,7 +12,7 @@
 #include "hashmap.hpp"
 #include "search_plan.cuh"
 #include "topk_by_radix.cuh"
-#include "topk_for_cagra/topk.h"  // TODO replace with raft topk
+#include "topk_for_cagra/topk.h"  // TODO(snanditale): replace with raft topk
 #include "utils.hpp"
 
 #include <cuvs/distance/distance.hpp>
@@ -24,7 +24,7 @@
 
 #include <cuvs/neighbors/common.hpp>
 
-// TODO: This shouldn't be invoking anything from spatial/knn
+// TODO(snanditale): This shouldn't be invoking anything from spatial/knn
 #include "../ann_utils.cuh"
 
 #include <raft/util/cuda_rt_essentials.hpp>
@@ -1622,7 +1622,7 @@ struct persistent_runner_base_t {
   // Otherwise, the benchmarks slowdown significantly.
   std::chrono::milliseconds lifetime;
 
-  persistent_runner_base_t(float persistent_lifetime)
+  explicit persistent_runner_base_t(float persistent_lifetime)
     : lifetime(size_t(persistent_lifetime * 1000)), job_queue(), worker_queue()
   {
     cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
@@ -1920,7 +1920,8 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
            dataset_desc.get().team_size ^ num_itopk_candidates ^ block_size ^ smem_size ^
            hash_bitlen ^ small_hash_reset_interval ^ num_random_samplings ^ rand_xor_mask ^
            num_seeds ^ itopk_size ^ search_width ^ min_iterations ^ max_iterations ^
-           uint64_t(persistent_lifetime * 1000) ^ uint64_t(persistent_device_usage * 1000);
+           static_cast<uint64_t>(persistent_lifetime * 1000) ^
+           static_cast<uint64_t>(persistent_device_usage * 1000);
   }
 
   persistent_runner_t(

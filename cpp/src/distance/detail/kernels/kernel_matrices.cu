@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2019-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2019-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -23,9 +23,9 @@ namespace cuvs::distance::kernels {
  * @param gain
  * @param offset
  */
-template <typename math_t, typename exp_t>
+template <typename MathT, typename ExpT>
 RAFT_KERNEL polynomial_kernel_nopad(
-  math_t* inout, size_t len, exp_t exponent, math_t gain, math_t offset)
+  MathT* inout, size_t len, ExpT exponent, MathT gain, MathT offset)
 {
   for (size_t tid = threadIdx.x + blockIdx.x * blockDim.x; tid < len;
        tid += blockDim.x * gridDim.x) {
@@ -43,16 +43,17 @@ RAFT_KERNEL polynomial_kernel_nopad(
  * @param gain
  * @param offset
  */
-template <typename math_t, typename exp_t>
+template <typename MathT, typename ExpT>
 RAFT_KERNEL polynomial_kernel(
-  math_t* inout, int ld, int rows, int cols, exp_t exponent, math_t gain, math_t offset)
+  MathT* inout, int ld, int rows, int cols, ExpT exponent, MathT gain, MathT offset)
 {
   for (size_t tidy = threadIdx.y + blockIdx.y * blockDim.y; tidy < cols;
-       tidy += blockDim.y * gridDim.y)
+       tidy += blockDim.y * gridDim.y) {
     for (size_t tidx = threadIdx.x + blockIdx.x * blockDim.x; tidx < rows;
          tidx += blockDim.x * gridDim.x) {
       inout[tidx + tidy * ld] = pow(gain * inout[tidx + tidy * ld] + offset, exponent);
     }
+  }
 }
 
 /** Epiloge function for tanh kernel without padding.
@@ -62,8 +63,8 @@ RAFT_KERNEL polynomial_kernel(
  * @param gain
  * @param offset
  */
-template <typename math_t>
-RAFT_KERNEL tanh_kernel_nopad(math_t* inout, size_t len, math_t gain, math_t offset)
+template <typename MathT>
+RAFT_KERNEL tanh_kernel_nopad(MathT* inout, size_t len, MathT gain, MathT offset)
 {
   for (size_t tid = threadIdx.x + blockIdx.x * blockDim.x; tid < len;
        tid += blockDim.x * gridDim.x) {
@@ -80,15 +81,16 @@ RAFT_KERNEL tanh_kernel_nopad(math_t* inout, size_t len, math_t gain, math_t off
  * @param gain
  * @param offset
  */
-template <typename math_t>
-RAFT_KERNEL tanh_kernel(math_t* inout, int ld, int rows, int cols, math_t gain, math_t offset)
+template <typename MathT>
+RAFT_KERNEL tanh_kernel(MathT* inout, int ld, int rows, int cols, MathT gain, MathT offset)
 {
   for (size_t tidy = threadIdx.y + blockIdx.y * blockDim.y; tidy < cols;
-       tidy += blockDim.y * gridDim.y)
+       tidy += blockDim.y * gridDim.y) {
     for (size_t tidx = threadIdx.x + blockIdx.x * blockDim.x; tidx < rows;
          tidx += blockDim.x * gridDim.x) {
       inout[tidx + tidy * ld] = tanh(gain * inout[tidx + tidy * ld] + offset);
     }
+  }
 }
 
 /** Epiloge function for rbf kernel using expansion.
@@ -108,13 +110,13 @@ RAFT_KERNEL tanh_kernel(math_t* inout, int ld, int rows, int cols, math_t gain, 
  * @param norm_y l2-norm of Y's rows
  * @param gain
  */
-template <typename math_t>
+template <typename MathT>
 RAFT_KERNEL rbf_kernel_expanded(
-  math_t* inout, int ld, int rows, int cols, math_t* norm_x, math_t* norm_y, math_t gain)
+  MathT* inout, int ld, int rows, int cols, MathT* norm_x, MathT* norm_y, MathT gain)
 {
   for (size_t tidy = threadIdx.y + blockIdx.y * blockDim.y; tidy < cols;
        tidy += blockDim.y * gridDim.y) {
-    math_t norm_y_val = norm_y[tidy];
+    MathT norm_y_val = norm_y[tidy];
     for (size_t tidx = threadIdx.x + blockIdx.x * blockDim.x; tidx < rows;
          tidx += blockDim.x * gridDim.x) {
       inout[tidx + tidy * ld] =
@@ -123,7 +125,7 @@ RAFT_KERNEL rbf_kernel_expanded(
   }
 }
 
-std::tuple<dim3, dim3> generateLaunchConfig2dElementwiseOp(int n1, int n2)
+auto generate_launch_config_2d_elementwise_op(int n1, int n2) -> std::tuple<dim3, dim3>
 {
   dim3 block_shape       = dim3(32, 4);
   const int num_blocks_x = raft::ceildiv(n1, 32);
@@ -135,9 +137,9 @@ std::tuple<dim3, dim3> generateLaunchConfig2dElementwiseOp(int n1, int n2)
 /**
  * Create a kernel matrix using polynomial kernel function.
  */
-template <typename math_t, typename exp_t>
-void PolynomialKernel<math_t, exp_t>::applyKernel(
-  math_t* inout, int ld, int rows, int cols, bool is_row_major, cudaStream_t stream)
+template <typename MathT, typename ExpT>
+void PolynomialKernel<MathT, ExpT>::applyKernel(
+  MathT* inout, int ld, int rows, int cols, bool is_row_major, cudaStream_t stream)
 {
   const int n_minor = is_row_major ? cols : rows;
   if (ld == n_minor) {
@@ -146,7 +148,7 @@ void PolynomialKernel<math_t, exp_t>::applyKernel(
   } else {
     int n1                         = is_row_major ? cols : rows;
     int n2                         = is_row_major ? rows : cols;
-    auto [grid_shape, block_shape] = generateLaunchConfig2dElementwiseOp(n1, n2);
+    auto [grid_shape, block_shape] = generate_launch_config_2d_elementwise_op(n1, n2);
     polynomial_kernel<<<grid_shape, block_shape, 0, stream>>>(
       inout, ld, n1, n2, exponent, gain, offset);
   }
@@ -166,17 +168,17 @@ void PolynomialKernel<math_t, exp_t>::applyKernel(
  * @param norm_x1 unused.
  * @param norm_x2 unused.
  */
-template <typename math_t, typename exp_t>
-void PolynomialKernel<math_t, exp_t>::evaluate(raft::resources const& handle,
-                                               dense_input_matrix_view_t<math_t> x1,
-                                               dense_input_matrix_view_t<math_t> x2,
-                                               dense_output_matrix_view_t<math_t> out,
-                                               math_t* norm_x1,
-                                               math_t* norm_x2)
+template <typename MathT, typename ExpT>
+void PolynomialKernel<MathT, ExpT>::evaluate(raft::resources const& handle,
+                                             dense_input_matrix_view_t<MathT> x1,
+                                             dense_input_matrix_view_t<MathT> x2,
+                                             dense_output_matrix_view_t<MathT> out,
+                                             MathT* norm_x1,
+                                             MathT* norm_x2)
 {
-  bool is_row_major = GramMatrixBase<math_t>::get_is_row_major(out);
+  bool is_row_major = GramMatrixBase<MathT>::get_is_row_major(out);
   int ld_out        = is_row_major ? out.stride(0) : out.stride(1);
-  GramMatrixBase<math_t>::linear(handle, x1, x2, out);
+  GramMatrixBase<MathT>::linear(handle, x1, x2, out);
   applyKernel(out.data_handle(),
               ld_out,
               out.extent(0),
@@ -198,17 +200,17 @@ void PolynomialKernel<math_t, exp_t>::evaluate(raft::resources const& handle,
  * @param norm_x1 unused.
  * @param norm_x2 unused.
  */
-template <typename math_t, typename exp_t>
-void PolynomialKernel<math_t, exp_t>::evaluate(raft::resources const& handle,
-                                               csr_input_matrix_view_t<math_t> x1,
-                                               dense_input_matrix_view_t<math_t> x2,
-                                               dense_output_matrix_view_t<math_t> out,
-                                               math_t* norm_x1,
-                                               math_t* norm_x2)
+template <typename MathT, typename ExpT>
+void PolynomialKernel<MathT, ExpT>::evaluate(raft::resources const& handle,
+                                             csr_input_matrix_view_t<MathT> x1,
+                                             dense_input_matrix_view_t<MathT> x2,
+                                             dense_output_matrix_view_t<MathT> out,
+                                             MathT* norm_x1,
+                                             MathT* norm_x2)
 {
-  bool is_row_major = GramMatrixBase<math_t>::get_is_row_major(out);
+  bool is_row_major = GramMatrixBase<MathT>::get_is_row_major(out);
   int ld_out        = is_row_major ? out.stride(0) : out.stride(1);
-  GramMatrixBase<math_t>::linear(handle, x1, x2, out);
+  GramMatrixBase<MathT>::linear(handle, x1, x2, out);
   applyKernel(out.data_handle(),
               ld_out,
               out.extent(0),
@@ -230,17 +232,17 @@ void PolynomialKernel<math_t, exp_t>::evaluate(raft::resources const& handle,
  * @param norm_x1 unused.
  * @param norm_x2 unused.
  */
-template <typename math_t, typename exp_t>
-void PolynomialKernel<math_t, exp_t>::evaluate(raft::resources const& handle,
-                                               csr_input_matrix_view_t<math_t> x1,
-                                               csr_input_matrix_view_t<math_t> x2,
-                                               dense_output_matrix_view_t<math_t> out,
-                                               math_t* norm_x1,
-                                               math_t* norm_x2)
+template <typename MathT, typename ExpT>
+void PolynomialKernel<MathT, ExpT>::evaluate(raft::resources const& handle,
+                                             csr_input_matrix_view_t<MathT> x1,
+                                             csr_input_matrix_view_t<MathT> x2,
+                                             dense_output_matrix_view_t<MathT> out,
+                                             MathT* norm_x1,
+                                             MathT* norm_x2)
 {
-  bool is_row_major = GramMatrixBase<math_t>::get_is_row_major(out);
+  bool is_row_major = GramMatrixBase<MathT>::get_is_row_major(out);
   int ld_out        = is_row_major ? out.stride(0) : out.stride(1);
-  GramMatrixBase<math_t>::linear(handle, x1, x2, out);
+  GramMatrixBase<MathT>::linear(handle, x1, x2, out);
   applyKernel(out.data_handle(),
               ld_out,
               out.extent(0),
@@ -264,22 +266,22 @@ void PolynomialKernel<math_t, exp_t>::evaluate(raft::resources const& handle,
  * @param ld2 leading dimension of x2 (usually it is n2)
  * @param ld_out leading dimension of out (usually it is n1)
  */
-template <typename math_t, typename exp_t>
-[[deprecated]] void PolynomialKernel<math_t, exp_t>::evaluate(const math_t* x1,
-                                                              int n1,
-                                                              int n_cols,
-                                                              const math_t* x2,
-                                                              int n2,
-                                                              math_t* out,
-                                                              bool is_row_major,
-                                                              cudaStream_t stream,
-                                                              int ld1,
-                                                              int ld2,
-                                                              int ld_out)
+template <typename MathT, typename ExpT>
+[[deprecated]] void PolynomialKernel<MathT, ExpT>::evaluate(const MathT* x1,
+                                                            int n1,
+                                                            int n_cols,
+                                                            const MathT* x2,
+                                                            int n2,
+                                                            MathT* out,
+                                                            bool is_row_major,
+                                                            cudaStream_t stream,
+                                                            int ld1,
+                                                            int ld2,
+                                                            int ld_out)
 {
-  ASSERT(GramMatrixBase<math_t>::legacy_interface,
+  ASSERT(GramMatrixBase<MathT>::legacy_interface,
          "Legacy interface can only be used with legacy ctor.");
-  GramMatrixBase<math_t>::linear(
+  GramMatrixBase<MathT>::linear(
     x1, n1, n_cols, x2, n2, out, is_row_major, stream, ld1, ld2, ld_out);
   applyKernel(out, ld_out, n1, n2, is_row_major, stream);
 }
@@ -287,9 +289,9 @@ template <typename math_t, typename exp_t>
 /**
  * Create a kernel matrix using tanh kernel function.
  */
-template <typename math_t>
-void TanhKernel<math_t>::applyKernel(
-  math_t* inout, int ld, int rows, int cols, bool is_row_major, cudaStream_t stream)
+template <typename MathT>
+void TanhKernel<MathT>::applyKernel(
+  MathT* inout, int ld, int rows, int cols, bool is_row_major, cudaStream_t stream)
 {
   const int n_minor = is_row_major ? cols : rows;
   if (ld == n_minor) {
@@ -298,7 +300,7 @@ void TanhKernel<math_t>::applyKernel(
   } else {
     int n1                         = is_row_major ? cols : rows;
     int n2                         = is_row_major ? rows : cols;
-    auto [grid_shape, block_shape] = generateLaunchConfig2dElementwiseOp(n1, n2);
+    auto [grid_shape, block_shape] = generate_launch_config_2d_elementwise_op(n1, n2);
     tanh_kernel<<<grid_shape, block_shape, 0, stream>>>(inout, ld, n1, n2, gain, offset);
   }
   RAFT_CUDA_TRY(cudaPeekAtLastError());
@@ -317,17 +319,17 @@ void TanhKernel<math_t>::applyKernel(
  * @param norm_x1 unused.
  * @param norm_x2 unused.
  */
-template <typename math_t>
-void TanhKernel<math_t>::evaluate(raft::resources const& handle,
-                                  dense_input_matrix_view_t<math_t> x1,
-                                  dense_input_matrix_view_t<math_t> x2,
-                                  dense_output_matrix_view_t<math_t> out,
-                                  math_t* norm_x1,
-                                  math_t* norm_x2)
+template <typename MathT>
+void TanhKernel<MathT>::evaluate(raft::resources const& handle,
+                                 dense_input_matrix_view_t<MathT> x1,
+                                 dense_input_matrix_view_t<MathT> x2,
+                                 dense_output_matrix_view_t<MathT> out,
+                                 MathT* norm_x1,
+                                 MathT* norm_x2)
 {
-  bool is_row_major = GramMatrixBase<math_t>::get_is_row_major(out);
+  bool is_row_major = GramMatrixBase<MathT>::get_is_row_major(out);
   int ld_out        = is_row_major ? out.stride(0) : out.stride(1);
-  GramMatrixBase<math_t>::linear(handle, x1, x2, out);
+  GramMatrixBase<MathT>::linear(handle, x1, x2, out);
   applyKernel(out.data_handle(),
               ld_out,
               out.extent(0),
@@ -349,17 +351,17 @@ void TanhKernel<math_t>::evaluate(raft::resources const& handle,
  * @param norm_x1 unused.
  * @param norm_x2 unused.
  */
-template <typename math_t>
-void TanhKernel<math_t>::evaluate(raft::resources const& handle,
-                                  csr_input_matrix_view_t<math_t> x1,
-                                  dense_input_matrix_view_t<math_t> x2,
-                                  dense_output_matrix_view_t<math_t> out,
-                                  math_t* norm_x1,
-                                  math_t* norm_x2)
+template <typename MathT>
+void TanhKernel<MathT>::evaluate(raft::resources const& handle,
+                                 csr_input_matrix_view_t<MathT> x1,
+                                 dense_input_matrix_view_t<MathT> x2,
+                                 dense_output_matrix_view_t<MathT> out,
+                                 MathT* norm_x1,
+                                 MathT* norm_x2)
 {
-  bool is_row_major = GramMatrixBase<math_t>::get_is_row_major(out);
+  bool is_row_major = GramMatrixBase<MathT>::get_is_row_major(out);
   int ld_out        = is_row_major ? out.stride(0) : out.stride(1);
-  GramMatrixBase<math_t>::linear(handle, x1, x2, out);
+  GramMatrixBase<MathT>::linear(handle, x1, x2, out);
   applyKernel(out.data_handle(),
               ld_out,
               out.extent(0),
@@ -381,17 +383,17 @@ void TanhKernel<math_t>::evaluate(raft::resources const& handle,
  * @param norm_x1 unused.
  * @param norm_x2 unused.
  */
-template <typename math_t>
-void TanhKernel<math_t>::evaluate(raft::resources const& handle,
-                                  csr_input_matrix_view_t<math_t> x1,
-                                  csr_input_matrix_view_t<math_t> x2,
-                                  dense_output_matrix_view_t<math_t> out,
-                                  math_t* norm_x1,
-                                  math_t* norm_x2)
+template <typename MathT>
+void TanhKernel<MathT>::evaluate(raft::resources const& handle,
+                                 csr_input_matrix_view_t<MathT> x1,
+                                 csr_input_matrix_view_t<MathT> x2,
+                                 dense_output_matrix_view_t<MathT> out,
+                                 MathT* norm_x1,
+                                 MathT* norm_x2)
 {
-  bool is_row_major = GramMatrixBase<math_t>::get_is_row_major(out);
+  bool is_row_major = GramMatrixBase<MathT>::get_is_row_major(out);
   int ld_out        = is_row_major ? out.stride(0) : out.stride(1);
-  GramMatrixBase<math_t>::linear(handle, x1, x2, out);
+  GramMatrixBase<MathT>::linear(handle, x1, x2, out);
   applyKernel(out.data_handle(),
               ld_out,
               out.extent(0),
@@ -415,22 +417,22 @@ void TanhKernel<math_t>::evaluate(raft::resources const& handle,
  * @param ld2 leading dimension of x2 (usually it is n2)
  * @param ld_out leading dimension of out (usually it is n1)
  */
-template <typename math_t>
-[[deprecated]] void TanhKernel<math_t>::evaluate(const math_t* x1,
-                                                 int n1,
-                                                 int n_cols,
-                                                 const math_t* x2,
-                                                 int n2,
-                                                 math_t* out,
-                                                 bool is_row_major,
-                                                 cudaStream_t stream,
-                                                 int ld1,
-                                                 int ld2,
-                                                 int ld_out)
+template <typename MathT>
+[[deprecated]] void TanhKernel<MathT>::evaluate(const MathT* x1,
+                                                int n1,
+                                                int n_cols,
+                                                const MathT* x2,
+                                                int n2,
+                                                MathT* out,
+                                                bool is_row_major,
+                                                cudaStream_t stream,
+                                                int ld1,
+                                                int ld2,
+                                                int ld_out)
 {
-  ASSERT(GramMatrixBase<math_t>::legacy_interface,
+  ASSERT(GramMatrixBase<MathT>::legacy_interface,
          "Legacy interface can only be used with legacy ctor.");
-  GramMatrixBase<math_t>::linear(
+  GramMatrixBase<MathT>::linear(
     x1, n1, n_cols, x2, n2, out, is_row_major, stream, ld1, ld2, ld_out);
   applyKernel(out, ld_out, n1, n2, is_row_major, stream);
 }
@@ -438,31 +440,31 @@ template <typename math_t>
 /**
  * Create a kernel matrix using RBF kernel function.
  */
-template <typename math_t>
-void RBFKernel<math_t>::applyKernel(math_t* inout,
-                                    int ld,
-                                    int rows,
-                                    int cols,
-                                    math_t* norm_x1,
-                                    math_t* norm_x2,
-                                    bool is_row_major,
-                                    cudaStream_t stream)
+template <typename MathT>
+void RBFKernel<MathT>::applyKernel(MathT* inout,
+                                   int ld,
+                                   int rows,
+                                   int cols,
+                                   MathT* norm_x1,
+                                   MathT* norm_x2,
+                                   bool is_row_major,
+                                   cudaStream_t stream)
 {
   int n1                         = is_row_major ? cols : rows;
   int n2                         = is_row_major ? rows : cols;
-  math_t* norm_n1                = is_row_major ? norm_x2 : norm_x1;
-  math_t* norm_n2                = is_row_major ? norm_x1 : norm_x2;
-  auto [grid_shape, block_shape] = generateLaunchConfig2dElementwiseOp(n1, n2);
+  MathT* norm_n1                 = is_row_major ? norm_x2 : norm_x1;
+  MathT* norm_n2                 = is_row_major ? norm_x1 : norm_x2;
+  auto [grid_shape, block_shape] = generate_launch_config_2d_elementwise_op(n1, n2);
   rbf_kernel_expanded<<<grid_shape, block_shape, 0, stream>>>(
     inout, ld, n1, n2, norm_n1, norm_n2, gain);
 }
 
-template <typename math_t>
-void RBFKernel<math_t>::matrixRowNormL2(raft::resources const& handle,
-                                        dense_input_matrix_view_t<math_t> matrix,
-                                        math_t* target)
+template <typename MathT>
+void RBFKernel<MathT>::matrixRowNormL2(raft::resources const& handle,
+                                       dense_input_matrix_view_t<MathT> matrix,
+                                       MathT* target)
 {
-  bool is_row_major = GramMatrixBase<math_t>::get_is_row_major(matrix);
+  bool is_row_major = GramMatrixBase<MathT>::get_is_row_major(matrix);
   int minor         = is_row_major ? matrix.extent(1) : matrix.extent(0);
   int ld            = is_row_major ? matrix.stride(0) : matrix.stride(1);
   ASSERT(ld == minor, "RBF Kernel lazy rowNorm compute does not support ld parameter");
@@ -481,10 +483,10 @@ void RBFKernel<math_t>::matrixRowNormL2(raft::resources const& handle,
   }
 }
 
-template <typename math_t>
-void RBFKernel<math_t>::matrixRowNormL2(raft::resources const& handle,
-                                        csr_input_matrix_view_t<math_t> matrix,
-                                        math_t* target)
+template <typename MathT>
+void RBFKernel<MathT>::matrixRowNormL2(raft::resources const& handle,
+                                       csr_input_matrix_view_t<MathT> matrix,
+                                       MathT* target)
 {
   auto matrix_structure = matrix.structure_view();
   raft::sparse::linalg::rowNormCsr(handle,
@@ -509,18 +511,18 @@ void RBFKernel<math_t>::matrixRowNormL2(raft::resources const& handle,
  * @param norm_x1 optional L2-norm of x1's rows for computation within RBF.
  * @param norm_x2 optional L2-norm of x2's rows for computation within RBF.
  */
-template <typename math_t>
-void RBFKernel<math_t>::evaluate(raft::resources const& handle,
-                                 dense_input_matrix_view_t<math_t> x1,
-                                 dense_input_matrix_view_t<math_t> x2,
-                                 dense_output_matrix_view_t<math_t> out,
-                                 math_t* norm_x1,
-                                 math_t* norm_x2)
+template <typename MathT>
+void RBFKernel<MathT>::evaluate(raft::resources const& handle,
+                                dense_input_matrix_view_t<MathT> x1,
+                                dense_input_matrix_view_t<MathT> x2,
+                                dense_output_matrix_view_t<MathT> out,
+                                MathT* norm_x1,
+                                MathT* norm_x2)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   // lazy compute norms if not given
-  rmm::device_uvector<math_t> tmp_norm_x1(0, stream);
-  rmm::device_uvector<math_t> tmp_norm_x2(0, stream);
+  rmm::device_uvector<MathT> tmp_norm_x1(0, stream);
+  rmm::device_uvector<MathT> tmp_norm_x2(0, stream);
   if (norm_x1 == nullptr) {
     tmp_norm_x1.reserve(x1.extent(0), stream);
     norm_x1 = tmp_norm_x1.data();
@@ -533,9 +535,9 @@ void RBFKernel<math_t>::evaluate(raft::resources const& handle,
   }
 
   // compute L2expanded
-  bool is_row_major = GramMatrixBase<math_t>::get_is_row_major(out);
+  bool is_row_major = GramMatrixBase<MathT>::get_is_row_major(out);
   int ld_out        = is_row_major ? out.stride(0) : out.stride(1);
-  GramMatrixBase<math_t>::linear(handle, x1, x2, out);
+  GramMatrixBase<MathT>::linear(handle, x1, x2, out);
   applyKernel(out.data_handle(),
               ld_out,
               out.extent(0),
@@ -559,19 +561,19 @@ void RBFKernel<math_t>::evaluate(raft::resources const& handle,
  * @param norm_x1 optional L2-norm of x1's rows for computation within RBF.
  * @param norm_x2 optional L2-norm of x2's rows for computation within RBF.
  */
-template <typename math_t>
-void RBFKernel<math_t>::evaluate(raft::resources const& handle,
-                                 csr_input_matrix_view_t<math_t> x1,
-                                 dense_input_matrix_view_t<math_t> x2,
-                                 dense_output_matrix_view_t<math_t> out,
-                                 math_t* norm_x1,
-                                 math_t* norm_x2)
+template <typename MathT>
+void RBFKernel<MathT>::evaluate(raft::resources const& handle,
+                                csr_input_matrix_view_t<MathT> x1,
+                                dense_input_matrix_view_t<MathT> x2,
+                                dense_output_matrix_view_t<MathT> out,
+                                MathT* norm_x1,
+                                MathT* norm_x2)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
   // lazy compute norms if not given
-  rmm::device_uvector<math_t> tmp_norm_x1(0, stream);
-  rmm::device_uvector<math_t> tmp_norm_x2(0, stream);
+  rmm::device_uvector<MathT> tmp_norm_x1(0, stream);
+  rmm::device_uvector<MathT> tmp_norm_x2(0, stream);
   if (norm_x1 == nullptr) {
     tmp_norm_x1.reserve(x1.structure_view().get_n_rows(), stream);
     norm_x1 = tmp_norm_x1.data();
@@ -584,9 +586,9 @@ void RBFKernel<math_t>::evaluate(raft::resources const& handle,
   }
 
   // compute L2expanded
-  bool is_row_major = GramMatrixBase<math_t>::get_is_row_major(out);
+  bool is_row_major = GramMatrixBase<MathT>::get_is_row_major(out);
   int ld_out        = is_row_major ? out.stride(0) : out.stride(1);
-  GramMatrixBase<math_t>::linear(handle, x1, x2, out);
+  GramMatrixBase<MathT>::linear(handle, x1, x2, out);
   applyKernel(out.data_handle(),
               ld_out,
               out.extent(0),
@@ -610,19 +612,19 @@ void RBFKernel<math_t>::evaluate(raft::resources const& handle,
  * @param norm_x1 optional L2-norm of x1's rows for computation within RBF.
  * @param norm_x2 optional L2-norm of x2's rows for computation within RBF.
  */
-template <typename math_t>
-void RBFKernel<math_t>::evaluate(raft::resources const& handle,
-                                 csr_input_matrix_view_t<math_t> x1,
-                                 csr_input_matrix_view_t<math_t> x2,
-                                 dense_output_matrix_view_t<math_t> out,
-                                 math_t* norm_x1,
-                                 math_t* norm_x2)
+template <typename MathT>
+void RBFKernel<MathT>::evaluate(raft::resources const& handle,
+                                csr_input_matrix_view_t<MathT> x1,
+                                csr_input_matrix_view_t<MathT> x2,
+                                dense_output_matrix_view_t<MathT> out,
+                                MathT* norm_x1,
+                                MathT* norm_x2)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
   // lazy compute norms if not given
-  rmm::device_uvector<math_t> tmp_norm_x1(0, stream);
-  rmm::device_uvector<math_t> tmp_norm_x2(0, stream);
+  rmm::device_uvector<MathT> tmp_norm_x1(0, stream);
+  rmm::device_uvector<MathT> tmp_norm_x2(0, stream);
   if (norm_x1 == nullptr) {
     tmp_norm_x1.reserve(x1.structure_view().get_n_rows(), stream);
     norm_x1 = tmp_norm_x1.data();
@@ -635,9 +637,9 @@ void RBFKernel<math_t>::evaluate(raft::resources const& handle,
   }
 
   // compute L2expanded
-  bool is_row_major = GramMatrixBase<math_t>::get_is_row_major(out);
+  bool is_row_major = GramMatrixBase<MathT>::get_is_row_major(out);
   int ld_out        = is_row_major ? out.stride(0) : out.stride(1);
-  GramMatrixBase<math_t>::linear(handle, x1, x2, out);
+  GramMatrixBase<MathT>::linear(handle, x1, x2, out);
   applyKernel(out.data_handle(),
               ld_out,
               out.extent(0),
@@ -663,20 +665,20 @@ void RBFKernel<math_t>::evaluate(raft::resources const& handle,
  * @param ld2 leading dimension of x2 (usually it is n2)
  * @param ld_out leading dimension of out (usually it is n1)
  */
-template <typename math_t>
-[[deprecated]] void RBFKernel<math_t>::evaluate(const math_t* x1,
-                                                int n1,
-                                                int n_cols,
-                                                const math_t* x2,
-                                                int n2,
-                                                math_t* out,
-                                                bool is_row_major,
-                                                cudaStream_t stream,
-                                                int ld1,
-                                                int ld2,
-                                                int ld_out)
+template <typename MathT>
+[[deprecated]] void RBFKernel<MathT>::evaluate(const MathT* x1,
+                                               int n1,
+                                               int n_cols,
+                                               const MathT* x2,
+                                               int n2,
+                                               MathT* out,
+                                               bool is_row_major,
+                                               cudaStream_t stream,
+                                               int ld1,
+                                               int ld2,
+                                               int ld_out)
 {
-  ASSERT(GramMatrixBase<math_t>::legacy_interface,
+  ASSERT(GramMatrixBase<MathT>::legacy_interface,
          "Legacy interface can only be used with legacy ctor.");
   int minor1    = is_row_major ? n_cols : n1;
   int minor2    = is_row_major ? n_cols : n2;
@@ -685,7 +687,7 @@ template <typename math_t>
   ASSERT(ld2 == minor2, "RBF Kernel distance does not support ld2 parameter");
   ASSERT(ld_out == minor_out, "RBF Kernel distance does not support ld_out parameter");
 
-  math_t gain   = this->gain;
+  MathT gain    = this->gain;
   using index_t = int64_t;
 
   rbf_fin_op fin_op{gain};
@@ -694,18 +696,18 @@ template <typename math_t>
   raft::resource::set_cuda_stream(handle, stream);
 
   cuvs::distance::distance<cuvs::distance::DistanceType::L2Unexpanded,
-                           math_t,
-                           math_t,
-                           math_t,
+                           MathT,
+                           MathT,
+                           MathT,
                            decltype(fin_op),
                            index_t>(handle,
-                                    const_cast<math_t*>(x1),
-                                    const_cast<math_t*>(x2),
+                                    const_cast<MathT*>(x1),
+                                    const_cast<MathT*>(x2),
                                     out,
                                     n1,
                                     n2,
                                     n_cols,
-                                    NULL,
+                                    nullptr,
                                     0,
                                     fin_op,
                                     is_row_major);

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2020-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -15,7 +15,7 @@
 
 namespace cuvs::neighbors::detail {
 template <typename value_t, typename distance_t>
-DI distance_t compute_haversine(value_t x1, value_t y1, value_t x2, value_t y2)
+DI auto compute_haversine(value_t x1, value_t y1, value_t x2, value_t y2) -> distance_t
 {
   if constexpr ((std::is_same_v<distance_t, float> && std::is_same_v<value_t, half>)) {
     distance_t _x1 = __half2float(x1);
@@ -68,7 +68,8 @@ RAFT_KERNEL haversine_knn_kernel(value_idx* out_inds,
   __shared__ distance_t smemK[kNumWarps * warp_q];
   __shared__ value_idx smemV[kNumWarps * warp_q];
 
-  using namespace cuvs::neighbors::detail::faiss_select;
+  using cuvs::neighbors::detail::faiss_select::BlockSelect;
+  using cuvs::neighbors::detail::faiss_select::Comparator;
   BlockSelect<distance_t, value_idx, false, Comparator<distance_t>, warp_q, thread_q, tpb> heap(
     std::numeric_limits<distance_t>::max(), std::numeric_limits<value_idx>::max(), smemK, smemV, k);
 

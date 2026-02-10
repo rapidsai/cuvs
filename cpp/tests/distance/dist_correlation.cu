@@ -1,25 +1,26 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "../test_utils.cuh"
 #include "distance_base.cuh"
 
-namespace cuvs {
+namespace cuvs {  // NOLINT(modernize-concat-nested-namespaces)
 namespace distance {
 
 template <typename DataType, typename OutputType = DataType>
-class DistanceCorrelation
+class DistanceCorrelation  // NOLINT(readability-identifier-naming)
   : public DistanceTest<cuvs::distance::DistanceType::CorrelationExpanded, DataType, OutputType> {};
 
 template <typename DataType, typename OutputType = DataType>
-class DistanceCorrelationXequalY
+class DistanceCorrelationXequalY  // NOLINT(readability-identifier-naming)
   : public DistanceTestSameBuffer<cuvs::distance::DistanceType::CorrelationExpanded,
                                   DataType,
                                   OutputType> {};
 
 const std::vector<DistanceInputs<float>> inputsf = {
+  // NOLINT(readability-identifier-naming)
   {0.001f, 1024, 1024, 32, true, 1234ULL},
   {0.001f, 1024, 32, 1024, true, 1234ULL},
   {0.001f, 32, 1024, 1024, true, 1234ULL},
@@ -29,17 +30,23 @@ const std::vector<DistanceInputs<float>> inputsf = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceCorrelation<float> DistanceCorrelationF;
-TEST_P(DistanceCorrelationF, Result)
+using DistanceCorrelationF = DistanceCorrelation<float>;  // NOLINT(readability-identifier-naming)
+TEST_P(DistanceCorrelationF,
+       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
   int m = params.isRowMajor ? params.m : params.n;
   int n = params.isRowMajor ? params.n : params.m;
   ASSERT_TRUE(cuvs::devArrMatch(
     dist_ref.data(), dist.data(), m, n, cuvs::CompareApprox<float>(params.tolerance), stream));
 }
-INSTANTIATE_TEST_CASE_P(DistanceTests, DistanceCorrelationF, ::testing::ValuesIn(inputsf));
+INSTANTIATE_TEST_CASE_P(
+  DistanceTests,
+  DistanceCorrelationF,
+  ::testing::ValuesIn(
+    inputsf));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
 const std::vector<DistanceInputs<half, float>> inputsh = {
+  // NOLINT(readability-identifier-naming)
   {0.001f, 1024, 1024, 32, true, 1234ULL},
   {0.001f, 1024, 32, 1024, true, 1234ULL},
   {0.001f, 32, 1024, 1024, true, 1234ULL},
@@ -49,18 +56,24 @@ const std::vector<DistanceInputs<half, float>> inputsh = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceCorrelation<half, float> DistanceCorrelationH;
-TEST_P(DistanceCorrelationH, Result)
+using DistanceCorrelationH = DistanceCorrelation<half, float>;  // NOLINT(readability-identifier-naming)
+TEST_P(DistanceCorrelationH,
+       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
   int m = params.isRowMajor ? params.m : params.n;
   int n = params.isRowMajor ? params.n : params.m;
   ASSERT_TRUE(cuvs::devArrMatch(
     dist_ref.data(), dist.data(), m, n, cuvs::CompareApprox<float>(params.tolerance), stream));
 }
-INSTANTIATE_TEST_CASE_P(DistanceTests, DistanceCorrelationH, ::testing::ValuesIn(inputsh));
+INSTANTIATE_TEST_CASE_P(
+  DistanceTests,
+  DistanceCorrelationH,
+  ::testing::ValuesIn(
+    inputsh));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-typedef DistanceCorrelationXequalY<float> DistanceCorrelationXequalYF;
-TEST_P(DistanceCorrelationXequalYF, Result)
+using DistanceCorrelationXequalYF = DistanceCorrelationXequalY<float>;  // NOLINT(readability-identifier-naming)
+TEST_P(DistanceCorrelationXequalYF,
+       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
   int m = params.m;
   ASSERT_TRUE(cuvs::devArrMatch(dist_ref[0].data(),
@@ -76,9 +89,14 @@ TEST_P(DistanceCorrelationXequalYF, Result)
                                 cuvs::CompareApprox<float>(params.tolerance),
                                 stream));
 }
-INSTANTIATE_TEST_CASE_P(DistanceTests, DistanceCorrelationXequalYF, ::testing::ValuesIn(inputsf));
+INSTANTIATE_TEST_CASE_P(
+  DistanceTests,
+  DistanceCorrelationXequalYF,
+  ::testing::ValuesIn(
+    inputsf));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
 const std::vector<DistanceInputs<double>> inputsd = {
+  // NOLINT(readability-identifier-naming)
   {0.001, 1024, 1024, 32, true, 1234ULL},
   {0.001, 1024, 32, 1024, true, 1234ULL},
   {0.001, 32, 1024, 1024, true, 1234ULL},
@@ -88,18 +106,24 @@ const std::vector<DistanceInputs<double>> inputsd = {
   {0.001, 32, 1024, 1024, false, 1234ULL},
   {0.003, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceCorrelation<double> DistanceCorrelationD;
-TEST_P(DistanceCorrelationD, Result)
+using DistanceCorrelationD = DistanceCorrelation<double>;  // NOLINT(readability-identifier-naming)
+TEST_P(DistanceCorrelationD,
+       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
   int m = params.isRowMajor ? params.m : params.n;
   int n = params.isRowMajor ? params.n : params.m;
   ASSERT_TRUE(cuvs::devArrMatch(
     dist_ref.data(), dist.data(), m, n, cuvs::CompareApprox<double>(params.tolerance), stream));
 }
-INSTANTIATE_TEST_CASE_P(DistanceTests, DistanceCorrelationD, ::testing::ValuesIn(inputsd));
+INSTANTIATE_TEST_CASE_P(
+  DistanceTests,
+  DistanceCorrelationD,
+  ::testing::ValuesIn(
+    inputsd));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-typedef DistanceCorrelationXequalY<half, float> DistanceCorrelationXequalYH;
-TEST_P(DistanceCorrelationXequalYH, Result)
+using DistanceCorrelationXequalYH = DistanceCorrelationXequalY<half, float>;  // NOLINT(readability-identifier-naming)
+TEST_P(DistanceCorrelationXequalYH,
+       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
   int m = params.m;
   ASSERT_TRUE(cuvs::devArrMatch(dist_ref[0].data(),
@@ -115,10 +139,15 @@ TEST_P(DistanceCorrelationXequalYH, Result)
                                 cuvs::CompareApprox<float>(params.tolerance),
                                 stream));
 }
-INSTANTIATE_TEST_CASE_P(DistanceTests, DistanceCorrelationXequalYH, ::testing::ValuesIn(inputsh));
+INSTANTIATE_TEST_CASE_P(
+  DistanceTests,
+  DistanceCorrelationXequalYH,
+  ::testing::ValuesIn(
+    inputsh));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-class BigMatrixCorrelation
+class BigMatrixCorrelation  // NOLINT(readability-identifier-naming)
   : public BigMatrixDistanceTest<cuvs::distance::DistanceType::CorrelationExpanded> {};
-TEST_F(BigMatrixCorrelation, Result) {}
+TEST_F(BigMatrixCorrelation, Result) {
+}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 }  // end namespace distance
 }  // namespace cuvs

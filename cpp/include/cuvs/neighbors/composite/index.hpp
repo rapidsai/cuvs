@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -18,7 +18,8 @@ namespace cuvs::neighbors::composite {
  * @brief Composite index made of other IndexBase implementations.
  */
 template <typename T, typename IdxT, typename OutputIdxT = IdxT>
-class CompositeIndex : public IndexBase<T, IdxT, OutputIdxT> {
+class CompositeIndex  // NOLINT(readability-identifier-naming)
+  : public IndexBase<T, IdxT, OutputIdxT> {
  public:
   using value_type        = typename IndexBase<T, IdxT, OutputIdxT>::value_type;
   using index_type        = typename IndexBase<T, IdxT, OutputIdxT>::index_type;
@@ -70,7 +71,7 @@ class CompositeIndex : public IndexBase<T, IdxT, OutputIdxT> {
     const cuvs::neighbors::filtering::base_filter& filter =
       cuvs::neighbors::filtering::none_sample_filter{}) const override;
 
-  index_type size() const noexcept override
+  [[nodiscard]] auto size() const noexcept -> index_type override
   {
     index_type total = 0;
     for (const auto& c : children_) {
@@ -79,7 +80,7 @@ class CompositeIndex : public IndexBase<T, IdxT, OutputIdxT> {
     return total;
   }
 
-  cuvs::distance::DistanceType metric() const noexcept override
+  [[nodiscard]] auto metric() const noexcept -> cuvs::distance::DistanceType override
   {
     return children_.empty() ? cuvs::distance::DistanceType::L2Expanded
                              : children_.front()->metric();

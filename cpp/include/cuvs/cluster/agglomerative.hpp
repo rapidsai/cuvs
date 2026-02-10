@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,7 +17,7 @@
 namespace cuvs::cluster::agglomerative {
 
 // constant to indirectly control the number of neighbors. k = sqrt(n) + c. default to 15
-constexpr int DEFAULT_CONST_C = 15;
+constexpr int DEFAULT_CONST_C = 15;  // NOLINT(readability-identifier-naming)
 
 /**
  * @defgroup agglomerative_params agglomerative clustering hyperparameters
@@ -27,7 +27,7 @@ constexpr int DEFAULT_CONST_C = 15;
 /**
  * Determines the method for computing the minimum spanning tree (MST)
  */
-enum Linkage {
+enum Linkage {  // NOLINT(readability-identifier-naming)
 
   /**
    * Use a pairwise distance matrix as input to the mst. This
@@ -53,7 +53,7 @@ enum Linkage {
  * Scikit-learn's AgglomerativeClustering estimator.
  * @tparam idx_t
  */
-template <typename idx_t>
+template <typename idx_t>  // NOLINT(readability-identifier-naming)
 class single_linkage_output {
  public:
   idx_t m;
@@ -62,16 +62,16 @@ class single_linkage_output {
   idx_t n_leaves;
   idx_t n_connected_components;
 
-  // TODO: These will be made private in a future release
+  // TODO(snanditale): These will be made private in a future release
   idx_t* labels;    // size: m
   idx_t* children;  // size: (m-1, 2)
 
-  raft::device_vector_view<idx_t> get_labels()
+  auto get_labels() -> raft::device_vector_view<idx_t>
   {
     return raft::make_device_vector_view<idx_t>(labels, m);
   }
 
-  raft::device_matrix_view<idx_t> get_children()
+  auto get_children() -> raft::device_matrix_view<idx_t>
   {
     return raft::make_device_matrix_view<idx_t>(children, m - 1, 2);
   }

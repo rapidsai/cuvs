@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -15,24 +15,21 @@
 #include <thrust/scan.h>
 #include <thrust/transform.h>
 
-namespace cuvs {
-namespace distance {
-namespace detail {
-namespace sparse {
+namespace cuvs::distance::detail::sparse {
 
 template <typename value_idx>
 class mask_row_it {
  public:
   mask_row_it(const value_idx* full_indptr_,
               const value_idx& n_rows_,
-              value_idx* mask_row_idx_ = NULL)
+              value_idx* mask_row_idx_ = nullptr)
     : full_indptr(full_indptr_), mask_row_idx(mask_row_idx_), n_rows(n_rows_)
   {
   }
 
-  __device__ inline value_idx get_row_idx(const int& n_blocks_nnz_b)
+  __device__ inline auto get_row_idx(const int& n_blocks_nnz_b) -> value_idx
   {
-    if (mask_row_idx != NULL) {
+    if (mask_row_idx != nullptr) {
       return mask_row_idx[blockIdx.x / n_blocks_nnz_b];
     } else {
       return blockIdx.x / n_blocks_nnz_b;
@@ -62,9 +59,9 @@ class mask_row_it {
     // do nothing;
   }
 
-  __device__ constexpr inline bool check_indices_bounds(value_idx& start_index_a,
+  __device__ constexpr inline auto check_indices_bounds(value_idx& start_index_a,
                                                         value_idx& stop_index_a,
-                                                        value_idx& index_b)
+                                                        value_idx& index_b) -> bool
   {
     return true;
   }
@@ -132,7 +129,7 @@ class chunked_mask_row_it : public mask_row_it<value_idx> {
     fill_chunk_indices(n_rows, n_chunks_per_row, chunk_indices, stream);
   }
 
-  __device__ inline value_idx get_row_idx(const int& n_blocks_nnz_b)
+  __device__ inline auto get_row_idx(const int& n_blocks_nnz_b) -> value_idx
   {
     return this->mask_row_idx[chunk_indices[blockIdx.x / n_blocks_nnz_b]];
   }
@@ -172,9 +169,9 @@ class chunked_mask_row_it : public mask_row_it<value_idx> {
     stop_index  = last_a_chunk ? stop_index : indices[stop_offset];
   }
 
-  __device__ inline bool check_indices_bounds(value_idx& start_index_a,
+  __device__ inline auto check_indices_bounds(value_idx& start_index_a,
                                               value_idx& stop_index_a,
-                                              value_idx& index_b)
+                                              value_idx& index_b) -> bool
   {
     return (index_b >= start_index_a && index_b <= stop_index_a);
   }
@@ -191,10 +188,10 @@ class chunked_mask_row_it : public mask_row_it<value_idx> {
     {
     }
 
-    __host__ __device__ value_idx operator()(const value_idx& i)
+    __host__ __device__ auto operator()(const value_idx& i) -> value_idx
     {
       auto degree = indptr[i + 1] - indptr[i];
-      return raft::ceildiv(degree, (value_idx)row_chunk_size);
+      return raft::ceildiv(degree, static_cast<value_idx>(row_chunk_size));
     }
 
     const value_idx* indptr;
@@ -208,7 +205,7 @@ class chunked_mask_row_it : public mask_row_it<value_idx> {
                                  cudaStream_t stream)
   {
     auto n_threads = std::min(n_rows, 256);
-    auto n_blocks  = raft::ceildiv(n_rows, (value_idx)n_threads);
+    auto n_blocks  = raft::ceildiv(n_rows, static_cast<value_idx>(n_threads));
 
     chunk_indices.resize(total_row_blocks, stream);
 
@@ -217,7 +214,4 @@ class chunked_mask_row_it : public mask_row_it<value_idx> {
   }
 };
 
-}  // namespace sparse
-}  // namespace detail
-}  // namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance::detail::sparse

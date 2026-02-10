@@ -1,6 +1,6 @@
 
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -26,7 +26,7 @@ namespace cuvs::neighbors::ivf_flat {
 void convert_c_index_params(cuvsIvfFlatIndexParams params,
                             cuvs::neighbors::ivf_flat::index_params* out)
 {
-  out->metric                   = static_cast<cuvs::distance::DistanceType>((int)params.metric),
+  out->metric                   = static_cast<cuvs::distance::DistanceType>(static_cast<int>(params.metric)),
   out->metric_arg               = params.metric_arg;
   out->add_data_on_build        = params.add_data_on_build;
   out->n_lists                  = params.n_lists;
@@ -45,7 +45,7 @@ void convert_c_search_params(cuvsIvfFlatSearchParams params,
 namespace {
 
 template <typename T, typename IdxT>
-void* _build(cuvsResources_t res, cuvsIvfFlatIndexParams params, DLManagedTensor* dataset_tensor)
+auto _build(cuvsResources_t res, cuvsIvfFlatIndexParams params, DLManagedTensor* dataset_tensor) -> void*
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
 
@@ -119,7 +119,7 @@ void _serialize(cuvsResources_t res, const char* filename, cuvsIvfFlatIndex inde
 }
 
 template <typename T, typename IdxT>
-void* _deserialize(cuvsResources_t res, const char* filename)
+auto _deserialize(cuvsResources_t res, const char* filename) -> void*
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   auto index   = new cuvs::neighbors::ivf_flat::index<T, IdxT>(*res_ptr);
@@ -152,12 +152,12 @@ void get_centers(cuvsIvfFlatIndex index, DLManagedTensor* centers)
 }
 }  // namespace
 
-extern "C" cuvsError_t cuvsIvfFlatIndexCreate(cuvsIvfFlatIndex_t* index)
+extern "C" auto cuvsIvfFlatIndexCreate(cuvsIvfFlatIndex_t* index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { *index = new cuvsIvfFlatIndex{}; });
 }
 
-extern "C" cuvsError_t cuvsIvfFlatIndexDestroy(cuvsIvfFlatIndex_t index_c_ptr)
+extern "C" auto cuvsIvfFlatIndexDestroy(cuvsIvfFlatIndex_t index_c_ptr) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto index = *index_c_ptr;
@@ -183,10 +183,10 @@ extern "C" cuvsError_t cuvsIvfFlatIndexDestroy(cuvsIvfFlatIndex_t index_c_ptr)
   });
 }
 
-extern "C" cuvsError_t cuvsIvfFlatBuild(cuvsResources_t res,
+extern "C" auto cuvsIvfFlatBuild(cuvsResources_t res,
                                         cuvsIvfFlatIndexParams_t params,
                                         DLManagedTensor* dataset_tensor,
-                                        cuvsIvfFlatIndex_t index)
+                                        cuvsIvfFlatIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
@@ -212,13 +212,13 @@ extern "C" cuvsError_t cuvsIvfFlatBuild(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsIvfFlatSearch(cuvsResources_t res,
+extern "C" auto cuvsIvfFlatSearch(cuvsResources_t res,
                                          cuvsIvfFlatSearchParams_t params,
                                          cuvsIvfFlatIndex_t index_c_ptr,
                                          DLManagedTensor* queries_tensor,
                                          DLManagedTensor* neighbors_tensor,
                                          DLManagedTensor* distances_tensor,
-                                         cuvsFilter filter)
+                                         cuvsFilter filter) -> cuvsError_t
 
 {
   return cuvs::core::translate_exceptions([=] {
@@ -261,7 +261,7 @@ extern "C" cuvsError_t cuvsIvfFlatSearch(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsIvfFlatIndexParamsCreate(cuvsIvfFlatIndexParams_t* params)
+extern "C" auto cuvsIvfFlatIndexParamsCreate(cuvsIvfFlatIndexParams_t* params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     *params = new cuvsIvfFlatIndexParams{.metric                         = L2Expanded,
@@ -275,25 +275,25 @@ extern "C" cuvsError_t cuvsIvfFlatIndexParamsCreate(cuvsIvfFlatIndexParams_t* pa
   });
 }
 
-extern "C" cuvsError_t cuvsIvfFlatIndexParamsDestroy(cuvsIvfFlatIndexParams_t params)
+extern "C" auto cuvsIvfFlatIndexParamsDestroy(cuvsIvfFlatIndexParams_t params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
 }
 
-extern "C" cuvsError_t cuvsIvfFlatSearchParamsCreate(cuvsIvfFlatSearchParams_t* params)
+extern "C" auto cuvsIvfFlatSearchParamsCreate(cuvsIvfFlatSearchParams_t* params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions(
     [=] { *params = new cuvsIvfFlatSearchParams{.n_probes = 20}; });
 }
 
-extern "C" cuvsError_t cuvsIvfFlatSearchParamsDestroy(cuvsIvfFlatSearchParams_t params)
+extern "C" auto cuvsIvfFlatSearchParamsDestroy(cuvsIvfFlatSearchParams_t params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
 }
 
-extern "C" cuvsError_t cuvsIvfFlatDeserialize(cuvsResources_t res,
+extern "C" auto cuvsIvfFlatDeserialize(cuvsResources_t res,
                                               const char* filename,
-                                              cuvsIvfFlatIndex_t index)
+                                              cuvsIvfFlatIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     // read the numpy dtype from the beginning of the file
@@ -324,9 +324,9 @@ extern "C" cuvsError_t cuvsIvfFlatDeserialize(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsIvfFlatSerialize(cuvsResources_t res,
+extern "C" auto cuvsIvfFlatSerialize(cuvsResources_t res,
                                             const char* filename,
-                                            cuvsIvfFlatIndex_t index)
+                                            cuvsIvfFlatIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
@@ -343,10 +343,10 @@ extern "C" cuvsError_t cuvsIvfFlatSerialize(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsIvfFlatExtend(cuvsResources_t res,
+extern "C" auto cuvsIvfFlatExtend(cuvsResources_t res,
                                          DLManagedTensor* new_vectors,
                                          DLManagedTensor* new_indices,
-                                         cuvsIvfFlatIndex_t index)
+                                         cuvsIvfFlatIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
@@ -363,7 +363,7 @@ extern "C" cuvsError_t cuvsIvfFlatExtend(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsIvfFlatIndexGetNLists(cuvsIvfFlatIndex_t index, int64_t* n_lists)
+extern "C" auto cuvsIvfFlatIndexGetNLists(cuvsIvfFlatIndex_t index, int64_t* n_lists) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
@@ -388,7 +388,7 @@ extern "C" cuvsError_t cuvsIvfFlatIndexGetNLists(cuvsIvfFlatIndex_t index, int64
   });
 }
 
-extern "C" cuvsError_t cuvsIvfFlatIndexGetDim(cuvsIvfFlatIndex_t index, int64_t* dim)
+extern "C" auto cuvsIvfFlatIndexGetDim(cuvsIvfFlatIndex_t index, int64_t* dim) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
@@ -413,8 +413,8 @@ extern "C" cuvsError_t cuvsIvfFlatIndexGetDim(cuvsIvfFlatIndex_t index, int64_t*
   });
 }
 
-extern "C" cuvsError_t cuvsIvfFlatIndexGetCenters(cuvsIvfFlatIndex_t index,
-                                                  DLManagedTensor* centers)
+extern "C" auto cuvsIvfFlatIndexGetCenters(cuvsIvfFlatIndex_t index,
+                                                  DLManagedTensor* centers) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {

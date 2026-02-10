@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2019-2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2019-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -31,7 +31,7 @@ struct rbf_fin_op {
   explicit HD rbf_fin_op(OutT gain_) noexcept : gain(gain_) {}
 
   template <typename... Args>
-  HDI OutT operator()(OutT d_val, Args... unused_args)
+  HDI auto operator()(OutT d_val, Args... unused_args) -> OutT
   {
     return raft::exp(-gain * d_val);
   }

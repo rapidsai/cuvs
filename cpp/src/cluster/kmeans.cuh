@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2020-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -344,7 +344,7 @@ void update_centroids(raft::resources const& handle,
                       raft::device_vector_view<DataT, IndexT> weight_per_cluster,
                       raft::device_matrix_view<DataT, IndexT, raft::row_major> new_centroids)
 {
-  // TODO: Passing these into the algorithm doesn't really present much of a benefit
+  // TODO(snanditale): Passing these into the algorithm doesn't really present much of a benefit
   // because they are being resized anyways.
   // ref https://github.com/rapidsai/raft/issues/930
   rmm::device_uvector<char> workspace(0, raft::resource::get_cuda_stream(handle));

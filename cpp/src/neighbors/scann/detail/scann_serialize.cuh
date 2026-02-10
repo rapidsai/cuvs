@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -26,7 +26,7 @@ constexpr int kSerializationVersion = 1;
 
 namespace {
 // Helper for opening an ofstream
-std::ofstream open_file(std::string file_name)
+auto open_file(std::string file_name) -> std::ofstream
 {
   std::ofstream file_of(file_name, std::ios::out | std::ios::binary);
 
@@ -67,7 +67,7 @@ void save_labels(raft::resources const& res,
   auto soar_labels_view = index_.soar_labels();
 
   raft::linalg::map_offset(
-    res, combined_labels.view(), [labels_view, soar_labels_view] __device__(size_t i) {
+    res, combined_labels.view(), [labels_view, soar_labels_view] __device__(size_t i) -> int {
       size_t label_type = i % 2;
       size_t idx        = i / 2;
 

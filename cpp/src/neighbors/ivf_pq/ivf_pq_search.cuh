@@ -117,13 +117,16 @@ void select_clusters(raft::resources const& handle,
   }
   auto float_queries_view =
     raft::make_device_vector_view<float, uint32_t>(float_queries, dim_ext * n_queries);
-  raft::linalg::map_offset(
-    handle, float_queries_view, [queries, dim, dim_ext, norm_factor] __device__(uint32_t ix) {
-      uint32_t col = ix % dim_ext;
-      uint32_t row = ix / dim_ext;
-      if (col < dim) { return utils::mapping<float>{}(queries[col + dim * row]); }
-      return col == dim ? norm_factor : 0.0f;
-    });
+  raft::linalg::map_offset(handle,
+                           float_queries_view,
+                           [queries, dim, dim_ext, norm_factor] __device__(uint32_t ix) -> float {
+                             uint32_t col = ix % dim_ext;
+                             uint32_t row = ix / dim_ext;
+                             if (col < dim) {
+                               return utils::mapping<float>{}(queries[col + dim * row]);
+                             }
+                             return col == dim ? norm_factor : 0.0f;
+                           });
 
   float alpha;
   float beta;
@@ -199,16 +202,22 @@ void select_clusters(raft::resources const& handle,
   }
   auto float_queries_view =
     raft::make_device_vector_view<int8_t, uint32_t>(float_queries, dim_ext * n_queries);
-  raft::linalg::map_offset(
-    handle, float_queries_view, [queries, dim, dim_ext, norm_factor] __device__(uint32_t ix) {
-      uint32_t col = ix % dim_ext;
-      uint32_t row = ix / dim_ext;
-      if (col < dim) { return utils::mapping<int8_t>{}(queries[col + dim * row]); }
-      auto m = dim_ext - dim;
-      // see 'NOTE: maximizing the range and the precision of int8_t GEMM' in ivf_pq_index.cu
-      if (m == 1 || col > dim) { return norm_factor; }  // times `y` (higher bits)
-      return static_cast<int8_t>(1 - m);                // times `z` (lower bits)
-    });
+  raft::linalg::map_offset(handle,
+                           float_queries_view,
+                           [queries, dim, dim_ext, norm_factor] __device__(uint32_t ix) -> int8_t {
+                             uint32_t col = ix % dim_ext;
+                             uint32_t row = ix / dim_ext;
+                             if (col < dim) {
+                               return utils::mapping<int8_t>{}(queries[col + dim * row]);
+                             }
+                             auto m = dim_ext - dim;
+                             // see 'NOTE: maximizing the range and the precision of int8_t GEMM' in
+                             // ivf_pq_index.cu
+                             if (m == 1 || col > dim) {
+                               return norm_factor;
+                             }  // times `y` (higher bits)
+                             return static_cast<int8_t>(1 - m);  // times `z` (lower bits)
+                           });
 
   using dist_type = int32_t;
   dist_type alpha;
@@ -287,13 +296,16 @@ void select_clusters(raft::resources const& handle,
   }
   auto float_queries_view =
     raft::make_device_vector_view<half, uint32_t>(float_queries, dim_ext * n_queries);
-  raft::linalg::map_offset(
-    handle, float_queries_view, [queries, dim, dim_ext, norm_factor] __device__(uint32_t ix) {
-      uint32_t col = ix % dim_ext;
-      uint32_t row = ix / dim_ext;
-      if (col < dim) { return utils::mapping<half>{}(queries[col + dim * row]); }
-      return col == dim ? norm_factor : half(0);
-    });
+  raft::linalg::map_offset(handle,
+                           float_queries_view,
+                           [queries, dim, dim_ext, norm_factor] __device__(uint32_t ix) -> half {
+                             uint32_t col = ix % dim_ext;
+                             uint32_t row = ix / dim_ext;
+                             if (col < dim) {
+                               return utils::mapping<half>{}(queries[col + dim * row]);
+                             }
+                             return col == dim ? norm_factor : half(0);
+                           });
 
   using dist_type = half;
   dist_type alpha;
@@ -443,10 +455,12 @@ void ivfpq_search_worker(raft::resources const& handle,
   auto stream = raft::resource::get_cuda_stream(handle);
   auto mr     = raft::resource::get_workspace_resource(handle);
 
-  bool manage_local_topk         = is_local_topk_feasible(topK, n_probes, n_queries);
-  auto topk_len                  = manage_local_topk ? n_probes * topK : max_samples;
-  std::size_t n_queries_probes   = std::size_t(n_queries) * std::size_t(n_probes);
-  std::size_t n_queries_topk_len = std::size_t(n_queries) * std::size_t(topk_len);
+  bool manage_local_topk = is_local_topk_feasible(topK, n_probes, n_queries);
+  auto topk_len          = manage_local_topk ? n_probes * topK : max_samples;
+  std::size_t n_queries_probes =
+    static_cast<std::size_t>(n_queries) * static_cast<std::size_t>(n_probes);
+  std::size_t n_queries_topk_len =
+    static_cast<std::size_t>(n_queries) * static_cast<std::size_t>(topk_len);
   if (manage_local_topk) {
     RAFT_LOG_DEBUG("Fused version of the search kernel is selected (manage_local_topk == true)");
   } else {
@@ -738,11 +752,12 @@ inline auto get_max_fine_batch_size(raft::resources const& res,
   uint32_t max_batch_size = n_queries;
   uint32_t n_ctas_total   = raft::resource::get_device_properties(res).multiProcessorCount * 2;
   uint32_t n_ctas_total_per_batch = n_ctas_total / max_batch_size;
-  float utilization               = float(n_ctas_total_per_batch * max_batch_size) / n_ctas_total;
+  float utilization = static_cast<float>(n_ctas_total_per_batch * max_batch_size) / n_ctas_total;
   if (n_ctas_total_per_batch > 1 || (n_ctas_total_per_batch == 1 && utilization < 0.6)) {
     uint32_t n_ctas_total_per_batch_1 = n_ctas_total_per_batch + 1;
     uint32_t max_batch_size_1         = n_ctas_total / n_ctas_total_per_batch_1;
-    float utilization_1 = float(n_ctas_total_per_batch_1 * max_batch_size_1) / n_ctas_total;
+    float utilization_1 =
+      static_cast<float>(n_ctas_total_per_batch_1 * max_batch_size_1) / n_ctas_total;
     if (utilization < utilization_1) { max_batch_size = max_batch_size_1; }
   }
   // Check in the tmp distance buffer is not too big
@@ -924,7 +939,7 @@ inline void search(raft::resources const& handle,
       "ivf_pq::search-batch(queries: %u - %u)", offset_q, offset_q + queries_batch);
 
     std::visit(
-      [&](auto&& gemm_qs) {
+      [&](auto&& gemm_qs) -> auto {
         using gemm_type  = std::remove_reference_t<decltype(gemm_qs)>;
         using value_type = std::remove_cv_t<typename gemm_type::value_type>;
         return select_clusters(handle,
@@ -944,7 +959,7 @@ inline void search(raft::resources const& handle,
 
     // Rotate queries
     std::visit(
-      [&](auto&& gemm_qs) {
+      [&](auto&& gemm_qs) -> auto {
         using gemm_type  = std::remove_reference_t<decltype(gemm_qs)>;
         using value_type = std::remove_cv_t<typename gemm_type::value_type>;
         float alpha      = std::is_same_v<value_type, int8_t> ? 1.0 / 128.0 / 128.0 : 1.0;
@@ -987,8 +1002,8 @@ inline void search(raft::resources const& handle,
                       offset_q + offset_b,
                       clusters_to_probe.data() + uint64_t(n_probes) * offset_b,
                       rot_queries.data() + uint64_t(index.rot_dim()) * offset_b,
-                      neighbors + uint64_t(k) * (offset_q + offset_b),
-                      distances + uint64_t(k) * (offset_q + offset_b),
+                      neighbors + static_cast<uint64_t>(k) * (offset_q + offset_b),
+                      distances + static_cast<uint64_t>(k) * (offset_q + offset_b),
                       utils::config<T>::kDivisor / utils::config<float>::kDivisor,
                       params.preferred_shmem_carveout,
                       filter_adapter);

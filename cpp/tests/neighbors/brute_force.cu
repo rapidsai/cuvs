@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -20,7 +20,7 @@
 namespace cuvs::neighbors::brute_force {
 
 template <typename T>
-struct KNNInputs {
+struct KNNInputs {  // NOLINT(readability-identifier-naming)
   std::vector<std::vector<T>> input;
   int k;
   std::vector<int> labels;
@@ -48,9 +48,10 @@ RAFT_KERNEL build_expected_output(int* output, int n_rows, int k, const int* lab
 }
 
 template <typename T, typename DistT, typename IdxT>
-class KNNTest : public ::testing::TestWithParam<KNNInputs<T>> {
+class KNNTest
+  : public ::testing::TestWithParam<KNNInputs<T>> {  // NOLINT(readability-identifier-naming)
  public:
-  KNNTest()
+  KNNTest()  // NOLINT(modernize-use-equals-default)
     : params_(::testing::TestWithParam<KNNInputs<T>>::GetParam()),
       stream(raft::resource::get_cuda_stream(handle)),
       actual_labels_(0, stream),
@@ -64,16 +65,16 @@ class KNNTest : public ::testing::TestWithParam<KNNInputs<T>> {
   }
 
  protected:
-  void testBruteForce()
+  void testBruteForce()  // NOLINT(readability-identifier-naming)
   {
     raft::print_device_vector("Input array: ", input_.data(), rows_ * cols_, std::cout);
     std::cout << "K: " << k_ << std::endl;
     raft::print_device_vector("Labels array: ", search_labels_.data(), rows_, std::cout);
 
     auto index = raft::make_device_matrix_view<const T, IdxT, raft::row_major>(
-      (const T*)(input_.data()), rows_, cols_);
+      reinterpret_cast<const T*>((input_.data())), rows_, cols_);
     auto search = raft::make_device_matrix_view<const T, IdxT, raft::row_major>(
-      (const T*)(search_data_.data()), rows_, cols_);
+      reinterpret_cast<const T*>((search_data_.data())), rows_, cols_);
     auto indices =
       raft::make_device_matrix_view<IdxT, IdxT, raft::row_major>(indices_.data(), rows_, k_);
     auto distances =
@@ -102,7 +103,7 @@ class KNNTest : public ::testing::TestWithParam<KNNInputs<T>> {
       expected_labels_.data(), actual_labels_.data(), rows_ * k_, cuvs::Compare<int>(), stream));
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     rows_ = params_.input.size();
     cols_ = params_.input[0].size();
@@ -148,8 +149,8 @@ class KNNTest : public ::testing::TestWithParam<KNNInputs<T>> {
   }
 
  private:
-  raft::resources handle;
-  cudaStream_t stream;
+  raft::resources handle;  // NOLINT(readability-identifier-naming)
+  cudaStream_t stream;     // NOLINT(readability-identifier-naming)
 
   KNNInputs<T> params_;
   int rows_;
@@ -166,7 +167,7 @@ class KNNTest : public ::testing::TestWithParam<KNNInputs<T>> {
 };
 
 template <typename T>
-const std::vector<KNNInputs<T>> inputs = {
+const std::vector<KNNInputs<T>> inputs = {  // NOLINT(readability-identifier-naming)
   // 2D
   {{
      {2.7810836, 2.550537003},
@@ -183,17 +184,33 @@ const std::vector<KNNInputs<T>> inputs = {
    2,
    {0, 0, 0, 0, 0, 1, 1, 1, 1, 1}}};
 
-typedef KNNTest<float, float, int64_t> KNNTest_float_int64_t;
-TEST_P(KNNTest_float_int64_t, BruteForce) { this->testBruteForce(); }
+using KNNTest_float_int64_t =
+  KNNTest<float, float, int64_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(KNNTest_float_int64_t,
+       BruteForce)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  this->testBruteForce();
+}  // NOLINT(readability-identifier-naming)
 
-typedef KNNTest<half, float, int64_t> KNNTest_half_int64_t;
-TEST_P(KNNTest_half_int64_t, BruteForce) { this->testBruteForce(); }
+using KNNTest_half_int64_t =
+  KNNTest<half, float, int64_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(KNNTest_half_int64_t,
+       BruteForce)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  this->testBruteForce();
+}  // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(KNNTest, KNNTest_float_int64_t, ::testing::ValuesIn(inputs<float>));
-INSTANTIATE_TEST_CASE_P(KNNTest, KNNTest_half_int64_t, ::testing::ValuesIn(inputs<half>));
+INSTANTIATE_TEST_CASE_P(
+  KNNTest,
+  KNNTest_float_int64_t,
+  ::testing::ValuesIn(inputs<float>));  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(
+  KNNTest,
+  KNNTest_half_int64_t,
+  ::testing::ValuesIn(inputs<half>));  // NOLINT(readability-identifier-naming)
 
 // Also test with larger random inputs, including col-major inputs
-struct RandomKNNInputs {
+struct RandomKNNInputs {  // NOLINT(readability-identifier-naming)
   int num_queries;
   int num_db_vecs;
   int dim;
@@ -203,7 +220,7 @@ struct RandomKNNInputs {
   bool host_dataset;
 };
 
-std::ostream& operator<<(std::ostream& os, const RandomKNNInputs& input)
+auto operator<<(std::ostream& os, const RandomKNNInputs& input) -> std::ostream&
 {
   return os << "num_queries:" << input.num_queries << " num_vecs:" << input.num_db_vecs
             << " dim:" << input.dim << " k:" << input.k
@@ -212,7 +229,8 @@ std::ostream& operator<<(std::ostream& os, const RandomKNNInputs& input)
 }
 
 template <typename T, typename DistT = T>
-class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs> {
+class RandomBruteForceKNNTest
+  : public ::testing::TestWithParam<RandomKNNInputs> {  // NOLINT(readability-identifier-naming)
  public:
   RandomBruteForceKNNTest()
     : stream_(raft::resource::get_cuda_stream(handle_)),
@@ -253,12 +271,14 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
                     DistT alpha = 1.0,
                     DistT beta  = 0.0)
   {
-    size_t size_A    = params_.num_queries * params_.dim * sizeof(T);
-    size_t size_B    = params_.num_db_vecs * params_.dim * sizeof(T);
+    size_t size_A =
+      params_.num_queries * params_.dim * sizeof(T);  // NOLINT(readability-identifier-naming)
+    size_t size_B =
+      params_.num_db_vecs * params_.dim * sizeof(T);  // NOLINT(readability-identifier-naming)
     size_t size_vals = params_.num_queries * params_.num_db_vecs * sizeof(DistT);
 
-    T* h_A        = static_cast<T*>(malloc(size_A));
-    T* h_B        = static_cast<T*>(malloc(size_B));
+    T* h_A        = static_cast<T*>(malloc(size_A));  // NOLINT(readability-identifier-naming)
+    T* h_B        = static_cast<T*>(malloc(size_B));  // NOLINT(readability-identifier-naming)
     DistT* h_vals = static_cast<DistT*>(malloc(size_vals));
 
     cudaMemcpyAsync(h_A, d_A, size_A, cudaMemcpyDeviceToHost, stream);
@@ -273,14 +293,14 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
     for (int64_t i = 0; i < params_.num_queries; ++i) {
       for (int64_t j = 0; j < params_.num_db_vecs; ++j) {
         DistT sum     = 0;
-        DistT norms_A = 0;
-        DistT norms_B = 0;
+        DistT norms_A = 0;  // NOLINT(readability-identifier-naming)
+        DistT norms_B = 0;  // NOLINT(readability-identifier-naming)
 
         for (int64_t l = 0; l < params_.dim; ++l) {
           int64_t a_index = trans_a ? i * params_.dim + l : l * params_.num_queries + i;
           int64_t b_index = trans_b ? j * params_.dim + l : l * params_.num_db_vecs + j;
-          DistT A_v;
-          DistT B_v;
+          DistT A_v;  // NOLINT(readability-identifier-naming)
+          DistT B_v;  // NOLINT(readability-identifier-naming)
           if constexpr (sizeof(T) == 2) {
             A_v = __half2float(h_A[a_index]);
             B_v = __half2float(h_B[b_index]);
@@ -315,7 +335,7 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
     free(h_vals);
   }
 
-  void testBruteForce()
+  void testBruteForce()  // NOLINT(readability-identifier-naming)
   {
     DistT metric_arg = 3.0;
 
@@ -456,7 +476,7 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
                                                     true));
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     num_queries = params_.num_queries;
     num_db_vecs = params_.num_db_vecs;
@@ -464,7 +484,7 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
     k_          = params_.k;
     metric      = params_.metric;
 
-    unsigned long long int seed = 1234ULL;
+    unsigned long long int seed = 1234ULL;  // NOLINT(google-runtime-int)
     raft::random::RngState r(seed);
 
     // JensenShannon distance requires positive values
@@ -475,22 +495,22 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
 
  private:
   raft::resources handle_;
-  cudaStream_t stream_ = 0;
+  cudaStream_t stream_ = nullptr;
   RandomKNNInputs params_;
-  int num_queries;
-  int num_db_vecs;
-  int dim;
-  rmm::device_uvector<T> database;
-  rmm::device_uvector<T> search_queries;
+  int num_queries;                        // NOLINT(readability-identifier-naming)
+  int num_db_vecs;                        // NOLINT(readability-identifier-naming)
+  int dim;                                // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<T> database;        // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<T> search_queries;  // NOLINT(readability-identifier-naming)
   rmm::device_uvector<int64_t> cuvs_indices_;
   rmm::device_uvector<DistT> cuvs_distances_;
   rmm::device_uvector<int64_t> ref_indices_;
   rmm::device_uvector<DistT> ref_distances_;
   int k_;
-  cuvs::distance::DistanceType metric;
+  cuvs::distance::DistanceType metric;  // NOLINT(readability-identifier-naming)
 };
 
-const std::vector<RandomKNNInputs> random_inputs = {
+const std::vector<RandomKNNInputs> random_inputs = {  // NOLINT(readability-identifier-naming)
   // test each distance metric on a small-ish input, with row-major inputs
   {100, 256, 2, 65, cuvs::distance::DistanceType::L2Expanded, true, false},
   {256, 512, 16, 8, cuvs::distance::DistanceType::L2Unexpanded, true, false},
@@ -538,17 +558,25 @@ const std::vector<RandomKNNInputs> random_inputs = {
   {256, 512, 16, 8, cuvs::distance::DistanceType::InnerProduct, true, true},
   {256, 512, 16, 7, cuvs::distance::DistanceType::L2Expanded, true, true}};
 
-typedef RandomBruteForceKNNTest<float, float> RandomBruteForceKNNTestF;
-TEST_P(RandomBruteForceKNNTestF, BruteForce) { this->testBruteForce(); }
+using RandomBruteForceKNNTestF =
+  RandomBruteForceKNNTest<float, float>;  // NOLINT(readability-identifier-naming)
+TEST_P(RandomBruteForceKNNTestF, BruteForce)
+{
+  this->testBruteForce();
+}  // NOLINT(readability-identifier-naming)
 
-typedef RandomBruteForceKNNTest<half, float> RandomBruteForceKNNTestH;
-TEST_P(RandomBruteForceKNNTestH, BruteForce) { this->testBruteForce(); }
+using RandomBruteForceKNNTestH =
+  RandomBruteForceKNNTest<half, float>;  // NOLINT(readability-identifier-naming)
+TEST_P(RandomBruteForceKNNTestH, BruteForce)
+{
+  this->testBruteForce();
+}  // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(RandomBruteForceKNNTest,
+INSTANTIATE_TEST_CASE_P(RandomBruteForceKNNTest,  // NOLINT(readability-identifier-naming)
                         RandomBruteForceKNNTestF,
                         ::testing::ValuesIn(random_inputs));
 
-INSTANTIATE_TEST_CASE_P(RandomBruteForceKNNTest,
+INSTANTIATE_TEST_CASE_P(RandomBruteForceKNNTest,  // NOLINT(readability-identifier-naming)
                         RandomBruteForceKNNTestH,
                         ::testing::ValuesIn(random_inputs));
 

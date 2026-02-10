@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -38,16 +38,16 @@ struct CagraSampleFilterT_Selector<cuvs::neighbors::filtering::none_sample_filte
 
 // A helper function to set a query id offset
 template <class CagraSampleFilterT>
-inline typename CagraSampleFilterT_Selector<CagraSampleFilterT>::type set_offset(
-  CagraSampleFilterT filter, const uint32_t offset)
+inline auto set_offset(CagraSampleFilterT filter, const uint32_t offset) ->
+  typename CagraSampleFilterT_Selector<CagraSampleFilterT>::type
 {
   typename CagraSampleFilterT_Selector<CagraSampleFilterT>::type new_filter(offset, filter);
   return new_filter;
 }
 template <>
-inline typename CagraSampleFilterT_Selector<cuvs::neighbors::filtering::none_sample_filter>::type
-set_offset<cuvs::neighbors::filtering::none_sample_filter>(
-  cuvs::neighbors::filtering::none_sample_filter filter, const uint32_t)
+inline auto set_offset<cuvs::neighbors::filtering::none_sample_filter>(
+  cuvs::neighbors::filtering::none_sample_filter filter, const uint32_t) ->
+  typename CagraSampleFilterT_Selector<cuvs::neighbors::filtering::none_sample_filter>::type
 {
   return filter;
 }

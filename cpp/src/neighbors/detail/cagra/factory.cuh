@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -97,7 +97,7 @@ auto make_key(const cagra::search_params& params,
              dataset.dim(),
              dataset.stride(),
              uint32_t(params.team_size),
-             uint32_t(metric)};
+             static_cast<uint32_t>(metric)};
 }
 
 template <typename DatasetT>
@@ -111,7 +111,7 @@ auto make_key(const cagra::search_params& params,
              dataset.dim(),
              uint32_t(reinterpret_cast<uint64_t>(dataset.pq_code_book.data_handle()) >> 6),
              uint32_t(params.team_size),
-             uint32_t(metric)};
+             static_cast<uint32_t>(metric)};
 }
 
 inline auto operator==(const key& a, const key& b) -> bool

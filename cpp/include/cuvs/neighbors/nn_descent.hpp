@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -32,7 +32,11 @@ namespace cuvs::neighbors::nn_descent {
  * memory usage.
  * - `FP16`: Use fp16 distance computation.
  */
-enum class DIST_COMP_DTYPE { AUTO = 0, FP32 = 1, FP16 = 2 };
+enum class DIST_COMP_DTYPE {  // NOLINT(readability-identifier-naming)
+  AUTO = 0,
+  FP32 = 1,
+  FP16 = 2
+};
 
 /**
  * @brief Parameters used to build an nn-descent index
@@ -66,8 +70,9 @@ struct index_params : cuvs::neighbors::index_params {
    * @param graph_degree output graph degree
    * @param metric distance metric to use
    */
-  index_params(size_t graph_degree                 = 64,
-               cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
+  index_params(  // NOLINT(google-explicit-constructor)
+    size_t graph_degree                 = 64,
+    cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
 };
 
 /**
@@ -520,8 +525,8 @@ auto build(raft::resources const& res,
  * @return true if enough GPU memory can be allocated
  * @return false otherwise
  */
-bool has_enough_device_memory(raft::resources const& res,
+auto has_enough_device_memory(raft::resources const& res,
                               raft::matrix_extent<int64_t> dataset,
-                              size_t idx_size = 4);
+                              size_t idx_size = 4) -> bool;
 
 }  // namespace cuvs::neighbors::nn_descent

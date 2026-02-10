@@ -26,7 +26,7 @@ struct dummy_block_sort_t {
   using queue_t = raft::matrix::detail::select::warpsort::
     warp_sort_distributed<raft::WarpSize, Ascending, T, IdxT>;
   template <typename... Args>
-  __device__ dummy_block_sort_t(int k, Args...) {};
+  __device__ explicit dummy_block_sort_t(int k, Args...){};
 };
 
 /**
@@ -63,7 +63,8 @@ struct calc_chunk_indices {
     if constexpr (BlockDim >= raft::WarpSize * 2) {
       if (BlockDim >= n_probes * 2) { return try_block_dim<(BlockDim / 2)>(n_probes, n_queries); }
     }
-    return {dim3(BlockDim, 1, 1), dim3(n_queries, 1, 1), n_probes};
+    return {
+      .block_dim = dim3(BlockDim, 1, 1), .grid_dim = dim3(n_queries, 1, 1), .n_probes = n_probes};
   }
 };
 
@@ -114,9 +115,9 @@ __launch_bounds__(BlockDim) RAFT_KERNEL
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
   const uint64_t i        = threadIdx.x + BlockDim * uint64_t(blockIdx.x);
-  const uint32_t query_ix = i / uint64_t(topk);
+  const uint32_t query_ix = i / static_cast<uint64_t>(topk);
   if (query_ix >= n_queries) { return; }
-  const uint32_t k = i % uint64_t(topk);
+  const uint32_t k = i % static_cast<uint64_t>(topk);
   neighbors_in += query_ix * topk;
   neighbors_out += query_ix * topk;
   chunk_indices += query_ix * n_probes;
@@ -173,8 +174,8 @@ void postprocess_distances(ScoreOutT* out,      // [n_queries, topk]
                            bool account_for_max_close,
                            rmm::cuda_stream_view stream)
 {
-  constexpr bool needs_cast = !std::is_same<ScoreInT, ScoreOutT>::value;
-  const bool needs_copy     = ((void*)in) != ((void*)out);
+  constexpr bool needs_cast = !std::is_same_v<ScoreInT, ScoreOutT>;
+  const bool needs_copy     = static_cast<const void*>(in) != static_cast<const void*>(out);
   size_t len                = size_t(n_queries) * size_t(topk);
   switch (metric) {
     case distance::DistanceType::L2Unexpanded:

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -25,7 +25,7 @@ struct kl_divergence_op {
   const bool is_row_major;
   const bool x_equal_y;
 
-  kl_divergence_op(bool row_major_, bool x_equal_y_ = false) noexcept
+  explicit kl_divergence_op(bool row_major_, bool x_equal_y_ = false) noexcept
     : is_row_major(row_major_), x_equal_y(x_equal_y_)
   {
   }
@@ -39,14 +39,14 @@ struct kl_divergence_op {
   // Size of shared memory. This is normally decided by the kernel policy, but
   // some ops such as correlation_distance_op use more.
   template <typename Policy>
-  static constexpr size_t shared_mem_size()
+  static constexpr auto shared_mem_size() -> size_t
   {
     return Policy::SmemSize;
   }
 
   DI void core(AccT& acc, DataT& x, DataT& y) const
   {
-    // TODO: make sure that these branches get hoisted out of main loop.. Could
+    // TODO(snanditale): make sure that these branches get hoisted out of main loop.. Could
     // be quite expensive otherwise.
     AccT x_ = raft::to_float(x);
     AccT y_ = raft::to_float(y);

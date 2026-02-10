@@ -1,7 +1,7 @@
 // clang-format off
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2017 - 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0 AND BSD-3-Clause
  */
 // clang-format on
@@ -66,12 +66,9 @@ Changes:
 
 ////////////////////////////////////////////////////////////////////////////////
 
-namespace cuvs {
-
 ////////////////////////////////////////////////////////////////////////////////
 
-namespace epilogue {
-namespace threadblock {
+namespace cuvs::epilogue::threadblock {
 
 // TODO (cjnolet): We shouldn't be doing `using namespace` in this file.
 using namespace cutlass::epilogue::threadblock;
@@ -132,10 +129,10 @@ class PredicatedTileIteratorNormVecSmem {
     using Base = PredicatedTileIteratorParams;
 
     CUTLASS_HOST_DEVICE
-    Params() {}
+    Params() = default;
 
     CUTLASS_HOST_DEVICE
-    Params(Layout const& layout)
+    explicit Params(Layout const& layout)
       : PredicatedTileIteratorParams(
           layout.stride(0) * int(sizeof(AccessType)) / kElementsPerAccess,
           make_OutputTileThreadMapDesc<ThreadMap>())
@@ -143,7 +140,7 @@ class PredicatedTileIteratorNormVecSmem {
     }
 
     CUTLASS_HOST_DEVICE
-    Params(Base const& base) : Base(base) {}
+    explicit Params(Base const& base) : Base(base) {}
   };
 
   /// Mask object
@@ -197,9 +194,9 @@ class PredicatedTileIteratorNormVecSmem {
     cutlass::AlignedBuffer<Element, StorageShape::kCount> storage;
 
     CUTLASS_DEVICE
-    Element* data() { return storage.data(); }
+    auto data() -> Element* { return storage.data(); }
 
-    SharedStorage() {}
+    SharedStorage() = default;
 
     CUTLASS_DEVICE
     void initSmem(void* pointer,
@@ -366,31 +363,34 @@ class PredicatedTileIteratorNormVecSmem {
   CUTLASS_DEVICE
   void load(Fragment& frag) const { load_with_byte_offset(frag, 0); }
 
-  CUTLASS_DEVICE
-  cutlass::MatrixCoord thread_start() const
+  [[nodiscard]] CUTLASS_DEVICE auto thread_start() const -> cutlass::MatrixCoord
   {
     return cutlass::MatrixCoord(thread_start_row_, thread_start_column_);
   }
 
   /// Need to get the thread start row from the tile iterator
-  CUTLASS_DEVICE
-  int32_t thread_start_row() const { return thread_start_row_; }
+  [[nodiscard]] CUTLASS_DEVICE auto thread_start_row() const -> int32_t
+  {
+    return thread_start_row_;
+  }
 
   /// Need to get the thread start row from the tile iterator
-  CUTLASS_DEVICE
-  int32_t thread_start_column() const { return thread_start_column_; }
+  [[nodiscard]] CUTLASS_DEVICE auto thread_start_column() const -> int32_t
+  {
+    return thread_start_column_;
+  }
 
   /// Extent of the matrix in rows
   CUTLASS_DEVICE
-  Index extent_row() const { return extent_row_; }
+  auto extent_row() const -> Index { return extent_row_; }
 
   /// Extent of the matrix in columns
   CUTLASS_DEVICE
-  Index extent_column() const { return extent_column_; }
+  auto extent_column() const -> Index { return extent_column_; }
 
   /// Advances to the next position to load or store
   CUTLASS_HOST_DEVICE
-  PredicatedTileIteratorNormVecSmem& operator++()
+  auto operator++() -> PredicatedTileIteratorNormVecSmem&
   {
     ++state_[0];
 
@@ -439,8 +439,6 @@ class PredicatedTileIteratorNormVecSmem {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-}  // namespace threadblock
-}  // namespace epilogue
-}  // namespace cuvs
+}  // namespace cuvs::epilogue::threadblock
 
 ////////////////////////////////////////////////////////////////////////////////

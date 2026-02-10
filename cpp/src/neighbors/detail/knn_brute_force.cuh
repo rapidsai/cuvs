@@ -187,7 +187,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
         raft::linalg::map_offset(
           handle,
           raft::make_device_vector_view(dist, current_query_size * current_centroid_size),
-          [=] __device__(IndexType idx) {
+          [=] __device__(IndexType idx) -> DistanceT {
             IndexType row = i + (idx / current_centroid_size);
             IndexType col = j + (idx % current_centroid_size);
 
@@ -203,7 +203,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
         raft::linalg::map_offset(
           handle,
           raft::make_device_vector_view(dist, current_query_size * current_centroid_size),
-          [=] __device__(IndexType idx) {
+          [=] __device__(IndexType idx) -> DistanceT {
             IndexType row = i + (idx / current_centroid_size);
             IndexType col = j + (idx % current_centroid_size);
             auto val      = DistanceT(1.0) - dist[idx] / DistanceT(row_norms[row] * col_norms[col]);
@@ -217,7 +217,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
             handle,
             raft::make_device_vector_view(temp_distances.data(),
                                           current_query_size * current_centroid_size),
-            [=] __device__(size_t idx) {
+            [=] __device__(size_t idx) -> DistanceT {
               IndexType row = i + (idx / current_centroid_size);
               IndexType col = j + (idx % current_centroid_size);
               return distance_epilogue(distances_ptr[idx], row, col);
@@ -235,14 +235,14 @@ void tiled_brute_force_knn(const raft::resources& handle,
         thrust::for_each(raft::resource::get_thrust_policy(handle),
                          count,
                          count + current_query_size * current_centroid_size,
-                         [=] __device__(IndexType idx) {
+                         [=] __device__(IndexType idx) -> void {
                            IndexType row      = i + (idx / current_centroid_size);
                            IndexType col      = j + (idx % current_centroid_size);
                            IndexType g_idx    = row * n_cols + col;
                            IndexType item_idx = (g_idx) >> 5;
                            uint32_t bit_idx   = (g_idx) & 31;
                            uint32_t filter    = filter_bits[item_idx];
-                           if ((filter & (uint32_t(1) << bit_idx)) == 0) {
+                           if ((filter & (static_cast<uint32_t>(1) << bit_idx)) == 0) {
                              distances_ptr[idx] = masked_distance;
                            }
                          });
@@ -280,7 +280,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
         thrust::for_each(raft::resource::get_thrust_policy(handle),
                          count,
                          count + current_query_size * current_k,
-                         [=] __device__(IndexType i) {
+                         [=] __device__(IndexType i) -> void {
                            IndexType row = i / current_k, col = i % current_k;
                            IndexType out_index = row * temp_out_cols + j * k / tile_cols + col;
 
@@ -458,7 +458,7 @@ void brute_force_knn_impl(
           res_D,
           res_D,
           n * k,
-          [p] __device__(DistType input) { return powf(fabsf(input), p); },
+          [p] __device__(DistType input) -> DistType { return powf(fabsf(input), p); },
           stream);
       }
     } else {
@@ -624,7 +624,8 @@ void brute_force_search_filtered(
     RAFT_FAIL("Unsupported sample filter type");
   }
 
-  std::visit([&](const auto& actual_view) { filter_data = actual_view.data(); }, *filter_view);
+  std::visit([&](const auto& actual_view) -> auto { filter_data = actual_view.data(); },
+             *filter_view);
 
   if (sparsity < 0.9f) {
     raft::resources stream_pool_handle(res);
@@ -651,7 +652,8 @@ void brute_force_search_filtered(
                                               filter_type);
   } else {
     auto csr = raft::make_device_csr_matrix<DistanceT, IdxT>(res, n_queries, n_dataset, nnz_h);
-    std::visit([&](const auto& actual_view) { actual_view.to_csr(res, csr); }, *filter_view);
+    std::visit([&](const auto& actual_view) -> auto { actual_view.to_csr(res, csr); },
+               *filter_view);
 
     // create filter csr view
     auto compressed_csr_view = csr.structure_view();
@@ -668,7 +670,7 @@ void brute_force_search_filtered(
       csr.get_elements().data(), compressed_csr_view);
 
     std::visit(
-      [&](const auto& actual_view) {
+      [&](const auto& actual_view) -> auto {
         raft::sparse::linalg::masked_matmul(res, queries, dataset_view, actual_view, csr_view);
       },
       *filter_view);
@@ -763,11 +765,10 @@ void search(raft::resources const& res,
 }
 
 template <typename T, typename DistT, typename AccessorT, typename LayoutT = raft::row_major>
-cuvs::neighbors::brute_force::index<T, DistT> build(
-  raft::resources const& res,
-  mdspan<const T, matrix_extent<int64_t>, LayoutT, AccessorT> dataset,
-  cuvs::distance::DistanceType metric,
-  DistT metric_arg)
+auto build(raft::resources const& res,
+           mdspan<const T, matrix_extent<int64_t>, LayoutT, AccessorT> dataset,
+           cuvs::distance::DistanceType metric,
+           DistT metric_arg) -> cuvs::neighbors::brute_force::index<T, DistT>
 {
   // certain distance metrics can benefit by pre-calculating the norms for the index dataset
   // which lets us avoid calculating these at query time
@@ -777,7 +778,7 @@ cuvs::neighbors::brute_force::index<T, DistT> build(
       metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
       metric == cuvs::distance::DistanceType::CosineExpanded) {
     auto dataset_storage = std::optional<device_matrix<T, int64_t, LayoutT>>{};
-    auto dataset_view    = [&res, &dataset_storage, dataset]() {
+    auto dataset_view    = [&res, &dataset_storage, dataset]() -> auto {
       if constexpr (std::is_same_v<decltype(dataset),
                                       raft::device_matrix_view<const T, int64_t, row_major>>) {
         return dataset;

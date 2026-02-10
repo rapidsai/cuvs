@@ -1,12 +1,12 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
 #include "utils.hpp"
 
-// TODO: This shouldn't be invoking anything from detail outside of neighbors/
+// TODO(snanditale): This shouldn't be invoking anything from detail outside of neighbors/
 #include <raft/core/detail/macros.hpp>
 #include <raft/util/device_atomics.cuh>
 
@@ -17,10 +17,10 @@
 // #pragma GCC diagnostic push
 // #pragma GCC diagnostic ignored
 // #pragma GCC diagnostic pop
-namespace cuvs::neighbors::cagra::detail {
+namespace cuvs::neighbors::cagra::detail {  // NOLINT(modernize-concat-nested-namespaces)
 namespace hashmap {
 
-RAFT_INLINE_FUNCTION uint32_t get_size(const uint32_t bitlen) { return 1U << bitlen; }
+RAFT_INLINE_FUNCTION auto get_size(const uint32_t bitlen) -> uint32_t { return 1U << bitlen; }
 
 template <class IdxT>
 RAFT_DEVICE_INLINE_FUNCTION void init(IdxT* const table,
@@ -34,9 +34,8 @@ RAFT_DEVICE_INLINE_FUNCTION void init(IdxT* const table,
 }
 
 template <class IdxT, unsigned SUPPORT_REMOVE = 0>
-RAFT_DEVICE_INLINE_FUNCTION uint32_t insert(IdxT* const table,
-                                            const uint32_t bitlen,
-                                            const IdxT key)
+RAFT_DEVICE_INLINE_FUNCTION auto insert(IdxT* const table, const uint32_t bitlen, const IdxT key)
+  -> uint32_t
 {
   // Open addressing is used for collision resolution
   const uint32_t size     = get_size(bitlen);
@@ -44,13 +43,13 @@ RAFT_DEVICE_INLINE_FUNCTION uint32_t insert(IdxT* const table,
 #ifdef HASHMAP_LINEAR_PROBING
   // Linear probing
   IdxT index                = (key ^ (key >> bitlen)) & bit_mask;
-  constexpr uint32_t stride = 1;
+  constexpr uint32_t stride = 1;  // NOLINT(readability-identifier-naming)
 #else
   // Double hashing
   uint32_t index        = key & bit_mask;
   const uint32_t stride = (key >> bitlen) * 2 + 1;
 #endif
-  constexpr IdxT hashval_empty = ~static_cast<IdxT>(0);
+  constexpr IdxT hashval_empty = ~static_cast<IdxT>(0);  // NOLINT(readability-identifier-naming)
   const IdxT removed_key       = key | utils::gen_index_msb_1_mask<IdxT>::value;
   for (unsigned i = 0; i < size; i++) {
     const IdxT old = atomicCAS(&table[index], hashval_empty, key);
@@ -73,20 +72,21 @@ RAFT_DEVICE_INLINE_FUNCTION uint32_t insert(IdxT* const table,
 }
 
 template <class IdxT, unsigned SUPPORT_REMOVE = 0>
-RAFT_DEVICE_INLINE_FUNCTION uint32_t search(IdxT* table, const uint32_t bitlen, const IdxT key)
+RAFT_DEVICE_INLINE_FUNCTION auto search(IdxT* table, const uint32_t bitlen, const IdxT key)
+  -> uint32_t
 {
   const uint32_t size     = get_size(bitlen);
   const uint32_t bit_mask = size - 1;
 #ifdef HASHMAP_LINEAR_PROBING
   // Linear probing
   IdxT index                = (key ^ (key >> bitlen)) & bit_mask;
-  constexpr uint32_t stride = 1;
+  constexpr uint32_t stride = 1;  // NOLINT(readability-identifier-naming)
 #else
   // Double hashing
   IdxT index            = key & bit_mask;
   const uint32_t stride = (key >> bitlen) * 2 + 1;
 #endif
-  constexpr IdxT hashval_empty = ~static_cast<IdxT>(0);
+  constexpr IdxT hashval_empty = ~static_cast<IdxT>(0);  // NOLINT(readability-identifier-naming)
   const IdxT removed_key       = key | utils::gen_index_msb_1_mask<IdxT>::value;
   for (unsigned i = 0; i < size; i++) {
     const IdxT val = table[index];
@@ -104,20 +104,21 @@ RAFT_DEVICE_INLINE_FUNCTION uint32_t search(IdxT* table, const uint32_t bitlen, 
 }
 
 template <class IdxT>
-RAFT_DEVICE_INLINE_FUNCTION uint32_t remove(IdxT* table, const uint32_t bitlen, const IdxT key)
+RAFT_DEVICE_INLINE_FUNCTION auto remove(IdxT* table, const uint32_t bitlen, const IdxT key)
+  -> uint32_t
 {
   const uint32_t size     = get_size(bitlen);
   const uint32_t bit_mask = size - 1;
 #ifdef HASHMAP_LINEAR_PROBING
   // Linear probing
   IdxT index                = (key ^ (key >> bitlen)) & bit_mask;
-  constexpr uint32_t stride = 1;
+  constexpr uint32_t stride = 1;  // NOLINT(readability-identifier-naming)
 #else
   // Double hashing
   IdxT index            = key & bit_mask;
   const uint32_t stride = (key >> bitlen) * 2 + 1;
 #endif
-  constexpr IdxT hashval_empty = ~static_cast<IdxT>(0);
+  constexpr IdxT hashval_empty = ~static_cast<IdxT>(0);  // NOLINT(readability-identifier-naming)
   const IdxT removed_key       = key | utils::gen_index_msb_1_mask<IdxT>::value;
   for (unsigned i = 0; i < size; i++) {
     // To remove a key, set the MSB to 1.
@@ -133,8 +134,10 @@ RAFT_DEVICE_INLINE_FUNCTION uint32_t remove(IdxT* table, const uint32_t bitlen, 
 }
 
 template <class IdxT, unsigned SUPPORT_REMOVE = 0>
-RAFT_DEVICE_INLINE_FUNCTION uint32_t
-insert(unsigned team_size, IdxT* const table, const uint32_t bitlen, const IdxT key)
+RAFT_DEVICE_INLINE_FUNCTION auto insert(unsigned team_size,
+                                        IdxT* const table,
+                                        const uint32_t bitlen,
+                                        const IdxT key) -> uint32_t
 {
   IdxT ret = 0;
   if (threadIdx.x % team_size == 0) { ret = insert(table, bitlen, key); }

@@ -45,23 +45,22 @@ template <typename DataT,
           typename FinalLambda,
           typename OpT,
           bool isRowMajor>
-std::enable_if_t<ops::has_cutlass_op<OpT>::value> cutlassDistanceKernel(const DataT* x,
-                                                                        const DataT* y,
-                                                                        const OutT* xn,
-                                                                        const OutT* yn,
-                                                                        IdxT m,
-                                                                        IdxT n,
-                                                                        IdxT k,
-                                                                        IdxT lda,
-                                                                        IdxT ldb,
-                                                                        IdxT ldd,
-                                                                        OutT* dOutput,
-                                                                        FinalLambda fin_op,
-                                                                        OpT distance_op,
-                                                                        cudaStream_t stream)
+auto cutlassDistanceKernel(const DataT* x,
+                           const DataT* y,
+                           const OutT* xn,
+                           const OutT* yn,
+                           IdxT m,
+                           IdxT n,
+                           IdxT k,
+                           IdxT lda,
+                           IdxT ldb,
+                           IdxT ldd,
+                           OutT* dOutput,
+                           FinalLambda fin_op,
+                           OpT distance_op,
+                           cudaStream_t stream) -> std::enable_if_t<ops::has_cutlass_op<OpT>::value>
 {
-  static_assert(!(std::is_same<OutT, bool>::value),
-                "OutType bool is not supported use uint8_t instead");
+  static_assert(!(std::is_same_v<OutT, bool>), "OutType bool is not supported use uint8_t instead");
 
   auto dist_op     = distance_op.get_cutlass_op();
   using DistanceFn = decltype(dist_op);
@@ -132,22 +131,23 @@ std::enable_if_t<ops::has_cutlass_op<OpT>::value> cutlassDistanceKernel(const Da
       epilog_op_param,
       a,
       b,
-      xn,                   // C matrix eq vector param, which here is A norm
-      nullptr,              // tensor_Z,
-      (OutT*)yn + offsetN,  // this is broadcast vec, which is required to be non-const param
-      dOutput + offsetN,    // Output distance matrix
-      (int64_t)0,           // batch stride A
-      (int64_t)0,           // batch stride B
-      (int64_t)0,           // batch stride Norm A
-      (int64_t)0,
-      (int64_t)0,  // batch stride Norm B
-      (int64_t)0,  // batch stride Output
-      gemm_lda,    // stride A
-      gemm_ldb,    // stride B
-      1,           // stride A norm
-      0,           // this is no-op for Z
-      0,           // This must be zero
-      ldd          // stride Output matrix
+      xn,       // C matrix eq vector param, which here is A norm
+      nullptr,  // tensor_Z,
+      const_cast<OutT*>(yn) +
+        offsetN,                // this is broadcast vec, which is required to be non-const param
+      dOutput + offsetN,        // Output distance matrix
+      static_cast<int64_t>(0),  // batch stride A
+      static_cast<int64_t>(0),  // batch stride B
+      static_cast<int64_t>(0),  // batch stride Norm A
+      static_cast<int64_t>(0),
+      static_cast<int64_t>(0),  // batch stride Norm B
+      static_cast<int64_t>(0),  // batch stride Output
+      gemm_lda,                 // stride A
+      gemm_ldb,                 // stride B
+      1,                        // stride A norm
+      0,                        // this is no-op for Z
+      0,                        // This must be zero
+      ldd                       // stride Output matrix
     };
 
     // Using the arguments, query for extra workspace required for matrix multiplication computation

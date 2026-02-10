@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2019-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2019-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -32,12 +32,12 @@ namespace cuvs::distance::kernels::sparse {
  *  - MIX: CSR, dense
  *  - CSR: CSR, CSR
  */
-enum SparseType { DENSE, MIX, CSR };
+enum SparseType { DENSE, MIX, CSR };  // NOLINT(readability-identifier-naming)
 
-struct GramMatrixInputs {
-  int n1;      // feature vectors in matrix 1
-  int n2;      // featuer vectors in matrix 2
-  int n_cols;  // number of elements in a feature vector
+struct GramMatrixInputs {  // NOLINT(readability-identifier-naming)
+  int n1;                  // feature vectors in matrix 1
+  int n2;                  // featuer vectors in matrix 2
+  int n_cols;              // number of elements in a feature vector
   bool is_row_major;
   SparseType sparse_input;
   KernelParams kernel;
@@ -48,7 +48,7 @@ struct GramMatrixInputs {
   // The reference output is calculated by a custom kernel.
 };
 
-std::ostream& operator<<(std::ostream& os, const GramMatrixInputs& p)
+auto operator<<(std::ostream& os, const GramMatrixInputs& p) -> std::ostream&
 {
   std::vector<std::string> kernel_names{"linear", "poly", "rbf", "tanh"};
   os << "/" << p.n1 << "x" << p.n2 << "x" << p.n_cols << "/"
@@ -71,48 +71,51 @@ std::ostream& operator<<(std::ostream& os, const GramMatrixInputs& p)
 // const KernelParams linear_kernel_params{.kernel=KernelType::LINEAR};
 
 // {KernelType::POLYNOMIAL, 2, 0.5, 2.4}, {KernelType::TANH, 0, 0.5, 2.4}, {KernelType::RBF, 0, 0.5}
-const std::vector<GramMatrixInputs> inputs = raft::util::itertools::product<GramMatrixInputs>(
-  {42},
-  {137},
-  {2},
-  {true, false},
-  {SparseType::DENSE, SparseType::MIX, SparseType::CSR},
-  {KernelParams{KernelType::LINEAR},
-   KernelParams{KernelType::POLYNOMIAL, 2, 0.5, 2.4},
-   KernelParams{KernelType::TANH, 0, 0.5, 2.4},
-   KernelParams{KernelType::RBF, 0, 0.5}});
+const std::vector<GramMatrixInputs> inputs =
+  raft::util::itertools::product<GramMatrixInputs>(  // NOLINT(readability-identifier-naming)
+    {42},
+    {137},
+    {2},
+    {true, false},
+    {SparseType::DENSE, SparseType::MIX, SparseType::CSR},
+    {KernelParams{.kernel = KernelType::LINEAR},
+     KernelParams{.kernel = KernelType::POLYNOMIAL, .degree = 2, .gamma = 0.5, .coef0 = 2.4},
+     KernelParams{.kernel = KernelType::TANH, .degree = 0, .gamma = 0.5, .coef0 = 2.4},
+     KernelParams{.kernel = KernelType::RBF, .degree = 0, .gamma = 0.5}});
 
 // (ld_1, ld_2, ld_out) not supported by RBF and CSR
-const std::vector<GramMatrixInputs> inputs_ld = raft::util::itertools::product<GramMatrixInputs>(
-  {137},
-  {42},
-  {2},
-  {true, false},
-  {SparseType::DENSE, SparseType::MIX},
-  {KernelParams{KernelType::LINEAR},
-   KernelParams{KernelType::POLYNOMIAL, 2, 0.5, 2.4},
-   KernelParams{KernelType::TANH, 0, 0.5, 2.4}},
-  {159},
-  {73},
-  {144});
+const std::vector<GramMatrixInputs> inputs_ld =
+  raft::util::itertools::product<GramMatrixInputs>(  // NOLINT(readability-identifier-naming)
+    {137},
+    {42},
+    {2},
+    {true, false},
+    {SparseType::DENSE, SparseType::MIX},
+    {KernelParams{.kernel = KernelType::LINEAR},
+     KernelParams{.kernel = KernelType::POLYNOMIAL, .degree = 2, .gamma = 0.5, .coef0 = 2.4},
+     KernelParams{.kernel = KernelType::TANH, .degree = 0, .gamma = 0.5, .coef0 = 2.4}},
+    {159},
+    {73},
+    {144});
 
 // (ld_1, ld_2) are supported by CSR
-const std::vector<GramMatrixInputs> inputs_ld_csr =
+const std::vector<GramMatrixInputs> inputs_ld_csr =  // NOLINT(readability-identifier-naming)
   raft::util::itertools::product<GramMatrixInputs>(
     {42},
     {137},
     {2},
     {true, false},
     {SparseType::CSR, SparseType::MIX},
-    {KernelParams{KernelType::LINEAR},
-     KernelParams{KernelType::POLYNOMIAL, 2, 0.5, 2.4},
-     KernelParams{KernelType::TANH, 0, 0.5, 2.4}},
+    {KernelParams{.kernel = KernelType::LINEAR},
+     KernelParams{.kernel = KernelType::POLYNOMIAL, .degree = 2, .gamma = 0.5, .coef0 = 2.4},
+     KernelParams{.kernel = KernelType::TANH, .degree = 0, .gamma = 0.5, .coef0 = 2.4}},
     {64},
     {155},
     {0});
 
-template <typename math_t>
-class GramMatrixTest : public ::testing::TestWithParam<GramMatrixInputs> {
+template <typename math_t>  // NOLINT(readability-identifier-naming)
+class GramMatrixTest
+  : public ::testing::TestWithParam<GramMatrixInputs> {  // NOLINT(readability-identifier-naming)
  protected:
   GramMatrixTest()
     : params(GetParam()),
@@ -150,9 +153,14 @@ class GramMatrixTest : public ::testing::TestWithParam<GramMatrixInputs> {
     RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
   }
 
-  ~GramMatrixTest() override {}
+  ~GramMatrixTest() override {}  // NOLINT(modernize-use-equals-default)
 
-  int prepareCsr(math_t* dense, int n_rows, int ld, int* indptr, int* indices, math_t* data)
+  auto prepareCsr(math_t* dense,
+                  int n_rows,
+                  int ld,
+                  int* indptr,
+                  int* indices,
+                  math_t* data) -> int  // NOLINT(readability-identifier-naming)
   {
     int nnz           = 0;
     double eps        = 1e-6;
@@ -198,7 +206,7 @@ class GramMatrixTest : public ::testing::TestWithParam<GramMatrixInputs> {
     return nnz;
   }
 
-  void runTest()
+  void runTest()  // NOLINT(readability-identifier-naming)
   {
     std::unique_ptr<GramMatrixBase<math_t>> kernel =
       std::unique_ptr<GramMatrixBase<math_t>>(KernelFactory<math_t>::create(params.kernel));
@@ -285,35 +293,39 @@ class GramMatrixTest : public ::testing::TestWithParam<GramMatrixInputs> {
       gram_host.data(), gram.data(), gram.size(), cuvs::CompareApprox<math_t>(1e-6f), stream));
   }
 
-  raft::resources handle;
-  cudaStream_t stream = 0;
-  GramMatrixInputs params;
+  raft::resources handle;         // NOLINT(readability-identifier-naming)
+  cudaStream_t stream = nullptr;  // NOLINT(readability-identifier-naming)
+  GramMatrixInputs params;        // NOLINT(readability-identifier-naming)
 
-  rmm::device_uvector<math_t> x1;
-  rmm::device_uvector<math_t> x2;
+  rmm::device_uvector<math_t> x1;  // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<math_t> x2;  // NOLINT(readability-identifier-naming)
 
-  rmm::device_uvector<int> x1_csr_indptr;
-  rmm::device_uvector<int> x1_csr_indices;
-  rmm::device_uvector<math_t> x1_csr_data;
-  rmm::device_uvector<int> x2_csr_indptr;
-  rmm::device_uvector<int> x2_csr_indices;
-  rmm::device_uvector<math_t> x2_csr_data;
+  rmm::device_uvector<int> x1_csr_indptr;   // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<int> x1_csr_indices;  // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<math_t> x1_csr_data;  // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<int> x2_csr_indptr;   // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<int> x2_csr_indices;  // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<math_t> x2_csr_data;  // NOLINT(readability-identifier-naming)
 
-  rmm::device_uvector<math_t> gram;
-  std::vector<math_t> gram_host;
+  rmm::device_uvector<math_t> gram;  // NOLINT(readability-identifier-naming)
+  std::vector<math_t> gram_host;     // NOLINT(readability-identifier-naming)
 };
 
-typedef GramMatrixTest<float> GramMatrixTestFloatStandard;
-typedef GramMatrixTest<float> GramMatrixTestFloatLd;
-typedef GramMatrixTest<float> GramMatrixTestFloatLdCsr;
+using GramMatrixTestFloatStandard = GramMatrixTest<float>;  // NOLINT(readability-identifier-naming)
+using GramMatrixTestFloatLd       = GramMatrixTest<float>;  // NOLINT(readability-identifier-naming)
+using GramMatrixTestFloatLdCsr    = GramMatrixTest<float>;  // NOLINT(readability-identifier-naming)
 
-TEST_P(GramMatrixTestFloatStandard, Gram) { runTest(); }
-TEST_P(GramMatrixTestFloatLd, Gram) { runTest(); }
-TEST_P(GramMatrixTestFloatLdCsr, Gram) { runTest(); }
+TEST_P(GramMatrixTestFloatStandard, Gram) { runTest(); }  // NOLINT(readability-identifier-naming)
+TEST_P(GramMatrixTestFloatLd, Gram) { runTest(); }        // NOLINT(readability-identifier-naming)
+TEST_P(GramMatrixTestFloatLdCsr, Gram) { runTest(); }     // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_SUITE_P(GramMatrixTests, GramMatrixTestFloatStandard, ::testing::ValuesIn(inputs));
-INSTANTIATE_TEST_SUITE_P(GramMatrixTests, GramMatrixTestFloatLd, ::testing::ValuesIn(inputs_ld));
 INSTANTIATE_TEST_SUITE_P(GramMatrixTests,
+                         GramMatrixTestFloatStandard,
+                         ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_SUITE_P(GramMatrixTests,
+                         GramMatrixTestFloatLd,
+                         ::testing::ValuesIn(inputs_ld));  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_SUITE_P(GramMatrixTests,                  // NOLINT(readability-identifier-naming)
                          GramMatrixTestFloatLdCsr,
                          ::testing::ValuesIn(inputs_ld_csr));
 };  // namespace cuvs::distance::kernels::sparse

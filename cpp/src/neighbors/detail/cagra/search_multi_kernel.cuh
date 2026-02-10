@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -22,7 +22,7 @@
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/selection/select_k.hpp>
 
-// TODO: This shouldn't be invoking anything from spatial/knn
+// TODO(snanditale): This shouldn't be invoking anything from spatial/knn
 #include "../ann_utils.cuh"
 
 #include <raft/util/cuda_rt_essentials.hpp>
@@ -265,7 +265,7 @@ void pickup_next_parents(INDEX_T* const parent_candidates_ptr,  // [num_queries,
                          const std::size_t ldd,               // (*) ldd >= parent_list_size
                          const std::size_t parent_list_size,  //
                          std::uint32_t* const terminate_flag,
-                         cudaStream_t cuda_stream = 0)
+                         cudaStream_t cuda_stream = nullptr)
 {
   std::uint32_t block_size = 32;
   if (small_hash_bitlen) {
@@ -273,7 +273,7 @@ void pickup_next_parents(INDEX_T* const parent_candidates_ptr,  // [num_queries,
     while (parent_candidates_size > block_size) {
       block_size *= 2;
     }
-    block_size = min(block_size, (uint32_t)512);
+    block_size = min(block_size, static_cast<uint32_t>(512));
   }
   pickup_next_parents_kernel<INDEX_T>
     <<<num_queries, block_size, 0, cuda_stream>>>(parent_candidates_ptr,
@@ -449,7 +449,7 @@ void remove_parent_bit(const std::uint32_t num_queries,
                        const std::uint32_t num_topk,
                        INDEX_T* const topk_indices_ptr,  // [ld, num_queries]
                        const std::uint32_t ld,
-                       cudaStream_t cuda_stream = 0)
+                       cudaStream_t cuda_stream = nullptr)
 {
   const std::size_t grid_size  = num_queries;
   const std::size_t block_size = 256;
@@ -687,7 +687,7 @@ struct search
     hashmap.resize(hashmap_size, raft::resource::get_cuda_stream(res));
   }
 
-  ~search() {}
+  ~search() = default;
 
   inline void _find_topk(raft::resources const& handle,
                          uint32_t topK,
@@ -953,7 +953,7 @@ struct search
       raft::linalg::map_offset(
         res,
         raft::make_device_matrix_view<OutputIndexT, int64_t>(topk_indices_ptr, num_queries, topk),
-        [source_indices_ptr, buf_result_indices, topk] __device__(auto offset) {
+        [source_indices_ptr, buf_result_indices, topk] __device__(auto offset) -> OutputIndexT {
           auto i = offset / topk;
           auto j = offset % topk;
           return static_cast<OutputIndexT>(source_indices_ptr[buf_result_indices(i, j)]);

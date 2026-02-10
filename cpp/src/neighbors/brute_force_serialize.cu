@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -13,7 +13,7 @@
 
 namespace cuvs::neighbors::brute_force {
 
-int constexpr serialization_version = 0;
+int constexpr serialization_version = 0;  // NOLINT(readability-identifier-naming)
 
 template <typename T, typename DistT>
 void serialize(raft::resources const& handle,

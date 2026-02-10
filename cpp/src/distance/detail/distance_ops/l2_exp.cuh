@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -18,7 +18,7 @@ namespace cuvs::distance::detail::ops {
  * @tparam DataT
  */
 template <typename DataT, typename AccT>
-__device__ constexpr AccT get_clamp_precision()
+__device__ constexpr auto get_clamp_precision() -> AccT
 {
   switch (sizeof(DataT)) {
     case 2: return AccT{1e-3};
@@ -34,8 +34,8 @@ struct l2_exp_cutlass_op {
   bool sqrt;
 
   __device__ l2_exp_cutlass_op() noexcept : sqrt(false) {}
-  __device__ l2_exp_cutlass_op(bool isSqrt) noexcept : sqrt(isSqrt) {}
-  inline __device__ AccT operator()(AccT aNorm, AccT bNorm, AccT accVal) const noexcept
+  __device__ explicit l2_exp_cutlass_op(bool isSqrt) noexcept : sqrt(isSqrt) {}
+  inline __device__ auto operator()(AccT aNorm, AccT bNorm, AccT accVal) const noexcept -> AccT
   {
     AccT outVal = aNorm + bNorm - AccT(2.0) * accVal;
 
@@ -48,7 +48,7 @@ struct l2_exp_cutlass_op {
     return sqrt ? raft::sqrt(outVal * static_cast<AccT>(outVal > AccT(0))) : outVal;
   }
 
-  __device__ AccT operator()(DataT aData) const noexcept
+  __device__ auto operator()(DataT aData) const noexcept -> AccT
   {
     if constexpr (std::is_same_v<DataT, half> && std::is_same_v<AccT, float>) {
       return __half2float(aData);
@@ -74,7 +74,7 @@ struct l2_exp_distance_op {
 
   const bool sqrt;
 
-  l2_exp_distance_op(bool sqrt_) noexcept : sqrt(sqrt_) {}
+  explicit l2_exp_distance_op(bool sqrt_) noexcept : sqrt(sqrt_) {}
 
   // Load norms of input data
   static constexpr bool use_norms = true;
@@ -85,7 +85,7 @@ struct l2_exp_distance_op {
   // Size of shared memory. This is normally decided by the kernel policy, but
   // some ops such as correlation_distance_op use more.
   template <typename Policy>
-  static constexpr size_t shared_mem_size()
+  static constexpr auto shared_mem_size() -> size_t
   {
     return Policy::SmemSize + ((Policy::Mblk + Policy::Nblk) * sizeof(AccT));
   }
@@ -111,7 +111,7 @@ struct l2_exp_distance_op {
 #pragma unroll
       for (int j = 0; j < Policy::AccColsPerTh; ++j) {
         AccT accVal = acc[i][j];
-        AccT val    = regxn[i] + regyn[j] - (AccT)2.0 * accVal;
+        AccT val    = regxn[i] + regyn[j] - static_cast<AccT>(2.0) * accVal;
 
         /**
          * Self-neighboring points should have (aNorm == bNorm) == accVal and the dot product
@@ -134,7 +134,7 @@ struct l2_exp_distance_op {
     }
   }
 
-  constexpr l2_exp_cutlass_op<DataT, AccT> get_cutlass_op() const
+  constexpr auto get_cutlass_op() const -> l2_exp_cutlass_op<DataT, AccT>
   {
     return l2_exp_cutlass_op<DataT, AccT>(sqrt);
   }

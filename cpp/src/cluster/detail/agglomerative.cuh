@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -36,13 +36,13 @@ class UnionFind {
 
   value_idx n_indices;
 
-  UnionFind(value_idx N_)
+  explicit UnionFind(value_idx N_)
     : n_indices(2 * N_ - 1), parent(2 * N_ - 1, -1), size(2 * N_ - 1, 1), next_label(N_)
   {
     memset(size.data() + N_, 0, (size.size() - N_) * sizeof(value_idx));
   }
 
-  value_idx find(value_idx n)
+  auto find(value_idx n) -> value_idx
   {
     value_idx p;
     p = n;
@@ -200,7 +200,7 @@ RAFT_KERNEL inherit_labels(const value_idx* children,
 
 template <typename value_idx>
 struct init_label_roots {
-  init_label_roots(value_idx* labels_) : labels(labels_) {}
+  explicit init_label_roots(value_idx* labels_) : labels(labels_) {}
 
   template <typename Tuple>
   __host__ __device__ void operator()(Tuple t)
@@ -262,7 +262,7 @@ void extract_flattened_clusters(raft::resources const& handle,
 
     rmm::device_uvector<value_idx> levels(n_vertices, stream);
 
-    value_idx n_blocks = raft::ceildiv(n_vertices, (value_idx)tpb);
+    value_idx n_blocks = raft::ceildiv(n_vertices, static_cast<value_idx>(tpb));
     write_levels_kernel<<<n_blocks, tpb, 0, stream>>>(children, levels.data(), n_vertices);
     /**
      * Step 1: Find label roots:

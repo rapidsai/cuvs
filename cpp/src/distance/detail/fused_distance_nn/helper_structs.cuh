@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -19,22 +19,22 @@
 #include <cstddef>  // size_t
 #include <limits>   // std::numeric_limits
 
-namespace cuvs {
-namespace distance {
-
-namespace detail {
+namespace cuvs::distance::detail {
 
 template <typename LabelT, typename DataT>
 struct KVPMinReduceImpl {
-  typedef raft::KeyValuePair<LabelT, DataT> KVP;
-  DI KVP operator()(LabelT rit, const KVP& a, const KVP& b) { return b.value < a.value ? b : a; }
-  DI KVP operator()(const KVP& a, const KVP& b) { return b.value < a.value ? b : a; }
+  using KVP = raft::KeyValuePair<LabelT, DataT>;
+  DI auto operator()(LabelT rit, const KVP& a, const KVP& b) -> KVP
+  {
+    return b.value < a.value ? b : a;
+  }
+  DI auto operator()(const KVP& a, const KVP& b) -> KVP { return b.value < a.value ? b : a; }
 
 };  // KVPMinReduce
 
 template <typename LabelT, typename DataT>
 struct MinAndDistanceReduceOpImpl {
-  typedef typename raft::KeyValuePair<LabelT, DataT> KVP;
+  using KVP = typename raft::KeyValuePair<LabelT, DataT>;
 
   DI void operator()(LabelT rid, KVP* out, const KVP& other) const
   {
@@ -81,13 +81,13 @@ struct MinAndDistanceReduceOpImpl {
   DI void init_key(DataT& out, LabelT idx) const { return; }
   DI void init_key(KVP& out, LabelT idx) const { out.key = idx; }
 
-  DI DataT get_value(KVP& out) const { return out.value; }
-  DI DataT get_value(DataT& out) const { return out; }
+  DI auto get_value(KVP& out) const -> DataT { return out.value; }
+  DI auto get_value(DataT& out) const -> DataT { return out; }
 };
 
 template <typename LabelT, typename DataT>
 struct MinReduceOpImpl {
-  typedef typename raft::KeyValuePair<LabelT, DataT> KVP;
+  using KVP = typename raft::KeyValuePair<LabelT, DataT>;
   DI void operator()(LabelT rid, DataT* out, const KVP& other)
   {
     if (other.value < *out) { *out = other.value; }
@@ -116,20 +116,24 @@ void initialize(OutT* min, IdxT m, DataT maxVal, ReduceOpT redOp, cudaStream_t s
 // store_with_byte_offset() passed to cg::reduce() & select_reduce.
 template <typename AccType, typename Index, typename OutType>
 struct kvp_cg_min_reduce_op {
-  typedef typename raft::KeyValuePair<Index, AccType> KVP;
+  using KVP = typename raft::KeyValuePair<Index, AccType>;
 
-  __host__ __device__ kvp_cg_min_reduce_op() noexcept {};
+  __host__ __device__ kvp_cg_min_reduce_op() noexcept = default;
 
   using AccTypeT = AccType;
   using IndexT   = Index;
   // functor signature.
-  __host__ __device__ KVP operator()(KVP a, KVP b) const { return a.value < b.value ? a : b; }
+  __host__ __device__ auto operator()(KVP a, KVP b) const -> KVP
+  {
+    return a.value < b.value ? a : b;
+  }
 
-  __host__ __device__ AccType operator()(AccType a, AccType b) const { return min(a, b); }
+  __host__ __device__ auto operator()(AccType a, AccType b) const -> AccType { return min(a, b); }
 
-  __host__ __device__ bool isAmin(AccType a, AccType b) const { return a < b ? true : false; }
+  __host__ __device__ auto isAmin(AccType a, AccType b) const -> bool
+  {
+    return a < b ? true : false;
+  }
 };
 
-}  // namespace detail
-}  // namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance::detail

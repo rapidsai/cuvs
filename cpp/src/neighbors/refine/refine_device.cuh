@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -40,9 +40,9 @@ void refine_device(
   matrix_idx n_candidates = neighbor_candidates.extent(1);
   matrix_idx n_queries    = queries.extent(0);
   matrix_idx dim          = dataset.extent(1);
-  uint32_t k              = static_cast<uint32_t>(indices.extent(1));
+  auto k                  = static_cast<uint32_t>(indices.extent(1));
 
-  // TODO: this restriction could be lifted with some effort
+  // TODO(snanditale): this restriction could be lifted with some effort
   RAFT_EXPECTS(k <= raft::matrix::detail::select::warpsort::kMaxCapacity,
                "k must be less than topk::kMaxCapacity (%d).",
                raft::matrix::detail::select::warpsort::kMaxCapacity);
@@ -97,7 +97,7 @@ void refine_device(
   if constexpr (sizeof(idx_t) == sizeof(uint32_t)) {
     neighbors_uint32 = reinterpret_cast<uint32_t*>(indices.data_handle());
   } else {
-    neighbors_uint32_buf.resize(std::size_t(n_queries) * std::size_t(k),
+    neighbors_uint32_buf.resize(std::size_t(n_queries) * static_cast<std::size_t>(k),
                                 raft::resource::get_cuda_stream(handle));
     neighbors_uint32 = neighbors_uint32_buf.data();
   }

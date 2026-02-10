@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -14,7 +14,7 @@
 #include <raft/core/logger.hpp>
 #include <raft/core/operators.hpp>
 
-// TODO: This shouldn't be invoking spatial/knn
+// TODO(snanditale): This shouldn't be invoking spatial/knn
 #include "../ann_utils.cuh"
 
 #include <raft/util/device_loads_stores.cuh>
@@ -331,7 +331,7 @@ struct instance_spec {
   using host_type     = dataset_descriptor_host<DataT, IndexT, DistanceT>;
   /** Use this to constrain the input dataset type. */
   template <typename DatasetT>
-  constexpr static inline bool accepts_dataset()
+  constexpr static inline auto accepts_dataset() -> bool
   {
     return false;
   }

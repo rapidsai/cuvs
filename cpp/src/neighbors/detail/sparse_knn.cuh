@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2020-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -56,7 +56,7 @@ struct csr_batcher_t {
     batch_rows_ = (batch_stop_ - batch_start_) + 1;
   }
 
-  value_idx get_batch_csr_indptr_nnz(value_idx* batch_indptr, cudaStream_t stream)
+  auto get_batch_csr_indptr_nnz(value_idx* batch_indptr, cudaStream_t stream) -> value_idx
   {
     raft::sparse::op::csr_row_slice_indptr(batch_start_,
                                            batch_stop_,
@@ -80,11 +80,11 @@ struct csr_batcher_t {
                                              stream);
   }
 
-  value_idx batch_rows() const { return batch_rows_; }
+  auto batch_rows() const -> value_idx { return batch_rows_; }
 
-  value_idx batch_start() const { return batch_start_; }
+  auto batch_start() const -> value_idx { return batch_start_; }
 
-  value_idx batch_stop() const { return batch_stop_; }
+  auto batch_stop() const -> value_idx { return batch_stop_; }
 
  private:
   value_idx batch_size_;
@@ -150,9 +150,7 @@ class sparse_knn_t {
 
   void run()
   {
-    using namespace raft::sparse;
-
-    int n_batches_query = raft::ceildiv((size_t)n_query_rows, batch_size_query);
+    int n_batches_query = raft::ceildiv(static_cast<size_t>(n_query_rows), batch_size_query);
     csr_batcher_t<value_idx, value_t> query_batcher(
       batch_size_query, n_query_rows, queryIndptr, queryIndices, queryData);
 
@@ -192,7 +190,7 @@ class sparse_knn_t {
       value_t* dists_merge_buffer_ptr;
       value_idx* indices_merge_buffer_ptr;
 
-      int n_batches_idx = raft::ceildiv((size_t)n_idx_rows, batch_size_index);
+      int n_batches_idx = raft::ceildiv(static_cast<size_t>(n_idx_rows), batch_size_index);
       csr_batcher_t<value_idx, value_t> idx_batcher(
         batch_size_index, n_idx_rows, idxIndptr, idxIndices, idxData);
 
@@ -225,8 +223,8 @@ class sparse_knn_t {
         /**
          * Compute distances
          */
-        uint64_t dense_size =
-          (uint64_t)idx_batcher.batch_rows() * (uint64_t)query_batcher.batch_rows();
+        uint64_t dense_size = static_cast<uint64_t>(idx_batcher.batch_rows()) *
+                              static_cast<uint64_t>(query_batcher.batch_rows());
         rmm::device_uvector<value_t> batch_dists(dense_size,
                                                  raft::resource::get_cuda_stream(handle));
 
@@ -251,7 +249,7 @@ class sparse_knn_t {
         // populate batch indices array
         value_idx batch_rows = query_batcher.batch_rows(), batch_cols = idx_batcher.batch_rows();
 
-        iota_fill(
+        raft::sparse::iota_fill(
           batch_indices.data(), batch_rows, batch_cols, raft::resource::get_cuda_stream(handle));
 
         /**

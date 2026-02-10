@@ -1,11 +1,5 @@
-# SPDX-FileCopyrightText: Copyright (c) 2020-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2020-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
-#
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# IMPORTANT DISCLAIMER:                                                       #
-# This file is experimental and may not run successfully on the entire repo!  #
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-#
 
 from __future__ import print_function
 import argparse
@@ -104,9 +98,20 @@ def parse_args():
     args.root = os.path.realpath(os.path.expanduser(args.root))
     # we need to have a recent enough cub version for clang to compile
     if args.thrust_dir is None:
-        args.thrust_dir = os.path.join(
-            os.path.dirname(args.cdb), "thrust_1.15", "src", "thrust_1.15"
+        # Try CCCL (modern layout: _deps/cccl-src/thrust/)
+        cccl_thrust = os.path.join(
+            os.path.dirname(args.cdb), "_deps", "cccl-src", "thrust"
         )
+        if os.path.isdir(cccl_thrust):
+            args.thrust_dir = cccl_thrust
+        else:
+            # Legacy fallback
+            args.thrust_dir = os.path.join(
+                os.path.dirname(args.cdb),
+                "thrust_1.15",
+                "src",
+                "thrust_1.15",
+            )
     if args.build_dir is None:
         args.build_dir = os.path.dirname(args.cdb)
     if not os.path.isdir(args.thrust_dir):

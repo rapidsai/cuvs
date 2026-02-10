@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -192,13 +192,13 @@ auto merge(raft::resources const& res,
 }
 
 template <typename UpstreamT>
-int64_t index<UpstreamT>::size() const noexcept
+auto index<UpstreamT>::size() const noexcept -> int64_t
 {
   return state->size();
 }
 
 template <typename UpstreamT>
-int64_t index<UpstreamT>::dim() const noexcept
+auto index<UpstreamT>::dim() const noexcept -> int64_t
 {
   return state->dim();
 }

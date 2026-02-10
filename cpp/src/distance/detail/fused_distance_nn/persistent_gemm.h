@@ -1,7 +1,7 @@
 // clang-format off
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2017 - 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0 AND BSD-3-Clause
  */
 // clang-format on
@@ -60,9 +60,7 @@ Changes:
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-namespace cuvs {
-namespace gemm {
-namespace kernel {
+namespace cuvs::gemm::kernel {
 
 // TODO (cjnolet): We shouldn't be doing `using namespace` in this file.
 using namespace cutlass::gemm::kernel;
@@ -83,7 +81,7 @@ struct FusedDistanceNNPersistent {
   static bool const kTransposed                     = Transposed;
 
   // Optional transpose
-  // TODO: This is dangerous- we shouldn't be using `detail` APIs from cutlass
+  // TODO(snanditale): This is dangerous- we shouldn't be using `detail` APIs from cutlass
   using MapArguments =
     cutlass::gemm::kernel::detail::MapArguments<typename Mma::IteratorA::Element,
                                                 typename Mma::IteratorA::Layout,
@@ -139,7 +137,8 @@ struct FusedDistanceNNPersistent {
     int problem_count;
 
     CUTLASS_HOST_DEVICE temp_problem_visitor() : problem_count(0) {};
-    CUTLASS_HOST_DEVICE temp_problem_visitor(int problem_count_) : problem_count(problem_count_) {};
+    CUTLASS_HOST_DEVICE explicit temp_problem_visitor(int problem_count_)
+      : problem_count(problem_count_){};
   };
 
   /// Argument structure
@@ -273,7 +272,7 @@ struct FusedDistanceNNPersistent {
     }
 
     CUTLASS_HOST_DEVICE
-    Params(Arguments const& args, void* workspace = nullptr, int tile_count = 0)
+    explicit Params(Arguments const& args, void* workspace = nullptr, int tile_count = 0)
       : problem_size(args.problem_sizes),
         threadblock_count(args.threadblock_count),
         output_op(args.output_op),
@@ -332,15 +331,18 @@ struct FusedDistanceNNPersistent {
   //
 
   CUTLASS_DEVICE
-  FusedDistanceNNPersistent() {}
+  FusedDistanceNNPersistent() = default;
 
   /// Determines whether kernel satisfies alignment
-  static cutlass::Status can_implement(cutlass::gemm::GemmCoord const& problem_size)
+  static auto can_implement(cutlass::gemm::GemmCoord const& problem_size) -> cutlass::Status
   {
     return cutlass::Status::kSuccess;
   }
 
-  static cutlass::Status can_implement(Arguments const& args) { return cutlass::Status::kSuccess; }
+  static auto can_implement(Arguments const& args) -> cutlass::Status
+  {
+    return cutlass::Status::kSuccess;
+  }
 
   static size_t get_extra_workspace_size(Arguments const& args,
                                          cutlass::gemm::GemmCoord const& grid_tiled_shape)
@@ -349,14 +351,14 @@ struct FusedDistanceNNPersistent {
   }
 
   CUTLASS_DEVICE
-  static uint32_t tile_count(const cutlass::MatrixCoord& grid)
+  static auto tile_count(const cutlass::MatrixCoord& grid) -> uint32_t
   {
     return grid.row() * grid.column();
   }
 
   /// Get the grid shape
   CUTLASS_DEVICE
-  static cutlass::MatrixCoord grid_shape(const cutlass::gemm::GemmCoord& problem)
+  static auto grid_shape(const cutlass::gemm::GemmCoord& problem) -> cutlass::MatrixCoord
   {
     return cutlass::MatrixCoord(((problem.m() - 1 + ThreadblockShape::kM) / ThreadblockShape::kM),
                                 ((problem.n() - 1 + ThreadblockShape::kN) / ThreadblockShape::kN));
@@ -500,8 +502,6 @@ struct FusedDistanceNNPersistent {
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-}  // namespace kernel
-}  // namespace gemm
-}  // namespace cuvs
+}  // namespace cuvs::gemm::kernel
 
 /////////////////////////////////////////////////////////////////////////////////////////////////

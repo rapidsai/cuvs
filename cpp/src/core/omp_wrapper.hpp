@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -7,13 +7,13 @@
 
 namespace cuvs::core::omp {
 
-constexpr bool is_omp_enabled();
+constexpr auto is_omp_enabled() -> bool;
 
-int get_max_threads();
-int get_num_procs();
-int get_num_threads();
-int get_thread_num();
-int get_nested();
+auto get_max_threads() -> int;
+auto get_num_procs() -> int;
+auto get_num_threads() -> int;
+auto get_thread_num() -> int;
+auto get_nested() -> int;
 
 void set_nested(int v);
 void set_num_threads(int v);

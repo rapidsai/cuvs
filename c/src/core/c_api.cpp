@@ -27,7 +27,7 @@
 #include <memory>
 #include <thread>
 
-extern "C" cuvsError_t cuvsResourcesCreate(cuvsResources_t* res)
+extern "C" auto cuvsResourcesCreate(cuvsResources_t* res) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = new raft::resources{};
@@ -35,7 +35,7 @@ extern "C" cuvsError_t cuvsResourcesCreate(cuvsResources_t* res)
   });
 }
 
-extern "C" cuvsError_t cuvsResourcesDestroy(cuvsResources_t res)
+extern "C" auto cuvsResourcesDestroy(cuvsResources_t res) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
@@ -43,7 +43,7 @@ extern "C" cuvsError_t cuvsResourcesDestroy(cuvsResources_t res)
   });
 }
 
-extern "C" cuvsError_t cuvsMultiGpuResourcesCreate(cuvsResources_t* res)
+extern "C" auto cuvsMultiGpuResourcesCreate(cuvsResources_t* res) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = new raft::device_resources_snmg{};
@@ -51,8 +51,8 @@ extern "C" cuvsError_t cuvsMultiGpuResourcesCreate(cuvsResources_t* res)
   });
 }
 
-extern "C" cuvsError_t cuvsMultiGpuResourcesCreateWithDeviceIds(cuvsResources_t* res,
-                                                                DLManagedTensor* device_ids)
+extern "C" auto cuvsMultiGpuResourcesCreateWithDeviceIds(cuvsResources_t* res,
+                                                                DLManagedTensor* device_ids) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     // Basic validation
@@ -79,7 +79,7 @@ extern "C" cuvsError_t cuvsMultiGpuResourcesCreateWithDeviceIds(cuvsResources_t*
   });
 }
 
-extern "C" cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res)
+extern "C" auto cuvsMultiGpuResourcesDestroy(cuvsResources_t res) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::device_resources_snmg*>(res);
@@ -87,8 +87,8 @@ extern "C" cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res)
   });
 }
 
-extern "C" cuvsError_t cuvsMultiGpuResourcesSetMemoryPool(cuvsResources_t res,
-                                                          int percent_of_free_memory)
+extern "C" auto cuvsMultiGpuResourcesSetMemoryPool(cuvsResources_t res,
+                                                          int percent_of_free_memory) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::device_resources_snmg*>(res);
@@ -96,7 +96,7 @@ extern "C" cuvsError_t cuvsMultiGpuResourcesSetMemoryPool(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsStreamSet(cuvsResources_t res, cudaStream_t stream)
+extern "C" auto cuvsStreamSet(cuvsResources_t res, cudaStream_t stream) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
@@ -104,7 +104,7 @@ extern "C" cuvsError_t cuvsStreamSet(cuvsResources_t res, cudaStream_t stream)
   });
 }
 
-extern "C" cuvsError_t cuvsStreamGet(cuvsResources_t res, cudaStream_t* stream)
+extern "C" auto cuvsStreamGet(cuvsResources_t res, cudaStream_t* stream) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
@@ -112,7 +112,7 @@ extern "C" cuvsError_t cuvsStreamGet(cuvsResources_t res, cudaStream_t* stream)
   });
 }
 
-extern "C" cuvsError_t cuvsStreamSync(cuvsResources_t res)
+extern "C" auto cuvsStreamSync(cuvsResources_t res) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
@@ -120,7 +120,7 @@ extern "C" cuvsError_t cuvsStreamSync(cuvsResources_t res)
   });
 }
 
-extern "C" cuvsError_t cuvsDeviceIdGet(cuvsResources_t res, int* device_id)
+extern "C" auto cuvsDeviceIdGet(cuvsResources_t res, int* device_id) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
@@ -128,7 +128,7 @@ extern "C" cuvsError_t cuvsDeviceIdGet(cuvsResources_t res, int* device_id)
   });
 }
 
-extern "C" cuvsError_t cuvsRMMAlloc(cuvsResources_t res, void** ptr, size_t bytes)
+extern "C" auto cuvsRMMAlloc(cuvsResources_t res, void** ptr, size_t bytes) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
@@ -137,7 +137,7 @@ extern "C" cuvsError_t cuvsRMMAlloc(cuvsResources_t res, void** ptr, size_t byte
   });
 }
 
-extern "C" cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes)
+extern "C" auto cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
@@ -151,9 +151,9 @@ thread_local std::shared_ptr<
                           rmm::mr::device_memory_resource>>
   pool_mr;
 
-extern "C" cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_percent,
+extern "C" auto cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_percent,
                                                        int max_pool_size_percent,
-                                                       bool managed)
+                                                       bool managed) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     // Upstream memory resource needs to be a cuda_memory_resource
@@ -182,7 +182,7 @@ extern "C" cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_per
   });
 }
 
-extern "C" cuvsError_t cuvsRMMMemoryResourceReset()
+extern "C" auto cuvsRMMMemoryResourceReset() -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     rmm::mr::set_current_device_resource(rmm::mr::detail::initial_resource());
@@ -192,7 +192,7 @@ extern "C" cuvsError_t cuvsRMMMemoryResourceReset()
 
 thread_local std::unique_ptr<rmm::mr::pinned_host_memory_resource> pinned_mr;
 
-extern "C" cuvsError_t cuvsRMMHostAlloc(void** ptr, size_t bytes)
+extern "C" auto cuvsRMMHostAlloc(void** ptr, size_t bytes) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (pinned_mr == nullptr) { pinned_mr = std::make_unique<rmm::mr::pinned_host_memory_resource>(); }
@@ -200,16 +200,16 @@ extern "C" cuvsError_t cuvsRMMHostAlloc(void** ptr, size_t bytes)
   });
 }
 
-extern "C" cuvsError_t cuvsRMMHostFree(void* ptr, size_t bytes)
+extern "C" auto cuvsRMMHostFree(void* ptr, size_t bytes) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { pinned_mr->deallocate_sync(ptr, bytes); });
 }
 
 thread_local std::string last_error_text = "";
 
-extern "C" const char* cuvsGetLastErrorText()
+extern "C" auto cuvsGetLastErrorText() -> const char*
 {
-  return last_error_text.empty() ? NULL : last_error_text.c_str();
+  return last_error_text.empty() ? nullptr : last_error_text.c_str();
 }
 
 extern "C" void cuvsSetLogLevel(cuvsLogLevel_t verbosity)
@@ -242,14 +242,14 @@ extern "C" void cuvsSetLogLevel(cuvsLogLevel_t verbosity)
   raft::default_logger().set_level(level);
 }
 
-extern "C" cuvsLogLevel_t cuvsGetLogLevel()
+extern "C" auto cuvsGetLogLevel() -> cuvsLogLevel_t
 {
   return static_cast<cuvsLogLevel_t>(raft::default_logger().level());
 }
 
 extern "C" void cuvsSetLastErrorText(const char* error) { last_error_text = error ? error : ""; }
 
-extern "C" cuvsError_t cuvsVersionGet(uint16_t* major, uint16_t* minor, uint16_t* patch)
+extern "C" auto cuvsVersionGet(uint16_t* major, uint16_t* minor, uint16_t* patch) -> cuvsError_t
 {
   *major = CUVS_VERSION_MAJOR;
   *minor = CUVS_VERSION_MINOR;
@@ -293,9 +293,9 @@ void _copy_matrix(cuvsResources_t res, DLManagedTensor* src_managed, DLManagedTe
 }
 }  // namespace
 
-extern "C" cuvsError_t cuvsMatrixCopy(cuvsResources_t res,
+extern "C" auto cuvsMatrixCopy(cuvsResources_t res,
                                       DLManagedTensor* src_managed,
-                                      DLManagedTensor* dst_managed)
+                                      DLManagedTensor* dst_managed) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     DLTensor& src = src_managed->dl_tensor;
@@ -353,11 +353,11 @@ extern "C" void cuvsMatrixDestroy(DLManagedTensor* tensor)
   }
 }
 
-extern "C" cuvsError_t cuvsMatrixSliceRows(cuvsResources_t res,
+extern "C" auto cuvsMatrixSliceRows(cuvsResources_t res,
                                            DLManagedTensor* src_managed,
                                            int64_t start,
                                            int64_t end,
-                                           DLManagedTensor* dst_managed)
+                                           DLManagedTensor* dst_managed) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     RAFT_EXPECTS(end >= start, "end index must be greater than start index");

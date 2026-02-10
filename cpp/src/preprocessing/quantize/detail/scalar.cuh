@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,13 +17,13 @@
 namespace cuvs::preprocessing::quantize::detail {
 
 template <class T>
-_RAFT_HOST_DEVICE bool fp_lt(const T& a, const T& b)
+_RAFT_HOST_DEVICE auto fp_lt(const T& a, const T& b) -> bool
 {
   return a < b;
 }
 
 template <>
-_RAFT_HOST_DEVICE bool fp_lt(const half& a, const half& b)
+_RAFT_HOST_DEVICE auto fp_lt(const half& a, const half& b) -> bool
 {
   return static_cast<float>(a) < static_cast<float>(b);
 }
@@ -48,24 +48,24 @@ struct quantize_op {
   {
   }
 
-  constexpr RAFT_INLINE_FUNCTION QuantI operator()(const T& x) const
+  constexpr RAFT_INLINE_FUNCTION auto operator()(const T& x) const -> QuantI
   {
     if (!fp_lt(min_, x)) return q_type_min_;
     if (!fp_lt(x, max_)) return q_type_max_;
     return static_cast<QuantI>(lroundf(scalar_ * static_cast<TempT>(x) + offset_));
   }
 
-  constexpr RAFT_INLINE_FUNCTION T operator()(const QuantI& x) const
+  constexpr RAFT_INLINE_FUNCTION auto operator()(const QuantI& x) const -> T
   {
     return static_cast<T>((static_cast<TempT>(x) - offset_) / scalar_);
   }
 };
 
 template <typename T, typename IdxT = int64_t, typename accessor>
-std::tuple<T, T> quantile_min_max(
+auto quantile_min_max(
   raft::resources const& res,
   raft::mdspan<const T, raft::matrix_extent<IdxT>, raft::row_major, accessor> dataset,
-  double quantile)
+  double quantile) -> std::tuple<T, T>
 {
   // settings for quantile approximation
   constexpr size_t max_num_samples = 1000000;
@@ -80,7 +80,7 @@ std::tuple<T, T> quantile_min_max(
   size_t n_sample_rows = std::min<size_t>(std::ceil(max_num_samples / dim), n_rows);
 
   // select subsample rows (this returns device data for both device and host input)
-  auto subset = raft::matrix::sample_rows(res, rng, dataset, (IdxT)n_sample_rows);
+  auto subset = raft::matrix::sample_rows(res, rng, dataset, static_cast<IdxT>(n_sample_rows));
 
   // quantile / sort element-wise and pick for now
   size_t subset_size = n_sample_rows * dim;
@@ -100,10 +100,10 @@ std::tuple<T, T> quantile_min_max(
 }
 
 template <typename T>
-cuvs::preprocessing::quantize::scalar::quantizer<T> train(
-  raft::resources const& res,
-  const cuvs::preprocessing::quantize::scalar::params params,
-  raft::device_matrix_view<const T, int64_t> dataset)
+auto train(raft::resources const& res,
+           const cuvs::preprocessing::quantize::scalar::params params,
+           raft::device_matrix_view<const T, int64_t> dataset)
+  -> cuvs::preprocessing::quantize::scalar::quantizer<T>
 {
   RAFT_EXPECTS(params.quantile > 0.0 && params.quantile <= 1.0,
                "quantile for scalar quantization needs to be within (0, 1] but is %f",
@@ -117,10 +117,10 @@ cuvs::preprocessing::quantize::scalar::quantizer<T> train(
 }
 
 template <typename T>
-cuvs::preprocessing::quantize::scalar::quantizer<T> train(
-  raft::resources const& res,
-  const cuvs::preprocessing::quantize::scalar::params params,
-  raft::host_matrix_view<const T, int64_t> dataset)
+auto train(raft::resources const& res,
+           const cuvs::preprocessing::quantize::scalar::params params,
+           raft::host_matrix_view<const T, int64_t> dataset)
+  -> cuvs::preprocessing::quantize::scalar::quantizer<T>
 {
   RAFT_EXPECTS(params.quantile > 0.0 && params.quantile <= 1.0,
                "quantile for scalar quantization needs to be within (0, 1] but is %f",

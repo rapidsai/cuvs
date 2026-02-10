@@ -1,15 +1,15 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <cuvs/util/file_io.hpp>
 
 #include <algorithm>
+#include <climits>
 #include <cstring>
-#include <limits.h>
 
-#include <errno.h>
+#include <cerrno>
 #include <unistd.h>
 
 namespace cuvs::util {
@@ -35,7 +35,7 @@ void read_large_file(const file_descriptor& fd,
 
     RAFT_EXPECTS(
       bytes_read != -1, "Failed to read from file at offset %lu: %s", file_pos, strerror(errno));
-    RAFT_EXPECTS(bytes_read == static_cast<ssize_t>(chunk_size),
+    RAFT_EXPECTS(std::cmp_equal(bytes_read, chunk_size),
                  "Incomplete read from file. Expected %zu bytes, got %zd at offset %lu",
                  chunk_size,
                  bytes_read,
@@ -67,7 +67,7 @@ void write_large_file(const file_descriptor& fd,
 
     RAFT_EXPECTS(
       chunk_written != -1, "Failed to write to file at offset %lu: %s", file_pos, strerror(errno));
-    RAFT_EXPECTS(chunk_written == static_cast<ssize_t>(chunk_size),
+    RAFT_EXPECTS(std::cmp_equal(chunk_written, chunk_size),
                  "Incomplete write to file. Expected %zu bytes, wrote %zd at offset %lu",
                  chunk_size,
                  chunk_written,

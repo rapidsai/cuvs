@@ -50,7 +50,7 @@ void create_insert_permutation(std::vector<IdxT>& insert_order, uint32_t N)
 {
   insert_order.resize(N);
   for (uint32_t i = 0; i < N; i++) {
-    insert_order[i] = (IdxT)i;
+    insert_order[i] = static_cast<IdxT>(i);
   }
   for (uint32_t i = 0; i < N; i++) {
     uint32_t temp;
@@ -74,8 +74,7 @@ __global__ void print_mtx(raft::device_vector_view<IdxT, int64_t> vec)
 template <typename IdxT, typename accT>
 __global__ void print_queryIds(void* query_list_ptr)
 {
-  QueryCandidates<IdxT, accT>* query_list =
-    static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
+  auto* query_list = static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
 
   for (int i = 0; i < 50; i++) {
     printf("queryId:%d\n", query_list[i].queryId);
@@ -108,7 +107,7 @@ void batched_insert_vamana(
   int degree  = graph.extent(1);
 
   // Algorithm params
-  int max_batchsize = (int)(params.max_fraction * (float)N);
+  int max_batchsize = static_cast<int>(params.max_fraction * static_cast<float>(N));
 
   if (max_batchsize > (int)dataset.extent(0)) {
     RAFT_LOG_WARN(
@@ -116,9 +115,9 @@ void batched_insert_vamana(
       "to 1.0");
     max_batchsize = (int)dataset.extent(0);
   }
-  float insert_iters = (float)(params.vamana_iters);
-  double base        = (double)(params.batch_base);
-  float alpha        = (float)(params.alpha);
+  float insert_iters = (params.vamana_iters);
+  auto base          = static_cast<double>(params.batch_base);
+  float alpha        = (params.alpha);
   int visited_size   = params.visited_size;
   int queue_size     = params.queue_size;
   int reverse_batch  = params.reverse_batchsize;
@@ -126,8 +125,9 @@ void batched_insert_vamana(
   if ((visited_size & (visited_size - 1)) != 0) {
     RAFT_LOG_WARN("visited_size must be a power of 2, rounding up.");
     int power = params.graph_degree;
-    while (power < visited_size)
+    while (power < visited_size) {
       power <<= 1;
+    }
     visited_size = power;
   }
 
@@ -145,8 +145,7 @@ void batched_insert_vamana(
     res,
     raft::resource::get_large_workspace_resource(res),
     raft::make_extents<int64_t>(max_batchsize + 1));
-  QueryCandidates<IdxT, accT>* query_list =
-    static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr.data_handle());
+  auto* query_list = static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr.data_handle());
 
   // Results of each batch of inserts during build - Memory is used by query_list structure
   auto visited_ids =
@@ -180,7 +179,7 @@ void batched_insert_vamana(
 
   // Create random permutation for order of node inserts into graph
   std::vector<IdxT> insert_order;
-  create_insert_permutation<IdxT>(insert_order, (uint32_t)N);
+  create_insert_permutation<IdxT>(insert_order, static_cast<uint32_t>(N));
 
   // Calculate the shared memory sizes of each kernel
   int sort_smem_size = 0;
@@ -215,7 +214,7 @@ void batched_insert_vamana(
 #endif
 
   // Random medoid has minor impact on recall
-  // TODO: use heuristic for better medoid selection, issue:
+  // TODO(snanditale): use heuristic for better medoid selection, issue:
   // https://github.com/rapidsai/cuvs/issues/355
   *medoid_id = rand() % N;
 
@@ -223,13 +222,13 @@ void batched_insert_vamana(
   int step_size = 1;
   // Loop through batches and call the insert and prune kernels - can insert > N times based on
   // iters parameter
-  for (int start = 0; start < (int)(insert_iters * (float)N);) {
+  for (int start = 0; start < static_cast<int>(insert_iters * static_cast<float>(N));) {
 #if KERNEL_TIMING
     start_t = std::chrono::system_clock::now();
 #endif
 
-    if (start + step_size > (int)(insert_iters * (float)N)) {
-      step_size = (int)(insert_iters * (float)N) - start;
+    if (start + step_size > static_cast<int>(insert_iters * static_cast<float>(N))) {
+      step_size = static_cast<int>(insert_iters * static_cast<float>(N)) - start;
     }
     if (start + step_size > N) { step_size = N - start; }
     RAFT_LOG_DEBUG("Starting batch of inserts indices_start:%d, batch_size:%d", start, step_size);
@@ -385,7 +384,7 @@ void batched_insert_vamana(
     raft::linalg::map(
       res,
       edge_dest.view(),
-      [] __device__(auto x) { return x.idx; },
+      [] __device__(auto x) -> IdxT { return x.idx; },
       raft::make_const_mdspan(edge_dist_pair.view()));
 
     void* d_temp_storage      = nullptr;
@@ -440,9 +439,10 @@ void batched_insert_vamana(
 
     // Batch execution of reverse edge creation/application
     reverse_batch = params.reverse_batchsize;
-    for (int rev_start = 0; rev_start < (int)unique_dests; rev_start += reverse_batch) {
-      if (rev_start + reverse_batch > (int)unique_dests) {
-        reverse_batch = (int)unique_dests - rev_start;
+    for (int rev_start = 0; rev_start < static_cast<int>(unique_dests);
+         rev_start += reverse_batch) {
+      if (rev_start + reverse_batch > static_cast<int>(unique_dests)) {
+        reverse_batch = static_cast<int>(unique_dests) - rev_start;
       }
 
       // Allocate reverse QueryCandidate list based on number of unique destinations
@@ -460,7 +460,7 @@ void batched_insert_vamana(
                                         raft::resource::get_large_workspace_resource(res),
                                         raft::make_extents<int64_t>(reverse_batch, visited_size));
 
-      QueryCandidates<IdxT, accT>* reverse_list =
+      auto* reverse_list =
         static_cast<QueryCandidates<IdxT, accT>*>(reverse_list_ptr.data_handle());
 
       init_query_candidate_list<IdxT, accT><<<256, blockD, 0, stream>>>(reverse_list,
@@ -551,10 +551,10 @@ template <typename T,
           typename IdxT = uint64_t,
           typename Accessor =
             raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
-index<T, IdxT> build(
-  raft::resources const& res,
-  const index_params& params,
-  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
+auto build(raft::resources const& res,
+           const index_params& params,
+           raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
+  -> index<T, IdxT>
 {
   uint32_t graph_degree = params.graph_degree;
 
@@ -619,7 +619,7 @@ index<T, IdxT> build(
        pq_dim,
        pq_codebook_size,
        dim_per_subspace,
-       dim] __device__(size_t i) {
+       dim] __device__(size_t i) -> float {
         int row_idx        = i / dim_per_subspace;
         int subspace_id    = row_idx / pq_codebook_size;  // idx_pq_dim
         int codebook_id    = row_idx % pq_codebook_size;  // idx_pq_codebook_size
@@ -648,7 +648,7 @@ index<T, IdxT> build(
     const int64_t codes_rowlen = cuvs::preprocessing::quantize::pq::get_quantized_dim(pq_params);
     quantized_vectors =
       raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(res, n_rows, codes_rowlen);
-    // TODO: with scaling workspace we could choose the batch size dynamically
+    // TODO(snanditale): with scaling workspace we could choose the batch size dynamically
     constexpr uint32_t kReasonableMaxBatchSize = 65536;
     const uint32_t max_batch_size              = std::min(n_rows, kReasonableMaxBatchSize);
     for (const auto& batch : cuvs::spatial::knn::detail::utils::batch_load_iterator<T>(
@@ -696,8 +696,9 @@ index<T, IdxT> build(
   try {
     auto idx = index<T, IdxT>(
       res, params.metric, dataset, raft::make_const_mdspan(vamana_graph.view()), medoid_id);
-    if (quantized_vectors)
+    if (quantized_vectors) {
       idx.update_quantized_dataset(res, raft::make_const_mdspan(quantized_vectors.value().view()));
+    }
     return idx;
   } catch (std::bad_alloc& e) {
     RAFT_LOG_DEBUG("Insufficient GPU memory to construct VAMANA index with dataset on GPU");

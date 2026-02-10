@@ -142,9 +142,9 @@ struct index_params : cuvs::neighbors::index_params {
    *   index_params.add_data_on_build = true;
    * @endcode
    */
-  static index_params from_dataset(
+  static auto from_dataset(
     raft::matrix_extent<int64_t> dataset,
-    cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
+    cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded) -> index_params;
 };
 /**
  * @}
@@ -258,7 +258,7 @@ struct list_spec_interleaved {
     const list_spec_interleaved<OtherSizeT, IdxT>& other_spec);
 
   /** Determine the extents of an array enough to hold a given amount of data. */
-  constexpr list_extents make_list_extents(SizeT n_rows) const;
+  [[nodiscard]] constexpr auto make_list_extents(SizeT n_rows) const -> list_extents;
 };
 
 template <typename SizeT, typename IdxT>
@@ -283,8 +283,8 @@ constexpr list_spec_interleaved<SizeT, IdxT>::list_spec_interleaved(
 }
 
 template <typename SizeT, typename IdxT>
-constexpr typename list_spec_interleaved<SizeT, IdxT>::list_extents
-list_spec_interleaved<SizeT, IdxT>::make_list_extents(SizeT n_rows) const
+constexpr auto list_spec_interleaved<SizeT, IdxT>::make_list_extents(SizeT n_rows) const ->
+  typename list_spec_interleaved<SizeT, IdxT>::list_extents
 {
   // how many elems of pq_dim fit into one kIndexGroupVecLen-byte chunk
   auto pq_chunk = (kIndexGroupVecLen * 8u) / pq_bits;
@@ -322,13 +322,13 @@ struct list_spec_flat {
   constexpr explicit list_spec_flat(const list_spec_flat<OtherSizeT, IdxT>& other_spec);
 
   /** Number of bytes per encoded vector. */
-  constexpr SizeT bytes_per_vector() const
+  [[nodiscard]] constexpr auto bytes_per_vector() const -> SizeT
   {
     return raft::div_rounding_up_safe<SizeT>(pq_dim * pq_bits, 8u);
   }
 
   /** Determine the extents of an array enough to hold a given amount of data. */
-  constexpr list_extents make_list_extents(SizeT n_rows) const
+  [[nodiscard]] constexpr auto make_list_extents(SizeT n_rows) const -> list_extents
   {
     return list_extents{n_rows, bytes_per_vector()};
   }
@@ -364,60 +364,65 @@ class index_iface {
  public:
   virtual ~index_iface() = default;
 
-  virtual cuvs::distance::DistanceType metric() const noexcept  = 0;
-  virtual codebook_gen codebook_kind() const noexcept           = 0;
-  virtual list_layout codes_layout() const noexcept             = 0;
-  virtual IdxT size() const noexcept                            = 0;
-  virtual uint32_t dim() const noexcept                         = 0;
-  virtual uint32_t dim_ext() const noexcept                     = 0;
-  virtual uint32_t rot_dim() const noexcept                     = 0;
-  virtual uint32_t pq_bits() const noexcept                     = 0;
-  virtual uint32_t pq_dim() const noexcept                      = 0;
-  virtual uint32_t pq_len() const noexcept                      = 0;
-  virtual uint32_t pq_book_size() const noexcept                = 0;
-  virtual uint32_t n_lists() const noexcept                     = 0;
-  virtual bool conservative_memory_allocation() const noexcept  = 0;
-  virtual uint32_t get_list_size_in_bytes(uint32_t label) const = 0;
+  [[nodiscard]] virtual auto metric() const noexcept -> cuvs::distance::DistanceType  = 0;
+  [[nodiscard]] virtual auto codebook_kind() const noexcept -> codebook_gen           = 0;
+  [[nodiscard]] virtual auto codes_layout() const noexcept -> list_layout             = 0;
+  [[nodiscard]] virtual auto size() const noexcept -> IdxT                            = 0;
+  [[nodiscard]] virtual auto dim() const noexcept -> uint32_t                         = 0;
+  [[nodiscard]] virtual auto dim_ext() const noexcept -> uint32_t                     = 0;
+  [[nodiscard]] virtual auto rot_dim() const noexcept -> uint32_t                     = 0;
+  [[nodiscard]] virtual auto pq_bits() const noexcept -> uint32_t                     = 0;
+  [[nodiscard]] virtual auto pq_dim() const noexcept -> uint32_t                      = 0;
+  [[nodiscard]] virtual auto pq_len() const noexcept -> uint32_t                      = 0;
+  [[nodiscard]] virtual auto pq_book_size() const noexcept -> uint32_t                = 0;
+  [[nodiscard]] virtual auto n_lists() const noexcept -> uint32_t                     = 0;
+  [[nodiscard]] virtual auto conservative_memory_allocation() const noexcept -> bool  = 0;
+  [[nodiscard]] virtual auto get_list_size_in_bytes(uint32_t label) const -> uint32_t = 0;
 
-  virtual std::vector<std::shared_ptr<list_data_base<IdxT>>>& lists() noexcept             = 0;
-  virtual const std::vector<std::shared_ptr<list_data_base<IdxT>>>& lists() const noexcept = 0;
+  virtual auto lists() noexcept -> std::vector<std::shared_ptr<list_data_base<IdxT>>>& = 0;
+  [[nodiscard]] virtual auto lists() const noexcept
+    -> const std::vector<std::shared_ptr<list_data_base<IdxT>>>& = 0;
 
-  virtual raft::device_vector_view<uint32_t, uint32_t, raft::row_major> list_sizes() noexcept = 0;
-  virtual raft::device_vector_view<const uint32_t, uint32_t, raft::row_major> list_sizes()
-    const noexcept = 0;
+  virtual auto list_sizes() noexcept
+    -> raft::device_vector_view<uint32_t, uint32_t, raft::row_major> = 0;
+  [[nodiscard]] virtual auto list_sizes() const noexcept
+    -> raft::device_vector_view<const uint32_t, uint32_t, raft::row_major> = 0;
 
-  virtual raft::device_vector_view<uint8_t*, uint32_t, raft::row_major> data_ptrs() noexcept = 0;
-  virtual raft::device_vector_view<const uint8_t* const, uint32_t, raft::row_major> data_ptrs()
-    const noexcept = 0;
+  virtual auto data_ptrs() noexcept
+    -> raft::device_vector_view<uint8_t*, uint32_t, raft::row_major> = 0;
+  [[nodiscard]] virtual auto data_ptrs() const noexcept
+    -> raft::device_vector_view<const uint8_t* const, uint32_t, raft::row_major> = 0;
 
-  virtual raft::device_vector_view<IdxT*, uint32_t, raft::row_major> inds_ptrs() noexcept = 0;
-  virtual raft::device_vector_view<const IdxT* const, uint32_t, raft::row_major> inds_ptrs()
-    const noexcept = 0;
+  virtual auto inds_ptrs() noexcept
+    -> raft::device_vector_view<IdxT*, uint32_t, raft::row_major> = 0;
+  [[nodiscard]] virtual auto inds_ptrs() const noexcept
+    -> raft::device_vector_view<const IdxT* const, uint32_t, raft::row_major> = 0;
 
-  virtual raft::host_vector_view<IdxT, uint32_t, raft::row_major> accum_sorted_sizes() noexcept = 0;
-  virtual raft::host_vector_view<const IdxT, uint32_t, raft::row_major> accum_sorted_sizes()
-    const noexcept = 0;
+  virtual auto accum_sorted_sizes() noexcept
+    -> raft::host_vector_view<IdxT, uint32_t, raft::row_major> = 0;
+  [[nodiscard]] virtual auto accum_sorted_sizes() const noexcept
+    -> raft::host_vector_view<const IdxT, uint32_t, raft::row_major> = 0;
 
-  virtual raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers()
-    const noexcept = 0;
+  [[nodiscard]] virtual auto pq_centers() const noexcept
+    -> raft::device_mdspan<const float, pq_centers_extents, raft::row_major> = 0;
 
-  virtual raft::device_matrix_view<const float, uint32_t, raft::row_major> centers()
-    const noexcept = 0;
+  [[nodiscard]] virtual auto centers() const noexcept
+    -> raft::device_matrix_view<const float, uint32_t, raft::row_major> = 0;
 
-  virtual raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot()
-    const noexcept = 0;
+  [[nodiscard]] virtual auto centers_rot() const noexcept
+    -> raft::device_matrix_view<const float, uint32_t, raft::row_major> = 0;
 
-  virtual raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix()
-    const noexcept = 0;
+  [[nodiscard]] virtual auto rotation_matrix() const noexcept
+    -> raft::device_matrix_view<const float, uint32_t, raft::row_major> = 0;
 
-  virtual raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> rotation_matrix_int8(
-    const raft::resources& res) const = 0;
-  virtual raft::device_matrix_view<const half, uint32_t, raft::row_major> rotation_matrix_half(
-    const raft::resources& res) const = 0;
-  virtual raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> centers_int8(
-    const raft::resources& res) const = 0;
-  virtual raft::device_matrix_view<const half, uint32_t, raft::row_major> centers_half(
-    const raft::resources& res) const = 0;
+  [[nodiscard]] virtual auto rotation_matrix_int8(const raft::resources& res) const
+    -> raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> = 0;
+  [[nodiscard]] virtual auto rotation_matrix_half(const raft::resources& res) const
+    -> raft::device_matrix_view<const half, uint32_t, raft::row_major> = 0;
+  [[nodiscard]] virtual auto centers_int8(const raft::resources& res) const
+    -> raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> = 0;
+  [[nodiscard]] virtual auto centers_half(const raft::resources& res) const
+    -> raft::device_matrix_view<const half, uint32_t, raft::row_major> = 0;
 };
 
 /**
@@ -482,7 +487,7 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
   index(index&&)                         = default;
   auto operator=(const index&) -> index& = delete;
   auto operator=(index&&) -> index&      = default;
-  ~index()                               = default;
+  ~index() override                      = default;
 
   /**
    * @brief Construct an empty index.
@@ -490,7 +495,7 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
    * Constructs an empty index. This index will either need to be trained with `build`
    * or loaded from a saved copy with `deserialize`
    */
-  index(raft::resources const& handle);
+  index(raft::resources const& handle);  // NOLINT(google-explicit-constructor)
 
   /**
    * @brief Construct an index with specified parameters.
@@ -525,52 +530,52 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
   index(raft::resources const& handle, const index_params& params, uint32_t dim);
 
   /** Total length of the index. */
-  IdxT size() const noexcept override;
+  [[nodiscard]] auto size() const noexcept -> IdxT override;
 
   /** Dimensionality of the input data. */
-  uint32_t dim() const noexcept override;
+  [[nodiscard]] auto dim() const noexcept -> uint32_t override;
 
   /**
    * Dimensionality of the cluster centers:
    * input data dim extended with vector norms and padded to 8 elems.
    */
-  uint32_t dim_ext() const noexcept;
+  [[nodiscard]] auto dim_ext() const noexcept -> uint32_t override;
 
   /**
    * Dimensionality of the data after transforming it for PQ processing
    * (rotated and augmented to be muplitple of `pq_dim`).
    */
-  uint32_t rot_dim() const noexcept;
+  [[nodiscard]] auto rot_dim() const noexcept -> uint32_t override;
 
   /** The bit length of an encoded vector element after compression by PQ. */
-  uint32_t pq_bits() const noexcept override;
+  [[nodiscard]] auto pq_bits() const noexcept -> uint32_t override;
 
   /** The dimensionality of an encoded vector after compression by PQ. */
-  uint32_t pq_dim() const noexcept override;
+  [[nodiscard]] auto pq_dim() const noexcept -> uint32_t override;
 
   /** Dimensionality of a subspace, i.e. the number of vector components mapped to a subspace */
-  uint32_t pq_len() const noexcept;
+  [[nodiscard]] auto pq_len() const noexcept -> uint32_t override;
 
   /** The number of vectors in a PQ codebook (`1 << pq_bits`). */
-  uint32_t pq_book_size() const noexcept;
+  [[nodiscard]] auto pq_book_size() const noexcept -> uint32_t override;
 
   /** Distance metric used for clustering. */
-  cuvs::distance::DistanceType metric() const noexcept override;
+  [[nodiscard]] auto metric() const noexcept -> cuvs::distance::DistanceType override;
 
   /** How PQ codebooks are created. */
-  codebook_gen codebook_kind() const noexcept override;
+  [[nodiscard]] auto codebook_kind() const noexcept -> codebook_gen override;
 
   /** Memory layout of PQ codes in IVF lists. */
-  list_layout codes_layout() const noexcept override;
+  [[nodiscard]] auto codes_layout() const noexcept -> list_layout override;
 
   /** Number of clusters/inverted lists (first level quantization). */
-  uint32_t n_lists() const noexcept;
+  [[nodiscard]] auto n_lists() const noexcept -> uint32_t override;
 
   /**
    * Whether to use convervative memory allocation when extending the list (cluster) data
    * (see index_params.conservative_memory_allocation).
    */
-  bool conservative_memory_allocation() const noexcept override;
+  [[nodiscard]] auto conservative_memory_allocation() const noexcept -> bool override;
 
   /**
    * PQ cluster centers
@@ -578,31 +583,33 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
    *   - codebook_gen::PER_SUBSPACE: [pq_dim , pq_len, pq_book_size]
    *   - codebook_gen::PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
    */
-  raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers()
-    const noexcept override;
+  [[nodiscard]] auto pq_centers() const noexcept
+    -> raft::device_mdspan<const float, pq_centers_extents, raft::row_major> override;
 
   /** Lists' data and indices (polymorphic, works for both FLAT and INTERLEAVED layouts). */
-  std::vector<std::shared_ptr<list_data_base<IdxT>>>& lists() noexcept override;
-  const std::vector<std::shared_ptr<list_data_base<IdxT>>>& lists() const noexcept override;
+  auto lists() noexcept -> std::vector<std::shared_ptr<list_data_base<IdxT>>>& override;
+  [[nodiscard]] auto lists() const noexcept
+    -> const std::vector<std::shared_ptr<list_data_base<IdxT>>>& override;
 
   /** Pointers to the inverted lists (clusters) data  [n_lists]. */
-  raft::device_vector_view<uint8_t*, uint32_t, raft::row_major> data_ptrs() noexcept override;
-  raft::device_vector_view<const uint8_t* const, uint32_t, raft::row_major> data_ptrs()
-    const noexcept override;
+  auto data_ptrs() noexcept
+    -> raft::device_vector_view<uint8_t*, uint32_t, raft::row_major> override;
+  [[nodiscard]] auto data_ptrs() const noexcept
+    -> raft::device_vector_view<const uint8_t* const, uint32_t, raft::row_major> override;
 
   /** Pointers to the inverted lists (clusters) indices  [n_lists]. */
-  raft::device_vector_view<IdxT*, uint32_t, raft::row_major> inds_ptrs() noexcept override;
-  raft::device_vector_view<const IdxT* const, uint32_t, raft::row_major> inds_ptrs()
-    const noexcept override;
+  auto inds_ptrs() noexcept -> raft::device_vector_view<IdxT*, uint32_t, raft::row_major> override;
+  [[nodiscard]] auto inds_ptrs() const noexcept
+    -> raft::device_vector_view<const IdxT* const, uint32_t, raft::row_major> override;
 
   /** The transform matrix (original space -> rotated padded space) [rot_dim, dim] */
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix()
-    const noexcept override;
+  [[nodiscard]] auto rotation_matrix() const noexcept
+    -> raft::device_matrix_view<const float, uint32_t, raft::row_major> override;
 
-  raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> rotation_matrix_int8(
-    const raft::resources& res) const override;
-  raft::device_matrix_view<const half, uint32_t, raft::row_major> rotation_matrix_half(
-    const raft::resources& res) const override;
+  [[nodiscard]] auto rotation_matrix_int8(const raft::resources& res) const
+    -> raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> override;
+  [[nodiscard]] auto rotation_matrix_half(const raft::resources& res) const
+    -> raft::device_matrix_view<const half, uint32_t, raft::row_major> override;
 
   /**
    * Accumulated list sizes, sorted in descending order [n_lists + 1].
@@ -613,27 +620,29 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
    *
    * This span is used during search to estimate the maximum size of the workspace.
    */
-  raft::host_vector_view<IdxT, uint32_t, raft::row_major> accum_sorted_sizes() noexcept override;
-  raft::host_vector_view<const IdxT, uint32_t, raft::row_major> accum_sorted_sizes()
-    const noexcept override;
+  auto accum_sorted_sizes() noexcept
+    -> raft::host_vector_view<IdxT, uint32_t, raft::row_major> override;
+  [[nodiscard]] auto accum_sorted_sizes() const noexcept
+    -> raft::host_vector_view<const IdxT, uint32_t, raft::row_major> override;
 
   /** Sizes of the lists [n_lists]. */
-  raft::device_vector_view<uint32_t, uint32_t, raft::row_major> list_sizes() noexcept override;
-  raft::device_vector_view<const uint32_t, uint32_t, raft::row_major> list_sizes()
-    const noexcept override;
+  auto list_sizes() noexcept
+    -> raft::device_vector_view<uint32_t, uint32_t, raft::row_major> override;
+  [[nodiscard]] auto list_sizes() const noexcept
+    -> raft::device_vector_view<const uint32_t, uint32_t, raft::row_major> override;
 
   /** Cluster centers corresponding to the lists in the original space [n_lists, dim_ext] */
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers()
-    const noexcept override;
+  [[nodiscard]] auto centers() const noexcept
+    -> raft::device_matrix_view<const float, uint32_t, raft::row_major> override;
 
-  raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> centers_int8(
-    const raft::resources& res) const override;
-  raft::device_matrix_view<const half, uint32_t, raft::row_major> centers_half(
-    const raft::resources& res) const override;
+  [[nodiscard]] auto centers_int8(const raft::resources& res) const
+    -> raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> override;
+  [[nodiscard]] auto centers_half(const raft::resources& res) const
+    -> raft::device_matrix_view<const half, uint32_t, raft::row_major> override;
 
   /** Cluster centers corresponding to the lists in the rotated space [n_lists, rot_dim] */
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot()
-    const noexcept override;
+  [[nodiscard]] auto centers_rot() const noexcept
+    -> raft::device_matrix_view<const float, uint32_t, raft::row_major> override;
 
   /** fetch size of a particular IVF list in bytes using the list extents.
    * Usage example:
@@ -651,7 +660,7 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
    *
    * @param[in] label list ID
    */
-  uint32_t get_list_size_in_bytes(uint32_t label) const override;
+  [[nodiscard]] auto get_list_size_in_bytes(uint32_t label) const -> uint32_t override;
 
   /**
    * @brief Construct index from implementation pointer.
@@ -662,10 +671,13 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
    */
   explicit index(std::unique_ptr<index_iface<IdxT>> impl);
 
-  static pq_centers_extents make_pq_centers_extents(
-    uint32_t dim, uint32_t pq_dim, uint32_t pq_bits, codebook_gen codebook_kind, uint32_t n_lists);
+  static auto make_pq_centers_extents(uint32_t dim,
+                                      uint32_t pq_dim,
+                                      uint32_t pq_bits,
+                                      codebook_gen codebook_kind,
+                                      uint32_t n_lists) -> pq_centers_extents;
 
-  static uint32_t calculate_pq_dim(uint32_t dim);
+  static auto calculate_pq_dim(uint32_t dim) -> uint32_t;
 
  private:
   std::unique_ptr<index_iface<IdxT>> impl_;

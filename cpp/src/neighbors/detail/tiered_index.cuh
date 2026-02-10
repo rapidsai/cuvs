@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -55,7 +55,10 @@ struct brute_force_storage {
     }
   }
 
-  size_t num_rows_available() const { return num_rows_allocated - num_rows_used; }
+  [[nodiscard]] auto num_rows_available() const -> size_t
+  {
+    return num_rows_allocated - num_rows_used;
+  }
 
   void append_vectors(const raft::resources& res,
                       raft::device_matrix_view<const T, int64_t, raft::row_major> new_vectors,
@@ -143,14 +146,14 @@ struct index_state {
     storage->append_vectors(res, dataset, metric);
   }
 
-  size_t dim() const { return storage->dim; }
-  size_t size() const { return storage->num_rows_used; }
+  [[nodiscard]] auto dim() const -> size_t { return storage->dim; }
+  [[nodiscard]] auto size() const -> size_t { return storage->num_rows_used; }
 
   // Number of rows inside the ann index
-  size_t ann_rows() const { return ann_index ? ann_index->size() : 0; }
+  [[nodiscard]] auto ann_rows() const -> size_t { return ann_index ? ann_index->size() : 0; }
 
   // Number of rows for bkfnn
-  size_t bfknn_rows() const { return storage->num_rows_used - ann_rows(); }
+  [[nodiscard]] auto bfknn_rows() const -> size_t { return storage->num_rows_used - ann_rows(); }
 
   void search(raft::resources const& res,
               const typename UpstreamT::search_params_type& search_params,

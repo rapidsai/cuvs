@@ -60,7 +60,7 @@ struct test_cagra_sample_filter {
  *
  * See https://en.wikipedia.org/wiki/Xorshift#xorshift for reference.
  */
-_RAFT_HOST_DEVICE inline uint64_t xorshift64(uint64_t u)
+_RAFT_HOST_DEVICE inline auto xorshift64(uint64_t u) -> uint64_t
 {
   u ^= u >> 12;
   u ^= u << 25;
@@ -230,7 +230,7 @@ void InitDataset(const raft::resources& handle,
         raft::make_const_mdspan(dataset_view),
         raft::make_const_mdspan(dev_row_norm.view()),
         dataset_view,
-        [normalized_norm] __device__(DataT elm, ComputeT norm) {
+        [normalized_norm] __device__(DataT elm, ComputeT norm) -> DataT {
           const ComputeT v           = elm / norm * normalized_norm;
           const ComputeT max_v_range = std::numeric_limits<DataT>::max();
           const ComputeT min_v_range = std::numeric_limits<DataT>::min();
@@ -278,7 +278,7 @@ struct AnnCagraInputs {
     cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL;
 };
 
-inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
+inline auto operator<<(::std::ostream& os, const AnnCagraInputs& p) -> ::std::ostream&
 {
   const auto metric_str = [](const cuvs::distance::DistanceType dist) -> std::string {
     switch (dist) {
@@ -303,9 +303,9 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
      << ", k=" << p.k << ", " << algo_name[p.algo] << ", max_queries=" << p.max_queries
      << ", itopk_size=" << p.itopk_size << ", search_width=" << p.search_width
      << ", metric=" << metric_str(p.metric) << ", " << (p.host_dataset ? "host" : "device")
-     << ", build_algo=" << build_algo.at((int)p.build_algo)
-     << ", merge_logic=" << merge_strategy.at((int)p.merge_strategy);
-  if ((int)p.build_algo == 0 && p.ivf_pq_search_refine_ratio) {
+     << ", build_algo=" << build_algo.at(static_cast<int>(p.build_algo))
+     << ", merge_logic=" << merge_strategy.at(static_cast<int>(p.merge_strategy));
+  if (static_cast<int>(p.build_algo) == 0 && p.ivf_pq_search_refine_ratio) {
     os << "(refine_rate=" << *p.ivf_pq_search_refine_ratio << ')';
   }
   if (p.compression.has_value()) {
@@ -334,14 +334,16 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
   {
     // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
-        ((!std::is_same_v<DataT, uint8_t>) || (ps.build_algo == graph_build_algo::IVF_PQ)))
+        ((!std::is_same_v<DataT, uint8_t>) || (ps.build_algo == graph_build_algo::IVF_PQ))) {
       GTEST_SKIP();
+    }
     // If the dataset dimension is small and the dataset size is large, there can be a lot of
     // dataset vectors that have the same distance to the query, especially in the binary Hamming
     // distance, making it impossible to make a top-k ground truth.
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
-        (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
+        (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows)) {
       GTEST_SKIP();
+    }
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.compression.has_value()) { GTEST_SKIP(); }
       if (ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH || ps.dim == 1) {
@@ -413,7 +415,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         search_params.team_size   = ps.team_size;
 
         auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
-          (const DataT*)database.data(), ps.n_rows, ps.dim);
+          reinterpret_cast<const DataT*>(database.data()), ps.n_rows, ps.dim);
 
         tmp_index_file index_file;
         {
@@ -493,7 +495,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
     }
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     search_queries.resize(ps.n_queries * ps.dim, stream_);
@@ -503,7 +505,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override
+  void TearDown() override  // NOLINT(readability-identifier-naming)
   {
     raft::resource::sync_stream(handle_);
     database.resize(0, stream_);
@@ -541,14 +543,16 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
     if (ps.compression != std::nullopt) GTEST_SKIP();
     // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
-        ((!std::is_same_v<DataT, uint8_t>) || (ps.build_algo == graph_build_algo::IVF_PQ)))
+        ((!std::is_same_v<DataT, uint8_t>) || (ps.build_algo == graph_build_algo::IVF_PQ))) {
       GTEST_SKIP();
+    }
     // If the dataset dimension is small and the dataset size is large, there can be a lot of
     // dataset vectors that have the same distance to the query, especially in the binary Hamming
     // distance, making it impossible to make a top-k ground truth.
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
-        (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
+        (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows)) {
       GTEST_SKIP();
+    }
 
     size_t queries_size = ps.n_queries * ps.k;
     std::vector<IdxT> indices_Cagra(queries_size);
@@ -618,7 +622,7 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
         const std::size_t initial_database_size = ps.n_rows * initial_dataset_ratio;
 
         auto initial_database_view = raft::make_device_matrix_view<const DataT, int64_t>(
-          (const DataT*)database.data(), initial_database_size, ps.dim);
+          reinterpret_cast<const DataT*>(database.data()), initial_database_size, ps.dim);
 
         std::optional<raft::host_matrix<DataT, int64_t>> database_host{std::nullopt};
         cagra::index<DataT, IdxT> index(handle_);
@@ -706,7 +710,7 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
     }
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     search_queries.resize(ps.n_queries * ps.dim, stream_);
@@ -716,7 +720,7 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override
+  void TearDown() override  // NOLINT(readability-identifier-naming)
   {
     raft::resource::sync_stream(handle_);
     database.resize(0, stream_);
@@ -753,14 +757,16 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
     }
     // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
-        ((!std::is_same_v<DataT, uint8_t>) || (ps.build_algo == graph_build_algo::IVF_PQ)))
+        ((!std::is_same_v<DataT, uint8_t>) || (ps.build_algo == graph_build_algo::IVF_PQ))) {
       GTEST_SKIP();
+    }
     // If the dataset dimension is small and the dataset size is large, there can be a lot of
     // dataset vectors that have the same distance to the query, especially in the binary Hamming
     // distance, making it impossible to make a top-k ground truth.
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
-        (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
+        (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows)) {
       GTEST_SKIP();
+    }
 
     size_t queries_size = ps.n_queries * ps.k;
     std::vector<IdxT> indices_Cagra(queries_size);
@@ -834,7 +840,7 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
         search_params.itopk_size  = ps.itopk_size;
 
         auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
-          (const DataT*)database.data(), ps.n_rows, ps.dim);
+          reinterpret_cast<const DataT*>(database.data()), ps.n_rows, ps.dim);
 
         std::optional<raft::host_matrix<DataT, int64_t>> database_host{std::nullopt};
         cagra::index<DataT, IdxT> index(handle_);
@@ -924,7 +930,7 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
     }
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     search_queries.resize(ps.n_queries * ps.dim, stream_);
@@ -934,7 +940,7 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override
+  void TearDown() override  // NOLINT(readability-identifier-naming)
   {
     raft::resource::sync_stream(handle_);
     database.resize(0, stream_);
@@ -972,14 +978,16 @@ class AnnCagraIndexFilteredMergeTest : public ::testing::TestWithParam<AnnCagraI
     if (ps.compression != std::nullopt) GTEST_SKIP();
     // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
-        ((!std::is_same_v<DataT, uint8_t>) || (ps.build_algo == graph_build_algo::IVF_PQ)))
+        ((!std::is_same_v<DataT, uint8_t>) || (ps.build_algo == graph_build_algo::IVF_PQ))) {
       GTEST_SKIP();
+    }
     // If the dataset dimension is small and the dataset size is large, there can be a lot of
     // dataset vectors that have the same distance to the query, especially in the binary Hamming
     // distance, making it impossible to make a top-k ground truth.
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
-        (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
+        (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows)) {
       GTEST_SKIP();
+    }
 
     // Avoid splitting datasets with a size of 0
     if (ps.n_rows <= 3) GTEST_SKIP();
@@ -1081,10 +1089,12 @@ class AnnCagraIndexFilteredMergeTest : public ::testing::TestWithParam<AnnCagraI
         const std::size_t database1_size = ps.n_rows - database0_size;
 
         auto database0_view = raft::make_device_matrix_view<const DataT, int64_t>(
-          (const DataT*)database.data(), database0_size, ps.dim);
+          reinterpret_cast<const DataT*>(database.data()), database0_size, ps.dim);
 
         auto database1_view = raft::make_device_matrix_view<const DataT, int64_t>(
-          (const DataT*)database.data() + database0_view.size(), database1_size, ps.dim);
+          reinterpret_cast<const DataT*>(database.data()) + database0_view.size(),
+          database1_size,
+          ps.dim);
 
         cagra::index<DataT, IdxT> index0(handle_, index_params.metric);
         cagra::index<DataT, IdxT> index1(handle_, index_params.metric);
@@ -1165,7 +1175,7 @@ class AnnCagraIndexFilteredMergeTest : public ::testing::TestWithParam<AnnCagraI
     }
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     search_queries.resize(ps.n_queries * ps.dim, stream_);
@@ -1175,7 +1185,7 @@ class AnnCagraIndexFilteredMergeTest : public ::testing::TestWithParam<AnnCagraI
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override
+  void TearDown() override  // NOLINT(readability-identifier-naming)
   {
     raft::resource::sync_stream(handle_);
     database.resize(0, stream_);
@@ -1213,14 +1223,16 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
     if (ps.compression != std::nullopt) GTEST_SKIP();
     // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
-        ((!std::is_same_v<DataT, uint8_t>) || (ps.build_algo == graph_build_algo::IVF_PQ)))
+        ((!std::is_same_v<DataT, uint8_t>) || (ps.build_algo == graph_build_algo::IVF_PQ))) {
       GTEST_SKIP();
+    }
     // If the dataset dimension is small and the dataset size is large, there can be a lot of
     // dataset vectors that have the same distance to the query, especially in the binary Hamming
     // distance, making it impossible to make a top-k ground truth.
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
-        (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
+        (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows)) {
       GTEST_SKIP();
+    }
 
     // Avoid splitting datasets with a size of 0
     if (ps.n_rows <= 3) GTEST_SKIP();
@@ -1291,10 +1303,12 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
         const std::size_t database1_size = ps.n_rows - database0_size;
 
         auto database0_view = raft::make_device_matrix_view<const DataT, int64_t>(
-          (const DataT*)database.data(), database0_size, ps.dim);
+          reinterpret_cast<const DataT*>(database.data()), database0_size, ps.dim);
 
         auto database1_view = raft::make_device_matrix_view<const DataT, int64_t>(
-          (const DataT*)database.data() + database0_view.size(), database1_size, ps.dim);
+          reinterpret_cast<const DataT*>(database.data()) + database0_view.size(),
+          database1_size,
+          ps.dim);
 
         cagra::index<DataT, IdxT> index0(handle_, index_params.metric);
         cagra::index<DataT, IdxT> index1(handle_, index_params.metric);
@@ -1376,7 +1390,7 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
     }
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     search_queries.resize(ps.n_queries * ps.dim, stream_);
@@ -1386,7 +1400,7 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override
+  void TearDown() override  // NOLINT(readability-identifier-naming)
   {
     raft::resource::sync_stream(handle_);
     database.resize(0, stream_);
@@ -1401,7 +1415,7 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
   rmm::device_uvector<DataT> search_queries;
 };
 
-inline std::vector<AnnCagraInputs> generate_inputs()
+inline auto generate_inputs() -> std::vector<AnnCagraInputs>
 {
   // TODO(tfeher): test MULTI_CTA kernel with search_width > 1 to allow multiple CTA per queries
   // Change graph dim, search algo and max_query parameter
@@ -1701,7 +1715,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
   return inputs;
 }
 
-inline std::vector<AnnCagraInputs> generate_addnode_inputs()
+inline auto generate_addnode_inputs() -> std::vector<AnnCagraInputs>
 {
   // changing dim
   std::vector<AnnCagraInputs> inputs =
@@ -1780,7 +1794,7 @@ inline std::vector<AnnCagraInputs> generate_addnode_inputs()
   return inputs;
 }
 
-inline std::vector<AnnCagraInputs> generate_filtering_inputs()
+inline auto generate_filtering_inputs() -> std::vector<AnnCagraInputs>
 {
   // Charge graph dim, search algo
   std::vector<AnnCagraInputs> inputs = raft::util::itertools::product<AnnCagraInputs>(

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -7,10 +7,10 @@
 
 #include "./detail/trustworthiness_score.cuh"
 
-namespace cuvs {
+namespace cuvs {  // NOLINT(modernize-concat-nested-namespaces)
 namespace stats {
 
-double trustworthiness_score(
+double trustworthiness_score(  // NOLINT(modernize-use-trailing-return-type)
   raft::resources const& handle,
   raft::device_matrix_view<const float, int64_t, raft::row_major> X,
   raft::device_matrix_view<const float, int64_t, raft::row_major> X_embedded,
@@ -21,7 +21,8 @@ double trustworthiness_score(
   RAFT_EXPECTS(X.extent(0) == X_embedded.extent(0), "Size mismatch between X and X_embedded");
   RAFT_EXPECTS(X.extent(0) <= std::numeric_limits<int>::max(), "Index type not supported");
 
-  // TODO: Change the underlying implementation to remove the need to const_cast X_embedded.
+  // TODO(cuvs): Change the underlying implementation to remove the need to const_cast X_embedded.  //
+  // NOLINT(google-readability-todo)
   return detail::trustworthiness_score<float>(handle,
                                               X.data_handle(),
                                               const_cast<float*>(X_embedded.data_handle()),

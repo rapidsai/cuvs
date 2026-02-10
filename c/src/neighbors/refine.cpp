@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -43,7 +43,7 @@ void _refine(bool on_device,
     auto candidates       = cuvs::core::from_dlpack<candidates_type>(candidates_tensor);
     auto indices          = cuvs::core::from_dlpack<indices_type>(indices_tensor);
     auto distances        = cuvs::core::from_dlpack<distances_type>(distances_tensor);
-    cuvs::neighbors::refine(*res_ptr, dataset, queries, candidates, indices, distances, static_cast<cuvs::distance::DistanceType>((int)metric));
+    cuvs::neighbors::refine(*res_ptr, dataset, queries, candidates, indices, distances, static_cast<cuvs::distance::DistanceType>(static_cast<int>(metric)));
   } else {
     using queries_type    = raft::host_matrix_view<const T, int64_t, raft::row_major>;
     using candidates_type = raft::host_matrix_view<const int64_t, int64_t, raft::row_major>;
@@ -54,18 +54,18 @@ void _refine(bool on_device,
     auto candidates       = cuvs::core::from_dlpack<candidates_type>(candidates_tensor);
     auto indices          = cuvs::core::from_dlpack<indices_type>(indices_tensor);
     auto distances        = cuvs::core::from_dlpack<distances_type>(distances_tensor);
-    cuvs::neighbors::refine(*res_ptr, dataset, queries, candidates, indices, distances, static_cast<cuvs::distance::DistanceType>((int)metric));
+    cuvs::neighbors::refine(*res_ptr, dataset, queries, candidates, indices, distances, static_cast<cuvs::distance::DistanceType>(static_cast<int>(metric)));
   }
 }
 }  // namespace
 
-extern "C" cuvsError_t cuvsRefine(cuvsResources_t res,
+extern "C" auto cuvsRefine(cuvsResources_t res,
                                   DLManagedTensor* dataset_tensor,
                                   DLManagedTensor* queries_tensor,
                                   DLManagedTensor* candidates_tensor,
                                   cuvsDistanceType metric,
                                   DLManagedTensor* indices_tensor,
-                                  DLManagedTensor* distances_tensor)
+                                  DLManagedTensor* distances_tensor) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset    = dataset_tensor->dl_tensor;

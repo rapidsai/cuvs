@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -158,7 +158,7 @@ struct index : cuvs::neighbors::index {
   /** \endcond */
 
   /** Construct an empty index. */
-  index(raft::resources const& res,
+  index(raft::resources const& res,  // NOLINT(google-explicit-constructor)
         cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
     : cuvs::neighbors::index(),
       metric_(metric),
@@ -171,6 +171,7 @@ struct index : cuvs::neighbors::index {
   /** Construct an index from dataset and vamana graph
    *
    */
+  // NOLINTNEXTLINE(readability-identifier-naming)
   template <typename data_accessor, typename graph_accessor>
   index(raft::resources const& res,
         cuvs::distance::DistanceType metric,

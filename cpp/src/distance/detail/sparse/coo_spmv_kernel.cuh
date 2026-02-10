@@ -13,11 +13,8 @@
 #include <cub/block/block_store.cuh>
 #include <cub/cub.cuh>
 
-namespace cuvs {
-namespace distance {
-namespace detail {
-namespace sparse {
-__device__ __inline__ unsigned int get_lowest_peer(unsigned int peer_group)
+namespace cuvs::distance::detail::sparse {
+__device__ __inline__ auto get_lowest_peer(unsigned int peer_group) -> unsigned int
 {
   return __ffs(peer_group) - 1;
 }
@@ -102,7 +99,7 @@ RAFT_KERNEL balanced_coo_generalized_spmv_kernel(strategy_t strategy,
                                                  accum_f accum_func,
                                                  write_f write_func)
 {
-  typedef cub::WarpReduce<value_t> warp_reduce;
+  using warp_reduce = cub::WarpReduce<value_t>;
 
   value_idx cur_row_a        = indptrA.get_row_idx(n_blocks_per_row);
   value_idx cur_chunk_offset = blockIdx.x % n_blocks_per_row;
@@ -214,7 +211,4 @@ RAFT_KERNEL balanced_coo_generalized_spmv_kernel(strategy_t strategy,
   }
 }
 
-}  // namespace sparse
-}  // namespace detail
-}  // namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance::detail::sparse

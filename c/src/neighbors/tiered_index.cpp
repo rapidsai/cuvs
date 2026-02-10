@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -27,7 +27,10 @@
 #include "ivf_pq.hpp"
 
 namespace {
-using namespace cuvs::neighbors;
+namespace tiered_index = cuvs::neighbors::tiered_index;
+namespace cagra        = cuvs::neighbors::cagra;
+namespace ivf_flat     = cuvs::neighbors::ivf_flat;
+namespace ivf_pq       = cuvs::neighbors::ivf_pq;
 
 template <typename T>
 void convert_c_index_params(cuvsTieredIndexParams params,
@@ -37,18 +40,18 @@ void convert_c_index_params(cuvsTieredIndexParams params,
 {
   out->min_ann_rows               = params.min_ann_rows;
   out->create_ann_index_on_extend = params.create_ann_index_on_extend;
-  out->metric                     = static_cast<cuvs::distance::DistanceType>((int)params.metric);
+  out->metric                     = static_cast<cuvs::distance::DistanceType>(static_cast<int>(params.metric));
 
   if constexpr (std::is_same_v<T, cagra::index_params>) {
-    if (params.cagra_params != NULL) {
+    if (params.cagra_params != nullptr) {
       cagra::convert_c_index_params(*params.cagra_params, n_rows, dim, out);
     }
   } else if constexpr (std::is_same_v<T, ivf_flat::index_params>) {
-    if (params.ivf_flat_params != NULL) {
+    if (params.ivf_flat_params != nullptr) {
       ivf_flat::convert_c_index_params(*params.ivf_flat_params, out);
     }
   } else if constexpr (std::is_same_v<T, ivf_pq::index_params>) {
-    if (params.ivf_pq_params != NULL) {
+    if (params.ivf_pq_params != nullptr) {
       ivf_pq::convert_c_index_params(*params.ivf_pq_params, out);
     }
   } else {
@@ -57,7 +60,7 @@ void convert_c_index_params(cuvsTieredIndexParams params,
 }
 
 template <typename T>
-void* _build(cuvsResources_t res, cuvsTieredIndexParams params, DLManagedTensor* dataset_tensor)
+auto _build(cuvsResources_t res, cuvsTieredIndexParams params, DLManagedTensor* dataset_tensor) -> void*
 {
   auto res_ptr      = reinterpret_cast<raft::resources*>(res);
   using mdspan_type = raft::device_matrix_view<const T, int64_t, raft::row_major>;
@@ -103,7 +106,7 @@ void _search(cuvsResources_t res,
   auto index_ptr = reinterpret_cast<tiered_index::index<UpstreamT>*>(index.addr);
 
   auto search_params = typename UpstreamT::search_params_type();
-  if (params != NULL) {
+  if (params != nullptr) {
     if constexpr (std::is_same_v<typename UpstreamT::search_params_type, cagra::search_params>) {
       auto c_params = reinterpret_cast<cuvsCagraSearchParams*>(params);
       cagra::convert_c_search_params(*c_params, &search_params);
@@ -206,12 +209,12 @@ void _merge(cuvsResources_t res,
 
 }  // namespace
 
-extern "C" cuvsError_t cuvsTieredIndexCreate(cuvsTieredIndex_t* index)
+extern "C" auto cuvsTieredIndexCreate(cuvsTieredIndex_t* index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { *index = new cuvsTieredIndex{}; });
 }
 
-extern "C" cuvsError_t cuvsTieredIndexDestroy(cuvsTieredIndex_t index_c_ptr)
+extern "C" auto cuvsTieredIndexDestroy(cuvsTieredIndex_t index_c_ptr) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto index = *index_c_ptr;
@@ -242,10 +245,10 @@ extern "C" cuvsError_t cuvsTieredIndexDestroy(cuvsTieredIndex_t index_c_ptr)
   });
 }
 
-extern "C" cuvsError_t cuvsTieredIndexBuild(cuvsResources_t res,
+extern "C" auto cuvsTieredIndexBuild(cuvsResources_t res,
                                             cuvsTieredIndexParams_t params,
                                             DLManagedTensor* dataset_tensor,
-                                            cuvsTieredIndex_t index)
+                                            cuvsTieredIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
@@ -261,13 +264,13 @@ extern "C" cuvsError_t cuvsTieredIndexBuild(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsTieredIndexSearch(cuvsResources_t res,
+extern "C" auto cuvsTieredIndexSearch(cuvsResources_t res,
                                              void* search_params,
                                              cuvsTieredIndex_t index_c_ptr,
                                              DLManagedTensor* queries_tensor,
                                              DLManagedTensor* neighbors_tensor,
                                              DLManagedTensor* distances_tensor,
-                                             cuvsFilter filter)
+                                             cuvsFilter filter) -> cuvsError_t
 
 {
   return cuvs::core::translate_exceptions([=] {
@@ -311,7 +314,7 @@ extern "C" cuvsError_t cuvsTieredIndexSearch(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsTieredIndexParamsCreate(cuvsTieredIndexParams_t* params)
+extern "C" auto cuvsTieredIndexParamsCreate(cuvsTieredIndexParams_t* params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     cuvs::neighbors::tiered_index::index_params<cagra::index_params> cpp_params;
@@ -323,14 +326,14 @@ extern "C" cuvsError_t cuvsTieredIndexParamsCreate(cuvsTieredIndexParams_t* para
   });
 }
 
-extern "C" cuvsError_t cuvsTieredIndexParamsDestroy(cuvsTieredIndexParams_t params)
+extern "C" auto cuvsTieredIndexParamsDestroy(cuvsTieredIndexParams_t params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
 }
 
-extern "C" cuvsError_t cuvsTieredIndexExtend(cuvsResources_t res,
+extern "C" auto cuvsTieredIndexExtend(cuvsResources_t res,
                                              DLManagedTensor* new_vectors,
-                                             cuvsTieredIndex_t index_c_ptr)
+                                             cuvsTieredIndex_t index_c_ptr) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto index = *index_c_ptr;
@@ -352,11 +355,11 @@ extern "C" cuvsError_t cuvsTieredIndexExtend(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsTieredIndexMerge(cuvsResources_t res,
+extern "C" auto cuvsTieredIndexMerge(cuvsResources_t res,
                                             cuvsTieredIndexParams_t params,
                                             cuvsTieredIndex_t* indices,
                                             size_t num_indices,
-                                            cuvsTieredIndex_t output_index)
+                                            cuvsTieredIndex_t output_index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     RAFT_EXPECTS(num_indices >= 1, "must have at least one index to merge");

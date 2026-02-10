@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -35,10 +35,11 @@ void to_file(const std::string& dataset_base_file, raft::host_matrix<T, int64_t>
   int size                   = static_cast<int>(dataset.extent(0));
   int dim                    = static_cast<int>(dataset.extent(1));
   dataset_of.seekp(dataset_file_offset, dataset_of.beg);
-  dataset_of.write((char*)&size, sizeof(int));
-  dataset_of.write((char*)&dim, sizeof(int));
+  dataset_of.write(reinterpret_cast<char*>(&size), sizeof(int));
+  dataset_of.write(reinterpret_cast<char*>(&dim), sizeof(int));
   for (int i = 0; i < size; i++) {
-    dataset_of.write((char*)(dataset.data_handle() + i * dataset.extent(1)), dim * sizeof(T));
+    dataset_of.write(reinterpret_cast<char*>(dataset.data_handle() + i * dataset.extent(1)),
+                     dim * sizeof(T));
   }
   dataset_of.close();
   if (!dataset_of) { RAFT_FAIL("Error writing output %s", dataset_base_file.c_str()); }
@@ -173,8 +174,9 @@ void serialize_sector_aligned(raft::resources const& res,
   std::unique_ptr<char[]> multisector_buf =
     std::make_unique<char[]>(raft::round_up_safe(max_node_len, sector_len));
   std::unique_ptr<char[]> node_buf = std::make_unique<char[]>(max_node_len);
-  IdxT& nnbrs                      = *(IdxT*)(node_buf.get() + ndims * sizeof(T));
-  IdxT* const nhood_buf            = (IdxT*)(node_buf.get() + (ndims * sizeof(T)) + sizeof(IdxT));
+  IdxT& nnbrs                      = *reinterpret_cast<IdxT*>(node_buf.get() + ndims * sizeof(T));
+  IdxT* const nhood_buf =
+    reinterpret_cast<IdxT*>(node_buf.get() + (ndims * sizeof(T)) + sizeof(IdxT));
 
   const uint64_t n_sectors = nnodes_per_sector > 0
                                ? raft::div_rounding_up_safe(npts, nnodes_per_sector)
@@ -201,23 +203,25 @@ void serialize_sector_aligned(raft::resources const& res,
   output_writer.seekp(0, output_writer.beg);
   const int metadata_size  = static_cast<int>(output_meta.size());
   const int metadata_ndims = 1;
-  output_writer.write((char*)&metadata_size, sizeof(int));
-  output_writer.write((char*)&metadata_ndims, sizeof(int));
-  output_writer.write((char*)output_meta.data(), sizeof(uint64_t) * output_meta.size());
+  output_writer.write(reinterpret_cast<const char*>(&metadata_size), sizeof(int));
+  output_writer.write(reinterpret_cast<const char*>(&metadata_ndims), sizeof(int));
+  output_writer.write(reinterpret_cast<char*>(output_meta.data()),
+                      sizeof(uint64_t) * output_meta.size());
   output_writer.seekp(sector_len, output_writer.beg);
 
   if (nnodes_per_sector > 0) {
     uint64_t cur_node_id = 0;
     // Write multiple nodes per sector
     for (uint64_t sector = 0; sector < n_sectors; sector++) {
-      if (sector && sector % 100000 == 0)
+      if (sector && sector % 100000 == 0) {
         std::cout << "Sector #" << sector << " written" << std::endl;
+      }
       memset(sector_buf.get(), 0, sector_len);
       for (uint64_t sector_node_id = 0; sector_node_id < nnodes_per_sector && cur_node_id < npts;
            sector_node_id++) {
         memset(node_buf.get(), 0, max_node_len);
         // copy node coords to buffer
-        memcpy(node_buf.get(), &h_data(cur_node_id, uint64_t(0)), ndims * sizeof(T));
+        memcpy(node_buf.get(), &h_data(cur_node_id, static_cast<uint64_t>(0)), ndims * sizeof(T));
 
         IdxT node_edges = 0;
         for (; node_edges < h_graph.extent(1); node_edges++) {
@@ -247,11 +251,13 @@ void serialize_sector_aligned(raft::resources const& res,
     // Write multi-sector nodes
     uint64_t nsectors_per_node = raft::div_rounding_up_safe(max_node_len, sector_len);
     for (uint64_t cur_node_id = 0; cur_node_id < npts; cur_node_id++) {
-      if (cur_node_id && (cur_node_id * nsectors_per_node) % 100000 == 0)
+      if (cur_node_id && (cur_node_id * nsectors_per_node) % 100000 == 0) {
         std::cout << "Sector #" << cur_node_id * nsectors_per_node << " written" << std::endl;
+      }
       memset(multisector_buf.get(), 0, nsectors_per_node * sector_len);
       // copy node coords to buffer
-      memcpy(multisector_buf.get(), &h_data(cur_node_id, uint64_t(0)), ndims * sizeof(T));
+      memcpy(
+        multisector_buf.get(), &h_data(cur_node_id, static_cast<uint64_t>(0)), ndims * sizeof(T));
 
       IdxT node_edges = 0;
       for (; node_edges < h_graph.extent(1); node_edges++) {
@@ -268,7 +274,7 @@ void serialize_sector_aligned(raft::resources const& res,
       memcpy(nhood_buf, &h_graph(cur_node_id, 0), nnbrs * sizeof(IdxT));
 
       // write nnbrs to buffer
-      *(IdxT*)(multisector_buf.get() + ndims * sizeof(T)) = nnbrs;
+      *reinterpret_cast<IdxT*>(multisector_buf.get() + ndims * sizeof(T)) = nnbrs;
 
       // copy neighbors to buffer
       memcpy(multisector_buf.get() + ndims * sizeof(T) + sizeof(IdxT),
@@ -344,14 +350,14 @@ void serialize(raft::resources const& res,
   index_of.seekp(file_offset, index_of.beg);
   uint32_t max_degree          = 0;
   size_t index_size            = 24;  // Starting metadata
-  uint32_t start               = static_cast<uint32_t>(index_.medoid());
+  auto start                   = static_cast<uint32_t>(index_.medoid());
   size_t num_frozen_points     = 0;
   uint32_t max_observed_degree = 0;
 
-  index_of.write((char*)&index_size, sizeof(uint64_t));
-  index_of.write((char*)&max_observed_degree, sizeof(uint32_t));
-  index_of.write((char*)&start, sizeof(uint32_t));
-  index_of.write((char*)&num_frozen_points, sizeof(size_t));
+  index_of.write(reinterpret_cast<char*>(&index_size), sizeof(uint64_t));
+  index_of.write(reinterpret_cast<char*>(&max_observed_degree), sizeof(uint32_t));
+  index_of.write(reinterpret_cast<char*>(&start), sizeof(uint32_t));
+  index_of.write(reinterpret_cast<char*>(&num_frozen_points), sizeof(size_t));
 
   size_t total_edges = 0;
   size_t num_sparse  = 0;
@@ -367,18 +373,18 @@ void serialize(raft::resources const& res,
     if (node_edges < 2) num_single++;
     total_edges += node_edges;
 
-    index_of.write((char*)&node_edges, sizeof(uint32_t));
+    index_of.write(reinterpret_cast<char*>(&node_edges), sizeof(uint32_t));
     if constexpr (!std::is_same_v<IdxT, uint32_t>) {
       RAFT_FAIL("serialization is only implemented for uint32_t graph");
     }
-    index_of.write((char*)&h_graph(i, 0), node_edges * sizeof(uint32_t));
+    index_of.write(reinterpret_cast<char*>(&h_graph(i, 0)), node_edges * sizeof(uint32_t));
 
-    max_degree = node_edges > max_degree ? (uint32_t)node_edges : max_degree;
-    index_size += (size_t)(sizeof(uint32_t) * (node_edges + 1));
+    max_degree = node_edges > max_degree ? node_edges : max_degree;
+    index_size += static_cast<size_t>(sizeof(uint32_t) * (node_edges + 1));
   }
   index_of.seekp(file_offset, index_of.beg);
-  index_of.write((char*)&index_size, sizeof(uint64_t));
-  index_of.write((char*)&max_degree, sizeof(uint32_t));
+  index_of.write(reinterpret_cast<char*>(&index_size), sizeof(uint64_t));
+  index_of.write(reinterpret_cast<char*>(&max_degree), sizeof(uint32_t));
 
   RAFT_LOG_DEBUG(
     "Wrote file out, index size:%lu, max_degree:%u, num_sparse:%ld, num_single:%ld, total "

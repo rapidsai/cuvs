@@ -1,15 +1,15 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
-// TODO: This shouldn't be calling RAFT detail APIs
+// TODO(snanditale): This shouldn't be calling RAFT detail APIs
 #include <raft/core/detail/macros.hpp>
 
 #include <cstdint>
 
-namespace cuvs::neighbors::cagra::detail {
+namespace cuvs::neighbors::cagra::detail {  // NOLINT(modernize-concat-nested-namespaces)
 namespace bitonic {
 
 namespace detail {
@@ -43,8 +43,8 @@ RAFT_DEVICE_INLINE_FUNCTION void swap_if_needed(K& k0,
 
 template <class K, class V, unsigned N, unsigned warp_size = 32>
 struct warp_merge_core {
-  RAFT_DEVICE_INLINE_FUNCTION void operator()(K k[N],
-                                              V v[N],
+  RAFT_DEVICE_INLINE_FUNCTION void operator()(K k[N],  // NOLINT(modernize-avoid-c-arrays)
+                                              V v[N],  // NOLINT(modernize-avoid-c-arrays)
                                               const std::uint32_t range,
                                               const bool asc)
   {
@@ -88,12 +88,12 @@ struct warp_merge_core {
 
 template <class K, class V, unsigned warp_size>
 struct warp_merge_core<K, V, 6, warp_size> {
-  RAFT_DEVICE_INLINE_FUNCTION void operator()(K k[6],
-                                              V v[6],
+  RAFT_DEVICE_INLINE_FUNCTION void operator()(K k[6],  // NOLINT(modernize-avoid-c-arrays)
+                                              V v[6],  // NOLINT(modernize-avoid-c-arrays)
                                               const std::uint32_t range,
                                               const bool asc)
   {
-    constexpr unsigned N = 6;
+    constexpr unsigned N = 6;  // NOLINT(readability-identifier-naming)
     const auto lane_id   = threadIdx.x % warp_size;
 
     if (range == 1) {
@@ -139,12 +139,12 @@ struct warp_merge_core<K, V, 6, warp_size> {
 
 template <class K, class V, unsigned warp_size>
 struct warp_merge_core<K, V, 3, warp_size> {
-  RAFT_DEVICE_INLINE_FUNCTION void operator()(K k[3],
-                                              V v[3],
+  RAFT_DEVICE_INLINE_FUNCTION void operator()(K k[3],  // NOLINT(modernize-avoid-c-arrays)
+                                              V v[3],  // NOLINT(modernize-avoid-c-arrays)
                                               const std::uint32_t range,
                                               const bool asc)
   {
-    constexpr unsigned N = 3;
+    constexpr unsigned N = 3;  // NOLINT(readability-identifier-naming)
     const auto lane_id   = threadIdx.x % warp_size;
 
     if (range == 1) {
@@ -172,12 +172,12 @@ struct warp_merge_core<K, V, 3, warp_size> {
 
 template <class K, class V, unsigned warp_size>
 struct warp_merge_core<K, V, 2, warp_size> {
-  RAFT_DEVICE_INLINE_FUNCTION void operator()(K k[2],
-                                              V v[2],
+  RAFT_DEVICE_INLINE_FUNCTION void operator()(K k[2],  // NOLINT(modernize-avoid-c-arrays)
+                                              V v[2],  // NOLINT(modernize-avoid-c-arrays)
                                               const std::uint32_t range,
                                               const bool asc)
   {
-    constexpr unsigned N = 2;
+    constexpr unsigned N = 2;  // NOLINT(readability-identifier-naming)
     const auto lane_id   = threadIdx.x % warp_size;
 
     if (range == 1) {
@@ -201,8 +201,8 @@ struct warp_merge_core<K, V, 2, warp_size> {
 
 template <class K, class V, unsigned warp_size>
 struct warp_merge_core<K, V, 1, warp_size> {
-  RAFT_DEVICE_INLINE_FUNCTION void operator()(K k[1],
-                                              V v[1],
+  RAFT_DEVICE_INLINE_FUNCTION void operator()(K k[1],  // NOLINT(modernize-avoid-c-arrays)
+                                              V v[1],  // NOLINT(modernize-avoid-c-arrays)
                                               const std::uint32_t range,
                                               const bool asc)
   {
@@ -218,13 +218,15 @@ struct warp_merge_core<K, V, 1, warp_size> {
 }  // namespace detail
 
 template <class K, class V, unsigned N, unsigned warp_size = 32>
-RAFT_DEVICE_INLINE_FUNCTION void warp_merge(K k[N], V v[N], unsigned range, const bool asc = true)
+RAFT_DEVICE_INLINE_FUNCTION void warp_merge(
+  K k[N], V v[N], unsigned range, const bool asc = true)  // NOLINT(modernize-avoid-c-arrays)
 {
   detail::warp_merge_core<K, V, N, warp_size>{}(k, v, range, asc);
 }
 
 template <class K, class V, unsigned N, unsigned warp_size = 32>
-RAFT_DEVICE_INLINE_FUNCTION void warp_sort(K k[N], V v[N], const bool asc = true)
+RAFT_DEVICE_INLINE_FUNCTION void warp_sort(
+  K k[N], V v[N], const bool asc = true)  // NOLINT(modernize-avoid-c-arrays)
 {
 #pragma unroll
   for (std::uint32_t range = 1; range <= warp_size; range <<= 1) {

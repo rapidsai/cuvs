@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -30,7 +30,7 @@
 #include <thrust/sort.h>
 #include <thrust/tuple.h>
 
-#include <limits.h>
+#include <climits>
 
 #include <cstdint>
 
@@ -77,8 +77,8 @@ void sample_landmarks(raft::resources const& handle,
                                          R_1nn_cols2.data(),
                                          index.get_R_1nn_cols().data_handle(),
                                          R_1nn_ones.data(),
-                                         (value_idx)index.n_landmarks,
-                                         (value_idx)index.m);
+                                         static_cast<value_idx>(index.n_landmarks),
+                                         static_cast<value_idx>(index.m));
 
   auto x = index.get_X();
   auto r = index.get_R();
@@ -115,11 +115,12 @@ void construct_landmark_1nn(raft::resources const& handle,
                R_1nn_inds.data_handle() + index.m,
                std::numeric_limits<value_idx>::max());
 
-  raft::linalg::map_offset(handle, R_1nn_inds.view(), [R_knn_inds_ptr, k] __device__(value_idx i) {
-    return R_knn_inds_ptr[i * k];
-  });
   raft::linalg::map_offset(
-    handle, index.get_R_1nn_dists(), [R_knn_dists_ptr, k] __device__(value_idx i) {
+    handle, R_1nn_inds.view(), [R_knn_inds_ptr, k] __device__(value_idx i) -> value_idx {
+      return R_knn_inds_ptr[i * k];
+    });
+  raft::linalg::map_offset(
+    handle, index.get_R_1nn_dists(), [R_knn_dists_ptr, k] __device__(value_idx i) -> value_t {
       return R_knn_dists_ptr[i * k];
     });
 
@@ -196,11 +197,12 @@ void compute_landmark_radii(raft::resources const& handle,
 {
   const value_idx* R_indptr_ptr  = index.get_R_indptr().data_handle();
   const value_t* R_1nn_dists_ptr = index.get_R_1nn_dists().data_handle();
-  raft::linalg::map_offset(
-    handle, index.get_R_radius(), [R_indptr_ptr, R_1nn_dists_ptr] __device__(value_idx input) {
-      value_idx last_row_idx = R_indptr_ptr[input + 1] - 1;
-      return R_1nn_dists_ptr[last_row_idx];
-    });
+  raft::linalg::map_offset(handle,
+                           index.get_R_radius(),
+                           [R_indptr_ptr, R_1nn_dists_ptr] __device__(value_idx input) -> value_t {
+                             value_idx last_row_idx = R_indptr_ptr[input + 1] - 1;
+                             return R_1nn_dists_ptr[last_row_idx];
+                           });
 }
 
 /**

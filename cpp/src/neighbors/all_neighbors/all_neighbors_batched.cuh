@@ -26,7 +26,7 @@
 #include <variant>
 
 namespace cuvs::neighbors::all_neighbors::detail {
-using namespace cuvs::neighbors;
+using cuvs::neighbors::dataset;
 
 template <typename T, typename IdxT>
 void reset_global_matrices(raft::resources const& res,
@@ -273,10 +273,12 @@ void get_min_max_cluster_size(size_t k,
   size_t n_clusters = cluster_sizes.extent(0);
   max_cluster_size  = static_cast<size_t>(
     *std::max_element(cluster_sizes.data_handle(), cluster_sizes.data_handle() + n_clusters));
-  min_cluster_size = static_cast<size_t>(*std::min_element(
-    cluster_sizes.data_handle(), cluster_sizes.data_handle() + n_clusters, [k](size_t a, size_t b) {
-      return (a > k && (b <= k || a < b));  // Compare only elements larger than k
-    }));
+  min_cluster_size = static_cast<size_t>(
+    *std::min_element(cluster_sizes.data_handle(),
+                      cluster_sizes.data_handle() + n_clusters,
+                      [k](size_t a, size_t b) -> auto {
+                        return (a > k && (b <= k || a < b));  // Compare only elements larger than k
+                      }));
 }
 
 template <typename T, typename IdxT>
@@ -412,7 +414,7 @@ void multi_gpu_batch_build(const raft::resources& handle,
     get_min_max_cluster_size(k, max_cluster_size, min_cluster_size, cluster_sizes_for_this_rank);
 
     std::optional<raft::device_vector<T, IdxT>> core_distances_d_for_rank;
-    auto dist_epilgogue_for_rank = [&]() {
+    auto dist_epilgogue_for_rank = [&]() -> auto {
       if constexpr (mutual_reach_dist) {
         core_distances_d_for_rank.emplace(raft::make_device_vector<T, IdxT>(dev_res, num_rows));
         raft::copy(core_distances_d_for_rank.value().data_handle(),
@@ -553,7 +555,7 @@ void batch_build(
 
     if (needs_workaround) {
       RAFT_LOG_DEBUG("Applying managed memory workaround for pre-Ampere GPU architecture");
-      cudaMemLocation cpu_location = {cudaMemLocationTypeHost, 0};
+      cudaMemLocation cpu_location = {.type = cudaMemLocationTypeHost, .id = 0};
       RAFT_CUDA_TRY(cudaMemAdvise(global_neighbors.data_handle(),
                                   num_rows * k * sizeof(IdxT),
                                   cudaMemAdviseSetPreferredLocation,

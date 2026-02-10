@@ -1,6 +1,6 @@
 
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -42,12 +42,12 @@ void _pairwise_distance(cuvsResources_t res,
 }
 }  // namespace
 
-extern "C" cuvsError_t cuvsPairwiseDistance(cuvsResources_t res,
+extern "C" auto cuvsPairwiseDistance(cuvsResources_t res,
                                             DLManagedTensor* x_tensor,
                                             DLManagedTensor* y_tensor,
                                             DLManagedTensor* distances_tensor,
                                             cuvsDistanceType metric,
-                                            float metric_arg)
+                                            float metric_arg) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto x_dt    = x_tensor->dl_tensor.dtype;

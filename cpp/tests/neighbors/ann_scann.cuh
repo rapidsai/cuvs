@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -166,7 +166,7 @@ auto map(const std::vector<A>& xs, F f) -> std::vector<B>
 
 inline auto with_dims(const std::vector<uint32_t>& dims) -> test_cases_t
 {
-  return map<scann_inputs>(dims, [](uint32_t d) {
+  return map<scann_inputs>(dims, [](uint32_t d) -> scann_inputs {
     scann_inputs x;
     x.dim = d;
     return x;

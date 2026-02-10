@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -106,7 +106,7 @@ void cuvs_cagra_diskann<T, IdxT>::save(const std::string& file) const
   index_of.seekp(file_offset, index_of.beg);
   uint32_t max_degree = 0;
   size_t index_size   = 24;
-  uint32_t start = static_cast<uint32_t>(rand() % (cagra_build_.get_index()->graph().extent(0)));
+  auto start = static_cast<uint32_t>(rand() % (cagra_build_.get_index()->graph().extent(0)));
   size_t num_frozen_points     = 0;
   uint32_t max_observed_degree = 0;
 

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -109,7 +109,7 @@ struct encode_vectors {
       }
       if (d < min_dist) {
         min_dist = d;
-        code     = uint8_t(l);
+        code     = static_cast<uint8_t>(l);
       }
     }
     // reduce among threads

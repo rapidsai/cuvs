@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -73,7 +73,7 @@ template <bool useNorms,
           typename BaseClass = raft::linalg::Contractions_NT<DataT, IdxT, Policy, isRowMajor>>
 struct MaskedDistances : public BaseClass {
  private:
-  typedef Policy P;
+  using P = Policy;
   const DataT* xn;
   const DataT* yn;
   const DataT* const yBase;
@@ -210,7 +210,7 @@ struct MaskedDistances : public BaseClass {
   }
 
  private:
-  DI uint64_t get_block_adjacency(const uint64_t* adj, IdxT tile_idx_m, IdxT idx_group)
+  DI auto get_block_adjacency(const uint64_t* adj, IdxT tile_idx_m, IdxT idx_group) -> uint64_t
   {
     // A single element of `adj` contains exactly enough bits to indicate which
     // rows in the current tile to skip and which to compute.
@@ -221,7 +221,7 @@ struct MaskedDistances : public BaseClass {
     return adj[block_flag_idx * this->num_groups + idx_group];
   }
 
-  DI uint32_t compute_thread_adjacency(const uint64_t block_adj)
+  DI auto compute_thread_adjacency(const uint64_t block_adj) -> uint32_t
   {
     // thread_adj is a bitfield that contains a 1 at location i iff we must
     // compute row i of acc (the accumulator register tile). It is described in
@@ -284,7 +284,7 @@ struct MaskedDistances : public BaseClass {
                      DataT (&regxn)[P::AccRowsPerTh],
                      DataT (&regyn)[P::AccColsPerTh])
   {
-    DataT* sxNorm = (DataT*)(&smem[P::SmemSize]);
+    auto* sxNorm  = reinterpret_cast<DataT*>((&smem[P::SmemSize]));
     DataT* syNorm = (&sxNorm[P::Mblk]);
 
     // Load x & y norms required by this threadblock in shmem buffer

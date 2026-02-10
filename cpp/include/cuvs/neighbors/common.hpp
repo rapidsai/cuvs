@@ -119,7 +119,7 @@ struct search_params {};
  * This enum is declared separately to avoid namespace pollution when including common.hpp.
  * It provides a generic merge strategy that can be used across different index types.
  */
-enum class MergeStrategy {
+enum class MergeStrategy {  // NOLINT(readability-identifier-naming)
   /** Merge indices physically by combining their data structures */
   MERGE_STRATEGY_PHYSICAL = 0,
   /** Merge indices logically by creating a composite wrapper */
@@ -130,7 +130,7 @@ enum class MergeStrategy {
 struct merge_params {
   virtual ~merge_params() = default;
 
-  virtual MergeStrategy strategy() const = 0;
+  [[nodiscard]] virtual auto strategy() const -> MergeStrategy = 0;
 };
 
 /** @} */  // end group neighbors_index
@@ -225,7 +225,8 @@ struct is_strided_dataset<owning_dataset<DataT, IdxT, LayoutPolicy, ContainerPol
   : std::true_type {};
 
 template <typename DatasetT>
-inline constexpr bool is_strided_dataset_v = is_strided_dataset<DatasetT>::value;
+inline constexpr bool is_strided_dataset_v =  // NOLINT(readability-identifier-naming)
+  is_strided_dataset<DatasetT>::value;
 
 /**
  * @brief Contstruct a strided matrix from any mdarray or mdspan.
@@ -490,7 +491,8 @@ template <typename MathT, typename IdxT>
 struct is_vpq_dataset<vpq_dataset<MathT, IdxT>> : std::true_type {};
 
 template <typename DatasetT>
-inline constexpr bool is_vpq_dataset_v = is_vpq_dataset<DatasetT>::value;
+inline constexpr bool is_vpq_dataset_v =  // NOLINT(readability-identifier-naming)
+  is_vpq_dataset<DatasetT>::value;
 
 namespace filtering {
 
@@ -499,31 +501,33 @@ namespace filtering {
  * @{
  */
 
-enum class FilterType { None, Bitmap, Bitset };
+// NOLINTNEXTLINE(readability-identifier-naming)
+enum class FilterType { None, Bitmap, Bitset };  // NOLINT(readability-identifier-naming)
 
 struct base_filter {
-  ~base_filter()                             = default;
-  virtual FilterType get_filter_type() const = 0;
+  ~base_filter() = default;
+  // NOLINTNEXTLINE(modernize-use-trailing-return-type)
+  [[nodiscard]] virtual FilterType get_filter_type() const = 0;
 };
 
 /* A filter that filters nothing. This is the default behavior. */
 struct none_sample_filter : public base_filter {
   /** \cond */
-  constexpr __forceinline__ _RAFT_HOST_DEVICE bool operator()(
+  constexpr __forceinline__ _RAFT_HOST_DEVICE auto operator()(
     // query index
     const uint32_t query_ix,
     // the current inverted list index
     const uint32_t cluster_ix,
     // the index of the current sample inside the current inverted list
-    const uint32_t sample_ix) const;
+    const uint32_t sample_ix) const -> bool;
 
-  constexpr __forceinline__ _RAFT_HOST_DEVICE bool operator()(
+  constexpr __forceinline__ _RAFT_HOST_DEVICE auto operator()(
     // query index
     const uint32_t query_ix,
     // the index of the current sample
-    const uint32_t sample_ix) const;
+    const uint32_t sample_ix) const -> bool;
   /** \endcond */
-  FilterType get_filter_type() const override { return FilterType::None; }
+  [[nodiscard]] auto get_filter_type() const -> FilterType override { return FilterType::None; }
 };
 
 /**
@@ -534,10 +538,10 @@ struct none_sample_filter : public base_filter {
  * @tparam index_t Indexing type
  * @tparam filter_t
  */
-template <typename index_t, typename filter_t>
+template <typename index_t, typename filter_t>  // NOLINT(readability-identifier-naming)
 struct ivf_to_sample_filter : public base_filter {
-  const index_t* const* inds_ptrs_;
-  const filter_t next_filter_;
+  const index_t* const* inds_ptrs_;  // NOLINT(readability-identifier-naming)
+  const filter_t next_filter_;       // NOLINT(readability-identifier-naming)
 
   ivf_to_sample_filter(const index_t* const* inds_ptrs, const filter_t next_filter);
 
@@ -546,15 +550,18 @@ struct ivf_to_sample_filter : public base_filter {
    * If the original filter takes two arguments, then we are using `inds_ptr_` to obtain the sample
    * index.
    */
-  inline _RAFT_HOST_DEVICE bool operator()(
+  inline _RAFT_HOST_DEVICE auto operator()(
     // query index
     const uint32_t query_ix,
     // the current inverted list index
     const uint32_t cluster_ix,
     // the index of the current sample inside the current inverted list
-    const uint32_t sample_ix) const;
+    const uint32_t sample_ix) const -> bool;
 
-  FilterType get_filter_type() const override { return next_filter_.get_filter_type(); }
+  [[nodiscard]] auto get_filter_type() const -> FilterType override
+  {
+    return next_filter_.get_filter_type();
+  }
   /** \endcond */
 };
 
@@ -564,27 +571,27 @@ struct ivf_to_sample_filter : public base_filter {
  * @tparam bitmap_t Data type of the bitmap
  * @tparam index_t Indexing type
  */
-template <typename bitmap_t, typename index_t>
+template <typename bitmap_t, typename index_t>  // NOLINT(readability-identifier-naming)
 struct bitmap_filter : public base_filter {
   using view_t = cuvs::core::bitmap_view<bitmap_t, index_t>;
 
   // View of the bitset to use as a filter
-  const view_t bitmap_view_;
+  const view_t bitmap_view_;  // NOLINT(readability-identifier-naming)
 
-  bitmap_filter(const view_t bitmap_for_filtering);
+  bitmap_filter(const view_t bitmap_for_filtering);  // NOLINT(google-explicit-constructor)
   /** \cond */
-  inline _RAFT_HOST_DEVICE bool operator()(
+  inline _RAFT_HOST_DEVICE auto operator()(
     // query index
     const uint32_t query_ix,
     // the index of the current sample
-    const uint32_t sample_ix) const;
+    const uint32_t sample_ix) const -> bool;
   /** \endcond */
 
-  FilterType get_filter_type() const override { return FilterType::Bitmap; }
+  [[nodiscard]] auto get_filter_type() const -> FilterType override { return FilterType::Bitmap; }
 
-  view_t view() const { return bitmap_view_; }
+  [[nodiscard]] auto view() const -> view_t { return bitmap_view_; }
 
-  template <typename csr_matrix_t>
+  template <typename csr_matrix_t>  // NOLINT(readability-identifier-naming)
   void to_csr(raft::resources const& handle, csr_matrix_t& csr);
 };
 
@@ -594,27 +601,28 @@ struct bitmap_filter : public base_filter {
  * @tparam bitset_t Data type of the bitset
  * @tparam index_t Indexing type
  */
-template <typename bitset_t, typename index_t>
+template <typename bitset_t, typename index_t>  // NOLINT(readability-identifier-naming)
 struct bitset_filter : public base_filter {
   using view_t = cuvs::core::bitset_view<bitset_t, index_t>;
 
   // View of the bitset to use as a filter
-  const view_t bitset_view_;
+  const view_t bitset_view_;  // NOLINT(readability-identifier-naming)
 
   /** \cond */
-  _RAFT_HOST_DEVICE bitset_filter(const view_t bitset_for_filtering);
-  constexpr __forceinline__ _RAFT_HOST_DEVICE bool operator()(
+  _RAFT_HOST_DEVICE bitset_filter(  // NOLINT(google-explicit-constructor)
+    const view_t bitset_for_filtering);
+  constexpr __forceinline__ _RAFT_HOST_DEVICE auto operator()(
     // query index
     const uint32_t query_ix,
     // the index of the current sample
-    const uint32_t sample_ix) const;
+    const uint32_t sample_ix) const -> bool;
   /** \endcond */
 
-  FilterType get_filter_type() const override { return FilterType::Bitset; }
+  [[nodiscard]] auto get_filter_type() const -> FilterType override { return FilterType::Bitset; }
 
-  view_t view() const { return bitset_view_; }
+  [[nodiscard]] auto view() const -> view_t { return bitset_view_; }
 
-  template <typename csr_matrix_t>
+  template <typename csr_matrix_t>  // NOLINT(readability-identifier-naming)
   void to_csr(raft::resources const& handle, csr_matrix_t& csr);
 };
 
@@ -730,24 +738,24 @@ struct list_base {
   virtual ~list_base() = default;
 
   /** Get the raw data pointer. */
-  virtual value_type* data_ptr() noexcept             = 0;
-  virtual const value_type* data_ptr() const noexcept = 0;
+  virtual auto data_ptr() noexcept -> value_type*                           = 0;
+  [[nodiscard]] virtual auto data_ptr() const noexcept -> const value_type* = 0;
 
   /** Get the indices pointer. */
-  virtual index_type* indices_ptr() noexcept             = 0;
-  virtual const index_type* indices_ptr() const noexcept = 0;
+  virtual auto indices_ptr() noexcept -> index_type*                           = 0;
+  [[nodiscard]] virtual auto indices_ptr() const noexcept -> const index_type* = 0;
 
   /** Get the current size (number of records). */
-  virtual size_type get_size() const noexcept = 0;
+  [[nodiscard]] virtual auto get_size() const noexcept -> size_type = 0;
 
   /** Set the current size (number of records). */
   virtual void set_size(size_type new_size) noexcept = 0;
 
   /** Get the total size of the data array in bytes. */
-  virtual size_t data_byte_size() const noexcept = 0;
+  [[nodiscard]] virtual auto data_byte_size() const noexcept -> size_t = 0;
 
   /** Get the capacity (number of indices that can be stored). */
-  virtual size_type indices_capacity() const noexcept = 0;
+  [[nodiscard]] virtual auto indices_capacity() const noexcept -> size_type = 0;
 };
 
 /** The data for a single IVF list. */
@@ -773,17 +781,29 @@ struct list : public list_base<typename SpecT<SizeT, SpecExtraArgs...>::value_ty
   /** Allocate a new list capable of holding at least `n_rows` data records and indices. */
   list(raft::resources const& res, const spec_type& spec, size_type n_rows);
 
-  value_type* data_ptr() noexcept override { return data.data_handle(); }
-  const value_type* data_ptr() const noexcept override { return data.data_handle(); }
+  auto data_ptr() noexcept -> value_type* override { return data.data_handle(); }
+  [[nodiscard]] auto data_ptr() const noexcept -> const value_type* override
+  {
+    return data.data_handle();
+  }
 
-  index_type* indices_ptr() noexcept override { return indices.data_handle(); }
-  const index_type* indices_ptr() const noexcept override { return indices.data_handle(); }
+  auto indices_ptr() noexcept -> index_type* override { return indices.data_handle(); }
+  [[nodiscard]] auto indices_ptr() const noexcept -> const index_type* override
+  {
+    return indices.data_handle();
+  }
 
-  size_type get_size() const noexcept override { return size.load(); }
+  [[nodiscard]] auto get_size() const noexcept -> size_type override { return size.load(); }
   void set_size(size_type new_size) noexcept override { size.store(new_size); }
 
-  size_t data_byte_size() const noexcept override { return data.size() * sizeof(value_type); }
-  size_type indices_capacity() const noexcept override { return indices.extent(0); }
+  [[nodiscard]] auto data_byte_size() const noexcept -> size_t override
+  {
+    return data.size() * sizeof(value_type);
+  }
+  [[nodiscard]] auto indices_capacity() const noexcept -> size_type override
+  {
+    return indices.extent(0);
+  }
 };
 
 template <typename ListT, class T = void>
@@ -830,39 +850,41 @@ void resize_list(raft::resources const& res,
  *       to obtain the typed pointer first.
  */
 template <typename ListT>
-enable_if_valid_list_t<ListT> serialize_list(
-  const raft::resources& handle,
-  std::ostream& os,
-  const ListT& ld,
-  const typename ListT::spec_type& store_spec,
-  std::optional<typename ListT::size_type> size_override = std::nullopt);
+auto serialize_list(const raft::resources& handle,
+                    std::ostream& os,
+                    const ListT& ld,
+                    const typename ListT::spec_type& store_spec,
+                    std::optional<typename ListT::size_type> size_override = std::nullopt)
+  -> enable_if_valid_list_t<ListT>;
 
 template <typename ListT>
-enable_if_valid_list_t<ListT> serialize_list(
-  const raft::resources& handle,
-  std::ostream& os,
-  const std::shared_ptr<ListT>& ld,
-  const typename ListT::spec_type& store_spec,
-  std::optional<typename ListT::size_type> size_override = std::nullopt);
+auto serialize_list(const raft::resources& handle,
+                    std::ostream& os,
+                    const std::shared_ptr<ListT>& ld,
+                    const typename ListT::spec_type& store_spec,
+                    std::optional<typename ListT::size_type> size_override = std::nullopt)
+  -> enable_if_valid_list_t<ListT>;
 
 template <typename ListT>
-enable_if_valid_list_t<ListT> deserialize_list(const raft::resources& handle,
-                                               std::istream& is,
-                                               std::shared_ptr<ListT>& ld,
-                                               const typename ListT::spec_type& store_spec,
-                                               const typename ListT::spec_type& device_spec);
+auto deserialize_list(const raft::resources& handle,
+                      std::istream& is,
+                      std::shared_ptr<ListT>& ld,
+                      const typename ListT::spec_type& store_spec,
+                      const typename ListT::spec_type& device_spec)
+  -> enable_if_valid_list_t<ListT>;
 }  // namespace ivf
 
-using namespace raft;
+using namespace raft;  // NOLINT(google-build-using-namespace,google-global-names-in-headers)
 
 template <typename AnnIndexType, typename T, typename IdxT>
 struct iface {
-  iface() : mutex_(std::make_shared<std::mutex>()) {}
+  iface() = default;
 
-  const IdxT size() const { return index_.value().size(); }
+  [[nodiscard]] auto size() const -> const IdxT { return index_.value().size(); }
 
-  std::optional<AnnIndexType> index_;
-  std::shared_ptr<std::mutex> mutex_;
+  std::optional<AnnIndexType> index_;  // NOLINT(readability-identifier-naming)
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  std::shared_ptr<std::mutex> mutex_ = std::make_shared<std::mutex>();
 };
 
 template <typename AnnIndexType, typename T, typename IdxT, typename Accessor>
@@ -879,6 +901,7 @@ void extend(
   std::optional<raft::mdspan<const IdxT, vector_extent<int64_t>, layout_c_contiguous, Accessor2>>
     new_indices);
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 template <typename AnnIndexType, typename T, typename IdxT, typename searchIdxT>
 void search(const raft::resources& handle,
             const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
@@ -937,9 +960,12 @@ enum sharded_merge_mode {
 /// \ingroup mg_cpp_index_params
 template <typename Upstream>
 struct mg_index_params : public Upstream {
-  mg_index_params() : mode(SHARDED) {}
+  mg_index_params() = default;
 
-  mg_index_params(const Upstream& sp) : Upstream(sp), mode(SHARDED) {}
+  mg_index_params(const Upstream& sp)  // NOLINT(google-explicit-constructor)
+    : Upstream(sp)
+  {
+  }
 
   /** Distribution mode */
   cuvs::neighbors::distribution_mode mode = SHARDED;
@@ -949,10 +975,10 @@ struct mg_index_params : public Upstream {
 /// \ingroup mg_cpp_search_params
 template <typename Upstream>
 struct mg_search_params : public Upstream {
-  mg_search_params() : search_mode(LOAD_BALANCER), merge_mode(TREE_MERGE) {}
+  mg_search_params() = default;
 
-  mg_search_params(const Upstream& sp)
-    : Upstream(sp), search_mode(LOAD_BALANCER), merge_mode(TREE_MERGE)
+  mg_search_params(const Upstream& sp)  // NOLINT(google-explicit-constructor)
+    : Upstream(sp)
   {
   }
 
@@ -974,12 +1000,14 @@ struct mg_index {
   auto operator=(const mg_index&) -> mg_index& = delete;
   auto operator=(mg_index&&) -> mg_index&      = default;
 
-  distribution_mode mode_;
-  int num_ranks_;
-  std::vector<iface<AnnIndexType, T, IdxT>> ann_interfaces_;
+  distribution_mode mode_;  // NOLINT(readability-identifier-naming)
+  int num_ranks_;           // NOLINT(readability-identifier-naming)
+  std::vector<iface<AnnIndexType, T, IdxT>>
+    ann_interfaces_;  // NOLINT(readability-identifier-naming)
 
   // for load balancing mechanism
-  std::shared_ptr<std::atomic<int64_t>> round_robin_counter_;
+  std::shared_ptr<std::atomic<int64_t>>
+    round_robin_counter_;  // NOLINT(readability-identifier-naming)
 };
 
 }  // namespace cuvs::neighbors

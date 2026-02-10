@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,20 +9,30 @@
 
 namespace cuvs::neighbors::all_neighbors {
 
-typedef AllNeighborsTest<float, float> AllNeighborsTestF;
-TEST_P(AllNeighborsTestF, AllNeighbors) { this->run(); }
+using AllNeighborsTestF = AllNeighborsTest<float, float>;  // NOLINT(readability-identifier-naming)
+TEST_P(AllNeighborsTestF, AllNeighbors)
+{
+  this->run();
+}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(AllNeighborsSingleTest,
-                        AllNeighborsTestF,
-                        ::testing::ValuesIn(inputsSingle));
+INSTANTIATE_TEST_CASE_P(
+  AllNeighborsSingleTest,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  AllNeighborsTestF,
+  ::testing::ValuesIn(inputsSingle));
 
-INSTANTIATE_TEST_CASE_P(AllNeighborsBatchTest, AllNeighborsTestF, ::testing::ValuesIn(inputsBatch));
+INSTANTIATE_TEST_CASE_P(
+  AllNeighborsBatchTest,
+  AllNeighborsTestF,
+  ::testing::ValuesIn(
+    inputsBatch));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(AllNeighborsSingleMutualTest,
-                        AllNeighborsTestF,
-                        ::testing::ValuesIn(mutualReachSingle));
+INSTANTIATE_TEST_CASE_P(
+  AllNeighborsSingleMutualTest,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  AllNeighborsTestF,
+  ::testing::ValuesIn(mutualReachSingle));
 
-INSTANTIATE_TEST_CASE_P(AllNeighborsBatchMutualTest,
-                        AllNeighborsTestF,
-                        ::testing::ValuesIn(mutualReachBatch));
+INSTANTIATE_TEST_CASE_P(
+  AllNeighborsBatchMutualTest,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  AllNeighborsTestF,
+  ::testing::ValuesIn(mutualReachBatch));
 }  // namespace cuvs::neighbors::all_neighbors

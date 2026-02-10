@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -16,9 +16,10 @@ namespace graph_build_params = cuvs::neighbors::graph_build_params;
  * @{
  */
 
-using GraphBuildParams = std::variant<graph_build_params::ivf_pq_params,
-                                      graph_build_params::nn_descent_params,
-                                      graph_build_params::brute_force_params>;
+using GraphBuildParams =  // NOLINT(readability-identifier-naming)
+  std::variant<graph_build_params::ivf_pq_params,
+               graph_build_params::nn_descent_params,
+               graph_build_params::brute_force_params>;
 
 /**
  * @brief Parameters used to build an all-neighbors graph (find nearest neighbors for all the

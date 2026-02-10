@@ -1,10 +1,10 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
-// TODO: This shouldn't be invoking anything from detail outside of neighbors namespace
+// TODO(snanditale): This shouldn't be invoking anything from detail outside of neighbors namespace
 #include <raft/core/detail/macros.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/host_mdarray.hpp>
@@ -21,124 +21,124 @@
 
 namespace cuvs::neighbors::cagra::detail {
 namespace utils {
-template <class DATA_T>
-inline cudaDataType_t get_cuda_data_type();
+template <class DATA_T>  // NOLINT(readability-identifier-naming)
+inline auto get_cuda_data_type() -> cudaDataType_t;
 template <>
-inline cudaDataType_t get_cuda_data_type<float>()
+inline auto get_cuda_data_type<float>() -> cudaDataType_t
 {
   return CUDA_R_32F;
 }
 template <>
-inline cudaDataType_t get_cuda_data_type<half>()
+inline auto get_cuda_data_type<half>() -> cudaDataType_t
 {
   return CUDA_R_16F;
 }
 template <>
-inline cudaDataType_t get_cuda_data_type<int8_t>()
+inline auto get_cuda_data_type<int8_t>() -> cudaDataType_t
 {
   return CUDA_R_8I;
 }
 template <>
-inline cudaDataType_t get_cuda_data_type<uint8_t>()
+inline auto get_cuda_data_type<uint8_t>() -> cudaDataType_t
 {
   return CUDA_R_8U;
 }
 template <>
-inline cudaDataType_t get_cuda_data_type<uint32_t>()
+inline auto get_cuda_data_type<uint32_t>() -> cudaDataType_t
 {
   return CUDA_R_32U;
 }
 template <>
-inline cudaDataType_t get_cuda_data_type<uint64_t>()
+inline auto get_cuda_data_type<uint64_t>() -> cudaDataType_t
 {
   return CUDA_R_64U;
 }
 
 template <class T>
-constexpr unsigned size_of();
+constexpr auto size_of() -> unsigned;
 template <>
-_RAFT_HOST_DEVICE constexpr unsigned size_of<std::int8_t>()
+_RAFT_HOST_DEVICE constexpr auto size_of<std::int8_t>() -> unsigned
 {
   return 1;
 }
 template <>
-_RAFT_HOST_DEVICE constexpr unsigned size_of<std::uint8_t>()
+_RAFT_HOST_DEVICE constexpr auto size_of<std::uint8_t>() -> unsigned
 {
   return 1;
 }
 template <>
-_RAFT_HOST_DEVICE constexpr unsigned size_of<std::uint16_t>()
+_RAFT_HOST_DEVICE constexpr auto size_of<std::uint16_t>() -> unsigned
 {
   return 2;
 }
 template <>
-_RAFT_HOST_DEVICE constexpr unsigned size_of<std::uint32_t>()
+_RAFT_HOST_DEVICE constexpr auto size_of<std::uint32_t>() -> unsigned
 {
   return 4;
 }
 template <>
-_RAFT_HOST_DEVICE constexpr unsigned size_of<std::uint64_t>()
+_RAFT_HOST_DEVICE constexpr auto size_of<std::uint64_t>() -> unsigned
 {
   return 8;
 }
 template <>
-_RAFT_HOST_DEVICE constexpr unsigned size_of<uint4>()
+_RAFT_HOST_DEVICE constexpr auto size_of<uint4>() -> unsigned
 {
   return 16;
 }
 template <>
-_RAFT_HOST_DEVICE constexpr unsigned size_of<ulonglong4>()
+_RAFT_HOST_DEVICE constexpr auto size_of<ulonglong4>() -> unsigned
 {
   return 32;
 }
 template <>
-_RAFT_HOST_DEVICE constexpr unsigned size_of<float>()
+_RAFT_HOST_DEVICE constexpr auto size_of<float>() -> unsigned
 {
   return 4;
 }
 template <>
-_RAFT_HOST_DEVICE constexpr unsigned size_of<half>()
+_RAFT_HOST_DEVICE constexpr auto size_of<half>() -> unsigned
 {
   return 2;
 }
 template <>
-_RAFT_HOST_DEVICE constexpr unsigned size_of<half2>()
+_RAFT_HOST_DEVICE constexpr auto size_of<half2>() -> unsigned
 {
   return 4;
 }
 
 // max values for data types
-template <class BS_T, class FP_T>
+template <class BS_T, class FP_T>  // NOLINT(readability-identifier-naming)
 union fp_conv {
   BS_T bs;
   FP_T fp;
 };
 template <class T>
-_RAFT_HOST_DEVICE constexpr inline T get_max_value();
+_RAFT_HOST_DEVICE constexpr inline auto get_max_value() -> T;
 template <>
-_RAFT_HOST_DEVICE constexpr inline float get_max_value<float>()
+_RAFT_HOST_DEVICE constexpr inline auto get_max_value<float>() -> float
 {
   return FLT_MAX;
 };
 template <>
-_RAFT_HOST_DEVICE constexpr inline half get_max_value<half>()
+_RAFT_HOST_DEVICE constexpr inline auto get_max_value<half>() -> half
 {
   return fp_conv<std::uint16_t, half>{.bs = 0x7aff}.fp;
 };
 template <>
-_RAFT_HOST_DEVICE constexpr inline std::uint32_t get_max_value<std::uint32_t>()
+_RAFT_HOST_DEVICE constexpr inline auto get_max_value<std::uint32_t>() -> std::uint32_t
 {
   return 0xffffffffu;
 };
 template <>
-_RAFT_HOST_DEVICE constexpr inline std::uint64_t get_max_value<std::uint64_t>()
+_RAFT_HOST_DEVICE constexpr inline auto get_max_value<std::uint64_t>() -> std::uint64_t
 {
   return 0xfffffffffffffffflu;
 };
 
 template <int A, int B, class = void>
 struct constexpr_max {
-  static const int value = A;
+  static const int value = A;  // NOLINT(readability-identifier-naming)
 };
 
 template <int A, int B>
@@ -148,7 +148,9 @@ struct constexpr_max<A, B, std::enable_if_t<(B > A), bool>> {
 
 template <class IdxT>
 struct gen_index_msb_1_mask {
-  static constexpr IdxT value = static_cast<IdxT>(1) << (utils::size_of<IdxT>() * 8 - 1);
+  static constexpr IdxT value = static_cast<IdxT>(1)
+                                << (utils::size_of<IdxT>() * 8 -
+                                    1);  // NOLINT(readability-identifier-naming)
 };
 }  // namespace utils
 
@@ -199,21 +201,21 @@ class device_matrix_view_from_host {
     if (!allocated_memory()) { raft::resource::sync_stream(res_); }
   }
 
-  raft::device_matrix_view<T, IdxT> view()
+  raft::device_matrix_view<T, IdxT> view()  // NOLINT(modernize-use-trailing-return-type)
   {
     return raft::make_device_matrix_view<T, IdxT>(
       device_ptr, host_view_.extent(0), host_view_.extent(1));
   }
 
-  T* data_handle() { return device_ptr; }
+  auto data_handle() -> T* { return device_ptr; }
 
-  [[nodiscard]] bool allocated_memory() const { return device_mem_.has_value(); }
+  [[nodiscard]] auto allocated_memory() const -> bool { return device_mem_.has_value(); }
 
  private:
   const raft::resources& res_;
   std::optional<raft::device_matrix<T, IdxT>> device_mem_;
   raft::host_matrix_view<T, IdxT> host_view_;
-  T* device_ptr;
+  T* device_ptr;  // NOLINT(readability-identifier-naming)
 };
 
 /**
@@ -249,24 +251,24 @@ class host_matrix_view_from_device {
     }
   }
 
-  raft::host_matrix_view<T, IdxT> view()
+  raft::host_matrix_view<T, IdxT> view()  // NOLINT(modernize-use-trailing-return-type)
   {
     return raft::make_host_matrix_view<T, IdxT>(
       host_ptr, device_view_.extent(0), device_view_.extent(1));
   }
 
-  T* data_handle() { return host_ptr; }
+  auto data_handle() -> T* { return host_ptr; }
 
-  bool allocated_memory() const { return host_mem_.has_value(); }
+  [[nodiscard]] auto allocated_memory() const -> bool { return host_mem_.has_value(); }
 
  private:
   std::optional<raft::host_matrix<T, IdxT>> host_mem_;
   raft::device_matrix_view<T, IdxT> device_view_;
-  T* host_ptr;
+  T* host_ptr;  // NOLINT(readability-identifier-naming)
 };
 
 // Copy matrix src to dst. pad rows with 0 if necessary to make them 16 byte aligned.
-template <typename T, typename data_accessor>
+template <typename T, typename data_accessor>  // NOLINT(readability-identifier-naming)
 void copy_with_padding(
   raft::resources const& res,
   raft::device_matrix<T, int64_t, raft::row_major>& dst,

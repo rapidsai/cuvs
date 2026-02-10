@@ -1,7 +1,7 @@
 // clang-format off
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2017 - 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0 AND BSD-3-Clause
  */
 // clang-format on
@@ -47,9 +47,7 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-namespace cuvs {
-namespace gemm {
-namespace kernel {
+namespace cuvs::gemm::kernel {
 
 // TODO (cjnolet): We shouldn't be doing `using namespace` in this file.
 using namespace cutlass::gemm::kernel;
@@ -128,15 +126,14 @@ struct FusedDistanceNNGemm {
   // we keep this same layout even for column major inputs
   using LayoutOutput = cutlass::layout::RowMajor;
 
-  typedef typename std::conditional<isRowMajor,
-                                    cutlass::layout::RowMajor,
-                                    cutlass::layout::ColumnMajor>::type NormXLayout;
+  using NormXLayout =
+    std::conditional_t<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>;
 
-  typedef typename std::
-    conditional<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>::type LayoutA_;
+  using LayoutA_ =
+    std::conditional_t<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>;
 
-  typedef typename std::
-    conditional<isRowMajor, cutlass::layout::ColumnMajor, cutlass::layout::RowMajor>::type LayoutB_;
+  using LayoutB_ =
+    std::conditional_t<isRowMajor, cutlass::layout::ColumnMajor, cutlass::layout::RowMajor>;
 
   using GemmBase = typename DefaultGemmUniversal<ElementA_,
                                                  LayoutA_,
@@ -242,15 +239,14 @@ struct FusedDistanceNNGemm<float,  /// Element type for A matrix operand
   // we keep this same layout even for column major inputs
   using LayoutOutput = cutlass::layout::RowMajor;
 
-  typedef typename std::conditional<isRowMajor,
-                                    cutlass::layout::RowMajor,
-                                    cutlass::layout::ColumnMajor>::type NormXLayout;
+  using NormXLayout =
+    std::conditional_t<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>;
 
-  typedef typename std::
-    conditional<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>::type LayoutA_;
+  using LayoutA_ =
+    std::conditional_t<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>;
 
-  typedef typename std::
-    conditional<isRowMajor, cutlass::layout::ColumnMajor, cutlass::layout::RowMajor>::type LayoutB_;
+  using LayoutB_ =
+    std::conditional_t<isRowMajor, cutlass::layout::ColumnMajor, cutlass::layout::RowMajor>;
 
   using GemmBase = typename DefaultGemmUniversal<ElementA_,
                                                  LayoutA_,
@@ -346,15 +342,14 @@ struct FusedDistanceNNGemm<double,
   // we keep this same layout even for column major inputs
   using LayoutOutput = cutlass::layout::RowMajor;
 
-  typedef typename std::conditional<isRowMajor,
-                                    cutlass::layout::RowMajor,
-                                    cutlass::layout::ColumnMajor>::type NormXLayout;
+  using NormXLayout =
+    std::conditional_t<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>;
 
-  typedef typename std::
-    conditional<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>::type LayoutA_;
+  using LayoutA_ =
+    std::conditional_t<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>;
 
-  typedef typename std::
-    conditional<isRowMajor, cutlass::layout::ColumnMajor, cutlass::layout::RowMajor>::type LayoutB_;
+  using LayoutB_ =
+    std::conditional_t<isRowMajor, cutlass::layout::ColumnMajor, cutlass::layout::RowMajor>;
 
   using GemmBase = typename DefaultGemmUniversal<double,
                                                  LayoutA_,
@@ -398,6 +393,4 @@ struct FusedDistanceNNGemm<double,
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-}  // namespace kernel
-}  // namespace gemm
-}  // namespace cuvs
+}  // namespace cuvs::gemm::kernel

@@ -28,10 +28,7 @@
 CUCO_DECLARE_BITWISE_COMPARABLE(float);
 CUCO_DECLARE_BITWISE_COMPARABLE(double);
 
-namespace cuvs {
-namespace distance {
-namespace detail {
-namespace sparse {
+namespace cuvs::distance::detail::sparse {
 
 template <typename value_idx, typename value_t, int tpb>
 class hash_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
@@ -50,9 +47,9 @@ class hash_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
                                         cuco::op::insert_tag,
                                         cuco::op::find_tag>;
 
-  hash_strategy(const distances_config_t<value_idx, value_t>& config_,
-                float capacity_threshold_ = 0.5,
-                int map_size_             = get_map_size())
+  explicit hash_strategy(const distances_config_t<value_idx, value_t>& config_,
+                         float capacity_threshold_ = 0.5,
+                         int map_size_             = get_map_size())
     : coo_spmv_strategy<value_idx, value_t, tpb>(config_),
       capacity_threshold(capacity_threshold_),
       map_size(map_size_)
@@ -232,7 +229,7 @@ class hash_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
     }
   }
 
-  __device__ inline map_type init_map(void* storage, const value_idx& cache_size)
+  __device__ inline auto init_map(void* storage, const value_idx& cache_size) -> map_type
   {
     auto map_ref =
       map_type{cuco::empty_key<value_idx>{empty_key_sentinel},
@@ -255,7 +252,7 @@ class hash_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
   // Note: init_find is now merged with init_map since the new API uses the same ref for both
   // operations
 
-  __device__ inline value_t find(map_type& map_ref, const value_idx& key)
+  __device__ inline auto find(map_type& map_ref, const value_idx& key) -> value_t
   {
     auto a_pair = map_ref.find(key);
 
@@ -271,7 +268,7 @@ class hash_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
     {
     }
 
-    __host__ __device__ bool operator()(const value_idx& i)
+    __host__ __device__ auto operator()(const value_idx& i) -> bool
     {
       auto degree = indptr[i + 1] - indptr[i];
 
@@ -283,7 +280,7 @@ class hash_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
     const value_idx degree_l, degree_r;
   };
 
-  inline static int get_map_size()
+  inline static auto get_map_size() -> int
   {
     return (raft::getSharedMemPerBlock() - ((tpb / raft::warp_size()) * sizeof(value_t))) /
            sizeof(cuco::pair<value_idx, value_t>);
@@ -294,7 +291,4 @@ class hash_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
   int map_size;
 };
 
-}  // namespace sparse
-}  // namespace detail
-}  // namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance::detail::sparse

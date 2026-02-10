@@ -74,7 +74,7 @@ auto train_pq_subspaces(
     raft::linalg::map_offset(
       res,
       pq_trainset.view(),
-      [labels = vq_labels.view(), vq_centers, dim] __device__(ix_t off, MathT x) {
+      [labels = vq_labels.view(), vq_centers, dim] __device__(ix_t off, MathT x) -> MathT {
         ix_t i = off / dim;
         ix_t j = off % dim;
         return x - vq_centers(labels(i), j);
@@ -121,10 +121,11 @@ auto train_pq_subspaces(
 }
 
 template <typename DataT, typename MathT, typename AccessorType>
-quantizer<MathT> build(
+auto build(
   raft::resources const& res,
   const cuvs::preprocessing::quantize::pq::params params,
   raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, AccessorType> dataset)
+  -> quantizer<MathT>
 {
   auto n_rows = dataset.extent(0);
   auto dim    = dataset.extent(1);
@@ -266,7 +267,7 @@ auto reconstruct_vectors(
   constexpr IdxT kBlockSize  = 256;
   const IdxT threads_per_vec = std::min<IdxT>(raft::WarpSize, pq_n_centers);
   dim3 threads(kBlockSize, 1, 1);
-  auto kernel = [](uint32_t pq_bits) {
+  auto kernel = [](uint32_t pq_bits) -> auto {
     if (pq_bits == 4) {
       return reconstruct_vectors_kernel<kBlockSize, 16, uint8_t, DataT, MathT, IdxT, LabelT>;
     } else if (pq_bits <= 8) {

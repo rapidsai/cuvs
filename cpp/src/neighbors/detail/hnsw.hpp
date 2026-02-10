@@ -20,6 +20,7 @@
 #include <hnswlib/hnswalg.h>
 #include <hnswlib/hnswlib.h>
 
+#include <array>
 #include <fcntl.h>
 #include <filesystem>
 #include <fstream>
@@ -92,7 +93,7 @@ struct index_impl : index<T> {
   /**
   @brief Get hnswlib index
   */
-  auto get_index() const -> void const* override { return appr_alg_.get(); }
+  [[nodiscard]] auto get_index() const -> void const* override { return appr_alg_.get(); }
 
   /**
   @brief Set ef for search
@@ -114,7 +115,7 @@ struct index_impl : index<T> {
   /**
   @brief Get space
    */
-  auto get_space() const -> hnswlib::SpaceInterface<typename hnsw_dist_t<T>::type>*
+  [[nodiscard]] auto get_space() const -> hnswlib::SpaceInterface<typename hnsw_dist_t<T>::type>*
   {
     return space_.get();
   }
@@ -127,7 +128,7 @@ struct index_impl : index<T> {
   /**
   @brief Get file descriptor
    */
-  auto file_descriptor() const -> const std::optional<cuvs::util::file_descriptor>&
+  [[nodiscard]] auto file_descriptor() const -> const std::optional<cuvs::util::file_descriptor>&
   {
     return hnsw_fd_;
   }
@@ -135,7 +136,7 @@ struct index_impl : index<T> {
   /**
   @brief Get file path for disk-backed index
    */
-  std::string file_path() const override
+  [[nodiscard]] auto file_path() const -> std::string override
   {
     if (hnsw_fd_.has_value() && hnsw_fd_->is_valid()) { return hnsw_fd_->get_path(); }
     return "";
@@ -182,11 +183,11 @@ struct index_impl : index<T> {
 };
 
 template <typename T, HnswHierarchy hierarchy>
-std::enable_if_t<hierarchy == HnswHierarchy::NONE, std::unique_ptr<index<T>>> from_cagra(
-  raft::resources const& res,
-  const index_params& params,
-  const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,
-  std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
+auto from_cagra(raft::resources const& res,
+                const index_params& params,
+                const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,
+                std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
+  -> std::enable_if_t<hierarchy == HnswHierarchy::NONE, std::unique_ptr<index<T>>>
 {
   common::nvtx::range<common::nvtx::domain::cuvs> fun_scope("hnsw::from_cagra<NONE>");
   std::random_device dev;
@@ -210,11 +211,11 @@ std::enable_if_t<hierarchy == HnswHierarchy::NONE, std::unique_ptr<index<T>>> fr
 }
 
 template <typename T, HnswHierarchy hierarchy>
-std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> from_cagra(
-  raft::resources const& res,
-  const index_params& params,
-  const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,
-  std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
+auto from_cagra(raft::resources const& res,
+                const index_params& params,
+                const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,
+                std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
+  -> std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>>
 {
   common::nvtx::range<common::nvtx::domain::cuvs> fun_scope("hnsw::from_cagra<CPU>");
   auto host_dataset = raft::make_host_matrix<T, int64_t>(0, 0);
@@ -281,7 +282,7 @@ std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> fro
     auto hnsw_internal_id = appr_algo->label_lookup_.find(i)->second;
     auto ll_i             = appr_algo->get_linklist0(hnsw_internal_id);
     appr_algo->setListCount(ll_i, host_graph_view.extent(1));
-    auto* data = (uint32_t*)(ll_i + 1);
+    auto* data = reinterpret_cast<uint32_t*>(ll_i + 1);
     for (size_t j = 0; j < static_cast<size_t>(host_graph_view.extent(1)); ++j) {
       auto neighbor_internal_id = appr_algo->label_lookup_.find(host_graph(i, j))->second;
       data[j]                   = neighbor_internal_id;
@@ -293,10 +294,10 @@ std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> fro
 }
 
 template <typename T, typename DistT>
-int initialize_point_in_hnsw(hnswlib::HierarchicalNSW<DistT>* appr_algo,
-                             raft::host_matrix_view<const T, int64_t, raft::row_major> dataset,
-                             int64_t real_index,
-                             int32_t curlevel)
+auto initialize_point_in_hnsw(hnswlib::HierarchicalNSW<DistT>* appr_algo,
+                              raft::host_matrix_view<const T, int64_t, raft::row_major> dataset,
+                              int64_t real_index,
+                              int32_t curlevel) -> int
 {
   auto cur_c                        = appr_algo->cur_element_count++;
   appr_algo->element_levels_[cur_c] = curlevel;
@@ -312,9 +313,11 @@ int initialize_point_in_hnsw(hnswlib::HierarchicalNSW<DistT>* appr_algo,
          appr_algo->data_size_);
 
   if (curlevel) {
-    appr_algo->linkLists_[cur_c] = (char*)malloc(appr_algo->size_links_per_element_ * curlevel + 1);
-    if (appr_algo->linkLists_[cur_c] == nullptr)
+    appr_algo->linkLists_[cur_c] =
+      static_cast<char*>(malloc(appr_algo->size_links_per_element_ * curlevel + 1));
+    if (appr_algo->linkLists_[cur_c] == nullptr) {
       throw std::runtime_error("Not enough memory: addPoint failed to allocate linklist");
+    }
     memset(appr_algo->linkLists_[cur_c], 0, appr_algo->size_links_per_element_ * curlevel + 1);
   }
   return cur_c;
@@ -336,7 +339,7 @@ void all_neighbors_graph(raft::resources const& res,
     nn_params.return_distances          = false;
     auto nn_index                       = nn_descent::build(res, nn_params, dataset, neighbors);
   } else {
-    // TODO: choose parameters to minimize memory consumption
+    // TODO(cuvs): choose parameters to minimize memory consumption
     cagra::graph_build_params::ivf_pq_params ivfpq_params(dataset.extents(), metric);
     cagra::build_knn_graph(res, dataset, neighbors, ivfpq_params);
   }
@@ -464,7 +467,7 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
                "Label elements (%zu) != index size (%zu)",
                label_n_elements,
                static_cast<size_t>(n_rows));
-  RAFT_EXPECTS(graph_n_cols == static_cast<size_t>(graph_degree_int),
+  RAFT_EXPECTS(std::cmp_equal(graph_n_cols, graph_degree_int),
                "Graph cols (%zu) != graph degree (%d)",
                graph_n_cols,
                graph_degree_int);
@@ -516,8 +519,9 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
     RAFT_LOG_INFO("Sort points by levels");
     for (int64_t i = 0; i < n_rows; i++) {
       auto pt_level = appr_algo->getRandomLevel(appr_algo->mult_);
-      while (pt_level >= static_cast<int32_t>(hist.size()))
+      while (pt_level >= static_cast<int32_t>(hist.size())) {
         hist.push_back(0);
+      }
       hist[pt_level]++;
       levels[i] = pt_level;
     }
@@ -556,7 +560,7 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
   // offset_level_0
   os.write(reinterpret_cast<char*>(&appr_algo->offsetLevel0_), sizeof(std::size_t));
   // 8 max_element - override with n_rows
-  size_t num_elements = (size_t)n_rows;
+  auto num_elements = static_cast<size_t>(n_rows);
   os.write(reinterpret_cast<char*>(&num_elements), sizeof(std::size_t));
   // 16 curr_element_count - override with n_rows
   os.write(reinterpret_cast<char*>(&num_elements), sizeof(std::size_t));
@@ -595,14 +599,14 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
 
   RAFT_LOG_INFO("Writing base level");
   size_t bytes_written = 0;
-  float GiB            = 1 << 30;
+  float gib            = 1 << 30;
   IdxT zero            = 0;
   RAFT_EXPECTS(appr_algo->size_data_per_element_ ==
                  dim * sizeof(T) + appr_algo->maxM0_ * sizeof(IdxT) + sizeof(int) + sizeof(size_t),
                "Size data per element mismatch");
 
   // Helper lambda for parallel reading of batches
-  auto read_batch = [&](int64_t start_row, int64_t rows_to_read) {
+  auto read_batch = [&](int64_t start_row, int64_t rows_to_read) -> void {
     const size_t graph_bytes   = rows_to_read * graph_degree_int * sizeof(IdxT);
     const size_t dataset_bytes = rows_to_read * dim * sizeof(T);
     const size_t label_bytes   = rows_to_read * sizeof(uint32_t);
@@ -624,7 +628,7 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
 #pragma omp section
       {
         ssize_t bytes_read = pread(graph_fd, graph_buffer.data_handle(), graph_bytes, graph_offset);
-        RAFT_EXPECTS(bytes_read == static_cast<ssize_t>(graph_bytes),
+        RAFT_EXPECTS(std::cmp_equal(bytes_read, graph_bytes),
                      "Failed to read graph data: expected %zu, got %zd",
                      graph_bytes,
                      bytes_read);
@@ -633,7 +637,7 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
       {
         ssize_t bytes_read =
           pread(dataset_fd, dataset_buffer.data_handle(), dataset_bytes, dataset_offset);
-        RAFT_EXPECTS(bytes_read == static_cast<ssize_t>(dataset_bytes),
+        RAFT_EXPECTS(std::cmp_equal(bytes_read, dataset_bytes),
                      "Failed to read dataset data: expected %zu, got %zd",
                      dataset_bytes,
                      bytes_read);
@@ -641,7 +645,7 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
 #pragma omp section
       {
         ssize_t bytes_read = pread(label_fd, label_buffer.data_handle(), label_bytes, label_offset);
-        RAFT_EXPECTS(bytes_read == static_cast<ssize_t>(label_bytes),
+        RAFT_EXPECTS(std::cmp_equal(bytes_read, label_bytes),
                      "Failed to read label data: expected %zu, got %zd",
                      label_bytes,
                      bytes_read);
@@ -711,9 +715,9 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
         const auto time =
           std::chrono::duration_cast<std::chrono::microseconds>(end_clock - start_clock).count() *
           1e-6;
-        float throughput      = bytes_written / GiB / time;
+        float throughput      = bytes_written / gib / time;
         float rows_throughput = i / time;
-        float ETA             = (n_rows - i) / rows_throughput;
+        float eta             = (n_rows - i) / rows_throughput;
         RAFT_LOG_INFO(
           "# Writing rows %12lu / %12lu (%3.2f %%), %3.2f GiB/sec, ETA %d:%3.1f, written %3.2f "
           "GiB\r",
@@ -721,9 +725,9 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
           n_rows,
           i / static_cast<double>(n_rows) * 100,
           throughput,
-          int(ETA / 60),
-          std::fmod(ETA, 60.0f),
-          bytes_written / GiB);
+          static_cast<int>(eta / 60),
+          std::fmod(eta, 60.0f),
+          bytes_written / gib);
       }
     }
   }
@@ -760,11 +764,11 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
 
   for (int64_t i = 0; i < n_rows; i++) {
     size_t cur_level = create_hierarchy ? levels[i] : 0;
-    unsigned int linkListSize =
+    unsigned int link_list_size =
       create_hierarchy && cur_level > 0 ? appr_algo->size_links_per_element_ * cur_level : 0;
-    os.write(reinterpret_cast<char*>(&linkListSize), sizeof(int));
+    os.write(reinterpret_cast<char*>(&link_list_size), sizeof(int));
     bytes_written += sizeof(int);
-    if (linkListSize) {
+    if (link_list_size) {
       for (size_t pt_level = 1; pt_level <= cur_level; pt_level++) {
         auto neighbor_view = host_neighbors[pt_level - 1].view();
         auto my_row        = order_bw[i] - offsets[pt_level - 1];
@@ -793,18 +797,18 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
       const auto time =
         std::chrono::duration_cast<std::chrono::microseconds>(end_clock - start_clock).count() *
         1e-6;
-      float throughput      = bytes_written / GiB / time;
+      float throughput      = bytes_written / gib / time;
       float rows_throughput = i / time;
-      float ETA             = (n_rows - i) / rows_throughput;
+      float eta             = (n_rows - i) / rows_throughput;
       RAFT_LOG_INFO(
         "# Writing rows %12lu / %12lu (%3.2f %%), %3.2f GiB/sec, ETA %d:%3.1f, written %3.2f GiB\r",
         i,
         n_rows,
         i / static_cast<double>(n_rows) * 100,
         throughput,
-        int(ETA / 60),
-        std::fmod(ETA, 60.0f),
-        bytes_written / GiB);
+        static_cast<int>(eta / 60),
+        std::fmod(eta, 60.0f),
+        bytes_written / gib);
     }
   }
 
@@ -822,11 +826,11 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
 }
 
 template <typename T, HnswHierarchy hierarchy>
-std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> from_cagra(
-  raft::resources const& res,
-  const index_params& params,
-  const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,
-  std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
+auto from_cagra(raft::resources const& res,
+                const index_params& params,
+                const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,
+                std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
+  -> std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>>
 {
   common::nvtx::range<common::nvtx::domain::cuvs> fun_scope("hnsw::from_cagra<GPU>");
   auto stream = raft::resource::get_cuda_stream(res);
@@ -895,7 +899,7 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
     const int64_t max_batch_size =
       device_copy ? raft::div_rounding_up_safe<int64_t>(64 * 1024 * 1024, source_stride * sizeof(T))
                   : n_rows;
-    T* bufs[2]                                                  = {nullptr, nullptr};
+    std::array<T*, 2> bufs                                      = {nullptr, nullptr};
     std::optional<raft::pinned_matrix<T, int64_t>> bufs_storage = std::nullopt;
     if (device_copy) {
       bufs_storage.emplace(
@@ -937,9 +941,10 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
         levels[i]                        = curlevel;
         if (curlevel) {
           appr_algo->linkLists_[i] =
-            (char*)malloc(appr_algo->size_links_per_element_ * curlevel + 1);
-          if (appr_algo->linkLists_[i] == nullptr)
+            static_cast<char*>(malloc(appr_algo->size_links_per_element_ * curlevel + 1));
+          if (appr_algo->linkLists_[i] == nullptr) {
             throw std::runtime_error("Not enough memory: addPoint failed to allocate linklist");
+          }
           memset(appr_algo->linkLists_[i], 0, appr_algo->size_links_per_element_ * curlevel + 1);
         }
       }
@@ -952,8 +957,9 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
   std::vector<size_t> order(n_rows);
   for (int64_t i = 0; i < n_rows; i++) {
     auto pt_level = levels[i];
-    while (pt_level >= static_cast<int32_t>(hist.size()))
+    while (pt_level >= static_cast<int32_t>(hist.size())) {
       hist.push_back(0);
+    }
     hist[pt_level]++;
   }
 
@@ -987,7 +993,7 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
 
     // gather points from dataset to form query set on host
     auto host_query_set = raft::make_host_matrix<T, int64_t>(num_pts, dim);
-    // TODO: Use `raft::matrix::gather` when available as a public API
+    // TODO(cuvs): Use `raft::matrix::gather` when available as a public API
     // Issue: https://github.com/rapidsai/raft/issues/2572
 #pragma omp parallel for num_threads(num_threads)
     for (auto i = start_idx; i < end_idx; i++) {
@@ -1013,7 +1019,7 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
         auto pt_id  = order[i];
         auto ll_cur = appr_algo->get_linklist(pt_id, pt_level);
         appr_algo->setListCount(ll_cur, host_neighbors.extent(1));
-        auto* data     = (uint32_t*)(ll_cur + 1);
+        auto* data     = reinterpret_cast<uint32_t*>(ll_cur + 1);
         auto neighbors = &host_neighbors(i - start_idx, 0);
         for (auto j = 0; j < host_neighbors.extent(1); j++) {
           data[j] = order[neighbors[j] + start_idx];
@@ -1041,7 +1047,7 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
     for (int64_t i = 0; i < n_rows; i++) {
       auto ll_i = appr_algo->get_linklist0(i);
       appr_algo->setListCount(ll_i, degree);
-      auto* data = (uint32_t*)(ll_i + 1);
+      auto* data = reinterpret_cast<uint32_t*>(ll_i + 1);
       for (int64_t j = 0; j < degree; j++) {
         data[j] = graph_ptr[i * degree + j];
       }
@@ -1067,11 +1073,11 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
 }
 
 template <typename T>
-std::unique_ptr<index<T>> from_cagra(
-  raft::resources const& res,
-  const index_params& params,
-  const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,
-  std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
+auto from_cagra(raft::resources const& res,
+                const index_params& params,
+                const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,
+                std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
+  -> std::unique_ptr<index<T>>
 {
   // special treatment for index on disk
   if (cagra_index.dataset_fd().has_value() && cagra_index.graph_fd().has_value()) {
@@ -1144,7 +1150,7 @@ void extend(raft::resources const& res,
 #pragma omp parallel for num_threads(num_threads)
   for (int64_t i = 0; i < additional_dataset.extent(0); i++) {
     hnswlib_index->addPoint(
-      (void*)(additional_dataset.data_handle() + i * additional_dataset.extent(1)),
+      static_cast<const void*>(additional_dataset.data_handle() + i * additional_dataset.extent(1)),
       current_element_count + i);
   }
 }
@@ -1274,9 +1280,10 @@ void deserialize(raft::resources const& res,
  * 3. Converting the CAGRA index to HNSW format
  */
 template <typename T>
-std::unique_ptr<index<T>> build(raft::resources const& res,
-                                const index_params& params,
-                                raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)
+auto build(raft::resources const& res,
+           const index_params& params,
+           raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)
+  -> std::unique_ptr<index<T>>
 {
   common::nvtx::range<common::nvtx::domain::cuvs> fun_scope("hnsw::build<ACE>");
 

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -349,7 +349,7 @@ void rescale_avq_centroids(raft::resources const& dev_resources,
   raft::linalg::map_offset(dev_resources,
                            raft::make_const_mdspan(rescale_denom_v),
                            rescale_denom_v,
-                           [cluster_sizes, dataset_size] __device__(size_t i, float x) {
+                           [cluster_sizes, dataset_size] __device__(size_t i, float x) -> float {
                              uint32_t cluster_size = i + 1 < cluster_sizes.extent(0)
                                                        ? cluster_sizes[i + 1] - cluster_sizes[i]
                                                        : dataset_size - cluster_sizes[i];
@@ -362,15 +362,16 @@ void rescale_avq_centroids(raft::resources const& dev_resources,
   auto rescale_num_ptr   = rescale_num.data_handle();
   auto rescale_denom_ptr = rescale_denom.data_handle();
 
-  raft::linalg::map_offset(dev_resources,
-                           raft::make_const_mdspan(centroids),
-                           centroids,
-                           [rescale_num_ptr, rescale_denom_ptr] __device__(size_t i, float x) {
-                             // should probably check the denominator is nonzero
-                             float rescale = (*rescale_num_ptr) / (*rescale_denom_ptr);
+  raft::linalg::map_offset(
+    dev_resources,
+    raft::make_const_mdspan(centroids),
+    centroids,
+    [rescale_num_ptr, rescale_denom_ptr] __device__(size_t i, float x) -> float {
+      // should probably check the denominator is nonzero
+      float rescale = (*rescale_num_ptr) / (*rescale_denom_ptr);
 
-                             return x * rescale;
-                           });
+      return x * rescale;
+    });
 }
 
 /**
@@ -405,7 +406,7 @@ class cluster_loader {
   int64_t cur_idx_  = -1;
   int64_t copy_idx_ = -1;
 
-  size_t cluster_size(LabelT idx)
+  auto cluster_size(LabelT idx) -> size_t
   {
     if (idx + 1 < h_cluster_offsets_.extent(0)) {
       return h_cluster_offsets_(idx + 1) - h_cluster_offsets_(idx);
@@ -485,7 +486,8 @@ class cluster_loader {
    * @param cluster_idx: the index of the cluster to be loaded
    * @return device_matrix_view of the cluster vectors
    */
-  raft::device_matrix_view<T, int64_t> load_cluster(raft::resources const& res, LabelT cluster_idx)
+  auto load_cluster(raft::resources const& res, LabelT cluster_idx)
+    -> raft::device_matrix_view<T, int64_t>
   {
     size_t size = cluster_size(cluster_idx);
 

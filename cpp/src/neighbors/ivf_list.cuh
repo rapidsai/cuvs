@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -108,11 +108,12 @@ void resize_list(raft::resources const& res,
 }
 
 template <typename ListT>
-enable_if_valid_list_t<ListT> serialize_list(const raft::resources& handle,
-                                             std::ostream& os,
-                                             const ListT& ld,
-                                             const typename ListT::spec_type& store_spec,
-                                             std::optional<typename ListT::size_type> size_override)
+auto serialize_list(const raft::resources& handle,
+                    std::ostream& os,
+                    const ListT& ld,
+                    const typename ListT::spec_type& store_spec,
+                    std::optional<typename ListT::size_type> size_override)
+  -> enable_if_valid_list_t<ListT>
 {
   using size_type = typename ListT::size_type;
   auto size       = size_override.value_or(ld.size.load());
@@ -138,11 +139,12 @@ enable_if_valid_list_t<ListT> serialize_list(const raft::resources& handle,
 }
 
 template <typename ListT>
-enable_if_valid_list_t<ListT> serialize_list(const raft::resources& handle,
-                                             std::ostream& os,
-                                             const std::shared_ptr<ListT>& ld,
-                                             const typename ListT::spec_type& store_spec,
-                                             std::optional<typename ListT::size_type> size_override)
+auto serialize_list(const raft::resources& handle,
+                    std::ostream& os,
+                    const std::shared_ptr<ListT>& ld,
+                    const typename ListT::spec_type& store_spec,
+                    std::optional<typename ListT::size_type> size_override)
+  -> enable_if_valid_list_t<ListT>
 {
   if (ld) {
     return serialize_list<ListT>(handle, os, *ld, store_spec, size_override);
@@ -152,11 +154,11 @@ enable_if_valid_list_t<ListT> serialize_list(const raft::resources& handle,
 }
 
 template <typename ListT>
-enable_if_valid_list_t<ListT> deserialize_list(const raft::resources& handle,
-                                               std::istream& is,
-                                               std::shared_ptr<ListT>& ld,
-                                               const typename ListT::spec_type& store_spec,
-                                               const typename ListT::spec_type& device_spec)
+auto deserialize_list(const raft::resources& handle,
+                      std::istream& is,
+                      std::shared_ptr<ListT>& ld,
+                      const typename ListT::spec_type& store_spec,
+                      const typename ListT::spec_type& device_spec) -> enable_if_valid_list_t<ListT>
 {
   using size_type = typename ListT::size_type;
   auto size       = raft::deserialize_scalar<size_type>(handle, is);

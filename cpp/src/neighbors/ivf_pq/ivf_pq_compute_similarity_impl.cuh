@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -338,7 +338,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
       out_indices               = _out_indices + out_offset * topk;
     } else {
       // Store all calculated distances to out_scores
-      out_scores = _out_scores + uint64_t(max_samples) * query_ix;
+      out_scores = _out_scores + static_cast<uint64_t>(max_samples) * query_ix;
     }
     uint32_t label              = cluster_labels[n_probes * query_ix + probe_ix];
     const float* cluster_center = cluster_centers + dim * label;
@@ -571,7 +571,8 @@ struct occupancy_t {
   {
     RAFT_CUDA_TRY(
       cudaOccupancyMaxActiveBlocksPerMultiprocessor(&blocks_per_sm, kernel, n_threads, smem));
-    occupancy = double(blocks_per_sm * n_threads) / double(dev_props.maxThreadsPerMultiProcessor);
+    occupancy = static_cast<double>(blocks_per_sm * n_threads) /
+                static_cast<double>(dev_props.maxThreadsPerMultiProcessor);
     shmem_use = double(shmem_unit::roundUp(smem) * blocks_per_sm) /
                 double(dev_props.sharedMemPerMultiprocessor);
   }
@@ -608,7 +609,7 @@ void compute_similarity_run(selected<OutT, LutT> s,
                             OutT* _out_scores,
                             uint32_t* _out_indices)
 {
-  auto launch_kernel = [&](filtering::ivf_filter_dev sample_filter) {
+  auto launch_kernel = [&](filtering::ivf_filter_dev sample_filter) -> auto {
     auto kernel = reinterpret_cast<compute_similarity_kernel_t<OutT, LutT>>(get_kernel(s));
     kernel<<<s.grid_dim, s.block_dim, s.smem_size, stream>>>(dim,
                                                              n_probes,
@@ -756,22 +757,22 @@ auto compute_similarity_select(const cudaDeviceProp& dev_props,
   //      (multiples of `1 << pq_bits`).
   //   2. It should be large enough to fully utilize an SM.
   uint32_t n_threads_min = raft::WarpSize;
-  while (dev_props.maxBlocksPerMultiProcessor * int(n_threads_min) <
+  while (dev_props.maxBlocksPerMultiProcessor * static_cast<int>(n_threads_min) <
          dev_props.maxThreadsPerMultiProcessor) {
     n_threads_min *= 2;
   }
   // Further increase the minimum block size to make sure full device occupancy
   // (NB: this may lead to `n_threads_min` being larger than the kernel's maximum)
-  while (int(n_blocks * n_threads_min) <
+  while (static_cast<int>(n_blocks * n_threads_min) <
            dev_props.multiProcessorCount * dev_props.maxThreadsPerMultiProcessor &&
-         int(n_threads_min) < dev_props.maxThreadsPerBlock) {
+         static_cast<int>(n_threads_min) < dev_props.maxThreadsPerBlock) {
     n_threads_min *= 2;
   }
   // Even further, increase it to allow less blocks per SM if there not enough queries.
   // With this, we reduce the chance of different clusters being processed by two blocks
   // on the same SM and thus improve the data locality for L1 caching.
-  while (int(n_queries * n_threads_min) < dev_props.maxThreadsPerMultiProcessor &&
-         int(n_threads_min) < dev_props.maxThreadsPerBlock) {
+  while (static_cast<int>(n_queries * n_threads_min) < dev_props.maxThreadsPerMultiProcessor &&
+         static_cast<int>(n_threads_min) < dev_props.maxThreadsPerBlock) {
     n_threads_min *= 2;
   }
 

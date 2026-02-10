@@ -133,11 +133,11 @@ void _serialize(cuvsResources_t res, const char* filename, cuvsHnswIndex index)
 }
 
 template <typename T>
-void* _deserialize(cuvsResources_t res,
+auto _deserialize(cuvsResources_t res,
                    cuvsHnswIndexParams_t params,
                    const char* filename,
                    int dim,
-                   cuvsDistanceType metric)
+                   cuvsDistanceType metric) -> void*
 {
   auto res_ptr                           = reinterpret_cast<raft::resources*>(res);
   cuvs::neighbors::hnsw::index<T>* index = nullptr;
@@ -150,7 +150,7 @@ void* _deserialize(cuvsResources_t res,
 }
 }  // namespace
 
-extern "C" cuvsError_t cuvsHnswAceParamsCreate(cuvsHnswAceParams_t* params)
+extern "C" auto cuvsHnswAceParamsCreate(cuvsHnswAceParams_t* params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     *params = new cuvsHnswAceParams{.npartitions         = 0,
@@ -161,12 +161,12 @@ extern "C" cuvsError_t cuvsHnswAceParamsCreate(cuvsHnswAceParams_t* params)
   });
 }
 
-extern "C" cuvsError_t cuvsHnswAceParamsDestroy(cuvsHnswAceParams_t params)
+extern "C" auto cuvsHnswAceParamsDestroy(cuvsHnswAceParams_t params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
 }
 
-extern "C" cuvsError_t cuvsHnswIndexParamsCreate(cuvsHnswIndexParams_t* params)
+extern "C" auto cuvsHnswIndexParamsCreate(cuvsHnswIndexParams_t* params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     *params = new cuvsHnswIndexParams{.hierarchy                 = cuvsHnswHierarchy::NONE,
@@ -178,16 +178,16 @@ extern "C" cuvsError_t cuvsHnswIndexParamsCreate(cuvsHnswIndexParams_t* params)
   });
 }
 
-extern "C" cuvsError_t cuvsHnswIndexParamsDestroy(cuvsHnswIndexParams_t params)
+extern "C" auto cuvsHnswIndexParamsDestroy(cuvsHnswIndexParams_t params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
 }
-extern "C" cuvsError_t cuvsHnswIndexCreate(cuvsHnswIndex_t* index)
+extern "C" auto cuvsHnswIndexCreate(cuvsHnswIndex_t* index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { *index = new cuvsHnswIndex{}; });
 }
 
-extern "C" cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index_c_ptr)
+extern "C" auto cuvsHnswIndexDestroy(cuvsHnswIndex_t index_c_ptr) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto index = *index_c_ptr;
@@ -209,21 +209,21 @@ extern "C" cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index_c_ptr)
   });
 }
 
-extern "C" cuvsError_t cuvsHnswExtendParamsCreate(cuvsHnswExtendParams_t* params)
+extern "C" auto cuvsHnswExtendParamsCreate(cuvsHnswExtendParams_t* params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions(
     [=] { *params = new cuvsHnswExtendParams{.num_threads = 0}; });
 }
 
-extern "C" cuvsError_t cuvsHnswExtendParamsDestroy(cuvsHnswExtendParams_t params)
+extern "C" auto cuvsHnswExtendParamsDestroy(cuvsHnswExtendParams_t params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
 }
 
-extern "C" cuvsError_t cuvsHnswFromCagra(cuvsResources_t res,
+extern "C" auto cuvsHnswFromCagra(cuvsResources_t res,
                                          cuvsHnswIndexParams_t params,
                                          cuvsCagraIndex_t cagra_index,
-                                         cuvsHnswIndex_t hnsw_index)
+                                         cuvsHnswIndex_t hnsw_index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto index        = *cagra_index;
@@ -242,11 +242,11 @@ extern "C" cuvsError_t cuvsHnswFromCagra(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsHnswFromCagraWithDataset(cuvsResources_t res,
+extern "C" auto cuvsHnswFromCagraWithDataset(cuvsResources_t res,
                                                     cuvsHnswIndexParams_t params,
                                                     cuvsCagraIndex_t cagra_index,
                                                     cuvsHnswIndex_t hnsw_index,
-                                                    DLManagedTensor* dataset_tensor)
+                                                    DLManagedTensor* dataset_tensor) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto index        = *cagra_index;
@@ -265,10 +265,10 @@ extern "C" cuvsError_t cuvsHnswFromCagraWithDataset(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsHnswBuild(cuvsResources_t res,
+extern "C" auto cuvsHnswBuild(cuvsResources_t res,
                                      cuvsHnswIndexParams_t params,
                                      DLManagedTensor* dataset,
-                                     cuvsHnswIndex_t index)
+                                     cuvsHnswIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset_dl = dataset->dl_tensor;
@@ -288,10 +288,10 @@ extern "C" cuvsError_t cuvsHnswBuild(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsHnswExtend(cuvsResources_t res,
+extern "C" auto cuvsHnswExtend(cuvsResources_t res,
                                       cuvsHnswExtendParams_t params,
                                       DLManagedTensor* additional_dataset,
-                                      cuvsHnswIndex_t index)
+                                      cuvsHnswIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
@@ -308,23 +308,23 @@ extern "C" cuvsError_t cuvsHnswExtend(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsHnswSearchParamsCreate(cuvsHnswSearchParams_t* params)
+extern "C" auto cuvsHnswSearchParamsCreate(cuvsHnswSearchParams_t* params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions(
     [=] { *params = new cuvsHnswSearchParams{.ef = 200, .num_threads = 0}; });
 }
 
-extern "C" cuvsError_t cuvsHnswSearchParamsDestroy(cuvsHnswSearchParams_t params)
+extern "C" auto cuvsHnswSearchParamsDestroy(cuvsHnswSearchParams_t params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
 }
 
-extern "C" cuvsError_t cuvsHnswSearch(cuvsResources_t res,
+extern "C" auto cuvsHnswSearch(cuvsResources_t res,
                                       cuvsHnswSearchParams_t params,
                                       cuvsHnswIndex_t index_c_ptr,
                                       DLManagedTensor* queries_tensor,
                                       DLManagedTensor* neighbors_tensor,
-                                      DLManagedTensor* distances_tensor)
+                                      DLManagedTensor* distances_tensor) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto queries   = queries_tensor->dl_tensor;
@@ -360,9 +360,9 @@ extern "C" cuvsError_t cuvsHnswSearch(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsHnswSerialize(cuvsResources_t res,
+extern "C" auto cuvsHnswSerialize(cuvsResources_t res,
                                          const char* filename,
-                                         cuvsHnswIndex_t index)
+                                         cuvsHnswIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
@@ -379,12 +379,12 @@ extern "C" cuvsError_t cuvsHnswSerialize(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsHnswDeserialize(cuvsResources_t res,
+extern "C" auto cuvsHnswDeserialize(cuvsResources_t res,
                                            cuvsHnswIndexParams_t params,
                                            const char* filename,
                                            int dim,
                                            cuvsDistanceType metric,
-                                           cuvsHnswIndex_t index)
+                                           cuvsHnswIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {

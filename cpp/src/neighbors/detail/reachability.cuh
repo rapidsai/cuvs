@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -45,7 +45,7 @@ void core_distances(raft::resources const& handle,
 
   auto out_view = raft::make_device_vector_view<value_t, value_idx>(out, n);
 
-  raft::linalg::map_offset(handle, out_view, [=] __device__(value_idx row) {
+  raft::linalg::map_offset(handle, out_view, [=] __device__(value_idx row) -> value_t {
     return knn_dists[row * n_neighbors + (min_samples - 1)];
   });
 }
@@ -112,7 +112,7 @@ void _compute_core_dists(const raft::resources& handle,
 //  Functor to post-process distances into reachability space
 template <typename value_idx, typename value_t>
 struct ReachabilityPostProcess {
-  DI value_t operator()(value_t value, value_idx row, value_idx col) const
+  DI auto operator()(value_t value, value_idx row, value_idx col) const -> value_t
   {
     return max(core_dists[col], max(core_dists[row], alpha * value));
   }
@@ -205,8 +205,15 @@ void mutual_reachability_graph(const raft::resources& handle,
   /**
    * Compute L2 norm
    */
-  mutual_reachability_knn_l2(
-    handle, inds.data(), dists.data(), X, m, n, min_samples, core_dists, (value_t)1.0 / alpha);
+  mutual_reachability_knn_l2(handle,
+                             inds.data(),
+                             dists.data(),
+                             X,
+                             m,
+                             n,
+                             min_samples,
+                             core_dists,
+                             static_cast<value_t>(1.0) / alpha);
 
   // self-loops get max distance
   auto coo_rows_view =
@@ -236,7 +243,7 @@ void mutual_reachability_graph(const raft::resources& handle,
   raft::linalg::map(
     handle,
     vals_out_view,
-    [=] __device__(const value_idx row, const value_idx col, const value_t val) {
+    [=] __device__(const value_idx row, const value_idx col, const value_t val) -> value_t {
       return row == col ? std::numeric_limits<value_t>::max() : val;
     },
     rows_view,

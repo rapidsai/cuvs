@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -54,7 +54,7 @@ void time_it(std::string label, F f, Args&&... xs)
  * This is similar to recording and waiting on CUDA events, but in C++11 API.
  */
 struct cuda_work_completion_promise {
-  cuda_work_completion_promise(const raft::resources& res)
+  explicit cuda_work_completion_promise(const raft::resources& res)
   {
     auto* promise = new std::promise<void>;
     RAFT_CUDA_TRY(cudaLaunchHostFunc(
@@ -84,7 +84,8 @@ void dynamic_batching_example(raft::resources const& res,
                               raft::device_matrix_view<const float, int64_t> dataset,
                               raft::device_matrix_view<const float, int64_t> queries)
 {
-  using namespace cuvs::neighbors;
+  using cuvs::neighbors::cagra;
+  using cuvs::neighbors::dynamic_batching;
 
   // Number of neighbors to search
   int64_t topk = 100;
@@ -153,7 +154,7 @@ void dynamic_batching_example(raft::resources const& res,
   auto search_batch_orig = [&res, &orig_index, &orig_search_params](
                              raft::device_matrix_view<const float, int64_t> queries,
                              raft::device_matrix_view<uint32_t, int64_t> neighbors,
-                             raft::device_matrix_view<float, int64_t> distances) {
+                             raft::device_matrix_view<float, int64_t> distances) -> void {
     cagra::search(res, orig_search_params, orig_index, queries, neighbors, distances);
     raft::resource::sync_stream(res);
   };
@@ -175,7 +176,7 @@ void dynamic_batching_example(raft::resources const& res,
   auto search_async_orig = [&resource_pool, &orig_index, &orig_search_params](
                              raft::device_matrix_view<const float, int64_t> queries,
                              raft::device_matrix_view<uint32_t, int64_t> neighbors,
-                             raft::device_matrix_view<float, int64_t> distances) {
+                             raft::device_matrix_view<float, int64_t> distances) -> void {
     auto work_size = queries.extent(0);
     std::array<std::future<void>, kMaxJobs> futures;
     for (int64_t i = 0; i < work_size + kMaxJobs; i++) {
@@ -201,7 +202,7 @@ void dynamic_batching_example(raft::resources const& res,
   auto search_async_dynb = [&resource_pool, &dynb_index, &dynb_search_params](
                              raft::device_matrix_view<const float, int64_t> queries,
                              raft::device_matrix_view<uint32_t, int64_t> neighbors,
-                             raft::device_matrix_view<float, int64_t> distances) {
+                             raft::device_matrix_view<float, int64_t> distances) -> void {
     auto work_size = queries.extent(0);
     std::array<std::future<void>, kMaxJobs> futures;
     for (int64_t i = 0; i < work_size + kMaxJobs; i++) {
@@ -231,7 +232,7 @@ void dynamic_batching_example(raft::resources const& res,
   time_it("dynamic_batching/async B", search_async_dynb, queries_b, neighbors_b, distances_b);
 }
 
-int main()
+auto main() -> int
 {
   raft::device_resources res;
 

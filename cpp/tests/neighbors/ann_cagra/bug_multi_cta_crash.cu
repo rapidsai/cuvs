@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -16,7 +16,8 @@
 
 namespace cuvs::neighbors::cagra {
 
-class AnnCagraBugMultiCTACrash : public ::testing::TestWithParam<cagra::search_algo> {
+class AnnCagraBugMultiCTACrash
+  : public ::testing::TestWithParam<cagra::search_algo> {  // NOLINT(readability-identifier-naming)
  public:
   using data_type = half;
 
@@ -50,7 +51,7 @@ class AnnCagraBugMultiCTACrash : public ::testing::TestWithParam<cagra::search_a
     raft::resource::sync_stream(res_search);
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     dataset.emplace(raft::make_device_matrix<data_type, int64_t>(res, n_samples, n_dim));
     queries.emplace(raft::make_device_matrix<data_type, int64_t>(res, n_queries, n_dim));
@@ -65,7 +66,7 @@ class AnnCagraBugMultiCTACrash : public ::testing::TestWithParam<cagra::search_a
     raft::resource::sync_stream(res);
   }
 
-  void TearDown() override
+  void TearDown() override  // NOLINT(readability-identifier-naming)
   {
     dataset.reset();
     queries.reset();
@@ -75,23 +76,28 @@ class AnnCagraBugMultiCTACrash : public ::testing::TestWithParam<cagra::search_a
   }
 
  private:
-  raft::resources res;
+  raft::resources res;  // NOLINT(readability-identifier-naming)
   std::optional<raft::device_matrix<data_type, int64_t>> dataset  = std::nullopt;
   std::optional<raft::device_matrix<data_type, int64_t>> queries  = std::nullopt;
   std::optional<raft::device_matrix<uint32_t, int64_t>> neighbors = std::nullopt;
   std::optional<raft::device_matrix<float, int64_t>> distances    = std::nullopt;
 
-  constexpr static int64_t n_samples                   = 1183514;
-  constexpr static int64_t n_dim                       = 100;
-  constexpr static int64_t n_queries                   = 30;
-  constexpr static int64_t k                           = 10;
-  constexpr static cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded;
+  constexpr static int64_t n_samples = 1183514;  // NOLINT(readability-identifier-naming)
+  constexpr static int64_t n_dim     = 100;      // NOLINT(readability-identifier-naming)
+  constexpr static int64_t n_queries = 30;       // NOLINT(readability-identifier-naming)
+  constexpr static int64_t k         = 10;       // NOLINT(readability-identifier-naming)
+  constexpr static cuvs::distance::DistanceType metric =
+    cuvs::distance::DistanceType::L2Expanded;  // NOLINT(readability-identifier-naming)
 };
 
-TEST_P(AnnCagraBugMultiCTACrash, AnnCagraBugMultiCTACrash) { this->run(); }
+TEST_P(AnnCagraBugMultiCTACrash, AnnCagraBugMultiCTACrash)
+{
+  this->run();
+}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(AnnCagraBugMultiCTACrashReproducer,
-                        AnnCagraBugMultiCTACrash,
-                        ::testing::Values(cagra::search_algo::MULTI_CTA));
+INSTANTIATE_TEST_CASE_P(
+  AnnCagraBugMultiCTACrashReproducer,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  AnnCagraBugMultiCTACrash,
+  ::testing::Values(cagra::search_algo::MULTI_CTA));
 
 }  // namespace cuvs::neighbors::cagra

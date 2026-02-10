@@ -73,17 +73,17 @@ constexpr static inline float kAdjustCentersWeight = 7.0f;
  * @param[inout] mr (optional) Memory resource to use for temporary allocations
  */
 template <typename MathT, typename IdxT, typename LabelT>
-inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
-  const raft::resources& handle,
-  const cuvs::cluster::kmeans::balanced_params& params,
-  const MathT* centers,
-  IdxT n_clusters,
-  IdxT dim,
-  const MathT* dataset,
-  const MathT* dataset_norm,
-  IdxT n_rows,
-  LabelT* labels,
-  rmm::device_async_resource_ref mr)
+inline auto predict_core(const raft::resources& handle,
+                         const cuvs::cluster::kmeans::balanced_params& params,
+                         const MathT* centers,
+                         IdxT n_clusters,
+                         IdxT dim,
+                         const MathT* dataset,
+                         const MathT* dataset_norm,
+                         IdxT n_rows,
+                         LabelT* labels,
+                         rmm::device_async_resource_ref mr)
+  -> std::enable_if_t<std::is_floating_point_v<MathT>>
 {
   auto stream = raft::resource::get_cuda_stream(handle);
   switch (params.metric) {
@@ -114,7 +114,7 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
         n_rows,
         n_clusters,
         dim,
-        (void*)workspace.data_handle(),
+        reinterpret_cast<void*>(workspace.data_handle()),
         (params.metric == cuvs::distance::DistanceType::L2Expanded) ? false : true,
         false,
         true,
@@ -157,7 +157,7 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
         n_rows,
         n_clusters,
         dim,
-        (void*)workspace.data_handle(),
+        reinterpret_cast<void*>(workspace.data_handle()),
         false,
         false,
         true,
@@ -173,7 +173,7 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
       break;
     }
     case cuvs::distance::DistanceType::InnerProduct: {
-      // TODO: pass buffer
+      // TODO(snanditale): pass buffer
       rmm::device_uvector<MathT> distances(n_rows * n_clusters, stream, mr);
 
       MathT alpha = -1.0;
@@ -443,7 +443,7 @@ void predict(const raft::resources& handle,
 
     // Compute the norm now if it hasn't been pre-computed.
     if (need_compute_norm) {
-      if (params.metric == cuvs::distance::DistanceType::CosineExpanded)
+      if (params.metric == cuvs::distance::DistanceType::CosineExpanded) {
         compute_norm(handle,
                      cur_dataset_norm.data(),
                      cur_dataset_ptr,
@@ -452,7 +452,7 @@ void predict(const raft::resources& handle,
                      mapping_op,
                      raft::sqrt_op{},
                      mr);
-      else
+      } else {
         compute_norm(handle,
                      cur_dataset_norm.data(),
                      cur_dataset_ptr,
@@ -461,6 +461,7 @@ void predict(const raft::resources& handle,
                      mapping_op,
                      raft::identity_op{},
                      mr);
+      }
       dataset_norm_ptr = cur_dataset_norm.data();
     } else if (dataset_norm != nullptr) {
       dataset_norm_ptr = dataset_norm + offset;
@@ -486,8 +487,9 @@ template <uint32_t BlockDimY,
           typename LabelT,
           typename CounterT,
           typename MappingOpT>
-__launch_bounds__((raft::WarpSize * BlockDimY)) RAFT_KERNEL
-  adjust_centers_kernel(MathT* centers,  // [n_clusters, dim]
+__launch_bounds__((raft::WarpSize *
+                   BlockDimY)) RAFT_KERNEL  // NOLINT(readability-identifier-naming)
+  adjust_centers_kernel(MathT* centers,     // [n_clusters, dim]
                         IdxT n_clusters,
                         IdxT dim,
                         const T* dataset,  // [n_rows, dim]
@@ -933,11 +935,12 @@ auto build_fine_clusters(const raft::resources& handle,
     for (IdxT j = 0; j < n_rows && k < mesocluster_size_max; j++) {
       if (labels_mptr[j] == LabelT(i)) { mc_trainset_ids[k++] = j; }
     }
-    if (k != static_cast<IdxT>(mesocluster_sizes[i]))
+    if (k != static_cast<IdxT>(mesocluster_sizes[i])) {
       RAFT_LOG_DEBUG("Incorrect mesocluster size at %d. %zu vs %zu",
                      static_cast<int>(i),
                      static_cast<size_t>(k),
                      static_cast<size_t>(mesocluster_sizes[i]));
+    }
     if (k == 0) {
       RAFT_LOG_DEBUG("Empty cluster %d", i);
       RAFT_EXPECTS(fine_clusters_nums[i] == 0,
@@ -1024,7 +1027,8 @@ void build_hierarchical(const raft::resources& handle,
   IdxT n_mesoclusters = std::min(n_clusters, static_cast<IdxT>(std::sqrt(n_clusters) + 0.5));
   RAFT_LOG_DEBUG("build_hierarchical: n_mesoclusters: %u", n_mesoclusters);
 
-  // TODO: Remove the explicit managed memory- we shouldn't be creating this on the user's behalf.
+  // TODO(snanditale): Remove the explicit managed memory- we shouldn't be creating this on the
+  // user's behalf.
   rmm::mr::managed_memory_resource managed_memory;
   rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource(handle);
   auto [max_minibatch_size, mem_per_row] =
@@ -1038,7 +1042,7 @@ void build_hierarchical(const raft::resources& handle,
     dataset_norm_buf.resize(n_rows, stream);
     for (IdxT offset = 0; offset < n_rows; offset += max_minibatch_size) {
       IdxT minibatch_size = std::min<IdxT>(max_minibatch_size, n_rows - offset);
-      if (params.metric == cuvs::distance::DistanceType::CosineExpanded)
+      if (params.metric == cuvs::distance::DistanceType::CosineExpanded) {
         compute_norm(handle,
                      dataset_norm_buf.data() + offset,
                      dataset + dim * offset,
@@ -1047,7 +1051,7 @@ void build_hierarchical(const raft::resources& handle,
                      mapping_op,
                      raft::sqrt_op{},
                      device_memory);
-      else
+      } else {
         compute_norm(handle,
                      dataset_norm_buf.data() + offset,
                      dataset + dim * offset,
@@ -1056,14 +1060,15 @@ void build_hierarchical(const raft::resources& handle,
                      mapping_op,
                      raft::identity_op{},
                      device_memory);
+      }
     }
-    dataset_norm = (const MathT*)dataset_norm_buf.data();
+    dataset_norm = reinterpret_cast<const MathT*>(dataset_norm_buf.data());
   }
 
   /* Temporary workaround to cub::DeviceHistogram not supporting any type that isn't natively
    * supported by atomicAdd: find a supported CounterT based on the IdxT. */
-  typedef typename std::conditional_t<sizeof(IdxT) == 8, unsigned long long int, unsigned int>
-    CounterT;
+  using CounterT =
+    typename std::conditional_t<sizeof(IdxT) == 8, unsigned long long int, unsigned int>;
 
   // build coarse clusters (mesoclusters)
   rmm::device_uvector<LabelT> mesocluster_labels_buf(n_rows, stream, &managed_memory);

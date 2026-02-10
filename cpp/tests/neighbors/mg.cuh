@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -87,10 +87,11 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
     if (ps.algo == algo_t::IVF_FLAT &&
         (ps.d_mode == d_mode_t::REPLICATED || ps.d_mode == d_mode_t::SHARDED)) {
       distribution_mode d_mode;
-      if (ps.d_mode == d_mode_t::REPLICATED)
+      if (ps.d_mode == d_mode_t::REPLICATED) {
         d_mode = distribution_mode::REPLICATED;
-      else
+      } else {
         d_mode = distribution_mode::SHARDED;
+      }
 
       mg_index_params<ivf_flat::index_params> index_params;
       index_params.n_lists                  = ps.nlist;
@@ -123,10 +124,11 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       auto new_index =
         cuvs::neighbors::ivf_flat::deserialize<DataT, int64_t>(clique_, index_file.filename);
 
-      if (ps.m_mode == m_mode_t::MERGE_ON_ROOT_RANK)
+      if (ps.m_mode == m_mode_t::MERGE_ON_ROOT_RANK) {
         search_params.merge_mode = MERGE_ON_ROOT_RANK;
-      else
+      } else {
         search_params.merge_mode = TREE_MERGE;
+      }
 
       search_params.n_rows_per_batch = n_rows_per_search_batch;
       cuvs::neighbors::ivf_flat::search(
@@ -150,10 +152,11 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
     if (ps.algo == algo_t::IVF_PQ &&
         (ps.d_mode == d_mode_t::REPLICATED || ps.d_mode == d_mode_t::SHARDED)) {
       distribution_mode d_mode;
-      if (ps.d_mode == d_mode_t::REPLICATED)
+      if (ps.d_mode == d_mode_t::REPLICATED) {
         d_mode = distribution_mode::REPLICATED;
-      else
+      } else {
         d_mode = distribution_mode::SHARDED;
+      }
 
       mg_index_params<ivf_pq::index_params> index_params;
       index_params.n_lists                  = ps.nlist;
@@ -185,10 +188,11 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       auto new_index =
         cuvs::neighbors::ivf_pq::deserialize<DataT, int64_t>(clique_, index_file.filename);
 
-      if (ps.m_mode == m_mode_t::MERGE_ON_ROOT_RANK)
+      if (ps.m_mode == m_mode_t::MERGE_ON_ROOT_RANK) {
         search_params.merge_mode = MERGE_ON_ROOT_RANK;
-      else
+      } else {
         search_params.merge_mode = TREE_MERGE;
+      }
 
       search_params.n_rows_per_batch = n_rows_per_search_batch;
       cuvs::neighbors::ivf_pq::search(
@@ -212,10 +216,11 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
     if (ps.algo == algo_t::CAGRA &&
         (ps.d_mode == d_mode_t::REPLICATED || ps.d_mode == d_mode_t::SHARDED)) {
       distribution_mode d_mode;
-      if (ps.d_mode == d_mode_t::REPLICATED)
+      if (ps.d_mode == d_mode_t::REPLICATED) {
         d_mode = distribution_mode::REPLICATED;
-      else
+      } else {
         d_mode = distribution_mode::SHARDED;
+      }
 
       mg_index_params<cagra::index_params> index_params;
       index_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
@@ -241,10 +246,11 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       auto new_index =
         cuvs::neighbors::cagra::deserialize<DataT, uint32_t>(clique_, index_file.filename);
 
-      if (ps.m_mode == m_mode_t::MERGE_ON_ROOT_RANK)
+      if (ps.m_mode == m_mode_t::MERGE_ON_ROOT_RANK) {
         search_params.merge_mode = MERGE_ON_ROOT_RANK;
-      else
+      } else {
         search_params.merge_mode = TREE_MERGE;
+      }
 
       search_params.n_rows_per_batch = n_rows_per_search_batch;
       cuvs::neighbors::cagra::search(
@@ -478,7 +484,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       }
       ASSERT_TRUE(std::all_of(searches_correctness.begin(),
                               searches_correctness.end(),
-                              [](char val) { return val != 0; }));
+                              [](char val) -> auto { return val != 0; }));
     }
 
     if (ps.algo == algo_t::IVF_PQ && ps.d_mode == d_mode_t::ROUND_ROBIN) {
@@ -547,7 +553,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       }
       ASSERT_TRUE(std::all_of(searches_correctness.begin(),
                               searches_correctness.end(),
-                              [](char val) { return val != 0; }));
+                              [](char val) -> auto { return val != 0; }));
     }
 
     if (ps.algo == algo_t::CAGRA && ps.d_mode == d_mode_t::ROUND_ROBIN) {
@@ -610,11 +616,11 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       }
       ASSERT_TRUE(std::all_of(searches_correctness.begin(),
                               searches_correctness.end(),
-                              [](char val) { return val != 0; }));
+                              [](char val) -> auto { return val != 0; }));
     }
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     d_index_dataset.resize(ps.num_db_vecs * ps.dim, resource::get_cuda_stream(clique_));
     d_queries.resize(ps.num_queries * ps.dim, resource::get_cuda_stream(clique_));
@@ -641,7 +647,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
     resource::sync_stream(clique_);
   }
 
-  void TearDown() override {}
+  void TearDown() override {}  // NOLINT(readability-identifier-naming)
 
  private:
   raft::device_resources_snmg clique_;

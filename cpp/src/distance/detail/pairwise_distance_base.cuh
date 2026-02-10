@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -60,7 +60,7 @@ struct PairwiseDistances : public BaseClass {
   using AccT = typename OpT::AccT;
 
  private:
-  typedef Policy P;
+  using P = Policy;
   const OutT* xn;
   const OutT* yn;
   const DataT* const yBase;
@@ -234,7 +234,7 @@ struct PairwiseDistances : public BaseClass {
                      OutT (&regxn)[P::AccRowsPerTh],
                      OutT (&regyn)[P::AccColsPerTh])
   {
-    OutT* sxNorm = (OutT*)(&smem[P::SmemSize]);
+    OutT* sxNorm = reinterpret_cast<OutT*>((&smem[P::SmemSize]));
     OutT* syNorm = (&sxNorm[P::Mblk]);
 
     // Load x & y norms required by this threadblock in shmem buffer
@@ -282,7 +282,7 @@ struct PairwiseDistances : public BaseClass {
 };  // struct PairwiseDistances
 
 template <typename P, typename IdxT, typename T>
-dim3 launchConfigGenerator(IdxT m, IdxT n, std::size_t sMemSize, T func)
+auto launchConfigGenerator(IdxT m, IdxT n, std::size_t sMemSize, T func) -> dim3
 {
   int devId;
   RAFT_CUDA_TRY(cudaGetDevice(&devId));

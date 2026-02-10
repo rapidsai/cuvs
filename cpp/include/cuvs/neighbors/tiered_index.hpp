@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -40,15 +40,17 @@ struct index : cuvs::neighbors::index {
   mutable std::shared_mutex ann_mutex;
 
   explicit index(std::shared_ptr<detail::index_state<UpstreamT>> state) : state(state) {}
-  explicit index(const index<UpstreamT>& other) : state(other.state) {}
+  index(const index<UpstreamT>& other)
+    : state(other.state) {}  // NOLINT(google-explicit-constructor)
 
   /** Total length of the index. */
-  int64_t size() const noexcept;
+  auto size() const noexcept -> int64_t;
 
   /** Dimensionality of the data. */
-  int64_t dim() const noexcept;
+  auto dim() const noexcept -> int64_t;
 };
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 template <typename upstream_index_params_type>
 struct index_params : upstream_index_params_type {
   /** The minimum number of rows necessary in the index to create an

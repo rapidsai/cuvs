@@ -31,10 +31,10 @@
 namespace cuvs::preprocessing::spectral_embedding::detail {
 
 template <typename DataT, typename OutSparseMatrixType, typename InSparseMatrixViewType>
-OutSparseMatrixType create_laplacian(raft::resources const& handle,
-                                     params spectral_embedding_config,
-                                     InSparseMatrixViewType sparse_matrix_view,
-                                     raft::device_vector_view<DataT, int> diagonal)
+auto create_laplacian(raft::resources const& handle,
+                      params spectral_embedding_config,
+                      InSparseMatrixViewType sparse_matrix_view,
+                      raft::device_vector_view<DataT, int> diagonal) -> OutSparseMatrixType
 {
   auto laplacian =
     spectral_embedding_config.norm_laplacian
@@ -47,7 +47,7 @@ OutSparseMatrixType create_laplacian(raft::resources const& handle,
   raft::linalg::unary_op(handle,
                          raft::make_const_mdspan(laplacian_elements_view),
                          laplacian_elements_view,
-                         [] __device__(DataT x) { return -x; });
+                         [] __device__(DataT x) -> DataT { return -x; });
 
   return laplacian;
 }
@@ -82,7 +82,7 @@ void compute_eigenpairs(raft::resources const& handle,
       raft::make_const_mdspan(eigenvectors.view()),  // input matrix view
       raft::make_const_mdspan(diagonal),             // input vector view
       eigenvectors.view(),                           // output matrix view (in-place)
-      [] __device__(DataT elem, DataT diag) { return elem / diag; });
+      [] __device__(DataT elem, DataT diag) -> DataT { return elem / diag; });
   }
 
   // Create a sequence of reversed column indices
@@ -90,7 +90,7 @@ void compute_eigenpairs(raft::resources const& handle,
     spectral_embedding_config.drop_first ? config.n_components - 1 : config.n_components;
   auto col_indices = raft::make_device_vector<int>(handle, config.n_components);
 
-  // TODO: https://github.com/rapidsai/raft/issues/2661
+  // TODO(snanditale): https://github.com/rapidsai/raft/issues/2661
   thrust::sequence(thrust::device,
                    col_indices.data_handle(),
                    col_indices.data_handle() + config.n_components,
@@ -165,14 +165,14 @@ void create_connectivity_graph(
   auto knn_cols = raft::make_device_vector<int, NNZType>(handle, nnz);
 
   raft::linalg::unary_op(
-    handle, make_const_mdspan(d_indices.view()), knn_cols.view(), [] __device__(int64_t x) {
+    handle, make_const_mdspan(d_indices.view()), knn_cols.view(), [] __device__(int64_t x) -> int {
       return static_cast<int>(x);
     });
 
   thrust::tabulate(raft::resource::get_thrust_policy(handle),
                    knn_rows.data_handle(),
                    knn_rows.data_handle() + nnz,
-                   [k_search] __device__(NNZType idx) { return idx / k_search; });
+                   [k_search] __device__(NNZType idx) -> NNZType { return idx / k_search; });
 
   // set all distances to 1.0f (connectivity KNN graph)
   raft::matrix::fill(
@@ -186,9 +186,10 @@ void create_connectivity_graph(
   auto sym_coo1_matrix =
     raft::make_device_coo_matrix<float, int, int, NNZType>(handle, n_samples, n_samples);
   raft::sparse::linalg::coo_symmetrize<128, float, int, NNZType>(
-    handle, coo_matrix_view, sym_coo1_matrix, [] __device__(int row, int col, float a, float b) {
-      return 0.5f * (a + b);
-    });
+    handle,
+    coo_matrix_view,
+    sym_coo1_matrix,
+    [] __device__(int row, int col, float a, float b) -> float { return 0.5f * (a + b); });
 
   raft::sparse::op::coo_sort<float, int, NNZType>(
     n_samples,

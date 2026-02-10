@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -74,7 +74,7 @@ void ivf_pq_build_search(raft::device_resources const& dev_resources,
   print_results(dev_resources, neighbors_refined.view(), distances_refined.view());
 }
 
-int main()
+auto main() -> int
 {
   raft::device_resources dev_resources;
 

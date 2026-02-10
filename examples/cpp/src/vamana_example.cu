@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -26,7 +26,7 @@ void vamana_build_and_write(raft::device_resources const& dev_resources,
                             float iters,
                             std::string codebook_prefix)
 {
-  using namespace cuvs::neighbors;
+  using cuvs::neighbors::vamana;
 
   // use default index parameters
   vamana::index_params index_params;
@@ -81,7 +81,7 @@ void usage()
   exit(1);
 }
 
-int main(int argc, char* argv[])
+auto main(int argc, char* argv[]) -> int
 {
   raft::device_resources dev_resources;
 

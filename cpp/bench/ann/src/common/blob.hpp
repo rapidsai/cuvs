@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -78,7 +78,7 @@ class mmap_error : public std::runtime_error {
   int errno_;
 
  public:
-  mmap_error(std::string extra_msg)
+  explicit mmap_error(std::string extra_msg)
     : std::runtime_error("cuvs::bench::mmap_owner: `mmap` error: Value of errno " +
                          std::to_string(errno) + ", " + std::string(strerror(errno)) + ". " +
                          extra_msg),
@@ -267,7 +267,7 @@ struct file {
   [[nodiscard]] auto descriptor() const -> const file_descriptor&
   {
     if (!descriptor_.has_value()) {
-      std::visit([&d = descriptor_](auto&& x) { d.emplace(x); }, reqsize_or_name_);
+      std::visit([&d = descriptor_](auto&& x) -> void { d.emplace(x); }, reqsize_or_name_);
     }
     return descriptor_.value();
   }
@@ -819,7 +819,7 @@ struct blob {
 
   [[nodiscard]] auto data() const -> T*
   {
-    return std::visit([](auto&& val) { return val.data(); }, value_);
+    return std::visit([](auto&& val) -> decltype(auto) { return val.data(); }, value_);
   }
 
   [[nodiscard]] auto data(MemoryType memory_type,
@@ -845,25 +845,25 @@ struct blob {
 
   [[nodiscard]] auto is_in_memory() const noexcept -> bool
   {
-    return std::visit([](auto&& val) { return val.is_in_memory(); }, value_);
+    return std::visit([](auto&& val) -> decltype(auto) { return val.is_in_memory(); }, value_);
   }
   [[nodiscard]] auto is_hugepage() const noexcept -> bool
   {
-    return std::visit([](auto&& val) { return val.is_hugepage(); }, value_);
+    return std::visit([](auto&& val) -> decltype(auto) { return val.is_hugepage(); }, value_);
   }
   [[nodiscard]] auto n_rows() const -> uint32_t
   {
-    return std::visit([](auto&& val) { return val.n_rows(); }, value_);
+    return std::visit([](auto&& val) -> decltype(auto) { return val.n_rows(); }, value_);
   }
 
   [[nodiscard]] auto n_cols() const -> uint32_t
   {
-    return std::visit([](auto&& val) { return val.n_cols(); }, value_);
+    return std::visit([](auto&& val) -> decltype(auto) { return val.n_cols(); }, value_);
   }
   /** Size of the blob content in bytes (doesn't include file header). */
   [[nodiscard]] auto size() const -> size_t
   {
-    return std::visit([](auto&& val) { return val.size(); }, value_);
+    return std::visit([](auto&& val) -> decltype(auto) { return val.size(); }, value_);
   }
   /**
    * Reset the hidden internal state, e.g. release the memory allocation or close a file descriptor.
@@ -872,7 +872,7 @@ struct blob {
    */
   void reset_lazy_state() const
   {
-    std::visit([](auto&& val) { val.reset_lazy_state(); }, value_);
+    std::visit([](auto&& val) -> void { val.reset_lazy_state(); }, value_);
   }
 };
 

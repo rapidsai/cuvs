@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,23 +9,47 @@
 
 namespace cuvs::neighbors::cagra {
 
-typedef AnnCagraTest<float, std::int8_t, std::uint32_t> AnnCagraTestI8_U32;
-TEST_P(AnnCagraTestI8_U32, AnnCagra) { this->testCagra(); }
-typedef AnnCagraAddNodesTest<float, std::int8_t, std::uint32_t> AnnCagraAddNodesTestI8_U32;
-TEST_P(AnnCagraAddNodesTestI8_U32, AnnCagra) { this->testCagra(); }
-typedef AnnCagraFilterTest<float, std::int8_t, std::uint32_t> AnnCagraFilterTestI8_U32;
-TEST_P(AnnCagraFilterTestI8_U32, AnnCagra) { this->testCagra(); }
-typedef AnnCagraIndexMergeTest<float, std::int8_t, std::uint32_t> AnnCagraIndexMergeTestI8_U32;
-TEST_P(AnnCagraIndexMergeTestI8_U32, AnnCagra) { this->testCagra(); }
+using AnnCagraTestI8_U32 =
+  AnnCagraTest<float, std::int8_t, std::uint32_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(AnnCagraTestI8_U32,
+       AnnCagra)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  this->testCagra();
+}  // NOLINT(readability-identifier-naming)
+using AnnCagraAddNodesTestI8_U32 =
+  AnnCagraAddNodesTest<float, std::int8_t, std::uint32_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(AnnCagraAddNodesTestI8_U32,
+       AnnCagra)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  this->testCagra();
+}  // NOLINT(readability-identifier-naming)
+using AnnCagraFilterTestI8_U32 =
+  AnnCagraFilterTest<float, std::int8_t, std::uint32_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(AnnCagraFilterTestI8_U32,
+       AnnCagra)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  this->testCagra();
+}  // NOLINT(readability-identifier-naming)
+using AnnCagraIndexMergeTestI8_U32 =
+  AnnCagraIndexMergeTest<float,
+                         std::int8_t,
+                         std::uint32_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(AnnCagraIndexMergeTestI8_U32,
+       AnnCagra)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  this->testCagra();
+}  // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(AnnCagraTest, AnnCagraTestI8_U32, ::testing::ValuesIn(inputs));
-INSTANTIATE_TEST_CASE_P(AnnCagraAddNodesTest,
+INSTANTIATE_TEST_CASE_P(AnnCagraTest,
+                        AnnCagraTestI8_U32,
+                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(AnnCagraAddNodesTest,          // NOLINT(readability-identifier-naming)
                         AnnCagraAddNodesTestI8_U32,
                         ::testing::ValuesIn(inputs_addnode));
-INSTANTIATE_TEST_CASE_P(AnnCagraFilterTest,
+INSTANTIATE_TEST_CASE_P(AnnCagraFilterTest,  // NOLINT(readability-identifier-naming)
                         AnnCagraFilterTestI8_U32,
                         ::testing::ValuesIn(inputs_filtering));
-INSTANTIATE_TEST_CASE_P(AnnCagraIndexMergeTest,
+INSTANTIATE_TEST_CASE_P(AnnCagraIndexMergeTest,  // NOLINT(readability-identifier-naming)
                         AnnCagraIndexMergeTestI8_U32,
                         ::testing::ValuesIn(inputs));
 

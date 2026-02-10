@@ -29,7 +29,7 @@ void _transform(cuvsResources_t res,
   using out_mdspan_type = raft::device_matrix_view<OutputT, int64_t, raft::row_major>;
   using vq_labels_mdspan_type = raft::device_vector_view<uint32_t, int64_t>;
   std::optional<vq_labels_mdspan_type> vq_labels = std::nullopt;
-  if (vq_labels_tensor != NULL) {
+  if (vq_labels_tensor != nullptr) {
     vq_labels = cuvs::core::from_dlpack<vq_labels_mdspan_type>(vq_labels_tensor);
   }
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
@@ -55,9 +55,9 @@ void _transform(cuvsResources_t res,
 }
 
 template <typename T>
-void* _build(cuvsResources_t res,
+auto _build(cuvsResources_t res,
              cuvsProductQuantizerParams_t params,
-             DLManagedTensor* dataset_tensor)
+             DLManagedTensor* dataset_tensor) -> void*
 {
   auto dataset = dataset_tensor->dl_tensor;
 
@@ -108,7 +108,7 @@ void _inverse_transform(cuvsResources_t res,
     using data_mdspan_type = raft::device_matrix_view<DataT, int64_t, raft::row_major>;
     using vq_labels_mdspan_type = raft::device_vector_view<const uint32_t, int64_t>;
     std::optional<vq_labels_mdspan_type> vq_labels = std::nullopt;
-    if (vq_labels_tensor != NULL) {
+    if (vq_labels_tensor != nullptr) {
       vq_labels = cuvs::core::from_dlpack<vq_labels_mdspan_type>(vq_labels_tensor);
     }
     cuvs::preprocessing::quantize::pq::inverse_transform(
@@ -124,7 +124,7 @@ void _inverse_transform(cuvsResources_t res,
 }
 }  // namespace
 
-extern "C" cuvsError_t cuvsProductQuantizerParamsCreate(cuvsProductQuantizerParams_t* params)
+extern "C" auto cuvsProductQuantizerParamsCreate(cuvsProductQuantizerParams_t* params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     *params = new cuvsProductQuantizerParams{
@@ -133,25 +133,25 @@ extern "C" cuvsError_t cuvsProductQuantizerParamsCreate(cuvsProductQuantizerPara
       .max_train_points_per_pq_code = 256, .max_train_points_per_vq_cluster = 1024}; });
 }
 
-extern "C" cuvsError_t cuvsProductQuantizerParamsDestroy(cuvsProductQuantizerParams_t params)
+extern "C" auto cuvsProductQuantizerParamsDestroy(cuvsProductQuantizerParams_t params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
 }
 
-extern "C" cuvsError_t cuvsProductQuantizerCreate(cuvsProductQuantizer_t* quantizer)
+extern "C" auto cuvsProductQuantizerCreate(cuvsProductQuantizer_t* quantizer) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { *quantizer = new cuvsProductQuantizer; });
 }
 
-extern "C" cuvsError_t cuvsProductQuantizerDestroy(cuvsProductQuantizer_t quantizer)
+extern "C" auto cuvsProductQuantizerDestroy(cuvsProductQuantizer_t quantizer) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { delete quantizer; });
 }
 
-extern "C" cuvsError_t cuvsProductQuantizerBuild(cuvsResources_t res,
+extern "C" auto cuvsProductQuantizerBuild(cuvsResources_t res,
                                                  cuvsProductQuantizerParams_t params,
                                                  DLManagedTensor* dataset_tensor,
-                                                 cuvsProductQuantizer_t quantizer)
+                                                 cuvsProductQuantizer_t quantizer) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset     = dataset_tensor->dl_tensor;
@@ -166,11 +166,11 @@ extern "C" cuvsError_t cuvsProductQuantizerBuild(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsProductQuantizerTransform(cuvsResources_t res,
+extern "C" auto cuvsProductQuantizerTransform(cuvsResources_t res,
                                                      cuvsProductQuantizer_t quantizer,
                                                      DLManagedTensor* dataset_tensor,
                                                      DLManagedTensor* codes_out_tensor,
-                                                     DLManagedTensor* vq_labels_tensor)
+                                                     DLManagedTensor* vq_labels_tensor) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
@@ -184,11 +184,11 @@ extern "C" cuvsError_t cuvsProductQuantizerTransform(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsProductQuantizerInverseTransform(cuvsResources_t res,
+extern "C" auto cuvsProductQuantizerInverseTransform(cuvsResources_t res,
                                                             cuvsProductQuantizer_t quantizer,
                                                             DLManagedTensor* codes_tensor,
                                                             DLManagedTensor* out_tensor,
-                                                            DLManagedTensor* vq_labels_tensor)
+                                                            DLManagedTensor* vq_labels_tensor) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto out_dtype = out_tensor->dl_tensor.dtype;
@@ -201,8 +201,8 @@ extern "C" cuvsError_t cuvsProductQuantizerInverseTransform(cuvsResources_t res,
     }
   });
 }
-extern "C" cuvsError_t cuvsProductQuantizerGetPqBits(cuvsProductQuantizer_t quantizer,
-                                                     uint32_t* pq_bits)
+extern "C" auto cuvsProductQuantizerGetPqBits(cuvsProductQuantizer_t quantizer,
+                                                     uint32_t* pq_bits) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (quantizer != nullptr) {
@@ -222,8 +222,8 @@ extern "C" cuvsError_t cuvsProductQuantizerGetPqBits(cuvsProductQuantizer_t quan
   });
 }
 
-extern "C" cuvsError_t cuvsProductQuantizerGetPqDim(cuvsProductQuantizer_t quantizer,
-                                                    uint32_t* pq_dim)
+extern "C" auto cuvsProductQuantizerGetPqDim(cuvsProductQuantizer_t quantizer,
+                                                    uint32_t* pq_dim) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (quantizer != nullptr) {
@@ -243,8 +243,8 @@ extern "C" cuvsError_t cuvsProductQuantizerGetPqDim(cuvsProductQuantizer_t quant
   });
 }
 
-extern "C" cuvsError_t cuvsProductQuantizerGetPqCodebook(cuvsProductQuantizer_t quantizer,
-                                                         DLManagedTensor* pq_codebook)
+extern "C" auto cuvsProductQuantizerGetPqCodebook(cuvsProductQuantizer_t quantizer,
+                                                         DLManagedTensor* pq_codebook) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (quantizer != nullptr) {
@@ -265,8 +265,8 @@ extern "C" cuvsError_t cuvsProductQuantizerGetPqCodebook(cuvsProductQuantizer_t 
   });
 }
 
-extern "C" cuvsError_t cuvsProductQuantizerGetVqCodebook(cuvsProductQuantizer_t quantizer,
-                                                         DLManagedTensor* vq_codebook)
+extern "C" auto cuvsProductQuantizerGetVqCodebook(cuvsProductQuantizer_t quantizer,
+                                                         DLManagedTensor* vq_codebook) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (quantizer != nullptr) {
@@ -287,8 +287,8 @@ extern "C" cuvsError_t cuvsProductQuantizerGetVqCodebook(cuvsProductQuantizer_t 
   });
 }
 
-extern "C" cuvsError_t cuvsProductQuantizerGetEncodedDim(cuvsProductQuantizer_t quantizer,
-                                                        uint32_t* encoded_dim)
+extern "C" auto cuvsProductQuantizerGetEncodedDim(cuvsProductQuantizer_t quantizer,
+                                                        uint32_t* encoded_dim) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (quantizer != nullptr) {
@@ -307,8 +307,8 @@ extern "C" cuvsError_t cuvsProductQuantizerGetEncodedDim(cuvsProductQuantizer_t 
   });
 }
 
-extern "C" cuvsError_t cuvsProductQuantizerGetUseVq(
-  cuvsProductQuantizer_t quantizer, bool* use_vq)
+extern "C" auto cuvsProductQuantizerGetUseVq(
+  cuvsProductQuantizer_t quantizer, bool* use_vq) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (quantizer != nullptr) {

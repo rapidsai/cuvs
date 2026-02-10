@@ -101,7 +101,7 @@ struct list_spec {
   }
 
   /** Determine the extents of an array enough to hold a given amount of data. */
-  constexpr auto make_list_extents(SizeT n_rows) const -> list_extents
+  [[nodiscard]] constexpr auto make_list_extents(SizeT n_rows) const -> list_extents
   {
     return raft::make_extents<SizeT>(n_rows, dim);
   }
@@ -135,11 +135,11 @@ struct index : cuvs::neighbors::index {
                 "IdxT must be able to represent all values of uint32_t");
 
  public:
-  index(const index&)            = delete;
-  index(index&&)                 = default;
-  index& operator=(const index&) = delete;
-  index& operator=(index&&)      = default;
-  ~index()                       = default;
+  index(const index&)                    = delete;
+  index(index&&)                         = default;
+  auto operator=(const index&) -> index& = delete;
+  auto operator=(index&&) -> index&      = default;
+  ~index()                               = default;
 
   /**
    * @brief Construct an empty index.
@@ -147,7 +147,7 @@ struct index : cuvs::neighbors::index {
    * Constructs an empty index. This index will either need to be trained with `build`
    * or loaded from a saved copy with `deserialize`
    */
-  index(raft::resources const& res);
+  index(raft::resources const& res);  // NOLINT(google-explicit-constructor)
 
   /** Construct an empty index. It needs to be trained and then populated. */
   index(raft::resources const& res, const index_params& params, uint32_t dim);
@@ -162,13 +162,13 @@ struct index : cuvs::neighbors::index {
   /**
    * Vectorized load/store size in elements, determines the size of interleaved data chunks.
    */
-  uint32_t veclen() const noexcept;
+  [[nodiscard]] auto veclen() const noexcept -> uint32_t;
 
   /** Distance metric used for clustering. */
-  cuvs::distance::DistanceType metric() const noexcept;
+  [[nodiscard]] auto metric() const noexcept -> cuvs::distance::DistanceType;
 
   /** Whether `centers()` change upon extending the index (ivf_flat::extend). */
-  bool adaptive_centers() const noexcept;
+  [[nodiscard]] auto adaptive_centers() const noexcept -> bool;
 
   /**
    * Inverted list data [size, dim].
@@ -197,12 +197,14 @@ struct index : cuvs::neighbors::index {
    * NB: This may differ from the actual list size if the shared lists have been extended by another
    * index
    */
-  raft::device_vector_view<uint32_t, uint32_t> list_sizes() noexcept;
-  raft::device_vector_view<const uint32_t, uint32_t> list_sizes() const noexcept;
+  auto list_sizes() noexcept -> raft::device_vector_view<uint32_t, uint32_t>;
+  [[nodiscard]] auto list_sizes() const noexcept
+    -> raft::device_vector_view<const uint32_t, uint32_t>;
 
   /** k-means cluster centers corresponding to the lists [n_lists, dim] */
-  raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept;
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers() const noexcept;
+  auto centers() noexcept -> raft::device_matrix_view<float, uint32_t, raft::row_major>;
+  [[nodiscard]] auto centers() const noexcept
+    -> raft::device_matrix_view<const float, uint32_t, raft::row_major>;
 
   /**
    * (Optional) Precomputed norms of the `centers` w.r.t. the chosen distance metric [n_lists].
@@ -210,8 +212,9 @@ struct index : cuvs::neighbors::index {
    * NB: this may be empty if the index is empty or if the metric does not require the center norms
    * calculation.
    */
-  std::optional<raft::device_vector_view<float, uint32_t>> center_norms() noexcept;
-  std::optional<raft::device_vector_view<const float, uint32_t>> center_norms() const noexcept;
+  auto center_norms() noexcept -> std::optional<raft::device_vector_view<float, uint32_t>>;
+  [[nodiscard]] auto center_norms() const noexcept
+    -> std::optional<raft::device_vector_view<const float, uint32_t>>;
 
   /**
    * Accumulated list sizes, sorted in descending order [n_lists + 1].
@@ -227,31 +230,32 @@ struct index : cuvs::neighbors::index {
     -> raft::host_vector_view<const IdxT, uint32_t>;
 
   /** Total length of the index. */
-  IdxT size() const noexcept;
+  [[nodiscard]] auto size() const noexcept -> IdxT;
 
   /** Dimensionality of the data. */
-  uint32_t dim() const noexcept;
+  [[nodiscard]] auto dim() const noexcept -> uint32_t;
 
   /** Number of clusters/inverted lists. */
-  uint32_t n_lists() const noexcept;
-  raft::device_vector_view<T*, uint32_t> data_ptrs() noexcept;
-  raft::device_vector_view<T* const, uint32_t> data_ptrs() const noexcept;
+  [[nodiscard]] auto n_lists() const noexcept -> uint32_t;
+  auto data_ptrs() noexcept -> raft::device_vector_view<T*, uint32_t>;
+  [[nodiscard]] auto data_ptrs() const noexcept -> raft::device_vector_view<T* const, uint32_t>;
 
   /** Pointers to the inverted lists (clusters) indices  [n_lists]. */
-  raft::device_vector_view<IdxT*, uint32_t> inds_ptrs() noexcept;
-  raft::device_vector_view<IdxT* const, uint32_t> inds_ptrs() const noexcept;
+  auto inds_ptrs() noexcept -> raft::device_vector_view<IdxT*, uint32_t>;
+  [[nodiscard]] auto inds_ptrs() const noexcept -> raft::device_vector_view<IdxT* const, uint32_t>;
 
   /**
    * Whether to use convervative memory allocation when extending the list (cluster) data
    * (see index_params.conservative_memory_allocation).
    */
-  bool conservative_memory_allocation() const noexcept;
+  [[nodiscard]] auto conservative_memory_allocation() const noexcept -> bool;
 
   void allocate_center_norms(raft::resources const& res);
 
   /** Lists' data and indices. */
-  std::vector<std::shared_ptr<list_data<T, IdxT>>>& lists() noexcept;
-  const std::vector<std::shared_ptr<list_data<T, IdxT>>>& lists() const noexcept;
+  auto lists() noexcept -> std::vector<std::shared_ptr<list_data<T, IdxT>>>&;
+  [[nodiscard]] auto lists() const noexcept
+    -> const std::vector<std::shared_ptr<list_data<T, IdxT>>>&;
 
   void check_consistency();
 
@@ -276,8 +280,8 @@ struct index : cuvs::neighbors::index {
 
   static auto calculate_veclen(uint32_t dim) -> uint32_t
   {
-    // TODO: consider padding the dimensions and fixing veclen to its maximum possible value as a
-    // template parameter (https://github.com/rapidsai/raft/issues/711)
+    // TODO(cuvs): consider padding the dimensions and fixing veclen to its maximum possible value
+    // as a template parameter (https://github.com/rapidsai/raft/issues/711)
 
     // NOTE: keep this consistent with the select_interleaved_scan_kernel logic
     // in detail/ivf_flat_interleaved_scan-inl.cuh.

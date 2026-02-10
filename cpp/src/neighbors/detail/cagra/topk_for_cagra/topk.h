@@ -1,20 +1,20 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
 #include <cuda_fp16.h>
 
-#include <stdint.h>
+#include <cstdint>
 
 namespace cuvs::neighbors::cagra::detail {
 
 //
-size_t _cuann_find_topk_bufferSize(uint32_t topK,
-                                   uint32_t sizeBatch,
-                                   uint32_t numElements,
-                                   cudaDataType_t sampleDtype = CUDA_R_32F);
+auto _cuann_find_topk_bufferSize(uint32_t topK,  // NOLINT(readability-identifier-naming)
+                                 uint32_t sizeBatch,
+                                 uint32_t numElements,
+                                 cudaDataType_t sampleDtype = CUDA_R_32F) -> size_t;
 
 //
 template <class ValT>
@@ -32,7 +32,7 @@ void _cuann_find_topk(uint32_t topK,
                       void* workspace,
                       bool sort           = false,
                       uint32_t* hint      = NULL,
-                      cudaStream_t stream = 0);
+                      cudaStream_t stream = nullptr);
 
 #ifdef __CUDA_ARCH__
 #define CUDA_DEVICE_HOST_FUNC __device__
@@ -40,7 +40,9 @@ void _cuann_find_topk(uint32_t topK,
 #define CUDA_DEVICE_HOST_FUNC
 #endif
 //
-CUDA_DEVICE_HOST_FUNC inline size_t _cuann_aligned(size_t size, size_t unit = 128)
+CUDA_DEVICE_HOST_FUNC inline auto _cuann_aligned(  // NOLINT(readability-identifier-naming)
+  size_t size,
+  size_t unit = 128) -> size_t
 {
   if (size % unit) { size += unit - (size % unit); }
   return size;

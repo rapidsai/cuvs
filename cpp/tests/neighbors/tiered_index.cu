@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -23,9 +23,9 @@
 
 namespace cuvs::neighbors::tiered_index {
 
-enum TieredIndexTestStrategy { TEST_EXTEND, TEST_MERGE };
+enum TieredIndexTestStrategy { TEST_EXTEND, TEST_MERGE };  // NOLINT(readability-identifier-naming)
 
-struct AnnTieredIndexInputs {
+struct AnnTieredIndexInputs {  // NOLINT(readability-identifier-naming)
   int n_rows;
   int dim;
   cuvs::distance::DistanceType metric;
@@ -34,7 +34,7 @@ struct AnnTieredIndexInputs {
   TieredIndexTestStrategy test_strategy;
 };
 
-inline ::std::ostream& operator<<(::std::ostream& os, const TieredIndexTestStrategy& p)
+inline auto operator<<(::std::ostream& os, const TieredIndexTestStrategy& p) -> ::std::ostream&
 {
   switch (p) {
     case TEST_EXTEND: os << "TEST_EXTEND"; break;
@@ -43,7 +43,7 @@ inline ::std::ostream& operator<<(::std::ostream& os, const TieredIndexTestStrat
   return os;
 }
 
-inline ::std::ostream& operator<<(::std::ostream& os, const AnnTieredIndexInputs& p)
+inline auto operator<<(::std::ostream& os, const AnnTieredIndexInputs& p) -> ::std::ostream&
 {
   os << "dataset shape=" << p.n_rows << "x" << p.dim << ", metric=" << print_metric{p.metric}
      << ", k=" << p.k << ", n_queries=" << p.n_queries << ", test_strategy=" << p.test_strategy
@@ -52,10 +52,11 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AnnTieredIndexInputs
 }
 
 template <typename UpstreamT>
-class ANNTieredIndexTest : public ::testing::TestWithParam<AnnTieredIndexInputs> {
+class ANNTieredIndexTest : public ::testing::TestWithParam<
+                             AnnTieredIndexInputs> {  // NOLINT(readability-identifier-naming)
  public:
   using value_type = typename UpstreamT::value_type;
-  ANNTieredIndexTest()
+  ANNTieredIndexTest()  // NOLINT(modernize-use-equals-default)
     : stream_(raft::resource::get_cuda_stream(handle_)),
       ps(::testing::TestWithParam<AnnTieredIndexInputs>::GetParam()),
       database(0, stream_),
@@ -64,7 +65,7 @@ class ANNTieredIndexTest : public ::testing::TestWithParam<AnnTieredIndexInputs>
   }
 
  protected:
-  void testTieredIndex()
+  void testTieredIndex()  // NOLINT(readability-identifier-naming)
   {
     // Calculate the naive results
     std::vector<int64_t> indices_naive(ps.n_queries * ps.k);
@@ -118,7 +119,7 @@ class ANNTieredIndexTest : public ::testing::TestWithParam<AnnTieredIndexInputs>
       // include 50% of the rows in the initial build
       auto initial_rows  = ps.n_rows / 2;
       auto database_view = raft::make_device_matrix_view<const value_type, int64_t>(
-        (const value_type*)database.data(), initial_rows, ps.dim);
+        static_cast<const value_type*>(database.data()), initial_rows, ps.dim);
       auto index = cuvs::neighbors::tiered_index::build(handle_, build_params, database_view);
 
       std::optional<cuvs::neighbors::tiered_index::index<UpstreamT>> final_index;
@@ -129,7 +130,7 @@ class ANNTieredIndexTest : public ::testing::TestWithParam<AnnTieredIndexInputs>
           cuvs::neighbors::tiered_index::extend(
             handle_,
             raft::make_device_matrix_view<const value_type, int64_t>(
-              (const value_type*)database.data() + i * ps.dim, 1, ps.dim),
+              static_cast<const value_type*>(database.data()) + i * ps.dim, 1, ps.dim),
             &index);
         }
         final_index.emplace(index);
@@ -137,7 +138,7 @@ class ANNTieredIndexTest : public ::testing::TestWithParam<AnnTieredIndexInputs>
         // test merge by creating a new index with the remaining vectors and then merge into the
         // main index
         auto database_view2 = raft::make_device_matrix_view<const value_type, int64_t>(
-          (const value_type*)database.data() + initial_rows * ps.dim,
+          static_cast<const value_type*>(database.data()) + initial_rows * ps.dim,
           ps.n_rows - initial_rows,
           ps.dim);
         auto index2 = cuvs::neighbors::tiered_index::build(handle_, build_params, database_view2);
@@ -151,14 +152,14 @@ class ANNTieredIndexTest : public ::testing::TestWithParam<AnnTieredIndexInputs>
       raft::resource::sync_stream(handle_);
 
       auto queries_view = raft::make_device_matrix_view<const value_type, int64_t>(
-        (const value_type*)queries.data(), ps.n_queries, ps.dim);
+        static_cast<const value_type*>(queries.data()), ps.n_queries, ps.dim);
       rmm::device_uvector<value_type> distances_tiered_dev(ps.n_queries * ps.k, stream_);
       rmm::device_uvector<int64_t> indices_tiered_dev(ps.n_queries * ps.k, stream_);
 
       auto distances_view = raft::make_device_matrix_view<value_type, int64_t>(
-        (value_type*)distances_tiered_dev.data(), ps.n_queries, ps.k);
+        static_cast<value_type*>(distances_tiered_dev.data()), ps.n_queries, ps.k);
       auto indices_view = raft::make_device_matrix_view<int64_t, int64_t>(
-        (int64_t*)indices_tiered_dev.data(), ps.n_queries, ps.k);
+        static_cast<int64_t*>(indices_tiered_dev.data()), ps.n_queries, ps.k);
 
       cuvs::neighbors::tiered_index::search(
         handle_, search_params, *final_index, queries_view, indices_view, distances_view);
@@ -180,7 +181,7 @@ class ANNTieredIndexTest : public ::testing::TestWithParam<AnnTieredIndexInputs>
                                 min_recall));
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     queries.resize(((size_t)ps.n_queries) * ps.dim, stream_);
@@ -192,7 +193,7 @@ class ANNTieredIndexTest : public ::testing::TestWithParam<AnnTieredIndexInputs>
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override
+  void TearDown() override  // NOLINT(readability-identifier-naming)
   {
     raft::resource::sync_stream(handle_);
     database.resize(0, stream_);
@@ -202,12 +203,12 @@ class ANNTieredIndexTest : public ::testing::TestWithParam<AnnTieredIndexInputs>
  private:
   raft::resources handle_;
   rmm::cuda_stream_view stream_;
-  AnnTieredIndexInputs ps;
-  rmm::device_uvector<value_type> database;
-  rmm::device_uvector<value_type> queries;
+  AnnTieredIndexInputs ps;                   // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<value_type> database;  // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<value_type> queries;   // NOLINT(readability-identifier-naming)
 };
 
-const std::vector<AnnTieredIndexInputs> inputs =
+const std::vector<AnnTieredIndexInputs> inputs =  // NOLINT(readability-identifier-naming)
   raft::util::itertools::product<AnnTieredIndexInputs>(
     {2000, 4000},   // n_rows
     {16, 29, 256},  // dim
@@ -217,15 +218,30 @@ const std::vector<AnnTieredIndexInputs> inputs =
     {10},                                          // n_queries
     {TEST_EXTEND, TEST_MERGE}                      // test_strategy
   );
-typedef ANNTieredIndexTest<cagra::index<float, uint32_t>> CAGRA_F;
-TEST_P(CAGRA_F, AnnTieredIndex) { this->testTieredIndex(); }
-INSTANTIATE_TEST_CASE_P(ANNTieredIndexTest, CAGRA_F, ::testing::ValuesIn(inputs));
+using CAGRA_F = ANNTieredIndexTest<cagra::index<float, uint32_t>>;
+TEST_P(CAGRA_F, AnnTieredIndex)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  this->testTieredIndex();
+}  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(ANNTieredIndexTest,
+                        CAGRA_F,
+                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
 
-typedef ANNTieredIndexTest<ivf_flat::index<float, int64_t>> IvfFlat_F;
-TEST_P(IvfFlat_F, AnnTieredIndex) { this->testTieredIndex(); }
-INSTANTIATE_TEST_CASE_P(ANNTieredIndexTest, IvfFlat_F, ::testing::ValuesIn(inputs));
+using IvfFlat_F = ANNTieredIndexTest<ivf_flat::index<float, int64_t>>;
+TEST_P(IvfFlat_F, AnnTieredIndex)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  this->testTieredIndex();
+}  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(ANNTieredIndexTest,
+                        IvfFlat_F,
+                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
 
-typedef ANNTieredIndexTest<ivf_pq::typed_index<float, int64_t>> IvfPq_F;
-TEST_P(IvfPq_F, AnnTieredIndex) { this->testTieredIndex(); }
-INSTANTIATE_TEST_CASE_P(ANNTieredIndexTest, IvfPq_F, ::testing::ValuesIn(inputs));
+using IvfPq_F = ANNTieredIndexTest<ivf_pq::typed_index<float, int64_t>>;
+TEST_P(IvfPq_F, AnnTieredIndex)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+{
+  this->testTieredIndex();
+}  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(ANNTieredIndexTest,
+                        IvfPq_F,
+                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
 }  // namespace cuvs::neighbors::tiered_index

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -16,13 +16,12 @@
 
 #include <cub/cub.cuh>
 
-#include <stdint.h>
+#include <cstdint>
 
 #include <limits>
 #include <type_traits>
 
-namespace cuvs {
-namespace distance {
+namespace cuvs::distance {
 
 /**
  * \ingroup fused_l2_nn
@@ -111,7 +110,7 @@ void fusedDistanceNN(OutT* min,
                    m,
                    n,
                    k,
-                   (int*)workspace,
+                   static_cast<int*>(workspace),
                    redOp,
                    pairRedOp,
                    sqrt,
@@ -134,7 +133,7 @@ void fusedDistanceNN(OutT* min,
                    m,
                    n,
                    k,
-                   (int*)workspace,
+                   static_cast<int*>(workspace),
                    redOp,
                    pairRedOp,
                    sqrt,
@@ -159,7 +158,7 @@ void fusedDistanceNN(OutT* min,
                    m,
                    n,
                    k,
-                   (int*)workspace,
+                   static_cast<int*>(workspace),
                    redOp,
                    pairRedOp,
                    sqrt,
@@ -182,7 +181,7 @@ void fusedDistanceNN(OutT* min,
                    m,
                    n,
                    k,
-                   (int*)workspace,
+                   static_cast<int*>(workspace),
                    redOp,
                    pairRedOp,
                    sqrt,
@@ -206,7 +205,7 @@ void fusedDistanceNN(OutT* min,
                                              m,
                                              n,
                                              k,
-                                             (int*)workspace,
+                                             static_cast<int*>(workspace),
                                              redOp,
                                              pairRedOp,
                                              sqrt,
@@ -228,7 +227,7 @@ void fusedDistanceNN(OutT* min,
                                              m,
                                              n,
                                              k,
-                                             (int*)workspace,
+                                             static_cast<int*>(workspace),
                                              redOp,
                                              pairRedOp,
                                              sqrt,
@@ -313,7 +312,6 @@ void fusedDistanceNNMinReduce(OutT* min,
 
 /** @} */
 
-}  // namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance
 
 #endif

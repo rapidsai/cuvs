@@ -70,7 +70,18 @@ files:
     output: none
     includes:
       - checks
+      - clang
       - py_version
+  clang_tidy:
+    output: none
+    includes:
+      - rapids_build
+      - clang
+      - cuda
+      - cuda_version
+      - depends_on_libraft
+      - depends_on_librmm
+      - depends_on_nccl
   docs:
     output: none
     includes:

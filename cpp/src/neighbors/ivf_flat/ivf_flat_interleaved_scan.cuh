@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -806,7 +806,7 @@ template <int Capacity,
           typename IvfSampleFilterT,
           typename Lambda,
           typename PostLambda>
-RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)
+RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)  // NOLINT(readability-identifier-naming)
   interleaved_scan_kernel(Lambda compute_dist,
                           PostLambda post_process,
                           const uint32_t query_smem_elems,
@@ -962,7 +962,8 @@ RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)
  *  Configure the gridDim.x to maximize GPU occupancy, but reduce the output size
  */
 template <typename T>
-uint32_t configure_launch_x(uint32_t numQueries, uint32_t n_probes, int32_t sMemSize, T func)
+auto configure_launch_x(uint32_t numQueries, uint32_t n_probes, int32_t sMemSize, T func)
+  -> uint32_t
 {
   int dev_id;
   RAFT_CUDA_TRY(cudaGetDevice(&dev_id));

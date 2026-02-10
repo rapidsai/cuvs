@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -21,7 +21,8 @@
 #include <fstream>
 
 namespace cuvs::neighbors {
-using namespace raft;
+using raft::host_matrix_view;
+using raft::row_major;
 
 template <typename AnnIndexType, typename T, typename IdxT, typename searchIdxT>
 void search(const raft::resources& handle,
@@ -33,8 +34,9 @@ void search(const raft::resources& handle,
 }  // namespace cuvs::neighbors
 
 namespace cuvs::neighbors::snmg::detail {
-using namespace cuvs::neighbors;
-using namespace raft;
+using raft::device_matrix_view;
+using raft::host_matrix_view;
+using raft::row_major;
 
 // local index deserialization and distribution
 template <typename AnnIndexType, typename T, typename IdxT>
@@ -120,7 +122,7 @@ void build(const raft::resources& clique,
   } else if (index.mode_ == SHARDED) {
     int64_t n_rows           = index_dataset.extent(0);
     int64_t n_cols           = index_dataset.extent(1);
-    int64_t n_rows_per_shard = raft::ceildiv(n_rows, (int64_t)index.num_ranks_);
+    int64_t n_rows_per_shard = raft::ceildiv(n_rows, static_cast<int64_t>(index.num_ranks_));
 
     RAFT_LOG_DEBUG("SHARDED BUILD: %d*%drows", index.num_ranks_, n_rows_per_shard);
 
@@ -194,7 +196,7 @@ void extend(const raft::resources& clique,
     cuvs::core::omp::set_nested(saved_nested);
   } else if (index.mode_ == SHARDED) {
     int64_t n_cols           = new_vectors.extent(1);
-    int64_t n_rows_per_shard = raft::ceildiv(n_rows, (int64_t)index.num_ranks_);
+    int64_t n_rows_per_shard = raft::ceildiv(n_rows, static_cast<int64_t>(index.num_ranks_));
 
     RAFT_LOG_DEBUG("SHARDED EXTEND: %d*%drows", index.num_ranks_, n_rows_per_shard);
 
@@ -265,7 +267,7 @@ void sharded_search_with_direct_merge(
     int64_t offset                  = batch_idx * n_rows_per_batch;
     int64_t query_offset            = offset * n_cols;
     int64_t output_offset           = offset * n_neighbors;
-    int64_t n_rows_of_current_batch = std::min((int64_t)n_rows_per_batch, n_rows - offset);
+    int64_t n_rows_of_current_batch = std::min(n_rows_per_batch, n_rows - offset);
     int64_t part_size               = n_rows_of_current_batch * n_neighbors;
     auto query_partition            = raft::make_host_matrix_view<const T, int64_t, row_major>(
       queries.data_handle() + query_offset, n_rows_of_current_batch, n_cols);
@@ -387,7 +389,7 @@ void sharded_search_with_tree_merge(
     int64_t offset                  = batch_idx * n_rows_per_batch;
     int64_t query_offset            = offset * n_cols;
     int64_t output_offset           = offset * n_neighbors;
-    int64_t n_rows_of_current_batch = std::min((int64_t)n_rows_per_batch, n_rows - offset);
+    int64_t n_rows_of_current_batch = std::min(n_rows_per_batch, n_rows - offset);
     auto query_partition            = raft::make_host_matrix_view<const T, int64_t, row_major>(
       queries.data_handle() + query_offset, n_rows_of_current_batch, n_cols);
 
@@ -569,18 +571,18 @@ void search(const raft::resources& clique,
   int64_t n_rows_per_batch = -1;
   if (index.mode_ == REPLICATED) {
     cuvs::neighbors::replicated_search_mode search_mode;
-    if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
+    if constexpr (std::is_same_v<AnnIndexType, ivf_flat::index<T, IdxT>>) {
       const cuvs::neighbors::mg_search_params<ivf_flat::search_params>* mg_search_params =
         static_cast<const cuvs::neighbors::mg_search_params<ivf_flat::search_params>*>(
           search_params);
       search_mode      = mg_search_params->search_mode;
       n_rows_per_batch = mg_search_params->n_rows_per_batch;
-    } else if constexpr (std::is_same<AnnIndexType, ivf_pq::index<IdxT>>::value) {
+    } else if constexpr (std::is_same_v<AnnIndexType, ivf_pq::index<IdxT>>) {
       const cuvs::neighbors::mg_search_params<ivf_pq::search_params>* mg_search_params =
         static_cast<const cuvs::neighbors::mg_search_params<ivf_pq::search_params>*>(search_params);
       search_mode      = mg_search_params->search_mode;
       n_rows_per_batch = mg_search_params->n_rows_per_batch;
-    } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
+    } else if constexpr (std::is_same_v<AnnIndexType, cagra::index<T, IdxT>>) {
       const cuvs::neighbors::mg_search_params<cagra::search_params>* mg_search_params =
         static_cast<const cuvs::neighbors::mg_search_params<cagra::search_params>*>(search_params);
       search_mode      = mg_search_params->search_mode;
@@ -588,10 +590,10 @@ void search(const raft::resources& clique,
     }
 
     if (search_mode == LOAD_BALANCER) {
-      int64_t n_rows_per_rank = raft::ceildiv(n_rows, (int64_t)index.num_ranks_);
+      int64_t n_rows_per_rank = raft::ceildiv(n_rows, static_cast<int64_t>(index.num_ranks_));
       n_rows_per_batch =
         std::min(n_rows_per_batch, n_rows_per_rank);  // get at least num_ranks_ batches
-      int64_t n_batches = raft::ceildiv(n_rows, (int64_t)n_rows_per_batch);
+      int64_t n_batches = raft::ceildiv(n_rows, n_rows_per_batch);
       if (n_batches <= 1) n_rows_per_batch = n_rows;
 
       RAFT_LOG_DEBUG(
@@ -643,25 +645,25 @@ void search(const raft::resources& clique,
     }
   } else if (index.mode_ == SHARDED) {
     cuvs::neighbors::sharded_merge_mode merge_mode;
-    if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
+    if constexpr (std::is_same_v<AnnIndexType, ivf_flat::index<T, IdxT>>) {
       const cuvs::neighbors::mg_search_params<ivf_flat::search_params>* mg_search_params =
         static_cast<const cuvs::neighbors::mg_search_params<ivf_flat::search_params>*>(
           search_params);
       merge_mode       = mg_search_params->merge_mode;
       n_rows_per_batch = mg_search_params->n_rows_per_batch;
-    } else if constexpr (std::is_same<AnnIndexType, ivf_pq::index<IdxT>>::value) {
+    } else if constexpr (std::is_same_v<AnnIndexType, ivf_pq::index<IdxT>>) {
       const cuvs::neighbors::mg_search_params<ivf_pq::search_params>* mg_search_params =
         static_cast<const cuvs::neighbors::mg_search_params<ivf_pq::search_params>*>(search_params);
       merge_mode       = mg_search_params->merge_mode;
       n_rows_per_batch = mg_search_params->n_rows_per_batch;
-    } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
+    } else if constexpr (std::is_same_v<AnnIndexType, cagra::index<T, IdxT>>) {
       const cuvs::neighbors::mg_search_params<cagra::search_params>* mg_search_params =
         static_cast<const cuvs::neighbors::mg_search_params<cagra::search_params>*>(search_params);
       merge_mode       = mg_search_params->merge_mode;
       n_rows_per_batch = mg_search_params->n_rows_per_batch;
     }
 
-    int64_t n_batches = raft::ceildiv(n_rows, (int64_t)n_rows_per_batch);
+    int64_t n_batches = raft::ceildiv(n_rows, n_rows_per_batch);
     if (n_batches <= 1) n_rows_per_batch = n_rows;
 
     if (merge_mode == MERGE_ON_ROOT_RANK && index.num_ranks_ > 1) {
@@ -733,8 +735,8 @@ void serialize(const raft::resources& clique,
 
   const auto& handle = raft::resource::set_current_device_to_root_rank(clique);
 
-  serialize_scalar(handle, of, (int)index.mode_);
-  serialize_scalar(handle, of, (int)index.num_ranks_);
+  serialize_scalar(handle, of, static_cast<int>(index.mode_));
+  serialize_scalar(handle, of, static_cast<int>(index.num_ranks_));
 
   for (int rank = 0; rank < index.num_ranks_; rank++) {
     const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);
@@ -749,8 +751,6 @@ void serialize(const raft::resources& clique,
 }  // namespace cuvs::neighbors::snmg::detail
 
 namespace cuvs::neighbors {
-using namespace cuvs::neighbors;
-using namespace raft;
 
 template <typename AnnIndexType, typename T, typename IdxT>
 mg_index<AnnIndexType, T, IdxT>::mg_index(const raft::resources& clique, distribution_mode mode)

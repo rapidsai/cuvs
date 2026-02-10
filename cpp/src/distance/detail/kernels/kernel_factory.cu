@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,7 +8,7 @@
 namespace cuvs::distance::kernels {
 
 template <typename math_t>
-GramMatrixBase<math_t>* KernelFactory<math_t>::create(KernelParams params)
+auto KernelFactory<math_t>::create(KernelParams params) -> GramMatrixBase<math_t>*
 {
   GramMatrixBase<math_t>* res;
   // KernelParams is not templated, we convert the parameters to math_t here:
@@ -25,8 +25,8 @@ GramMatrixBase<math_t>* KernelFactory<math_t>::create(KernelParams params)
 }
 
 template <typename math_t>
-[[deprecated]] GramMatrixBase<math_t>* KernelFactory<math_t>::create(KernelParams params,
-                                                                     cublasHandle_t handle)
+[[deprecated]] auto KernelFactory<math_t>::create(KernelParams params, cublasHandle_t handle)
+  -> GramMatrixBase<math_t>*
 {
   GramMatrixBase<math_t>* res;
   // KernelParams is not templated, we convert the parameters to math_t here:

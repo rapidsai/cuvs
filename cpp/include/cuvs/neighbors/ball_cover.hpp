@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -32,7 +32,7 @@ namespace cuvs::neighbors::ball_cover {
  * @tparam float
  * @tparam int
  */
-template <typename idx_t, typename value_t>
+template <typename idx_t, typename value_t>  // NOLINT(readability-identifier-naming)
 struct index : cuvs::neighbors::index {
  public:
   explicit index(raft::resources const& handle_,
@@ -55,59 +55,67 @@ struct index : cuvs::neighbors::index {
       R_closest_landmark_dists(raft::make_device_vector<float, int64_t>(handle, X_.extent(0))),
       R(raft::make_device_matrix<float, int64_t>(handle, raft::sqrt(X_.extent(0)), X_.extent(1))),
       X_reordered(raft::make_device_matrix<float, int64_t>(handle, X_.extent(0), X_.extent(1))),
-      R_radius(raft::make_device_vector<float, int64_t>(handle, raft::sqrt(X_.extent(0)))),
-      index_trained(false)
+      R_radius(raft::make_device_vector<float, int64_t>(handle, raft::sqrt(X_.extent(0))))
   {
   }
 
-  auto get_R_indptr() const -> raft::device_vector_view<const idx_t, int64_t>
+  // NOLINTBEGIN(readability-identifier-naming)
+  [[nodiscard]] auto get_R_indptr() const -> raft::device_vector_view<const idx_t, int64_t>
   {
     return R_indptr.view();
   }
-  auto get_R_1nn_cols() const -> raft::device_vector_view<const idx_t, int64_t>
+  [[nodiscard]] auto get_R_1nn_cols() const -> raft::device_vector_view<const idx_t, int64_t>
   {
     return R_1nn_cols.view();
   }
-  auto get_R_1nn_dists() const -> raft::device_vector_view<const float, int64_t>
+  [[nodiscard]] auto get_R_1nn_dists() const -> raft::device_vector_view<const float, int64_t>
   {
     return R_1nn_dists.view();
   }
-  auto get_R_radius() const -> raft::device_vector_view<const float, int64_t>
+  [[nodiscard]] auto get_R_radius() const -> raft::device_vector_view<const float, int64_t>
   {
     return R_radius.view();
   }
-  auto get_R() const -> raft::device_matrix_view<const float, int64_t, raft::row_major>
+  [[nodiscard]] auto get_R() const
+    -> raft::device_matrix_view<const float, int64_t, raft::row_major>
   {
     return R.view();
   }
-  auto get_R_closest_landmark_dists() const -> raft::device_vector_view<const float, int64_t>
+  [[nodiscard]] auto get_R_closest_landmark_dists() const
+    -> raft::device_vector_view<const float, int64_t>
   {
     return R_closest_landmark_dists.view();
   }
-  auto get_X_reordered() const -> raft::device_matrix_view<const float, int64_t, raft::row_major>
+  [[nodiscard]] auto get_X_reordered() const
+    -> raft::device_matrix_view<const float, int64_t, raft::row_major>
   {
     return X_reordered.view();
   }
 
-  raft::device_vector_view<idx_t, int64_t> get_R_indptr() { return R_indptr.view(); }
-  raft::device_vector_view<idx_t, int64_t> get_R_1nn_cols() { return R_1nn_cols.view(); }
-  raft::device_vector_view<float, int64_t> get_R_1nn_dists() { return R_1nn_dists.view(); }
-  raft::device_vector_view<float, int64_t> get_R_radius() { return R_radius.view(); }
-  raft::device_matrix_view<float, int64_t, raft::row_major> get_R() { return R.view(); }
-  raft::device_vector_view<float, int64_t> get_R_closest_landmark_dists()
+  auto get_R_indptr() -> raft::device_vector_view<idx_t, int64_t> { return R_indptr.view(); }
+  auto get_R_1nn_cols() -> raft::device_vector_view<idx_t, int64_t> { return R_1nn_cols.view(); }
+  auto get_R_1nn_dists() -> raft::device_vector_view<float, int64_t> { return R_1nn_dists.view(); }
+  auto get_R_radius() -> raft::device_vector_view<float, int64_t> { return R_radius.view(); }
+  auto get_R() -> raft::device_matrix_view<float, int64_t, raft::row_major> { return R.view(); }
+  auto get_R_closest_landmark_dists() -> raft::device_vector_view<float, int64_t>
   {
     return R_closest_landmark_dists.view();
   }
-  raft::device_matrix_view<float, int64_t, raft::row_major> get_X_reordered()
+  auto get_X_reordered() -> raft::device_matrix_view<float, int64_t, raft::row_major>
   {
     return X_reordered.view();
   }
-  raft::device_matrix_view<const float, int64_t, raft::row_major> get_X() const { return X; }
+  [[nodiscard]] auto get_X() const
+    -> raft::device_matrix_view<const float, int64_t, raft::row_major>
+  {
+    return X;
+  }
+  // NOLINTEND(readability-identifier-naming)
 
-  cuvs::distance::DistanceType get_metric() const { return metric; }
+  [[nodiscard]] auto get_metric() const -> cuvs::distance::DistanceType { return metric; }
 
-  int get_n_landmarks() const { return n_landmarks; }
-  bool is_index_trained() const { return index_trained; };
+  [[nodiscard]] auto get_n_landmarks() const -> int { return n_landmarks; }
+  [[nodiscard]] auto is_index_trained() const -> bool { return index_trained; };
 
   // This should only be set by internal functions
   void set_index_trained() { index_trained = true; }
@@ -118,11 +126,13 @@ struct index : cuvs::neighbors::index {
   int64_t n;
   int64_t n_landmarks;
 
-  raft::device_matrix_view<const float, idx_t, raft::row_major> X;
+  raft::device_matrix_view<const float, idx_t, raft::row_major>
+    X;  // NOLINT(readability-identifier-naming)
 
   cuvs::distance::DistanceType metric;
 
  private:
+  // NOLINTBEGIN(readability-identifier-naming)
   // CSR storing the neighborhoods for each data point
   raft::device_vector<idx_t, int64_t> R_indptr;
   raft::device_vector<idx_t, int64_t> R_1nn_cols;
@@ -133,9 +143,10 @@ struct index : cuvs::neighbors::index {
 
   raft::device_matrix<float, int64_t, raft::row_major> R;
   raft::device_matrix<float, int64_t, raft::row_major> X_reordered;
+  // NOLINTEND(readability-identifier-naming)
 
  protected:
-  bool index_trained;
+  bool index_trained{false};  // NOLINT(readability-identifier-naming)
 };
 
 /** @} */

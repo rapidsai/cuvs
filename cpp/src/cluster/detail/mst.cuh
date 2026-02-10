@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -138,7 +138,10 @@ void connect_knn_graph(
   red_op reduction_op                 = red_op{},
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2SqrtExpanded)
 {
-  using namespace cuvs::sparse::neighbors;
+  using cuvs::sparse::neighbors::cross_component_nn;
+  using cuvs::sparse::neighbors::FixConnectivitiesRedOp;
+  using cuvs::sparse::neighbors::get_n_components;
+  using cuvs::sparse::neighbors::MutualReachabilityFixConnectivitiesRedOp;
   static_assert(
     std::is_same_v<red_op, raft::identity_op> ||
       std::is_same_v<red_op, MutualReachabilityFixConnectivitiesRedOp<value_idx, value_t>> ||
@@ -225,7 +228,7 @@ void connect_knn_graph(
       [pairwise_dist_ptr    = pairwise_dist_vec.data_handle(),
        core_dist_ptr        = reduction_op.core_dists,
        device_u_indices_ptr = device_u_indices.data_handle(),
-       device_v_indices_ptr = device_v_indices.data_handle()] __device__(auto i) {
+       device_v_indices_ptr = device_v_indices.data_handle()] __device__(auto i) -> float {
         float dist        = pairwise_dist_ptr[i];
         float u_core_dist = core_dist_ptr[device_u_indices_ptr[i]];
         float v_core_dist = core_dist_ptr[device_v_indices_ptr[i]];
@@ -309,7 +312,7 @@ void build_sorted_mst(
 
   // We want to have MST initialize colors on first call.
   auto mst_coo = raft::sparse::solver::mst<value_idx, value_idx, value_t, double>(
-    handle, indptr, indices, pw_dists, (value_idx)m, nnz, color, stream, false, true);
+    handle, indptr, indices, pw_dists, static_cast<value_idx>(m), nnz, color, stream, false, true);
 
   int iters        = 1;
   int n_components = cuvs::sparse::neighbors::get_n_components(color, m, stream);

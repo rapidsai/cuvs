@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,14 +9,18 @@
 
 namespace cuvs::neighbors::ivf_flat {
 
-typedef AnnIVFFlatTest<float, float, int64_t> AnnIVFFlatTestF_float;
-TEST_P(AnnIVFFlatTestF_float, AnnIVFFlat)
+using AnnIVFFlatTestF_float =
+  AnnIVFFlatTest<float, float, int64_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(AnnIVFFlatTestF_float,  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+       AnnIVFFlat)             // NOLINT(readability-identifier-naming)
 {
   this->testIVFFlat();
   this->testPacker();
   this->testFilter();
 }
 
-INSTANTIATE_TEST_CASE_P(AnnIVFFlatTest, AnnIVFFlatTestF_float, ::testing::ValuesIn(inputs));
+INSTANTIATE_TEST_CASE_P(AnnIVFFlatTest,
+                        AnnIVFFlatTestF_float,
+                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
 
 }  // namespace cuvs::neighbors::ivf_flat

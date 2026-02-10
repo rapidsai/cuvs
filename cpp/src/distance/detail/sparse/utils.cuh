@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -11,10 +11,7 @@
 #include <cuda_fp16.h>
 #include <cuda_pipeline.h>
 
-namespace cuvs {
-namespace distance {
-namespace detail {
-namespace sparse {
+namespace cuvs::distance::detail::sparse {
 
 /**
  * Computes the maximum number of columns that can be stored
@@ -23,7 +20,7 @@ namespace sparse {
  * @return the maximum number of columns that can be stored in smem
  */
 template <typename value_idx, typename value_t, int tpb = 1024>
-inline int max_cols_per_block()
+inline auto max_cols_per_block() -> int
 {
   // max cols = (total smem available - cub reduction smem)
   return (raft::getSharedMemPerBlock() - ((tpb / raft::warp_size()) * sizeof(value_t))) /
@@ -44,7 +41,7 @@ RAFT_KERNEL faster_dot_on_csr_kernel(dot_t* __restrict__ dot,
   auto lane_id = threadIdx.x & 0x1f;
 
   extern __shared__ char smem[];
-  value_t* s_A      = (value_t*)smem;
+  auto* s_A         = reinterpret_cast<value_t*>(smem);
   value_idx cur_row = -1;
 
   for (int row = blockIdx.x; row < n_rows; row += gridDim.x) {
@@ -73,7 +70,7 @@ RAFT_KERNEL faster_dot_on_csr_kernel(dot_t* __restrict__ dot,
         }
       }
 
-      typedef cub::WarpReduce<dot_t> WarpReduce;
+      using WarpReduce = cub::WarpReduce<dot_t>;
       __shared__ typename WarpReduce::TempStorage temp_storage;
       dot_t warp_sum = WarpReduce(temp_storage).Sum(l_dot_);
 
@@ -154,7 +151,4 @@ void faster_dot_on_csr(raft::resources const& handle,
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
-}  // namespace sparse
-}  // namespace detail
-}  // namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance::detail::sparse

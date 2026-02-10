@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,7 +17,10 @@
 
 namespace cuvs::neighbors {
 
-using namespace raft;
+using raft::device_matrix_view;
+using raft::host_matrix_view;
+using raft::matrix_extent;
+using raft::row_major;
 
 template <typename AnnIndexType, typename T, typename IdxT, typename Accessor>
 void build(const raft::resources& handle,
@@ -27,15 +30,15 @@ void build(const raft::resources& handle,
 {
   std::lock_guard lock(*interface.mutex_);
 
-  if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
+  if constexpr (std::is_same_v<AnnIndexType, ivf_flat::index<T, IdxT>>) {
     auto idx = cuvs::neighbors::ivf_flat::build(
       handle, *static_cast<const ivf_flat::index_params*>(index_params), index_dataset);
     interface.index_.emplace(std::move(idx));
-  } else if constexpr (std::is_same<AnnIndexType, ivf_pq::index<IdxT>>::value) {
+  } else if constexpr (std::is_same_v<AnnIndexType, ivf_pq::index<IdxT>>) {
     auto idx = cuvs::neighbors::ivf_pq::build(
       handle, *static_cast<const ivf_pq::index_params*>(index_params), index_dataset);
     interface.index_.emplace(std::move(idx));
-  } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
+  } else if constexpr (std::is_same_v<AnnIndexType, cagra::index<T, IdxT>>) {
     auto idx = cuvs::neighbors::cagra::build(
       handle, *static_cast<const cagra::index_params*>(index_params), index_dataset);
     interface.index_.emplace(std::move(idx));
@@ -53,21 +56,24 @@ void extend(
 {
   std::lock_guard lock(*interface.mutex_);
 
-  if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
+  if constexpr (std::is_same_v<AnnIndexType, ivf_flat::index<T, IdxT>>) {
     auto idx =
       cuvs::neighbors::ivf_flat::extend(handle, new_vectors, new_indices, interface.index_.value());
     interface.index_.emplace(std::move(idx));
-  } else if constexpr (std::is_same<AnnIndexType, ivf_pq::index<IdxT>>::value) {
+  } else if constexpr (std::is_same_v<AnnIndexType, ivf_pq::index<IdxT>>) {
     auto idx =
       cuvs::neighbors::ivf_pq::extend(handle, new_vectors, new_indices, interface.index_.value());
     interface.index_.emplace(std::move(idx));
-  } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
+  } else if constexpr (std::is_same_v<AnnIndexType, cagra::index<T, IdxT>>) {
     RAFT_FAIL("CAGRA does not implement the extend method");
   }
   resource::sync_stream(handle);
 }
 
-template <typename AnnIndexType, typename T, typename IdxT, typename searchIdxT>
+template <typename AnnIndexType,
+          typename T,
+          typename IdxT,
+          typename searchIdxT>  // NOLINT(readability-identifier-naming)
 void search(const raft::resources& handle,
             const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
             const cuvs::neighbors::search_params* search_params,
@@ -76,7 +82,7 @@ void search(const raft::resources& handle,
             raft::device_matrix_view<float, int64_t, row_major> distances)
 {
   // std::lock_guard(*interface.mutex_);
-  if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, int64_t>>::value) {
+  if constexpr (std::is_same_v<AnnIndexType, ivf_flat::index<T, int64_t>>) {
     cuvs::neighbors::ivf_flat::search(
       handle,
       *reinterpret_cast<const ivf_flat::search_params*>(search_params),
@@ -84,14 +90,14 @@ void search(const raft::resources& handle,
       queries,
       neighbors,
       distances);
-  } else if constexpr (std::is_same<AnnIndexType, ivf_pq::index<int64_t>>::value) {
+  } else if constexpr (std::is_same_v<AnnIndexType, ivf_pq::index<int64_t>>) {
     cuvs::neighbors::ivf_pq::search(handle,
                                     *reinterpret_cast<const ivf_pq::search_params*>(search_params),
                                     interface.index_.value(),
                                     queries,
                                     neighbors,
                                     distances);
-  } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, uint32_t>>::value) {
+  } else if constexpr (std::is_same_v<AnnIndexType, cagra::index<T, uint32_t>>) {
     cuvs::neighbors::cagra::search(handle,
                                    *reinterpret_cast<const cagra::search_params*>(search_params),
                                    interface.index_.value(),
@@ -103,7 +109,10 @@ void search(const raft::resources& handle,
 }
 
 // for MG ANN only
-template <typename AnnIndexType, typename T, typename IdxT, typename searchIdxT>
+template <typename AnnIndexType,
+          typename T,
+          typename IdxT,
+          typename searchIdxT>  // NOLINT(readability-identifier-naming)
 void search(const raft::resources& handle,
             const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
             const cuvs::neighbors::search_params* search_params,
@@ -132,11 +141,11 @@ void serialize(const raft::resources& handle,
 {
   std::lock_guard lock(*interface.mutex_);
 
-  if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
+  if constexpr (std::is_same_v<AnnIndexType, ivf_flat::index<T, IdxT>>) {
     ivf_flat::serialize(handle, os, interface.index_.value());
-  } else if constexpr (std::is_same<AnnIndexType, ivf_pq::index<IdxT>>::value) {
+  } else if constexpr (std::is_same_v<AnnIndexType, ivf_pq::index<IdxT>>) {
     ivf_pq::serialize(handle, os, interface.index_.value());
-  } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
+  } else if constexpr (std::is_same_v<AnnIndexType, cagra::index<T, IdxT>>) {
     cagra::serialize(handle, os, interface.index_.value(), true);
   }
 
@@ -150,17 +159,17 @@ void deserialize(const raft::resources& handle,
 {
   std::lock_guard lock(*interface.mutex_);
 
-  if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
+  if constexpr (std::is_same_v<AnnIndexType, ivf_flat::index<T, IdxT>>) {
     ivf_flat::index<T, IdxT> idx(handle);
     ivf_flat::deserialize(handle, is, &idx);
     resource::sync_stream(handle);
     interface.index_.emplace(std::move(idx));
-  } else if constexpr (std::is_same<AnnIndexType, ivf_pq::index<IdxT>>::value) {
+  } else if constexpr (std::is_same_v<AnnIndexType, ivf_pq::index<IdxT>>) {
     ivf_pq::index<IdxT> idx(handle);
     ivf_pq::deserialize(handle, is, &idx);
     resource::sync_stream(handle);
     interface.index_.emplace(std::move(idx));
-  } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
+  } else if constexpr (std::is_same_v<AnnIndexType, cagra::index<T, IdxT>>) {
     cagra::index<T, IdxT> idx(handle);
     cagra::deserialize(handle, is, &idx);
     resource::sync_stream(handle);
@@ -178,17 +187,17 @@ void deserialize(const raft::resources& handle,
   std::ifstream is(filename, std::ios::in | std::ios::binary);
   if (!is) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
 
-  if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
+  if constexpr (std::is_same_v<AnnIndexType, ivf_flat::index<T, IdxT>>) {
     ivf_flat::index<T, IdxT> idx(handle);
     ivf_flat::deserialize(handle, is, &idx);
     resource::sync_stream(handle);
     interface.index_.emplace(std::move(idx));
-  } else if constexpr (std::is_same<AnnIndexType, ivf_pq::index<IdxT>>::value) {
+  } else if constexpr (std::is_same_v<AnnIndexType, ivf_pq::index<IdxT>>) {
     ivf_pq::index<IdxT> idx(handle);
     ivf_pq::deserialize(handle, is, &idx);
     resource::sync_stream(handle);
     interface.index_.emplace(std::move(idx));
-  } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
+  } else if constexpr (std::is_same_v<AnnIndexType, cagra::index<T, IdxT>>) {
     cagra::index<T, IdxT> idx(handle);
     cagra::deserialize(handle, is, &idx);
     resource::sync_stream(handle);

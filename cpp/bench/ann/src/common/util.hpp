@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -18,6 +18,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -362,16 +363,18 @@ inline auto host_info()
   struct sysinfo sys_info;
   if (sysinfo(&sys_info) != -1) {
     props.emplace_back("host_total_ram_size",
-                       std::to_string(size_t(sys_info.totalram) * size_t(sys_info.mem_unit)));
+                       std::to_string(static_cast<size_t>(sys_info.totalram) *
+                                      static_cast<size_t>(sys_info.mem_unit)));
     props.emplace_back("host_total_swap_size",
-                       std::to_string(size_t(sys_info.totalswap) * size_t(sys_info.mem_unit)));
+                       std::to_string(static_cast<size_t>(sys_info.totalswap) *
+                                      static_cast<size_t>(sys_info.mem_unit)));
   }
 
   // CPU info
   int host_processors_configured = sysconf(_SC_NPROCESSORS_CONF);
   props.emplace_back("host_processors_sysconf", std::to_string(host_processors_configured));
   std::vector<uint8_t> affinity_mask_buf(CPU_ALLOC_SIZE(host_processors_configured));
-  cpu_set_t* affinity_mask = reinterpret_cast<cpu_set_t*>(affinity_mask_buf.data());
+  auto* affinity_mask = reinterpret_cast<cpu_set_t*>(affinity_mask_buf.data());
   sched_getaffinity(0, affinity_mask_buf.size(), affinity_mask);
   uint64_t cpu_freq_min    = 0;
   uint64_t cpu_freq_max    = 0;
@@ -435,15 +438,15 @@ inline auto cuda_info()
     throw std::runtime_error{"cuda_info: call to cudaGetDeviceProperties failed with code " +
                              std::to_string(err_code)};
   }
-  int clockRate       = 0;
-  int memoryClockRate = 0;
-  err_code            = cudaDeviceGetAttribute(&clockRate, cudaDevAttrClockRate, dev);
-  err_code            = cudaDeviceGetAttribute(&memoryClockRate, cudaDevAttrMemoryClockRate, dev);
+  int clock_rate        = 0;
+  int memory_clock_rate = 0;
+  err_code              = cudaDeviceGetAttribute(&clock_rate, cudaDevAttrClockRate, dev);
+  err_code = cudaDeviceGetAttribute(&memory_clock_rate, cudaDevAttrMemoryClockRate, dev);
 
   props.emplace_back("gpu_name", std::string(device_prop.name));
   props.emplace_back("gpu_sm_count", std::to_string(device_prop.multiProcessorCount));
-  props.emplace_back("gpu_sm_freq", std::to_string(clockRate * 1e3));
-  props.emplace_back("gpu_mem_freq", std::to_string(memoryClockRate * 1e3));
+  props.emplace_back("gpu_sm_freq", std::to_string(clock_rate * 1e3));
+  props.emplace_back("gpu_mem_freq", std::to_string(memory_clock_rate * 1e3));
   props.emplace_back("gpu_mem_bus_width", std::to_string(device_prop.memoryBusWidth));
   props.emplace_back("gpu_mem_global_size", std::to_string(device_prop.totalGlobalMem));
   props.emplace_back("gpu_mem_shared_size", std::to_string(device_prop.sharedMemPerMultiprocessor));
@@ -666,14 +669,14 @@ inline auto combine_path(const std::string& dir, const std::string& path)
 template <typename... Ts>
 void log_with_level(const char* level, const Ts&... vs)
 {
-  char buf[20];
+  std::array<char, 20> buf{};
   auto now    = std::chrono::system_clock::now();
   auto now_tt = std::chrono::system_clock::to_time_t(now);
   size_t millis =
     std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count() %
     1000000ULL;
-  std::strftime(buf, sizeof(buf), "%H:%M:%S", std::localtime(&now_tt));
-  printf("[%s] [%s.%06zu] ", level, buf, millis);
+  std::strftime(buf.data(), buf.size(), "%H:%M:%S", std::localtime(&now_tt));
+  printf("[%s] [%s.%06zu] ", level, buf.data(), millis);
   if constexpr (sizeof...(Ts) == 1) {
     printf("%s", vs...);
   } else {

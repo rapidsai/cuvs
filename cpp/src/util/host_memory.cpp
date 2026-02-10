@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -10,7 +10,7 @@
 
 namespace cuvs::util {
 
-size_t get_free_host_memory()
+auto get_free_host_memory() -> size_t
 {
   size_t available_memory = 0;
   std::ifstream meminfo("/proc/meminfo");

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -124,10 +124,10 @@ template <typename Policy,
           typename OutT,
           typename FinOpT,
           typename SM_compat_t>
-pairwise_matrix_sm60_wrapper<OpT, IdxT, DataT, OutT, FinOpT> make_pairwise_matrix_sm60_wrapper(
-  OpT distance_op,
-  pairwise_matrix_params<IdxT, DataT, OutT, FinOpT> params,
-  SM_compat_t sm_compat_range)
+auto make_pairwise_matrix_sm60_wrapper(OpT distance_op,
+                                       pairwise_matrix_params<IdxT, DataT, OutT, FinOpT> params,
+                                       SM_compat_t sm_compat_range)
+  -> pairwise_matrix_sm60_wrapper<OpT, IdxT, DataT, OutT, FinOpT>
 {
   dim3 block(Policy::Nthreads);
   // Use ::template to disambiguate (See:

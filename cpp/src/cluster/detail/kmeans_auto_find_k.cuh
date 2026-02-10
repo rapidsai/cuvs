@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -97,7 +97,7 @@ void find_k(raft::resources const& handle,
   // Perform k-means in binary search
   int left   = kmin;  // must be at least 2
   int right  = kmax;  // int(floor(len(data)/2)) #assumption of clusters of size 2 at least
-  int mid    = ((unsigned int)left + (unsigned int)right) >> 1;
+  int mid    = (static_cast<unsigned int>(left) + static_cast<unsigned int>(right)) >> 1;
   int oldmid = mid;
   int tests  = 0;
   double objective[3];      // 0= left of mid, 1= right of mid
@@ -197,7 +197,7 @@ void find_k(raft::resources const& handle,
       left = mid;
     }
     oldmid = mid;
-    mid    = ((unsigned int)right + (unsigned int)left) >> 1;
+    mid    = (static_cast<unsigned int>(right) + static_cast<unsigned int>(left)) >> 1;
   }
 
   best_k[0]    = right;

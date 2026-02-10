@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -14,20 +14,20 @@
 namespace cuvs::preprocessing::spectral_embedding {
 
 template <typename T>
-struct SpectralEmbeddingInputs {
-  int n_samples;        // Number of samples in the dataset
-  int n_features;       // Number of features in the dataset
-  int n_clusters;       // Number of clusters to generate
-  int n_components;     // Number of components in the embedding
-  int n_neighbors;      // Number of neighbors for KNN
-  T cluster_std;        // Standard deviation of clusters
-  bool norm_laplacian;  // Whether to use normalized Laplacian
-  bool drop_first;      // Whether to drop the first eigenvector
-  uint64_t seed;        // Random seed
+struct SpectralEmbeddingInputs {  // NOLINT(readability-identifier-naming)
+  int n_samples;                  // Number of samples in the dataset
+  int n_features;                 // Number of features in the dataset
+  int n_clusters;                 // Number of clusters to generate
+  int n_components;               // Number of components in the embedding
+  int n_neighbors;                // Number of neighbors for KNN
+  T cluster_std;                  // Standard deviation of clusters
+  bool norm_laplacian;            // Whether to use normalized Laplacian
+  bool drop_first;                // Whether to drop the first eigenvector
+  uint64_t seed;                  // Random seed
 };
 
 template <typename T>
-std::ostream& operator<<(std::ostream& os, const SpectralEmbeddingInputs<T>& inputs)
+auto operator<<(std::ostream& os, const SpectralEmbeddingInputs<T>& inputs) -> std::ostream&
 {
   return os << "n_samples:" << inputs.n_samples << " n_features:" << inputs.n_features
             << " n_clusters:" << inputs.n_clusters << " n_components:" << inputs.n_components
@@ -37,9 +37,11 @@ std::ostream& operator<<(std::ostream& os, const SpectralEmbeddingInputs<T>& inp
 }
 
 template <typename T>
-class SpectralEmbeddingTest : public ::testing::TestWithParam<SpectralEmbeddingInputs<T>> {
+class SpectralEmbeddingTest
+  : public ::testing::TestWithParam<
+      SpectralEmbeddingInputs<T>> {  // NOLINT(readability-identifier-naming)
  public:
-  SpectralEmbeddingTest()
+  SpectralEmbeddingTest()  // NOLINT(modernize-use-equals-default)
     : params_(::testing::TestWithParam<SpectralEmbeddingInputs<T>>::GetParam()),
       stream(raft::resource::get_cuda_stream(handle)),
       input_(raft::make_device_matrix<T, int, raft::row_major>(
@@ -51,7 +53,7 @@ class SpectralEmbeddingTest : public ::testing::TestWithParam<SpectralEmbeddingI
   }
 
  protected:
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     n_samples_    = params_.n_samples;
     n_features_   = params_.n_features;
@@ -85,9 +87,9 @@ class SpectralEmbeddingTest : public ::testing::TestWithParam<SpectralEmbeddingI
     config_.n_components = params_.drop_first ? n_components_ + 1 : n_components_;
   }
 
-  void TearDown() override {}
+  void TearDown() override {}  // NOLINT(readability-identifier-naming)
 
-  void testSpectralEmbedding()
+  void testSpectralEmbedding()  // NOLINT(readability-identifier-naming)
   {
     // Call the spectral embedding function
     transform(handle, config_, input_.view(), embedding_.view());
@@ -165,8 +167,8 @@ class SpectralEmbeddingTest : public ::testing::TestWithParam<SpectralEmbeddingI
   }
 
  private:
-  raft::resources handle;
-  cudaStream_t stream;
+  raft::resources handle;  // NOLINT(readability-identifier-naming)
+  cudaStream_t stream;     // NOLINT(readability-identifier-naming)
 
   SpectralEmbeddingInputs<T> params_;
   int n_samples_;
@@ -183,7 +185,7 @@ class SpectralEmbeddingTest : public ::testing::TestWithParam<SpectralEmbeddingI
 
 // Define test cases with different parameters
 template <typename T>
-const std::vector<SpectralEmbeddingInputs<T>> inputs = {
+const std::vector<SpectralEmbeddingInputs<T>> inputs = {  // NOLINT(readability-identifier-naming)
   // Small dataset with 2 components
   {100, 10, 3, 2, 10, 1.0f, true, false, 42ULL},
 
@@ -202,10 +204,14 @@ const std::vector<SpectralEmbeddingInputs<T>> inputs = {
   // Larger dataset
   {10000, 20, 8, 2, 12, 1.0f, true, true, 42ULL}};
 
-typedef SpectralEmbeddingTest<float> SpectralEmbeddingTestF;
-TEST_P(SpectralEmbeddingTestF, Result) { this->testSpectralEmbedding(); }
+using SpectralEmbeddingTestF =
+  SpectralEmbeddingTest<float>;  // NOLINT(readability-identifier-naming)
+TEST_P(SpectralEmbeddingTestF, Result)
+{
+  this->testSpectralEmbedding();
+}  // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(SpectralEmbeddingTests,
+INSTANTIATE_TEST_CASE_P(SpectralEmbeddingTests,  // NOLINT(readability-identifier-naming)
                         SpectralEmbeddingTestF,
                         ::testing::ValuesIn(inputs<float>));
 

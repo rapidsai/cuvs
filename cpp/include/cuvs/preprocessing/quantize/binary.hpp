@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -24,7 +24,7 @@ namespace cuvs::preprocessing::quantize::binary {
  * @brief quantizer algorithms. The mean and sampling_median thresholds are calculated separately
  * for each dimension.
  */
-enum class bit_threshold { zero, mean, sampling_median };
+enum class bit_threshold { zero, mean, sampling_median };  // NOLINT(readability-identifier-naming)
 
 /**
  * @brief quantizer parameters.
@@ -50,7 +50,10 @@ template <typename T>
 struct quantizer {
   raft::device_vector<T, int64_t> threshold;
 
-  quantizer(raft::resources const& res) : threshold(raft::make_device_vector<T, int64_t>(res, 0)) {}
+  quantizer(raft::resources const& res)  // NOLINT(google-explicit-constructor)
+    : threshold(raft::make_device_vector<T, int64_t>(res, 0))
+  {
+  }
 };
 
 /**
@@ -69,9 +72,9 @@ struct quantizer {
  *
  * @return quantizer
  */
-quantizer<double> train(raft::resources const& res,
-                        const params params,
-                        raft::device_matrix_view<const double, int64_t> dataset);
+auto train(raft::resources const& res,
+           const params params,
+           raft::device_matrix_view<const double, int64_t> dataset) -> quantizer<double>;
 
 /**
  * @brief Initializes a binary quantizer to be used later for quantizing the dataset.
@@ -89,9 +92,9 @@ quantizer<double> train(raft::resources const& res,
  *
  * @return quantizer
  */
-quantizer<double> train(raft::resources const& res,
-                        const params params,
-                        raft::host_matrix_view<const double, int64_t> dataset);
+auto train(raft::resources const& res,
+           const params params,
+           raft::host_matrix_view<const double, int64_t> dataset) -> quantizer<double>;
 
 /**
  * @brief Applies binary quantization transform to given dataset. If a dataset element is positive,
@@ -163,9 +166,9 @@ void transform(raft::resources const& res,
  *
  * @return quantizer
  */
-quantizer<float> train(raft::resources const& res,
-                       const params params,
-                       raft::device_matrix_view<const float, int64_t> dataset);
+auto train(raft::resources const& res,
+           const params params,
+           raft::device_matrix_view<const float, int64_t> dataset) -> quantizer<float>;
 
 /**
  * @brief Initializes a binary quantizer to be used later for quantizing the dataset.
@@ -183,9 +186,9 @@ quantizer<float> train(raft::resources const& res,
  *
  * @return quantizer
  */
-quantizer<float> train(raft::resources const& res,
-                       const params params,
-                       raft::host_matrix_view<const float, int64_t> dataset);
+auto train(raft::resources const& res,
+           const params params,
+           raft::host_matrix_view<const float, int64_t> dataset) -> quantizer<float>;
 
 /**
  * @brief Applies binary quantization transform to given dataset. If a dataset element is positive,
@@ -261,9 +264,9 @@ void transform(raft::resources const& res,
  *
  * @return quantizer
  */
-quantizer<half> train(raft::resources const& res,
-                      const params params,
-                      raft::device_matrix_view<const half, int64_t> dataset);
+auto train(raft::resources const& res,
+           const params params,
+           raft::device_matrix_view<const half, int64_t> dataset) -> quantizer<half>;
 
 /**
  * @brief Initializes a binary quantizer to be used later for quantizing the dataset.
@@ -281,9 +284,9 @@ quantizer<half> train(raft::resources const& res,
  *
  * @return quantizer
  */
-quantizer<half> train(raft::resources const& res,
-                      const params params,
-                      raft::host_matrix_view<const half, int64_t> dataset);
+auto train(raft::resources const& res,
+           const params params,
+           raft::host_matrix_view<const half, int64_t> dataset) -> quantizer<half>;
 
 /**
  * @brief Applies binary quantization transform to given dataset.

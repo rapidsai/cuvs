@@ -1,6 +1,6 @@
 /**
  * SPDX-FileCopyrightText: Copyright (c) Facebook, Inc. and its affiliates.
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 /*
@@ -19,16 +19,16 @@ namespace cuvs::neighbors::detail::faiss_select {
 
 template <typename T>
 struct Comparator {
-  __device__ static inline bool lt(T a, T b) { return a < b; }
+  __device__ static inline auto lt(T a, T b) -> bool { return a < b; }
 
-  __device__ static inline bool gt(T a, T b) { return a > b; }
+  __device__ static inline auto gt(T a, T b) -> bool { return a > b; }
 };
 
 template <>
 struct Comparator<half> {
-  __device__ static inline bool lt(half a, half b) { return __hlt(a, b); }
+  __device__ static inline auto lt(half a, half b) -> bool { return __hlt(a, b); }
 
-  __device__ static inline bool gt(half a, half b) { return __hgt(a, b); }
+  __device__ static inline auto gt(half a, half b) -> bool { return __hgt(a, b); }
 };
 
 }  // namespace cuvs::neighbors::detail::faiss_select

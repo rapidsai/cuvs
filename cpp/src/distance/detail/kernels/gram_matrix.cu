@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -289,24 +289,24 @@ template <typename math_t>
 }
 
 template <typename math_t>
-bool GramMatrixBase<math_t>::get_is_row_major(dense_output_matrix_view_t<math_t> matrix)
+auto GramMatrixBase<math_t>::get_is_row_major(dense_output_matrix_view_t<math_t> matrix) -> bool
 {
   return (matrix.stride(1) == 1);
 }
 template <typename math_t>
-bool GramMatrixBase<math_t>::get_is_row_major(dense_input_matrix_view_t<math_t> matrix)
+auto GramMatrixBase<math_t>::get_is_row_major(dense_input_matrix_view_t<math_t> matrix) -> bool
 {
   return (matrix.stride(1) == 1);
 }
 
 template <typename math_t>
-bool GramMatrixBase<math_t>::get_is_col_major(dense_output_matrix_view_t<math_t> matrix)
+auto GramMatrixBase<math_t>::get_is_col_major(dense_output_matrix_view_t<math_t> matrix) -> bool
 {
   return (matrix.stride(0) == 1);
 }
 
 template <typename math_t>
-bool GramMatrixBase<math_t>::get_is_col_major(dense_input_matrix_view_t<math_t> matrix)
+auto GramMatrixBase<math_t>::get_is_col_major(dense_input_matrix_view_t<math_t> matrix) -> bool
 {
   return (matrix.stride(0) == 1);
 }

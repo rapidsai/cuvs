@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -21,7 +21,7 @@ struct template_distance_op {
 
   TODO member;
 
-  template_distance_op(TODO member_) noexcept : member(member_) {}
+  explicit template_distance_op(TODO member_) noexcept : member(member_) {}
 
   // Load norms of input data
   static constexpr bool use_norms = TODO;
@@ -32,7 +32,7 @@ struct template_distance_op {
   // Size of shared memory. This is normally decided by the kernel policy, but
   // some ops such as correlation_distance_op use more.
   template <typename Policy>
-  static constexpr size_t shared_mem_size()
+  static constexpr auto shared_mem_size() -> size_t
   {
     return Policy::SmemSize + TODO;
   }
@@ -51,7 +51,7 @@ struct template_distance_op {
 
   // If exist, returns a cutlass op that performs the same operation.
   // See cosine and l2_exp distance ops for an example.
-  constexpr l2_exp_cutlass_op<DataT, AccT> get_cutlass_op() const { TODO; }
+  [[nodiscard]] constexpr auto get_cutlass_op() const -> l2_exp_cutlass_op<DataT, AccT> { TODO; }
 };
 
 }  // namespace cuvs::distance::detail::ops

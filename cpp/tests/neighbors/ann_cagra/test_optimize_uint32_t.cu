@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -13,7 +13,7 @@
 
 namespace {
 
-using IdxT = uint32_t;
+using IdxT = uint32_t;  // NOLINT(readability-identifier-naming)
 
 // Helper to create a simple synthetic KNN graph (ring-like neighbors)
 auto make_ring_knn_host(int64_t num_rows, int64_t kin)
@@ -27,13 +27,15 @@ auto make_ring_knn_host(int64_t num_rows, int64_t kin)
   return knn_graph;
 }
 
-TEST(CagraOptimize, HostToHostOptimizesGraph)
+TEST(
+  CagraOptimize,
+  HostToHostOptimizesGraph)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
   raft::resources res;
 
-  constexpr int64_t num_rows = 8;
-  constexpr int64_t kin      = 8;
-  constexpr int64_t kout     = 4;
+  constexpr int64_t num_rows = 8;  // NOLINT(readability-identifier-naming)
+  constexpr int64_t kin      = 8;  // NOLINT(readability-identifier-naming)
+  constexpr int64_t kout     = 4;  // NOLINT(readability-identifier-naming)
 
   auto knn_graph       = make_ring_knn_host(num_rows, kin);
   auto optimized_graph = raft::make_host_matrix<IdxT, int64_t>(num_rows, kout);

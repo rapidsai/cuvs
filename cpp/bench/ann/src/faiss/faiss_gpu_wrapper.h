@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -36,7 +36,9 @@
 #include <string>
 #include <type_traits>
 
-namespace {
+namespace cuvs::bench {
+
+namespace detail {
 
 auto parse_metric_faiss(cuvs::bench::Metric metric) -> faiss::MetricType
 {
@@ -68,9 +70,7 @@ class omp_single_thread_scope {
   int max_threads_;
 };
 
-}  // namespace
-
-namespace cuvs::bench {
+}  // namespace detail
 
 template <typename T>
 class faiss_gpu : public algo<T>, public algo_gpu {
@@ -90,7 +90,7 @@ class faiss_gpu : public algo<T>, public algo_gpu {
   faiss_gpu(Metric metric, int dim, const build_param& param)
     : algo<T>(metric, dim),
       gpu_resource_{std::make_shared<faiss::gpu::StandardGpuResources>()},
-      metric_type_(parse_metric_faiss(metric)),
+      metric_type_(detail::parse_metric_faiss(metric)),
       nlist_{param.nlist},
       training_sample_fraction_{1.0 / double(param.ratio)}
   {
@@ -171,7 +171,7 @@ class faiss_gpu : public algo<T>, public algo_gpu {
 template <typename T>
 void faiss_gpu<T>::build(const T* dataset, size_t nrow)
 {
-  omp_single_thread_scope omp_single_thread;
+  detail::omp_single_thread_scope omp_single_thread;
   auto index_ivf = dynamic_cast<faiss::gpu::GpuIndexIVF*>(index_.get());
   if (index_ivf != nullptr) {
     // set the min/max training size for clustering to use the whole provided training set.
@@ -213,7 +213,7 @@ void faiss_gpu<T>::search(
 
   if (refine_ratio_ > 1.0) {
     if (raft::get_device_for_address(queries) >= 0) {
-      uint32_t k0        = static_cast<uint32_t>(refine_ratio_ * k);
+      auto k0            = static_cast<uint32_t>(refine_ratio_ * k);
       auto distances_tmp = raft::make_device_matrix<float, IdxT>(
         gpu_resource_->getRaftHandle(device_), batch_size, k0);
       auto candidates =
@@ -279,7 +279,7 @@ template <typename T>
 template <typename GpuIndex, typename CpuIndex>
 void faiss_gpu<T>::save_(const std::string& file) const
 {
-  omp_single_thread_scope omp_single_thread;
+  detail::omp_single_thread_scope omp_single_thread;
 
   auto cpu_index  = std::make_unique<CpuIndex>();
   auto hnsw_index = dynamic_cast<faiss::IndexHNSWCagra*>(cpu_index.get());
@@ -292,7 +292,7 @@ template <typename T>
 template <typename GpuIndex, typename CpuIndex>
 void faiss_gpu<T>::load_(const std::string& file)
 {
-  omp_single_thread_scope omp_single_thread;
+  detail::omp_single_thread_scope omp_single_thread;
 
   std::unique_ptr<CpuIndex> cpu_index(dynamic_cast<CpuIndex*>(faiss::read_index(file.c_str())));
   assert(cpu_index);
@@ -553,7 +553,7 @@ class faiss_gpu_cagra : public faiss_gpu<T> {
     config.nn_descent_niter = param.nn_descent_niter;
 
     this->index_ = std::make_shared<faiss::gpu::GpuIndexCagra>(
-      this->gpu_resource_.get(), dim, parse_metric_faiss(this->metric_), config);
+      this->gpu_resource_.get(), dim, detail::parse_metric_faiss(this->metric_), config);
   }
 
   void set_search_param(const search_param_base& param, const void* filter_bitset) override
@@ -565,7 +565,7 @@ class faiss_gpu_cagra : public faiss_gpu<T> {
 
   void save(const std::string& file) const override
   {
-    omp_single_thread_scope omp_single_thread;
+    detail::omp_single_thread_scope omp_single_thread;
 
     auto cpu_hnsw_index = std::make_unique<faiss::IndexHNSWCagra>();
     // Only add the base HNSW layer to serialize the CAGRA index.
@@ -579,7 +579,7 @@ class faiss_gpu_cagra : public faiss_gpu<T> {
   }
   std::unique_ptr<algo<T>> copy() override { return std::make_unique<faiss_gpu_cagra<T>>(*this); };
 
-  std::shared_ptr<faiss::gpu::GpuIndex> faiss_index() { return this->index_; }
+  auto faiss_index() -> std::shared_ptr<faiss::gpu::GpuIndex> { return this->index_; }
 
  private:
   std::shared_ptr<faiss::gpu::IVFPQBuildCagraConfig> ivf_pq_build_params_;
@@ -641,13 +641,13 @@ class faiss_gpu_cagra_hnsw : public faiss_gpu<T> {
   }
   void load(const std::string& file) override
   {
-    omp_single_thread_scope omp_single_thread;
+    detail::omp_single_thread_scope omp_single_thread;
     this->search_index_.reset(static_cast<faiss::IndexHNSWCagra*>(faiss::read_index(file.c_str())));
   }
 
   [[nodiscard]] auto get_sync_stream() const noexcept -> cudaStream_t override
   {
-    if (this->gpu_resource_ == nullptr) { return 0; }
+    if (this->gpu_resource_ == nullptr) { return nullptr; }
     return this->gpu_resource_->getDefaultStream(this->device_);
   }
   std::unique_ptr<algo<T>> copy() override

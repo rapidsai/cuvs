@@ -40,7 +40,7 @@ static void _set_graph_build_params(
   int64_t dim)
 
 {
-  auto metric = static_cast<cuvs::distance::DistanceType>((int)params.metric);
+  auto metric = static_cast<cuvs::distance::DistanceType>(static_cast<int>(params.metric));
   switch (algo) {
     case cuvsCagraGraphBuildAlgo::AUTO_SELECT: break;
     case cuvsCagraGraphBuildAlgo::IVF_PQ: {
@@ -107,7 +107,7 @@ static void _set_graph_build_params(
 }
 
 template <typename T>
-void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* dataset_tensor)
+auto _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* dataset_tensor) -> void*
 {
   auto dataset = dataset_tensor->dl_tensor;
 
@@ -130,17 +130,17 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
 }
 
 template <typename T>
-void* _from_args(cuvsResources_t res,
+auto _from_args(cuvsResources_t res,
                  cuvsDistanceType _metric,
                  DLManagedTensor* graph_tensor,
-                 DLManagedTensor* dataset_tensor)
+                 DLManagedTensor* dataset_tensor) -> void*
 {
-  auto metric  = static_cast<cuvs::distance::DistanceType>((int)_metric);
+  auto metric  = static_cast<cuvs::distance::DistanceType>(static_cast<int>(_metric));
   auto dataset = dataset_tensor->dl_tensor;
   auto graph   = graph_tensor->dl_tensor;
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
 
-  void* index = NULL;
+  void* index = nullptr;
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
     using mdspan_type = raft::device_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
@@ -179,7 +179,7 @@ void _extend(cuvsResources_t res,
   auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(index.addr);
   auto res_ptr   = reinterpret_cast<raft::resources*>(res);
 
-  // TODO: use C struct here (see issue #487)
+  // TODO(achirkin): use C struct here (see issue #487)
   auto extend_params           = cuvs::neighbors::cagra::extend_params();
   extend_params.max_chunk_size = params.max_chunk_size;
 
@@ -283,7 +283,7 @@ void _serialize_to_hnswlib(cuvsResources_t res, const char* filename, cuvsCagraI
 }
 
 template <typename T>
-void* _deserialize(cuvsResources_t res, const char* filename)
+auto _deserialize(cuvsResources_t res, const char* filename) -> void*
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   auto index   = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr);
@@ -292,17 +292,17 @@ void* _deserialize(cuvsResources_t res, const char* filename)
 }
 
 template <typename T>
-void* _merge(cuvsResources_t res,
+auto _merge(cuvsResources_t res,
              cuvsCagraIndexParams params,
              cuvsCagraIndex_t* indices,
              size_t num_indices,
-             cuvsFilter filter)
+             cuvsFilter filter) -> void*
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   cuvs::neighbors::cagra::index_params params_cpp;
 
   params_cpp.metric =
-    static_cast<cuvs::distance::DistanceType>((int)params.metric);
+    static_cast<cuvs::distance::DistanceType>(static_cast<int>(params.metric));
   params_cpp.intermediate_graph_degree =
     params.intermediate_graph_degree;
   params_cpp.graph_degree = params.graph_degree;
@@ -423,7 +423,7 @@ static void _populate_cagra_index_params_from_cpp(cuvsCagraIndexParams_t c_param
     auto ace_params =
       std::get<cuvs::neighbors::cagra::graph_build_params::ace_params>(
         cpp_params.graph_build_params);
-    cuvsAceParams* c_ace_params = new cuvsAceParams;
+    auto* c_ace_params = new cuvsAceParams;
     c_ace_params->npartitions = ace_params.npartitions;
     c_ace_params->ef_construction = ace_params.ef_construction;
     c_ace_params->build_dir = ace_params.build_dir.empty() ? nullptr : strdup(ace_params.build_dir.c_str());
@@ -440,7 +440,7 @@ void convert_c_index_params(cuvsCagraIndexParams params,
                             int64_t dim,
                             cuvs::neighbors::cagra::index_params* out)
 {
-  out->metric                    = static_cast<cuvs::distance::DistanceType>((int)params.metric);
+  out->metric                    = static_cast<cuvs::distance::DistanceType>(static_cast<int>(params.metric));
   out->intermediate_graph_degree = params.intermediate_graph_degree;
   out->graph_degree              = params.graph_degree;
   _set_graph_build_params(out->graph_build_params, params, params.build_algo, n_rows, dim);
@@ -477,12 +477,12 @@ void convert_c_search_params(cuvsCagraSearchParams params,
   out->persistent_device_usage = params.persistent_device_usage;
 }
 }  // namespace cuvs::neighbors::cagra
-extern "C" cuvsError_t cuvsCagraIndexCreate(cuvsCagraIndex_t* index)
+extern "C" auto cuvsCagraIndexCreate(cuvsCagraIndex_t* index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { *index = new cuvsCagraIndex{}; });
 }
 
-extern "C" cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index_c_ptr)
+extern "C" auto cuvsCagraIndexDestroy(cuvsCagraIndex_t index_c_ptr) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto index = *index_c_ptr;
@@ -507,7 +507,7 @@ extern "C" cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index_c_ptr)
   });
 }
 
-extern "C" cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int64_t* dim)
+extern "C" auto cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int64_t* dim) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<float, uint32_t>*>(index->addr);
@@ -515,7 +515,7 @@ extern "C" cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int64_t* di
   });
 }
 
-extern "C" cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, int64_t* size)
+extern "C" auto cuvsCagraIndexGetSize(cuvsCagraIndex_t index, int64_t* size) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<float, uint32_t>*>(index->addr);
@@ -523,7 +523,7 @@ extern "C" cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, int64_t* si
   });
 }
 
-extern "C" cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, int64_t* graph_degree)
+extern "C" auto cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, int64_t* graph_degree) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<float, uint32_t>*>(index->addr);
@@ -531,7 +531,7 @@ extern "C" cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, int6
   });
 }
 
-extern "C" cuvsError_t cuvsCagraIndexGetDataset(cuvsCagraIndex_t index, DLManagedTensor* dataset)
+extern "C" auto cuvsCagraIndexGetDataset(cuvsCagraIndex_t index, DLManagedTensor* dataset) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
@@ -548,7 +548,7 @@ extern "C" cuvsError_t cuvsCagraIndexGetDataset(cuvsCagraIndex_t index, DLManage
   });
 }
 
-extern "C" cuvsError_t cuvsCagraIndexGetGraph(cuvsCagraIndex_t index, DLManagedTensor* graph)
+extern "C" auto cuvsCagraIndexGetGraph(cuvsCagraIndex_t index, DLManagedTensor* graph) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
@@ -565,10 +565,10 @@ extern "C" cuvsError_t cuvsCagraIndexGetGraph(cuvsCagraIndex_t index, DLManagedT
   });
 }
 
-extern "C" cuvsError_t cuvsCagraBuild(cuvsResources_t res,
+extern "C" auto cuvsCagraBuild(cuvsResources_t res,
                                       cuvsCagraIndexParams_t params,
                                       DLManagedTensor* dataset_tensor,
-                                      cuvsCagraIndex_t index)
+                                      cuvsCagraIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
@@ -589,11 +589,11 @@ extern "C" cuvsError_t cuvsCagraBuild(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsCagraIndexFromArgs(cuvsResources_t res,
+extern "C" auto cuvsCagraIndexFromArgs(cuvsResources_t res,
                                               cuvsDistanceType metric,
                                               DLManagedTensor* graph_tensor,
                                               DLManagedTensor* dataset_tensor,
-                                              cuvsCagraIndex_t index)
+                                              cuvsCagraIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
@@ -618,10 +618,10 @@ extern "C" cuvsError_t cuvsCagraIndexFromArgs(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsCagraExtend(cuvsResources_t res,
+extern "C" auto cuvsCagraExtend(cuvsResources_t res,
                                        cuvsCagraExtendParams_t params,
                                        DLManagedTensor* additional_dataset_tensor,
-                                       cuvsCagraIndex_t index_c_ptr)
+                                       cuvsCagraIndex_t index_c_ptr) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = additional_dataset_tensor->dl_tensor;
@@ -643,13 +643,13 @@ extern "C" cuvsError_t cuvsCagraExtend(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsCagraSearch(cuvsResources_t res,
+extern "C" auto cuvsCagraSearch(cuvsResources_t res,
                                        cuvsCagraSearchParams_t params,
                                        cuvsCagraIndex_t index_c_ptr,
                                        DLManagedTensor* queries_tensor,
                                        DLManagedTensor* neighbors_tensor,
                                        DLManagedTensor* distances_tensor,
-                                       cuvsFilter filter)
+                                       cuvsFilter filter) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto queries   = queries_tensor->dl_tensor;
@@ -690,12 +690,12 @@ extern "C" cuvsError_t cuvsCagraSearch(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsCagraMerge(cuvsResources_t res,
+extern "C" auto cuvsCagraMerge(cuvsResources_t res,
                                       cuvsCagraIndexParams_t params,
                                       cuvsCagraIndex_t* indices,
                                       size_t num_indices,
                                       cuvsFilter filter,
-                                      cuvsCagraIndex_t output_index)
+                                      cuvsCagraIndex_t output_index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     // Basic checks on inputs
@@ -730,7 +730,7 @@ extern "C" cuvsError_t cuvsCagraMerge(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params)
+extern "C" auto cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     *params                       = new cuvsCagraIndexParams{.metric                    = L2Expanded,
@@ -742,7 +742,7 @@ extern "C" cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params
   });
 }
 
-extern "C" cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params)
+extern "C" auto cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     // Delete graph_build_params based on the build algorithm type
@@ -769,7 +769,7 @@ extern "C" cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params
   });
 }
 
-extern "C" cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionParams_t* params)
+extern "C" auto cuvsCagraCompressionParamsCreate(cuvsCagraCompressionParams_t* params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto ps = cuvs::neighbors::vpq_params();
@@ -783,12 +783,12 @@ extern "C" cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionPara
   });
 }
 
-extern "C" cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t params)
+extern "C" auto cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
 }
 
-extern "C" cuvsError_t cuvsAceParamsCreate(cuvsAceParams_t* params)
+extern "C" auto cuvsAceParamsCreate(cuvsAceParams_t* params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto ps = cuvs::neighbors::cagra::graph_build_params::ace_params();
@@ -805,7 +805,7 @@ extern "C" cuvsError_t cuvsAceParamsCreate(cuvsAceParams_t* params)
   });
 }
 
-extern "C" cuvsError_t cuvsAceParamsDestroy(cuvsAceParams_t params)
+extern "C" auto cuvsAceParamsDestroy(cuvsAceParams_t params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (params) {
@@ -816,13 +816,13 @@ extern "C" cuvsError_t cuvsAceParamsDestroy(cuvsAceParams_t params)
   });
 }
 
-extern "C" cuvsError_t cuvsCagraIndexParamsFromHnswParams(cuvsCagraIndexParams_t params,
+extern "C" auto cuvsCagraIndexParamsFromHnswParams(cuvsCagraIndexParams_t params,
                                                            int64_t n_rows,
                                                            int64_t dim,
                                                            int M,
                                                            int ef_construction,
                                                            enum cuvsCagraHnswHeuristicType heuristic,
-                                                           cuvsDistanceType metric)
+                                                           cuvsDistanceType metric) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto cpp_metric = static_cast<cuvs::distance::DistanceType>((int)metric);
@@ -834,18 +834,18 @@ extern "C" cuvsError_t cuvsCagraIndexParamsFromHnswParams(cuvsCagraIndexParams_t
   });
 }
 
-extern "C" cuvsError_t cuvsCagraExtendParamsCreate(cuvsCagraExtendParams_t* params)
+extern "C" auto cuvsCagraExtendParamsCreate(cuvsCagraExtendParams_t* params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions(
     [=] { *params = new cuvsCagraExtendParams{.max_chunk_size = 0}; });
 }
 
-extern "C" cuvsError_t cuvsCagraExtendParamsDestroy(cuvsCagraExtendParams_t params)
+extern "C" auto cuvsCagraExtendParamsDestroy(cuvsCagraExtendParams_t params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
 }
 
-extern "C" cuvsError_t cuvsCagraSearchParamsCreate(cuvsCagraSearchParams_t* params)
+extern "C" auto cuvsCagraSearchParamsCreate(cuvsCagraSearchParams_t* params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     *params = new cuvsCagraSearchParams{
@@ -861,14 +861,14 @@ extern "C" cuvsError_t cuvsCagraSearchParamsCreate(cuvsCagraSearchParams_t* para
   });
 }
 
-extern "C" cuvsError_t cuvsCagraSearchParamsDestroy(cuvsCagraSearchParams_t params)
+extern "C" auto cuvsCagraSearchParamsDestroy(cuvsCagraSearchParams_t params) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
 }
 
-extern "C" cuvsError_t cuvsCagraDeserialize(cuvsResources_t res,
+extern "C" auto cuvsCagraDeserialize(cuvsResources_t res,
                                             const char* filename,
-                                            cuvsCagraIndex_t index)
+                                            cuvsCagraIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     // read the numpy dtype from the beginning of the file
@@ -897,10 +897,10 @@ extern "C" cuvsError_t cuvsCagraDeserialize(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
+extern "C" auto cuvsCagraSerialize(cuvsResources_t res,
                                           const char* filename,
                                           cuvsCagraIndex_t index,
-                                          bool include_dataset)
+                                          bool include_dataset) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
@@ -917,9 +917,9 @@ extern "C" cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsCagraSerializeToHnswlib(cuvsResources_t res,
+extern "C" auto cuvsCagraSerializeToHnswlib(cuvsResources_t res,
                                                    const char* filename,
-                                                   cuvsCagraIndex_t index)
+                                                   cuvsCagraIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {

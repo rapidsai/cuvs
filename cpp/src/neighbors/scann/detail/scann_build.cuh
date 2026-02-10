@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -37,10 +37,10 @@ template <typename T,
           typename IdxT = int64_t,
           typename Accessor =
             raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
-index<T, IdxT> build(
-  raft::resources const& res,
-  const index_params& params,
-  raft::mdspan<const T, raft::matrix_extent<IdxT>, raft::row_major, Accessor> dataset)
+auto build(raft::resources const& res,
+           const index_params& params,
+           raft::mdspan<const T, raft::matrix_extent<IdxT>, raft::row_major, Accessor> dataset)
+  -> index<T, IdxT>
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(res);
   IdxT dim            = dataset.extent(1);
@@ -166,7 +166,7 @@ index<T, IdxT> build(
     int sub_dim_end   = (subspace + 1) * dim_per_subspace;
 
     auto sub_trainset = raft::make_device_matrix<T, int64_t>(
-      res, trainset_residuals.extent(0), (int64_t)dim_per_subspace);
+      res, trainset_residuals.extent(0), static_cast<int64_t>(dim_per_subspace));
     raft::matrix::slice_coordinates<int64_t> avq_sub_coords(
       0, sub_dim_start, trainset_residuals.extent(0), sub_dim_end);
     raft::matrix::slice(
@@ -301,7 +301,8 @@ index<T, IdxT> build(
   raft::linalg::map_offset(
     res,
     idx.pq_codebook(),
-    [full_codebook_view, num_subspaces, dim_per_subspace, num_clusters] __device__(size_t i) {
+    [full_codebook_view, num_subspaces, dim_per_subspace, num_clusters] __device__(
+      size_t i) -> float {
       int codebook_dim   = num_subspaces * dim_per_subspace;
       int row_idx        = i / codebook_dim;
       int el_idx         = i % codebook_dim;

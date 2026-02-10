@@ -1,7 +1,7 @@
 // clang-format off
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2017 - 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0 AND BSD-3-Clause
  */
 // clang-format on
@@ -58,9 +58,7 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-namespace cuvs {
-namespace epilogue {
-namespace thread {
+namespace cuvs::epilogue::thread {
 
 // TODO (cjnolet): We shouldn't be doing `using namespace` in this file.
 using namespace cutlass::epilogue::thread;
@@ -139,7 +137,7 @@ class FusedDistanceNNEpilogueElementwise {
     }
 
     CUTLASS_HOST_DEVICE
-    Params() {}
+    Params() = default;
   };
 
  private:
@@ -158,14 +156,13 @@ class FusedDistanceNNEpilogueElementwise {
 
   /// Constructor from Params
   CUTLASS_HOST_DEVICE
-  FusedDistanceNNEpilogueElementwise(Params const& params)
+  explicit FusedDistanceNNEpilogueElementwise(Params const& params)
     : elementwise_op(params.dist_op_), pair_redop(params.pair_redop_), red_op(params.red_op_)
   {
   }
 
   /// Returns true if source is needed
-  CUTLASS_HOST_DEVICE
-  bool is_source_needed() const
+  [[nodiscard]] CUTLASS_HOST_DEVICE auto is_source_needed() const -> bool
   {
     // we use for making sure C matrix is used for A mat norm.
     return true;
@@ -207,8 +204,6 @@ class FusedDistanceNNEpilogueElementwise {
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-}  // namespace thread
-}  // namespace epilogue
-}  // namespace cuvs
+}  // namespace cuvs::epilogue::thread
 
 /////////////////////////////////////////////////////////////////////////////////////////////////

@@ -1,6 +1,6 @@
 
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -26,10 +26,10 @@
 namespace {
 
 template <typename T, typename LayoutT = raft::row_major, typename DistT = float>
-void* _build(cuvsResources_t res,
+auto _build(cuvsResources_t res,
              DLManagedTensor* dataset_tensor,
              cuvsDistanceType metric,
-             T metric_arg)
+             T metric_arg) -> void*
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
 
@@ -37,7 +37,7 @@ void* _build(cuvsResources_t res,
   auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
 
   cuvs::neighbors::brute_force::index_params params;
-  params.metric     = static_cast<cuvs::distance::DistanceType>((int)metric);
+  params.metric     = static_cast<cuvs::distance::DistanceType>(static_cast<int>(metric));
   params.metric_arg = metric_arg;
 
   auto index_on_stack = cuvs::neighbors::brute_force::build(*res_ptr, params, mds);
@@ -80,7 +80,7 @@ void _search(cuvsResources_t res,
     auto prefilter_ptr       = reinterpret_cast<DLManagedTensor*>(prefilter.addr);
     auto prefilter_mds       = cuvs::core::from_dlpack<prefilter_mds_type>(prefilter_ptr);
     const auto prefilter     = cuvs::neighbors::filtering::bitmap_filter(
-      prefilter_bmp_type((uint32_t*)prefilter_mds.data_handle(),
+      prefilter_bmp_type(static_cast<uint32_t*>(prefilter_mds.data_handle()),
                          queries_mds.extent(0),
                          index_ptr->dataset().extent(0)));
     cuvs::neighbors::brute_force::search(
@@ -90,7 +90,7 @@ void _search(cuvsResources_t res,
     auto prefilter_ptr       = reinterpret_cast<DLManagedTensor*>(prefilter.addr);
     auto prefilter_mds       = cuvs::core::from_dlpack<prefilter_mds_type>(prefilter_ptr);
     const auto prefilter     = cuvs::neighbors::filtering::bitset_filter(
-      prefilter_bst_type((uint32_t*)prefilter_mds.data_handle(), index_ptr->dataset().extent(0)));
+      prefilter_bst_type(static_cast<uint32_t*>(prefilter_mds.data_handle()), index_ptr->dataset().extent(0)));
     cuvs::neighbors::brute_force::search(
       *res_ptr, params, *index_ptr, queries_mds, neighbors_mds, distances_mds, prefilter);
   } else {
@@ -107,7 +107,7 @@ void _serialize(cuvsResources_t res, const char* filename, cuvsBruteForceIndex i
 }
 
 template <typename T, typename DistT = float>
-void* _deserialize(cuvsResources_t res, const char* filename)
+auto _deserialize(cuvsResources_t res, const char* filename) -> void*
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   auto index   = new cuvs::neighbors::brute_force::index<T, DistT>(*res_ptr);
@@ -116,12 +116,12 @@ void* _deserialize(cuvsResources_t res, const char* filename)
 }
 }  // namespace
 
-extern "C" cuvsError_t cuvsBruteForceIndexCreate(cuvsBruteForceIndex_t* index)
+extern "C" auto cuvsBruteForceIndexCreate(cuvsBruteForceIndex_t* index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] { *index = new cuvsBruteForceIndex{}; });
 }
 
-extern "C" cuvsError_t cuvsBruteForceIndexDestroy(cuvsBruteForceIndex_t index_c_ptr)
+extern "C" auto cuvsBruteForceIndexDestroy(cuvsBruteForceIndex_t index_c_ptr) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto index = *index_c_ptr;
@@ -139,11 +139,11 @@ extern "C" cuvsError_t cuvsBruteForceIndexDestroy(cuvsBruteForceIndex_t index_c_
   });
 }
 
-extern "C" cuvsError_t cuvsBruteForceBuild(cuvsResources_t res,
+extern "C" auto cuvsBruteForceBuild(cuvsResources_t res,
                                            DLManagedTensor* dataset_tensor,
                                            cuvsDistanceType metric,
                                            float metric_arg,
-                                           cuvsBruteForceIndex_t index)
+                                           cuvsBruteForceIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
@@ -177,12 +177,12 @@ extern "C" cuvsError_t cuvsBruteForceBuild(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsBruteForceSearch(cuvsResources_t res,
+extern "C" auto cuvsBruteForceSearch(cuvsResources_t res,
                                             cuvsBruteForceIndex_t index_c_ptr,
                                             DLManagedTensor* queries_tensor,
                                             DLManagedTensor* neighbors_tensor,
                                             DLManagedTensor* distances_tensor,
-                                            cuvsFilter prefilter)
+                                            cuvsFilter prefilter) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     auto queries   = queries_tensor->dl_tensor;
@@ -230,9 +230,9 @@ extern "C" cuvsError_t cuvsBruteForceSearch(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsBruteForceDeserialize(cuvsResources_t res,
+extern "C" auto cuvsBruteForceDeserialize(cuvsResources_t res,
                                                  const char* filename,
-                                                 cuvsBruteForceIndex_t index)
+                                                 cuvsBruteForceIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     // read the numpy dtype from the beginning of the file
@@ -255,9 +255,9 @@ extern "C" cuvsError_t cuvsBruteForceDeserialize(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsBruteForceSerialize(cuvsResources_t res,
+extern "C" auto cuvsBruteForceSerialize(cuvsResources_t res,
                                                const char* filename,
-                                               cuvsBruteForceIndex_t index)
+                                               cuvsBruteForceIndex_t index) -> cuvsError_t
 {
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {

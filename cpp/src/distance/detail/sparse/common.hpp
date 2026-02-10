@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -7,14 +7,14 @@
 
 #include <raft/core/resources.hpp>
 
-namespace cuvs {
+namespace cuvs {  // NOLINT(modernize-concat-nested-namespaces)
 namespace distance {
 namespace detail {
 namespace sparse {
 
-template <typename value_idx, typename value_t>
+template <typename value_idx, typename value_t>  // NOLINT(readability-identifier-naming)
 struct distances_config_t {
-  distances_config_t(raft::resources const& handle_) : handle(handle_) {}
+  explicit distances_config_t(raft::resources const& handle_) : handle(handle_) {}
 
   // left side
   value_idx a_nrows;
@@ -35,7 +35,7 @@ struct distances_config_t {
   raft::resources const& handle;
 };
 
-template <typename value_t>
+template <typename value_t>  // NOLINT(readability-identifier-naming)
 class distances_t {
  public:
   virtual void compute(value_t* out) {}

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -22,7 +22,7 @@ namespace cuvs::core {
  * @param[in] tensor DLTensor object to check underlying memory type
  * @return bool
  */
-inline bool is_dlpack_device_compatible(DLTensor tensor)
+inline auto is_dlpack_device_compatible(DLTensor tensor) -> bool
 {
   return detail::is_dlpack_device_compatible(tensor);
 }
@@ -35,7 +35,7 @@ inline bool is_dlpack_device_compatible(DLTensor tensor)
  * @param tensor DLTensor object to check underlying memory type
  * @return bool
  */
-inline bool is_dlpack_host_compatible(DLTensor tensor)
+inline auto is_dlpack_host_compatible(DLTensor tensor) -> bool
 {
   return detail::is_dlpack_host_compatible(tensor);
 }
@@ -46,7 +46,7 @@ inline bool is_dlpack_host_compatible(DLTensor tensor)
  * @param tensor DLManagedTensor object to check
  * @return bool
  */
-inline bool is_c_contiguous(DLManagedTensor* tensor) { return detail::is_c_contiguous(tensor); }
+inline auto is_c_contiguous(DLManagedTensor* tensor) -> bool { return detail::is_c_contiguous(tensor); }
 
 /**
  * @brief Check if DLManagedTensor has a col-major (f-contiguous) layout
@@ -54,7 +54,7 @@ inline bool is_c_contiguous(DLManagedTensor* tensor) { return detail::is_c_conti
  * @param tensor DLManagedTensor object to check
  * @return bool
  */
-inline bool is_f_contiguous(DLManagedTensor* tensor) { return detail::is_f_contiguous(tensor); }
+inline auto is_f_contiguous(DLManagedTensor* tensor) -> bool { return detail::is_f_contiguous(tensor); }
 
 /**
  * @brief Convert a DLManagedTensor to a mdspan
@@ -77,7 +77,7 @@ inline bool is_f_contiguous(DLManagedTensor* tensor) { return detail::is_f_conti
  * @return MdspanType
  */
 template <typename MdspanType, typename = raft::is_mdspan_t<MdspanType>>
-inline MdspanType from_dlpack(DLManagedTensor* managed_tensor)
+inline auto from_dlpack(DLManagedTensor* managed_tensor) -> MdspanType
 {
   return detail::from_dlpack<MdspanType>(managed_tensor);
 }

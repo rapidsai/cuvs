@@ -9,22 +9,19 @@
 
 #include <raft/util/cuda_dev_essentials.cuh>
 
-namespace cuvs {
-namespace distance {
-namespace detail {
-namespace sparse {
+namespace cuvs::distance::detail::sparse {
 
 template <typename value_idx, typename value_t, int tpb>
 class dense_smem_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
  public:
   using map_type = value_t*;
 
-  dense_smem_strategy(const distances_config_t<value_idx, value_t>& config_)
+  explicit dense_smem_strategy(const distances_config_t<value_idx, value_t>& config_)
     : coo_spmv_strategy<value_idx, value_t, tpb>(config_)
   {
   }
 
-  inline static int smem_per_block(int n_cols)
+  inline static auto smem_per_block(int n_cols) -> int
   {
     return (n_cols * sizeof(value_t)) + ((1024 / raft::warp_size()) * sizeof(value_t));
   }
@@ -81,7 +78,7 @@ class dense_smem_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
                              n_blocks_per_row);
   }
 
-  __device__ inline map_type init_map(void* storage, const value_idx& cache_size)
+  __device__ inline auto init_map(void* storage, const value_idx& cache_size) -> map_type
   {
     auto cache = static_cast<value_t*>(storage);
     for (int k = threadIdx.x; k < cache_size; k += blockDim.x) {
@@ -95,10 +92,10 @@ class dense_smem_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
     cache[key] = value;
   }
 
-  __device__ inline value_t find(map_type& cache, const value_idx& key) { return cache[key]; }
+  __device__ inline auto find(map_type& cache, const value_idx& key) -> value_t
+  {
+    return cache[key];
+  }
 };
 
-}  // namespace sparse
-}  // namespace detail
-}  // namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance::detail::sparse

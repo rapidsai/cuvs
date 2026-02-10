@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -49,50 +49,53 @@ index<T, IdxT>::index(raft::resources const& res,
 }
 
 template <typename T, typename IdxT>
-uint32_t index<T, IdxT>::veclen() const noexcept
+auto index<T, IdxT>::veclen() const noexcept -> uint32_t
 {
   return veclen_;
 }
 
 template <typename T, typename IdxT>
-cuvs::distance::DistanceType index<T, IdxT>::metric() const noexcept
+auto index<T, IdxT>::metric() const noexcept -> cuvs::distance::DistanceType
 {
   return metric_;
 }
 
 template <typename T, typename IdxT>
-bool index<T, IdxT>::adaptive_centers() const noexcept
+auto index<T, IdxT>::adaptive_centers() const noexcept -> bool
 {
   return adaptive_centers_;
 }
 
 template <typename T, typename IdxT>
-raft::device_vector_view<uint32_t, uint32_t> index<T, IdxT>::list_sizes() noexcept
+auto index<T, IdxT>::list_sizes() noexcept -> raft::device_vector_view<uint32_t, uint32_t>
 {
   return list_sizes_.view();
 }
 
 template <typename T, typename IdxT>
-raft::device_vector_view<const uint32_t, uint32_t> index<T, IdxT>::list_sizes() const noexcept
+auto index<T, IdxT>::list_sizes() const noexcept
+  -> raft::device_vector_view<const uint32_t, uint32_t>
 {
   return list_sizes_.view();
 }
 
 template <typename T, typename IdxT>
-raft::device_matrix_view<float, uint32_t, raft::row_major> index<T, IdxT>::centers() noexcept
+auto index<T, IdxT>::centers() noexcept
+  -> raft::device_matrix_view<float, uint32_t, raft::row_major>
 {
   return centers_.view();
 }
 
 template <typename T, typename IdxT>
-raft::device_matrix_view<const float, uint32_t, raft::row_major> index<T, IdxT>::centers()
-  const noexcept
+auto index<T, IdxT>::centers() const noexcept
+  -> raft::device_matrix_view<const float, uint32_t, raft::row_major>
 {
   return centers_.view();
 }
 
 template <typename T, typename IdxT>
-std::optional<raft::device_vector_view<float, uint32_t>> index<T, IdxT>::center_norms() noexcept
+auto index<T, IdxT>::center_norms() noexcept
+  -> std::optional<raft::device_vector_view<float, uint32_t>>
 {
   if (center_norms_.has_value()) {
     return std::make_optional<raft::device_vector_view<float, uint32_t>>(center_norms_->view());
@@ -102,8 +105,8 @@ std::optional<raft::device_vector_view<float, uint32_t>> index<T, IdxT>::center_
 }
 
 template <typename T, typename IdxT>
-std::optional<raft::device_vector_view<const float, uint32_t>> index<T, IdxT>::center_norms()
-  const noexcept
+auto index<T, IdxT>::center_norms() const noexcept
+  -> std::optional<raft::device_vector_view<const float, uint32_t>>
 {
   if (center_norms_.has_value()) {
     return std::make_optional<raft::device_vector_view<const float, uint32_t>>(
@@ -127,49 +130,49 @@ template <typename T, typename IdxT>
 }
 
 template <typename T, typename IdxT>
-IdxT index<T, IdxT>::size() const noexcept
+auto index<T, IdxT>::size() const noexcept -> IdxT
 {
   return accum_sorted_sizes()(n_lists());
 }
 
 template <typename T, typename IdxT>
-uint32_t index<T, IdxT>::dim() const noexcept
+auto index<T, IdxT>::dim() const noexcept -> uint32_t
 {
   return centers_.extent(1);
 }
 
 template <typename T, typename IdxT>
-uint32_t index<T, IdxT>::n_lists() const noexcept
+auto index<T, IdxT>::n_lists() const noexcept -> uint32_t
 {
   return lists_.size();
 }
 
 template <typename T, typename IdxT>
-raft::device_vector_view<T*, uint32_t> index<T, IdxT>::data_ptrs() noexcept
+auto index<T, IdxT>::data_ptrs() noexcept -> raft::device_vector_view<T*, uint32_t>
 {
   return data_ptrs_.view();
 }
 
 template <typename T, typename IdxT>
-raft::device_vector_view<T* const, uint32_t> index<T, IdxT>::data_ptrs() const noexcept
+auto index<T, IdxT>::data_ptrs() const noexcept -> raft::device_vector_view<T* const, uint32_t>
 {
   return data_ptrs_.view();
 }
 
 template <typename T, typename IdxT>
-raft::device_vector_view<IdxT*, uint32_t> index<T, IdxT>::inds_ptrs() noexcept
+auto index<T, IdxT>::inds_ptrs() noexcept -> raft::device_vector_view<IdxT*, uint32_t>
 {
   return inds_ptrs_.view();
 }
 
 template <typename T, typename IdxT>
-raft::device_vector_view<IdxT* const, uint32_t> index<T, IdxT>::inds_ptrs() const noexcept
+auto index<T, IdxT>::inds_ptrs() const noexcept -> raft::device_vector_view<IdxT* const, uint32_t>
 {
   return inds_ptrs_.view();
 }
 
 template <typename T, typename IdxT>
-bool index<T, IdxT>::conservative_memory_allocation() const noexcept
+auto index<T, IdxT>::conservative_memory_allocation() const noexcept -> bool
 {
   return conservative_memory_allocation_;
 }
@@ -190,13 +193,14 @@ void index<T, IdxT>::allocate_center_norms(raft::resources const& res)
 }
 
 template <typename T, typename IdxT>
-std::vector<std::shared_ptr<list_data<T, IdxT>>>& index<T, IdxT>::lists() noexcept
+auto index<T, IdxT>::lists() noexcept -> std::vector<std::shared_ptr<list_data<T, IdxT>>>&
 {
   return lists_;
 }
 
 template <typename T, typename IdxT>
-const std::vector<std::shared_ptr<list_data<T, IdxT>>>& index<T, IdxT>::lists() const noexcept
+auto index<T, IdxT>::lists() const noexcept
+  -> const std::vector<std::shared_ptr<list_data<T, IdxT>>>&
 {
   return lists_;
 }

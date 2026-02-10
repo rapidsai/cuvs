@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -106,7 +106,7 @@ void build_mr_linkage(
     raft::linalg::map(
       handle,
       vals_out_view,
-      [=] __device__(const value_idx row, const value_idx col, const value_t val) {
+      [=] __device__(const value_idx row, const value_idx col, const value_t val) -> value_t {
         return row == col ? std::numeric_limits<value_t>::max() : val;
       },
       rows_view,

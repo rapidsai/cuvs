@@ -136,13 +136,13 @@ void cutlassFusedDistanceNN(const DataT* x,
     epilog_op_param,
     x,
     y,
-    xn,            // C matrix eq vector param, which here is A norm
-    (DataT*)yn,    // this is broadcast vec, which is required to be non-const param
-    dOutput,       // Output distance matrix
-    (int64_t)lda,  // stride A
-    (int64_t)ldb,  // stride B
-    (int64_t)1,    // stride A norm
-    (int64_t)ldd   // stride Output matrix
+    xn,                       // C matrix eq vector param, which here is A norm
+    (DataT*)yn,               // this is broadcast vec, which is required to be non-const param
+    dOutput,                  // Output distance matrix
+    (int64_t)lda,             // stride A
+    (int64_t)ldb,             // stride B
+    static_cast<int64_t>(1),  // stride A norm
+    (int64_t)ldd              // stride Output matrix
   };
 
   // Using the arguments, query for extra workspace required for matrix multiplication computation

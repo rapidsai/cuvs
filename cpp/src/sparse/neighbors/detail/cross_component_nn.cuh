@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2018-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -56,9 +56,9 @@ struct FixConnectivitiesRedOp {
   // default constructor for cutlass
   DI FixConnectivitiesRedOp() : m(0) {}
 
-  FixConnectivitiesRedOp(value_idx m_) : m(m_) {};
+  explicit FixConnectivitiesRedOp(value_idx m_) : m(m_) {};
 
-  typedef typename raft::KeyValuePair<value_idx, value_t> KVP;
+  using KVP = typename raft::KeyValuePair<value_idx, value_t>;
   DI void operator()(value_idx rit, KVP* out, const KVP& other) const
   {
     if (rit < m && other.value < out->value) {
@@ -67,12 +67,13 @@ struct FixConnectivitiesRedOp {
     }
   }
 
-  DI KVP operator()(value_idx rit, const KVP& a, const KVP& b) const
+  DI auto operator()(value_idx rit, const KVP& a, const KVP& b) const -> KVP
   {
     if (rit < m && a.value < b.value) {
       return a;
-    } else
+    } else {
       return b;
+    }
   }
 
   DI void init(value_t* out, value_t maxVal) const { *out = maxVal; }
@@ -85,9 +86,9 @@ struct FixConnectivitiesRedOp {
   DI void init_key(value_t& out, value_idx idx) const { return; }
   DI void init_key(KVP& out, value_idx idx) const { out.key = idx; }
 
-  DI value_t get_value(KVP& out) const { return out.value; }
+  DI auto get_value(KVP& out) const -> value_t { return out.value; }
 
-  DI value_t get_value(value_t& out) const { return out; }
+  DI auto get_value(value_t& out) const -> value_t { return out; }
 
   /** The gather and scatter ensure that operator() is still consistent after rearranging the data.
    * TODO (tarang-jain): refactor cross_component_nn API to separate out the gather and scatter
@@ -107,7 +108,7 @@ struct MutualReachabilityFixConnectivitiesRedOp {
   MutualReachabilityFixConnectivitiesRedOp(value_t* core_dists, value_idx m)
     : core_dists(core_dists), m(m) {};
 
-  typedef typename raft::KeyValuePair<value_idx, value_t> KVP;
+  using KVP = typename raft::KeyValuePair<value_idx, value_t>;
   DI void operator()(value_idx rit, KVP* out, const KVP& other) const
   {
     if (rit < m && other.value < std::numeric_limits<value_t>::max()) {
@@ -127,7 +128,7 @@ struct MutualReachabilityFixConnectivitiesRedOp {
     }
   }
 
-  DI KVP operator()(value_idx rit, const KVP& a, const KVP& b) const
+  DI auto operator()(value_idx rit, const KVP& a, const KVP& b) const -> KVP
   {
     if (rit < m && a.key > -1) {
       value_t core_dist_rit = core_dists[rit];
@@ -156,8 +157,8 @@ struct MutualReachabilityFixConnectivitiesRedOp {
   DI void init_key(value_t& out, value_idx idx) const { return; }
   DI void init_key(KVP& out, value_idx idx) const { out.key = idx; }
 
-  DI value_t get_value(KVP& out) const { return out.value; }
-  DI value_t get_value(value_t& out) const { return out; }
+  DI auto get_value(KVP& out) const -> value_t { return out.value; }
+  DI auto get_value(value_t& out) const -> value_t { return out; }
 
   void gather(const raft::resources& handle, value_idx* map)
   {
@@ -191,7 +192,7 @@ struct MutualReachabilityFixConnectivitiesRedOp {
  */
 struct TupleComp {
   template <typename one, typename two>
-  __host__ __device__ bool operator()(const one& t1, const two& t2)
+  __host__ __device__ auto operator()(const one& t1, const two& t2) -> bool
   {
     // sort first by each sample's color,
     if (thrust::get<0>(t1) < thrust::get<0>(t2)) return true;
@@ -208,18 +209,18 @@ struct TupleComp {
 
 template <typename LabelT, typename DataT>
 struct CubKVPMinReduce {
-  typedef raft::KeyValuePair<LabelT, DataT> KVP;
+  using KVP = raft::KeyValuePair<LabelT, DataT>;
 
-  DI KVP
+  DI auto
 
-  operator()(LabelT rit, const KVP& a, const KVP& b)
+  operator()(LabelT rit, const KVP& a, const KVP& b) -> KVP
   {
     return b.value < a.value ? b : a;
   }
 
-  DI KVP
+  DI auto
 
-  operator()(const KVP& a, const KVP& b)
+  operator()(const KVP& a, const KVP& b) -> KVP
   {
     return b.value < a.value ? b : a;
   }
@@ -237,7 +238,7 @@ struct CubKVPMinReduce {
  * @return total number of components
  */
 template <typename value_idx>
-value_idx get_n_components(value_idx* colors, size_t n_rows, cudaStream_t stream)
+auto get_n_components(value_idx* colors, size_t n_rows, cudaStream_t stream) -> value_idx
 {
   rmm::device_uvector<value_idx> map_ids(0, stream);
   int num_clusters = raft::label::getUniquelabels(map_ids, colors, n_rows, stream);
@@ -253,11 +254,11 @@ template <typename value_idx, typename value_t>
 struct LookupColorOp {
   value_idx* colors;
 
-  LookupColorOp(value_idx* colors_) : colors(colors_) {}
+  explicit LookupColorOp(value_idx* colors_) : colors(colors_) {}
 
-  DI value_idx
+  DI auto
 
-  operator()(const raft::KeyValuePair<value_idx, value_t>& kvp)
+  operator()(const raft::KeyValuePair<value_idx, value_t>& kvp) -> value_idx
   {
     return colors[kvp.key];
   }
@@ -295,8 +296,9 @@ void perform_1nn(raft::resources const& handle,
   auto stream      = raft::resource::get_cuda_stream(handle);
   auto exec_policy = raft::resource::get_thrust_policy(handle);
 
-  auto sort_plan = raft::make_device_vector<value_idx>(handle, (value_idx)n_rows);
-  raft::linalg::map_offset(handle, sort_plan.view(), [] __device__(value_idx idx) { return idx; });
+  auto sort_plan = raft::make_device_vector<value_idx>(handle, static_cast<value_idx>(n_rows));
+  raft::linalg::map_offset(
+    handle, sort_plan.view(), [] __device__(value_idx idx) -> value_idx { return idx; });
 
   thrust::sort_by_key(
     raft::resource::get_thrust_policy(handle), colors, colors + n_rows, sort_plan.data_handle());
@@ -308,7 +310,8 @@ void perform_1nn(raft::resources const& handle,
     raft::make_device_matrix_view<value_t, value_idx>(const_cast<value_t*>(X), n_rows, n_cols);
   auto sort_plan_const_view =
     raft::make_device_vector_view<const value_idx, value_idx>(sort_plan.data_handle(), n_rows);
-  raft::matrix::gather(handle, X_mutable_view, sort_plan_const_view, (value_idx)col_batch_size);
+  raft::matrix::gather(
+    handle, X_mutable_view, sort_plan_const_view, static_cast<value_idx>(col_batch_size));
 
   // Get the number of unique components from the array of colors
   value_idx n_components = get_n_components(colors, n_rows, stream);
@@ -324,7 +327,8 @@ void perform_1nn(raft::resources const& handle,
   auto group_idxs_view = raft::make_device_vector_view<const value_idx, value_idx>(
     colors_group_idxs.data_handle() + 1, n_components);
 
-  auto x_norm = raft::make_device_vector<value_t, value_idx>(handle, (value_idx)n_rows);
+  auto x_norm =
+    raft::make_device_vector<value_t, value_idx>(handle, static_cast<value_idx>(n_rows));
   raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
     x_norm.data_handle(), X, n_cols, n_rows, stream);
 
@@ -352,7 +356,7 @@ void perform_1nn(raft::resources const& handle,
 
     auto mask_op = [colors,
                     n_components = raft::util::FastIntDiv(n_components),
-                    batch_offset] __device__(value_idx idx) {
+                    batch_offset] __device__(value_idx idx) -> bool {
       value_idx row = idx / n_components;
       value_idx col = idx % n_components;
       return colors[batch_offset + row] != col;
@@ -386,7 +390,7 @@ void perform_1nn(raft::resources const& handle,
                     kvp,
                     kvp + n_rows,
                     kvp,
-                    [sort_plan = sort_plan.data_handle()] __device__(OutT KVP) {
+                    [sort_plan = sort_plan.data_handle()] __device__(OutT KVP) -> OutT {
                       OutT res;
                       res.value = KVP.value;
                       res.key   = sort_plan[KVP.key];
@@ -394,7 +398,8 @@ void perform_1nn(raft::resources const& handle,
                     });
 
   // Undo permutation of the rows of X by scattering in place.
-  raft::matrix::scatter(handle, X_mutable_view, sort_plan_const_view, (value_idx)col_batch_size);
+  raft::matrix::scatter(
+    handle, X_mutable_view, sort_plan_const_view, static_cast<value_idx>(col_batch_size));
 
   // Undo permutation of the key-value pair and color vectors. This is not done
   // inplace, so using two temporary vectors.
@@ -437,8 +442,8 @@ void sort_by_color(raft::resources const& handle,
   thrust::counting_iterator<value_idx> arg_sort_iter(0);
   thrust::copy(exec_policy, arg_sort_iter, arg_sort_iter + n_rows, src_indices);
 
-  auto keys = thrust::make_zip_iterator(
-    thrust::make_tuple(colors, nn_colors, (raft::KeyValuePair<value_idx, value_t>*)kvp));
+  auto keys = thrust::make_zip_iterator(thrust::make_tuple(
+    colors, nn_colors, reinterpret_cast<raft::KeyValuePair<value_idx, value_t>*>(kvp)));
   auto vals = thrust::make_zip_iterator(thrust::make_tuple(src_indices));
   // get all the colors in contiguous locations so we can map them to warps.
   thrust::sort_by_key(exec_policy, keys, keys + n_rows, vals, TupleComp());
@@ -599,7 +604,7 @@ void cross_component_nn(
   value_idx size_int = 0;
   raft::update_host(&size_int, out_index.data() + (out_index.size() - 1), 1, stream);
   raft::resource::sync_stream(handle, stream);
-  nnz_t size = static_cast<nnz_t>(size_int);
+  auto size = static_cast<nnz_t>(size_int);
 
   size++;
 
