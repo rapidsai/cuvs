@@ -9,8 +9,7 @@
 
 namespace cuvs::neighbors::vamana {
 
-typedef AnnVamanaTest<float, int8_t, std::uint32_t>
-  AnnVamanaTestI8_U32;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using AnnVamanaTestI8_U32 = AnnVamanaTest<float, int8_t, std::uint32_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(AnnVamanaTestI8_U32, AnnVamana)
 {
   this->testVamana();

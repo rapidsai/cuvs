@@ -177,8 +177,7 @@ const std::vector<AnnHNSWInputs> inputs =
     {0.98}                                         // min_recall
   );
 
-typedef AnnHNSWTest<float, float, uint64_t>
-  AnnHNSW_F;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using AnnHNSW_F = AnnHNSWTest<float, float, uint64_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(AnnHNSW_F, AnnHNSW)
 {
   this->testHNSW();
@@ -190,8 +189,7 @@ INSTANTIATE_TEST_CASE_P(
   ::testing::ValuesIn(
     inputs));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-typedef AnnHNSWTest<float, half, uint64_t>
-  AnnHNSW_H;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using AnnHNSW_H = AnnHNSWTest<float, half, uint64_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(AnnHNSW_H, AnnHNSW)
 {
   this->testHNSW();
@@ -203,8 +201,7 @@ INSTANTIATE_TEST_CASE_P(
   ::testing::ValuesIn(
     inputs));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-typedef AnnHNSWTest<float, int8_t, uint64_t>
-  AnnHNSW_I8;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using AnnHNSW_I8 = AnnHNSWTest<float, int8_t, uint64_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(AnnHNSW_I8, AnnHNSW)
 {
   this->testHNSW();
@@ -216,8 +213,7 @@ INSTANTIATE_TEST_CASE_P(
   ::testing::ValuesIn(
     inputs));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-typedef AnnHNSWTest<float, uint8_t, uint64_t>
-  AnnHNSW_U8;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using AnnHNSW_U8 = AnnHNSWTest<float, uint8_t, uint64_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(AnnHNSW_U8, AnnHNSW)
 {
   this->testHNSW();

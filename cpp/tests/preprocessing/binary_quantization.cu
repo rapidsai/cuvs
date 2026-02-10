@@ -137,22 +137,19 @@ generate_inputs()  // NOLINT(modernize-use-trailing-return-type)
   return inputs;
 }
 
-typedef BinaryQuantizationTest<float, uint8_t>
-  QuantizationTest_float_uint8t;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using QuantizationTest_float_uint8t = BinaryQuantizationTest<float, uint8_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(QuantizationTest_float_uint8t, BinaryQuantizationTest)
 {
   this->testBinaryQuantization();
 }  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-typedef BinaryQuantizationTest<double, uint8_t>
-  QuantizationTest_double_uint8t;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using QuantizationTest_double_uint8t = BinaryQuantizationTest<double, uint8_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(QuantizationTest_double_uint8t, BinaryQuantizationTest)
 {
   this->testBinaryQuantization();
 }  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-typedef BinaryQuantizationTest<half, uint8_t>
-  QuantizationTest_half_uint8t;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using QuantizationTest_half_uint8t = BinaryQuantizationTest<half, uint8_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(QuantizationTest_half_uint8t, BinaryQuantizationTest)
 {
   this->testBinaryQuantization();

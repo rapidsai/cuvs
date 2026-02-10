@@ -9,8 +9,7 @@
 
 namespace cuvs::neighbors::mg {
 
-typedef AnnMGTest<float, float>
-  AnnMGTestF_float;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using AnnMGTestF_float = AnnMGTest<float, float>;  // NOLINT(readability-identifier-naming)
 TEST_P(AnnMGTestF_float, AnnMG)
 {
   this->testAnnMG();

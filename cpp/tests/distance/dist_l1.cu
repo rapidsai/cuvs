@@ -24,8 +24,7 @@ const std::vector<DistanceInputs<float>> inputsf = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceUnexpL1<float>
-  DistanceUnexpL1F;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceUnexpL1F = DistanceUnexpL1<float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceUnexpL1F,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -51,8 +50,7 @@ const std::vector<DistanceInputs<double>> inputsd = {
   {0.001, 32, 1024, 1024, false, 1234ULL},
   {0.003, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceUnexpL1<double>
-  DistanceUnexpL1D;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceUnexpL1D = DistanceUnexpL1<double>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceUnexpL1D,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -78,8 +76,7 @@ const std::vector<DistanceInputs<half, float>> inputsh = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceUnexpL1<half, float>
-  DistanceUnexpL1H;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceUnexpL1H = DistanceUnexpL1<half, float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceUnexpL1H,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {

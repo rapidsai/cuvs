@@ -226,8 +226,7 @@ const std::vector<silhouetteScoreParam> inputs = {  // NOLINT(readability-identi
   {7, 5, 5, cuvs::distance::DistanceType::L1, 2, 0.00001}};
 
 // writing the test suite
-typedef silhouetteScoreTest<int, double>
-  silhouetteScoreTestClass;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using silhouetteScoreTestClass = silhouetteScoreTest<int, double>;  // NOLINT(readability-identifier-naming)
 TEST_P(silhouetteScoreTestClass,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {

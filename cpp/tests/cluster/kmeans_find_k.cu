@@ -100,8 +100,7 @@ const std::vector<KmeansFindKInputs<float>> inputsf2 = {
   {10000, 500, 100, 0.001f, true},
   {10000, 500, 100, 0.001f, false}};
 
-typedef KmeansFindKTest<float>
-  KmeansFindKTestF;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using KmeansFindKTestF = KmeansFindKTest<float>;  // NOLINT(readability-identifier-naming)
 TEST_P(KmeansFindKTestF,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {

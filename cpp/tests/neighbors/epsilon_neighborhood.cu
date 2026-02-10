@@ -30,7 +30,8 @@ struct EpsInputs {  // NOLINT(readability-identifier-naming)
 
 template <typename T, typename IdxT>
 auto operator<<(  // NOLINT(modernize-use-trailing-return-type)
-  ::std::ostream& os, const EpsInputs<T, IdxT>& p) -> ::std::ostream&
+  ::std::ostream& os,
+  const EpsInputs<T, IdxT>& p) -> ::std::ostream&
 {
   return os;
 }
@@ -72,14 +73,15 @@ class EpsNeighTest  // NOLINT(readability-identifier-naming)
 
   const raft::resources handle;          // NOLINT(readability-identifier-naming)
   EpsInputs<T, IdxT> param;              // NOLINT(readability-identifier-naming)
-  cudaStream_t stream = nullptr;          // NOLINT(readability-identifier-naming)
+  cudaStream_t stream = nullptr;         // NOLINT(readability-identifier-naming)
   rmm::device_uvector<T> data;           // NOLINT(readability-identifier-naming)
   rmm::device_uvector<bool> adj;         // NOLINT(readability-identifier-naming)
   rmm::device_uvector<IdxT> labels, vd;  // NOLINT(readability-identifier-naming)
   IdxT batchSize;                        // NOLINT(readability-identifier-naming)
 };  // class EpsNeighTest
 
-const std::vector<EpsInputs<float, int64_t>> kInputsfi = {  // NOLINT(readability-identifier-naming)
+const std::vector<EpsInputs<float, int64_t>> kInputsfi = {
+  // NOLINT(readability-identifier-naming)
   {100, 16, 5, 2, 2.f},
   {1500, 16, 5, 3, 2.f},
   {15000, 16, 5, 1, 2.f},
@@ -135,7 +137,8 @@ INSTANTIATE_TEST_CASE_P(
     kInputsfi));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
 // rbc examples take fewer points as correctness checks are very costly
-const std::vector<EpsInputs<float, int64_t>> kInputsfiRbc = {  // NOLINT(readability-identifier-naming)
+const std::vector<EpsInputs<float, int64_t>> kInputsfiRbc = {
+  // NOLINT(readability-identifier-naming)
   {100, 16, 5, 2, 2.f},
   {1500, 16, 5, 3, 2.f},
   {1500, 16, 5, 1, 2.f},

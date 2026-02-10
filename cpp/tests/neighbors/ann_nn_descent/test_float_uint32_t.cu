@@ -9,15 +9,13 @@
 
 namespace cuvs::neighbors::nn_descent {
 
-typedef AnnNNDescentTest<float, float, std::uint32_t>
-  AnnNNDescentTestF_U32;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using AnnNNDescentTestF_U32 = AnnNNDescentTest<float, float, std::uint32_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(AnnNNDescentTestF_U32, AnnNNDescent)
 {
   this->testNNDescent();
 }  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-typedef AnnNNDescentDistEpiTest<float, float, std::uint32_t>
-  AnnNNDescentTestDistEpiF_U32;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using AnnNNDescentTestDistEpiF_U32 = AnnNNDescentDistEpiTest<float, float, std::uint32_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(AnnNNDescentTestDistEpiF_U32, AnnNNDescentDistEpi)
 {
   this->testNNDescent();

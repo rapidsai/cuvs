@@ -96,6 +96,7 @@
     return idx;                                                                              \
   }                                                                                          \
   }  // namespace cuvs::neighbors::cagra
-CUVS_INST_MG_CAGRA(float, uint32_t);  // NOLINT(google-build-using-namespace,modernize-use-trailing-return-type)
+CUVS_INST_MG_CAGRA(
+  float, uint32_t);  // NOLINT(google-build-using-namespace,modernize-use-trailing-return-type)
 
 #undef CUVS_INST_MG_CAGRA

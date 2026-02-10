@@ -123,8 +123,7 @@ __launch_bounds__(32 * NWARPS, 2) RAFT_KERNEL
       }
       if (sqrt) { acc = raft::sqrt(acc); }
       ReduceOpT redOp;  // NOLINT(readability-identifier-naming)
-      typedef cub::WarpReduce<raft::KeyValuePair<int, DataT>>
-        WarpReduce;  // NOLINT(modernize-use-using,readability-identifier-naming)
+      using WarpReduce = cub::WarpReduce<raft::KeyValuePair<int, DataT>>;  // NOLINT(readability-identifier-naming)
       __shared__ typename WarpReduce::TempStorage temp[NWARPS];
       int warpId = threadIdx.x / raft::WarpSize;  // NOLINT(readability-identifier-naming)
       raft::KeyValuePair<int, DataT> tmp;
@@ -283,8 +282,7 @@ auto run_masked_nn(const raft::handle_t& handle, const Inputs<DataT>& inp, const
 
 template <typename T>
 struct CompareApproxAbsKVP {  // NOLINT(readability-identifier-naming)
-  typedef typename raft::KeyValuePair<int, T>
-    KVP;  // NOLINT(modernize-use-using,readability-identifier-naming)
+  using KVP = typename raft::KeyValuePair<int, T>;  // NOLINT(readability-identifier-naming)
   CompareApproxAbsKVP(T eps_) : eps(eps_) {}         // NOLINT(google-explicit-constructor)
   bool operator()(const KVP& a, const KVP& b) const  // NOLINT(modernize-use-trailing-return-type)
   {
@@ -307,8 +305,7 @@ template <typename K, typename V, typename L>
   L eq_compare,
   cudaStream_t stream = 0)
 {
-  typedef typename raft::KeyValuePair<K, V>
-    KVP;  // NOLINT(modernize-use-using,readability-identifier-naming)
+  using KVP = typename raft::KeyValuePair<K, V>;  // NOLINT(readability-identifier-naming)
   std::shared_ptr<KVP[]> exp_h(new KVP[size]);  // NOLINT(modernize-avoid-c-arrays)
   std::shared_ptr<KVP[]> act_h(new KVP[size]);  // NOLINT(modernize-avoid-c-arrays)
   raft::update_host<KVP>(exp_h.get(), expected, size, stream);

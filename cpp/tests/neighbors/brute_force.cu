@@ -184,15 +184,13 @@ const std::vector<KNNInputs<T>> inputs = {  // NOLINT(readability-identifier-nam
    2,
    {0, 0, 0, 0, 0, 1, 1, 1, 1, 1}}};
 
-typedef KNNTest<float, float, int64_t>
-  KNNTest_float_int64_t;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using KNNTest_float_int64_t = KNNTest<float, float, int64_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(KNNTest_float_int64_t, BruteForce)
 {
   this->testBruteForce();
 }  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-typedef KNNTest<half, float, int64_t>
-  KNNTest_half_int64_t;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using KNNTest_half_int64_t = KNNTest<half, float, int64_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(KNNTest_half_int64_t, BruteForce)
 {
   this->testBruteForce();
@@ -559,15 +557,13 @@ const std::vector<RandomKNNInputs> random_inputs = {  // NOLINT(readability-iden
   {256, 512, 16, 8, cuvs::distance::DistanceType::InnerProduct, true, true},
   {256, 512, 16, 7, cuvs::distance::DistanceType::L2Expanded, true, true}};
 
-typedef RandomBruteForceKNNTest<float, float>
-  RandomBruteForceKNNTestF;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using RandomBruteForceKNNTestF = RandomBruteForceKNNTest<float, float>;  // NOLINT(readability-identifier-naming)
 TEST_P(RandomBruteForceKNNTestF, BruteForce)
 {
   this->testBruteForce();
 }  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-typedef RandomBruteForceKNNTest<half, float>
-  RandomBruteForceKNNTestH;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using RandomBruteForceKNNTestH = RandomBruteForceKNNTest<half, float>;  // NOLINT(readability-identifier-naming)
 TEST_P(RandomBruteForceKNNTestH, BruteForce)
 {
   this->testBruteForce();

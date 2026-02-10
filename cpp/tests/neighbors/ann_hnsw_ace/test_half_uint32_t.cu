@@ -7,8 +7,7 @@
 
 namespace cuvs::neighbors::hnsw {
 
-typedef AnnHnswAceTest<float, half, uint32_t>
-  AnnHnswAceTest_half;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using AnnHnswAceTest_half = AnnHnswAceTest<float, half, uint32_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(AnnHnswAceTest_half, AnnHnswAceBuild)
 {
   this->testHnswAceBuild();

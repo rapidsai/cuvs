@@ -24,8 +24,7 @@ const std::vector<DistanceInputs<float>> inputsf = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceCanberra<float>
-  DistanceCanberraF;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceCanberraF = DistanceCanberra<float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceCanberraF,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -51,8 +50,7 @@ const std::vector<DistanceInputs<double>> inputsd = {
   {0.001, 32, 1024, 1024, false, 1234ULL},
   {0.003, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceCanberra<double>
-  DistanceCanberraD;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceCanberraD = DistanceCanberra<double>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceCanberraD,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -78,8 +76,7 @@ const std::vector<DistanceInputs<half, float>> inputsh = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceCanberra<half, float>
-  DistanceCanberraH;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceCanberraH = DistanceCanberra<half, float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceCanberraH,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {

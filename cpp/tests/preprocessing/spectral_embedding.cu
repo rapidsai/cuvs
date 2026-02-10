@@ -206,8 +206,7 @@ const std::vector<SpectralEmbeddingInputs<T>> inputs = {  // NOLINT(readability-
   // Larger dataset
   {10000, 20, 8, 2, 12, 1.0f, true, true, 42ULL}};
 
-typedef SpectralEmbeddingTest<float>
-  SpectralEmbeddingTestF;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using SpectralEmbeddingTestF = SpectralEmbeddingTest<float>;  // NOLINT(readability-identifier-naming)
 TEST_P(SpectralEmbeddingTestF, Result)
 {
   this->testSpectralEmbedding();

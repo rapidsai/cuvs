@@ -183,10 +183,8 @@ const std::vector<SpectralClusteringInputs> inputs = {
   {500, 20, 3, 3, 15, 3, 0.5f, 777ULL},  // More spread but still reasonable
 };
 
-typedef SpectralClusteringTest<float>
-  SpectralClusteringTestF;  // NOLINT(modernize-use-using,readability-identifier-naming)
-typedef SpectralClusteringTest<double>
-  SpectralClusteringTestD;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using SpectralClusteringTestF = SpectralClusteringTest<float>;  // NOLINT(readability-identifier-naming)
+using SpectralClusteringTestD = SpectralClusteringTest<double>;  // NOLINT(readability-identifier-naming)
 
 TEST_P(SpectralClusteringTestF,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)

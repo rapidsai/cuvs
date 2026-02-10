@@ -393,10 +393,8 @@ class BallCoverAllKNNTest
   BallCoverInputs<value_int> params;  // NOLINT(readability-identifier-naming)
 };
 
-typedef BallCoverAllKNNTest<int64_t, float>
-  BallCoverAllKNNTestF;  // NOLINT(modernize-use-using,readability-identifier-naming)
-typedef BallCoverKNNQueryTest<int64_t, float>
-  BallCoverKNNQueryTestF;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using BallCoverAllKNNTestF = BallCoverAllKNNTest<int64_t, float>;  // NOLINT(readability-identifier-naming)
+using BallCoverKNNQueryTestF = BallCoverKNNQueryTest<int64_t, float>;  // NOLINT(readability-identifier-naming)
 
 const std::vector<BallCoverInputs<std::int64_t>> ballcover_inputs =
   {  // NOLINT(readability-identifier-naming)

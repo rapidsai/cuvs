@@ -24,8 +24,7 @@ const std::vector<DistanceInputs<float>> inputsf = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceInnerProduct<float>
-  DistanceInnerProductF;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceInnerProductF = DistanceInnerProduct<float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceInnerProductF,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -52,8 +51,7 @@ const std::vector<DistanceInputs<double>> inputsd = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceInnerProduct<double>
-  DistanceInnerProductD;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceInnerProductD = DistanceInnerProduct<double>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceInnerProductD,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -80,8 +78,7 @@ const std::vector<DistanceInputs<half, float>> inputsh = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceInnerProduct<half, float>
-  DistanceInnerProductH;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceInnerProductH = DistanceInnerProduct<half, float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceInnerProductH,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {

@@ -270,22 +270,19 @@ const std::vector<QuantizationInputs<T>> inputs = {
   {{0.95}, 10, 20, T(5.0), T(5.0)},
 };
 
-typedef QuantizationTest<float, int8_t>
-  QuantizationTest_float_int8t;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using QuantizationTest_float_int8t = QuantizationTest<float, int8_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(QuantizationTest_float_int8t, ScalarQuantizationTest)
 {
   this->testScalarQuantization();
 }  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-typedef QuantizationTest<double, int8_t>
-  QuantizationTest_double_int8t;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using QuantizationTest_double_int8t = QuantizationTest<double, int8_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(QuantizationTest_double_int8t, ScalarQuantizationTest)
 {
   this->testScalarQuantization();
 }  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-typedef QuantizationTest<half, int8_t>
-  QuantizationTest_half_int8t;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using QuantizationTest_half_int8t = QuantizationTest<half, int8_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(QuantizationTest_half_int8t, ScalarQuantizationTest)
 {
   this->testScalarQuantization();

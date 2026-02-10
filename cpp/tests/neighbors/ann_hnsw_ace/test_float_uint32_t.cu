@@ -7,8 +7,7 @@
 
 namespace cuvs::neighbors::hnsw {
 
-typedef AnnHnswAceTest<float, float, uint32_t>
-  AnnHnswAceTest_float;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using AnnHnswAceTest_float = AnnHnswAceTest<float, float, uint32_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(AnnHnswAceTest_float, AnnHnswAceBuild)
 {
   this->testHnswAceBuild();
@@ -21,8 +20,7 @@ INSTANTIATE_TEST_CASE_P(
     hnsw_ace_inputs));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
 // Test for memory limit fallback to disk mode
-typedef AnnHnswAceTest<float, float, uint32_t>
-  AnnHnswAceMemoryFallbackTest_float;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using AnnHnswAceMemoryFallbackTest_float = AnnHnswAceTest<float, float, uint32_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(
   AnnHnswAceMemoryFallbackTest_float,
   AnnHnswAceMemoryLimitFallback)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)

@@ -9,8 +9,7 @@
 
 namespace cuvs::neighbors::nn_descent {
 
-typedef AnnNNDescentTest<float, int8_t, std::uint32_t>
-  AnnNNDescentTestI8_U32;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using AnnNNDescentTestI8_U32 = AnnNNDescentTest<float, int8_t, std::uint32_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(AnnNNDescentTestI8_U32, AnnNNDescent)
 {
   this->testNNDescent();

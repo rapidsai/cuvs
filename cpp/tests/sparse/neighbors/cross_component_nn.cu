@@ -527,8 +527,7 @@ const std::vector<ConnectComponentsInputs<float, int>> fix_conn_inputsf2 =
      },
      -4}};
 
-typedef ConnectComponentsTest<int, float>
-  ConnectComponentsTestF_Int;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using ConnectComponentsTestF_Int = ConnectComponentsTest<int, float>;  // NOLINT(readability-identifier-naming)
 TEST_P(ConnectComponentsTestF_Int,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -1103,8 +1102,7 @@ const std::vector<ConnectComponentsMutualReachabilityInputs<float, int>> mr_fix_
      {426, 601, 426, 387, 343, 271, 329, 271},
      {3.70991, 4.43491, 3.76334, 9.43944, 9.43944, 3.70991, 3.76334, 4.43491}}};
 
-typedef ConnectComponentsEdgesTest<int, float>
-  ConnectComponentsEdgesTestF_Int;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using ConnectComponentsEdgesTestF_Int = ConnectComponentsEdgesTest<int, float>;  // NOLINT(readability-identifier-naming)
 TEST_P(ConnectComponentsEdgesTestF_Int, Result)
 {
   EXPECT_TRUE(true);

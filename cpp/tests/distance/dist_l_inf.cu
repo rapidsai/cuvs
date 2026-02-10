@@ -26,8 +26,7 @@ const std::vector<DistanceInputs<float>> inputsf = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceLinf<float>
-  DistanceLinfF;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceLinfF = DistanceLinf<float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceLinfF,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -53,8 +52,7 @@ const std::vector<DistanceInputs<double>> inputsd = {
   {0.001, 32, 1024, 1024, false, 1234ULL},
   {0.003, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceLinf<double>
-  DistanceLinfD;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceLinfD = DistanceLinf<double>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceLinfD,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -80,8 +78,7 @@ const std::vector<DistanceInputs<half, float>> inputsh = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceLinf<half, float>
-  DistanceLinfH;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceLinfH = DistanceLinf<half, float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceLinfH,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {

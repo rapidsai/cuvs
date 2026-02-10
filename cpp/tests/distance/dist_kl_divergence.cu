@@ -24,8 +24,7 @@ const std::vector<DistanceInputs<float>> inputsf = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceKLDivergence<float>
-  DistanceKLDivergenceF;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceKLDivergenceF = DistanceKLDivergence<float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceKLDivergenceF,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -51,8 +50,7 @@ const std::vector<DistanceInputs<double>> inputsd = {
   {0.001, 32, 1024, 1024, false, 1234ULL},
   {0.003, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceKLDivergence<double>
-  DistanceKLDivergenceD;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceKLDivergenceD = DistanceKLDivergence<double>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceKLDivergenceD,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -78,8 +76,7 @@ const std::vector<DistanceInputs<half, float>> inputsh = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceKLDivergence<half, float>
-  DistanceKLDivergenceH;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceKLDivergenceH = DistanceKLDivergence<half, float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceKLDivergenceH,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {

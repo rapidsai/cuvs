@@ -9,26 +9,22 @@
 
 namespace cuvs::neighbors::cagra {
 
-typedef AnnCagraTest<float, std::int8_t, std::uint32_t>
-  AnnCagraTestI8_U32;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using AnnCagraTestI8_U32 = AnnCagraTest<float, std::int8_t, std::uint32_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(AnnCagraTestI8_U32, AnnCagra)
 {
   this->testCagra();
 }  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-typedef AnnCagraAddNodesTest<float, std::int8_t, std::uint32_t>
-  AnnCagraAddNodesTestI8_U32;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using AnnCagraAddNodesTestI8_U32 = AnnCagraAddNodesTest<float, std::int8_t, std::uint32_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(AnnCagraAddNodesTestI8_U32, AnnCagra)
 {
   this->testCagra();
 }  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-typedef AnnCagraFilterTest<float, std::int8_t, std::uint32_t>
-  AnnCagraFilterTestI8_U32;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using AnnCagraFilterTestI8_U32 = AnnCagraFilterTest<float, std::int8_t, std::uint32_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(AnnCagraFilterTestI8_U32, AnnCagra)
 {
   this->testCagra();
 }  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-typedef AnnCagraIndexMergeTest<float, std::int8_t, std::uint32_t>
-  AnnCagraIndexMergeTestI8_U32;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using AnnCagraIndexMergeTestI8_U32 = AnnCagraIndexMergeTest<float, std::int8_t, std::uint32_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(AnnCagraIndexMergeTestI8_U32, AnnCagra)
 {
   this->testCagra();

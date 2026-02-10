@@ -161,8 +161,7 @@ const std::vector<SparseKNNInputs<int, float>> inputs_i32_f =
      2,
      2,
      cuvs::distance::DistanceType::L2SqrtExpanded}};
-typedef SparseKNNTest<int, float>
-  SparseKNNTestF;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using SparseKNNTestF = SparseKNNTest<int, float>;  // NOLINT(readability-identifier-naming)
 TEST_P(SparseKNNTestF, Result)
 {
   compare();

@@ -832,8 +832,7 @@ const std::vector<SparseDistanceInputs<int, float>> inputs_i32_f = {
 
 };
 
-typedef SparseDistanceTest<int, float>
-  SparseDistanceTestF;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using SparseDistanceTestF = SparseDistanceTest<int, float>;  // NOLINT(readability-identifier-naming)
 TEST_P(SparseDistanceTestF, Result)
 {
   compare();

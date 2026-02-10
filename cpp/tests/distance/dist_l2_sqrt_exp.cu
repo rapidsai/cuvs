@@ -27,8 +27,7 @@ const std::vector<DistanceInputs<float>> inputsf = {
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
   {0.003f, 1021, 1021, 1021, false, 1234ULL},
 };
-typedef DistanceEucSqrtExpTest<float>
-  DistanceEucSqrtExpTestF;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceEucSqrtExpTestF = DistanceEucSqrtExpTest<float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceEucSqrtExpTestF,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -54,8 +53,7 @@ const std::vector<DistanceInputs<double>> inputsd = {
   {0.001, 32, 1024, 1024, false, 1234ULL},
   {0.003, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceEucSqrtExpTest<double>
-  DistanceEucSqrtExpTestD;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceEucSqrtExpTestD = DistanceEucSqrtExpTest<double>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceEucSqrtExpTestD,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -84,8 +82,7 @@ const std::vector<DistanceInputs<half, float>> inputsh = {
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
   {0.003f, 1021, 1021, 1021, false, 1234ULL},
 };
-typedef DistanceEucSqrtExpTest<half, float>
-  DistanceEucSqrtExpTestH;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceEucSqrtExpTestH = DistanceEucSqrtExpTest<half, float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceEucSqrtExpTestH,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {

@@ -101,8 +101,7 @@ const std::vector<RefineInputs<int64_t>> inputs =  // NOLINT(readability-identif
     {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false, true});
 
-typedef RefineTest<float, float, std::int64_t>
-  RefineTestF;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using RefineTestF = RefineTest<float, float, std::int64_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(RefineTestF, AnnRefine)
 {
   this->testRefine();
@@ -114,8 +113,7 @@ INSTANTIATE_TEST_CASE_P(
   ::testing::ValuesIn(
     inputs));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-typedef RefineTest<uint8_t, float, std::int64_t>
-  RefineTestF_uint8;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using RefineTestF_uint8 = RefineTest<uint8_t, float, std::int64_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(RefineTestF_uint8, AnnRefine)
 {
   this->testRefine();
@@ -126,8 +124,7 @@ INSTANTIATE_TEST_CASE_P(
   ::testing::ValuesIn(
     inputs));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-typedef RefineTest<int8_t, float, std::int64_t>
-  RefineTestF_int8;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using RefineTestF_int8 = RefineTest<int8_t, float, std::int64_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(RefineTestF_int8, AnnRefine)
 {
   this->testRefine();

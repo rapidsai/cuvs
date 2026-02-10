@@ -313,12 +313,9 @@ class GramMatrixTest
   std::vector<math_t> gram_host;     // NOLINT(readability-identifier-naming)
 };
 
-typedef GramMatrixTest<float>
-  GramMatrixTestFloatStandard;  // NOLINT(modernize-use-using,readability-identifier-naming)
-typedef GramMatrixTest<float>
-  GramMatrixTestFloatLd;  // NOLINT(modernize-use-using,readability-identifier-naming)
-typedef GramMatrixTest<float>
-  GramMatrixTestFloatLdCsr;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using GramMatrixTestFloatStandard = GramMatrixTest<float>;  // NOLINT(readability-identifier-naming)
+using GramMatrixTestFloatLd = GramMatrixTest<float>;  // NOLINT(readability-identifier-naming)
+using GramMatrixTestFloatLdCsr = GramMatrixTest<float>;  // NOLINT(readability-identifier-naming)
 
 TEST_P(GramMatrixTestFloatStandard, Gram)
 {

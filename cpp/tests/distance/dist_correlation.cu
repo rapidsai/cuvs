@@ -30,8 +30,7 @@ const std::vector<DistanceInputs<float>> inputsf = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceCorrelation<float>
-  DistanceCorrelationF;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceCorrelationF = DistanceCorrelation<float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceCorrelationF,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -57,8 +56,7 @@ const std::vector<DistanceInputs<half, float>> inputsh = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceCorrelation<half, float>
-  DistanceCorrelationH;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceCorrelationH = DistanceCorrelation<half, float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceCorrelationH,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -73,8 +71,7 @@ INSTANTIATE_TEST_CASE_P(
   ::testing::ValuesIn(
     inputsh));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-typedef DistanceCorrelationXequalY<float>
-  DistanceCorrelationXequalYF;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceCorrelationXequalYF = DistanceCorrelationXequalY<float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceCorrelationXequalYF,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -109,8 +106,7 @@ const std::vector<DistanceInputs<double>> inputsd = {
   {0.001, 32, 1024, 1024, false, 1234ULL},
   {0.003, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceCorrelation<double>
-  DistanceCorrelationD;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceCorrelationD = DistanceCorrelation<double>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceCorrelationD,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -125,8 +121,7 @@ INSTANTIATE_TEST_CASE_P(
   ::testing::ValuesIn(
     inputsd));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-typedef DistanceCorrelationXequalY<half, float>
-  DistanceCorrelationXequalYH;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceCorrelationXequalYH = DistanceCorrelationXequalY<half, float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceCorrelationXequalYH,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {

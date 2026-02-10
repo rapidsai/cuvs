@@ -195,8 +195,7 @@ const std::vector<ConnectKNNInputs> inputs =
     {cuvs::distance::DistanceType::L2SqrtExpanded},  // metric
     {true, false});                                  // mutual_reach
 
-typedef ConnectKNNTest<float>
-  ConnectKNNTestF;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using ConnectKNNTestF = ConnectKNNTest<float>;  // NOLINT(readability-identifier-naming)
 TEST_P(ConnectKNNTestF, ConnectKNN)
 {
   this->basicTest();

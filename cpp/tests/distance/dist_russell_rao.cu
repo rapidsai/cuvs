@@ -24,8 +24,7 @@ const std::vector<DistanceInputs<float>> inputsf = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceRussellRao<float>
-  DistanceRussellRaoF;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceRussellRaoF = DistanceRussellRao<float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceRussellRaoF,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -51,8 +50,7 @@ const std::vector<DistanceInputs<double>> inputsd = {
   {0.001, 32, 1024, 1024, false, 1234ULL},
   {0.003, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceRussellRao<double>
-  DistanceRussellRaoD;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceRussellRaoD = DistanceRussellRao<double>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceRussellRaoD,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -78,8 +76,7 @@ const std::vector<DistanceInputs<half, float>> inputsh = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceRussellRao<half, float>
-  DistanceRussellRaoH;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceRussellRaoH = DistanceRussellRao<half, float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceRussellRaoH,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {

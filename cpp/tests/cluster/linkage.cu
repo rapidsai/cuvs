@@ -77,11 +77,7 @@ RAFT_KERNEL computeTheNumerator(  // NOLINT(readability-identifier-naming)
   }
 
   // specialize blockReduce for a 2D block of 1024 threads of type uint64_t
-  typedef cub::BlockReduce<uint64_t,
-                           BLOCK_DIM_X,
-                           cub::BLOCK_REDUCE_WARP_REDUCTIONS,
-                           BLOCK_DIM_Y>  // NOLINT(modernize-use-using)
-    BlockReduce;                         // NOLINT(readability-identifier-naming)
+  using BlockReduce = cub::BlockReduce<uint64_t, BLOCK_DIM_X, cub::BLOCK_REDUCE_WARP_REDUCTIONS, BLOCK_DIM_Y>;  // NOLINT(readability-identifier-naming)
 
   // Allocate shared memory for blockReduce
   __shared__ typename BlockReduce::TempStorage temp_storage;
@@ -996,8 +992,7 @@ const std::vector<LinkageInputs<float, int>> linkage_inputsf2 =
      false,
      5}};
 
-typedef LinkageTest<float, int>
-  LinkageTestF_Int;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using LinkageTestF_Int = LinkageTest<float, int>;  // NOLINT(readability-identifier-naming)
 TEST_P(LinkageTestF_Int, Result)
 {
   EXPECT_TRUE(score == 1.0);

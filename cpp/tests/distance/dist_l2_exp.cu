@@ -82,8 +82,7 @@ const std::vector<DistanceInputs<half, float>> inputsXeqYh = {
   {0.03f, 1021, 1021, 1021, false, 1234ULL},
 };
 
-typedef DistanceEucExpTest<float>
-  DistanceEucExpTestF;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceEucExpTestF = DistanceEucExpTest<float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceEucExpTestF,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -98,8 +97,7 @@ INSTANTIATE_TEST_CASE_P(
   ::testing::ValuesIn(
     inputsf));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-typedef DistanceEucExpTest<half, float>
-  DistanceEucExpTestH;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceEucExpTestH = DistanceEucExpTest<half, float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceEucExpTestH,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -114,8 +112,7 @@ INSTANTIATE_TEST_CASE_P(
   ::testing::ValuesIn(
     inputsh));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-typedef DistanceEucExpTestXequalY<float>
-  DistanceEucExpTestXequalYF;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceEucExpTestXequalYF = DistanceEucExpTestXequalY<float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceEucExpTestXequalYF,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -138,8 +135,7 @@ INSTANTIATE_TEST_CASE_P(
   DistanceEucExpTestXequalYF,
   ::testing::ValuesIn(inputsXeqYf));
 
-typedef DistanceEucExpTestXequalY<half, float>
-  DistanceEucExpTestXequalYH;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceEucExpTestXequalYH = DistanceEucExpTestXequalY<half, float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceEucExpTestXequalYH,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -173,8 +169,7 @@ const std::vector<DistanceInputs<double>> inputsd = {
   {0.001, 32, 1024, 1024, false, 1234ULL},
   {0.003, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceEucExpTest<double>
-  DistanceEucExpTestD;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceEucExpTestD = DistanceEucExpTest<double>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceEucExpTestD,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {

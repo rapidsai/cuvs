@@ -9,8 +9,7 @@
 
 namespace cuvs::neighbors::ivf_flat {
 
-typedef AnnIVFFlatTest<float, float, int64_t>
-  AnnIVFFlatTestF_float;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using AnnIVFFlatTestF_float = AnnIVFFlatTest<float, float, int64_t>;  // NOLINT(readability-identifier-naming)
 TEST_P(AnnIVFFlatTestF_float,
        AnnIVFFlat)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {

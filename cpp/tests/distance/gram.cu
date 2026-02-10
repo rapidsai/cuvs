@@ -34,8 +34,7 @@ struct GramMatrixInputs {  // NOLINT(readability-identifier-naming)
   // The reference output is calculated by a custom kernel.
 };
 
-auto operator<<(std::ostream& os,
-                const GramMatrixInputs& p) -> std::ostream&
+auto operator<<(std::ostream& os, const GramMatrixInputs& p) -> std::ostream&
 {
   std::vector<std::string> kernel_names{"linear", "poly", "rbf", "tanh"};
   os << "/" << p.n1 << "x" << p.n2 << "x" << p.n_cols << "/"
@@ -66,7 +65,7 @@ const std::vector<GramMatrixInputs> kInputs = {
 };
 
 template <typename math_t>  // NOLINT(readability-identifier-naming)
-class GramMatrixTest  // NOLINT(readability-identifier-naming)
+class GramMatrixTest        // NOLINT(readability-identifier-naming)
   : public ::testing::TestWithParam<GramMatrixInputs> {
  protected:
   GramMatrixTest()

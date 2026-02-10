@@ -71,8 +71,7 @@ const std::vector<DistanceInputs<half, float>> inputsXeqYh = {
   {0.03f, 1024, 1024, 1024, false, 1234ULL},
 };
 
-typedef DistanceExpCos<float>
-  DistanceExpCosF;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceExpCosF = DistanceExpCos<float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceExpCosF,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -87,8 +86,7 @@ INSTANTIATE_TEST_CASE_P(
   ::testing::ValuesIn(
     inputsf));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-typedef DistanceExpCos<half, float>
-  DistanceExpCosH;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceExpCosH = DistanceExpCos<half, float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceExpCosH,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -103,8 +101,7 @@ INSTANTIATE_TEST_CASE_P(
   ::testing::ValuesIn(
     inputsh));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-typedef DistanceExpCosXequalY<float>
-  DistanceExpCosXequalYF;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceExpCosXequalYF = DistanceExpCosXequalY<float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceExpCosXequalYF,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -132,8 +129,7 @@ INSTANTIATE_TEST_CASE_P(
   ::testing::ValuesIn(
     inputsXeqYf));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 
-typedef DistanceExpCosXequalY<half, float>
-  DistanceExpCosXequalYH;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceExpCosXequalYH = DistanceExpCosXequalY<half, float>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceExpCosXequalYH,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
@@ -172,8 +168,7 @@ const std::vector<DistanceInputs<double>> inputsd = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceExpCos<double>
-  DistanceExpCosD;  // NOLINT(modernize-use-using,readability-identifier-naming)
+using DistanceExpCosD = DistanceExpCos<double>;  // NOLINT(readability-identifier-naming)
 TEST_P(DistanceExpCosD,
        Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
 {
