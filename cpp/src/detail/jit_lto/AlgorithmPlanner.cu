@@ -19,6 +19,7 @@
 #include "cuda_runtime.h"
 #include "nvJitLink.h"
 
+#include <raft/core/logger.hpp>
 #include <raft/util/cuda_rt_essentials.hpp>
 
 void AlgorithmPlanner::add_entrypoint()
@@ -54,7 +55,13 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::get_launcher()
   if (launchers.count(launch_key) == 0) {
     add_entrypoint();
     add_device_functions();
-    RAFT_LOG_INFO("JIT compiling launcher for key: %s", launch_key.c_str());
+    std::string log_message =
+      "JIT compiling launcher for entrypoint: " + this->entrypoint + " and device functions: ";
+    for (const auto& device_function : this->device_functions) {
+      log_message += device_function + ",";
+    }
+    log_message.pop_back();
+    RAFT_LOG_INFO("%s", log_message.c_str());
     launchers[launch_key] = this->build();
   }
   return launchers[launch_key];
