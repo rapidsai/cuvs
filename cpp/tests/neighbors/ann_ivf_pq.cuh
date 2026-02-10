@@ -104,7 +104,7 @@ void compare_vectors_l2(
   rmm::mr::managed_memory_resource managed_memory;
   auto dist =
     raft::make_device_mdarray<double>(res, &managed_memory, raft::make_extents<uint32_t>(n_rows));
-  raft::linalg::map_offset(res, dist.view(), [a, b, dim] __device__(uint32_t i) {
+  raft::linalg::map_offset(res, dist.view(), [a, b, dim] __device__(uint32_t i) -> double {
     cuvs::spatial::knn::detail::utils::mapping<float> f{};
     double d = 0.0f;
     for (uint32_t j = 0; j < dim; j++) {
@@ -366,7 +366,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     raft::copy(indices.data_handle(), old_list->indices.data_handle(), n_rows, stream_);
 
     ivf_pq::helpers::codepacker::reconstruct_list_data(
-      handle_, *index, vectors_1.view(), label, uint32_t(0));
+      handle_, *index, vectors_1.view(), label, static_cast<uint32_t>(0));
     ivf_pq::helpers::erase_list(handle_, index, label);
     // NB: passing the type parameter because const->non-const implicit conversion of the mdspans
     // breaks type inference
@@ -380,7 +380,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
 
     auto vectors_2 = raft::make_device_matrix<EvalT>(handle_, n_rows, index->dim());
     ivf_pq::helpers::codepacker::reconstruct_list_data(
-      handle_, *index, vectors_2.view(), label, uint32_t(0));
+      handle_, *index, vectors_2.view(), label, static_cast<uint32_t>(0));
     // The code search is unstable, and there's high chance of repeating values of the lvl-2 codes.
     // Hence, encoding-decoding chain often leads to altering both the PQ codes and the
     // reconstructed data.
@@ -403,7 +403,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     raft::copy(indices.data_handle(), old_list->indices.data_handle(), n_rows, stream_);
 
     ivf_pq::helpers::codepacker::unpack_list_data(
-      handle_, *index, codes.view(), label, uint32_t(0));
+      handle_, *index, codes.view(), label, static_cast<uint32_t>(0));
     ivf_pq::helpers::erase_list(handle_, index, label);
     ivf_pq::helpers::codepacker::extend_list_with_codes(
       handle_, index, codes.view(), indices.view(), label);
@@ -438,7 +438,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     auto codes_to_pack = raft::make_device_matrix_view<const uint8_t, uint32_t>(
       codes.data_handle() + offset, n_vec, index->pq_dim());
     ivf_pq::helpers::codepacker::pack_list_data(
-      handle_, index, codes_to_pack, label, uint32_t(row_offset));
+      handle_, index, codes_to_pack, label, static_cast<uint32_t>(row_offset));
     ASSERT_TRUE(cuvs::devArrMatch(old_list->data.data_handle(),
                                   new_list->data.data_handle(),
                                   list_data_byte_size,
@@ -899,7 +899,7 @@ auto map(const std::vector<A>& xs, F f) -> std::vector<B>
 
 inline auto with_dims(const std::vector<uint32_t>& dims) -> test_cases_t
 {
-  return map<ivf_pq_inputs>(dims, [](uint32_t d) {
+  return map<ivf_pq_inputs>(dims, [](uint32_t d) -> ivf_pq_inputs {
     ivf_pq_inputs x;
     x.dim = d;
     return x;
@@ -911,7 +911,7 @@ inline auto small_dims() -> test_cases_t { return with_dims({1, 2, 3, 4, 5, 8, 1
 
 inline auto small_dims_per_cluster() -> test_cases_t
 {
-  return map<ivf_pq_inputs>(small_dims(), [](const ivf_pq_inputs& x) {
+  return map<ivf_pq_inputs>(small_dims(), [](const ivf_pq_inputs& x) -> ivf_pq_inputs {
     ivf_pq_inputs y(x);
     y.index_params.codebook_kind = ivf_pq::codebook_gen::PER_CLUSTER;
     return y;
@@ -922,7 +922,7 @@ inline auto big_dims() -> test_cases_t
 {
   // with_dims({512, 513, 1023, 1024, 1025, 2048, 2049, 2050, 2053, 6144, 8192, 12288, 16384});
   auto xs = with_dims({512, 513, 1023, 1024, 1025, 2048, 2049, 2050, 2053, 6144});
-  return map<ivf_pq_inputs>(xs, [](const ivf_pq_inputs& x) {
+  return map<ivf_pq_inputs>(xs, [](const ivf_pq_inputs& x) -> ivf_pq_inputs {
     ivf_pq_inputs y(x);
     uint32_t pq_len       = 2;
     y.index_params.pq_dim = raft::div_rounding_up_safe(x.dim, pq_len);
@@ -935,7 +935,7 @@ inline auto big_dims() -> test_cases_t
 /** These will surely trigger no-smem-lut kernel.  */
 inline auto big_dims_moderate_lut() -> test_cases_t
 {
-  return map<ivf_pq_inputs>(big_dims(), [](const ivf_pq_inputs& x) {
+  return map<ivf_pq_inputs>(big_dims(), [](const ivf_pq_inputs& x) -> ivf_pq_inputs {
     ivf_pq_inputs y(x);
     uint32_t pq_len           = 2;
     y.index_params.pq_dim     = raft::round_up_safe(raft::div_rounding_up_safe(x.dim, pq_len), 4u);
@@ -949,7 +949,7 @@ inline auto big_dims_moderate_lut() -> test_cases_t
 /** Some of these should trigger no-basediff kernel.  */
 inline auto big_dims_small_lut() -> test_cases_t
 {
-  return map<ivf_pq_inputs>(big_dims(), [](const ivf_pq_inputs& x) {
+  return map<ivf_pq_inputs>(big_dims(), [](const ivf_pq_inputs& x) -> ivf_pq_inputs {
     ivf_pq_inputs y(x);
     uint32_t pq_len           = 8;
     y.index_params.pq_dim     = raft::round_up_safe(raft::div_rounding_up_safe(x.dim, pq_len), 4u);
@@ -980,64 +980,64 @@ inline auto enum_variety() -> test_cases_t
 {
   test_cases_t xs;
 
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.index_params.codebook_kind = ivf_pq::codebook_gen::PER_CLUSTER;
     x.min_recall                 = 0.86;
   });
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.index_params.codebook_kind = ivf_pq::codebook_gen::PER_SUBSPACE;
     x.min_recall                 = 0.86;
   });
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.index_params.codebook_kind = ivf_pq::codebook_gen::PER_CLUSTER;
     x.index_params.pq_bits       = 4;
     x.min_recall                 = 0.79;
   });
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.index_params.codebook_kind = ivf_pq::codebook_gen::PER_CLUSTER;
     x.index_params.pq_bits       = 5;
     x.min_recall                 = 0.83;
   });
 
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.index_params.pq_bits = 6;
     x.min_recall           = 0.84;
   });
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.index_params.pq_bits = 7;
     x.min_recall           = 0.85;
   });
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.index_params.pq_bits = 8;
     x.min_recall           = 0.86;
   });
 
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.index_params.force_random_rotation = true;
     x.min_recall                         = 0.86;
   });
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.index_params.force_random_rotation = false;
     x.min_recall                         = 0.86;
   });
 
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.search_params.lut_dtype = CUDA_R_32F;
     x.min_recall              = 0.86;
   });
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.search_params.lut_dtype = CUDA_R_16F;
     x.min_recall              = 0.86;
   });
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.search_params.lut_dtype = CUDA_R_8U;
     x.min_recall              = 0.84;
   });
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.search_params.coarse_search_dtype = CUDA_R_16F;
     x.min_recall                        = 0.86;
   });
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.search_params.coarse_search_dtype = CUDA_R_8I;
     // 8-bit coarse search is experimental and there's no go guarantee of any recall
     // if the data is not normalized. Especially for L2, because we store vector norms alongside the
@@ -1045,16 +1045,16 @@ inline auto enum_variety() -> test_cases_t
     x.min_recall = 0.1;
   });
 
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.search_params.internal_distance_dtype = CUDA_R_32F;
     x.min_recall                            = 0.86;
   });
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.search_params.internal_distance_dtype = CUDA_R_16F;
     x.search_params.lut_dtype               = CUDA_R_16F;
     x.min_recall                            = 0.86;
   });
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.search_params.internal_distance_dtype = CUDA_R_16F;
     x.search_params.lut_dtype               = CUDA_R_16F;
     x.search_params.coarse_search_dtype     = CUDA_R_16F;
@@ -1066,7 +1066,7 @@ inline auto enum_variety() -> test_cases_t
 
 inline auto enum_variety_l2() -> test_cases_t
 {
-  return map<ivf_pq_inputs>(enum_variety(), [](const ivf_pq_inputs& x) {
+  return map<ivf_pq_inputs>(enum_variety(), [](const ivf_pq_inputs& x) -> ivf_pq_inputs {
     ivf_pq_inputs y(x);
     y.index_params.metric = distance::DistanceType::L2Expanded;
     return y;
@@ -1075,7 +1075,7 @@ inline auto enum_variety_l2() -> test_cases_t
 
 inline auto enum_variety_ip() -> test_cases_t
 {
-  return map<ivf_pq_inputs>(enum_variety(), [](const ivf_pq_inputs& x) {
+  return map<ivf_pq_inputs>(enum_variety(), [](const ivf_pq_inputs& x) -> ivf_pq_inputs {
     ivf_pq_inputs y(x);
     if (y.min_recall.has_value()) {
       if (y.search_params.lut_dtype == CUDA_R_8U) {
@@ -1095,7 +1095,7 @@ inline auto enum_variety_ip() -> test_cases_t
 
 inline auto enum_variety_l2sqrt() -> test_cases_t
 {
-  return map<ivf_pq_inputs>(enum_variety(), [](const ivf_pq_inputs& x) {
+  return map<ivf_pq_inputs>(enum_variety(), [](const ivf_pq_inputs& x) -> ivf_pq_inputs {
     ivf_pq_inputs y(x);
     y.index_params.metric = distance::DistanceType::L2SqrtExpanded;
     return y;
@@ -1104,11 +1104,11 @@ inline auto enum_variety_l2sqrt() -> test_cases_t
 
 inline auto enum_variety_cosine() -> test_cases_t
 {
-  return map<ivf_pq_inputs>(enum_variety(), [](const ivf_pq_inputs& x) {
+  return map<ivf_pq_inputs>(enum_variety(), [](const ivf_pq_inputs& x) -> ivf_pq_inputs {
     ivf_pq_inputs y(x);
     if (y.min_recall.has_value()) {
       if (y.search_params.lut_dtype == CUDA_R_8U) {
-        // TODO: Increase this recall threshold for 8 bit lut
+        // TODO(cuvs): Increase this recall threshold for 8 bit lut
         // (https://github.com/rapidsai/cuvs/issues/390)
         y.min_recall = y.min_recall.value() * 0.70;
       } else {
@@ -1132,7 +1132,7 @@ inline auto var_n_probes() -> test_cases_t
   for (auto x = dflt.index_params.n_lists; x >= 1; x /= 2) {
     xs.push_back(x);
   }
-  return map<ivf_pq_inputs>(xs, [](uint32_t n_probes) {
+  return map<ivf_pq_inputs>(xs, [](uint32_t n_probes) -> ivf_pq_inputs {
     ivf_pq_inputs x;
     x.search_params.n_probes = n_probes;
     return x;
@@ -1161,7 +1161,8 @@ inline auto var_n_probes() -> test_cases_t
 inline auto var_k() -> test_cases_t
 {
   return map<ivf_pq_inputs, uint32_t>(
-    {1, 2, 3, 5, 8, 15, 16, 32, 63, 65, 127, 128, 256, 257, 1023, 2048, 2049}, [](uint32_t k) {
+    {1, 2, 3, 5, 8, 15, 16, 32, 63, 65, 127, 128, 256, 257, 1023, 2048, 2049},
+    [](uint32_t k) -> ivf_pq_inputs {
       ivf_pq_inputs x;
       x.k = k;
       // when there's not enough data, try more cluster probes
@@ -1177,7 +1178,7 @@ inline auto special_cases() -> test_cases_t
 {
   test_cases_t xs;
 
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.num_db_vecs                = 1183514;
     x.dim                        = 100;
     x.num_queries                = 10000;
@@ -1190,7 +1191,7 @@ inline auto special_cases() -> test_cases_t
   });
 
   // Test large max_internal_batch_size
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.num_db_vecs                           = 500000;
     x.dim                                   = 100;
     x.num_queries                           = 128 * 1024 * 1024;
@@ -1204,7 +1205,7 @@ inline auto special_cases() -> test_cases_t
   });
 
   // Test small max_internal_batch_size
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.num_db_vecs                           = 500000;
     x.dim                                   = 100;
     x.num_queries                           = 128 * 1024 * 1024;
@@ -1217,7 +1218,7 @@ inline auto special_cases() -> test_cases_t
     x.search_params.max_internal_batch_size = 1024 * 1024;
   });
 
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.num_db_vecs                = 10000;
     x.dim                        = 16;
     x.num_queries                = 500;
@@ -1229,7 +1230,7 @@ inline auto special_cases() -> test_cases_t
     x.search_params.n_probes     = 100;
   });
 
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.num_db_vecs                = 10000;
     x.dim                        = 16;
     x.num_queries                = 500;
@@ -1295,7 +1296,7 @@ inline auto flat_layout_tests() -> test_cases_t
   test_cases_t xs;
 
   // Test with pq_bits = 8 (byte-aligned, 1 code per byte)
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.num_db_vecs          = 1000;
     x.dim                  = 64;
     x.index_params.n_lists = 10;
@@ -1304,7 +1305,7 @@ inline auto flat_layout_tests() -> test_cases_t
   });
 
   // Test with pq_bits = 6 (packed codes)
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.num_db_vecs          = 1000;
     x.dim                  = 64;
     x.index_params.n_lists = 10;
@@ -1313,7 +1314,7 @@ inline auto flat_layout_tests() -> test_cases_t
   });
 
   // Test with PER_CLUSTER codebook and pq_bits = 8
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.num_db_vecs                = 1000;
     x.dim                        = 64;
     x.index_params.n_lists       = 10;
@@ -1323,7 +1324,7 @@ inline auto flat_layout_tests() -> test_cases_t
   });
 
   // Test with PER_CLUSTER codebook and pq_bits = 6
-  add_test_case(xs, [](ivf_pq_inputs& x) {
+  add_test_case(xs, [](ivf_pq_inputs& x) -> void {
     x.num_db_vecs                = 1000;
     x.dim                        = 64;
     x.index_params.n_lists       = 10;

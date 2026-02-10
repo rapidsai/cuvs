@@ -19,7 +19,7 @@
 
 #include <cub/cub.cuh>
 
-#include <math.h>
+#include <cmath>
 
 #include <algorithm>
 #include <iostream>
@@ -277,7 +277,7 @@ auto silhouette_score(
     sampleToClusterSumOfDistancesView,
     binCountArrayView,
     averageDistanceBetweenSampleAndClusterView,
-    [] __device__(DataT a, DataT b) {
+    [] __device__(DataT a, DataT b) -> DataT {
       if (b == 0) {
         return static_cast<DataT>(ULLONG_MAX);
       } else {

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -13,12 +13,11 @@
 #include <raft/core/handle.hpp>
 #include <raft/util/cuda_utils.cuh>
 
-#include <stdint.h>
+#include <cstdint>
 
 #include <limits>
 
-namespace cuvs {
-namespace distance {
+namespace cuvs::distance {
 /**
  * \defgroup masked_nn Masked 1-nearest neighbors
  * @{
@@ -184,7 +183,6 @@ void masked_l2_nn(raft::resources const& handle,
 
 /** @} */
 
-}  // namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance
 
 #endif

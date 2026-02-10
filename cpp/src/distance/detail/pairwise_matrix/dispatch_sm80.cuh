@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -26,7 +26,7 @@ void pairwise_matrix_sm80_dispatch(OpT distance_op,
 
   // f takes compile-time constants row_major and vec_len aligned and runs the
   // corresponding cutlass launch code.
-  auto f = [&](auto row_major, auto vec_len_aligned) {
+  auto f = [&](auto row_major, auto vec_len_aligned) -> auto {
     // row_major and vec_len are std::integral_constants of type bool and int
     // respectively.
 

@@ -256,7 +256,7 @@ void initKMeansPlusPlus(const raft::resources& handle,
     workspace,
     clusterCost.view(),
     cuda::proclaim_return_type<DataT>(
-      [] __device__(const DataT& a, const DataT& b) { return a + b; }));
+      [] __device__(const DataT& a, const DataT& b) -> DataT { return a + b; }));
 
   // compute total cluster cost by accumulating the partial cost from all the
   // ranks
@@ -273,7 +273,7 @@ void initKMeansPlusPlus(const raft::resources& handle,
          "a failed rank");
 
   // Scalable kmeans++ paper claims 8 rounds is sufficient
-  int niter = std::min(8, (int)ceil(log(psi)));
+  int niter = std::min(8, static_cast<int>(ceil(log(psi))));
   CUVS_LOG_KMEANS(handle,
                   "@Rank-%d:KMeans|| :phi - %f, max # of iterations for kmeans++ loop - "
                   "%d\n",
@@ -307,7 +307,7 @@ void initKMeansPlusPlus(const raft::resources& handle,
       workspace,
       clusterCost.view(),
       cuda::proclaim_return_type<DataT>(
-        [] __device__(const DataT& a, const DataT& b) { return a + b; }));
+        [] __device__(const DataT& a, const DataT& b) -> DataT { return a + b; }));
     comm.allreduce(
       clusterCost.data_handle(), clusterCost.data_handle(), 1, raft::comms::op_t::SUM, stream);
     raft::copy(&psi, clusterCost.data_handle(), 1, stream);
@@ -317,8 +317,12 @@ void initKMeansPlusPlus(const raft::resources& handle,
 
     // <<<< Step-4 >>> : Sample each point x in X independently and identify new
     // potentialCentroids
-    raft::random::uniform(
-      handle, rng, uniformRands.data_handle(), uniformRands.extent(0), (DataT)0, (DataT)1);
+    raft::random::uniform(handle,
+                          rng,
+                          uniformRands.data_handle(),
+                          uniformRands.extent(0),
+                          static_cast<DataT>(0),
+                          static_cast<DataT>(1));
     cuvs::cluster::kmeans::SamplingOp<DataT, IndexT> select_op(psi,
                                                                params.oversampling_factor,
                                                                n_clusters,
@@ -354,10 +358,11 @@ void initKMeansPlusPlus(const raft::resources& handle,
 
     // gather centroids from all ranks
     std::vector<size_t> sizes(n_rank);
-    thrust::transform(
-      thrust::host, nPtsSampledByRank, nPtsSampledByRank + n_rank, sizes.begin(), [&](int val) {
-        return val * n_features;
-      });
+    thrust::transform(thrust::host,
+                      nPtsSampledByRank,
+                      nPtsSampledByRank + n_rank,
+                      sizes.begin(),
+                      [&](int val) -> size_t { return val * n_features; });
 
     RAFT_CUDA_TRY_NO_THROW(cudaFreeHost(nPtsSampledByRank));
 
@@ -382,7 +387,7 @@ void initKMeansPlusPlus(const raft::resources& handle,
                   my_rank,
                   potentialCentroids.extent(0));
 
-  if ((IndexT)potentialCentroids.extent(0) > (IndexT)n_clusters) {
+  if (static_cast<IndexT>(potentialCentroids.extent(0)) > static_cast<IndexT>(n_clusters)) {
     // <<< Step-7 >>>: For x in C, set w_x to be the number of pts closest to X
     // temporary buffer to store the sample count per cluster, destructor
     // releases the resource
@@ -425,7 +430,7 @@ void initKMeansPlusPlus(const raft::resources& handle,
                                                    n_iter.view(),
                                                    workspace);
 
-  } else if ((IndexT)potentialCentroids.extent(0) < (IndexT)n_clusters) {
+  } else if (static_cast<IndexT>(potentialCentroids.extent(0)) < static_cast<IndexT>(n_clusters)) {
     // supplement with random
     auto n_random_clusters = n_clusters - potentialCentroids.extent(0);
     CUVS_LOG_KMEANS(handle,
@@ -493,12 +498,12 @@ void checkWeights(const raft::resources& handle,
                     n_samples);
 
     DataT scale = n_samples / wt_sum;
-    raft::linalg::unaryOp(
-      weight.data_handle(),
-      weight.data_handle(),
-      weight.size(),
-      cuda::proclaim_return_type<DataT>([=] __device__(const DataT& wt) { return wt * scale; }),
-      stream);
+    raft::linalg::unaryOp(weight.data_handle(),
+                          weight.data_handle(),
+                          weight.size(),
+                          cuda::proclaim_return_type<DataT>(
+                            [=] __device__(const DataT& wt) -> DataT { return wt * scale; }),
+                          stream);
   }
 }
 
@@ -613,7 +618,7 @@ void fit(const raft::resources& handle,
 
     // Calculates weighted sum of all the samples assigned to cluster-i and
     // store the result in newCentroids[i]
-    raft::linalg::reduce_rows_by_key((DataT*)X.data_handle(),
+    raft::linalg::reduce_rows_by_key(const_cast<DataT*>(X.data_handle()),
                                      X.extent(1),
                                      itr,
                                      weight.data_handle(),
@@ -628,9 +633,9 @@ void fit(const raft::resources& handle,
     raft::linalg::reduce_cols_by_key(weight.data_handle(),
                                      itr,
                                      wtInCluster.data_handle(),
-                                     (IndexT)1,
-                                     (IndexT)weight.extent(0),
-                                     (IndexT)n_clusters,
+                                     static_cast<IndexT>(1),
+                                     static_cast<IndexT>(weight.extent(0)),
+                                     static_cast<IndexT>(n_clusters),
                                      stream);
 
     // merge the local histogram from all ranks
@@ -659,7 +664,7 @@ void fit(const raft::resources& handle,
       raft::make_const_mdspan(newCentroids.view()),
       raft::make_const_mdspan(wtInCluster.view()),
       newCentroids.view(),
-      cuda::proclaim_return_type<DataT>([=] __device__(DataT mat, DataT vec) {
+      cuda::proclaim_return_type<DataT>([=] __device__(DataT mat, DataT vec) -> DataT {
         if (vec == 0) {
           return DataT(0);
         } else {
@@ -678,7 +683,7 @@ void fit(const raft::resources& handle,
       wtInCluster.extent(0),
       newCentroids.data_handle(),
       cuda::proclaim_return_type<bool>(
-        [=] __device__(raft::KeyValuePair<ptrdiff_t, DataT> map) {  // predicate
+        [=] __device__(raft::KeyValuePair<ptrdiff_t, DataT> map) -> bool {  // predicate
           // copy when the # of samples in the cluster is 0
           if (map.value == 0) {
             return true;
@@ -698,7 +703,7 @@ void fit(const raft::resources& handle,
     raft::linalg::mapThenSumReduce(
       sqrdNorm.data_handle(),
       newCentroids.size(),
-      cuda::proclaim_return_type<DataT>([=] __device__(const DataT a, const DataT b) {
+      cuda::proclaim_return_type<DataT>([=] __device__(const DataT a, const DataT b) -> DataT {
         DataT diff = a - b;
         return diff * diff;
       }),
@@ -722,8 +727,9 @@ void fit(const raft::resources& handle,
         workspace,
         raft::make_device_scalar_view(clusterCostD.data()),
         cuda::proclaim_return_type<raft::KeyValuePair<IndexT, DataT>>(
-          [] __device__(const raft::KeyValuePair<IndexT, DataT>& a,
-                        const raft::KeyValuePair<IndexT, DataT>& b) {
+          [] __device__(
+            const raft::KeyValuePair<IndexT, DataT>& a,
+            const raft::KeyValuePair<IndexT, DataT>& b) -> raft::KeyValuePair<IndexT, DataT> {
             raft::KeyValuePair<IndexT, DataT> res;
             res.key   = 0;
             res.value = a.value + b.value;

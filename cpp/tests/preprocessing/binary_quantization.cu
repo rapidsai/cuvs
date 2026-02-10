@@ -23,9 +23,7 @@ struct BinaryQuantizationInputs {  // NOLINT(readability-identifier-naming)
 };
 
 template <typename T>
-std::ostream& operator<<(
-  std::ostream& os,
-  const BinaryQuantizationInputs<T>& inputs)  // NOLINT(modernize-use-trailing-return-type)
+auto operator<<(std::ostream& os, const BinaryQuantizationInputs<T>& inputs) -> std::ostream&
 {
   os << "> dataset_size:" << inputs.rows << " dataset_dim:" << inputs.cols;
   os << " threshold: ";
@@ -56,7 +54,7 @@ class BinaryQuantizationTest
   {
     // dataset identical on host / device
     auto dataset = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
-      (const T*)(input_.data()), rows_, cols_);
+      reinterpret_cast<const T*>((input_.data())), rows_, cols_);
     auto dataset_h = raft::make_host_matrix_view<const T, int64_t, raft::row_major>(
       (const T*)(host_input_.data()), rows_, cols_);
 
@@ -124,8 +122,7 @@ class BinaryQuantizationTest
 };
 
 template <typename T>
-const std::vector<BinaryQuantizationInputs<T>>
-generate_inputs()  // NOLINT(modernize-use-trailing-return-type)
+auto generate_inputs() -> const std::vector<BinaryQuantizationInputs<T>>
 {
   const auto inputs = raft::util::itertools::product<BinaryQuantizationInputs<T>>(
     {5, 100, 1000},
@@ -137,35 +134,38 @@ generate_inputs()  // NOLINT(modernize-use-trailing-return-type)
   return inputs;
 }
 
-using QuantizationTest_float_uint8t = BinaryQuantizationTest<float, uint8_t>;  // NOLINT(readability-identifier-naming)
-TEST_P(QuantizationTest_float_uint8t, BinaryQuantizationTest)
+using QuantizationTest_float_uint8t =
+  BinaryQuantizationTest<float, uint8_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(QuantizationTest_float_uint8t,
+       BinaryQuantizationTest)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testBinaryQuantization();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(readability-identifier-naming)
 
-using QuantizationTest_double_uint8t = BinaryQuantizationTest<double, uint8_t>;  // NOLINT(readability-identifier-naming)
-TEST_P(QuantizationTest_double_uint8t, BinaryQuantizationTest)
+using QuantizationTest_double_uint8t =
+  BinaryQuantizationTest<double, uint8_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(QuantizationTest_double_uint8t,
+       BinaryQuantizationTest)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testBinaryQuantization();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(readability-identifier-naming)
 
-using QuantizationTest_half_uint8t = BinaryQuantizationTest<half, uint8_t>;  // NOLINT(readability-identifier-naming)
-TEST_P(QuantizationTest_half_uint8t, BinaryQuantizationTest)
+using QuantizationTest_half_uint8t =
+  BinaryQuantizationTest<half, uint8_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(QuantizationTest_half_uint8t,
+       BinaryQuantizationTest)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testBinaryQuantization();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(
-  BinaryQuantizationTest,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-  QuantizationTest_float_uint8t,
-  ::testing::ValuesIn(generate_inputs<float>()));
-INSTANTIATE_TEST_CASE_P(
-  BinaryQuantizationTest,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-  QuantizationTest_double_uint8t,
-  ::testing::ValuesIn(generate_inputs<double>()));
-INSTANTIATE_TEST_CASE_P(
-  BinaryQuantizationTest,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-  QuantizationTest_half_uint8t,
-  ::testing::ValuesIn(generate_inputs<half>()));
+INSTANTIATE_TEST_CASE_P(BinaryQuantizationTest,  // NOLINT(readability-identifier-naming)
+                        QuantizationTest_float_uint8t,
+                        ::testing::ValuesIn(generate_inputs<float>()));
+INSTANTIATE_TEST_CASE_P(BinaryQuantizationTest,  // NOLINT(readability-identifier-naming)
+                        QuantizationTest_double_uint8t,
+                        ::testing::ValuesIn(generate_inputs<double>()));
+INSTANTIATE_TEST_CASE_P(BinaryQuantizationTest,  // NOLINT(readability-identifier-naming)
+                        QuantizationTest_half_uint8t,
+                        ::testing::ValuesIn(generate_inputs<half>()));
 
 }  // namespace cuvs::preprocessing::quantize::binary

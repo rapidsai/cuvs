@@ -19,10 +19,7 @@
 #include <cstddef>  // size_t
 #include <limits>   // std::numeric_limits
 
-namespace cuvs {
-namespace distance {
-
-namespace detail {
+namespace cuvs::distance::detail {
 
 template <typename DataT,
           typename OutT,
@@ -129,6 +126,4 @@ void fusedL2NNImpl(OutT* min,
   }
 }
 
-}  // namespace detail
-}  // namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance::detail

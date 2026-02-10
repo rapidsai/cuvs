@@ -99,14 +99,13 @@ auto build(raft::resources const& res,
     }
   }
 
-  utils::batch_load_iterator<T> dataset_vec_batches(  // NOLINT(modernize-use-trailing-return-type)
-    dataset.data_handle(),
-    dataset.extent(0),
-    dataset.extent(1),
-    max_batch_size,
-    copy_stream,
-    device_memory,
-    enable_prefetch);
+  utils::batch_load_iterator<T> dataset_vec_batches(dataset.data_handle(),
+                                                    dataset.extent(0),
+                                                    dataset.extent(1),
+                                                    max_batch_size,
+                                                    copy_stream,
+                                                    device_memory,
+                                                    enable_prefetch);
 
   dataset_vec_batches.reset();
   dataset_vec_batches.prefetch_next_batch();
@@ -302,7 +301,8 @@ auto build(raft::resources const& res,
   raft::linalg::map_offset(
     res,
     idx.pq_codebook(),
-    [full_codebook_view, num_subspaces, dim_per_subspace, num_clusters] __device__(size_t i) {
+    [full_codebook_view, num_subspaces, dim_per_subspace, num_clusters] __device__(
+      size_t i) -> float {
       int codebook_dim   = num_subspaces * dim_per_subspace;
       int row_idx        = i / codebook_dim;
       int el_idx         = i % codebook_dim;

@@ -63,7 +63,8 @@ struct calc_chunk_indices {
     if constexpr (BlockDim >= raft::WarpSize * 2) {
       if (BlockDim >= n_probes * 2) { return try_block_dim<(BlockDim / 2)>(n_probes, n_queries); }
     }
-    return {dim3(BlockDim, 1, 1), dim3(n_queries, 1, 1), n_probes};
+    return {
+      .block_dim = dim3(BlockDim, 1, 1), .grid_dim = dim3(n_queries, 1, 1), .n_probes = n_probes};
   }
 };
 
@@ -173,7 +174,7 @@ void postprocess_distances(ScoreOutT* out,      // [n_queries, topk]
                            bool account_for_max_close,
                            rmm::cuda_stream_view stream)
 {
-  constexpr bool needs_cast = !std::is_same<ScoreInT, ScoreOutT>::value;
+  constexpr bool needs_cast = !std::is_same_v<ScoreInT, ScoreOutT>;
   const bool needs_copy     = static_cast<const void*>(in) != static_cast<const void*>(out);
   size_t len                = size_t(n_queries) * size_t(topk);
   switch (metric) {

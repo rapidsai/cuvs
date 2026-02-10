@@ -150,9 +150,7 @@ class sparse_knn_t {
 
   void run()
   {
-    using namespace raft::sparse;
-
-    int n_batches_query = raft::ceildiv((size_t)n_query_rows, batch_size_query);
+    int n_batches_query = raft::ceildiv(static_cast<size_t>(n_query_rows), batch_size_query);
     csr_batcher_t<value_idx, value_t> query_batcher(
       batch_size_query, n_query_rows, queryIndptr, queryIndices, queryData);
 
@@ -192,7 +190,7 @@ class sparse_knn_t {
       value_t* dists_merge_buffer_ptr;
       value_idx* indices_merge_buffer_ptr;
 
-      int n_batches_idx = raft::ceildiv((size_t)n_idx_rows, batch_size_index);
+      int n_batches_idx = raft::ceildiv(static_cast<size_t>(n_idx_rows), batch_size_index);
       csr_batcher_t<value_idx, value_t> idx_batcher(
         batch_size_index, n_idx_rows, idxIndptr, idxIndices, idxData);
 
@@ -251,7 +249,7 @@ class sparse_knn_t {
         // populate batch indices array
         value_idx batch_rows = query_batcher.batch_rows(), batch_cols = idx_batcher.batch_rows();
 
-        iota_fill(
+        raft::sparse::iota_fill(
           batch_indices.data(), batch_rows, batch_cols, raft::resource::get_cuda_stream(handle));
 
         /**

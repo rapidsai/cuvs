@@ -448,7 +448,7 @@ struct batch_load_iterator {
         pos_(std::nullopt),
         prefetch_pos_(std::nullopt),
         n_iters_(raft::div_rounding_up_safe(n_rows, batch_size)),
-        needs_copy_(false),
+
         prefetch_(prefetch)
     {
       if (source_ == nullptr) { return; }
@@ -479,7 +479,7 @@ struct batch_load_iterator {
     size_type row_width_;
     size_type batch_size_;
     size_type n_iters_;
-    bool needs_copy_;
+    bool needs_copy_{false};
     bool prefetch_;
 
     std::optional<size_type> pos_;

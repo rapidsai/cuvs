@@ -67,7 +67,8 @@ void knn_graph(raft::resources const& res,
 
   auto rows_view = raft::make_device_vector_view<value_idx, nnz_t>(rows.data(), nnz);
 
-  raft::linalg::map_offset(res, rows_view, [k] __device__(nnz_t i) { return value_idx(i / k); });
+  raft::linalg::map_offset(
+    res, rows_view, [k] __device__(nnz_t i) -> value_idx { return value_idx(i / k); });
 
   cuvs::neighbors::all_neighbors::all_neighbors_params params;
   params.metric = metric;

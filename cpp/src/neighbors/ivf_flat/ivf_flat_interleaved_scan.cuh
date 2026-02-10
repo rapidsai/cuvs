@@ -806,7 +806,7 @@ template <int Capacity,
           typename IvfSampleFilterT,
           typename Lambda,
           typename PostLambda>
-RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)
+RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)  // NOLINT(readability-identifier-naming)
   interleaved_scan_kernel(Lambda compute_dist,
                           PostLambda post_process,
                           const uint32_t query_smem_elems,

@@ -1,0 +1,1 @@
+Checks: '-google-build-using-namespace,-modernize-use-trailing-return-type,-google-readability-casting'

@@ -6,8 +6,7 @@
 
 #include "topk_for_cagra/topk_core.cuh"
 
-namespace cuvs::neighbors::cagra::detail {
-namespace single_cta_search {
+namespace cuvs::neighbors::cagra::detail::single_cta_search {
 
 struct topk_by_radix_sort_base {
   static constexpr std::uint32_t state_bit_length = 0;
@@ -73,7 +72,7 @@ struct topk_by_radix_sort : topk_by_radix_sort_base {
                                  uint32_t>) {  // use a non-template wrapper function to avoid
                                                // pre-inlining the topk_cta_11_core function (vs
                                                // post-inlining, this impacts register pressure)
-      std::uint8_t* const state = reinterpret_cast<std::uint8_t*>(work);
+      auto* const state = reinterpret_cast<std::uint8_t*>(work);
       if (max_itopk <= 256) {
         topk_cta_11_core_wrapper_256(
           topk, len_x, _x, _in_vals, _y, _out_vals, state, _hints, sort, _smem);
@@ -83,7 +82,7 @@ struct topk_by_radix_sort : topk_by_radix_sort_base {
           topk, len_x, _x, _in_vals, _y, _out_vals, state, _hints, sort, _smem);
       }
     } else {  // currently, unused
-      std::uint8_t* const state = reinterpret_cast<std::uint8_t*>(work);
+      auto* const state = reinterpret_cast<std::uint8_t*>(work);
       if (max_itopk <= 256) {
         topk_cta_11_core<topk_by_radix_sort_base::state_bit_length,
                          topk_by_radix_sort_base::vecLen,
@@ -104,5 +103,4 @@ struct topk_by_radix_sort : topk_by_radix_sort_base {
   }
 };
 
-}  // namespace single_cta_search
-}  // namespace cuvs::neighbors::cagra::detail
+}  // namespace cuvs::neighbors::cagra::detail::single_cta_search

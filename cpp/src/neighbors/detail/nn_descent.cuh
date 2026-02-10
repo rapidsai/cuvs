@@ -115,7 +115,7 @@ template <typename T>
 constexpr __host__ __device__ __forceinline__ auto skew_dim(int ndim) -> int
 {
   // all "4"s are for alignment
-  if constexpr (std::is_same<T, float>::value) {
+  if constexpr (std::is_same_v<T, float>) {
     ndim = raft::ceildiv(ndim, 4) * 4;
     return ndim + (ndim % 32 == 0) * 4;
   }
@@ -208,7 +208,7 @@ __device__ __forceinline__ void load_vec(DataT* vec_buffer,
           *reinterpret_cast<float2*>(vec_buffer + idx_in_vec) =
             *reinterpret_cast<const float2*>(d_vec + idx_in_vec);
         } else if (idx_in_vec + 4 <= padding_dims) {
-          *reinterpret_cast<float2*>(vec_buffer + idx_in_vec) = float2({0.0f, 0.0f});
+          *reinterpret_cast<float2*>(vec_buffer + idx_in_vec) = float2({.x = 0.0f, .y = 0.0f});
         }
       }
     } else {
@@ -238,7 +238,7 @@ RAFT_KERNEL preprocess_data_kernel(
 {
   extern __shared__ char buffer[];
   __shared__ float l2_norm;
-  DataT* s_vec   = reinterpret_cast<DataT*>(buffer);
+  auto* s_vec    = reinterpret_cast<DataT*>(buffer);
   size_t list_id = list_offset + blockIdx.x;
 
   load_vec(s_vec,
@@ -279,7 +279,7 @@ RAFT_KERNEL preprocess_data_kernel(
           (float)input_data[(size_t)blockIdx.x * dim + idx] / sqrt(l2_norm);
       } else if (metric == cuvs::distance::DistanceType::BitwiseHamming) {
         int idx_for_byte           = list_id * dim + idx;  // uint8 or int8 data
-        uint8_t* output_bytes      = reinterpret_cast<uint8_t*>(output_data);
+        auto* output_bytes         = reinterpret_cast<uint8_t*>(output_data);
         output_bytes[idx_for_byte] = input_data[(size_t)blockIdx.x * dim + idx];
       } else {  // L2Expanded or L2SqrtExpanded
         output_data[list_id * dim + idx] = input_data[(size_t)blockIdx.x * dim + idx];
@@ -549,7 +549,7 @@ RAFT_KERNEL
   (__CUDA_ARCH__) == 1000
 __launch_bounds__(BLOCK_SIZE, 4)
 #else
-__launch_bounds__(BLOCK_SIZE)
+__launch_bounds__(BLOCK_SIZE)  // NOLINT(readability-identifier-naming)
 #endif
 #endif
   local_join_kernel(const IndexT* graph_new,
@@ -570,7 +570,7 @@ __launch_bounds__(BLOCK_SIZE)
                     DistEpilogueT dist_epilogue)
 {
 #if (__CUDA_ARCH__ >= 700)
-  using namespace nvcuda;
+  namespace wmma = nvcuda::wmma;
   __shared__ int s_list[MAX_NUM_BI_SAMPLES * 2];
 
   constexpr int APAD           = 4;
@@ -581,7 +581,7 @@ __launch_bounds__(BLOCK_SIZE)
   __shared__ float s_distances[MAX_NUM_BI_SAMPLES * SKEWED_MAX_NUM_BI_SAMPLES];
 
   // s_distances: MAX_NUM_BI_SAMPLES x SKEWED_MAX_NUM_BI_SAMPLES, reuse the space of s_ov
-  int* s_unique_counter = (int*)&s_ov[0][0];
+  int* s_unique_counter = reinterpret_cast<int*>(&s_ov[0][0]);
 
   if (threadIdx.x == 0) {
     s_unique_counter[0] = 0;
@@ -817,7 +817,7 @@ RAFT_KERNEL
   (__CUDA_ARCH__) == 1000
 __launch_bounds__(BLOCK_SIZE, 4)
 #else
-__launch_bounds__(BLOCK_SIZE)
+__launch_bounds__(BLOCK_SIZE)  // NOLINT(readability-identifier-naming)
 #endif
 #endif
   local_join_kernel(const IndexT* graph_new,
@@ -838,7 +838,7 @@ __launch_bounds__(BLOCK_SIZE)
                     DistEpilogueT dist_epilogue)
 {
 #if (__CUDA_ARCH__ >= 700)
-  using namespace nvcuda;
+  namespace wmma = nvcuda::wmma;
   __shared__ int s_list[MAX_NUM_BI_SAMPLES * 2];
 
   constexpr int APAD           = 8;
@@ -850,7 +850,7 @@ __launch_bounds__(BLOCK_SIZE)
                 sizeof(__half) * MAX_NUM_BI_SAMPLES * (TILE_COL_WIDTH + BPAD));
   // s_distances: MAX_NUM_BI_SAMPLES x SKEWED_MAX_NUM_BI_SAMPLES, reuse the space of s_ov
   float* s_distances    = (float*)&s_ov[0][0];
-  int* s_unique_counter = (int*)&s_ov[0][0];
+  int* s_unique_counter = reinterpret_cast<int*>(&s_ov[0][0]);
 
   if (threadIdx.x == 0) {
     s_unique_counter[0] = 0;
@@ -1317,7 +1317,7 @@ gnnd<DataT, IndexT>::gnnd(raft::resources const& res, const build_config& build_
 {
   static_assert(NUM_SAMPLES <= 32);
 
-  using input_t = typename std::remove_const<DataT>::type;
+  using input_t = std::remove_const_t<DataT>;
   if (std::is_same_v<input_t, float> &&
       (build_config.dist_comp_dtype == cuvs::neighbors::nn_descent::DIST_COMP_DTYPE::FP32 ||
        (build_config.dist_comp_dtype == cuvs::neighbors::nn_descent::DIST_COMP_DTYPE::AUTO &&
@@ -1423,7 +1423,7 @@ void gnnd<DataT, IndexT>::build(DataT* data,
                                 dist_data_t* output_distances,
                                 DistEpilogueT dist_epilogue)
 {
-  using input_t = typename std::remove_const<DataT>::type;
+  using input_t = std::remove_const_t<DataT>;
 
   if (build_config_.metric == distance::DistanceType::BitwiseHamming &&
       !(std::is_same_v<input_t, uint8_t> || std::is_same_v<input_t, int8_t>)) {
@@ -1482,7 +1482,7 @@ void gnnd<DataT, IndexT>::build(DataT* data,
   graph_.init_random_graph();
   graph_.sample_graph(true);
 
-  auto update_and_sample = [&](bool update_graph) {
+  auto update_and_sample = [&](bool update_graph) -> void {
     if (update_graph) {
       update_counter_ = 0;
       graph_.update_graph(graph_host_buffer_.data_handle(),
@@ -1607,7 +1607,7 @@ void gnnd<DataT, IndexT>::build(DataT* data,
     raft::resource::sync_stream(res_);
   }
 
-  IndexT* graph_shrink_buffer = reinterpret_cast<IndexT*>(graph_.h_dists.data_handle());
+  auto* graph_shrink_buffer = reinterpret_cast<IndexT*>(graph_.h_dists.data_handle());
 
 #pragma omp parallel for
   for (size_t i = 0; i < (size_t)nrow_; i++) {

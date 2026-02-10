@@ -48,8 +48,7 @@ struct GramMatrixInputs {  // NOLINT(readability-identifier-naming)
   // The reference output is calculated by a custom kernel.
 };
 
-std::ostream& operator<<(std::ostream& os,
-                         const GramMatrixInputs& p)  // NOLINT(modernize-use-trailing-return-type)
+auto operator<<(std::ostream& os, const GramMatrixInputs& p) -> std::ostream&
 {
   std::vector<std::string> kernel_names{"linear", "poly", "rbf", "tanh"};
   os << "/" << p.n1 << "x" << p.n2 << "x" << p.n_cols << "/"
@@ -79,10 +78,10 @@ const std::vector<GramMatrixInputs> inputs =
     {2},
     {true, false},
     {SparseType::DENSE, SparseType::MIX, SparseType::CSR},
-    {KernelParams{KernelType::LINEAR},
-     KernelParams{KernelType::POLYNOMIAL, 2, 0.5, 2.4},
-     KernelParams{KernelType::TANH, 0, 0.5, 2.4},
-     KernelParams{KernelType::RBF, 0, 0.5}});
+    {KernelParams{.kernel = KernelType::LINEAR},
+     KernelParams{.kernel = KernelType::POLYNOMIAL, .degree = 2, .gamma = 0.5, .coef0 = 2.4},
+     KernelParams{.kernel = KernelType::TANH, .degree = 0, .gamma = 0.5, .coef0 = 2.4},
+     KernelParams{.kernel = KernelType::RBF, .degree = 0, .gamma = 0.5}});
 
 // (ld_1, ld_2, ld_out) not supported by RBF and CSR
 const std::vector<GramMatrixInputs> inputs_ld =
@@ -92,9 +91,9 @@ const std::vector<GramMatrixInputs> inputs_ld =
     {2},
     {true, false},
     {SparseType::DENSE, SparseType::MIX},
-    {KernelParams{KernelType::LINEAR},
-     KernelParams{KernelType::POLYNOMIAL, 2, 0.5, 2.4},
-     KernelParams{KernelType::TANH, 0, 0.5, 2.4}},
+    {KernelParams{.kernel = KernelType::LINEAR},
+     KernelParams{.kernel = KernelType::POLYNOMIAL, .degree = 2, .gamma = 0.5, .coef0 = 2.4},
+     KernelParams{.kernel = KernelType::TANH, .degree = 0, .gamma = 0.5, .coef0 = 2.4}},
     {159},
     {73},
     {144});
@@ -107,9 +106,9 @@ const std::vector<GramMatrixInputs> inputs_ld_csr =  // NOLINT(readability-ident
     {2},
     {true, false},
     {SparseType::CSR, SparseType::MIX},
-    {KernelParams{KernelType::LINEAR},
-     KernelParams{KernelType::POLYNOMIAL, 2, 0.5, 2.4},
-     KernelParams{KernelType::TANH, 0, 0.5, 2.4}},
+    {KernelParams{.kernel = KernelType::LINEAR},
+     KernelParams{.kernel = KernelType::POLYNOMIAL, .degree = 2, .gamma = 0.5, .coef0 = 2.4},
+     KernelParams{.kernel = KernelType::TANH, .degree = 0, .gamma = 0.5, .coef0 = 2.4}},
     {64},
     {155},
     {0});
@@ -156,13 +155,12 @@ class GramMatrixTest
 
   ~GramMatrixTest() override {}  // NOLINT(modernize-use-equals-default)
 
-  int prepareCsr(
-    math_t* dense,
-    int n_rows,
-    int ld,
-    int* indptr,
-    int* indices,
-    math_t* data)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  auto prepareCsr(math_t* dense,
+                  int n_rows,
+                  int ld,
+                  int* indptr,
+                  int* indices,
+                  math_t* data) -> int  // NOLINT(readability-identifier-naming)
   {
     int nnz           = 0;
     double eps        = 1e-6;
@@ -295,9 +293,9 @@ class GramMatrixTest
       gram_host.data(), gram.data(), gram.size(), cuvs::CompareApprox<math_t>(1e-6f), stream));
   }
 
-  raft::resources handle;   // NOLINT(readability-identifier-naming)
-  cudaStream_t stream = 0;  // NOLINT(readability-identifier-naming)
-  GramMatrixInputs params;  // NOLINT(readability-identifier-naming)
+  raft::resources handle;         // NOLINT(readability-identifier-naming)
+  cudaStream_t stream = nullptr;  // NOLINT(readability-identifier-naming)
+  GramMatrixInputs params;        // NOLINT(readability-identifier-naming)
 
   rmm::device_uvector<math_t> x1;  // NOLINT(readability-identifier-naming)
   rmm::device_uvector<math_t> x2;  // NOLINT(readability-identifier-naming)
@@ -314,34 +312,20 @@ class GramMatrixTest
 };
 
 using GramMatrixTestFloatStandard = GramMatrixTest<float>;  // NOLINT(readability-identifier-naming)
-using GramMatrixTestFloatLd = GramMatrixTest<float>;  // NOLINT(readability-identifier-naming)
-using GramMatrixTestFloatLdCsr = GramMatrixTest<float>;  // NOLINT(readability-identifier-naming)
+using GramMatrixTestFloatLd       = GramMatrixTest<float>;  // NOLINT(readability-identifier-naming)
+using GramMatrixTestFloatLdCsr    = GramMatrixTest<float>;  // NOLINT(readability-identifier-naming)
 
-TEST_P(GramMatrixTestFloatStandard, Gram)
-{
-  runTest();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-TEST_P(GramMatrixTestFloatLd, Gram)
-{
-  runTest();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-TEST_P(GramMatrixTestFloatLdCsr, Gram)
-{
-  runTest();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+TEST_P(GramMatrixTestFloatStandard, Gram) { runTest(); }  // NOLINT(readability-identifier-naming)
+TEST_P(GramMatrixTestFloatLd, Gram) { runTest(); }        // NOLINT(readability-identifier-naming)
+TEST_P(GramMatrixTestFloatLdCsr, Gram) { runTest(); }     // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_SUITE_P(
-  GramMatrixTests,
-  GramMatrixTestFloatStandard,
-  ::testing::ValuesIn(
-    inputs));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-INSTANTIATE_TEST_SUITE_P(
-  GramMatrixTests,
-  GramMatrixTestFloatLd,
-  ::testing::ValuesIn(
-    inputs_ld));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-INSTANTIATE_TEST_SUITE_P(
-  GramMatrixTests,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-  GramMatrixTestFloatLdCsr,
-  ::testing::ValuesIn(inputs_ld_csr));
+INSTANTIATE_TEST_SUITE_P(GramMatrixTests,
+                         GramMatrixTestFloatStandard,
+                         ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_SUITE_P(GramMatrixTests,
+                         GramMatrixTestFloatLd,
+                         ::testing::ValuesIn(inputs_ld));  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_SUITE_P(GramMatrixTests,                  // NOLINT(readability-identifier-naming)
+                         GramMatrixTestFloatLdCsr,
+                         ::testing::ValuesIn(inputs_ld_csr));
 };  // namespace cuvs::distance::kernels::sparse

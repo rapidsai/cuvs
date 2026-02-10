@@ -11,10 +11,7 @@
 #include <cuda_fp16.h>
 #include <cuda_pipeline.h>
 
-namespace cuvs {
-namespace distance {
-namespace detail {
-namespace sparse {
+namespace cuvs::distance::detail::sparse {
 
 /**
  * Computes the maximum number of columns that can be stored
@@ -44,7 +41,7 @@ RAFT_KERNEL faster_dot_on_csr_kernel(dot_t* __restrict__ dot,
   auto lane_id = threadIdx.x & 0x1f;
 
   extern __shared__ char smem[];
-  value_t* s_A      = (value_t*)smem;
+  auto* s_A         = reinterpret_cast<value_t*>(smem);
   value_idx cur_row = -1;
 
   for (int row = blockIdx.x; row < n_rows; row += gridDim.x) {
@@ -154,7 +151,4 @@ void faster_dot_on_csr(raft::resources const& handle,
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
-}  // namespace sparse
-}  // namespace detail
-}  // namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance::detail::sparse

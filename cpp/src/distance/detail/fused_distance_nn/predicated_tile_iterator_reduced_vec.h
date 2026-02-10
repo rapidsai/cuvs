@@ -75,12 +75,9 @@ namespace cg = cooperative_groups;
 
 ////////////////////////////////////////////////////////////////////////////////
 
-namespace cuvs {
-
 ////////////////////////////////////////////////////////////////////////////////
 
-namespace epilogue {
-namespace threadblock {
+namespace cuvs::epilogue::threadblock {
 
 // TODO (cjnolet): We shouldn't be doing `using namespace` in this file.
 using namespace cutlass::epilogue::threadblock;
@@ -437,7 +434,7 @@ class PredicatedTileIteratorReducedVec {
       __syncthreads();
 
       if (row < total_rows) {
-        volatile Element* gmem_ptr = reinterpret_cast<volatile Element*>(first_tile_byte_pointer_);
+        volatile auto* gmem_ptr = reinterpret_cast<volatile Element*>(first_tile_byte_pointer_);
 
         if ((block_start_row_first_tile_ + row) < extent_row_) {
           user_params.red_op_(block_start_row_first_tile_ + row, (gmem_ptr + row), row_local_min);
@@ -603,8 +600,6 @@ class PredicatedTileIteratorReducedVec {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-}  // namespace threadblock
-}  // namespace epilogue
-}  // namespace cuvs
+}  // namespace cuvs::epilogue::threadblock
 
 ////////////////////////////////////////////////////////////////////////////////

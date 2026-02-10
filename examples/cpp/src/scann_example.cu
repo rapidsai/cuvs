@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -20,7 +20,7 @@ template <typename T>
 void scann_build_and_write(raft::device_resources const& dev_resources,
                            raft::device_matrix_view<const T, int64_t> dataset)
 {
-  using namespace cuvs::neighbors::experimental;
+  using cuvs::neighbors::experimental::scann;
 
   // use default index parameters
   scann::index_params index_params;
@@ -41,7 +41,7 @@ void scann_build_and_write(raft::device_resources const& dev_resources,
   auto end   = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;
 
-  // TODO - output statistics about the index
+  // TODO(cuvs): output statistics about the index
 
   std::cout << "Time to build index: " << elapsed_seconds.count() << "s\n";
 
@@ -49,7 +49,7 @@ void scann_build_and_write(raft::device_resources const& dev_resources,
   serialize(dev_resources, "/tmp", index);
 }
 
-int main(int argc, char* argv[])
+auto main(int argc, char* argv[]) -> int
 {
   raft::device_resources dev_resources;
 

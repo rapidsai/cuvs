@@ -297,7 +297,8 @@ void perform_1nn(raft::resources const& handle,
   auto exec_policy = raft::resource::get_thrust_policy(handle);
 
   auto sort_plan = raft::make_device_vector<value_idx>(handle, static_cast<value_idx>(n_rows));
-  raft::linalg::map_offset(handle, sort_plan.view(), [] __device__(value_idx idx) { return idx; });
+  raft::linalg::map_offset(
+    handle, sort_plan.view(), [] __device__(value_idx idx) -> value_idx { return idx; });
 
   thrust::sort_by_key(
     raft::resource::get_thrust_policy(handle), colors, colors + n_rows, sort_plan.data_handle());
@@ -355,7 +356,7 @@ void perform_1nn(raft::resources const& handle,
 
     auto mask_op = [colors,
                     n_components = raft::util::FastIntDiv(n_components),
-                    batch_offset] __device__(value_idx idx) {
+                    batch_offset] __device__(value_idx idx) -> bool {
       value_idx row = idx / n_components;
       value_idx col = idx % n_components;
       return colors[batch_offset + row] != col;
@@ -389,7 +390,7 @@ void perform_1nn(raft::resources const& handle,
                     kvp,
                     kvp + n_rows,
                     kvp,
-                    [sort_plan = sort_plan.data_handle()] __device__(OutT KVP) {
+                    [sort_plan = sort_plan.data_handle()] __device__(OutT KVP) -> OutT {
                       OutT res;
                       res.value = KVP.value;
                       res.key   = sort_plan[KVP.key];
@@ -603,7 +604,7 @@ void cross_component_nn(
   value_idx size_int = 0;
   raft::update_host(&size_int, out_index.data() + (out_index.size() - 1), 1, stream);
   raft::resource::sync_stream(handle, stream);
-  nnz_t size = static_cast<nnz_t>(size_int);
+  auto size = static_cast<nnz_t>(size_int);
 
   size++;
 

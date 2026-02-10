@@ -116,7 +116,7 @@ class SpectralClusteringTest
         connectivity_graph_double.view().get_elements().data(), nnz);
 
       raft::linalg::unary_op(
-        handle, float_elements_view, double_elements_view, [] __device__(float x) {
+        handle, float_elements_view, double_elements_view, [] __device__(float x) -> double {
           return static_cast<double>(x);
         });
 
@@ -183,29 +183,29 @@ const std::vector<SpectralClusteringInputs> inputs = {
   {500, 20, 3, 3, 15, 3, 0.5f, 777ULL},  // More spread but still reasonable
 };
 
-using SpectralClusteringTestF = SpectralClusteringTest<float>;  // NOLINT(readability-identifier-naming)
-using SpectralClusteringTestD = SpectralClusteringTest<double>;  // NOLINT(readability-identifier-naming)
+using SpectralClusteringTestF =
+  SpectralClusteringTest<float>;  // NOLINT(readability-identifier-naming)
+using SpectralClusteringTestD =
+  SpectralClusteringTest<double>;  // NOLINT(readability-identifier-naming)
 
 TEST_P(SpectralClusteringTestF,
-       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+       Result)  // NOLINT(readability-identifier-naming)
 {
   ASSERT_GT(score, 0.7) << "Adjusted Rand Index is too low: " << score;
 }
 
 TEST_P(SpectralClusteringTestD,
-       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+       Result)  // NOLINT(readability-identifier-naming)
 {
   ASSERT_GT(score, 0.7) << "Adjusted Rand Index (double) is too low: " << score;
 }
 
-INSTANTIATE_TEST_CASE_P(
-  SpectralClusteringTests,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-  SpectralClusteringTestF,
-  ::testing::ValuesIn(inputs));
+INSTANTIATE_TEST_CASE_P(SpectralClusteringTests,  // NOLINT(readability-identifier-naming)
+                        SpectralClusteringTestF,
+                        ::testing::ValuesIn(inputs));
 
-INSTANTIATE_TEST_CASE_P(
-  SpectralClusteringTests,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-  SpectralClusteringTestD,
-  ::testing::ValuesIn(inputs));
+INSTANTIATE_TEST_CASE_P(SpectralClusteringTests,  // NOLINT(readability-identifier-naming)
+                        SpectralClusteringTestD,
+                        ::testing::ValuesIn(inputs));
 
 }  // namespace cuvs

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -16,7 +16,7 @@ namespace cuvs {
 
 template <typename T>
 struct Compare {
-  bool operator()(const T& a, const T& b) const { return a == b; }
+  auto operator()(const T& a, const T& b) const -> bool { return a == b; }
 };
 
 #if CUDART_VERSION < 12040
@@ -30,8 +30,8 @@ struct Compare<half> {
 
 template <typename Key, typename Value>
 struct Compare<raft::KeyValuePair<Key, Value>> {
-  bool operator()(const raft::KeyValuePair<Key, Value>& a,
-                  const raft::KeyValuePair<Key, Value>& b) const
+  auto operator()(const raft::KeyValuePair<Key, Value>& a,
+                  const raft::KeyValuePair<Key, Value>& b) const -> bool
   {
     return a.key == b.key && a.value == b.value;
   }
@@ -39,8 +39,8 @@ struct Compare<raft::KeyValuePair<Key, Value>> {
 
 template <typename T>
 struct CompareApprox {
-  CompareApprox(T eps_) : eps(eps_) {}
-  bool operator()(const T& a, const T& b) const
+  explicit CompareApprox(T eps_) : eps(eps_) {}
+  auto operator()(const T& a, const T& b) const -> bool
   {
     T diff  = std::abs(a - b);
     T m     = std::max(std::abs(a), std::abs(b));
@@ -54,7 +54,7 @@ struct CompareApprox {
 };
 
 template <typename Key, typename Value>
-::std::ostream& operator<<(::std::ostream& os, const raft::KeyValuePair<Key, Value>& kv)
+auto operator<<(::std::ostream& os, const raft::KeyValuePair<Key, Value>& kv) -> ::std::ostream&
 {
   os << "{ " << kv.key << ", " << kv.value << '}';
   return os;
@@ -62,12 +62,12 @@ template <typename Key, typename Value>
 
 template <typename Key, typename Value>
 struct CompareApprox<raft::KeyValuePair<Key, Value>> {
-  CompareApprox(raft::KeyValuePair<Key, Value> eps)
+  explicit CompareApprox(raft::KeyValuePair<Key, Value> eps)
     : compare_keys(eps.key), compare_values(eps.value)
   {
   }
-  bool operator()(const raft::KeyValuePair<Key, Value>& a,
-                  const raft::KeyValuePair<Key, Value>& b) const
+  auto operator()(const raft::KeyValuePair<Key, Value>& a,
+                  const raft::KeyValuePair<Key, Value>& b) const -> bool
   {
     return compare_keys(a.key, b.key) && compare_values(a.value, b.value);
   }
@@ -79,8 +79,8 @@ struct CompareApprox<raft::KeyValuePair<Key, Value>> {
 
 template <typename T>
 struct CompareApproxAbs {
-  CompareApproxAbs(T eps_) : eps(eps_) {}
-  bool operator()(const T& a, const T& b) const
+  explicit CompareApproxAbs(T eps_) : eps(eps_) {}
+  auto operator()(const T& a, const T& b) const -> bool
   {
     T diff  = std::abs(std::abs(a) - std::abs(b));
     T m     = std::max(std::abs(a), std::abs(b));
@@ -94,15 +94,15 @@ struct CompareApproxAbs {
 
 template <typename T>
 struct CompareApproxNoScaling {
-  CompareApproxNoScaling(T eps_) : eps(eps_) {}
-  bool operator()(const T& a, const T& b) const { return (std::abs(a - b) <= eps); }
+  explicit CompareApproxNoScaling(T eps_) : eps(eps_) {}
+  auto operator()(const T& a, const T& b) const -> bool { return (std::abs(a - b) <= eps); }
 
  private:
   T eps;
 };
 
 template <typename T, typename L>
-testing::AssertionResult match(const T& expected, const T& actual, L eq_compare)
+auto match(const T& expected, const T& actual, L eq_compare) -> testing::AssertionResult
 {
   if (!eq_compare(expected, actual)) {
     return testing::AssertionFailure() << "actual=" << actual << " != expected=" << expected;

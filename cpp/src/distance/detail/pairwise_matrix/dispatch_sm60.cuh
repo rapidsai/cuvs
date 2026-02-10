@@ -29,7 +29,7 @@ auto pairwise_matrix_sm60_get_wrapper(OpT distance_op,
   // the corresponding kernel wrapper. The wrapper contains the launch
   // parameters of the kernel: a pointer to the kernel function, grid size,
   // block size, and shared memory size.
-  auto f = [&](auto row_major, auto vec_len_aligned) {
+  auto f = [&](auto row_major, auto vec_len_aligned) -> auto {
     // row_major and vec_len are std::integral_constants of type bool and int
     // respectively.
 

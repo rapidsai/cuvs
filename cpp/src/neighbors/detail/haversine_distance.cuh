@@ -68,7 +68,8 @@ RAFT_KERNEL haversine_knn_kernel(value_idx* out_inds,
   __shared__ distance_t smemK[kNumWarps * warp_q];
   __shared__ value_idx smemV[kNumWarps * warp_q];
 
-  using namespace cuvs::neighbors::detail::faiss_select;
+  using cuvs::neighbors::detail::faiss_select::BlockSelect;
+  using cuvs::neighbors::detail::faiss_select::Comparator;
   BlockSelect<distance_t, value_idx, false, Comparator<distance_t>, warp_q, thread_q, tpb> heap(
     std::numeric_limits<distance_t>::max(), std::numeric_limits<value_idx>::max(), smemK, smemV, k);
 

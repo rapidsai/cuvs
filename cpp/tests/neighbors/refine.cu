@@ -101,37 +101,33 @@ const std::vector<RefineInputs<int64_t>> inputs =  // NOLINT(readability-identif
     {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false, true});
 
-using RefineTestF = RefineTest<float, float, std::int64_t>;  // NOLINT(readability-identifier-naming)
-TEST_P(RefineTestF, AnnRefine)
+using RefineTestF =
+  RefineTest<float, float, std::int64_t>;               // NOLINT(readability-identifier-naming)
+TEST_P(RefineTestF, AnnRefine) { this->testRefine(); }  // NOLINT(readability-identifier-naming)
+
+INSTANTIATE_TEST_CASE_P(RefineTest,
+                        RefineTestF,
+                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
+
+using RefineTestF_uint8 =
+  RefineTest<uint8_t, float, std::int64_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(RefineTestF_uint8,
+       AnnRefine)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testRefine();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(RefineTest,
+                        RefineTestF_uint8,
+                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(
-  RefineTest,
-  RefineTestF,
-  ::testing::ValuesIn(
-    inputs));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-
-using RefineTestF_uint8 = RefineTest<uint8_t, float, std::int64_t>;  // NOLINT(readability-identifier-naming)
-TEST_P(RefineTestF_uint8, AnnRefine)
+using RefineTestF_int8 =
+  RefineTest<int8_t, float, std::int64_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(RefineTestF_int8,
+       AnnRefine)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testRefine();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-INSTANTIATE_TEST_CASE_P(
-  RefineTest,
-  RefineTestF_uint8,
-  ::testing::ValuesIn(
-    inputs));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-
-using RefineTestF_int8 = RefineTest<int8_t, float, std::int64_t>;  // NOLINT(readability-identifier-naming)
-TEST_P(RefineTestF_int8, AnnRefine)
-{
-  this->testRefine();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-INSTANTIATE_TEST_CASE_P(
-  RefineTest,
-  RefineTestF_int8,
-  ::testing::ValuesIn(
-    inputs));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(RefineTest,
+                        RefineTestF_int8,
+                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
 }  // namespace cuvs::neighbors

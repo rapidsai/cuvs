@@ -20,14 +20,11 @@
 
 #include <rmm/device_uvector.hpp>
 
-#include <limits.h>
+#include <climits>
 
 #include <nvfunctional>
 
-namespace cuvs {
-namespace distance {
-namespace detail {
-namespace sparse {
+namespace cuvs::distance::detail::sparse {
 
 template <typename value_idx, typename value_t>
 class ip_distances_t : public distances_t<value_t> {
@@ -72,7 +69,7 @@ class ip_distances_t : public distances_t<value_t> {
   rmm::device_uvector<value_idx> coo_rows_b;
 };
 
-}  // END namespace sparse
-}  // END namespace detail
-}  // END namespace distance
-}  // END namespace cuvs
+}  // namespace cuvs::distance::detail::sparse
+   // END namespace detail
+   // END namespace distance
+   // END namespace cuvs

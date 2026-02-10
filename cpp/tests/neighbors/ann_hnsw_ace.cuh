@@ -27,7 +27,7 @@ struct AnnHnswAceInputs {
   double max_gpu_memory_gb  = 0;  // 0 = use system default
 };
 
-inline ::std::ostream& operator<<(::std::ostream& os, const AnnHnswAceInputs& p)
+inline auto operator<<(::std::ostream& os, const AnnHnswAceInputs& p) -> ::std::ostream&
 {
   os << "{n_queries=" << p.n_queries << ", dataset shape=" << p.n_rows << "x" << p.dim
      << ", k=" << p.k << ", npartitions=" << p.npartitions
@@ -259,7 +259,7 @@ class AnnHnswAceTest : public ::testing::TestWithParam<AnnHnswAceInputs> {
     std::filesystem::remove_all(temp_dir);
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     database_dev.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     search_queries.resize(ps.n_queries * ps.dim, stream_);
@@ -271,7 +271,7 @@ class AnnHnswAceTest : public ::testing::TestWithParam<AnnHnswAceInputs> {
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override
+  void TearDown() override  // NOLINT(readability-identifier-naming)
   {
     raft::resource::sync_stream(handle_);
     database_dev.resize(0, stream_);
@@ -286,7 +286,7 @@ class AnnHnswAceTest : public ::testing::TestWithParam<AnnHnswAceInputs> {
   rmm::device_uvector<DataT> search_queries;
 };
 
-inline std::vector<AnnHnswAceInputs> generate_hnsw_ace_inputs()
+inline auto generate_hnsw_ace_inputs() -> std::vector<AnnHnswAceInputs>
 {
   return raft::util::itertools::product<AnnHnswAceInputs>(
     {10},           // n_queries
@@ -305,7 +305,7 @@ inline std::vector<AnnHnswAceInputs> generate_hnsw_ace_inputs()
 }
 
 // Inputs specifically for testing memory limit fallback to disk mode
-inline std::vector<AnnHnswAceInputs> generate_hnsw_ace_memory_fallback_inputs()
+inline auto generate_hnsw_ace_memory_fallback_inputs() -> std::vector<AnnHnswAceInputs>
 {
   return {
     // Test with L2 metric

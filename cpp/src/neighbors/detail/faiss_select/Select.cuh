@@ -1,6 +1,6 @@
 /**
  * SPDX-FileCopyrightText: Copyright (c) Facebook, Inc. and its affiliates.
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 /*
@@ -101,7 +101,7 @@ struct BlockSelect {
   __device__ inline BlockSelect(K initKVal, V initVVal, K* smemK, V* smemV, int k)
     : initK(initKVal),
       initV(initVVal),
-      numVals(0),
+
       warpKTop(initKVal),
       sharedK(smemK),
       sharedV(smemV),
@@ -253,7 +253,7 @@ struct BlockSelect {
   const V initV;
 
   // Number of valid elements in our thread queue
-  int numVals;
+  int numVals{0};
 
   // The k-th highest (Dir) or lowest (!Dir) element
   K warpKTop;
@@ -375,7 +375,7 @@ struct WarpSelect {
   static constexpr int kNumWarpQRegisters = NumWarpQ / WarpSize;
 
   __device__ inline WarpSelect(K initKVal, V initVVal, int k)
-    : initK(initKVal), initV(initVVal), numVals(0), warpKTop(initKVal), kLane((k - 1) % WarpSize)
+    : initK(initKVal), initV(initVVal), warpKTop(initKVal), kLane((k - 1) % WarpSize)
   {
     static_assert(utils::isPowerOf2(ThreadsPerBlock), "threads must be a power-of-2");
     static_assert(utils::isPowerOf2(NumWarpQ), "warp queue must be power-of-2");
@@ -495,7 +495,7 @@ struct WarpSelect {
   const V initV;
 
   // Number of valid elements in our thread queue
-  int numVals;
+  int numVals{0};
 
   // The k-th highest (Dir) or lowest (!Dir) element
   K warpKTop;
@@ -511,7 +511,7 @@ struct WarpSelect {
   // This is what lane we should load an approximation (>=k) to the
   // kth element from the last register in the warp queue (i.e.,
   // warpK[kNumWarpQRegisters - 1]).
-  int kLane;
+  int kLane;  // NOLINT(modernize-use-default-member-init)
 };
 
 /// Specialization for k == 1 (NumWarpQ == 1)

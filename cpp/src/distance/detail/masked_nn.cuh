@@ -15,13 +15,11 @@
 
 #include <rmm/device_uvector.hpp>
 
-#include <stdint.h>
+#include <cstdint>
 
 #include <limits>
 
-namespace cuvs {
-namespace distance {
-namespace detail {
+namespace cuvs::distance::detail {
 
 template <typename DataT,
           typename OutT,
@@ -276,7 +274,7 @@ void masked_l2_nn_impl(raft::resources const& handle,
   }
 
   // Accumulation operation lambda
-  auto core_lambda = [] __device__(DataT & acc, DataT & x, DataT & y) { acc += x * y; };
+  auto core_lambda = [] __device__(DataT & acc, DataT & x, DataT & y) -> void { acc += x * y; };
   auto fin_op      = raft::identity_op{};
 
   auto kernel               = masked_l2_nn_kernel<DataT,
@@ -313,6 +311,4 @@ void masked_l2_nn_impl(raft::resources const& handle,
   RAFT_CUDA_TRY(cudaGetLastError());
 }
 
-}  // namespace detail
-}  // namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance::detail

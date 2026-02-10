@@ -72,9 +72,9 @@ class KNNTest
     raft::print_device_vector("Labels array: ", search_labels_.data(), rows_, std::cout);
 
     auto index = raft::make_device_matrix_view<const T, IdxT, raft::row_major>(
-      (const T*)(input_.data()), rows_, cols_);
+      reinterpret_cast<const T*>((input_.data())), rows_, cols_);
     auto search = raft::make_device_matrix_view<const T, IdxT, raft::row_major>(
-      (const T*)(search_data_.data()), rows_, cols_);
+      reinterpret_cast<const T*>((search_data_.data())), rows_, cols_);
     auto indices =
       raft::make_device_matrix_view<IdxT, IdxT, raft::row_major>(indices_.data(), rows_, k_);
     auto distances =
@@ -184,28 +184,30 @@ const std::vector<KNNInputs<T>> inputs = {  // NOLINT(readability-identifier-nam
    2,
    {0, 0, 0, 0, 0, 1, 1, 1, 1, 1}}};
 
-using KNNTest_float_int64_t = KNNTest<float, float, int64_t>;  // NOLINT(readability-identifier-naming)
-TEST_P(KNNTest_float_int64_t, BruteForce)
+using KNNTest_float_int64_t =
+  KNNTest<float, float, int64_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(KNNTest_float_int64_t,
+       BruteForce)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testBruteForce();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(readability-identifier-naming)
 
-using KNNTest_half_int64_t = KNNTest<half, float, int64_t>;  // NOLINT(readability-identifier-naming)
-TEST_P(KNNTest_half_int64_t, BruteForce)
+using KNNTest_half_int64_t =
+  KNNTest<half, float, int64_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(KNNTest_half_int64_t,
+       BruteForce)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testBruteForce();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(readability-identifier-naming)
 
 INSTANTIATE_TEST_CASE_P(
   KNNTest,
   KNNTest_float_int64_t,
-  ::testing::ValuesIn(
-    inputs<float>));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  ::testing::ValuesIn(inputs<float>));  // NOLINT(readability-identifier-naming)
 INSTANTIATE_TEST_CASE_P(
   KNNTest,
   KNNTest_half_int64_t,
-  ::testing::ValuesIn(
-    inputs<half>));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  ::testing::ValuesIn(inputs<half>));  // NOLINT(readability-identifier-naming)
 
 // Also test with larger random inputs, including col-major inputs
 struct RandomKNNInputs {  // NOLINT(readability-identifier-naming)
@@ -218,8 +220,7 @@ struct RandomKNNInputs {  // NOLINT(readability-identifier-naming)
   bool host_dataset;
 };
 
-std::ostream& operator<<(
-  std::ostream& os, const RandomKNNInputs& input)  // NOLINT(modernize-use-trailing-return-type)
+auto operator<<(std::ostream& os, const RandomKNNInputs& input) -> std::ostream&
 {
   return os << "num_queries:" << input.num_queries << " num_vecs:" << input.num_db_vecs
             << " dim:" << input.dim << " k:" << input.k
@@ -494,7 +495,7 @@ class RandomBruteForceKNNTest
 
  private:
   raft::resources handle_;
-  cudaStream_t stream_ = 0;
+  cudaStream_t stream_ = nullptr;
   RandomKNNInputs params_;
   int num_queries;                        // NOLINT(readability-identifier-naming)
   int num_db_vecs;                        // NOLINT(readability-identifier-naming)
@@ -557,26 +558,26 @@ const std::vector<RandomKNNInputs> random_inputs = {  // NOLINT(readability-iden
   {256, 512, 16, 8, cuvs::distance::DistanceType::InnerProduct, true, true},
   {256, 512, 16, 7, cuvs::distance::DistanceType::L2Expanded, true, true}};
 
-using RandomBruteForceKNNTestF = RandomBruteForceKNNTest<float, float>;  // NOLINT(readability-identifier-naming)
+using RandomBruteForceKNNTestF =
+  RandomBruteForceKNNTest<float, float>;  // NOLINT(readability-identifier-naming)
 TEST_P(RandomBruteForceKNNTestF, BruteForce)
 {
   this->testBruteForce();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(readability-identifier-naming)
 
-using RandomBruteForceKNNTestH = RandomBruteForceKNNTest<half, float>;  // NOLINT(readability-identifier-naming)
+using RandomBruteForceKNNTestH =
+  RandomBruteForceKNNTest<half, float>;  // NOLINT(readability-identifier-naming)
 TEST_P(RandomBruteForceKNNTestH, BruteForce)
 {
   this->testBruteForce();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(
-  RandomBruteForceKNNTest,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-  RandomBruteForceKNNTestF,
-  ::testing::ValuesIn(random_inputs));
+INSTANTIATE_TEST_CASE_P(RandomBruteForceKNNTest,  // NOLINT(readability-identifier-naming)
+                        RandomBruteForceKNNTestF,
+                        ::testing::ValuesIn(random_inputs));
 
-INSTANTIATE_TEST_CASE_P(
-  RandomBruteForceKNNTest,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-  RandomBruteForceKNNTestH,
-  ::testing::ValuesIn(random_inputs));
+INSTANTIATE_TEST_CASE_P(RandomBruteForceKNNTest,  // NOLINT(readability-identifier-naming)
+                        RandomBruteForceKNNTestH,
+                        ::testing::ValuesIn(random_inputs));
 
 }  // namespace cuvs::neighbors::brute_force

@@ -284,7 +284,7 @@ struct MaskedDistances : public BaseClass {
                      DataT (&regxn)[P::AccRowsPerTh],
                      DataT (&regyn)[P::AccColsPerTh])
   {
-    DataT* sxNorm = (DataT*)(&smem[P::SmemSize]);
+    auto* sxNorm  = reinterpret_cast<DataT*>((&smem[P::SmemSize]));
     DataT* syNorm = (&sxNorm[P::Mblk]);
 
     // Load x & y norms required by this threadblock in shmem buffer

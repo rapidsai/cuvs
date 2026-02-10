@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -21,7 +21,7 @@ void ivf_flat_build_search_simple(raft::device_resources const& dev_resources,
                                   raft::device_matrix_view<const float, int64_t> dataset,
                                   raft::device_matrix_view<const float, int64_t> queries)
 {
-  using namespace cuvs::neighbors;
+  using cuvs::neighbors::ivf_flat;
 
   ivf_flat::index_params index_params;
   index_params.n_lists                  = 1024;
@@ -58,7 +58,7 @@ void ivf_flat_build_extend_search(raft::device_resources const& dev_resources,
                                   raft::device_matrix_view<const float, int64_t> dataset,
                                   raft::device_matrix_view<const float, int64_t> queries)
 {
-  using namespace cuvs::neighbors;
+  using cuvs::neighbors::ivf_flat;
 
   // Define dataset indices.
   auto data_indices = raft::make_device_vector<int64_t, int64_t>(dev_resources, dataset.extent(0));
@@ -108,7 +108,7 @@ void ivf_flat_build_extend_search(raft::device_resources const& dev_resources,
   print_results(dev_resources, neighbors.view(), distances.view());
 }
 
-int main()
+auto main() -> int
 {
   raft::device_resources dev_resources;
 

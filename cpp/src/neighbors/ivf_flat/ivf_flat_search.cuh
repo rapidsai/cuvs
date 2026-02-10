@@ -159,7 +159,7 @@ void search_impl(raft::resources const& handle,
     raft::linalg::map_offset(
       handle,
       distance_buffer_dev_view,
-      [=] __device__(const uint32_t idx, const float dist) {
+      [=] __device__(const uint32_t idx, const float dist) -> float {
         const auto query   = idx / n_lists;
         const auto cluster = idx % n_lists;
         return dist / (q_norm_ptr[query] * index_center_norm_ptr[cluster]);

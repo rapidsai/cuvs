@@ -82,7 +82,7 @@ RAFT_KERNEL init_adj(AdjacencyPattern pattern,
 }
 
 template <typename DataT, typename ReduceOpT, int NWARPS>
-__launch_bounds__(32 * NWARPS, 2) RAFT_KERNEL
+__launch_bounds__(32 * NWARPS, 2) RAFT_KERNEL           // NOLINT(readability-identifier-naming)
   referenceKernel(raft::KeyValuePair<int, DataT>* min,  // NOLINT(readability-identifier-naming)
                   const DataT* x,
                   const DataT* y,
@@ -123,7 +123,8 @@ __launch_bounds__(32 * NWARPS, 2) RAFT_KERNEL
       }
       if (sqrt) { acc = raft::sqrt(acc); }
       ReduceOpT redOp;  // NOLINT(readability-identifier-naming)
-      using WarpReduce = cub::WarpReduce<raft::KeyValuePair<int, DataT>>;  // NOLINT(readability-identifier-naming)
+      using WarpReduce =
+        cub::WarpReduce<raft::KeyValuePair<int, DataT>>;  // NOLINT(readability-identifier-naming)
       __shared__ typename WarpReduce::TempStorage temp[NWARPS];
       int warpId = threadIdx.x / raft::WarpSize;  // NOLINT(readability-identifier-naming)
       raft::KeyValuePair<int, DataT> tmp;
@@ -281,10 +282,10 @@ auto run_masked_nn(const raft::handle_t& handle, const Inputs<DataT>& inp, const
 }
 
 template <typename T>
-struct CompareApproxAbsKVP {  // NOLINT(readability-identifier-naming)
+struct CompareApproxAbsKVP {                        // NOLINT(readability-identifier-naming)
   using KVP = typename raft::KeyValuePair<int, T>;  // NOLINT(readability-identifier-naming)
-  CompareApproxAbsKVP(T eps_) : eps(eps_) {}         // NOLINT(google-explicit-constructor)
-  bool operator()(const KVP& a, const KVP& b) const  // NOLINT(modernize-use-trailing-return-type)
+  CompareApproxAbsKVP(T eps_) : eps(eps_) {}        // NOLINT(google-explicit-constructor)
+  auto operator()(const KVP& a, const KVP& b) const -> bool
   {
     T diff  = raft::abs(raft::abs(a.value) - raft::abs(b.value));
     T m     = std::max(raft::abs(a.value), raft::abs(b.value));
@@ -297,17 +298,15 @@ struct CompareApproxAbsKVP {  // NOLINT(readability-identifier-naming)
 };
 
 template <typename K, typename V, typename L>
-::testing::AssertionResult devArrMatch(
-  const raft::KeyValuePair<K, V>*
-    expected,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-  const raft::KeyValuePair<K, V>* actual,
-  size_t size,
-  L eq_compare,
-  cudaStream_t stream = 0)
+auto devArrMatch(const raft::KeyValuePair<K, V>* expected,  // NOLINT(readability-identifier-naming)
+                 const raft::KeyValuePair<K, V>* actual,
+                 size_t size,
+                 L eq_compare,
+                 cudaStream_t stream = nullptr) -> ::testing::AssertionResult
 {
   using KVP = typename raft::KeyValuePair<K, V>;  // NOLINT(readability-identifier-naming)
-  std::shared_ptr<KVP[]> exp_h(new KVP[size]);  // NOLINT(modernize-avoid-c-arrays)
-  std::shared_ptr<KVP[]> act_h(new KVP[size]);  // NOLINT(modernize-avoid-c-arrays)
+  std::shared_ptr<KVP[]> exp_h(new KVP[size]);    // NOLINT(modernize-avoid-c-arrays)
+  std::shared_ptr<KVP[]> act_h(new KVP[size]);    // NOLINT(modernize-avoid-c-arrays)
   raft::update_host<KVP>(exp_h.get(), expected, size, stream);
   raft::update_host<KVP>(act_h.get(), actual, size, stream);
   RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
@@ -361,9 +360,8 @@ class MaskedL2NNTest
 };
 
 //
-TEST_P(
-  MaskedL2NNTest,
-  ReferenceCheckFloat)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+TEST_P(MaskedL2NNTest,
+       ReferenceCheckFloat)  // NOLINT(readability-identifier-naming)
 {
   using DataT = float;  // NOLINT(readability-identifier-naming)
 
@@ -386,9 +384,8 @@ TEST_P(
 
 // This test checks whether running the masked_l2_nn twice returns the same
 // output.
-TEST_P(
-  MaskedL2NNTest,
-  DeterminismCheck)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+TEST_P(MaskedL2NNTest,
+       DeterminismCheck)  // NOLINT(readability-identifier-naming)
 {
   using DataT = float;  // NOLINT(readability-identifier-naming)
 
@@ -409,9 +406,8 @@ TEST_P(
                           raft::resource::get_cuda_stream(handle)));
 }
 
-TEST_P(
-  MaskedL2NNTest,
-  ReferenceCheckDouble)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+TEST_P(MaskedL2NNTest,
+       ReferenceCheckDouble)  // NOLINT(readability-identifier-naming)
 {
   using DataT = double;  // NOLINT(readability-identifier-naming)
 
@@ -435,7 +431,6 @@ TEST_P(
 INSTANTIATE_TEST_CASE_P(
   MaskedL2NNTests,
   MaskedL2NNTest,
-  ::testing::ValuesIn(
-    gen_params()));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  ::testing::ValuesIn(gen_params()));  // NOLINT(readability-identifier-naming)
 
 }  // end namespace cuvs::distance::masked_nn

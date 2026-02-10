@@ -7,15 +7,16 @@
 
 namespace cuvs::neighbors::hnsw {
 
-using AnnHnswAceTest_int8_t = AnnHnswAceTest<float, int8_t, uint32_t>;  // NOLINT(readability-identifier-naming)
-TEST_P(AnnHnswAceTest_int8_t, AnnHnswAceBuild)
+using AnnHnswAceTest_int8_t =
+  AnnHnswAceTest<float, int8_t, uint32_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(AnnHnswAceTest_int8_t,
+       AnnHnswAceBuild)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testHnswAceBuild();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(
-  AnnHnswAceTest,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-  AnnHnswAceTest_int8_t,
-  ::testing::ValuesIn(hnsw_ace_inputs));
+INSTANTIATE_TEST_CASE_P(AnnHnswAceTest,  // NOLINT(readability-identifier-naming)
+                        AnnHnswAceTest_int8_t,
+                        ::testing::ValuesIn(hnsw_ace_inputs));
 
 }  // namespace cuvs::neighbors::hnsw

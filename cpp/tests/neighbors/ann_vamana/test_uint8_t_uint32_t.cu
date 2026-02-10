@@ -9,16 +9,16 @@
 
 namespace cuvs::neighbors::vamana {
 
-using AnnVamanaTestU8_U32 = AnnVamanaTest<float, uint8_t, std::uint32_t>;  // NOLINT(readability-identifier-naming)
-TEST_P(AnnVamanaTestU8_U32, AnnVamana)
+using AnnVamanaTestU8_U32 =
+  AnnVamanaTest<float, uint8_t, std::uint32_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(AnnVamanaTestU8_U32,
+       AnnVamana)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testVamana();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(
-  AnnVamanaTest,
-  AnnVamanaTestU8_U32,
-  ::testing::ValuesIn(
-    inputs));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(AnnVamanaTest,
+                        AnnVamanaTestU8_U32,
+                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
 
 }  // namespace cuvs::neighbors::vamana

@@ -6,8 +6,8 @@
 #pragma once
 
 #include "vamana_structs.cuh"
+#include <cstdio>
 #include <raft/util/warp_primitives.cuh>
-#include <stdio.h>
 
 namespace cuvs::neighbors::vamana::detail {
 

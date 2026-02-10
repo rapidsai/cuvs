@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -19,7 +19,7 @@ void cagra_build_search_simple(raft::device_resources const& dev_resources,
                                raft::device_matrix_view<const float, int64_t> dataset,
                                raft::device_matrix_view<const float, int64_t> queries)
 {
-  using namespace cuvs::neighbors;
+  using cuvs::neighbors::cagra;
 
   int64_t topk      = 12;
   int64_t n_queries = queries.extent(0);
@@ -49,7 +49,7 @@ void cagra_build_search_simple(raft::device_resources const& dev_resources,
   print_results(dev_resources, neighbors.view(), distances.view());
 }
 
-int main()
+auto main() -> int
 {
   raft::device_resources dev_resources;
 

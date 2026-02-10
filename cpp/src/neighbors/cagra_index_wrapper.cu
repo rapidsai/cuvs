@@ -31,29 +31,29 @@ void IndexWrapper<T, IdxT, OutputIdxT>::search(
 }
 
 template <typename T, typename IdxT, typename OutputIdxT>
-typename IndexWrapper<T, IdxT, OutputIdxT>::index_type IndexWrapper<T, IdxT, OutputIdxT>::size()
-  const noexcept
+auto IndexWrapper<T, IdxT, OutputIdxT>::size() const noexcept ->
+  typename IndexWrapper<T, IdxT, OutputIdxT>::index_type
 {
   return index_->size();
 }
 
 template <typename T, typename IdxT, typename OutputIdxT>
-cuvs::distance::DistanceType IndexWrapper<T, IdxT, OutputIdxT>::metric() const noexcept
+auto IndexWrapper<T, IdxT, OutputIdxT>::metric() const noexcept -> cuvs::distance::DistanceType
 {
   return index_->metric();
 }
 
 template <typename T, typename IdxT, typename OutputIdxT>
-std::shared_ptr<
-  cuvs::neighbors::IndexBase<typename IndexWrapper<T, IdxT, OutputIdxT>::value_type,
-                             typename IndexWrapper<T, IdxT, OutputIdxT>::index_type,
-                             typename IndexWrapper<T, IdxT, OutputIdxT>::out_index_type>>
-IndexWrapper<T, IdxT, OutputIdxT>::merge(
+auto IndexWrapper<T, IdxT, OutputIdxT>::merge(
   const raft::resources& handle,
   const cuvs::neighbors::merge_params& params,
   const std::vector<
     std::shared_ptr<cuvs::neighbors::IndexBase<value_type, index_type, out_index_type>>>&
     other_indices) const
+  -> std::shared_ptr<
+    cuvs::neighbors::IndexBase<typename IndexWrapper<T, IdxT, OutputIdxT>::value_type,
+                               typename IndexWrapper<T, IdxT, OutputIdxT>::index_type,
+                               typename IndexWrapper<T, IdxT, OutputIdxT>::out_index_type>>
 {
   const auto* cagra_params = dynamic_cast<const cuvs::neighbors::cagra::merge_params*>(&params);
   if (!cagra_params) { RAFT_FAIL("CAGRA IndexWrapper::merge requires cagra::merge_params"); }

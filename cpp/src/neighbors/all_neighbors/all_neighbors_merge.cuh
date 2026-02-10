@@ -17,7 +17,6 @@
 #include <raft/util/cudart_utils.hpp>
 
 namespace cuvs::neighbors::all_neighbors::detail {
-using namespace cuvs::neighbors;
 
 template <typename IdxT, int BLOCK_SIZE, int ITEMS_PER_THREAD, bool SweepAll = false>
 RAFT_KERNEL merge_subgraphs_kernel(IdxT* cluster_data_indices,
@@ -37,9 +36,9 @@ RAFT_KERNEL merge_subgraphs_kernel(IdxT* cluster_data_indices,
                                           ITEMS_PER_THREAD>::TempStorage tmpSmem;
 
   extern __shared__ char sharedMem[];
-  float* blockKeys  = reinterpret_cast<float*>(sharedMem);
+  auto* blockKeys   = reinterpret_cast<float*>(sharedMem);
   IdxT* blockValues = reinterpret_cast<IdxT*>(&sharedMem[graph_degree * 2 * sizeof(float)]);
-  int16_t* uniqueMask =
+  auto* uniqueMask =
     reinterpret_cast<int16_t*>(&sharedMem[graph_degree * 2 * (sizeof(float) + sizeof(IdxT))]);
 
   if (batch_row < num_cluster_in_batch) {

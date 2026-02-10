@@ -20,10 +20,7 @@
 #include <thrust/fill.h>
 #include <thrust/reduce.h>
 
-namespace cuvs {
-namespace stats {
-namespace batched {
-namespace detail {
+namespace cuvs::stats::batched::detail {
 
 /**
  * This kernel initializes matrix b (n_rows * n_labels)
@@ -266,7 +263,4 @@ auto silhouette_score(
   return thrust::reduce(policy, a_ptr, a_ptr + n_rows, value_t(0)) / n_rows;
 }
 
-}  // namespace detail
-}  // namespace batched
-}  // namespace stats
-}  // namespace cuvs
+}  // namespace cuvs::stats::batched::detail

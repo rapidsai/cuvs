@@ -12,10 +12,10 @@
 #include <raft/core/detail/macros.hpp>
 #include <raft/core/error.hpp>
 
-#include <assert.h>
-#include <float.h>
-#include <stdint.h>
-#include <stdio.h>
+#include <cassert>
+#include <cfloat>
+#include <cstdint>
+#include <cstdio>
 
 namespace cuvs::neighbors::cagra::detail {
 //
@@ -59,13 +59,13 @@ template <int vecLen>
 RAFT_DEVICE_INLINE_FUNCTION void load_u32_vector(struct u32_vector& vec, const uint32_t* x, int i)
 {
   if (vecLen == 1) {
-    vec.x1 = ((uint1*)(x + i))[0];
+    vec.x1 = (reinterpret_cast<const uint1*>(x + i))[0];
   } else if (vecLen == 2) {
-    vec.x2 = ((uint2*)(x + i))[0];
+    vec.x2 = (reinterpret_cast<const uint2*>(x + i))[0];
   } else if (vecLen == 4) {
-    vec.x4 = ((uint4*)(x + i))[0];
+    vec.x4 = (reinterpret_cast<const uint4*>(x + i))[0];
   } else if (vecLen == 8) {
-    vec.x8 = ((ulonglong4*)(x + i))[0];
+    vec.x8 = (reinterpret_cast<const ulonglong4*>(x + i))[0];
   }
 }
 
@@ -74,13 +74,13 @@ template <int vecLen>
 RAFT_DEVICE_INLINE_FUNCTION void load_u16_vector(struct u16_vector& vec, const uint16_t* x, int i)
 {
   if (vecLen == 1) {
-    vec.x1 = ((ushort1*)(x + i))[0];
+    vec.x1 = (reinterpret_cast<const ushort1*>(x + i))[0];
   } else if (vecLen == 2) {
-    vec.x2 = ((ushort2*)(x + i))[0];
+    vec.x2 = (reinterpret_cast<const ushort2*>(x + i))[0];
   } else if (vecLen == 4) {
-    vec.x4 = ((ushort4*)(x + i))[0];
+    vec.x4 = (reinterpret_cast<const ushort4*>(x + i))[0];
   } else if (vecLen == 8) {
-    vec.x8 = ((uint4*)(x + i))[0];
+    vec.x8 = (reinterpret_cast<const uint4*>(x + i))[0];
   }
 }
 
@@ -283,9 +283,9 @@ RAFT_DEVICE_INLINE_FUNCTION void update_histogram(int itr,
       struct u32_vector x_u32_vec;
       struct u16_vector x_u16_vec;
       if (sizeof(T) == 4) {
-        load_u32_vector<vecLen>(x_u32_vec, (const uint32_t*)x, iv);
+        load_u32_vector<vecLen>(x_u32_vec, reinterpret_cast<const uint32_t*>(x), iv);
       } else {
-        load_u16_vector<vecLen>(x_u16_vec, (const uint16_t*)x, iv);
+        load_u16_vector<vecLen>(x_u16_vec, reinterpret_cast<const uint16_t*>(x), iv);
       }
 #pragma unroll
       for (int u = 0; u < vecLen; u++) {
@@ -499,9 +499,9 @@ RAFT_DEVICE_INLINE_FUNCTION void output_index_below_threshold(const uint32_t top
       struct u32_vector u32_vec;
       struct u16_vector u16_vec;
       if (sizeof(T) == 4) {
-        load_u32_vector<vecLen>(u32_vec, (const uint32_t*)x, iv);
+        load_u32_vector<vecLen>(u32_vec, reinterpret_cast<const uint32_t*>(x), iv);
       } else {
-        load_u16_vector<vecLen>(u16_vec, (const uint16_t*)x, iv);
+        load_u16_vector<vecLen>(u16_vec, reinterpret_cast<const uint16_t*>(x), iv);
       }
 #pragma unroll
       for (int u = 0; u < vecLen; u++) {
@@ -740,7 +740,7 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t topk,
       const int k = thread_id + (numSortThreads * i);
       if (k < topk) {
         const int j = smem_out_vals[k];
-        my_keys[i]  = ((float*)x)[j];
+        my_keys[i]  = (reinterpret_cast<const float*>(x))[j];
         if (in_vals) {
           my_vals[i] = in_vals[j];
         } else {
@@ -787,7 +787,7 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t topk,
       if (curr_mask >= 32) {
         // inter warp
         ValT* const smem_vals = reinterpret_cast<ValT*>(_smem);  // [maxTopk]
-        float* const smem_keys =
+        auto* const smem_keys =
           reinterpret_cast<float*>(smem_vals + maxTopk);  // [numTopkPerThread, numSortThreads]
         __syncthreads();
         if (thread_id < numSortThreads) {

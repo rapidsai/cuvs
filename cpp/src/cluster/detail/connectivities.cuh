@@ -81,7 +81,7 @@ struct distance_graph_impl<Linkage::KNN_GRAPH, value_idx, value_t> {
     raft::linalg::map(
       handle,
       vals_out_view,
-      [=] __device__(const value_idx row, const value_idx col, const value_t val) {
+      [=] __device__(const value_idx row, const value_idx col, const value_t val) -> value_t {
         bool self_loop = row == col;
         return (self_loop * std::numeric_limits<value_t>::max()) + (!self_loop * val);
       },
@@ -137,12 +137,12 @@ void pairwise_distances(const raft::resources& handle,
 
   value_idx nnz = m * m;
 
-  value_idx blocks = raft::ceildiv(nnz, (value_idx)256);
+  value_idx blocks = raft::ceildiv(nnz, static_cast<value_idx>(256));
   fill_indices2<value_idx><<<blocks, 256, 0, stream>>>(indices, m, nnz);
 
   raft::linalg::map_offset(handle,
                            raft::make_device_vector_view<value_idx, value_idx>(indptr, m),
-                           [=] __device__(value_idx idx) { return idx * m; });
+                           [=] __device__(value_idx idx) -> value_idx { return idx * m; });
 
   raft::update_device(indptr + m, &nnz, 1, stream);
 
@@ -157,7 +157,7 @@ void pairwise_distances(const raft::resources& handle,
   // self-loops get max distance
   auto data_view = raft::make_device_vector_view<value_t, value_idx>(data, nnz);
 
-  raft::linalg::map_offset(handle, data_view, [=] __device__(value_idx idx) {
+  raft::linalg::map_offset(handle, data_view, [=] __device__(value_idx idx) -> value_t {
     value_t val    = data[idx];
     bool self_loop = idx % m == idx / m;
     return (self_loop * std::numeric_limits<value_t>::max()) + (!self_loop * val);

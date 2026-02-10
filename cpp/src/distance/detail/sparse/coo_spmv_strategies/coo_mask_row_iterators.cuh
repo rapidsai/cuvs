@@ -15,10 +15,7 @@
 #include <thrust/scan.h>
 #include <thrust/transform.h>
 
-namespace cuvs {
-namespace distance {
-namespace detail {
-namespace sparse {
+namespace cuvs::distance::detail::sparse {
 
 template <typename value_idx>
 class mask_row_it {
@@ -194,7 +191,7 @@ class chunked_mask_row_it : public mask_row_it<value_idx> {
     __host__ __device__ auto operator()(const value_idx& i) -> value_idx
     {
       auto degree = indptr[i + 1] - indptr[i];
-      return raft::ceildiv(degree, (value_idx)row_chunk_size);
+      return raft::ceildiv(degree, static_cast<value_idx>(row_chunk_size));
     }
 
     const value_idx* indptr;
@@ -208,7 +205,7 @@ class chunked_mask_row_it : public mask_row_it<value_idx> {
                                  cudaStream_t stream)
   {
     auto n_threads = std::min(n_rows, 256);
-    auto n_blocks  = raft::ceildiv(n_rows, (value_idx)n_threads);
+    auto n_blocks  = raft::ceildiv(n_rows, static_cast<value_idx>(n_threads));
 
     chunk_indices.resize(total_row_blocks, stream);
 
@@ -217,7 +214,4 @@ class chunked_mask_row_it : public mask_row_it<value_idx> {
   }
 };
 
-}  // namespace sparse
-}  // namespace detail
-}  // namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance::detail::sparse

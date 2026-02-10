@@ -10,14 +10,14 @@
 namespace cuvs::neighbors::brute_force {
 
 using AnnBruteForceTest_half_float = AnnBruteForceTest<float, half, std::int64_t>;
-TEST_P(AnnBruteForceTest_half_float, AnnBruteForce)
+TEST_P(AnnBruteForceTest_half_float,
+       AnnBruteForce)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testBruteForce();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(
-  AnnBruteForceTest,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-  AnnBruteForceTest_half_float,
-  ::testing::ValuesIn(inputs));
+INSTANTIATE_TEST_CASE_P(AnnBruteForceTest,  // NOLINT(readability-identifier-naming)
+                        AnnBruteForceTest_half_float,
+                        ::testing::ValuesIn(inputs));
 
 }  // namespace cuvs::neighbors::brute_force

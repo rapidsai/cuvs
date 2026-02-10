@@ -9,10 +9,7 @@
 
 #include <raft/util/cuda_dev_essentials.cuh>
 
-namespace cuvs {
-namespace distance {
-namespace detail {
-namespace sparse {
+namespace cuvs::distance::detail::sparse {
 
 template <typename value_idx, typename value_t, int tpb>
 class dense_smem_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
@@ -101,7 +98,4 @@ class dense_smem_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
   }
 };
 
-}  // namespace sparse
-}  // namespace detail
-}  // namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance::detail::sparse

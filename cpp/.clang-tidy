@@ -1,7 +1,7 @@
 ---
 # Refer to the following link for the explanation of each params:
 #  https://releases.llvm.org/8.0.1/tools/clang/tools/extra/docs/clang-tidy/checks/list.html
-Checks:          '-*,modernize-*,-modernize-make-*,-modernize-raw-string-literal,google-*,-google-default-arguments,readability-identifier-naming'
+Checks:          '-*,modernize-*,-modernize-make-*,-modernize-raw-string-literal,-modernize-avoid-c-arrays,-modernize-use-integer-sign-comparison,-modernize-macro-to-enum,-modernize-use-constraints,google-*,-google-default-arguments,-google-runtime-int,readability-identifier-naming'
 WarningsAsErrors: '*'
 HeaderFilterRegex: ''
 FormatStyle:     none

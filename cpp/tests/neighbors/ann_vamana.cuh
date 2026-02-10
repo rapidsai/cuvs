@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -85,7 +85,7 @@ inline void CheckGraph(vamana::index<DataT, IdxT>* index_,
   for (int i = 0; i < h_graph.extent(0); i++) {
     int temp_degree = 0;
     for (int j = 0; j < h_graph.extent(1); j++) {
-      if (h_graph(i, j) < (uint32_t)(inputs.n_rows)) temp_degree++;
+      if (h_graph(i, j) < static_cast<uint32_t>(inputs.n_rows)) temp_degree++;
     }
     if (temp_degree > max_degree) max_degree = temp_degree;
     edge_count += (size_t)temp_degree;
@@ -95,7 +95,7 @@ inline void CheckGraph(vamana::index<DataT, IdxT>* index_,
   // Minimum expected maximum degree across the whole graph
   EXPECT_TRUE(max_degree >= std::min(inputs.graph_degree, inputs.dim));
 
-  float max_edges = (float)(inputs.n_rows * std::min(inputs.graph_degree, inputs.dim));
+  auto max_edges = static_cast<float>((inputs.n_rows * std::min(inputs.graph_degree, inputs.dim)));
 
   RAFT_LOG_INFO("dim:%d, degree:%d, visited_size:%d, Total edges:%lu, Maximum edges:%lu",
                 inputs.dim,
@@ -139,22 +139,24 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
     index_params.vamana_iters      = ps.insert_iters;
 
     // use randomized codebooks to test serialization & quantization code path
-    if (ps.dim == 384 && std::is_same_v<DataT, int8_t>)
+    if (ps.dim == 384 && std::is_same_v<DataT, int8_t>) {
       index_params.codebooks = vamana::deserialize_codebooks(
         test_data_dir_ + "/neighbors/ann_vamana/randomized_codebooks/384_int8", ps.dim);
-    if (ps.dim == 64 && std::is_same_v<DataT, float>)
+    }
+    if (ps.dim == 64 && std::is_same_v<DataT, float>) {
       index_params.codebooks = vamana::deserialize_codebooks(
         test_data_dir_ + "/neighbors/ann_vamana/randomized_codebooks/64_float", ps.dim);
+    }
 
     auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
-      (const DataT*)database.data(), ps.n_rows, ps.dim);
+      reinterpret_cast<const DataT*>(database.data()), ps.n_rows, ps.dim);
 
     vamana::index<DataT, IdxT> index(handle_);
     if (ps.host_dataset) {
       auto database_host = raft::make_host_matrix<DataT, int64_t>(ps.n_rows, ps.dim);
       raft::copy(database_host.data_handle(), database.data(), database.size(), stream_);
       auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
-        (const DataT*)database_host.data_handle(), ps.n_rows, ps.dim);
+        reinterpret_cast<const DataT*>(database_host.data_handle()), ps.n_rows, ps.dim);
 
       index = vamana::build(handle_, index_params, database_host_view);
     } else {
@@ -246,7 +248,7 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
     }
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     search_queries.resize(((size_t)ps.n_queries) * ps.dim, stream_);
@@ -264,7 +266,7 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override
+  void TearDown() override  // NOLINT(readability-identifier-naming)
   {
     raft::resource::sync_stream(handle_);
     database.resize(0, stream_);
@@ -280,7 +282,7 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
   std::string test_data_dir_;
 };
 
-inline std::vector<AnnVamanaInputs> generate_inputs()
+inline auto generate_inputs() -> std::vector<AnnVamanaInputs>
 {
   std::vector<AnnVamanaInputs> inputs = raft::util::itertools::product<AnnVamanaInputs>(
     {1000},

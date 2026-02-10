@@ -73,17 +73,17 @@ constexpr static inline float kAdjustCentersWeight = 7.0f;
  * @param[inout] mr (optional) Memory resource to use for temporary allocations
  */
 template <typename MathT, typename IdxT, typename LabelT>
-inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
-  const raft::resources& handle,
-  const cuvs::cluster::kmeans::balanced_params& params,
-  const MathT* centers,
-  IdxT n_clusters,
-  IdxT dim,
-  const MathT* dataset,
-  const MathT* dataset_norm,
-  IdxT n_rows,
-  LabelT* labels,
-  rmm::device_async_resource_ref mr)
+inline auto predict_core(const raft::resources& handle,
+                         const cuvs::cluster::kmeans::balanced_params& params,
+                         const MathT* centers,
+                         IdxT n_clusters,
+                         IdxT dim,
+                         const MathT* dataset,
+                         const MathT* dataset_norm,
+                         IdxT n_rows,
+                         LabelT* labels,
+                         rmm::device_async_resource_ref mr)
+  -> std::enable_if_t<std::is_floating_point_v<MathT>>
 {
   auto stream = raft::resource::get_cuda_stream(handle);
   switch (params.metric) {
@@ -114,7 +114,7 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
         n_rows,
         n_clusters,
         dim,
-        (void*)workspace.data_handle(),
+        reinterpret_cast<void*>(workspace.data_handle()),
         (params.metric == cuvs::distance::DistanceType::L2Expanded) ? false : true,
         false,
         true,
@@ -157,7 +157,7 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
         n_rows,
         n_clusters,
         dim,
-        (void*)workspace.data_handle(),
+        reinterpret_cast<void*>(workspace.data_handle()),
         false,
         false,
         true,
@@ -487,8 +487,9 @@ template <uint32_t BlockDimY,
           typename LabelT,
           typename CounterT,
           typename MappingOpT>
-__launch_bounds__((raft::WarpSize * BlockDimY)) RAFT_KERNEL
-  adjust_centers_kernel(MathT* centers,  // [n_clusters, dim]
+__launch_bounds__((raft::WarpSize *
+                   BlockDimY)) RAFT_KERNEL  // NOLINT(readability-identifier-naming)
+  adjust_centers_kernel(MathT* centers,     // [n_clusters, dim]
                         IdxT n_clusters,
                         IdxT dim,
                         const T* dataset,  // [n_rows, dim]
@@ -1061,7 +1062,7 @@ void build_hierarchical(const raft::resources& handle,
                      device_memory);
       }
     }
-    dataset_norm = (const MathT*)dataset_norm_buf.data();
+    dataset_norm = reinterpret_cast<const MathT*>(dataset_norm_buf.data());
   }
 
   /* Temporary workaround to cub::DeviceHistogram not supporting any type that isn't natively

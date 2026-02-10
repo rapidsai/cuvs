@@ -8,11 +8,11 @@
 namespace cuvs::neighbors::cagra::detail {
 
 //
-size_t _cuann_find_topk_bufferSize(
-  uint32_t topK,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+auto _cuann_find_topk_bufferSize(  // NOLINT(readability-identifier-naming)
+  uint32_t topK,
   uint32_t sizeBatch,
   uint32_t numElements,
-  cudaDataType_t sampleDtype)
+  cudaDataType_t sampleDtype) -> size_t
 {
   constexpr int numThreads  = NUM_THREADS;       // NOLINT(readability-identifier-naming)
   constexpr int stateBitLen = STATE_BIT_LENGTH;  // NOLINT(readability-identifier-naming)

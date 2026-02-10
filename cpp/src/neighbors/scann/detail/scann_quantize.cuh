@@ -12,7 +12,9 @@
 #include <raft/matrix/gather.cuh>
 
 #include "scann_common.cuh"
-using namespace cuvs::neighbors;
+using cuvs::neighbors::dataset;
+using cuvs::neighbors::vpq_dataset;
+using cuvs::neighbors::vpq_params;
 
 namespace cuvs::neighbors::experimental::scann::detail {
 
@@ -94,7 +96,7 @@ auto process_and_fill_codes_subspaces(
   const ix_t threads_per_vec = std::min<ix_t>(raft::WarpSize, pq_n_centers);
   dim3 threads(kBlockSize, 1, 1);
 
-  auto kernel = [](uint32_t pq_bits) {
+  auto kernel = [](uint32_t pq_bits) -> auto {
     switch (pq_bits) {
       case 4:
         return process_and_fill_codes_subspaces_kernel<kBlockSize, 4, data_t, MathT, IdxT, label_t>;
@@ -130,7 +132,7 @@ auto create_pq_codebook(raft::resources const& res,
   // Create codebooks (vq initialized to 0s since we don't need here)
   auto vq_code_book =
     raft::make_device_matrix<T, uint32_t, raft::row_major>(res, 1, residuals.extent(1));
-  raft::linalg::map_offset(res, vq_code_book.view(), [] __device__(size_t i) { return 0; });
+  raft::linalg::map_offset(res, vq_code_book.view(), [] __device__(size_t i) -> T { return 0; });
 
   auto pq_code_book = cuvs::neighbors::detail::train_pq<T>(
     res, ps, residuals, raft::make_const_mdspan(vq_code_book.view()));
@@ -164,7 +166,7 @@ auto compute_residuals(raft::resources const& res,
 
   // compute residuals for AVQ assignments
   raft::linalg::map_offset(
-    res, residuals.view(), [dataset, centers, labels, dim] __device__(size_t i) {
+    res, residuals.view(), [dataset, centers, labels, dim] __device__(size_t i) -> T {
       int row_idx = i / dim;
       int el_idx  = i % dim;
       return dataset(row_idx, el_idx) - centers(labels(row_idx), el_idx);
@@ -243,7 +245,7 @@ void unpack_codes(raft::resources const& res,
 {
   if (pq_bits == 4) {
     raft::linalg::map_offset(
-      res, unpacked_codes_view, [codes_view, num_subspaces] __device__(size_t i) {
+      res, unpacked_codes_view, [codes_view, num_subspaces] __device__(size_t i) -> uint8_t {
         int64_t row_idx             = i / num_subspaces;
         int64_t subspace_idx        = i % num_subspaces;
         int64_t packed_subspace_idx = 4 + subspace_idx / 2;
@@ -500,7 +502,7 @@ void quantize_bfloat16(raft::resources const& res,
       bf16_dataset.data_handle(),
       dataset.data_handle(),
       dataset.size(),
-      [] __device__(float x) { return float_to_bfloat16(x); },
+      [] __device__(float x) -> nv_bfloat16 { return float_to_bfloat16(x); },
       resource::get_cuda_stream(res));
   }
 }

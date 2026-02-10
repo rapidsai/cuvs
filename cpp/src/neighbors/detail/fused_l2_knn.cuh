@@ -185,22 +185,23 @@ template <typename DataT,
           int NumThreadQ,
           bool usePrevTopKs = false,
           bool isRowMajor   = true>
-__launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL fusedL2kNN(const DataT* x,
-                                                              const DataT* y,
-                                                              const OutT* _xn,
-                                                              const OutT* _yn,
-                                                              const IdxT m,
-                                                              const IdxT n,
-                                                              const IdxT k,
-                                                              const IdxT lda,
-                                                              const IdxT ldb,
-                                                              const IdxT ldd,
-                                                              OpT distance_op,
-                                                              FinalLambda fin_op,
-                                                              unsigned int numOfNN,
-                                                              volatile int* mutexes,
-                                                              volatile OutT* out_dists,
-                                                              volatile IdxT* out_inds)
+__launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL
+  fusedL2kNN(const DataT* x,  // NOLINT(readability-identifier-naming)
+             const DataT* y,
+             const OutT* _xn,
+             const OutT* _yn,
+             const IdxT m,
+             const IdxT n,
+             const IdxT k,
+             const IdxT lda,
+             const IdxT ldb,
+             const IdxT ldd,
+             OpT distance_op,
+             FinalLambda fin_op,
+             unsigned int numOfNN,
+             volatile int* mutexes,
+             volatile OutT* out_dists,
+             volatile IdxT* out_inds)
 {
   using AccT = typename OpT::AccT;
   extern __shared__ char smem[];
@@ -209,7 +210,8 @@ __launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL fusedL2kNN(const DataT* x,
   constexpr auto identity = std::numeric_limits<AccT>::max();
   constexpr auto keyMax   = std::numeric_limits<uint32_t>::max();
   constexpr auto Dir      = false;
-  using namespace cuvs::neighbors::detail::faiss_select;
+  using cuvs::neighbors::detail::faiss_select::Comparator;
+  using cuvs::neighbors::detail::faiss_select::WarpSelect;
   using myWarpSelect = WarpSelect<AccT, uint32_t, Dir, Comparator<AccT>, NumWarpQ, NumThreadQ, 32>;
 
   auto rowEpilog_lambda = [m, n, &distance_op, numOfNN, out_dists, out_inds, mutexes] __device__(
@@ -532,7 +534,7 @@ void fusedL2UnexpKnnImpl(const DataT* x,
   using RowPolicy = typename raft::linalg::Policy2x8<AccT, 1>::Policy;
   using ColPolicy = typename raft::linalg::Policy4x4<AccT, VecLen>::ColPolicy;
 
-  using KPolicy = typename std::conditional<true, RowPolicy, ColPolicy>::type;
+  using KPolicy = std::conditional_t<true, RowPolicy, ColPolicy>;
 
   ASSERT(isRowMajor, "Only Row major inputs are allowed");
 
@@ -717,7 +719,7 @@ void fusedL2ExpKnnImpl(const DataT* x,
   using RowPolicy = typename raft::linalg::Policy2x8<AccT, 1>::Policy;
   using ColPolicy = typename raft::linalg::Policy4x4<AccT, VecLen>::ColPolicy;
 
-  using KPolicy = typename std::conditional<true, RowPolicy, ColPolicy>::type;
+  using KPolicy = std::conditional_t<true, RowPolicy, ColPolicy>;
 
   ASSERT(isRowMajor, "Only Row major inputs are allowed");
 

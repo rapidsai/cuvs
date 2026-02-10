@@ -14,10 +14,7 @@
 
 #include <rmm/device_uvector.hpp>
 
-namespace cuvs {
-namespace distance {
-namespace detail {
-namespace sparse {
+namespace cuvs::distance::detail::sparse {
 
 template <typename value_idx, typename value_t, int tpb>
 class coo_spmv_strategy {
@@ -133,7 +130,4 @@ class coo_spmv_strategy {
   const distances_config_t<value_idx, value_t>& config;
 };
 
-}  // namespace sparse
-}  // namespace detail
-}  // namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance::detail::sparse

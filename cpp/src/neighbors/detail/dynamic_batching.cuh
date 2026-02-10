@@ -76,13 +76,13 @@ struct local_waiter {
 
 class cuda_event {
  public:
-  cuda_event(cuda_event&&)            = default;
-  cuda_event& operator=(cuda_event&&) = default;  // NOLINT(modernize-use-trailing-return-type)
-  ~cuda_event()                       = default;
-  cuda_event(cuda_event const&)       = delete;  // Copying disallowed: one event one owner
-  cuda_event& operator=(cuda_event&)  = delete;  // NOLINT(modernize-use-trailing-return-type)
+  cuda_event(cuda_event&&)                    = default;
+  auto operator=(cuda_event&&) -> cuda_event& = default;
+  ~cuda_event()                               = default;
+  cuda_event(cuda_event const&)               = delete;  // Copying disallowed: one event one owner
+  auto operator=(cuda_event&) -> cuda_event&  = delete;
 
-  cuda_event()
+  cuda_event()  // NOLINT(modernize-use-equals-default)
     : event_{[]() {
                cudaEvent_t* e = new cudaEvent_t;
                RAFT_CUDA_TRY(cudaEventCreateWithFlags(e, cudaEventDisableTiming));
@@ -955,7 +955,7 @@ class batch_runner {
       return upstream_search_(res, queries, neighbors, distances);
     }
 
-    if (neighbors.extent(1) != int64_t(k_)) {
+    if (neighbors.extent(1) != static_cast<int64_t>(k_)) {
       // TODO(snanditale): the check can be relaxed to `neighbors.extent(1) > int64_t(k_)`;
       //       this, however, would require an extra bounds check per-query in the scatter kernel.
       RAFT_LOG_WARN(

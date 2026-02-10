@@ -17,8 +17,8 @@ using brute_force_float32 = dynamic_batching_test<float,
                                                   brute_force::build,
                                                   brute_force::search>;
 
-TEST_P(brute_force_float32,
-       defaults)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+TEST_P(brute_force_float32,  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+       defaults)             // NOLINT(readability-identifier-naming)
 {
   build_all();
   search_all();

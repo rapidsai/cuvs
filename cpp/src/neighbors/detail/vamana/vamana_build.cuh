@@ -74,8 +74,7 @@ __global__ void print_mtx(raft::device_vector_view<IdxT, int64_t> vec)
 template <typename IdxT, typename accT>
 __global__ void print_queryIds(void* query_list_ptr)
 {
-  QueryCandidates<IdxT, accT>* query_list =
-    static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
+  auto* query_list = static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
 
   for (int i = 0; i < 50; i++) {
     printf("queryId:%d\n", query_list[i].queryId);
@@ -117,7 +116,7 @@ void batched_insert_vamana(
     max_batchsize = (int)dataset.extent(0);
   }
   float insert_iters = (params.vamana_iters);
-  double base        = static_cast<double>(params.batch_base);
+  auto base          = static_cast<double>(params.batch_base);
   float alpha        = (params.alpha);
   int visited_size   = params.visited_size;
   int queue_size     = params.queue_size;
@@ -146,8 +145,7 @@ void batched_insert_vamana(
     res,
     raft::resource::get_large_workspace_resource(res),
     raft::make_extents<int64_t>(max_batchsize + 1));
-  QueryCandidates<IdxT, accT>* query_list =
-    static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr.data_handle());
+  auto* query_list = static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr.data_handle());
 
   // Results of each batch of inserts during build - Memory is used by query_list structure
   auto visited_ids =
@@ -386,7 +384,7 @@ void batched_insert_vamana(
     raft::linalg::map(
       res,
       edge_dest.view(),
-      [] __device__(auto x) { return x.idx; },
+      [] __device__(auto x) -> IdxT { return x.idx; },
       raft::make_const_mdspan(edge_dist_pair.view()));
 
     void* d_temp_storage      = nullptr;
@@ -462,7 +460,7 @@ void batched_insert_vamana(
                                         raft::resource::get_large_workspace_resource(res),
                                         raft::make_extents<int64_t>(reverse_batch, visited_size));
 
-      QueryCandidates<IdxT, accT>* reverse_list =
+      auto* reverse_list =
         static_cast<QueryCandidates<IdxT, accT>*>(reverse_list_ptr.data_handle());
 
       init_query_candidate_list<IdxT, accT><<<256, blockD, 0, stream>>>(reverse_list,
@@ -621,7 +619,7 @@ auto build(raft::resources const& res,
        pq_dim,
        pq_codebook_size,
        dim_per_subspace,
-       dim] __device__(size_t i) {
+       dim] __device__(size_t i) -> float {
         int row_idx        = i / dim_per_subspace;
         int subspace_id    = row_idx / pq_codebook_size;  // idx_pq_dim
         int codebook_id    = row_idx % pq_codebook_size;  // idx_pq_codebook_size

@@ -42,9 +42,7 @@ struct KmeansBalancedInputs {  // NOLINT(readability-identifier-naming)
 };
 
 template <typename MathT, typename IdxT>
-::std::ostream& operator<<(
-  ::std::ostream& os,
-  const KmeansBalancedInputs<MathT, IdxT>& p)  // NOLINT(modernize-use-trailing-return-type)
+auto operator<<(::std::ostream& os, const KmeansBalancedInputs<MathT, IdxT>& p) -> ::std::ostream&
 {
   os << "{ " << p.n_rows << ", " << p.n_cols << ", " << p.n_clusters << ", " << p.kb_params.n_iters
      << static_cast<int>(p.kb_params.metric) << '}' << std::endl;
@@ -101,7 +99,7 @@ class KmeansBalancedTest
                                           true,
                                           MathT{-1},
                                           MathT{1},
-                                          (uint64_t)1234);  // NOLINT(google-readability-casting)
+                                          static_cast<uint64_t>(1234));
 
     // Convert blobs dataset to DataT if necessary
     if constexpr (!std::is_same_v<DataT, MathT>) {
@@ -159,8 +157,7 @@ class KmeansBalancedTest
 };
 
 template <typename MathT, typename IdxT>
-std::vector<KmeansBalancedInputs<MathT, IdxT>>
-get_kmeans_balanced_inputs()  // NOLINT(modernize-use-trailing-return-type)
+auto get_kmeans_balanced_inputs() -> std::vector<KmeansBalancedInputs<MathT, IdxT>>
 {
   std::vector<KmeansBalancedInputs<MathT, IdxT>> out;
   KmeansBalancedInputs<MathT, IdxT> p;
@@ -201,41 +198,23 @@ const auto inputsf_i64 =
  * First set of tests: no conversion
  */
 
-KB_TEST((KmeansBalancedTest<float,
-                            float,
-                            uint32_t,
-                            int,
-                            raft::identity_op,
-                            false>),  // NOLINT(modernize-use-trailing-return-type)
+KB_TEST((KmeansBalancedTest<float, float, uint32_t, int, raft::identity_op, false>),
         KmeansBalancedTestFFU32I32,
         inputsf_i32);
-KB_TEST((KmeansBalancedTest<float,
-                            float,
-                            int,
-                            int,
-                            raft::identity_op,
-                            true>),  // NOLINT(modernize-use-trailing-return-type)
-        KmeansBalancedTestFFI32I32_SEP,
-        inputsf_i32);
+KB_TEST(
+  (KmeansBalancedTest<float, float, int, int, raft::identity_op, true>),
+  KmeansBalancedTestFFI32I32_SEP,  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+  inputsf_i32);
 // KB_TEST((KmeansBalancedTest<double, double, uint32_t, int, raft::identity_op>),
 //         KmeansBalancedTestDDU32I32,
 //         inputsd_i32);
-KB_TEST((KmeansBalancedTest<float,
-                            float,
-                            uint32_t,
-                            int64_t,
-                            raft::identity_op,
-                            false>),  // NOLINT(modernize-use-trailing-return-type)
+KB_TEST((KmeansBalancedTest<float, float, uint32_t, int64_t, raft::identity_op, false>),
         KmeansBalancedTestFFU32I64,
         inputsf_i64);
-KB_TEST((KmeansBalancedTest<float,
-                            float,
-                            int,
-                            int64_t,
-                            raft::identity_op,
-                            true>),  // NOLINT(modernize-use-trailing-return-type)
-        KmeansBalancedTestFFI32I64_SEP,
-        inputsf_i64);
+KB_TEST(
+  (KmeansBalancedTest<float, float, int, int64_t, raft::identity_op, true>),
+  KmeansBalancedTestFFI32I64_SEP,  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+  inputsf_i64);
 // KB_TEST((KmeansBalancedTest<double, double, uint32_t, int64_t, raft::identity_op>),
 //         KmeansBalancedTestDDU32I64,
 //         inputsd_i64);
@@ -268,21 +247,12 @@ struct i2f_scaler {
   RAFT_INLINE_FUNCTION auto operator()(const DataT& x) const { return op(x); };
 };
 
-KB_TEST((KmeansBalancedTest<int8_t,
-                            float,
-                            uint32_t,
-                            int,
-                            i2f_scaler<int8_t, float>,
-                            false>),  // NOLINT(modernize-use-trailing-return-type)
+KB_TEST((KmeansBalancedTest<int8_t, float, uint32_t, int, i2f_scaler<int8_t, float>, false>),
         KmeansBalancedTestFI8U32I32,
         inputsf_i32);
-KB_TEST((KmeansBalancedTest<int8_t,
-                            float,
-                            int,
-                            int,
-                            i2f_scaler<int8_t, float>,
-                            true>),  // NOLINT(modernize-use-trailing-return-type)
-        KmeansBalancedTestFI8I32I32_SEP,
-        inputsf_i32);
+KB_TEST(
+  (KmeansBalancedTest<int8_t, float, int, int, i2f_scaler<int8_t, float>, true>),
+  KmeansBalancedTestFI8I32I32_SEP,  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+  inputsf_i32);
 
 }  // namespace cuvs

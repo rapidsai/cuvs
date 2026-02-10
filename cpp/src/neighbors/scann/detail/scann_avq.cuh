@@ -349,7 +349,7 @@ void rescale_avq_centroids(raft::resources const& dev_resources,
   raft::linalg::map_offset(dev_resources,
                            raft::make_const_mdspan(rescale_denom_v),
                            rescale_denom_v,
-                           [cluster_sizes, dataset_size] __device__(size_t i, float x) {
+                           [cluster_sizes, dataset_size] __device__(size_t i, float x) -> float {
                              uint32_t cluster_size = i + 1 < cluster_sizes.extent(0)
                                                        ? cluster_sizes[i + 1] - cluster_sizes[i]
                                                        : dataset_size - cluster_sizes[i];
@@ -362,15 +362,16 @@ void rescale_avq_centroids(raft::resources const& dev_resources,
   auto rescale_num_ptr   = rescale_num.data_handle();
   auto rescale_denom_ptr = rescale_denom.data_handle();
 
-  raft::linalg::map_offset(dev_resources,
-                           raft::make_const_mdspan(centroids),
-                           centroids,
-                           [rescale_num_ptr, rescale_denom_ptr] __device__(size_t i, float x) {
-                             // should probably check the denominator is nonzero
-                             float rescale = (*rescale_num_ptr) / (*rescale_denom_ptr);
+  raft::linalg::map_offset(
+    dev_resources,
+    raft::make_const_mdspan(centroids),
+    centroids,
+    [rescale_num_ptr, rescale_denom_ptr] __device__(size_t i, float x) -> float {
+      // should probably check the denominator is nonzero
+      float rescale = (*rescale_num_ptr) / (*rescale_denom_ptr);
 
-                             return x * rescale;
-                           });
+      return x * rescale;
+    });
 }
 
 /**

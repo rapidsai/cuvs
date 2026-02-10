@@ -9,16 +9,16 @@
 
 namespace cuvs::neighbors::nn_descent {
 
-using AnnNNDescentTestI8_U32 = AnnNNDescentTest<float, int8_t, std::uint32_t>;  // NOLINT(readability-identifier-naming)
-TEST_P(AnnNNDescentTestI8_U32, AnnNNDescent)
+using AnnNNDescentTestI8_U32 =
+  AnnNNDescentTest<float, int8_t, std::uint32_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(AnnNNDescentTestI8_U32,
+       AnnNNDescent)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testNNDescent();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(
-  AnnNNDescentTest,
-  AnnNNDescentTestI8_U32,
-  ::testing::ValuesIn(
-    inputs));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(AnnNNDescentTest,
+                        AnnNNDescentTestI8_U32,
+                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
 
 }  // namespace   cuvs::neighbors::nn_descent

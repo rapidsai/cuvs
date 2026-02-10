@@ -163,7 +163,7 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
   std::shared_ptr<cuvs::neighbors::filtering::base_filter> filter_;
   std::vector<std::shared_ptr<cuvs::neighbors::cagra::index<T, IdxT>>> sub_indices_;
 
-  inline rmm::device_async_resource_ref get_mr(AllocatorType mem_type)
+  inline auto get_mr(AllocatorType mem_type) -> rmm::device_async_resource_ref
   {
     switch (mem_type) {
       case (AllocatorType::kHostPinned): return &mr_pinned_;
@@ -452,8 +452,8 @@ void cuvs_cagra<T, IdxT>::search_base(
         handle_, search_params_, *index_, queries_view, neighbors_view, distances_view, *filter_);
     } else {
       if (index_params_.merge_type == CagraMergeType::kLogical) {
-        // TODO(cuvs): index merge must happen outside of search, otherwise what are we benchmarking?  //
-        // NOLINT(google-readability-todo)
+        // TODO(cuvs): index merge must happen outside of search, otherwise what are we
+        // benchmarking?  // NOLINT(google-readability-todo)
         cuvs::neighbors::cagra::merge_params merge_params{cuvs::neighbors::cagra::index_params{}};
         merge_params.merge_strategy = cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL;
 

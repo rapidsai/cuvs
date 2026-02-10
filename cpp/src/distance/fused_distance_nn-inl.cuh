@@ -16,13 +16,12 @@
 
 #include <cub/cub.cuh>
 
-#include <stdint.h>
+#include <cstdint>
 
 #include <limits>
 #include <type_traits>
 
-namespace cuvs {
-namespace distance {
+namespace cuvs::distance {
 
 /**
  * \ingroup fused_l2_nn
@@ -313,7 +312,6 @@ void fusedDistanceNNMinReduce(OutT* min,
 
 /** @} */
 
-}  // namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance
 
 #endif

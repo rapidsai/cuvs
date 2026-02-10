@@ -18,15 +18,12 @@
 
 #include <rmm/device_uvector.hpp>
 
-#include <limits.h>
+#include <climits>
 
 #include <algorithm>
 #include <nvfunctional>
 
-namespace cuvs {
-namespace distance {
-namespace detail {
-namespace sparse {
+namespace cuvs::distance::detail::sparse {
 
 template <typename value_idx = int,
           typename value_t   = float,
@@ -116,7 +113,8 @@ class l2_sqrt_unexpanded_distances_t : public l2_unexpanded_distances_t<value_id
   {
     l2_unexpanded_distances_t<value_idx, value_t>::compute(out_dists);
 
-    uint64_t n = (uint64_t)this->config_->a_nrows * (uint64_t)this->config_->b_nrows;
+    uint64_t n =
+      static_cast<uint64_t>(this->config_->a_nrows) * static_cast<uint64_t>(this->config_->b_nrows);
     // Sqrt Post-processing
     raft::linalg::unaryOp<value_t>(
       out_dists,
@@ -161,7 +159,7 @@ class canberra_unexpanded_distances_t : public distances_t<value_t> {
     unexpanded_lp_distances<value_idx, value_t>(
       out_dists,
       config_,
-      [] __device__(value_t a, value_t b) {
+      [] __device__(value_t a, value_t b) -> value_t {
         value_t d = fabs(a) + fabs(b);
 
         // deal with potential for 0 in denominator by
@@ -194,7 +192,8 @@ class lp_unexpanded_distances_t : public distances_t<value_t> {
       raft::add_op(),
       raft::atomic_add_op());
 
-    uint64_t n         = (uint64_t)this->config_->a_nrows * (uint64_t)this->config_->b_nrows;
+    uint64_t n =
+      static_cast<uint64_t>(this->config_->a_nrows) * static_cast<uint64_t>(this->config_->b_nrows);
     value_t one_over_p = value_t{1} / p;
     raft::linalg::unaryOp<value_t>(out_dists,
                                    out_dists,
@@ -221,7 +220,7 @@ class hamming_unexpanded_distances_t : public distances_t<value_t> {
     unexpanded_lp_distances<value_idx, value_t>(
       out_dists, config_, raft::notequal_op(), raft::add_op(), raft::atomic_add_op());
 
-    uint64_t n     = (uint64_t)config_->a_nrows * (uint64_t)config_->b_nrows;
+    uint64_t n = static_cast<uint64_t>(config_->a_nrows) * static_cast<uint64_t>(config_->b_nrows);
     value_t n_cols = 1.0 / config_->a_ncols;
     raft::linalg::unaryOp<value_t>(out_dists,
                                    out_dists,
@@ -248,7 +247,7 @@ class jensen_shannon_unexpanded_distances_t : public distances_t<value_t> {
     unexpanded_lp_distances<value_idx, value_t>(
       out_dists,
       config_,
-      [] __device__(value_t a, value_t b) {
+      [] __device__(value_t a, value_t b) -> value_t {
         value_t m   = 0.5f * (a + b);
         bool a_zero = a == 0;
         bool b_zero = b == 0;
@@ -264,7 +263,8 @@ class jensen_shannon_unexpanded_distances_t : public distances_t<value_t> {
       raft::add_op(),
       raft::atomic_add_op());
 
-    uint64_t n = (uint64_t)this->config_->a_nrows * (uint64_t)this->config_->b_nrows;
+    uint64_t n =
+      static_cast<uint64_t>(this->config_->a_nrows) * static_cast<uint64_t>(this->config_->b_nrows);
     raft::linalg::unaryOp<value_t>(
       out_dists,
       out_dists,
@@ -301,11 +301,12 @@ class kl_divergence_unexpanded_distances_t : public distances_t<value_t> {
       out_dists,
       *config_,
       coo_rows.data(),
-      [] __device__(value_t a, value_t b) { return a * log(a / b); },
+      [] __device__(value_t a, value_t b) -> value_t { return a * log(a / b); },
       raft::add_op(),
       raft::atomic_add_op());
 
-    uint64_t n = (uint64_t)this->config_->a_nrows * (uint64_t)this->config_->b_nrows;
+    uint64_t n =
+      static_cast<uint64_t>(this->config_->a_nrows) * static_cast<uint64_t>(this->config_->b_nrows);
     raft::linalg::unaryOp<value_t>(out_dists,
                                    out_dists,
                                    n,
@@ -317,7 +318,7 @@ class kl_divergence_unexpanded_distances_t : public distances_t<value_t> {
   const distances_config_t<value_idx, value_t>* config_;
 };
 
-}  // END namespace sparse
-}  // END namespace detail
-}  // END namespace distance
-}  // END namespace cuvs
+}  // namespace cuvs::distance::detail::sparse
+   // END namespace detail
+   // END namespace distance
+   // END namespace cuvs

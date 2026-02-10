@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -62,8 +62,7 @@ __global__ void SortPairsKernel(void* query_list_ptr, int num_queries, int topk)
   };
   extern __shared__ __align__(alignof(ShmemLayout)) char smem[];
 
-  QueryCandidates<IdxT, accT>* query_list =
-    static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
+  auto* query_list = static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
 
   for (int i = blockIdx.x; i < num_queries; i += gridDim.x) {
     __syncthreads();

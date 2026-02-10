@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -34,7 +34,7 @@ struct dynamic_batching_spec {
   int64_t max_concurrent_threads      = 128;
 };
 
-inline ::std::ostream& operator<<(::std::ostream& os, const dynamic_batching_spec& p)
+inline auto operator<<(::std::ostream& os, const dynamic_batching_spec& p) -> ::std::ostream&
 {
   os << "{n_queries=" << p.n_queries;
   os << ", dataset shape=" << p.n_rows << "x" << p.dim;
@@ -129,7 +129,7 @@ struct dynamic_batching_test : public ::testing::TestWithParam<dynamic_batching_
 
     // Try multiple batch sizes in a round-robin to improve test coverage
     std::vector<int64_t> minibatch_sizes{1, 3, 7, 10};
-    auto get_bs = [&minibatch_sizes](auto i) {
+    auto get_bs = [&minibatch_sizes](auto i) -> auto {
       return minibatch_sizes[i % minibatch_sizes.size()];
     };
     int64_t i = 0;
@@ -149,7 +149,7 @@ struct dynamic_batching_test : public ::testing::TestWithParam<dynamic_batching_
          neighbors_view = raft::make_device_matrix_view<index_type, int64_t>(
            neighbors_dynb->data_handle() + offset * ps.k, bs, ps.k),
          distances_view = raft::make_device_matrix_view<distance_type, int64_t>(
-           distances_dynb->data_handle() + offset * ps.k, bs, ps.k)]() {
+           distances_dynb->data_handle() + offset * ps.k, bs, ps.k)]() -> auto {
           dynamic_batching::search(res, params, index, query_view, neighbors_view, distances_view);
         });
     }
@@ -190,7 +190,7 @@ struct dynamic_batching_test : public ::testing::TestWithParam<dynamic_batching_
       << ps;
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     dataset.emplace(raft::make_device_matrix<data_type, int64_t>(res, ps.n_rows, ps.dim));
     queries.emplace(raft::make_device_matrix<data_type, int64_t>(res, ps.n_queries, ps.dim));
@@ -216,7 +216,7 @@ struct dynamic_batching_test : public ::testing::TestWithParam<dynamic_batching_
     raft::resource::sync_stream(res);
   }
 
-  void TearDown() override
+  void TearDown() override  // NOLINT(readability-identifier-naming)
   {
     index_dynb.reset();
     index_upsm.reset();
@@ -230,7 +230,7 @@ struct dynamic_batching_test : public ::testing::TestWithParam<dynamic_batching_
   }
 };
 
-inline std::vector<dynamic_batching_spec> generate_inputs()
+inline auto generate_inputs() -> std::vector<dynamic_batching_spec>
 {
   std::vector<dynamic_batching_spec> inputs{dynamic_batching_spec{}};
 

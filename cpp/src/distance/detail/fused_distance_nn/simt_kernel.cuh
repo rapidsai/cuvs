@@ -13,9 +13,7 @@
 #include <cstddef>  // size_t
 #include <limits>   // std::numeric_limits
 
-namespace cuvs {
-namespace distance {
-namespace detail {
+namespace cuvs::distance::detail {
 
 // TODO(snanditale): specialize this function for MinAndDistanceReduceOp<int, float>
 // with atomicCAS of 64 bit which will eliminate mutex and shfls
@@ -172,6 +170,4 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedDistanceNNkernel(OutT* min,
 #endif
 }
 
-}  // namespace detail
-}  // namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance::detail

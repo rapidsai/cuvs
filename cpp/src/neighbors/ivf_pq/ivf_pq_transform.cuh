@@ -79,7 +79,7 @@ void transform_batch(raft::resources const& res,
   const uint32_t threads_per_vec = std::min<uint32_t>(raft::WarpSize, index.pq_book_size());
   dim3 blocks(raft::div_rounding_up_safe<IdxT>(n_rows, kBlockSize / threads_per_vec), 1, 1);
   dim3 threads(kBlockSize, 1, 1);
-  auto kernel = [](uint32_t pq_bits) {
+  auto kernel = [](uint32_t pq_bits) -> auto {
     switch (pq_bits) {
       case 4: return transform_codes_kernel<kBlockSize, 4, IdxT>;
       case 5: return transform_codes_kernel<kBlockSize, 5, IdxT>;

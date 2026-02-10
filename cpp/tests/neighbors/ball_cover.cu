@@ -28,7 +28,6 @@
 #include <vector>
 
 namespace cuvs::neighbors::ball_cover {
-using namespace std;  // NOLINT(google-build-using-namespace)
 
 template <typename value_idx, typename value_t>  // NOLINT(readability-identifier-naming)
 RAFT_KERNEL count_discrepancies_kernel(value_idx* actual_idx,
@@ -66,21 +65,21 @@ RAFT_KERNEL count_discrepancies_kernel(value_idx* actual_idx,
 }
 
 struct is_nonzero {
-  __host__ __device__ bool operator()(uint32_t i)
+  __host__ __device__ auto operator()(uint32_t i) -> bool
   {
     return i > 0;
   }  // NOLINT(readability-identifier-naming)
 };
 
-template <typename value_idx, typename value_t>      // NOLINT(readability-identifier-naming)
-uint32_t count_discrepancies(value_idx* actual_idx,  // NOLINT(modernize-use-trailing-return-type)
-                             value_idx* expected_idx,
-                             value_t* actual,
-                             value_t* expected,
-                             uint32_t m,
-                             uint32_t n,
-                             uint32_t* out,
-                             cudaStream_t stream)
+template <typename value_idx, typename value_t>  // NOLINT(readability-identifier-naming)
+auto count_discrepancies(value_idx* actual_idx,
+                         value_idx* expected_idx,
+                         value_t* actual,
+                         value_t* expected,
+                         uint32_t m,
+                         uint32_t n,
+                         uint32_t* out,
+                         cudaStream_t stream) -> uint32_t
 {
   uint32_t tpb = 256;
   count_discrepancies_kernel<<<raft::ceildiv(m, tpb), tpb, 0, stream>>>(
@@ -129,7 +128,7 @@ void compute_bfknn(const raft::resources& handle,
 }
 
 struct ToRadians {  // NOLINT(readability-identifier-naming)
-  __device__ __host__ float operator()(float a)
+  __device__ __host__ auto operator()(float a) -> float
   {
     return a * (CUDART_PI_F / 180.0);
   }  // NOLINT(readability-identifier-naming)
@@ -393,8 +392,10 @@ class BallCoverAllKNNTest
   BallCoverInputs<value_int> params;  // NOLINT(readability-identifier-naming)
 };
 
-using BallCoverAllKNNTestF = BallCoverAllKNNTest<int64_t, float>;  // NOLINT(readability-identifier-naming)
-using BallCoverKNNQueryTestF = BallCoverKNNQueryTest<int64_t, float>;  // NOLINT(readability-identifier-naming)
+using BallCoverAllKNNTestF =
+  BallCoverAllKNNTest<int64_t, float>;  // NOLINT(readability-identifier-naming)
+using BallCoverKNNQueryTestF =
+  BallCoverKNNQueryTest<int64_t, float>;  // NOLINT(readability-identifier-naming)
 
 const std::vector<BallCoverInputs<std::int64_t>> ballcover_inputs =
   {  // NOLINT(readability-identifier-naming)
@@ -408,22 +409,14 @@ const std::vector<BallCoverInputs<std::int64_t>> ballcover_inputs =
     {11, 6000, 3, 1.0, 10000, cuvs::distance::DistanceType::L2SqrtUnexpanded},
     {25, 10000, 3, 1.0, 5000, cuvs::distance::DistanceType::L2SqrtUnexpanded}};
 
-INSTANTIATE_TEST_CASE_P(
-  BallCoverAllKNNTest,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-  BallCoverAllKNNTestF,
-  ::testing::ValuesIn(ballcover_inputs));
-INSTANTIATE_TEST_CASE_P(
-  BallCoverKNNQueryTest,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-  BallCoverKNNQueryTestF,
-  ::testing::ValuesIn(ballcover_inputs));
+INSTANTIATE_TEST_CASE_P(BallCoverAllKNNTest,  // NOLINT(readability-identifier-naming)
+                        BallCoverAllKNNTestF,
+                        ::testing::ValuesIn(ballcover_inputs));
+INSTANTIATE_TEST_CASE_P(BallCoverKNNQueryTest,  // NOLINT(readability-identifier-naming)
+                        BallCoverKNNQueryTestF,
+                        ::testing::ValuesIn(ballcover_inputs));
 
-TEST_P(BallCoverAllKNNTestF, Fit)
-{
-  basicTest();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-TEST_P(BallCoverKNNQueryTestF, Fit)
-{
-  basicTest();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+TEST_P(BallCoverAllKNNTestF, Fit) { basicTest(); }    // NOLINT(readability-identifier-naming)
+TEST_P(BallCoverKNNQueryTestF, Fit) { basicTest(); }  // NOLINT(readability-identifier-naming)
 
 }  // namespace cuvs::neighbors::ball_cover

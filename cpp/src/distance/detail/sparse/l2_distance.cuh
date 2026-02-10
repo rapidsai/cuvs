@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -25,10 +25,7 @@
 #include <algorithm>
 #include <nvfunctional>
 
-namespace cuvs {
-namespace distance {
-namespace detail {
-namespace sparse {
+namespace cuvs::distance::detail::sparse {
 
 // @TODO: Move this into sparse prims (coo_norm)
 template <typename value_idx, typename value_t>
@@ -248,7 +245,7 @@ class l2_expanded_distances_t : public distances_t<value_t> {
                config_->a_nrows,
                config_->b_nrows,
                raft::resource::get_cuda_stream(config_->handle),
-               [] __device__ __host__(value_t dot, value_t q_norm, value_t r_norm) {
+               [] __device__ __host__(value_t dot, value_t q_norm, value_t r_norm) -> value_t {
                  return -2 * dot + q_norm + r_norm;
                });
   }
@@ -280,7 +277,7 @@ class l2_sqrt_expanded_distances_t : public l2_expanded_distances_t<value_idx, v
       out_dists,
       out_dists,
       this->config_->a_nrows * this->config_->b_nrows,
-      [] __device__(value_t input) {
+      [] __device__(value_t input) -> value_t {
         int neg = input < 0 ? -1 : 1;
         return raft::sqrt(abs(input) * neg);
       },
@@ -372,7 +369,7 @@ class cosine_expanded_distances_t : public distances_t<value_t> {
                config_->a_nrows,
                config_->b_nrows,
                raft::resource::get_cuda_stream(config_->handle),
-               [] __device__ __host__(value_t dot, value_t q_norm, value_t r_norm) {
+               [] __device__ __host__(value_t dot, value_t q_norm, value_t r_norm) -> value_t {
                  value_t norms = raft::sqrt(q_norm) * raft::sqrt(r_norm);
                  // deal with potential for 0 in denominator by forcing 0/1 instead
                  value_t cos = ((norms != 0) * dot) / ((norms == 0) + norms);
@@ -423,7 +420,7 @@ class hellinger_expanded_distances_t : public distances_t<value_t> {
       out_dists,
       *config_,
       coo_rows.data(),
-      [] __device__(value_t a, value_t b) { return raft::sqrt(a) * raft::sqrt(b); },
+      [] __device__(value_t a, value_t b) -> value_t { return raft::sqrt(a) * raft::sqrt(b); },
       raft::add_op(),
       raft::atomic_add_op());
 
@@ -431,7 +428,7 @@ class hellinger_expanded_distances_t : public distances_t<value_t> {
       out_dists,
       out_dists,
       config_->a_nrows * config_->b_nrows,
-      [=] __device__(value_t input) {
+      [=] __device__(value_t input) -> value_t {
         // Adjust to replace NaN in sqrt with 0 if input to sqrt is negative
         bool rectifier = (1 - input) > 0;
         return raft::sqrt(rectifier * (1 - input));
@@ -466,15 +463,16 @@ class russelrao_expanded_distances_t : public distances_t<value_t> {
       out_dists,
       out_dists,
       config_->a_nrows * config_->b_nrows,
-      [=] __device__(value_t input) { return (n_cols - input) * n_cols_inv; },
+      [=] __device__(value_t input) -> value_t { return (n_cols - input) * n_cols_inv; },
       raft::resource::get_cuda_stream(config_->handle));
 
     auto exec_policy  = rmm::exec_policy(raft::resource::get_cuda_stream(config_->handle));
     auto diags        = thrust::counting_iterator<value_idx>(0);
     value_idx b_nrows = config_->b_nrows;
-    thrust::for_each(exec_policy, diags, diags + config_->a_nrows, [=] __device__(value_idx input) {
-      out_dists[input * b_nrows + input] = 0.0;
-    });
+    thrust::for_each(
+      exec_policy, diags, diags + config_->a_nrows, [=] __device__(value_idx input) -> void {
+        out_dists[input * b_nrows + input] = 0.0;
+      });
   }
 
   ~russelrao_expanded_distances_t() = default;
@@ -485,7 +483,7 @@ class russelrao_expanded_distances_t : public distances_t<value_t> {
   ip_distances_t<value_idx, value_t> ip_dists;
 };
 
-}  // END namespace sparse
-}  // END namespace detail
-}  // END namespace distance
-}  // END namespace cuvs
+}  // namespace cuvs::distance::detail::sparse
+   // END namespace detail
+   // END namespace distance
+   // END namespace cuvs

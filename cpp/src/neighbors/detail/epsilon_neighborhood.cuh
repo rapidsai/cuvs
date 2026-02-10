@@ -149,16 +149,25 @@ struct EpsUnexpL2SqNeighborhood : public BaseClass {
   DI void atomicUpdate(IdxT addrId, IdxT val)
   {
     if (sizeof(IdxT) == 4) {
-      raft::myAtomicAdd<unsigned>((unsigned*)(vd + addrId), val);
+      raft::myAtomicAdd<unsigned>(reinterpret_cast<unsigned*>((vd + addrId)), val);
     } else if (sizeof(IdxT) == 8) {
-      raft::myAtomicAdd<unsigned long long>((unsigned long long*)(vd + addrId), val);
+      raft::myAtomicAdd<unsigned long long>(reinterpret_cast<unsigned long long*>((vd + addrId)),
+                                            val);
     }
   }
 };  // struct EpsUnexpL2SqNeighborhood
 
 template <typename DataT, typename IdxT, typename Policy>
-__launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL epsUnexpL2SqNeighKernel(
-  bool* adj, IdxT* vd, const DataT* x, const DataT* y, IdxT m, IdxT n, IdxT k, DataT eps)
+__launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL
+  epsUnexpL2SqNeighKernel(  // NOLINT(readability-identifier-naming)
+    bool* adj,
+    IdxT* vd,
+    const DataT* x,
+    const DataT* y,
+    IdxT m,
+    IdxT n,
+    IdxT k,
+    DataT eps)
 {
   extern __shared__ char smem[];
   EpsUnexpL2SqNeighborhood<DataT, IdxT, Policy> obj(adj, vd, x, y, m, n, k, eps, smem);

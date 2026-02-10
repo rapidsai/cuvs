@@ -247,7 +247,8 @@ auto train_pq(const raft::resources& res,
     raft::linalg::map_offset(
       res,
       pq_trainset.view(),
-      [labels = vq_labels.view(), centers = vq_centers, dim] __device__(index_type off, MathT x) {
+      [labels = vq_labels.view(), centers = vq_centers, dim] __device__(index_type off,
+                                                                        MathT x) -> MathT {
         index_type i = off / dim;
         index_type j = off % dim;
         return x - centers(labels(i), j);
@@ -444,7 +445,7 @@ void process_and_fill_codes(
   const ix_t threads_per_vec  = std::min<ix_t>(raft::WarpSize, pq_n_centers);
   dim3 threads(kBlockSize, 1, 1);
   ix_t max_batch_size = std::min<ix_t>(n_rows, kReasonableMaxBatchSize);
-  auto kernel         = [](uint32_t pq_bits) {
+  auto kernel         = [](uint32_t pq_bits) -> auto {
     if (pq_bits == 4) {
       return process_and_fill_codes_kernel<kBlockSize, 16, uint8_t, data_t, MathT, IdxT, label_t>;
     } else if (pq_bits <= 8) {
@@ -828,7 +829,7 @@ void process_and_fill_codes_subspaces(
   }
 
   dim3 threads(kBlockSize, 1, 1);
-  auto kernel = [](uint32_t pq_bits) {
+  auto kernel = [](uint32_t pq_bits) -> auto {
     if (pq_bits == 4) {
       return process_and_fill_codes_subspaces_kernel<kBlockSize,
                                                      16,

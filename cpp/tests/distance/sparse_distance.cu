@@ -5,6 +5,7 @@
 
 #include "../test_utils.cuh"
 
+#include <numbers>
 #include <raft/core/device_csr_matrix.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/sparse/detail/cusparse_wrappers.h>
@@ -18,8 +19,8 @@
 namespace cuvs {  // NOLINT(modernize-concat-nested-namespaces)
 namespace distance {
 
-using namespace raft;          // NOLINT(google-build-using-namespace)
-using namespace raft::sparse;  // NOLINT(google-build-using-namespace)
+using raft::update_device;
+namespace resource = raft::resource;
 
 template <typename value_idx, typename value_t>  // NOLINT(readability-identifier-naming)
 struct SparseDistanceInputs {                    // NOLINT(readability-identifier-naming)
@@ -37,9 +38,8 @@ struct SparseDistanceInputs {                    // NOLINT(readability-identifie
 };
 
 template <typename value_idx, typename value_t>  // NOLINT(readability-identifier-naming)
-::std::ostream& operator<<(::std::ostream& os,
-                           const SparseDistanceInputs<value_idx, value_t>&
-                             dims)  // NOLINT(modernize-use-trailing-return-type)
+auto operator<<(::std::ostream& os, const SparseDistanceInputs<value_idx, value_t>& dims)
+  -> ::std::ostream&
 {
   return os;
 }
@@ -725,13 +725,13 @@ const std::vector<SparseDistanceInputs<int, float>> inputs_i32_f = {
      // dense output
      0.0,
      0.99296,
-     1.41476,
+     std::numbers::sqrt2,
      1.415707,
      0.99296,
      0.0,
      0.42180,
      0.42274,
-     1.41476,
+     std::numbers::sqrt2,
      0.42180,
      0.0,
      0.84454,
@@ -746,12 +746,14 @@ const std::vector<SparseDistanceInputs<int, float>> inputs_i32_f = {
    {0, 3, 8, 12, 16, 20, 25, 30, 35, 40, 45},
    {0, 3, 4, 0, 1, 2, 3, 4, 1, 2, 3, 4, 0, 2, 3, 4, 0, 1, 3, 4, 0, 1, 2,
     3, 4, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4},
-   {0.70862347, 0.8232774,  0.12108795, 0.84527547, 0.94937088, 0.03258545, 0.99584118, 0.76835667,
-    0.34426657, 0.2357925,  0.01274851, 0.11422017, 0.3437756,  0.31967718, 0.5956055,  0.31610373,
-    0.04147273, 0.03724415, 0.21515727, 0.04751052, 0.50283183, 0.99957274, 0.01395933, 0.96032529,
-    0.88438711, 0.46095378, 0.27432481, 0.54294211, 0.54280225, 0.59503329, 0.61364678, 0.22837736,
-    0.56609561, 0.29809423, 0.76736686, 0.56460608, 0.98165371, 0.02140123, 0.19881268, 0.26057815,
-    0.31648823, 0.89874295, 0.27366735, 0.5119944,  0.11416134},
+   {0.70862347, 0.8232774,  0.12108795, 0.84527547, 0.94937088, 0.03258545,
+    0.99584118, 0.76835667, 0.34426657, 0.2357925,  0.01274851, 0.11422017,
+    0.3437756,  0.31967718, 0.5956055,  0.31610373, 0.04147273, 0.03724415,
+    0.21515727, 0.04751052, 0.50283183, 0.99957274, 0.01395933, 0.96032529,
+    0.88438711, 0.46095378, 0.27432481, 0.54294211, 0.54280225, 0.59503329,
+    0.61364678, 0.22837736, 0.56609561, 0.29809423, 0.76736686, std::numbers::inv_sqrtpi,
+    0.98165371, 0.02140123, 0.19881268, 0.26057815, 0.31648823, 0.89874295,
+    0.27366735, 0.5119944,  0.11416134},
    {// dense output
     0.,         0.48769777, 1.88014197, 0.26127048, 0.26657011, 0.7874794,  0.76962708, 1.122858,
     1.1232498,  1.08166081, 0.48769777, 0.,         1.31332116, 0.98318907, 0.42661815, 0.09279052,
@@ -832,15 +834,12 @@ const std::vector<SparseDistanceInputs<int, float>> inputs_i32_f = {
 
 };
 
-using SparseDistanceTestF = SparseDistanceTest<int, float>;  // NOLINT(readability-identifier-naming)
-TEST_P(SparseDistanceTestF, Result)
-{
-  compare();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-INSTANTIATE_TEST_CASE_P(
-  SparseDistanceTests,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-  SparseDistanceTestF,
-  ::testing::ValuesIn(inputs_i32_f));
+using SparseDistanceTestF =
+  SparseDistanceTest<int, float>;                   // NOLINT(readability-identifier-naming)
+TEST_P(SparseDistanceTestF, Result) { compare(); }  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(SparseDistanceTests,        // NOLINT(readability-identifier-naming)
+                        SparseDistanceTestF,
+                        ::testing::ValuesIn(inputs_i32_f));
 
 }  // end namespace distance
 }  // end namespace cuvs

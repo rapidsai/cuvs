@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -59,7 +59,8 @@ template <cuvs::distance::DistanceType DistT,
           typename AccT,
           typename OutT,
           typename IdxT = int>
-size_t getWorkspaceSize(const DataT* x, const DataT* y, IdxT m, IdxT n, IdxT k) RAFT_EXPLICIT;
+auto getWorkspaceSize(const DataT* x, const DataT* y, IdxT m, IdxT n, IdxT k)
+  -> size_t RAFT_EXPLICIT;
 
 template <cuvs::distance::DistanceType DistT,
           typename DataT,
@@ -67,8 +68,9 @@ template <cuvs::distance::DistanceType DistT,
           typename OutT,
           typename IdxT = int,
           typename layout>
-size_t getWorkspaceSize(raft::device_matrix_view<DataT, IdxT, layout> const& x,
-                        raft::device_matrix_view<DataT, IdxT, layout> const& y) RAFT_EXPLICIT;
+auto getWorkspaceSize(raft::device_matrix_view<DataT, IdxT, layout> const& x,
+                      raft::device_matrix_view<DataT, IdxT, layout> const& y)
+  -> size_t RAFT_EXPLICIT;
 
 template <cuvs::distance::DistanceType DistT,
           typename DataT,
@@ -274,18 +276,18 @@ instantiate_cuvs_distance_distance_extra(cuvs::distance::DistanceType::L2Unexpan
 #undef instantiate_cuvs_distance_distance_extra
 
 #define instantiate_cuvs_distance_getWorkspaceSize(DistT, DataT, AccT, OutT, IdxT)             \
-  extern template size_t cuvs::distance::getWorkspaceSize<DistT, DataT, AccT, OutT, IdxT>(     \
-    const DataT* x, const DataT* y, IdxT m, IdxT n, IdxT k);                                   \
+  extern template auto cuvs::distance::getWorkspaceSize<DistT, DataT, AccT, OutT, IdxT>(       \
+    const DataT* x, const DataT* y, IdxT m, IdxT n, IdxT k) -> size_t;                         \
                                                                                                \
-  extern template size_t                                                                       \
+  extern template auto                                                                         \
   cuvs::distance::getWorkspaceSize<DistT, DataT, AccT, OutT, IdxT, raft::layout_f_contiguous>( \
     raft::device_matrix_view<DataT, IdxT, raft::layout_f_contiguous> const& x,                 \
-    raft::device_matrix_view<DataT, IdxT, raft::layout_f_contiguous> const& y);                \
+    raft::device_matrix_view<DataT, IdxT, raft::layout_f_contiguous> const& y) -> size_t;      \
                                                                                                \
-  extern template size_t                                                                       \
+  extern template auto                                                                         \
   cuvs::distance::getWorkspaceSize<DistT, DataT, AccT, OutT, IdxT, raft::layout_c_contiguous>( \
     raft::device_matrix_view<DataT, IdxT, raft::layout_c_contiguous> const& x,                 \
-    raft::device_matrix_view<DataT, IdxT, raft::layout_c_contiguous> const& y)
+    raft::device_matrix_view<DataT, IdxT, raft::layout_c_contiguous> const& y) -> size_t
 
 #define instantiate_cuvs_distance_getWorkspaceSize_by_algo(DistT)                     \
   instantiate_cuvs_distance_getWorkspaceSize(DistT, float, float, float, int);        \

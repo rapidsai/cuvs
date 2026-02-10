@@ -34,13 +34,12 @@ struct AnnHNSWInputs {  // NOLINT(readability-identifier-naming)
   double min_recall;
 };
 
-inline ::std::ostream& operator<<(
-  ::std::ostream& os, const AnnHNSWInputs& p)  // NOLINT(modernize-use-trailing-return-type)
+inline auto operator<<(::std::ostream& os, const AnnHNSWInputs& p) -> ::std::ostream&
 {
   os << "dataset shape=" << p.n_rows << "x" << p.dim << ", graph_degree=" << p.graph_degree
      << ", metric="
-     << cuvs::neighbors::print_metric{
-          static_cast<cuvs::distance::DistanceType>(static_cast<int>(p.metric))}
+     << cuvs::neighbors::print_metric{static_cast<cuvs::distance::DistanceType>(
+          static_cast<int>(p.metric))}
      << ", ef=" << (p.ef) << std::endl;
   return os;
 }
@@ -96,7 +95,7 @@ class AnnHNSWTest
       index_params.intermediate_graph_degree = 2 * ps.graph_degree;
 
       auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
-        (const DataT*)database.data(), ps.n_rows, ps.dim);  // NOLINT(google-readability-casting)
+        reinterpret_cast<const DataT*>(database.data()), ps.n_rows, ps.dim);
 
       auto index = cuvs::neighbors::cagra::build(handle_, index_params, database_view);
       raft::resource::sync_stream(handle_);
@@ -178,51 +177,43 @@ const std::vector<AnnHNSWInputs> inputs =
   );
 
 using AnnHNSW_F = AnnHNSWTest<float, float, uint64_t>;  // NOLINT(readability-identifier-naming)
-TEST_P(AnnHNSW_F, AnnHNSW)
+TEST_P(AnnHNSW_F, AnnHNSW)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testHNSW();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(
-  AnnHNSWTest,
-  AnnHNSW_F,
-  ::testing::ValuesIn(
-    inputs));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(AnnHNSWTest,
+                        AnnHNSW_F,
+                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
 
 using AnnHNSW_H = AnnHNSWTest<float, half, uint64_t>;  // NOLINT(readability-identifier-naming)
-TEST_P(AnnHNSW_H, AnnHNSW)
+TEST_P(AnnHNSW_H, AnnHNSW)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testHNSW();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(
-  AnnHNSWTest,
-  AnnHNSW_H,
-  ::testing::ValuesIn(
-    inputs));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(AnnHNSWTest,
+                        AnnHNSW_H,
+                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
 
 using AnnHNSW_I8 = AnnHNSWTest<float, int8_t, uint64_t>;  // NOLINT(readability-identifier-naming)
-TEST_P(AnnHNSW_I8, AnnHNSW)
+TEST_P(AnnHNSW_I8, AnnHNSW)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testHNSW();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(
-  AnnHNSWTest,
-  AnnHNSW_I8,
-  ::testing::ValuesIn(
-    inputs));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(AnnHNSWTest,
+                        AnnHNSW_I8,
+                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
 
 using AnnHNSW_U8 = AnnHNSWTest<float, uint8_t, uint64_t>;  // NOLINT(readability-identifier-naming)
-TEST_P(AnnHNSW_U8, AnnHNSW)
+TEST_P(AnnHNSW_U8, AnnHNSW)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testHNSW();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(
-  AnnHNSWTest,
-  AnnHNSW_U8,
-  ::testing::ValuesIn(
-    inputs));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(AnnHNSWTest,
+                        AnnHNSW_U8,
+                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
 
 }  // namespace cuvs::neighbors::hnsw

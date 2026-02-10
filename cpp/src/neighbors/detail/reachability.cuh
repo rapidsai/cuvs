@@ -45,7 +45,7 @@ void core_distances(raft::resources const& handle,
 
   auto out_view = raft::make_device_vector_view<value_t, value_idx>(out, n);
 
-  raft::linalg::map_offset(handle, out_view, [=] __device__(value_idx row) {
+  raft::linalg::map_offset(handle, out_view, [=] __device__(value_idx row) -> value_t {
     return knn_dists[row * n_neighbors + (min_samples - 1)];
   });
 }
@@ -243,7 +243,7 @@ void mutual_reachability_graph(const raft::resources& handle,
   raft::linalg::map(
     handle,
     vals_out_view,
-    [=] __device__(const value_idx row, const value_idx col, const value_t val) {
+    [=] __device__(const value_idx row, const value_idx col, const value_t val) -> value_t {
       return row == col ? std::numeric_limits<value_t>::max() : val;
     },
     rows_view,

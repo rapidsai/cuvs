@@ -19,10 +19,7 @@
 #include <cstddef>  // size_t
 #include <limits>   // std::numeric_limits
 
-namespace cuvs {
-namespace distance {
-
-namespace detail {
+namespace cuvs::distance::detail {
 
 template <typename LabelT, typename DataT>
 struct KVPMinReduceImpl {
@@ -139,6 +136,4 @@ struct kvp_cg_min_reduce_op {
   }
 };
 
-}  // namespace detail
-}  // namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance::detail

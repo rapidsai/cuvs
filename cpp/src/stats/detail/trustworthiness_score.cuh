@@ -14,9 +14,7 @@
 
 #define N_THREADS 512
 
-namespace cuvs {
-namespace stats {
-namespace detail {
+namespace cuvs::stats::detail {
 
 /**
  * @brief Build the lookup table
@@ -204,6 +202,4 @@ auto trustworthiness_score(const raft::resources& h,
   return t;
 }
 
-}  // namespace detail
-}  // namespace stats
-}  // namespace cuvs
+}  // namespace cuvs::stats::detail

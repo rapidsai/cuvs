@@ -5,10 +5,10 @@
 
 #pragma once
 
+#include <cfloat>
 #include <climits>
 #include <cstdint>
 #include <cstdio>
-#include <float.h>
 #include <unordered_set>
 #include <vector>
 
@@ -278,8 +278,7 @@ namespace {
 template <typename accT, typename IdxT = uint32_t>
 __global__ void print_query_results(void* query_list_ptr, int count)
 {
-  QueryCandidates<IdxT, accT>* query_list =
-    static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
+  auto* query_list = static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
 
   for (int i = 0; i < count; i++) {
     query_list[i].print_visited();
@@ -317,8 +316,7 @@ __global__ void init_query_candidate_list(QueryCandidates<IdxT, accT>* query_lis
 template <typename IdxT, typename accT>
 __global__ void set_query_ids(void* query_list_ptr, IdxT* d_query_ids, int step_size)
 {
-  QueryCandidates<IdxT, accT>* query_list =
-    static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
+  auto* query_list = static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
 
   for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < step_size; i += blockDim.x * gridDim.x) {
     query_list[i].queryId = d_query_ids[i];
@@ -394,8 +392,7 @@ __global__ void create_reverse_edge_list(void* query_list_ptr,
                                          IdxT* edge_src,
                                          DistPair<IdxT, accT>* edge_dest)
 {
-  QueryCandidates<IdxT, accT>* query_list =
-    static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
+  auto* query_list = static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
 
   for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < num_queries;
        i += blockDim.x * gridDim.x) {

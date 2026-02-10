@@ -560,7 +560,7 @@ void ace_reorder_and_store_dataset(
     core_buffer_counts(p)      = 0;
     augmented_buffer_counts(p) = 0;
   }
-  auto flush_core_buffer = [&](size_t partition_id) {
+  auto flush_core_buffer = [&](size_t partition_id) -> auto {
     const size_t count = core_buffer_counts(partition_id);
     if (count > 0) {
       const size_t bytes_to_write = count * vector_size;
@@ -576,7 +576,7 @@ void ace_reorder_and_store_dataset(
     }
   };
 
-  auto flush_augmented_buffer = [&](size_t partition_id) {
+  auto flush_augmented_buffer = [&](size_t partition_id) -> auto {
     const size_t count = augmented_buffer_counts(partition_id);
     if (count > 0) {
       const size_t bytes_to_write = count * vector_size;
@@ -816,11 +816,11 @@ constexpr double imbalance_factor           = 3.0;
 
 // Calculate CAGRA optimize workspace memory requirements.
 // This is the working memory on top of the input/output memory usage.
-inline std::pair<size_t, size_t> optimize_workspace_size(size_t n_rows,
-                                                         size_t graph_degree,
-                                                         size_t intermediate_degree,
-                                                         size_t index_size,
-                                                         bool mst_optimize = false)
+inline auto optimize_workspace_size(size_t n_rows,
+                                    size_t graph_degree,
+                                    size_t intermediate_degree,
+                                    size_t index_size,
+                                    bool mst_optimize = false) -> std::pair<size_t, size_t>
 {
   // MST optimization memory (host only)
   size_t mst_host = n_rows * index_size;  // mst_graph_num_edges
@@ -1624,7 +1624,7 @@ void build_knn_graph(
     node_degree);
 
   // Make model name
-  const std::string model_name = [&]() {
+  const std::string model_name = [&]() -> auto {
     char model_name[1024];
     sprintf(model_name,
             "%s-%lux%lu.cluster_%u.pq_%u.%ubit.itr_%u.metric_%d.pqcenter_%u",
@@ -1725,14 +1725,13 @@ void build_knn_graph(
   bool first                    = true;
   const auto start_clock        = std::chrono::system_clock::now();
 
-  cuvs::spatial::knn::detail::utils::batch_load_iterator<DataT>
-    vec_batches(  // NOLINT(modernize-use-trailing-return-type)
-      dataset.data_handle(),
-      dataset.extent(0),
-      dataset.extent(1),
-      static_cast<int64_t>(max_queries),
-      raft::resource::get_cuda_stream(res),
-      workspace_mr);
+  cuvs::spatial::knn::detail::utils::batch_load_iterator<DataT> vec_batches(
+    dataset.data_handle(),
+    dataset.extent(0),
+    dataset.extent(1),
+    static_cast<int64_t>(max_queries),
+    raft::resource::get_cuda_stream(res),
+    workspace_mr);
 
   size_t next_report_offset = 0;
   size_t d_report_offset    = dataset.extent(0) / 100;  // Report progress in 1% steps.
@@ -1884,7 +1883,7 @@ void build_knn_graph(
   std::optional<raft::host_matrix_view<IdxT, int64_t, row_major>> graph_view = knn_graph;
   auto nn_descent_idx = cuvs::neighbors::nn_descent::build(res, build_params, dataset, graph_view);
 
-  using internal_IdxT = typename std::make_unsigned<IdxT>::type;
+  using internal_IdxT = std::make_unsigned_t<IdxT>;
   using g_accessor    = typename decltype(nn_descent_idx.graph())::accessor_type;
   using g_accessor_internal =
     raft::host_device_accessor<cuda::std::default_accessor<internal_IdxT>, g_accessor::mem_type>;
@@ -1908,7 +1907,7 @@ void optimize(
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph,
   const bool guarantee_connectivity = false)
 {
-  using internal_IdxT = typename std::make_unsigned<IdxT>::type;
+  using internal_IdxT = std::make_unsigned_t<IdxT>;
 
   auto new_graph_internal = raft::make_host_matrix_view<internal_IdxT, int64_t>(
     reinterpret_cast<internal_IdxT*>(new_graph.data_handle()),
@@ -2060,7 +2059,7 @@ auto iterative_build_graph(
   size_t byte_size          = sizeof(IdxT) * final_graph_size * topk;
   if (byte_size % thp_size) { byte_size += thp_size - (byte_size % thp_size); }
   mmap_owner neighbors_list(byte_size);
-  IdxT* neighbors_ptr = (IdxT*)neighbors_list.data();
+  IdxT* neighbors_ptr = reinterpret_cast<IdxT*>(neighbors_list.data());
   memset(neighbors_ptr, 0, byte_size);
 
   bool flag_last       = false;
@@ -2105,7 +2104,7 @@ auto iterative_build_graph(
       res, params.metric, dev_dataset_view, raft::make_const_mdspan(cagra_graph.view()));
 
     auto dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
-      dev_dataset.data_handle(), (int64_t)curr_query_size, dev_dataset.extent(1));
+      dev_dataset.data_handle(), static_cast<int64_t>(curr_query_size), dev_dataset.extent(1));
 
     auto neighbors_view =
       raft::make_host_matrix_view<IdxT, int64_t>(neighbors_ptr, curr_query_size, curr_topk);

@@ -25,14 +25,12 @@ struct QuantizationInputs {  // NOLINT(readability-identifier-naming)
 };
 
 template <typename T>
-std::ostream& operator<<(
-  std::ostream& os,
-  const QuantizationInputs<T>& inputs)  // NOLINT(modernize-use-trailing-return-type)
+auto operator<<(std::ostream& os, const QuantizationInputs<T>& inputs) -> std::ostream&
 {
   return os << "quantization_quantile:<" << inputs.quantization_params.quantile
             << "> rows:" << inputs.rows << " cols:" << inputs.cols
-            << " min:" << (double)inputs.min 
-            << " max:" << (double)inputs.max;
+            << " min:" << static_cast<double>(inputs.min)
+            << " max:" << static_cast<double>(inputs.max);
 }
 
 template <typename T, typename QuantI>
@@ -46,11 +44,10 @@ class QuantizationTest : public ::testing::TestWithParam<
   {
   }
 
-  double getRelativeErrorStddev(
-    const T* array_a,
-    const T* array_b,
-    size_t size,
-    float quantile)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  auto getRelativeErrorStddev(const T* array_a,
+                              const T* array_b,
+                              size_t size,
+                              float quantile) -> double  // NOLINT(readability-identifier-naming)
   {
     // relative error elementwise
     rmm::device_uvector<double> relative_error(size, stream);
@@ -59,7 +56,7 @@ class QuantizationTest : public ::testing::TestWithParam<
       array_a,
       array_b,
       size,
-      [] __device__(double a, double b) {
+      [] __device__(double a, double b) -> double {
         return a != b ? (raft::abs(a - b) / raft::max(raft::abs(a), raft::abs(b))) : 0;
       },
       stream);
@@ -94,7 +91,7 @@ class QuantizationTest : public ::testing::TestWithParam<
   {
     // dataset identical on host / device
     auto dataset = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
-      (const T*)(input_.data()), rows_, cols_);
+      reinterpret_cast<const T*>((input_.data())), rows_, cols_);
     auto dataset_h = raft::make_host_matrix_view<const T, int64_t, raft::row_major>(
       (const T*)(host_input_.data()), rows_, cols_);
 
@@ -104,8 +101,7 @@ class QuantizationTest : public ::testing::TestWithParam<
     auto quantizer_1 =
       cuvs::preprocessing::quantize::scalar::train(handle, params_.quantization_params, dataset);
     std::cerr << "Q1: min = " << static_cast<double>(quantizer_1.min_)
-              << ", max = " << static_cast<double>(quantizer_1.max_)
-              << std::endl;
+              << ", max = " << static_cast<double>(quantizer_1.max_) << std::endl;
 
     {
       auto quantized_input_h = raft::make_host_matrix<QuantI, int64_t>(rows_, cols_);
@@ -166,15 +162,12 @@ class QuantizationTest : public ::testing::TestWithParam<
     auto quantizer_2 =
       cuvs::preprocessing::quantize::scalar::train(handle, params_.quantization_params, dataset_h);
     std::cerr << "Q2: min = " << static_cast<double>(quantizer_2.min_)
-              << ", max = " << static_cast<double>(quantizer_2.max_)
-              << std::endl;
+              << ", max = " << static_cast<double>(quantizer_2.max_) << std::endl;
 
     // check both quantizers are the same (valid if sampling is identical)
     if (input_.size() <= 1000000) {
-      ASSERT_TRUE(static_cast<double>(quantizer_1.min_) ==
-                  static_cast<double>(quantizer_2.min_));
-      ASSERT_TRUE(static_cast<double>(quantizer_1.max_) ==
-                  static_cast<double>(quantizer_2.max_));
+      ASSERT_TRUE(static_cast<double>(quantizer_1.min_) == static_cast<double>(quantizer_2.min_));
+      ASSERT_TRUE(static_cast<double>(quantizer_1.max_) == static_cast<double>(quantizer_2.max_));
     }
 
     {
@@ -270,35 +263,38 @@ const std::vector<QuantizationInputs<T>> inputs = {
   {{0.95}, 10, 20, T(5.0), T(5.0)},
 };
 
-using QuantizationTest_float_int8t = QuantizationTest<float, int8_t>;  // NOLINT(readability-identifier-naming)
-TEST_P(QuantizationTest_float_int8t, ScalarQuantizationTest)
+using QuantizationTest_float_int8t =
+  QuantizationTest<float, int8_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(QuantizationTest_float_int8t,
+       ScalarQuantizationTest)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testScalarQuantization();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(readability-identifier-naming)
 
-using QuantizationTest_double_int8t = QuantizationTest<double, int8_t>;  // NOLINT(readability-identifier-naming)
-TEST_P(QuantizationTest_double_int8t, ScalarQuantizationTest)
+using QuantizationTest_double_int8t =
+  QuantizationTest<double, int8_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(QuantizationTest_double_int8t,
+       ScalarQuantizationTest)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testScalarQuantization();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(readability-identifier-naming)
 
-using QuantizationTest_half_int8t = QuantizationTest<half, int8_t>;  // NOLINT(readability-identifier-naming)
-TEST_P(QuantizationTest_half_int8t, ScalarQuantizationTest)
+using QuantizationTest_half_int8t =
+  QuantizationTest<half, int8_t>;  // NOLINT(readability-identifier-naming)
+TEST_P(QuantizationTest_half_int8t,
+       ScalarQuantizationTest)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testScalarQuantization();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(
-  QuantizationTest,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-  QuantizationTest_float_int8t,
-  ::testing::ValuesIn(inputs<float>));
-INSTANTIATE_TEST_CASE_P(
-  QuantizationTest,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-  QuantizationTest_double_int8t,
-  ::testing::ValuesIn(inputs<double>));
-INSTANTIATE_TEST_CASE_P(
-  QuantizationTest,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-  QuantizationTest_half_int8t,
-  ::testing::ValuesIn(inputs<half>));
+INSTANTIATE_TEST_CASE_P(QuantizationTest,  // NOLINT(readability-identifier-naming)
+                        QuantizationTest_float_int8t,
+                        ::testing::ValuesIn(inputs<float>));
+INSTANTIATE_TEST_CASE_P(QuantizationTest,  // NOLINT(readability-identifier-naming)
+                        QuantizationTest_double_int8t,
+                        ::testing::ValuesIn(inputs<double>));
+INSTANTIATE_TEST_CASE_P(QuantizationTest,  // NOLINT(readability-identifier-naming)
+                        QuantizationTest_half_int8t,
+                        ::testing::ValuesIn(inputs<half>));
 
 }  // namespace cuvs::preprocessing::quantize::scalar

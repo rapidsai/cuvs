@@ -84,7 +84,7 @@ void launch_process_and_fill_codes_kernel(
   const uint32_t bytes_per_vector =
     raft::div_rounding_up_safe(index.pq_dim() * index.pq_bits(), 8u);
 
-  auto kernel = [](uint32_t pq_bits) {
+  auto kernel = [](uint32_t pq_bits) -> auto {
     switch (pq_bits) {
       case 4: return process_and_fill_codes_kernel<kBlockSize, 4, IdxT>;
       case 5: return process_and_fill_codes_kernel<kBlockSize, 5, IdxT>;

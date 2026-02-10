@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #include "../../../core/omp_wrapper.hpp"
@@ -179,11 +179,12 @@ void add_node_core(
           detourable_node_count_list[i] = std::make_pair(a_id, detourable_node_count);
         }
 
-        std::sort(detourable_node_count_list.begin(),
-                  detourable_node_count_list.end(),
-                  [&](const std::pair<IdxT, std::size_t> a, const std::pair<IdxT, std::size_t> b) {
-                    return a.second < b.second;
-                  });
+        std::sort(
+          detourable_node_count_list.begin(),
+          detourable_node_count_list.end(),
+          [&](const std::pair<IdxT, std::size_t> a, const std::pair<IdxT, std::size_t> b) -> auto {
+            return a.second < b.second;
+          });
 
         for (std::size_t i = 0; i < degree; i++) {
           updated_graph(old_size + batch.offset() + vec_i, i) = detourable_node_count_list[i].first;

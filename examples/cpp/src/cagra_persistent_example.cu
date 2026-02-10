@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -45,7 +45,7 @@ void cagra_build_search_variants(raft::device_resources const& res,
                                  raft::device_matrix_view<const float, int64_t> dataset,
                                  raft::device_matrix_view<const float, int64_t> queries)
 {
-  using namespace cuvs::neighbors;
+  using cuvs::neighbors::cagra;
 
   // Number of neighbors to search
   int64_t topk = 100;
@@ -102,7 +102,7 @@ void cagra_build_search_variants(raft::device_resources const& res,
                                      const cagra::search_params& ps,
                                      raft::device_matrix_view<const float, int64_t> queries,
                                      raft::device_matrix_view<uint32_t, int64_t> neighbors,
-                                     raft::device_matrix_view<float, int64_t> distances) {
+                                     raft::device_matrix_view<float, int64_t> distances) -> void {
     cagra::search(res, ps, index, queries, neighbors, distances);
     /*
     To make a fair comparison, standard implementation needs to synchronize
@@ -145,7 +145,7 @@ void cagra_build_search_variants(raft::device_resources const& res,
                                      const cagra::search_params& ps,
                                      raft::device_matrix_view<const float, int64_t> queries,
                                      raft::device_matrix_view<uint32_t, int64_t> neighbors,
-                                     raft::device_matrix_view<float, int64_t> distances) {
+                                     raft::device_matrix_view<float, int64_t> distances) -> void {
     auto work_size   = queries.extent(0);
     using index_type = typeof(work_size);
     // Limit the maximum number of concurrent jobs
@@ -156,7 +156,7 @@ void cagra_build_search_variants(raft::device_resources const& res,
       if (i >= kMaxJobs) { futures[i % kMaxJobs].wait(); }
       // submit a new job
       if (i < work_size) {
-        futures[i % kMaxJobs] = std::async(std::launch::async, [&]() {
+        futures[i % kMaxJobs] = std::async(std::launch::async, [&]() -> void {
           cagra::search(res,
                         ps,
                         index,
@@ -226,7 +226,7 @@ for you. This increases the latency of individual jobs though.
   */
 }
 
-int main()
+auto main() -> int
 {
   raft::device_resources res;
 

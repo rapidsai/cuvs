@@ -23,7 +23,7 @@ namespace cuvs::distance::detail {
  * @param stride   Stride in number of element between consecutive rows.
  */
 template <typename DataT>
-size_t alignment_of_2d_array(const DataT* x, size_t stride)
+auto alignment_of_2d_array(const DataT* x, size_t stride) -> size_t
 {
   auto base           = reinterpret_cast<uintptr_t>(x);
   size_t stride_bytes = sizeof(DataT) * stride;

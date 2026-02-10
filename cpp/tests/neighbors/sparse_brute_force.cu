@@ -6,6 +6,7 @@
 #include "../test_utils.cuh"
 
 #include <cuvs/neighbors/brute_force.hpp>
+#include <numbers>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/util/cudart_utils.hpp>
 
@@ -15,8 +16,8 @@
 namespace cuvs {
 namespace neighbors {
 
-using namespace raft;  // NOLINT(google-build-using-namespace)
-using namespace raft::sparse;
+using raft::update_device;
+namespace resource = raft::resource;
 
 template <typename value_idx, typename value_t>  // NOLINT(readability-identifier-naming)
 struct SparseKNNInputs {                         // NOLINT(readability-identifier-naming)
@@ -38,9 +39,8 @@ struct SparseKNNInputs {                         // NOLINT(readability-identifie
 };
 
 template <typename value_idx, typename value_t>  // NOLINT(readability-identifier-naming)
-::std::ostream& operator<<(
-  ::std::ostream& os,
-  const SparseKNNInputs<value_idx, value_t>& dims)  // NOLINT(modernize-use-trailing-return-type)
+auto operator<<(::std::ostream& os, const SparseKNNInputs<value_idx, value_t>& dims)
+  -> ::std::ostream&
 {
   return os;
 }
@@ -155,22 +155,18 @@ const std::vector<SparseKNNInputs<int, float>> inputs_i32_f =
      {0, 2, 4, 6, 8},                                   // indptr
      {0, 4, 0, 3, 0, 2, 0, 8},                          // indices
      {0.0f, 1.0f, 5.0f, 6.0f, 5.0f, 6.0f, 0.0f, 1.0f},  // data
-     {0, 1.41421, 0, 7.87401, 0, 7.87401, 0, 1.41421},  // dists
-     {0, 3, 1, 0, 2, 0, 3, 0},                          // inds
+     {0, std::numbers::sqrt2, 0, 7.87401, 0, 7.87401, 0, std::numbers::sqrt2},  // dists
+     {0, 3, 1, 0, 2, 0, 3, 0},                                                  // inds
      2,
      2,
      2,
      cuvs::distance::DistanceType::L2SqrtExpanded}};
 using SparseKNNTestF = SparseKNNTest<int, float>;  // NOLINT(readability-identifier-naming)
-TEST_P(SparseKNNTestF, Result)
-{
-  compare();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+TEST_P(SparseKNNTestF, Result) { compare(); }      // NOLINT(readability-identifier-naming)
 INSTANTIATE_TEST_CASE_P(
   SparseKNNTest,
   SparseKNNTestF,
-  ::testing::ValuesIn(
-    inputs_i32_f));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  ::testing::ValuesIn(inputs_i32_f));  // NOLINT(readability-identifier-naming)
 
 };  // end namespace neighbors
 };  // end namespace cuvs

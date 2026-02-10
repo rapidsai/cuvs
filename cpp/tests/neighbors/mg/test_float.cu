@@ -10,15 +10,13 @@
 namespace cuvs::neighbors::mg {
 
 using AnnMGTestF_float = AnnMGTest<float, float>;  // NOLINT(readability-identifier-naming)
-TEST_P(AnnMGTestF_float, AnnMG)
+TEST_P(AnnMGTestF_float, AnnMG)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testAnnMG();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(
-  AnnMGTest,
-  AnnMGTestF_float,
-  ::testing::ValuesIn(
-    inputs));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(AnnMGTest,
+                        AnnMGTestF_float,
+                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
 
 }  // namespace cuvs::neighbors::mg

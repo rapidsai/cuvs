@@ -70,7 +70,7 @@ auto merge(raft::resources const& handle,
 
   IdxT offset = 0;
 
-  auto merge_dataset = [&](T* dst) {
+  auto merge_dataset = [&](T* dst) -> auto {
     for (cagra_index_t* index : indices) {
       auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index->data());
       raft::copy_matrix(dst + offset * dim,

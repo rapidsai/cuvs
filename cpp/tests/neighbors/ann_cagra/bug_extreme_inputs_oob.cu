@@ -68,9 +68,11 @@ class cagra_extreme_inputs_oob_test : public ::testing::Test {
     cuvs::distance::DistanceType::L2Expanded;  // NOLINT(readability-identifier-naming)
 };
 
-TEST_F(cagra_extreme_inputs_oob_test, cagra_extreme_inputs_oob_test)
+TEST_F(
+  cagra_extreme_inputs_oob_test,
+  cagra_extreme_inputs_oob_test)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->run();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(readability-identifier-naming)
 
 }  // namespace cuvs::neighbors::cagra

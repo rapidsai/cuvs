@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -15,14 +15,11 @@
 
 #include <rmm/device_uvector.hpp>
 
-#include <limits.h>
+#include <climits>
 
 #include <nvfunctional>
 
-namespace cuvs {
-namespace distance {
-namespace detail {
-namespace sparse {
+namespace cuvs::distance::detail::sparse {
 // @TODO: Move this into sparse prims (coo_norm)
 template <typename value_idx, typename value_t>
 RAFT_KERNEL compute_binary_row_norm_kernel(value_t* out,
@@ -129,26 +126,27 @@ class jaccard_expanded_distances_t : public distances_t<value_t> {
                                       config_->a_nnz,
                                       raft::resource::get_cuda_stream(config_->handle));
 
-    compute_bin_distance(out_dists,
-                         search_coo_rows.data(),
-                         config_->a_data,
-                         config_->a_nnz,
-                         b_indices,
-                         b_data,
-                         config_->b_nnz,
-                         config_->a_nrows,
-                         config_->b_nrows,
-                         raft::resource::get_cuda_stream(config_->handle),
-                         [] __device__ __host__(value_t dot, value_t q_norm, value_t r_norm) {
-                           value_t q_r_union = q_norm + r_norm;
-                           value_t denom     = q_r_union - dot;
+    compute_bin_distance(
+      out_dists,
+      search_coo_rows.data(),
+      config_->a_data,
+      config_->a_nnz,
+      b_indices,
+      b_data,
+      config_->b_nnz,
+      config_->a_nrows,
+      config_->b_nrows,
+      raft::resource::get_cuda_stream(config_->handle),
+      [] __device__ __host__(value_t dot, value_t q_norm, value_t r_norm) -> value_t {
+        value_t q_r_union = q_norm + r_norm;
+        value_t denom     = q_r_union - dot;
 
-                           value_t jacc = ((denom != 0) * dot) / ((denom == 0) + denom);
+        value_t jacc = ((denom != 0) * dot) / ((denom == 0) + denom);
 
-                           // flip the similarity when both rows are 0
-                           bool both_empty = q_r_union == 0;
-                           return 1 - ((!both_empty * jacc) + both_empty);
-                         });
+        // flip the similarity when both rows are 0
+        bool both_empty = q_r_union == 0;
+        return 1 - ((!both_empty * jacc) + both_empty);
+      });
   }
 
   ~jaccard_expanded_distances_t() = default;
@@ -188,22 +186,23 @@ class dice_expanded_distances_t : public distances_t<value_t> {
                                       config_->a_nnz,
                                       raft::resource::get_cuda_stream(config_->handle));
 
-    compute_bin_distance(out_dists,
-                         search_coo_rows.data(),
-                         config_->a_data,
-                         config_->a_nnz,
-                         b_indices,
-                         b_data,
-                         config_->b_nnz,
-                         config_->a_nrows,
-                         config_->b_nrows,
-                         raft::resource::get_cuda_stream(config_->handle),
-                         [] __device__ __host__(value_t dot, value_t q_norm, value_t r_norm) {
-                           value_t q_r_union = q_norm + r_norm;
-                           value_t dice      = (2 * dot) / q_r_union;
-                           bool both_empty   = q_r_union == 0;
-                           return 1 - ((!both_empty * dice) + both_empty);
-                         });
+    compute_bin_distance(
+      out_dists,
+      search_coo_rows.data(),
+      config_->a_data,
+      config_->a_nnz,
+      b_indices,
+      b_data,
+      config_->b_nnz,
+      config_->a_nrows,
+      config_->b_nrows,
+      raft::resource::get_cuda_stream(config_->handle),
+      [] __device__ __host__(value_t dot, value_t q_norm, value_t r_norm) -> value_t {
+        value_t q_r_union = q_norm + r_norm;
+        value_t dice      = (2 * dot) / q_r_union;
+        bool both_empty   = q_r_union == 0;
+        return 1 - ((!both_empty * dice) + both_empty);
+      });
   }
 
   ~dice_expanded_distances_t() = default;
@@ -214,7 +213,7 @@ class dice_expanded_distances_t : public distances_t<value_t> {
   ip_distances_t<value_idx, value_t> ip_dists;
 };
 
-}  // END namespace sparse
-}  // END namespace detail
-}  // END namespace distance
-}  // END namespace cuvs
+}  // namespace cuvs::distance::detail::sparse
+   // END namespace detail
+   // END namespace distance
+   // END namespace cuvs

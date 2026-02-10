@@ -12,7 +12,8 @@
 #include <raft/util/cudart_utils.hpp>
 
 namespace cuvs::neighbors::all_neighbors::detail {
-using namespace cuvs::neighbors;
+using cuvs::neighbors::dataset;
+using cuvs::neighbors::GRAPH_BUILD_ALGO;
 
 auto check_params_validity(const all_neighbors_params& params, bool do_mutual_reachability_dist)
   -> GRAPH_BUILD_ALGO

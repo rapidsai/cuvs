@@ -953,7 +953,7 @@ struct search
       raft::linalg::map_offset(
         res,
         raft::make_device_matrix_view<OutputIndexT, int64_t>(topk_indices_ptr, num_queries, topk),
-        [source_indices_ptr, buf_result_indices, topk] __device__(auto offset) {
+        [source_indices_ptr, buf_result_indices, topk] __device__(auto offset) -> OutputIndexT {
           auto i = offset / topk;
           auto j = offset % topk;
           return static_cast<OutputIndexT>(source_indices_ptr[buf_result_indices(i, j)]);

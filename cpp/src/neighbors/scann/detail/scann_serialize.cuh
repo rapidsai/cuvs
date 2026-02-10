@@ -67,7 +67,7 @@ void save_labels(raft::resources const& res,
   auto soar_labels_view = index_.soar_labels();
 
   raft::linalg::map_offset(
-    res, combined_labels.view(), [labels_view, soar_labels_view] __device__(size_t i) {
+    res, combined_labels.view(), [labels_view, soar_labels_view] __device__(size_t i) -> int {
       size_t label_type = i % 2;
       size_t idx        = i / 2;
 

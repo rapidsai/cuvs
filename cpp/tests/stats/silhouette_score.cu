@@ -54,12 +54,8 @@ class silhouetteScoreTest : public ::testing::TestWithParam<
     std::uniform_real_distribution<double> realGenerator(
       0, 100);  // NOLINT(readability-identifier-naming)
 
-    std::generate(h_X.begin(), h_X.end(), [&]() {
-      return realGenerator(dre);
-    });  // NOLINT(modernize-use-trailing-return-type)
-    std::generate(h_labels.begin(), h_labels.end(), [&]() {
-      return intGenerator(dre);
-    });  // NOLINT(modernize-use-trailing-return-type)
+    std::generate(h_X.begin(), h_X.end(), [&]() -> auto { return realGenerator(dre); });
+    std::generate(h_labels.begin(), h_labels.end(), [&]() -> auto { return intGenerator(dre); });
 
     // allocating and initializing memory to the GPU
     auto stream = raft::resource::get_cuda_stream(handle);
@@ -69,10 +65,8 @@ class silhouetteScoreTest : public ::testing::TestWithParam<
     RAFT_CUDA_TRY(cudaMemsetAsync(d_labels.data(), 0, d_labels.size() * sizeof(LabelT), stream));
     sampleSilScore.resize(nElements, stream);
 
-    raft::update_device(
-      d_X.data(), &h_X[0], (int)nElements, stream);  // NOLINT(google-readability-casting)
-    raft::update_device(
-      d_labels.data(), &h_labels[0], (int)nElements, stream);  // NOLINT(google-readability-casting)
+    raft::update_device(d_X.data(), &h_X[0], static_cast<int>(nElements), stream);
+    raft::update_device(d_labels.data(), &h_labels[0], static_cast<int>(nElements), stream);
 
     // finding the distance matrix
 
@@ -226,18 +220,17 @@ const std::vector<silhouetteScoreParam> inputs = {  // NOLINT(readability-identi
   {7, 5, 5, cuvs::distance::DistanceType::L1, 2, 0.00001}};
 
 // writing the test suite
-using silhouetteScoreTestClass = silhouetteScoreTest<int, double>;  // NOLINT(readability-identifier-naming)
+using silhouetteScoreTestClass =
+  silhouetteScoreTest<int, double>;  // NOLINT(readability-identifier-naming)
 TEST_P(silhouetteScoreTestClass,
-       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+       Result)  // NOLINT(readability-identifier-naming)
 {
   ASSERT_NEAR(computedSilhouetteScore, truthSilhouetteScore, params.tolerance);
   ASSERT_NEAR(batchedSilhouetteScore, truthSilhouetteScore, params.tolerance);
 }
-INSTANTIATE_TEST_CASE_P(
-  silhouetteScore,
-  silhouetteScoreTestClass,
-  ::testing::ValuesIn(
-    inputs));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(silhouetteScore,
+                        silhouetteScoreTestClass,
+                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
 
 }  // end namespace stats
 }  // end namespace cuvs

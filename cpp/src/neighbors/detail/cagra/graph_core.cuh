@@ -22,7 +22,7 @@
 
 #include <cuda_fp16.h>
 
-#include <float.h>
+#include <cfloat>
 #include <sys/time.h>
 
 #include <climits>
@@ -34,7 +34,7 @@ namespace cuvs::neighbors::cagra::detail::graph {
 
 // unnamed namespace to avoid multiple definition error
 namespace {
-inline auto cur_time(void) -> double
+inline auto cur_time() -> double
 {
   struct timeval tv;
   gettimeofday(&tv, nullptr);
@@ -291,7 +291,7 @@ __global__ void kern_mst_opt_update_graph(IdxT* mst_graph,  // [graph_size, grap
     if (ret == 0) return;
 
     ret     = 0;
-    auto kj = atomicAdd(incoming_num_edges + j, (IdxT)1);
+    auto kj = atomicAdd(incoming_num_edges + j, static_cast<IdxT>(1));
     if (kj < incoming_max_edges[j]) {
       auto ki                                      = outgoing_num_edges[i]++;
       mst_graph[(graph_degree * (i)) + ki]         = j;  // outgoing
@@ -328,7 +328,7 @@ __global__ void kern_mst_opt_update_graph(IdxT* mst_graph,  // [graph_size, grap
     }
     if (ret == 0) { break; }
 
-    auto kl = atomicAdd(incoming_num_edges + l, (IdxT)1);
+    auto kl = atomicAdd(incoming_num_edges + l, static_cast<IdxT>(1));
     if (kl < incoming_max_edges[l]) {
       auto ki                                      = outgoing_num_edges[i]++;
       mst_graph[(graph_degree * (i)) + ki]         = l;  // outgoing
@@ -440,19 +440,19 @@ __global__ void kern_mst_opt_postprocessing(IdxT* outgoing_num_edges,  // [graph
   if (cluster_size[i] > 0) {
     if (smem_cluster_size_min[0] > cluster_size[i]) {
       atomicMin(reinterpret_cast<unsigned long long int*>(smem_cluster_size_min),
-                (unsigned long long int)(cluster_size[i]));
+                static_cast<unsigned long long int>((cluster_size[i])));
     }
     if (smem_cluster_size_max[0] < cluster_size[i]) {
       atomicMax(reinterpret_cast<unsigned long long int*>(smem_cluster_size_max),
-                (unsigned long long int)(cluster_size[i]));
+                static_cast<unsigned long long int>((cluster_size[i])));
     }
   }
 
   // Calculate total number of outgoing/incoming edges
   atomicAdd(reinterpret_cast<unsigned long long int*>(smem_total_outgoing_edges),
-            (unsigned long long int)(outgoing_num_edges[i]));
+            static_cast<unsigned long long int>((outgoing_num_edges[i])));
   atomicAdd(reinterpret_cast<unsigned long long int*>(smem_total_incoming_edges),
-            (unsigned long long int)(incoming_num_edges[i]));
+            static_cast<unsigned long long int>((incoming_num_edges[i])));
 
   // Adjust incoming/outgoing_max_edges
   if (outgoing_num_edges[i] == outgoing_max_edges[i]) {

@@ -61,8 +61,7 @@ inline auto operator<<(std::ostream& os, const print_metric& p) -> std::ostream&
   return os;
 }
 
-std::ostream& operator<<(
-  std::ostream& os, const RandomKNNInputs& input)  // NOLINT(modernize-use-trailing-return-type)
+auto operator<<(std::ostream& os, const RandomKNNInputs& input) -> std::ostream&
 {
   return os << "num_queries:" << input.num_queries << " num_vecs:" << input.num_db_vecs
             << " dim:" << input.dim << " k:" << input.k << " metric:" << print_metric{input.metric}
@@ -242,7 +241,7 @@ class BruteForceKNNBenchmark {  // NOLINT(readability-identifier-naming)
               << std::setprecision(3) << throughput << "\n";
   }
   raft::resources handle_;
-  cudaStream_t stream_ = 0;
+  cudaStream_t stream_ = nullptr;
   RandomKNNInputs params_;
   rmm::device_uvector<T> database;        // NOLINT(readability-identifier-naming)
   rmm::device_uvector<T> search_queries;  // NOLINT(readability-identifier-naming)
@@ -252,8 +251,7 @@ class BruteForceKNNBenchmark {  // NOLINT(readability-identifier-naming)
   std::string type_str_;
 };
 
-static std::vector<RandomKNNInputs>
-getInputs()  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+static std::vector<RandomKNNInputs> getInputs()  // NOLINT(readability-identifier-naming)
 {
   std::vector<RandomKNNInputs> param_vec;
   struct TestParams {  // NOLINT(readability-identifier-naming)
@@ -266,10 +264,10 @@ getInputs()  // NOLINT(modernize-use-trailing-return-type,readability-identifier
   };
 
   const std::vector<TestParams> params_group = raft::util::itertools::product<TestParams>(
-    {int(10), int(100), int(1024)},  // NOLINT(google-readability-casting)
-    {int(1000000)},                  // NOLINT(google-readability-casting)
-    {int(32), int(256), int(1024)},  // NOLINT(google-readability-casting)
-    {int(128), int(1024)},           // NOLINT(google-readability-casting)
+    {int(10), int(100), int(1024)},
+    {int(1000000)},
+    {int(32), int(256), int(1024)},
+    {int(128), int(1024)},
     {cuvs::distance::DistanceType::InnerProduct, cuvs::distance::DistanceType::L2SqrtExpanded},
     {true, false});
 
@@ -316,7 +314,7 @@ void runBenchmarkForType()  // NOLINT(readability-identifier-naming)
 
 }  // namespace cuvs::neighbors::brute_force
 
-int main()  // NOLINT(modernize-use-trailing-return-type)
+int main()
 {
   cuvs::neighbors::brute_force::printHeader();
   cuvs::neighbors::brute_force::runBenchmarkForType();

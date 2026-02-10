@@ -56,7 +56,7 @@ reduction
 #include <cuda/std/cassert>
 #include <cuda/std/utility>
 #else
-#include <assert.h>
+#include <cassert>
 
 #include <utility>
 #endif
@@ -79,9 +79,7 @@ reduction
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-namespace cuvs {
-namespace epilogue {
-namespace threadblock {
+namespace cuvs::epilogue::threadblock {
 
 // TODO (cjnolet): We shouldn't be doing `using namespace` in this file.
 using namespace cutlass::epilogue::threadblock;
@@ -655,8 +653,6 @@ class EpilogueWithBroadcastCustom : public EpilogueBase<Shape_,
 
 ////////////////////////////////////////////////////////////////////////////////
 
-}  // namespace threadblock
-}  // namespace epilogue
-}  // namespace cuvs
+}  // namespace cuvs::epilogue::threadblock
 
 ////////////////////////////////////////////////////////////////////////////////

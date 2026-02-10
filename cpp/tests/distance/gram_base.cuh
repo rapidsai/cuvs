@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -15,12 +15,10 @@
 #include <iostream>
 #include <memory>
 
-namespace cuvs {
-namespace distance {
-namespace kernels {
+namespace cuvs::distance::kernels {
 
 // Get the offset of element [i,k].
-HDI int get_offset(int i, int k, int ld, bool is_row_major)
+HDI auto get_offset(int i, int k, int ld, bool is_row_major) -> int
 {
   return is_row_major ? i * ld + k : i + k * ld;
 }
@@ -75,6 +73,4 @@ void naiveGramMatrixKernel(int n1,
   }
 }
 
-}  // namespace kernels
-}  // namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance::kernels

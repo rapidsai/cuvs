@@ -158,13 +158,13 @@ void flat_compute_residuals(
     raft::linalg::row_normalize<raft::linalg::L2Norm>(
       handle, raft::make_const_mdspan(tmp_matrix_view), tmp_matrix_view);
   } else {
-    raft::linalg::map_offset(handle, tmp_view, [dataset, dim] __device__(size_t i) {
+    raft::linalg::map_offset(handle, tmp_view, [dataset, dim] __device__(size_t i) -> float {
       return utils::mapping<float>{}(dataset[i]);
     });
   }
 
   raft::linalg::map_offset(
-    handle, tmp_view, [centers, tmp = tmp.data(), labels, dim] __device__(size_t i) {
+    handle, tmp_view, [centers, tmp = tmp.data(), labels, dim] __device__(size_t i) -> float {
       auto row_ix = i / dim;
       auto el_ix  = i % dim;
       auto label  = std::holds_alternative<uint32_t>(labels)
@@ -311,15 +311,16 @@ void transpose_pq_centers(const raft::resources& handle,
     pq_centers_source, extents_source);
   auto pq_centers_view = raft::make_device_vector_view<float, IdxT>(
     impl->pq_centers().data_handle(), impl->pq_centers().size());
-  raft::linalg::map_offset(handle, pq_centers_view, [span_source, extents] __device__(size_t i) {
-    uint32_t ii[3];
-    for (int r = 2; r > 0; r--) {
-      ii[r] = i % extents.extent(r);
-      i /= extents.extent(r);
-    }
-    ii[0] = i;
-    return span_source(ii[0], ii[2], ii[1]);
-  });
+  raft::linalg::map_offset(
+    handle, pq_centers_view, [span_source, extents] __device__(size_t i) -> float {
+      uint32_t ii[3];
+      for (int r = 2; r > 0; r--) {
+        ii[r] = i % extents.extent(r);
+        i /= extents.extent(r);
+      }
+      ii[0] = i;
+      return span_source(ii[0], ii[2], ii[1]);
+    });
 }
 
 template <typename IdxT>
@@ -600,7 +601,7 @@ void reconstruct_list_data(raft::resources const& res,
   constexpr uint32_t kBlockSize = 256;
   dim3 blocks(raft::div_rounding_up_safe<uint32_t>(n_rows, kBlockSize), 1, 1);
   dim3 threads(kBlockSize, 1, 1);
-  auto kernel = [](uint32_t pq_bits) {
+  auto kernel = [](uint32_t pq_bits) -> auto {
     switch (pq_bits) {
       case 4: return reconstruct_list_data_kernel<kBlockSize, 4>;
       case 5: return reconstruct_list_data_kernel<kBlockSize, 5>;
@@ -727,7 +728,7 @@ void encode_list_data(raft::resources const& res,
   if (index->codes_layout() == list_layout::FLAT) {
     const uint32_t bytes_per_vector =
       raft::div_rounding_up_safe(index->pq_dim() * index->pq_bits(), 8u);
-    auto kernel = [](uint32_t pq_bits) {
+    auto kernel = [](uint32_t pq_bits) -> auto {
       switch (pq_bits) {
         case 4: return encode_list_data_flat_kernel<kBlockSize, 4>;
         case 5: return encode_list_data_flat_kernel<kBlockSize, 5>;
@@ -746,7 +747,7 @@ void encode_list_data(raft::resources const& res,
       offset_or_indices,
       bytes_per_vector);
   } else {
-    auto kernel = [](uint32_t pq_bits) {
+    auto kernel = [](uint32_t pq_bits) -> auto {
       switch (pq_bits) {
         case 4: return encode_list_data_interleaved_kernel<kBlockSize, 4>;
         case 5: return encode_list_data_interleaved_kernel<kBlockSize, 5>;

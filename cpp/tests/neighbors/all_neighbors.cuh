@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -46,7 +46,7 @@ struct AllNeighborsInputs {
   bool mutual_reach;
 };
 
-inline ::std::ostream& operator<<(::std::ostream& os, const AllNeighborsInputs& p)
+inline auto operator<<(::std::ostream& os, const AllNeighborsInputs& p) -> ::std::ostream&
 {
   os << "dataset shape=" << p.n_rows << "x" << p.dim << ", k=" << p.k
      << ", metric=" << static_cast<int>(std::get<1>(p.build_algo_metric_recall))
@@ -219,7 +219,7 @@ class AllNeighborsTest : public ::testing::TestWithParam<AllNeighborsInputs> {
     EXPECT_TRUE(eval_recall(indices_bf, indices_allNN, ps.n_rows, ps.k, 0.01, min_recall, true));
   }
 
-  void SetUp() override
+  void SetUp() override  // NOLINT(readability-identifier-naming)
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     auto database_view =
@@ -229,7 +229,7 @@ class AllNeighborsTest : public ::testing::TestWithParam<AllNeighborsInputs> {
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override
+  void TearDown() override  // NOLINT(readability-identifier-naming)
   {
     raft::resource::sync_stream(handle_);
     database.resize(0, stream_);

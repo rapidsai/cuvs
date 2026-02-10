@@ -234,7 +234,7 @@ struct PairwiseDistances : public BaseClass {
                      OutT (&regxn)[P::AccRowsPerTh],
                      OutT (&regyn)[P::AccColsPerTh])
   {
-    OutT* sxNorm = (OutT*)(&smem[P::SmemSize]);
+    OutT* sxNorm = reinterpret_cast<OutT*>((&smem[P::SmemSize]));
     OutT* syNorm = (&sxNorm[P::Mblk]);
 
     // Load x & y norms required by this threadblock in shmem buffer

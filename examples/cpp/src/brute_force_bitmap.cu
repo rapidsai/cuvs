@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -19,9 +19,10 @@ void load_dataset(const raft::device_resources& res, float* data_ptr, int n_vect
   raft::random::uniform(res, rng, data_ptr, n_vectors * dim, 0.1f, 2.0f);
 }
 
-int main()
+auto main() -> int
 {
-  using namespace cuvs::neighbors;
+  using cuvs::neighbors::brute_force;
+  using cuvs::neighbors::filtering;
   using dataset_dtype  = float;
   using indexing_dtype = int64_t;
   auto dim             = 128;

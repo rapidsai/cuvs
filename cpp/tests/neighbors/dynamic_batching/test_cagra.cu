@@ -32,8 +32,9 @@ static void set_default_cagra_params(fixture& that)
     std::clamp<int64_t>(raft::bound_by_power_of_two(that.ps.k) * 16, 128, 512);
 }
 
-TEST_P(cagra_F32,
-       single_cta)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+TEST_P(
+  cagra_F32,  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+  single_cta)  // NOLINT(readability-identifier-naming,google-readability-avoid-underscore-in-googletest-name)
 {
   set_default_cagra_params(*this);
   search_params_upsm.algo = cagra::search_algo::SINGLE_CTA;
@@ -42,8 +43,9 @@ TEST_P(cagra_F32,
   check_neighbors();
 }
 
-TEST_P(cagra_F32,
-       multi_cta)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+TEST_P(
+  cagra_F32,  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+  multi_cta)  // NOLINT(readability-identifier-naming,google-readability-avoid-underscore-in-googletest-name)
 {
   set_default_cagra_params(*this);
   search_params_upsm.algo = cagra::search_algo::MULTI_CTA;
@@ -52,8 +54,9 @@ TEST_P(cagra_F32,
   check_neighbors();
 }
 
-TEST_P(cagra_F32,
-       multi_kernel)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+TEST_P(
+  cagra_F32,  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+  multi_kernel)  // NOLINT(readability-identifier-naming,google-readability-avoid-underscore-in-googletest-name)
 {
   set_default_cagra_params(*this);
   search_params_upsm.algo = cagra::search_algo::MULTI_KERNEL;
@@ -62,8 +65,9 @@ TEST_P(cagra_F32,
   check_neighbors();
 }
 
-TEST_P(cagra_U8,
-       defaults)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+TEST_P(
+  cagra_U8,  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
+  defaults)  // NOLINT(readability-identifier-naming,google-readability-avoid-underscore-in-googletest-name)
 {
   set_default_cagra_params(*this);
   build_all();

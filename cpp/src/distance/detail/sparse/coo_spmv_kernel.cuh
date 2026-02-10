@@ -13,10 +13,7 @@
 #include <cub/block/block_store.cuh>
 #include <cub/cub.cuh>
 
-namespace cuvs {
-namespace distance {
-namespace detail {
-namespace sparse {
+namespace cuvs::distance::detail::sparse {
 __device__ __inline__ auto get_lowest_peer(unsigned int peer_group) -> unsigned int
 {
   return __ffs(peer_group) - 1;
@@ -214,7 +211,4 @@ RAFT_KERNEL balanced_coo_generalized_spmv_kernel(strategy_t strategy,
   }
 }
 
-}  // namespace sparse
-}  // namespace detail
-}  // namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance::detail::sparse

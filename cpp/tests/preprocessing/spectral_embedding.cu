@@ -27,9 +27,7 @@ struct SpectralEmbeddingInputs {  // NOLINT(readability-identifier-naming)
 };
 
 template <typename T>
-std::ostream& operator<<(
-  std::ostream& os,
-  const SpectralEmbeddingInputs<T>& inputs)  // NOLINT(modernize-use-trailing-return-type)
+auto operator<<(std::ostream& os, const SpectralEmbeddingInputs<T>& inputs) -> std::ostream&
 {
   return os << "n_samples:" << inputs.n_samples << " n_features:" << inputs.n_features
             << " n_clusters:" << inputs.n_clusters << " n_components:" << inputs.n_components
@@ -206,15 +204,15 @@ const std::vector<SpectralEmbeddingInputs<T>> inputs = {  // NOLINT(readability-
   // Larger dataset
   {10000, 20, 8, 2, 12, 1.0f, true, true, 42ULL}};
 
-using SpectralEmbeddingTestF = SpectralEmbeddingTest<float>;  // NOLINT(readability-identifier-naming)
+using SpectralEmbeddingTestF =
+  SpectralEmbeddingTest<float>;  // NOLINT(readability-identifier-naming)
 TEST_P(SpectralEmbeddingTestF, Result)
 {
   this->testSpectralEmbedding();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(readability-identifier-naming)
 
-INSTANTIATE_TEST_CASE_P(
-  SpectralEmbeddingTests,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-  SpectralEmbeddingTestF,
-  ::testing::ValuesIn(inputs<float>));
+INSTANTIATE_TEST_CASE_P(SpectralEmbeddingTests,  // NOLINT(readability-identifier-naming)
+                        SpectralEmbeddingTestF,
+                        ::testing::ValuesIn(inputs<float>));
 
 }  // namespace cuvs::preprocessing::spectral_embedding

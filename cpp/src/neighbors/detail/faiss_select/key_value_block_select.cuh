@@ -39,7 +39,7 @@ struct KeyValueBlockSelect {
     : initK(initKVal),
       initVk(initVKey),
       initVv(initVVal),
-      numVals(0),
+
       warpKTop(initKVal),
       warpKTopRDist(initKVal),
       sharedK(smemK),
@@ -202,7 +202,7 @@ struct KeyValueBlockSelect {
   const V initVv;
 
   // Number of valid elements in our thread queue
-  int numVals;
+  int numVals{0};
 
   // The k-th highest (Dir) or lowest (!Dir) element
   K warpKTop;

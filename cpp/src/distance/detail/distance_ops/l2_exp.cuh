@@ -85,7 +85,7 @@ struct l2_exp_distance_op {
   // Size of shared memory. This is normally decided by the kernel policy, but
   // some ops such as correlation_distance_op use more.
   template <typename Policy>
-  static constexpr size_t shared_mem_size()
+  static constexpr auto shared_mem_size() -> size_t
   {
     return Policy::SmemSize + ((Policy::Mblk + Policy::Nblk) * sizeof(AccT));
   }
@@ -111,7 +111,7 @@ struct l2_exp_distance_op {
 #pragma unroll
       for (int j = 0; j < Policy::AccColsPerTh; ++j) {
         AccT accVal = acc[i][j];
-        AccT val    = regxn[i] + regyn[j] - (AccT)2.0 * accVal;
+        AccT val    = regxn[i] + regyn[j] - static_cast<AccT>(2.0) * accVal;
 
         /**
          * Self-neighboring points should have (aNorm == bNorm) == accVal and the dot product

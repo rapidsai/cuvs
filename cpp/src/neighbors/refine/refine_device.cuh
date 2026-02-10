@@ -40,7 +40,7 @@ void refine_device(
   matrix_idx n_candidates = neighbor_candidates.extent(1);
   matrix_idx n_queries    = queries.extent(0);
   matrix_idx dim          = dataset.extent(1);
-  uint32_t k              = static_cast<uint32_t>(indices.extent(1));
+  auto k                  = static_cast<uint32_t>(indices.extent(1));
 
   // TODO(snanditale): this restriction could be lifted with some effort
   RAFT_EXPECTS(k <= raft::matrix::detail::select::warpsort::kMaxCapacity,
