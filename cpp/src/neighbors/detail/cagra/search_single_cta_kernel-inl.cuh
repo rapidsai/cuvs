@@ -1980,9 +1980,6 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
     // initialize the dataset/distance descriptor
     auto* dd_dev_ptr = dd_host.dev_ptr(stream);
 
-    // set kernel attributes same as in normal kernel
-    cuvs::neighbors::detail::optionally_set_larger_max_smem_size(smem_size, kernel);
-
     // set kernel launch parameters
     dim3 gs = calc_coop_grid_size(block_size, smem_size, persistent_device_usage);
     dim3 bs(block_size, 1, 1);
@@ -2049,15 +2046,19 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
        &small_hash_bitlen,
        &small_hash_reset_interval,
        &sample_filter};
-    cuda::atomic_thread_fence(cuda::memory_order_seq_cst, cuda::thread_scope_system);
-    RAFT_CUDA_TRY(cudaLaunchCooperativeKernel<std::remove_pointer_t<kernel_type>>(
-      kernel, gs, bs, args, smem_size, stream));
-    RAFT_LOG_INFO(
-      "Initialized the kernel %p in stream %zd; job_queue size = %u; worker_queue size = %u",
-      reinterpret_cast<void*>(kernel),
-      int64_t((cudaStream_t)stream),
-      job_queue.capacity(),
-      worker_queue.capacity());
+    auto const& invoke_kernel = [&]() {
+      cuda::atomic_thread_fence(cuda::memory_order_seq_cst, cuda::thread_scope_system);
+      RAFT_CUDA_TRY(cudaLaunchCooperativeKernel<std::remove_pointer_t<kernel_type>>(
+        kernel, gs, bs, args, smem_size, stream));
+      RAFT_LOG_INFO(
+        "Initialized the kernel %p in stream %zd; job_queue size = %u; worker_queue size = %u",
+        reinterpret_cast<void*>(kernel),
+        int64_t((cudaStream_t)stream),
+        job_queue.capacity(),
+        worker_queue.capacity());
+    };
+    // set kernel attributes same as in normal kernel
+    cuvs::neighbors::detail::safely_invoke_kernel_with_smem_size(kernel, smem_size, invoke_kernel);
     last_touch.store(std::chrono::system_clock::now(), std::memory_order_relaxed);
   }
 
@@ -2312,35 +2313,37 @@ control is returned in this thread (in persistent_runner_t constructor), so we'r
     using descriptor_base_type = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
     auto kernel = search_kernel_config<false, descriptor_base_type, SourceIndexT, SampleFilterT>::
       choose_itopk_and_mx_candidates(ps.itopk_size, num_itopk_candidates, block_size);
-    cuvs::neighbors::detail::optionally_set_larger_max_smem_size(smem_size, kernel);
     dim3 thread_dims(block_size, 1, 1);
     dim3 block_dims(1, num_queries, 1);
     RAFT_LOG_DEBUG(
       "Launching kernel with %u threads, %u block %u smem", block_size, num_queries, smem_size);
-    kernel<<<block_dims, thread_dims, smem_size, stream>>>(topk_indices_ptr,
-                                                           topk_distances_ptr,
-                                                           topk,
-                                                           dataset_desc.dev_ptr(stream),
-                                                           queries_ptr,
-                                                           graph.data_handle(),
-                                                           graph.extent(1),
-                                                           source_indices_ptr,
-                                                           ps.num_random_samplings,
-                                                           ps.rand_xor_mask,
-                                                           dev_seed_ptr,
-                                                           num_seeds,
-                                                           hashmap_ptr,
-                                                           max_candidates,
-                                                           max_itopk,
-                                                           ps.itopk_size,
-                                                           ps.search_width,
-                                                           ps.min_iterations,
-                                                           ps.max_iterations,
-                                                           num_executed_iterations,
-                                                           hash_bitlen,
-                                                           small_hash_bitlen,
-                                                           small_hash_reset_interval,
-                                                           sample_filter);
+    auto const& invoke_kernel = [&]() {
+      kernel<<<block_dims, thread_dims, smem_size, stream>>>(topk_indices_ptr,
+                                                             topk_distances_ptr,
+                                                             topk,
+                                                             dataset_desc.dev_ptr(stream),
+                                                             queries_ptr,
+                                                             graph.data_handle(),
+                                                             graph.extent(1),
+                                                             source_indices_ptr,
+                                                             ps.num_random_samplings,
+                                                             ps.rand_xor_mask,
+                                                             dev_seed_ptr,
+                                                             num_seeds,
+                                                             hashmap_ptr,
+                                                             max_candidates,
+                                                             max_itopk,
+                                                             ps.itopk_size,
+                                                             ps.search_width,
+                                                             ps.min_iterations,
+                                                             ps.max_iterations,
+                                                             num_executed_iterations,
+                                                             hash_bitlen,
+                                                             small_hash_bitlen,
+                                                             small_hash_reset_interval,
+                                                             sample_filter);
+    };
+    cuvs::neighbors::detail::safely_invoke_kernel_with_smem_size(kernel, smem_size, invoke_kernel);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
 }
