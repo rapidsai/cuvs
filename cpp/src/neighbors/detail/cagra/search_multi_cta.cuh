@@ -41,15 +41,19 @@ namespace cuvs::neighbors::cagra::detail {
 namespace multi_cta_search {
 
 template <typename DataT,
-          typename IndexT,
-          typename DistanceT,
+          typename index_t,
+          typename distance_t,
           typename SAMPLE_FILTER_T,
-          typename SourceIndexT = IndexT,
+          typename SourceIndexT = index_t,
           typename OutputIndexT = SourceIndexT>
-struct search
-  : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, SourceIndexT, OutputIndexT> {
+struct search : public search_plan_impl<DataT,
+                                        index_t,
+                                        distance_t,
+                                        SAMPLE_FILTER_T,
+                                        SourceIndexT,
+                                        OutputIndexT> {
   using base_type =
-    search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, SourceIndexT, OutputIndexT>;
+    search_plan_impl<DataT, index_t, distance_t, SAMPLE_FILTER_T, SourceIndexT, OutputIndexT>;
   using DATA_T     = typename base_type::DATA_T;
   using INDEX_T    = typename base_type::INDEX_T;
   using DISTANCE_T = typename base_type::DISTANCE_T;
@@ -98,7 +102,7 @@ struct search
 
   search(raft::resources const& res,
          search_params params,
-         const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
+         const dataset_descriptor_host<DataT, index_t, distance_t>& dataset_desc,
          int64_t dim,
          int64_t dataset_size,
          int64_t graph_degree,
@@ -245,36 +249,36 @@ struct search
     auto* output_indices_ptr =
       kNeedIndexCopy ? intermediate_indices.data() + num_intermediate_results * max_queries
                      : reinterpret_cast<INDEX_T*>(topk_indices_ptr);
-    _cuann_find_topk(topk,
-                     num_queries,
-                     num_intermediate_results,
-                     intermediate_distances.data(),
-                     num_intermediate_results,
-                     intermediate_indices.data(),
-                     num_intermediate_results,
-                     topk_distances_ptr,
-                     topk,
-                     output_indices_ptr,
-                     topk,
-                     topk_workspace.data(),
-                     true,
-                     nullptr,
-                     stream);
+    cuann_find_topk(topk,
+                    num_queries,
+                    num_intermediate_results,
+                    intermediate_distances.data(),
+                    num_intermediate_results,
+                    intermediate_indices.data(),
+                    num_intermediate_results,
+                    topk_distances_ptr,
+                    topk,
+                    output_indices_ptr,
+                    topk,
+                    topk_workspace.data(),
+                    true,
+                    nullptr,
+                    stream);
     if (source_indices_ptr != nullptr) {
       raft::linalg::map(
         res,
         raft::make_device_matrix_view<OutputIndexT, int64_t>(topk_indices_ptr, num_queries, topk),
-        [source_indices_ptr] __device__(IndexT x) {
+        [source_indices_ptr] __device__(index_t x) {
           return static_cast<OutputIndexT>(source_indices_ptr[x]);
         },
-        raft::make_device_matrix_view<const IndexT, int64_t>(
+        raft::make_device_matrix_view<const index_t, int64_t>(
           output_indices_ptr, num_queries, topk));
     } else if constexpr (kNeedIndexCopy) {
       raft::linalg::map(
         res,
         raft::make_device_matrix_view<OutputIndexT, int64_t>(topk_indices_ptr, num_queries, topk),
         raft::cast_op<OutputIndexT>{},
-        raft::make_device_matrix_view<const IndexT, int64_t>(
+        raft::make_device_matrix_view<const index_t, int64_t>(
           output_indices_ptr, num_queries, topk));
     }
   }

@@ -16,10 +16,10 @@
 namespace cuvs::neighbors::cagra::detail {
 
 template <typename DataT,
-          typename IndexT,
-          typename DistanceT,
+          typename index_t,
+          typename distance_t,
           typename CagraSampleFilterT = cuvs::neighbors::filtering::none_sample_filter,
-          typename SourceIndexT       = IndexT,
+          typename SourceIndexT       = index_t,
           typename OutputIndexT       = SourceIndexT>
 class factory {
  public:
@@ -27,10 +27,10 @@ class factory {
    * Create a search structure for dataset with dim features.
    */
   static std::unique_ptr<
-    search_plan_impl<DataT, IndexT, DistanceT, CagraSampleFilterT, SourceIndexT, OutputIndexT>>
+    search_plan_impl<DataT, index_t, distance_t, CagraSampleFilterT, SourceIndexT, OutputIndexT>>
   create(raft::resources const& res,
          search_params const& params,
-         const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
+         const dataset_descriptor_host<DataT, index_t, distance_t>& dataset_desc,
          int64_t dim,
          int64_t dataset_size,
          int64_t graph_degree,
@@ -42,25 +42,25 @@ class factory {
 
  private:
   static std::unique_ptr<
-    search_plan_impl<DataT, IndexT, DistanceT, CagraSampleFilterT, SourceIndexT, OutputIndexT>>
+    search_plan_impl<DataT, index_t, distance_t, CagraSampleFilterT, SourceIndexT, OutputIndexT>>
   dispatch_kernel(raft::resources const& res,
                   search_plan_impl_base& plan,
-                  const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc)
+                  const dataset_descriptor_host<DataT, index_t, distance_t>& dataset_desc)
   {
     if (plan.algo == search_algo::SINGLE_CTA) {
       return std::make_unique<
         single_cta_search::
-          search<DataT, IndexT, DistanceT, CagraSampleFilterT, SourceIndexT, OutputIndexT>>(
+          search<DataT, index_t, distance_t, CagraSampleFilterT, SourceIndexT, OutputIndexT>>(
         res, plan, dataset_desc, plan.dim, plan.dataset_size, plan.graph_degree, plan.topk);
     } else if (plan.algo == search_algo::MULTI_CTA) {
       return std::make_unique<
         multi_cta_search::
-          search<DataT, IndexT, DistanceT, CagraSampleFilterT, SourceIndexT, OutputIndexT>>(
+          search<DataT, index_t, distance_t, CagraSampleFilterT, SourceIndexT, OutputIndexT>>(
         res, plan, dataset_desc, plan.dim, plan.dataset_size, plan.graph_degree, plan.topk);
     } else {
       return std::make_unique<
         multi_kernel_search::
-          search<DataT, IndexT, DistanceT, CagraSampleFilterT, SourceIndexT, OutputIndexT>>(
+          search<DataT, index_t, distance_t, CagraSampleFilterT, SourceIndexT, OutputIndexT>>(
         res, plan, dataset_desc, plan.dim, plan.dataset_size, plan.graph_degree, plan.topk);
     }
   }
@@ -128,12 +128,12 @@ struct key_hash {
   }
 };
 
-template <typename DataT, typename IndexT, typename DistanceT>
+template <typename DataT, typename index_t, typename distance_t>
 struct store {
   /** Number of descriptors to cache. */
   static constexpr size_t kDefaultSize = 100;
   raft::cache::
-    lru<key, key_hash, std::equal_to<>, dataset_descriptor_host<DataT, IndexT, DistanceT>>
+    lru<key, key_hash, std::equal_to<>, dataset_descriptor_host<DataT, index_t, distance_t>>
       value{kDefaultSize};
 };
 
@@ -149,22 +149,22 @@ struct store {
  * Caching the the descriptor helps to hide this latency for repeated searches.
  *
  */
-template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
+template <typename DataT, typename index_t, typename distance_t, typename DatasetT>
 auto dataset_descriptor_init_with_cache(const raft::resources& res,
                                         const cagra::search_params& params,
                                         const DatasetT& dataset,
                                         cuvs::distance::DistanceType metric,
-                                        const DistanceT* dataset_norms = nullptr)
-  -> dataset_descriptor_host<DataT, IndexT, DistanceT>
+                                        const distance_t* dataset_norms = nullptr)
+  -> dataset_descriptor_host<DataT, index_t, distance_t>
 {
   auto key = descriptor_cache::make_key(params, dataset, metric);
   auto& cache =
-    raft::resource::get_custom_resource<descriptor_cache::store<DataT, IndexT, DistanceT>>(res)
+    raft::resource::get_custom_resource<descriptor_cache::store<DataT, index_t, distance_t>>(res)
       ->value;
-  dataset_descriptor_host<DataT, IndexT, DistanceT> desc;
+  dataset_descriptor_host<DataT, index_t, distance_t> desc;
   if (!cache.get(key, &desc)) {
     desc =
-      dataset_descriptor_init<DataT, IndexT, DistanceT>(params, dataset, metric, dataset_norms);
+      dataset_descriptor_init<DataT, index_t, distance_t>(params, dataset, metric, dataset_norms);
     cache.set(key, desc);
   }
   return desc;

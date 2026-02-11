@@ -12,34 +12,34 @@
 
 namespace cuvs::neighbors::ball_cover::detail {
 
-template <typename value_t, typename value_int>
-struct DistFunc {
+template <typename value_t, typename ValueInt>  // NOLINT(readability-identifier-naming)
+struct dist_func {
   virtual __device__ __host__ __forceinline__ auto operator()(const value_t* a,
                                                               const value_t* b,
-                                                              const value_int n_dims) -> value_t
+                                                              const ValueInt n_dims) -> value_t
   {
     return -1;
   };
 };
 
-template <typename value_t, typename value_int>
-struct HaversineFunc : public DistFunc<value_t, value_int> {
+template <typename value_t, typename ValueInt>  // NOLINT(readability-identifier-naming)
+struct haversine_func : public dist_func<value_t, ValueInt> {
   __device__ __host__ __forceinline__ auto operator()(const value_t* a,
                                                       const value_t* b,
-                                                      const value_int n_dims) -> value_t override
+                                                      const ValueInt n_dims) -> value_t override
   {
     return cuvs::neighbors::detail::compute_haversine<value_t, value_t>(a[0], b[0], a[1], b[1]);
   }
 };
 
-template <typename value_t, typename value_int>
-struct EuclideanFunc : public DistFunc<value_t, value_int> {
+template <typename value_t, typename ValueInt>  // NOLINT(readability-identifier-naming)
+struct euclidean_func : public dist_func<value_t, ValueInt> {
   __device__ __host__ __forceinline__ auto operator()(const value_t* a,
                                                       const value_t* b,
-                                                      const value_int n_dims) -> value_t override
+                                                      const ValueInt n_dims) -> value_t override
   {
     value_t sum_sq = 0;
-    for (value_int i = 0; i < n_dims; ++i) {
+    for (ValueInt i = 0; i < n_dims; ++i) {
       value_t diff = a[i] - b[i];
       sum_sq += diff * diff;
     }
@@ -48,14 +48,14 @@ struct EuclideanFunc : public DistFunc<value_t, value_int> {
   }
 };
 
-template <typename value_t, typename value_int>
-struct EuclideanSqFunc : public DistFunc<value_t, value_int> {
+template <typename value_t, typename ValueInt>  // NOLINT(readability-identifier-naming)
+struct euclidean_sq_func : public dist_func<value_t, ValueInt> {
   __device__ __host__ __forceinline__ auto operator()(const value_t* a,
                                                       const value_t* b,
-                                                      const value_int n_dims) -> value_t override
+                                                      const ValueInt n_dims) -> value_t override
   {
     value_t sum_sq = 0;
-    for (value_int i = 0; i < n_dims; ++i) {
+    for (ValueInt i = 0; i < n_dims; ++i) {
       value_t diff = a[i] - b[i];
       sum_sq += diff * diff;
     }
@@ -64,18 +64,18 @@ struct EuclideanSqFunc : public DistFunc<value_t, value_int> {
 };
 
 // Direct distance function for use in kernels that need metric information
-template <typename value_t, typename value_int>
+template <typename value_t, typename ValueInt>  // NOLINT(readability-identifier-naming)
 __device__ __host__ __forceinline__ auto compute_distance_by_metric(
-  const value_t* a, const value_t* b, const value_int n_dims, cuvs::distance::DistanceType metric)
+  const value_t* a, const value_t* b, const ValueInt n_dims, cuvs::distance::DistanceType metric)
   -> value_t
 {
   if (metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
       metric == cuvs::distance::DistanceType::L2SqrtUnexpanded) {
     // Euclidean distance implementation
-    return EuclideanFunc<value_t, value_int>{}(a, b, n_dims);
+    return euclidean_func<value_t, ValueInt>{}(a, b, n_dims);
   } else if (metric == cuvs::distance::DistanceType::Haversine) {
     // Haversine distance implementation
-    return HaversineFunc<value_t, value_int>{}(a, b, n_dims);
+    return haversine_func<value_t, ValueInt>{}(a, b, n_dims);
   }
 
   // Default case

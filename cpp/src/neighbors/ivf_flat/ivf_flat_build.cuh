@@ -91,7 +91,7 @@ auto clone(const raft::resources& res, const index<T, IdxT>& source) -> index<T,
  *
  * @tparam T      element type.
  * @tparam IdxT   type of the vector ids in the index (corresponds to second arg ofindex<T, IdxT>)
- * @tparam LabelT label type
+ * @tparam label_t label type
  * @tparam SourceIndexT input index type (usually same as IdxT)
  * @tparam gather_src if false, then we build the index from vectors source_vecs[i,:], otherwise
  *     we use source_vecs[source_ixs[i],:]. In both cases i=0..n_rows-1.
@@ -109,8 +109,8 @@ auto clone(const raft::resources& res, const index<T, IdxT>& source) -> index<T,
  * @param veclen size of vectorized loads/stores; must satisfy `dim % veclen == 0`.
  *
  */
-template <typename T, typename IdxT, typename LabelT, typename SourceIdxT, bool gather_src = false>
-RAFT_KERNEL build_index_kernel(const LabelT* labels,
+template <typename T, typename IdxT, typename label_t, typename SourceIdxT, bool gather_src = false>
+RAFT_KERNEL build_index_kernel(const label_t* labels,
                                const T* source_vecs,
                                const SourceIdxT* source_ixs,
                                T** list_data_ptrs,
@@ -144,10 +144,10 @@ RAFT_KERNEL build_index_kernel(const LabelT* labels,
   auto group_offset       = interleaved_group::roundDown(inlist_id);
   auto ingroup_id         = interleaved_group::mod(inlist_id) * veclen;
 
-  // Point to the location of the interleaved group of vectors
+  // point to the location of the interleaved group of vectors
   list_data += group_offset * dim;
 
-  // Point to the source vector
+  // point to the source vector
   if constexpr (gather_src) {
     source_vecs += source_ix * dim;
   } else {
@@ -170,7 +170,7 @@ void extend(raft::resources const& handle,
             const IdxT* new_indices,
             IdxT n_rows)
 {
-  using LabelT = uint32_t;
+  using label_t = uint32_t;
   RAFT_EXPECTS(index != nullptr, "index cannot be empty.");
 
   auto stream  = raft::resource::get_cuda_stream(handle);
@@ -184,7 +184,7 @@ void extend(raft::resources const& handle,
   RAFT_EXPECTS(new_indices != nullptr || index->size() == 0,
                "You must pass data indices when the index is non-empty.");
 
-  auto new_labels = raft::make_device_mdarray<LabelT>(
+  auto new_labels = raft::make_device_mdarray<label_t>(
     handle, raft::resource::get_large_workspace_resource(handle), raft::make_extents<IdxT>(n_rows));
   cuvs::cluster::kmeans::balanced_params kmeans_params;
   kmeans_params.metric = index->metric();
@@ -217,7 +217,7 @@ void extend(raft::resources const& handle,
   for (const auto& batch : vec_batches) {
     auto batch_data_view =
       raft::make_device_matrix_view<const T, IdxT>(batch.data(), batch.size(), index->dim());
-    auto batch_labels_view = raft::make_device_vector_view<LabelT, IdxT>(
+    auto batch_labels_view = raft::make_device_vector_view<label_t, IdxT>(
       new_labels.data_handle() + batch.offset(), batch.size());
     cuvs::cluster::kmeans::predict(
       handle, kmeans_params, batch_data_view, orig_centroids_view, batch_labels_view);
@@ -242,7 +242,7 @@ void extend(raft::resources const& handle,
     for (const auto& batch : vec_batches) {
       auto batch_data_view =
         raft::make_device_matrix_view<const T, IdxT>(batch.data(), batch.size(), index->dim());
-      auto batch_labels_view = raft::make_device_vector_view<const LabelT, IdxT>(
+      auto batch_labels_view = raft::make_device_vector_view<const label_t, IdxT>(
         new_labels.data_handle() + batch.offset(), batch.size());
       cuvs::cluster::kmeans_balanced::helpers::calc_centers_and_sizes(handle,
                                                                       batch_data_view,
@@ -299,7 +299,7 @@ void extend(raft::resources const& handle,
     // Kernel to insert the new vectors
     const dim3 block_dim(256);
     const dim3 grid_dim(raft::ceildiv<IdxT>(batch.size(), block_dim.x));
-    build_index_kernel<T, IdxT, LabelT>
+    build_index_kernel<T, IdxT, label_t>
       <<<grid_dim, block_dim, 0, stream>>>(new_labels.data_handle() + batch.offset(),
                                            batch_data_view.data_handle(),
                                            idx_batch->data(),
@@ -457,21 +457,21 @@ inline void fill_refinement_index(raft::resources const& handle,
                                   IdxT n_queries,
                                   uint32_t n_candidates)
 {
-  using LabelT = uint32_t;
+  using label_t = uint32_t;
 
   auto stream      = raft::resource::get_cuda_stream(handle);
   uint32_t n_lists = n_queries;
   common::nvtx::range<common::nvtx::domain::cuvs> fun_scope(
     "ivf_flat::fill_refinement_index(%zu, %u)", size_t(n_queries));
 
-  rmm::device_uvector<LabelT> new_labels(
+  rmm::device_uvector<label_t> new_labels(
     n_queries * n_candidates, stream, raft::resource::get_workspace_resource(handle));
   auto new_labels_view =
-    raft::make_device_vector_view<LabelT, IdxT>(new_labels.data(), n_queries * n_candidates);
+    raft::make_device_vector_view<label_t, IdxT>(new_labels.data(), n_queries * n_candidates);
   raft::linalg::map_offset(
     handle,
     new_labels_view,
-    raft::compose_op(raft::cast_op<LabelT>(), raft::div_const_op<IdxT>(n_candidates)));
+    raft::compose_op(raft::cast_op<label_t>(), raft::div_const_op<IdxT>(n_candidates)));
 
   auto list_sizes_ptr = refinement_index->list_sizes().data_handle();
   // We do not fill centers and center norms, since we will not run coarse search.
@@ -490,7 +490,7 @@ inline void fill_refinement_index(raft::resources const& handle,
 
   const dim3 block_dim(256);
   const dim3 grid_dim(raft::ceildiv<IdxT>(n_queries * n_candidates, block_dim.x));
-  build_index_kernel<T, IdxT, LabelT, CandidateIdxT, true>
+  build_index_kernel<T, IdxT, label_t, CandidateIdxT, true>
     <<<grid_dim, block_dim, 0, stream>>>(new_labels.data(),
                                          dataset,
                                          candidate_idx,

@@ -21,13 +21,13 @@
 
 namespace cuvs::distance::detail::sparse {
 // @TODO: Move this into sparse prims (coo_norm)
-template <typename value_idx, typename value_t>
+template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
 RAFT_KERNEL compute_binary_row_norm_kernel(value_t* out,
-                                           const value_idx* __restrict__ coo_rows,
+                                           const ValueIdx* __restrict__ coo_rows,
                                            const value_t* __restrict__ data,
-                                           value_idx nnz)
+                                           ValueIdx nnz)
 {
-  value_idx i = blockDim.x * blockIdx.x + threadIdx.x;
+  ValueIdx i = blockDim.x * blockIdx.x + threadIdx.x;
   if (i < nnz) {
     // We do conditional here only because it's
     // possible there could be some stray zeros in
@@ -37,89 +37,98 @@ RAFT_KERNEL compute_binary_row_norm_kernel(value_t* out,
   }
 }
 
-template <typename value_idx, typename value_t, typename expansion_f>
+template <typename ValueIdx,
+          typename value_t,
+          typename ExpansionF>  // NOLINT(readability-identifier-naming)
 RAFT_KERNEL compute_binary_warp_kernel(value_t* __restrict__ C,
-                                       const value_t* __restrict__ Q_norms,
-                                       const value_t* __restrict__ R_norms,
-                                       value_idx n_rows,
-                                       value_idx n_cols,
-                                       expansion_f expansion_func)
+                                       const value_t* __restrict__ q_norms,
+                                       const value_t* __restrict__ r_norms,
+                                       ValueIdx n_rows,
+                                       ValueIdx n_cols,
+                                       ExpansionF expansion_func)
 {
   std::size_t tid = blockDim.x * blockIdx.x + threadIdx.x;
-  value_idx i     = tid / n_cols;
-  value_idx j     = tid % n_cols;
+  ValueIdx i      = tid / n_cols;
+  ValueIdx j      = tid % n_cols;
 
   if (i >= n_rows || j >= n_cols) return;
 
-  value_t q_norm            = Q_norms[i];
-  value_t r_norm            = R_norms[j];
+  value_t q_norm            = q_norms[i];
+  value_t r_norm            = r_norms[j];
   value_t dot               = C[(size_t)i * n_cols + j];
   C[(size_t)i * n_cols + j] = expansion_func(dot, q_norm, r_norm);
 }
 
-template <typename value_idx, typename value_t, typename expansion_f, int tpb = 1024>
+template <typename ValueIdx,
+          typename value_t,
+          typename ExpansionF,
+          int tpb = 1024>  // NOLINT(readability-identifier-naming)
 void compute_binary(value_t* C,
-                    const value_t* Q_norms,
-                    const value_t* R_norms,
-                    value_idx n_rows,
-                    value_idx n_cols,
-                    expansion_f expansion_func,
+                    const value_t* q_norms,
+                    const value_t* r_norms,
+                    ValueIdx n_rows,
+                    ValueIdx n_cols,
+                    ExpansionF expansion_func,
                     cudaStream_t stream)
 {
   int blocks = raft::ceildiv<size_t>((size_t)n_rows * n_cols, tpb);
   compute_binary_warp_kernel<<<blocks, tpb, 0, stream>>>(
-    C, Q_norms, R_norms, n_rows, n_cols, expansion_func);
+    C, q_norms, r_norms, n_rows, n_cols, expansion_func);
 }
 
-template <typename value_idx, typename value_t, typename expansion_f, int tpb = 1024>
+template <typename ValueIdx,
+          typename value_t,
+          typename ExpansionF,
+          int tpb = 1024>  // NOLINT(readability-identifier-naming)
 void compute_bin_distance(value_t* out,
-                          const value_idx* Q_coo_rows,
+                          const ValueIdx* Q_coo_rows,
                           const value_t* Q_data,
-                          value_idx Q_nnz,
-                          const value_idx* R_coo_rows,
+                          ValueIdx Q_nnz,
+                          const ValueIdx* R_coo_rows,
                           const value_t* R_data,
-                          value_idx R_nnz,
-                          value_idx m,
-                          value_idx n,
+                          ValueIdx R_nnz,
+                          ValueIdx m,
+                          ValueIdx n,
                           cudaStream_t stream,
-                          expansion_f expansion_func)
+                          ExpansionF expansion_func)
 {
-  rmm::device_uvector<value_t> Q_norms(m, stream);
-  rmm::device_uvector<value_t> R_norms(n, stream);
-  RAFT_CUDA_TRY(cudaMemsetAsync(Q_norms.data(), 0, Q_norms.size() * sizeof(value_t)));
-  RAFT_CUDA_TRY(cudaMemsetAsync(R_norms.data(), 0, R_norms.size() * sizeof(value_t)));
+  rmm::device_uvector<value_t> q_norms(m, stream);
+  rmm::device_uvector<value_t> r_norms(n, stream);
+  RAFT_CUDA_TRY(cudaMemsetAsync(q_norms.data(), 0, q_norms.size() * sizeof(value_t)));
+  RAFT_CUDA_TRY(cudaMemsetAsync(r_norms.data(), 0, r_norms.size() * sizeof(value_t)));
 
   compute_binary_row_norm_kernel<<<raft::ceildiv(Q_nnz, tpb), tpb, 0, stream>>>(
-    Q_norms.data(), Q_coo_rows, Q_data, Q_nnz);
+    q_norms.data(), Q_coo_rows, Q_data, Q_nnz);
   compute_binary_row_norm_kernel<<<raft::ceildiv(R_nnz, tpb), tpb, 0, stream>>>(
-    R_norms.data(), R_coo_rows, R_data, R_nnz);
+    r_norms.data(), R_coo_rows, R_data, R_nnz);
 
-  compute_binary(out, Q_norms.data(), R_norms.data(), m, n, expansion_func, stream);
+  compute_binary(out, q_norms.data(), r_norms.data(), m, n, expansion_func, stream);
 }
 
 /**
  * Jaccard distance using the expanded form:
  * 1 - (sum(x_k * y_k) / ((sum(x_k) + sum(y_k)) - sum(x_k * y_k))
  */
-template <typename value_idx = int, typename value_t = float>
+template <typename ValueIdx = int,
+          typename value_t  = float>  // NOLINT(readability-identifier-naming)
 class jaccard_expanded_distances_t : public distances_t<value_t> {
  public:
-  explicit jaccard_expanded_distances_t(const distances_config_t<value_idx, value_t>& config)
+  explicit jaccard_expanded_distances_t(const distances_config_t<ValueIdx, value_t>& config)
     : config_(&config),
-      workspace(0, raft::resource::get_cuda_stream(config.handle)),
-      ip_dists(config)
+      workspace_(0, raft::resource::get_cuda_stream(config.handle)),
+      ip_dists_(config)
   {
   }
 
   void compute(value_t* out_dists)
   {
-    ip_dists.compute(out_dists);
+    ip_dists_.compute(out_dists);
 
-    value_idx* b_indices = ip_dists.b_rows_coo();
-    value_t* b_data      = ip_dists.b_data_coo();
+    ValueIdx* b_indices = ip_dists_.b_rows_coo();
+    value_t* b_data     = ip_dists_.b_data_coo();
 
-    rmm::device_uvector<value_idx> search_coo_rows(
-      config_->a_nnz, raft::resource::get_cuda_stream(config_->handle));
+    rmm::device_uvector<ValueIdx> search_coo_rows(config_->a_nnz,
+                                                  raft::resource::get_cuda_stream(config_->handle));
     raft::sparse::convert::csr_to_coo(config_->a_indptr,
                                       config_->a_nrows,
                                       search_coo_rows.data(),
@@ -152,34 +161,35 @@ class jaccard_expanded_distances_t : public distances_t<value_t> {
   ~jaccard_expanded_distances_t() = default;
 
  private:
-  const distances_config_t<value_idx, value_t>* config_;
-  rmm::device_uvector<char> workspace;
-  ip_distances_t<value_idx, value_t> ip_dists;
+  const distances_config_t<ValueIdx, value_t>* config_;
+  rmm::device_uvector<char> workspace_;
+  ip_distances_t<ValueIdx, value_t> ip_dists_;
 };
 
 /**
  * Dice distance using the expanded form:
  * 1 - ((2 * sum(x_k * y_k)) / (sum(x_k) + sum(y_k)))
  */
-template <typename value_idx = int, typename value_t = float>
+template <typename ValueIdx = int,
+          typename value_t  = float>  // NOLINT(readability-identifier-naming)
 class dice_expanded_distances_t : public distances_t<value_t> {
  public:
-  explicit dice_expanded_distances_t(const distances_config_t<value_idx, value_t>& config)
+  explicit dice_expanded_distances_t(const distances_config_t<ValueIdx, value_t>& config)
     : config_(&config),
-      workspace(0, raft::resource::get_cuda_stream(config.handle)),
-      ip_dists(config)
+      workspace_(0, raft::resource::get_cuda_stream(config.handle)),
+      ip_dists_(config)
   {
   }
 
   void compute(value_t* out_dists)
   {
-    ip_dists.compute(out_dists);
+    ip_dists_.compute(out_dists);
 
-    value_idx* b_indices = ip_dists.b_rows_coo();
-    value_t* b_data      = ip_dists.b_data_coo();
+    ValueIdx* b_indices = ip_dists_.b_rows_coo();
+    value_t* b_data     = ip_dists_.b_data_coo();
 
-    rmm::device_uvector<value_idx> search_coo_rows(
-      config_->a_nnz, raft::resource::get_cuda_stream(config_->handle));
+    rmm::device_uvector<ValueIdx> search_coo_rows(config_->a_nnz,
+                                                  raft::resource::get_cuda_stream(config_->handle));
     raft::sparse::convert::csr_to_coo(config_->a_indptr,
                                       config_->a_nrows,
                                       search_coo_rows.data(),
@@ -208,9 +218,9 @@ class dice_expanded_distances_t : public distances_t<value_t> {
   ~dice_expanded_distances_t() = default;
 
  private:
-  const distances_config_t<value_idx, value_t>* config_;
-  rmm::device_uvector<char> workspace;
-  ip_distances_t<value_idx, value_t> ip_dists;
+  const distances_config_t<ValueIdx, value_t>* config_;
+  rmm::device_uvector<char> workspace_;
+  ip_distances_t<ValueIdx, value_t> ip_dists_;
 };
 
 }  // namespace cuvs::distance::detail::sparse

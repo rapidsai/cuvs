@@ -460,9 +460,10 @@ void RBFKernel<MathT>::applyKernel(MathT* inout,
 }
 
 template <typename MathT>
-void RBFKernel<MathT>::matrixRowNormL2(raft::resources const& handle,
-                                       dense_input_matrix_view_t<MathT> matrix,
-                                       MathT* target)
+void RBFKernel<MathT>::matrixRowNormL2(
+  raft::resources const& handle,  // NOLINT(readability-identifier-naming)
+  dense_input_matrix_view_t<MathT> matrix,
+  MathT* target)
 {
   bool is_row_major = GramMatrixBase<MathT>::get_is_row_major(matrix);
   int minor         = is_row_major ? matrix.extent(1) : matrix.extent(0);
@@ -484,9 +485,10 @@ void RBFKernel<MathT>::matrixRowNormL2(raft::resources const& handle,
 }
 
 template <typename MathT>
-void RBFKernel<MathT>::matrixRowNormL2(raft::resources const& handle,
-                                       csr_input_matrix_view_t<MathT> matrix,
-                                       MathT* target)
+void RBFKernel<MathT>::matrixRowNormL2(
+  raft::resources const& handle,  // NOLINT(readability-identifier-naming)
+  csr_input_matrix_view_t<MathT> matrix,
+  MathT* target)
 {
   auto matrix_structure = matrix.structure_view();
   raft::sparse::linalg::rowNormCsr(handle,

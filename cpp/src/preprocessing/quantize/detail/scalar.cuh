@@ -30,54 +30,54 @@ _RAFT_HOST_DEVICE auto fp_lt(const half& a, const half& b) -> bool
 
 template <typename T, typename QuantI, typename TempT = double>
 struct quantize_op {
-  const T min_;
-  const T max_;
-  const QuantI q_type_min_ = std::numeric_limits<QuantI>::min();
-  const QuantI q_type_max_ = std::numeric_limits<QuantI>::max();
-  const TempT scalar_;
-  const TempT offset_;
+  const T min_;  // NOLINT(readability-identifier-naming)
+  const T max_;  // NOLINT(readability-identifier-naming)
+  const QuantI q_type_min = std::numeric_limits<QuantI>::min();
+  const QuantI q_type_max = std::numeric_limits<QuantI>::max();
+  const TempT scalar;
+  const TempT offset;
 
   constexpr explicit quantize_op(T min, T max)
     : min_(min),
       max_(max),
-      scalar_(static_cast<TempT>(max_) > static_cast<TempT>(min_)
-                ? ((static_cast<TempT>(q_type_max_) - static_cast<TempT>(q_type_min_)) /
-                   (static_cast<TempT>(max_) - static_cast<TempT>(min_)))
-                : static_cast<TempT>(1)),
-      offset_(static_cast<TempT>(q_type_min_) - static_cast<TempT>(min_) * scalar_)
+      scalar(static_cast<TempT>(max_) > static_cast<TempT>(min_)
+               ? ((static_cast<TempT>(q_type_max) - static_cast<TempT>(q_type_min)) /
+                  (static_cast<TempT>(max_) - static_cast<TempT>(min_)))
+               : static_cast<TempT>(1)),
+      offset(static_cast<TempT>(q_type_min) - static_cast<TempT>(min_) * scalar)
   {
   }
 
   constexpr RAFT_INLINE_FUNCTION auto operator()(const T& x) const -> QuantI
   {
-    if (!fp_lt(min_, x)) return q_type_min_;
-    if (!fp_lt(x, max_)) return q_type_max_;
-    return static_cast<QuantI>(lroundf(scalar_ * static_cast<TempT>(x) + offset_));
+    if (!fp_lt(min_, x)) return q_type_min;
+    if (!fp_lt(x, max_)) return q_type_max;
+    return static_cast<QuantI>(lroundf(scalar * static_cast<TempT>(x) + offset));
   }
 
   constexpr RAFT_INLINE_FUNCTION auto operator()(const QuantI& x) const -> T
   {
-    return static_cast<T>((static_cast<TempT>(x) - offset_) / scalar_);
+    return static_cast<T>((static_cast<TempT>(x) - offset) / scalar);
   }
 };
 
-template <typename T, typename IdxT = int64_t, typename accessor>
+template <typename T, typename IdxT = int64_t, typename Accessor>
 auto quantile_min_max(
   raft::resources const& res,
-  raft::mdspan<const T, raft::matrix_extent<IdxT>, raft::row_major, accessor> dataset,
+  raft::mdspan<const T, raft::matrix_extent<IdxT>, raft::row_major, Accessor> dataset,
   double quantile) -> std::tuple<T, T>
 {
   // settings for quantile approximation
-  constexpr size_t max_num_samples = 1000000;
-  constexpr int seed               = 137;
+  constexpr size_t kMaxNumSamples = 1000000;
+  constexpr int kSeed             = 137;
 
   cudaStream_t stream = raft::resource::get_cuda_stream(res);
 
   // select subsample
-  raft::random::RngState rng(seed);
+  raft::random::RngState rng(kSeed);
   size_t n_rows        = dataset.extent(0);
   size_t dim           = dataset.extent(1);
-  size_t n_sample_rows = std::min<size_t>(std::ceil(max_num_samples / dim), n_rows);
+  size_t n_sample_rows = std::min<size_t>(std::ceil(kMaxNumSamples / dim), n_rows);
 
   // select subsample rows (this returns device data for both device and host input)
   auto subset = raft::matrix::sample_rows(res, rng, dataset, static_cast<IdxT>(n_sample_rows));

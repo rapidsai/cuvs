@@ -16,118 +16,118 @@
 
 namespace cuvs::distance::detail::sparse {
 
-template <typename value_idx, typename value_t, int tpb>
+template <typename ValueIdx, typename value_t, int tpb>  // NOLINT(readability-identifier-naming)
 class coo_spmv_strategy {
  public:
-  explicit coo_spmv_strategy(const distances_config_t<value_idx, value_t>& config_)
-    : config(config_)
+  explicit coo_spmv_strategy(const distances_config_t<ValueIdx, value_t>& config_)
+    : config_(config_)
   {
-    smem = raft::getSharedMemPerBlock();
+    smem_ = raft::getSharedMemPerBlock();
   }
 
-  template <typename strategy_t,
-            typename indptr_it,
-            typename product_f,
-            typename accum_f,
-            typename write_f>
-  void _dispatch_base(strategy_t& strategy,
-                      int smem_dim,
-                      indptr_it& a_indptr,
-                      value_t* out_dists,
-                      value_idx* coo_rows_b,
-                      product_f product_func,
-                      accum_f accum_func,
-                      write_f write_func,
-                      int chunk_size,
-                      int n_blocks,
-                      int n_blocks_per_row)
+  template <typename StrategyT,
+            typename IndptrIt,
+            typename ProductF,
+            typename AccumF,
+            typename WriteF>
+  void dispatch_base(StrategyT& strategy,
+                     int smem_dim,
+                     IndptrIt& a_indptr,
+                     value_t* out_dists,
+                     ValueIdx* coo_rows_b,
+                     ProductF product_func,
+                     AccumF accum_func,
+                     WriteF write_func,
+                     int chunk_size,
+                     int n_blocks,
+                     int n_blocks_per_row)
   {
-    RAFT_CUDA_TRY(cudaFuncSetCacheConfig(balanced_coo_generalized_spmv_kernel<strategy_t,
-                                                                              indptr_it,
-                                                                              value_idx,
+    RAFT_CUDA_TRY(cudaFuncSetCacheConfig(balanced_coo_generalized_spmv_kernel<StrategyT,
+                                                                              IndptrIt,
+                                                                              ValueIdx,
                                                                               value_t,
                                                                               false,
                                                                               tpb,
-                                                                              product_f,
-                                                                              accum_f,
-                                                                              write_f>,
+                                                                              ProductF,
+                                                                              AccumF,
+                                                                              WriteF>,
                                          cudaFuncCachePreferShared));
 
-    balanced_coo_generalized_spmv_kernel<strategy_t, indptr_it, value_idx, value_t, false, tpb>
-      <<<n_blocks, tpb, smem, raft::resource::get_cuda_stream(config.handle)>>>(strategy,
-                                                                                a_indptr,
-                                                                                config.a_indices,
-                                                                                config.a_data,
-                                                                                config.a_nnz,
-                                                                                coo_rows_b,
-                                                                                config.b_indices,
-                                                                                config.b_data,
-                                                                                config.a_nrows,
-                                                                                config.b_nrows,
-                                                                                smem_dim,
-                                                                                config.b_nnz,
-                                                                                out_dists,
-                                                                                n_blocks_per_row,
-                                                                                chunk_size,
-                                                                                config.b_ncols,
-                                                                                product_func,
-                                                                                accum_func,
-                                                                                write_func);
+    balanced_coo_generalized_spmv_kernel<StrategyT, IndptrIt, ValueIdx, value_t, false, tpb>
+      <<<n_blocks, tpb, smem_, raft::resource::get_cuda_stream(config_.handle)>>>(strategy,
+                                                                                  a_indptr,
+                                                                                  config_.a_indices,
+                                                                                  config_.a_data,
+                                                                                  config_.a_nnz,
+                                                                                  coo_rows_b,
+                                                                                  config_.b_indices,
+                                                                                  config_.b_data,
+                                                                                  config_.a_nrows,
+                                                                                  config_.b_nrows,
+                                                                                  smem_dim,
+                                                                                  config_.b_nnz,
+                                                                                  out_dists,
+                                                                                  n_blocks_per_row,
+                                                                                  chunk_size,
+                                                                                  config_.b_ncols,
+                                                                                  product_func,
+                                                                                  accum_func,
+                                                                                  write_func);
   }
 
-  template <typename strategy_t,
-            typename indptr_it,
-            typename product_f,
-            typename accum_f,
-            typename write_f>
-  void _dispatch_base_rev(strategy_t& strategy,
-                          int smem_dim,
-                          indptr_it& b_indptr,
-                          value_t* out_dists,
-                          value_idx* coo_rows_a,
-                          product_f product_func,
-                          accum_f accum_func,
-                          write_f write_func,
-                          int chunk_size,
-                          int n_blocks,
-                          int n_blocks_per_row)
+  template <typename StrategyT,
+            typename IndptrIt,
+            typename ProductF,
+            typename AccumF,
+            typename WriteF>
+  void dispatch_base_rev(StrategyT& strategy,
+                         int smem_dim,
+                         IndptrIt& b_indptr,
+                         value_t* out_dists,
+                         ValueIdx* coo_rows_a,
+                         ProductF product_func,
+                         AccumF accum_func,
+                         WriteF write_func,
+                         int chunk_size,
+                         int n_blocks,
+                         int n_blocks_per_row)
   {
-    RAFT_CUDA_TRY(cudaFuncSetCacheConfig(balanced_coo_generalized_spmv_kernel<strategy_t,
-                                                                              indptr_it,
-                                                                              value_idx,
+    RAFT_CUDA_TRY(cudaFuncSetCacheConfig(balanced_coo_generalized_spmv_kernel<StrategyT,
+                                                                              IndptrIt,
+                                                                              ValueIdx,
                                                                               value_t,
                                                                               true,
                                                                               tpb,
-                                                                              product_f,
-                                                                              accum_f,
-                                                                              write_f>,
+                                                                              ProductF,
+                                                                              AccumF,
+                                                                              WriteF>,
                                          cudaFuncCachePreferShared));
 
-    balanced_coo_generalized_spmv_kernel<strategy_t, indptr_it, value_idx, value_t, true, tpb>
-      <<<n_blocks, tpb, smem, raft::resource::get_cuda_stream(config.handle)>>>(strategy,
-                                                                                b_indptr,
-                                                                                config.b_indices,
-                                                                                config.b_data,
-                                                                                config.b_nnz,
-                                                                                coo_rows_a,
-                                                                                config.a_indices,
-                                                                                config.a_data,
-                                                                                config.b_nrows,
-                                                                                config.a_nrows,
-                                                                                smem_dim,
-                                                                                config.a_nnz,
-                                                                                out_dists,
-                                                                                n_blocks_per_row,
-                                                                                chunk_size,
-                                                                                config.a_ncols,
-                                                                                product_func,
-                                                                                accum_func,
-                                                                                write_func);
+    balanced_coo_generalized_spmv_kernel<StrategyT, IndptrIt, ValueIdx, value_t, true, tpb>
+      <<<n_blocks, tpb, smem_, raft::resource::get_cuda_stream(config_.handle)>>>(strategy,
+                                                                                  b_indptr,
+                                                                                  config_.b_indices,
+                                                                                  config_.b_data,
+                                                                                  config_.b_nnz,
+                                                                                  coo_rows_a,
+                                                                                  config_.a_indices,
+                                                                                  config_.a_data,
+                                                                                  config_.b_nrows,
+                                                                                  config_.a_nrows,
+                                                                                  smem_dim,
+                                                                                  config_.a_nnz,
+                                                                                  out_dists,
+                                                                                  n_blocks_per_row,
+                                                                                  chunk_size,
+                                                                                  config_.a_ncols,
+                                                                                  product_func,
+                                                                                  accum_func,
+                                                                                  write_func);
   }
 
  protected:
-  int smem;
-  const distances_config_t<value_idx, value_t>& config;
+  int smem_;
+  const distances_config_t<ValueIdx, value_t>& config_;
 };
 
 }  // namespace cuvs::distance::detail::sparse

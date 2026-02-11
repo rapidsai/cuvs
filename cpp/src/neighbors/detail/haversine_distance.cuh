@@ -14,18 +14,18 @@
 #include <cuda_fp16.h>
 
 namespace cuvs::neighbors::detail {
-template <typename value_t, typename distance_t>
+template <typename value_t, typename distance_t>  // NOLINT(readability-identifier-naming)
 DI auto compute_haversine(value_t x1, value_t y1, value_t x2, value_t y2) -> distance_t
 {
   if constexpr ((std::is_same_v<distance_t, float> && std::is_same_v<value_t, half>)) {
-    distance_t _x1 = __half2float(x1);
-    distance_t _y1 = __half2float(y1);
-    distance_t _x2 = __half2float(x2);
-    distance_t _y2 = __half2float(y2);
+    distance_t x1_f = __half2float(x1);
+    distance_t y1_f = __half2float(y1);
+    distance_t x2_f = __half2float(x2);
+    distance_t y2_f = __half2float(y2);
 
-    distance_t sin_0 = raft::sin(distance_t(0.5) * (_x1 - _y1));
-    distance_t sin_1 = raft::sin(distance_t(0.5) * (_x2 - _y2));
-    distance_t rdist = sin_0 * sin_0 + raft::cos(_x1) * raft::cos(_y1) * sin_1 * sin_1;
+    distance_t sin_0 = raft::sin(distance_t(0.5) * (x1_f - y1_f));
+    distance_t sin_1 = raft::sin(distance_t(0.5) * (x2_f - y2_f));
+    distance_t rdist = sin_0 * sin_0 + raft::cos(x1_f) * raft::cos(y1_f) * sin_1 * sin_1;
 
     return static_cast<distance_t>(2) * raft::asin(raft::sqrt(rdist));
   } else {
@@ -38,7 +38,7 @@ DI auto compute_haversine(value_t x1, value_t y1, value_t x2, value_t y2) -> dis
 }
 
 /**
- * @tparam value_idx data type of indices
+ * @tparam ValueIdx data type of indices
  * @tparam value_t data type of values and distances
  * @tparam warp_q
  * @tparam thread_q
@@ -50,13 +50,13 @@ DI auto compute_haversine(value_t x1, value_t y1, value_t x2, value_t y2) -> dis
  * @param[in] n_index_rows number of rows in index array
  * @param[in] k number of closest neighbors to return
  */
-template <typename value_idx,
-          typename value_t,
+template <typename ValueIdx,
+          typename value_t,  // NOLINT(readability-identifier-naming)
           int warp_q          = 1024,
           int thread_q        = 8,
           int tpb             = 128,
           typename distance_t = float>
-RAFT_KERNEL haversine_knn_kernel(value_idx* out_inds,
+RAFT_KERNEL haversine_knn_kernel(ValueIdx* out_inds,
                                  distance_t* out_dists,
                                  const value_t* index,
                                  const value_t* query,
@@ -65,13 +65,17 @@ RAFT_KERNEL haversine_knn_kernel(value_idx* out_inds,
 {
   constexpr int kNumWarps = tpb / raft::WarpSize;
 
-  __shared__ distance_t smemK[kNumWarps * warp_q];
-  __shared__ value_idx smemV[kNumWarps * warp_q];
+  __shared__ distance_t smem_k[kNumWarps * warp_q];
+  __shared__ ValueIdx smem_v[kNumWarps * warp_q];
 
-  using cuvs::neighbors::detail::faiss_select::BlockSelect;
-  using cuvs::neighbors::detail::faiss_select::Comparator;
-  BlockSelect<distance_t, value_idx, false, Comparator<distance_t>, warp_q, thread_q, tpb> heap(
-    std::numeric_limits<distance_t>::max(), std::numeric_limits<value_idx>::max(), smemK, smemV, k);
+  using cuvs::neighbors::detail::faiss_select::block_select;
+  using cuvs::neighbors::detail::faiss_select::comparator;
+  block_select<distance_t, ValueIdx, false, comparator<distance_t>, warp_q, thread_q, tpb> heap(
+    std::numeric_limits<distance_t>::max(),
+    std::numeric_limits<ValueIdx>::max(),
+    smem_k,
+    smem_v,
+    k);
 
   // Grid is exactly sized to rows available
   int limit = raft::Pow2<raft::WarpSize>::roundDown(n_index_rows);
@@ -100,14 +104,14 @@ RAFT_KERNEL haversine_knn_kernel(value_idx* out_inds,
 
     distance_t dist = compute_haversine<value_t, distance_t>(x1, y1, x2, y2);
 
-    heap.addThreadQ(dist, i);
+    heap.add_thread_q(dist, i);
   }
 
   heap.reduce();
 
   for (int i = threadIdx.x; i < k; i += tpb) {
-    out_dists[blockIdx.x * k + i] = smemK[i];
-    out_inds[blockIdx.x * k + i]  = smemV[i];
+    out_dists[blockIdx.x * k + i] = smem_k[i];
+    out_inds[blockIdx.x * k + i]  = smem_v[i];
   }
 }
 
@@ -116,7 +120,7 @@ RAFT_KERNEL haversine_knn_kernel(value_idx* out_inds,
  * (great circle arc) distance. Input is assumed to have
  * 2 dimensions (latitude, longitude) in radians.
 
- * @tparam value_idx
+ * @tparam ValueIdx
  * @tparam value_t
  * @param[out] out_inds output indices array on device (size n_query_rows * k)
  * @param[out] out_dists output dists array on device (size n_query_rows * k)
@@ -127,8 +131,10 @@ RAFT_KERNEL haversine_knn_kernel(value_idx* out_inds,
  * @param[in] k number of closest neighbors to return
  * @param[in] stream stream to order kernel launch
  */
-template <typename value_idx, typename value_t, typename distance_t = float>
-void haversine_knn(value_idx* out_inds,
+template <typename ValueIdx,
+          typename value_t,
+          typename distance_t = float>  // NOLINT(readability-identifier-naming)
+void haversine_knn(ValueIdx* out_inds,
                    distance_t* out_dists,
                    const value_t* index,
                    const value_t* query,
@@ -139,7 +145,7 @@ void haversine_knn(value_idx* out_inds,
 {
   // ensure kernel does not breach shared memory limits
   constexpr int kWarpQ = sizeof(value_t) > 4 ? 512 : 1024;
-  haversine_knn_kernel<value_idx, value_t, kWarpQ>
+  haversine_knn_kernel<ValueIdx, value_t, kWarpQ>
     <<<n_query_rows, 128, 0, stream>>>(out_inds, out_dists, index, query, n_index_rows, k);
 }
 

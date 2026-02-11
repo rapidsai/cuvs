@@ -139,18 +139,18 @@ instantiate_cuvs_distance_distance_extra(cuvs::distance::DistanceType::L2Unexpan
 
 #undef instantiate_cuvs_distance_distance_extra
 
-#define instantiate_cuvs_distance_getWorkspaceSize(DistT, DataT, AccT, OutT, IdxT)             \
-  template auto cuvs::distance::getWorkspaceSize<DistT, DataT, AccT, OutT, IdxT>(              \
-    const DataT* x, const DataT* y, IdxT m, IdxT n, IdxT k) -> size_t;                         \
-                                                                                               \
-  template auto                                                                                \
-  cuvs::distance::getWorkspaceSize<DistT, DataT, AccT, OutT, IdxT, raft::layout_f_contiguous>( \
-    raft::device_matrix_view<DataT, IdxT, raft::layout_f_contiguous> const& x,                 \
-    raft::device_matrix_view<DataT, IdxT, raft::layout_f_contiguous> const& y) -> size_t;      \
-                                                                                               \
-  template auto                                                                                \
-  cuvs::distance::getWorkspaceSize<DistT, DataT, AccT, OutT, IdxT, raft::layout_c_contiguous>( \
-    raft::device_matrix_view<DataT, IdxT, raft::layout_c_contiguous> const& x,                 \
+#define instantiate_cuvs_distance_getWorkspaceSize(DistT, DataT, AccT, OutT, IdxT)               \
+  template auto cuvs::distance::get_workspace_size<DistT, DataT, AccT, OutT, IdxT>(              \
+    const DataT* x, const DataT* y, IdxT m, IdxT n, IdxT k) -> size_t;                           \
+                                                                                                 \
+  template auto                                                                                  \
+  cuvs::distance::get_workspace_size<DistT, DataT, AccT, OutT, IdxT, raft::layout_f_contiguous>( \
+    raft::device_matrix_view<DataT, IdxT, raft::layout_f_contiguous> const& x,                   \
+    raft::device_matrix_view<DataT, IdxT, raft::layout_f_contiguous> const& y) -> size_t;        \
+                                                                                                 \
+  template auto                                                                                  \
+  cuvs::distance::get_workspace_size<DistT, DataT, AccT, OutT, IdxT, raft::layout_c_contiguous>( \
+    raft::device_matrix_view<DataT, IdxT, raft::layout_c_contiguous> const& x,                   \
     raft::device_matrix_view<DataT, IdxT, raft::layout_c_contiguous> const& y) -> size_t
 
 #define instantiate_cuvs_distance_getWorkspaceSize_by_algo(DistT)                     \

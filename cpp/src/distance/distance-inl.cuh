@@ -132,9 +132,9 @@ template <cuvs::distance::DistanceType DistT,
           typename AccT,
           typename OutT,
           typename IdxT = int>
-auto getWorkspaceSize(const DataT* x, const DataT* y, IdxT m, IdxT n, IdxT k) -> size_t
+auto get_workspace_size(const DataT* x, const DataT* y, IdxT m, IdxT n, IdxT k) -> size_t
 {
-  return detail::getWorkspaceSize<DistT, DataT, AccT, OutT, IdxT>(x, y, m, n, k);
+  return detail::get_workspace_size<DistT, DataT, AccT, OutT, IdxT>(x, y, m, n, k);
 }
 
 /**
@@ -156,13 +156,13 @@ template <cuvs::distance::DistanceType DistT,
           typename AccT,
           typename OutT,
           typename IdxT = int,
-          typename layout>
-auto getWorkspaceSize(raft::device_matrix_view<DataT, IdxT, layout> const& x,
-                      raft::device_matrix_view<DataT, IdxT, layout> const& y) -> size_t
+          typename Layout>
+auto get_workspace_size(raft::device_matrix_view<DataT, IdxT, Layout> const& x,
+                        raft::device_matrix_view<DataT, IdxT, Layout> const& y) -> size_t
 {
   RAFT_EXPECTS(x.extent(1) == y.extent(1), "Number of columns must be equal.");
 
-  return getWorkspaceSize<DistT, DataT, AccT, OutT, IdxT>(
+  return get_workspace_size<DistT, DataT, AccT, OutT, IdxT>(
     x.data_handle(), y.data_handle(), x.extent(0), y.extent(0), x.extent(1));
 }
 
@@ -200,7 +200,7 @@ void distance(raft::resources const& handle,
 {
   auto stream = raft::resource::get_cuda_stream(handle);
   rmm::device_uvector<char> workspace(0, stream);
-  auto worksize = getWorkspaceSize<DistT, DataT, AccT, OutT, IdxT>(x, y, m, n, k);
+  auto worksize = get_workspace_size<DistT, DataT, AccT, OutT, IdxT>(x, y, m, n, k);
   workspace.resize(worksize, stream);
   detail::distance<DistT, DataT, AccT, OutT, IdxT>(
     handle, x, y, dist, m, n, k, workspace.data(), worksize, isRowMajor, metric_arg);
@@ -241,7 +241,7 @@ void pairwise_distance(raft::resources const& handle,
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
   auto dispatch = [&](auto distance_type) -> auto {
-    auto worksize = getWorkspaceSize<distance_type(), Type, DistT, DistT, IdxT>(x, y, m, n, k);
+    auto worksize = get_workspace_size<distance_type(), Type, DistT, DistT, IdxT>(x, y, m, n, k);
     workspace.resize(worksize, stream);
     detail::distance<distance_type(), Type, DistT, DistT, IdxT>(
       handle, x, y, dist, m, n, k, workspace.data(), worksize, isRowMajor, metric_arg);
@@ -382,12 +382,12 @@ template <cuvs::distance::DistanceType DistT,
           typename DataT,
           typename AccT,
           typename OutT,
-          typename layout = raft::layout_c_contiguous,
+          typename Layout = raft::layout_c_contiguous,
           typename IdxT   = int>
 void distance(raft::resources const& handle,
-              raft::device_matrix_view<const DataT, IdxT, layout> const x,
-              raft::device_matrix_view<const DataT, IdxT, layout> const y,
-              raft::device_matrix_view<OutT, IdxT, layout> dist,
+              raft::device_matrix_view<const DataT, IdxT, Layout> const x,
+              raft::device_matrix_view<const DataT, IdxT, Layout> const y,
+              raft::device_matrix_view<OutT, IdxT, Layout> dist,
               OutT metric_arg = 2.0f)
 {
   RAFT_EXPECTS(x.extent(1) == y.extent(1), "Number of columns must be equal.");
@@ -401,7 +401,7 @@ void distance(raft::resources const& handle,
   RAFT_EXPECTS(x.is_exhaustive(), "Input x must be contiguous.");
   RAFT_EXPECTS(y.is_exhaustive(), "Input y must be contiguous.");
 
-  constexpr auto is_rowmajor = std::is_same_v<layout, raft::layout_c_contiguous>;
+  constexpr auto kIsRowmajor = std::is_same_v<Layout, raft::layout_c_contiguous>;
 
   distance<DistT, DataT, AccT, OutT, IdxT>(handle,
                                            x.data_handle(),
@@ -410,7 +410,7 @@ void distance(raft::resources const& handle,
                                            x.extent(0),
                                            y.extent(0),
                                            x.extent(1),
-                                           is_rowmajor,
+                                           kIsRowmajor,
                                            metric_arg);
 }
 
@@ -428,13 +428,13 @@ void distance(raft::resources const& handle,
  * @param metric_arg metric argument (used for Minkowski distance)
  */
 template <typename Type,
-          typename layout = raft::layout_c_contiguous,
+          typename Layout = raft::layout_c_contiguous,
           typename IdxT   = int,
           typename DistT  = Type>
 void pairwise_distance(raft::resources const& handle,
-                       raft::device_matrix_view<const Type, IdxT, layout> const x,
-                       raft::device_matrix_view<const Type, IdxT, layout> const y,
-                       raft::device_matrix_view<DistT, IdxT, layout> dist,
+                       raft::device_matrix_view<const Type, IdxT, Layout> const x,
+                       raft::device_matrix_view<const Type, IdxT, Layout> const y,
+                       raft::device_matrix_view<DistT, IdxT, Layout> dist,
                        cuvs::distance::DistanceType metric,
                        DistT metric_arg = DistT(2.0f))
 {
@@ -450,7 +450,7 @@ void pairwise_distance(raft::resources const& handle,
   RAFT_EXPECTS(y.is_exhaustive(), "Input y must be contiguous.");
   RAFT_EXPECTS(dist.is_exhaustive(), "Output must be contiguous.");
 
-  constexpr auto rowmajor = std::is_same_v<layout, raft::layout_c_contiguous>;
+  constexpr auto kRowmajor = std::is_same_v<Layout, raft::layout_c_contiguous>;
 
   auto stream = raft::resource::get_cuda_stream(handle);
   rmm::device_uvector<char> workspace(0, stream);
@@ -463,7 +463,7 @@ void pairwise_distance(raft::resources const& handle,
                     y.extent(0),
                     x.extent(1),
                     metric,
-                    rowmajor,
+                    kRowmajor,
                     metric_arg);
 }
 

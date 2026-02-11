@@ -45,7 +45,7 @@ template <typename DataT,
           typename FinalLambda,
           typename OpT,
           bool isRowMajor>
-auto cutlassDistanceKernel(const DataT* x,
+auto cutlassDistanceKernel(const DataT* x,  // NOLINT(readability-identifier-naming)
                            const DataT* y,
                            const OutT* xn,
                            const OutT* yn,
@@ -62,9 +62,9 @@ auto cutlassDistanceKernel(const DataT* x,
 {
   static_assert(!(std::is_same_v<OutT, bool>), "OutType bool is not supported use uint8_t instead");
 
-  auto dist_op     = distance_op.get_cutlass_op();
-  using DistanceFn = decltype(dist_op);
-  using EpilogueOutputOp =
+  auto dist_op           = distance_op.get_cutlass_op();
+  using DistanceFn       = decltype(dist_op);  // NOLINT(readability-identifier-naming)
+  using EpilogueOutputOp =                     // NOLINT(readability-identifier-naming)
     epilogue::thread::PairwiseDistanceEpilogueElementwise<OutT,  // ElementC_
                                                           AccT,  // ElementAccumulator_
                                                           AccT,  // ElementCompute_
@@ -73,18 +73,19 @@ auto cutlassDistanceKernel(const DataT* x,
                                                           1,     // Elements per access 1
                                                           DistanceFn,
                                                           FinalLambda>;
-  constexpr int batch_count = 1;
+  constexpr int batch_count = 1;  // NOLINT(readability-identifier-naming)
 
-  constexpr auto mode = cutlass::gemm::GemmUniversalMode::kGemm;
+  constexpr auto mode =
+    cutlass::gemm::GemmUniversalMode::kGemm;  // NOLINT(readability-identifier-naming)
 
   typename EpilogueOutputOp::Params epilog_op_param(dist_op, fin_op);
 
   // Number of pipelines you want to use
-  constexpr int NumStages = 3;
+  constexpr int NumStages = 3;  // NOLINT(readability-identifier-naming)
   // Alignment
-  constexpr int Alignment = VecLen;
+  constexpr int Alignment = VecLen;  // NOLINT(readability-identifier-naming)
 
-  using cutlassDistKernel =
+  using cutlassDistKernel =  // NOLINT(readability-identifier-naming)
     typename gemm::kernel::PairwiseDistanceGemm<DataT,
                                                 Alignment,
                                                 DataT,
@@ -97,14 +98,17 @@ auto cutlassDistanceKernel(const DataT* x,
 
   using cutlassDist = cutlass::gemm::device::GemmUniversalAdapter<cutlassDistKernel>;
 
-  constexpr uint32_t gridYZMax      = ((1 << (sizeof(uint16_t) * 8)) - 1);
-  constexpr uint32_t max_batch_size = gridYZMax * cutlassDistKernel::ThreadblockShape::kN;
-  IdxT numNbatches                  = (n - 1 + max_batch_size) / max_batch_size;
+  constexpr uint32_t gridYZMax =
+    ((1 << (sizeof(uint16_t) * 8)) - 1);  // NOLINT(readability-identifier-naming)
+  constexpr uint32_t max_batch_size =
+    gridYZMax * cutlassDistKernel::ThreadblockShape::kN;  // NOLINT(readability-identifier-naming)
+  IdxT numNbatches =
+    (n - 1 + max_batch_size) / max_batch_size;  // NOLINT(readability-identifier-naming)
 
   for (IdxT i = 0; i < numNbatches; i++) {
     const DataT *a, *b;
     IdxT gemm_lda, gemm_ldb;
-    size_t offsetN = i * max_batch_size;
+    size_t offsetN = i * max_batch_size;  // NOLINT(readability-identifier-naming)
 
     if constexpr (isRowMajor) {
       gemm_lda = ldb;
@@ -117,8 +121,9 @@ auto cutlassDistanceKernel(const DataT* x,
       a        = x;
       b        = y + offsetN;
     }
-    IdxT chunkN   = (i + 1) * max_batch_size;
-    IdxT currentN = (chunkN < n) ? max_batch_size : (n - offsetN);
+    IdxT chunkN = (i + 1) * max_batch_size;  // NOLINT(readability-identifier-naming)
+    IdxT currentN =
+      (chunkN < n) ? max_batch_size : (n - offsetN);  // NOLINT(readability-identifier-naming)
 
     // default initialize problem size with row major inputs
     auto problem_size = isRowMajor ? cutlass::gemm::GemmCoord(currentN, m, k)
@@ -155,7 +160,7 @@ auto cutlassDistanceKernel(const DataT* x,
     // Allocate workspace memory
     rmm::device_uvector<uint8_t> workspace(workspace_size, stream);
     // Instantiate CUTLASS kernel depending on templates
-    cutlassDist cutlassDist_op;
+    cutlassDist cutlassDist_op;  // NOLINT(readability-identifier-naming)
     // Check the problem size is supported or not
     CUVS_CUTLASS_TRY(cutlassDist_op.can_implement(arguments));
 

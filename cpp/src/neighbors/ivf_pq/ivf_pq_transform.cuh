@@ -18,8 +18,8 @@
 
 namespace cuvs::neighbors::ivf_pq::detail {
 
-template <uint32_t BlockSize, uint32_t PqBits, typename IdxT>
-__launch_bounds__(BlockSize) static __global__ void transform_codes_kernel(
+template <uint32_t block_size, uint32_t PqBits, typename IdxT>
+__launch_bounds__(block_size) static __global__ void transform_codes_kernel(
   raft::device_matrix_view<float, IdxT> dataset_residual,
   raft::device_vector_view<uint32_t, IdxT> output_labels,
   raft::device_matrix_view<uint8_t, IdxT, raft::row_major> output_dataset,
@@ -29,7 +29,7 @@ __launch_bounds__(BlockSize) static __global__ void transform_codes_kernel(
   constexpr uint32_t kSubWarpSize = std::min<uint32_t>(raft::WarpSize, 1u << PqBits);
   using subwarp_align             = raft::Pow2<kSubWarpSize>;
   const uint32_t lane_id          = subwarp_align::mod(threadIdx.x);
-  const IdxT row_ix = subwarp_align::div(IdxT{threadIdx.x} + IdxT{BlockSize} * IdxT{blockIdx.x});
+  const IdxT row_ix = subwarp_align::div(IdxT{threadIdx.x} + IdxT{block_size} * IdxT{blockIdx.x});
   if (row_ix >= dataset_residual.extent(0)) { return; }
 
   const uint32_t cluster_ix = output_labels[row_ix];
@@ -137,13 +137,13 @@ void transform(raft::resources const& res,
     }
   }
 
-  constexpr size_t max_batch_size              = 65536;
+  constexpr size_t kMaxBatchSize               = 65536;
   rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource(res);
 
   utils::batch_load_iterator<T> vec_batches(dataset.data_handle(),
                                             n_rows,
                                             index.dim(),
-                                            max_batch_size,
+                                            kMaxBatchSize,
                                             copy_stream,
                                             device_memory,
                                             enable_prefetch);

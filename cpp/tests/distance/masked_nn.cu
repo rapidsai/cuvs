@@ -130,7 +130,7 @@ __launch_bounds__(32 * NWARPS, 2) RAFT_KERNEL           // NOLINT(readability-id
       raft::KeyValuePair<int, DataT> tmp;
       tmp.key   = include_dist ? nidx : -1;
       tmp.value = include_dist ? acc : maxVal;
-      tmp       = WarpReduce(temp[warpId]).Reduce(tmp, cuvs::distance::KVPMinReduce<int, DataT>{});
+      tmp = WarpReduce(temp[warpId]).Reduce(tmp, cuvs::distance::kvp_min_reduce<int, DataT>{});
       if (threadIdx.x % raft::WarpSize == 0 && midx < m) {
         while (atomicCAS(workspace + midx, 0, 1) ==
                1)  // NOLINT(google-readability-braces-around-statements)
@@ -213,8 +213,8 @@ auto reference(const raft::handle_t& handle, const Inputs<DataT>& inp, const Par
   // Initialize output
   auto out  = raft::make_device_vector<OutT, int>(handle, m);
   auto blks = raft::ceildiv(m, 256);
-  cuvs::distance::MinAndDistanceReduceOp<int, DataT> op;
-  cuvs::distance::detail::initKernel<DataT, raft::KeyValuePair<int, DataT>, int>
+  cuvs::distance::min_and_distance_reduce_op<int, DataT> op;
+  cuvs::distance::detail::init_kernel<DataT, raft::KeyValuePair<int, DataT>, int>
     <<<blks, 256, 0, stream>>>(out.data_handle(), m, std::numeric_limits<DataT>::max(), op);
   RAFT_CUDA_TRY(cudaGetLastError());
 
@@ -255,8 +255,8 @@ auto run_masked_nn(const raft::handle_t& handle, const Inputs<DataT>& inp, const
 
   // Create parameters for masked_l2_nn
   using IdxT       = int;  // NOLINT(readability-identifier-naming)
-  using RedOpT     = cuvs::distance::MinAndDistanceReduceOp<int, DataT>;
-  using PairRedOpT = cuvs::distance::KVPMinReduce<int, DataT>;
+  using RedOpT     = cuvs::distance::min_and_distance_reduce_op<int, DataT>;
+  using PairRedOpT = cuvs::distance::kvp_min_reduce<int, DataT>;
   using ParamT     = cuvs::distance::masked_l2_nn_params<RedOpT, PairRedOpT>;
 
   bool init_out = true;

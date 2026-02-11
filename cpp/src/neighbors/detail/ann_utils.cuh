@@ -27,13 +27,13 @@ namespace cuvs::spatial::knn::detail::utils {
 /** Whether pointers are accessible on the device or on the host. */
 enum class pointer_residency {
   /** Some of the pointers are on the device, some on the host. */
-  mixed,
+  MIXED,
   /** All pointers accessible from both the device and the host. */
-  host_and_device,
+  HOST_AND_DEVICE,
   /** All pointers are host accessible. */
-  host_only,
+  HOST_ONLY,
   /** All poitners are device accessible. */
-  device_only
+  DEVICE_ONLY
 };
 
 template <typename... Types>
@@ -63,10 +63,10 @@ auto check_pointer_residency(const Types*... ptrs) -> pointer_residency
 {
   auto [on_device, on_host] = pointer_residency_count<Types...>::run(ptrs...);
   int n_args                = sizeof...(Types);
-  if (on_device == n_args && on_host == n_args) { return pointer_residency::host_and_device; }
-  if (on_device == n_args) { return pointer_residency::device_only; }
-  if (on_host == n_args) { return pointer_residency::host_only; }
-  return pointer_residency::mixed;
+  if (on_device == n_args && on_host == n_args) { return pointer_residency::HOST_AND_DEVICE; }
+  if (on_device == n_args) { return pointer_residency::DEVICE_ONLY; }
+  if (on_host == n_args) { return pointer_residency::HOST_ONLY; }
+  return pointer_residency::MIXED;
 }
 
 /** RAII helper to access the host data from gpu when necessary. */
@@ -76,8 +76,8 @@ struct with_mapped_memory_t {
   {
     if (ptr == nullptr) { return; }
     switch (utils::check_pointer_residency(ptr)) {
-      case utils::pointer_residency::device_only:
-      case utils::pointer_residency::host_and_device: {
+      case utils::pointer_residency::DEVICE_ONLY:
+      case utils::pointer_residency::HOST_AND_DEVICE: {
         dev_ptr_ = (void*)ptr;  // NOLINT
       } break;
       default: {
@@ -210,11 +210,11 @@ template <typename T, typename IdxT>
 inline void memzero(T* ptr, IdxT n_elems, rmm::cuda_stream_view stream)
 {
   switch (check_pointer_residency(ptr)) {
-    case pointer_residency::host_and_device:
-    case pointer_residency::device_only: {
+    case pointer_residency::HOST_AND_DEVICE:
+    case pointer_residency::DEVICE_ONLY: {
       RAFT_CUDA_TRY(cudaMemsetAsync(ptr, 0, n_elems * sizeof(T), stream));
     } break;
-    case pointer_residency::host_only: {
+    case pointer_residency::HOST_ONLY: {
       stream.synchronize();
       ::memset(ptr, 0, n_elems * sizeof(T));
     } break;
@@ -315,9 +315,9 @@ void outer_add(const T* a, IdxT len_a, const T* b, IdxT len_b, T* c, rmm::cuda_s
   outer_add_kernel<<<blocks, threads, 0, stream>>>(a, len_a, b, len_b, c);
 }
 
-template <typename T, typename S, typename IdxT, typename LabelT>
+template <typename T, typename S, typename IdxT, typename label_t>
 static __global__ void copy_selected_kernel(
-  IdxT n_rows, IdxT n_cols, const S* src, const LabelT* row_ids, IdxT ld_src, T* dst, IdxT ld_dst)
+  IdxT n_rows, IdxT n_cols, const S* src, const label_t* row_ids, IdxT ld_src, T* dst, IdxT ld_dst)
 {
   IdxT gid   = threadIdx.x + blockDim.x * static_cast<IdxT>(blockIdx.x);
   IdxT j     = gid % n_cols;
@@ -334,7 +334,7 @@ static __global__ void copy_selected_kernel(
  * @tparam T      target type
  * @tparam S      source type
  * @tparam IdxT   index type
- * @tparam LabelT label type
+ * @tparam label_t label type
  *
  * @param n_rows
  * @param n_cols
@@ -345,25 +345,25 @@ static __global__ void copy_selected_kernel(
  * @param ld_dst number of cols in the output (ld_dst >= n_cols)
  * @param stream
  */
-template <typename T, typename S, typename IdxT, typename LabelT>
+template <typename T, typename S, typename IdxT, typename label_t>
 void copy_selected(IdxT n_rows,
                    IdxT n_cols,
                    const S* src,
-                   const LabelT* row_ids,
+                   const label_t* row_ids,
                    IdxT ld_src,
                    T* dst,
                    IdxT ld_dst,
                    rmm::cuda_stream_view stream)
 {
   switch (check_pointer_residency(src, dst, row_ids)) {
-    case pointer_residency::host_and_device:
-    case pointer_residency::device_only: {
+    case pointer_residency::HOST_AND_DEVICE:
+    case pointer_residency::DEVICE_ONLY: {
       IdxT block_dim = 128;
       IdxT grid_dim  = raft::ceildiv(n_rows * n_cols, block_dim);
       copy_selected_kernel<T, S>
         <<<grid_dim, block_dim, 0, stream>>>(n_rows, n_cols, src, row_ids, ld_src, dst, ld_dst);
     } break;
-    case pointer_residency::host_only: {
+    case pointer_residency::HOST_ONLY: {
       stream.synchronize();
       for (IdxT i_dst = 0; i_dst < n_rows; i_dst++) {
         auto i_src = static_cast<IdxT>(row_ids[i_dst]);

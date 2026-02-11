@@ -20,11 +20,11 @@ namespace cuvs::stats::detail {
  * @brief Build the lookup table
  * @param[out] lookup_table: Lookup table giving nearest neighbor order
  *                of pairwise distance calculations given sample index
- * @param[in] X_ind: Sorted indexes of pairwise distance calculations of X
+ * @param[in] x_ind: Sorted indexes of pairwise distance calculations of X
  * @param n: Number of samples
  * @param work: Number of elements to consider
  */
-RAFT_KERNEL build_lookup_table(int* lookup_table, const int* X_ind, int n, int work)
+RAFT_KERNEL build_lookup_table(int* lookup_table, const int* x_ind, int n, int work)
 {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= work) return;
@@ -32,7 +32,7 @@ RAFT_KERNEL build_lookup_table(int* lookup_table, const int* X_ind, int n, int w
   int sample_idx = i / n;
   int nn_idx     = i % n;
 
-  int idx                              = X_ind[i];
+  int idx                              = x_ind[i];
   lookup_table[(sample_idx * n) + idx] = nn_idx;
 }
 
@@ -46,20 +46,16 @@ RAFT_KERNEL build_lookup_table(int* lookup_table, const int* X_ind, int n, int w
  * @param n_neighbors: Number of neighbors considered by trustworthiness score
  * @param work: Batch to consider (to do it at once use n * n_neighbors)
  */
-template <typename knn_index_t>
-RAFT_KERNEL compute_rank(double* rank,
-                         const int* lookup_table,
-                         const knn_index_t* emb_ind,
-                         int n,
-                         int n_neighbors,
-                         int work)
+template <typename KnnIndexT>
+RAFT_KERNEL compute_rank(
+  double* rank, const int* lookup_table, const KnnIndexT* emb_ind, int n, int n_neighbors, int work)
 {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= work) return;
 
   int sample_idx = i / n_neighbors;
 
-  knn_index_t emb_nn_ind = emb_ind[i];
+  KnnIndexT emb_nn_ind = emb_ind[i];
 
   int r   = lookup_table[(sample_idx * n) + emb_nn_ind];
   int tmp = r - n_neighbors + 1;
@@ -76,17 +72,17 @@ RAFT_KERNEL compute_rank(double* rank,
  * @param[out] indices KNN indexes
  * @param[out] distances KNN distances
  */
-template <typename math_t>
+template <typename MathT>
 void run_knn(const raft::resources& h,
-             math_t* input,
+             MathT* input,
              cuvs::distance::DistanceType metric,
              int n,
              int d,
              int n_neighbors,
              int64_t* indices,
-             math_t* distances)
+             MathT* distances)
 {
-  auto input_view = raft::make_device_matrix_view<const math_t, int64_t>(input, n, d);
+  auto input_view = raft::make_device_matrix_view<const MathT, int64_t>(input, n, d);
   auto index      = cuvs::neighbors::brute_force::build(h, input_view, metric);
 
   cuvs::neighbors::brute_force::search(
@@ -94,7 +90,7 @@ void run_knn(const raft::resources& h,
     index,
     input_view,
     raft::make_device_matrix_view<int64_t, int64_t>(indices, n, n_neighbors),
-    raft::make_device_matrix_view<math_t, int64_t>(distances, n, n_neighbors),
+    raft::make_device_matrix_view<MathT, int64_t>(distances, n, n_neighbors),
     cuvs::neighbors::filtering::none_sample_filter{});
 }
 
@@ -110,10 +106,10 @@ void run_knn(const raft::resources& h,
  * @param batchSize Batch size
  * @return Trustworthiness score
  */
-template <typename math_t>
+template <typename MathT>
 auto trustworthiness_score(const raft::resources& h,
-                           const math_t* X,
-                           math_t* X_embedded,
+                           const MathT* X,
+                           MathT* X_embedded,
                            cuvs::distance::DistanceType metric,
                            int n,
                            int m,
@@ -123,70 +119,71 @@ auto trustworthiness_score(const raft::resources& h,
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(h);
 
-  const int KNN_ALLOC = n * (n_neighbors + 1);
-  rmm::device_uvector<int64_t> emb_ind(KNN_ALLOC, stream);
-  rmm::device_uvector<math_t> emb_dist(KNN_ALLOC, stream);
+  const int knn_alloc = n * (n_neighbors + 1);
+  rmm::device_uvector<int64_t> emb_ind(knn_alloc, stream);
+  rmm::device_uvector<MathT> emb_dist(knn_alloc, stream);
 
   run_knn(h, X_embedded, metric, n, d, n_neighbors + 1, emb_ind.data(), emb_dist.data());
 
-  const int PAIRWISE_ALLOC = batchSize * n;
-  rmm::device_uvector<int> X_ind(PAIRWISE_ALLOC, stream);
-  rmm::device_uvector<math_t> X_dist(PAIRWISE_ALLOC, stream);
-  rmm::device_uvector<int> lookup_table(PAIRWISE_ALLOC, stream);
+  const int pairwise_alloc = batchSize * n;
+  rmm::device_uvector<int> x_ind(pairwise_alloc, stream);
+  rmm::device_uvector<MathT> x_dist(pairwise_alloc, stream);
+  rmm::device_uvector<int> lookup_table(pairwise_alloc, stream);
 
   double t = 0.0;
   rmm::device_scalar<double> t_dbuf(stream);
 
-  int toDo = n;
-  while (toDo > 0) {
-    int curBatchSize = min(toDo, batchSize);
+  int to_do = n;
+  while (to_do > 0) {
+    int cur_batch_size = min(to_do, batchSize);
 
     // Takes at most batchSize vectors at a time
     cuvs::distance::pairwise_distance(
       h,
-      raft::make_device_matrix_view<const float, std::int64_t>(&X[(n - toDo) * m], curBatchSize, m),
+      raft::make_device_matrix_view<const float, std::int64_t>(
+        &X[(n - to_do) * m], cur_batch_size, m),
       raft::make_device_matrix_view<const float, std::int64_t>(X, n, m),
-      raft::make_device_matrix_view<float, std::int64_t>(X_dist.data(), curBatchSize, n),
+      raft::make_device_matrix_view<float, std::int64_t>(x_dist.data(), cur_batch_size, n),
       metric);
 
-    size_t colSortWorkspaceSize = 0;
-    bool bAllocWorkspace        = false;
+    size_t col_sort_workspace_size = 0;
+    bool b_alloc_workspace         = false;
 
-    raft::matrix::sort_cols_per_row(X_dist.data(),
-                                    X_ind.data(),
-                                    curBatchSize,
+    raft::matrix::sort_cols_per_row(x_dist.data(),
+                                    x_ind.data(),
+                                    cur_batch_size,
                                     n,
-                                    bAllocWorkspace,
+                                    b_alloc_workspace,
                                     nullptr,
-                                    colSortWorkspaceSize,
+                                    col_sort_workspace_size,
                                     stream);
 
-    if (bAllocWorkspace) {
-      rmm::device_uvector<char> sortColsWorkspace(colSortWorkspaceSize, stream);
+    if (b_alloc_workspace) {
+      rmm::device_uvector<char> sort_cols_workspace(col_sort_workspace_size, stream);
 
-      raft::matrix::sort_cols_per_row(X_dist.data(),
-                                      X_ind.data(),
-                                      curBatchSize,
+      raft::matrix::sort_cols_per_row(x_dist.data(),
+                                      x_ind.data(),
+                                      cur_batch_size,
                                       n,
-                                      bAllocWorkspace,
-                                      sortColsWorkspace.data(),
-                                      colSortWorkspaceSize,
+                                      b_alloc_workspace,
+                                      sort_cols_workspace.data(),
+                                      col_sort_workspace_size,
                                       stream);
     }
 
-    int work     = curBatchSize * n;
+    int work     = cur_batch_size * n;
     int n_blocks = raft::ceildiv(work, N_THREADS);
     build_lookup_table<<<n_blocks, N_THREADS, 0, stream>>>(
-      lookup_table.data(), X_ind.data(), n, work);
+      lookup_table.data(), x_ind.data(), n, work);
 
     RAFT_CUDA_TRY(cudaMemsetAsync(t_dbuf.data(), 0, sizeof(double), stream));
 
-    work     = curBatchSize * (n_neighbors + 1);
+    work     = cur_batch_size * (n_neighbors + 1);
     n_blocks = raft::ceildiv(work, N_THREADS);
     compute_rank<<<n_blocks, N_THREADS, 0, stream>>>(
       t_dbuf.data(),
       lookup_table.data(),
-      &emb_ind.data()[(n - toDo) * (n_neighbors + 1)],
+      &emb_ind.data()[(n - to_do) * (n_neighbors + 1)],
       n,
       n_neighbors + 1,
       work);
@@ -194,7 +191,7 @@ auto trustworthiness_score(const raft::resources& h,
 
     t += t_dbuf.value(stream);
 
-    toDo -= curBatchSize;
+    to_do -= cur_batch_size;
   }
 
   t = 1.0 - ((2.0 / ((n * n_neighbors) * ((2.0 * n) - (3.0 * n_neighbors) - 1.0))) * t);

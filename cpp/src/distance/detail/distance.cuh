@@ -167,8 +167,8 @@ void distance_impl(raft::resources const& handle,
     }
   }
 
-  using OpT = ops::correlation_distance_op<DataT, AccT, IdxT>;
-  OpT corr_op(is_row_major, sq_x_norm, sq_y_norm, m, n, k);
+  using op_t = ops::correlation_distance_op<DataT, AccT, IdxT>;
+  op_t corr_op(is_row_major, sq_x_norm, sq_y_norm, m, n, k);
   pairwise_matrix_dispatch<decltype(corr_op), DataT, AccT, OutT, FinOpT, IdxT>(
     corr_op, m, n, k, x, y, x_norm, y_norm, out, fin_op, stream, is_row_major);
 }
@@ -384,30 +384,30 @@ void distance_impl(raft::resources const& handle,
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
-  auto unaryOp_lambda = [] __device__(DataT input) -> DataT {
-    auto input_       = raft::to_float(input);
-    const bool x_zero = (input_ == 0);
+  auto unary_op_lambda = [] __device__(DataT input) -> DataT {
+    auto input_f      = raft::to_float(input);
+    const bool x_zero = (input_f == 0);
     if constexpr (std::is_same_v<DataT, half>) {
-      return __float2half((!x_zero) * raft::log(input_ + x_zero));
+      return __float2half((!x_zero) * raft::log(input_f + x_zero));
     } else {
-      return (!x_zero) * raft::log(input_ + x_zero);
+      return (!x_zero) * raft::log(input_f + x_zero);
     }
   };
 
-  auto unaryOp_lambda_reverse = [] __device__(DataT input) -> DataT {
+  auto unary_op_lambda_reverse = [] __device__(DataT input) -> DataT {
     // reverse previous log (x) back to x using (e ^ log(x))
-    auto input_       = raft::to_float(input);
-    const bool x_zero = (input_ == 0);
+    auto input_f      = raft::to_float(input);
+    const bool x_zero = (input_f == 0);
     if constexpr (std::is_same_v<DataT, half>) {
-      return __float2half((!x_zero) * raft::exp(input_));
+      return __float2half((!x_zero) * raft::exp(input_f));
     } else {
-      return (!x_zero) * raft::exp(input_);
+      return (!x_zero) * raft::exp(input_f);
     }
   };
 
   if (x != y) {
-    raft::linalg::unaryOp<DataT, decltype(unaryOp_lambda), IdxT>(
-      const_cast<DataT*>(y), y, n * k, unaryOp_lambda, stream);
+    raft::linalg::unaryOp<DataT, decltype(unary_op_lambda), IdxT>(
+      const_cast<DataT*>(y), y, n * k, unary_op_lambda, stream);
   }
 
   const OutT* x_norm = nullptr;
@@ -422,8 +422,8 @@ void distance_impl(raft::resources const& handle,
 
   if (x != y) {
     // Now reverse previous log (x) back to x using (e ^ log(x))
-    raft::linalg::unaryOp<DataT, decltype(unaryOp_lambda_reverse), IdxT>(
-      const_cast<DataT*>(y), y, n * k, unaryOp_lambda_reverse, stream);
+    raft::linalg::unaryOp<DataT, decltype(unary_op_lambda_reverse), IdxT>(
+      const_cast<DataT*>(y), y, n * k, unary_op_lambda_reverse, stream);
   }
 }
 
@@ -695,7 +695,7 @@ void distance_impl(raft::resources const& handle,
  * @tparam AccType accumulation type
  * @tparam OutType output type
  * @tparam FinalLambda user-defined epilogue lamba
- * @tparam Index_ Index type
+ * @tparam Index Index type
  *
  * @param x first set of points
  * @param y second set of points
@@ -719,14 +719,14 @@ template <cuvs::distance::DistanceType distanceType,
           typename AccType,
           typename OutType,
           typename FinalLambda,
-          typename Index_ = int>
+          typename Index = int>
 void distance(raft::resources const& handle,
               const InType* x,
               const InType* y,
               OutType* out,
-              Index_ m,
-              Index_ n,
-              Index_ k,
+              Index m,
+              Index n,
+              Index k,
               void* workspace,
               size_t worksize,
               FinalLambda fin_op,
@@ -738,20 +738,19 @@ void distance(raft::resources const& handle,
                 "OutType can be uint8_t, float, double,"
                 "if sizeof(OutType) > 1 then sizeof(AccType) == sizeof(OutType).");
 
-  distance_impl<InType, AccType, OutType, FinalLambda, Index_>(
-    handle,
-    distance_tag<distanceType>{},
-    x,
-    y,
-    out,
-    m,
-    n,
-    k,
-    reinterpret_cast<AccType*>(workspace),
-    worksize,
-    fin_op,
-    isRowMajor,
-    metric_arg);
+  distance_impl<InType, AccType, OutType, FinalLambda, Index>(handle,
+                                                              distance_tag<distanceType>{},
+                                                              x,
+                                                              y,
+                                                              out,
+                                                              m,
+                                                              n,
+                                                              k,
+                                                              reinterpret_cast<AccType*>(workspace),
+                                                              worksize,
+                                                              fin_op,
+                                                              isRowMajor,
+                                                              metric_arg);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
@@ -761,7 +760,7 @@ void distance(raft::resources const& handle,
  * @tparam InType input argument type
  * @tparam AccType accumulation type
  * @tparam OutType output type
- * @tparam Index_ Index type
+ * @tparam Index Index type
  * @param x first set of points
  * @param y second set of points
  * @param dist output distance matrix
@@ -777,14 +776,14 @@ template <cuvs::distance::DistanceType distanceType,
           typename InType,
           typename AccType,
           typename OutType,
-          typename Index_ = int>
+          typename Index = int>
 void distance(raft::resources const& handle,
               const InType* x,
               const InType* y,
               OutType* out,
-              Index_ m,
-              Index_ n,
-              Index_ k,
+              Index m,
+              Index n,
+              Index k,
               void* workspace,
               size_t worksize,
               bool isRowMajor    = true,
@@ -792,7 +791,7 @@ void distance(raft::resources const& handle,
 {
   auto fin_op = raft::identity_op();
 
-  distance<distanceType, InType, AccType, OutType, decltype(fin_op), Index_>(
+  distance<distanceType, InType, AccType, OutType, decltype(fin_op), Index>(
     handle, x, y, out, m, n, k, workspace, worksize, fin_op, isRowMajor, metric_arg);
 }
 
@@ -802,7 +801,7 @@ void distance(raft::resources const& handle,
  * @tparam InType input argument type
  * @tparam AccType accumulation type
  * @tparam OutType output type
- * @tparam Index_ Index type
+ * @tparam Index Index type
  * @param x first set of points
  * @param y second set of points
  * @param m number of points in x
@@ -816,20 +815,20 @@ template <cuvs::distance::DistanceType distanceType,
           typename InType,
           typename AccType,
           typename OutType,
-          typename Index_ = int>
-auto getWorkspaceSize(const InType* x, const InType* y, Index_ m, Index_ n, Index_ k) -> size_t
+          typename Index = int>
+auto get_workspace_size(const InType* x, const InType* y, Index m, Index n, Index k) -> size_t
 {
   size_t worksize             = 0;
-  constexpr bool is_allocated = (distanceType <= cuvs::distance::DistanceType::CosineExpanded) ||
+  constexpr bool kIsAllocated = (distanceType <= cuvs::distance::DistanceType::CosineExpanded) ||
                                 (distanceType == cuvs::distance::DistanceType::CorrelationExpanded);
-  constexpr int numOfBuffers =
+  constexpr int kNumOfBuffers =
     (distanceType == cuvs::distance::DistanceType::CorrelationExpanded) ? 2 : 1;
 
-  if (is_allocated) {
+  if (kIsAllocated) {
     // TODO(snanditale): when X == Y allocate std::max(m, n) instead of m + n when column major
     // input accuracy issue is resolved until then we allocate as m + n.
-    worksize += numOfBuffers * m * sizeof(AccType);
-    worksize += numOfBuffers * n * sizeof(AccType);
+    worksize += kNumOfBuffers * m * sizeof(AccType);
+    worksize += kNumOfBuffers * n * sizeof(AccType);
   }
 
   return worksize;

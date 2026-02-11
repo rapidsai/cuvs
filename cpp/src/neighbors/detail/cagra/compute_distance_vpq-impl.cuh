@@ -22,10 +22,10 @@ template <cuvs::distance::DistanceType Metric,
           uint32_t PQ_LEN,
           typename CodebookT,
           typename DataT,
-          typename IndexT,
-          typename DistanceT>
-struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, IndexT, DistanceT> {
-  using base_type   = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
+          typename index_t,
+          typename distance_t>
+struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, index_t, distance_t> {
+  using base_type   = dataset_descriptor_base_t<DataT, index_t, distance_t>;
   using CODE_BOOK_T = CodebookT;
   using QUERY_T     = half;
   using base_type::args;
@@ -93,7 +93,7 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
                                                  std::uint32_t encoded_dataset_dim,
                                                  const CODE_BOOK_T* vq_code_book_ptr,
                                                  const CODE_BOOK_T* pq_code_book_ptr,
-                                                 IndexT size,
+                                                 index_t size,
                                                  std::uint32_t dim)
     : base_type(setup_workspace_impl,
                 compute_distance_impl,
@@ -354,15 +354,15 @@ template <cuvs::distance::DistanceType Metric,
           uint32_t PqLen,
           typename CodebookT,
           typename DataT,
-          typename IndexT,
-          typename DistanceT>
+          typename index_t,
+          typename distance_t>
 RAFT_KERNEL __launch_bounds__(1, 1)
-  vpq_dataset_descriptor_init_kernel(dataset_descriptor_base_t<DataT, IndexT, DistanceT>* out,
+  vpq_dataset_descriptor_init_kernel(dataset_descriptor_base_t<DataT, index_t, distance_t>* out,
                                      const std::uint8_t* encoded_dataset_ptr,
                                      uint32_t encoded_dataset_dim,
                                      const CodebookT* vq_code_book_ptr,
                                      const CodebookT* pq_code_book_ptr,
-                                     IndexT size,
+                                     index_t size,
                                      uint32_t dim)
 {
   using desc_type = cagra_q_dataset_descriptor_t<Metric,
@@ -372,8 +372,8 @@ RAFT_KERNEL __launch_bounds__(1, 1)
                                                  PqLen,
                                                  CodebookT,
                                                  DataT,
-                                                 IndexT,
-                                                 DistanceT>;
+                                                 index_t,
+                                                 distance_t>;
   using base_type = typename desc_type::base_type;
   new (out) desc_type(
     reinterpret_cast<typename base_type::setup_workspace_type*>(&setup_workspace_vpq<desc_type>),
@@ -393,8 +393,8 @@ template <cuvs::distance::DistanceType Metric,
           uint32_t PqLen,
           typename CodebookT,
           typename DataT,
-          typename IndexT,
-          typename DistanceT>
+          typename index_t,
+          typename distance_t>
 auto vpq_descriptor_spec<Metric,
                          TeamSize,
                          DatasetBlockDim,
@@ -402,15 +402,15 @@ auto vpq_descriptor_spec<Metric,
                          PqLen,
                          CodebookT,
                          DataT,
-                         IndexT,
-                         DistanceT>::init_(const cagra::search_params& params,
-                                           const std::uint8_t* encoded_dataset_ptr,
-                                           uint32_t encoded_dataset_dim,
-                                           const CodebookT* vq_code_book_ptr,
-                                           const CodebookT* pq_code_book_ptr,
-                                           IndexT size,
-                                           uint32_t dim)
-  -> dataset_descriptor_host<DataT, IndexT, DistanceT>
+                         index_t,
+                         distance_t>::init_(const cagra::search_params& params,
+                                            const std::uint8_t* encoded_dataset_ptr,
+                                            uint32_t encoded_dataset_dim,
+                                            const CodebookT* vq_code_book_ptr,
+                                            const CodebookT* pq_code_book_ptr,
+                                            index_t size,
+                                            uint32_t dim)
+  -> dataset_descriptor_host<DataT, index_t, distance_t>
 {
   using desc_type = cagra_q_dataset_descriptor_t<Metric,
                                                  TeamSize,
@@ -419,8 +419,8 @@ auto vpq_descriptor_spec<Metric,
                                                  PqLen,
                                                  CodebookT,
                                                  DataT,
-                                                 IndexT,
-                                                 DistanceT>;
+                                                 index_t,
+                                                 distance_t>;
   using base_type = typename desc_type::base_type;
 
   desc_type dd_host{nullptr,
@@ -432,7 +432,7 @@ auto vpq_descriptor_spec<Metric,
                     size,
                     dim};
   return host_type{dd_host,
-                   [=](dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dev_ptr,
+                   [=](dataset_descriptor_base_t<DataT, index_t, distance_t>* dev_ptr,
                        rmm::cuda_stream_view stream) {
                      vpq_dataset_descriptor_init_kernel<Metric,
                                                         TeamSize,
@@ -441,8 +441,8 @@ auto vpq_descriptor_spec<Metric,
                                                         PqLen,
                                                         CodebookT,
                                                         DataT,
-                                                        IndexT,
-                                                        DistanceT>
+                                                        index_t,
+                                                        distance_t>
                        <<<1, 1, 0, stream>>>(dev_ptr,
                                              encoded_dataset_ptr,
                                              encoded_dataset_dim,

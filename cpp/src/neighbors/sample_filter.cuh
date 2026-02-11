@@ -40,7 +40,7 @@ constexpr __forceinline__ _RAFT_HOST_DEVICE auto none_sample_filter::operator()(
   return true;
 }
 
-template <typename filter_t, typename = void>
+template <typename filter_t, typename = void>  // NOLINT(readability-identifier-naming)
 struct takes_three_args : std::false_type {};
 template <typename filter_t>
 struct takes_three_args<
@@ -56,7 +56,7 @@ struct takes_three_args<
  * @tparam index_t Indexing type
  * @tparam filter_t
  */
-template <typename index_t, typename filter_t>
+template <typename index_t, typename filter_t>  // NOLINT(readability-identifier-naming)
 ivf_to_sample_filter<index_t, filter_t>::ivf_to_sample_filter(const index_t* const* inds_ptrs,
                                                               const filter_t next_filter)
   : inds_ptrs_{inds_ptrs}, next_filter_{next_filter}
@@ -67,7 +67,7 @@ ivf_to_sample_filter<index_t, filter_t>::ivf_to_sample_filter(const index_t* con
  * If the original filter takes two arguments, then we are using `inds_ptr_` to obtain the sample
  * index.
  */
-template <typename index_t, typename filter_t>
+template <typename index_t, typename filter_t>  // NOLINT(readability-identifier-naming)
 inline _RAFT_HOST_DEVICE auto ivf_to_sample_filter<index_t, filter_t>::operator()(
   // query index
   const uint32_t query_ix,
@@ -83,15 +83,15 @@ inline _RAFT_HOST_DEVICE auto ivf_to_sample_filter<index_t, filter_t>::operator(
   }
 }
 
-template <typename bitset_t, typename index_t>
-_RAFT_HOST_DEVICE bitset_filter<bitset_t, index_t>::bitset_filter(
-  const cuvs::core::bitset_view<bitset_t, index_t> bitset_for_filtering)
+template <typename BitsetT, typename index_t>
+_RAFT_HOST_DEVICE bitset_filter<BitsetT, index_t>::bitset_filter(
+  const cuvs::core::bitset_view<BitsetT, index_t> bitset_for_filtering)
   : bitset_view_{bitset_for_filtering}
 {
 }
 
-template <typename bitset_t, typename index_t>
-constexpr __forceinline__ _RAFT_HOST_DEVICE auto bitset_filter<bitset_t, index_t>::operator()(
+template <typename BitsetT, typename index_t>
+constexpr __forceinline__ _RAFT_HOST_DEVICE auto bitset_filter<BitsetT, index_t>::operator()(
   // query index
   const uint32_t query_ix,
   // the index of the current sample
@@ -100,22 +100,22 @@ constexpr __forceinline__ _RAFT_HOST_DEVICE auto bitset_filter<bitset_t, index_t
   return bitset_view_.test(sample_ix);
 }
 
-template <typename bitset_t, typename index_t>
-template <typename csr_matrix_t>
-void bitset_filter<bitset_t, index_t>::to_csr(raft::resources const& handle, csr_matrix_t& csr)
+template <typename BitsetT, typename index_t>
+template <typename csr_matrix_t>  // NOLINT(readability-identifier-naming)
+void bitset_filter<BitsetT, index_t>::to_csr(raft::resources const& handle, csr_matrix_t& csr)
 {
   raft::sparse::convert::bitset_to_csr(handle, bitset_view_, csr);
 }
 
-template <typename bitmap_t, typename index_t>
-bitmap_filter<bitmap_t, index_t>::bitmap_filter(
-  const cuvs::core::bitmap_view<bitmap_t, index_t> bitmap_for_filtering)
+template <typename BitmapT, typename index_t>
+bitmap_filter<BitmapT, index_t>::bitmap_filter(
+  const cuvs::core::bitmap_view<BitmapT, index_t> bitmap_for_filtering)
   : bitmap_view_{bitmap_for_filtering}
 {
 }
 
-template <typename bitmap_t, typename index_t>
-inline _RAFT_HOST_DEVICE auto bitmap_filter<bitmap_t, index_t>::operator()(
+template <typename BitmapT, typename index_t>
+inline _RAFT_HOST_DEVICE auto bitmap_filter<BitmapT, index_t>::operator()(
   // query index
   const uint32_t query_ix,
   // the index of the current sample
@@ -124,9 +124,9 @@ inline _RAFT_HOST_DEVICE auto bitmap_filter<bitmap_t, index_t>::operator()(
   return bitmap_view_.test(query_ix, sample_ix);
 }
 
-template <typename bitmap_t, typename index_t>
-template <typename csr_matrix_t>
-void bitmap_filter<bitmap_t, index_t>::to_csr(raft::resources const& handle, csr_matrix_t& csr)
+template <typename BitmapT, typename index_t>
+template <typename csr_matrix_t>  // NOLINT(readability-identifier-naming)
+void bitmap_filter<BitmapT, index_t>::to_csr(raft::resources const& handle, csr_matrix_t& csr)
 {
   raft::sparse::convert::bitmap_to_csr(handle, bitmap_view_, csr);
 }
@@ -136,7 +136,7 @@ using bitset_filter_args_t =
   cuda::std::tuple<const int64_t* const*, cuvs::core::bitset_view<uint32_t, int64_t>>;
 
 struct ivf_filter_dev {
-  filtering::FilterType tag_;
+  filtering::FilterType tag;
 
   union ivf_filter_dev_args_variant {
     none_filter_args_t none_filter_args;
@@ -151,23 +151,23 @@ struct ivf_filter_dev {
       : bitset_filter_args(args)
     {
     }
-  } args_;
+  } args;
 
   _RAFT_HOST_DEVICE explicit ivf_filter_dev(none_filter_args_t args = {})
-    : tag_(FilterType::None), args_(args){};
+    : tag(FilterType::None), args(args){};
 
   _RAFT_HOST_DEVICE explicit ivf_filter_dev(bitset_filter_args_t args)
-    : tag_(FilterType::Bitset), args_(args){};
+    : tag(FilterType::Bitset), args(args){};
 
   constexpr __forceinline__ _RAFT_HOST_DEVICE auto operator()(const uint32_t query_ix,
                                                               const uint32_t cluster_ix,
                                                               const uint32_t sample_ix) -> bool
   {
-    switch (tag_) {
+    switch (tag) {
       case FilterType::None:
         return filtering::none_sample_filter{}(query_ix, cluster_ix, sample_ix);
       case FilterType::Bitset: {
-        auto& [inds_ptrs_, bitset_view_] = args_.bitset_filter_args;
+        auto& [inds_ptrs_, bitset_view_] = args.bitset_filter_args;
         return filtering::bitset_filter<uint32_t, int64_t>(bitset_view_)(
           query_ix, inds_ptrs_[cluster_ix][sample_ix]);
       }

@@ -12,7 +12,7 @@
 #include "simt_kernel.cuh"
 #include <raft/core/kvp.hpp>             // raft::KeyValuePair
 #include <raft/core/operators.hpp>       // raft::identity_op
-#include <raft/linalg/contractions.cuh>  // Policy
+#include <raft/linalg/contractions.cuh>  // policy
 #include <raft/util/arch.cuh>            // raft::util::arch::SM_*
 #include <raft/util/cuda_utils.cuh>      // raft::ceildiv, raft::shfl
 
@@ -24,7 +24,7 @@ namespace cuvs::distance::detail {
 template <typename DataT,
           typename OutT,
           typename IdxT,
-          typename Policy,
+          typename policy,
           typename ReduceOpT,
           typename KVPReduceOpT>
 void fused_l2_nn_impl(OutT* min,
@@ -43,7 +43,7 @@ void fused_l2_nn_impl(OutT* min,
                       cudaStream_t stream)
 {
   // The kernel policy is determined by fusedL2NN.
-  using policy_t = Policy;
+  using policy_t = policy;
 
   dim3 blk(policy_t::Nthreads);
   auto nblks             = raft::ceildiv<int>(m, policy_t::Nthreads);
@@ -51,7 +51,7 @@ void fused_l2_nn_impl(OutT* min,
   using kv_pair_t        = raft::KeyValuePair<IdxT, DataT>;
 
   if (initOutBuffer) {
-    initKernel<DataT, OutT, IdxT, ReduceOpT>
+    init_kernel<DataT, OutT, IdxT, ReduceOpT>
       <<<nblks, policy_t::Nthreads, 0, stream>>>(min, m, kMaxVal, redOp);
     RAFT_CUDA_TRY(cudaGetLastError());
   }

@@ -104,7 +104,7 @@ class ConnectComponentsTest                      // NOLINT(readability-identifie
     /**
      * 3. cross_component_nn to fix connectivities
      */
-    cuvs::sparse::neighbors::FixConnectivitiesRedOp<value_idx, value_t> red_op(params.n_row);
+    cuvs::sparse::neighbors::fix_connectivities_red_op<value_idx, value_t> red_op(params.n_row);
     cuvs::sparse::neighbors::cross_component_nn<value_idx, value_t>(handle,
                                                                     out_edges,
                                                                     data.data(),
@@ -589,8 +589,8 @@ class ConnectComponentsEdgesTest                 // NOLINT(readability-identifie
     /**
      * 3. cross_component_nn to fix connectivities
      */
-    cuvs::sparse::neighbors::MutualReachabilityFixConnectivitiesRedOp<value_idx, value_t> red_op(
-      core_dists.data(), params.n_row);
+    cuvs::sparse::neighbors::mutual_reachability_fix_connectivities_red_op<value_idx, value_t>
+      red_op(core_dists.data(), params.n_row);
 
     cuvs::sparse::neighbors::cross_component_nn<value_idx, value_t>(handle,
                                                                     out_edges_unbatched,

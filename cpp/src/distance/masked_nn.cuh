@@ -35,34 +35,34 @@ namespace cuvs::distance {
  *
  * using IdxT        = int;
  * using DataT       = float;
- * using RedOpT      = cuvs::distance::MinAndDistanceReduceOp<IdxT, DataT>;
- * using PairRedOpT  = cuvs::distance::KVPMinReduce<IdxT, DataT>;
- * using ParamT      = cuvs::distance::masked_l2_nn_params<RedOpT, PairRedOpT>;
+ * using RedOpT      = cuvs::distance::min_and_distance_reduce_op<IdxT, DataT>;
+ * using PairRedOpT  = cuvs::distance::kvp_min_reduce<IdxT, DataT>;
+ * using param_t      = cuvs::distance::masked_l2_nn_params<RedOpT, PairRedOpT>;
  *
  * bool init_out = true;
  * bool sqrt     = false;
  *
- * ParamT masked_l2_params{RedOpT{}, PairRedOpT{}, sqrt, init_out};
+ * param_t masked_l2_params{RedOpT{}, PairRedOpT{}, sqrt, init_out};
  * @endcode
  *
- * Prescribes how to reduce a distance to an intermediate type (`redOp`), and
- * how to reduce two intermediate types (`pairRedOp`). Typically, a distance is
+ * Prescribes how to reduce a distance to an intermediate type (`red_op`), and
+ * how to reduce two intermediate types (`pair_red_op`). Typically, a distance is
  * mapped to an (index, value) pair and (index, value) pair with the lowest
  * value (distance) is selected.
  *
  * In addition, prescribes whether to compute the square root of the distance
- * (`sqrt`) and whether to initialize the output buffer (`initOutBuffer`).
+ * (`sqrt`) and whether to initialize the output buffer (`init_out_buffer`).
  */
 template <typename ReduceOpT, typename KVPReduceOpT>
 struct masked_l2_nn_params {
   /** Reduction operator in the epilogue */
-  ReduceOpT redOp;
+  ReduceOpT red_op;
   /** Reduction operation on key value pairs */
-  KVPReduceOpT pairRedOp;
+  KVPReduceOpT pair_red_op;
   /** Whether the output `minDist` should contain L2-sqrt */
   bool sqrt;
   /** Whether to initialize the output buffer before the main kernel launch */
-  bool initOutBuffer;
+  bool init_out_buffer;
 };
 
 /**
@@ -175,10 +175,10 @@ void masked_l2_nn(raft::resources const& handle,
                                                           m,
                                                           n,
                                                           k,
-                                                          params.redOp,
-                                                          params.pairRedOp,
+                                                          params.red_op,
+                                                          params.pair_red_op,
                                                           params.sqrt,
-                                                          params.initOutBuffer);
+                                                          params.init_out_buffer);
 }
 
 /** @} */

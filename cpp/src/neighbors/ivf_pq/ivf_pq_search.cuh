@@ -879,8 +879,8 @@ inline void search(raft::resources const& handle,
                "GPU search.");
 
   switch (utils::check_pointer_residency(queries, neighbors, distances)) {
-    case utils::pointer_residency::device_only:
-    case utils::pointer_residency::host_and_device: break;
+    case utils::pointer_residency::DEVICE_ONLY:
+    case utils::pointer_residency::HOST_AND_DEVICE: break;
     default: RAFT_FAIL("all pointers must be accessible from the device.");
   }
 

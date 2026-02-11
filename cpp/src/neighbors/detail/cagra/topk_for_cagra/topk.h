@@ -18,21 +18,21 @@ auto _cuann_find_topk_bufferSize(uint32_t topK,  // NOLINT(readability-identifie
 
 //
 template <class ValT>
-void _cuann_find_topk(uint32_t topK,
-                      uint32_t sizeBatch,
-                      uint32_t numElements,
-                      const float* inputKeys,  // [sizeBatch, ldIK,]
-                      uint32_t ldIK,           // (*) ldIK >= numElements
-                      const ValT* inputVals,   // [sizeBatch, ldIV,]
-                      uint32_t ldIV,           // (*) ldIV >= numElements
-                      float* outputKeys,       // [sizeBatch, ldOK,]
-                      uint32_t ldOK,           // (*) ldOK >= topK
-                      ValT* outputVals,        // [sizeBatch, ldOV,]
-                      uint32_t ldOV,           // (*) ldOV >= topK
-                      void* workspace,
-                      bool sort           = false,
-                      uint32_t* hint      = NULL,
-                      cudaStream_t stream = nullptr);
+void cuann_find_topk(uint32_t topK,
+                     uint32_t sizeBatch,
+                     uint32_t numElements,
+                     const float* inputKeys,  // [sizeBatch, ldIK,]
+                     uint32_t ldIK,           // (*) ldIK >= numElements
+                     const ValT* inputVals,   // [sizeBatch, ldIV,]
+                     uint32_t ldIV,           // (*) ldIV >= numElements
+                     float* outputKeys,       // [sizeBatch, ldOK,]
+                     uint32_t ldOK,           // (*) ldOK >= topK
+                     ValT* outputVals,        // [sizeBatch, ldOV,]
+                     uint32_t ldOV,           // (*) ldOV >= topK
+                     void* workspace,
+                     bool sort           = false,
+                     uint32_t* hint      = NULL,
+                     cudaStream_t stream = nullptr);
 
 #ifdef __CUDA_ARCH__
 #define CUDA_DEVICE_HOST_FUNC __device__

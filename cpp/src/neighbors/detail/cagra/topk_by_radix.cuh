@@ -9,8 +9,8 @@
 namespace cuvs::neighbors::cagra::detail::single_cta_search {
 
 struct topk_by_radix_sort_base {
-  static constexpr std::uint32_t state_bit_length = 0;
-  static constexpr std::uint32_t vecLen           = 2;  // TODO(snanditale):
+  static constexpr std::uint32_t kStateBitLength = 0;
+  static constexpr std::uint32_t kVecLen         = 2;  // TODO(snanditale):
 
   static constexpr auto smem_size(uint32_t max_itopk) -> uint32_t
   {
@@ -29,8 +29,8 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core_wrapper_256(uint32_t topk,
                                                               bool sort,
                                                               uint32_t* _smem)
 {
-  topk_cta_11_core<topk_by_radix_sort_base::state_bit_length,
-                   topk_by_radix_sort_base::vecLen,
+  topk_cta_11_core<topk_by_radix_sort_base::kStateBitLength,
+                   topk_by_radix_sort_base::kVecLen,
                    256,
                    64,
                    uint32_t>(topk, len_x, _x, _in_vals, _y, _out_vals, state, _hints, sort, _smem);
@@ -47,8 +47,8 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core_wrapper_512(uint32_t topk,
                                                               bool sort,
                                                               uint32_t* _smem)
 {
-  topk_cta_11_core<topk_by_radix_sort_base::state_bit_length,
-                   topk_by_radix_sort_base::vecLen,
+  topk_cta_11_core<topk_by_radix_sort_base::kStateBitLength,
+                   topk_by_radix_sort_base::kVecLen,
                    512,
                    128,
                    uint32_t>(topk, len_x, _x, _in_vals, _y, _out_vals, state, _hints, sort, _smem);
@@ -84,16 +84,16 @@ struct topk_by_radix_sort : topk_by_radix_sort_base {
     } else {  // currently, unused
       auto* const state = reinterpret_cast<std::uint8_t*>(work);
       if (max_itopk <= 256) {
-        topk_cta_11_core<topk_by_radix_sort_base::state_bit_length,
-                         topk_by_radix_sort_base::vecLen,
+        topk_cta_11_core<topk_by_radix_sort_base::kStateBitLength,
+                         topk_by_radix_sort_base::kVecLen,
                          256,
                          64,
                          IdxT>(
           topk, len_x, _x, _in_vals, _y, _out_vals, state, _hints, sort, _smem);
       } else {
         assert(max_itopk <= 512);
-        topk_cta_11_core<topk_by_radix_sort_base::state_bit_length,
-                         topk_by_radix_sort_base::vecLen,
+        topk_cta_11_core<topk_by_radix_sort_base::kStateBitLength,
+                         topk_by_radix_sort_base::kVecLen,
                          512,
                          128,
                          IdxT>(

@@ -116,14 +116,14 @@ void get_graphs(raft::resources& handle,
         handle, distances_naive_dev.data(), ps.k, ps.k, ps.n_rows, core_dists_dev.data());
 
       auto epilogue =
-        cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, DistanceT>{
+        cuvs::neighbors::detail::reachability::reachability_post_process<IdxT, DistanceT>{
           core_dists_dev.data(), 1.0, static_cast<size_t>(ps.n_rows)};
 
       cuvs::neighbors::detail::tiled_brute_force_knn<
         DataT,
         IdxT,
         DistanceT,
-        cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, DistanceT>>(
+        cuvs::neighbors::detail::reachability::reachability_post_process<IdxT, DistanceT>>(
         handle,
         database.data(),
         database.data(),

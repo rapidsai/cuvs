@@ -12,7 +12,7 @@
 #include "simt_kernel.cuh"
 #include <raft/core/kvp.hpp>             // raft::KeyValuePair
 #include <raft/core/operators.hpp>       // raft::identity_op
-#include <raft/linalg/contractions.cuh>  // Policy
+#include <raft/linalg/contractions.cuh>  // policy
 #include <raft/util/arch.cuh>            // raft::util::arch::SM_*
 #include <raft/util/cuda_utils.cuh>      // raft::ceildiv, raft::shfl
 
@@ -24,7 +24,7 @@ namespace cuvs::distance::detail {
 template <typename DataT,
           typename OutT,
           typename IdxT,
-          typename Policy,
+          typename policy,
           typename ReduceOpT,
           typename KVPReduceOpT>
 void fused_cosine_nn(OutT* min,
@@ -42,7 +42,7 @@ void fused_cosine_nn(OutT* min,
                      cudaStream_t stream)
 {
   // The kernel policy is determined by fusedL2NN.
-  using policy_t = Policy;
+  using policy_t = policy;
 
   dim3 blk(policy_t::Nthreads);
   constexpr auto kMaxVal = std::numeric_limits<DataT>::max();

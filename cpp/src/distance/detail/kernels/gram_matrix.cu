@@ -38,13 +38,13 @@ namespace cuvs::distance::kernels {
  * @param norm_x1 optional L2-norm of x1's rows for computation within RBF.
  * @param norm_x2 optional L2-norm of x2's rows for computation within RBF.
  */
-template <typename math_t>
-void GramMatrixBase<math_t>::operator()(raft::resources const& handle,
-                                        dense_input_matrix_view_t<math_t> x1,
-                                        dense_input_matrix_view_t<math_t> x2,
-                                        dense_output_matrix_view_t<math_t> out,
-                                        math_t* norm_x1,
-                                        math_t* norm_x2)
+template <typename MathT>
+void GramMatrixBase<MathT>::operator()(raft::resources const& handle,
+                                       dense_input_matrix_view_t<MathT> x1,
+                                       dense_input_matrix_view_t<MathT> x2,
+                                       dense_output_matrix_view_t<MathT> out,
+                                       MathT* norm_x1,
+                                       MathT* norm_x2)
 {
   evaluate(handle, x1, x2, out, norm_x1, norm_x2);
 }
@@ -59,13 +59,13 @@ void GramMatrixBase<math_t>::operator()(raft::resources const& handle,
  * @param norm_x1 optional L2-norm of x1's rows for computation within RBF.
  * @param norm_x2 optional L2-norm of x2's rows for computation within RBF.
  */
-template <typename math_t>
-void GramMatrixBase<math_t>::operator()(raft::resources const& handle,
-                                        csr_input_matrix_view_t<math_t> x1,
-                                        dense_input_matrix_view_t<math_t> x2,
-                                        dense_output_matrix_view_t<math_t> out,
-                                        math_t* norm_x1,
-                                        math_t* norm_x2)
+template <typename MathT>
+void GramMatrixBase<MathT>::operator()(raft::resources const& handle,
+                                       csr_input_matrix_view_t<MathT> x1,
+                                       dense_input_matrix_view_t<MathT> x2,
+                                       dense_output_matrix_view_t<MathT> out,
+                                       MathT* norm_x1,
+                                       MathT* norm_x2)
 {
   evaluate(handle, x1, x2, out, norm_x1, norm_x2);
 }
@@ -80,13 +80,13 @@ void GramMatrixBase<math_t>::operator()(raft::resources const& handle,
  * @param norm_x1 optional L2-norm of x1's rows for computation within RBF.
  * @param norm_x2 optional L2-norm of x2's rows for computation within RBF.
  */
-template <typename math_t>
-void GramMatrixBase<math_t>::operator()(raft::resources const& handle,
-                                        csr_input_matrix_view_t<math_t> x1,
-                                        csr_input_matrix_view_t<math_t> x2,
-                                        dense_output_matrix_view_t<math_t> out,
-                                        math_t* norm_x1,
-                                        math_t* norm_x2)
+template <typename MathT>
+void GramMatrixBase<MathT>::operator()(raft::resources const& handle,
+                                       csr_input_matrix_view_t<MathT> x1,
+                                       csr_input_matrix_view_t<MathT> x2,
+                                       dense_output_matrix_view_t<MathT> out,
+                                       MathT* norm_x1,
+                                       MathT* norm_x2)
 {
   evaluate(handle, x1, x2, out, norm_x1, norm_x2);
 }
@@ -102,13 +102,13 @@ void GramMatrixBase<math_t>::operator()(raft::resources const& handle,
  * @param norm_x1 unused.
  * @param norm_x2 unused.
  */
-template <typename math_t>
-void GramMatrixBase<math_t>::evaluate(raft::resources const& handle,
-                                      dense_input_matrix_view_t<math_t> x1,
-                                      dense_input_matrix_view_t<math_t> x2,
-                                      dense_output_matrix_view_t<math_t> out,
-                                      math_t* norm_x1,
-                                      math_t* norm_x2)
+template <typename MathT>
+void GramMatrixBase<MathT>::evaluate(raft::resources const& handle,
+                                     dense_input_matrix_view_t<MathT> x1,
+                                     dense_input_matrix_view_t<MathT> x2,
+                                     dense_output_matrix_view_t<MathT> out,
+                                     MathT* norm_x1,
+                                     MathT* norm_x2)
 {
   linear(handle, x1, x2, out);
 }
@@ -121,13 +121,13 @@ void GramMatrixBase<math_t>::evaluate(raft::resources const& handle,
  * @param norm_x1 unused.
  * @param norm_x2 unused.
  */
-template <typename math_t>
-void GramMatrixBase<math_t>::evaluate(raft::resources const& handle,
-                                      csr_input_matrix_view_t<math_t> x1,
-                                      dense_input_matrix_view_t<math_t> x2,
-                                      dense_output_matrix_view_t<math_t> out,
-                                      math_t* norm_x1,
-                                      math_t* norm_x2)
+template <typename MathT>
+void GramMatrixBase<MathT>::evaluate(raft::resources const& handle,
+                                     csr_input_matrix_view_t<MathT> x1,
+                                     dense_input_matrix_view_t<MathT> x2,
+                                     dense_output_matrix_view_t<MathT> out,
+                                     MathT* norm_x1,
+                                     MathT* norm_x2)
 {
   linear(handle, x1, x2, out);
 }
@@ -140,13 +140,13 @@ void GramMatrixBase<math_t>::evaluate(raft::resources const& handle,
  * @param norm_x1 unused.
  * @param norm_x2 unused.
  */
-template <typename math_t>
-void GramMatrixBase<math_t>::evaluate(raft::resources const& handle,
-                                      csr_input_matrix_view_t<math_t> x1,
-                                      csr_input_matrix_view_t<math_t> x2,
-                                      dense_output_matrix_view_t<math_t> out,
-                                      math_t* norm_x1,
-                                      math_t* norm_x2)
+template <typename MathT>
+void GramMatrixBase<MathT>::evaluate(raft::resources const& handle,
+                                     csr_input_matrix_view_t<MathT> x1,
+                                     csr_input_matrix_view_t<MathT> x2,
+                                     dense_output_matrix_view_t<MathT> out,
+                                     MathT* norm_x1,
+                                     MathT* norm_x2)
 {
   linear(handle, x1, x2, out);
 }
@@ -166,18 +166,18 @@ void GramMatrixBase<math_t>::evaluate(raft::resources const& handle,
  * @param ld2 leading dimension of x2 (usually it is n2)
  * @param ld_out leading dimension of out (usually it is n1)
  */
-template <typename math_t>
-[[deprecated]] void GramMatrixBase<math_t>::evaluate(const math_t* x1,
-                                                     int n1,
-                                                     int n_cols,
-                                                     const math_t* x2,
-                                                     int n2,
-                                                     math_t* out,
-                                                     bool is_row_major,
-                                                     cudaStream_t stream,
-                                                     int ld1,
-                                                     int ld2,
-                                                     int ld_out)
+template <typename MathT>
+[[deprecated]] void GramMatrixBase<MathT>::evaluate(const MathT* x1,
+                                                    int n1,
+                                                    int n_cols,
+                                                    const MathT* x2,
+                                                    int n2,
+                                                    MathT* out,
+                                                    bool is_row_major,
+                                                    cudaStream_t stream,
+                                                    int ld1,
+                                                    int ld2,
+                                                    int ld_out)
 {
   linear(x1, n1, n_cols, x2, n2, out, is_row_major, stream, ld1, ld2, ld_out);
 }
@@ -197,18 +197,18 @@ template <typename math_t>
  * @param ld2 leading dimension of x2
  * @param ld_out leading dimension of out
  */
-template <typename math_t>
-[[deprecated]] void GramMatrixBase<math_t>::operator()(const math_t* x1,
-                                                       int n1,
-                                                       int n_cols,
-                                                       const math_t* x2,
-                                                       int n2,
-                                                       math_t* out,
-                                                       bool is_row_major,
-                                                       cudaStream_t stream,
-                                                       int ld1,
-                                                       int ld2,
-                                                       int ld_out)
+template <typename MathT>
+[[deprecated]] void GramMatrixBase<MathT>::operator()(const MathT* x1,
+                                                      int n1,
+                                                      int n_cols,
+                                                      const MathT* x2,
+                                                      int n2,
+                                                      MathT* out,
+                                                      bool is_row_major,
+                                                      cudaStream_t stream,
+                                                      int ld1,
+                                                      int ld2,
+                                                      int ld_out)
 {
   ASSERT(legacy_interface, "Legacy interface can only be used with legacy ctor.");
   if (ld1 <= 0) { ld1 = is_row_major ? n_cols : n1; }
@@ -236,21 +236,21 @@ template <typename math_t>
  * @param ld2 leading dimension of x2
  * @param ld_out leading dimension of out
  */
-template <typename math_t>
-[[deprecated]] void GramMatrixBase<math_t>::linear(const math_t* x1,
-                                                   int n1,
-                                                   int n_cols,
-                                                   const math_t* x2,
-                                                   int n2,
-                                                   math_t* out,
-                                                   bool is_row_major,
-                                                   cudaStream_t stream,
-                                                   int ld1,
-                                                   int ld2,
-                                                   int ld_out)
+template <typename MathT>
+[[deprecated]] void GramMatrixBase<MathT>::linear(const MathT* x1,
+                                                  int n1,
+                                                  int n_cols,
+                                                  const MathT* x2,
+                                                  int n2,
+                                                  MathT* out,
+                                                  bool is_row_major,
+                                                  cudaStream_t stream,
+                                                  int ld1,
+                                                  int ld2,
+                                                  int ld_out)
 {
-  math_t alpha = 1.0;
-  math_t beta  = 0.0;
+  MathT alpha = 1.0;
+  MathT beta  = 0.0;
   if (is_row_major) {
     // #TODO: Call from public API when ready
     RAFT_CUBLAS_TRY(raft::linalg::detail::cublasgemm(cublas_handle,
@@ -288,25 +288,25 @@ template <typename math_t>
   }
 }
 
-template <typename math_t>
-auto GramMatrixBase<math_t>::get_is_row_major(dense_output_matrix_view_t<math_t> matrix) -> bool
+template <typename MathT>
+auto GramMatrixBase<MathT>::get_is_row_major(dense_output_matrix_view_t<MathT> matrix) -> bool
 {
   return (matrix.stride(1) == 1);
 }
-template <typename math_t>
-auto GramMatrixBase<math_t>::get_is_row_major(dense_input_matrix_view_t<math_t> matrix) -> bool
+template <typename MathT>
+auto GramMatrixBase<MathT>::get_is_row_major(dense_input_matrix_view_t<MathT> matrix) -> bool
 {
   return (matrix.stride(1) == 1);
 }
 
-template <typename math_t>
-auto GramMatrixBase<math_t>::get_is_col_major(dense_output_matrix_view_t<math_t> matrix) -> bool
+template <typename MathT>
+auto GramMatrixBase<MathT>::get_is_col_major(dense_output_matrix_view_t<MathT> matrix) -> bool
 {
   return (matrix.stride(0) == 1);
 }
 
-template <typename math_t>
-auto GramMatrixBase<math_t>::get_is_col_major(dense_input_matrix_view_t<math_t> matrix) -> bool
+template <typename MathT>
+auto GramMatrixBase<MathT>::get_is_col_major(dense_input_matrix_view_t<MathT> matrix) -> bool
 {
   return (matrix.stride(0) == 1);
 }
@@ -322,11 +322,11 @@ auto GramMatrixBase<math_t>::get_is_col_major(dense_input_matrix_view_t<math_t> 
  * @param [in] x2 dense device matrix view, size [n2*n_cols]
  * @param [out] out dense device matrix view for the Gram matrix, size [n1*n2]
  */
-template <typename math_t>
-void GramMatrixBase<math_t>::linear(raft::resources const& handle,
-                                    dense_input_matrix_view_t<math_t> x1,
-                                    dense_input_matrix_view_t<math_t> x2,
-                                    dense_output_matrix_view_t<math_t> out)
+template <typename MathT>
+void GramMatrixBase<MathT>::linear(raft::resources const& handle,
+                                   dense_input_matrix_view_t<MathT> x1,
+                                   dense_input_matrix_view_t<MathT> x2,
+                                   dense_output_matrix_view_t<MathT> out)
 {
   // check is_row_major consistency
   bool is_row_major = get_is_row_major(x1) && get_is_row_major(x2) && get_is_row_major(out);
@@ -347,8 +347,8 @@ void GramMatrixBase<math_t>::linear(raft::resources const& handle,
   int ld2    = is_row_major ? x2.stride(0) : x2.stride(1);
   int ld_out = is_row_major ? out.stride(0) : out.stride(1);
 
-  math_t alpha = 1.0;
-  math_t beta  = 0.0;
+  MathT alpha = 1.0;
+  MathT beta  = 0.0;
   if (is_row_major) {
     // #TODO: Use mdspan-based API when stride-capable
     // https://github.com/rapidsai/raft/issues/875
@@ -399,11 +399,11 @@ void GramMatrixBase<math_t>::linear(raft::resources const& handle,
  * @param [in] x2 dense device matrix view, size [n2*n_cols]
  * @param [out] out dense device matrix view for the Gram matrix, size [n1*n2]
  */
-template <typename math_t>
-void GramMatrixBase<math_t>::linear(raft::resources const& handle,
-                                    csr_input_matrix_view_t<math_t> x1,
-                                    dense_input_matrix_view_t<math_t> x2,
-                                    dense_output_matrix_view_t<math_t> out)
+template <typename MathT>
+void GramMatrixBase<MathT>::linear(raft::resources const& handle,
+                                   csr_input_matrix_view_t<MathT> x1,
+                                   dense_input_matrix_view_t<MathT> x2,
+                                   dense_output_matrix_view_t<MathT> out)
 {
   // check is_row_major consistency
   bool is_row_major = get_is_row_major(x2) && get_is_row_major(out);
@@ -419,8 +419,8 @@ void GramMatrixBase<math_t>::linear(raft::resources const& handle,
   ASSERT(x2.extent(1) == x1_structure.get_n_cols(),
          "GramMatrix input matrix dimensions for x1 and x2 do not match");
 
-  math_t alpha = 1.0;
-  math_t beta  = 0.0;
+  MathT alpha = 1.0;
+  MathT beta  = 0.0;
 
   raft::sparse::linalg::spmm(handle, false, true, &alpha, x1, x2, &beta, out);
 }
@@ -436,11 +436,11 @@ void GramMatrixBase<math_t>::linear(raft::resources const& handle,
  * @param [in] x2 csr device matrix view, size [n2*n_cols]
  * @param [out] out dense device matrix view for the Gram matrix, size [n1*n2]
  */
-template <typename math_t>
-void GramMatrixBase<math_t>::linear(raft::resources const& handle,
-                                    csr_input_matrix_view_t<math_t> x1,
-                                    csr_input_matrix_view_t<math_t> x2,
-                                    dense_output_matrix_view_t<math_t> out)
+template <typename MathT>
+void GramMatrixBase<MathT>::linear(raft::resources const& handle,
+                                   csr_input_matrix_view_t<MathT> x1,
+                                   csr_input_matrix_view_t<MathT> x2,
+                                   dense_output_matrix_view_t<MathT> out)
 {
   // check layout consistency (w.r.t. strides a matrix might be both row & col major)
   bool is_row_major_nopad = get_is_row_major(out) && out.stride(0) == out.extent(1);
@@ -451,13 +451,13 @@ void GramMatrixBase<math_t>::linear(raft::resources const& handle,
 
   // switch a,b based on is_row_major
   if (is_col_major_nopad) {
-    auto out_row_major = raft::make_device_matrix_view<math_t, int, raft::row_major>(
+    auto out_row_major = raft::make_device_matrix_view<MathT, int, raft::row_major>(
       out.data_handle(), out.extent(1), out.extent(0));
 
     cuvs::distance::pairwise_distance(
       handle, x2, x1, out_row_major, cuvs::distance::DistanceType::InnerProduct, 0.0);
   } else {
-    auto out_row_major = raft::make_device_matrix_view<math_t, int, raft::row_major>(
+    auto out_row_major = raft::make_device_matrix_view<MathT, int, raft::row_major>(
       out.data_handle(), out.extent(0), out.extent(1));
     cuvs::distance::pairwise_distance(
       handle, x1, x2, out_row_major, cuvs::distance::DistanceType::InnerProduct, 0.0);

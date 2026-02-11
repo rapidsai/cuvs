@@ -30,10 +30,10 @@ struct hellinger_distance_op {
 
   // Size of shared memory. This is normally decided by the kernel policy, but
   // some ops such as correlation_distance_op use more.
-  template <typename Policy>
+  template <typename policy>
   static constexpr auto shared_mem_size() -> size_t
   {
-    return Policy::SmemSize;
+    return policy::SmemSize;
   }
 
   DI auto core(acc_t& acc, data_t& x, data_t& y) const -> void
@@ -43,17 +43,17 @@ struct hellinger_distance_op {
     acc += product;
   };
 
-  template <typename Policy>
-  DI auto epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
+  template <typename policy>
+  DI auto epilog(acc_t acc[policy::AccRowsPerTh][policy::AccColsPerTh],
                  acc_t* regxn,
                  acc_t* regyn,
                  idx_t gridStrideX,
                  idx_t gridStrideY) const -> void
   {
 #pragma unroll
-    for (int i = 0; i < Policy::AccRowsPerTh; ++i) {
+    for (int i = 0; i < policy::AccRowsPerTh; ++i) {
 #pragma unroll
-      for (int j = 0; j < Policy::AccColsPerTh; ++j) {
+      for (int j = 0; j < policy::AccColsPerTh; ++j) {
         // Adjust to replace NaN in sqrt with 0 if input to sqrt is negative
         const auto final_val = (1 - acc[i][j]);
         const auto rectifier = (!signbit(final_val));

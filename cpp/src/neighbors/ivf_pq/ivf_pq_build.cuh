@@ -192,13 +192,13 @@ void flat_compute_residuals(
                      stream);
 }
 
-template <uint32_t BlockDim, typename IdxT>
-__launch_bounds__(BlockDim) static __global__ void fill_indices_kernel(IdxT n_rows,
-                                                                       IdxT* data_indices,
-                                                                       IdxT* data_offsets,
-                                                                       const uint32_t* labels)
+template <uint32_t block_dim, typename IdxT>
+__launch_bounds__(block_dim) static __global__ void fill_indices_kernel(IdxT n_rows,
+                                                                        IdxT* data_indices,
+                                                                        IdxT* data_offsets,
+                                                                        const uint32_t* labels)
 {
-  const auto i = IdxT(BlockDim) * IdxT(blockIdx.x) + IdxT(threadIdx.x);
+  const auto i = IdxT(block_dim) * IdxT(blockIdx.x) + IdxT(threadIdx.x);
   if (i >= n_rows) { return; }
   data_indices[atomicAdd<IdxT>(data_offsets + labels[i], 1)] = i;
 }
@@ -551,8 +551,8 @@ struct reconstruct_vectors {
   }
 };
 
-template <uint32_t BlockSize, uint32_t PqBits>
-__launch_bounds__(BlockSize) static __global__ void reconstruct_list_data_kernel(
+template <uint32_t block_size, uint32_t PqBits>
+__launch_bounds__(block_size) static __global__ void reconstruct_list_data_kernel(
   raft::device_matrix_view<float, uint32_t, raft::row_major> out_vectors,
   raft::device_mdspan<const uint8_t,
                       list_spec_interleaved<uint32_t, uint32_t>::list_extents,
@@ -658,8 +658,8 @@ void reconstruct_list_data(raft::resources const& res,
   }
 }
 
-template <uint32_t BlockSize, uint32_t PqBits>
-__launch_bounds__(BlockSize) static __global__ void encode_list_data_interleaved_kernel(
+template <uint32_t block_size, uint32_t PqBits>
+__launch_bounds__(block_size) static __global__ void encode_list_data_interleaved_kernel(
   raft::device_mdspan<uint8_t,
                       list_spec_interleaved<uint32_t, uint32_t>::list_extents,
                       raft::row_major> list_data,
@@ -677,8 +677,8 @@ __launch_bounds__(BlockSize) static __global__ void encode_list_data_interleaved
     list_data, offset_or_indices, new_vectors.extent(0), pq_dim, encode_action);
 }
 
-template <uint32_t BlockSize, uint32_t PqBits>
-__launch_bounds__(BlockSize) static __global__ void encode_list_data_flat_kernel(
+template <uint32_t block_size, uint32_t PqBits>
+__launch_bounds__(block_size) static __global__ void encode_list_data_flat_kernel(
   uint8_t* list_data,
   raft::device_matrix_view<const float, uint32_t, raft::row_major> new_vectors,
   raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
@@ -1058,15 +1058,15 @@ void extend(raft::resources const& handle,
     size_factor += sizeof(IdxT);
     // if the input data is not accessible on device, we'd need a buffer for it.
     switch (utils::check_pointer_residency(new_vectors)) {
-      case utils::pointer_residency::device_only:
-      case utils::pointer_residency::host_and_device: break;
+      case utils::pointer_residency::DEVICE_ONLY:
+      case utils::pointer_residency::HOST_AND_DEVICE: break;
       default: size_factor += index->dim() * sizeof(T);
     }
     // the same with indices
     if (new_indices != nullptr) {
       switch (utils::check_pointer_residency(new_indices)) {
-        case utils::pointer_residency::device_only:
-        case utils::pointer_residency::host_and_device: break;
+        case utils::pointer_residency::DEVICE_ONLY:
+        case utils::pointer_residency::HOST_AND_DEVICE: break;
         default: size_factor += sizeof(IdxT);
       }
     }
@@ -1219,10 +1219,10 @@ auto extend(raft::resources const& handle,
   return ext_index;
 }
 
-template <typename T, typename IdxT, typename accessor>
+template <typename T, typename IdxT, typename Accessor>
 auto build(raft::resources const& handle,
            const index_params& params,
-           raft::mdspan<const T, raft::matrix_extent<IdxT>, raft::row_major, accessor> dataset)
+           raft::mdspan<const T, raft::matrix_extent<IdxT>, raft::row_major, Accessor> dataset)
   -> index<IdxT>
 {
   IdxT n_rows = dataset.extent(0);
@@ -1379,10 +1379,10 @@ auto build(raft::resources const& handle,
   return idx;
 }
 
-template <typename T, typename IdxT, typename accessor>
+template <typename T, typename IdxT, typename Accessor>
 void build(raft::resources const& handle,
            const index_params& params,
-           raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, accessor> dataset,
+           raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
            index<IdxT>* index)
 {
   *index = build(handle, params, dataset);
@@ -1478,11 +1478,11 @@ void build(raft::resources const& handle,
   *idx = build<IdxT>(handle, index_params, dim, pq_centers, centers, centers_rot, rotation_matrix);
 }
 
-template <typename T, typename IdxT, typename accessor, typename accessor2>
+template <typename T, typename IdxT, typename Accessor, typename Accessor2>
 auto extend(
   raft::resources const& handle,
-  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, accessor> new_vectors,
-  std::optional<raft::mdspan<const IdxT, raft::vector_extent<int64_t>, raft::row_major, accessor2>>
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> new_vectors,
+  std::optional<raft::mdspan<const IdxT, raft::vector_extent<int64_t>, raft::row_major, Accessor2>>
     new_indices,
   const cuvs::neighbors::ivf_pq::index<IdxT>& orig_index) -> index<IdxT>
 {
@@ -1503,11 +1503,11 @@ auto extend(
 }
 
 // True in-place extend (does not clone the index)
-template <typename T, typename IdxT, typename accessor, typename accessor2>
+template <typename T, typename IdxT, typename Accessor, typename Accessor2>
 void extend(
   raft::resources const& handle,
-  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, accessor> new_vectors,
-  std::optional<raft::mdspan<const IdxT, raft::vector_extent<int64_t>, raft::row_major, accessor2>>
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> new_vectors,
+  std::optional<raft::mdspan<const IdxT, raft::vector_extent<int64_t>, raft::row_major, Accessor2>>
     new_indices,
   index<IdxT>* index)
 {
@@ -1646,10 +1646,10 @@ void build(
   *idx = build<IdxT>(handle, index_params, dim, pq_centers, centers, centers_rot, rotation_matrix);
 }
 
-template <typename output_mdspan_type>
+template <typename OutputMdspanType>
 inline void extract_centers(raft::resources const& res,
                             const cuvs::neighbors::ivf_pq::index<int64_t>& index,
-                            output_mdspan_type cluster_centers)
+                            OutputMdspanType cluster_centers)
 {
   RAFT_EXPECTS(cluster_centers.extent(0) == index.n_lists(),
                "Number of rows in the output buffer for cluster centers must be equal to the "

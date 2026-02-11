@@ -26,8 +26,8 @@ namespace device {
 constexpr unsigned warp_size = 32;  // NOLINT(readability-identifier-naming)
 
 // using LOAD_256BIT_T = ulonglong4;
-using LOAD_128BIT_T = uint4;
-using LOAD_64BIT_T  = uint64_t;  // NOLINT(readability-identifier-naming)
+using load_128_bit_t = uint4;
+using LOAD_64BIT_T   = uint64_t;  // NOLINT(readability-identifier-naming)
 
 template <class LOAD_T, class DATA_T>  // NOLINT(readability-identifier-naming)
 RAFT_DEVICE_INLINE_FUNCTION constexpr auto get_vlen() -> unsigned
@@ -85,21 +85,21 @@ RAFT_DEVICE_INLINE_FUNCTION auto team_sum(T x, uint32_t team_size_bitshift) -> T
   }
 }
 
-template <typename IndexT,
-          typename DistanceT,
+template <typename index_t,
+          typename distance_t,
           typename DATASET_DESCRIPTOR_T>  // NOLINT(readability-identifier-naming)
 RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
-  IndexT* __restrict__ result_indices_ptr,       // [num_pickup]
-  DistanceT* __restrict__ result_distances_ptr,  // [num_pickup]
+  index_t* __restrict__ result_indices_ptr,       // [num_pickup]
+  distance_t* __restrict__ result_distances_ptr,  // [num_pickup]
   const DATASET_DESCRIPTOR_T& dataset_desc,
   const uint32_t num_pickup,
   const uint32_t num_distilation,
   const uint64_t rand_xor_mask,
-  const IndexT* __restrict__ seed_ptr,  // [num_seeds]
+  const index_t* __restrict__ seed_ptr,  // [num_seeds]
   const uint32_t num_seeds,
-  IndexT* __restrict__ visited_hash_ptr,
+  index_t* __restrict__ visited_hash_ptr,
   const uint32_t visited_hash_bitlen,
-  IndexT* __restrict__ traversed_hash_ptr,
+  index_t* __restrict__ traversed_hash_ptr,
   const uint32_t traversed_hash_bitlen,
   const uint32_t block_id   = 0,
   const uint32_t num_blocks = 1)
@@ -110,11 +110,11 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
   for (uint32_t i = threadIdx.x >> team_size_bits; i < max_i; i += (blockDim.x >> team_size_bits)) {
     const bool valid_i = (i < num_pickup);
 
-    IndexT best_index_team_local    = raft::upper_bound<IndexT>();
-    DistanceT best_norm2_team_local = raft::upper_bound<DistanceT>();
+    index_t best_index_team_local    = raft::upper_bound<index_t>();
+    distance_t best_norm2_team_local = raft::upper_bound<distance_t>();
     for (uint32_t j = 0; j < num_distilation; j++) {
       // Select a node randomly and compute the distance to it
-      IndexT seed_index = 0;
+      index_t seed_index = 0;
       if (valid_i) {
         // uint32_t gid = i + (num_pickup * (j + (num_distilation * block_id)));
         uint32_t gid = block_id + (num_blocks * (i + (num_pickup * j)));
@@ -135,17 +135,17 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
 
     const unsigned lane_id = threadIdx.x & ((1u << team_size_bits) - 1u);
     if (valid_i && lane_id == 0) {
-      if (best_index_team_local != raft::upper_bound<IndexT>()) {
+      if (best_index_team_local != raft::upper_bound<index_t>()) {
         if (hashmap::insert(visited_hash_ptr, visited_hash_bitlen, best_index_team_local) == 0) {
           // Deactivate this entry as insertion into visited hash table has failed.
-          best_norm2_team_local = raft::upper_bound<DistanceT>();
-          best_index_team_local = raft::upper_bound<IndexT>();
+          best_norm2_team_local = raft::upper_bound<distance_t>();
+          best_index_team_local = raft::upper_bound<index_t>();
         } else if ((traversed_hash_ptr != nullptr) &&
-                   hashmap::search<IndexT, 1>(
+                   hashmap::search<index_t, 1>(
                      traversed_hash_ptr, traversed_hash_bitlen, best_index_team_local)) {
           // Deactivate this entry as it has been already used by others.
-          best_norm2_team_local = raft::upper_bound<DistanceT>();
-          best_index_team_local = raft::upper_bound<IndexT>();
+          best_norm2_team_local = raft::upper_bound<distance_t>();
+          best_index_team_local = raft::upper_bound<index_t>();
         }
       }
       result_distances_ptr[i] = best_norm2_team_local;
@@ -154,57 +154,57 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
   }
 }
 
-template <typename IndexT,
-          typename DistanceT,
+template <typename index_t,
+          typename distance_t,
           typename DATASET_DESCRIPTOR_T,  // NOLINT(readability-identifier-naming)
           int STATIC_RESULT_POSITION = 1>
 RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
-  IndexT* __restrict__ result_child_indices_ptr,
-  DistanceT* __restrict__ result_child_distances_ptr,
+  index_t* __restrict__ result_child_indices_ptr,
+  distance_t* __restrict__ result_child_distances_ptr,
   // [dataset_dim, dataset_size]
   const DATASET_DESCRIPTOR_T& dataset_desc,
   // [knn_k, dataset_size]
-  const IndexT* __restrict__ knn_graph,
+  const index_t* __restrict__ knn_graph,
   const uint32_t knn_k,
   // hashmap
-  IndexT* __restrict__ visited_hashmap_ptr,
+  index_t* __restrict__ visited_hashmap_ptr,
   const uint32_t visited_hash_bitlen,
-  IndexT* __restrict__ traversed_hashmap_ptr,
+  index_t* __restrict__ traversed_hashmap_ptr,
   const uint32_t traversed_hash_bitlen,
-  const IndexT* __restrict__ parent_indices,
-  const IndexT* __restrict__ internal_topk_list,
+  const index_t* __restrict__ parent_indices,
+  const index_t* __restrict__ internal_topk_list,
   const uint32_t search_width,
   int* __restrict__ result_position = nullptr,
   const int max_result_position     = 0)
 {
-  constexpr IndexT index_msb_1_mask =
-    utils::gen_index_msb_1_mask<IndexT>::value;  // NOLINT(readability-identifier-naming)
-  constexpr IndexT invalid_index =
-    ~static_cast<IndexT>(0);  // NOLINT(readability-identifier-naming)
+  constexpr index_t kIndexMsb1Mask =
+    utils::gen_index_msb_1_mask<index_t>::value;  // NOLINT(readability-identifier-naming)
+  constexpr index_t kInvalidIndex =
+    ~static_cast<index_t>(0);  // NOLINT(readability-identifier-naming)
 
   // Read child indices of parents from knn graph and check if the distance
   // computaiton is necessary.
   for (uint32_t i = threadIdx.x; i < knn_k * search_width; i += blockDim.x) {
-    const IndexT smem_parent_id = parent_indices[i / knn_k];
-    IndexT child_id             = invalid_index;
-    if (smem_parent_id != invalid_index) {
-      const auto parent_id = internal_topk_list[smem_parent_id] & ~index_msb_1_mask;
+    const index_t smem_parent_id = parent_indices[i / knn_k];
+    index_t child_id             = kInvalidIndex;
+    if (smem_parent_id != kInvalidIndex) {
+      const auto parent_id = internal_topk_list[smem_parent_id] & ~kIndexMsb1Mask;
       child_id             = knn_graph[(i % knn_k) + (static_cast<int64_t>(knn_k) * parent_id)];
     }
-    if (child_id != invalid_index) {
+    if (child_id != kInvalidIndex) {
       if (hashmap::insert(visited_hashmap_ptr, visited_hash_bitlen, child_id) == 0) {
         // Deactivate this entry as insertion into visited hash table has failed.
-        child_id = invalid_index;
+        child_id = kInvalidIndex;
       } else if ((traversed_hashmap_ptr != nullptr) &&
-                 hashmap::search<IndexT, 1>(
+                 hashmap::search<index_t, 1>(
                    traversed_hashmap_ptr, traversed_hash_bitlen, child_id)) {
         // Deactivate this entry as this has been already used by others.
-        child_id = invalid_index;
+        child_id = kInvalidIndex;
       }
     }
     if (STATIC_RESULT_POSITION) {
       result_child_indices_ptr[i] = child_id;
-    } else if (child_id != invalid_index) {
+    } else if (child_id != kInvalidIndex) {
       int j                       = atomicSub(result_position, 1) - 1;
       result_child_indices_ptr[j] = child_id;
     }
@@ -222,15 +222,15 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
   for (uint32_t i = threadIdx.x >> team_size_bits; i < max_i; i += blockDim.x >> team_size_bits) {
     const auto j        = i + ofst;
     const bool valid_i  = STATIC_RESULT_POSITION ? (j < num_k) : (j < max_result_position);
-    const auto child_id = valid_i ? result_child_indices_ptr[j] : invalid_index;
+    const auto child_id = valid_i ? result_child_indices_ptr[j] : kInvalidIndex;
 
     // We should be calling `dataset_desc.compute_distance(..)` here as follows:
-    // > const auto child_dist = dataset_desc.compute_distance(child_id, child_id != invalid_index);
+    // > const auto child_dist = dataset_desc.compute_distance(child_id, child_id != kInvalidIndex);
     // Instead, we manually inline this function for performance reasons.
     // This allows us to move the fetching of the arguments from shared memory out of the loop.
-    const DistanceT child_dist = device::team_sum(
-      (child_id != invalid_index) ? compute_distance(args, child_id)
-                                  : (lead_lane ? raft::upper_bound<DistanceT>() : 0),
+    const distance_t child_dist = device::team_sum(
+      (child_id != kInvalidIndex) ? compute_distance(args, child_id)
+                                  : (lead_lane ? raft::upper_bound<distance_t>() : 0),
       team_size_bits);
     __syncwarp();
 

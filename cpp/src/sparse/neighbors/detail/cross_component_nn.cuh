@@ -46,20 +46,20 @@ namespace cuvs::sparse::neighbors::detail {
 /**
  * Base functor with reduction ops for performing masked 1-nn
  * computation.
- * @tparam value_idx
+ * @tparam ValueIdx
  * @tparam value_t
  */
-template <typename value_idx, typename value_t>
-struct FixConnectivitiesRedOp {
-  value_idx m;
+template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+struct fix_connectivities_red_op {
+  ValueIdx m;
 
   // default constructor for cutlass
-  DI FixConnectivitiesRedOp() : m(0) {}
+  DI fix_connectivities_red_op() : m(0) {}
 
-  explicit FixConnectivitiesRedOp(value_idx m_) : m(m_) {};
+  explicit fix_connectivities_red_op(ValueIdx m_) : m(m_) {};
 
-  using KVP = typename raft::KeyValuePair<value_idx, value_t>;
-  DI void operator()(value_idx rit, KVP* out, const KVP& other) const
+  using kvp = typename raft::KeyValuePair<ValueIdx, value_t>;
+  DI void operator()(ValueIdx rit, kvp* out, const kvp& other) const
   {
     if (rit < m && other.value < out->value) {
       out->key   = other.key;
@@ -67,7 +67,7 @@ struct FixConnectivitiesRedOp {
     }
   }
 
-  DI auto operator()(value_idx rit, const KVP& a, const KVP& b) const -> KVP
+  DI auto operator()(ValueIdx rit, const kvp& a, const kvp& b) const -> kvp
   {
     if (rit < m && a.value < b.value) {
       return a;
@@ -77,39 +77,39 @@ struct FixConnectivitiesRedOp {
   }
 
   DI void init(value_t* out, value_t maxVal) const { *out = maxVal; }
-  DI void init(KVP* out, value_t maxVal) const
+  DI void init(kvp* out, value_t maxVal) const
   {
     out->key   = -1;
     out->value = maxVal;
   }
 
-  DI void init_key(value_t& out, value_idx idx) const { return; }
-  DI void init_key(KVP& out, value_idx idx) const { out.key = idx; }
+  DI void init_key(value_t& out, ValueIdx idx) const { return; }
+  DI void init_key(kvp& out, ValueIdx idx) const { out.key = idx; }
 
-  DI auto get_value(KVP& out) const -> value_t { return out.value; }
+  DI auto get_value(kvp& out) const -> value_t { return out.value; }
 
   DI auto get_value(value_t& out) const -> value_t { return out; }
 
   /** The gather and scatter ensure that operator() is still consistent after rearranging the data.
    * TODO (tarang-jain): refactor cross_component_nn API to separate out the gather and scatter
    * functions from the reduction op. Reference: https://github.com/rapidsai/raft/issues/1614 */
-  void gather(const raft::resources& handle, value_idx* map) {}
+  void gather(const raft::resources& handle, ValueIdx* map) {}
 
-  void scatter(const raft::resources& handle, value_idx* map) {}
+  void scatter(const raft::resources& handle, ValueIdx* map) {}
 };
 
-template <typename value_idx, typename value_t>
-struct MutualReachabilityFixConnectivitiesRedOp {
+template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+struct mutual_reachability_fix_connectivities_red_op {
   value_t* core_dists;
-  value_idx m;
+  ValueIdx m;
 
-  DI MutualReachabilityFixConnectivitiesRedOp() : m(0), core_dists(nullptr) {}
+  DI mutual_reachability_fix_connectivities_red_op() : m(0), core_dists(nullptr) {}
 
-  MutualReachabilityFixConnectivitiesRedOp(value_t* core_dists, value_idx m)
+  mutual_reachability_fix_connectivities_red_op(value_t* core_dists, ValueIdx m)
     : core_dists(core_dists), m(m) {};
 
-  using KVP = typename raft::KeyValuePair<value_idx, value_t>;
-  DI void operator()(value_idx rit, KVP* out, const KVP& other) const
+  using kvp = typename raft::KeyValuePair<ValueIdx, value_t>;
+  DI void operator()(ValueIdx rit, kvp* out, const kvp& other) const
   {
     if (rit < m && other.value < std::numeric_limits<value_t>::max()) {
       value_t core_dist_rit   = core_dists[rit];
@@ -128,7 +128,7 @@ struct MutualReachabilityFixConnectivitiesRedOp {
     }
   }
 
-  DI auto operator()(value_idx rit, const KVP& a, const KVP& b) const -> KVP
+  DI auto operator()(ValueIdx rit, const kvp& a, const kvp& b) const -> kvp
   {
     if (rit < m && a.key > -1) {
       value_t core_dist_rit = core_dists[rit];
@@ -141,26 +141,26 @@ struct MutualReachabilityFixConnectivitiesRedOp {
         core_dist_b = b.value;
       }
 
-      return core_dist_a < core_dist_b ? KVP(a.key, core_dist_a) : KVP(b.key, core_dist_b);
+      return core_dist_a < core_dist_b ? kvp(a.key, core_dist_a) : kvp(b.key, core_dist_b);
     }
 
     return b;
   }
 
   DI void init(value_t* out, value_t maxVal) const { *out = maxVal; }
-  DI void init(KVP* out, value_t maxVal) const
+  DI void init(kvp* out, value_t maxVal) const
   {
     out->key   = -1;
     out->value = maxVal;
   }
 
-  DI void init_key(value_t& out, value_idx idx) const { return; }
-  DI void init_key(KVP& out, value_idx idx) const { out.key = idx; }
+  DI void init_key(value_t& out, ValueIdx idx) const { return; }
+  DI void init_key(kvp& out, ValueIdx idx) const { out.key = idx; }
 
-  DI auto get_value(KVP& out) const -> value_t { return out.value; }
+  DI auto get_value(kvp& out) const -> value_t { return out.value; }
   DI auto get_value(value_t& out) const -> value_t { return out; }
 
-  void gather(const raft::resources& handle, value_idx* map)
+  void gather(const raft::resources& handle, ValueIdx* map)
   {
     auto tmp_core_dists = raft::make_device_vector<value_t>(handle, m);
     thrust::gather(raft::resource::get_thrust_policy(handle),
@@ -172,7 +172,7 @@ struct MutualReachabilityFixConnectivitiesRedOp {
       core_dists, tmp_core_dists.data_handle(), m, raft::resource::get_cuda_stream(handle));
   }
 
-  void scatter(const raft::resources& handle, value_idx* map)
+  void scatter(const raft::resources& handle, ValueIdx* map)
   {
     auto tmp_core_dists = raft::make_device_vector<value_t>(handle, m);
     thrust::scatter(raft::resource::get_thrust_policy(handle),
@@ -190,9 +190,9 @@ struct MutualReachabilityFixConnectivitiesRedOp {
  * a cub keyvalue pair object. Sorts the 3 arrays in
  * ascending order: row->col->keyvaluepair
  */
-struct TupleComp {
-  template <typename one, typename two>
-  __host__ __device__ auto operator()(const one& t1, const two& t2) -> bool
+struct tuple_comp {
+  template <typename One, typename Two>
+  __host__ __device__ auto operator()(const One& t1, const Two& t2) -> bool
   {
     // sort first by each sample's color,
     if (thrust::get<0>(t1) < thrust::get<0>(t2)) return true;
@@ -207,58 +207,58 @@ struct TupleComp {
   }
 };
 
-template <typename LabelT, typename DataT>
-struct CubKVPMinReduce {
-  using KVP = raft::KeyValuePair<LabelT, DataT>;
+template <typename label_t, typename DataT>
+struct cub_kvp_min_reduce {
+  using kvp = raft::KeyValuePair<label_t, DataT>;
 
   DI auto
 
-  operator()(LabelT rit, const KVP& a, const KVP& b) -> KVP
+  operator()(label_t rit, const kvp& a, const kvp& b) -> kvp
   {
     return b.value < a.value ? b : a;
   }
 
   DI auto
 
-  operator()(const KVP& a, const KVP& b) -> KVP
+  operator()(const kvp& a, const kvp& b) -> kvp
   {
     return b.value < a.value ? b : a;
   }
 
-};  // KVPMinReduce
+};  // kvp_min_reduce
 
 /**
  * Gets the number of unique components from array of
  * colors or labels. This does not assume the components are
  * drawn from a monotonically increasing set.
- * @tparam value_idx
+ * @tparam ValueIdx
  * @param[in] colors array of components
  * @param[in] n_rows size of components array
  * @param[in] stream cuda stream for which to order cuda operations
  * @return total number of components
  */
-template <typename value_idx>
-auto get_n_components(value_idx* colors, size_t n_rows, cudaStream_t stream) -> value_idx
+template <typename ValueIdx>
+auto get_n_components(ValueIdx* colors, size_t n_rows, cudaStream_t stream) -> ValueIdx
 {
-  rmm::device_uvector<value_idx> map_ids(0, stream);
+  rmm::device_uvector<ValueIdx> map_ids(0, stream);
   int num_clusters = raft::label::getUniquelabels(map_ids, colors, n_rows, stream);
   return num_clusters;
 }
 
 /**
  * Functor to look up a component for a vertex
- * @tparam value_idx
+ * @tparam ValueIdx
  * @tparam value_t
  */
-template <typename value_idx, typename value_t>
-struct LookupColorOp {
-  value_idx* colors;
+template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+struct lookup_color_op {
+  ValueIdx* colors;
 
-  explicit LookupColorOp(value_idx* colors_) : colors(colors_) {}
+  explicit lookup_color_op(ValueIdx* colors_) : colors(colors_) {}
 
   DI auto
 
-  operator()(const raft::KeyValuePair<value_idx, value_t>& kvp) -> value_idx
+  operator()(const raft::KeyValuePair<ValueIdx, value_t>& kvp) -> ValueIdx
   {
     return colors[kvp.key];
   }
@@ -267,7 +267,7 @@ struct LookupColorOp {
 /**
  * Compute the cross-component 1-nearest neighbors for each row in X using
  * the given array of components
- * @tparam value_idx
+ * @tparam ValueIdx
  * @tparam value_t
  * @param[in] handle raft handle
  * @param[out] kvp mapping of closest neighbor vertex and distance for each vertex in the given
@@ -281,24 +281,26 @@ struct LookupColorOp {
  * @param[in] col_batch_size column batch size for sorting and 'unsorting'
  * @param[in] reduction_op reduction operation for computing nearest neighbors
  */
-template <typename value_idx, typename value_t, typename red_op>
+template <typename ValueIdx,
+          typename value_t,
+          typename RedOp>  // NOLINT(readability-identifier-naming)
 void perform_1nn(raft::resources const& handle,
-                 raft::KeyValuePair<value_idx, value_t>* kvp,
-                 value_idx* nn_colors,
-                 value_idx* colors,
+                 raft::KeyValuePair<ValueIdx, value_t>* kvp,
+                 ValueIdx* nn_colors,
+                 ValueIdx* colors,
                  const value_t* X,
                  size_t n_rows,
                  size_t n_cols,
                  size_t row_batch_size,
                  size_t col_batch_size,
-                 red_op reduction_op)
+                 RedOp reduction_op)
 {
   auto stream      = raft::resource::get_cuda_stream(handle);
   auto exec_policy = raft::resource::get_thrust_policy(handle);
 
-  auto sort_plan = raft::make_device_vector<value_idx>(handle, static_cast<value_idx>(n_rows));
+  auto sort_plan = raft::make_device_vector<ValueIdx>(handle, static_cast<ValueIdx>(n_rows));
   raft::linalg::map_offset(
-    handle, sort_plan.view(), [] __device__(value_idx idx) -> value_idx { return idx; });
+    handle, sort_plan.view(), [] __device__(ValueIdx idx) -> ValueIdx { return idx; });
 
   thrust::sort_by_key(
     raft::resource::get_thrust_policy(handle), colors, colors + n_rows, sort_plan.data_handle());
@@ -306,41 +308,40 @@ void perform_1nn(raft::resources const& handle,
   // Modify the reduction operation based on the sort plan.
   reduction_op.gather(handle, sort_plan.data_handle());
 
-  auto X_mutable_view =
-    raft::make_device_matrix_view<value_t, value_idx>(const_cast<value_t*>(X), n_rows, n_cols);
+  auto x_mutable_view =
+    raft::make_device_matrix_view<value_t, ValueIdx>(const_cast<value_t*>(X), n_rows, n_cols);
   auto sort_plan_const_view =
-    raft::make_device_vector_view<const value_idx, value_idx>(sort_plan.data_handle(), n_rows);
+    raft::make_device_vector_view<const ValueIdx, ValueIdx>(sort_plan.data_handle(), n_rows);
   raft::matrix::gather(
-    handle, X_mutable_view, sort_plan_const_view, static_cast<value_idx>(col_batch_size));
+    handle, x_mutable_view, sort_plan_const_view, static_cast<ValueIdx>(col_batch_size));
 
   // Get the number of unique components from the array of colors
-  value_idx n_components = get_n_components(colors, n_rows, stream);
+  ValueIdx n_components = get_n_components(colors, n_rows, stream);
 
   // colors_group_idxs is an array containing the *end* indices of each color
   // component in colors. That is, the value of colors_group_idxs[j] indicates
   // the start of color j + 1, i.e., it is the inclusive scan of the sizes of
   // the color components.
-  auto colors_group_idxs = raft::make_device_vector<value_idx, value_idx>(handle, n_components + 1);
+  auto colors_group_idxs = raft::make_device_vector<ValueIdx, ValueIdx>(handle, n_components + 1);
   raft::sparse::convert::sorted_coo_to_csr(
     colors, n_rows, colors_group_idxs.data_handle(), n_components + 1, stream);
 
-  auto group_idxs_view = raft::make_device_vector_view<const value_idx, value_idx>(
+  auto group_idxs_view = raft::make_device_vector_view<const ValueIdx, ValueIdx>(
     colors_group_idxs.data_handle() + 1, n_components);
 
-  auto x_norm =
-    raft::make_device_vector<value_t, value_idx>(handle, static_cast<value_idx>(n_rows));
+  auto x_norm = raft::make_device_vector<value_t, ValueIdx>(handle, static_cast<ValueIdx>(n_rows));
   raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
     x_norm.data_handle(), X, n_cols, n_rows, stream);
 
-  auto adj     = raft::make_device_matrix<bool, value_idx>(handle, row_batch_size, n_components);
-  using OutT   = raft::KeyValuePair<value_idx, value_t>;
-  using ParamT = cuvs::distance::masked_l2_nn_params<red_op, red_op>;
+  auto adj      = raft::make_device_matrix<bool, ValueIdx>(handle, row_batch_size, n_components);
+  using out_t   = raft::KeyValuePair<ValueIdx, value_t>;
+  using param_t = cuvs::distance::masked_l2_nn_params<RedOp, RedOp>;
 
   bool apply_sqrt      = true;
   bool init_out_buffer = true;
-  ParamT params{reduction_op, reduction_op, apply_sqrt, init_out_buffer};
+  param_t params{reduction_op, reduction_op, apply_sqrt, init_out_buffer};
 
-  auto X_full_view = raft::make_device_matrix_view<const value_t, value_idx>(X, n_rows, n_cols);
+  auto x_full_view = raft::make_device_matrix_view<const value_t, ValueIdx>(X, n_rows, n_cols);
 
   size_t n_batches = raft::ceildiv(n_rows, row_batch_size);
 
@@ -348,41 +349,40 @@ void perform_1nn(raft::resources const& handle,
     size_t batch_offset   = bid * row_batch_size;
     size_t rows_per_batch = min(row_batch_size, n_rows - batch_offset);
 
-    auto X_batch_view = raft::make_device_matrix_view<const value_t, value_idx>(
+    auto x_batch_view = raft::make_device_matrix_view<const value_t, ValueIdx>(
       X + batch_offset * n_cols, rows_per_batch, n_cols);
 
-    auto x_norm_batch_view = raft::make_device_vector_view<const value_t, value_idx>(
+    auto x_norm_batch_view = raft::make_device_vector_view<const value_t, ValueIdx>(
       x_norm.data_handle() + batch_offset, rows_per_batch);
 
     auto mask_op = [colors,
                     n_components = raft::util::FastIntDiv(n_components),
-                    batch_offset] __device__(value_idx idx) -> bool {
-      value_idx row = idx / n_components;
-      value_idx col = idx % n_components;
+                    batch_offset] __device__(ValueIdx idx) -> bool {
+      ValueIdx row = idx / n_components;
+      ValueIdx col = idx % n_components;
       return colors[batch_offset + row] != col;
     };
 
-    auto adj_vector_view = raft::make_device_vector_view<bool, value_idx>(
+    auto adj_vector_view = raft::make_device_vector_view<bool, ValueIdx>(
       adj.data_handle(), rows_per_batch * n_components);
 
     raft::linalg::map_offset(handle, adj_vector_view, mask_op);
 
-    auto adj_view = raft::make_device_matrix_view<const bool, value_idx>(
+    auto adj_view = raft::make_device_matrix_view<const bool, ValueIdx>(
       adj.data_handle(), rows_per_batch, n_components);
 
-    auto kvp_view =
-      raft::make_device_vector_view<raft::KeyValuePair<value_idx, value_t>, value_idx>(
-        kvp + batch_offset, rows_per_batch);
+    auto kvp_view = raft::make_device_vector_view<raft::KeyValuePair<ValueIdx, value_t>, ValueIdx>(
+      kvp + batch_offset, rows_per_batch);
 
-    cuvs::distance::masked_l2_nn<value_t, OutT, value_idx, red_op, red_op>(handle,
-                                                                           params,
-                                                                           X_batch_view,
-                                                                           X_full_view,
-                                                                           x_norm_batch_view,
-                                                                           x_norm.view(),
-                                                                           adj_view,
-                                                                           group_idxs_view,
-                                                                           kvp_view);
+    cuvs::distance::masked_l2_nn<value_t, out_t, ValueIdx, RedOp, RedOp>(handle,
+                                                                         params,
+                                                                         x_batch_view,
+                                                                         x_full_view,
+                                                                         x_norm_batch_view,
+                                                                         x_norm.view(),
+                                                                         adj_view,
+                                                                         group_idxs_view,
+                                                                         kvp_view);
   }
 
   // Transform the keys so that they correctly point to the unpermuted indices.
@@ -390,21 +390,21 @@ void perform_1nn(raft::resources const& handle,
                     kvp,
                     kvp + n_rows,
                     kvp,
-                    [sort_plan = sort_plan.data_handle()] __device__(OutT KVP) -> OutT {
-                      OutT res;
-                      res.value = KVP.value;
-                      res.key   = sort_plan[KVP.key];
+                    [sort_plan = sort_plan.data_handle()] __device__(out_t kvp) -> out_t {
+                      out_t res;
+                      res.value = kvp.value;
+                      res.key   = sort_plan[kvp.key];
                       return res;
                     });
 
   // Undo permutation of the rows of X by scattering in place.
   raft::matrix::scatter(
-    handle, X_mutable_view, sort_plan_const_view, static_cast<value_idx>(col_batch_size));
+    handle, x_mutable_view, sort_plan_const_view, static_cast<ValueIdx>(col_batch_size));
 
   // Undo permutation of the key-value pair and color vectors. This is not done
-  // inplace, so using two temporary vectors.
-  auto tmp_colors = raft::make_device_vector<value_idx>(handle, n_rows);
-  auto tmp_kvp    = raft::make_device_vector<OutT>(handle, n_rows);
+  // inplace, so using Two temporary vectors.
+  auto tmp_colors = raft::make_device_vector<ValueIdx>(handle, n_rows);
+  auto tmp_kvp    = raft::make_device_vector<out_t>(handle, n_rows);
 
   thrust::scatter(exec_policy, kvp, kvp + n_rows, sort_plan.data_handle(), tmp_kvp.data_handle());
   thrust::scatter(
@@ -414,13 +414,13 @@ void perform_1nn(raft::resources const& handle,
   raft::copy_async(colors, tmp_colors.data_handle(), n_rows, stream);
   raft::copy_async(kvp, tmp_kvp.data_handle(), n_rows, stream);
 
-  LookupColorOp<value_idx, value_t> extract_colors_op(colors);
+  lookup_color_op<ValueIdx, value_t> extract_colors_op(colors);
   thrust::transform(exec_policy, kvp, kvp + n_rows, nn_colors, extract_colors_op);
 }
 
 /**
  * Sort nearest neighboring components wrt component of source vertices
- * @tparam value_idx
+ * @tparam ValueIdx
  * @tparam value_t
  * @param[inout] colors components array of source vertices
  * @param[inout] nn_colors nearest neighbors components array
@@ -430,32 +430,32 @@ void perform_1nn(raft::resources const& handle,
  * @param n_rows number of components in `colors`
  * @param stream stream for which to order CUDA operations
  */
-template <typename value_idx, typename value_t>
+template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
 void sort_by_color(raft::resources const& handle,
-                   value_idx* colors,
-                   value_idx* nn_colors,
-                   raft::KeyValuePair<value_idx, value_t>* kvp,
-                   value_idx* src_indices,
+                   ValueIdx* colors,
+                   ValueIdx* nn_colors,
+                   raft::KeyValuePair<ValueIdx, value_t>* kvp,
+                   ValueIdx* src_indices,
                    size_t n_rows)
 {
   auto exec_policy = raft::resource::get_thrust_policy(handle);
-  thrust::counting_iterator<value_idx> arg_sort_iter(0);
+  thrust::counting_iterator<ValueIdx> arg_sort_iter(0);
   thrust::copy(exec_policy, arg_sort_iter, arg_sort_iter + n_rows, src_indices);
 
   auto keys = thrust::make_zip_iterator(thrust::make_tuple(
-    colors, nn_colors, reinterpret_cast<raft::KeyValuePair<value_idx, value_t>*>(kvp)));
+    colors, nn_colors, reinterpret_cast<raft::KeyValuePair<ValueIdx, value_t>*>(kvp)));
   auto vals = thrust::make_zip_iterator(thrust::make_tuple(src_indices));
   // get all the colors in contiguous locations so we can map them to warps.
-  thrust::sort_by_key(exec_policy, keys, keys + n_rows, vals, TupleComp());
+  thrust::sort_by_key(exec_policy, keys, keys + n_rows, vals, tuple_comp());
 }
 
-template <typename value_idx, typename value_t>
-RAFT_KERNEL min_components_by_color_kernel(value_idx* out_rows,
-                                           value_idx* out_cols,
+template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+RAFT_KERNEL min_components_by_color_kernel(ValueIdx* out_rows,
+                                           ValueIdx* out_cols,
                                            value_t* out_vals,
-                                           const value_idx* out_index,
-                                           const value_idx* indices,
-                                           const raft::KeyValuePair<value_idx, value_t>* kvp,
+                                           const ValueIdx* out_index,
+                                           const ValueIdx* indices,
+                                           const raft::KeyValuePair<ValueIdx, value_t>* kvp,
                                            size_t nnz)
 {
   size_t tid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -474,7 +474,7 @@ RAFT_KERNEL min_components_by_color_kernel(value_idx* out_rows,
 /**
  * Computes the min set of unique components that neighbor the
  * components of each source vertex.
- * @tparam value_idx
+ * @tparam ValueIdx
  * @tparam value_t
  * @param[out] coo output edge list
  * @param[in] out_index output indptr for ordering edge list
@@ -483,11 +483,11 @@ RAFT_KERNEL min_components_by_color_kernel(value_idx* out_rows,
  * @param[in] n_colors number of components
  * @param[in] stream cuda stream for which to order cuda operations
  */
-template <typename value_idx, typename value_t>
-void min_components_by_color(raft::sparse::COO<value_t, value_idx>& coo,
-                             const value_idx* out_index,
-                             const value_idx* indices,
-                             const raft::KeyValuePair<value_idx, value_t>* kvp,
+template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+void min_components_by_color(raft::sparse::COO<value_t, ValueIdx>& coo,
+                             const ValueIdx* out_index,
+                             const ValueIdx* indices,
+                             const raft::KeyValuePair<ValueIdx, value_t>* kvp,
                              size_t nnz,
                              cudaStream_t stream)
 {
@@ -508,7 +508,7 @@ void min_components_by_color(raft::sparse::COO<value_t, value_idx>& coo,
  * component. The result will not necessarily contain
  * n_components^2 - n_components number of elements because many components
  * will likely not be contained in the neighborhoods of 1-nns.
- * @tparam value_idx
+ * @tparam ValueIdx
  * @tparam value_t
  * @param[in] handle raft handle
  * @param[out] out output edge list containing nearest cross-component
@@ -530,17 +530,20 @@ void min_components_by_color(raft::sparse::COO<value_t, value_idx>& coo,
  * is done
  * @param[in] metric distance metric
  */
-template <typename value_idx, typename value_t, typename red_op, typename nnz_t = size_t>
+template <typename ValueIdx,
+          typename value_t,
+          typename RedOp,
+          typename NnzT = size_t>  // NOLINT(readability-identifier-naming)
 void cross_component_nn(
   raft::resources const& handle,
-  raft::sparse::COO<value_t, value_idx, nnz_t>& out,
+  raft::sparse::COO<value_t, ValueIdx, NnzT>& out,
   const value_t* X,
-  const value_idx* orig_colors,
-  value_idx n_rows,
-  value_idx n_cols,
-  red_op reduction_op,
-  value_idx row_batch_size,
-  value_idx col_batch_size,
+  const ValueIdx* orig_colors,
+  ValueIdx n_rows,
+  ValueIdx n_cols,
+  RedOp reduction_op,
+  ValueIdx row_batch_size,
+  ValueIdx col_batch_size,
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2SqrtExpanded)
 {
   auto stream = raft::resource::get_cuda_stream(handle);
@@ -553,20 +556,20 @@ void cross_component_nn(
 
   if (col_batch_size == 0 || col_batch_size > n_cols) { col_batch_size = n_cols; }
 
-  rmm::device_uvector<value_idx> colors(n_rows, stream);
+  rmm::device_uvector<ValueIdx> colors(n_rows, stream);
 
   // Normalize colors so they are drawn from a monotonically increasing set
-  constexpr bool zero_based = true;
+  constexpr bool kZeroBased = true;
   raft::label::make_monotonic(
-    colors.data(), const_cast<value_idx*>(orig_colors), n_rows, stream, zero_based);
+    colors.data(), const_cast<ValueIdx*>(orig_colors), n_rows, stream, kZeroBased);
 
   /**
    * First compute 1-nn for all colors where the color of each data point
    * is guaranteed to be != color of its nearest neighbor.
    */
-  rmm::device_uvector<value_idx> nn_colors(n_rows, stream);
-  rmm::device_uvector<raft::KeyValuePair<value_idx, value_t>> temp_inds_dists(n_rows, stream);
-  rmm::device_uvector<value_idx> src_indices(n_rows, stream);
+  rmm::device_uvector<ValueIdx> nn_colors(n_rows, stream);
+  rmm::device_uvector<raft::KeyValuePair<ValueIdx, value_t>> temp_inds_dists(n_rows, stream);
+  rmm::device_uvector<ValueIdx> src_indices(n_rows, stream);
 
   perform_1nn(handle,
               temp_inds_dists.data(),
@@ -591,7 +594,7 @@ void cross_component_nn(
    * Take the min for any duplicate colors
    */
   // Compute mask of duplicates
-  rmm::device_uvector<value_idx> out_index(n_rows + 1, stream);
+  rmm::device_uvector<ValueIdx> out_index(n_rows + 1, stream);
   raft::sparse::op::compute_duplicates_mask(
     out_index.data(), colors.data(), nn_colors.data(), n_rows, stream);
 
@@ -601,14 +604,14 @@ void cross_component_nn(
                          out_index.data());
 
   // compute final size
-  value_idx size_int = 0;
+  ValueIdx size_int = 0;
   raft::update_host(&size_int, out_index.data() + (out_index.size() - 1), 1, stream);
   raft::resource::sync_stream(handle, stream);
-  auto size = static_cast<nnz_t>(size_int);
+  auto size = static_cast<NnzT>(size_int);
 
   size++;
 
-  raft::sparse::COO<value_t, value_idx, nnz_t> min_edges(stream);
+  raft::sparse::COO<value_t, ValueIdx, NnzT> min_edges(stream);
   min_edges.allocate(size, n_rows, n_rows, true, stream);
 
   min_components_by_color(

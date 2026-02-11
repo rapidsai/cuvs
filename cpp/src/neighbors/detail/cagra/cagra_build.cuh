@@ -118,14 +118,15 @@ void ace_get_partition_labels(
 
   // Compute distances between dataset and centroid vectors
   // Uses float conversion on host instead of batch_load_iterator to minimize GPU memory usage.
-  const size_t chunk_size = 32 * 1024;
-  auto _sub_dataset       = raft::make_host_matrix<float, int64_t>(chunk_size, dataset_dim);
-  auto _sub_distances     = raft::make_host_matrix<float, int64_t>(chunk_size, n_partitions);
-  auto _sub_dataset_dev   = raft::make_device_matrix<float, int64_t>(res, chunk_size, dataset_dim);
-  auto _sub_distances_dev = raft::make_device_matrix<float, int64_t>(res, chunk_size, n_partitions);
-  size_t report_interval  = dataset_size / 10;
-  report_interval         = (report_interval / chunk_size) * chunk_size;
-  report_interval         = std::max(report_interval, chunk_size);
+  const size_t chunk_size  = 32 * 1024;
+  auto sub_dataset_buf     = raft::make_host_matrix<float, int64_t>(chunk_size, dataset_dim);
+  auto sub_distances_buf   = raft::make_host_matrix<float, int64_t>(chunk_size, n_partitions);
+  auto sub_dataset_dev_buf = raft::make_device_matrix<float, int64_t>(res, chunk_size, dataset_dim);
+  auto sub_distances_dev_buf =
+    raft::make_device_matrix<float, int64_t>(res, chunk_size, n_partitions);
+  size_t report_interval = dataset_size / 10;
+  report_interval        = (report_interval / chunk_size) * chunk_size;
+  report_interval        = std::max(report_interval, chunk_size);
 
   for (size_t i_base = 0; i_base < dataset_size; i_base += chunk_size) {
     const size_t sub_dataset_size = std::min(chunk_size, dataset_size - i_base);
@@ -137,7 +138,7 @@ void ace_get_partition_labels(
     }
 
     auto sub_dataset = raft::make_host_matrix_view<float, int64_t>(
-      _sub_dataset.data_handle(), sub_dataset_size, dataset_dim);
+      sub_dataset_buf.data_handle(), sub_dataset_size, dataset_dim);
 #pragma omp parallel for
     for (size_t i_sub = 0; i_sub < sub_dataset_size; i_sub++) {
       size_t i = i_base + i_sub;
@@ -146,14 +147,14 @@ void ace_get_partition_labels(
       }
     }
     auto sub_dataset_dev = raft::make_device_matrix_view<const float, int64_t>(
-      _sub_dataset_dev.data_handle(), sub_dataset_size, dataset_dim);
+      sub_dataset_dev_buf.data_handle(), sub_dataset_size, dataset_dim);
     raft::update_device(
-      _sub_dataset_dev.data_handle(), sub_dataset.data_handle(), sub_dataset.size(), stream);
+      sub_dataset_dev_buf.data_handle(), sub_dataset.data_handle(), sub_dataset.size(), stream);
 
     auto sub_distances = raft::make_host_matrix_view<float, int64_t>(
-      _sub_distances.data_handle(), sub_dataset_size, n_partitions);
+      sub_distances_buf.data_handle(), sub_dataset_size, n_partitions);
     auto sub_distances_dev = raft::make_device_matrix_view<float, int64_t>(
-      _sub_distances_dev.data_handle(), sub_dataset_size, n_partitions);
+      sub_distances_dev_buf.data_handle(), sub_dataset_size, n_partitions);
 
     cuvs::distance::pairwise_distance(res,
                                       sub_dataset_dev,
@@ -810,9 +811,9 @@ struct ace_memory_requirements {
 };
 
 // TODO(snanditale): Adjust overhead factor if needed. Very conservative for now.
-constexpr double usable_cpu_memory_fraction = 0.8;
-constexpr double usable_gpu_memory_fraction = 0.8;
-constexpr double imbalance_factor           = 3.0;
+constexpr double kUsableCpuMemoryFraction = 0.8;
+constexpr double kUsableGpuMemoryFraction = 0.8;
+constexpr double kImbalanceFactor         = 3.0;
 
 // Calculate CAGRA optimize workspace memory requirements.
 // This is the working memory on top of the input/output memory usage.
@@ -891,8 +892,8 @@ auto ace_check_use_disk_mode(bool use_disk,
   mem.partition_labels_size = 2 * dataset_size * sizeof(IdxT);
   mem.id_mapping_size       = 2 * dataset_size * sizeof(IdxT);
   mem.sub_dataset_size =
-    imbalance_factor * 2 * (dataset_size / n_partitions) * dataset_dim * sizeof(T);
-  mem.sub_graph_size = imbalance_factor * 2 * (dataset_size / n_partitions) *
+    kImbalanceFactor * 2 * (dataset_size / n_partitions) * dataset_dim * sizeof(T);
+  mem.sub_graph_size = kImbalanceFactor * 2 * (dataset_size / n_partitions) *
                        (intermediate_degree + graph_degree) * sizeof(IdxT);
   mem.cagra_graph_size = dataset_size * graph_degree * sizeof(IdxT);
   mem.total_size       = mem.partition_labels_size + mem.id_mapping_size + mem.sub_dataset_size +
@@ -903,7 +904,7 @@ auto ace_check_use_disk_mode(bool use_disk,
                 to_gib(mem.available_host_memory));
 
   bool host_memory_limited =
-    static_cast<size_t>(usable_cpu_memory_fraction * mem.available_host_memory) < mem.total_size;
+    static_cast<size_t>(kUsableCpuMemoryFraction * mem.available_host_memory) < mem.total_size;
 
   // GPU is mostly limited by the index size (update_graph() in the end of this routine).
   // Check if GPU has enough memory for the final graph or use disk mode instead.
@@ -915,7 +916,7 @@ auto ace_check_use_disk_mode(bool use_disk,
     mem.available_gpu_memory = rmm::available_device_memory().second;
   }
   bool gpu_memory_limited =
-    static_cast<size_t>(usable_gpu_memory_fraction * mem.available_gpu_memory) <
+    static_cast<size_t>(kUsableGpuMemoryFraction * mem.available_gpu_memory) <
     std::max(mem.sub_graph_size, mem.sub_dataset_size);
 
   RAFT_LOG_INFO("ACE: Estimated GPU memory required: %.2f GiB, available: %.2f GiB",
@@ -988,7 +989,7 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
 
   // Compute optimize workspace requirements
   size_t sub_partition_size =
-    static_cast<size_t>(imbalance_factor * 2 * (dataset_size / n_partitions));
+    static_cast<size_t>(kImbalanceFactor * 2 * (dataset_size / n_partitions));
   auto [host_workspace_size, gpu_workspace_size] = optimize_workspace_size(
     sub_partition_size, graph_degree, intermediate_degree, sizeof(IdxT), guarantee_connectivity);
 
@@ -996,7 +997,7 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
   size_t disk_mode_host_required = mem.partition_labels_size + mem.id_mapping_size +
                                    mem.sub_dataset_size + mem.sub_graph_size + host_workspace_size;
 
-  if (static_cast<size_t>(usable_cpu_memory_fraction * mem.available_host_memory) <
+  if (static_cast<size_t>(kUsableCpuMemoryFraction * mem.available_host_memory) <
       disk_mode_host_required) {
     host_memory_insufficient = true;
     RAFT_LOG_WARN(
@@ -1009,13 +1010,13 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
       to_gib(host_workspace_size));
 
     // Calculate suggested number of partitions for host memory
-    double available_for_scaling = usable_cpu_memory_fraction * mem.available_host_memory -
+    double available_for_scaling = kUsableCpuMemoryFraction * mem.available_host_memory -
                                    mem.partition_labels_size - mem.id_mapping_size;
     RAFT_EXPECTS(available_for_scaling > 0,
                  "ACE: Host memory insufficient even for constant overhead (labels + id_mapping). "
                  "Required: %.2f GiB, available: %.2f GiB",
                  to_gib(mem.partition_labels_size + mem.id_mapping_size),
-                 to_gib(usable_cpu_memory_fraction * mem.available_host_memory));
+                 to_gib(kUsableCpuMemoryFraction * mem.available_host_memory));
     host_suggested_partitions = static_cast<size_t>(
       std::ceil((mem.sub_dataset_size + mem.sub_graph_size + host_workspace_size) * n_partitions /
                 available_for_scaling));
@@ -1031,7 +1032,7 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
   //   - CAGRA optimize workspace memory (computed from optimize_workspace_size)
   size_t disk_mode_gpu_required = mem.sub_dataset_size + mem.sub_graph_size + gpu_workspace_size;
 
-  if (static_cast<size_t>(usable_gpu_memory_fraction * mem.available_gpu_memory) <
+  if (static_cast<size_t>(kUsableGpuMemoryFraction * mem.available_gpu_memory) <
       disk_mode_gpu_required) {
     gpu_memory_insufficient = true;
     RAFT_LOG_WARN(
@@ -1045,7 +1046,7 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
       to_gib(gpu_workspace_size));
 
     gpu_suggested_partitions = static_cast<size_t>(
-      std::ceil(disk_mode_gpu_required / (usable_gpu_memory_fraction * mem.available_gpu_memory) *
+      std::ceil(disk_mode_gpu_required / (kUsableGpuMemoryFraction * mem.available_gpu_memory) *
                 n_partitions));
     gpu_suggested_partitions = std::max(gpu_suggested_partitions, n_partitions + 1);
   }
@@ -1068,14 +1069,14 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
 
     n_partitions = new_n_partitions;
     mem.sub_dataset_size =
-      imbalance_factor * 2 * (dataset_size / n_partitions) * dataset_dim * sizeof(T);
-    mem.sub_graph_size = imbalance_factor * 2 * (dataset_size / n_partitions) *
+      kImbalanceFactor * 2 * (dataset_size / n_partitions) * dataset_dim * sizeof(T);
+    mem.sub_graph_size = kImbalanceFactor * 2 * (dataset_size / n_partitions) *
                          (intermediate_degree + graph_degree) * sizeof(IdxT);
     mem.total_size = mem.partition_labels_size + mem.id_mapping_size + mem.sub_dataset_size +
                      mem.sub_graph_size + mem.cagra_graph_size;
 
     size_t new_sub_partition_size =
-      static_cast<size_t>(imbalance_factor * 2 * (dataset_size / n_partitions));
+      static_cast<size_t>(kImbalanceFactor * 2 * (dataset_size / n_partitions));
     auto [new_opt_host_ws, new_opt_dev_ws] = optimize_workspace_size(new_sub_partition_size,
                                                                      graph_degree,
                                                                      intermediate_degree,
@@ -1558,14 +1559,14 @@ void write_to_graph(raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_g
   }
 }
 
-template <typename DataT, typename IdxT, typename accessor>
+template <typename DataT, typename IdxT, typename Accessor>
 void refine_host_and_write_graph(
   raft::resources const& res,
   raft::host_matrix<DataT, int64_t>& queries_host,
   raft::host_matrix<int64_t, int64_t>& neighbors_host,
   raft::host_matrix<int64_t, int64_t>& refined_neighbors_host,
   raft::host_matrix<float, int64_t>& refined_distances_host,
-  raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, accessor> dataset,
+  raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,
   cuvs::distance::DistanceType metric,
   size_t& num_self_included,
@@ -1604,10 +1605,10 @@ void refine_host_and_write_graph(
     knn_graph, refined_neighbors_host_view, num_self_included, batch_size, batch_offset);
 }
 
-template <typename DataT, typename IdxT, typename accessor>
+template <typename DataT, typename IdxT, typename Accessor>
 void build_knn_graph(
   raft::resources const& res,
-  raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, accessor> dataset,
+  raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,
   cuvs::neighbors::cagra::graph_build_params::ivf_pq_params pq)
 {
@@ -1868,10 +1869,10 @@ void build_knn_graph(
   }
 }
 
-template <typename DataT, typename IdxT, typename accessor>
+template <typename DataT, typename IdxT, typename Accessor>
 void build_knn_graph(
   raft::resources const& res,
-  raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, accessor> dataset,
+  raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,
   cuvs::neighbors::nn_descent::index_params build_params)
 {
@@ -1885,9 +1886,9 @@ void build_knn_graph(
   auto nn_descent_idx = cuvs::neighbors::nn_descent::build(res, build_params, dataset, graph_view);
 
   using internal_IdxT = std::make_unsigned_t<IdxT>;
-  using g_accessor    = typename decltype(nn_descent_idx.graph())::accessor_type;
+  using GAccessor     = typename decltype(nn_descent_idx.graph())::accessor_type;
   using g_accessor_internal =
-    raft::host_device_accessor<cuda::std::default_accessor<internal_IdxT>, g_accessor::mem_type>;
+    raft::host_device_accessor<cuda::std::default_accessor<internal_IdxT>, GAccessor::mem_type>;
 
   auto knn_graph_internal =
     raft::mdspan<internal_IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor_internal>(
@@ -1900,11 +1901,11 @@ void build_knn_graph(
 }
 
 template <typename IdxT = uint32_t,
-          typename g_accessor =
+          typename GAccessor =
             raft::host_device_accessor<cuda::std::default_accessor<IdxT>, raft::memory_type::host>>
 void optimize(
   raft::resources const& res,
-  raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph,
+  raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, GAccessor> knn_graph,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph,
   const bool guarantee_connectivity = false)
 {
@@ -2021,10 +2022,10 @@ auto iterative_build_graph(
   RAFT_LOG_DEBUG("# initial graph size = %lu", (uint64_t)initial_graph_size);
 
   // Allocate memory for search results.
-  constexpr uint64_t max_chunk_size = 8192;
-  auto topk                         = intermediate_degree;
-  auto dev_neighbors = raft::make_device_matrix<IdxT, int64_t>(res, max_chunk_size, topk);
-  auto dev_distances = raft::make_device_matrix<float, int64_t>(res, max_chunk_size, topk);
+  constexpr uint64_t kMaxChunkSize = 8192;
+  auto topk                        = intermediate_degree;
+  auto dev_neighbors = raft::make_device_matrix<IdxT, int64_t>(res, kMaxChunkSize, topk);
+  auto dev_distances = raft::make_device_matrix<float, int64_t>(res, kMaxChunkSize, topk);
 
   // Determine graph degree and number of search results while increasing
   // graph size.
@@ -2056,9 +2057,9 @@ auto iterative_build_graph(
   }
 
   // Allocate memory for neighbors list using Transparent HugePage
-  constexpr size_t thp_size = 2 * 1024 * 1024;
+  constexpr size_t kThpSize = 2 * 1024 * 1024;
   size_t byte_size          = sizeof(IdxT) * final_graph_size * topk;
-  if (byte_size % thp_size) { byte_size += thp_size - (byte_size % thp_size); }
+  if (byte_size % kThpSize) { byte_size += kThpSize - (byte_size % kThpSize); }
   mmap_owner neighbors_list(byte_size);
   IdxT* neighbors_ptr = reinterpret_cast<IdxT*>(neighbors_list.data());
   memset(neighbors_ptr, 0, byte_size);
@@ -2093,7 +2094,7 @@ auto iterative_build_graph(
 
     cuvs::neighbors::cagra::search_params search_params;
     search_params.algo        = cuvs::neighbors::cagra::search_algo::AUTO;
-    search_params.max_queries = max_chunk_size;
+    search_params.max_queries = kMaxChunkSize;
     search_params.itopk_size  = curr_itopk_size;
 
     // Create an index (idx), a query view (dev_query_view), and a mdarray for
@@ -2116,7 +2117,7 @@ auto iterative_build_graph(
       dev_query_view.data_handle(),
       curr_query_size,
       dev_query_view.extent(1),
-      max_chunk_size,
+      kMaxChunkSize,
       raft::resource::get_cuda_stream(res),
       raft::resource::get_workspace_resource(res));
     for (const auto& batch : query_batch) {

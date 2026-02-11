@@ -581,7 +581,7 @@ struct occupancy_t {
 template <typename OutT, typename LutT>
 auto get_kernel(selected<OutT, LutT> s) -> const void*
 {
-  return s.kernel;
+  return s.kernel_;
 }
 
 template <typename OutT, typename LutT>

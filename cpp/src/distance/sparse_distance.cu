@@ -48,7 +48,7 @@ void pairwise_distance(
   input_config.b_indices = const_cast<IndexType*>(y_structure.get_indices().data());
   input_config.b_data    = const_cast<ElementType*>(y.get_elements().data());
 
-  pairwiseDistance(dist.data_handle(), input_config, metric, metric_arg);
+  pairwise_distance(dist.data_handle(), input_config, metric, metric_arg);
 }
 
 void pairwise_distance(raft::resources const& handle,

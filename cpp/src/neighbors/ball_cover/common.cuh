@@ -12,9 +12,9 @@
 
 namespace cuvs::neighbors::ball_cover::detail {
 
-struct NNComp {
-  template <typename one, typename two>
-  __host__ __device__ auto operator()(const one& t1, const two& t2) -> bool
+struct nn_comp {
+  template <typename One, typename Two>
+  __host__ __device__ auto operator()(const One& t1, const Two& t2) -> bool
   {
     // sort first by each sample's reference landmark,
     if (thrust::get<0>(t1) < thrust::get<0>(t2)) return true;
@@ -26,9 +26,9 @@ struct NNComp {
 };
 
 /**
- * Zeros the bit at location h in a one-hot encoded 32-bit int array
+ * Zeros the bit at location h in a One-hot encoded 32-bit int array
  */
-__device__ inline void _zero_bit(std::uint32_t* arr, std::uint32_t h)
+__device__ inline void zero_bit(std::uint32_t* arr, std::uint32_t h)
 {
   int bit = h % 32;
   int idx = h / 32;
@@ -42,10 +42,10 @@ __device__ inline void _zero_bit(std::uint32_t* arr, std::uint32_t h)
 }
 
 /**
- * Returns whether or not bit at location h is nonzero in a one-hot
+ * Returns whether or not bit at location h is nonzero in a One-hot
  * encoded 32-bit in array.
  */
-__device__ inline auto _get_val(std::uint32_t* arr, std::uint32_t h) -> bool
+__device__ inline auto get_val(std::uint32_t* arr, std::uint32_t h) -> bool
 {
   int bit = h % 32;
   int idx = h / 32;

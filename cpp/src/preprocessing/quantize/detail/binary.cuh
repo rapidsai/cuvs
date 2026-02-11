@@ -31,27 +31,27 @@ _RAFT_HOST_DEVICE auto is_positive<half>(const half& a) -> bool
   return is_positive(static_cast<float>(a));
 }
 
-template <class T, uint32_t block_size, class pack_t = uint8_t>
+template <class T, uint32_t kBlockSize, class PackT = uint8_t>
 RAFT_KERNEL binary_quantization_kernel(const T* const in_ptr,
                                        const uint32_t ldi,
                                        const T* const threshold_ptr,
                                        const size_t dataset_size,
                                        const uint32_t dataset_dim,
-                                       pack_t* const out_ptr,
+                                       PackT* const out_ptr,
                                        const uint32_t ldo)
 {
-  constexpr uint32_t warp_size = 32;
-  const uint32_t bits_per_pack = sizeof(pack_t) * 8;
+  constexpr uint32_t kWarpSize = 32;
+  const uint32_t bits_per_pack = sizeof(PackT) * 8;
   const auto output_dim        = raft::div_rounding_up_safe(dataset_dim, bits_per_pack);
 
-  const auto vector_id = (blockDim.x * blockIdx.x + threadIdx.x) / warp_size;
+  const auto vector_id = (blockDim.x * blockIdx.x + threadIdx.x) / kWarpSize;
   if (vector_id >= dataset_size) { return; }
 
-  __shared__ pack_t smem[block_size];
-  auto local_smem = smem + (threadIdx.x / warp_size) * warp_size;
+  __shared__ PackT smem[kBlockSize];
+  auto local_smem = smem + (threadIdx.x / kWarpSize) * kWarpSize;
 
-  const auto lane_id = threadIdx.x % warp_size;
-  for (uint32_t j_offset = 0; j_offset < dataset_dim; j_offset += warp_size * bits_per_pack) {
+  const auto lane_id = threadIdx.x % kWarpSize;
+  for (uint32_t j_offset = 0; j_offset < dataset_dim; j_offset += kWarpSize * bits_per_pack) {
     // Load dataset vector elements with coalesce access. The mapping of the vector element position
     // and the `pack` register is as follows:
     //
@@ -60,9 +60,9 @@ RAFT_KERNEL binary_quantization_kernel(const T* const in_ptr,
     //       1 |  1, 33, 65, ..., 225
     //       ...
     //      31 | 31, 63, 95, ..., 255
-    pack_t pack = 0;
+    PackT pack = 0;
     for (uint32_t bit_offset = 0; bit_offset < bits_per_pack; bit_offset++) {
-      const auto j = j_offset + lane_id + bit_offset * warp_size;
+      const auto j = j_offset + lane_id + bit_offset * kWarpSize;
       if (j < dataset_dim) {
         auto v = in_ptr[static_cast<size_t>(vector_id) * ldi + j];
         if (threshold_ptr != nullptr) { v -= threshold_ptr[j]; }
@@ -89,8 +89,8 @@ RAFT_KERNEL binary_quantization_kernel(const T* const in_ptr,
     // bit. By this mapping, the quantization result of 8*i-th ~ (8*(i+1)-1)-th vector elements is
     // stored by the lane_id=i thread.
     pack                    = 0;
-    const auto smem_start_i = (lane_id % (warp_size / bits_per_pack)) * bits_per_pack;
-    const auto mask         = 1u << (lane_id / (warp_size / bits_per_pack));
+    const auto smem_start_i = (lane_id % (kWarpSize / bits_per_pack)) * bits_per_pack;
+    const auto mask         = 1u << (lane_id / (kWarpSize / bits_per_pack));
     for (uint32_t j = 0; j < bits_per_pack; j++) {
       if (local_smem[smem_start_i + j] & mask) { pack |= (1u << j); }
     }
@@ -105,13 +105,13 @@ RAFT_KERNEL mean_f16_in_f32_kernel_sum(float* const result_ptr,
                                        const uint32_t ld,
                                        const uint32_t dataset_dim,
                                        const size_t dataset_size,
-                                       const size_t dataset_size_per_cta)
+                                       const size_t kDatasetSizePerCta)
 {
   const auto dim_i = threadIdx.x + blockIdx.x * blockDim.x;
   if (dim_i >= dataset_dim) { return; }
 
-  const auto start_dataset_index = blockIdx.y * dataset_size_per_cta;
-  const auto end_dataset_index   = std::min((blockIdx.y + 1) * dataset_size_per_cta, dataset_size);
+  const auto start_dataset_index = blockIdx.y * kDatasetSizePerCta;
+  const auto end_dataset_index   = std::min((blockIdx.y + 1) * kDatasetSizePerCta, dataset_size);
 
   if (start_dataset_index >= dataset_size) { return; }
 
@@ -148,13 +148,13 @@ void mean_f16_in_f32(raft::resources const& res,
   RAFT_CUDA_TRY(
     cudaMemsetAsync(f32_result_vec.data_handle(), 0, sizeof(float) * dataset_dim, cuda_stream));
 
-  constexpr uint32_t dataset_size_per_cta = 2048;
-  constexpr uint32_t block_size           = 256;
-  const dim3 grid_size(raft::div_rounding_up_safe<size_t>(dataset_dim, block_size),
-                       raft::div_rounding_up_safe<size_t>(dataset_size, dataset_size_per_cta));
-  mean_f16_in_f32_kernel_sum<<<grid_size, block_size, 0, cuda_stream>>>(
-    f32_result_vec.data_handle(), src_ptr, ld, dataset_dim, dataset_size, dataset_size_per_cta);
-  mean_f16_in_f32_kernel_div<<<grid_size.x, block_size, 0, cuda_stream>>>(
+  constexpr uint32_t kDatasetSizePerCta = 2048;
+  constexpr uint32_t kBlockSize         = 256;
+  const dim3 grid_size(raft::div_rounding_up_safe<size_t>(dataset_dim, kBlockSize),
+                       raft::div_rounding_up_safe<size_t>(dataset_size, kDatasetSizePerCta));
+  mean_f16_in_f32_kernel_sum<<<grid_size, kBlockSize, 0, cuda_stream>>>(
+    f32_result_vec.data_handle(), src_ptr, ld, dataset_dim, dataset_size, kDatasetSizePerCta);
+  mean_f16_in_f32_kernel_div<<<grid_size.x, kBlockSize, 0, cuda_stream>>>(
     result_ptr, f32_result_vec.data_handle(), dataset_dim, dataset_size);
 }
 
@@ -369,14 +369,13 @@ void transform(raft::resources const& res,
   const T* threshold_ptr = nullptr;
   if (quantizer.threshold.size() != 0) { threshold_ptr = quantizer.threshold.data_handle(); }
 
-  constexpr uint32_t warp_size    = 32;
-  constexpr uint32_t block_size   = 256;
-  constexpr uint32_t vecs_per_cta = block_size / warp_size;
-  const auto grid_size =
-    raft::div_rounding_up_safe(dataset_size, static_cast<size_t>(vecs_per_cta));
+  constexpr uint32_t kWarpSize   = 32;
+  constexpr uint32_t kBlockSize  = 256;
+  constexpr uint32_t kVecsPerCta = kBlockSize / kWarpSize;
+  const auto grid_size = raft::div_rounding_up_safe(dataset_size, static_cast<size_t>(kVecsPerCta));
 
-  binary_quantization_kernel<T, block_size>
-    <<<grid_size, block_size, 0, stream>>>(dataset.data_handle(),
+  binary_quantization_kernel<T, kBlockSize>
+    <<<grid_size, kBlockSize, 0, stream>>>(dataset.data_handle(),
                                            dataset.stride(0),
                                            threshold_ptr,
                                            dataset_size,

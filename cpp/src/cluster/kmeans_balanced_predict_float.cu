@@ -35,15 +35,15 @@ void predict(const raft::resources& handle,
 
 namespace cuvs::cluster::kmeans_balanced::helpers {
 
-#define INSTANTIATE_BUILD_CLUSTERS(DataT, MathT, IndexT, LabelT, CounterT, MappingOpT) \
-  template void build_clusters<DataT, MathT, IndexT, LabelT, CounterT, MappingOpT>(    \
-    const raft::resources& handle,                                                     \
-    const cuvs::cluster::kmeans::balanced_params& params,                              \
-    raft::device_matrix_view<const DataT, IndexT> X,                                   \
-    raft::device_matrix_view<MathT, IndexT> centroids,                                 \
-    raft::device_vector_view<LabelT, IndexT> labels,                                   \
-    raft::device_vector_view<CounterT, IndexT> cluster_sizes,                          \
-    MappingOpT mapping_op,                                                             \
+#define INSTANTIATE_BUILD_CLUSTERS(DataT, MathT, index_t, label_t, CounterT, MappingOpT) \
+  template void build_clusters<DataT, MathT, index_t, label_t, CounterT, MappingOpT>(    \
+    const raft::resources& handle,                                                       \
+    const cuvs::cluster::kmeans::balanced_params& params,                                \
+    raft::device_matrix_view<const DataT, index_t> X,                                    \
+    raft::device_matrix_view<MathT, index_t> centroids,                                  \
+    raft::device_vector_view<label_t, index_t> labels,                                   \
+    raft::device_vector_view<CounterT, index_t> cluster_sizes,                           \
+    MappingOpT mapping_op,                                                               \
     std::optional<raft::device_vector_view<const MathT>> X_norm);
 
 // Explicit instantiation for the build_clusters actually used in IVF-PQ build

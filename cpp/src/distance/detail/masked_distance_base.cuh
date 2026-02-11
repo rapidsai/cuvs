@@ -20,7 +20,7 @@ namespace detail {
  * @tparam DataT          input data-type (for x and y matrices)
  * @tparam AccT           accumulation data-type
   * @tparam IdxT           index data-type
- * @tparam Policy         struct which tunes the Contraction kernel
+ * @tparam policy         struct which tunes the Contraction kernel
  * @tparam CoreLambda     tells how to accumulate an x and y into
                           acc. its signature:
     template <typename AccT, typename DataT> void core_lambda(AccT& acc,
@@ -64,16 +64,16 @@ template <bool useNorms,
           typename DataT,
           typename AccT,
           typename IdxT,
-          typename Policy,
+          typename policy,
           typename CoreLambda,
           typename EpilogueLambda,
           typename FinalLambda,
           typename RowEpilogueLambda,
           bool isRowMajor    = true,
-          typename BaseClass = raft::linalg::Contractions_NT<DataT, IdxT, Policy, isRowMajor>>
+          typename BaseClass = raft::linalg::Contractions_NT<DataT, IdxT, policy, isRowMajor>>
 struct masked_distances : public BaseClass {
  private:
-  using p = Policy;
+  using p = policy;
   const DataT* xn_;
   const DataT* yn_;
   const DataT* const y_base_;

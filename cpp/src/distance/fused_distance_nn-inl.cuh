@@ -288,8 +288,8 @@ void fused_distance_nn_min_reduce(OutT* min,
                                   float metric_arg,
                                   cudaStream_t stream)
 {
-  MinAndDistanceReduceOp<IdxT, DataT> red_op;
-  KVPMinReduce<IdxT, DataT> pair_red_op;
+  min_and_distance_reduce_op<IdxT, DataT> red_op;
+  kvp_min_reduce<IdxT, DataT> pair_red_op;
 
   fused_distance_nn<DataT, OutT, IdxT>(min,
                                        x,

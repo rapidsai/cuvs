@@ -20,21 +20,21 @@ namespace cuvs::cluster::kmeans {
 /**
  * Functor used for sampling centroids
  */
-template <typename DataT, typename IndexT>
-using SamplingOp = cuvs::cluster::kmeans::detail::SamplingOp<DataT, IndexT>;
+template <typename DataT, typename index_t>
+using sampling_op = cuvs::cluster::kmeans::detail::sampling_op<DataT, index_t>;
 
 /**
  * Functor used to extract the index from a KeyValue pair
  * storing both index and a distance.
  */
-template <typename IndexT, typename DataT>
-using KeyValueIndexOp = cuvs::cluster::kmeans::detail::KeyValueIndexOp<IndexT, DataT>;
+template <typename index_t, typename DataT>
+using key_value_index_op = cuvs::cluster::kmeans::detail::key_value_index_op<index_t, DataT>;
 
 /*
  * @brief Main function used to fit KMeans (after cluster initialization)
  *
  * @tparam DataT the type of data used for weights, distances.
- * @tparam IndexT the type of data used for indexing.
+ * @tparam index_t the type of data used for indexing.
  *
  * @param[in]     handle        The raft handle.
  * @param[in]     params        Parameters for KMeans model.
@@ -53,25 +53,25 @@ using KeyValueIndexOp = cuvs::cluster::kmeans::detail::KeyValueIndexOp<IndexT, D
  * @param[out]    n_iter        Number of iterations run.
  * @param[in]     workspace     Temporary workspace buffer which can get resized
  */
-template <typename DataT, typename IndexT>
+template <typename DataT, typename index_t>
 void fit_main(raft::resources const& handle,
               const kmeans::params& params,
-              raft::device_matrix_view<const DataT, IndexT> X,
-              raft::device_vector_view<const DataT, IndexT> sample_weights,
-              raft::device_matrix_view<DataT, IndexT> centroids,
+              raft::device_matrix_view<const DataT, index_t> X,
+              raft::device_vector_view<const DataT, index_t> sample_weights,
+              raft::device_matrix_view<DataT, index_t> centroids,
               raft::host_scalar_view<DataT> inertia,
-              raft::host_scalar_view<IndexT> n_iter,
+              raft::host_scalar_view<index_t> n_iter,
               rmm::device_uvector<char>& workspace);
 
-#define EXTERN_TEMPLATE_FIT_MAIN(DataT, IndexT)                   \
-  extern template void fit_main<DataT, IndexT>(                   \
-    raft::resources const& handle,                                \
-    const kmeans::params& params,                                 \
-    raft::device_matrix_view<const DataT, IndexT> X,              \
-    raft::device_vector_view<const DataT, IndexT> sample_weights, \
-    raft::device_matrix_view<DataT, IndexT> centroids,            \
-    raft::host_scalar_view<DataT> inertia,                        \
-    raft::host_scalar_view<IndexT> n_iter,                        \
+#define EXTERN_TEMPLATE_FIT_MAIN(DataT, index_t)                   \
+  extern template void fit_main<DataT, index_t>(                   \
+    raft::resources const& handle,                                 \
+    const kmeans::params& params,                                  \
+    raft::device_matrix_view<const DataT, index_t> X,              \
+    raft::device_vector_view<const DataT, index_t> sample_weights, \
+    raft::device_matrix_view<DataT, index_t> centroids,            \
+    raft::host_scalar_view<DataT> inertia,                         \
+    raft::host_scalar_view<index_t> n_iter,                        \
     rmm::device_uvector<char>& workspace);
 
 EXTERN_TEMPLATE_FIT_MAIN(double, int)
@@ -107,7 +107,7 @@ EXTERN_TEMPLATE_FIT_MAIN(float, int)
  * @endcode
  *
  * @tparam DataT the type of data used for weights, distances.
- * @tparam IndexT the type of data used for indexing.
+ * @tparam index_t the type of data used for indexing.
  * @param[in]     handle        The raft handle.
  * @param[in]     params        Parameters for KMeans model.
  * @param[in]     X             Training instances to cluster. The data must
@@ -125,24 +125,24 @@ EXTERN_TEMPLATE_FIT_MAIN(float, int)
  *                              closest cluster center.
  * @param[out]    n_iter        Number of iterations run.
  */
-template <typename DataT, typename IndexT>
+template <typename DataT, typename index_t>
 void fit(raft::resources const& handle,
          const kmeans::params& params,
-         raft::device_matrix_view<const DataT, IndexT> X,
-         std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight,
-         raft::device_matrix_view<DataT, IndexT> centroids,
+         raft::device_matrix_view<const DataT, index_t> X,
+         std::optional<raft::device_vector_view<const DataT, index_t>> sample_weight,
+         raft::device_matrix_view<DataT, index_t> centroids,
          raft::host_scalar_view<DataT> inertia,
-         raft::host_scalar_view<IndexT> n_iter);
+         raft::host_scalar_view<index_t> n_iter);
 
-#define EXTERN_TEMPLATE_FIT(DataT, IndexT)                                      \
-  extern template void fit<DataT, IndexT>(                                      \
-    raft::resources const& handle,                                              \
-    const kmeans::params& params,                                               \
-    raft::device_matrix_view<const DataT, IndexT> X,                            \
-    std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight, \
-    raft::device_matrix_view<DataT, IndexT> centroids,                          \
-    raft::host_scalar_view<DataT> inertia,                                      \
-    raft::host_scalar_view<IndexT> n_iter);
+#define EXTERN_TEMPLATE_FIT(DataT, index_t)                                      \
+  extern template void fit<DataT, index_t>(                                      \
+    raft::resources const& handle,                                               \
+    const kmeans::params& params,                                                \
+    raft::device_matrix_view<const DataT, index_t> X,                            \
+    std::optional<raft::device_vector_view<const DataT, index_t>> sample_weight, \
+    raft::device_matrix_view<DataT, index_t> centroids,                          \
+    raft::host_scalar_view<DataT> inertia,                                       \
+    raft::host_scalar_view<index_t> n_iter);
 
 EXTERN_TEMPLATE_FIT(double, int)
 EXTERN_TEMPLATE_FIT(double, int64_t)
@@ -185,7 +185,7 @@ EXTERN_TEMPLATE_FIT(float, int64_t)
  * @endcode
  *
  * @tparam DataT the type of data used for weights, distances.
- * @tparam IndexT the type of data used for indexing.
+ * @tparam index_t the type of data used for indexing.
  * @param[in]     handle           The raft handle.
  * @param[in]     params           Parameters for KMeans model.
  * @param[in]     X                New data to predict.
@@ -202,25 +202,25 @@ EXTERN_TEMPLATE_FIT(float, int64_t)
  * @param[out]    inertia          Sum of squared distances of samples to
  *                                 their closest cluster center.
  */
-template <typename DataT, typename IndexT>
+template <typename DataT, typename index_t>
 void predict(raft::resources const& handle,
              const kmeans::params& params,
-             raft::device_matrix_view<const DataT, IndexT> X,
-             std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight,
-             raft::device_matrix_view<const DataT, IndexT> centroids,
-             raft::device_vector_view<IndexT, IndexT> labels,
+             raft::device_matrix_view<const DataT, index_t> X,
+             std::optional<raft::device_vector_view<const DataT, index_t>> sample_weight,
+             raft::device_matrix_view<const DataT, index_t> centroids,
+             raft::device_vector_view<index_t, index_t> labels,
              bool normalize_weight,
              raft::host_scalar_view<DataT> inertia);
 
-#define EXTERN_TEMPLATE_PREDICT(DataT, IndexT)                                  \
-  extern template void predict<DataT, IndexT>(                                  \
-    raft::resources const& handle,                                              \
-    const kmeans::params& params,                                               \
-    raft::device_matrix_view<const DataT, IndexT> X,                            \
-    std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight, \
-    raft::device_matrix_view<const DataT, IndexT> centroids,                    \
-    raft::device_vector_view<IndexT, IndexT> labels,                            \
-    bool normalize_weight,                                                      \
+#define EXTERN_TEMPLATE_PREDICT(DataT, index_t)                                  \
+  extern template void predict<DataT, index_t>(                                  \
+    raft::resources const& handle,                                               \
+    const kmeans::params& params,                                                \
+    raft::device_matrix_view<const DataT, index_t> X,                            \
+    std::optional<raft::device_vector_view<const DataT, index_t>> sample_weight, \
+    raft::device_matrix_view<const DataT, index_t> centroids,                    \
+    raft::device_vector_view<index_t, index_t> labels,                           \
+    bool normalize_weight,                                                       \
     raft::host_scalar_view<DataT> inertia);
 
 EXTERN_TEMPLATE_PREDICT(double, int)
@@ -234,7 +234,7 @@ EXTERN_TEMPLATE_PREDICT(float, int64_t)
  * @brief Transform X to a cluster-distance space.
  *
  * @tparam DataT the type of data used for weights, distances.
- * @tparam IndexT the type of data used for indexing.
+ * @tparam index_t the type of data used for indexing.
  * @param[in]     handle        The raft handle.
  * @param[in]     params        Parameters for KMeans model.
  * @param[in]     X             Training instances to cluster. The data must
@@ -252,14 +252,14 @@ EXTERN_TEMPLATE_PREDICT(float, int64_t)
  * @param[out]    X_new         X transformed in the new space.
  *                              [dim = n_samples x n_features]
  */
-template <typename DataT, typename IndexT>
+template <typename DataT, typename index_t>
 void transform(raft::resources const& handle,
                const kmeans::params& params,
-               raft::device_matrix_view<const DataT, IndexT> X,
-               raft::device_matrix_view<const DataT, IndexT> centroids,
-               raft::device_matrix_view<DataT, IndexT> X_new)
+               raft::device_matrix_view<const DataT, index_t> X,
+               raft::device_matrix_view<const DataT, index_t> centroids,
+               raft::device_matrix_view<DataT, index_t> X_new)
 {
-  cuvs::cluster::kmeans::detail::kmeans_transform<DataT, IndexT>(
+  cuvs::cluster::kmeans::detail::kmeans_transform<DataT, index_t>(
     handle, params, X, centroids, X_new);
 }
 
@@ -267,7 +267,7 @@ void transform(raft::resources const& handle,
  * @brief Select centroids according to a sampling operation
  *
  * @tparam DataT the type of data used for weights, distances.
- * @tparam IndexT the type of data used for indexing.
+ * @tparam index_t the type of data used for indexing.
  *
  * @param[in]  handle             The raft handle
  * @param[in]  X                  The data in row-major format
@@ -282,16 +282,16 @@ void transform(raft::resources const& handle,
  * @param[in]  workspace          Temporary workspace buffer which can get resized
  *
  */
-template <typename DataT, typename IndexT>
+template <typename DataT, typename index_t>
 void sample_centroids(raft::resources const& handle,
-                      raft::device_matrix_view<const DataT, IndexT> X,
-                      raft::device_vector_view<DataT, IndexT> minClusterDistance,
-                      raft::device_vector_view<std::uint8_t, IndexT> isSampleCentroid,
-                      SamplingOp<DataT, IndexT>& select_op,
+                      raft::device_matrix_view<const DataT, index_t> X,
+                      raft::device_vector_view<DataT, index_t> minClusterDistance,
+                      raft::device_vector_view<std::uint8_t, index_t> isSampleCentroid,
+                      sampling_op<DataT, index_t>& select_op,
                       rmm::device_uvector<DataT>& inRankCp,
                       rmm::device_uvector<char>& workspace)
 {
-  cuvs::cluster::kmeans::detail::sampleCentroids<DataT, IndexT>(
+  cuvs::cluster::kmeans::detail::sample_centroids<DataT, index_t>(
     handle, X, minClusterDistance, isSampleCentroid, select_op, inRankCp, workspace);
 }
 
@@ -309,14 +309,14 @@ void sample_centroids(raft::resources const& handle,
  * @param[in]  reduction_op       The reduction operation used for the cost
  *
  */
-template <typename DataT, typename IndexT, typename ReductionOpT>
+template <typename DataT, typename index_t, typename ReductionOpT>
 void cluster_cost(raft::resources const& handle,
-                  raft::device_vector_view<DataT, IndexT> minClusterDistance,
+                  raft::device_vector_view<DataT, index_t> minClusterDistance,
                   rmm::device_uvector<char>& workspace,
                   raft::device_scalar_view<DataT> clusterCost,
                   ReductionOpT reduction_op)
 {
-  cuvs::cluster::kmeans::detail::computeClusterCost(
+  cuvs::cluster::kmeans::detail::compute_cluster_cost(
     handle, minClusterDistance, workspace, clusterCost, raft::identity_op{}, reduction_op);
 }
 
@@ -326,7 +326,7 @@ void cluster_cost(raft::resources const& handle,
  *  for each point and its distance.
  *
  * @tparam DataT
- * @tparam IndexT
+ * @tparam index_t
  * @param[in] handle: Raft handle to use for managing library resources
  * @param[in] X: input matrix (size n_samples, n_features)
  * @param[in] sample_weights: number of samples currently assigned to each centroid (size n_samples)
@@ -335,21 +335,21 @@ void cluster_cost(raft::resources const& handle,
  * @param[out] weight_per_cluster: sum of sample weights per cluster (size n_clusters)
  * @param[out] new_centroids: output matrix of updated centroids (size n_clusters, n_features)
  */
-template <typename DataT, typename IndexT, typename LabelsIterator>
+template <typename DataT, typename index_t, typename LabelsIterator>
 void update_centroids(raft::resources const& handle,
-                      raft::device_matrix_view<const DataT, IndexT, raft::row_major> X,
-                      raft::device_vector_view<const DataT, IndexT> sample_weights,
-                      raft::device_matrix_view<const DataT, IndexT, raft::row_major> centroids,
+                      raft::device_matrix_view<const DataT, index_t, raft::row_major> X,
+                      raft::device_vector_view<const DataT, index_t> sample_weights,
+                      raft::device_matrix_view<const DataT, index_t, raft::row_major> centroids,
                       LabelsIterator labels,
-                      raft::device_vector_view<DataT, IndexT> weight_per_cluster,
-                      raft::device_matrix_view<DataT, IndexT, raft::row_major> new_centroids)
+                      raft::device_vector_view<DataT, index_t> weight_per_cluster,
+                      raft::device_matrix_view<DataT, index_t, raft::row_major> new_centroids)
 {
   // TODO(snanditale): Passing these into the algorithm doesn't really present much of a benefit
   // because they are being resized anyways.
   // ref https://github.com/rapidsai/raft/issues/930
   rmm::device_uvector<char> workspace(0, raft::resource::get_cuda_stream(handle));
 
-  cuvs::cluster::kmeans::detail::update_centroids<DataT, IndexT>(
+  cuvs::cluster::kmeans::detail::update_centroids<DataT, index_t>(
     handle, X, sample_weights, centroids, labels, weight_per_cluster, new_centroids, workspace);
 }
 
@@ -357,7 +357,7 @@ void update_centroids(raft::resources const& handle,
  * @brief Compute distance for every sample to it's nearest centroid
  *
  * @tparam DataT the type of data used for weights, distances.
- * @tparam IndexT the type of data used for indexing.
+ * @tparam index_t the type of data used for indexing.
  *
  * @param[in]  handle               The raft handle
  * @param[in]  X                    The data in row-major format
@@ -376,34 +376,34 @@ void update_centroids(raft::resources const& handle,
  * @param[in]  workspace            Temporary workspace buffer which can get resized
  *
  */
-template <typename DataT, typename IndexT>
+template <typename DataT, typename index_t>
 void min_cluster_distance(raft::resources const& handle,
-                          raft::device_matrix_view<const DataT, IndexT> X,
-                          raft::device_matrix_view<DataT, IndexT> centroids,
-                          raft::device_vector_view<DataT, IndexT> minClusterDistance,
-                          raft::device_vector_view<DataT, IndexT> L2NormX,
+                          raft::device_matrix_view<const DataT, index_t> X,
+                          raft::device_matrix_view<DataT, index_t> centroids,
+                          raft::device_vector_view<DataT, index_t> minClusterDistance,
+                          raft::device_vector_view<DataT, index_t> L2NormX,
                           rmm::device_uvector<DataT>& L2NormBuf_OR_DistBuf,
                           cuvs::distance::DistanceType metric,
                           int batch_samples,
                           int batch_centroids,
                           rmm::device_uvector<char>& workspace)
 {
-  cuvs::cluster::kmeans::detail::minClusterDistanceCompute<DataT, IndexT>(handle,
-                                                                          X,
-                                                                          centroids,
-                                                                          minClusterDistance,
-                                                                          L2NormX,
-                                                                          L2NormBuf_OR_DistBuf,
-                                                                          metric,
-                                                                          batch_samples,
-                                                                          batch_centroids,
-                                                                          workspace);
+  cuvs::cluster::kmeans::detail::min_cluster_distance_compute<DataT, index_t>(handle,
+                                                                              X,
+                                                                              centroids,
+                                                                              minClusterDistance,
+                                                                              L2NormX,
+                                                                              L2NormBuf_OR_DistBuf,
+                                                                              metric,
+                                                                              batch_samples,
+                                                                              batch_centroids,
+                                                                              workspace);
 }
 
-template <typename DataT, typename IndexT>
+template <typename DataT, typename index_t>
 void cluster_cost(raft::resources const& handle,
-                  raft::device_matrix_view<const DataT, IndexT> X,
-                  raft::device_matrix_view<const DataT, IndexT> centroids,
+                  raft::device_matrix_view<const DataT, index_t> X,
+                  raft::device_matrix_view<const DataT, index_t> centroids,
                   raft::host_scalar_view<DataT> cost)
 {
   auto stream = raft::resource::get_cuda_stream(handle);
@@ -412,7 +412,7 @@ void cluster_cost(raft::resources const& handle,
   auto n_samples  = X.extent(0);
   auto n_features = X.extent(1);
 
-  rmm::device_uvector<char> workspace(n_samples * sizeof(IndexT), stream);
+  rmm::device_uvector<char> workspace(n_samples * sizeof(index_t), stream);
 
   auto x_norms = raft::make_device_vector<DataT>(handle, n_samples);
 
@@ -424,10 +424,10 @@ void cluster_cost(raft::resources const& handle,
 
   auto metric = cuvs::distance::DistanceType::L2Expanded;
 
-  cuvs::cluster::kmeans::min_cluster_distance<DataT, IndexT>(
+  cuvs::cluster::kmeans::min_cluster_distance<DataT, index_t>(
     handle,
     X,
-    raft::make_device_matrix_view<DataT, IndexT>(
+    raft::make_device_matrix_view<DataT, index_t>(
       const_cast<DataT*>(centroids.data_handle()), n_clusters, n_features),
     min_cluster_distance.view(),
     x_norms.view(),
@@ -455,7 +455,7 @@ void cluster_cost(raft::resources const& handle,
  * is the distance between the sample and the 'centroid[key]'
  *
  * @tparam DataT the type of data used for weights, distances.
- * @tparam IndexT the type of data used for indexing.
+ * @tparam index_t the type of data used for indexing.
  *
  * @param[in]  handle                The raft handle
  * @param[in]  X                     The data in row-major format
@@ -475,29 +475,30 @@ void cluster_cost(raft::resources const& handle,
  * @param[in] workspace              Temporary workspace buffer which can get resized
  *
  */
-template <typename DataT, typename IndexT>
+template <typename DataT, typename index_t>
 void min_cluster_and_distance(
   raft::resources const& handle,
-  raft::device_matrix_view<const DataT, IndexT> X,
-  raft::device_matrix_view<const DataT, IndexT> centroids,
-  raft::device_vector_view<raft::KeyValuePair<IndexT, DataT>, IndexT> minClusterAndDistance,
-  raft::device_vector_view<DataT, IndexT> L2NormX,
+  raft::device_matrix_view<const DataT, index_t> X,
+  raft::device_matrix_view<const DataT, index_t> centroids,
+  raft::device_vector_view<raft::KeyValuePair<index_t, DataT>, index_t> minClusterAndDistance,
+  raft::device_vector_view<DataT, index_t> L2NormX,
   rmm::device_uvector<DataT>& L2NormBuf_OR_DistBuf,
   cuvs::distance::DistanceType metric,
   int batch_samples,
   int batch_centroids,
   rmm::device_uvector<char>& workspace)
 {
-  cuvs::cluster::kmeans::detail::minClusterAndDistanceCompute<DataT, IndexT>(handle,
-                                                                             X,
-                                                                             centroids,
-                                                                             minClusterAndDistance,
-                                                                             L2NormX,
-                                                                             L2NormBuf_OR_DistBuf,
-                                                                             metric,
-                                                                             batch_samples,
-                                                                             batch_centroids,
-                                                                             workspace);
+  cuvs::cluster::kmeans::detail::min_cluster_and_distance_compute<DataT, index_t>(
+    handle,
+    X,
+    centroids,
+    minClusterAndDistance,
+    L2NormX,
+    L2NormBuf_OR_DistBuf,
+    metric,
+    batch_samples,
+    batch_centroids,
+    workspace);
 }
 
 /**
@@ -505,7 +506,7 @@ void min_cluster_and_distance(
  * in 'out' does not modify the input
  *
  * @tparam DataT the type of data used for weights, distances.
- * @tparam IndexT the type of data used for indexing.
+ * @tparam index_t the type of data used for indexing.
  *
  * @param[in]  handle              The raft handle
  * @param[in]  in                  The data to shuffle and gather
@@ -516,14 +517,14 @@ void min_cluster_and_distance(
  * @param[in]  seed                Seed for the shuffle
  *
  */
-template <typename DataT, typename IndexT>
+template <typename DataT, typename index_t>
 void shuffle_and_gather(raft::resources const& handle,
-                        raft::device_matrix_view<const DataT, IndexT> in,
-                        raft::device_matrix_view<DataT, IndexT> out,
+                        raft::device_matrix_view<const DataT, index_t> in,
+                        raft::device_matrix_view<DataT, index_t> out,
                         uint32_t n_samples_to_gather,
                         uint64_t seed)
 {
-  cuvs::cluster::kmeans::detail::shuffleAndGather<DataT, IndexT>(
+  cuvs::cluster::kmeans::detail::shuffle_and_gather<DataT, index_t>(
     handle, in, out, n_samples_to_gather, seed);
 }
 
@@ -531,7 +532,7 @@ void shuffle_and_gather(raft::resources const& handle,
  * @brief Count the number of samples in each cluster
  *
  * @tparam DataT the type of data used for weights, distances.
- * @tparam IndexT the type of data used for indexing.
+ * @tparam index_t the type of data used for indexing.
  *
  * @param[in]  handle               The raft handle
  * @param[in]  params               The parameters for KMeans
@@ -546,16 +547,16 @@ void shuffle_and_gather(raft::resources const& handle,
  *                                  [dim = n_cluster]
  *
  */
-template <typename DataT, typename IndexT>
+template <typename DataT, typename index_t>
 void count_samples_in_cluster(raft::resources const& handle,
                               const kmeans::params& params,
-                              raft::device_matrix_view<const DataT, IndexT> X,
-                              raft::device_vector_view<DataT, IndexT> L2NormX,
-                              raft::device_matrix_view<DataT, IndexT> centroids,
+                              raft::device_matrix_view<const DataT, index_t> X,
+                              raft::device_vector_view<DataT, index_t> L2NormX,
+                              raft::device_matrix_view<DataT, index_t> centroids,
                               rmm::device_uvector<char>& workspace,
-                              raft::device_vector_view<DataT, IndexT> sampleCountInCluster)
+                              raft::device_vector_view<DataT, index_t> sampleCountInCluster)
 {
-  cuvs::cluster::kmeans::detail::countSamplesInCluster<DataT, IndexT>(
+  cuvs::cluster::kmeans::detail::count_samples_in_cluster<DataT, index_t>(
     handle, params, X, L2NormX, centroids, workspace, sampleCountInCluster);
 }
 
@@ -566,7 +567,7 @@ void count_samples_in_cluster(raft::resources const& handle,
  *        ACM-SIAM symposium on Discrete algorithms.
  *
  * @tparam DataT the type of data used for weights, distances.
- * @tparam IndexT the type of data used for indexing.
+ * @tparam index_t the type of data used for indexing.
  *
  * @param[in]  handle                The raft handle
  * @param[in]  params                The parameters for KMeans
@@ -576,14 +577,14 @@ void count_samples_in_cluster(raft::resources const& handle,
  *                                   [dim = n_cluster x n_features]
  * @param[in]  workspace             Temporary workspace buffer which can get resized
  */
-template <typename DataT, typename IndexT>
+template <typename DataT, typename index_t>
 void init_plus_plus(raft::resources const& handle,
                     const kmeans::params& params,
-                    raft::device_matrix_view<const DataT, IndexT> X,
-                    raft::device_matrix_view<DataT, IndexT> centroids,
+                    raft::device_matrix_view<const DataT, index_t> X,
+                    raft::device_matrix_view<DataT, index_t> centroids,
                     rmm::device_uvector<char>& workspace)
 {
-  cuvs::cluster::kmeans::detail::kmeansPlusPlus<DataT, IndexT>(
+  cuvs::cluster::kmeans::detail::kmeans_plus_plus<DataT, index_t>(
     handle, params, X, centroids, workspace);
 }
 

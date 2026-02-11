@@ -26,7 +26,7 @@ void add_node_core(
   raft::host_matrix_view<IdxT, std::int64_t> updated_graph,
   const cuvs::neighbors::cagra::extend_params& extend_params)
 {
-  using DistanceT                 = float;
+  using distance_t                = float;
   const std::size_t degree        = idx.graph_degree();
   const std::size_t dim           = idx.dim();
   const std::size_t old_size      = idx.dataset().extent(0);
@@ -56,7 +56,7 @@ void add_node_core(
              raft::resource::get_cuda_stream(handle));
 
   std::size_t data_size_per_vector =
-    sizeof(IdxT) * base_degree + sizeof(DistanceT) * base_degree + sizeof(T) * dim;
+    sizeof(IdxT) * base_degree + sizeof(distance_t) * base_degree + sizeof(T) * dim;
   cudaPointerAttributes attr;
   RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, additional_dataset_view.data_handle()));
   if (attr.devicePointer == nullptr) {
@@ -78,7 +78,7 @@ void add_node_core(
   auto neighbor_indices = raft::make_device_mdarray<IdxT, std::int64_t>(
     handle, mr, raft::make_extents<std::int64_t>(max_search_batch_size, base_degree));
 
-  auto neighbor_distances = raft::make_device_mdarray<DistanceT, std::int64_t>(
+  auto neighbor_distances = raft::make_device_mdarray<distance_t, std::int64_t>(
     handle, mr, raft::make_extents<std::int64_t>(max_search_batch_size, base_degree));
 
   auto queries = raft::make_device_mdarray<T, std::int64_t>(
@@ -124,7 +124,7 @@ void add_node_core(
     raft::resource::sync_stream(handle);
 
     // Check search results
-    constexpr int max_warnings = 3;
+    constexpr int kMaxWarnings = 3;
     int num_warnings           = 0;
     for (std::size_t vec_i = 0; vec_i < batch.size(); vec_i++) {
       std::uint32_t invalid_edges = 0;
@@ -132,7 +132,7 @@ void add_node_core(
         if (host_neighbor_indices(vec_i, i) >= old_size) { invalid_edges++; }
       }
       if (invalid_edges > 0) {
-        if (num_warnings < max_warnings) {
+        if (num_warnings < kMaxWarnings) {
           RAFT_LOG_WARN(
             "Invalid edges found in search results "
             "(vec_i:%lu, invalid_edges:%lu, degree:%lu, base_degree:%lu)",
@@ -144,7 +144,7 @@ void add_node_core(
         num_warnings += 1;
       }
     }
-    if (num_warnings > max_warnings) {
+    if (num_warnings > kMaxWarnings) {
       RAFT_LOG_WARN("The number of queries that contain invalid search results: %d", num_warnings);
     }
 
@@ -298,7 +298,7 @@ void add_graph_nodes(
   const std::size_t degree               = index.graph_degree();
   const std::size_t dim                  = index.dim();
   const std::size_t stride               = input_updated_dataset_view.stride(0);
-  const std::size_t max_chunk_size_ =
+  const std::size_t max_chunk_size =
     params.max_chunk_size == 0 ? new_dataset_size : params.max_chunk_size;
 
   raft::copy(updated_graph_view.data_handle(),
@@ -313,9 +313,9 @@ void add_graph_nodes(
     raft::make_device_matrix_view<const IdxT, int64_t>(nullptr, 0, degree));
 
   for (std::size_t additional_dataset_offset = 0; additional_dataset_offset < num_new_nodes;
-       additional_dataset_offset += max_chunk_size_) {
+       additional_dataset_offset += max_chunk_size) {
     const auto actual_chunk_size =
-      std::min(num_new_nodes - additional_dataset_offset, max_chunk_size_);
+      std::min(num_new_nodes - additional_dataset_offset, max_chunk_size);
 
     auto dataset_view = raft::make_device_strided_matrix_view<const T, std::int64_t>(
       input_updated_dataset_view.data_handle(),

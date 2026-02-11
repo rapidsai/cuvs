@@ -92,55 +92,55 @@ using raft::WarpSize;
 // If IsBitonic is false, the first stage is reversed, so we don't
 // need to sort directionally. It's still technically a bitonic sort.
 template <typename K, typename V, int L, bool Dir, typename Comp, bool IsBitonic>
-inline __device__ void warpBitonicMergeLE16(K& k, V& v)
+inline __device__ void warp_bitonic_merge_le16(K& k, V& v)
 {
-  static_assert(utils::isPowerOf2(L), "L must be a power-of-2");
+  static_assert(utils::is_power_of2(L), "L must be a power-of-2");
   static_assert(L <= WarpSize / 2, "merge list size must be <= 16");
 
-  int laneId = raft::laneId();
+  int lane_id = raft::laneId();
 
   if (!IsBitonic) {
     // Reverse the first comparison stage.
     // For example, merging a list of size 8 has the exchanges:
     // 0 <-> 15, 1 <-> 14, ...
-    K otherK = shfl_xor(k, 2 * L - 1);
-    V otherV = shfl_xor(v, 2 * L - 1);
+    K other_k = shfl_xor(k, 2 * L - 1);
+    V other_v = shfl_xor(v, 2 * L - 1);
 
     // Whether we are the lesser thread in the exchange
-    bool small = !(laneId & L);
+    bool small = !(lane_id & L);
 
     if (Dir) {
       // See the comment above how performing both of these
       // comparisons in the warp seems to win out over the
       // alternatives in practice
-      bool s = small ? Comp::gt(k, otherK) : Comp::lt(k, otherK);
-      assign(s, k, otherK);
-      assign(s, v, otherV);
+      bool s = small ? Comp::gt(k, other_k) : Comp::lt(k, other_k);
+      assign(s, k, other_k);
+      assign(s, v, other_v);
 
     } else {
-      bool s = small ? Comp::lt(k, otherK) : Comp::gt(k, otherK);
-      assign(s, k, otherK);
-      assign(s, v, otherV);
+      bool s = small ? Comp::lt(k, other_k) : Comp::gt(k, other_k);
+      assign(s, k, other_k);
+      assign(s, v, other_v);
     }
   }
 
 #pragma unroll
   for (int stride = IsBitonic ? L : L / 2; stride > 0; stride /= 2) {
-    K otherK = shfl_xor(k, stride);
-    V otherV = shfl_xor(v, stride);
+    K other_k = shfl_xor(k, stride);
+    V other_v = shfl_xor(v, stride);
 
     // Whether we are the lesser thread in the exchange
-    bool small = !(laneId & stride);
+    bool small = !(lane_id & stride);
 
     if (Dir) {
-      bool s = small ? Comp::gt(k, otherK) : Comp::lt(k, otherK);
-      assign(s, k, otherK);
-      assign(s, v, otherV);
+      bool s = small ? Comp::gt(k, other_k) : Comp::lt(k, other_k);
+      assign(s, k, other_k);
+      assign(s, v, other_v);
 
     } else {
-      bool s = small ? Comp::lt(k, otherK) : Comp::gt(k, otherK);
-      assign(s, k, otherK);
-      assign(s, v, otherV);
+      bool s = small ? Comp::lt(k, other_k) : Comp::gt(k, other_k);
+      assign(s, k, other_k);
+      assign(s, v, other_v);
     }
   }
 }
@@ -148,7 +148,7 @@ inline __device__ void warpBitonicMergeLE16(K& k, V& v)
 // Template for performing a bitonic merge of an arbitrary set of
 // registers
 template <typename K, typename V, int N, bool Dir, typename Comp, bool Low, bool Pow2>
-struct BitonicMergeStep {};
+struct bitonic_merge_step {};
 
 //
 // Power-of-2 merge specialization
@@ -156,19 +156,19 @@ struct BitonicMergeStep {};
 
 // All merges eventually call this
 template <typename K, typename V, bool Dir, typename Comp, bool Low>
-struct BitonicMergeStep<K, V, 1, Dir, Comp, Low, true> {
+struct bitonic_merge_step<K, V, 1, Dir, Comp, Low, true> {
   static inline __device__ void merge(K k[1], V v[1])
   {
     // Use warp shuffles
-    warpBitonicMergeLE16<K, V, 16, Dir, Comp, true>(k[0], v[0]);
+    warp_bitonic_merge_le16<K, V, 16, Dir, Comp, true>(k[0], v[0]);
   }
 };
 
 template <typename K, typename V, int N, bool Dir, typename Comp, bool Low>
-struct BitonicMergeStep<K, V, N, Dir, Comp, Low, true> {
+struct bitonic_merge_step<K, V, N, Dir, Comp, Low, true> {
   static inline __device__ void merge(K k[N], V v[N])
   {
-    static_assert(utils::isPowerOf2(N), "must be power of 2");
+    static_assert(utils::is_power_of2(N), "must be power of 2");
     static_assert(N > 1, "must be N > 1");
 
 #pragma unroll
@@ -185,40 +185,40 @@ struct BitonicMergeStep<K, V, N, Dir, Comp, Low, true> {
     }
 
     {
-      K newK[N / 2];
-      V newV[N / 2];
+      K new_k[N / 2];
+      V new_v[N / 2];
 
 #pragma unroll
       for (int i = 0; i < N / 2; ++i) {
-        newK[i] = k[i];
-        newV[i] = v[i];
+        new_k[i] = k[i];
+        new_v[i] = v[i];
       }
 
-      BitonicMergeStep<K, V, N / 2, Dir, Comp, true, true>::merge(newK, newV);
+      bitonic_merge_step<K, V, N / 2, Dir, Comp, true, true>::merge(new_k, new_v);
 
 #pragma unroll
       for (int i = 0; i < N / 2; ++i) {
-        k[i] = newK[i];
-        v[i] = newV[i];
+        k[i] = new_k[i];
+        v[i] = new_v[i];
       }
     }
 
     {
-      K newK[N / 2];
-      V newV[N / 2];
+      K new_k[N / 2];
+      V new_v[N / 2];
 
 #pragma unroll
       for (int i = 0; i < N / 2; ++i) {
-        newK[i] = k[i + N / 2];
-        newV[i] = v[i + N / 2];
+        new_k[i] = k[i + N / 2];
+        new_v[i] = v[i + N / 2];
       }
 
-      BitonicMergeStep<K, V, N / 2, Dir, Comp, false, true>::merge(newK, newV);
+      bitonic_merge_step<K, V, N / 2, Dir, Comp, false, true>::merge(new_k, new_v);
 
 #pragma unroll
       for (int i = 0; i < N / 2; ++i) {
-        k[i + N / 2] = newK[i];
-        v[i + N / 2] = newV[i];
+        k[i + N / 2] = new_k[i];
+        v[i + N / 2] = new_v[i];
       }
     }
   }
@@ -230,13 +230,13 @@ struct BitonicMergeStep<K, V, N, Dir, Comp, Low, true> {
 
 // Low recursion
 template <typename K, typename V, int N, bool Dir, typename Comp>
-struct BitonicMergeStep<K, V, N, Dir, Comp, true, false> {
+struct bitonic_merge_step<K, V, N, Dir, Comp, true, false> {
   static inline __device__ void merge(K k[N], V v[N])
   {
-    static_assert(!utils::isPowerOf2(N), "must be non-power-of-2");
+    static_assert(!utils::is_power_of2(N), "must be non-power-of-2");
     static_assert(N >= 3, "must be N >= 3");
 
-    constexpr int kNextHighestPowerOf2 = utils::nextHighestPowerOf2(N);
+    constexpr int kNextHighestPowerOf2 = utils::next_highest_power_of2(N);
 
 #pragma unroll
     for (int i = 0; i < N - kNextHighestPowerOf2 / 2; ++i) {
@@ -254,59 +254,59 @@ struct BitonicMergeStep<K, V, N, Dir, Comp, true, false> {
     constexpr int kLowSize  = N - kNextHighestPowerOf2 / 2;
     constexpr int kHighSize = kNextHighestPowerOf2 / 2;
     {
-      K newK[kLowSize];
-      V newV[kLowSize];
+      K new_k[kLowSize];
+      V new_v[kLowSize];
 
 #pragma unroll
       for (int i = 0; i < kLowSize; ++i) {
-        newK[i] = k[i];
-        newV[i] = v[i];
+        new_k[i] = k[i];
+        new_v[i] = v[i];
       }
 
-      constexpr bool kLowIsPowerOf2 = utils::isPowerOf2(N - kNextHighestPowerOf2 / 2);
+      constexpr bool kLowIsPowerOf2 = utils::is_power_of2(N - kNextHighestPowerOf2 / 2);
       // FIXME: compiler doesn't like this expression? compiler bug?
-      //      constexpr bool kLowIsPowerOf2 = utils::isPowerOf2(kLowSize);
-      BitonicMergeStep<K,
-                       V,
-                       kLowSize,
-                       Dir,
-                       Comp,
-                       true,  // low
-                       kLowIsPowerOf2>::merge(newK, newV);
+      //      constexpr bool kLowIsPowerOf2 = utils::is_power_of2(kLowSize);
+      bitonic_merge_step<K,
+                         V,
+                         kLowSize,
+                         Dir,
+                         Comp,
+                         true,  // low
+                         kLowIsPowerOf2>::merge(new_k, new_v);
 
 #pragma unroll
       for (int i = 0; i < kLowSize; ++i) {
-        k[i] = newK[i];
-        v[i] = newV[i];
+        k[i] = new_k[i];
+        v[i] = new_v[i];
       }
     }
 
     {
-      K newK[kHighSize];
-      V newV[kHighSize];
+      K new_k[kHighSize];
+      V new_v[kHighSize];
 
 #pragma unroll
       for (int i = 0; i < kHighSize; ++i) {
-        newK[i] = k[i + kLowSize];
-        newV[i] = v[i + kLowSize];
+        new_k[i] = k[i + kLowSize];
+        new_v[i] = v[i + kLowSize];
       }
 
-      constexpr bool kHighIsPowerOf2 = utils::isPowerOf2(kNextHighestPowerOf2 / 2);
+      constexpr bool kHighIsPowerOf2 = utils::is_power_of2(kNextHighestPowerOf2 / 2);
       // FIXME: compiler doesn't like this expression? compiler bug?
       //      constexpr bool kHighIsPowerOf2 =
-      //      utils::isPowerOf2(kHighSize);
-      BitonicMergeStep<K,
-                       V,
-                       kHighSize,
-                       Dir,
-                       Comp,
-                       false,  // high
-                       kHighIsPowerOf2>::merge(newK, newV);
+      //      utils::is_power_of2(kHighSize);
+      bitonic_merge_step<K,
+                         V,
+                         kHighSize,
+                         Dir,
+                         Comp,
+                         false,  // high
+                         kHighIsPowerOf2>::merge(new_k, new_v);
 
 #pragma unroll
       for (int i = 0; i < kHighSize; ++i) {
-        k[i + kLowSize] = newK[i];
-        v[i + kLowSize] = newV[i];
+        k[i + kLowSize] = new_k[i];
+        v[i + kLowSize] = new_v[i];
       }
     }
   }
@@ -314,13 +314,13 @@ struct BitonicMergeStep<K, V, N, Dir, Comp, true, false> {
 
 // High recursion
 template <typename K, typename V, int N, bool Dir, typename Comp>
-struct BitonicMergeStep<K, V, N, Dir, Comp, false, false> {
+struct bitonic_merge_step<K, V, N, Dir, Comp, false, false> {
   static inline __device__ void merge(K k[N], V v[N])
   {
-    static_assert(!utils::isPowerOf2(N), "must be non-power-of-2");
+    static_assert(!utils::is_power_of2(N), "must be non-power-of-2");
     static_assert(N >= 3, "must be N >= 3");
 
-    constexpr int kNextHighestPowerOf2 = utils::nextHighestPowerOf2(N);
+    constexpr int kNextHighestPowerOf2 = utils::next_highest_power_of2(N);
 
 #pragma unroll
     for (int i = 0; i < N - kNextHighestPowerOf2 / 2; ++i) {
@@ -338,59 +338,59 @@ struct BitonicMergeStep<K, V, N, Dir, Comp, false, false> {
     constexpr int kLowSize  = kNextHighestPowerOf2 / 2;
     constexpr int kHighSize = N - kNextHighestPowerOf2 / 2;
     {
-      K newK[kLowSize];
-      V newV[kLowSize];
+      K new_k[kLowSize];
+      V new_v[kLowSize];
 
 #pragma unroll
       for (int i = 0; i < kLowSize; ++i) {
-        newK[i] = k[i];
-        newV[i] = v[i];
+        new_k[i] = k[i];
+        new_v[i] = v[i];
       }
 
-      constexpr bool kLowIsPowerOf2 = utils::isPowerOf2(kNextHighestPowerOf2 / 2);
+      constexpr bool kLowIsPowerOf2 = utils::is_power_of2(kNextHighestPowerOf2 / 2);
       // FIXME: compiler doesn't like this expression? compiler bug?
-      //      constexpr bool kLowIsPowerOf2 = utils::isPowerOf2(kLowSize);
-      BitonicMergeStep<K,
-                       V,
-                       kLowSize,
-                       Dir,
-                       Comp,
-                       true,  // low
-                       kLowIsPowerOf2>::merge(newK, newV);
+      //      constexpr bool kLowIsPowerOf2 = utils::is_power_of2(kLowSize);
+      bitonic_merge_step<K,
+                         V,
+                         kLowSize,
+                         Dir,
+                         Comp,
+                         true,  // low
+                         kLowIsPowerOf2>::merge(new_k, new_v);
 
 #pragma unroll
       for (int i = 0; i < kLowSize; ++i) {
-        k[i] = newK[i];
-        v[i] = newV[i];
+        k[i] = new_k[i];
+        v[i] = new_v[i];
       }
     }
 
     {
-      K newK[kHighSize];
-      V newV[kHighSize];
+      K new_k[kHighSize];
+      V new_v[kHighSize];
 
 #pragma unroll
       for (int i = 0; i < kHighSize; ++i) {
-        newK[i] = k[i + kLowSize];
-        newV[i] = v[i + kLowSize];
+        new_k[i] = k[i + kLowSize];
+        new_v[i] = v[i + kLowSize];
       }
 
-      constexpr bool kHighIsPowerOf2 = utils::isPowerOf2(N - kNextHighestPowerOf2 / 2);
+      constexpr bool kHighIsPowerOf2 = utils::is_power_of2(N - kNextHighestPowerOf2 / 2);
       // FIXME: compiler doesn't like this expression? compiler bug?
       //      constexpr bool kHighIsPowerOf2 =
-      //      utils::isPowerOf2(kHighSize);
-      BitonicMergeStep<K,
-                       V,
-                       kHighSize,
-                       Dir,
-                       Comp,
-                       false,  // high
-                       kHighIsPowerOf2>::merge(newK, newV);
+      //      utils::is_power_of2(kHighSize);
+      bitonic_merge_step<K,
+                         V,
+                         kHighSize,
+                         Dir,
+                         Comp,
+                         false,  // high
+                         kHighIsPowerOf2>::merge(new_k, new_v);
 
 #pragma unroll
       for (int i = 0; i < kHighSize; ++i) {
-        k[i + kLowSize] = newK[i];
-        v[i + kLowSize] = newV[i];
+        k[i + kLowSize] = new_k[i];
+        v[i + kLowSize] = new_v[i];
       }
     }
   }
@@ -401,7 +401,7 @@ struct BitonicMergeStep<K, V, N, Dir, Comp, false, false> {
 /// sorted k/v list of size WarpSize * N2, where N1 and N2 are any
 /// value >= 1
 template <typename K, typename V, int N1, int N2, bool Dir, typename Comp, bool FullMerge = true>
-inline __device__ void warpMergeAnyRegisters(K k1[N1], V v1[N1], K k2[N2], V v2[N2])
+inline __device__ void warp_merge_any_registers(K k1[N1], V v1[N1], K k2[N2], V v2[N2])
 {
   constexpr int kSmallestN = N1 < N2 ? N1 : N2;
 
@@ -413,47 +413,47 @@ inline __device__ void warpMergeAnyRegisters(K k1[N1], V v1[N1], K k2[N2], V v2[
     K& kb = k2[i];
     V& vb = v2[i];
 
-    K otherKa;
-    V otherVa;
+    K other_ka;
+    V other_va;
 
     if (FullMerge) {
       // We need the other values
-      otherKa = shfl_xor(ka, WarpSize - 1);
-      otherVa = shfl_xor(va, WarpSize - 1);
+      other_ka = shfl_xor(ka, WarpSize - 1);
+      other_va = shfl_xor(va, WarpSize - 1);
     }
 
-    K otherKb = shfl_xor(kb, WarpSize - 1);
-    V otherVb = shfl_xor(vb, WarpSize - 1);
+    K other_kb = shfl_xor(kb, WarpSize - 1);
+    V other_vb = shfl_xor(vb, WarpSize - 1);
 
     // ka is always first in the list, so we needn't use our lane
     // in this comparison
-    bool swapa = Dir ? Comp::gt(ka, otherKb) : Comp::lt(ka, otherKb);
-    assign(swapa, ka, otherKb);
-    assign(swapa, va, otherVb);
+    bool swapa = Dir ? Comp::gt(ka, other_kb) : Comp::lt(ka, other_kb);
+    assign(swapa, ka, other_kb);
+    assign(swapa, va, other_vb);
 
     // kb is always second in the list, so we needn't use our lane
     // in this comparison
     if (FullMerge) {
-      bool swapb = Dir ? Comp::lt(kb, otherKa) : Comp::gt(kb, otherKa);
-      assign(swapb, kb, otherKa);
-      assign(swapb, vb, otherVa);
+      bool swapb = Dir ? Comp::lt(kb, other_ka) : Comp::gt(kb, other_ka);
+      assign(swapb, kb, other_ka);
+      assign(swapb, vb, other_va);
 
     } else {
       // We don't care about updating elements in the second list
     }
   }
 
-  BitonicMergeStep<K, V, N1, Dir, Comp, true, utils::isPowerOf2(N1)>::merge(k1, v1);
+  bitonic_merge_step<K, V, N1, Dir, Comp, true, utils::is_power_of2(N1)>::merge(k1, v1);
   if (FullMerge) {
     // Only if we care about N2 do we need to bother merging it fully
-    BitonicMergeStep<K, V, N2, Dir, Comp, false, utils::isPowerOf2(N2)>::merge(k2, v2);
+    bitonic_merge_step<K, V, N2, Dir, Comp, false, utils::is_power_of2(N2)>::merge(k2, v2);
   }
 }
 
 // Recursive template that uses the above bitonic merge to perform a
 // bitonic sort
 template <typename K, typename V, int N, bool Dir, typename Comp>
-struct BitonicSortStep {
+struct bitonic_sort_step {
   static inline __device__ void sort(K k[N], V v[N])
   {
     static_assert(N > 1, "did not hit specialized case");
@@ -462,68 +462,68 @@ struct BitonicSortStep {
     constexpr int kSizeA = N / 2;
     constexpr int kSizeB = N - kSizeA;
 
-    K aK[kSizeA];
-    V aV[kSizeA];
+    K a_k[kSizeA];
+    V a_v[kSizeA];
 
 #pragma unroll
     for (int i = 0; i < kSizeA; ++i) {
-      aK[i] = k[i];
-      aV[i] = v[i];
+      a_k[i] = k[i];
+      a_v[i] = v[i];
     }
 
-    BitonicSortStep<K, V, kSizeA, Dir, Comp>::sort(aK, aV);
+    bitonic_sort_step<K, V, kSizeA, Dir, Comp>::sort(a_k, a_v);
 
-    K bK[kSizeB];
-    V bV[kSizeB];
+    K b_k[kSizeB];
+    V b_v[kSizeB];
 
 #pragma unroll
     for (int i = 0; i < kSizeB; ++i) {
-      bK[i] = k[i + kSizeA];
-      bV[i] = v[i + kSizeA];
+      b_k[i] = k[i + kSizeA];
+      b_v[i] = v[i + kSizeA];
     }
 
-    BitonicSortStep<K, V, kSizeB, Dir, Comp>::sort(bK, bV);
+    bitonic_sort_step<K, V, kSizeB, Dir, Comp>::sort(b_k, b_v);
 
     // Merge halves
-    warpMergeAnyRegisters<K, V, kSizeA, kSizeB, Dir, Comp>(aK, aV, bK, bV);
+    warp_merge_any_registers<K, V, kSizeA, kSizeB, Dir, Comp>(a_k, a_v, b_k, b_v);
 
 #pragma unroll
     for (int i = 0; i < kSizeA; ++i) {
-      k[i] = aK[i];
-      v[i] = aV[i];
+      k[i] = a_k[i];
+      v[i] = a_v[i];
     }
 
 #pragma unroll
     for (int i = 0; i < kSizeB; ++i) {
-      k[i + kSizeA] = bK[i];
-      v[i + kSizeA] = bV[i];
+      k[i + kSizeA] = b_k[i];
+      v[i + kSizeA] = b_v[i];
     }
   }
 };
 
 // Single warp (N == 1) sorting specialization
 template <typename K, typename V, bool Dir, typename Comp>
-struct BitonicSortStep<K, V, 1, Dir, Comp> {
+struct bitonic_sort_step<K, V, 1, Dir, Comp> {
   static inline __device__ void sort(K k[1], V v[1])
   {
     // Update this code if this changes
     // should go from 1 -> WarpSize in multiples of 2
     static_assert(WarpSize == 32, "unexpected warp size");
 
-    warpBitonicMergeLE16<K, V, 1, Dir, Comp, false>(k[0], v[0]);
-    warpBitonicMergeLE16<K, V, 2, Dir, Comp, false>(k[0], v[0]);
-    warpBitonicMergeLE16<K, V, 4, Dir, Comp, false>(k[0], v[0]);
-    warpBitonicMergeLE16<K, V, 8, Dir, Comp, false>(k[0], v[0]);
-    warpBitonicMergeLE16<K, V, 16, Dir, Comp, false>(k[0], v[0]);
+    warp_bitonic_merge_le16<K, V, 1, Dir, Comp, false>(k[0], v[0]);
+    warp_bitonic_merge_le16<K, V, 2, Dir, Comp, false>(k[0], v[0]);
+    warp_bitonic_merge_le16<K, V, 4, Dir, Comp, false>(k[0], v[0]);
+    warp_bitonic_merge_le16<K, V, 8, Dir, Comp, false>(k[0], v[0]);
+    warp_bitonic_merge_le16<K, V, 16, Dir, Comp, false>(k[0], v[0]);
   }
 };
 
 /// Sort a list of WarpSize * N elements in registers, where N is an
 /// arbitrary >= 1
 template <typename K, typename V, int N, bool Dir, typename Comp>
-inline __device__ void warpSortAnyRegisters(K k[N], V v[N])
+inline __device__ void warp_sort_any_registers(K k[N], V v[N])
 {
-  BitonicSortStep<K, V, N, Dir, Comp>::sort(k, v);
+  bitonic_sort_step<K, V, N, Dir, Comp>::sort(k, v);
 }
 
 }  // namespace cuvs::neighbors::detail::faiss_select

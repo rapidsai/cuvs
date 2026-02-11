@@ -8,10 +8,10 @@
 namespace cuvs::neighbors::vamana::detail {
 
 /* Macros to compute the shared memory requirements for CUB primitives used by search and prune */
-#define COMPUTE_SMEM_SIZE(degree, visited_size, DEG, CANDS)                                     \
-  if (degree == DEG && visited_size <= CANDS && visited_size > CANDS / 2) {                     \
-    sort_smem_size = static_cast<int>(                                                          \
-      sizeof(typename cub::BlockMergeSort<DistPair<IdxT, accT>, 32, CANDS / 32>::TempStorage)); \
+#define COMPUTE_SMEM_SIZE(degree, visited_size, DEG, CANDS)                                      \
+  if (degree == DEG && visited_size <= CANDS && visited_size > CANDS / 2) {                      \
+    sort_smem_size = static_cast<int>(                                                           \
+      sizeof(typename cub::BlockMergeSort<dist_pair<IdxT, AccT>, 32, CANDS / 32>::TempStorage)); \
   }
 
 // Current supported sizes for degree and visited_size. Note that visited_size must be > degree
@@ -29,11 +29,11 @@ namespace cuvs::neighbors::vamana::detail {
   COMPUTE_SMEM_SIZE(degree, visited_size, 256, 1024);
 
 /* Macros to call the CUB BlockSort primitives for supported sizes for GREEDY SEARCH */
-#define SEARCH_CALL_SORT(topk, CANDS)                                             \
-  if (topk <= CANDS && topk > CANDS / 2) {                                        \
-    using BlockSortT = cub::BlockMergeSort<DistPair<IdxT, accT>, 32, CANDS / 32>; \
-    auto& sort_mem   = reinterpret_cast<typename BlockSortT::TempStorage&>(smem); \
-    sort_visited<accT, IdxT, CANDS>(&query_list[i], &sort_mem);                   \
+#define SEARCH_CALL_SORT(topk, CANDS)                                              \
+  if (topk <= CANDS && topk > CANDS / 2) {                                         \
+    using BlockSortT = cub::BlockMergeSort<dist_pair<IdxT, AccT>, 32, CANDS / 32>; \
+    auto& sort_mem   = reinterpret_cast<typename BlockSortT::TempStorage&>(smem);  \
+    sort_visited<AccT, IdxT, CANDS>(&query_list[i], &sort_mem);                    \
   }
 
 // SEARCH only relies on visited_size (not degree) for shared memory.

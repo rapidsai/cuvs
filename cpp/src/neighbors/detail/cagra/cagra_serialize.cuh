@@ -24,7 +24,7 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
-constexpr int serialization_version = 5;
+constexpr int kSerializationVersion = 5;
 
 /**
  * Save the index to file.
@@ -56,7 +56,7 @@ void serialize(raft::resources const& res,
   dtype_string.resize(4);
   os << dtype_string;
 
-  raft::serialize_scalar(res, os, serialization_version);
+  raft::serialize_scalar(res, os, kSerializationVersion);
   raft::serialize_scalar(res, os, index_.size());
   raft::serialize_scalar(res, os, index_.dim());
   raft::serialize_scalar(res, os, index_.graph_degree());
@@ -122,8 +122,8 @@ void serialize_to_hnswlib(
   // curr_element_count
   std::size_t curr_element_count = index_.size();
   os.write(reinterpret_cast<char*>(&curr_element_count), sizeof(std::size_t));
-  // Example:M: 16, dim = 128, data_t = float, index_t = uint32_t, list_size_type = uint32_t,
-  // labeltype: size_t size_data_per_element_ = M * 2 * sizeof(index_t) + sizeof(list_size_type) +
+  // Example:m: 16, dim = 128, data_t = float, index_t = uint32_t, list_size_type = uint32_t,
+  // labeltype: size_t size_data_per_element_ = m * 2 * sizeof(index_t) + sizeof(list_size_type) +
   // dim * sizeof(T) + sizeof(labeltype)
   auto size_data_per_element =
     static_cast<std::size_t>(index_.graph_degree() * sizeof(IdxT) + 4 + dim * sizeof(T) + 8);
@@ -140,21 +140,21 @@ void serialize_to_hnswlib(
   // entrypoint_node
   auto entrypoint_node = static_cast<int>(index_.size() / 2);
   os.write(reinterpret_cast<char*>(&entrypoint_node), sizeof(int));
-  // max_M
-  auto max_M = static_cast<std::size_t>(index_.graph_degree() / 2);
-  os.write(reinterpret_cast<char*>(&max_M), sizeof(std::size_t));
-  // max_M0
-  std::size_t max_M0 = index_.graph_degree();
-  os.write(reinterpret_cast<char*>(&max_M0), sizeof(std::size_t));
-  // M
-  auto M = static_cast<std::size_t>(index_.graph_degree() / 2);
-  os.write(reinterpret_cast<char*>(&M), sizeof(std::size_t));
+  // max_m
+  auto max_m = static_cast<std::size_t>(index_.graph_degree() / 2);
+  os.write(reinterpret_cast<char*>(&max_m), sizeof(std::size_t));
+  // max_m0
+  std::size_t max_m0 = index_.graph_degree();
+  os.write(reinterpret_cast<char*>(&max_m0), sizeof(std::size_t));
+  // m
+  auto m = static_cast<std::size_t>(index_.graph_degree() / 2);
+  os.write(reinterpret_cast<char*>(&m), sizeof(std::size_t));
   // mult, can be anything
   double mult = 0.42424242;
   os.write(reinterpret_cast<char*>(&mult), sizeof(double));
-  // efConstruction, can be anything
-  std::size_t efConstruction = 500;
-  os.write(reinterpret_cast<char*>(&efConstruction), sizeof(std::size_t));
+  // ef_construction, can be anything
+  std::size_t ef_construction = 500;
+  os.write(reinterpret_cast<char*>(&ef_construction), sizeof(std::size_t));
 
   // Remove padding before saving the dataset
   raft::host_matrix<T, int64_t> host_dataset = raft::make_host_matrix<T, int64_t>(0, 0);
@@ -196,7 +196,7 @@ void serialize_to_hnswlib(
   RAFT_EXPECTS(host_dataset_view.stride(1) == 1, "serialize_to_hnswlib expects row_major dataset");
 
   size_t bytes_written = 0;
-  float GiB            = 1 << 30;
+  float gi_b           = 1 << 30;
   for (std::size_t i = 0; i < index_.size(); i++) {
     auto graph_degree = static_cast<int>(index_.graph_degree());
     os.write(reinterpret_cast<char*>(&graph_degree), sizeof(int));
@@ -217,18 +217,19 @@ void serialize_to_hnswlib(
       const auto time =
         std::chrono::duration_cast<std::chrono::microseconds>(end_clock - start_clock).count() *
         1e-6;
-      float throughput      = bytes_written / GiB / time;
+      float throughput      = bytes_written / gi_b / time;
       float rows_throughput = i / time;
-      float ETA             = (index_.size() - i) / rows_throughput;
+      float eta             = (index_.size() - i) / rows_throughput;
       RAFT_LOG_DEBUG(
-        "# Writing rows %12lu / %12lu (%3.2f %%), %3.2f GiB/sec, ETA %d:%3.1f, written %3.2f GiB\r",
+        "# Writing rows %12lu / %12lu (%3.2f %%), %3.2f gi_b/sec, eta %d:%3.1f, written %3.2f "
+        "gi_b\r",
         i,
         index_.size(),
         i / static_cast<double>(index_.size()) * 100,
         throughput,
-        int(ETA / 60),
-        std::fmod(ETA, 60.0f),
-        bytes_written / GiB);
+        int(eta / 60),
+        std::fmod(eta, 60.0f),
+        bytes_written / gi_b);
     }
   }
 
@@ -273,8 +274,8 @@ void deserialize(raft::resources const& res, std::istream& is, index<T, IdxT>* i
   is.read(dtype_string, 4);
 
   auto ver = raft::deserialize_scalar<int>(res, is);
-  if (ver != serialization_version) {
-    RAFT_FAIL("serialization version mismatch, expected %d, got %d ", serialization_version, ver);
+  if (ver != kSerializationVersion) {
+    RAFT_FAIL("serialization version mismatch, expected %d, got %d ", kSerializationVersion, ver);
   }
   auto n_rows       = raft::deserialize_scalar<IdxT>(res, is);
   auto dim          = raft::deserialize_scalar<std::uint32_t>(res, is);

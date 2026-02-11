@@ -24,7 +24,7 @@ namespace cuvs::neighbors::vamana::detail {
  *
  * The structure keeps the nearest visited neighbors seen thus far during
  * search and lets us efficiently find the next node to visit during the search.
- * Stores a total of KVAL pairs, where currently KVAL must be 2i-1 for some integer
+ * Stores a total of kval pairs, where currently kval must be 2i-1 for some integer
  * i since the heap must be complete.
  * This size is determined during vamana build with the "queue_size" parameter (default 127)
  *
@@ -35,86 +35,86 @@ namespace cuvs::neighbors::vamana::detail {
  *
  *
  * @tparam IdxT type of the vector indices (represent dataset.extent(0))
- * @tparam accT type of distances between vectors (accumuator type)
+ * @tparam AccT type of distances between vectors (accumuator type)
  *
  */
-template <typename IdxT, typename accT>
-class PriorityQueue {
+template <typename IdxT, typename AccT>
+class priority_queue {
  public:
-  int KVAL;
+  int kval;
   int insert_pointer;
-  DistPair<IdxT, accT>* vals;
-  DistPair<IdxT, accT> temp;
+  dist_pair<IdxT, AccT>* vals;
+  dist_pair<IdxT, AccT> temp;
 
   int* q_size;
   // Enforce max-heap property on the entries
   __forceinline__ __device__ void heapify()
   {
-    int i        = 0;
-    int swapDest = 0;
+    int i         = 0;
+    int swap_dest = 0;
 
-    while (2 * i + 2 < KVAL) {
-      swapDest = 2 * i;
-      swapDest +=
+    while (2 * i + 2 < kval) {
+      swap_dest = 2 * i;
+      swap_dest +=
         (vals[i].dist > vals[2 * i + 1].dist && vals[2 * i + 2].dist >= vals[2 * i + 1].dist);
-      swapDest +=
+      swap_dest +=
         2 * (vals[i].dist > vals[2 * i + 2].dist && vals[2 * i + 1].dist > vals[2 * i + 2].dist);
 
-      if (swapDest == 2 * i) return;
+      if (swap_dest == 2 * i) return;
 
-      swap(&vals[i], &vals[swapDest]);
+      swap(&vals[i], &vals[swap_dest]);
 
-      i = swapDest;
+      i = swap_dest;
     }
   }
 
   // Starts the heapify process starting at a particular index
-  __forceinline__ __device__ void heapifyAt(int idx)
+  __forceinline__ __device__ void heapify_at(int idx)
   {
-    int i        = idx;
-    int swapDest = 0;
+    int i         = idx;
+    int swap_dest = 0;
 
-    while (2 * i + 2 < KVAL) {
-      swapDest = 2 * i;
-      swapDest +=
+    while (2 * i + 2 < kval) {
+      swap_dest = 2 * i;
+      swap_dest +=
         (vals[i].dist > vals[2 * i + 1].dist && vals[2 * i + 2].dist <= vals[2 * i + 1].dist);
-      swapDest +=
+      swap_dest +=
         2 * (vals[i].dist > vals[2 * i + 2].dist && vals[2 * i + 1].dist < vals[2 * i + 2].dist);
 
-      if (swapDest == 2 * i) return;
+      if (swap_dest == 2 * i) return;
 
-      swap(&vals[i], &vals[swapDest]);
-      i = swapDest;
+      swap(&vals[i], &vals[swap_dest]);
+      i = swap_dest;
     }
   }
 
   // Heapify from the bottom up, used with insert_back
-  __forceinline__ __device__ void heapifyReverseAt(int idx)
+  __forceinline__ __device__ void heapify_reverse_at(int idx)
   {
-    int i        = idx;
-    int swapDest = 0;
+    int i         = idx;
+    int swap_dest = 0;
     while (i > 0) {
-      swapDest = ((i - 1) / 2);
-      if (vals[swapDest].dist <= vals[i].dist) return;
+      swap_dest = ((i - 1) / 2);
+      if (vals[swap_dest].dist <= vals[i].dist) return;
 
-      swap(&vals[i], &vals[swapDest]);
-      i = swapDest;
+      swap(&vals[i], &vals[swap_dest]);
+      i = swap_dest;
     }
   }
 
   __device__ void reset()
   {
     *q_size = 0;
-    for (int i = 0; i < KVAL; i++) {
-      vals[i].dist = raft::upper_bound<accT>();
+    for (int i = 0; i < kval; i++) {
+      vals[i].dist = raft::upper_bound<AccT>();
       vals[i].idx  = raft::upper_bound<IdxT>();
     }
   }
 
-  __device__ void initialize(DistPair<IdxT, accT>* v, int _kval, int* _q_size)
+  __device__ void initialize(dist_pair<IdxT, AccT>* v, int _kval, int* _q_size)
   {
     vals           = v;
-    KVAL           = _kval;
+    kval           = _kval;
     insert_pointer = _kval / 2;
     q_size         = _q_size;
     reset();
@@ -123,21 +123,21 @@ class PriorityQueue {
   // Initialize all nodes of the heap to +infinity
   __device__ void initialize()
   {
-    for (int i = 0; i < KVAL; i++) {
+    for (int i = 0; i < kval; i++) {
       vals[i].idx  = raft::upper_bound<IdxT>();
-      vals[i].dist = raft::upper_bound<accT>();
+      vals[i].dist = raft::upper_bound<AccT>();
     }
   }
 
   __device__ void write_to_gmem(int* gmem)
   {
-    for (int i = 0; i < KVAL; i++) {
+    for (int i = 0; i < kval; i++) {
       gmem[i] = vals[i].idx;
     }
   }
 
   // Replace the root of the heap with new pair
-  __device__ void insert(accT newDist, IdxT newIdx)
+  __device__ void insert(AccT newDist, IdxT newIdx)
   {
     vals[0].dist = newDist;
     vals[0].idx  = newIdx;
@@ -146,39 +146,39 @@ class PriorityQueue {
   }
 
   // Replace a specific element in the heap (and maintain heap properties)
-  __device__ void insertAt(accT newDist, IdxT newIdx, int idx)
+  __device__ void insert_at(AccT newDist, IdxT newIdx, int idx)
   {
     vals[idx].dist = newDist;
     vals[idx].idx  = newIdx;
 
-    heapifyAt(idx);
+    heapify_at(idx);
   }
 
   // Return value of the root of the heap (largest value)
-  __device__ auto top() -> accT { return vals[0].dist; }
+  __device__ auto top() -> AccT { return vals[0].dist; }
 
   __device__ auto top_node() -> IdxT { return vals[0].idx; }
 
-  __device__ void insert_back(accT newDist, IdxT newIdx)
+  __device__ void insert_back(AccT newDist, IdxT newIdx)
   {
     if (newDist < vals[insert_pointer].dist) {
       if (vals[insert_pointer].idx == raft::upper_bound<IdxT>()) *q_size += 1;
       vals[insert_pointer].dist = newDist;
       vals[insert_pointer].idx  = newIdx;
-      heapifyReverseAt(insert_pointer);
+      heapify_reverse_at(insert_pointer);
     }
     insert_pointer++;
 
-    if (insert_pointer == KVAL) insert_pointer = KVAL / 2;
+    if (insert_pointer == kval) insert_pointer = kval / 2;
   }
 
   // Pop root node off and heapify
-  __device__ auto pop() -> DistPair<IdxT, accT>
+  __device__ auto pop() -> dist_pair<IdxT, AccT>
   {
-    DistPair<IdxT, accT> result;
+    dist_pair<IdxT, AccT> result;
     result.dist  = vals[0].dist;
     result.idx   = vals[0].idx;
-    vals[0].dist = raft::upper_bound<accT>();
+    vals[0].dist = raft::upper_bound<AccT>();
     vals[0].idx  = raft::upper_bound<IdxT>();
     heapify();
     *q_size -= 1;
@@ -187,11 +187,11 @@ class PriorityQueue {
 };
 
 /***************************************************************************************
- * Node structure used for simplified lists during GreedySearch.
+ * node structure used for simplified lists during GreedySearch.
  * Used for other operations like checking for duplicates, etc.
  ****************************************************************************************/
 template <typename SUMTYPE>
-class __align__(16) Node {
+class __align__(16) node {
  public:
   SUMTYPE distance;
   int nodeid;
@@ -199,20 +199,20 @@ class __align__(16) Node {
 
 // Less-than operator between two Nodes.
 template <typename SUMTYPE>
-__host__ __device__ auto operator<(const Node<SUMTYPE>& first, const Node<SUMTYPE>& other) -> bool
+__host__ __device__ auto operator<(const node<SUMTYPE>& first, const node<SUMTYPE>& other) -> bool
 {
   return first.distance < other.distance;
 }
 
 // Less-than operator between two Nodes.
 template <typename SUMTYPE>
-__host__ __device__ auto operator>(const Node<SUMTYPE>& first, const Node<SUMTYPE>& other) -> bool
+__host__ __device__ auto operator>(const node<SUMTYPE>& first, const node<SUMTYPE>& other) -> bool
 {
   return first.distance > other.distance;
 }
 
-template <typename accT>
-__device__ auto check_duplicate(const Node<accT>* pq, const int size, Node<accT> new_node) -> bool
+template <typename AccT>
+__device__ auto check_duplicate(const node<AccT>* pq, const int size, node<AccT> new_node) -> bool
 {
   bool found = false;
   for (int i = threadIdx.x; i < size; i += blockDim.x) {
@@ -236,10 +236,10 @@ __device__ auto check_duplicate(const Node<accT>* pq, const int size, Node<accT>
   Enqueuing a input value into parallel queue with tracker
 */
 template <typename SUMTYPE>
-__inline__ __device__ void parallel_pq_max_enqueue(Node<SUMTYPE>* pq,
+__inline__ __device__ void parallel_pq_max_enqueue(node<SUMTYPE>* pq,
                                                    int* size,
                                                    const int pq_size,
-                                                   Node<SUMTYPE> input_data,
+                                                   node<SUMTYPE> input_data,
                                                    SUMTYPE* cur_max_val,
                                                    int* max_idx)
 {
@@ -296,17 +296,17 @@ __inline__ __device__ void parallel_pq_max_enqueue(Node<SUMTYPE>* pq,
   Compute the distances between the source vector and all nodes in the neighbor_array and enqueue
   them in the PQ
 */
-template <typename T, typename accT, typename IdxT>
+template <typename T, typename AccT, typename IdxT>
 __forceinline__ __device__ void enqueue_all_neighbors(int num_neighbors,
-                                                      Point<T, accT>* query_vec,
+                                                      point<T, AccT>* query_vec,
                                                       const T* vec_ptr,
                                                       int* neighbor_array,
-                                                      PriorityQueue<IdxT, accT>& heap_queue,
+                                                      priority_queue<IdxT, AccT>& heap_queue,
                                                       int dim,
                                                       cuvs::distance::DistanceType metric)
 {
   for (int i = 0; i < num_neighbors; i++) {
-    accT dist_out = dist<T, accT>(
+    AccT dist_out = dist<T, AccT>(
       query_vec->coords, &vec_ptr[(size_t)(neighbor_array[i]) * (size_t)(dim)], dim, metric);
 
     __syncthreads();

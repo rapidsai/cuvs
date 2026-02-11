@@ -42,5 +42,5 @@
     Mvalue_idx* vd)
 
 instantiate_cuvs_neighbors_detail_rbc_eps_pass(
-  std::int64_t, float, cuvs::neighbors::ball_cover::detail::EuclideanSqFunc);
+  std::int64_t, float, cuvs::neighbors::ball_cover::detail::euclidean_sq_func);
 #undef instantiate_cuvs_neighbors_detail_rbc_eps_pass

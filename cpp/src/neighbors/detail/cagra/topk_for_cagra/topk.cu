@@ -14,48 +14,48 @@ auto _cuann_find_topk_bufferSize(  // NOLINT(readability-identifier-naming)
   uint32_t numElements,
   cudaDataType_t sampleDtype) -> size_t
 {
-  constexpr int numThreads  = NUM_THREADS;       // NOLINT(readability-identifier-naming)
-  constexpr int stateBitLen = STATE_BIT_LENGTH;  // NOLINT(readability-identifier-naming)
-  assert(stateBitLen == 0 || stateBitLen == 8);
+  constexpr int numThreads   = kNumThreads;      // NOLINT(readability-identifier-naming)
+  constexpr int kStateBitLen = kStateBitLength;  // NOLINT(readability-identifier-naming)
+  assert(kStateBitLen == 0 || kStateBitLen == 8);
 
-  size_t workspaceSize = 1;
+  size_t workspace_size = 1;
   // state
-  if (stateBitLen == 8) {
-    workspaceSize = _cuann_aligned(
-      sizeof(uint8_t) * get_state_size<stateBitLen, numThreads>(numElements) * sizeBatch);
+  if (kStateBitLen == 8) {
+    workspace_size = _cuann_aligned(
+      sizeof(uint8_t) * get_state_size<kStateBitLen, numThreads>(numElements) * sizeBatch);
   }
 
-  return workspaceSize;
+  return workspace_size;
 }
 
 template <class ValT>
-void _cuann_find_topk(uint32_t topK,  // NOLINT(readability-identifier-naming)
-                      uint32_t sizeBatch,
-                      uint32_t numElements,
-                      const float* inputKeys,  // [sizeBatch, ldIK,]
-                      uint32_t ldIK,           // (*) ldIK >= numElements
-                      const ValT* inputVals,   // [sizeBatch, ldIV,]
-                      uint32_t ldIV,           // (*) ldIV >= numElements
-                      float* outputKeys,       // [sizeBatch, ldOK,]
-                      uint32_t ldOK,           // (*) ldOK >= topK
-                      ValT* outputVals,        // [sizeBatch, ldOV,]
-                      uint32_t ldOV,           // (*) ldOV >= topK
-                      void* workspace,
-                      bool sort,
-                      uint32_t* hints,
-                      cudaStream_t stream)
+void cuann_find_topk(uint32_t topK,  // NOLINT(readability-identifier-naming)
+                     uint32_t sizeBatch,
+                     uint32_t numElements,
+                     const float* inputKeys,  // [sizeBatch, ldIK,]
+                     uint32_t ldIK,           // (*) ldIK >= numElements
+                     const ValT* inputVals,   // [sizeBatch, ldIV,]
+                     uint32_t ldIV,           // (*) ldIV >= numElements
+                     float* outputKeys,       // [sizeBatch, ldOK,]
+                     uint32_t ldOK,           // (*) ldOK >= topK
+                     ValT* outputVals,        // [sizeBatch, ldOV,]
+                     uint32_t ldOV,           // (*) ldOV >= topK
+                     void* workspace,
+                     bool sort,
+                     uint32_t* hints,
+                     cudaStream_t stream)
 {
   assert(ldIK >= numElements);
   assert(ldIV >= numElements);
   assert(ldOK >= topK);
   assert(ldOV >= topK);
 
-  constexpr int numThreads  = NUM_THREADS;  // NOLINT(readability-identifier-naming)
-  constexpr int stateBitLen = STATE_BIT_LENGTH;
-  assert(stateBitLen == 0 || stateBitLen == 8);
+  constexpr int numThreads   = kNumThreads;  // NOLINT(readability-identifier-naming)
+  constexpr int kStateBitLen = kStateBitLength;
+  assert(kStateBitLen == 0 || kStateBitLen == 8);
 
   uint8_t* state = nullptr;
-  if (stateBitLen == 8) { state = (uint8_t*)workspace; }  // NOLINT(google-readability-casting)
+  if (kStateBitLen == 8) { state = (uint8_t*)workspace; }  // NOLINT(google-readability-casting)
 
   dim3 threads(numThreads, 1, 1);
   dim3 blocks(sizeBatch, 1, 1);
@@ -76,12 +76,12 @@ void _cuann_find_topk(uint32_t topK,  // NOLINT(readability-identifier-naming)
                      bool) = nullptr;
 
   // V:vecLen, K:maxTopk, T:numSortThreads
-#define SET_KERNEL_VKT(V, K, T, ValT)                          \
-  do {                                                         \
-    assert(numThreads >= T);                                   \
-    assert((K % T) == 0);                                      \
-    assert((K / T) <= 4);                                      \
-    cta_kernel = kern_topk_cta_11<stateBitLen, V, K, T, ValT>; \
+#define SET_KERNEL_VKT(V, K, T, ValT)                           \
+  do {                                                          \
+    assert(numThreads >= T);                                    \
+    assert((K % T) == 0);                                       \
+    assert((K / T) <= 4);                                       \
+    cta_kernel = kern_topk_cta_11<kStateBitLen, V, K, T, ValT>; \
   } while (0)
 
   // V: vecLen
@@ -117,7 +117,7 @@ void _cuann_find_topk(uint32_t topK,  // NOLINT(readability-identifier-naming)
     }                                                        \
   } while (0)
 
-  int _vecLen = _get_vecLen(ldIK, 2);  // NOLINT(readability-identifier-naming)
+  int _vecLen = get_vec_len(ldIK, 2);  // NOLINT(readability-identifier-naming)
   if (_vecLen == 2) {
     SET_KERNEL_V(2, ValT);
   } else if (_vecLen == 1) {
@@ -142,20 +142,20 @@ void _cuann_find_topk(uint32_t topK,  // NOLINT(readability-identifier-naming)
   return;
 }
 
-template void _cuann_find_topk<uint32_t>(uint32_t topK,
-                                         uint32_t sizeBatch,
-                                         uint32_t numElements,
-                                         const float* inputKeys,     // [sizeBatch, ldIK,]
-                                         uint32_t ldIK,              // (*) ldIK >= numElements
-                                         const uint32_t* inputVals,  // [sizeBatch, ldIV,]
-                                         uint32_t ldIV,              // (*) ldIV >= numElements
-                                         float* outputKeys,          // [sizeBatch, ldOK,]
-                                         uint32_t ldOK,              // (*) ldOK >= topK
-                                         uint32_t* outputVals,       // [sizeBatch, ldOV,]
-                                         uint32_t ldOV,              // (*) ldOV >= topK
-                                         void* workspace,
-                                         bool sort,
-                                         uint32_t* hint,
-                                         cudaStream_t stream);
+template void cuann_find_topk<uint32_t>(uint32_t topK,
+                                        uint32_t sizeBatch,
+                                        uint32_t numElements,
+                                        const float* inputKeys,     // [sizeBatch, ldIK,]
+                                        uint32_t ldIK,              // (*) ldIK >= numElements
+                                        const uint32_t* inputVals,  // [sizeBatch, ldIV,]
+                                        uint32_t ldIV,              // (*) ldIV >= numElements
+                                        float* outputKeys,          // [sizeBatch, ldOK,]
+                                        uint32_t ldOK,              // (*) ldOK >= topK
+                                        uint32_t* outputVals,       // [sizeBatch, ldOV,]
+                                        uint32_t ldOV,              // (*) ldOV >= topK
+                                        void* workspace,
+                                        bool sort,
+                                        uint32_t* hint,
+                                        cudaStream_t stream);
 
 }  // namespace cuvs::neighbors::cagra::detail

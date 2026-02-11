@@ -11,7 +11,7 @@
 #include "simt_kernel.cuh"
 #include <raft/core/kvp.hpp>             // raft::KeyValuePair
 #include <raft/core/operators.hpp>       // raft::identity_op
-#include <raft/linalg/contractions.cuh>  // Policy
+#include <raft/linalg/contractions.cuh>  // policy
 #include <raft/util/arch.cuh>            // raft::util::arch::SM_*
 #include <raft/util/cuda_utils.cuh>      // raft::ceildiv, raft::shfl
 #include <raft/util/device_atomics.cuh>
@@ -21,29 +21,29 @@
 
 namespace cuvs::distance::detail {
 
-template <typename LabelT, typename DataT>
-struct KVPMinReduceImpl {
-  using KVP = raft::KeyValuePair<LabelT, DataT>;
-  DI auto operator()(LabelT rit, const KVP& a, const KVP& b) -> KVP
+template <typename label_t, typename DataT>
+struct kvp_min_reduce_impl {
+  using kvp = raft::KeyValuePair<label_t, DataT>;
+  DI auto operator()(label_t rit, const kvp& a, const kvp& b) -> kvp
   {
     return b.value < a.value ? b : a;
   }
-  DI auto operator()(const KVP& a, const KVP& b) -> KVP { return b.value < a.value ? b : a; }
+  DI auto operator()(const kvp& a, const kvp& b) -> kvp { return b.value < a.value ? b : a; }
 
-};  // KVPMinReduce
+};  // kvp_min_reduce
 
-template <typename LabelT, typename DataT>
-struct MinAndDistanceReduceOpImpl {
-  using KVP = typename raft::KeyValuePair<LabelT, DataT>;
+template <typename label_t, typename DataT>
+struct min_and_distance_reduce_op_impl {
+  using kvp = typename raft::KeyValuePair<label_t, DataT>;
 
-  DI void operator()(LabelT rid, KVP* out, const KVP& other) const
+  DI void operator()(label_t rid, kvp* out, const kvp& other) const
   {
     if (other.value < out->value) {
       out->key   = other.key;
       out->value = other.value;
     }
   }
-  DI void operator()(LabelT rid, volatile KVP* out, const KVP& other) const
+  DI void operator()(label_t rid, volatile kvp* out, const kvp& other) const
   {
     if (other.value < out->value) {
       out->key   = other.key;
@@ -51,44 +51,44 @@ struct MinAndDistanceReduceOpImpl {
     }
   }
 
-  DI void operator()(LabelT rid, DataT* out, const KVP& other) const
+  DI void operator()(label_t rid, DataT* out, const kvp& other) const
   {
     if (other.value < *out) { *out = other.value; }
   }
 
-  DI void operator()(LabelT rid, volatile DataT* out, const KVP& other) const
+  DI void operator()(label_t rid, volatile DataT* out, const kvp& other) const
   {
     if (other.value < *out) { *out = other.value; }
   }
 
-  DI void operator()(LabelT rid, DataT* out, const DataT& other) const
+  DI void operator()(label_t rid, DataT* out, const DataT& other) const
   {
     if (other < *out) { *out = other; }
   }
 
-  DI void operator()(LabelT rid, volatile DataT* out, const DataT& other) const
+  DI void operator()(label_t rid, volatile DataT* out, const DataT& other) const
   {
     if (other < *out) { *out = other; }
   }
 
   DI void init(DataT* out, DataT maxVal) const { *out = maxVal; }
-  DI void init(KVP* out, DataT maxVal) const
+  DI void init(kvp* out, DataT maxVal) const
   {
     out->value = maxVal;
     out->key   = 0xfffffff0;
   }
 
-  DI void init_key(DataT& out, LabelT idx) const { return; }
-  DI void init_key(KVP& out, LabelT idx) const { out.key = idx; }
+  DI void init_key(DataT& out, label_t idx) const { return; }
+  DI void init_key(kvp& out, label_t idx) const { out.key = idx; }
 
-  DI auto get_value(KVP& out) const -> DataT { return out.value; }
+  DI auto get_value(kvp& out) const -> DataT { return out.value; }
   DI auto get_value(DataT& out) const -> DataT { return out; }
 };
 
-template <typename LabelT, typename DataT>
-struct MinReduceOpImpl {
-  using KVP = typename raft::KeyValuePair<LabelT, DataT>;
-  DI void operator()(LabelT rid, DataT* out, const KVP& other)
+template <typename label_t, typename DataT>
+struct min_reduce_op_impl {
+  using kvp = typename raft::KeyValuePair<label_t, DataT>;
+  DI void operator()(label_t rid, DataT* out, const kvp& other)
   {
     if (other.value < *out) { *out = other.value; }
   }
@@ -97,7 +97,7 @@ struct MinReduceOpImpl {
 };
 
 template <typename DataT, typename OutT, typename IdxT, typename ReduceOpT>
-RAFT_KERNEL initKernel(OutT* min, IdxT m, DataT maxVal, ReduceOpT redOp)
+RAFT_KERNEL init_kernel(OutT* min, IdxT m, DataT maxVal, ReduceOpT redOp)
 {
   auto tid = IdxT(blockIdx.x) * blockDim.x + threadIdx.x;
   if (tid < m) { redOp.init(min + tid, maxVal); }
@@ -107,7 +107,7 @@ template <typename DataT, typename OutT, typename IdxT, typename ReduceOpT>
 void initialize(OutT* min, IdxT m, DataT maxVal, ReduceOpT redOp, cudaStream_t stream)
 {
   auto blks = raft::ceildiv(m, 256);
-  initKernel<DataT, OutT, IdxT><<<blks, 256, 0, stream>>>(min, m, maxVal, redOp);
+  init_kernel<DataT, OutT, IdxT><<<blks, 256, 0, stream>>>(min, m, maxVal, redOp);
 }
 
 // cg::reduce functor for FusedDistanceNN used in its cutlass version
@@ -116,21 +116,21 @@ void initialize(OutT* min, IdxT m, DataT maxVal, ReduceOpT redOp, cudaStream_t s
 // store_with_byte_offset() passed to cg::reduce() & select_reduce.
 template <typename AccType, typename Index, typename OutType>
 struct kvp_cg_min_reduce_op {
-  using KVP = typename raft::KeyValuePair<Index, AccType>;
+  using kvp = typename raft::KeyValuePair<Index, AccType>;
 
   __host__ __device__ kvp_cg_min_reduce_op() noexcept = default;
 
-  using AccTypeT = AccType;
-  using IndexT   = Index;
+  using acc_type_t = AccType;
+  using index_t    = Index;
   // functor signature.
-  __host__ __device__ auto operator()(KVP a, KVP b) const -> KVP
+  __host__ __device__ auto operator()(kvp a, kvp b) const -> kvp
   {
     return a.value < b.value ? a : b;
   }
 
   __host__ __device__ auto operator()(AccType a, AccType b) const -> AccType { return min(a, b); }
 
-  __host__ __device__ auto isAmin(AccType a, AccType b) const -> bool
+  __host__ __device__ auto is_amin(AccType a, AccType b) const -> bool
   {
     return a < b ? true : false;
   }

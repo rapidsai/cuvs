@@ -12,11 +12,11 @@
 namespace cuvs::neighbors::cagra::detail {
 
 template <class CagraSampleFilterT>
-struct CagraSampleFilterWithQueryIdOffset {
+struct cagra_sample_filter_with_query_id_offset {
   const uint32_t offset;
   CagraSampleFilterT filter;
 
-  CagraSampleFilterWithQueryIdOffset(const uint32_t offset, const CagraSampleFilterT filter)
+  cagra_sample_filter_with_query_id_offset(const uint32_t offset, const CagraSampleFilterT filter)
     : offset(offset), filter(filter)
   {
   }
@@ -28,26 +28,26 @@ struct CagraSampleFilterWithQueryIdOffset {
 };
 
 template <class CagraSampleFilterT>
-struct CagraSampleFilterT_Selector {
-  using type = CagraSampleFilterWithQueryIdOffset<CagraSampleFilterT>;
+struct cagra_sample_filter_t_selector {
+  using type = cagra_sample_filter_with_query_id_offset<CagraSampleFilterT>;
 };
 template <>
-struct CagraSampleFilterT_Selector<cuvs::neighbors::filtering::none_sample_filter> {
+struct cagra_sample_filter_t_selector<cuvs::neighbors::filtering::none_sample_filter> {
   using type = cuvs::neighbors::filtering::none_sample_filter;
 };
 
 // A helper function to set a query id offset
 template <class CagraSampleFilterT>
 inline auto set_offset(CagraSampleFilterT filter, const uint32_t offset) ->
-  typename CagraSampleFilterT_Selector<CagraSampleFilterT>::type
+  typename cagra_sample_filter_t_selector<CagraSampleFilterT>::type
 {
-  typename CagraSampleFilterT_Selector<CagraSampleFilterT>::type new_filter(offset, filter);
+  typename cagra_sample_filter_t_selector<CagraSampleFilterT>::type new_filter(offset, filter);
   return new_filter;
 }
 template <>
 inline auto set_offset<cuvs::neighbors::filtering::none_sample_filter>(
   cuvs::neighbors::filtering::none_sample_filter filter, const uint32_t) ->
-  typename CagraSampleFilterT_Selector<cuvs::neighbors::filtering::none_sample_filter>::type
+  typename cagra_sample_filter_t_selector<cuvs::neighbors::filtering::none_sample_filter>::type
 {
   return filter;
 }

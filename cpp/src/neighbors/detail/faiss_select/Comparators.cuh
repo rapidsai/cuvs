@@ -18,14 +18,14 @@
 namespace cuvs::neighbors::detail::faiss_select {
 
 template <typename T>
-struct Comparator {
+struct comparator {
   __device__ static inline auto lt(T a, T b) -> bool { return a < b; }
 
   __device__ static inline auto gt(T a, T b) -> bool { return a > b; }
 };
 
 template <>
-struct Comparator<half> {
+struct comparator<half> {
   __device__ static inline auto lt(half a, half b) -> bool { return __hlt(a, b); }
 
   __device__ static inline auto gt(half a, half b) -> bool { return __hgt(a, b); }

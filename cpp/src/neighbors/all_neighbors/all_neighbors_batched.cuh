@@ -356,8 +356,8 @@ void multi_gpu_batch_build(const raft::resources& handle,
              cluster_offsets_c.size(),
              raft::resource::get_cuda_stream(handle));
 
-  using ReachabilityPP = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, T>;
-  const bool mutual_reach_dist = std::is_same_v<DistEpilogueT, ReachabilityPP>;
+  using reachability_pp = cuvs::neighbors::detail::reachability::reachability_post_process<IdxT, T>;
+  const bool mutual_reach_dist = std::is_same_v<DistEpilogueT, reachability_pp>;
   std::optional<raft::host_vector<T, IdxT>> core_distances_h;
   if constexpr (mutual_reach_dist) {
     core_distances_h.emplace(raft::make_host_vector<T, IdxT>(num_rows));
@@ -421,7 +421,7 @@ void multi_gpu_batch_build(const raft::resources& handle,
                    core_distances_h.value().data_handle(),
                    num_rows,
                    raft::resource::get_cuda_stream(dev_res));
-        return ReachabilityPP{
+        return reachability_pp{
           core_distances_d_for_rank.value().data_handle(), dist_epilogue.alpha, num_rows};
       } else {
         return dist_epilogue;
@@ -452,13 +452,13 @@ void multi_gpu_batch_build(const raft::resources& handle,
 
 /* Holds necessary vectors to avoid recomputation when calculating mutual rechability distances */
 template <typename IdxT>
-struct BatchBuildAux {
+struct batch_build_aux {
   raft::host_vector<IdxT, IdxT> cluster_sizes;
   raft::host_vector<IdxT, IdxT> cluster_offsets;
   raft::host_vector<IdxT, IdxT> inverted_indices;
   bool is_computed = false;
 
-  BatchBuildAux(IdxT n_clusters, IdxT num_rows, IdxT overlap_factor)
+  batch_build_aux(IdxT n_clusters, IdxT num_rows, IdxT overlap_factor)
     : cluster_sizes(raft::make_host_vector<IdxT, IdxT>(n_clusters)),
       cluster_offsets(raft::make_host_vector<IdxT, IdxT>(n_clusters)),
       inverted_indices(raft::make_host_vector<IdxT, IdxT>(num_rows * overlap_factor))
@@ -473,7 +473,7 @@ void batch_build(
   raft::host_matrix_view<const T, IdxT, row_major> dataset,
   raft::device_matrix_view<IdxT, IdxT, row_major> indices,
   std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances = std::nullopt,
-  BatchBuildAux<IdxT>* aux_vectors                                      = nullptr,
+  batch_build_aux<IdxT>* aux_vectors                                    = nullptr,
   DistEpilogueT dist_epilogue                                           = DistEpilogueT{})
 {
   if (raft::resource::is_multi_gpu(handle)) {

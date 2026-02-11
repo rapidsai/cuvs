@@ -25,19 +25,19 @@ auto has_enough_device_memory(raft::resources const& res,
 {
   using DistData_t = float;  // NOLINT(readability-identifier-naming)
   try {
-    auto d_data_ = raft::
+    auto d_data = raft::
       make_device_matrix<__half, size_t, raft::row_major>(  // NOLINT(readability-identifier-naming)
         res,
         dataset.extent(0),
         dataset.extent(1));
-    auto l2_norms_ = raft::make_device_vector<DistData_t, size_t>(
+    auto l2_norms = raft::make_device_vector<DistData_t, size_t>(
       res, dataset.extent(0));  // NOLINT(readability-identifier-naming)
-    auto graph_buffer_ =
+    auto graph_buffer =
       raft::make_device_vector<uint32_t, size_t>(  // NOLINT(readability-identifier-naming)
         res,
         dataset.extent(0) * idx_size * detail::kDegreeOnDevice);
 
-    auto dists_buffer_ =
+    auto dists_buffer =
       raft::make_device_matrix<DistData_t,
                                size_t,
                                raft::row_major>(  // NOLINT(readability-identifier-naming)
@@ -45,12 +45,12 @@ auto has_enough_device_memory(raft::resources const& res,
         dataset.extent(0),
         detail::kDegreeOnDevice);
 
-    auto d_locks_ = raft::make_device_vector<int, size_t>(
+    auto d_locks = raft::make_device_vector<int, size_t>(
       res, dataset.extent(0));  // NOLINT(readability-identifier-naming)
 
-    auto d_list_sizes_new_ = raft::make_device_vector<int2, size_t>(
+    auto d_list_sizes_new = raft::make_device_vector<int2, size_t>(
       res, dataset.extent(0));  // NOLINT(readability-identifier-naming)
-    auto d_list_sizes_old_ = raft::make_device_vector<int2, size_t>(
+    auto d_list_sizes_old = raft::make_device_vector<int2, size_t>(
       res, dataset.extent(0));  // NOLINT(readability-identifier-naming)
     RAFT_LOG_DEBUG("Sufficient memory for NN descent");
     return true;

@@ -59,7 +59,7 @@ constexpr static inline float kAdjustCentersWeight = 7.0f;
  *
  * @tparam MathT  type of the centroids and mapped data
  * @tparam IdxT   index type
- * @tparam LabelT label type
+ * @tparam label_t label type
  *
  * @param[in] handle The raft handle.
  * @param[in] params Structure containing the hyper-parameters
@@ -72,7 +72,7 @@ constexpr static inline float kAdjustCentersWeight = 7.0f;
  * @param[out] labels Output predictions [n_rows]
  * @param[inout] mr (optional) Memory resource to use for temporary allocations
  */
-template <typename MathT, typename IdxT, typename LabelT>
+template <typename MathT, typename IdxT, typename label_t>
 inline auto predict_core(const raft::resources& handle,
                          const cuvs::cluster::kmeans::balanced_params& params,
                          const MathT* centers,
@@ -81,7 +81,7 @@ inline auto predict_core(const raft::resources& handle,
                          const MathT* dataset,
                          const MathT* dataset_norm,
                          IdxT n_rows,
-                         LabelT* labels,
+                         label_t* labels,
                          rmm::device_async_resource_ref mr)
   -> std::enable_if_t<std::is_floating_point_v<MathT>>
 {
@@ -129,7 +129,7 @@ inline auto predict_core(const raft::resources& handle,
                         min_cluster_and_distance.data_handle(),
                         min_cluster_and_distance.data_handle() + n_rows,
                         labels,
-                        raft::compose_op<raft::cast_op<LabelT>, raft::key_op>());
+                        raft::compose_op<raft::cast_op<label_t>, raft::key_op>());
       break;
     }
     case cuvs::distance::DistanceType::CosineExpanded: {
@@ -171,7 +171,7 @@ inline auto predict_core(const raft::resources& handle,
                         min_cluster_and_distance.data_handle(),
                         min_cluster_and_distance.data_handle() + n_rows,
                         labels,
-                        raft::compose_op<raft::cast_op<LabelT>, raft::key_op>());
+                        raft::compose_op<raft::cast_op<label_t>, raft::key_op>());
       break;
     }
     case cuvs::distance::DistanceType::InnerProduct: {
@@ -199,7 +199,7 @@ inline auto predict_core(const raft::resources& handle,
 
       auto distances_const_view = raft::make_device_matrix_view<const MathT, IdxT, raft::row_major>(
         distances.data(), n_rows, n_clusters);
-      auto labels_view = raft::make_device_vector_view<LabelT, IdxT>(labels, n_rows);
+      auto labels_view = raft::make_device_vector_view<label_t, IdxT>(labels, n_rows);
       raft::matrix::argmin(handle, distances_const_view, labels_view);
       break;
     }
@@ -267,7 +267,7 @@ constexpr auto calc_minibatch_size(IdxT n_clusters,
  * @tparam T          element type
  * @tparam MathT      type of the centroids and mapped data
  * @tparam IdxT       index type
- * @tparam LabelT     label type
+ * @tparam label_t     label type
  * @tparam CounterT   counter type supported by CUDA's native atomicAdd
  * @tparam MappingOpT type of the mapping operation
  *
@@ -288,7 +288,7 @@ constexpr auto calc_minibatch_size(IdxT n_clusters,
 template <typename T,
           typename MathT,
           typename IdxT,
-          typename LabelT,
+          typename label_t,
           typename CounterT,
           typename MappingOpT>
 void calc_centers_and_sizes(const raft::resources& handle,
@@ -298,7 +298,7 @@ void calc_centers_and_sizes(const raft::resources& handle,
                             IdxT dim,
                             const T* dataset,
                             IdxT n_rows,
-                            const LabelT* labels,
+                            const label_t* labels,
                             bool reset_counters,
                             MappingOpT mapping_op,
                             rmm::device_async_resource_ref mr)
@@ -341,7 +341,7 @@ void calc_centers_and_sizes(const raft::resources& handle,
   }
 
   // Compute weight of each cluster
-  cuvs::cluster::kmeans::detail::countLabels(
+  cuvs::cluster::kmeans::detail::count_labels(
     handle, labels, temp_sizes, n_rows, n_clusters, workspace);
 
   // Add previous sizes if necessary
@@ -394,7 +394,7 @@ void compute_norm(const raft::resources& handle,
  * @tparam T element type
  * @tparam MathT type of the centroids and mapped data
  * @tparam IdxT index type
- * @tparam LabelT label type
+ * @tparam label_t label type
  * @tparam MappingOpT type of the mapping operation
  *
  * @param[in] handle The raft handle
@@ -409,7 +409,7 @@ void compute_norm(const raft::resources& handle,
  * @param[inout] mr (optional) memory resource to use for temporary allocations
  * @param[in] dataset_norm (optional) Pre-computed norms of each row in the dataset [n_rows]
  */
-template <typename T, typename MathT, typename IdxT, typename LabelT, typename MappingOpT>
+template <typename T, typename MathT, typename IdxT, typename label_t, typename MappingOpT>
 void predict(const raft::resources& handle,
              const cuvs::cluster::kmeans::balanced_params& params,
              const MathT* centers,
@@ -417,7 +417,7 @@ void predict(const raft::resources& handle,
              IdxT dim,
              const T* dataset,
              IdxT n_rows,
-             LabelT* labels,
+             label_t* labels,
              MappingOpT mapping_op,
              std::optional<rmm::device_async_resource_ref> mr = std::nullopt,
              const MathT* dataset_norm                        = nullptr)
@@ -491,7 +491,7 @@ template <uint32_t BlockDimY,
           typename T,
           typename MathT,
           typename IdxT,
-          typename LabelT,
+          typename label_t,
           typename CounterT,
           typename MappingOpT>
 __launch_bounds__((raft::WarpSize *  // NOLINT(readability-identifier-naming)
@@ -501,7 +501,7 @@ __launch_bounds__((raft::WarpSize *  // NOLINT(readability-identifier-naming)
                         IdxT dim,
                         const T* dataset,  // [n_rows, dim]
                         IdxT n_rows,
-                        const LabelT* labels,           // [n_rows]
+                        const label_t* labels,          // [n_rows]
                         const CounterT* cluster_sizes,  // [n_clusters]
                         MathT threshold,
                         IdxT average,
@@ -556,7 +556,7 @@ __launch_bounds__((raft::WarpSize *  // NOLINT(readability-identifier-naming)
  * @tparam T element type
  * @tparam MathT type of the centroids and mapped data
  * @tparam IdxT index type
- * @tparam LabelT label type
+ * @tparam label_t label type
  * @tparam CounterT counter type supported by CUDA's native atomicAdd
  * @tparam MappingOpT type of the mapping operation
  *
@@ -579,7 +579,7 @@ __launch_bounds__((raft::WarpSize *  // NOLINT(readability-identifier-naming)
 template <typename T,
           typename MathT,
           typename IdxT,
-          typename LabelT,
+          typename label_t,
           typename CounterT,
           typename MappingOpT>
 auto adjust_centers(MathT* centers,
@@ -587,7 +587,7 @@ auto adjust_centers(MathT* centers,
                     IdxT dim,
                     const T* dataset,
                     IdxT n_rows,
-                    const LabelT* labels,
+                    const label_t* labels,
                     const CounterT* cluster_sizes,
                     MathT threshold,
                     MappingOpT mapping_op,
@@ -643,7 +643,7 @@ auto adjust_centers(MathT* centers,
  * @tparam T      element type
  * @tparam MathT  type of the centroids and mapped data
  * @tparam IdxT   index type
- * @tparam LabelT label type
+ * @tparam label_t label type
  * @tparam CounterT counter type supported by CUDA's native atomicAdd
  * @tparam MappingOpT type of the mapping operation
  *
@@ -673,7 +673,7 @@ auto adjust_centers(MathT* centers,
 template <typename T,
           typename MathT,
           typename IdxT,
-          typename LabelT,
+          typename label_t,
           typename CounterT,
           typename MappingOpT>
 void balancing_em_iters(const raft::resources& handle,
@@ -685,7 +685,7 @@ void balancing_em_iters(const raft::resources& handle,
                         IdxT n_rows,
                         IdxT n_clusters,
                         MathT* cluster_centers,
-                        LabelT* cluster_labels,
+                        label_t* cluster_labels,
                         CounterT* cluster_sizes,
                         uint32_t balancing_pullback,
                         MathT balancing_threshold,
@@ -760,7 +760,7 @@ void balancing_em_iters(const raft::resources& handle,
 template <typename T,
           typename MathT,
           typename IdxT,
-          typename LabelT,
+          typename label_t,
           typename CounterT,
           typename MappingOpT>
 void build_clusters(const raft::resources& handle,
@@ -770,7 +770,7 @@ void build_clusters(const raft::resources& handle,
                     IdxT n_rows,
                     IdxT n_clusters,
                     MathT* cluster_centers,
-                    LabelT* cluster_labels,
+                    label_t* cluster_labels,
                     CounterT* cluster_sizes,
                     MappingOpT mapping_op,
                     rmm::device_async_resource_ref device_memory,
@@ -779,11 +779,11 @@ void build_clusters(const raft::resources& handle,
   auto stream = raft::resource::get_cuda_stream(handle);
 
   // "randomly" initialize labels
-  auto labels_view = raft::make_device_vector_view<LabelT, IdxT>(cluster_labels, n_rows);
+  auto labels_view = raft::make_device_vector_view<label_t, IdxT>(cluster_labels, n_rows);
   raft::linalg::map_offset(
     handle,
     labels_view,
-    raft::compose_op(raft::cast_op<LabelT>(), raft::mod_const_op<IdxT>(n_clusters)));
+    raft::compose_op(raft::cast_op<label_t>(), raft::mod_const_op<IdxT>(n_clusters)));
 
   // update centers to match the initialized labels.
   calc_centers_and_sizes(handle,
@@ -897,7 +897,7 @@ inline auto arrange_fine_clusters(IdxT n_clusters,
 template <typename T,
           typename MathT,
           typename IdxT,
-          typename LabelT,
+          typename label_t,
           typename CounterT,
           typename MappingOpT>
 auto build_fine_clusters(const raft::resources& handle,
@@ -905,7 +905,7 @@ auto build_fine_clusters(const raft::resources& handle,
                          IdxT dim,
                          const T* dataset_mptr,
                          const MathT* dataset_norm_mptr,
-                         const LabelT* labels_mptr,
+                         const label_t* labels_mptr,
                          IdxT n_rows,
                          const IdxT* fine_clusters_nums,
                          const IdxT* fine_clusters_csum,
@@ -927,7 +927,7 @@ auto build_fine_clusters(const raft::resources& handle,
   auto mc_trainset_norm = mc_trainset_norm_buf.data();
 
   // label (cluster ID) of each vector
-  rmm::device_uvector<LabelT> mc_trainset_labels(mesocluster_size_max, stream, device_memory);
+  rmm::device_uvector<label_t> mc_trainset_labels(mesocluster_size_max, stream, device_memory);
 
   rmm::device_uvector<MathT> mc_trainset_ccenters(
     fine_clusters_nums_max * dim, stream, device_memory);
@@ -940,7 +940,7 @@ auto build_fine_clusters(const raft::resources& handle,
   for (IdxT i = 0; i < n_mesoclusters; i++) {
     IdxT k = 0;
     for (IdxT j = 0; j < n_rows && k < mesocluster_size_max; j++) {
-      if (labels_mptr[j] == LabelT(i)) { mc_trainset_ids[k++] = j; }
+      if (labels_mptr[j] == label_t(i)) { mc_trainset_ids[k++] = j; }
     }
     if (k != static_cast<IdxT>(mesocluster_sizes[i])) {
       RAFT_LOG_DEBUG("Incorrect mesocluster size at %d. %zu vs %zu",
@@ -1000,7 +1000,7 @@ auto build_fine_clusters(const raft::resources& handle,
  * @tparam T      element type
  * @tparam MathT  type of the centroids and mapped data
  * @tparam IdxT   index type
- * @tparam LabelT label type
+ * @tparam label_t label type
  * @tparam MappingOpT type of the mapping operation
  *
  * @param[in] handle The raft handle.

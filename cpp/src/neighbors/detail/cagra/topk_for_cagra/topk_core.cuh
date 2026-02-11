@@ -55,50 +55,50 @@ struct u16_vector {
 };
 
 //
-template <int vecLen>
+template <int vec_len>
 RAFT_DEVICE_INLINE_FUNCTION void load_u32_vector(struct u32_vector& vec, const uint32_t* x, int i)
 {
-  if (vecLen == 1) {
+  if (vec_len == 1) {
     vec.x1 = (reinterpret_cast<const uint1*>(x + i))[0];
-  } else if (vecLen == 2) {
+  } else if (vec_len == 2) {
     vec.x2 = (reinterpret_cast<const uint2*>(x + i))[0];
-  } else if (vecLen == 4) {
+  } else if (vec_len == 4) {
     vec.x4 = (reinterpret_cast<const uint4*>(x + i))[0];
-  } else if (vecLen == 8) {
+  } else if (vec_len == 8) {
     vec.x8 = (reinterpret_cast<const ulonglong4*>(x + i))[0];
   }
 }
 
 //
-template <int vecLen>
+template <int vec_len>
 RAFT_DEVICE_INLINE_FUNCTION void load_u16_vector(struct u16_vector& vec, const uint16_t* x, int i)
 {
-  if (vecLen == 1) {
+  if (vec_len == 1) {
     vec.x1 = (reinterpret_cast<const ushort1*>(x + i))[0];
-  } else if (vecLen == 2) {
+  } else if (vec_len == 2) {
     vec.x2 = (reinterpret_cast<const ushort2*>(x + i))[0];
-  } else if (vecLen == 4) {
+  } else if (vec_len == 4) {
     vec.x4 = (reinterpret_cast<const ushort4*>(x + i))[0];
-  } else if (vecLen == 8) {
+  } else if (vec_len == 8) {
     vec.x8 = (reinterpret_cast<const uint4*>(x + i))[0];
   }
 }
 
 //
-template <int vecLen>
+template <int vec_len>
 RAFT_DEVICE_INLINE_FUNCTION auto get_element_from_u32_vector(struct u32_vector& vec, int i)
   -> uint32_t
 {
   uint32_t xi;
-  if (vecLen == 1) {
+  if (vec_len == 1) {
     xi = convert(vec.x1.x);
-  } else if (vecLen == 2) {
+  } else if (vec_len == 2) {
     if (i == 0) {
       xi = convert(vec.x2.x);
     } else {
       xi = convert(vec.x2.y);
     }
-  } else if (vecLen == 4) {
+  } else if (vec_len == 4) {
     if (i == 0) {
       xi = convert(vec.x4.x);
     } else if (i == 1) {
@@ -108,7 +108,7 @@ RAFT_DEVICE_INLINE_FUNCTION auto get_element_from_u32_vector(struct u32_vector& 
     } else {
       xi = convert(vec.x4.w);
     }
-  } else if (vecLen == 8) {
+  } else if (vec_len == 8) {
     if (i == 0) {
       xi = convert(static_cast<uint32_t>(vec.x8.x & 0xffffffff));
     } else if (i == 1) {
@@ -131,20 +131,20 @@ RAFT_DEVICE_INLINE_FUNCTION auto get_element_from_u32_vector(struct u32_vector& 
 }
 
 //
-template <int vecLen>
+template <int vec_len>
 RAFT_DEVICE_INLINE_FUNCTION auto get_element_from_u16_vector(struct u16_vector& vec, int i)
   -> uint16_t
 {
   uint16_t xi;
-  if (vecLen == 1) {
+  if (vec_len == 1) {
     xi = convert(vec.x1.x);
-  } else if (vecLen == 2) {
+  } else if (vec_len == 2) {
     if (i == 0) {
       xi = convert(vec.x2.x);
     } else {
       xi = convert(vec.x2.y);
     }
-  } else if (vecLen == 4) {
+  } else if (vec_len == 4) {
     if (i == 0) {
       xi = convert(vec.x4.x);
     } else if (i == 1) {
@@ -154,7 +154,7 @@ RAFT_DEVICE_INLINE_FUNCTION auto get_element_from_u16_vector(struct u16_vector& 
     } else {
       xi = convert(vec.x4.w);
     }
-  } else if (vecLen == 8) {
+  } else if (vec_len == 8) {
     if (i == 0) {
       xi = convert(static_cast<uint16_t>(vec.x8.x & 0xffff));
     } else if (i == 1) {
@@ -215,7 +215,7 @@ RAFT_DEVICE_INLINE_FUNCTION void block_scan(const T input, T& output)
 }
 
 //
-template <typename T, int stateBitLen, int vecLen>
+template <typename T, int stateBitLen, int vec_len>
 RAFT_DEVICE_INLINE_FUNCTION void update_histogram(int itr,
                                                   uint32_t thread_id,
                                                   uint32_t num_threads,
@@ -269,50 +269,50 @@ RAFT_DEVICE_INLINE_FUNCTION void update_histogram(int itr,
   // (*) Note that 'thread_id' may be different from 'threadIdx.x',
   // and 'num_threads' may be different from 'blockDim.x'
   int ii = 0;
-  for (int i = thread_id * vecLen; i < nx; i += num_threads * max(vecLen, stateBitLen), ii++) {
-    uint8_t iState = 0;
+  for (int i = thread_id * vec_len; i < nx; i += num_threads * max(vec_len, stateBitLen), ii++) {
+    uint8_t i_state = 0;
     if ((stateBitLen == 8) && (itr > 0)) {
-      iState = state[thread_id + (num_threads * ii)];
-      if (iState == static_cast<uint8_t>(0xff)) continue;
+      i_state = state[thread_id + (num_threads * ii)];
+      if (i_state == static_cast<uint8_t>(0xff)) continue;
     }
 #pragma unroll
-    for (int v = 0; v < max(vecLen, stateBitLen); v += vecLen) {
+    for (int v = 0; v < max(vec_len, stateBitLen); v += vec_len) {
       const int iv = i + (num_threads * v);
       if (iv >= nx) break;
 
       struct u32_vector x_u32_vec;
       struct u16_vector x_u16_vec;
       if (sizeof(T) == 4) {
-        load_u32_vector<vecLen>(x_u32_vec, reinterpret_cast<const uint32_t*>(x), iv);
+        load_u32_vector<vec_len>(x_u32_vec, reinterpret_cast<const uint32_t*>(x), iv);
       } else {
-        load_u16_vector<vecLen>(x_u16_vec, reinterpret_cast<const uint16_t*>(x), iv);
+        load_u16_vector<vec_len>(x_u16_vec, reinterpret_cast<const uint16_t*>(x), iv);
       }
 #pragma unroll
-      for (int u = 0; u < vecLen; u++) {
+      for (int u = 0; u < vec_len; u++) {
         const int ivu = iv + u;
         if (ivu >= nx) break;
 
         uint8_t mask = static_cast<uint8_t>(0x1) << (v + u);
-        if ((stateBitLen == 8) && (iState & mask)) continue;
+        if ((stateBitLen == 8) && (i_state & mask)) continue;
 
         uint32_t xi;
         if (sizeof(T) == 4) {
-          xi = get_element_from_u32_vector<vecLen>(x_u32_vec, u);
+          xi = get_element_from_u32_vector<vec_len>(x_u32_vec, u);
         } else {
-          xi = get_element_from_u16_vector<vecLen>(x_u16_vec, u);
+          xi = get_element_from_u16_vector<vec_len>(x_u16_vec, u);
         }
         if ((xi > hint) && (itr == 0)) {
-          if (stateBitLen == 8) { iState |= mask; }
+          if (stateBitLen == 8) { i_state |= mask; }
         } else if (xi < threshold) {
           if (stateBitLen == 8) {
             // If the condition is already met, record the index.
             output[atomicAdd(output_count, 1)] = ivu;
-            iState |= mask;
+            i_state |= mask;
           }
         } else {
           const uint32_t k = (xi - threshold) >> shift;  // 0 <= k
           if (k >= num_bins) {
-            if (stateBitLen == 8) { iState |= mask; }
+            if (stateBitLen == 8) { i_state |= mask; }
           } else if (k + 1 < num_bins) {
             // Update histogram
             atomicAdd(&(hist[k + 1]), 1);
@@ -320,7 +320,7 @@ RAFT_DEVICE_INLINE_FUNCTION void update_histogram(int itr,
         }
       }
     }
-    if (stateBitLen == 8) { state[thread_id + (num_threads * ii)] = iState; }
+    if (stateBitLen == 8) { state[thread_id + (num_threads * ii)] = i_state; }
   }
   __syncthreads();
 }
@@ -340,30 +340,30 @@ RAFT_DEVICE_INLINE_FUNCTION void select_best_index_for_next_threshold_core(
   using BlockScanT = cub::BlockScan<uint32_t, blockDim_x>;
   __shared__ typename BlockScanT::TempStorage temp_storage;
   if (num_bins == 2048) {
-    constexpr int n_data = 2048 / blockDim_x;
-    uint32_t csum[n_data];
-    for (int i = 0; i < n_data; i++) {
-      csum[i] = hist[i + (n_data * threadIdx.x)];
+    constexpr int kNData = 2048 / blockDim_x;
+    uint32_t csum[kNData];
+    for (int i = 0; i < kNData; i++) {
+      csum[i] = hist[i + (kNData * threadIdx.x)];
     }
     BlockScanT(temp_storage).InclusiveSum(csum, csum);
-    for (int i = n_data - 1; i >= 0; i--) {
+    for (int i = kNData - 1; i >= 0; i--) {
       if (nx_below_threshold + csum[i] > topk) continue;
-      const uint32_t index = i + (n_data * threadIdx.x);
+      const uint32_t index = i + (kNData * threadIdx.x);
       if (threshold + (index << shift) > max_threshold) continue;
       my_index = index;
       my_csum  = csum[i];
       break;
     }
   } else if (num_bins == 1024) {
-    constexpr int n_data = 1024 / blockDim_x;
-    uint32_t csum[n_data];
-    for (int i = 0; i < n_data; i++) {
-      csum[i] = hist[i + (n_data * threadIdx.x)];
+    constexpr int kNData = 1024 / blockDim_x;
+    uint32_t csum[kNData];
+    for (int i = 0; i < kNData; i++) {
+      csum[i] = hist[i + (kNData * threadIdx.x)];
     }
     BlockScanT(temp_storage).InclusiveSum(csum, csum);
-    for (int i = n_data - 1; i >= 0; i--) {
+    for (int i = kNData - 1; i >= 0; i--) {
       if (nx_below_threshold + csum[i] > topk) continue;
-      const uint32_t index = i + (n_data * threadIdx.x);
+      const uint32_t index = i + (kNData * threadIdx.x);
       if (threshold + (index << shift) > max_threshold) continue;
       my_index = index;
       my_csum  = csum[i];
@@ -471,7 +471,7 @@ RAFT_DEVICE_INLINE_FUNCTION void select_best_index_for_next_threshold(
 }
 
 //
-template <typename T, int stateBitLen, int vecLen>
+template <typename T, int stateBitLen, int vec_len>
 RAFT_DEVICE_INLINE_FUNCTION void output_index_below_threshold(const uint32_t topk,
                                                               const uint32_t thread_id,
                                                               const uint32_t num_threads,
@@ -485,37 +485,37 @@ RAFT_DEVICE_INLINE_FUNCTION void output_index_below_threshold(const uint32_t top
                                                               uint32_t* const output_count_eq)
 {
   int ii = 0;
-  for (int i = thread_id * vecLen; i < nx; i += num_threads * max(vecLen, stateBitLen), ii++) {
-    uint8_t iState = 0;
+  for (int i = thread_id * vec_len; i < nx; i += num_threads * max(vec_len, stateBitLen), ii++) {
+    uint8_t i_state = 0;
     if (stateBitLen == 8) {
-      iState = state[thread_id + (num_threads * ii)];
-      if (iState == static_cast<uint8_t>(0xff)) continue;
+      i_state = state[thread_id + (num_threads * ii)];
+      if (i_state == static_cast<uint8_t>(0xff)) continue;
     }
 #pragma unroll
-    for (int v = 0; v < max(vecLen, stateBitLen); v += vecLen) {
+    for (int v = 0; v < max(vec_len, stateBitLen); v += vec_len) {
       const int iv = i + (num_threads * v);
       if (iv >= nx) break;
 
       struct u32_vector u32_vec;
       struct u16_vector u16_vec;
       if (sizeof(T) == 4) {
-        load_u32_vector<vecLen>(u32_vec, reinterpret_cast<const uint32_t*>(x), iv);
+        load_u32_vector<vec_len>(u32_vec, reinterpret_cast<const uint32_t*>(x), iv);
       } else {
-        load_u16_vector<vecLen>(u16_vec, reinterpret_cast<const uint16_t*>(x), iv);
+        load_u16_vector<vec_len>(u16_vec, reinterpret_cast<const uint16_t*>(x), iv);
       }
 #pragma unroll
-      for (int u = 0; u < vecLen; u++) {
+      for (int u = 0; u < vec_len; u++) {
         const int ivu = iv + u;
         if (ivu >= nx) break;
 
         const uint8_t mask = static_cast<uint8_t>(0x1) << (v + u);
-        if ((stateBitLen == 8) && (iState & mask)) continue;
+        if ((stateBitLen == 8) && (i_state & mask)) continue;
 
         uint32_t xi;
         if (sizeof(T) == 4) {
-          xi = get_element_from_u32_vector<vecLen>(u32_vec, u);
+          xi = get_element_from_u32_vector<vec_len>(u32_vec, u);
         } else {
-          xi = get_element_from_u16_vector<vecLen>(u16_vec, u);
+          xi = get_element_from_u16_vector<vec_len>(u16_vec, u);
         }
         if (xi < threshold) {
           output[atomicAdd(output_count, 1)] = ivu;
@@ -601,15 +601,15 @@ RAFT_INLINE_FUNCTION constexpr auto get_state_size(uint32_t len_x) -> uint32_t
   const uint32_t num_threads = BLOCK_SIZE;
 #endif
   if (stateBitLen == 8) {
-    uint32_t numElements_perThread = (len_x + num_threads - 1) / num_threads;
-    uint32_t numState_perThread    = (numElements_perThread + stateBitLen - 1) / stateBitLen;
-    return numState_perThread * num_threads;
+    uint32_t num_elements_per_thread = (len_x + num_threads - 1) / num_threads;
+    uint32_t num_state_per_thread    = (num_elements_per_thread + stateBitLen - 1) / stateBitLen;
+    return num_state_per_thread * num_threads;
   }
   return 0;
 }
 
 //
-template <int stateBitLen, int vecLen, int maxTopk, int numSortThreads, class ValT>
+template <int stateBitLen, int vec_len, int maxTopk, int numSortThreads, class ValT>
 RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t topk,
                                                   uint32_t len_x,
                                                   const uint32_t* _x,    // [size_batch, ld_x,]
@@ -619,12 +619,12 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t topk,
                                                   uint8_t* _state,       // [size_batch, ...,]
                                                   uint32_t* _hint,
                                                   bool sort,
-                                                  uint32_t* _smem)
+                                                  uint32_t* smem)
 {
-  uint32_t* const smem_out_vals = _smem;
-  uint32_t* const hist          = &(_smem[2 * maxTopk]);
-  uint32_t* const best_index    = &(_smem[2 * maxTopk + 2048]);
-  uint32_t* const best_csum     = &(_smem[2 * maxTopk + 2048 + 3]);
+  uint32_t* const smem_out_vals = smem;
+  uint32_t* const hist          = &(smem[2 * maxTopk]);
+  uint32_t* const best_index    = &(smem[2 * maxTopk + 2048]);
+  uint32_t* const best_csum     = &(smem[2 * maxTopk + 2048 + 3]);
 
   const uint32_t num_threads = blockDim.x;
   const uint32_t thread_id   = threadIdx.x;
@@ -641,10 +641,10 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t topk,
 
   // Initialize shared memory
   for (int i = 2 * maxTopk + thread_id; i < 2 * maxTopk + 2048 + 8; i += num_threads) {
-    _smem[i] = 0;
+    smem[i] = 0;
   }
-  uint32_t* const output_count    = &(_smem[2 * maxTopk + 2048 + 6]);
-  uint32_t* const output_count_eq = &(_smem[2 * maxTopk + 2048 + 7]);
+  uint32_t* const output_count    = &(smem[2 * maxTopk + 2048 + 6]);
+  uint32_t* const output_count_eq = &(smem[2 * maxTopk + 2048 + 7]);
   uint32_t threshold              = 0;
   uint32_t nx_below_threshold     = 0;
   __syncthreads();
@@ -657,19 +657,19 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t topk,
     uint32_t num_bins;
     uint32_t shift;
 
-    update_histogram<uint32_t, stateBitLen, vecLen>(j,
-                                                    thread_id,
-                                                    num_threads,
-                                                    hint,
-                                                    threshold,
-                                                    num_bins,
-                                                    shift,
-                                                    x,
-                                                    nx,
-                                                    hist,
-                                                    state,
-                                                    smem_out_vals,
-                                                    output_count);
+    update_histogram<uint32_t, stateBitLen, vec_len>(j,
+                                                     thread_id,
+                                                     num_threads,
+                                                     hint,
+                                                     threshold,
+                                                     num_bins,
+                                                     shift,
+                                                     x,
+                                                     nx,
+                                                     hist,
+                                                     state,
+                                                     smem_out_vals,
+                                                     output_count);
     select_best_index_for_next_threshold(topk,
                                          threshold,
                                          hint,
@@ -690,17 +690,17 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t topk,
   //
   // Output index that satisfies "x[i] < threshold".
   //
-  output_index_below_threshold<uint32_t, stateBitLen, vecLen>(topk,
-                                                              thread_id,
-                                                              num_threads,
-                                                              threshold,
-                                                              nx_below_threshold,
-                                                              x,
-                                                              nx,
-                                                              state,
-                                                              smem_out_vals,
-                                                              output_count,
-                                                              output_count_eq);
+  output_index_below_threshold<uint32_t, stateBitLen, vec_len>(topk,
+                                                               thread_id,
+                                                               num_threads,
+                                                               threshold,
+                                                               nx_below_threshold,
+                                                               x,
+                                                               nx,
+                                                               state,
+                                                               smem_out_vals,
+                                                               output_count,
+                                                               output_count_eq);
   __syncthreads();
 
 #ifdef CUANN_DEBUG
@@ -730,13 +730,13 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t topk,
     return;
   }
 
-  constexpr int numTopkPerThread = maxTopk / numSortThreads;
-  float my_keys[numTopkPerThread];
-  ValT my_vals[numTopkPerThread];
+  constexpr int kNumTopkPerThread = maxTopk / numSortThreads;
+  float my_keys[kNumTopkPerThread];
+  ValT my_vals[kNumTopkPerThread];
 
   // Read keys and values to registers
   if (thread_id < numSortThreads) {
-    for (int i = 0; i < numTopkPerThread; i++) {
+    for (int i = 0; i < kNumTopkPerThread; i++) {
       const int k = thread_id + (numSortThreads * i);
       if (k < topk) {
         const int j = smem_out_vals[k];
@@ -758,19 +758,19 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t topk,
   // Sorting by thread
   if (thread_id < numSortThreads) {
     const bool ascending = ((thread_id & mask) == 0);
-    if constexpr (numTopkPerThread == 3) {
+    if constexpr (kNumTopkPerThread == 3) {
       swap_if_needed<float, ValT>(my_keys[0], my_keys[1], my_vals[0], my_vals[1], ascending);
       swap_if_needed<float, ValT>(my_keys[0], my_keys[2], my_vals[0], my_vals[2], ascending);
       swap_if_needed<float, ValT>(my_keys[1], my_keys[2], my_vals[1], my_vals[2], ascending);
     } else {
-      for (int j = 0; j < numTopkPerThread / 2; j += 1) {
+      for (int j = 0; j < kNumTopkPerThread / 2; j += 1) {
 #pragma unroll
-        for (int i = 0; i < numTopkPerThread; i += 2) {
+        for (int i = 0; i < kNumTopkPerThread; i += 2) {
           swap_if_needed<float, ValT>(
             my_keys[i], my_keys[i + 1], my_vals[i], my_vals[i + 1], ascending);
         }
 #pragma unroll
-        for (int i = 1; i < numTopkPerThread - 1; i += 2) {
+        for (int i = 1; i < kNumTopkPerThread - 1; i += 2) {
           swap_if_needed<float, ValT>(
             my_keys[i], my_keys[i + 1], my_vals[i], my_vals[i + 1], ascending);
         }
@@ -786,13 +786,13 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t topk,
       const bool ascending = ((thread_id & curr_mask) == 0) == ((thread_id & next_mask) == 0);
       if (curr_mask >= 32) {
         // inter warp
-        ValT* const smem_vals = reinterpret_cast<ValT*>(_smem);  // [maxTopk]
+        ValT* const smem_vals = reinterpret_cast<ValT*>(smem);  // [maxTopk]
         auto* const smem_keys =
-          reinterpret_cast<float*>(smem_vals + maxTopk);  // [numTopkPerThread, numSortThreads]
+          reinterpret_cast<float*>(smem_vals + maxTopk);  // [kNumTopkPerThread, numSortThreads]
         __syncthreads();
         if (thread_id < numSortThreads) {
 #pragma unroll
-          for (int i = 0; i < numTopkPerThread; i++) {
+          for (int i = 0; i < kNumTopkPerThread; i++) {
             smem_keys[thread_id + (numSortThreads * i)] = my_keys[i];
             smem_vals[thread_id + (numSortThreads * i)] = my_vals[i];
           }
@@ -800,7 +800,7 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t topk,
         __syncthreads();
         if (thread_id < numSortThreads) {
 #pragma unroll
-          for (int i = 0; i < numTopkPerThread; i++) {
+          for (int i = 0; i < kNumTopkPerThread; i++) {
             float opp_key = smem_keys[(thread_id ^ curr_mask) + (numSortThreads * i)];
             ValT opp_val  = smem_vals[(thread_id ^ curr_mask) + (numSortThreads * i)];
             swap_if_needed<float, ValT>(my_keys[i], opp_key, my_vals[i], opp_val, ascending);
@@ -810,7 +810,7 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t topk,
         // intra warp
         if (thread_id < numSortThreads) {
 #pragma unroll
-          for (int i = 0; i < numTopkPerThread; i++) {
+          for (int i = 0; i < kNumTopkPerThread; i++) {
             float opp_key = __shfl_xor_sync(0xffffffff, my_keys[i], curr_mask);
             ValT opp_val  = __shfl_xor_sync(0xffffffff, my_vals[i], curr_mask);
             swap_if_needed<float, ValT>(my_keys[i], opp_key, my_vals[i], opp_val, ascending);
@@ -821,15 +821,15 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t topk,
 
     if (thread_id < numSortThreads) {
       const bool ascending = ((thread_id & next_mask) == 0);
-      if constexpr (numTopkPerThread == 3) {
+      if constexpr (kNumTopkPerThread == 3) {
         swap_if_needed<float, ValT>(my_keys[0], my_keys[1], my_vals[0], my_vals[1], ascending);
         swap_if_needed<float, ValT>(my_keys[0], my_keys[2], my_vals[0], my_vals[2], ascending);
         swap_if_needed<float, ValT>(my_keys[1], my_keys[2], my_vals[1], my_vals[2], ascending);
       } else {
 #pragma unroll
-        for (uint32_t curr_mask = numTopkPerThread / 2; curr_mask > 0; curr_mask >>= 1) {
+        for (uint32_t curr_mask = kNumTopkPerThread / 2; curr_mask > 0; curr_mask >>= 1) {
 #pragma unroll
-          for (int i = 0; i < numTopkPerThread; i++) {
+          for (int i = 0; i < kNumTopkPerThread; i++) {
             const int j = i ^ curr_mask;
             if (i > j) continue;
             swap_if_needed<float, ValT>(my_keys[i], my_keys[j], my_vals[i], my_vals[j], ascending);
@@ -842,8 +842,8 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t topk,
 
   // Write sorted keys and values
   if (thread_id < numSortThreads) {
-    for (int i = 0; i < numTopkPerThread; i++) {
-      const int k = i + (numTopkPerThread * thread_id);
+    for (int i = 0; i < kNumTopkPerThread; i++) {
+      const int k = i + (kNumTopkPerThread * thread_id);
       if (k < topk) {
         if (y) { y[k] = reinterpret_cast<uint32_t*>(my_keys)[i]; }
         if (out_vals) { out_vals[k] = my_vals[i]; }
@@ -855,23 +855,23 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t topk,
 namespace {
 
 //
-constexpr std::uint32_t NUM_THREADS      = 1024;  // DO NOT CHANGE
-constexpr std::uint32_t STATE_BIT_LENGTH = 8;     // 0: state not used,  8: state used
-constexpr std::uint32_t MAX_VEC_LENGTH   = 4;     // 1, 2, 4 or 8
+constexpr std::uint32_t kNumThreads     = 1024;  // DO NOT CHANGE
+constexpr std::uint32_t kStateBitLength = 8;     // 0: state not used,  8: state used
+constexpr std::uint32_t kMaxVecLength   = 4;     // 1, 2, 4 or 8
 
 //
 //
-auto _get_vecLen(uint32_t maxSamples, int maxVecLen = MAX_VEC_LENGTH) -> int
+auto get_vec_len(uint32_t maxSamples, int maxVecLen = kMaxVecLength) -> int
 {
-  int vecLen = min(maxVecLen, static_cast<int>(MAX_VEC_LENGTH));
-  while ((maxSamples % vecLen) != 0) {
-    vecLen /= 2;
+  int vec_len = min(maxVecLen, static_cast<int>(kMaxVecLength));
+  while ((maxSamples % vec_len) != 0) {
+    vec_len /= 2;
   }
-  return vecLen;
+  return vec_len;
 }
 }  // unnamed namespace
 
-template <int stateBitLen, int vecLen, int maxTopk, int numSortThreads, class ValT>
+template <int stateBitLen, int vec_len, int maxTopk, int numSortThreads, class ValT>
 __launch_bounds__(1024, 1) RAFT_KERNEL
   kern_topk_cta_11(uint32_t topk,
                    uint32_t size_batch,
@@ -891,12 +891,12 @@ __launch_bounds__(1024, 1) RAFT_KERNEL
   const uint32_t i_batch = blockIdx.x;
   if (i_batch >= size_batch) return;
 
-  constexpr uint32_t smem_len = 2 * maxTopk + 2048 + 8;
-  static_assert(maxTopk * (1 + utils::size_of<ValT>() / utils::size_of<uint32_t>()) <= smem_len,
+  constexpr uint32_t kSmemLen = 2 * maxTopk + 2048 + 8;
+  static_assert(maxTopk * (1 + utils::size_of<ValT>() / utils::size_of<uint32_t>()) <= kSmemLen,
                 "maxTopk * sizeof(ValT) must be smaller or equal to 8192 byte");
-  __shared__ uint32_t _smem[smem_len];
+  __shared__ uint32_t smem[kSmemLen];
 
-  topk_cta_11_core<stateBitLen, vecLen, maxTopk, numSortThreads, ValT>(
+  topk_cta_11_core<stateBitLen, vec_len, maxTopk, numSortThreads, ValT>(
     topk,
     len_x,
     (_x == nullptr ? nullptr : _x + i_batch * ld_x),
@@ -906,7 +906,7 @@ __launch_bounds__(1024, 1) RAFT_KERNEL
     (_state == nullptr ? nullptr : _state + i_batch * get_state_size<stateBitLen>(len_x)),
     (_hints == nullptr ? nullptr : _hints + i_batch),
     sort,
-    _smem);
+    smem);
 }
 
 }  // namespace cuvs::neighbors::cagra::detail

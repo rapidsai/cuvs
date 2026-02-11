@@ -39,7 +39,7 @@ namespace cuvs::neighbors::ball_cover::detail {
  *  ball_cover::build_index(handle, index);
  * @endcode
  *
- * @tparam idx_t knn index type
+ * @tparam IdxT knn index type
  * @tparam value_t knn value type
  * @tparam int_t integral type for knn params
  * @tparam matrix_idx_t matrix indexing type
@@ -47,9 +47,9 @@ namespace cuvs::neighbors::ball_cover::detail {
  * @param[inout] index an empty (and not previous built) instance of
  * cuvs::neighbors::ball_cover::index
  */
-template <typename idx_t, typename value_t>
+template <typename IdxT, typename value_t>  // NOLINT(readability-identifier-naming)
 void build_index(raft::resources const& handle,
-                 cuvs::neighbors::ball_cover::index<idx_t, value_t>& index)
+                 cuvs::neighbors::ball_cover::index<IdxT, value_t>& index)
 {
   RAFT_EXPECTS(index.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
                  index.metric == cuvs::distance::DistanceType::L2SqrtUnexpanded ||
@@ -70,7 +70,7 @@ void build_index(raft::resources const& handle,
  * the index and query are the same array. This function will
  * build the index and assumes rbc_build_index() has not already
  * been called.
- * @tparam idx_t knn index type
+ * @tparam IdxT knn index type
  * @tparam value_t knn distance type
  * @tparam int_t type for integers, such as number of rows/cols
  * @param[in] handle raft handle for resource management
@@ -90,11 +90,11 @@ void build_index(raft::resources const& handle,
  *               many datasets can still have great recall even by only
  *               looking in the closest landmark.
  */
-template <typename idx_t, typename value_t>
+template <typename IdxT, typename value_t>  // NOLINT(readability-identifier-naming)
 void all_knn_query(raft::resources const& handle,
-                   cuvs::neighbors::ball_cover::index<idx_t, value_t>& index,
+                   cuvs::neighbors::ball_cover::index<IdxT, value_t>& index,
                    int64_t k,
-                   idx_t* inds,
+                   IdxT* inds,
                    value_t* dists,
                    bool perform_post_filtering = true,
                    float weight                = 1.0)
@@ -143,7 +143,7 @@ void all_knn_query(raft::resources const& handle,
  *  ball_cover::all_knn_query(handle, index, inds, dists, k);
  * @endcode
  *
- * @tparam idx_t knn index type
+ * @tparam IdxT knn index type
  * @tparam value_t knn distance type
  * @tparam int_t type for integers, such as number of rows/cols
  * @tparam matrix_idx_t matrix indexing type
@@ -164,10 +164,10 @@ void all_knn_query(raft::resources const& handle,
  *               many datasets can still have great recall even by only
  *               looking in the closest landmark.
  */
-template <typename idx_t, typename value_t>
+template <typename IdxT, typename value_t>  // NOLINT(readability-identifier-naming)
 void all_knn_query(raft::resources const& handle,
-                   cuvs::neighbors::ball_cover::index<idx_t, value_t>& index,
-                   raft::device_matrix_view<idx_t, int64_t, raft::row_major> inds,
+                   cuvs::neighbors::ball_cover::index<IdxT, value_t>& index,
+                   raft::device_matrix_view<IdxT, int64_t, raft::row_major> inds,
                    raft::device_matrix_view<value_t, int64_t, raft::row_major> dists,
                    bool perform_post_filtering = true,
                    float weight                = 1.0)
@@ -200,7 +200,7 @@ void all_knn_query(raft::resources const& handle,
  * function does not build the index and assumes rbc_build_index() has
  * already been called. Use this function when the index and
  * query arrays are different, otherwise use rbc_all_knn_query().
- * @tparam idx_t index type
+ * @tparam IdxT index type
  * @tparam value_t distances type
  * @tparam int_t integer type for size info
  * @param[in] handle raft handle for resource management
@@ -222,13 +222,13 @@ void all_knn_query(raft::resources const& handle,
  *               looking in the closest landmark.
  * @param[in] n_query_pts number of query points
  */
-template <typename idx_t, typename value_t>
+template <typename IdxT, typename value_t>  // NOLINT(readability-identifier-naming)
 void knn_query(raft::resources const& handle,
-               const cuvs::neighbors::ball_cover::index<idx_t, value_t>& index,
+               const cuvs::neighbors::ball_cover::index<IdxT, value_t>& index,
                int64_t k,
                const value_t* query,
                int64_t n_query_pts,
-               idx_t* inds,
+               IdxT* inds,
                value_t* dists,
                bool perform_post_filtering = true,
                float weight                = 1.0)
@@ -246,7 +246,7 @@ void knn_query(raft::resources const& handle,
  * @brief Computes epsilon neighborhood for the L2 distance metric using rbc
  *
  * @tparam value_t   IO and math type
- * @tparam idx_t    Index type
+ * @tparam IdxT    Index type
  *
  * @param[in] handle raft handle for resource management
  * @param[in] index ball cover index which has been built
@@ -257,11 +257,11 @@ void knn_query(raft::resources const& handle,
  * @param[in]  query  first matrix [row-major] [on device] [dim = m x k]
  * @param[in]  eps    defines epsilon neighborhood radius
  */
-template <typename idx_t, typename value_t>
+template <typename IdxT, typename value_t>  // NOLINT(readability-identifier-naming)
 void eps_nn(raft::resources const& handle,
-            const cuvs::neighbors::ball_cover::index<idx_t, value_t>& index,
+            const cuvs::neighbors::ball_cover::index<IdxT, value_t>& index,
             raft::device_matrix_view<bool, int64_t, raft::row_major> adj,
-            raft::device_vector_view<idx_t, int64_t> vd,
+            raft::device_vector_view<IdxT, int64_t> vd,
             raft::device_matrix_view<const value_t, int64_t, raft::row_major> query,
             value_t eps)
 {
@@ -280,14 +280,14 @@ void eps_nn(raft::resources const& handle,
     query.extent(0),
     adj.data_handle(),
     vd.data_handle(),
-    cuvs::neighbors::ball_cover::detail::EuclideanSqFunc<value_t, int64_t>());
+    cuvs::neighbors::ball_cover::detail::euclidean_sq_func<value_t, int64_t>());
 }
 
 /**
  * @brief Computes epsilon neighborhood for the L2 distance metric using rbc
  *
  * @tparam value_t   IO and math type
- * @tparam idx_t    Index type
+ * @tparam IdxT    Index type
  *
  * @param[in] handle raft handle for resource management
  * @param[in] index ball cover index which has been built
@@ -309,12 +309,12 @@ void eps_nn(raft::resources const& handle,
  *                     Upon return max_k is overwritten with the actual max_k found during
  *                     computation.
  */
-template <typename idx_t, typename value_t>
+template <typename IdxT, typename value_t>  // NOLINT(readability-identifier-naming)
 void eps_nn(raft::resources const& handle,
-            const cuvs::neighbors::ball_cover::index<idx_t, value_t>& index,
-            raft::device_vector_view<idx_t, int64_t> adj_ia,
-            raft::device_vector_view<idx_t, int64_t> adj_ja,
-            raft::device_vector_view<idx_t, int64_t> vd,
+            const cuvs::neighbors::ball_cover::index<IdxT, value_t>& index,
+            raft::device_vector_view<IdxT, int64_t> adj_ia,
+            raft::device_vector_view<IdxT, int64_t> adj_ja,
+            raft::device_vector_view<IdxT, int64_t> vd,
             raft::device_matrix_view<const value_t, int64_t, raft::row_major> query,
             value_t eps,
             std::optional<raft::host_scalar_view<int64_t, int64_t>> max_k = std::nullopt)
@@ -339,7 +339,7 @@ void eps_nn(raft::resources const& handle,
     adj_ia.data_handle(),
     adj_ja.data_handle(),
     vd.data_handle(),
-    cuvs::neighbors::ball_cover::detail::EuclideanSqFunc<value_t, int64_t>());
+    cuvs::neighbors::ball_cover::detail::euclidean_sq_func<value_t, int64_t>());
 }
 
 /**
@@ -376,7 +376,7 @@ void eps_nn(raft::resources const& handle,
  * @endcode
 
  *
- * @tparam idx_t index type
+ * @tparam IdxT index type
  * @tparam value_t distances type
  * @tparam int_t integer type for size info
  * @tparam matrix_idx_t
@@ -397,11 +397,11 @@ void eps_nn(raft::resources const& handle,
  *               many datasets can still have great recall even by only
  *               looking in the closest landmark.
  */
-template <typename idx_t, typename value_t>
+template <typename IdxT, typename value_t>  // NOLINT(readability-identifier-naming)
 void knn_query(raft::resources const& handle,
-               const cuvs::neighbors::ball_cover::index<idx_t, value_t>& index,
+               const cuvs::neighbors::ball_cover::index<IdxT, value_t>& index,
                raft::device_matrix_view<const value_t, int64_t, raft::row_major> query,
-               raft::device_matrix_view<idx_t, int64_t, raft::row_major> inds,
+               raft::device_matrix_view<IdxT, int64_t, raft::row_major> inds,
                raft::device_matrix_view<value_t, int64_t, raft::row_major> dists,
                bool perform_post_filtering = true,
                float weight                = 1.0)

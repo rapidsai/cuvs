@@ -205,14 +205,14 @@ void transform(
   }
 }
 
-template <uint32_t BlockSize,
+template <uint32_t block_size,
           uint32_t SubWarpSize,
           typename CodeT,
           typename DataT,
           typename MathT,
           typename IdxT,
-          typename LabelT>
-__launch_bounds__(BlockSize) RAFT_KERNEL reconstruct_vectors_kernel(
+          typename label_t>
+__launch_bounds__(block_size) RAFT_KERNEL reconstruct_vectors_kernel(
   raft::device_matrix_view<const uint8_t, IdxT, raft::row_major> codes,
   raft::device_matrix_view<DataT, IdxT, raft::row_major> dataset,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
@@ -223,12 +223,12 @@ __launch_bounds__(BlockSize) RAFT_KERNEL reconstruct_vectors_kernel(
 {
   const uint32_t n_centers = 1 << pq_bits;
   using subwarp_align      = raft::Pow2<SubWarpSize>;
-  const IdxT row_ix = subwarp_align::div(IdxT{threadIdx.x} + IdxT{BlockSize} * IdxT{blockIdx.x});
+  const IdxT row_ix = subwarp_align::div(IdxT{threadIdx.x} + IdxT{block_size} * IdxT{blockIdx.x});
   if (row_ix >= dataset.extent(0)) { return; }
   uint32_t lane_id      = subwarp_align::mod(raft::laneId());
   const uint32_t pq_len = raft::div_rounding_up_unsafe(dataset.extent(1), pq_centers.extent(1));
 
-  LabelT vq_label = 0;
+  label_t vq_label = 0;
   if (vq_labels.has_value()) { vq_label = vq_labels.value()(row_ix); }
   cuvs::preprocessing::quantize::detail::bitfield_view_t code_view{&codes(row_ix, 0), pq_bits};
   for (uint32_t j = lane_id; j < pq_len; j += SubWarpSize) {
@@ -245,7 +245,7 @@ __launch_bounds__(BlockSize) RAFT_KERNEL reconstruct_vectors_kernel(
   }
 }
 
-template <typename DataT, typename MathT, typename IdxT, typename LabelT>
+template <typename DataT, typename MathT, typename IdxT, typename label_t>
 auto reconstruct_vectors(
   const raft::resources& res,
   const params& params,
@@ -269,7 +269,7 @@ auto reconstruct_vectors(
   dim3 threads(kBlockSize, 1, 1);
   auto kernel = [](uint32_t pq_bits) -> auto {
     if (pq_bits == 4) {
-      return reconstruct_vectors_kernel<kBlockSize, 16, uint8_t, DataT, MathT, IdxT, LabelT>;
+      return reconstruct_vectors_kernel<kBlockSize, 16, uint8_t, DataT, MathT, IdxT, label_t>;
     } else if (pq_bits <= 8) {
       return reconstruct_vectors_kernel<kBlockSize,
                                         raft::WarpSize,
@@ -277,7 +277,7 @@ auto reconstruct_vectors(
                                         DataT,
                                         MathT,
                                         IdxT,
-                                        LabelT>;
+                                        label_t>;
     } else if (pq_bits <= 16) {
       return reconstruct_vectors_kernel<kBlockSize,
                                         raft::WarpSize,
@@ -285,7 +285,7 @@ auto reconstruct_vectors(
                                         DataT,
                                         MathT,
                                         IdxT,
-                                        LabelT>;
+                                        label_t>;
     } else {
       RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 16]", pq_bits);
     }

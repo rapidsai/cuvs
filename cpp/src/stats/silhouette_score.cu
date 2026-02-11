@@ -11,7 +11,7 @@
 namespace cuvs {
 namespace stats {
 namespace {
-template <typename value_t,
+template <typename value_t,  // NOLINT(readability-identifier-naming)
           typename label_t,
           typename idx_t>  // NOLINT(readability-identifier-naming)
 auto _silhouette_score(    // NOLINT(readability-identifier-naming)
@@ -41,7 +41,7 @@ auto _silhouette_score(    // NOLINT(readability-identifier-naming)
                                   metric);
 }
 
-template <typename value_t,
+template <typename value_t,  // NOLINT(readability-identifier-naming)
           typename label_t,
           typename idx_t>        // NOLINT(readability-identifier-naming)
 auto _silhouette_score_batched(  // NOLINT(readability-identifier-naming)

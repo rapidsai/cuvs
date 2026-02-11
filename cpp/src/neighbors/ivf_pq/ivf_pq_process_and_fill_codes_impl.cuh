@@ -15,8 +15,8 @@
 
 namespace cuvs::neighbors::ivf_pq::detail {
 
-template <uint32_t BlockSize, uint32_t PqBits, typename IdxT>
-__launch_bounds__(BlockSize) static __global__ void process_and_fill_codes_kernel(
+template <uint32_t block_size, uint32_t PqBits, typename IdxT>
+__launch_bounds__(block_size) static __global__ void process_and_fill_codes_kernel(
   raft::device_matrix_view<const float, IdxT, raft::row_major> new_vectors,
   std::variant<IdxT, const IdxT*> src_offset_or_indices,
   const uint32_t* new_labels,
@@ -31,7 +31,7 @@ __launch_bounds__(BlockSize) static __global__ void process_and_fill_codes_kerne
   constexpr uint32_t kSubWarpSize = std::min<uint32_t>(raft::WarpSize, 1u << PqBits);
   using subwarp_align             = raft::Pow2<kSubWarpSize>;
   const uint32_t lane_id          = subwarp_align::mod(threadIdx.x);
-  const IdxT row_ix = subwarp_align::div(IdxT{threadIdx.x} + IdxT{BlockSize} * IdxT{blockIdx.x});
+  const IdxT row_ix = subwarp_align::div(IdxT{threadIdx.x} + IdxT{block_size} * IdxT{blockIdx.x});
   if (row_ix >= new_vectors.extent(0)) { return; }
 
   const uint32_t cluster_ix = new_labels[row_ix];

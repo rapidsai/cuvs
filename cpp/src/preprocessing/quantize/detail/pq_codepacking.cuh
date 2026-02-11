@@ -14,7 +14,7 @@
 namespace cuvs::preprocessing::quantize::detail {
 
 template <typename T>
-constexpr bool is_const_ptr_v = std::is_const_v<std::remove_pointer_t<T>>;
+constexpr bool kIsConstPtrV = std::is_const_v<std::remove_pointer_t<T>>;
 
 /**
  * Bitfield reference for reading/writing from non-const pointers.
@@ -48,7 +48,7 @@ struct bitfield_ref_t {
 
   template <typename T = PtrT>
   __host__ __device__ auto operator=(uint8_t code)
-    -> std::enable_if_t<!is_const_ptr_v<T>, bitfield_ref_t&>
+    -> std::enable_if_t<!kIsConstPtrV<T>, bitfield_ref_t&>
   {
     const auto mask = static_cast<uint8_t>((1u << bits) - 1u);
 
@@ -67,7 +67,7 @@ struct bitfield_ref_t {
 
   template <typename T = PtrT>
   __host__ __device__ auto operator=(uint16_t code)
-    -> std::enable_if_t<!is_const_ptr_v<T>, bitfield_ref_t&>
+    -> std::enable_if_t<!kIsConstPtrV<T>, bitfield_ref_t&>
   {
     const auto mask = static_cast<uint16_t>((1u << bits) - 1u);
 
@@ -100,7 +100,7 @@ struct bitfield_view_t {
 
   template <typename T = PtrT>
   __host__ __device__ auto operator[](uint32_t i)
-    -> std::enable_if_t<!is_const_ptr_v<T>, bitfield_ref_t<PtrT>>
+    -> std::enable_if_t<!kIsConstPtrV<T>, bitfield_ref_t<PtrT>>
   {
     uint32_t bit_offset = i * bits;
     return bitfield_ref_t<PtrT>{

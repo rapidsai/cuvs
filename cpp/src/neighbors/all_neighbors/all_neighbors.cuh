@@ -118,12 +118,12 @@ void build(
                  "distances matrix should be allocated to get mutual reachability distance.");
   }
 
-  std::unique_ptr<BatchBuildAux<IdxT>> aux_vectors;
+  std::unique_ptr<batch_build_aux<IdxT>> aux_vectors;
   if (params.n_clusters == 1) {
     single_build(handle, params, dataset, indices, distances);
   } else {
     if (core_distances.has_value()) {
-      aux_vectors = std::make_unique<BatchBuildAux<IdxT>>(
+      aux_vectors = std::make_unique<batch_build_aux<IdxT>>(
         params.n_clusters, dataset.extent(0), params.overlap_factor);
       batch_build(handle, params, dataset, indices, distances, aux_vectors.get());
     } else {
@@ -153,8 +153,9 @@ void build(
       num_rows,
       core_distances.value().data_handle());
 
-    using ReachabilityPP = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, T>;
-    auto dist_epilogue   = ReachabilityPP{core_distances.value().data_handle(), alpha, num_rows};
+    using reachability_pp =
+      cuvs::neighbors::detail::reachability::reachability_post_process<IdxT, T>;
+    auto dist_epilogue = reachability_pp{core_distances.value().data_handle(), alpha, num_rows};
     if (params.n_clusters == 1) {
       single_build(handle, params, dataset, indices, distances, dist_epilogue);
     } else {
@@ -227,8 +228,9 @@ void build(
       num_rows,
       core_distances.value().data_handle());
 
-    using ReachabilityPP = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, T>;
-    auto dist_epilogue   = ReachabilityPP{core_distances.value().data_handle(), alpha, num_rows};
+    using reachability_pp =
+      cuvs::neighbors::detail::reachability::reachability_post_process<IdxT, T>;
+    auto dist_epilogue = reachability_pp{core_distances.value().data_handle(), alpha, num_rows};
     single_build(handle, params, dataset, indices, distances, dist_epilogue);
 
     if (need_shift) {

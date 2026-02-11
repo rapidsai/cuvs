@@ -19,7 +19,7 @@ namespace detail {
  * @tparam AccT           accumulation data-type
  * @tparam OutT           output data-type (for C and D matrices)
  * @tparam IdxT           index data-type
- * @tparam Policy         struct which tunes the Contraction kernel
+ * @tparam policy         struct which tunes the Contraction kernel
  * @tparam OpT            A distance operation, e.g., cosine_distance_op.
  * @tparam EpilogueLambda applies an elementwise function to compute final
     values. Its signature is:
@@ -47,20 +47,20 @@ namespace detail {
 template <typename DataT,
           typename OutT,
           typename IdxT,
-          typename Policy,
+          typename policy,
           typename OpT,
           typename EpilogueLambda,
           typename FinalLambda,
           typename RowEpilogueLambda,
           bool isRowMajor    = true,
-          bool writeOut      = true,
-          typename BaseClass = raft::linalg::Contractions_NT<DataT, IdxT, Policy, isRowMajor>>
+          bool write_out     = true,
+          typename BaseClass = raft::linalg::Contractions_NT<DataT, IdxT, policy, isRowMajor>>
 struct pairwise_distances : public BaseClass {
   // Get accumulation type from distance_op
   using acc_t = typename OpT::acc_t;
 
  private:
-  using p = Policy;
+  using p = policy;
   const OutT* xn_;
   const OutT* yn_;
   const DataT* const y_base_;
@@ -150,7 +150,7 @@ struct pairwise_distances : public BaseClass {
           // Calculate distance_op epilog.
           // Use .template to disambiguate (See:
           // https://en.cppreference.com/w/cpp/language/dependent_name)
-          distance_op_.template epilog<Policy>(acc_, regxn, regyn, tile_idx_n, tile_idx_m);
+          distance_op_.template epilog<policy>(acc_, regxn, regyn, tile_idx_n, tile_idx_m);
           // And any possible additional epilogs
           epilog_op_(acc_, regxn, regyn, tile_idx_n, tile_idx_m);
         } else {
@@ -159,11 +159,11 @@ struct pairwise_distances : public BaseClass {
           // Calculate distance_op epilog.
           // Use .template to disambiguate (See:
           // https://en.cppreference.com/w/cpp/language/dependent_name)
-          distance_op_.template epilog<Policy>(acc_, nullptr, nullptr, tile_idx_n, tile_idx_m);
+          distance_op_.template epilog<policy>(acc_, nullptr, nullptr, tile_idx_n, tile_idx_m);
           // And any possible additional epilogs
           epilog_op_(acc_, nullptr, nullptr, tile_idx_n, tile_idx_m);
         }
-        if (writeOut) { store_output(tile_idx_m, tile_idx_n); }
+        if (write_out) { store_output(tile_idx_m, tile_idx_n); }
       }
       row_epilog_op_(tile_idx_m);
     }

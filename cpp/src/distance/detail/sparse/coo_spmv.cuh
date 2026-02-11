@@ -23,21 +23,21 @@
 
 namespace cuvs::distance::detail::sparse {
 
-template <typename value_idx,
-          typename value_t,
+template <typename ValueIdx,
+          typename value_t,  // NOLINT(readability-identifier-naming)
           int threads_per_block = 1024,
-          typename product_f,
-          typename accum_f,
-          typename write_f,
-          typename strategy_t>
+          typename ProductF,
+          typename AccumF,
+          typename WriteF,
+          typename StrategyT>
 inline void balanced_coo_pairwise_generalized_spmv(
   value_t* out_dists,
-  const distances_config_t<value_idx, value_t>& config_,
-  value_idx* coo_rows_b,
-  product_f product_func,
-  accum_f accum_func,
-  write_f write_func,
-  strategy_t strategy,
+  const distances_config_t<ValueIdx, value_t>& config_,
+  ValueIdx* coo_rows_b,
+  ProductF product_func,
+  AccumF accum_func,
+  WriteF write_func,
+  StrategyT strategy,
   int chunk_size = 500000)
 {
   uint64_t n = static_cast<uint64_t>(sizeof(value_t)) * static_cast<uint64_t>(config_.a_nrows) *
@@ -63,12 +63,12 @@ inline void balanced_coo_pairwise_generalized_spmv(
  *
  * Each vector of A is loaded into shared memory in dense form and the
  * non-zeros of B load balanced across the threads of each block.
- * @tparam value_idx index type
+ * @tparam ValueIdx index type
  * @tparam value_t value type
  * @tparam threads_per_block block size
- * @tparam product_f semiring product() function
- * @tparam accum_f semiring sum() function
- * @tparam write_f atomic semiring sum() function
+ * @tparam ProductF semiring product() function
+ * @tparam AccumF semiring sum() function
+ * @tparam WriteF atomic semiring sum() function
  * @param[out] out_dists dense array of out distances of size m * n in row-major
  *             format.
  * @param[in] config_ distance config object
@@ -80,51 +80,51 @@ inline void balanced_coo_pairwise_generalized_spmv(
  *            this value was found through profiling and represents a reasonable
  *            setting for both large and small densities
  */
-template <typename value_idx,
-          typename value_t,
+template <typename ValueIdx,
+          typename value_t,  // NOLINT(readability-identifier-naming)
           int threads_per_block = 1024,
-          typename product_f,
-          typename accum_f,
-          typename write_f>
+          typename ProductF,
+          typename AccumF,
+          typename WriteF>
 inline void balanced_coo_pairwise_generalized_spmv(
   value_t* out_dists,
-  const distances_config_t<value_idx, value_t>& config_,
-  value_idx* coo_rows_b,
-  product_f product_func,
-  accum_f accum_func,
-  write_f write_func,
+  const distances_config_t<ValueIdx, value_t>& config_,
+  ValueIdx* coo_rows_b,
+  ProductF product_func,
+  AccumF accum_func,
+  WriteF write_func,
   int chunk_size = 500000)
 {
   uint64_t n = static_cast<uint64_t>(sizeof(value_t)) * static_cast<uint64_t>(config_.a_nrows) *
                static_cast<uint64_t>(config_.b_nrows);
   RAFT_CUDA_TRY(cudaMemsetAsync(out_dists, 0, n, raft::resource::get_cuda_stream(config_.handle)));
 
-  int max_cols = max_cols_per_block<value_idx, value_t>();
+  int max_cols = max_cols_per_block<ValueIdx, value_t>();
 
   if (max_cols > config_.a_ncols) {
-    dense_smem_strategy<value_idx, value_t, threads_per_block> strategy(config_);
+    dense_smem_strategy<ValueIdx, value_t, threads_per_block> strategy(config_);
     strategy.dispatch(out_dists, coo_rows_b, product_func, accum_func, write_func, chunk_size);
   } else {
-    hash_strategy<value_idx, value_t, threads_per_block> strategy(config_);
+    hash_strategy<ValueIdx, value_t, threads_per_block> strategy(config_);
     strategy.dispatch(out_dists, coo_rows_b, product_func, accum_func, write_func, chunk_size);
   }
 };
 
-template <typename value_idx,
-          typename value_t,
+template <typename ValueIdx,
+          typename value_t,  // NOLINT(readability-identifier-naming)
           int threads_per_block = 1024,
-          typename product_f,
-          typename accum_f,
-          typename write_f,
-          typename strategy_t>
+          typename ProductF,
+          typename AccumF,
+          typename WriteF,
+          typename StrategyT>
 inline void balanced_coo_pairwise_generalized_spmv_rev(
   value_t* out_dists,
-  const distances_config_t<value_idx, value_t>& config_,
-  value_idx* coo_rows_a,
-  product_f product_func,
-  accum_f accum_func,
-  write_f write_func,
-  strategy_t strategy,
+  const distances_config_t<ValueIdx, value_t>& config_,
+  ValueIdx* coo_rows_a,
+  ProductF product_func,
+  AccumF accum_func,
+  WriteF write_func,
+  StrategyT strategy,
   int chunk_size = 500000)
 {
   strategy.dispatch_rev(out_dists, coo_rows_a, product_func, accum_func, write_func, chunk_size);
@@ -150,12 +150,12 @@ inline void balanced_coo_pairwise_generalized_spmv_rev(
  * Manattan distance sum(abs(x_k-y_k)) is a great example of when this type of
  * execution pattern is necessary.
  *
- * @tparam value_idx index type
+ * @tparam ValueIdx index type
  * @tparam value_t value type
  * @tparam threads_per_block block size
- * @tparam product_f semiring product() function
- * @tparam accum_f semiring sum() function
- * @tparam write_f atomic semiring sum() function
+ * @tparam ProductF semiring product() function
+ * @tparam AccumF semiring sum() function
+ * @tparam WriteF atomic semiring sum() function
  * @param[out] out_dists dense array of out distances of size m * n
  * @param[in] config_ distance config object
  * @param[in] coo_rows_a coo row array for A
@@ -166,29 +166,29 @@ inline void balanced_coo_pairwise_generalized_spmv_rev(
  *            this value was found through profiling and represents a reasonable
  *            setting for both large and small densities
  */
-template <typename value_idx,
-          typename value_t,
+template <typename ValueIdx,
+          typename value_t,  // NOLINT(readability-identifier-naming)
           int threads_per_block = 1024,
-          typename product_f,
-          typename accum_f,
-          typename write_f>
+          typename ProductF,
+          typename AccumF,
+          typename WriteF>
 inline void balanced_coo_pairwise_generalized_spmv_rev(
   value_t* out_dists,
-  const distances_config_t<value_idx, value_t>& config_,
-  value_idx* coo_rows_a,
-  product_f product_func,
-  accum_f accum_func,
-  write_f write_func,
+  const distances_config_t<ValueIdx, value_t>& config_,
+  ValueIdx* coo_rows_a,
+  ProductF product_func,
+  AccumF accum_func,
+  WriteF write_func,
   int chunk_size = 500000)
 {
   // try dense first
-  int max_cols = max_cols_per_block<value_idx, value_t>();
+  int max_cols = max_cols_per_block<ValueIdx, value_t>();
 
   if (max_cols > config_.b_ncols) {
-    dense_smem_strategy<value_idx, value_t, threads_per_block> strategy(config_);
+    dense_smem_strategy<ValueIdx, value_t, threads_per_block> strategy(config_);
     strategy.dispatch_rev(out_dists, coo_rows_a, product_func, accum_func, write_func, chunk_size);
   } else {
-    hash_strategy<value_idx, value_t, threads_per_block> strategy(config_);
+    hash_strategy<ValueIdx, value_t, threads_per_block> strategy(config_);
     strategy.dispatch_rev(out_dists, coo_rows_a, product_func, accum_func, write_func, chunk_size);
   }
 };

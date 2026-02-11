@@ -52,7 +52,7 @@ namespace cuvs::cluster::kmeans_balanced {
  *
  * @tparam DataT Type of the input data.
  * @tparam MathT Type of the centroids and mapped data.
- * @tparam IndexT Type used for indexing.
+ * @tparam index_t Type used for indexing.
  * @tparam MappingOpT Type of the mapping function.
  * @param[in]  handle     The raft resources
  * @param[in]  params     Structure containing the hyper-parameters
@@ -62,19 +62,19 @@ namespace cuvs::cluster::kmeans_balanced {
  * @param[in]  mapping_op (optional) Functor to convert from the input datatype to the arithmetic
  *                        datatype. If DataT == MathT, this must be the identity.
  */
-template <typename DataT, typename MathT, typename IndexT, typename MappingOpT = raft::identity_op>
+template <typename DataT, typename MathT, typename index_t, typename MappingOpT = raft::identity_op>
 void fit(const raft::resources& handle,
          cuvs::cluster::kmeans::balanced_params const& params,
-         raft::device_matrix_view<const DataT, IndexT> X,
-         raft::device_matrix_view<MathT, IndexT> centroids,
+         raft::device_matrix_view<const DataT, index_t> X,
+         raft::device_matrix_view<MathT, index_t> centroids,
          MappingOpT mapping_op = raft::identity_op())
 {
   RAFT_EXPECTS(X.extent(1) == centroids.extent(1),
                "Number of features in dataset and centroids are different");
   RAFT_EXPECTS(static_cast<uint64_t>(X.extent(0)) * static_cast<uint64_t>(X.extent(1)) <=
-                 static_cast<uint64_t>(std::numeric_limits<IndexT>::max()),
+                 static_cast<uint64_t>(std::numeric_limits<index_t>::max()),
                "The chosen index type cannot represent all indices for the given dataset");
-  RAFT_EXPECTS(centroids.extent(0) > IndexT{0} && centroids.extent(0) <= X.extent(0),
+  RAFT_EXPECTS(centroids.extent(0) > index_t{0} && centroids.extent(0) <= X.extent(0),
                "The number of centroids must be strictly positive and cannot exceed the number of "
                "points in the training dataset.");
 
@@ -104,8 +104,8 @@ void fit(const raft::resources& handle,
  *
  * @tparam DataT Type of the input data.
  * @tparam MathT Type of the centroids and mapped data.
- * @tparam IndexT Type used for indexing.
- * @tparam LabelT Type of the output labels.
+ * @tparam index_t Type used for indexing.
+ * @tparam label_t Type of the output labels.
  * @tparam MappingOpT Type of the mapping function.
  * @param[in]  handle     The raft resources
  * @param[in]  params     Structure containing the hyper-parameters
@@ -118,14 +118,14 @@ void fit(const raft::resources& handle,
  */
 template <typename DataT,
           typename MathT,
-          typename IndexT,
-          typename LabelT,
+          typename index_t,
+          typename label_t,
           typename MappingOpT = raft::identity_op>
 void predict(const raft::resources& handle,
              cuvs::cluster::kmeans::balanced_params const& params,
-             raft::device_matrix_view<const DataT, IndexT> X,
-             raft::device_matrix_view<const MathT, IndexT> centroids,
-             raft::device_vector_view<LabelT, IndexT> labels,
+             raft::device_matrix_view<const DataT, index_t> X,
+             raft::device_matrix_view<const MathT, index_t> centroids,
+             raft::device_vector_view<label_t, index_t> labels,
              MappingOpT mapping_op = raft::identity_op())
 {
   RAFT_EXPECTS(X.extent(0) == labels.extent(0),
@@ -133,10 +133,10 @@ void predict(const raft::resources& handle,
   RAFT_EXPECTS(X.extent(1) == centroids.extent(1),
                "Number of features in dataset and centroids are different");
   RAFT_EXPECTS(static_cast<uint64_t>(X.extent(0)) * static_cast<uint64_t>(X.extent(1)) <=
-                 static_cast<uint64_t>(std::numeric_limits<IndexT>::max()),
+                 static_cast<uint64_t>(std::numeric_limits<index_t>::max()),
                "The chosen index type cannot represent all indices for the given dataset");
   RAFT_EXPECTS(static_cast<uint64_t>(centroids.extent(0)) <=
-                 static_cast<uint64_t>(std::numeric_limits<LabelT>::max()),
+                 static_cast<uint64_t>(std::numeric_limits<label_t>::max()),
                "The chosen label type cannot represent all cluster labels");
 
   cuvs::cluster::kmeans::detail::predict(handle,
@@ -176,8 +176,8 @@ namespace helpers {
  *
  * @tparam DataT Type of the input data.
  * @tparam MathT Type of the centroids and mapped data.
- * @tparam IndexT Type used for indexing.
- * @tparam LabelT Type of the output labels.
+ * @tparam index_t Type used for indexing.
+ * @tparam label_t Type of the output labels.
  * @tparam CounterT Counter type supported by CUDA's native atomicAdd.
  * @tparam MappingOpT Type of the mapping function.
  * @param[in]  handle        The raft resources
@@ -193,28 +193,28 @@ namespace helpers {
  */
 template <typename DataT,
           typename MathT,
-          typename IndexT,
-          typename LabelT,
+          typename index_t,
+          typename label_t,
           typename CounterT,
           typename MappingOpT>
 void build_clusters(const raft::resources& handle,
                     const cuvs::cluster::kmeans::balanced_params& params,
-                    raft::device_matrix_view<const DataT, IndexT> X,
-                    raft::device_matrix_view<MathT, IndexT> centroids,
-                    raft::device_vector_view<LabelT, IndexT> labels,
-                    raft::device_vector_view<CounterT, IndexT> cluster_sizes,
+                    raft::device_matrix_view<const DataT, index_t> X,
+                    raft::device_matrix_view<MathT, index_t> centroids,
+                    raft::device_vector_view<label_t, index_t> labels,
+                    raft::device_vector_view<CounterT, index_t> cluster_sizes,
                     MappingOpT mapping_op = raft::identity_op(),
                     std::optional<raft::device_vector_view<const MathT>> X_norm = std::nullopt);
 
-#define EXTERN_TEMPLATE_BUILD_CLUSTERS(DataT, MathT, IndexT, LabelT, CounterT, MappingOpT) \
-  extern template void build_clusters<DataT, MathT, IndexT, LabelT, CounterT, MappingOpT>( \
-    const raft::resources& handle,                                                         \
-    const cuvs::cluster::kmeans::balanced_params& params,                                  \
-    raft::device_matrix_view<const DataT, IndexT> X,                                       \
-    raft::device_matrix_view<MathT, IndexT> centroids,                                     \
-    raft::device_vector_view<LabelT, IndexT> labels,                                       \
-    raft::device_vector_view<CounterT, IndexT> cluster_sizes,                              \
-    MappingOpT mapping_op,                                                                 \
+#define EXTERN_TEMPLATE_BUILD_CLUSTERS(DataT, MathT, index_t, label_t, CounterT, MappingOpT) \
+  extern template void build_clusters<DataT, MathT, index_t, label_t, CounterT, MappingOpT>( \
+    const raft::resources& handle,                                                           \
+    const cuvs::cluster::kmeans::balanced_params& params,                                    \
+    raft::device_matrix_view<const DataT, index_t> X,                                        \
+    raft::device_matrix_view<MathT, index_t> centroids,                                      \
+    raft::device_vector_view<label_t, index_t> labels,                                       \
+    raft::device_vector_view<CounterT, index_t> cluster_sizes,                               \
+    MappingOpT mapping_op,                                                                   \
     std::optional<raft::device_vector_view<const MathT>> X_norm);
 
 // Extern template declaration for the instantiation actually used in IVF-PQ build
@@ -251,8 +251,8 @@ EXTERN_TEMPLATE_BUILD_CLUSTERS(
  *
  * @tparam DataT Type of the input data.
  * @tparam MathT Type of the centroids and mapped data.
- * @tparam IndexT Type used for indexing.
- * @tparam LabelT Type of the output labels.
+ * @tparam index_t Type used for indexing.
+ * @tparam label_t Type of the output labels.
  * @tparam CounterT Counter type supported by CUDA's native atomicAdd.
  * @tparam MappingOpT Type of the mapping function.
  * @param[in]  handle         The raft resources
@@ -269,15 +269,15 @@ EXTERN_TEMPLATE_BUILD_CLUSTERS(
  */
 template <typename DataT,
           typename MathT,
-          typename IndexT,
-          typename LabelT,
+          typename index_t,
+          typename label_t,
           typename CounterT,
           typename MappingOpT = raft::identity_op>
 void calc_centers_and_sizes(const raft::resources& handle,
-                            raft::device_matrix_view<const DataT, IndexT> X,
-                            raft::device_vector_view<const LabelT, IndexT> labels,
-                            raft::device_matrix_view<MathT, IndexT> centroids,
-                            raft::device_vector_view<CounterT, IndexT> cluster_sizes,
+                            raft::device_matrix_view<const DataT, index_t> X,
+                            raft::device_vector_view<const label_t, index_t> labels,
+                            raft::device_matrix_view<MathT, index_t> centroids,
+                            raft::device_vector_view<CounterT, index_t> cluster_sizes,
                             bool reset_counters   = true,
                             MappingOpT mapping_op = raft::identity_op())
 {

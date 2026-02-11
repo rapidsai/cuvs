@@ -25,7 +25,7 @@ namespace cuvs::neighbors::ivf_flat::detail {
 // backward compatibility.
 // TODO(hcho3) Implement next-gen serializer for IVF that allows for expansion in a backward
 //             compatible fashion.
-constexpr int serialization_version = 4;
+constexpr int kSerializationVersion = 4;
 
 /**
  * Save the index to file.
@@ -47,7 +47,7 @@ void serialize(raft::resources const& handle, std::ostream& os, const index<T, I
   dtype_string.resize(4);
   os << dtype_string;
 
-  serialize_scalar(handle, os, serialization_version);
+  serialize_scalar(handle, os, kSerializationVersion);
   serialize_scalar(handle, os, index_.size());
   serialize_scalar(handle, os, index_.dim());
   serialize_scalar(handle, os, index_.n_lists());
@@ -112,8 +112,8 @@ auto deserialize(raft::resources const& handle, std::istream& is) -> index<T, Id
   is.read(dtype_string, 4);
 
   auto ver = raft::deserialize_scalar<int>(handle, is);
-  if (ver != serialization_version) {
-    RAFT_FAIL("serialization version mismatch, expected %d, got %d ", serialization_version, ver);
+  if (ver != kSerializationVersion) {
+    RAFT_FAIL("serialization version mismatch, expected %d, got %d ", kSerializationVersion, ver);
   }
   auto n_rows           = raft::deserialize_scalar<IdxT>(handle, is);
   auto dim              = raft::deserialize_scalar<std::uint32_t>(handle, is);
@@ -122,7 +122,8 @@ auto deserialize(raft::resources const& handle, std::istream& is) -> index<T, Id
   bool adaptive_centers = raft::deserialize_scalar<bool>(handle, is);
   bool cma              = raft::deserialize_scalar<bool>(handle, is);
 
-  index<T, IdxT> index_ = index<T, IdxT>(handle, metric, n_lists, adaptive_centers, cma, dim);
+  index<T, IdxT> index_ = index<T, IdxT>(
+    handle, metric, n_lists, adaptive_centers, cma, dim);  // NOLINT(readability-identifier-naming)
 
   deserialize_mdspan(handle, is, index_.centers());
   bool has_norms = raft::deserialize_scalar<bool>(handle, is);

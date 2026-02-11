@@ -63,11 +63,11 @@ inline auto parse_pq_pivots_file(const std::string& path,
 
   pivots_if.seekg(offset[0], std::ios_base::beg);
   pivots_if.read(reinterpret_cast<char*>(&pq_codebook_size), sizeof(int32_t));
-  int32_t pq_dim_times_codebookDim;
-  pivots_if.read(reinterpret_cast<char*>(&pq_dim_times_codebookDim), sizeof(int32_t));
+  int32_t pq_dim_times_codebook_dim;
+  pivots_if.read(reinterpret_cast<char*>(&pq_dim_times_codebook_dim), sizeof(int32_t));
 
-  int32_t codebookDim = vector_dim / pq_dim;
-  RAFT_EXPECTS(pq_dim * codebookDim == pq_dim_times_codebookDim,
+  int32_t codebook_dim = vector_dim / pq_dim;
+  RAFT_EXPECTS(pq_dim * codebook_dim == pq_dim_times_codebook_dim,
                "Invalid metadata in pq_pivots file.");
 
   // parse pq_encoding_table
@@ -117,9 +117,9 @@ inline auto parse_rotation_matrix_file(const std::string& path, const int vector
 
   // read rotation matrix
   std::vector<float> mat(nr * nc);
-  for (int iRow = 0; iRow < nr; iRow++) {
-    for (int iCol = 0; iCol < nc; iCol++) {
-      mat_if.read(reinterpret_cast<char*>(&mat[iRow * vector_dim + iCol]), 4);
+  for (int i_row = 0; i_row < nr; i_row++) {
+    for (int i_col = 0; i_col < nc; i_col++) {
+      mat_if.read(reinterpret_cast<char*>(&mat[i_row * vector_dim + i_col]), 4);
     }
   }
   return mat;

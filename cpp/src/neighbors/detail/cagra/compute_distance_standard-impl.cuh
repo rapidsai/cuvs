@@ -47,10 +47,11 @@ template <cuvs::distance::DistanceType Metric,
           uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           typename DataT,
-          typename IndexT,
-          typename DistanceT>
-struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, IndexT, DistanceT> {
-  using base_type = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
+          typename index_t,
+          typename distance_t>
+struct standard_dataset_descriptor_t
+  : public dataset_descriptor_base_t<DataT, index_t, distance_t> {
+  using base_type = dataset_descriptor_base_t<DataT, index_t, distance_t>;
   using QUERY_T   = typename std::
     conditional_t<Metric == cuvs::distance::DistanceType::BitwiseHamming, DataT, float>;
   using base_type::args;
@@ -246,18 +247,18 @@ template <cuvs::distance::DistanceType Metric,
           uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           typename DataT,
-          typename IndexT,
-          typename DistanceT>
-RAFT_KERNEL __launch_bounds__(1, 1)
-  standard_dataset_descriptor_init_kernel(dataset_descriptor_base_t<DataT, IndexT, DistanceT>* out,
-                                          const DataT* ptr,
-                                          IndexT size,
-                                          uint32_t dim,
-                                          uint32_t ld,
-                                          const DistanceT* dataset_norms = nullptr)
+          typename index_t,
+          typename distance_t>
+RAFT_KERNEL __launch_bounds__(1, 1) standard_dataset_descriptor_init_kernel(
+  dataset_descriptor_base_t<DataT, index_t, distance_t>* out,
+  const DataT* ptr,
+  index_t size,
+  uint32_t dim,
+  uint32_t ld,
+  const distance_t* dataset_norms = nullptr)
 {
   using desc_type =
-    standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
+    standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, index_t, distance_t>;
   using base_type = typename desc_type::base_type;
   new (out) desc_type(reinterpret_cast<typename base_type::setup_workspace_type*>(
                         &setup_workspace_standard<desc_type>),
@@ -274,18 +275,18 @@ template <cuvs::distance::DistanceType Metric,
           uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           typename DataT,
-          typename IndexT,
-          typename DistanceT>
-auto standard_descriptor_spec<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>::init_(
+          typename index_t,
+          typename distance_t>
+auto standard_descriptor_spec<Metric, TeamSize, DatasetBlockDim, DataT, index_t, distance_t>::init_(
   const cagra::search_params& params,
   const DataT* ptr,
-  IndexT size,
+  index_t size,
   uint32_t dim,
   uint32_t ld,
-  const DistanceT* dataset_norms) -> dataset_descriptor_host<DataT, IndexT, DistanceT>
+  const distance_t* dataset_norms) -> dataset_descriptor_host<DataT, index_t, distance_t>
 {
   using desc_type =
-    standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
+    standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, index_t, distance_t>;
   using base_type = typename desc_type::base_type;
 
   RAFT_EXPECTS(Metric != cuvs::distance::DistanceType::CosineExpanded || dataset_norms != nullptr,
@@ -293,14 +294,14 @@ auto standard_descriptor_spec<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, 
 
   desc_type dd_host{nullptr, nullptr, ptr, size, dim, ld, dataset_norms};
   return host_type{dd_host,
-                   [=](dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dev_ptr,
+                   [=](dataset_descriptor_base_t<DataT, index_t, distance_t>* dev_ptr,
                        rmm::cuda_stream_view stream) {
                      standard_dataset_descriptor_init_kernel<Metric,
                                                              TeamSize,
                                                              DatasetBlockDim,
                                                              DataT,
-                                                             IndexT,
-                                                             DistanceT>
+                                                             index_t,
+                                                             distance_t>
                        <<<1, 1, 0, stream>>>(dev_ptr, ptr, size, dim, ld, dataset_norms);
                      RAFT_CUDA_TRY(cudaPeekAtLastError());
                    }};

@@ -57,14 +57,14 @@ struct calc_chunk_indices {
   }
 
  private:
-  template <int BlockDim>
+  template <int block_dim>
   static auto try_block_dim(uint32_t n_probes, uint32_t n_queries) -> configured
   {
-    if constexpr (BlockDim >= raft::WarpSize * 2) {
-      if (BlockDim >= n_probes * 2) { return try_block_dim<(BlockDim / 2)>(n_probes, n_queries); }
+    if constexpr (block_dim >= raft::WarpSize * 2) {
+      if (block_dim >= n_probes * 2) { return try_block_dim<(block_dim / 2)>(n_probes, n_queries); }
     }
     return {
-      .block_dim = dim3(BlockDim, 1, 1), .grid_dim = dim3(n_queries, 1, 1), .n_probes = n_probes};
+      .block_dim = dim3(block_dim, 1, 1), .grid_dim = dim3(n_queries, 1, 1), .n_probes = n_probes};
   }
 };
 
@@ -101,8 +101,8 @@ __device__ inline auto find_chunk_ix(uint32_t& sample_ix,  // NOLINT
   return ix_min;
 }
 
-template <int BlockDim, typename IdxT, typename DbIdxT>
-__launch_bounds__(BlockDim) RAFT_KERNEL
+template <int block_dim, typename IdxT, typename DbIdxT>
+__launch_bounds__(block_dim) RAFT_KERNEL
   postprocess_neighbors_kernel(IdxT* neighbors_out,                // [n_queries, topk]
                                const uint32_t* neighbors_in,       // [n_queries, topk]
                                const DbIdxT* const* db_indices,    // [n_clusters][..]
@@ -114,7 +114,7 @@ __launch_bounds__(BlockDim) RAFT_KERNEL
 {
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
-  const uint64_t i        = threadIdx.x + BlockDim * uint64_t(blockIdx.x);
+  const uint64_t i        = threadIdx.x + block_dim * uint64_t(blockIdx.x);
   const uint32_t query_ix = i / static_cast<uint64_t>(topk);
   if (query_ix >= n_queries) { return; }
   const uint32_t k = i % static_cast<uint64_t>(topk);
@@ -174,7 +174,7 @@ void postprocess_distances(ScoreOutT* out,      // [n_queries, topk]
                            bool account_for_max_close,
                            rmm::cuda_stream_view stream)
 {
-  constexpr bool needs_cast = !std::is_same_v<ScoreInT, ScoreOutT>;
+  constexpr bool kNeedsCast = !std::is_same_v<ScoreInT, ScoreOutT>;
   const bool needs_copy     = static_cast<const void*>(in) != static_cast<const void*>(out);
   size_t len                = size_t(n_queries) * size_t(topk);
   switch (metric) {
@@ -188,7 +188,7 @@ void postprocess_distances(ScoreOutT* out,      // [n_queries, topk]
           raft::compose_op(raft::mul_const_op<ScoreOutT>{scaling_factor * scaling_factor},
                            raft::cast_op<ScoreOutT>{}),
           stream);
-      } else if (needs_cast || needs_copy) {
+      } else if (kNeedsCast || needs_copy) {
         raft::linalg::unaryOp(out, in, len, raft::cast_op<ScoreOutT>{}, stream);
       }
     } break;
@@ -202,7 +202,7 @@ void postprocess_distances(ScoreOutT* out,      // [n_queries, topk]
                                                raft::sqrt_op{},
                                                raft::cast_op<ScoreOutT>{}},
                               stream);
-      } else if (needs_cast) {
+      } else if (kNeedsCast) {
         raft::linalg::unaryOp(
           out, in, len, raft::compose_op{raft::sqrt_op{}, raft::cast_op<ScoreOutT>{}}, stream);
       } else {
@@ -219,7 +219,7 @@ void postprocess_distances(ScoreOutT* out,      // [n_queries, topk]
           len,
           raft::compose_op(raft::mul_const_op<ScoreOutT>{factor}, raft::cast_op<ScoreOutT>{}),
           stream);
-      } else if (needs_cast || needs_copy) {
+      } else if (kNeedsCast || needs_copy) {
         raft::linalg::unaryOp(out, in, len, raft::cast_op<ScoreOutT>{}, stream);
       }
     } break;

@@ -33,9 +33,9 @@ void CompositeIndex<T, IdxT, OutputIdxT>::search(
   }
 
   size_t num_queries = queries.extent(0);
-  size_t K           = neighbors.extent(1);
+  size_t k           = neighbors.extent(1);
   size_t num_indices = children_.size();
-  size_t buffer_size = num_queries * K * num_indices;
+  size_t buffer_size = num_queries * k * num_indices;
 
   auto main_stream = raft::resource::get_cuda_stream(handle);
   auto tmp_res     = raft::resource::get_workspace_resource(handle);
@@ -47,14 +47,14 @@ void CompositeIndex<T, IdxT, OutputIdxT>::search(
   std::vector<rmm::device_uvector<float>> temp_distances;
 
   for (size_t i = 0; i < num_indices; i++) {
-    temp_neighbors.emplace_back(num_queries * K, main_stream, tmp_res);
-    temp_distances.emplace_back(num_queries * K, main_stream, tmp_res);
+    temp_neighbors.emplace_back(num_queries * k, main_stream, tmp_res);
+    temp_distances.emplace_back(num_queries * k, main_stream, tmp_res);
   }
 
   raft::resource::wait_stream_pool_on_stream(handle);
 
   out_index_type offset = 0;
-  out_index_type stride = K * num_indices;
+  out_index_type stride = k * num_indices;
 
   for (size_t i = 0; i < num_indices; i++) {
     const auto& sub_index = children_[i];
@@ -66,10 +66,10 @@ void CompositeIndex<T, IdxT, OutputIdxT>::search(
 
     auto temp_neighbors_view =
       raft::make_device_matrix_view<out_index_type, matrix_index_type, raft::row_major>(
-        temp_neighbors[i].data(), num_queries, K);
+        temp_neighbors[i].data(), num_queries, k);
     auto temp_distances_view =
       raft::make_device_matrix_view<float, matrix_index_type, raft::row_major>(
-        temp_distances[i].data(), num_queries, K);
+        temp_distances[i].data(), num_queries, k);
 
     sub_index->search(
       stream_pool_handle, params, queries, temp_neighbors_view, temp_distances_view, filter);
@@ -83,18 +83,18 @@ void CompositeIndex<T, IdxT, OutputIdxT>::search(
     }
 
     raft::copy_matrix(
-      neighbors_buffer.data() + i * K, stride, temp_neighbors[i].data(), K, K, num_queries, stream);
+      neighbors_buffer.data() + i * k, stride, temp_neighbors[i].data(), k, k, num_queries, stream);
     raft::copy_matrix(
-      distances_buffer.data() + i * K, stride, temp_distances[i].data(), K, K, num_queries, stream);
+      distances_buffer.data() + i * k, stride, temp_distances[i].data(), k, k, num_queries, stream);
 
     offset += sub_index->size();
   }
   raft::resource::sync_stream_pool(handle);
 
   auto distances_view = raft::make_device_matrix_view<const float, matrix_index_type>(
-    distances_buffer.data(), num_queries, K * num_indices);
+    distances_buffer.data(), num_queries, k * num_indices);
   auto neighbors_view = raft::make_device_matrix_view<const out_index_type, matrix_index_type>(
-    neighbors_buffer.data(), num_queries, K * num_indices);
+    neighbors_buffer.data(), num_queries, k * num_indices);
 
   cuvs::selection::select_k(handle,
                             distances_view,

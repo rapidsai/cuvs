@@ -7,38 +7,38 @@
 
 namespace cuvs::distance::kernels {
 
-template <typename math_t>
-auto KernelFactory<math_t>::create(KernelParams params) -> GramMatrixBase<math_t>*
+template <typename MathT>
+auto KernelFactory<MathT>::create(KernelParams params) -> GramMatrixBase<MathT>*
 {
-  GramMatrixBase<math_t>* res;
-  // KernelParams is not templated, we convert the parameters to math_t here:
-  math_t coef0 = params.coef0;
-  math_t gamma = params.gamma;
+  GramMatrixBase<MathT>* res;
+  // KernelParams is not templated, we convert the parameters to MathT here:
+  MathT coef0 = params.coef0;
+  MathT gamma = params.gamma;
   switch (params.kernel) {
-    case LINEAR: res = new GramMatrixBase<math_t>(); break;
-    case POLYNOMIAL: res = new PolynomialKernel<math_t, int>(params.degree, gamma, coef0); break;
-    case TANH: res = new TanhKernel<math_t>(gamma, coef0); break;
-    case RBF: res = new RBFKernel<math_t>(gamma); break;
+    case LINEAR: res = new GramMatrixBase<MathT>(); break;
+    case POLYNOMIAL: res = new PolynomialKernel<MathT, int>(params.degree, gamma, coef0); break;
+    case TANH: res = new TanhKernel<MathT>(gamma, coef0); break;
+    case RBF: res = new RBFKernel<MathT>(gamma); break;
     default: throw raft::exception("Kernel not implemented");
   }
   return res;
 }
 
-template <typename math_t>
-[[deprecated]] auto KernelFactory<math_t>::create(KernelParams params, cublasHandle_t handle)
-  -> GramMatrixBase<math_t>*
+template <typename MathT>
+[[deprecated]] auto KernelFactory<MathT>::create(KernelParams params, cublasHandle_t handle)
+  -> GramMatrixBase<MathT>*
 {
-  GramMatrixBase<math_t>* res;
-  // KernelParams is not templated, we convert the parameters to math_t here:
-  math_t coef0 = params.coef0;
-  math_t gamma = params.gamma;
+  GramMatrixBase<MathT>* res;
+  // KernelParams is not templated, we convert the parameters to MathT here:
+  MathT coef0 = params.coef0;
+  MathT gamma = params.gamma;
   switch (params.kernel) {
-    case LINEAR: res = new GramMatrixBase<math_t>(handle); break;
+    case LINEAR: res = new GramMatrixBase<MathT>(handle); break;
     case POLYNOMIAL:
-      res = new PolynomialKernel<math_t, int>(params.degree, gamma, coef0, handle);
+      res = new PolynomialKernel<MathT, int>(params.degree, gamma, coef0, handle);
       break;
-    case TANH: res = new TanhKernel<math_t>(gamma, coef0, handle); break;
-    case RBF: res = new RBFKernel<math_t>(gamma, handle); break;
+    case TANH: res = new TanhKernel<MathT>(gamma, coef0, handle); break;
+    case RBF: res = new RBFKernel<MathT>(gamma, handle); break;
     default: throw raft::exception("Kernel not implemented");
   }
   return res;

@@ -344,7 +344,7 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
 
     if constexpr (std::is_same_v<
                     DistEpilogueT,
-                    cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, T>>) {
+                    cuvs::neighbors::detail::reachability::reachability_post_process<IdxT, T>>) {
       batch_core_distances.emplace(
         raft::make_device_vector<T, IdxT>(this->res, this->max_cluster_size));
     }
@@ -373,12 +373,13 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
       "need valid inverted_indices, global_neighbors, and global_distances for "
       "build_knn if doing batching.");
 
-    using ReachabilityPP = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, T>;
+    using reachability_pp =
+      cuvs::neighbors::detail::reachability::reachability_post_process<IdxT, T>;
 
     if (this->n_clusters > 1) {
       bool return_distances      = true;
       size_t num_data_in_cluster = dataset.extent(0);
-      if constexpr (std::is_same_v<DistEpilogueT, ReachabilityPP>) {
+      if constexpr (std::is_same_v<DistEpilogueT, reachability_pp>) {
         // gather core dists
         raft::copy(this->inverted_indices_d.value().data_handle(),
                    inverted_indices.value().data_handle(),
@@ -399,7 +400,7 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
           int_graph.value().data_handle(),
           return_distances,
           this->batch_distances_d.value().data_handle(),
-          cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>{
+          cuvs::neighbors::detail::reachability::reachability_post_process<int, T>{
             batch_core_distances.value().data_handle(), dist_epilogue.alpha, num_data_in_cluster});
       } else {
         nnd_builder.value().build(dataset.data_handle(),
@@ -409,7 +410,7 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
                                   this->batch_distances_d.value().data_handle());
       }
 
-      remap_and_merge_subgraphs<T, IdxT, int, std::is_same_v<DistEpilogueT, ReachabilityPP>>(
+      remap_and_merge_subgraphs<T, IdxT, int, std::is_same_v<DistEpilogueT, reachability_pp>>(
         this->res,
         this->inverted_indices_d.value().view(),
         inverted_indices.value(),
@@ -425,7 +426,7 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
     } else {
       size_t num_rows = dataset.extent(0);
 
-      if constexpr (std::is_same_v<DistEpilogueT, ReachabilityPP>) {
+      if constexpr (std::is_same_v<DistEpilogueT, reachability_pp>) {
         nnd_builder.value().build(
           dataset.data_handle(),
           static_cast<int>(num_rows),
@@ -433,7 +434,7 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
           this->distances_.has_value(),
           this->distances_.value_or(raft::make_device_matrix<T, IdxT>(this->res, 0, 0).view())
             .data_handle(),
-          cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>{
+          cuvs::neighbors::detail::reachability::reachability_post_process<int, T>{
             dist_epilogue.core_dists, dist_epilogue.alpha, dist_epilogue.n});
       } else {
         nnd_builder.value().build(
@@ -520,7 +521,7 @@ struct all_neighbors_builder_brute_force : public all_neighbors_builder<T, IdxT>
       raft::make_device_matrix<T, IdxT, row_major>(this->res, this->max_cluster_size, num_cols));
     if constexpr (std::is_same_v<
                     DistEpilogueT,
-                    cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, T>>) {
+                    cuvs::neighbors::detail::reachability::reachability_post_process<IdxT, T>>) {
       batch_core_distances.emplace(
         raft::make_device_vector<T, IdxT>(this->res, this->max_cluster_size));
     }
@@ -540,10 +541,10 @@ struct all_neighbors_builder_brute_force : public all_neighbors_builder<T, IdxT>
 
     if (this->n_clusters > 1) {
       size_t num_data_in_cluster = dataset.extent(0);
-      using ReachabilityPP =
-        cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, T>;
+      using reachability_pp =
+        cuvs::neighbors::detail::reachability::reachability_post_process<IdxT, T>;
 
-      if constexpr (std::is_same_v<DistEpilogueT, ReachabilityPP>) {
+      if constexpr (std::is_same_v<DistEpilogueT, reachability_pp>) {
         // gather core dists
         raft::copy(this->inverted_indices_d.value().data_handle(),
                    inverted_indices.value().data_handle(),
@@ -575,7 +576,7 @@ struct all_neighbors_builder_brute_force : public all_neighbors_builder<T, IdxT>
           nullptr,
           nullptr,
           nullptr,
-          ReachabilityPP{
+          reachability_pp{
             batch_core_distances.value().data_handle(), dist_epilogue.alpha, num_data_in_cluster});
       } else {
         auto idx = cuvs::neighbors::brute_force::build(this->res, bf_params.build_params, dataset);
@@ -595,7 +596,7 @@ struct all_neighbors_builder_brute_force : public all_neighbors_builder<T, IdxT>
                  num_data_in_cluster * this->k,
                  raft::resource::get_cuda_stream(this->res));
 
-      remap_and_merge_subgraphs<T, IdxT, IdxT, std::is_same_v<DistEpilogueT, ReachabilityPP>>(
+      remap_and_merge_subgraphs<T, IdxT, IdxT, std::is_same_v<DistEpilogueT, reachability_pp>>(
         this->res,
         this->inverted_indices_d.value().view(),
         inverted_indices.value(),

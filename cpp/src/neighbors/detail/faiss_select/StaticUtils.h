@@ -24,31 +24,31 @@
 namespace cuvs::neighbors::detail::faiss_select::utils {
 
 template <typename T>
-constexpr __host__ __device__ auto isPowerOf2(T v) -> bool
+constexpr __host__ __device__ auto is_power_of2(T v) -> bool
 {
   return (v && !(v & (v - 1)));
 }
 
-static_assert(isPowerOf2(2048), "isPowerOf2");
-static_assert(!isPowerOf2(3333), "isPowerOf2");
+static_assert(is_power_of2(2048), "is_power_of2");
+static_assert(!is_power_of2(3333), "is_power_of2");
 
 template <typename T>
-constexpr __host__ __device__ auto nextHighestPowerOf2(T v) -> T
+constexpr __host__ __device__ auto next_highest_power_of2(T v) -> T
 {
-  return (isPowerOf2(v) ? static_cast<T>(2) * v : (static_cast<T>(1) << (raft::log2(v) + 1)));
+  return (is_power_of2(v) ? static_cast<T>(2) * v : (static_cast<T>(1) << (raft::log2(v) + 1)));
 }
 
-static_assert(nextHighestPowerOf2(1) == 2, "nextHighestPowerOf2");
-static_assert(nextHighestPowerOf2(2) == 4, "nextHighestPowerOf2");
-static_assert(nextHighestPowerOf2(3) == 4, "nextHighestPowerOf2");
-static_assert(nextHighestPowerOf2(4) == 8, "nextHighestPowerOf2");
+static_assert(next_highest_power_of2(1) == 2, "next_highest_power_of2");
+static_assert(next_highest_power_of2(2) == 4, "next_highest_power_of2");
+static_assert(next_highest_power_of2(3) == 4, "next_highest_power_of2");
+static_assert(next_highest_power_of2(4) == 8, "next_highest_power_of2");
 
-static_assert(nextHighestPowerOf2(15) == 16, "nextHighestPowerOf2");
-static_assert(nextHighestPowerOf2(16) == 32, "nextHighestPowerOf2");
-static_assert(nextHighestPowerOf2(17) == 32, "nextHighestPowerOf2");
+static_assert(next_highest_power_of2(15) == 16, "next_highest_power_of2");
+static_assert(next_highest_power_of2(16) == 32, "next_highest_power_of2");
+static_assert(next_highest_power_of2(17) == 32, "next_highest_power_of2");
 
-static_assert(nextHighestPowerOf2(1536000000u) == 2147483648u, "nextHighestPowerOf2");
-static_assert(nextHighestPowerOf2((size_t)2147483648ULL) == (size_t)4294967296ULL,
-              "nextHighestPowerOf2");
+static_assert(next_highest_power_of2(1536000000u) == 2147483648u, "next_highest_power_of2");
+static_assert(next_highest_power_of2((size_t)2147483648ULL) == (size_t)4294967296ULL,
+              "next_highest_power_of2");
 
 }  // namespace cuvs::neighbors::detail::faiss_select::utils

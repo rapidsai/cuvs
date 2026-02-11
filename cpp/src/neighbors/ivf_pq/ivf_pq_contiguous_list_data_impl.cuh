@@ -40,8 +40,8 @@ struct unpack_contiguous {
   }
 };
 
-template <uint32_t BlockSize, uint32_t PqBits>
-__launch_bounds__(BlockSize) static __global__ void unpack_contiguous_list_data_kernel(
+template <uint32_t block_size, uint32_t PqBits>
+__launch_bounds__(block_size) static __global__ void unpack_contiguous_list_data_kernel(
   uint8_t* out_codes,
   raft::device_mdspan<const uint8_t,
                       list_spec_interleaved<uint32_t, uint32_t>::list_extents,
@@ -120,8 +120,8 @@ struct pack_contiguous {
   }
 };
 
-template <uint32_t BlockSize, uint32_t PqBits>
-__launch_bounds__(BlockSize) static __global__ void pack_contiguous_list_data_kernel(
+template <uint32_t block_size, uint32_t PqBits>
+__launch_bounds__(block_size) static __global__ void pack_contiguous_list_data_kernel(
   raft::device_mdspan<uint8_t,
                       list_spec_interleaved<uint32_t, uint32_t>::list_extents,
                       raft::row_major> list_data,

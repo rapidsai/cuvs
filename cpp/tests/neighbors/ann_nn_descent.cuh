@@ -232,14 +232,14 @@ class AnnNNDescentDistEpiTest : public ::testing::TestWithParam<AnnNNDescentInpu
         ps.n_rows,
         core_dists_dev.data());
       auto epilogue =
-        cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, DistanceT>{
+        cuvs::neighbors::detail::reachability::reachability_post_process<IdxT, DistanceT>{
           core_dists_dev.data(), 1.0, static_cast<size_t>(ps.n_rows)};
 
       cuvs::neighbors::detail::tiled_brute_force_knn<
         DataT,
         IdxT,
         DistanceT,
-        cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, DistanceT>>(
+        cuvs::neighbors::detail::reachability::reachability_post_process<IdxT, DistanceT>>(
         handle_,
         database.data(),
         database.data(),
@@ -293,7 +293,7 @@ class AnnNNDescentDistEpiTest : public ::testing::TestWithParam<AnnNNDescentInpu
         ps.n_rows, static_cast<IdxT>(extended_graph_degree));
 
       auto dist_epilogue =
-        cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, DataT>{
+        cuvs::neighbors::detail::reachability::reachability_post_process<int, DataT>{
           core_dists_dev.data(), 1.0, static_cast<size_t>(ps.n_rows)};
       rmm::device_uvector<DistanceT> distances_nnd_dev(queries_size, stream_);
       gnnd.build(database_host.data_handle(),

@@ -25,15 +25,15 @@ namespace cuvs::gemm::kernel {
 
 template <
   /// Element type for A matrix operand
-  typename ElementA_,
+  typename ElementA_,  // NOLINT(readability-identifier-naming)
   /// Layout type for A matrix operand
   int kAlignmentA,
   /// Element type for B matrix operand
-  typename ElementB_,
+  typename ElementB_,  // NOLINT(readability-identifier-naming)
   /// Layout type for B matrix operand
   int kAlignmentB,
   /// Element type for C and D matrix operands
-  typename ElementC_,
+  typename ElementC_,  // NOLINT(readability-identifier-naming)
   /// Element type for internal accumulation
   typename ElementAccumulator,
   /// Element type for final output
@@ -44,29 +44,30 @@ template <
   int Stages,
   /// data layout row/column major of inputs
   bool isRowMajor>
-struct PairwiseDistanceGemm {
+struct PairwiseDistanceGemm {  // NOLINT(readability-identifier-naming)
   // This struct is specialized for fp32/3xTF32
 
   /// Threadblock-level tile size (concept: GemmShape)
-  using ThreadblockShape =
+  using ThreadblockShape =                   // NOLINT(readability-identifier-naming)
     cutlass::gemm::GemmShape<128, 128, 16>;  // <- threadblock tile M = 128, N = 128, K = 16
   /// Warp-level tile size (concept: GemmShape)
   // This code section describes tile size a warp will compute
-  using WarpShape = cutlass::gemm::GemmShape<64, 64, 16>;  // <- warp tile M = 64, N = 64, K = 16
+  using WarpShape = cutlass::gemm::GemmShape<64, 64, 16>;  // <- warp tile M = 64, N = 64, K = 16 //
+                                                           // NOLINT(readability-identifier-naming)
   /// Warp-level tile size (concept: GemmShape)
   // This code section describes the size of MMA op
-  using InstructionShape =
+  using InstructionShape =               // NOLINT(readability-identifier-naming)
     cutlass::gemm::GemmShape<16, 8, 4>;  // <- MMA Op tile M = 16, N = 8, K = 4
 
   /// Operation performed by GEMM
-  using Operator = cutlass::arch::OpMultiplyAddFastF32;
+  using Operator = cutlass::arch::OpMultiplyAddFastF32;  // NOLINT(readability-identifier-naming)
 
   // This code section describes whether you want to use tensor cores or regular SIMT cores on GPU
   // SM
-  using OperatorClass = cutlass::arch::OpClassTensorOp;
+  using OperatorClass = cutlass::arch::OpClassTensorOp;  // NOLINT(readability-identifier-naming)
 
   // This code section describes CUDA SM architecture number
-  using ArchTag = cutlass::arch::Sm80;
+  using ArchTag = cutlass::arch::Sm80;  // NOLINT(readability-identifier-naming)
 
   // This code section describes how threadblocks are scheduled on GPU
   /// Threadblock-level swizzling operator
@@ -74,7 +75,7 @@ struct PairwiseDistanceGemm {
 
   /// data layout for final output matrix.
   // we keep this same layout even for column major inputs
-  using LayoutOutput = cutlass::layout::RowMajor;
+  using LayoutOutput = cutlass::layout::RowMajor;  // NOLINT(readability-identifier-naming)
 
   using NormXLayout =
     std::conditional_t<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>;
@@ -130,7 +131,7 @@ template <
   /// Layout type for B matrix operand
   int kAlignmentB,
   /// Element type for C and D matrix operands
-  typename ElementC_,
+  typename ElementC_,  // NOLINT(readability-identifier-naming)
   /// Element type for internal accumulation
   typename ElementAccumulator,
   /// Epilogue output operator      - must satisfy concept of 'EpilogueWithBroadcastOp'
@@ -150,23 +151,25 @@ struct PairwiseDistanceGemm<double,
                             isRowMajor> {
   // using Transform = cutlass::ComplexTransform::kNone;
   // Threadblock-level tile size (concept: GemmShape)
-  using ThreadblockShape =
+  using ThreadblockShape =                 // NOLINT(readability-identifier-naming)
     cutlass::gemm::GemmShape<64, 64, 16>;  // <- threadblock tile M = 64, N = 64, K = 16
   /// Warp-level tile size (concept: GemmShape)
   // This code section describes tile size a warp will compute
-  using WarpShape = cutlass::gemm::GemmShape<32, 32, 16>;  // <- warp tile M = 32, N = 32, K = 16
+  using WarpShape = cutlass::gemm::GemmShape<32, 32, 16>;  // <- warp tile M = 32, N = 32, K = 16 //
+                                                           // NOLINT(readability-identifier-naming)
   /// Warp-level tile size (concept: GemmShape)
   // This code section describes the size of MMA op
-  using InstructionShape = cutlass::gemm::GemmShape<8, 8, 4>;
+  using InstructionShape =
+    cutlass::gemm::GemmShape<8, 8, 4>;  // NOLINT(readability-identifier-naming)
 
   // Operation performed by GEMM
-  using Operator = cutlass::arch::OpMultiplyAdd;
+  using Operator = cutlass::arch::OpMultiplyAdd;  // NOLINT(readability-identifier-naming)
   // This code section describes whether you want to use tensor cores or regular SIMT cores on GPU
   // SM
-  using OperatorClass = cutlass::arch::OpClassTensorOp;
+  using OperatorClass = cutlass::arch::OpClassTensorOp;  // NOLINT(readability-identifier-naming)
 
   // This code section describes CUDA SM architecture number
-  using ArchTag = cutlass::arch::Sm80;
+  using ArchTag = cutlass::arch::Sm80;  // NOLINT(readability-identifier-naming)
 
   // This code section describes how threadblocks are scheduled on GPU
   /// Threadblock-level swizzling operator
@@ -174,7 +177,7 @@ struct PairwiseDistanceGemm<double,
 
   /// data layout for final output matrix.
   // we keep this same layout even for column major inputs
-  using LayoutOutput = cutlass::layout::RowMajor;
+  using LayoutOutput = cutlass::layout::RowMajor;  // NOLINT(readability-identifier-naming)
 
   using NormXLayout =
     std::conditional_t<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>;
@@ -230,7 +233,7 @@ template <
   /// Layout type for B matrix operand
   int kAlignmentB,
   /// Element type for C and D matrix operands
-  typename ElementC_,
+  typename ElementC_,  // NOLINT(readability-identifier-naming)
   /// Element type for internal accumulation
   typename ElementAccumulator,
   /// Epilogue output operator      - must satisfy concept of 'EpilogueWithBroadcastOp'
@@ -250,31 +253,34 @@ struct PairwiseDistanceGemm<half,
                             isRowMajor> {
   // using Transform = cutlass::ComplexTransform::kNone;
   // Threadblock-level tile size (concept: GemmShape)
-  using ThreadblockShape =
+  using ThreadblockShape =                   // NOLINT(readability-identifier-naming)
     cutlass::gemm::GemmShape<128, 128, 32>;  // <- threadblock tile M = 64, N = 64, K = 16
   /// Warp-level tile size (concept: GemmShape)
   // This code section describes tile size a warp will compute
-  using WarpShape = cutlass::gemm::GemmShape<64, 64, 32>;  // <- warp tile M = 32, N = 32, K = 16
+  using WarpShape = cutlass::gemm::GemmShape<64, 64, 32>;  // <- warp tile M = 32, N = 32, K = 16 //
+                                                           // NOLINT(readability-identifier-naming)
   /// Warp-level tile size (concept: GemmShape)
   // This code section describes the size of MMA op
-  using InstructionShape = cutlass::gemm::GemmShape<16, 8, 16>;
+  using InstructionShape =
+    cutlass::gemm::GemmShape<16, 8, 16>;  // NOLINT(readability-identifier-naming)
 
   // Operation performed by GEMM
-  using Operator = cutlass::arch::OpMultiplyAdd;
+  using Operator = cutlass::arch::OpMultiplyAdd;  // NOLINT(readability-identifier-naming)
   // This code section describes whether you want to use tensor cores or regular SIMT cores on GPU
   // SM
-  using OperatorClass = cutlass::arch::OpClassTensorOp;
+  using OperatorClass = cutlass::arch::OpClassTensorOp;  // NOLINT(readability-identifier-naming)
 
   // This code section describes CUDA SM architecture number
-  using ArchTag = cutlass::arch::Sm80;
+  using ArchTag = cutlass::arch::Sm80;  // NOLINT(readability-identifier-naming)
 
   // This code section describes how threadblocks are scheduled on GPU
   /// Threadblock-level swizzling operator
-  using ThreadblockSwizzle = cutlass::gemm::threadblock::GemmBatchedIdentityThreadblockSwizzle;
+  using ThreadblockSwizzle = cutlass::gemm::threadblock::
+    GemmBatchedIdentityThreadblockSwizzle;  // NOLINT(readability-identifier-naming)
 
   /// data layout for final output matrix.
   // we keep this same layout even for column major inputs
-  using LayoutOutput = cutlass::layout::RowMajor;
+  using LayoutOutput = cutlass::layout::RowMajor;  // NOLINT(readability-identifier-naming)
 
   using NormXLayout =
     std::conditional_t<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>;

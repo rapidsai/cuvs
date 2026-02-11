@@ -42,10 +42,10 @@ auto pairwise_matrix_sm60_get_wrapper(OpT distance_op,
 
     using RowPolicy = typename raft::linalg::Policy4x4<DataT, kVecLen>::Policy;
     using ColPolicy = typename raft::linalg::Policy4x4<DataT, kVecLen>::ColPolicy;
-    using Policy    = typename std::conditional<row_major(), RowPolicy, ColPolicy>::type;
+    using policy    = typename std::conditional<row_major(), RowPolicy, ColPolicy>::type;
 
     auto wrapper =
-      make_pairwise_matrix_sm60_wrapper<Policy, row_major()>(distance_op, params, sm_compat_range);
+      make_pairwise_matrix_sm60_wrapper<policy, row_major()>(distance_op, params, sm_compat_range);
 
     return wrapper;
   };

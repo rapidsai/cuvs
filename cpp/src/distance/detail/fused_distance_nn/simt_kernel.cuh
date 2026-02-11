@@ -8,14 +8,14 @@
 #include "../distance_ops/l2_exp.cuh"     // ops::l2_exp_distance_op
 #include "../pairwise_distance_base.cuh"  // PairwiseDistances
 #include <raft/core/kvp.hpp>              // raft::KeyValuePair
-#include <raft/linalg/contractions.cuh>   // Policy
+#include <raft/linalg/contractions.cuh>   // policy
 
 #include <cstddef>  // size_t
 #include <limits>   // std::numeric_limits
 
 namespace cuvs::distance::detail {
 
-// TODO(snanditale): specialize this function for MinAndDistanceReduceOp<int, float>
+// TODO(snanditale): specialize this function for min_and_distance_reduce_op<int, float>
 // with atomicCAS of 64 bit which will eliminate mutex and shfls
 template <typename P, typename OutT, typename IdxT, typename KVPair, typename ReduceOpT>
 DI auto update_reduced_val(

@@ -34,25 +34,25 @@ namespace cuvs::neighbors::experimental::scann::detail {
 
 namespace {
 
-template <typename LabelT, typename IdxT>
+template <typename label_t, typename IdxT>
 __global__ void build_clusters(
-  LabelT const* node_to_cluster, LabelT* clusters, IdxT* cluster_start, int nodes, int n_clusters)
+  label_t const* node_to_cluster, label_t* clusters, IdxT* cluster_start, int nodes, int n_clusters)
 {
   size_t node = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (node < nodes) {
-    LabelT cluster        = node_to_cluster[node];
-    LabelT cluster_ptr    = atomicAdd(&cluster_start[cluster], 1);
+    label_t cluster       = node_to_cluster[node];
+    label_t cluster_ptr   = atomicAdd(&cluster_start[cluster], 1);
     clusters[cluster_ptr] = node;
   }
 }
 }  // namespace
 
 // Compute cluster sizes/offsets
-template <typename LabelT, typename IdxT>
+template <typename label_t, typename IdxT>
 void compute_cluster_offsets(raft::resources const& dev_resources,
-                             raft::device_vector_view<const LabelT, IdxT> clusters,
-                             raft::device_vector_view<LabelT, int64_t> cluster_sizes,
+                             raft::device_vector_view<const label_t, IdxT> clusters,
+                             raft::device_vector_view<label_t, int64_t> cluster_sizes,
                              int64_t& max_cluster_size)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(dev_resources);
@@ -161,12 +161,12 @@ void cholesky_solver(raft::resources const& dev_resources,
                      raft::device_vector_view<T, int64_t> b,
                      raft::device_vector_view<T, int64_t> x)
 {
-  cudaStream_t stream          = raft::resource::get_cuda_stream(dev_resources);
-  cusolverDnHandle_t cusolverH = raft::resource::get_cusolver_dn_handle(dev_resources);
+  cudaStream_t stream           = raft::resource::get_cuda_stream(dev_resources);
+  cusolverDnHandle_t cusolver_h = raft::resource::get_cusolver_dn_handle(dev_resources);
   rmm::device_async_resource_ref device_memory =
     raft::resource::get_workspace_resource(dev_resources);
 
-  // RAFT_CUSOLVER_TRY(cusolverDnSetStream(cusolverH, stream));
+  // RAFT_CUSOLVER_TRY(cusolverDnSetStream(cusolver_h, stream));
 
   int n                 = A.extent(0);
   int lda               = n;
@@ -175,19 +175,26 @@ void cholesky_solver(raft::resources const& dev_resources,
 
   // compute bufferszie for potrf
   RAFT_CUSOLVER_TRY(raft::linalg::detail::cusolverDnpotrf_bufferSize(
-    cusolverH, uplo, n, A.data_handle(), lda, &lwork));
+    cusolver_h, uplo, n, A.data_handle(), lda, &lwork));
   // compute cholesky factorization w/ potrf
-  auto devInfo = raft::make_device_scalar(dev_resources, 0);
+  auto dev_info = raft::make_device_scalar(dev_resources, 0);
   rmm::device_uvector<T> d_work(lwork, stream, device_memory);
 
-  RAFT_CUSOLVER_TRY(raft::linalg::detail::cusolverDnpotrf(
-    cusolverH, uplo, n, A.data_handle(), lda, d_work.data(), lwork, devInfo.data_handle(), stream));
+  RAFT_CUSOLVER_TRY(raft::linalg::detail::cusolverDnpotrf(cusolver_h,
+                                                          uplo,
+                                                          n,
+                                                          A.data_handle(),
+                                                          lda,
+                                                          d_work.data(),
+                                                          lwork,
+                                                          dev_info.data_handle(),
+                                                          stream));
 
   // solve Ax = b
   int ldb  = b.extent(0);
   int nrhs = 1;
 
-  RAFT_CUSOLVER_TRY(raft::linalg::detail::cusolverDnpotrs(cusolverH,
+  RAFT_CUSOLVER_TRY(raft::linalg::detail::cusolverDnpotrs(cusolver_h,
                                                           uplo,
                                                           n,
                                                           nrhs,
@@ -195,7 +202,7 @@ void cholesky_solver(raft::resources const& dev_resources,
                                                           lda,
                                                           b.data_handle(),
                                                           ldb,
-                                                          devInfo.data_handle(),
+                                                          dev_info.data_handle(),
                                                           stream));
 }
 
@@ -388,16 +395,16 @@ void rescale_avq_centroids(raft::resources const& dev_resources,
  * 	 allocated on the provided stream, allowing for overlapping with
  *		 other work on other streams.
  */
-template <typename T, typename LabelT>
+template <typename T, typename label_t>
 class cluster_loader {
  private:
   raft::pinned_matrix<T, int64_t> cluster_buf_;
-  raft::pinned_vector<LabelT, int64_t> cluster_ids_buf_;
+  raft::pinned_vector<label_t, int64_t> cluster_ids_buf_;
   raft::device_matrix<T, int64_t> d_cluster_buf_;
   raft::device_matrix<T, int64_t> d_cluster_copy_buf_;
   const T* dataset_ptr_;
-  raft::host_vector_view<const LabelT, int64_t> h_cluster_offsets_;
-  raft::device_vector_view<const LabelT, int64_t> cluster_ids_;
+  raft::host_vector_view<const label_t, int64_t> h_cluster_offsets_;
+  raft::device_vector_view<const label_t, int64_t> cluster_ids_;
   cudaStream_t stream_;
   int64_t dim_;
   int64_t n_rows_;
@@ -406,7 +413,7 @@ class cluster_loader {
   int64_t cur_idx_  = -1;
   int64_t copy_idx_ = -1;
 
-  auto cluster_size(LabelT idx) -> size_t
+  auto cluster_size(label_t idx) -> size_t
   {
     if (idx + 1 < h_cluster_offsets_.extent(0)) {
       return h_cluster_offsets_(idx + 1) - h_cluster_offsets_(idx);
@@ -420,15 +427,15 @@ class cluster_loader {
                  int64_t n_rows,
                  int64_t max_cluster_size,
                  int64_t h_buf_size,
-                 raft::host_vector_view<LabelT, int64_t> h_cluster_offsets,
-                 raft::device_vector_view<LabelT, int64_t> cluster_ids,
+                 raft::host_vector_view<label_t, int64_t> h_cluster_offsets,
+                 raft::device_vector_view<label_t, int64_t> cluster_ids,
                  bool needs_copy,
                  cudaStream_t stream)
     : dim_(dim),
       n_rows_(n_rows),
       dataset_ptr_(dataset_ptr),
       cluster_buf_(raft::make_pinned_matrix<T, int64_t>(res, h_buf_size, dim)),
-      cluster_ids_buf_(raft::make_pinned_vector<LabelT, int64_t>(res, h_buf_size)),
+      cluster_ids_buf_(raft::make_pinned_vector<label_t, int64_t>(res, h_buf_size)),
       d_cluster_buf_(raft::make_device_matrix<T, int64_t>(res, max_cluster_size, dim)),
       d_cluster_copy_buf_(raft::make_device_matrix<T, int64_t>(res, max_cluster_size, dim)),
       h_cluster_offsets_(h_cluster_offsets),
@@ -441,8 +448,8 @@ class cluster_loader {
  public:
   cluster_loader(raft::resources const& res,
                  raft::device_matrix_view<const T, int64_t> dataset_view,
-                 raft::host_vector_view<LabelT, int64_t> h_cluster_offsets,
-                 raft::device_vector_view<LabelT, int64_t> cluster_ids,
+                 raft::host_vector_view<label_t, int64_t> h_cluster_offsets,
+                 raft::device_vector_view<label_t, int64_t> cluster_ids,
                  int64_t max_cluster_size,
                  cudaStream_t stream)
     : cluster_loader(res,
@@ -461,8 +468,8 @@ class cluster_loader {
 
   cluster_loader(raft::resources const& res,
                  raft::host_matrix_view<const T, int64_t> dataset_view,
-                 raft::host_vector_view<LabelT, int64_t> h_cluster_offsets,
-                 raft::device_vector_view<LabelT, int64_t> cluster_ids,
+                 raft::host_vector_view<label_t, int64_t> h_cluster_offsets,
+                 raft::device_vector_view<label_t, int64_t> cluster_ids,
                  int64_t max_cluster_size,
                  cudaStream_t stream)
     : cluster_loader(res,
@@ -486,7 +493,7 @@ class cluster_loader {
    * @param cluster_idx: the index of the cluster to be loaded
    * @return device_matrix_view of the cluster vectors
    */
-  auto load_cluster(raft::resources const& res, LabelT cluster_idx)
+  auto load_cluster(raft::resources const& res, label_t cluster_idx)
     -> raft::device_matrix_view<T, int64_t>
   {
     size_t size = cluster_size(cluster_idx);
@@ -509,13 +516,13 @@ class cluster_loader {
    * @param res: the raft resources
    * @param cluster_idx: the index of the cluster
    */
-  void prefetch_cluster(raft::resources const& res, LabelT cluster_idx)
+  void prefetch_cluster(raft::resources const& res, label_t cluster_idx)
   {
     if (cluster_idx >= h_cluster_offsets_.extent(0)) { return; }
 
     size_t size = cluster_size(cluster_idx);
 
-    auto cluster_ids = raft::make_device_vector_view<const LabelT, int64_t>(
+    auto cluster_ids = raft::make_device_vector_view<const label_t, int64_t>(
       cluster_ids_.data_handle() + h_cluster_offsets_(cluster_idx), size);
 
     auto cluster_vectors =
@@ -524,7 +531,7 @@ class cluster_loader {
     if (needs_copy_) {
       // htod
       auto h_cluster_ids =
-        raft::make_pinned_vector_view<LabelT, int64_t>(cluster_ids_buf_.data_handle(), size);
+        raft::make_pinned_vector_view<label_t, int64_t>(cluster_ids_buf_.data_handle(), size);
 
       raft::copy(
         h_cluster_ids.data_handle(), cluster_ids.data_handle(), cluster_ids.size(), stream_);
@@ -570,7 +577,7 @@ class cluster_loader {
  *
  * @tparam T
  * @tparam IdxT
- * @tparam LabelT
+ * @tparam label_t
  * @tparam Accessor
  * @param res raft resources
  * @param dataset the dataset (host or device), size [n_rows, dim]
@@ -579,14 +586,14 @@ class cluster_loader {
  * @param eta the weight for the parallel component of the residual in the avq update
  */
 template <typename T,
-          typename IdxT   = int64_t,
-          typename LabelT = uint32_t,
+          typename IdxT    = int64_t,
+          typename label_t = uint32_t,
           typename Accessor =
             raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 void apply_avq(raft::resources const& res,
                raft::mdspan<const T, raft::matrix_extent<IdxT>, raft::row_major, Accessor> dataset,
                raft::device_matrix_view<T, IdxT> centroids_view,
-               raft::device_vector_view<const LabelT, IdxT> labels_view,
+               raft::device_vector_view<const label_t, IdxT> labels_view,
                float eta,
                cudaStream_t copy_stream)
 {
@@ -616,7 +623,7 @@ void apply_avq(raft::resources const& res,
   auto rescale_num   = raft::make_device_vector<float, int64_t>(res, centroids_view.extent(0));
   auto rescale_denom = raft::make_device_vector<float, int64_t>(res, centroids_view.extent(0));
 
-  cluster_loader<T, LabelT> loader(
+  cluster_loader<T, label_t> loader(
     res, dataset, h_cluster_offsets.view(), clusters.view(), max_cluster_size, copy_stream);
   raft::resource::sync_stream(res);
 

@@ -9,15 +9,15 @@
 
 namespace cuvs::cluster::kmeans {
 
-#define INSTANTIATE_PREDICT(DataT, IndexT)                                      \
-  template void predict<DataT, IndexT>(                                         \
-    raft::resources const& handle,                                              \
-    const kmeans::params& params,                                               \
-    raft::device_matrix_view<const DataT, IndexT> X,                            \
-    std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight, \
-    raft::device_matrix_view<const DataT, IndexT> centroids,                    \
-    raft::device_vector_view<IndexT, IndexT> labels,                            \
-    bool normalize_weight,                                                      \
+#define INSTANTIATE_PREDICT(DataT, index_t)                                      \
+  template void predict<DataT, index_t>(                                         \
+    raft::resources const& handle,                                               \
+    const kmeans::params& params,                                                \
+    raft::device_matrix_view<const DataT, index_t> X,                            \
+    std::optional<raft::device_vector_view<const DataT, index_t>> sample_weight, \
+    raft::device_matrix_view<const DataT, index_t> centroids,                    \
+    raft::device_vector_view<index_t, index_t> labels,                           \
+    bool normalize_weight,                                                       \
     raft::host_scalar_view<DataT> inertia);
 
 INSTANTIATE_PREDICT(float, int)

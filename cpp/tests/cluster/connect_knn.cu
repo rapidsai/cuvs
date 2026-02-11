@@ -71,29 +71,30 @@ class ConnectKNNTest
       cuvs::neighbors::detail::reachability::core_distances<int64_t, T>(
         handle, dists.data(), ps.k, ps.k, (size_t)ps.n_rows, core_dists.data());
 
-      auto epilogue = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int64_t, T>{
+      auto epilogue = cuvs::neighbors::detail::reachability::reachability_post_process<int64_t, T>{
         core_dists.data(), 1.0};
       cuvs::neighbors::detail::tiled_brute_force_knn<
         T,
         int64_t,
         T,
-        cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int64_t, T>>(handle,
-                                                                                    database.data(),
-                                                                                    database.data(),
-                                                                                    ps.n_rows,
-                                                                                    ps.n_rows,
-                                                                                    ps.dim,
-                                                                                    ps.k,
-                                                                                    dists.data(),
-                                                                                    inds.data(),
-                                                                                    ps.metric,
-                                                                                    2.0,
-                                                                                    0,
-                                                                                    0,
-                                                                                    nullptr,
-                                                                                    nullptr,
-                                                                                    nullptr,
-                                                                                    epilogue);
+        cuvs::neighbors::detail::reachability::reachability_post_process<int64_t, T>>(
+        handle,
+        database.data(),
+        database.data(),
+        ps.n_rows,
+        ps.n_rows,
+        ps.dim,
+        ps.k,
+        dists.data(),
+        inds.data(),
+        ps.metric,
+        2.0,
+        0,
+        0,
+        nullptr,
+        nullptr,
+        nullptr,
+        epilogue);
     }
 
     rmm::device_uvector<int64_t> coo_rows(queries_size, stream);
@@ -143,8 +144,8 @@ class ConnectKNNTest
     raft::copy(database_h.data_handle(), database.data(), ps.n_rows * ps.dim, stream);
 
     if (ps.mutual_reach) {
-      cuvs::sparse::neighbors::MutualReachabilityFixConnectivitiesRedOp<int64_t, T> reduction_op(
-        core_dists.data(), static_cast<int64_t>(ps.n_rows));
+      cuvs::sparse::neighbors::mutual_reachability_fix_connectivities_red_op<int64_t, T>
+        reduction_op(core_dists.data(), static_cast<int64_t>(ps.n_rows));
       cuvs::cluster::agglomerative::detail::connect_knn_graph<int64_t, T>(
         handle,
         raft::make_const_mdspan(database_h.view()),

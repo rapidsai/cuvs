@@ -28,41 +28,41 @@ namespace cuvs::neighbors::vamana::detail {
 
 /* Combines edge and candidate lists, removes duplicates, and sorts by distance
  * Uses CUB primitives, so needs to be templated. Called with Macros for supported sizes above */
-template <typename accT, typename IdxT, int CANDS>
+template <typename AccT, typename IdxT, int CANDS>
 __forceinline__ __device__ void sort_visited(
-  QueryCandidates<IdxT, accT>* query,
-  typename cub::BlockMergeSort<DistPair<IdxT, accT>, 32, (CANDS / 32)>::TempStorage* sort_mem)
+  query_candidates<IdxT, AccT>* query,
+  typename cub::BlockMergeSort<dist_pair<IdxT, AccT>, 32, (CANDS / 32)>::TempStorage* sort_mem)
 {
-  const int ELTS   = CANDS / 32;
-  using BlockSortT = cub::BlockMergeSort<DistPair<IdxT, accT>, 32, ELTS>;
-  DistPair<IdxT, accT> tmp[ELTS];
-  for (int i = 0; i < ELTS; i++) {
-    tmp[i].idx  = query->ids[ELTS * threadIdx.x + i];
-    tmp[i].dist = query->dists[ELTS * threadIdx.x + i];
+  const int elts   = CANDS / 32;
+  using BlockSortT = cub::BlockMergeSort<dist_pair<IdxT, AccT>, 32, elts>;
+  dist_pair<IdxT, AccT> tmp[elts];
+  for (int i = 0; i < elts; i++) {
+    tmp[i].idx  = query->ids[elts * threadIdx.x + i];
+    tmp[i].dist = query->dists[elts * threadIdx.x + i];
   }
 
   __syncthreads();
-  BlockSortT(*sort_mem).Sort(tmp, CmpDist<IdxT, accT>());
+  BlockSortT(*sort_mem).Sort(tmp, cmp_dist<IdxT, AccT>());
   __syncthreads();
 
-  for (int i = 0; i < ELTS; i++) {
-    query->ids[ELTS * threadIdx.x + i]   = tmp[i].idx;
-    query->dists[ELTS * threadIdx.x + i] = tmp[i].dist;
+  for (int i = 0; i < elts; i++) {
+    query->ids[elts * threadIdx.x + i]   = tmp[i].idx;
+    query->dists[elts * threadIdx.x + i] = tmp[i].dist;
   }
   __syncthreads();
 }
 
 namespace {
 
-template <typename T, typename accT, typename IdxT = uint32_t>
-__global__ void SortPairsKernel(void* query_list_ptr, int num_queries, int topk)
+template <typename T, typename AccT, typename IdxT = uint32_t>
+__global__ void sort_pairs_kernel(void* query_list_ptr, int num_queries, int topk)
 {
   union ShmemLayout {
-    typename cub::BlockMergeSort<DistPair<IdxT, accT>, 32, 1>::TempStorage sort_mem;
+    typename cub::BlockMergeSort<dist_pair<IdxT, AccT>, 32, 1>::TempStorage sort_mem;
   };
   extern __shared__ __align__(alignof(ShmemLayout)) char smem[];
 
-  auto* query_list = static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
+  auto* query_list = static_cast<query_candidates<IdxT, AccT>*>(query_list_ptr);
 
   for (int i = blockIdx.x; i < num_queries; i += gridDim.x) {
     __syncthreads();
@@ -80,11 +80,11 @@ __global__ void SortPairsKernel(void* query_list_ptr, int num_queries, int topk)
            during the GreedySearch.
 **********************************************************************************************/
 template <typename T,
-          typename accT,
+          typename AccT,
           typename IdxT = uint32_t,
           typename Accessor =
             raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
-__global__ void GreedySearchKernel(
+__global__ void greedy_search_kernel(
   raft::device_matrix_view<IdxT, int64_t> graph,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
   void* query_list_ptr,
@@ -93,27 +93,27 @@ __global__ void GreedySearchKernel(
   int topk,
   cuvs::distance::DistanceType metric,
   int max_queue_size,
-  Node<accT>* topk_pq_mem)
+  node<AccT>* topk_pq_mem)
 {
   int n      = dataset.extent(0);
   int dim    = dataset.extent(1);
   int degree = graph.extent(1);
 
-  QueryCandidates<IdxT, accT>* query_list =
-    static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
+  query_candidates<IdxT, AccT>* query_list =
+    static_cast<query_candidates<IdxT, AccT>*>(query_list_ptr);
 
   static __shared__ int topk_q_size;
   static __shared__ int cand_q_size;
-  static __shared__ accT cur_k_max;
+  static __shared__ AccT cur_k_max;
   static __shared__ int k_max_idx;
 
-  static __shared__ Point<T, accT> s_query;
+  static __shared__ point<T, AccT> s_query;
 
   union ShmemLayout {
     // All blocksort sizes have same alignment (16)
     T coords;
     int neighborhood_arr;
-    DistPair<IdxT, accT> candidate_queue;
+    dist_pair<IdxT, AccT> candidate_queue;
   };
 
   int align_padding = (((dim - 1) / alignof(ShmemLayout)) + 1) * alignof(ShmemLayout) - dim;
@@ -126,18 +126,18 @@ __global__ void GreedySearchKernel(
   T* s_coords = reinterpret_cast<T*>(&smem[smem_offset]);
   smem_offset += (dim + align_padding) * sizeof(T);
 
-  Node<accT>* topk_pq = &topk_pq_mem[blockIdx.x * topk];
+  node<AccT>* topk_pq = &topk_pq_mem[blockIdx.x * topk];
 
   int* neighbor_array = reinterpret_cast<int*>(&smem[smem_offset]);
   smem_offset += degree * sizeof(int);
 
-  DistPair<IdxT, accT>* candidate_queue_smem =
-    reinterpret_cast<DistPair<IdxT, accT>*>(&smem[smem_offset]);
+  dist_pair<IdxT, AccT>* candidate_queue_smem =
+    reinterpret_cast<dist_pair<IdxT, AccT>*>(&smem[smem_offset]);
 
   s_query.coords = s_coords;
-  s_query.Dim    = dim;
+  s_query.dim    = dim;
 
-  PriorityQueue<IdxT, accT> heap_queue;
+  priority_queue<IdxT, AccT> heap_queue;
 
   if (threadIdx.x == 0) {
     heap_queue.initialize(candidate_queue_smem, max_queue_size, &cand_q_size);
@@ -152,12 +152,12 @@ __global__ void GreedySearchKernel(
     query_list[i].reset();
 
     // storing the current query vector into shared memory
-    update_shared_point<T, accT>(&s_query, &dataset(0, 0), query_list[i].queryId, dim);
+    update_shared_point<T, AccT>(&s_query, &dataset(0, 0), query_list[i].query_id, dim);
 
     if (threadIdx.x == 0) {
       topk_q_size = 0;
       cand_q_size = 0;
-      s_query.id  = query_list[i].queryId;
+      s_query.id  = query_list[i].query_id;
       cur_k_max   = 0;
       k_max_idx   = 0;
       heap_queue.reset();
@@ -165,13 +165,13 @@ __global__ void GreedySearchKernel(
 
     __syncthreads();
 
-    Point<T, accT>* query_vec;
+    point<T, AccT>* query_vec;
 
     // Just start from medoid every time, rather than multiple set_ups
     query_vec        = &s_query;
-    query_vec->Dim   = dim;
+    query_vec->dim   = dim;
     const T* medoid  = &dataset((size_t)medoid_id, 0);
-    accT medoid_dist = dist<T, accT>(query_vec->coords, medoid, dim, metric);
+    AccT medoid_dist = dist<T, AccT>(query_vec->coords, medoid, dim, metric);
 
     if (threadIdx.x == 0) { heap_queue.insert_back(medoid_dist, medoid_id); }
     __syncthreads();
@@ -180,14 +180,14 @@ __global__ void GreedySearchKernel(
       __syncthreads();
 
       int cand_num;
-      accT cur_distance;
+      AccT cur_distance;
       if (threadIdx.x == 0) {
-        Node<accT> test_cand;
-        DistPair<IdxT, accT> test_cand_out = heap_queue.pop();
-        test_cand.distance                 = test_cand_out.dist;
-        test_cand.nodeid                   = test_cand_out.idx;
-        cand_num                           = test_cand.nodeid;
-        cur_distance                       = test_cand_out.dist;
+        node<AccT> test_cand;
+        dist_pair<IdxT, AccT> test_cand_out = heap_queue.pop();
+        test_cand.distance                  = test_cand_out.dist;
+        test_cand.nodeid                    = test_cand_out.idx;
+        cand_num                            = test_cand.nodeid;
+        cur_distance                        = test_cand_out.dist;
       }
       __syncthreads();
 
@@ -223,13 +223,13 @@ __global__ void GreedySearchKernel(
 
       // The current node is closer to the query vector than the worst candidate in top-K queue, so
       // enquee the current node in top-k queue
-      Node<accT> new_cand;
+      node<AccT> new_cand;
       new_cand.distance = cur_distance;
       new_cand.nodeid   = cand_num;
 
       if (check_duplicate(topk_pq, topk_q_size, new_cand) == false) {
         if (!pass_flag) {
-          parallel_pq_max_enqueue<accT>(
+          parallel_pq_max_enqueue<AccT>(
             topk_pq, &topk_q_size, topk, new_cand, &cur_k_max, &k_max_idx);
 
           __syncthreads();
@@ -251,7 +251,7 @@ __global__ void GreedySearchKernel(
 
       // computing distances between the query vector and neighbor vectors then enqueue in priority
       // queue.
-      enqueue_all_neighbors<T, accT, IdxT>(
+      enqueue_all_neighbors<T, AccT, IdxT>(
         num_neighbors, query_vec, &dataset(0, 0), neighbor_array, heap_queue, dim, metric);
 
       __syncthreads();
@@ -262,15 +262,15 @@ __global__ void GreedySearchKernel(
     // Remove self edges
     for (int j = threadIdx.x; j < query_list[i].size; j += blockDim.x) {
       if (query_list[i].ids[j] == query_vec->id) {
-        query_list[i].dists[j] = raft::upper_bound<accT>();
+        query_list[i].dists[j] = raft::upper_bound<AccT>();
         query_list[i].ids[j]   = raft::upper_bound<IdxT>();
         self_found             = true;  // Flag to reduce size by 1
       }
     }
 
-    for (int j = query_list[i].size + threadIdx.x; j < query_list[i].maxSize; j += blockDim.x) {
+    for (int j = query_list[i].size + threadIdx.x; j < query_list[i].max_size; j += blockDim.x) {
       query_list[i].ids[j]   = raft::upper_bound<IdxT>();
-      query_list[i].dists[j] = raft::upper_bound<accT>();
+      query_list[i].dists[j] = raft::upper_bound<AccT>();
     }
 
     __syncthreads();

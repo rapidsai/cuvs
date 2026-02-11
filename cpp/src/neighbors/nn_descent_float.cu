@@ -48,17 +48,17 @@ namespace cuvs::neighbors::nn_descent {
   template class detail::gnnd<const T, int>;                                                  \
                                                                                               \
   template void detail::gnnd<const T, int>::build<                                            \
-    cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>>(                  \
+    cuvs::neighbors::detail::reachability::reachability_post_process<int, T>>(                \
     const T* data,                                                                            \
     const int nrow,                                                                           \
     int* output_graph,                                                                        \
     bool return_distances,                                                                    \
     float* output_distances,                                                                  \
-    cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T> dist_epilogue);    \
+    cuvs::neighbors::detail::reachability::reachability_post_process<int, T> dist_epilogue);  \
   template void detail::gnnd<const T, int>::local_join<                                       \
-    cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>>(                  \
+    cuvs::neighbors::detail::reachability::reachability_post_process<int, T>>(                \
     cudaStream_t stream,                                                                      \
-    cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T> dist_epilogue);    \
+    cuvs::neighbors::detail::reachability::reachability_post_process<int, T> dist_epilogue);  \
                                                                                               \
   template void detail::gnnd<const T, int>::build<raft::identity_op>(                         \
     const T* data,                                                                            \

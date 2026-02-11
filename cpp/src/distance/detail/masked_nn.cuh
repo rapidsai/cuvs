@@ -270,7 +270,7 @@ void masked_l2_nn_impl(raft::resources const& handle,
     dim3 grid(raft::ceildiv<int>(m, p::Nthreads));
     dim3 block(p::Nthreads);
 
-    initKernel<DataT, OutT, IdxT, ReduceOpT><<<grid, block, 0, stream>>>(out, m, kMaxVal, redOp);
+    init_kernel<DataT, OutT, IdxT, ReduceOpT><<<grid, block, 0, stream>>>(out, m, kMaxVal, redOp);
     RAFT_CUDA_TRY(cudaGetLastError());
   }
 

@@ -15,14 +15,14 @@ namespace cuvs::distance {
  * @{
  */
 
-template <typename LabelT, typename DataT>
-using KVPMinReduce = detail::KVPMinReduceImpl<LabelT, DataT>;
+template <typename label_t, typename DataT>
+using kvp_min_reduce = detail::kvp_min_reduce_impl<label_t, DataT>;
 
-template <typename LabelT, typename DataT>
-using MinAndDistanceReduceOp = detail::MinAndDistanceReduceOpImpl<LabelT, DataT>;
+template <typename label_t, typename DataT>
+using min_and_distance_reduce_op = detail::min_and_distance_reduce_op_impl<label_t, DataT>;
 
-template <typename LabelT, typename DataT>
-using MinReduceOp = detail::MinReduceOpImpl<LabelT, DataT>;
+template <typename label_t, typename DataT>
+using min_reduce_op = detail::min_reduce_op_impl<label_t, DataT>;
 
 /** @} */
 

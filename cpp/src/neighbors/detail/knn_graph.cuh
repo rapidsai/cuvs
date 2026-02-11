@@ -21,14 +21,14 @@
 
 namespace cuvs::neighbors::detail {
 
-template <typename value_idx>
-auto build_k(value_idx n_samples, int c) -> value_idx
+template <typename ValueIdx>
+auto build_k(ValueIdx n_samples, int c) -> ValueIdx
 {
   // from "kNN-MST-Agglomerative: A fast & scalable graph-based data clustering
   // approach on GPU"
   return std::min(
     n_samples,
-    std::max(static_cast<value_idx>(2), static_cast<value_idx>(floor(raft::log2(n_samples))) + c));
+    std::max(static_cast<ValueIdx>(2), static_cast<ValueIdx>(floor(raft::log2(n_samples))) + c));
 }
 /**
  * Constructs a (symmetrized) knn graph edge list from
@@ -36,9 +36,9 @@ auto build_k(value_idx n_samples, int c) -> value_idx
  *
  * Note: The resulting KNN graph is not guaranteed to be connected.
  *
- * @tparam value_idx
+ * @tparam ValueIdx
  * @tparam value_t
- * @tparam nnz_t
+ * @tparam NnzT
  * @param[in] res raft res
  * @param[in] X dense matrix of input data samples and observations (size m * n)
  * @param[in] metric distance metric to use when constructing neighborhoods
@@ -46,11 +46,13 @@ auto build_k(value_idx n_samples, int c) -> value_idx
  * @param[in] c a constant used when constructing linkage from knn graph. Allows the indirect
  control of k. The algorithm will set `k = log(n) + c`
  */
-template <typename value_idx = int, typename value_t = float, typename nnz_t = size_t>
+template <typename ValueIdx = int,
+          typename value_t  = float,
+          typename NnzT     = size_t>  // NOLINT(readability-identifier-naming)
 void knn_graph(raft::resources const& res,
-               raft::device_matrix_view<const value_t, value_idx> X,
+               raft::device_matrix_view<const value_t, ValueIdx> X,
                cuvs::distance::DistanceType metric,
-               raft::sparse::COO<value_t, value_idx, nnz_t>& out,
+               raft::sparse::COO<value_t, ValueIdx, NnzT>& out,
                int c = 15)
 {
   size_t m = X.extent(0);
@@ -59,16 +61,16 @@ void knn_graph(raft::resources const& res,
 
   auto stream = raft::resource::get_cuda_stream(res);
 
-  nnz_t nnz = m * k;
+  NnzT nnz = m * k;
 
-  rmm::device_uvector<value_idx> rows(nnz, stream);
-  rmm::device_uvector<value_idx> indices(nnz, stream);
+  rmm::device_uvector<ValueIdx> rows(nnz, stream);
+  rmm::device_uvector<ValueIdx> indices(nnz, stream);
   rmm::device_uvector<value_t> data(nnz, stream);
 
-  auto rows_view = raft::make_device_vector_view<value_idx, nnz_t>(rows.data(), nnz);
+  auto rows_view = raft::make_device_vector_view<ValueIdx, NnzT>(rows.data(), nnz);
 
   raft::linalg::map_offset(
-    res, rows_view, [k] __device__(nnz_t i) -> value_idx { return value_idx(i / k); });
+    res, rows_view, [k] __device__(NnzT i) -> ValueIdx { return ValueIdx(i / k); });
 
   cuvs::neighbors::all_neighbors::all_neighbors_params params;
   params.metric = metric;
@@ -93,15 +95,15 @@ void knn_graph(raft::resources const& res,
 
   raft::linalg::unary_op(res,
                          raft::make_const_mdspan(indices_64_view),
-                         raft::make_device_vector_view<value_idx, nnz_t>(indices.data(), nnz),
-                         raft::cast_op<value_idx>{});
+                         raft::make_device_vector_view<ValueIdx, NnzT>(indices.data(), nnz),
+                         raft::cast_op<ValueIdx>{});
 
   raft::sparse::linalg::symmetrize(res,
                                    rows.data(),
                                    indices.data(),
                                    data.data(),
-                                   static_cast<value_idx>(m),
-                                   static_cast<value_idx>(k),
+                                   static_cast<ValueIdx>(m),
+                                   static_cast<ValueIdx>(k),
                                    nnz,
                                    out);
 }

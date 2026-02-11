@@ -39,8 +39,8 @@ struct unpack_codes {
   }
 };
 
-template <uint32_t BlockSize, uint32_t PqBits>
-__launch_bounds__(BlockSize) static __global__ void unpack_list_data_kernel(
+template <uint32_t block_size, uint32_t PqBits>
+__launch_bounds__(block_size) static __global__ void unpack_list_data_kernel(
   raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> out_codes,
   raft::device_mdspan<const uint8_t,
                       list_spec_interleaved<uint32_t, uint32_t>::list_extents,
@@ -113,8 +113,8 @@ struct pass_codes {
   __device__ inline auto operator()(uint32_t i, uint32_t j) const -> uint8_t { return codes(i, j); }
 };
 
-template <uint32_t BlockSize, uint32_t PqBits>
-__launch_bounds__(BlockSize) static __global__ void pack_list_data_kernel(
+template <uint32_t block_size, uint32_t PqBits>
+__launch_bounds__(block_size) static __global__ void pack_list_data_kernel(
   raft::device_mdspan<uint8_t,
                       list_spec_interleaved<uint32_t, uint32_t>::list_extents,
                       raft::row_major> list_data,

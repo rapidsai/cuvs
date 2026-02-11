@@ -12,25 +12,25 @@
 
 namespace cuvs::sparse::neighbors {
 
-template <typename value_idx, typename value_t>
-using FixConnectivitiesRedOp = detail::FixConnectivitiesRedOp<value_idx, value_t>;
+template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+using fix_connectivities_red_op = detail::fix_connectivities_red_op<ValueIdx, value_t>;
 
-template <typename value_idx, typename value_t>
-using MutualReachabilityFixConnectivitiesRedOp =
-  detail::MutualReachabilityFixConnectivitiesRedOp<value_idx, value_t>;
+template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+using mutual_reachability_fix_connectivities_red_op =
+  detail::mutual_reachability_fix_connectivities_red_op<ValueIdx, value_t>;
 
 /**
  * Gets the number of unique components from array of
  * colors or labels. This does not assume the components are
  * drawn from a monotonically increasing set.
- * @tparam value_idx
+ * @tparam ValueIdx
  * @param[in] colors array of components
  * @param[in] n_rows size of components array
  * @param[in] stream cuda stream for which to order cuda operations
  * @return total number of components
  */
-template <typename value_idx>
-auto get_n_components(value_idx* colors, size_t n_rows, cudaStream_t stream) -> value_idx
+template <typename ValueIdx>
+auto get_n_components(ValueIdx* colors, size_t n_rows, cudaStream_t stream) -> ValueIdx
 {
   return detail::get_n_components(colors, n_rows, stream);
 }
@@ -43,7 +43,7 @@ auto get_n_components(value_idx* colors, size_t n_rows, cudaStream_t stream) -> 
  * component. The result will not necessarily contain
  * n_components^2 - n_components number of elements because many components
  * will likely not be contained in the neighborhoods of 1-nns.
- * @tparam value_idx
+ * @tparam ValueIdx
  * @tparam value_t
  * @param[in] handle raft handle
  * @param[out] out output edge list containing nearest cross-component
@@ -64,17 +64,19 @@ auto get_n_components(value_idx* colors, size_t n_rows, cudaStream_t stream) -> 
  * increase in compute time as the col_batch_size is reduced
  * @param[in] metric distance metric
  */
-template <typename value_idx, typename value_t, typename red_op>
+template <typename ValueIdx,
+          typename value_t,
+          typename RedOp>  // NOLINT(readability-identifier-naming)
 void cross_component_nn(
   raft::resources const& handle,
-  raft::sparse::COO<value_t, value_idx>& out,
+  raft::sparse::COO<value_t, ValueIdx>& out,
   const value_t* X,
-  const value_idx* orig_colors,
-  value_idx n_rows,
-  value_idx n_cols,
-  red_op reduction_op,
-  value_idx row_batch_size            = 0,
-  value_idx col_batch_size            = 0,
+  const ValueIdx* orig_colors,
+  ValueIdx n_rows,
+  ValueIdx n_cols,
+  RedOp reduction_op,
+  ValueIdx row_batch_size             = 0,
+  ValueIdx col_batch_size             = 0,
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2SqrtExpanded)
 {
   detail::cross_component_nn(handle,

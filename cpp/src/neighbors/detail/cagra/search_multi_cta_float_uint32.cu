@@ -25,7 +25,7 @@ instantiate_kernel_selection(float,
 instantiate_kernel_selection(float,
                              uint32_t,
                              float,
-                             CagraSampleFilterWithQueryIdOffset<
+                             cagra_sample_filter_with_query_id_offset<
                                cuvs::neighbors::filtering::bitset_filter<uint32_t COMMA int64_t>>);
 
 }  // namespace cuvs::neighbors::cagra::detail::multi_cta_search

@@ -22,7 +22,7 @@ namespace cuvs::cluster::agglomerative {
  * that use the fully-connected graph of pairwise distances by connecting
  * a knn graph when k is not large enough to connect it.
 
- * @tparam value_idx
+ * @tparam ValueIdx
  * @tparam value_t
  * @tparam dist_type method to use for constructing connectivities graph
  * @param[in] handle raft handle
@@ -36,18 +36,19 @@ namespace cuvs::cluster::agglomerative {
  *            of k. The algorithm will set `k = log(n) + c`
  * @param[in] n_clusters number of clusters to assign data samples
  */
-template <typename value_idx, typename value_t, Linkage dist_type = Linkage::KNN_GRAPH>
+template <typename ValueIdx,
+          typename value_t,
+          Linkage dist_type = Linkage::KNN_GRAPH>  // NOLINT(readability-identifier-naming)
 void single_linkage(raft::resources const& handle,
                     const value_t* X,
-                    value_idx m,
-                    value_idx n,
+                    ValueIdx m,
+                    ValueIdx n,
                     cuvs::distance::DistanceType metric,
-                    single_linkage_output<value_idx>* out,
+                    single_linkage_output<ValueIdx>* out,
                     int c,
                     size_t n_clusters)
 {
-  detail::single_linkage<value_idx, value_t, dist_type>(
-    handle, X, m, n, metric, out, c, n_clusters);
+  detail::single_linkage<ValueIdx, value_t, dist_type>(handle, X, m, n, metric, out, c, n_clusters);
 }
 
 /**
@@ -56,7 +57,7 @@ void single_linkage(raft::resources const& handle,
  * that use the fully-connected graph of pairwise distances by connecting
  * a knn graph when k is not large enough to connect it.
 
- * @tparam value_idx
+ * @tparam ValueIdx
  * @tparam value_t
  * @tparam dist_type method to use for constructing connectivities graph
  * @param[in] handle raft handle
@@ -68,26 +69,28 @@ void single_linkage(raft::resources const& handle,
  * @param[in] c a constant used when constructing connectivities from knn graph. Allows the indirect
  control of k. The algorithm will set `k = log(n) + c`
  */
-template <typename value_t, typename idx_t, Linkage dist_type = Linkage::KNN_GRAPH>
+template <typename value_t,
+          typename IdxT,
+          Linkage dist_type = Linkage::KNN_GRAPH>  // NOLINT(readability-identifier-naming)
 void single_linkage(raft::resources const& handle,
-                    raft::device_matrix_view<const value_t, idx_t, raft::row_major> X,
-                    raft::device_matrix_view<idx_t, idx_t, raft::row_major> dendrogram,
-                    raft::device_vector_view<idx_t, idx_t> labels,
+                    raft::device_matrix_view<const value_t, IdxT, raft::row_major> X,
+                    raft::device_matrix_view<IdxT, IdxT, raft::row_major> dendrogram,
+                    raft::device_vector_view<IdxT, IdxT> labels,
                     cuvs::distance::DistanceType metric,
                     size_t n_clusters,
                     std::optional<int> c = std::make_optional<int>(DEFAULT_CONST_C))
 {
-  single_linkage_output<idx_t> out_arrs;
+  single_linkage_output<IdxT> out_arrs;
   out_arrs.children = dendrogram.data_handle();
   out_arrs.labels   = labels.data_handle();
 
-  single_linkage<idx_t, value_t, dist_type>(handle,
-                                            X.data_handle(),
-                                            X.extent(0),
-                                            X.extent(1),
-                                            metric,
-                                            &out_arrs,
-                                            c.has_value() ? c.value() : DEFAULT_CONST_C,
-                                            n_clusters);
+  single_linkage<IdxT, value_t, dist_type>(handle,
+                                           X.data_handle(),
+                                           X.extent(0),
+                                           X.extent(1),
+                                           metric,
+                                           &out_arrs,
+                                           c.has_value() ? c.value() : DEFAULT_CONST_C,
+                                           n_clusters);
 }
 };  // namespace   cuvs::cluster::agglomerative

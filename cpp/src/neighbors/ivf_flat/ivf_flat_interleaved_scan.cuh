@@ -89,14 +89,14 @@ __device__ inline void copy_vectorized(T* out, const T* in, uint32_t n)
  * values)
  */
 template <int kUnroll, typename Lambda, int Veclen, typename T, typename AccT, bool ComputeNorm>
-struct loadAndComputeDist {
+struct load_and_compute_dist {
   Lambda compute_dist;
   AccT& dist;
   AccT& norm_query;
   AccT& norm_data;
 
   __device__ __forceinline__
-  loadAndComputeDist(AccT& dist, Lambda op, AccT& norm_query, AccT& norm_data)
+  load_and_compute_dist(AccT& dist, Lambda op, AccT& norm_query, AccT& norm_data)
     : dist(dist), compute_dist(op), norm_query(norm_query), norm_data(norm_data)
   {
   }
@@ -107,23 +107,23 @@ struct loadAndComputeDist {
    * Every thread here processes exactly kUnroll * Veclen elements independently of others.
    */
   template <typename IdxT>
-  __device__ __forceinline__ void runLoadShmemCompute(const T* const& data,
-                                                      const T* query_shared,
-                                                      IdxT loadIndex,
-                                                      IdxT shmemIndex)
+  __device__ __forceinline__ void run_load_shmem_compute(const T* const& data,
+                                                         const T* query_shared,
+                                                         IdxT loadIndex,
+                                                         IdxT shmemIndex)
   {
 #pragma unroll
     for (int j = 0; j < kUnroll; ++j) {
-      T encV[Veclen];
-      raft::ldg(encV, data + (loadIndex + j * kIndexGroupSize) * Veclen);
-      T queryRegs[Veclen];
-      raft::lds(queryRegs, &query_shared[shmemIndex + j * Veclen]);
+      T enc_v[Veclen];
+      raft::ldg(enc_v, data + (loadIndex + j * kIndexGroupSize) * Veclen);
+      T query_regs[Veclen];
+      raft::lds(query_regs, &query_shared[shmemIndex + j * Veclen]);
 #pragma unroll
       for (int k = 0; k < Veclen; ++k) {
-        compute_dist(dist, queryRegs[k], encV[k]);
+        compute_dist(dist, query_regs[k], enc_v[k]);
         if constexpr (ComputeNorm) {
-          norm_query += queryRegs[k] * queryRegs[k];
-          norm_data += encV[k] * encV[k];
+          norm_query += query_regs[k] * query_regs[k];
+          norm_data += enc_v[k] * enc_v[k];
         }
       }
     }
@@ -136,29 +136,29 @@ struct loadAndComputeDist {
    * corresponding threads (`WarpSize / (kUnroll * Veclen)` elements per thread at once).
    */
   template <typename IdxT>
-  __device__ __forceinline__ void runLoadShflAndCompute(const T*& data,
-                                                        const T* query,
-                                                        IdxT baseLoadIndex,
-                                                        const int lane_id)
+  __device__ __forceinline__ void run_load_shfl_and_compute(const T*& data,
+                                                            const T* query,
+                                                            IdxT baseLoadIndex,
+                                                            const int lane_id)
   {
-    T queryReg               = query[baseLoadIndex + lane_id];
-    constexpr int stride     = kUnroll * Veclen;
-    constexpr int totalIter  = raft::WarpSize / stride;
-    constexpr int gmemStride = stride * kIndexGroupSize;
+    T query_reg               = query[baseLoadIndex + lane_id];
+    constexpr int kStride     = kUnroll * Veclen;
+    constexpr int kTotalIter  = raft::WarpSize / kStride;
+    constexpr int kGmemStride = kStride * kIndexGroupSize;
 #pragma unroll
-    for (int i = 0; i < totalIter; ++i, data += gmemStride) {
+    for (int i = 0; i < kTotalIter; ++i, data += kGmemStride) {
 #pragma unroll
       for (int j = 0; j < kUnroll; ++j) {
-        T encV[Veclen];
-        raft::ldg(encV, data + (lane_id + j * kIndexGroupSize) * Veclen);
+        T enc_v[Veclen];
+        raft::ldg(enc_v, data + (lane_id + j * kIndexGroupSize) * Veclen);
         const int d = (i * kUnroll + j) * Veclen;
 #pragma unroll
         for (int k = 0; k < Veclen; ++k) {
-          T q = raft::shfl(queryReg, d + k, raft::WarpSize);
-          compute_dist(dist, q, encV[k]);
+          T q = raft::shfl(query_reg, d + k, raft::WarpSize);
+          compute_dist(dist, q, enc_v[k]);
           if constexpr (ComputeNorm) {
             norm_query += q * q;
-            norm_data += encV[k] * encV[k];
+            norm_data += enc_v[k] * enc_v[k];
           }
         }
       }
@@ -167,20 +167,20 @@ struct loadAndComputeDist {
 
   /**
    * Load parts of vectors from the index and query and accumulates the partial distance.
-   * This version augments `runLoadShflAndCompute` when `dim` is not a multiple of `WarpSize`.
+   * This version augments `run_load_shfl_and_compute` when `dim` is not a multiple of `WarpSize`.
    */
-  __device__ __forceinline__ void runLoadShflAndComputeRemainder(
+  __device__ __forceinline__ void run_load_shfl_and_compute_remainder(
     const T*& data, const T* query, const int lane_id, const int dim, const int dimBlocks)
   {
-    const int loadDim     = dimBlocks + lane_id;
-    T queryReg            = loadDim < dim ? query[loadDim] : T{0};
-    const int loadDataIdx = lane_id * Veclen;
+    const int load_dim      = dimBlocks + lane_id;
+    T query_reg             = load_dim < dim ? query[load_dim] : T{0};
+    const int load_data_idx = lane_id * Veclen;
     for (int d = 0; d < dim - dimBlocks; d += Veclen, data += kIndexGroupSize * Veclen) {
       T enc[Veclen];
-      raft::ldg(enc, data + loadDataIdx);
+      raft::ldg(enc, data + load_data_idx);
 #pragma unroll
       for (int k = 0; k < Veclen; k++) {
-        T q = raft::shfl(queryReg, d + k, raft::WarpSize);
+        T q = raft::shfl(query_reg, d + k, raft::WarpSize);
         compute_dist(dist, q, enc[k]);
         if constexpr (ComputeNorm) {
           norm_query += q * q;
@@ -193,92 +193,93 @@ struct loadAndComputeDist {
 
 // This handles uint8_t 8, 16 Veclens
 template <int kUnroll, typename Lambda, int uint8_veclen, bool ComputeNorm>
-struct loadAndComputeDist<kUnroll, Lambda, uint8_veclen, uint8_t, uint32_t, ComputeNorm> {
+struct load_and_compute_dist<kUnroll, Lambda, uint8_veclen, uint8_t, uint32_t, ComputeNorm> {
   Lambda compute_dist;
   uint32_t& dist;
   uint32_t& norm_query;
   uint32_t& norm_data;
 
   __device__ __forceinline__
-  loadAndComputeDist(uint32_t& dist, Lambda op, uint32_t& norm_query, uint32_t& norm_data)
+  load_and_compute_dist(uint32_t& dist, Lambda op, uint32_t& norm_query, uint32_t& norm_data)
     : dist(dist), compute_dist(op), norm_query(norm_query), norm_data(norm_data)
   {
   }
 
-  __device__ __forceinline__ void runLoadShmemCompute(const uint8_t* const& data,
-                                                      const uint8_t* query_shared,
-                                                      int loadIndex,
-                                                      int shmemIndex)
+  __device__ __forceinline__ void run_load_shmem_compute(const uint8_t* const& data,
+                                                         const uint8_t* query_shared,
+                                                         int loadIndex,
+                                                         int shmemIndex)
   {
-    constexpr int veclen_int = uint8_veclen / 4;  // converting uint8_t veclens to int
-    loadIndex                = loadIndex * veclen_int;
+    constexpr int kVeclenInt = uint8_veclen / 4;  // converting uint8_t veclens to int
+    loadIndex                = loadIndex * kVeclenInt;
 #pragma unroll
     for (int j = 0; j < kUnroll; ++j) {
-      uint32_t encV[veclen_int];
+      uint32_t enc_v[kVeclenInt];
       raft::ldg(
-        encV,
-        reinterpret_cast<unsigned const*>(data) + loadIndex + j * kIndexGroupSize * veclen_int);
-      uint32_t queryRegs[veclen_int];
-      raft::lds(queryRegs,
-                reinterpret_cast<unsigned const*>(query_shared + shmemIndex) + j * veclen_int);
+        enc_v,
+        reinterpret_cast<unsigned const*>(data) + loadIndex + j * kIndexGroupSize * kVeclenInt);
+      uint32_t query_regs[kVeclenInt];
+      raft::lds(query_regs,
+                reinterpret_cast<unsigned const*>(query_shared + shmemIndex) + j * kVeclenInt);
 #pragma unroll
-      for (int k = 0; k < veclen_int; k++) {
-        compute_dist(dist, queryRegs[k], encV[k]);
+      for (int k = 0; k < kVeclenInt; k++) {
+        compute_dist(dist, query_regs[k], enc_v[k]);
         if constexpr (ComputeNorm) {
-          norm_query = raft::dp4a(queryRegs[k], queryRegs[k], norm_query);
-          norm_data  = raft::dp4a(encV[k], encV[k], norm_data);
+          norm_query = raft::dp4a(query_regs[k], query_regs[k], norm_query);
+          norm_data  = raft::dp4a(enc_v[k], enc_v[k], norm_data);
         }
       }
     }
   }
-  __device__ __forceinline__ void runLoadShflAndCompute(const uint8_t*& data,
-                                                        const uint8_t* query,
-                                                        int baseLoadIndex,
-                                                        const int lane_id)
+  __device__ __forceinline__ void run_load_shfl_and_compute(const uint8_t*& data,
+                                                            const uint8_t* query,
+                                                            int baseLoadIndex,
+                                                            const int lane_id)
   {
-    constexpr int veclen_int = uint8_veclen / 4;  // converting uint8_t veclens to int
-    uint32_t queryReg =
+    constexpr int kVeclenInt = uint8_veclen / 4;  // converting uint8_t veclens to int
+    uint32_t query_reg =
       (lane_id < 8) ? reinterpret_cast<unsigned const*>(query + baseLoadIndex)[lane_id] : 0;
-    constexpr int stride = kUnroll * uint8_veclen;
+    constexpr int kStride = kUnroll * uint8_veclen;
 
 #pragma unroll
-    for (int i = 0; i < raft::WarpSize / stride; ++i, data += stride * kIndexGroupSize) {
+    for (int i = 0; i < raft::WarpSize / kStride; ++i, data += kStride * kIndexGroupSize) {
 #pragma unroll
       for (int j = 0; j < kUnroll; ++j) {
-        uint32_t encV[veclen_int];
+        uint32_t enc_v[kVeclenInt];
         raft::ldg(
-          encV,
-          reinterpret_cast<unsigned const*>(data) + (lane_id + j * kIndexGroupSize) * veclen_int);
-        const int d = (i * kUnroll + j) * veclen_int;
+          enc_v,
+          reinterpret_cast<unsigned const*>(data) + (lane_id + j * kIndexGroupSize) * kVeclenInt);
+        const int d = (i * kUnroll + j) * kVeclenInt;
 #pragma unroll
-        for (int k = 0; k < veclen_int; ++k) {
-          uint32_t q = raft::shfl(queryReg, d + k, raft::WarpSize);
-          compute_dist(dist, q, encV[k]);
+        for (int k = 0; k < kVeclenInt; ++k) {
+          uint32_t q = raft::shfl(query_reg, d + k, raft::WarpSize);
+          compute_dist(dist, q, enc_v[k]);
           if constexpr (ComputeNorm) {
             norm_query = raft::dp4a(q, q, norm_query);
-            norm_data  = raft::dp4a(encV[k], encV[k], norm_data);
+            norm_data  = raft::dp4a(enc_v[k], enc_v[k], norm_data);
           }
         }
       }
     }
   }
 
-  __device__ __forceinline__ void runLoadShflAndComputeRemainder(const uint8_t*& data,
-                                                                 const uint8_t* query,
-                                                                 const int lane_id,
-                                                                 const int dim,
-                                                                 const int dimBlocks)
+  __device__ __forceinline__ void run_load_shfl_and_compute_remainder(const uint8_t*& data,
+                                                                      const uint8_t* query,
+                                                                      const int lane_id,
+                                                                      const int dim,
+                                                                      const int dimBlocks)
   {
-    constexpr int veclen_int = uint8_veclen / 4;
-    const int loadDim        = dimBlocks + lane_id * 4;  // Here 4 is for 1 - int
-    uint32_t queryReg = loadDim < dim ? reinterpret_cast<uint32_t const*>(query + loadDim)[0] : 0;
+    constexpr int kVeclenInt = uint8_veclen / 4;
+    const int load_dim       = dimBlocks + lane_id * 4;  // Here 4 is for 1 - int
+    uint32_t query_reg =
+      load_dim < dim ? reinterpret_cast<uint32_t const*>(query + load_dim)[0] : 0;
     for (int d = 0; d < dim - dimBlocks;
          d += uint8_veclen, data += kIndexGroupSize * uint8_veclen) {
-      uint32_t enc[veclen_int];
-      raft::ldg(enc, reinterpret_cast<uint32_t const*>(data) + lane_id * veclen_int);
+      uint32_t enc[kVeclenInt];
+      raft::ldg(enc, reinterpret_cast<uint32_t const*>(data) + lane_id * kVeclenInt);
 #pragma unroll
-      for (int k = 0; k < veclen_int; k++) {
-        uint32_t q = raft::shfl(queryReg, (d / 4) + k, raft::WarpSize);
+      for (int k = 0; k < kVeclenInt; k++) {
+        uint32_t q = raft::shfl(query_reg, (d / 4) + k, raft::WarpSize);
         compute_dist(dist, q, enc[k]);
         if constexpr (ComputeNorm) {
           norm_query = raft::dp4a(q, q, norm_query);
@@ -292,71 +293,71 @@ struct loadAndComputeDist<kUnroll, Lambda, uint8_veclen, uint8_t, uint32_t, Comp
 // Keep this specialized uint8 Veclen = 4, because compiler is generating suboptimal code while
 // using above common template of int2/int4
 template <int kUnroll, typename Lambda, bool ComputeNorm>
-struct loadAndComputeDist<kUnroll, Lambda, 4, uint8_t, uint32_t, ComputeNorm> {
+struct load_and_compute_dist<kUnroll, Lambda, 4, uint8_t, uint32_t, ComputeNorm> {
   Lambda compute_dist;
   uint32_t& dist;
   uint32_t& norm_query;
   uint32_t& norm_data;
 
   __device__ __forceinline__
-  loadAndComputeDist(uint32_t& dist, Lambda op, uint32_t& norm_query, uint32_t& norm_data)
+  load_and_compute_dist(uint32_t& dist, Lambda op, uint32_t& norm_query, uint32_t& norm_data)
     : dist(dist), compute_dist(op), norm_query(norm_query), norm_data(norm_data)
   {
   }
 
-  __device__ __forceinline__ void runLoadShmemCompute(const uint8_t* const& data,
-                                                      const uint8_t* query_shared,
-                                                      int loadIndex,
-                                                      int shmemIndex)
+  __device__ __forceinline__ void run_load_shmem_compute(const uint8_t* const& data,
+                                                         const uint8_t* query_shared,
+                                                         int loadIndex,
+                                                         int shmemIndex)
   {
 #pragma unroll
     for (int j = 0; j < kUnroll; ++j) {
-      uint32_t encV      = reinterpret_cast<unsigned const*>(data)[loadIndex + j * kIndexGroupSize];
-      uint32_t queryRegs = reinterpret_cast<unsigned const*>(query_shared + shmemIndex)[j];
-      compute_dist(dist, queryRegs, encV);
+      uint32_t enc_v = reinterpret_cast<unsigned const*>(data)[loadIndex + j * kIndexGroupSize];
+      uint32_t query_regs = reinterpret_cast<unsigned const*>(query_shared + shmemIndex)[j];
+      compute_dist(dist, query_regs, enc_v);
       if constexpr (ComputeNorm) {
-        norm_query = raft::dp4a(queryRegs, queryRegs, norm_query);
-        norm_data  = raft::dp4a(encV, encV, norm_data);
+        norm_query = raft::dp4a(query_regs, query_regs, norm_query);
+        norm_data  = raft::dp4a(enc_v, enc_v, norm_data);
       }
     }
   }
-  __device__ __forceinline__ void runLoadShflAndCompute(const uint8_t*& data,
-                                                        const uint8_t* query,
-                                                        int baseLoadIndex,
-                                                        const int lane_id)
+  __device__ __forceinline__ void run_load_shfl_and_compute(const uint8_t*& data,
+                                                            const uint8_t* query,
+                                                            int baseLoadIndex,
+                                                            const int lane_id)
   {
-    uint32_t queryReg =
+    uint32_t query_reg =
       (lane_id < 8) ? reinterpret_cast<unsigned const*>(query + baseLoadIndex)[lane_id] : 0;
-    constexpr int veclen = 4;
-    constexpr int stride = kUnroll * veclen;
+    constexpr int kVeclen = 4;
+    constexpr int kStride = kUnroll * kVeclen;
 
 #pragma unroll
-    for (int i = 0; i < raft::WarpSize / stride; ++i, data += stride * kIndexGroupSize) {
+    for (int i = 0; i < raft::WarpSize / kStride; ++i, data += kStride * kIndexGroupSize) {
 #pragma unroll
       for (int j = 0; j < kUnroll; ++j) {
-        uint32_t encV = reinterpret_cast<unsigned const*>(data)[lane_id + j * kIndexGroupSize];
-        uint32_t q    = raft::shfl(queryReg, i * kUnroll + j, raft::WarpSize);
-        compute_dist(dist, q, encV);
+        uint32_t enc_v = reinterpret_cast<unsigned const*>(data)[lane_id + j * kIndexGroupSize];
+        uint32_t q     = raft::shfl(query_reg, i * kUnroll + j, raft::WarpSize);
+        compute_dist(dist, q, enc_v);
         if constexpr (ComputeNorm) {
           norm_query = raft::dp4a(q, q, norm_query);
-          norm_data  = raft::dp4a(encV, encV, norm_data);
+          norm_data  = raft::dp4a(enc_v, enc_v, norm_data);
         }
       }
     }
   }
 
-  __device__ __forceinline__ void runLoadShflAndComputeRemainder(const uint8_t*& data,
-                                                                 const uint8_t* query,
-                                                                 const int lane_id,
-                                                                 const int dim,
-                                                                 const int dimBlocks)
+  __device__ __forceinline__ void run_load_shfl_and_compute_remainder(const uint8_t*& data,
+                                                                      const uint8_t* query,
+                                                                      const int lane_id,
+                                                                      const int dim,
+                                                                      const int dimBlocks)
   {
-    constexpr int veclen = 4;
-    const int loadDim    = dimBlocks + lane_id;
-    uint32_t queryReg    = loadDim < dim ? reinterpret_cast<unsigned const*>(query)[loadDim] : 0;
-    for (int d = 0; d < dim - dimBlocks; d += veclen, data += kIndexGroupSize * veclen) {
+    constexpr int kVeclen = 4;
+    const int load_dim    = dimBlocks + lane_id;
+    uint32_t query_reg    = load_dim < dim ? reinterpret_cast<unsigned const*>(query)[load_dim] : 0;
+    for (int d = 0; d < dim - dimBlocks; d += kVeclen, data += kIndexGroupSize * kVeclen) {
       uint32_t enc = reinterpret_cast<unsigned const*>(data)[lane_id];
-      uint32_t q   = raft::shfl(queryReg, d / veclen, raft::WarpSize);
+      uint32_t q   = raft::shfl(query_reg, d / kVeclen, raft::WarpSize);
       compute_dist(dist, q, enc);
       if constexpr (ComputeNorm) {
         norm_query = raft::dp4a(q, q, norm_query);
@@ -367,72 +368,73 @@ struct loadAndComputeDist<kUnroll, Lambda, 4, uint8_t, uint32_t, ComputeNorm> {
 };
 
 template <int kUnroll, typename Lambda, bool ComputeNorm>
-struct loadAndComputeDist<kUnroll, Lambda, 2, uint8_t, uint32_t, ComputeNorm> {
+struct load_and_compute_dist<kUnroll, Lambda, 2, uint8_t, uint32_t, ComputeNorm> {
   Lambda compute_dist;
   uint32_t& dist;
   uint32_t& norm_query;
   uint32_t& norm_data;
 
   __device__ __forceinline__
-  loadAndComputeDist(uint32_t& dist, Lambda op, uint32_t& norm_query, uint32_t& norm_data)
+  load_and_compute_dist(uint32_t& dist, Lambda op, uint32_t& norm_query, uint32_t& norm_data)
     : dist(dist), compute_dist(op), norm_query(norm_query), norm_data(norm_data)
   {
   }
 
-  __device__ __forceinline__ void runLoadShmemCompute(const uint8_t* const& data,
-                                                      const uint8_t* query_shared,
-                                                      int loadIndex,
-                                                      int shmemIndex)
+  __device__ __forceinline__ void run_load_shmem_compute(const uint8_t* const& data,
+                                                         const uint8_t* query_shared,
+                                                         int loadIndex,
+                                                         int shmemIndex)
   {
 #pragma unroll
     for (int j = 0; j < kUnroll; ++j) {
-      uint32_t encV      = reinterpret_cast<uint16_t const*>(data)[loadIndex + j * kIndexGroupSize];
-      uint32_t queryRegs = reinterpret_cast<uint16_t const*>(query_shared + shmemIndex)[j];
-      compute_dist(dist, queryRegs, encV);
+      uint32_t enc_v = reinterpret_cast<uint16_t const*>(data)[loadIndex + j * kIndexGroupSize];
+      uint32_t query_regs = reinterpret_cast<uint16_t const*>(query_shared + shmemIndex)[j];
+      compute_dist(dist, query_regs, enc_v);
       if constexpr (ComputeNorm) {
-        norm_query = raft::dp4a(queryRegs, queryRegs, norm_query);
-        norm_data  = raft::dp4a(encV, encV, norm_data);
+        norm_query = raft::dp4a(query_regs, query_regs, norm_query);
+        norm_data  = raft::dp4a(enc_v, enc_v, norm_data);
       }
     }
   }
 
-  __device__ __forceinline__ void runLoadShflAndCompute(const uint8_t*& data,
-                                                        const uint8_t* query,
-                                                        int baseLoadIndex,
-                                                        const int lane_id)
+  __device__ __forceinline__ void run_load_shfl_and_compute(const uint8_t*& data,
+                                                            const uint8_t* query,
+                                                            int baseLoadIndex,
+                                                            const int lane_id)
   {
-    uint32_t queryReg =
+    uint32_t query_reg =
       (lane_id < 16) ? reinterpret_cast<uint16_t const*>(query + baseLoadIndex)[lane_id] : 0;
-    constexpr int veclen = 2;
-    constexpr int stride = kUnroll * veclen;
+    constexpr int kVeclen = 2;
+    constexpr int kStride = kUnroll * kVeclen;
 
 #pragma unroll
-    for (int i = 0; i < raft::WarpSize / stride; ++i, data += stride * kIndexGroupSize) {
+    for (int i = 0; i < raft::WarpSize / kStride; ++i, data += kStride * kIndexGroupSize) {
 #pragma unroll
       for (int j = 0; j < kUnroll; ++j) {
-        uint32_t encV = reinterpret_cast<uint16_t const*>(data)[lane_id + j * kIndexGroupSize];
-        uint32_t q    = raft::shfl(queryReg, i * kUnroll + j, raft::WarpSize);
-        compute_dist(dist, q, encV);
+        uint32_t enc_v = reinterpret_cast<uint16_t const*>(data)[lane_id + j * kIndexGroupSize];
+        uint32_t q     = raft::shfl(query_reg, i * kUnroll + j, raft::WarpSize);
+        compute_dist(dist, q, enc_v);
         if constexpr (ComputeNorm) {
           norm_query = raft::dp4a(q, q, norm_query);
-          norm_data  = raft::dp4a(encV, encV, norm_data);
+          norm_data  = raft::dp4a(enc_v, enc_v, norm_data);
         }
       }
     }
   }
 
-  __device__ __forceinline__ void runLoadShflAndComputeRemainder(const uint8_t*& data,
-                                                                 const uint8_t* query,
-                                                                 const int lane_id,
-                                                                 const int dim,
-                                                                 const int dimBlocks)
+  __device__ __forceinline__ void run_load_shfl_and_compute_remainder(const uint8_t*& data,
+                                                                      const uint8_t* query,
+                                                                      const int lane_id,
+                                                                      const int dim,
+                                                                      const int dimBlocks)
   {
-    constexpr int veclen = 2;
-    int loadDim          = dimBlocks + lane_id * veclen;
-    uint32_t queryReg = loadDim < dim ? reinterpret_cast<uint16_t const*>(query + loadDim)[0] : 0;
-    for (int d = 0; d < dim - dimBlocks; d += veclen, data += kIndexGroupSize * veclen) {
+    constexpr int kVeclen = 2;
+    int load_dim          = dimBlocks + lane_id * kVeclen;
+    uint32_t query_reg =
+      load_dim < dim ? reinterpret_cast<uint16_t const*>(query + load_dim)[0] : 0;
+    for (int d = 0; d < dim - dimBlocks; d += kVeclen, data += kIndexGroupSize * kVeclen) {
       uint32_t enc = reinterpret_cast<uint16_t const*>(data)[lane_id];
-      uint32_t q   = raft::shfl(queryReg, d / veclen, raft::WarpSize);
+      uint32_t q   = raft::shfl(query_reg, d / kVeclen, raft::WarpSize);
       compute_dist(dist, q, enc);
       if constexpr (ComputeNorm) {
         norm_query = raft::dp4a(q, q, norm_query);
@@ -443,71 +445,71 @@ struct loadAndComputeDist<kUnroll, Lambda, 2, uint8_t, uint32_t, ComputeNorm> {
 };
 
 template <int kUnroll, typename Lambda, bool ComputeNorm>
-struct loadAndComputeDist<kUnroll, Lambda, 1, uint8_t, uint32_t, ComputeNorm> {
+struct load_and_compute_dist<kUnroll, Lambda, 1, uint8_t, uint32_t, ComputeNorm> {
   Lambda compute_dist;
   uint32_t& dist;
   uint32_t& norm_query;
   uint32_t& norm_data;
 
   __device__ __forceinline__
-  loadAndComputeDist(uint32_t& dist, Lambda op, uint32_t& norm_query, uint32_t& norm_data)
+  load_and_compute_dist(uint32_t& dist, Lambda op, uint32_t& norm_query, uint32_t& norm_data)
     : dist(dist), compute_dist(op), norm_query(norm_query), norm_data(norm_data)
   {
   }
 
-  __device__ __forceinline__ void runLoadShmemCompute(const uint8_t* const& data,
-                                                      const uint8_t* query_shared,
-                                                      int loadIndex,
-                                                      int shmemIndex)
+  __device__ __forceinline__ void run_load_shmem_compute(const uint8_t* const& data,
+                                                         const uint8_t* query_shared,
+                                                         int loadIndex,
+                                                         int shmemIndex)
   {
 #pragma unroll
     for (int j = 0; j < kUnroll; ++j) {
-      uint32_t encV      = data[loadIndex + j * kIndexGroupSize];
-      uint32_t queryRegs = query_shared[shmemIndex + j];
-      compute_dist(dist, queryRegs, encV);
+      uint32_t enc_v      = data[loadIndex + j * kIndexGroupSize];
+      uint32_t query_regs = query_shared[shmemIndex + j];
+      compute_dist(dist, query_regs, enc_v);
       if constexpr (ComputeNorm) {
-        norm_query += queryRegs * queryRegs;
-        norm_data += encV * encV;
+        norm_query += query_regs * query_regs;
+        norm_data += enc_v * enc_v;
       }
     }
   }
 
-  __device__ __forceinline__ void runLoadShflAndCompute(const uint8_t*& data,
-                                                        const uint8_t* query,
-                                                        int baseLoadIndex,
-                                                        const int lane_id)
+  __device__ __forceinline__ void run_load_shfl_and_compute(const uint8_t*& data,
+                                                            const uint8_t* query,
+                                                            int baseLoadIndex,
+                                                            const int lane_id)
   {
-    uint32_t queryReg    = query[baseLoadIndex + lane_id];
-    constexpr int veclen = 1;
-    constexpr int stride = kUnroll * veclen;
+    uint32_t query_reg    = query[baseLoadIndex + lane_id];
+    constexpr int kVeclen = 1;
+    constexpr int kStride = kUnroll * kVeclen;
 
 #pragma unroll
-    for (int i = 0; i < raft::WarpSize / stride; ++i, data += stride * kIndexGroupSize) {
+    for (int i = 0; i < raft::WarpSize / kStride; ++i, data += kStride * kIndexGroupSize) {
 #pragma unroll
       for (int j = 0; j < kUnroll; ++j) {
-        uint32_t encV = data[lane_id + j * kIndexGroupSize];
-        uint32_t q    = raft::shfl(queryReg, i * kUnroll + j, raft::WarpSize);
-        compute_dist(dist, q, encV);
+        uint32_t enc_v = data[lane_id + j * kIndexGroupSize];
+        uint32_t q     = raft::shfl(query_reg, i * kUnroll + j, raft::WarpSize);
+        compute_dist(dist, q, enc_v);
         if constexpr (ComputeNorm) {
           norm_query += q * q;
-          norm_data += encV * encV;
+          norm_data += enc_v * enc_v;
         }
       }
     }
   }
 
-  __device__ __forceinline__ void runLoadShflAndComputeRemainder(const uint8_t*& data,
-                                                                 const uint8_t* query,
-                                                                 const int lane_id,
-                                                                 const int dim,
-                                                                 const int dimBlocks)
+  __device__ __forceinline__ void run_load_shfl_and_compute_remainder(const uint8_t*& data,
+                                                                      const uint8_t* query,
+                                                                      const int lane_id,
+                                                                      const int dim,
+                                                                      const int dimBlocks)
   {
-    constexpr int veclen = 1;
-    int loadDim          = dimBlocks + lane_id;
-    uint32_t queryReg    = loadDim < dim ? query[loadDim] : 0;
-    for (int d = 0; d < dim - dimBlocks; d += veclen, data += kIndexGroupSize * veclen) {
+    constexpr int kVeclen = 1;
+    int load_dim          = dimBlocks + lane_id;
+    uint32_t query_reg    = load_dim < dim ? query[load_dim] : 0;
+    for (int d = 0; d < dim - dimBlocks; d += kVeclen, data += kIndexGroupSize * kVeclen) {
       uint32_t enc = data[lane_id];
-      uint32_t q   = raft::shfl(queryReg, d, raft::WarpSize);
+      uint32_t q   = raft::shfl(query_reg, d, raft::WarpSize);
       compute_dist(dist, q, enc);
       if constexpr (ComputeNorm) {
         norm_query += q * q;
@@ -519,90 +521,90 @@ struct loadAndComputeDist<kUnroll, Lambda, 1, uint8_t, uint32_t, ComputeNorm> {
 
 // This device function is for int8 veclens 4, 8 and 16
 template <int kUnroll, typename Lambda, int int8_veclen, bool ComputeNorm>
-struct loadAndComputeDist<kUnroll, Lambda, int8_veclen, int8_t, int32_t, ComputeNorm> {
+struct load_and_compute_dist<kUnroll, Lambda, int8_veclen, int8_t, int32_t, ComputeNorm> {
   Lambda compute_dist;
   int32_t& dist;
   int32_t& norm_query;
   int32_t& norm_data;
 
   __device__ __forceinline__
-  loadAndComputeDist(int32_t& dist, Lambda op, int32_t& norm_query, int32_t& norm_data)
+  load_and_compute_dist(int32_t& dist, Lambda op, int32_t& norm_query, int32_t& norm_data)
     : dist(dist), compute_dist(op), norm_query(norm_query), norm_data(norm_data)
   {
   }
 
-  __device__ __forceinline__ void runLoadShmemCompute(const int8_t* const& data,
-                                                      const int8_t* query_shared,
-                                                      int loadIndex,
-                                                      int shmemIndex)
+  __device__ __forceinline__ void run_load_shmem_compute(const int8_t* const& data,
+                                                         const int8_t* query_shared,
+                                                         int loadIndex,
+                                                         int shmemIndex)
   {
-    constexpr int veclen_int = int8_veclen / 4;  // converting int8_t veclens to int
+    constexpr int kVeclenInt = int8_veclen / 4;  // converting int8_t veclens to int
 
 #pragma unroll
     for (int j = 0; j < kUnroll; ++j) {
-      int32_t encV[veclen_int];
+      int32_t enc_v[kVeclenInt];
       raft::ldg(
-        encV,
-        reinterpret_cast<int32_t const*>(data) + (loadIndex + j * kIndexGroupSize) * veclen_int);
-      int32_t queryRegs[veclen_int];
-      raft::lds(queryRegs,
-                reinterpret_cast<int32_t const*>(query_shared + shmemIndex) + j * veclen_int);
+        enc_v,
+        reinterpret_cast<int32_t const*>(data) + (loadIndex + j * kIndexGroupSize) * kVeclenInt);
+      int32_t query_regs[kVeclenInt];
+      raft::lds(query_regs,
+                reinterpret_cast<int32_t const*>(query_shared + shmemIndex) + j * kVeclenInt);
 #pragma unroll
-      for (int k = 0; k < veclen_int; k++) {
-        compute_dist(dist, queryRegs[k], encV[k]);
+      for (int k = 0; k < kVeclenInt; k++) {
+        compute_dist(dist, query_regs[k], enc_v[k]);
         if constexpr (ComputeNorm) {
-          norm_query = raft::dp4a(queryRegs[k], queryRegs[k], norm_query);
-          norm_data  = raft::dp4a(encV[k], encV[k], norm_data);
+          norm_query = raft::dp4a(query_regs[k], query_regs[k], norm_query);
+          norm_data  = raft::dp4a(enc_v[k], enc_v[k], norm_data);
         }
       }
     }
   }
 
-  __device__ __forceinline__ void runLoadShflAndCompute(const int8_t*& data,
-                                                        const int8_t* query,
-                                                        int baseLoadIndex,
-                                                        const int lane_id)
+  __device__ __forceinline__ void run_load_shfl_and_compute(const int8_t*& data,
+                                                            const int8_t* query,
+                                                            int baseLoadIndex,
+                                                            const int lane_id)
   {
-    constexpr int veclen_int = int8_veclen / 4;  // converting int8_t veclens to int
+    constexpr int kVeclenInt = int8_veclen / 4;  // converting int8_t veclens to int
 
-    int32_t queryReg =
+    int32_t query_reg =
       (lane_id < 8) ? reinterpret_cast<int32_t const*>(query + baseLoadIndex)[lane_id] : 0;
-    constexpr int stride = kUnroll * int8_veclen;
+    constexpr int kStride = kUnroll * int8_veclen;
 
 #pragma unroll
-    for (int i = 0; i < raft::WarpSize / stride; ++i, data += stride * kIndexGroupSize) {
+    for (int i = 0; i < raft::WarpSize / kStride; ++i, data += kStride * kIndexGroupSize) {
 #pragma unroll
       for (int j = 0; j < kUnroll; ++j) {
-        int32_t encV[veclen_int];
+        int32_t enc_v[kVeclenInt];
         raft::ldg(
-          encV,
-          reinterpret_cast<int32_t const*>(data) + (lane_id + j * kIndexGroupSize) * veclen_int);
-        const int d = (i * kUnroll + j) * veclen_int;
+          enc_v,
+          reinterpret_cast<int32_t const*>(data) + (lane_id + j * kIndexGroupSize) * kVeclenInt);
+        const int d = (i * kUnroll + j) * kVeclenInt;
 #pragma unroll
-        for (int k = 0; k < veclen_int; ++k) {
-          int32_t q = raft::shfl(queryReg, d + k, raft::WarpSize);
-          compute_dist(dist, q, encV[k]);
+        for (int k = 0; k < kVeclenInt; ++k) {
+          int32_t q = raft::shfl(query_reg, d + k, raft::WarpSize);
+          compute_dist(dist, q, enc_v[k]);
           if constexpr (ComputeNorm) {
             norm_query = raft::dp4a(q, q, norm_query);
-            norm_data  = raft::dp4a(encV[k], encV[k], norm_data);
+            norm_data  = raft::dp4a(enc_v[k], enc_v[k], norm_data);
           }
         }
       }
     }
   }
 
-  __device__ __forceinline__ void runLoadShflAndComputeRemainder(
+  __device__ __forceinline__ void run_load_shfl_and_compute_remainder(
     const int8_t*& data, const int8_t* query, const int lane_id, const int dim, const int dimBlocks)
   {
-    constexpr int veclen_int = int8_veclen / 4;
-    const int loadDim        = dimBlocks + lane_id * 4;  // Here 4 is for 1 - int;
-    int32_t queryReg = loadDim < dim ? reinterpret_cast<int32_t const*>(query + loadDim)[0] : 0;
+    constexpr int kVeclenInt = int8_veclen / 4;
+    const int load_dim       = dimBlocks + lane_id * 4;  // Here 4 is for 1 - int;
+    int32_t query_reg = load_dim < dim ? reinterpret_cast<int32_t const*>(query + load_dim)[0] : 0;
     for (int d = 0; d < dim - dimBlocks; d += int8_veclen, data += kIndexGroupSize * int8_veclen) {
-      int32_t enc[veclen_int];
-      raft::ldg(enc, reinterpret_cast<int32_t const*>(data) + lane_id * veclen_int);
+      int32_t enc[kVeclenInt];
+      raft::ldg(enc, reinterpret_cast<int32_t const*>(data) + lane_id * kVeclenInt);
 #pragma unroll
-      for (int k = 0; k < veclen_int; k++) {
-        int32_t q = raft::shfl(queryReg, (d / 4) + k, raft::WarpSize);  // Here 4 is for 1 - int;
+      for (int k = 0; k < kVeclenInt; k++) {
+        int32_t q = raft::shfl(query_reg, (d / 4) + k, raft::WarpSize);  // Here 4 is for 1 - int;
         compute_dist(dist, q, enc[k]);
         if constexpr (ComputeNorm) {
           norm_query = raft::dp4a(q, q, norm_query);
@@ -614,67 +616,67 @@ struct loadAndComputeDist<kUnroll, Lambda, int8_veclen, int8_t, int32_t, Compute
 };
 
 template <int kUnroll, typename Lambda, bool ComputeNorm>
-struct loadAndComputeDist<kUnroll, Lambda, 2, int8_t, int32_t, ComputeNorm> {
+struct load_and_compute_dist<kUnroll, Lambda, 2, int8_t, int32_t, ComputeNorm> {
   Lambda compute_dist;
   int32_t& dist;
   int32_t& norm_query;
   int32_t& norm_data;
   __device__ __forceinline__
-  loadAndComputeDist(int32_t& dist, Lambda op, int32_t& norm_query, int32_t& norm_data)
+  load_and_compute_dist(int32_t& dist, Lambda op, int32_t& norm_query, int32_t& norm_data)
     : dist(dist), compute_dist(op), norm_query(norm_query), norm_data(norm_data)
   {
   }
-  __device__ __forceinline__ void runLoadShmemCompute(const int8_t* const& data,
-                                                      const int8_t* query_shared,
-                                                      int loadIndex,
-                                                      int shmemIndex)
+  __device__ __forceinline__ void run_load_shmem_compute(const int8_t* const& data,
+                                                         const int8_t* query_shared,
+                                                         int loadIndex,
+                                                         int shmemIndex)
   {
 #pragma unroll
     for (int j = 0; j < kUnroll; ++j) {
-      int32_t encV      = reinterpret_cast<uint16_t const*>(data)[loadIndex + j * kIndexGroupSize];
-      int32_t queryRegs = reinterpret_cast<uint16_t const*>(query_shared + shmemIndex)[j];
-      compute_dist(dist, queryRegs, encV);
+      int32_t enc_v      = reinterpret_cast<uint16_t const*>(data)[loadIndex + j * kIndexGroupSize];
+      int32_t query_regs = reinterpret_cast<uint16_t const*>(query_shared + shmemIndex)[j];
+      compute_dist(dist, query_regs, enc_v);
       if constexpr (ComputeNorm) {
-        norm_query = raft::dp4a(queryRegs, queryRegs, norm_query);
-        norm_data  = raft::dp4a(encV, encV, norm_data);
+        norm_query = raft::dp4a(query_regs, query_regs, norm_query);
+        norm_data  = raft::dp4a(enc_v, enc_v, norm_data);
       }
     }
   }
 
-  __device__ __forceinline__ void runLoadShflAndCompute(const int8_t*& data,
-                                                        const int8_t* query,
-                                                        int baseLoadIndex,
-                                                        const int lane_id)
+  __device__ __forceinline__ void run_load_shfl_and_compute(const int8_t*& data,
+                                                            const int8_t* query,
+                                                            int baseLoadIndex,
+                                                            const int lane_id)
   {
-    int32_t queryReg =
+    int32_t query_reg =
       (lane_id < 16) ? reinterpret_cast<uint16_t const*>(query + baseLoadIndex)[lane_id] : 0;
-    constexpr int veclen = 2;
-    constexpr int stride = kUnroll * veclen;
+    constexpr int kVeclen = 2;
+    constexpr int kStride = kUnroll * kVeclen;
 
 #pragma unroll
-    for (int i = 0; i < raft::WarpSize / stride; ++i, data += stride * kIndexGroupSize) {
+    for (int i = 0; i < raft::WarpSize / kStride; ++i, data += kStride * kIndexGroupSize) {
 #pragma unroll
       for (int j = 0; j < kUnroll; ++j) {
-        int32_t encV = reinterpret_cast<uint16_t const*>(data)[lane_id + j * kIndexGroupSize];
-        int32_t q    = raft::shfl(queryReg, i * kUnroll + j, raft::WarpSize);
-        compute_dist(dist, q, encV);
+        int32_t enc_v = reinterpret_cast<uint16_t const*>(data)[lane_id + j * kIndexGroupSize];
+        int32_t q     = raft::shfl(query_reg, i * kUnroll + j, raft::WarpSize);
+        compute_dist(dist, q, enc_v);
         if constexpr (ComputeNorm) {
-          norm_query = raft::dp4a(queryReg, queryReg, norm_query);
-          norm_data  = raft::dp4a(encV, encV, norm_data);
+          norm_query = raft::dp4a(query_reg, query_reg, norm_query);
+          norm_data  = raft::dp4a(enc_v, enc_v, norm_data);
         }
       }
     }
   }
 
-  __device__ __forceinline__ void runLoadShflAndComputeRemainder(
+  __device__ __forceinline__ void run_load_shfl_and_compute_remainder(
     const int8_t*& data, const int8_t* query, const int lane_id, const int dim, const int dimBlocks)
   {
-    constexpr int veclen = 2;
-    int loadDim          = dimBlocks + lane_id * veclen;
-    int32_t queryReg = loadDim < dim ? reinterpret_cast<uint16_t const*>(query + loadDim)[0] : 0;
-    for (int d = 0; d < dim - dimBlocks; d += veclen, data += kIndexGroupSize * veclen) {
-      int32_t enc = reinterpret_cast<uint16_t const*>(data + lane_id * veclen)[0];
-      int32_t q   = raft::shfl(queryReg, d / veclen, raft::WarpSize);
+    constexpr int kVeclen = 2;
+    int load_dim          = dimBlocks + lane_id * kVeclen;
+    int32_t query_reg = load_dim < dim ? reinterpret_cast<uint16_t const*>(query + load_dim)[0] : 0;
+    for (int d = 0; d < dim - dimBlocks; d += kVeclen, data += kIndexGroupSize * kVeclen) {
+      int32_t enc = reinterpret_cast<uint16_t const*>(data + lane_id * kVeclen)[0];
+      int32_t q   = raft::shfl(query_reg, d / kVeclen, raft::WarpSize);
       compute_dist(dist, q, enc);
       if constexpr (ComputeNorm) {
         norm_query = raft::dp4a(q, q, norm_query);
@@ -685,21 +687,21 @@ struct loadAndComputeDist<kUnroll, Lambda, 2, int8_t, int32_t, ComputeNorm> {
 };
 
 template <int kUnroll, typename Lambda, bool ComputeNorm>
-struct loadAndComputeDist<kUnroll, Lambda, 1, int8_t, int32_t, ComputeNorm> {
+struct load_and_compute_dist<kUnroll, Lambda, 1, int8_t, int32_t, ComputeNorm> {
   Lambda compute_dist;
   int32_t& dist;
   int32_t& norm_query;
   int32_t& norm_data;
   __device__ __forceinline__
-  loadAndComputeDist(int32_t& dist, Lambda op, int32_t& norm_query, int32_t& norm_data)
+  load_and_compute_dist(int32_t& dist, Lambda op, int32_t& norm_query, int32_t& norm_data)
     : dist(dist), compute_dist(op), norm_query(norm_query), norm_data(norm_data)
   {
   }
 
-  __device__ __forceinline__ void runLoadShmemCompute(const int8_t* const& data,
-                                                      const int8_t* query_shared,
-                                                      int loadIndex,
-                                                      int shmemIndex)
+  __device__ __forceinline__ void run_load_shmem_compute(const int8_t* const& data,
+                                                         const int8_t* query_shared,
+                                                         int loadIndex,
+                                                         int shmemIndex)
   {
 #pragma unroll
     for (int j = 0; j < kUnroll; ++j) {
@@ -712,20 +714,20 @@ struct loadAndComputeDist<kUnroll, Lambda, 1, int8_t, int32_t, ComputeNorm> {
     }
   }
 
-  __device__ __forceinline__ void runLoadShflAndCompute(const int8_t*& data,
-                                                        const int8_t* query,
-                                                        int baseLoadIndex,
-                                                        const int lane_id)
+  __device__ __forceinline__ void run_load_shfl_and_compute(const int8_t*& data,
+                                                            const int8_t* query,
+                                                            int baseLoadIndex,
+                                                            const int lane_id)
   {
-    constexpr int veclen = 1;
-    constexpr int stride = kUnroll * veclen;
-    int32_t queryReg     = query[baseLoadIndex + lane_id];
+    constexpr int kVeclen = 1;
+    constexpr int kStride = kUnroll * kVeclen;
+    int32_t query_reg     = query[baseLoadIndex + lane_id];
 
 #pragma unroll
-    for (int i = 0; i < raft::WarpSize / stride; ++i, data += stride * kIndexGroupSize) {
+    for (int i = 0; i < raft::WarpSize / kStride; ++i, data += kStride * kIndexGroupSize) {
 #pragma unroll
       for (int j = 0; j < kUnroll; ++j) {
-        int32_t q = raft::shfl(queryReg, i * kUnroll + j, raft::WarpSize);
+        int32_t q = raft::shfl(query_reg, i * kUnroll + j, raft::WarpSize);
         compute_dist(dist, q, data[lane_id + j * kIndexGroupSize]);
         if constexpr (ComputeNorm) {
           norm_query += q * q;
@@ -734,14 +736,14 @@ struct loadAndComputeDist<kUnroll, Lambda, 1, int8_t, int32_t, ComputeNorm> {
       }
     }
   }
-  __device__ __forceinline__ void runLoadShflAndComputeRemainder(
+  __device__ __forceinline__ void run_load_shfl_and_compute_remainder(
     const int8_t*& data, const int8_t* query, const int lane_id, const int dim, const int dimBlocks)
   {
-    constexpr int veclen = 1;
-    const int loadDim    = dimBlocks + lane_id;
-    int32_t queryReg     = loadDim < dim ? query[loadDim] : 0;
-    for (int d = 0; d < dim - dimBlocks; d += veclen, data += kIndexGroupSize * veclen) {
-      int32_t q = raft::shfl(queryReg, d, raft::WarpSize);
+    constexpr int kVeclen = 1;
+    const int load_dim    = dimBlocks + lane_id;
+    int32_t query_reg     = load_dim < dim ? query[load_dim] : 0;
+    for (int d = 0; d < dim - dimBlocks; d += kVeclen, data += kIndexGroupSize * kVeclen) {
+      int32_t q = raft::shfl(query_reg, d, raft::WarpSize);
       compute_dist(dist, q, data[lane_id]);
       if constexpr (ComputeNorm) {
         norm_query += q * q;
@@ -897,28 +899,28 @@ RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)  // NOLINT(readability-identifie
 
         if (valid) {
           // Process first shm_assisted_dim dimensions (always using shared memory)
-          loadAndComputeDist<kUnroll, decltype(compute_dist), Veclen, T, AccT, ComputeNorm> lc(
+          load_and_compute_dist<kUnroll, decltype(compute_dist), Veclen, T, AccT, ComputeNorm> lc(
             dist, compute_dist, norm_query, norm_dataset);
           for (int pos = 0; pos < shm_assisted_dim;
                pos += raft::WarpSize, data += kIndexGroupSize * raft::WarpSize) {
-            lc.runLoadShmemCompute(data, query_shared, lane_id, pos);
+            lc.run_load_shmem_compute(data, query_shared, lane_id, pos);
           }
 
           if (dim > query_smem_elems) {
             // The default path - using shfl ops - for dimensions beyond query_smem_elems
-            loadAndComputeDist<kUnroll, decltype(compute_dist), Veclen, T, AccT, ComputeNorm> lc(
+            load_and_compute_dist<kUnroll, decltype(compute_dist), Veclen, T, AccT, ComputeNorm> lc(
               dist, compute_dist, norm_query, norm_dataset);
             for (int pos = shm_assisted_dim; pos < full_warps_along_dim; pos += raft::WarpSize) {
-              lc.runLoadShflAndCompute(data, query, pos, lane_id);
+              lc.run_load_shfl_and_compute(data, query, pos, lane_id);
             }
-            lc.runLoadShflAndComputeRemainder(data, query, lane_id, dim, full_warps_along_dim);
+            lc.run_load_shfl_and_compute_remainder(data, query, lane_id, dim, full_warps_along_dim);
           } else {
             // when  shm_assisted_dim == full_warps_along_dim < dim
-            loadAndComputeDist<1, decltype(compute_dist), Veclen, T, AccT, ComputeNorm> lc(
+            load_and_compute_dist<1, decltype(compute_dist), Veclen, T, AccT, ComputeNorm> lc(
               dist, compute_dist, norm_query, norm_dataset);
             for (int pos = full_warps_along_dim; pos < dim;
                  pos += Veclen, data += kIndexGroupSize * Veclen) {
-              lc.runLoadShmemCompute(data, query_shared, lane_id, pos);
+              lc.run_load_shmem_compute(data, query_shared, lane_id, pos);
             }
           }
         }
@@ -1198,7 +1200,7 @@ void launch_with_fixed_consts(cuvs::distance::DistanceType metric, Args&&... arg
 }
 
 /**
- * Lift the `capacity` and `veclen` parameters to the template level,
+ * Lift the `capacity` and `kVeclen` parameters to the template level,
  * forward the rest of the arguments unmodified to `launch_interleaved_scan_kernel`.
  */
 template <typename T,
@@ -1215,12 +1217,12 @@ struct select_interleaved_scan_kernel {
    * two parameters and ends with both values equal to 1.
    */
   template <typename... Args>
-  static inline void run(int k_max, int veclen, bool select_min, Args&&... args)
+  static inline void run(int k_max, int kVeclen, bool select_min, Args&&... args)
   {
     if constexpr (Capacity > 0) {
       if (k_max == 0 || k_max > Capacity) {
         return select_interleaved_scan_kernel<T, AccT, IdxT, IvfSampleFilterT, 0, Veclen>::run(
-          k_max, veclen, select_min, std::forward<Args>(args)...);
+          k_max, kVeclen, select_min, std::forward<Args>(args)...);
       }
     }
     if constexpr (Capacity > 1) {
@@ -1231,13 +1233,13 @@ struct select_interleaved_scan_kernel {
                                               IvfSampleFilterT,
                                               Capacity / 2,
                                               Veclen>::run(k_max,
-                                                           veclen,
+                                                           kVeclen,
                                                            select_min,
                                                            std::forward<Args>(args)...);
       }
     }
     if constexpr (Veclen > 1) {
-      if (veclen % Veclen != 0) {
+      if (kVeclen % Veclen != 0) {
         return select_interleaved_scan_kernel<T, AccT, IdxT, IvfSampleFilterT, Capacity, 1>::run(
           k_max, 1, select_min, std::forward<Args>(args)...);
       }
@@ -1249,7 +1251,7 @@ struct select_interleaved_scan_kernel {
                  "allowed size matrix::detail::select::warpsort::kMaxCapacity (%d).",
                  raft::matrix::detail::select::warpsort::kMaxCapacity);
     RAFT_EXPECTS(
-      veclen == Veclen,
+      kVeclen == Veclen,
       "Veclen must be power-of-two not bigger than the maximum allowed size for this data type.");
     if (select_min) {
       launch_with_fixed_consts<Capacity, Veclen, true, T, AccT, IdxT, IvfSampleFilterT>(

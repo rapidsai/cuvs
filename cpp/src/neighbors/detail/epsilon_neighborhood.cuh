@@ -13,31 +13,31 @@ namespace cuvs::neighbors::epsilon_neighborhood::detail {
 
 template <typename DataT,
           typename IdxT,
-          typename Policy,
-          typename BaseClass = raft::linalg::Contractions_NT<DataT, IdxT, Policy>>
-struct EpsUnexpL2SqNeighborhood : public BaseClass {
+          typename policy,
+          typename BaseClass = raft::linalg::Contractions_NT<DataT, IdxT, policy>>
+struct eps_unexp_l2_sq_neighborhood_impl : public BaseClass {
  private:
-  using P = Policy;
+  using p = policy;
 
-  bool* adj;
-  DataT eps;
-  IdxT* vd;
+  bool* adj_;
+  DataT eps_;
+  IdxT* vd_;
 
-  char* smem;  // for final reductions
+  char* smem_;  // for final reductions
 
-  DataT acc[P::AccRowsPerTh][P::AccColsPerTh];
+  DataT acc_[p::AccRowsPerTh][p::AccColsPerTh];
 
  public:
-  DI EpsUnexpL2SqNeighborhood(bool* _adj,
-                              IdxT* _vd,
-                              const DataT* _x,
-                              const DataT* _y,
-                              IdxT _m,
-                              IdxT _n,
-                              IdxT _k,
-                              DataT _eps,
-                              char* _smem)
-    : BaseClass(_x, _y, _m, _n, _k, _smem), adj(_adj), eps(_eps), vd(_vd), smem(_smem)
+  DI eps_unexp_l2_sq_neighborhood_impl(bool* _adj,
+                                       IdxT* _vd,
+                                       const DataT* _x,
+                                       const DataT* _y,
+                                       IdxT _m,
+                                       IdxT _n,
+                                       IdxT _k,
+                                       DataT _eps,
+                                       char* _smem)
+    : BaseClass(_x, _y, _m, _n, _k, _smem), adj_(_adj), eps_(_eps), vd_(_vd), smem_(_smem)
   {
   }
 
@@ -51,12 +51,12 @@ struct EpsUnexpL2SqNeighborhood : public BaseClass {
  private:
   DI void prolog()
   {
-    this->ldgXY(IdxT(blockIdx.x) * P::Mblk, IdxT(blockIdx.y) * P::Nblk, 0);
+    this->ldgXY(IdxT(blockIdx.x) * p::Mblk, IdxT(blockIdx.y) * p::Nblk, 0);
 #pragma unroll
-    for (int i = 0; i < P::AccRowsPerTh; ++i) {
+    for (int i = 0; i < p::AccRowsPerTh; ++i) {
 #pragma unroll
-      for (int j = 0; j < P::AccColsPerTh; ++j) {
-        acc[i][j] = BaseClass::Zero();
+      for (int j = 0; j < p::AccColsPerTh; ++j) {
+        acc_[i][j] = BaseClass::Zero();
       }
     }
     this->stsXY();
@@ -66,8 +66,8 @@ struct EpsUnexpL2SqNeighborhood : public BaseClass {
 
   DI void loop()
   {
-    for (int kidx = P::Kblk; kidx < this->k; kidx += P::Kblk) {
-      this->ldgXY(IdxT(blockIdx.x) * P::Mblk, IdxT(blockIdx.y) * P::Nblk, kidx);
+    for (int kidx = p::Kblk; kidx < this->k; kidx += p::Kblk) {
+      this->ldgXY(IdxT(blockIdx.x) * p::Mblk, IdxT(blockIdx.y) * p::Nblk, kidx);
       accumulate();  // on the previous k-block
       this->stsXY();
       __syncthreads();
@@ -79,117 +79,117 @@ struct EpsUnexpL2SqNeighborhood : public BaseClass {
 
   DI void epilog()
   {
-    IdxT startx = blockIdx.x * P::Mblk + this->accrowid;
-    IdxT starty = blockIdx.y * P::Nblk + this->acccolid;
+    IdxT startx = blockIdx.x * p::Mblk + this->accrowid;
+    IdxT starty = blockIdx.y * p::Nblk + this->acccolid;
     auto lid    = raft::laneId();
-    IdxT sums[P::AccRowsPerTh];
+    IdxT sums[p::AccRowsPerTh];
 #pragma unroll
-    for (int i = 0; i < P::AccRowsPerTh; ++i) {
+    for (int i = 0; i < p::AccRowsPerTh; ++i) {
       sums[i]  = 0;
-      auto xid = startx + i * P::AccThRows;
+      auto xid = startx + i * p::AccThRows;
 #pragma unroll
-      for (int j = 0; j < P::AccColsPerTh; ++j) {
-        auto yid      = starty + j * P::AccThCols;
-        auto is_neigh = acc[i][j] <= eps;
+      for (int j = 0; j < p::AccColsPerTh; ++j) {
+        auto yid      = starty + j * p::AccThCols;
+        auto is_neigh = acc_[i][j] <= eps_;
         ///@todo: fix uncoalesced writes using shared mem
         if (xid < this->m && yid < this->n) {
-          adj[xid * this->n + yid] = is_neigh;
+          adj_[xid * this->n + yid] = is_neigh;
           sums[i] += is_neigh;
         }
       }
     }
     // perform reduction of adjacency values to compute vertex degrees
-    if (vd != nullptr) { updateVertexDegree(sums); }
+    if (vd_ != nullptr) { update_vertex_degree(sums); }
   }
 
   DI void accumulate()
   {
 #pragma unroll
-    for (int ki = 0; ki < P::Kblk; ki += P::Veclen) {
+    for (int ki = 0; ki < p::Kblk; ki += p::Veclen) {
       this->ldsXY(ki);
 #pragma unroll
-      for (int i = 0; i < P::AccRowsPerTh; ++i) {
+      for (int i = 0; i < p::AccRowsPerTh; ++i) {
 #pragma unroll
-        for (int j = 0; j < P::AccColsPerTh; ++j) {
+        for (int j = 0; j < p::AccColsPerTh; ++j) {
 #pragma unroll
-          for (int v = 0; v < P::Veclen; ++v) {
+          for (int v = 0; v < p::Veclen; ++v) {
             auto diff = this->regx[i][v] - this->regy[j][v];
-            acc[i][j] += diff * diff;
+            acc_[i][j] += diff * diff;
           }
         }
       }
     }
   }
 
-  DI void updateVertexDegree(IdxT (&sums)[P::AccRowsPerTh])
+  DI void update_vertex_degree(IdxT (&sums)[p::AccRowsPerTh])
   {
-    __syncthreads();  // so that we can safely reuse smem
-    int gid       = this->accrowid;
-    int lid       = this->acccolid;
-    auto cidx     = IdxT(blockIdx.x) * P::Mblk + gid;
-    IdxT totalSum = 0;
+    __syncthreads();  // so that we can safely reuse smem_
+    int gid        = this->accrowid;
+    int lid        = this->acccolid;
+    auto cidx      = IdxT(blockIdx.x) * p::Mblk + gid;
+    IdxT total_sum = 0;
     // update the individual vertex degrees
 #pragma unroll
-    for (int i = 0; i < P::AccRowsPerTh; ++i) {
-      // P::AccThCols neighboring threads need to reduce
-      // -> we have P::Nblk/P::AccThCols individual reductions
-      auto cid = cidx + i * P::AccThRows;
-      sums[i]  = raft::logicalWarpReduce<P::AccThCols>(sums[i], raft::add_op());
+    for (int i = 0; i < p::AccRowsPerTh; ++i) {
+      // p::AccThCols neighboring threads need to reduce
+      // -> we have p::Nblk/p::AccThCols individual reductions
+      auto cid = cidx + i * p::AccThRows;
+      sums[i]  = raft::logicalWarpReduce<p::AccThCols>(sums[i], raft::add_op());
       if (lid == 0 && cid < this->m) {
-        atomicUpdate(cid, sums[i]);
-        totalSum += sums[i];
+        atomic_update(cid, sums[i]);
+        total_sum += sums[i];
       }
-      __syncthreads();  // for safe smem reuse
+      __syncthreads();  // for safe smem_ reuse
     }
     // update the total edge count
-    totalSum = raft::blockReduce<IdxT>(totalSum, smem);
-    if (threadIdx.x == 0) { atomicUpdate(this->m, totalSum); }
+    total_sum = raft::blockReduce<IdxT>(total_sum, smem_);
+    if (threadIdx.x == 0) { atomic_update(this->m, total_sum); }
   }
 
-  DI void atomicUpdate(IdxT addrId, IdxT val)
+  DI void atomic_update(IdxT addrId, IdxT val)
   {
     if (sizeof(IdxT) == 4) {
-      raft::myAtomicAdd<unsigned>(reinterpret_cast<unsigned*>((vd + addrId)), val);
+      raft::myAtomicAdd<unsigned>(reinterpret_cast<unsigned*>((vd_ + addrId)), val);
     } else if (sizeof(IdxT) == 8) {
-      raft::myAtomicAdd<unsigned long long>(reinterpret_cast<unsigned long long*>((vd + addrId)),
+      raft::myAtomicAdd<unsigned long long>(reinterpret_cast<unsigned long long*>((vd_ + addrId)),
                                             val);
     }
   }
-};  // struct EpsUnexpL2SqNeighborhood
+};  // struct eps_unexp_l2_sq_neighborhood_impl
 
-template <typename DataT, typename IdxT, typename Policy>
-__launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL
+template <typename DataT, typename IdxT, typename policy>
+__launch_bounds__(policy::Nthreads, 2) RAFT_KERNEL
   epsUnexpL2SqNeighKernel(  // NOLINT(readability-identifier-naming)
-    bool* adj,
-    IdxT* vd,
+    bool* adj_,
+    IdxT* vd_,
     const DataT* x,
     const DataT* y,
     IdxT m,
     IdxT n,
     IdxT k,
-    DataT eps)
+    DataT eps_)
 {
-  extern __shared__ char smem[];
-  EpsUnexpL2SqNeighborhood<DataT, IdxT, Policy> obj(adj, vd, x, y, m, n, k, eps, smem);
+  extern __shared__ char smem_[];
+  eps_unexp_l2_sq_neighborhood_impl<DataT, IdxT, policy> obj(adj_, vd_, x, y, m, n, k, eps_, smem_);
   obj.run();
 }
 
 template <typename DataT, typename IdxT, int VecLen>
-void epsUnexpL2SqNeighImpl(bool* adj,
-                           IdxT* vd,
-                           const DataT* x,
-                           const DataT* y,
-                           IdxT m,
-                           IdxT n,
-                           IdxT k,
-                           DataT eps,
-                           cudaStream_t stream)
+void eps_unexp_l2_sq_neigh_impl(bool* adj_,
+                                IdxT* vd_,
+                                const DataT* x,
+                                const DataT* y,
+                                IdxT m,
+                                IdxT n,
+                                IdxT k,
+                                DataT eps_,
+                                cudaStream_t stream)
 {
-  using Policy = typename raft::linalg::Policy4x4<DataT, VecLen>::Policy;
-  dim3 grid(raft::ceildiv<int>(m, Policy::Mblk), raft::ceildiv<int>(n, Policy::Nblk));
-  dim3 blk(Policy::Nthreads);
-  epsUnexpL2SqNeighKernel<DataT, IdxT, Policy>
-    <<<grid, blk, Policy::SmemSize, stream>>>(adj, vd, x, y, m, n, k, eps);
+  using policy = typename raft::linalg::Policy4x4<DataT, VecLen>::Policy;
+  dim3 grid(raft::ceildiv<int>(m, policy::Mblk), raft::ceildiv<int>(n, policy::Nblk));
+  dim3 blk(policy::Nthreads);
+  epsUnexpL2SqNeighKernel<DataT, IdxT, policy>
+    <<<grid, blk, policy::SmemSize, stream>>>(adj_, vd_, x, y, m, n, k, eps_);
   RAFT_CUDA_TRY(cudaGetLastError());
 }
 
@@ -199,37 +199,39 @@ void epsUnexpL2SqNeighImpl(bool* adj,
  * @tparam DataT   IO and math type
  * @tparam IdxT    Index type
  *
- * @param[out] adj    adjacency matrix [row-major] [on device] [dim = m x n]
- * @param[out] vd     vertex degree array [on device] [len = m + 1]
- *                    `vd + m` stores the total number of edges in the adjacency
+ * @param[out] adj_    adjacency matrix [row-major] [on device] [dim = m x n]
+ * @param[out] vd_     vertex degree array [on device] [len = m + 1]
+ *                    `vd_ + m` stores the total number of edges in the adjacency
  *                    matrix. Pass a nullptr if you don't need this info.
  * @param[in]  x      first matrix [row-major] [on device] [dim = m x k]
  * @param[in]  y      second matrix [row-major] [on device] [dim = n x k]
- * @param[in]  eps    defines epsilon neighborhood radius (should be passed as
+ * @param[in]  eps_    defines epsilon neighborhood radius (should be passed as
  *                    squared as we compute L2-squared distance in this method)
  * @param[in]  fop    device lambda to do any other custom functions
  * @param[in]  stream cuda stream
  */
 template <typename DataT, typename IdxT>
-void epsUnexpL2SqNeighborhood(bool* adj,
-                              IdxT* vd,
-                              const DataT* x,
-                              const DataT* y,
-                              IdxT m,
-                              IdxT n,
-                              IdxT k,
-                              DataT eps,
-                              cudaStream_t stream)
+void eps_unexp_l2_sq_neighborhood(bool* adj_,
+                                  IdxT* vd_,
+                                  const DataT* x,
+                                  const DataT* y,
+                                  IdxT m,
+                                  IdxT n,
+                                  IdxT k,
+                                  DataT eps_,
+                                  cudaStream_t stream)
 {
-  if (vd != nullptr) { RAFT_CUDA_TRY(cudaMemsetAsync(vd, 0, (m + 1) * sizeof(IdxT), stream)); }
+  if (vd_ != nullptr) { RAFT_CUDA_TRY(cudaMemsetAsync(vd_, 0, (m + 1) * sizeof(IdxT), stream)); }
 
   size_t bytes = sizeof(DataT) * k;
   if (16 % sizeof(DataT) == 0 && bytes % 16 == 0) {
-    epsUnexpL2SqNeighImpl<DataT, IdxT, 16 / sizeof(DataT)>(adj, vd, x, y, m, n, k, eps, stream);
+    eps_unexp_l2_sq_neigh_impl<DataT, IdxT, 16 / sizeof(DataT)>(
+      adj_, vd_, x, y, m, n, k, eps_, stream);
   } else if (8 % sizeof(DataT) == 0 && bytes % 8 == 0) {
-    epsUnexpL2SqNeighImpl<DataT, IdxT, 8 / sizeof(DataT)>(adj, vd, x, y, m, n, k, eps, stream);
+    eps_unexp_l2_sq_neigh_impl<DataT, IdxT, 8 / sizeof(DataT)>(
+      adj_, vd_, x, y, m, n, k, eps_, stream);
   } else {
-    epsUnexpL2SqNeighImpl<DataT, IdxT, 1>(adj, vd, x, y, m, n, k, eps, stream);
+    eps_unexp_l2_sq_neigh_impl<DataT, IdxT, 1>(adj_, vd_, x, y, m, n, k, eps_, stream);
   }
 }
 }  // namespace cuvs::neighbors::epsilon_neighborhood::detail

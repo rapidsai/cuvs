@@ -19,82 +19,88 @@ namespace cuvs::distance::detail::sparse {
  * and precision.
  * @return the maximum number of columns that can be stored in smem
  */
-template <typename value_idx, typename value_t, int tpb = 1024>
+template <typename ValueIdx,
+          typename value_t,
+          int kTpb = 1024>  // NOLINT(readability-identifier-naming)
 inline auto max_cols_per_block() -> int
 {
   // max cols = (total smem available - cub reduction smem)
-  return (raft::getSharedMemPerBlock() - ((tpb / raft::warp_size()) * sizeof(value_t))) /
+  return (raft::getSharedMemPerBlock() - ((kTpb / raft::warp_size()) * sizeof(value_t))) /
          sizeof(value_t);
 }
 
-template <typename value_idx, typename value_t, typename dot_t = value_t>
-RAFT_KERNEL faster_dot_on_csr_kernel(dot_t* __restrict__ dot,
-                                     const value_idx* __restrict__ indptr,
-                                     const value_idx* __restrict__ cols,
+template <typename ValueIdx,
+          typename value_t,
+          typename DotT = value_t>  // NOLINT(readability-identifier-naming)
+RAFT_KERNEL faster_dot_on_csr_kernel(DotT* __restrict__ dot,
+                                     const ValueIdx* __restrict__ indptr,
+                                     const ValueIdx* __restrict__ cols,
                                      const value_t* __restrict__ A,
                                      const value_t* __restrict__ B,
-                                     const value_idx nnz,
-                                     const value_idx n_rows,
-                                     const value_idx dim)
+                                     const ValueIdx nnz,
+                                     const ValueIdx n_rows,
+                                     const ValueIdx dim)
 {
   auto vec_id  = threadIdx.x;
   auto lane_id = threadIdx.x & 0x1f;
 
   extern __shared__ char smem[];
-  auto* s_A         = reinterpret_cast<value_t*>(smem);
-  value_idx cur_row = -1;
+  auto* s_a        = reinterpret_cast<value_t*>(smem);
+  ValueIdx cur_row = -1;
 
   for (int row = blockIdx.x; row < n_rows; row += gridDim.x) {
     for (int dot_id = blockIdx.y + indptr[row]; dot_id < indptr[row + 1]; dot_id += gridDim.y) {
       if (dot_id >= nnz) { return; }
-      const value_idx col               = cols[dot_id] * dim;
-      const value_t* __restrict__ B_col = B + col;
+      const ValueIdx col                = cols[dot_id] * dim;
+      const value_t* __restrict__ b_col = B + col;
 
       if (threadIdx.x == 0) { dot[dot_id] = 0.0; }
       __syncthreads();
 
       if (cur_row != row) {
-        for (value_idx k = vec_id; k < dim; k += blockDim.x) {
-          s_A[k] = A[row * dim + k];
+        for (ValueIdx k = vec_id; k < dim; k += blockDim.x) {
+          s_a[k] = A[row * dim + k];
         }
         cur_row = row;
       }
 
-      dot_t l_dot_ = 0.0;
-      for (value_idx k = vec_id; k < dim; k += blockDim.x) {
-        asm("prefetch.global.L2 [%0];" ::"l"(B_col + k + blockDim.x));
-        if constexpr ((std::is_same_v<dot_t, float> && std::is_same_v<value_t, half>)) {
-          l_dot_ += __half2float(s_A[k]) * __half2float(__ldcg(B_col + k));
+      DotT l_dot = 0.0;
+      for (ValueIdx k = vec_id; k < dim; k += blockDim.x) {
+        asm("prefetch.global.L2 [%0];" ::"l"(b_col + k + blockDim.x));
+        if constexpr ((std::is_same_v<DotT, float> && std::is_same_v<value_t, half>)) {
+          l_dot += __half2float(s_a[k]) * __half2float(__ldcg(b_col + k));
         } else {
-          l_dot_ += s_A[k] * __ldcg(B_col + k);
+          l_dot += s_a[k] * __ldcg(b_col + k);
         }
       }
 
-      using WarpReduce = cub::WarpReduce<dot_t>;
+      using WarpReduce = cub::WarpReduce<DotT>;
       __shared__ typename WarpReduce::TempStorage temp_storage;
-      dot_t warp_sum = WarpReduce(temp_storage).Sum(l_dot_);
+      DotT warp_sum = WarpReduce(temp_storage).Sum(l_dot);
 
       if (lane_id == 0) { atomicAdd_block(dot + dot_id, warp_sum); }
     }
   }
 }
 
-template <typename value_idx, typename value_t, typename dot_t = value_t>
+template <typename ValueIdx,
+          typename value_t,
+          typename DotT = value_t>  // NOLINT(readability-identifier-naming)
 void faster_dot_on_csr(raft::resources const& handle,
-                       dot_t* dot,
-                       const value_idx nnz,
-                       const value_idx* indptr,
-                       const value_idx* cols,
+                       DotT* dot,
+                       const ValueIdx nnz,
+                       const ValueIdx* indptr,
+                       const ValueIdx* cols,
                        const value_t* A,
                        const value_t* B,
-                       const value_idx n_rows,
-                       const value_idx dim)
+                       const ValueIdx n_rows,
+                       const ValueIdx dim)
 {
   if (nnz == 0 || n_rows == 0) return;
 
   auto stream = raft::resource::get_cuda_stream(handle);
 
-  constexpr value_idx MAX_ROW_PER_ITER = 500;
+  constexpr ValueIdx kMaxRowPerIter = 500;
   int dev_id, sm_count, blocks_per_sm;
 
   const int smem_size = dim * sizeof(value_t);
@@ -102,50 +108,46 @@ void faster_dot_on_csr(raft::resources const& handle,
   cudaDeviceGetAttribute(&sm_count, cudaDevAttrMultiProcessorCount, dev_id);
 
   if (dim < 128) {
-    constexpr int tpb = 64;
+    constexpr int kTpb = 64;
     cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-      &blocks_per_sm, faster_dot_on_csr_kernel<value_idx, value_t, dot_t>, tpb, smem_size);
-    auto block_x = std::min(n_rows, MAX_ROW_PER_ITER);
-    auto block_y =
-      (std::min(value_idx(blocks_per_sm * sm_count * 16), nnz) + block_x - 1) / block_x;
+      &blocks_per_sm, faster_dot_on_csr_kernel<ValueIdx, value_t, DotT>, kTpb, smem_size);
+    auto block_x = std::min(n_rows, kMaxRowPerIter);
+    auto block_y = (std::min(ValueIdx(blocks_per_sm * sm_count * 16), nnz) + block_x - 1) / block_x;
     dim3 blocks(block_x, block_y, 1);
 
-    faster_dot_on_csr_kernel<value_idx, value_t, dot_t>
-      <<<blocks, tpb, smem_size, stream>>>(dot, indptr, cols, A, B, nnz, n_rows, dim);
+    faster_dot_on_csr_kernel<ValueIdx, value_t, DotT>
+      <<<blocks, kTpb, smem_size, stream>>>(dot, indptr, cols, A, B, nnz, n_rows, dim);
 
   } else if (dim < 256) {
-    constexpr int tpb = 128;
+    constexpr int kTpb = 128;
     cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-      &blocks_per_sm, faster_dot_on_csr_kernel<value_idx, value_t, dot_t>, tpb, smem_size);
-    auto block_x = std::min(n_rows, MAX_ROW_PER_ITER);
-    auto block_y =
-      (std::min(value_idx(blocks_per_sm * sm_count * 16), nnz) + block_x - 1) / block_x;
+      &blocks_per_sm, faster_dot_on_csr_kernel<ValueIdx, value_t, DotT>, kTpb, smem_size);
+    auto block_x = std::min(n_rows, kMaxRowPerIter);
+    auto block_y = (std::min(ValueIdx(blocks_per_sm * sm_count * 16), nnz) + block_x - 1) / block_x;
     dim3 blocks(block_x, block_y, 1);
 
-    faster_dot_on_csr_kernel<value_idx, value_t, dot_t>
-      <<<blocks, tpb, smem_size, stream>>>(dot, indptr, cols, A, B, nnz, n_rows, dim);
+    faster_dot_on_csr_kernel<ValueIdx, value_t, DotT>
+      <<<blocks, kTpb, smem_size, stream>>>(dot, indptr, cols, A, B, nnz, n_rows, dim);
   } else if (dim < 512) {
-    constexpr int tpb = 256;
+    constexpr int kTpb = 256;
     cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-      &blocks_per_sm, faster_dot_on_csr_kernel<value_idx, value_t, dot_t>, tpb, smem_size);
-    auto block_x = std::min(n_rows, MAX_ROW_PER_ITER);
-    auto block_y =
-      (std::min(value_idx(blocks_per_sm * sm_count * 16), nnz) + block_x - 1) / block_x;
+      &blocks_per_sm, faster_dot_on_csr_kernel<ValueIdx, value_t, DotT>, kTpb, smem_size);
+    auto block_x = std::min(n_rows, kMaxRowPerIter);
+    auto block_y = (std::min(ValueIdx(blocks_per_sm * sm_count * 16), nnz) + block_x - 1) / block_x;
     dim3 blocks(block_x, block_y, 1);
 
-    faster_dot_on_csr_kernel<value_idx, value_t, dot_t>
-      <<<blocks, tpb, smem_size, stream>>>(dot, indptr, cols, A, B, nnz, n_rows, dim);
+    faster_dot_on_csr_kernel<ValueIdx, value_t, DotT>
+      <<<blocks, kTpb, smem_size, stream>>>(dot, indptr, cols, A, B, nnz, n_rows, dim);
   } else {
-    constexpr int tpb = 512;
+    constexpr int kTpb = 512;
     cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-      &blocks_per_sm, faster_dot_on_csr_kernel<value_idx, value_t, dot_t>, tpb, smem_size);
-    auto block_x = std::min(n_rows, MAX_ROW_PER_ITER);
-    auto block_y =
-      (std::min(value_idx(blocks_per_sm * sm_count * 16), nnz) + block_x - 1) / block_x;
+      &blocks_per_sm, faster_dot_on_csr_kernel<ValueIdx, value_t, DotT>, kTpb, smem_size);
+    auto block_x = std::min(n_rows, kMaxRowPerIter);
+    auto block_y = (std::min(ValueIdx(blocks_per_sm * sm_count * 16), nnz) + block_x - 1) / block_x;
     dim3 blocks(block_x, block_y, 1);
 
-    faster_dot_on_csr_kernel<value_idx, value_t, dot_t>
-      <<<blocks, tpb, smem_size, stream>>>(dot, indptr, cols, A, B, nnz, n_rows, dim);
+    faster_dot_on_csr_kernel<ValueIdx, value_t, DotT>
+      <<<blocks, kTpb, smem_size, stream>>>(dot, indptr, cols, A, B, nnz, n_rows, dim);
   }
 
   RAFT_CUDA_TRY(cudaPeekAtLastError());
