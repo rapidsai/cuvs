@@ -314,6 +314,12 @@ uint32_t index<IdxT>::dim() const noexcept
   return rabitq_index_->get_num_dimensions();
 }
 
+template <typename IdxT>
+IdxT index<IdxT>::size() const noexcept
+{
+  return rabitq_index_->get_num_vectors();
+}
+
 void build(raft::resources const& handle,
            const cuvs::neighbors::ivf_rabitq::index_params& index_params,
            raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,

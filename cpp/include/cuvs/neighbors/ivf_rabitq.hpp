@@ -131,6 +131,9 @@ struct index : cuvs::neighbors::index {
   /** Dimensionality of the input data. */
   uint32_t dim() const noexcept;
 
+  /** Total length of the index. */
+  IdxT size() const noexcept;
+
   /** Accessor for underlying RaBitQ index */
   detail::IVFGPU& rabitq_index() noexcept;
 

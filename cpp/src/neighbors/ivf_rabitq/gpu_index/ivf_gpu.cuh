@@ -268,6 +268,7 @@ class IVFGPU {
   }
 
   // metadata getters
+  size_t get_num_vectors() const noexcept { return this->num_vectors; }
   size_t get_num_dimensions() const noexcept { return this->num_dimensions; }
   size_t get_num_padded_dim() const noexcept { return this->num_padded_dim; }
   size_t get_num_centroids() const { return num_centroids; }
