@@ -317,7 +317,6 @@ jobs:
       build_type: pull-request
       node_type: cpu16
       script: ci/build_cpp.sh
-      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
   conda-cpp-tests:
     needs: [conda-cpp-build, changed-files]
     secrets: inherit
@@ -326,7 +325,6 @@ jobs:
     with:
       build_type: pull-request
       script: ci/test_cpp.sh
-      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
   conda-cpp-checks:
     needs: conda-cpp-build
     secrets: inherit
@@ -349,7 +347,6 @@ jobs:
     with:
       build_type: pull-request
       script: ci/test_python.sh
-      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
   rocky8-clib-standalone-build:
     needs: [checks]
     secrets: inherit
@@ -374,7 +371,6 @@ jobs:
       artifact-name: "libcuvs_c_${{ matrix.cuda_version }}_${{ matrix.arch }}.tar.gz"
       file_to_upload: "libcuvs_c.tar.gz"
       sha: ${{ inputs.sha }}
-      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
   rocky8-clib-tests:
     needs: [rocky8-clib-standalone-build, changed-files]
     secrets: inherit
@@ -418,7 +414,6 @@ jobs:
       script: "ci/test_java.sh"
       artifact-name: "cuvs-java-cuda${{ matrix.cuda_version }}"
       file_to_upload: "java/cuvs-java/target/"
-      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
   rust-build:
     needs: [conda-cpp-build, changed-files]
     secrets: inherit
@@ -438,7 +433,6 @@ jobs:
       arch: "amd64"
       container_image: "rapidsai/ci-conda:26.04-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
       script: "ci/build_rust.sh"
-      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
   go-build:
     needs: [conda-cpp-build, changed-files]
     secrets: inherit
@@ -480,7 +474,6 @@ jobs:
       matrix_filter: group_by([.ARCH, (.CUDA_VER|split(".")|map(tonumber)|.[0])]) | map(max_by(.PY_VER|split(".")|map(tonumber)))
       package-name: libcuvs
       package-type: cpp
-      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
   wheel-build-cuvs:
     needs: wheel-build-libcuvs
     secrets: inherit
@@ -491,7 +484,6 @@ jobs:
       script: ci/build_wheel_cuvs.sh
       package-name: cuvs
       package-type: python
-      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
   wheel-tests-cuvs:
     needs: [wheel-build-cuvs, changed-files]
     secrets: inherit
@@ -500,7 +492,6 @@ jobs:
     with:
       build_type: pull-request
       script: ci/test_wheel_cuvs.sh
-      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
   devcontainer:
     secrets: inherit
     needs: telemetry-setup
@@ -509,12 +500,10 @@ jobs:
       arch: '["amd64", "arm64"]'
       cuda: '["13.1"]'
       node_type: "cpu8"
-      rapids-aux-secret-1: GIST_REPO_READ_ORG_GITHUB_TOKEN
       env: |
         SCCACHE_DIST_MAX_RETRIES=inf
         SCCACHE_SERVER_LOG=sccache=debug
         SCCACHE_DIST_FALLBACK_TO_LOCAL_COMPILE=false
-        SCCACHE_DIST_AUTH_TOKEN_VAR=RAPIDS_AUX_SECRET_1
       build_command: |
         sccache --zero-stats;
         build-all -j0 --verbose 2>&1 | tee telemetry-artifacts/build.log;

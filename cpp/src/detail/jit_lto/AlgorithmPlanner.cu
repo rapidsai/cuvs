@@ -107,7 +107,7 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
   check_nvjitlink_result(handle, result);
 
   result = nvJitLinkDestroy(&handle);
-  check_nvjitlink_result(handle, result);
+  RAFT_EXPECTS(result == NVJITLINK_SUCCESS, "nvJitLinkDestroy failed");
 
   // cubin is linked, so now load it
   // NOTE: cudaLibrary_t does not need to be freed explicitly
