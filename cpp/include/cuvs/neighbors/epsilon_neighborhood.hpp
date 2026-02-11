@@ -55,8 +55,8 @@ namespace cuvs::neighbors::epsilon_neighborhood {
  *                    squared when using L2Unexpanded metric)
  * @param[in]  metric distance metric to use. Currently only L2Unexpanded is supported.
  */
-template <typename value_t,
-          typename idx_t,
+template <typename value_t,       // NOLINT(readability-identifier-naming)
+          typename idx_t,         // NOLINT(readability-identifier-naming)
           typename matrix_idx_t>  // NOLINT(readability-identifier-naming)
 void compute(raft::resources const& handle,
              raft::device_matrix_view<const value_t, matrix_idx_t, raft::row_major> x,

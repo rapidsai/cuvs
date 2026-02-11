@@ -17,10 +17,10 @@ template <typename OpT,
           typename DataT,
           typename OutT,
           typename FinOpT,
-          typename SM_compat_t>
+          typename SmCompatT>
 auto pairwise_matrix_sm60_get_wrapper(OpT distance_op,
                                       pairwise_matrix_params<IdxT, DataT, OutT, FinOpT> params,
-                                      SM_compat_t sm_compat_range)
+                                      SmCompatT sm_compat_range)
   -> pairwise_matrix_sm60_wrapper<OpT, IdxT, DataT, OutT, FinOpT>
 {
   int vec_len = determine_vec_len(params);
@@ -35,13 +35,13 @@ auto pairwise_matrix_sm60_get_wrapper(OpT distance_op,
 
     // To keep compile times in check, we only specialize on veclen > 1 when
     // the inner loop is relatively cheap (< 5 flops).
-    constexpr int vec_len_op = distance_op.expensive_inner_loop ? 1 : vec_len_aligned();
+    constexpr int kVecLenOp = distance_op.kExpensiveInnerLoop ? 1 : vec_len_aligned();
 
     // Prevent double, vec_len=4 combination (this is not supported)
-    constexpr int vec_len = std::min(vec_len_op, static_cast<int>(16 / sizeof(DataT)));
+    constexpr int kVecLen = std::min(kVecLenOp, static_cast<int>(16 / sizeof(DataT)));
 
-    using RowPolicy = typename raft::linalg::Policy4x4<DataT, vec_len>::Policy;
-    using ColPolicy = typename raft::linalg::Policy4x4<DataT, vec_len>::ColPolicy;
+    using RowPolicy = typename raft::linalg::Policy4x4<DataT, kVecLen>::Policy;
+    using ColPolicy = typename raft::linalg::Policy4x4<DataT, kVecLen>::ColPolicy;
     using Policy    = typename std::conditional<row_major(), RowPolicy, ColPolicy>::type;
 
     auto wrapper =
@@ -60,10 +60,10 @@ template <typename OpT,
           typename DataT,
           typename OutT,
           typename FinOpT,
-          typename SM_compat_t>
+          typename SmCompatT>
 void pairwise_matrix_sm60_dispatch(OpT distance_op,
                                    pairwise_matrix_params<IdxT, DataT, OutT, FinOpT> params,
-                                   SM_compat_t sm_compat_range,
+                                   SmCompatT sm_compat_range,
                                    cudaStream_t stream)
 {
   auto wrapper = pairwise_matrix_sm60_get_wrapper(distance_op, params, sm_compat_range);

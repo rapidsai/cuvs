@@ -68,25 +68,25 @@ namespace cuvs::distance {
  * @param[in]  stream        cuda stream
  */
 template <typename DataT, typename OutT, typename IdxT, typename ReduceOpT, typename KVPReduceOpT>
-void fusedDistanceNN(OutT* min,
-                     const DataT* x,
-                     const DataT* y,
-                     const DataT* xn,
-                     const DataT* yn,
-                     IdxT m,
-                     IdxT n,
-                     IdxT k,
-                     void* workspace,
-                     ReduceOpT redOp,
-                     KVPReduceOpT pairRedOp,
-                     bool sqrt,
-                     bool initOutBuffer,
-                     bool isRowMajor,
-                     cuvs::distance::DistanceType metric,
-                     float metric_arg,
-                     cudaStream_t stream)
+void fused_distance_nn(OutT* min,
+                       const DataT* x,
+                       const DataT* y,
+                       const DataT* xn,
+                       const DataT* yn,
+                       IdxT m,
+                       IdxT n,
+                       IdxT k,
+                       void* workspace,
+                       ReduceOpT redOp,
+                       KVPReduceOpT pairRedOp,
+                       bool sqrt,
+                       bool initOutBuffer,
+                       bool isRowMajor,
+                       cuvs::distance::DistanceType metric,
+                       float metric_arg,
+                       cudaStream_t stream)
 {
-  ASSERT(isRowMajor, "fusedDistanceNN only supports row major inputs");
+  ASSERT(isRowMajor, "fused_distance_nn only supports row major inputs");
   // When k is smaller than 32, the Policy4x4 results in redundant calculations
   // as it uses tiles that have k=32. Therefore, use a "skinny" policy instead
   // that uses tiles with a smaller value of k.
@@ -97,7 +97,7 @@ void fusedDistanceNN(OutT* min,
   auto py      = reinterpret_cast<uintptr_t>(y);
   if (16 % sizeof(DataT) == 0 && bytes % 16 == 0 && px % 16 == 0 && py % 16 == 0) {
     if (is_skinny) {
-      detail::fusedDistanceNNImpl<
+      detail::fused_distance_nn_impl<
         DataT,
         OutT,
         IdxT,
@@ -120,7 +120,7 @@ void fusedDistanceNN(OutT* min,
                    metric_arg,
                    stream);
     } else {
-      detail::fusedDistanceNNImpl<
+      detail::fused_distance_nn_impl<
         DataT,
         OutT,
         IdxT,
@@ -145,7 +145,7 @@ void fusedDistanceNN(OutT* min,
     }
   } else if (8 % sizeof(DataT) == 0 && bytes % 8 == 0 && px % 8 == 0 && py % 8 == 0) {
     if (is_skinny) {
-      detail::fusedDistanceNNImpl<
+      detail::fused_distance_nn_impl<
         DataT,
         OutT,
         IdxT,
@@ -168,7 +168,7 @@ void fusedDistanceNN(OutT* min,
                    metric_arg,
                    stream);
     } else {
-      detail::fusedDistanceNNImpl<
+      detail::fused_distance_nn_impl<
         DataT,
         OutT,
         IdxT,
@@ -193,49 +193,49 @@ void fusedDistanceNN(OutT* min,
     }
   } else {
     if (is_skinny) {
-      detail::fusedDistanceNNImpl<DataT,
-                                  OutT,
-                                  IdxT,
-                                  typename raft::linalg::Policy4x4Skinny<DataT, 1>::Policy,
-                                  ReduceOpT>(min,
-                                             x,
-                                             y,
-                                             xn,
-                                             yn,
-                                             m,
-                                             n,
-                                             k,
-                                             static_cast<int*>(workspace),
-                                             redOp,
-                                             pairRedOp,
-                                             sqrt,
-                                             initOutBuffer,
-                                             isRowMajor,
-                                             metric,
-                                             metric_arg,
-                                             stream);
+      detail::fused_distance_nn_impl<DataT,
+                                     OutT,
+                                     IdxT,
+                                     typename raft::linalg::Policy4x4Skinny<DataT, 1>::Policy,
+                                     ReduceOpT>(min,
+                                                x,
+                                                y,
+                                                xn,
+                                                yn,
+                                                m,
+                                                n,
+                                                k,
+                                                static_cast<int*>(workspace),
+                                                redOp,
+                                                pairRedOp,
+                                                sqrt,
+                                                initOutBuffer,
+                                                isRowMajor,
+                                                metric,
+                                                metric_arg,
+                                                stream);
     } else {
-      detail::fusedDistanceNNImpl<DataT,
-                                  OutT,
-                                  IdxT,
-                                  typename raft::linalg::Policy4x4<DataT, 1>::Policy,
-                                  ReduceOpT>(min,
-                                             x,
-                                             y,
-                                             xn,
-                                             yn,
-                                             m,
-                                             n,
-                                             k,
-                                             static_cast<int*>(workspace),
-                                             redOp,
-                                             pairRedOp,
-                                             sqrt,
-                                             initOutBuffer,
-                                             isRowMajor,
-                                             metric,
-                                             metric_arg,
-                                             stream);
+      detail::fused_distance_nn_impl<DataT,
+                                     OutT,
+                                     IdxT,
+                                     typename raft::linalg::Policy4x4<DataT, 1>::Policy,
+                                     ReduceOpT>(min,
+                                                x,
+                                                y,
+                                                xn,
+                                                yn,
+                                                m,
+                                                n,
+                                                k,
+                                                static_cast<int*>(workspace),
+                                                redOp,
+                                                pairRedOp,
+                                                sqrt,
+                                                initOutBuffer,
+                                                isRowMajor,
+                                                metric,
+                                                metric_arg,
+                                                stream);
     }
   }
 }
@@ -272,42 +272,42 @@ void fusedDistanceNN(OutT* min,
  * @param[in]  stream        cuda stream
  */
 template <typename DataT, typename OutT, typename IdxT>
-void fusedDistanceNNMinReduce(OutT* min,
-                              const DataT* x,
-                              const DataT* y,
-                              const DataT* xn,
-                              const DataT* yn,
-                              IdxT m,
-                              IdxT n,
-                              IdxT k,
-                              void* workspace,
-                              bool sqrt,
-                              bool initOutBuffer,
-                              bool isRowMajor,
-                              cuvs::distance::DistanceType metric,
-                              float metric_arg,
-                              cudaStream_t stream)
+void fused_distance_nn_min_reduce(OutT* min,
+                                  const DataT* x,
+                                  const DataT* y,
+                                  const DataT* xn,
+                                  const DataT* yn,
+                                  IdxT m,
+                                  IdxT n,
+                                  IdxT k,
+                                  void* workspace,
+                                  bool sqrt,
+                                  bool initOutBuffer,
+                                  bool isRowMajor,
+                                  cuvs::distance::DistanceType metric,
+                                  float metric_arg,
+                                  cudaStream_t stream)
 {
-  MinAndDistanceReduceOp<IdxT, DataT> redOp;
-  KVPMinReduce<IdxT, DataT> pairRedOp;
+  MinAndDistanceReduceOp<IdxT, DataT> red_op;
+  KVPMinReduce<IdxT, DataT> pair_red_op;
 
-  fusedDistanceNN<DataT, OutT, IdxT>(min,
-                                     x,
-                                     y,
-                                     xn,
-                                     yn,
-                                     m,
-                                     n,
-                                     k,
-                                     workspace,
-                                     redOp,
-                                     pairRedOp,
-                                     sqrt,
-                                     initOutBuffer,
-                                     isRowMajor,
-                                     metric,
-                                     metric_arg,
-                                     stream);
+  fused_distance_nn<DataT, OutT, IdxT>(min,
+                                       x,
+                                       y,
+                                       xn,
+                                       yn,
+                                       m,
+                                       n,
+                                       k,
+                                       workspace,
+                                       red_op,
+                                       pair_red_op,
+                                       sqrt,
+                                       initOutBuffer,
+                                       isRowMajor,
+                                       metric,
+                                       metric_arg,
+                                       stream);
 }
 
 /** @} */

@@ -21,15 +21,15 @@ namespace cuvs::distance::detail::ops {
  */
 template <typename DataType, typename AccType, typename IdxType>
 struct canberra_distance_op {
-  using DataT = DataType;
-  using AccT  = AccType;
-  using IdxT  = IdxType;
+  using data_t = DataType;
+  using acc_t  = AccType;
+  using idx_t  = IdxType;
 
   // Load norms of input data
-  static constexpr bool use_norms = false;
+  static constexpr bool kUseNorms = false;
   // Whether the core function requires so many instructions that it makes sense
   // to reduce loop unrolling, etc. We do this to keep compile times in check.
-  static constexpr bool expensive_inner_loop = true;
+  static constexpr bool kExpensiveInnerLoop = true;
 
   // Size of shared memory. This is normally decided by the kernel policy, but
   // some ops such as correlation_distance_op use more.
@@ -39,13 +39,13 @@ struct canberra_distance_op {
     return Policy::SmemSize;
   }
 
-  DI void core(AccT& acc, DataT& x, DataT& y) const
+  DI void core(acc_t& acc, data_t& x, data_t& y) const
   {
-    if constexpr ((std::is_same_v<AccT, float> && std::is_same_v<DataT, half>)) {
-      AccT _x         = __half2float(x);
-      AccT _y         = __half2float(y);
-      const auto diff = raft::abs(_x - _y);
-      const auto add  = raft::abs(_x) + raft::abs(_y);
+    if constexpr ((std::is_same_v<acc_t, float> && std::is_same_v<data_t, half>)) {
+      acc_t hx        = __half2float(x);
+      acc_t hy        = __half2float(y);
+      const auto diff = raft::abs(hx - hy);
+      const auto add  = raft::abs(hx) + raft::abs(hy);
       // deal with potential for 0 in denominator by
       // forcing 0/1 instead
       acc += ((add != 0) * diff / (add + (add == 0)));
@@ -59,11 +59,11 @@ struct canberra_distance_op {
   };
 
   template <typename Policy>
-  DI void epilog(AccT acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
-                 AccT* regxn,
-                 AccT* regyn,
-                 IdxT gridStrideX,
-                 IdxT gridStrideY) const
+  DI void epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
+                 acc_t* regxn,
+                 acc_t* regyn,
+                 idx_t gridStrideX,
+                 idx_t gridStrideY) const
   {
     return;
   }

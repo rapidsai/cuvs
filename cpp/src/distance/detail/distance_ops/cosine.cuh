@@ -31,27 +31,27 @@ struct cosine_cutlass_op {
  */
 template <typename DataType, typename AccType, typename IdxType>
 struct cosine_distance_op {
-  using DataT = DataType;
-  using AccT  = AccType;
-  using IdxT  = IdxType;
+  using data_t = DataType;
+  using acc_t  = AccType;
+  using idx_t  = IdxType;
 
   // Load norms of input data
-  static constexpr bool use_norms = true;
+  static constexpr bool kUseNorms = true;
   // Whether the core function requires so many instructions that it makes sense
   // to reduce loop unrolling, etc. We do this to keep compile times in check.
-  static constexpr bool expensive_inner_loop = false;
+  static constexpr bool kExpensiveInnerLoop = false;
 
   // Size of shared memory. This is normally decided by the kernel policy, but
   // some ops such as correlation_distance_op use more.
   template <typename Policy>
   static constexpr auto shared_mem_size() -> size_t
   {
-    return Policy::SmemSize + ((Policy::Mblk + Policy::Nblk) * sizeof(AccT));
+    return Policy::SmemSize + ((Policy::Mblk + Policy::Nblk) * sizeof(acc_t));
   }
 
-  DI void core(AccT& acc, DataT& x, DataT& y) const
+  DI void core(acc_t& acc, data_t& x, data_t& y) const
   {
-    if constexpr ((std::is_same_v<AccT, float> && std::is_same_v<DataT, half>)) {
+    if constexpr ((std::is_same_v<acc_t, float> && std::is_same_v<data_t, half>)) {
       acc += __half2float(x) * __half2float(y);
     } else {
       acc += x * y;
@@ -59,17 +59,17 @@ struct cosine_distance_op {
   };
 
   template <typename Policy>
-  DI void epilog(AccT acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
-                 AccT* regxn,
-                 AccT* regyn,
-                 IdxT gridStrideX,
-                 IdxT gridStrideY) const
+  DI void epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
+                 acc_t* regxn,
+                 acc_t* regyn,
+                 idx_t gridStrideX,
+                 idx_t gridStrideY) const
   {
 #pragma unroll
     for (int i = 0; i < Policy::AccRowsPerTh; ++i) {
 #pragma unroll
       for (int j = 0; j < Policy::AccColsPerTh; ++j) {
-        if constexpr ((std::is_same_v<AccT, float> && std::is_same_v<AccT, half>)) {
+        if constexpr ((std::is_same_v<acc_t, float> && std::is_same_v<acc_t, half>)) {
           acc[i][j] = 1.0 - (acc[i][j] / (__half2float(regxn[i]) * __half2float(regyn[j])));
         } else {
           acc[i][j] = 1.0 - (acc[i][j] / (regxn[i] * regyn[j]));
@@ -78,9 +78,9 @@ struct cosine_distance_op {
     }
   }
 
-  constexpr auto get_cutlass_op() const -> cosine_cutlass_op<DataT, AccT>
+  constexpr auto get_cutlass_op() const -> cosine_cutlass_op<data_t, acc_t>
   {
-    return cosine_cutlass_op<DataT, AccT>();
+    return cosine_cutlass_op<data_t, acc_t>();
   }
 };
 

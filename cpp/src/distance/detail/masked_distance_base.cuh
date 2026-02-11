@@ -68,73 +68,73 @@ template <bool useNorms,
           typename CoreLambda,
           typename EpilogueLambda,
           typename FinalLambda,
-          typename rowEpilogueLambda,
+          typename RowEpilogueLambda,
           bool isRowMajor    = true,
           typename BaseClass = raft::linalg::Contractions_NT<DataT, IdxT, Policy, isRowMajor>>
-struct MaskedDistances : public BaseClass {
+struct masked_distances : public BaseClass {
  private:
-  using P = Policy;
-  const DataT* xn;
-  const DataT* yn;
-  const DataT* const yBase;
-  const uint64_t* adj;
-  const IdxT* group_idxs;
-  IdxT num_groups;
-  char* smem;
-  CoreLambda core_op;
-  EpilogueLambda epilog_op;
-  FinalLambda fin_op;
-  rowEpilogueLambda rowEpilog_op;
+  using p = Policy;
+  const DataT* xn_;
+  const DataT* yn_;
+  const DataT* const y_base_;
+  const uint64_t* adj_;
+  const IdxT* group_idxs_;
+  IdxT num_groups_;
+  char* smem_;
+  CoreLambda core_op_;
+  EpilogueLambda epilog_op_;
+  FinalLambda fin_op_;
+  RowEpilogueLambda row_epilog_op_;
 
-  AccT acc[P::AccRowsPerTh][P::AccColsPerTh];
+  AccT acc_[p::AccRowsPerTh][p::AccColsPerTh];
 
  public:
   // Constructor
-  DI MaskedDistances(const DataT* _x,
-                     const DataT* _y,
-                     IdxT _m,
-                     IdxT _n,
-                     IdxT _k,
-                     IdxT _lda,
-                     IdxT _ldb,
-                     IdxT _ldd,
-                     const DataT* _xn,
-                     const DataT* _yn,
-                     const uint64_t* _adj,
-                     const IdxT* _group_idxs,
-                     IdxT _num_groups,
-                     char* _smem,
-                     CoreLambda _core_op,
-                     EpilogueLambda _epilog_op,
-                     FinalLambda _fin_op,
-                     rowEpilogueLambda _rowEpilog_op)
+  DI masked_distances(const DataT* _x,
+                      const DataT* _y,
+                      IdxT _m,
+                      IdxT _n,
+                      IdxT _k,
+                      IdxT _lda,
+                      IdxT _ldb,
+                      IdxT _ldd,
+                      const DataT* _xn,
+                      const DataT* _yn,
+                      const uint64_t* _adj,
+                      const IdxT* _group_idxs,
+                      IdxT _num_groups,
+                      char* _smem,
+                      CoreLambda _core_op,
+                      EpilogueLambda _epilog_op,
+                      FinalLambda _fin_op,
+                      RowEpilogueLambda _rowEpilog_op)
     : BaseClass(_x, _y, _m, _n, _k, _lda, _ldb, _ldd, _smem),
-      xn(_xn),
-      yn(_yn),
-      yBase(_y),
-      adj(_adj),
-      group_idxs(_group_idxs),
-      num_groups(_num_groups),
-      smem(_smem),
-      core_op(_core_op),
-      epilog_op(_epilog_op),
-      fin_op(_fin_op),
-      rowEpilog_op(_rowEpilog_op)
+      xn_(_xn),
+      yn_(_yn),
+      y_base_(_y),
+      adj_(_adj),
+      group_idxs_(_group_idxs),
+      num_groups_(_num_groups),
+      smem_(_smem),
+      core_op_(_core_op),
+      epilog_op_(_epilog_op),
+      fin_op_(_fin_op),
+      row_epilog_op_(_rowEpilog_op)
   {
   }
 
   DI void run()
   {
-    const auto grid_stride_m = (P::Mblk * gridDim.y);
-    const auto grid_offset_m = (P::Mblk * blockIdx.y);
+    const auto grid_stride_m = (p::Mblk * gridDim.y);
+    const auto grid_offset_m = (p::Mblk * blockIdx.y);
 
     const auto grid_stride_g = gridDim.x;
     const auto grid_offset_g = blockIdx.x;
 
     for (auto tile_idx_m = grid_offset_m; tile_idx_m < this->m; tile_idx_m += grid_stride_m) {
       // Start loop over groups
-      for (auto idx_g = grid_offset_g; idx_g < this->num_groups; idx_g += grid_stride_g) {
-        const uint64_t block_adj = get_block_adjacency(adj, tile_idx_m, idx_g);
+      for (auto idx_g = grid_offset_g; idx_g < this->num_groups_; idx_g += grid_stride_g) {
+        const uint64_t block_adj = get_block_adjacency(adj_, tile_idx_m, idx_g);
         // block_adj is a bitfield that contains a 1 if a row is adjacent to the
         // current group. All zero means we can skip this group.
         if (block_adj == 0) { continue; }
@@ -162,9 +162,9 @@ struct MaskedDistances : public BaseClass {
         // performance.
         int thread_adj = compute_thread_adjacency(block_adj);
 
-        auto tile_idx_n        = idx_g == 0 ? 0 : group_idxs[idx_g - 1];
-        const auto group_end_n = group_idxs[idx_g];
-        for (; tile_idx_n < group_end_n; tile_idx_n += P::Nblk) {
+        auto tile_idx_n        = idx_g == 0 ? 0 : group_idxs_[idx_g - 1];
+        const auto group_end_n = group_idxs_[idx_g];
+        for (; tile_idx_n < group_end_n; tile_idx_n += p::Nblk) {
           // We provide group_end_n to limit the number of unnecessary data
           // points that are loaded from y.
           this->ldgXY(tile_idx_m, tile_idx_n, 0, group_end_n);
@@ -174,7 +174,7 @@ struct MaskedDistances : public BaseClass {
           __syncthreads();
           this->switch_write_buffer();
 
-          for (int kidx = P::Kblk; kidx < this->k; kidx += P::Kblk) {
+          for (int kidx = p::Kblk; kidx < this->k; kidx += p::Kblk) {
             this->ldgXY(tile_idx_m, tile_idx_n, kidx, group_end_n);
             // Process all data in shared memory (previous k-block) and
             // accumulate in registers.
@@ -193,19 +193,19 @@ struct MaskedDistances : public BaseClass {
           this->switch_read_buffer();
 
           if (useNorms) {
-            DataT regxn[P::AccRowsPerTh], regyn[P::AccColsPerTh];
+            DataT regxn[p::AccRowsPerTh], regyn[p::AccColsPerTh];
             load_norms(tile_idx_m, tile_idx_n, group_end_n, regxn, regyn);
             if (thread_adj != 0) {
-              epilog_op(acc, thread_adj, regxn, regyn, tile_idx_n, tile_idx_m, group_end_n);
+              epilog_op_(acc_, thread_adj, regxn, regyn, tile_idx_n, tile_idx_m, group_end_n);
             }
           } else {
             if (thread_adj != 0) {
-              epilog_op(acc, thread_adj, nullptr, nullptr, tile_idx_n, tile_idx_m, group_end_n);
+              epilog_op_(acc_, thread_adj, nullptr, nullptr, tile_idx_n, tile_idx_m, group_end_n);
             }
           }
         }  // tile_idx_n
       }  // idx_g
-      rowEpilog_op(tile_idx_m);
+      row_epilog_op_(tile_idx_m);
     }  // tile_idx_m
   }
 
@@ -214,11 +214,11 @@ struct MaskedDistances : public BaseClass {
   {
     // A single element of `adj` contains exactly enough bits to indicate which
     // rows in the current tile to skip and which to compute.
-    static_assert(P::Mblk == 8 * sizeof(adj[0]),
+    static_assert(p::Mblk == 8 * sizeof(adj[0]),
                   "masked_l2_nn only supports a policy with 64 rows per block.");
-    IdxT block_flag_idx = tile_idx_m / P::Mblk;
+    IdxT block_flag_idx = tile_idx_m / p::Mblk;
     // Index into adj at row tile_idx_m / 64 and column idx_group.
-    return adj[block_flag_idx * this->num_groups + idx_group];
+    return adj[block_flag_idx * this->num_groups_ + idx_group];
   }
 
   DI auto compute_thread_adjacency(const uint64_t block_adj) -> uint32_t
@@ -228,11 +228,11 @@ struct MaskedDistances : public BaseClass {
     // more detail in the run() method.
     uint32_t thread_adj = 0;
 #pragma unroll
-    for (int thread_row_idx = 0; thread_row_idx < P::AccRowsPerTh; ++thread_row_idx) {
+    for (int thread_row_idx = 0; thread_row_idx < p::AccRowsPerTh; ++thread_row_idx) {
       // Index `thread_row_idx` refers to a row of the current threads' register
       // tile `acc`, i.e., acc[i][:]. Index `block_row_idx` refers to the
       // corresponding row of the current block tile in shared memory.
-      const int block_row_idx = this->accrowid + thread_row_idx * P::AccThRows;
+      const int block_row_idx = this->accrowid + thread_row_idx * p::AccThRows;
 
       // block_row_is_adjacent is true if the current block_row_idx is adjacent
       // to the current group.
@@ -252,10 +252,10 @@ struct MaskedDistances : public BaseClass {
   {
     // Reset accumulator registers to zero.
 #pragma unroll
-    for (int i = 0; i < P::AccRowsPerTh; ++i) {
+    for (int i = 0; i < p::AccRowsPerTh; ++i) {
 #pragma unroll
-      for (int j = 0; j < P::AccColsPerTh; ++j) {
-        acc[i][j] = BaseClass::Zero();
+      for (int j = 0; j < p::AccColsPerTh; ++j) {
+        acc_[i][j] = BaseClass::Zero();
       }
     }
   }
@@ -263,15 +263,15 @@ struct MaskedDistances : public BaseClass {
   DI void accumulate()
   {
 #pragma unroll
-    for (int ki = 0; ki < P::Kblk; ki += P::Veclen) {
+    for (int ki = 0; ki < p::Kblk; ki += p::Veclen) {
       this->ldsXY(ki);
 #pragma unroll
-      for (int i = 0; i < P::AccRowsPerTh; ++i) {
+      for (int i = 0; i < p::AccRowsPerTh; ++i) {
 #pragma unroll
-        for (int j = 0; j < P::AccColsPerTh; ++j) {
+        for (int j = 0; j < p::AccColsPerTh; ++j) {
 #pragma unroll
-          for (int v = 0; v < P::Veclen; ++v) {
-            core_op(acc[i][j], this->regx[i][v], this->regy[j][v]);
+          for (int v = 0; v < p::Veclen; ++v) {
+            core_op_(acc_[i][j], this->regx[i][v], this->regy[j][v]);
           }
         }
       }
@@ -281,31 +281,31 @@ struct MaskedDistances : public BaseClass {
   DI void load_norms(IdxT tile_idx_m,
                      IdxT tile_idx_n,
                      IdxT end_n,
-                     DataT (&regxn)[P::AccRowsPerTh],
-                     DataT (&regyn)[P::AccColsPerTh])
+                     DataT (&regxn)[p::AccRowsPerTh],
+                     DataT (&regyn)[p::AccColsPerTh])
   {
-    auto* sxNorm  = reinterpret_cast<DataT*>((&smem[P::SmemSize]));
-    DataT* syNorm = (&sxNorm[P::Mblk]);
+    auto* sx_norm  = reinterpret_cast<DataT*>((&smem_[p::SmemSize]));
+    DataT* sy_norm = (&sx_norm[p::Mblk]);
 
     // Load x & y norms required by this threadblock in shmem buffer
-    for (int i = threadIdx.x; i < P::Mblk; i += P::Nthreads) {
-      auto idx  = tile_idx_m + i;
-      sxNorm[i] = idx < this->m ? xn[idx] : 0;
+    for (int i = threadIdx.x; i < p::Mblk; i += p::Nthreads) {
+      auto idx   = tile_idx_m + i;
+      sx_norm[i] = idx < this->m ? xn_[idx] : 0;
     }
 
-    for (int i = threadIdx.x; i < P::Nblk; i += P::Nthreads) {
-      auto idx  = tile_idx_n + i;
-      syNorm[i] = idx < end_n ? yn[idx] : 0;
+    for (int i = threadIdx.x; i < p::Nblk; i += p::Nthreads) {
+      auto idx   = tile_idx_n + i;
+      sy_norm[i] = idx < end_n ? yn_[idx] : 0;
     }
     __syncthreads();
 
 #pragma unroll
-    for (int i = 0; i < P::AccRowsPerTh; ++i) {
-      regxn[i] = sxNorm[i * P::AccThRows + (threadIdx.x / P::AccThCols)];
+    for (int i = 0; i < p::AccRowsPerTh; ++i) {
+      regxn[i] = sx_norm[i * p::AccThRows + (threadIdx.x / p::AccThCols)];
     }
 #pragma unroll
-    for (int i = 0; i < P::AccColsPerTh; ++i) {
-      regyn[i] = syNorm[i * P::AccThCols + (threadIdx.x % P::AccThCols)];
+    for (int i = 0; i < p::AccColsPerTh; ++i) {
+      regyn[i] = sy_norm[i * p::AccThCols + (threadIdx.x % p::AccThCols)];
     }
   }
 };  // struct MaskedDistances

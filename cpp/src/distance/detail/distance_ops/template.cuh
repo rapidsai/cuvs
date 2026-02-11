@@ -15,19 +15,19 @@ namespace cuvs::distance::detail::ops {
 
 template <typename DataType, typename AccType, typename IdxType>
 struct template_distance_op {
-  using DataT = DataType;
-  using AccT  = AccType;
-  using IdxT  = IdxType;
+  using data_t = DataType;
+  using acc_t  = AccType;
+  using idx_t  = IdxType;
 
   TODO member;
 
   explicit template_distance_op(TODO member_) noexcept : member(member_) {}
 
   // Load norms of input data
-  static constexpr bool use_norms = TODO;
+  static constexpr bool kUseNorms = TODO;
   // Whether the core function requires so many instructions that it makes sense
   // to reduce loop unrolling, etc. We do this to keep compile times in check.
-  static constexpr bool expensive_inner_loop = false;
+  static constexpr bool kExpensiveInnerLoop = false;
 
   // Size of shared memory. This is normally decided by the kernel policy, but
   // some ops such as correlation_distance_op use more.
@@ -37,21 +37,21 @@ struct template_distance_op {
     return Policy::SmemSize + TODO;
   }
 
-  DI void core(AccT& acc, DataT& x, DataT& y) const { TODO; };
+  DI void core(acc_t& acc, data_t& x, data_t& y) const { TODO; };
 
   template <typename Policy>
-  DI void epilog(AccT acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
-                 AccT* regxn,
-                 AccT* regyn,
-                 IdxT gridStrideX,
-                 IdxT gridStrideY) const
+  DI void epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
+                 acc_t* regxn,
+                 acc_t* regyn,
+                 idx_t gridStrideX,
+                 idx_t gridStrideY) const
   {
     TODO;
   }
 
   // If exist, returns a cutlass op that performs the same operation.
   // See cosine and l2_exp distance ops for an example.
-  [[nodiscard]] constexpr auto get_cutlass_op() const -> l2_exp_cutlass_op<DataT, AccT> { TODO; }
+  [[nodiscard]] constexpr auto get_cutlass_op() const -> l2_exp_cutlass_op<data_t, acc_t> { TODO; }
 };
 
 }  // namespace cuvs::distance::detail::ops

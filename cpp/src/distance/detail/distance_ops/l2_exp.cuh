@@ -37,15 +37,15 @@ struct l2_exp_cutlass_op {
   __device__ explicit l2_exp_cutlass_op(bool isSqrt) noexcept : sqrt(isSqrt) {}
   inline __device__ auto operator()(AccT aNorm, AccT bNorm, AccT accVal) const noexcept -> AccT
   {
-    AccT outVal = aNorm + bNorm - AccT(2.0) * accVal;
+    AccT out_val = aNorm + bNorm - AccT(2.0) * accVal;
 
     /**
      * Self-neighboring points should have (aNorm == bNorm) == accVal and the dot product (accVal)
      * can sometimes have round-off errors, which will cause (aNorm == bNorm) ~ accVal instead.
      */
-    outVal =
-      outVal * AccT(!((outVal * outVal < get_clamp_precision<DataT, AccT>()) * (aNorm == bNorm)));
-    return sqrt ? raft::sqrt(outVal * static_cast<AccT>(outVal > AccT(0))) : outVal;
+    out_val = out_val *
+              AccT(!((out_val * out_val < get_clamp_precision<DataT, AccT>()) * (aNorm == bNorm)));
+    return sqrt ? raft::sqrt(out_val * static_cast<AccT>(out_val > AccT(0))) : out_val;
   }
 
   __device__ auto operator()(DataT aData) const noexcept -> AccT
@@ -68,31 +68,31 @@ struct l2_exp_cutlass_op {
  */
 template <typename DataType, typename AccType, typename IdxType>
 struct l2_exp_distance_op {
-  using DataT = DataType;
-  using AccT  = AccType;
-  using IdxT  = IdxType;
+  using data_t = DataType;
+  using acc_t  = AccType;
+  using idx_t  = IdxType;
 
   const bool sqrt;
 
   explicit l2_exp_distance_op(bool sqrt_) noexcept : sqrt(sqrt_) {}
 
   // Load norms of input data
-  static constexpr bool use_norms = true;
+  static constexpr bool kUseNorms = true;
   // Whether the core function requires so many instructions that it makes sense
   // to reduce loop unrolling, etc. We do this to keep compile times in check.
-  static constexpr bool expensive_inner_loop = false;
+  static constexpr bool kExpensiveInnerLoop = false;
 
   // Size of shared memory. This is normally decided by the kernel policy, but
   // some ops such as correlation_distance_op use more.
   template <typename Policy>
   static constexpr auto shared_mem_size() -> size_t
   {
-    return Policy::SmemSize + ((Policy::Mblk + Policy::Nblk) * sizeof(AccT));
+    return Policy::SmemSize + ((Policy::Mblk + Policy::Nblk) * sizeof(acc_t));
   }
 
-  DI void core(AccT& acc, DataT& x, DataT& y) const
+  DI void core(acc_t& acc, data_t& x, data_t& y) const
   {
-    if constexpr ((std::is_same_v<AccT, float> && std::is_same_v<DataT, half>)) {
+    if constexpr ((std::is_same_v<acc_t, float> && std::is_same_v<data_t, half>)) {
       acc += __half2float(x) * __half2float(y);
     } else {
       acc += x * y;
@@ -100,27 +100,27 @@ struct l2_exp_distance_op {
   };
 
   template <typename Policy>
-  DI void epilog(AccT acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
-                 AccT* regxn,
-                 AccT* regyn,
-                 IdxT gridStrideX,
-                 IdxT gridStrideY) const
+  DI void epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
+                 acc_t* regxn,
+                 acc_t* regyn,
+                 idx_t gridStrideX,
+                 idx_t gridStrideY) const
   {
 #pragma unroll
     for (int i = 0; i < Policy::AccRowsPerTh; ++i) {
 #pragma unroll
       for (int j = 0; j < Policy::AccColsPerTh; ++j) {
-        AccT accVal = acc[i][j];
-        AccT val    = regxn[i] + regyn[j] - static_cast<AccT>(2.0) * accVal;
+        acc_t acc_val = acc[i][j];
+        acc_t val     = regxn[i] + regyn[j] - static_cast<acc_t>(2.0) * acc_val;
 
         /**
          * Self-neighboring points should have (aNorm == bNorm) == accVal and the dot product
          * (accVal) can sometimes have round-off errors, which will cause (aNorm == bNorm) ~ accVal
          * instead.
          */
-        acc[i][j] = val * static_cast<AccT>((val > AccT(0))) *
-                    static_cast<AccT>(
-                      !((val * val < get_clamp_precision<DataT, AccT>()) * (regxn[i] == regyn[j])));
+        acc[i][j] = val * static_cast<acc_t>((val > acc_t(0))) *
+                    static_cast<acc_t>(!((val * val < get_clamp_precision<data_t, acc_t>()) *
+                                         (regxn[i] == regyn[j])));
       }
     }
     if (sqrt) {
@@ -134,9 +134,9 @@ struct l2_exp_distance_op {
     }
   }
 
-  constexpr auto get_cutlass_op() const -> l2_exp_cutlass_op<DataT, AccT>
+  constexpr auto get_cutlass_op() const -> l2_exp_cutlass_op<data_t, acc_t>
   {
-    return l2_exp_cutlass_op<DataT, AccT>(sqrt);
+    return l2_exp_cutlass_op<data_t, acc_t>(sqrt);
   }
 };
 

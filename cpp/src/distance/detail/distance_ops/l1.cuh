@@ -17,15 +17,15 @@ namespace cuvs::distance::detail::ops {
  */
 template <typename DataType, typename AccType, typename IdxType>
 struct l1_distance_op {
-  using DataT = DataType;
-  using AccT  = AccType;
-  using IdxT  = IdxType;
+  using data_t = DataType;
+  using acc_t  = AccType;
+  using idx_t  = IdxType;
 
   // Do not load norms of data, the computation of L1 distance does not use them.
-  static constexpr bool use_norms = false;
+  static constexpr bool kUseNorms = false;
   // Whether the core function requires so many instructions that it makes sense
   // to reduce loop unrolling, etc. We do this to keep compile times in check.
-  static constexpr bool expensive_inner_loop = false;
+  static constexpr bool kExpensiveInnerLoop = false;
 
   // Size of shared memory. This is normally decided by the kernel policy, but
   // some ops such as correlation_distance_op use more.
@@ -35,17 +35,17 @@ struct l1_distance_op {
     return Policy::SmemSize;
   }
 
-  DI void core(AccT& acc, DataT& x, DataT& y) const
+  DI void core(acc_t& acc, data_t& x, data_t& y) const
   {
     acc += raft::abs(raft::to_float(x) - raft::to_float(y));
   };
 
   template <typename Policy>
-  DI void epilog(AccT acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
-                 AccT* regxn,
-                 AccT* regyn,
-                 IdxT gridStrideX,
-                 IdxT gridStrideY) const
+  DI void epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
+                 acc_t* regxn,
+                 acc_t* regyn,
+                 idx_t gridStrideX,
+                 idx_t gridStrideY) const
   {
     return;
   };

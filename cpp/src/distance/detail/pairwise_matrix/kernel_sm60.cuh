@@ -15,18 +15,18 @@ namespace cuvs::distance::detail {
 
 template <typename Policy,
           bool row_major,
-          typename SM_compat_t,
+          typename SmCompatT,
           typename OpT,
           typename IdxT,
           typename DataT,
           typename OutT,
           typename FinOpT>
-__launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL
+__launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL  // NOLINT(readability-identifier-naming)
   pairwise_matrix_kernel(OpT distance_op, pairwise_matrix_params<IdxT, DataT, OutT, FinOpT> params)
 {
   // Early exit to minimize the size of the kernel when it is not supposed to be compiled.
-  constexpr SM_compat_t sm_compat_range{};
-  if constexpr (!sm_compat_range.contains(raft::util::arch::SM_compute_arch())) {
+  constexpr SmCompatT kSmCompatRange{};
+  if constexpr (!kSmCompatRange.contains(raft::util::arch::SM_compute_arch())) {
     assert(false);
     return;
   }
@@ -40,18 +40,18 @@ __launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL
   auto row_epilog_op = raft::void_op();
 
   // Always write output
-  constexpr bool write_out = true;
-  constexpr bool use_norms = distance_op.use_norms;
-  PairwiseDistances<DataT,
-                    OutT,
-                    IdxT,
-                    Policy,
-                    decltype(distance_op),
-                    decltype(epilog_op),
-                    decltype(params.fin_op),
-                    decltype(row_epilog_op),
-                    row_major,
-                    write_out>
+  constexpr bool kWriteOut = true;
+  constexpr bool kUseNorms = distance_op.kUseNorms;
+  pairwise_distances<DataT,
+                     OutT,
+                     IdxT,
+                     Policy,
+                     decltype(distance_op),
+                     decltype(epilog_op),
+                     decltype(params.fin_op),
+                     decltype(row_epilog_op),
+                     row_major,
+                     kWriteOut>
     obj(params.x,
         params.y,
         params.m,
@@ -123,10 +123,10 @@ template <typename Policy,
           typename DataT,
           typename OutT,
           typename FinOpT,
-          typename SM_compat_t>
+          typename SmCompatT>
 auto make_pairwise_matrix_sm60_wrapper(OpT distance_op,
                                        pairwise_matrix_params<IdxT, DataT, OutT, FinOpT> params,
-                                       SM_compat_t sm_compat_range)
+                                       SmCompatT sm_compat_range)
   -> pairwise_matrix_sm60_wrapper<OpT, IdxT, DataT, OutT, FinOpT>
 {
   dim3 block(Policy::Nthreads);
@@ -134,9 +134,10 @@ auto make_pairwise_matrix_sm60_wrapper(OpT distance_op,
   // https://en.cppreference.com/w/cpp/language/dependent_name)
   int smem_size = OpT::template shared_mem_size<Policy>();
   // Obtain function pointer to kernel
+  // NOLINTNEXTLINE(readability-identifier-naming)
   auto kernel =
-    pairwise_matrix_kernel<Policy, row_major, SM_compat_t, OpT, IdxT, DataT, OutT, FinOpT>;
-  dim3 grid = launchConfigGenerator<Policy>(params.m, params.n, smem_size, kernel);
+    pairwise_matrix_kernel<Policy, row_major, SmCompatT, OpT, IdxT, DataT, OutT, FinOpT>;
+  dim3 grid = launch_config_generator<Policy>(params.m, params.n, smem_size, kernel);
 
   return pairwise_matrix_sm60_wrapper<OpT, IdxT, DataT, OutT, FinOpT>{
     grid, block, smem_size, kernel};

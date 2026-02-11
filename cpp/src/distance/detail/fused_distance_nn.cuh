@@ -30,48 +30,48 @@ template <typename DataT,
           typename Policy,
           typename ReduceOpT,
           typename KVPReduceOpT>
-void fusedDistanceNNImpl(OutT* min,
-                         const DataT* x,
-                         const DataT* y,
-                         const DataT* xn,
-                         const DataT* yn,
-                         IdxT m,
-                         IdxT n,
-                         IdxT k,
-                         int* workspace,
-                         ReduceOpT redOp,
-                         KVPReduceOpT pairRedOp,
-                         bool sqrt,
-                         bool initOutBuffer,
-                         bool isRowMajor,
-                         cuvs::distance::DistanceType metric,
-                         float metric_arg,
-                         cudaStream_t stream)
+void fused_distance_nn_impl(OutT* min,
+                            const DataT* x,
+                            const DataT* y,
+                            const DataT* xn,
+                            const DataT* yn,
+                            IdxT m,
+                            IdxT n,
+                            IdxT k,
+                            int* workspace,
+                            ReduceOpT redOp,
+                            KVPReduceOpT pairRedOp,
+                            bool sqrt,
+                            bool initOutBuffer,
+                            bool isRowMajor,
+                            cuvs::distance::DistanceType metric,
+                            float metric_arg,
+                            cudaStream_t stream)
 {
   // The kernel policy is determined by fusedDistanceNN.
-  using P = Policy;
+  using policy_t = Policy;
 
-  dim3 blk(P::Nthreads);
-  auto nblks            = raft::ceildiv<int>(m, P::Nthreads);
-  constexpr auto maxVal = std::numeric_limits<DataT>::max();
-  using KVPair          = raft::KeyValuePair<IdxT, DataT>;
+  dim3 blk(policy_t::Nthreads);
+  auto nblks             = raft::ceildiv<int>(m, policy_t::Nthreads);
+  constexpr auto kMaxVal = std::numeric_limits<DataT>::max();
+  using kv_pair_t        = raft::KeyValuePair<IdxT, DataT>;
 
   RAFT_CUDA_TRY(cudaMemsetAsync(workspace, 0, sizeof(int) * m, stream));
   if (initOutBuffer) {
     initKernel<DataT, OutT, IdxT, ReduceOpT>
-      <<<nblks, P::Nthreads, 0, stream>>>(min, m, maxVal, redOp);
+      <<<nblks, policy_t::Nthreads, 0, stream>>>(min, m, kMaxVal, redOp);
     RAFT_CUDA_TRY(cudaGetLastError());
   }
 
   switch (metric) {
     case cuvs::distance::DistanceType::CosineExpanded:
-      fusedCosineNN<DataT, OutT, IdxT, P, ReduceOpT, KVPReduceOpT>(
+      fused_cosine_nn<DataT, OutT, IdxT, policy_t, ReduceOpT, KVPReduceOpT>(
         min, x, y, xn, yn, m, n, k, workspace, redOp, pairRedOp, sqrt, stream);
       break;
     case cuvs::distance::DistanceType::L2SqrtExpanded:
     case cuvs::distance::DistanceType::L2Expanded:
-      // initOutBuffer is take care by fusedDistanceNNImpl() so we set it false to fusedL2NNImpl.
-      fusedL2NNImpl<DataT, OutT, IdxT, P, ReduceOpT, KVPReduceOpT>(
+      // initOutBuffer is taken care of by fused_distance_nn_impl() so we set it false.
+      fused_l2_nn_impl<DataT, OutT, IdxT, policy_t, ReduceOpT, KVPReduceOpT>(
         min, x, y, xn, yn, m, n, k, workspace, redOp, pairRedOp, sqrt, false, stream);
       break;
     default: assert("only cosine/l2 metric is supported with fusedDistanceNN\n"); break;

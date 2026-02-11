@@ -16,10 +16,10 @@ template <typename OpT,
           typename DataT,
           typename OutT,
           typename FinOpT,
-          typename SM_compat_t>
+          typename SmCompatT>
 void pairwise_matrix_sm80_dispatch(OpT distance_op,
                                    pairwise_matrix_params<IdxT, DataT, OutT, FinOpT> params,
-                                   SM_compat_t sm_compat_range,
+                                   SmCompatT sm_compat_range,
                                    cudaStream_t stream)
 {
   int vec_len = determine_vec_len(params);
@@ -31,23 +31,24 @@ void pairwise_matrix_sm80_dispatch(OpT distance_op,
     // respectively.
 
     // Prevent double, vec_len=4 combination (this is not supported)
-    constexpr int vec_len = std::min(vec_len_aligned(), static_cast<int>(16 / sizeof(DataT)));
+    constexpr int kVecLen = std::min(vec_len_aligned(), static_cast<int>(16 / sizeof(DataT)));
 
-    using AccT = typename OpT::AccT;
-    cutlassDistanceKernel<DataT, AccT, OutT, IdxT, vec_len, FinOpT, OpT, row_major()>(params.x,
-                                                                                      params.y,
-                                                                                      params.x_norm,
-                                                                                      params.y_norm,
-                                                                                      params.m,
-                                                                                      params.n,
-                                                                                      params.k,
-                                                                                      params.ldx,
-                                                                                      params.ldy,
-                                                                                      params.ld_out,
-                                                                                      params.out,
-                                                                                      params.fin_op,
-                                                                                      distance_op,
-                                                                                      stream);
+    using acc_t = typename OpT::acc_t;
+    cutlassDistanceKernel<DataT, acc_t, OutT, IdxT, kVecLen, FinOpT, OpT, row_major()>(
+      params.x,
+      params.y,
+      params.x_norm,
+      params.y_norm,
+      params.m,
+      params.n,
+      params.k,
+      params.ldx,
+      params.ldy,
+      params.ld_out,
+      params.out,
+      params.fin_op,
+      distance_op,
+      stream);
   };
 
   // Dispatch_layout calls f with appropriate compile time constants based on

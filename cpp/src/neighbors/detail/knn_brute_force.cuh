@@ -318,7 +318,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
  * @param[out] res_I    pointer to device memory for returning k nearest indices
  * @param[out] res_D    pointer to device memory for returning k nearest distances
  * @param[in] k        number of neighbors to query
- * @param[in] userStream the main cuda stream to use
+ * @param[in] user_stream the main cuda stream to use
  * @param[in] internalStreams optional when n_params > 0, the index partitions can be
  *        queried in parallel using these streams. Note that n_int_streams also
  *        has to be > 0 for these to be used and their cardinality does not need
@@ -334,14 +334,14 @@ void tiled_brute_force_knn(const raft::resources& handle,
  */
 template <typename IntType  = int,
           typename IdxType  = std::int64_t,
-          typename value_t  = float,
+          typename ValueT   = float,
           typename DistType = float>
 void brute_force_knn_impl(
   raft::resources const& handle,
-  std::vector<value_t*>& input,
+  std::vector<ValueT*>& input,
   std::vector<IntType>& sizes,
   IntType D,
-  value_t* search_items,
+  ValueT* search_items,
   IntType n,
   IdxType* res_I,
   DistType* res_D,
@@ -354,7 +354,7 @@ void brute_force_knn_impl(
   std::vector<DistType*>* input_norms = nullptr,
   const DistType* search_norms        = nullptr)
 {
-  auto userStream = raft::resource::get_cuda_stream(handle);
+  auto user_stream = raft::resource::get_cuda_stream(handle);
 
   ASSERT(input.size() == sizes.size(), "input and sizes vectors should be the same size");
 
@@ -373,24 +373,24 @@ void brute_force_knn_impl(
     }
   }
 
-  rmm::device_uvector<IdxType> trans(0, userStream);
+  rmm::device_uvector<IdxType> trans(0, user_stream);
   if (id_ranges.size() > 0) {
-    trans.resize(id_ranges.size(), userStream);
-    raft::update_device(trans.data(), id_ranges.data(), id_ranges.size(), userStream);
+    trans.resize(id_ranges.size(), user_stream);
+    raft::update_device(trans.data(), id_ranges.data(), id_ranges.size(), user_stream);
   }
 
-  rmm::device_uvector<DistType> all_D(0, userStream);
-  rmm::device_uvector<IdxType> all_I(0, userStream);
+  rmm::device_uvector<DistType> all_d(0, user_stream);
+  rmm::device_uvector<IdxType> all_i(0, user_stream);
 
-  DistType* out_D = res_D;
-  IdxType* out_I  = res_I;
+  DistType* out_d = res_D;
+  IdxType* out_i  = res_I;
 
   if (input.size() > 1) {
-    all_D.resize(input.size() * k * n, userStream);
-    all_I.resize(input.size() * k * n, userStream);
+    all_d.resize(input.size() * k * n, user_stream);
+    all_i.resize(input.size() * k * n, user_stream);
 
-    out_D = all_D.data();
-    out_I = all_I.data();
+    out_d = all_d.data();
+    out_i = all_i.data();
   }
 
   // currently we don't support col_major inside tiled_brute_force_knn, because
@@ -401,21 +401,21 @@ void brute_force_knn_impl(
   // api, which isn't supported
   // Instead, transpose the input matrices if they are passed as col-major.
   auto search = search_items;
-  rmm::device_uvector<value_t> search_row_major(0, userStream);
+  rmm::device_uvector<ValueT> search_row_major(0, user_stream);
   if (!rowMajorQuery) {
-    search_row_major.resize(n * D, userStream);
-    raft::linalg::transpose(handle, search, search_row_major.data(), n, D, userStream);
+    search_row_major.resize(n * D, user_stream);
+    raft::linalg::transpose(handle, search, search_row_major.data(), n, D, user_stream);
     search = search_row_major.data();
   }
 
   // transpose into a temporary buffer if necessary
-  rmm::device_uvector<value_t> index_row_major(0, userStream);
+  rmm::device_uvector<ValueT> index_row_major(0, user_stream);
   if (!rowMajorIndex) {
     size_t total_size = 0;
     for (auto size : sizes) {
       total_size += size;
     }
-    index_row_major.resize(total_size * D, userStream);
+    index_row_major.resize(total_size * D, user_stream);
   }
 
   // Make other streams from pool wait on main stream
@@ -423,8 +423,8 @@ void brute_force_knn_impl(
 
   size_t total_rows_processed = 0;
   for (size_t i = 0; i < input.size(); i++) {
-    DistType* out_d_ptr = out_D + (i * k * n);
-    IdxType* out_i_ptr  = out_I + (i * k * n);
+    DistType* out_d_ptr = out_d + (i * k * n);
+    IdxType* out_i_ptr  = out_i + (i * k * n);
 
     auto stream = raft::resource::get_next_usable_stream(handle, i);
 
@@ -433,20 +433,20 @@ void brute_force_knn_impl(
          metric == cuvs::distance::DistanceType::L2SqrtUnexpanded ||
          metric == cuvs::distance::DistanceType::L2Expanded ||
          metric == cuvs::distance::DistanceType::L2SqrtExpanded)) {
-      fusedL2Knn(D,
-                 out_i_ptr,
-                 out_d_ptr,
-                 input[i],
-                 search_items,
-                 sizes[i],
-                 n,
-                 k,
-                 rowMajorIndex,
-                 rowMajorQuery,
-                 stream,
-                 metric,
-                 input_norms ? (*input_norms)[i] : nullptr,
-                 search_norms);
+      fused_l2_knn(D,
+                   out_i_ptr,
+                   out_d_ptr,
+                   input[i],
+                   search_items,
+                   sizes[i],
+                   n,
+                   k,
+                   rowMajorIndex,
+                   rowMajorQuery,
+                   stream,
+                   metric,
+                   input_norms ? (*input_norms)[i] : nullptr,
+                   search_norms);
 
       // Perform necessary post-processing
       if (metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
@@ -482,21 +482,21 @@ void brute_force_knn_impl(
             raft::linalg::transpose(handle, input[i], index, sizes[i], D, stream);
           }
 
-          tiled_brute_force_knn<value_t, IdxType>(stream_pool_handle,
-                                                  search,
-                                                  index,
-                                                  n,
-                                                  sizes[i],
-                                                  D,
-                                                  k,
-                                                  out_d_ptr,
-                                                  out_i_ptr,
-                                                  metric,
-                                                  metricArg,
-                                                  0,
-                                                  0,
-                                                  input_norms ? (*input_norms)[i] : nullptr,
-                                                  search_norms);
+          tiled_brute_force_knn<ValueT, IdxType>(stream_pool_handle,
+                                                 search,
+                                                 index,
+                                                 n,
+                                                 sizes[i],
+                                                 D,
+                                                 k,
+                                                 out_d_ptr,
+                                                 out_i_ptr,
+                                                 metric,
+                                                 metricArg,
+                                                 0,
+                                                 0,
+                                                 input_norms ? (*input_norms)[i] : nullptr,
+                                                 search_norms);
           break;
       }
     }
@@ -514,8 +514,8 @@ void brute_force_knn_impl(
     // no translations or partitions to combine, it can be skipped.
     knn_merge_parts(
       handle,
-      raft::make_device_matrix_view<const DistType, int64_t>(out_D, n, input.size() * k),
-      raft::make_device_matrix_view<const IdxType, int64_t>(out_I, n, input.size() * k),
+      raft::make_device_matrix_view<const DistType, int64_t>(out_d, n, input.size() * k),
+      raft::make_device_matrix_view<const IdxType, int64_t>(out_i, n, input.size() * k),
       raft::make_device_matrix_view<DistType, int64_t>(res_D, n, k),
       raft::make_device_matrix_view<IdxType, int64_t>(res_I, n, k),
       raft::make_device_vector_view<IdxType, int64_t>(trans.data(), input.size()));

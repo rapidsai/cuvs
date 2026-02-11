@@ -29,24 +29,25 @@ template <typename DataT,
           typename KVPReduceOpT,
           typename CoreLambda,
           typename FinalLambda>
-__launch_bounds__(P::Nthreads, 2) RAFT_KERNEL masked_l2_nn_kernel(OutT* min,
-                                                                  const DataT* x,
-                                                                  const DataT* y,
-                                                                  const DataT* xn,
-                                                                  const DataT* yn,
-                                                                  const uint64_t* adj,
-                                                                  const IdxT* group_idxs,
-                                                                  IdxT num_groups,
-                                                                  IdxT m,
-                                                                  IdxT n,
-                                                                  IdxT k,
-                                                                  bool sqrt,
-                                                                  DataT maxVal,
-                                                                  int* mutex,
-                                                                  ReduceOpT redOp,
-                                                                  KVPReduceOpT pairRedOp,
-                                                                  CoreLambda core_op,
-                                                                  FinalLambda fin_op)
+__launch_bounds__(P::Nthreads, 2) RAFT_KERNEL  // NOLINT(readability-identifier-naming)
+  masked_l2_nn_kernel(OutT* min,
+                      const DataT* x,
+                      const DataT* y,
+                      const DataT* xn,
+                      const DataT* yn,
+                      const uint64_t* adj,
+                      const IdxT* group_idxs,
+                      IdxT num_groups,
+                      IdxT m,
+                      IdxT n,
+                      IdxT k,
+                      bool sqrt,
+                      DataT maxVal,
+                      int* mutex,
+                      ReduceOpT redOp,
+                      KVPReduceOpT pairRedOp,
+                      CoreLambda core_op,
+                      FinalLambda fin_op)
 {
   extern __shared__ char smem[];
 
@@ -66,7 +67,7 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL masked_l2_nn_kernel(OutT* min,
                          IdxT tile_idx_n,
                          IdxT tile_idx_m,
                          IdxT tile_end_n) -> void {
-    KVPReduceOpT pairRed_op(pairRedOp);
+    KVPReduceOpT pair_red_op(pairRedOp);
 
 #pragma unroll
     for (int i = 0; i < P::AccRowsPerTh; ++i) {
@@ -105,15 +106,15 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL masked_l2_nn_kernel(OutT* min,
         }
         KVPair tmp = {tmpkey, acc[i][j]};
         if (tmpkey < tile_end_n) {
-          val[i] = pairRed_op(accrowid + i * P::AccThRows + tile_idx_m, tmp, val[i]);
+          val[i] = pair_red_op(accrowid + i * P::AccThRows + tile_idx_m, tmp, val[i]);
         }
       }
     }
   };
 
-  auto rowEpilog_lambda =
+  auto row_epilog_lambda =
     [m, mutex, min, pairRedOp, redOp, &val, maxVal] __device__(IdxT tile_idx_m) -> void {
-    KVPReduceOpT pairRed_op(pairRedOp);
+    KVPReduceOpT pair_red_op(pairRedOp);
     ReduceOpT red_op(redOp);
 
     const auto accrowid = threadIdx.x / P::AccThCols;
@@ -126,11 +127,11 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL masked_l2_nn_kernel(OutT* min,
         auto tmpkey   = raft::shfl(val[i].key, lid + j);
         auto tmpvalue = raft::shfl(val[i].value, lid + j);
         KVPair tmp    = {tmpkey, tmpvalue};
-        val[i]        = pairRed_op(accrowid + i * P::AccThRows + tile_idx_m, tmp, val[i]);
+        val[i]        = pair_red_op(accrowid + i * P::AccThRows + tile_idx_m, tmp, val[i]);
       }
     }
 
-    updateReducedVal<P, OutT, IdxT, KVPair, ReduceOpT>(mutex, min, val, red_op, m, tile_idx_m);
+    update_reduced_val<P, OutT, IdxT, KVPair, ReduceOpT>(mutex, min, val, red_op, m, tile_idx_m);
 
     // reset the val array.
 #pragma unroll
@@ -140,16 +141,16 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL masked_l2_nn_kernel(OutT* min,
   };
 
   IdxT lda = k, ldb = k, ldd = n;
-  MaskedDistances<true,
-                  DataT,
-                  DataT,
-                  IdxT,
-                  P,
-                  CoreLambda,
-                  decltype(epilog_lambda),
-                  FinalLambda,
-                  decltype(rowEpilog_lambda),
-                  true>
+  masked_distances<true,
+                   DataT,
+                   DataT,
+                   IdxT,
+                   P,
+                   CoreLambda,
+                   decltype(epilog_lambda),
+                   FinalLambda,
+                   decltype(row_epilog_lambda),
+                   true>
     obj(x,
         y,
         m,
@@ -167,7 +168,7 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL masked_l2_nn_kernel(OutT* min,
         core_op,
         epilog_lambda,
         fin_op,
-        rowEpilog_lambda);
+        row_epilog_lambda);
   obj.run();
 }
 
@@ -238,9 +239,9 @@ void masked_l2_nn_impl(raft::resources const& handle,
                        bool sqrt,
                        bool initOutBuffer)
 {
-  using P = typename raft::linalg::Policy4x4<DataT, 1>::Policy;
+  using p = typename raft::linalg::Policy4x4<DataT, 1>::Policy;
 
-  static_assert(P::Mblk == 64, "masked_l2_nn_impl only supports a policy with 64 rows per block.");
+  static_assert(p::Mblk == 64, "masked_l2_nn_impl only supports a policy with 64 rows per block.");
 
   // Get stream and workspace memory resource
   rmm::mr::device_memory_resource* ws_mr =
@@ -264,12 +265,12 @@ void masked_l2_nn_impl(raft::resources const& handle,
 
   // Initialize output buffer with keyvalue pairs as determined by the reduction
   // operator (it will be called with maxVal).
-  constexpr auto maxVal = std::numeric_limits<DataT>::max();
+  constexpr auto kMaxVal = std::numeric_limits<DataT>::max();
   if (initOutBuffer) {
-    dim3 grid(raft::ceildiv<int>(m, P::Nthreads));
-    dim3 block(P::Nthreads);
+    dim3 grid(raft::ceildiv<int>(m, p::Nthreads));
+    dim3 block(p::Nthreads);
 
-    initKernel<DataT, OutT, IdxT, ReduceOpT><<<grid, block, 0, stream>>>(out, m, maxVal, redOp);
+    initKernel<DataT, OutT, IdxT, ReduceOpT><<<grid, block, 0, stream>>>(out, m, kMaxVal, redOp);
     RAFT_CUDA_TRY(cudaGetLastError());
   }
 
@@ -277,36 +278,36 @@ void masked_l2_nn_impl(raft::resources const& handle,
   auto core_lambda = [] __device__(DataT & acc, DataT & x, DataT & y) -> void { acc += x * y; };
   auto fin_op      = raft::identity_op{};
 
-  auto kernel               = masked_l2_nn_kernel<DataT,
-                                                  OutT,
-                                                  IdxT,
-                                                  P,
-                                                  ReduceOpT,
-                                                  KVPReduceOpT,
-                                                  decltype(core_lambda),
-                                                  decltype(fin_op)>;
-  constexpr size_t smemSize = P::SmemSize + ((P::Mblk + P::Nblk) * sizeof(DataT));
-  dim3 block(P::Nthreads);
-  dim3 grid = launchConfigGenerator<P>(m, n, smemSize, kernel);
+  auto kernel                = masked_l2_nn_kernel<DataT,
+                                                   OutT,
+                                                   IdxT,
+                                                   p,
+                                                   ReduceOpT,
+                                                   KVPReduceOpT,
+                                                   decltype(core_lambda),
+                                                   decltype(fin_op)>;  // NOLINT(readability-identifier-naming)
+  constexpr size_t kSmemSize = p::SmemSize + ((p::Mblk + p::Nblk) * sizeof(DataT));
+  dim3 block(p::Nthreads);
+  dim3 grid = launch_config_generator<p>(m, n, kSmemSize, kernel);
 
-  kernel<<<grid, block, smemSize, stream>>>(out,
-                                            x,
-                                            y,
-                                            xn,
-                                            yn,
-                                            ws_adj64.data(),
-                                            group_idxs,
-                                            num_groups,
-                                            m,
-                                            n,
-                                            k,
-                                            sqrt,
-                                            maxVal,
-                                            ws_fused_nn.data(),
-                                            redOp,
-                                            pairRedOp,
-                                            core_lambda,
-                                            fin_op);
+  kernel<<<grid, block, kSmemSize, stream>>>(out,
+                                             x,
+                                             y,
+                                             xn,
+                                             yn,
+                                             ws_adj64.data(),
+                                             group_idxs,
+                                             num_groups,
+                                             m,
+                                             n,
+                                             k,
+                                             sqrt,
+                                             kMaxVal,
+                                             ws_fused_nn.data(),
+                                             redOp,
+                                             pairRedOp,
+                                             core_lambda,
+                                             fin_op);
 
   RAFT_CUDA_TRY(cudaGetLastError());
 }

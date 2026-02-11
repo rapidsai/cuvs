@@ -18,19 +18,19 @@ namespace cuvs::distance::detail::ops {
  */
 template <typename DataType, typename AccType, typename IdxType>
 struct lp_unexp_distance_op {
-  using DataT = DataType;
-  using AccT  = AccType;
-  using IdxT  = IdxType;
+  using data_t = DataType;
+  using acc_t  = AccType;
+  using idx_t  = IdxType;
 
-  DataT p;
+  data_t p;
 
-  explicit lp_unexp_distance_op(DataT p_) noexcept : p(p_) {}
+  explicit lp_unexp_distance_op(data_t p_) noexcept : p(p_) {}
 
   // Load norms of input data
-  static constexpr bool use_norms = false;
+  static constexpr bool kUseNorms = false;
   // Whether the core function requires so many instructions that it makes sense
   // to reduce loop unrolling, etc. We do this to keep compile times in check.
-  static constexpr bool expensive_inner_loop = true;
+  static constexpr bool kExpensiveInnerLoop = true;
 
   // Size of shared memory. This is normally decided by the kernel policy, but
   // some ops such as correlation_distance_op use more.
@@ -40,20 +40,20 @@ struct lp_unexp_distance_op {
     return Policy::SmemSize;
   }
 
-  DI void core(AccT& acc, DataT& x, DataT& y) const
+  DI void core(acc_t& acc, data_t& x, data_t& y) const
   {
-    const AccT diff = raft::abs(raft::to_float(x) - raft::to_float(y));
+    const acc_t diff = raft::abs(raft::to_float(x) - raft::to_float(y));
     acc += raft::pow(diff, raft::to_float(p));
   };
 
   template <typename Policy>
-  DI void epilog(AccT acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
-                 AccT* regxn,
-                 AccT* regyn,
-                 IdxT gridStrideX,
-                 IdxT gridStrideY) const
+  DI void epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
+                 acc_t* regxn,
+                 acc_t* regyn,
+                 idx_t gridStrideX,
+                 idx_t gridStrideY) const
   {
-    const AccT one_over_p = 1.0f / static_cast<AccT>(raft::to_float(p));
+    const acc_t one_over_p = 1.0f / static_cast<acc_t>(raft::to_float(p));
 #pragma unroll
     for (int i = 0; i < Policy::AccRowsPerTh; ++i) {
 #pragma unroll

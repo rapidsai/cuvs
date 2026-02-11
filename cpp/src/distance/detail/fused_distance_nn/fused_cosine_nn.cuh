@@ -27,41 +27,42 @@ template <typename DataT,
           typename Policy,
           typename ReduceOpT,
           typename KVPReduceOpT>
-void fusedCosineNN(OutT* min,
-                   const DataT* x,
-                   const DataT* y,
-                   const DataT* xn,
-                   const DataT* yn,
-                   IdxT m,
-                   IdxT n,
-                   IdxT k,
-                   int* workspace,
-                   ReduceOpT redOp,
-                   KVPReduceOpT pairRedOp,
-                   bool sqrt,
-                   cudaStream_t stream)
+void fused_cosine_nn(OutT* min,
+                     const DataT* x,
+                     const DataT* y,
+                     const DataT* xn,
+                     const DataT* yn,
+                     IdxT m,
+                     IdxT n,
+                     IdxT k,
+                     int* workspace,
+                     ReduceOpT redOp,
+                     KVPReduceOpT pairRedOp,
+                     bool sqrt,
+                     cudaStream_t stream)
 {
   // The kernel policy is determined by fusedL2NN.
-  using P = Policy;
+  using policy_t = Policy;
 
-  dim3 blk(P::Nthreads);
-  constexpr auto maxVal = std::numeric_limits<DataT>::max();
-  using KVPair          = raft::KeyValuePair<IdxT, DataT>;
+  dim3 blk(policy_t::Nthreads);
+  constexpr auto kMaxVal = std::numeric_limits<DataT>::max();
+  using kv_pair_t        = raft::KeyValuePair<IdxT, DataT>;
 
   namespace arch = raft::util::arch;
-  using AccT     = DataT;
-  ops::cosine_distance_op<DataT, AccT, IdxT> distance_op{};
+  using acc_t    = DataT;
+  ops::cosine_distance_op<DataT, acc_t, IdxT> distance_op{};
 
   raft::identity_op fin_op{};
 
-  auto kernel = fusedDistanceNNkernel<DataT,
-                                      OutT,
-                                      IdxT,
-                                      P,
-                                      ReduceOpT,
-                                      KVPReduceOpT,
-                                      decltype(distance_op),
-                                      decltype(fin_op)>;
+  auto kernel =
+    fused_distance_nn_kernel<DataT,
+                             OutT,
+                             IdxT,
+                             policy_t,
+                             ReduceOpT,
+                             KVPReduceOpT,
+                             decltype(distance_op),
+                             decltype(fin_op)>;  // NOLINT(readability-identifier-naming)
 
   // Get pointer to fp32 SIMT kernel to determine the runtime architecture of the
   // current system. Other methods to determine the architecture (that do not
@@ -73,46 +74,47 @@ void fusedCosineNN(OutT* min,
 
   if (cutlass_range.contains(runtime_arch)) {
     // If device is SM_80 or later, use CUTLASS-based kernel.
-    using cosineOp              = cuvs::distance::detail::ops::cosine_cutlass_op<DataT, DataT>;
-    using kvp_cg_min_reduce_op_ = kvp_cg_min_reduce_op<DataT, IdxT, OutT>;
-    kvp_cg_min_reduce_op_ cg_reduce_op;
-    cosineOp cosine_dist_op;
+    using cosine_op_t            = cuvs::distance::detail::ops::cosine_cutlass_op<DataT, DataT>;
+    using kvp_cg_min_reduce_op_t = kvp_cg_min_reduce_op<DataT, IdxT, OutT>;
+    kvp_cg_min_reduce_op_t cg_reduce_op;
+    cosine_op_t cosine_dist_op;
 
     IdxT lda, ldb, ldd;
     lda = k, ldb = k, ldd = n;
 
-    cutlassFusedDistanceNN<DataT,
-                           DataT,
-                           OutT,
-                           IdxT,
-                           P::Veclen,
-                           decltype(cg_reduce_op),
-                           decltype(cosine_dist_op),
-                           ReduceOpT,
-                           KVPReduceOpT>(x,
-                                         y,
-                                         xn,
-                                         yn,
-                                         m,
-                                         n,
-                                         k,
-                                         lda,
-                                         ldb,
-                                         ldd,
-                                         min,
-                                         workspace,
-                                         cg_reduce_op,
-                                         cosine_dist_op,
-                                         redOp,
-                                         pairRedOp,
-                                         stream);
+    cutlass_fused_distance_nn<DataT,
+                              DataT,
+                              OutT,
+                              IdxT,
+                              policy_t::Veclen,
+                              decltype(cg_reduce_op),
+                              decltype(cosine_dist_op),
+                              ReduceOpT,
+                              KVPReduceOpT>(x,
+                                            y,
+                                            xn,
+                                            yn,
+                                            m,
+                                            n,
+                                            k,
+                                            lda,
+                                            ldb,
+                                            ldd,
+                                            min,
+                                            workspace,
+                                            cg_reduce_op,
+                                            cosine_dist_op,
+                                            redOp,
+                                            pairRedOp,
+                                            stream);
   } else {
     // If device less than SM_80, use fp32 SIMT kernel.
-    constexpr size_t shmemSize = P::SmemSize + ((P::Mblk + P::Nblk) * sizeof(DataT));
-    dim3 grid                  = launchConfigGenerator<P>(m, n, shmemSize, kernel);
+    constexpr size_t kShmemSize =
+      policy_t::SmemSize + ((policy_t::Mblk + policy_t::Nblk) * sizeof(DataT));
+    dim3 grid = launch_config_generator<policy_t>(m, n, kShmemSize, kernel);
 
-    kernel<<<grid, blk, shmemSize, stream>>>(
-      min, x, y, xn, yn, m, n, k, maxVal, workspace, redOp, pairRedOp, distance_op, fin_op);
+    kernel<<<grid, blk, kShmemSize, stream>>>(
+      min, x, y, xn, yn, m, n, k, kMaxVal, workspace, redOp, pairRedOp, distance_op, fin_op);
     RAFT_CUDA_TRY(cudaGetLastError());
   }
 }

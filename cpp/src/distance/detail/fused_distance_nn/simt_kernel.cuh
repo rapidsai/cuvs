@@ -18,8 +18,8 @@ namespace cuvs::distance::detail {
 // TODO(snanditale): specialize this function for MinAndDistanceReduceOp<int, float>
 // with atomicCAS of 64 bit which will eliminate mutex and shfls
 template <typename P, typename OutT, typename IdxT, typename KVPair, typename ReduceOpT>
-DI void updateReducedVal(
-  int* mutex, OutT* min, KVPair* val, ReduceOpT red_op, IdxT m, IdxT gridStrideY)
+DI auto update_reduced_val(
+  int* mutex, OutT* min, KVPair* val, ReduceOpT red_op, IdxT m, IdxT gridStrideY) -> void
 {
   const auto lid      = threadIdx.x % raft::WarpSize;
   const auto accrowid = threadIdx.x / P::AccThCols;
@@ -55,20 +55,21 @@ template <typename DataT,
           typename KVPReduceOpT,
           typename OpT,
           typename FinalLambda>
-__launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedDistanceNNkernel(OutT* min,
-                                                                    const DataT* x,
-                                                                    const DataT* y,
-                                                                    const DataT* xn,
-                                                                    const DataT* yn,
-                                                                    IdxT m,
-                                                                    IdxT n,
-                                                                    IdxT k,
-                                                                    DataT maxVal,
-                                                                    int* mutex,
-                                                                    ReduceOpT redOp,
-                                                                    KVPReduceOpT pairRedOp,
-                                                                    OpT distance_op,
-                                                                    FinalLambda fin_op)
+__launch_bounds__(P::Nthreads, 2) RAFT_KERNEL  // NOLINT(readability-identifier-naming)
+  fused_distance_nn_kernel(OutT* min,
+                           const DataT* x,
+                           const DataT* y,
+                           const DataT* xn,
+                           const DataT* yn,
+                           IdxT m,
+                           IdxT n,
+                           IdxT k,
+                           DataT maxVal,
+                           int* mutex,
+                           ReduceOpT redOp,
+                           KVPReduceOpT pairRedOp,
+                           OpT distance_op,
+                           FinalLambda fin_op)
 {
 // compile only if below non-ampere arch.
 #if __CUDA_ARCH__ < 800
@@ -88,7 +89,7 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedDistanceNNkernel(OutT* min,
                          DataT * regyn,
                          IdxT gridStrideX,
                          IdxT gridStrideY) -> void {
-    KVPReduceOpT pairRed_op(pairRedOp);
+    KVPReduceOpT pair_red_op(pairRedOp);
 
     // intra thread reduce
     const auto acccolid = threadIdx.x % P::AccThCols;
@@ -100,15 +101,15 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedDistanceNNkernel(OutT* min,
         auto tmpkey = acccolid + j * P::AccThCols + gridStrideX;
         KVPair tmp  = {tmpkey, acc[i][j]};
         if (tmpkey < n) {
-          val[i] = pairRed_op(accrowid + i * P::AccThRows + gridStrideY, tmp, val[i]);
+          val[i] = pair_red_op(accrowid + i * P::AccThRows + gridStrideY, tmp, val[i]);
         }
       }
     }
   };
 
-  auto rowEpilog_lambda =
+  auto row_epilog_lambda =
     [m, mutex, min, pairRedOp, redOp, &val, maxVal] __device__(IdxT gridStrideY) -> void {
-    KVPReduceOpT pairRed_op(pairRedOp);
+    KVPReduceOpT pair_red_op(pairRedOp);
     ReduceOpT red_op(redOp);
 
     const auto accrowid = threadIdx.x / P::AccThCols;
@@ -124,11 +125,11 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedDistanceNNkernel(OutT* min,
         auto tmpkey   = raft::shfl(val[i].key, lid + j, P::AccThCols);
         auto tmpvalue = raft::shfl(val[i].value, lid + j, P::AccThCols);
         KVPair tmp    = {tmpkey, tmpvalue};
-        val[i]        = pairRed_op(accrowid + i * P::AccThRows + gridStrideY, tmp, val[i]);
+        val[i]        = pair_red_op(accrowid + i * P::AccThRows + gridStrideY, tmp, val[i]);
       }
     }
 
-    updateReducedVal<P, OutT, IdxT, KVPair, ReduceOpT>(mutex, min, val, red_op, m, gridStrideY);
+    update_reduced_val<P, OutT, IdxT, KVPair, ReduceOpT>(mutex, min, val, red_op, m, gridStrideY);
 
     // reset the val array.
 #pragma unroll
@@ -138,18 +139,18 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedDistanceNNkernel(OutT* min,
   };
 
   IdxT lda = k, ldb = k, ldd = n;
-  constexpr bool row_major = true;
-  constexpr bool write_out = false;
-  PairwiseDistances<DataT,
-                    DataT,  // OutT (unused in PairwiseDistances)
-                    IdxT,
-                    P,
-                    decltype(distance_op),
-                    decltype(epilog_lambda),
-                    FinalLambda,
-                    decltype(rowEpilog_lambda),
-                    row_major,
-                    write_out>
+  constexpr bool kRowMajor = true;
+  constexpr bool kWriteOut = false;
+  pairwise_distances<DataT,
+                     DataT,  // OutT (unused in pairwise_distances)
+                     IdxT,
+                     P,
+                     decltype(distance_op),
+                     decltype(epilog_lambda),
+                     FinalLambda,
+                     decltype(row_epilog_lambda),
+                     kRowMajor,
+                     kWriteOut>
     obj(x,
         y,
         m,
@@ -165,7 +166,7 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedDistanceNNkernel(OutT* min,
         distance_op,
         epilog_lambda,
         fin_op,
-        rowEpilog_lambda);
+        row_epilog_lambda);
   obj.run();
 #endif
 }

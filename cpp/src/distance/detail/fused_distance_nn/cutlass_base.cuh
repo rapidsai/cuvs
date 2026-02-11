@@ -38,7 +38,7 @@ namespace distance {
 namespace detail {
 
 template <typename IdxT>
-RAFT_KERNEL initBinMutexKernel(cuda::binary_semaphore<cuda::thread_scope_device>* mut, IdxT m)
+RAFT_KERNEL init_bin_mutex_kernel(cuda::binary_semaphore<cuda::thread_scope_device>* mut, IdxT m)
 {
   auto tid = IdxT(blockIdx.x) * blockDim.x + threadIdx.x;
 
@@ -54,25 +54,25 @@ template <typename DataT,
           typename DistanceFn,
           typename ReduceOpT,
           typename KVPReduceOpT>
-void cutlassFusedDistanceNN(const DataT* x,
-                            const DataT* y,
-                            const DataT* xn,
-                            const DataT* yn,
-                            IdxT m,
-                            IdxT n,
-                            IdxT k,
-                            IdxT lda,
-                            IdxT ldb,
-                            IdxT ldd,
-                            OutT* dOutput,
-                            int* mutexes,
-                            CGReduceOpT cg_reduce_op,
-                            DistanceFn dist_op,
-                            ReduceOpT redOp,
-                            KVPReduceOpT pairRedOp,
-                            cudaStream_t stream)
+void cutlass_fused_distance_nn(const DataT* x,
+                               const DataT* y,
+                               const DataT* xn,
+                               const DataT* yn,
+                               IdxT m,
+                               IdxT n,
+                               IdxT k,
+                               IdxT lda,
+                               IdxT ldb,
+                               IdxT ldd,
+                               OutT* dOutput,
+                               int* mutexes,
+                               CGReduceOpT cg_reduce_op,
+                               DistanceFn dist_op,
+                               ReduceOpT redOp,
+                               KVPReduceOpT pairRedOp,
+                               cudaStream_t stream)
 {
-  using EpilogueOutputOp = cuvs::epilogue::thread::FusedDistanceNNEpilogueElementwise<
+  using epilogue_output_op_t = cuvs::epilogue::thread::FusedDistanceNNEpilogueElementwise<
     DataT,  // ElementC_
     AccT,   // ElementAccumulator_
     DataT,  // ElementCompute_
@@ -84,79 +84,79 @@ void cutlassFusedDistanceNN(const DataT* x,
     CGReduceOpT,
     ReduceOpT,
     KVPReduceOpT>;
-  constexpr int batch_count = 1;
+  constexpr int kBatchCount = 1;
 
   rmm::device_uvector<cuda::binary_semaphore<cuda::thread_scope_device>> bin_mutex(m, stream);
 
-  int blks_ = (m / 256) + 1;
+  int nblks = (m / 256) + 1;
 
-  initBinMutexKernel<<<blks_, 256, 0, stream>>>(bin_mutex.data(), m);
+  init_bin_mutex_kernel<<<nblks, 256, 0, stream>>>(bin_mutex.data(), m);
 
-  typename EpilogueOutputOp::Params epilog_op_param(
+  typename epilogue_output_op_t::Params epilog_op_param(
     dist_op, cg_reduce_op, redOp, pairRedOp, mutexes, bin_mutex.data());
 
   // Number of pipelines you want to use
-  constexpr int NumStages = 3;
+  constexpr int kNumStages = 3;
   // Alignment
-  constexpr int Alignment = VecLen;
+  constexpr int kAlignment = VecLen;
 
   // default initialize problem size with row major inputs
   auto problem_size = cutlass::gemm::GemmCoord(m, n, k);
 
-  constexpr bool isRowMajor = true;
+  constexpr bool kIsRowMajor = true;
 
-  using fusedDistanceNNKernel =
+  using fused_distance_nn_kernel_t =
     typename cuvs::gemm::kernel::FusedDistanceNNGemm<DataT,
-                                                     Alignment,
+                                                     kAlignment,
                                                      DataT,
-                                                     Alignment,
+                                                     kAlignment,
                                                      AccT,
                                                      AccT,
-                                                     EpilogueOutputOp,
-                                                     NumStages,  // Number of pipeline stages
-                                                     isRowMajor>::GemmKernel;
+                                                     epilogue_output_op_t,
+                                                     kNumStages,  // Number of pipeline stages
+                                                     kIsRowMajor>::GemmKernel;
 
-  using fusedDistanceNN = cutlass::gemm::device::GemmGrouped<fusedDistanceNNKernel>;
+  using fused_distance_nn_t = cutlass::gemm::device::GemmGrouped<fused_distance_nn_kernel_t>;
 
-  int num_blocks_per_sm   = fusedDistanceNN::maximum_active_blocks();
-  int num_sms             = raft::getMultiProcessorCount();
-  int full_wave           = num_blocks_per_sm * num_sms;
-  constexpr int mmaShapeM = fusedDistanceNNKernel::Mma::Shape::kM;
-  constexpr int mmaShapeN = fusedDistanceNNKernel::Mma::Shape::kN;
-  int columnTiles         = (problem_size.n() - 1 + mmaShapeN) / mmaShapeN;
-  int rowTiles            = (problem_size.m() - 1 + mmaShapeM) / mmaShapeM;
-  int totalTiles          = columnTiles * rowTiles;
+  int num_blocks_per_sm    = fused_distance_nn_t::maximum_active_blocks();
+  int num_sms              = raft::getMultiProcessorCount();
+  int full_wave            = num_blocks_per_sm * num_sms;
+  constexpr int kMmaShapeM = fused_distance_nn_kernel_t::Mma::Shape::kM;
+  constexpr int kMmaShapeN = fused_distance_nn_kernel_t::Mma::Shape::kN;
+  int column_tiles         = (problem_size.n() - 1 + kMmaShapeN) / kMmaShapeN;
+  int row_tiles            = (problem_size.m() - 1 + kMmaShapeM) / kMmaShapeM;
+  int total_tiles          = column_tiles * row_tiles;
   int thread_blocks =
-    rowTiles < full_wave ? (totalTiles < full_wave ? totalTiles : full_wave) : rowTiles;
+    row_tiles < full_wave ? (total_tiles < full_wave ? total_tiles : full_wave) : row_tiles;
 
-  typename fusedDistanceNN::Arguments arguments{
+  typename fused_distance_nn_t::Arguments arguments{
     problem_size,
-    batch_count,  // num of problems.
+    kBatchCount,  // num of problems.
     thread_blocks,
     epilog_op_param,
     x,
     y,
-    xn,                       // C matrix eq vector param, which here is A norm
-    (DataT*)yn,               // this is broadcast vec, which is required to be non-const param
-    dOutput,                  // Output distance matrix
-    (int64_t)lda,             // stride A
-    (int64_t)ldb,             // stride B
-    static_cast<int64_t>(1),  // stride A norm
-    (int64_t)ldd              // stride Output matrix
+    xn,                         // C matrix eq vector param, which here is A norm
+    const_cast<DataT*>(yn),     // this is broadcast vec, which is required to be non-const param
+    dOutput,                    // Output distance matrix
+    static_cast<int64_t>(lda),  // stride A
+    static_cast<int64_t>(ldb),  // stride B
+    static_cast<int64_t>(1),    // stride A norm
+    static_cast<int64_t>(ldd)   // stride Output matrix
   };
 
   // Using the arguments, query for extra workspace required for matrix multiplication computation
-  size_t workspace_size = fusedDistanceNN::get_workspace_size(arguments);
+  size_t workspace_size = fused_distance_nn_t::get_workspace_size(arguments);
   // Allocate workspace memory
   rmm::device_uvector<uint8_t> workspace(workspace_size, stream);
   // Instantiate CUTLASS kernel depending on templates
-  fusedDistanceNN fusedDistanceNN_op;
+  fused_distance_nn_t fused_distance_nn_op;
   // Check the problem size is supported or not
-  CUVS_CUTLASS_TRY(fusedDistanceNN_op.can_implement(arguments));
+  CUVS_CUTLASS_TRY(fused_distance_nn_op.can_implement(arguments));
   // Initialize CUTLASS kernel with arguments and workspace pointer
-  CUVS_CUTLASS_TRY(fusedDistanceNN_op.initialize(arguments, workspace.data(), stream));
+  CUVS_CUTLASS_TRY(fused_distance_nn_op.initialize(arguments, workspace.data(), stream));
   // Launch initialized CUTLASS kernel
-  CUVS_CUTLASS_TRY(fusedDistanceNN_op.run(stream));
+  CUVS_CUTLASS_TRY(fused_distance_nn_op.run(stream));
 }
 
 };  // namespace detail
