@@ -36,8 +36,7 @@ struct index_params : cuvs::neighbors::index_params {
   /**
    * The number of inverted lists (clusters)
    *
-   * Hint: the number of vectors per cluster (`n_rows/n_lists`) should be approximately 1,000 to
-   * 10,000.
+   * Hint: Increasing this parameter may alleviate shared memory pressure.
    */
   uint32_t n_lists = 1024;
   /**

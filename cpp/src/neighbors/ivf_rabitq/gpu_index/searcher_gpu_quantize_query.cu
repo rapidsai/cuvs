@@ -1855,14 +1855,22 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
     if (cur_ivf.get_ex_bits() != 0) {
       auto kernel = use_block_sort ? computeInnerProductsWithBitwiseOpt8bitBlockSort
                                    : computeInnerProductsWithBitwiseOpt;
-      RAFT_CUDA_TRY(
-        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size));
+      auto status =
+        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size);
+      RAFT_EXPECTS(status == cudaSuccess,
+                   "Failed to set max dynamic shared memory size to %zu bytes. Increasing the "
+                   "`n_lists` parameter may reduce shared memory usage.",
+                   shared_mem_size);
       kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
     } else {
       auto kernel = use_block_sort ? computeInnerProductsWithBitwiseOpt8bitNoEXBlockSort
                                    : computeInnerProductsWithBitwiseOptNoEX;
-      RAFT_CUDA_TRY(
-        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size));
+      auto status =
+        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size);
+      RAFT_EXPECTS(status == cudaSuccess,
+                   "Failed to set max dynamic shared memory size to %zu bytes. Increasing the "
+                   "`n_lists` parameter may reduce shared memory usage.",
+                   shared_mem_size);
       kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
     }
     RAFT_CUDA_TRY(cudaPeekAtLastError());
@@ -1870,14 +1878,22 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
     if (cur_ivf.get_ex_bits() != 0) {
       auto kernel = use_block_sort ? computeInnerProductsWithBitwiseOpt4bitBlockSort
                                    : computeInnerProductsWithBitwiseOpt;
-      RAFT_CUDA_TRY(
-        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size));
+      auto status =
+        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size);
+      RAFT_EXPECTS(status == cudaSuccess,
+                   "Failed to set max dynamic shared memory size to %zu bytes. Increasing the "
+                   "`n_lists` parameter may reduce shared memory usage.",
+                   shared_mem_size);
       kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
     } else {
       auto kernel = use_block_sort ? computeInnerProductsWithBitwiseOpt4bitNoEXBlockSort
                                    : computeInnerProductsWithBitwiseOptNoEX;
-      RAFT_CUDA_TRY(
-        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size));
+      auto status =
+        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size);
+      RAFT_EXPECTS(status == cudaSuccess,
+                   "Failed to set max dynamic shared memory size to %zu bytes. Increasing the "
+                   "`n_lists` parameter may reduce shared memory usage.",
+                   shared_mem_size);
       kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
     }
     RAFT_CUDA_TRY(cudaPeekAtLastError());

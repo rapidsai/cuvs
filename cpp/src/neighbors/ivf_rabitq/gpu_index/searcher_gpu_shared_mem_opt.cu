@@ -1077,9 +1077,13 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(const IVFGPU& cur_ivf,
           (size_t)queue_buffer_smem_bytes);
     auto kernel =
       use_block_sort ? computeInnerProductsWithLUT16OptBlockSort : computeInnerProductsWithLUT16Opt;
+    auto status =
+      cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size);
     // Note that for large dimensions, we need to set it for specific kernel
-    RAFT_CUDA_TRY(
-      cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size));
+    RAFT_EXPECTS(status == cudaSuccess,
+                 "Failed to set max dynamic shared memory size to %zu bytes. Increasing the "
+                 "`n_lists` parameter may reduce shared memory usage.",
+                 shared_mem_size);
     kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
   } else {
     size_t first_part_shared_mem = lut_size / num_queries;
@@ -1090,9 +1094,13 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(const IVFGPU& cur_ivf,
       max(first_part_shared_mem + second_part_shared_mem, (size_t)queue_buffer_smem_bytes);
     auto kernel = use_block_sort ? computeInnerProductsWithLUT16OptNoEXBlockSort
                                  : computeInnerProductsWithLUT16OptNoEX;
+    auto status =
+      cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size);
     // Note that for large dimensions, we need to set it for specific kernel
-    RAFT_CUDA_TRY(
-      cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size));
+    RAFT_EXPECTS(status == cudaSuccess,
+                 "Failed to set max dynamic shared memory size to %zu bytes. Increasing the "
+                 "`n_lists` parameter may reduce shared memory usage.",
+                 shared_mem_size);
     kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
   }
   RAFT_CUDA_TRY(cudaPeekAtLastError());
