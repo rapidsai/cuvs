@@ -122,15 +122,15 @@ struct search_plan_impl_base : public search_params {
 };
 
 template <typename DataT,
-          typename index_t,
-          typename distance_t,
+          typename IndexT,
+          typename DistanceT,
           typename SAMPLE_FILTER_T,
-          typename SourceIndexT = index_t,
+          typename SourceIndexT = IndexT,
           typename OutputIndexT = SourceIndexT>
 struct search_plan_impl : public search_plan_impl_base {
   using DATA_T     = DataT;
-  using INDEX_T    = index_t;
-  using DISTANCE_T = distance_t;
+  using INDEX_T    = IndexT;
+  using DISTANCE_T = DistanceT;
 
   int64_t hash_bitlen;
 
@@ -145,11 +145,11 @@ struct search_plan_impl : public search_plan_impl_base {
   lightweight_uvector<INDEX_T> hashmap;
   lightweight_uvector<uint32_t> num_executed_iterations;  // device or managed?
   lightweight_uvector<INDEX_T> dev_seed;
-  dataset_descriptor_host<DataT, index_t, distance_t> dataset_desc;
+  dataset_descriptor_host<DataT, IndexT, DistanceT> dataset_desc;
 
   search_plan_impl(raft::resources const& res,
                    search_params params,
-                   const dataset_descriptor_host<DataT, index_t, distance_t>& dataset_desc,
+                   const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
                    int64_t dim,
                    int64_t dataset_size,
                    int64_t graph_degree,

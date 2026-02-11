@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -16,14 +16,14 @@
 namespace cuvs::neighbors::detail {
 
 template <typename ValueIdx,
-          typename value_t,
+          typename ValueT,
           typename OutputT,
           typename ExpansionF>  // NOLINT(readability-identifier-naming)
 RAFT_KERNEL epilogue_on_csr_kernel(OutputT* __restrict__ compressed_C,
                                    const ValueIdx* __restrict__ rows,
                                    const ValueIdx* __restrict__ cols,
                                    const OutputT* __restrict__ Q_sq_norms,
-                                   const value_t* __restrict__ R_sq_norms,
+                                   const ValueT* __restrict__ R_sq_norms,
                                    ValueIdx nnz,
                                    ExpansionF expansion_func)
 {
@@ -37,7 +37,7 @@ RAFT_KERNEL epilogue_on_csr_kernel(OutputT* __restrict__ compressed_C,
 }
 
 template <typename ValueIdx,
-          typename value_t,
+          typename ValueT,
           typename OutputT,
           int tpb = 256>  // NOLINT(readability-identifier-naming)
 void epilogue_on_csr(raft::resources const& handle,
@@ -46,7 +46,7 @@ void epilogue_on_csr(raft::resources const& handle,
                      const ValueIdx* rows,
                      const ValueIdx* cols,
                      const OutputT* Q_sq_norms,
-                     const value_t* R_sq_norms,
+                     const ValueT* R_sq_norms,
                      cuvs::distance::DistanceType metric)
 {
   if (nnz == 0) return;
@@ -61,8 +61,8 @@ void epilogue_on_csr(raft::resources const& handle,
       Q_sq_norms,
       R_sq_norms,
       nnz,
-      [] __device__ __host__(OutputT dot, OutputT q_norm, value_t r_norm) -> OutputT {
-        if constexpr (std::is_same_v<value_t, half>) {
+      [] __device__ __host__(OutputT dot, OutputT q_norm, ValueT r_norm) -> OutputT {
+        if constexpr (std::is_same_v<ValueT, half>) {
           return OutputT(-2.0) * dot + q_norm + __half2float(r_norm);
         } else {
           return OutputT(-2.0) * dot + q_norm + r_norm;
@@ -76,8 +76,8 @@ void epilogue_on_csr(raft::resources const& handle,
       Q_sq_norms,
       R_sq_norms,
       nnz,
-      [] __device__ __host__(OutputT dot, OutputT q_norm, value_t r_norm) -> OutputT {
-        if constexpr (std::is_same_v<value_t, half>) {
+      [] __device__ __host__(OutputT dot, OutputT q_norm, ValueT r_norm) -> OutputT {
+        if constexpr (std::is_same_v<ValueT, half>) {
           return raft::sqrt(OutputT(-2.0) * dot + q_norm + __half2float(r_norm));
         } else {
           return raft::sqrt(OutputT(-2.0) * dot + q_norm + r_norm);
@@ -91,8 +91,8 @@ void epilogue_on_csr(raft::resources const& handle,
       Q_sq_norms,
       R_sq_norms,
       nnz,
-      [] __device__ __host__(OutputT dot, OutputT q_norm, value_t r_norm) -> OutputT {
-        if constexpr (std::is_same_v<value_t, half>) {
+      [] __device__ __host__(OutputT dot, OutputT q_norm, ValueT r_norm) -> OutputT {
+        if constexpr (std::is_same_v<ValueT, half>) {
           return OutputT(1.0) - dot / (q_norm * __half2float(r_norm));
         } else {
           return OutputT(1.0) - dot / (q_norm * r_norm);

@@ -26,12 +26,12 @@
 namespace cuvs::distance::detail::sparse {
 
 template <typename ValueIdx = int,
-          typename value_t  = float,  // NOLINT(readability-identifier-naming)
+          typename ValueT   = float,  // NOLINT(readability-identifier-naming)
           typename ProductF,
           typename AccumF,
           typename WriteF>
-void unexpanded_lp_distances(value_t* out_dists,
-                             const distances_config_t<ValueIdx, value_t>* config_,
+void unexpanded_lp_distances(ValueT* out_dists,
+                             const distances_config_t<ValueIdx, ValueT>* config_,
                              ProductF product_func,
                              AccumF accum_func,
                              WriteF write_func)
@@ -45,7 +45,7 @@ void unexpanded_lp_distances(value_t* out_dists,
                                     config_->b_nnz,
                                     raft::resource::get_cuda_stream(config_->handle));
 
-  balanced_coo_pairwise_generalized_spmv<ValueIdx, value_t>(
+  balanced_coo_pairwise_generalized_spmv<ValueIdx, ValueT>(
     out_dists, *config_, coo_rows.data(), product_func, accum_func, write_func);
 
   raft::sparse::convert::csr_to_coo(config_->a_indptr,
@@ -54,7 +54,7 @@ void unexpanded_lp_distances(value_t* out_dists,
                                     config_->a_nnz,
                                     raft::resource::get_cuda_stream(config_->handle));
 
-  balanced_coo_pairwise_generalized_spmv_rev<ValueIdx, value_t>(
+  balanced_coo_pairwise_generalized_spmv_rev<ValueIdx, ValueT>(
     out_dists, *config_, coo_rows.data(), product_func, accum_func, write_func);
 }
 
@@ -63,67 +63,67 @@ void unexpanded_lp_distances(value_t* out_dists,
  * an equivalent expanded form, so it is only executed in
  * an unexpanded form.
  * @tparam ValueIdx
- * @tparam value_t
+ * @tparam ValueT
  */
 template <typename ValueIdx = int,
-          typename value_t  = float>  // NOLINT(readability-identifier-naming)
-class l1_unexpanded_distances_t : public distances_t<value_t> {
+          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+class l1_unexpanded_distances_t : public distances_t<ValueT> {
  public:
-  explicit l1_unexpanded_distances_t(const distances_config_t<ValueIdx, value_t>& config)
+  explicit l1_unexpanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
     : config_(&config)
   {
   }
 
-  void compute(value_t* out_dists)
+  void compute(ValueT* out_dists)
   {
-    unexpanded_lp_distances<ValueIdx, value_t>(
+    unexpanded_lp_distances<ValueIdx, ValueT>(
       out_dists, config_, raft::absdiff_op(), raft::add_op(), raft::atomic_add_op());
   }
 
  private:
-  const distances_config_t<ValueIdx, value_t>* config_;
+  const distances_config_t<ValueIdx, ValueT>* config_;
 };
 
 template <typename ValueIdx = int,
-          typename value_t  = float>  // NOLINT(readability-identifier-naming)
-class l2_unexpanded_distances_t : public distances_t<value_t> {
+          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+class l2_unexpanded_distances_t : public distances_t<ValueT> {
  public:
-  explicit l2_unexpanded_distances_t(const distances_config_t<ValueIdx, value_t>& config)
+  explicit l2_unexpanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
     : config_(&config)
   {
   }
 
-  void compute(value_t* out_dists)
+  void compute(ValueT* out_dists)
   {
-    unexpanded_lp_distances<ValueIdx, value_t>(
+    unexpanded_lp_distances<ValueIdx, ValueT>(
       out_dists, config_, raft::sqdiff_op(), raft::add_op(), raft::atomic_add_op());
   }
 
  protected:
-  const distances_config_t<ValueIdx, value_t>* config_;
+  const distances_config_t<ValueIdx, ValueT>* config_;
 };
 
 template <typename ValueIdx = int,
-          typename value_t  = float>  // NOLINT(readability-identifier-naming)
-class l2_sqrt_unexpanded_distances_t : public l2_unexpanded_distances_t<ValueIdx, value_t> {
+          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+class l2_sqrt_unexpanded_distances_t : public l2_unexpanded_distances_t<ValueIdx, ValueT> {
  public:
-  explicit l2_sqrt_unexpanded_distances_t(const distances_config_t<ValueIdx, value_t>& config)
-    : l2_unexpanded_distances_t<ValueIdx, value_t>(config)
+  explicit l2_sqrt_unexpanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
+    : l2_unexpanded_distances_t<ValueIdx, ValueT>(config)
   {
   }
 
-  void compute(value_t* out_dists)
+  void compute(ValueT* out_dists)
   {
-    l2_unexpanded_distances_t<ValueIdx, value_t>::compute(out_dists);
+    l2_unexpanded_distances_t<ValueIdx, ValueT>::compute(out_dists);
 
     uint64_t n =
       static_cast<uint64_t>(this->config_->a_nrows) * static_cast<uint64_t>(this->config_->b_nrows);
     // Sqrt Post-processing
-    raft::linalg::unaryOp<value_t>(
+    raft::linalg::unaryOp<ValueT>(
       out_dists,
       out_dists,
       n,
-      [] __device__(value_t input) {
+      [] __device__(ValueT input) {
         int neg = input < 0 ? -1 : 1;
         return raft::sqrt(abs(input) * neg);
       },
@@ -132,40 +132,40 @@ class l2_sqrt_unexpanded_distances_t : public l2_unexpanded_distances_t<ValueIdx
 };
 
 template <typename ValueIdx = int,
-          typename value_t  = float>  // NOLINT(readability-identifier-naming)
-class linf_unexpanded_distances_t : public distances_t<value_t> {
+          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+class linf_unexpanded_distances_t : public distances_t<ValueT> {
  public:
-  explicit linf_unexpanded_distances_t(const distances_config_t<ValueIdx, value_t>& config)
+  explicit linf_unexpanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
     : config_(&config)
   {
   }
 
-  void compute(value_t* out_dists)
+  void compute(ValueT* out_dists)
   {
-    unexpanded_lp_distances<ValueIdx, value_t>(
+    unexpanded_lp_distances<ValueIdx, ValueT>(
       out_dists, config_, raft::absdiff_op(), raft::max_op(), raft::atomic_max_op());
   }
 
  private:
-  const distances_config_t<ValueIdx, value_t>* config_;
+  const distances_config_t<ValueIdx, ValueT>* config_;
 };
 
 template <typename ValueIdx = int,
-          typename value_t  = float>  // NOLINT(readability-identifier-naming)
-class canberra_unexpanded_distances_t : public distances_t<value_t> {
+          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+class canberra_unexpanded_distances_t : public distances_t<ValueT> {
  public:
-  explicit canberra_unexpanded_distances_t(const distances_config_t<ValueIdx, value_t>& config)
+  explicit canberra_unexpanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
     : config_(&config)
   {
   }
 
-  void compute(value_t* out_dists)
+  void compute(ValueT* out_dists)
   {
-    unexpanded_lp_distances<ValueIdx, value_t>(
+    unexpanded_lp_distances<ValueIdx, ValueT>(
       out_dists,
       config_,
-      [] __device__(value_t a, value_t b) -> value_t {
-        value_t d = fabs(a) + fabs(b);
+      [] __device__(ValueT a, ValueT b) -> ValueT {
+        ValueT d = fabs(a) + fabs(b);
 
         // deal with potential for 0 in denominator by
         // forcing 1/0 instead
@@ -176,92 +176,90 @@ class canberra_unexpanded_distances_t : public distances_t<value_t> {
   }
 
  private:
-  const distances_config_t<ValueIdx, value_t>* config_;
+  const distances_config_t<ValueIdx, ValueT>* config_;
 };
 
 template <typename ValueIdx = int,
-          typename value_t  = float>  // NOLINT(readability-identifier-naming)
-class lp_unexpanded_distances_t : public distances_t<value_t> {
+          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+class lp_unexpanded_distances_t : public distances_t<ValueT> {
  public:
-  explicit lp_unexpanded_distances_t(const distances_config_t<ValueIdx, value_t>& config,
-                                     value_t p_)
+  explicit lp_unexpanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config, ValueT p_)
     : config_(&config), p_(p_)
   {
   }
 
-  void compute(value_t* out_dists)
+  void compute(ValueT* out_dists)
   {
-    unexpanded_lp_distances<ValueIdx, value_t>(
+    unexpanded_lp_distances<ValueIdx, ValueT>(
       out_dists,
       config_,
-      raft::compose_op(raft::pow_const_op<value_t>(p_), raft::sub_op()),
+      raft::compose_op(raft::pow_const_op<ValueT>(p_), raft::sub_op()),
       raft::add_op(),
       raft::atomic_add_op());
 
     uint64_t n =
       static_cast<uint64_t>(this->config_->a_nrows) * static_cast<uint64_t>(this->config_->b_nrows);
-    value_t one_over_p = value_t{1} / p_;
-    raft::linalg::unaryOp<value_t>(out_dists,
-                                   out_dists,
-                                   n,
-                                   raft::pow_const_op<value_t>(one_over_p),
-                                   raft::resource::get_cuda_stream(config_->handle));
+    ValueT one_over_p = ValueT{1} / p_;
+    raft::linalg::unaryOp<ValueT>(out_dists,
+                                  out_dists,
+                                  n,
+                                  raft::pow_const_op<ValueT>(one_over_p),
+                                  raft::resource::get_cuda_stream(config_->handle));
   }
 
  private:
-  const distances_config_t<ValueIdx, value_t>* config_;
-  value_t p_;
+  const distances_config_t<ValueIdx, ValueT>* config_;
+  ValueT p_;
 };
 
 template <typename ValueIdx = int,
-          typename value_t  = float>  // NOLINT(readability-identifier-naming)
-class hamming_unexpanded_distances_t : public distances_t<value_t> {
+          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+class hamming_unexpanded_distances_t : public distances_t<ValueT> {
  public:
-  explicit hamming_unexpanded_distances_t(const distances_config_t<ValueIdx, value_t>& config)
+  explicit hamming_unexpanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
     : config_(&config)
   {
   }
 
-  void compute(value_t* out_dists)
+  void compute(ValueT* out_dists)
   {
-    unexpanded_lp_distances<ValueIdx, value_t>(
+    unexpanded_lp_distances<ValueIdx, ValueT>(
       out_dists, config_, raft::notequal_op(), raft::add_op(), raft::atomic_add_op());
 
     uint64_t n = static_cast<uint64_t>(config_->a_nrows) * static_cast<uint64_t>(config_->b_nrows);
-    value_t n_cols = 1.0 / config_->a_ncols;
-    raft::linalg::unaryOp<value_t>(out_dists,
-                                   out_dists,
-                                   n,
-                                   raft::mul_const_op<value_t>(n_cols),
-                                   raft::resource::get_cuda_stream(config_->handle));
+    ValueT n_cols = 1.0 / config_->a_ncols;
+    raft::linalg::unaryOp<ValueT>(out_dists,
+                                  out_dists,
+                                  n,
+                                  raft::mul_const_op<ValueT>(n_cols),
+                                  raft::resource::get_cuda_stream(config_->handle));
   }
 
  private:
-  const distances_config_t<ValueIdx, value_t>* config_;
+  const distances_config_t<ValueIdx, ValueT>* config_;
 };
 
 template <typename ValueIdx = int,
-          typename value_t  = float>  // NOLINT(readability-identifier-naming)
-class jensen_shannon_unexpanded_distances_t : public distances_t<value_t> {
+          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+class jensen_shannon_unexpanded_distances_t : public distances_t<ValueT> {
  public:
-  explicit jensen_shannon_unexpanded_distances_t(
-    const distances_config_t<ValueIdx, value_t>& config)
+  explicit jensen_shannon_unexpanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
     : config_(&config)
   {
   }
 
-  void compute(value_t* out_dists)
+  void compute(ValueT* out_dists)
   {
-    unexpanded_lp_distances<ValueIdx, value_t>(
+    unexpanded_lp_distances<ValueIdx, ValueT>(
       out_dists,
       config_,
-      [] __device__(value_t a, value_t b) -> value_t {
-        value_t m   = 0.5f * (a + b);
+      [] __device__(ValueT a, ValueT b) -> ValueT {
+        ValueT m    = 0.5f * (a + b);
         bool a_zero = a == 0;
         bool b_zero = b == 0;
 
-        value_t x = (!a_zero * m) / (a_zero + a);
-        value_t y = (!b_zero * m) / (b_zero + b);
+        ValueT x = (!a_zero * m) / (a_zero + a);
+        ValueT y = (!b_zero * m) / (b_zero + b);
 
         bool x_zero = x == 0;
         bool y_zero = y == 0;
@@ -273,28 +271,28 @@ class jensen_shannon_unexpanded_distances_t : public distances_t<value_t> {
 
     uint64_t n =
       static_cast<uint64_t>(this->config_->a_nrows) * static_cast<uint64_t>(this->config_->b_nrows);
-    raft::linalg::unaryOp<value_t>(
+    raft::linalg::unaryOp<ValueT>(
       out_dists,
       out_dists,
       n,
-      [=] __device__(value_t input) { return raft::sqrt(0.5 * input); },
+      [=] __device__(ValueT input) { return raft::sqrt(0.5 * input); },
       raft::resource::get_cuda_stream(config_->handle));
   }
 
  private:
-  const distances_config_t<ValueIdx, value_t>* config_;
+  const distances_config_t<ValueIdx, ValueT>* config_;
 };
 
 template <typename ValueIdx = int,
-          typename value_t  = float>  // NOLINT(readability-identifier-naming)
-class kl_divergence_unexpanded_distances_t : public distances_t<value_t> {
+          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+class kl_divergence_unexpanded_distances_t : public distances_t<ValueT> {
  public:
-  explicit kl_divergence_unexpanded_distances_t(const distances_config_t<ValueIdx, value_t>& config)
+  explicit kl_divergence_unexpanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
     : config_(&config)
   {
   }
 
-  void compute(value_t* out_dists)
+  void compute(ValueT* out_dists)
   {
     rmm::device_uvector<ValueIdx> coo_rows(std::max(config_->b_nnz, config_->a_nnz),
                                            raft::resource::get_cuda_stream(config_->handle));
@@ -305,25 +303,25 @@ class kl_divergence_unexpanded_distances_t : public distances_t<value_t> {
                                       config_->b_nnz,
                                       raft::resource::get_cuda_stream(config_->handle));
 
-    balanced_coo_pairwise_generalized_spmv<ValueIdx, value_t>(
+    balanced_coo_pairwise_generalized_spmv<ValueIdx, ValueT>(
       out_dists,
       *config_,
       coo_rows.data(),
-      [] __device__(value_t a, value_t b) -> value_t { return a * log(a / b); },
+      [] __device__(ValueT a, ValueT b) -> ValueT { return a * log(a / b); },
       raft::add_op(),
       raft::atomic_add_op());
 
     uint64_t n =
       static_cast<uint64_t>(this->config_->a_nrows) * static_cast<uint64_t>(this->config_->b_nrows);
-    raft::linalg::unaryOp<value_t>(out_dists,
-                                   out_dists,
-                                   n,
-                                   raft::mul_const_op<value_t>(0.5),
-                                   raft::resource::get_cuda_stream(config_->handle));
+    raft::linalg::unaryOp<ValueT>(out_dists,
+                                  out_dists,
+                                  n,
+                                  raft::mul_const_op<ValueT>(0.5),
+                                  raft::resource::get_cuda_stream(config_->handle));
   }
 
  private:
-  const distances_config_t<ValueIdx, value_t>* config_;
+  const distances_config_t<ValueIdx, ValueT>* config_;
 };
 
 }  // namespace cuvs::distance::detail::sparse

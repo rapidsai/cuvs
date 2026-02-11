@@ -28,9 +28,9 @@
 
 namespace cuvs::cluster::agglomerative::detail {
 
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
-void merge_msts(raft::sparse::solver::Graph_COO<ValueIdx, ValueIdx, value_t>& coo1,
-                raft::sparse::solver::Graph_COO<ValueIdx, ValueIdx, value_t>& coo2,
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+void merge_msts(raft::sparse::solver::Graph_COO<ValueIdx, ValueIdx, ValueT>& coo1,
+                raft::sparse::solver::Graph_COO<ValueIdx, ValueIdx, ValueT>& coo2,
                 cudaStream_t stream)
 {
   /** Add edges to existing mst **/
@@ -54,7 +54,7 @@ void merge_msts(raft::sparse::solver::Graph_COO<ValueIdx, ValueIdx, value_t>& co
  * Connect an unconnected knn graph (one in which mst returns an msf). The
  * device buffers underlying the Graph_COO object are modified in-place.
  * @tparam ValueIdx index type
- * @tparam value_t floating-point value type
+ * @tparam ValueT floating-point value type
  * @param[in] handle raft handle
  * @param[in] X original dense data on device memory from which knn graph was constructed
  * @param[inout] msf edge list containing the mst result
@@ -64,12 +64,12 @@ void merge_msts(raft::sparse::solver::Graph_COO<ValueIdx, ValueIdx, value_t>& co
  * @return updated MST edge list
  */
 template <typename ValueIdx,
-          typename value_t,
+          typename ValueT,
           typename RedOp>  // NOLINT(readability-identifier-naming)
 void connect_knn_graph(
   raft::resources const& handle,
-  raft::device_matrix_view<const value_t, ValueIdx> X,
-  raft::sparse::solver::Graph_COO<ValueIdx, ValueIdx, value_t>& msf,
+  raft::device_matrix_view<const ValueT, ValueIdx> X,
+  raft::sparse::solver::Graph_COO<ValueIdx, ValueIdx, ValueT>& msf,
   size_t m,
   size_t n,
   ValueIdx* color,
@@ -78,22 +78,22 @@ void connect_knn_graph(
 {
   auto stream = raft::resource::get_cuda_stream(handle);
 
-  raft::sparse::COO<value_t, ValueIdx> connected_edges(stream);
+  raft::sparse::COO<ValueT, ValueIdx> connected_edges(stream);
 
   // default row and column batch sizes are chosen for computing cross component nearest neighbors.
   // Reference: PR #1445
   static constexpr size_t kDefaultRowBatchSize = 4096;
   static constexpr size_t kDefaultColBatchSize = 16;
 
-  cuvs::sparse::neighbors::cross_component_nn<ValueIdx, value_t>(handle,
-                                                                 connected_edges,
-                                                                 X.data_handle(),
-                                                                 color,
-                                                                 m,
-                                                                 n,
-                                                                 reduction_op,
-                                                                 min(m, kDefaultRowBatchSize),
-                                                                 min(n, kDefaultColBatchSize));
+  cuvs::sparse::neighbors::cross_component_nn<ValueIdx, ValueT>(handle,
+                                                                connected_edges,
+                                                                X.data_handle(),
+                                                                color,
+                                                                m,
+                                                                n,
+                                                                reduction_op,
+                                                                min(m, kDefaultRowBatchSize),
+                                                                min(n, kDefaultColBatchSize));
 
   rmm::device_uvector<ValueIdx> indptr2(m + 1, stream);
   raft::sparse::convert::sorted_coo_to_csr(
@@ -102,25 +102,25 @@ void connect_knn_graph(
   // On the second call, we hand the MST the original colors
   // and the new set of edges and let it restart the optimization process
   auto new_mst =
-    raft::sparse::solver::mst<ValueIdx, ValueIdx, value_t, double>(handle,
-                                                                   indptr2.data(),
-                                                                   connected_edges.cols(),
-                                                                   connected_edges.vals(),
-                                                                   m,
-                                                                   connected_edges.nnz,
-                                                                   color,
-                                                                   stream,
-                                                                   false,
-                                                                   false);
+    raft::sparse::solver::mst<ValueIdx, ValueIdx, ValueT, double>(handle,
+                                                                  indptr2.data(),
+                                                                  connected_edges.cols(),
+                                                                  connected_edges.vals(),
+                                                                  m,
+                                                                  connected_edges.nnz,
+                                                                  color,
+                                                                  stream,
+                                                                  false,
+                                                                  false);
 
-  merge_msts<ValueIdx, value_t>(msf, new_mst, stream);
+  merge_msts<ValueIdx, ValueT>(msf, new_mst, stream);
 }
 
 /**
  * Connect an unconnected knn graph (one in which mst returns an msf). The
  * device buffers underlying the Graph_COO object are modified in-place.
  * @tparam ValueIdx index type
- * @tparam value_t floating-point value type
+ * @tparam ValueT floating-point value type
  * @param[in] handle raft handle
  * @param[in] X original dense data on host memory from which knn graph was constructed
  * @param[inout] msf edge list containing the mst result
@@ -130,12 +130,12 @@ void connect_knn_graph(
  * @return updated MST edge list
  */
 template <typename ValueIdx,
-          typename value_t,
+          typename ValueT,
           typename RedOp = raft::identity_op>  // NOLINT(readability-identifier-naming)
 void connect_knn_graph(
   raft::resources const& handle,
-  raft::host_matrix_view<const value_t, ValueIdx> X,
-  raft::sparse::solver::Graph_COO<ValueIdx, ValueIdx, value_t>& msf,
+  raft::host_matrix_view<const ValueT, ValueIdx> X,
+  raft::sparse::solver::Graph_COO<ValueIdx, ValueIdx, ValueT>& msf,
   size_t m,
   size_t n,
   ValueIdx* color,
@@ -148,8 +148,8 @@ void connect_knn_graph(
   using cuvs::sparse::neighbors::mutual_reachability_fix_connectivities_red_op;
   static_assert(
     std::is_same_v<RedOp, raft::identity_op> ||
-      std::is_same_v<RedOp, mutual_reachability_fix_connectivities_red_op<ValueIdx, value_t>> ||
-      std::is_same_v<RedOp, fix_connectivities_red_op<ValueIdx, value_t>>,
+      std::is_same_v<RedOp, mutual_reachability_fix_connectivities_red_op<ValueIdx, ValueT>> ||
+      std::is_same_v<RedOp, fix_connectivities_red_op<ValueIdx, ValueT>>,
     "reduction_op must be identity_op, mutual_reachability_fix_connectivities_red_op, or "
     "fix_connectivities_red_op");
 
@@ -169,7 +169,7 @@ void connect_knn_graph(
     component_map[h_color[i]].push_back(i);
   }
 
-  std::vector<std::tuple<ValueIdx, ValueIdx, value_t>> selected_edges;
+  std::vector<std::tuple<ValueIdx, ValueIdx, ValueT>> selected_edges;
 
   std::random_device rd;
   std::mt19937 gen(rd());
@@ -205,28 +205,28 @@ void connect_knn_graph(
   raft::copy(device_u_indices.data_handle(), host_u_indices.data(), new_nnz, stream);
   raft::copy(device_v_indices.data_handle(), host_v_indices.data(), new_nnz, stream);
 
-  auto data_u = raft::make_device_matrix<value_t, ValueIdx>(handle, new_nnz, n);
-  auto data_v = raft::make_device_matrix<value_t, ValueIdx>(handle, new_nnz, n);
+  auto data_u = raft::make_device_matrix<ValueT, ValueIdx>(handle, new_nnz, n);
+  auto data_v = raft::make_device_matrix<ValueT, ValueIdx>(handle, new_nnz, n);
 
   raft::matrix::detail::gather(
     handle, X, raft::make_const_mdspan(device_u_indices.view()), data_u.view());
   raft::matrix::detail::gather(
     handle, X, raft::make_const_mdspan(device_v_indices.view()), data_v.view());
 
-  auto pairwise_dist = raft::make_device_matrix<value_t, ValueIdx>(handle, new_nnz, new_nnz);
+  auto pairwise_dist = raft::make_device_matrix<ValueT, ValueIdx>(handle, new_nnz, new_nnz);
   cuvs::distance::pairwise_distance(handle,
                                     raft::make_const_mdspan(data_u.view()),
                                     raft::make_const_mdspan(data_v.view()),
                                     pairwise_dist.view(),
                                     metric);
 
-  auto pairwise_dist_vec = raft::make_device_vector<value_t, ValueIdx>(handle, n_components - 1);
+  auto pairwise_dist_vec = raft::make_device_vector<ValueT, ValueIdx>(handle, n_components - 1);
   raft::matrix::get_diagonal(
     handle, raft::make_const_mdspan(pairwise_dist.view()), pairwise_dist_vec.view());
 
   if constexpr (std::is_same<
                   RedOp,
-                  mutual_reachability_fix_connectivities_red_op<ValueIdx, value_t>>::value) {
+                  mutual_reachability_fix_connectivities_red_op<ValueIdx, ValueT>>::value) {
     raft::linalg::map_offset(
       handle,
       pairwise_dist_vec.view(),
@@ -256,18 +256,18 @@ void connect_knn_graph(
   // On the second call, we hand the MST the original colors
   // and the new set of edges and let it restart the optimization process
   auto new_mst =
-    raft::sparse::solver::mst<ValueIdx, ValueIdx, value_t, double>(handle,
-                                                                   indptr2.data(),
-                                                                   device_v_indices.data_handle(),
-                                                                   pairwise_dist_vec.data_handle(),
-                                                                   m,
-                                                                   new_nnz,
-                                                                   color,
-                                                                   stream,
-                                                                   false,
-                                                                   false);
+    raft::sparse::solver::mst<ValueIdx, ValueIdx, ValueT, double>(handle,
+                                                                  indptr2.data(),
+                                                                  device_v_indices.data_handle(),
+                                                                  pairwise_dist_vec.data_handle(),
+                                                                  m,
+                                                                  new_nnz,
+                                                                  color,
+                                                                  stream,
+                                                                  false,
+                                                                  false);
 
-  merge_msts<ValueIdx, value_t>(msf, new_mst, stream);
+  merge_msts<ValueIdx, ValueT>(msf, new_mst, stream);
 }
 
 /**
@@ -281,7 +281,7 @@ void connect_knn_graph(
  * case, this graph will be connected by performing a
  * KNN across the components.
  * @tparam ValueIdx
- * @tparam value_t
+ * @tparam ValueT
  * @param[in] handle raft handle
  * @param[in] X dataset residing on host or device memory
  * @param[in] indptr CSR indptr of connectivities graph
@@ -296,19 +296,19 @@ void connect_knn_graph(
  *  argument is really just a safeguard against the potential for infinite loops.
  */
 template <typename ValueIdx,
-          typename value_t,
+          typename ValueT,
           typename RedOp>  // NOLINT(readability-identifier-naming)
 void build_sorted_mst(
   raft::resources const& handle,
-  const value_t* X,
+  const ValueT* X,
   const ValueIdx* indptr,
   const ValueIdx* indices,
-  const value_t* pw_dists,
+  const ValueT* pw_dists,
   size_t m,
   size_t n,
   ValueIdx* mst_src,
   ValueIdx* mst_dst,
-  value_t* mst_weight,
+  ValueT* mst_weight,
   ValueIdx* color,
   size_t nnz,
   RedOp reduction_op,
@@ -318,7 +318,7 @@ void build_sorted_mst(
   auto stream = raft::resource::get_cuda_stream(handle);
 
   // We want to have MST initialize colors on first call.
-  auto mst_coo = raft::sparse::solver::mst<ValueIdx, ValueIdx, value_t, double>(
+  auto mst_coo = raft::sparse::solver::mst<ValueIdx, ValueIdx, ValueT, double>(
     handle, indptr, indices, pw_dists, static_cast<ValueIdx>(m), nnz, color, stream, false, true);
 
   int iters        = 1;
@@ -328,18 +328,18 @@ void build_sorted_mst(
 
   while (n_components > 1 && iters < max_iter) {
     if (data_on_device) {
-      connect_knn_graph<ValueIdx, value_t>(
+      connect_knn_graph<ValueIdx, ValueT>(
         handle,
-        raft::make_device_matrix_view<const value_t, ValueIdx>(X, m, n),
+        raft::make_device_matrix_view<const ValueT, ValueIdx>(X, m, n),
         mst_coo,
         m,
         n,
         color,
         reduction_op);
     } else {
-      connect_knn_graph<ValueIdx, value_t>(
+      connect_knn_graph<ValueIdx, ValueT>(
         handle,
-        raft::make_host_matrix_view<const value_t, ValueIdx>(X, m, n),
+        raft::make_host_matrix_view<const ValueT, ValueIdx>(X, m, n),
         mst_coo,
         m,
         n,

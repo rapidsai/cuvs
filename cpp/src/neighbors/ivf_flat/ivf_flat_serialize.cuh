@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -122,32 +122,31 @@ auto deserialize(raft::resources const& handle, std::istream& is) -> index<T, Id
   bool adaptive_centers = raft::deserialize_scalar<bool>(handle, is);
   bool cma              = raft::deserialize_scalar<bool>(handle, is);
 
-  index<T, IdxT> index_ = index<T, IdxT>(
-    handle, metric, n_lists, adaptive_centers, cma, dim);  // NOLINT(readability-identifier-naming)
+  index<T, IdxT> result = index<T, IdxT>(handle, metric, n_lists, adaptive_centers, cma, dim);
 
-  deserialize_mdspan(handle, is, index_.centers());
+  deserialize_mdspan(handle, is, result.centers());
   bool has_norms = raft::deserialize_scalar<bool>(handle, is);
   if (has_norms) {
-    index_.allocate_center_norms(handle);
-    if (!index_.center_norms()) {
+    result.allocate_center_norms(handle);
+    if (!result.center_norms()) {
       RAFT_FAIL("Error inconsistent center norms");
     } else {
-      auto center_norms = index_.center_norms().value();
+      auto center_norms = result.center_norms().value();
       deserialize_mdspan(handle, is, center_norms);
     }
   }
-  deserialize_mdspan(handle, is, index_.list_sizes());
+  deserialize_mdspan(handle, is, result.list_sizes());
 
-  list_spec<uint32_t, T, IdxT> list_device_spec{index_.dim(), cma};
-  list_spec<uint32_t, T, IdxT> list_store_spec{index_.dim(), true};
-  for (uint32_t label = 0; label < index_.n_lists(); label++) {
-    ivf::deserialize_list(handle, is, index_.lists()[label], list_store_spec, list_device_spec);
+  list_spec<uint32_t, T, IdxT> list_device_spec{result.dim(), cma};
+  list_spec<uint32_t, T, IdxT> list_store_spec{result.dim(), true};
+  for (uint32_t label = 0; label < result.n_lists(); label++) {
+    ivf::deserialize_list(handle, is, result.lists()[label], list_store_spec, list_device_spec);
   }
   raft::resource::sync_stream(handle);
 
-  ivf::detail::recompute_internal_state(handle, index_);
+  ivf::detail::recompute_internal_state(handle, result);
 
-  return index_;
+  return result;
 }
 
 template <typename T, typename IdxT>

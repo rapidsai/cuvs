@@ -23,7 +23,7 @@ namespace cuvs::neighbors::detail::reachability {
  * Extract core distances from KNN graph. This is essentially
  * performing a knn_dists[:,min_pts]
  * @tparam ValueIdx data type for integrals
- * @tparam value_t data type for distance
+ * @tparam ValueT data type for distance
  * @tparam tpb block size for kernel
  * @param[in] knn_dists knn distance array (size n * k)
  * @param[in] min_samples this neighbor will be selected for core distances
@@ -33,21 +33,21 @@ namespace cuvs::neighbors::detail::reachability {
  * @param[in] stream stream for which to order cuda operations
  */
 template <typename ValueIdx,
-          typename value_t,
+          typename ValueT,
           int tpb = 256>  // NOLINT(readability-identifier-naming)
 void core_distances(raft::resources const& handle,
-                    value_t* knn_dists,
+                    ValueT* knn_dists,
                     int min_samples,
                     int n_neighbors,
                     size_t n,
-                    value_t* out)
+                    ValueT* out)
 {
   ASSERT(n_neighbors >= min_samples,
          "the size of the neighborhood should be greater than or equal to min_samples");
 
-  auto out_view = raft::make_device_vector_view<value_t, ValueIdx>(out, n);
+  auto out_view = raft::make_device_vector_view<ValueT, ValueIdx>(out, n);
 
-  raft::linalg::map_offset(handle, out_view, [=] __device__(ValueIdx row) -> value_t {
+  raft::linalg::map_offset(handle, out_view, [=] __device__(ValueIdx row) -> ValueT {
     return knn_dists[row * n_neighbors + (min_samples - 1)];
   });
 }
@@ -55,7 +55,7 @@ void core_distances(raft::resources const& handle,
 /**
  * Wraps the brute force knn API, to be used for both training and prediction
  * @tparam ValueIdx data type for integrals
- * @tparam value_t data type for distance
+ * @tparam ValueT data type for distance
  * @param[in] handle raft handle for resource reuse
  * @param[in] X input data points (size m * n)
  * @param[out] inds nearest neighbor indices (size n_search_items * k)
@@ -67,14 +67,14 @@ void core_distances(raft::resources const& handle,
  * @param[in] k number of nearest neighbors
  * @param[in] metric distance metric to use
  */
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
 void compute_knn(const raft::resources& handle,
-                 const value_t* X,
+                 const ValueT* X,
                  ValueIdx* inds,
-                 value_t* dists,
+                 ValueT* dists,
                  size_t m,
                  size_t n,
-                 const value_t* search_items,
+                 const ValueT* search_items,
                  size_t n_search_items,
                  int k,
                  cuvs::distance::DistanceType metric)
@@ -87,10 +87,10 @@ void compute_knn(const raft::resources& handle,
   @brief Internal function for CPU->GPU interop
          to compute core_dists
 */
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
 void compute_core_dists(const raft::resources& handle,
-                        const value_t* X,
-                        value_t* core_dists,
+                        const ValueT* X,
+                        ValueT* core_dists,
                         size_t m,
                         size_t n,
                         cuvs::distance::DistanceType metric,
@@ -102,7 +102,7 @@ void compute_core_dists(const raft::resources& handle,
   auto stream = raft::resource::get_cuda_stream(handle);
 
   rmm::device_uvector<ValueIdx> inds(min_samples * m, stream);
-  rmm::device_uvector<value_t> dists(min_samples * m, stream);
+  rmm::device_uvector<ValueT> dists(min_samples * m, stream);
 
   // perform knn
   compute_knn(handle, X, inds.data(), dists.data(), m, n, X, m, min_samples, metric);
@@ -112,15 +112,15 @@ void compute_core_dists(const raft::resources& handle,
 }
 
 //  Functor to post-process distances into reachability space
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
 struct reachability_post_process {
-  DI auto operator()(value_t value, ValueIdx row, ValueIdx col) const -> value_t
+  DI auto operator()(ValueT value, ValueIdx row, ValueIdx col) const -> ValueT
   {
     return max(core_dists[col], max(core_dists[row], alpha * value));
   }
 
-  const value_t* core_dists;
-  value_t alpha;
+  const ValueT* core_dists;
+  ValueT alpha;
   size_t n;  // size of core_dists array
 };
 
@@ -128,7 +128,7 @@ struct reachability_post_process {
  * Given core distances, Fuses computations of L2 distances between all
  * points, projection into mutual reachability space, and k-selection.
  * @tparam ValueIdx
- * @tparam value_t
+ * @tparam ValueT
  * @param[in] handle raft handle for resource reuse
  * @param[out] out_inds  output indices array (size m * k)
  * @param[out] out_dists output distances array (size m * k)
@@ -138,26 +138,26 @@ struct reachability_post_process {
  * @param[in] k neighborhood size (includes self-loop)
  * @param[in] core_dists array of core distances (size m)
  */
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
 void mutual_reachability_knn_l2(const raft::resources& handle,
                                 ValueIdx* out_inds,
-                                value_t* out_dists,
-                                const value_t* X,
+                                ValueT* out_dists,
+                                const ValueT* X,
                                 size_t m,
                                 size_t n,
                                 int k,
-                                value_t* core_dists,
-                                value_t alpha)
+                                ValueT* core_dists,
+                                ValueT alpha)
 {
   // Create a functor to postprocess distances into mutual reachability space
   // Note that we can't use a lambda for this here, since we get errors like:
   // `A type local to a function cannot be used in the template argument of the
   // enclosing parent function (and any parent classes) of an extended __device__
   // or __host__ __device__ lambda`
-  auto epilogue = reachability_post_process<ValueIdx, value_t>{core_dists, alpha, m};
+  auto epilogue = reachability_post_process<ValueIdx, ValueT>{core_dists, alpha, m};
 
   cuvs::neighbors::detail::
-    tiled_brute_force_knn<value_t, ValueIdx, value_t, reachability_post_process<ValueIdx, value_t>>(
+    tiled_brute_force_knn<ValueT, ValueIdx, ValueT, reachability_post_process<ValueIdx, ValueT>>(
       handle,
       X,
       X,
@@ -178,18 +178,18 @@ void mutual_reachability_knn_l2(const raft::resources& handle,
 }
 
 template <typename ValueIdx,
-          typename value_t,
+          typename ValueT,
           typename NnzT>  // NOLINT(readability-identifier-naming)
 void mutual_reachability_graph(const raft::resources& handle,
-                               const value_t* X,
+                               const ValueT* X,
                                ValueIdx m,
                                ValueIdx n,
                                cuvs::distance::DistanceType metric,
                                int min_samples,
-                               value_t alpha,
+                               ValueT alpha,
                                ValueIdx* indptr,
-                               value_t* core_dists,
-                               raft::sparse::COO<value_t, ValueIdx, NnzT>& out)
+                               ValueT* core_dists,
+                               raft::sparse::COO<ValueT, ValueIdx, NnzT>& out)
 {
   RAFT_EXPECTS(metric == cuvs::distance::DistanceType::L2SqrtExpanded,
                "Currently only L2 expanded distance is supported");
@@ -198,7 +198,7 @@ void mutual_reachability_graph(const raft::resources& handle,
 
   rmm::device_uvector<ValueIdx> coo_rows(min_samples * m, stream);
   rmm::device_uvector<ValueIdx> inds(min_samples * m, stream);
-  rmm::device_uvector<value_t> dists(min_samples * m, stream);
+  rmm::device_uvector<ValueT> dists(min_samples * m, stream);
 
   // perform knn
   compute_knn(handle, X, inds.data(), dists.data(), m, n, X, m, min_samples, metric);
@@ -217,7 +217,7 @@ void mutual_reachability_graph(const raft::resources& handle,
                              n,
                              min_samples,
                              core_dists,
-                             static_cast<value_t>(1.0) / alpha);
+                             static_cast<ValueT>(1.0) / alpha);
 
   // self-loops get max distance
   auto coo_rows_view =
@@ -240,14 +240,14 @@ void mutual_reachability_graph(const raft::resources& handle,
   // self-loops get max distance
   auto rows_view     = raft::make_device_vector_view<const ValueIdx, NnzT>(out.rows(), out.nnz);
   auto cols_view     = raft::make_device_vector_view<const ValueIdx, NnzT>(out.cols(), out.nnz);
-  auto vals_in_view  = raft::make_device_vector_view<const value_t, NnzT>(out.vals(), out.nnz);
-  auto vals_out_view = raft::make_device_vector_view<value_t, NnzT>(out.vals(), out.nnz);
+  auto vals_in_view  = raft::make_device_vector_view<const ValueT, NnzT>(out.vals(), out.nnz);
+  auto vals_out_view = raft::make_device_vector_view<ValueT, NnzT>(out.vals(), out.nnz);
 
   raft::linalg::map(
     handle,
     vals_out_view,
-    [=] __device__(const ValueIdx row, const ValueIdx col, const value_t val) -> value_t {
-      return row == col ? std::numeric_limits<value_t>::max() : val;
+    [=] __device__(const ValueIdx row, const ValueIdx col, const ValueT val) -> ValueT {
+      return row == col ? std::numeric_limits<ValueT>::max() : val;
     },
     rows_view,
     cols_view,

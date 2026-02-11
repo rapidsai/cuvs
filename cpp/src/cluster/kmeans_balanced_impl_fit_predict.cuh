@@ -9,14 +9,14 @@
 
 namespace cuvs::cluster::kmeans_balanced {
 
-template <typename DataT, typename MathT, typename index_t, typename label_t>
+template <typename DataT, typename MathT, typename IndexT, typename LabelT>
 void fit_predict(const raft::resources& handle,
                  cuvs::cluster::kmeans::balanced_params const& params,
-                 raft::device_matrix_view<const DataT, index_t> X,
-                 raft::device_matrix_view<MathT, index_t> centroids,
-                 raft::device_vector_view<label_t, index_t> labels)
+                 raft::device_matrix_view<const DataT, IndexT> X,
+                 raft::device_matrix_view<MathT, IndexT> centroids,
+                 raft::device_vector_view<LabelT, IndexT> labels)
 {
-  auto centroids_const = raft::make_device_matrix_view<const MathT, index_t>(
+  auto centroids_const = raft::make_device_matrix_view<const MathT, IndexT>(
     centroids.data_handle(), centroids.extent(0), centroids.extent(1));
   cuvs::cluster::kmeans::fit(handle, params, X, centroids);
   cuvs::cluster::kmeans::predict(handle, params, X, centroids_const, labels);

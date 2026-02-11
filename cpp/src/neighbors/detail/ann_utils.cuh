@@ -315,9 +315,9 @@ void outer_add(const T* a, IdxT len_a, const T* b, IdxT len_b, T* c, rmm::cuda_s
   outer_add_kernel<<<blocks, threads, 0, stream>>>(a, len_a, b, len_b, c);
 }
 
-template <typename T, typename S, typename IdxT, typename label_t>
+template <typename T, typename S, typename IdxT, typename LabelT>
 static __global__ void copy_selected_kernel(
-  IdxT n_rows, IdxT n_cols, const S* src, const label_t* row_ids, IdxT ld_src, T* dst, IdxT ld_dst)
+  IdxT n_rows, IdxT n_cols, const S* src, const LabelT* row_ids, IdxT ld_src, T* dst, IdxT ld_dst)
 {
   IdxT gid   = threadIdx.x + blockDim.x * static_cast<IdxT>(blockIdx.x);
   IdxT j     = gid % n_cols;
@@ -334,7 +334,7 @@ static __global__ void copy_selected_kernel(
  * @tparam T      target type
  * @tparam S      source type
  * @tparam IdxT   index type
- * @tparam label_t label type
+ * @tparam LabelT label type
  *
  * @param n_rows
  * @param n_cols
@@ -345,11 +345,11 @@ static __global__ void copy_selected_kernel(
  * @param ld_dst number of cols in the output (ld_dst >= n_cols)
  * @param stream
  */
-template <typename T, typename S, typename IdxT, typename label_t>
+template <typename T, typename S, typename IdxT, typename LabelT>
 void copy_selected(IdxT n_rows,
                    IdxT n_cols,
                    const S* src,
-                   const label_t* row_ids,
+                   const LabelT* row_ids,
                    IdxT ld_src,
                    T* dst,
                    IdxT ld_dst,

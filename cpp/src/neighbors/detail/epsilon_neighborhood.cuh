@@ -13,11 +13,11 @@ namespace cuvs::neighbors::epsilon_neighborhood::detail {
 
 template <typename DataT,
           typename IdxT,
-          typename policy,
-          typename BaseClass = raft::linalg::Contractions_NT<DataT, IdxT, policy>>
+          typename Policy,
+          typename BaseClass = raft::linalg::Contractions_NT<DataT, IdxT, Policy>>
 struct eps_unexp_l2_sq_neighborhood_impl : public BaseClass {
  private:
-  using p = policy;
+  using p = Policy;
 
   bool* adj_;
   DataT eps_;
@@ -157,9 +157,9 @@ struct eps_unexp_l2_sq_neighborhood_impl : public BaseClass {
   }
 };  // struct eps_unexp_l2_sq_neighborhood_impl
 
-template <typename DataT, typename IdxT, typename policy>
-__launch_bounds__(policy::Nthreads, 2) RAFT_KERNEL
-  epsUnexpL2SqNeighKernel(  // NOLINT(readability-identifier-naming)
+template <typename DataT, typename IdxT, typename Policy>
+__launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL  // NOLINT(readability-identifier-naming)
+  epsUnexpL2SqNeighKernel(                          // NOLINT(readability-identifier-naming)
     bool* adj_,
     IdxT* vd_,
     const DataT* x,
@@ -169,8 +169,8 @@ __launch_bounds__(policy::Nthreads, 2) RAFT_KERNEL
     IdxT k,
     DataT eps_)
 {
-  extern __shared__ char smem_[];
-  eps_unexp_l2_sq_neighborhood_impl<DataT, IdxT, policy> obj(adj_, vd_, x, y, m, n, k, eps_, smem_);
+  extern __shared__ char smem[];  // NOLINT(modernize-avoid-c-arrays)
+  eps_unexp_l2_sq_neighborhood_impl<DataT, IdxT, Policy> obj(adj_, vd_, x, y, m, n, k, eps_, smem);
   obj.run();
 }
 

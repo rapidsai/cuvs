@@ -41,19 +41,15 @@ namespace cuvs::neighbors::cagra::detail {
 namespace multi_cta_search {
 
 template <typename DataT,
-          typename index_t,
-          typename distance_t,
+          typename IndexT,
+          typename DistanceT,
           typename SAMPLE_FILTER_T,
-          typename SourceIndexT = index_t,
+          typename SourceIndexT = IndexT,
           typename OutputIndexT = SourceIndexT>
-struct search : public search_plan_impl<DataT,
-                                        index_t,
-                                        distance_t,
-                                        SAMPLE_FILTER_T,
-                                        SourceIndexT,
-                                        OutputIndexT> {
+struct search
+  : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, SourceIndexT, OutputIndexT> {
   using base_type =
-    search_plan_impl<DataT, index_t, distance_t, SAMPLE_FILTER_T, SourceIndexT, OutputIndexT>;
+    search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, SourceIndexT, OutputIndexT>;
   using DATA_T     = typename base_type::DATA_T;
   using INDEX_T    = typename base_type::INDEX_T;
   using DISTANCE_T = typename base_type::DISTANCE_T;
@@ -102,7 +98,7 @@ struct search : public search_plan_impl<DataT,
 
   search(raft::resources const& res,
          search_params params,
-         const dataset_descriptor_host<DataT, index_t, distance_t>& dataset_desc,
+         const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
          int64_t dim,
          int64_t dataset_size,
          int64_t graph_degree,
@@ -268,17 +264,17 @@ struct search : public search_plan_impl<DataT,
       raft::linalg::map(
         res,
         raft::make_device_matrix_view<OutputIndexT, int64_t>(topk_indices_ptr, num_queries, topk),
-        [source_indices_ptr] __device__(index_t x) {
+        [source_indices_ptr] __device__(IndexT x) {
           return static_cast<OutputIndexT>(source_indices_ptr[x]);
         },
-        raft::make_device_matrix_view<const index_t, int64_t>(
+        raft::make_device_matrix_view<const IndexT, int64_t>(
           output_indices_ptr, num_queries, topk));
     } else if constexpr (kNeedIndexCopy) {
       raft::linalg::map(
         res,
         raft::make_device_matrix_view<OutputIndexT, int64_t>(topk_indices_ptr, num_queries, topk),
         raft::cast_op<OutputIndexT>{},
-        raft::make_device_matrix_view<const index_t, int64_t>(
+        raft::make_device_matrix_view<const IndexT, int64_t>(
           output_indices_ptr, num_queries, topk));
     }
   }

@@ -17,34 +17,34 @@
 namespace cuvs::neighbors::detail {
 
 template <typename ValueIdx = std::int64_t,
-          typename value_t  = float,  // NOLINT(readability-identifier-naming)
+          typename ValueT   = float,  // NOLINT(readability-identifier-naming)
           int warp_q,
           int thread_q,
           int tpb>
-RAFT_KERNEL knn_merge_parts_kernel(const value_t* inK,
+RAFT_KERNEL knn_merge_parts_kernel(const ValueT* inK,
                                    const ValueIdx* inV,
-                                   value_t* outK,
+                                   ValueT* outK,
                                    ValueIdx* outV,
                                    size_t n_samples,
                                    int n_parts,
-                                   value_t initK,
+                                   ValueT initK,
                                    ValueIdx initV,
                                    int k,
                                    ValueIdx* translations)
 {
   constexpr int kNumWarps = tpb / raft::WarpSize;
 
-  __shared__ value_t smem_k[kNumWarps * warp_q];
+  __shared__ ValueT smem_k[kNumWarps * warp_q];
   __shared__ ValueIdx smem_v[kNumWarps * warp_q];
 
   /**
    * Uses shared memory
    */
   cuvs::neighbors::detail::faiss_select::block_select<
-    value_t,
+    ValueT,
     ValueIdx,
     false,
-    cuvs::neighbors::detail::faiss_select::comparator<value_t>,
+    cuvs::neighbors::detail::faiss_select::comparator<ValueT>,
     warp_q,
     thread_q,
     tpb>
@@ -62,7 +62,7 @@ RAFT_KERNEL knn_merge_parts_kernel(const value_t* inK,
 
   int col = i % k;
 
-  const value_t* in_k_start  = inK + (row_idx + col);
+  const ValueT* in_k_start   = inK + (row_idx + col);
   const ValueIdx* in_v_start = inV + (row_idx + col);
 
   int limit            = raft::Pow2<raft::WarpSize>::roundDown(total_k);
@@ -96,12 +96,12 @@ RAFT_KERNEL knn_merge_parts_kernel(const value_t* inK,
 }
 
 template <typename ValueIdx = std::int64_t,
-          typename value_t  = float,
+          typename ValueT   = float,
           int warp_q,
           int thread_q>  // NOLINT(readability-identifier-naming)
-inline void knn_merge_parts_impl(const value_t* inK,
+inline void knn_merge_parts_impl(const ValueT* inK,
                                  const ValueIdx* inV,
-                                 value_t* outK,
+                                 ValueT* outK,
                                  ValueIdx* outV,
                                  size_t n_samples,
                                  int n_parts,
@@ -114,11 +114,10 @@ inline void knn_merge_parts_impl(const value_t* inK,
   constexpr int kNThreads = (warp_q < 1024) ? 128 : 64;
   auto block              = dim3(kNThreads);
 
-  auto k_init = std::numeric_limits<value_t>::max();
+  auto k_init = std::numeric_limits<ValueT>::max();
   auto v_init = -1;
-  knn_merge_parts_kernel<ValueIdx, value_t, warp_q, thread_q, kNThreads>
-    <<<grid, block, 0, stream>>>(
-      inK, inV, outK, outV, n_samples, n_parts, k_init, v_init, k, translations);
+  knn_merge_parts_kernel<ValueIdx, ValueT, warp_q, thread_q, kNThreads><<<grid, block, 0, stream>>>(
+    inK, inV, outK, outV, n_samples, n_parts, k_init, v_init, k, translations);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
@@ -137,10 +136,10 @@ inline void knn_merge_parts_impl(const value_t* inK,
  * @param translations mapping of index offsets for each partition
  */
 template <typename ValueIdx = std::int64_t,
-          typename value_t  = float>  // NOLINT(readability-identifier-naming)
-inline void knn_merge_parts(const value_t* inK,
+          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+inline void knn_merge_parts(const ValueT* inK,
                             const ValueIdx* inV,
-                            value_t* outK,
+                            ValueT* outK,
                             ValueIdx* outV,
                             size_t n_samples,
                             int n_parts,
@@ -149,25 +148,25 @@ inline void knn_merge_parts(const value_t* inK,
                             ValueIdx* translations)
 {
   if (k == 1) {
-    knn_merge_parts_impl<ValueIdx, value_t, 1, 1>(
+    knn_merge_parts_impl<ValueIdx, ValueT, 1, 1>(
       inK, inV, outK, outV, n_samples, n_parts, k, stream, translations);
   } else if (k <= 32) {
-    knn_merge_parts_impl<ValueIdx, value_t, 32, 2>(
+    knn_merge_parts_impl<ValueIdx, ValueT, 32, 2>(
       inK, inV, outK, outV, n_samples, n_parts, k, stream, translations);
   } else if (k <= 64) {
-    knn_merge_parts_impl<ValueIdx, value_t, 64, 3>(
+    knn_merge_parts_impl<ValueIdx, ValueT, 64, 3>(
       inK, inV, outK, outV, n_samples, n_parts, k, stream, translations);
   } else if (k <= 128) {
-    knn_merge_parts_impl<ValueIdx, value_t, 128, 3>(
+    knn_merge_parts_impl<ValueIdx, ValueT, 128, 3>(
       inK, inV, outK, outV, n_samples, n_parts, k, stream, translations);
   } else if (k <= 256) {
-    knn_merge_parts_impl<ValueIdx, value_t, 256, 4>(
+    knn_merge_parts_impl<ValueIdx, ValueT, 256, 4>(
       inK, inV, outK, outV, n_samples, n_parts, k, stream, translations);
   } else if (k <= 512) {
-    knn_merge_parts_impl<ValueIdx, value_t, 512, 8>(
+    knn_merge_parts_impl<ValueIdx, ValueT, 512, 8>(
       inK, inV, outK, outV, n_samples, n_parts, k, stream, translations);
   } else if (k <= 1024) {
-    knn_merge_parts_impl<ValueIdx, value_t, 1024, 8>(
+    knn_merge_parts_impl<ValueIdx, ValueT, 1024, 8>(
       inK, inV, outK, outV, n_samples, n_parts, k, stream, translations);
   } else {
     THROW("Unimplemented for k=%d, knn_merge_parts works for k<=1024", k);

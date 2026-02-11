@@ -13,7 +13,7 @@
 
 namespace cuvs::distance::detail {
 
-template <typename policy,
+template <typename Policy,
           bool row_major,
           typename SmCompatT,
           typename OpT,
@@ -21,7 +21,7 @@ template <typename policy,
           typename DataT,
           typename OutT,
           typename FinOpT>
-__launch_bounds__(policy::Nthreads, 2) RAFT_KERNEL  // NOLINT(readability-identifier-naming)
+__launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL  // NOLINT(readability-identifier-naming)
   pairwise_matrix_kernel(OpT distance_op, pairwise_matrix_params<IdxT, DataT, OutT, FinOpT> params)
 {
   // Early exit to minimize the size of the kernel when it is not supposed to be compiled.
@@ -45,7 +45,7 @@ __launch_bounds__(policy::Nthreads, 2) RAFT_KERNEL  // NOLINT(readability-identi
   pairwise_distances<DataT,
                      OutT,
                      IdxT,
-                     policy,
+                     Policy,
                      decltype(distance_op),
                      decltype(epilog_op),
                      decltype(params.fin_op),
@@ -116,7 +116,7 @@ struct pairwise_matrix_sm60_wrapper {
  * @param params: Parameters
  * @param sm_compat_range: Which SM architectures to compile for.
  */
-template <typename policy,
+template <typename Policy,
           bool row_major,
           typename OpT,
           typename IdxT,
@@ -129,15 +129,15 @@ auto make_pairwise_matrix_sm60_wrapper(OpT distance_op,
                                        SmCompatT sm_compat_range)
   -> pairwise_matrix_sm60_wrapper<OpT, IdxT, DataT, OutT, FinOpT>
 {
-  dim3 block(policy::Nthreads);
+  dim3 block(Policy::Nthreads);
   // Use ::template to disambiguate (See:
   // https://en.cppreference.com/w/cpp/language/dependent_name)
-  int smem_size = OpT::template shared_mem_size<policy>();
+  int smem_size = OpT::template shared_mem_size<Policy>();
   // Obtain function pointer to kernel
   // NOLINTNEXTLINE(readability-identifier-naming)
   auto kernel =
-    pairwise_matrix_kernel<policy, row_major, SmCompatT, OpT, IdxT, DataT, OutT, FinOpT>;
-  dim3 grid = launch_config_generator<policy>(params.m, params.n, smem_size, kernel);
+    pairwise_matrix_kernel<Policy, row_major, SmCompatT, OpT, IdxT, DataT, OutT, FinOpT>;
+  dim3 grid = launch_config_generator<Policy>(params.m, params.n, smem_size, kernel);
 
   return pairwise_matrix_sm60_wrapper<OpT, IdxT, DataT, OutT, FinOpT>{
     grid, block, smem_size, kernel};

@@ -28,20 +28,20 @@
 namespace cuvs::distance::detail::sparse {
 
 // @TODO: Move this into sparse prims (coo_norm)
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
-RAFT_KERNEL compute_row_norm_kernel(value_t* out,
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+RAFT_KERNEL compute_row_norm_kernel(ValueT* out,
                                     const ValueIdx* __restrict__ coo_rows,
-                                    const value_t* __restrict__ data,
+                                    const ValueT* __restrict__ data,
                                     ValueIdx nnz)
 {
   ValueIdx i = blockDim.x * blockIdx.x + threadIdx.x;
   if (i < nnz) { atomicAdd(&out[coo_rows[i]], data[i] * data[i]); }
 }
 
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
-RAFT_KERNEL compute_row_sum_kernel(value_t* out,
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+RAFT_KERNEL compute_row_sum_kernel(ValueT* out,
                                    const ValueIdx* __restrict__ coo_rows,
-                                   const value_t* __restrict__ data,
+                                   const ValueT* __restrict__ data,
                                    ValueIdx nnz)
 {
   ValueIdx i = blockDim.x * blockIdx.x + threadIdx.x;
@@ -49,11 +49,11 @@ RAFT_KERNEL compute_row_sum_kernel(value_t* out,
 }
 
 template <typename ValueIdx,
-          typename value_t,
+          typename ValueT,
           typename ExpansionF>  // NOLINT(readability-identifier-naming)
-RAFT_KERNEL compute_euclidean_warp_kernel(value_t* __restrict__ C,
-                                          const value_t* __restrict__ q_sq_norms,
-                                          const value_t* __restrict__ r_sq_norms,
+RAFT_KERNEL compute_euclidean_warp_kernel(ValueT* __restrict__ C,
+                                          const ValueT* __restrict__ q_sq_norms,
+                                          const ValueT* __restrict__ r_sq_norms,
                                           ValueIdx n_rows,
                                           ValueIdx n_cols,
                                           ExpansionF expansion_func)
@@ -64,21 +64,21 @@ RAFT_KERNEL compute_euclidean_warp_kernel(value_t* __restrict__ C,
 
   if (i >= n_rows || j >= n_cols) return;
 
-  value_t dot = C[(size_t)i * n_cols + j];
+  ValueT dot = C[(size_t)i * n_cols + j];
 
   // e.g. Euclidean expansion func = -2.0 * dot + q_norm + r_norm
-  value_t val = expansion_func(dot, q_sq_norms[i], r_sq_norms[j]);
+  ValueT val = expansion_func(dot, q_sq_norms[i], r_sq_norms[j]);
 
   // correct for small instabilities
   C[(size_t)i * n_cols + j] = val * (fabs(val) >= 0.0001);
 }
 
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
-RAFT_KERNEL compute_correlation_warp_kernel(value_t* __restrict__ C,
-                                            const value_t* __restrict__ q_sq_norms,
-                                            const value_t* __restrict__ r_sq_norms,
-                                            const value_t* __restrict__ q_norms,
-                                            const value_t* __restrict__ r_norms,
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+RAFT_KERNEL compute_correlation_warp_kernel(ValueT* __restrict__ C,
+                                            const ValueT* __restrict__ q_sq_norms,
+                                            const ValueT* __restrict__ r_sq_norms,
+                                            const ValueT* __restrict__ q_norms,
+                                            const ValueT* __restrict__ r_norms,
                                             ValueIdx n_rows,
                                             ValueIdx n_cols,
                                             ValueIdx n)
@@ -89,30 +89,30 @@ RAFT_KERNEL compute_correlation_warp_kernel(value_t* __restrict__ C,
 
   if (i >= n_rows || j >= n_cols) return;
 
-  value_t dot  = C[(size_t)i * n_cols + j];
-  value_t q_l1 = q_norms[i];
-  value_t r_l1 = r_norms[j];
+  ValueT dot  = C[(size_t)i * n_cols + j];
+  ValueT q_l1 = q_norms[i];
+  ValueT r_l1 = r_norms[j];
 
-  value_t q_l2 = q_sq_norms[i];
-  value_t r_l2 = r_sq_norms[j];
+  ValueT q_l2 = q_sq_norms[i];
+  ValueT r_l2 = r_sq_norms[j];
 
-  value_t numer   = n * dot - (q_l1 * r_l1);
-  value_t q_denom = n * q_l2 - (q_l1 * q_l1);
-  value_t r_denom = n * r_l2 - (r_l1 * r_l1);
+  ValueT numer   = n * dot - (q_l1 * r_l1);
+  ValueT q_denom = n * q_l2 - (q_l1 * q_l1);
+  ValueT r_denom = n * r_l2 - (r_l1 * r_l1);
 
-  value_t val = 1 - (numer / raft::sqrt(q_denom * r_denom));
+  ValueT val = 1 - (numer / raft::sqrt(q_denom * r_denom));
 
   // correct for small instabilities
   C[(size_t)i * n_cols + j] = val * (fabs(val) >= 0.0001);
 }
 
 template <typename ValueIdx,
-          typename value_t,
+          typename ValueT,
           int tpb = 256,
           typename ExpansionF>  // NOLINT(readability-identifier-naming)
-void compute_euclidean(value_t* C,
-                       const value_t* q_sq_norms,
-                       const value_t* r_sq_norms,
+void compute_euclidean(ValueT* C,
+                       const ValueT* q_sq_norms,
+                       const ValueT* r_sq_norms,
                        ValueIdx n_rows,
                        ValueIdx n_cols,
                        cudaStream_t stream,
@@ -124,25 +124,25 @@ void compute_euclidean(value_t* C,
 }
 
 template <typename ValueIdx,
-          typename value_t,
+          typename ValueT,
           int tpb = 256,
           typename ExpansionF>  // NOLINT(readability-identifier-naming)
-void compute_l2(value_t* out,
+void compute_l2(ValueT* out,
                 const ValueIdx* Q_coo_rows,
-                const value_t* Q_data,
+                const ValueT* Q_data,
                 ValueIdx Q_nnz,
                 const ValueIdx* R_coo_rows,
-                const value_t* R_data,
+                const ValueT* R_data,
                 ValueIdx R_nnz,
                 ValueIdx m,
                 ValueIdx n,
                 cudaStream_t stream,
                 ExpansionF expansion_func)
 {
-  rmm::device_uvector<value_t> q_sq_norms(m, stream);
-  rmm::device_uvector<value_t> r_sq_norms(n, stream);
-  RAFT_CUDA_TRY(cudaMemsetAsync(q_sq_norms.data(), 0, q_sq_norms.size() * sizeof(value_t)));
-  RAFT_CUDA_TRY(cudaMemsetAsync(r_sq_norms.data(), 0, r_sq_norms.size() * sizeof(value_t)));
+  rmm::device_uvector<ValueT> q_sq_norms(m, stream);
+  rmm::device_uvector<ValueT> r_sq_norms(n, stream);
+  RAFT_CUDA_TRY(cudaMemsetAsync(q_sq_norms.data(), 0, q_sq_norms.size() * sizeof(ValueT)));
+  RAFT_CUDA_TRY(cudaMemsetAsync(r_sq_norms.data(), 0, r_sq_norms.size() * sizeof(ValueT)));
 
   compute_row_norm_kernel<<<raft::ceildiv(Q_nnz, tpb), tpb, 0, stream>>>(
     q_sq_norms.data(), Q_coo_rows, Q_data, Q_nnz);
@@ -153,13 +153,13 @@ void compute_l2(value_t* out,
 }
 
 template <typename ValueIdx,
-          typename value_t,
+          typename ValueT,
           int tpb = 256>  // NOLINT(readability-identifier-naming)
-void compute_correlation(value_t* C,
-                         const value_t* q_sq_norms,
-                         const value_t* r_sq_norms,
-                         const value_t* q_norms,
-                         const value_t* r_norms,
+void compute_correlation(ValueT* C,
+                         const ValueT* q_sq_norms,
+                         const ValueT* r_sq_norms,
+                         const ValueT* q_norms,
+                         const ValueT* r_norms,
                          ValueIdx n_rows,
                          ValueIdx n_cols,
                          ValueIdx n,
@@ -171,14 +171,14 @@ void compute_correlation(value_t* C,
 }
 
 template <typename ValueIdx,
-          typename value_t,
+          typename ValueT,
           int tpb = 256>  // NOLINT(readability-identifier-naming)
-void compute_corr(value_t* out,
+void compute_corr(ValueT* out,
                   const ValueIdx* Q_coo_rows,
-                  const value_t* Q_data,
+                  const ValueT* Q_data,
                   ValueIdx Q_nnz,
                   const ValueIdx* R_coo_rows,
-                  const value_t* R_data,
+                  const ValueT* R_data,
                   ValueIdx R_nnz,
                   ValueIdx m,
                   ValueIdx n,
@@ -186,18 +186,18 @@ void compute_corr(value_t* out,
                   cudaStream_t stream)
 {
   // sum_sq for std dev
-  rmm::device_uvector<value_t> q_sq_norms(m, stream);
-  rmm::device_uvector<value_t> r_sq_norms(n, stream);
+  rmm::device_uvector<ValueT> q_sq_norms(m, stream);
+  rmm::device_uvector<ValueT> r_sq_norms(n, stream);
 
   // sum for mean
-  rmm::device_uvector<value_t> q_norms(m, stream);
-  rmm::device_uvector<value_t> r_norms(n, stream);
+  rmm::device_uvector<ValueT> q_norms(m, stream);
+  rmm::device_uvector<ValueT> r_norms(n, stream);
 
-  RAFT_CUDA_TRY(cudaMemsetAsync(q_sq_norms.data(), 0, q_sq_norms.size() * sizeof(value_t)));
-  RAFT_CUDA_TRY(cudaMemsetAsync(r_sq_norms.data(), 0, r_sq_norms.size() * sizeof(value_t)));
+  RAFT_CUDA_TRY(cudaMemsetAsync(q_sq_norms.data(), 0, q_sq_norms.size() * sizeof(ValueT)));
+  RAFT_CUDA_TRY(cudaMemsetAsync(r_sq_norms.data(), 0, r_sq_norms.size() * sizeof(ValueT)));
 
-  RAFT_CUDA_TRY(cudaMemsetAsync(q_norms.data(), 0, q_norms.size() * sizeof(value_t)));
-  RAFT_CUDA_TRY(cudaMemsetAsync(r_norms.data(), 0, r_norms.size() * sizeof(value_t)));
+  RAFT_CUDA_TRY(cudaMemsetAsync(q_norms.data(), 0, q_norms.size() * sizeof(ValueT)));
+  RAFT_CUDA_TRY(cudaMemsetAsync(r_norms.data(), 0, r_norms.size() * sizeof(ValueT)));
 
   compute_row_norm_kernel<<<raft::ceildiv(Q_nnz, tpb), tpb, 0, stream>>>(
     q_sq_norms.data(), Q_coo_rows, Q_data, Q_nnz);
@@ -225,20 +225,20 @@ void compute_corr(value_t* out,
  * The expanded form is more efficient for sparse data.
  */
 template <typename ValueIdx = int,
-          typename value_t  = float>  // NOLINT(readability-identifier-naming)
-class l2_expanded_distances_t : public distances_t<value_t> {
+          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+class l2_expanded_distances_t : public distances_t<ValueT> {
  public:
-  explicit l2_expanded_distances_t(const distances_config_t<ValueIdx, value_t>& config)
+  explicit l2_expanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
     : config_(&config), ip_dists_(config)
   {
   }
 
-  void compute(value_t* out_dists)
+  void compute(ValueT* out_dists)
   {
     ip_dists_.compute(out_dists);
 
     ValueIdx* b_indices = ip_dists_.b_rows_coo();
-    value_t* b_data     = ip_dists_.b_data_coo();
+    ValueT* b_data      = ip_dists_.b_data_coo();
 
     rmm::device_uvector<ValueIdx> search_coo_rows(config_->a_nnz,
                                                   raft::resource::get_cuda_stream(config_->handle));
@@ -258,7 +258,7 @@ class l2_expanded_distances_t : public distances_t<value_t> {
                config_->a_nrows,
                config_->b_nrows,
                raft::resource::get_cuda_stream(config_->handle),
-               [] __device__ __host__(value_t dot, value_t q_norm, value_t r_norm) -> value_t {
+               [] __device__ __host__(ValueT dot, ValueT q_norm, ValueT r_norm) -> ValueT {
                  return -2 * dot + q_norm + r_norm;
                });
   }
@@ -266,8 +266,8 @@ class l2_expanded_distances_t : public distances_t<value_t> {
   ~l2_expanded_distances_t() = default;
 
  protected:
-  const distances_config_t<ValueIdx, value_t>* config_;
-  ip_distances_t<ValueIdx, value_t> ip_dists_;
+  const distances_config_t<ValueIdx, ValueT>* config_;
+  ip_distances_t<ValueIdx, ValueT> ip_dists_;
 };
 
 /**
@@ -275,23 +275,23 @@ class l2_expanded_distances_t : public distances_t<value_t> {
  * The expanded form is more efficient for sparse data.
  */
 template <typename ValueIdx = int,
-          typename value_t  = float>  // NOLINT(readability-identifier-naming)
-class l2_sqrt_expanded_distances_t : public l2_expanded_distances_t<ValueIdx, value_t> {
+          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+class l2_sqrt_expanded_distances_t : public l2_expanded_distances_t<ValueIdx, ValueT> {
  public:
-  explicit l2_sqrt_expanded_distances_t(const distances_config_t<ValueIdx, value_t>& config)
-    : l2_expanded_distances_t<ValueIdx, value_t>(config)
+  explicit l2_sqrt_expanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
+    : l2_expanded_distances_t<ValueIdx, ValueT>(config)
   {
   }
 
-  void compute(value_t* out_dists) override
+  void compute(ValueT* out_dists) override
   {
-    l2_expanded_distances_t<ValueIdx, value_t>::compute(out_dists);
+    l2_expanded_distances_t<ValueIdx, ValueT>::compute(out_dists);
     // Sqrt Post-processing
-    raft::linalg::unaryOp<value_t>(
+    raft::linalg::unaryOp<ValueT>(
       out_dists,
       out_dists,
       this->config_->a_nrows * this->config_->b_nrows,
-      [] __device__(value_t input) -> value_t {
+      [] __device__(ValueT input) -> ValueT {
         int neg = input < 0 ? -1 : 1;
         return raft::sqrt(abs(input) * neg);
       },
@@ -301,20 +301,20 @@ class l2_sqrt_expanded_distances_t : public l2_expanded_distances_t<ValueIdx, va
   ~l2_sqrt_expanded_distances_t() = default;
 };
 
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
-class correlation_expanded_distances_t : public distances_t<value_t> {
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+class correlation_expanded_distances_t : public distances_t<ValueT> {
  public:
-  explicit correlation_expanded_distances_t(const distances_config_t<ValueIdx, value_t>& config)
+  explicit correlation_expanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
     : config_(&config), ip_dists_(config)
   {
   }
 
-  void compute(value_t* out_dists)
+  void compute(ValueT* out_dists)
   {
     ip_dists_.compute(out_dists);
 
     ValueIdx* b_indices = ip_dists_.b_rows_coo();
-    value_t* b_data     = ip_dists_.b_data_coo();
+    ValueT* b_data      = ip_dists_.b_data_coo();
 
     rmm::device_uvector<ValueIdx> search_coo_rows(config_->a_nnz,
                                                   raft::resource::get_cuda_stream(config_->handle));
@@ -340,8 +340,8 @@ class correlation_expanded_distances_t : public distances_t<value_t> {
   ~correlation_expanded_distances_t() = default;
 
  protected:
-  const distances_config_t<ValueIdx, value_t>* config_;
-  ip_distances_t<ValueIdx, value_t> ip_dists_;
+  const distances_config_t<ValueIdx, ValueT>* config_;
+  ip_distances_t<ValueIdx, ValueT> ip_dists_;
 };
 
 /**
@@ -349,22 +349,22 @@ class correlation_expanded_distances_t : public distances_t<value_t> {
  * sqrt(sum(y_k)^2))) The expanded form is more efficient for sparse data.
  */
 template <typename ValueIdx = int,
-          typename value_t  = float>  // NOLINT(readability-identifier-naming)
-class cosine_expanded_distances_t : public distances_t<value_t> {
+          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+class cosine_expanded_distances_t : public distances_t<ValueT> {
  public:
-  explicit cosine_expanded_distances_t(const distances_config_t<ValueIdx, value_t>& config)
+  explicit cosine_expanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
     : config_(&config),
       workspace_(0, raft::resource::get_cuda_stream(config.handle)),
       ip_dists_(config)
   {
   }
 
-  void compute(value_t* out_dists)
+  void compute(ValueT* out_dists)
   {
     ip_dists_.compute(out_dists);
 
     ValueIdx* b_indices = ip_dists_.b_rows_coo();
-    value_t* b_data     = ip_dists_.b_data_coo();
+    ValueT* b_data      = ip_dists_.b_data_coo();
 
     rmm::device_uvector<ValueIdx> search_coo_rows(config_->a_nnz,
                                                   raft::resource::get_cuda_stream(config_->handle));
@@ -384,10 +384,10 @@ class cosine_expanded_distances_t : public distances_t<value_t> {
                config_->a_nrows,
                config_->b_nrows,
                raft::resource::get_cuda_stream(config_->handle),
-               [] __device__ __host__(value_t dot, value_t q_norm, value_t r_norm) -> value_t {
-                 value_t norms = raft::sqrt(q_norm) * raft::sqrt(r_norm);
+               [] __device__ __host__(ValueT dot, ValueT q_norm, ValueT r_norm) -> ValueT {
+                 ValueT norms = raft::sqrt(q_norm) * raft::sqrt(r_norm);
                  // deal with potential for 0 in denominator by forcing 0/1 instead
-                 value_t cos = ((norms != 0) * dot) / ((norms == 0) + norms);
+                 ValueT cos = ((norms != 0) * dot) / ((norms == 0) + norms);
 
                  // flip the similarity when both rows are 0
                  bool both_empty = (q_norm == 0) && (r_norm == 0);
@@ -398,9 +398,9 @@ class cosine_expanded_distances_t : public distances_t<value_t> {
   ~cosine_expanded_distances_t() = default;
 
  private:
-  const distances_config_t<ValueIdx, value_t>* config_;
+  const distances_config_t<ValueIdx, ValueT>* config_;
   rmm::device_uvector<char> workspace_;
-  ip_distances_t<ValueIdx, value_t> ip_dists_;
+  ip_distances_t<ValueIdx, ValueT> ip_dists_;
 };
 
 /**
@@ -413,15 +413,15 @@ class cosine_expanded_distances_t : public distances_t<value_t> {
  * after this is invoked.
  */
 template <typename ValueIdx = int,
-          typename value_t  = float>  // NOLINT(readability-identifier-naming)
-class hellinger_expanded_distances_t : public distances_t<value_t> {
+          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+class hellinger_expanded_distances_t : public distances_t<ValueT> {
  public:
-  explicit hellinger_expanded_distances_t(const distances_config_t<ValueIdx, value_t>& config)
+  explicit hellinger_expanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
     : config_(&config), workspace_(0, raft::resource::get_cuda_stream(config.handle))
   {
   }
 
-  void compute(value_t* out_dists)
+  void compute(ValueT* out_dists)
   {
     rmm::device_uvector<ValueIdx> coo_rows(std::max(config_->b_nnz, config_->a_nnz),
                                            raft::resource::get_cuda_stream(config_->handle));
@@ -432,19 +432,19 @@ class hellinger_expanded_distances_t : public distances_t<value_t> {
                                       config_->b_nnz,
                                       raft::resource::get_cuda_stream(config_->handle));
 
-    balanced_coo_pairwise_generalized_spmv<ValueIdx, value_t>(
+    balanced_coo_pairwise_generalized_spmv<ValueIdx, ValueT>(
       out_dists,
       *config_,
       coo_rows.data(),
-      [] __device__(value_t a, value_t b) -> value_t { return raft::sqrt(a) * raft::sqrt(b); },
+      [] __device__(ValueT a, ValueT b) -> ValueT { return raft::sqrt(a) * raft::sqrt(b); },
       raft::add_op(),
       raft::atomic_add_op());
 
-    raft::linalg::unaryOp<value_t>(
+    raft::linalg::unaryOp<ValueT>(
       out_dists,
       out_dists,
       config_->a_nrows * config_->b_nrows,
-      [=] __device__(value_t input) -> value_t {
+      [=] __device__(ValueT input) -> ValueT {
         // Adjust to replace NaN in sqrt with 0 if input to sqrt is negative
         bool rectifier = (1 - input) > 0;
         return raft::sqrt(rectifier * (1 - input));
@@ -455,32 +455,32 @@ class hellinger_expanded_distances_t : public distances_t<value_t> {
   ~hellinger_expanded_distances_t() = default;
 
  private:
-  const distances_config_t<ValueIdx, value_t>* config_;
+  const distances_config_t<ValueIdx, ValueT>* config_;
   rmm::device_uvector<char> workspace_;
 };
 
 template <typename ValueIdx = int,
-          typename value_t  = float>  // NOLINT(readability-identifier-naming)
-class russelrao_expanded_distances_t : public distances_t<value_t> {
+          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+class russelrao_expanded_distances_t : public distances_t<ValueT> {
  public:
-  explicit russelrao_expanded_distances_t(const distances_config_t<ValueIdx, value_t>& config)
+  explicit russelrao_expanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
     : config_(&config),
       workspace_(0, raft::resource::get_cuda_stream(config.handle)),
       ip_dists_(config)
   {
   }
 
-  void compute(value_t* out_dists)
+  void compute(ValueT* out_dists)
   {
     ip_dists_.compute(out_dists);
 
-    value_t n_cols     = config_->a_ncols;
-    value_t n_cols_inv = 1.0 / n_cols;
-    raft::linalg::unaryOp<value_t>(
+    ValueT n_cols     = config_->a_ncols;
+    ValueT n_cols_inv = 1.0 / n_cols;
+    raft::linalg::unaryOp<ValueT>(
       out_dists,
       out_dists,
       config_->a_nrows * config_->b_nrows,
-      [=] __device__(value_t input) -> value_t { return (n_cols - input) * n_cols_inv; },
+      [=] __device__(ValueT input) -> ValueT { return (n_cols - input) * n_cols_inv; },
       raft::resource::get_cuda_stream(config_->handle));
 
     auto exec_policy = rmm::exec_policy(raft::resource::get_cuda_stream(config_->handle));
@@ -495,9 +495,9 @@ class russelrao_expanded_distances_t : public distances_t<value_t> {
   ~russelrao_expanded_distances_t() = default;
 
  private:
-  const distances_config_t<ValueIdx, value_t>* config_;
+  const distances_config_t<ValueIdx, ValueT>* config_;
   rmm::device_uvector<char> workspace_;
-  ip_distances_t<ValueIdx, value_t> ip_dists_;
+  ip_distances_t<ValueIdx, ValueT> ip_dists_;
 };
 
 }  // namespace cuvs::distance::detail::sparse

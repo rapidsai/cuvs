@@ -29,10 +29,10 @@ struct l1_distance_op {
 
   // Size of shared memory. This is normally decided by the kernel policy, but
   // some ops such as correlation_distance_op use more.
-  template <typename policy>
+  template <typename Policy>
   static constexpr auto shared_mem_size() -> size_t
   {
-    return policy::SmemSize;
+    return Policy::SmemSize;
   }
 
   DI auto core(acc_t& acc, data_t& x, data_t& y) const -> void
@@ -40,8 +40,8 @@ struct l1_distance_op {
     acc += raft::abs(raft::to_float(x) - raft::to_float(y));
   };
 
-  template <typename policy>
-  DI auto epilog(acc_t acc[policy::AccRowsPerTh][policy::AccColsPerTh],
+  template <typename Policy>
+  DI auto epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
                  acc_t* regxn,
                  acc_t* regyn,
                  idx_t gridStrideX,

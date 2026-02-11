@@ -11,20 +11,20 @@
 namespace cuvs {
 namespace stats {
 namespace {
-template <typename value_t,  // NOLINT(readability-identifier-naming)
-          typename label_t,
+template <typename ValueT,  // NOLINT(readability-identifier-naming)
+          typename LabelT,
           typename idx_t>  // NOLINT(readability-identifier-naming)
 auto _silhouette_score(    // NOLINT(readability-identifier-naming)
   raft::resources const& handle,
-  raft::device_matrix_view<const value_t, idx_t, raft::row_major> X_in,
-  raft::device_vector_view<const label_t, idx_t> labels,
-  std::optional<raft::device_vector_view<value_t, idx_t>> silhouette_score_per_sample,
+  raft::device_matrix_view<const ValueT, idx_t, raft::row_major> X_in,
+  raft::device_vector_view<const LabelT, idx_t> labels,
+  std::optional<raft::device_vector_view<ValueT, idx_t>> silhouette_score_per_sample,
   idx_t n_unique_labels,
-  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded) -> value_t
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded) -> ValueT
 {
   RAFT_EXPECTS(labels.extent(0) == X_in.extent(0), "Size mismatch between labels and data");
 
-  value_t* silhouette_score_per_sample_ptr = nullptr;
+  ValueT* silhouette_score_per_sample_ptr = nullptr;
   if (silhouette_score_per_sample.has_value()) {
     silhouette_score_per_sample_ptr = silhouette_score_per_sample.value().data_handle();
     RAFT_EXPECTS(silhouette_score_per_sample.value().extent(0) == X_in.extent(0),
@@ -41,40 +41,40 @@ auto _silhouette_score(    // NOLINT(readability-identifier-naming)
                                   metric);
 }
 
-template <typename value_t,  // NOLINT(readability-identifier-naming)
-          typename label_t,
+template <typename ValueT,  // NOLINT(readability-identifier-naming)
+          typename LabelT,
           typename idx_t>        // NOLINT(readability-identifier-naming)
 auto _silhouette_score_batched(  // NOLINT(readability-identifier-naming)
   raft::resources const& handle,
-  raft::device_matrix_view<const value_t, idx_t, raft::row_major> X,
-  raft::device_vector_view<const label_t, idx_t> labels,
-  std::optional<raft::device_vector_view<value_t, idx_t>> silhouette_score_per_sample,
+  raft::device_matrix_view<const ValueT, idx_t, raft::row_major> X,
+  raft::device_vector_view<const LabelT, idx_t> labels,
+  std::optional<raft::device_vector_view<ValueT, idx_t>> silhouette_score_per_sample,
   idx_t n_unique_labels,
   idx_t batch_size,
-  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded) -> value_t
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded) -> ValueT
 {
   static_assert(std::is_integral_v<idx_t>,
                 "silhouette_score_batched: The index type "
                 "of each mdspan argument must be an integral type.");
-  static_assert(std::is_integral_v<label_t>,
+  static_assert(std::is_integral_v<LabelT>,
                 "silhouette_score_batched: The label type must be an integral type.");
   RAFT_EXPECTS(labels.extent(0) == X.extent(0), "Size mismatch between labels and data");
 
-  value_t* scores_ptr = nullptr;
+  ValueT* scores_ptr = nullptr;
   if (silhouette_score_per_sample.has_value()) {
     scores_ptr = silhouette_score_per_sample.value().data_handle();
     RAFT_EXPECTS(silhouette_score_per_sample.value().extent(0) == X.extent(0),
                  "Size mismatch between silhouette_score_per_sample and data");
   }
-  return cuvs::stats::batched::detail::silhouette_score<value_t, int, label_t>(handle,
-                                                                               X.data_handle(),
-                                                                               X.extent(0),
-                                                                               X.extent(1),
-                                                                               labels.data_handle(),
-                                                                               n_unique_labels,
-                                                                               scores_ptr,
-                                                                               batch_size,
-                                                                               metric);
+  return cuvs::stats::batched::detail::silhouette_score<ValueT, int, LabelT>(handle,
+                                                                             X.data_handle(),
+                                                                             X.extent(0),
+                                                                             X.extent(1),
+                                                                             labels.data_handle(),
+                                                                             n_unique_labels,
+                                                                             scores_ptr,
+                                                                             batch_size,
+                                                                             metric);
 }
 }  // namespace
 

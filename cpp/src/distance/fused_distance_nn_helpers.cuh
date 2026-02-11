@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -15,14 +15,14 @@ namespace cuvs::distance {
  * @{
  */
 
-template <typename label_t, typename DataT>
-using kvp_min_reduce = detail::kvp_min_reduce_impl<label_t, DataT>;
+template <typename LabelT, typename DataT>
+using kvp_min_reduce = detail::kvp_min_reduce_impl<LabelT, DataT>;
 
-template <typename label_t, typename DataT>
-using min_and_distance_reduce_op = detail::min_and_distance_reduce_op_impl<label_t, DataT>;
+template <typename LabelT, typename DataT>
+using min_and_distance_reduce_op = detail::min_and_distance_reduce_op_impl<LabelT, DataT>;
 
-template <typename label_t, typename DataT>
-using min_reduce_op = detail::min_reduce_op_impl<label_t, DataT>;
+template <typename LabelT, typename DataT>
+using min_reduce_op = detail::min_reduce_op_impl<LabelT, DataT>;
 
 /** @} */
 

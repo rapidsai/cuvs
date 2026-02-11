@@ -27,14 +27,14 @@ namespace detail {
 /**
  * See cuvs::neighbors::refine for docs.
  */
-template <typename IdxT, typename DataT, typename distance_t, typename MatrixIdx>
+template <typename IdxT, typename DataT, typename DistanceT, typename MatrixIdx>
 void refine_device(
   raft::resources const& handle,
   raft::device_matrix_view<const DataT, MatrixIdx, raft::row_major> dataset,
   raft::device_matrix_view<const DataT, MatrixIdx, raft::row_major> queries,
   raft::device_matrix_view<const IdxT, MatrixIdx, raft::row_major> neighbor_candidates,
   raft::device_matrix_view<IdxT, MatrixIdx, raft::row_major> indices,
-  raft::device_matrix_view<distance_t, MatrixIdx, raft::row_major> distances,
+  raft::device_matrix_view<DistanceT, MatrixIdx, raft::row_major> distances,
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded)
 {
   MatrixIdx n_candidates = neighbor_candidates.extent(1);
@@ -136,14 +136,14 @@ void refine_device(
 
 }  // namespace detail
 
-template <typename IdxT, typename DataT, typename distance_t, typename MatrixIdx>
+template <typename IdxT, typename DataT, typename DistanceT, typename MatrixIdx>
 void refine_impl(
   raft::resources const& handle,
   raft::device_matrix_view<const DataT, MatrixIdx, raft::row_major> dataset,
   raft::device_matrix_view<const DataT, MatrixIdx, raft::row_major> queries,
   raft::device_matrix_view<const IdxT, MatrixIdx, raft::row_major> neighbor_candidates,
   raft::device_matrix_view<IdxT, MatrixIdx, raft::row_major> indices,
-  raft::device_matrix_view<distance_t, MatrixIdx, raft::row_major> distances,
+  raft::device_matrix_view<DistanceT, MatrixIdx, raft::row_major> distances,
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded)
 {
   detail::refine_device(handle, dataset, queries, neighbor_candidates, indices, distances, metric);

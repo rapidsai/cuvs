@@ -9,29 +9,29 @@
 
 namespace cuvs::neighbors::epsilon_neighborhood {
 
-template <typename value_t, typename IdxT>    // NOLINT(readability-identifier-naming)
+template <typename ValueT, typename IdxT>     // NOLINT(readability-identifier-naming)
 void eps_unexp_l2_sq_neighborhood(bool* adj,  // NOLINT(readability-identifier-naming)
                                   IdxT* vd,
-                                  const value_t* x,
-                                  const value_t* y,
+                                  const ValueT* x,
+                                  const ValueT* y,
                                   IdxT m,
                                   IdxT n,
                                   IdxT k,
-                                  value_t eps,
+                                  ValueT eps,
                                   cudaStream_t stream)
 {
-  detail::eps_unexp_l2_sq_neighborhood<value_t, IdxT>(adj, vd, x, y, m, n, k, eps, stream);
+  detail::eps_unexp_l2_sq_neighborhood<ValueT, IdxT>(adj, vd, x, y, m, n, k, eps, stream);
 }
 
-template <typename value_t,  // NOLINT(readability-identifier-naming)
+template <typename ValueT,  // NOLINT(readability-identifier-naming)
           typename IdxT,
           typename matrix_idx_t>  // NOLINT(readability-identifier-naming)
 void compute(raft::resources const& handle,
-             raft::device_matrix_view<const value_t, matrix_idx_t, raft::row_major> x,
-             raft::device_matrix_view<const value_t, matrix_idx_t, raft::row_major> y,
+             raft::device_matrix_view<const ValueT, matrix_idx_t, raft::row_major> x,
+             raft::device_matrix_view<const ValueT, matrix_idx_t, raft::row_major> y,
              raft::device_matrix_view<bool, matrix_idx_t, raft::row_major> adj,
              raft::device_vector_view<IdxT, matrix_idx_t> vd,
-             value_t eps,
+             ValueT eps,
              cuvs::distance::DistanceType metric)
 {
   // Currently only L2Unexpanded metric is supported
@@ -39,15 +39,15 @@ void compute(raft::resources const& handle,
                "Currently only L2Unexpanded distance metric is supported. "
                "Other metrics will be supported in future versions.");
 
-  eps_unexp_l2_sq_neighborhood<value_t, IdxT>(adj.data_handle(),
-                                              vd.data_handle(),
-                                              x.data_handle(),
-                                              y.data_handle(),
-                                              x.extent(0),
-                                              y.extent(0),
-                                              x.extent(1),
-                                              eps,
-                                              raft::resource::get_cuda_stream(handle));
+  eps_unexp_l2_sq_neighborhood<ValueT, IdxT>(adj.data_handle(),
+                                             vd.data_handle(),
+                                             x.data_handle(),
+                                             y.data_handle(),
+                                             x.extent(0),
+                                             y.extent(0),
+                                             x.extent(1),
+                                             eps,
+                                             raft::resource::get_cuda_stream(handle));
 }
 
 // Explicit template instantiations

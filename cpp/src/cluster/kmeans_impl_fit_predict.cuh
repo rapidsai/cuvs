@@ -10,20 +10,20 @@
 
 namespace cuvs::cluster::kmeans {
 
-template <typename DataT, typename index_t>
+template <typename DataT, typename IndexT>
 void fit_predict(raft::resources const& handle,
                  const kmeans::params& pams,
-                 raft::device_matrix_view<const DataT, index_t> X,
-                 std::optional<raft::device_vector_view<const DataT, index_t>> sample_weight,
-                 std::optional<raft::device_matrix_view<DataT, index_t>> centroids,
-                 raft::device_vector_view<index_t, index_t> labels,
+                 raft::device_matrix_view<const DataT, IndexT> X,
+                 std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight,
+                 std::optional<raft::device_matrix_view<DataT, IndexT>> centroids,
+                 raft::device_vector_view<IndexT, IndexT> labels,
                  raft::host_scalar_view<DataT> inertia,
-                 raft::host_scalar_view<index_t> n_iter)
+                 raft::host_scalar_view<IndexT> n_iter)
 {
   if (!centroids.has_value()) {
     auto n_features = X.extent(1);
     auto centroids_matrix =
-      raft::make_device_matrix<DataT, index_t>(handle, pams.n_clusters, n_features);
+      raft::make_device_matrix<DataT, IndexT>(handle, pams.n_clusters, n_features);
     cuvs::cluster::kmeans::fit(
       handle, pams, X, sample_weight, centroids_matrix.view(), inertia, n_iter);
     cuvs::cluster::kmeans::predict(handle,

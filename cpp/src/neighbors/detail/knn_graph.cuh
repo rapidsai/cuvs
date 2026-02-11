@@ -37,7 +37,7 @@ auto build_k(ValueIdx n_samples, int c) -> ValueIdx
  * Note: The resulting KNN graph is not guaranteed to be connected.
  *
  * @tparam ValueIdx
- * @tparam value_t
+ * @tparam ValueT
  * @tparam NnzT
  * @param[in] res raft res
  * @param[in] X dense matrix of input data samples and observations (size m * n)
@@ -47,12 +47,12 @@ auto build_k(ValueIdx n_samples, int c) -> ValueIdx
  control of k. The algorithm will set `k = log(n) + c`
  */
 template <typename ValueIdx = int,
-          typename value_t  = float,
+          typename ValueT   = float,
           typename NnzT     = size_t>  // NOLINT(readability-identifier-naming)
 void knn_graph(raft::resources const& res,
-               raft::device_matrix_view<const value_t, ValueIdx> X,
+               raft::device_matrix_view<const ValueT, ValueIdx> X,
                cuvs::distance::DistanceType metric,
-               raft::sparse::COO<value_t, ValueIdx, NnzT>& out,
+               raft::sparse::COO<ValueT, ValueIdx, NnzT>& out,
                int c = 15)
 {
   size_t m = X.extent(0);
@@ -65,7 +65,7 @@ void knn_graph(raft::resources const& res,
 
   rmm::device_uvector<ValueIdx> rows(nnz, stream);
   rmm::device_uvector<ValueIdx> indices(nnz, stream);
-  rmm::device_uvector<value_t> data(nnz, stream);
+  rmm::device_uvector<ValueT> data(nnz, stream);
 
   auto rows_view = raft::make_device_vector_view<ValueIdx, NnzT>(rows.data(), nnz);
 
@@ -84,12 +84,12 @@ void knn_graph(raft::resources const& res,
 
   rmm::device_uvector<int64_t> indices_64(nnz, stream);
   auto indices_64_view = raft::make_device_matrix_view<int64_t, int64_t>(indices_64.data(), m, k);
-  auto distances_view  = raft::make_device_matrix_view<value_t, int64_t>(data.data(), m, k);
+  auto distances_view  = raft::make_device_matrix_view<ValueT, int64_t>(data.data(), m, k);
 
   cuvs::neighbors::all_neighbors::build(
     res,
     params,
-    raft::make_device_matrix_view<const value_t, int64_t>(X.data_handle(), m, n),
+    raft::make_device_matrix_view<const ValueT, int64_t>(X.data_handle(), m, n),
     indices_64_view,
     distances_view);
 

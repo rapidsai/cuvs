@@ -27,7 +27,7 @@
 #include <cstddef>
 
 namespace cuvs::cluster::agglomerative::detail {
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
 class union_find {
  public:
   ValueIdx next_label;
@@ -80,7 +80,7 @@ class union_find {
  * becomes a bottleneck.
  *
  * @tparam ValueIdx
- * @tparam value_t
+ * @tparam ValueT
  * @param[in] handle the raft handle
  * @param[in] rows src edges of the sorted MST
  * @param[in] cols dst edges of the sorted MST
@@ -90,14 +90,14 @@ class union_find {
  * @param[out] out_delta distances of output
  * @param[out] out_size cluster sizes of output
  */
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
 void build_dendrogram_host(raft::resources const& handle,
                            const ValueIdx* rows,
                            const ValueIdx* cols,
-                           const value_t* data,
+                           const ValueT* data,
                            size_t nnz,
                            ValueIdx* children,
-                           value_t* out_delta,
+                           ValueT* out_delta,
                            ValueIdx* out_size)
 {
   auto stream = raft::resource::get_cuda_stream(handle);
@@ -106,7 +106,7 @@ void build_dendrogram_host(raft::resources const& handle,
 
   std::vector<ValueIdx> mst_src_h(n_edges);
   std::vector<ValueIdx> mst_dst_h(n_edges);
-  std::vector<value_t> mst_weights_h(n_edges);
+  std::vector<ValueT> mst_weights_h(n_edges);
 
   raft::update_host(mst_src_h.data(), rows, n_edges, stream);
   raft::update_host(mst_dst_h.data(), cols, n_edges, stream);
@@ -116,14 +116,14 @@ void build_dendrogram_host(raft::resources const& handle,
 
   std::vector<ValueIdx> children_h(n_edges * 2);
   std::vector<ValueIdx> out_size_h(n_edges);
-  std::vector<value_t> out_delta_h(n_edges);
+  std::vector<ValueT> out_delta_h(n_edges);
 
-  union_find<ValueIdx, value_t> u(nnz + 1);
+  union_find<ValueIdx, ValueT> u(nnz + 1);
 
   for (std::size_t i = 0; i < nnz; i++) {
-    ValueIdx a    = mst_src_h[i];
-    ValueIdx b    = mst_dst_h[i];
-    value_t delta = mst_weights_h[i];
+    ValueIdx a   = mst_src_h[i];
+    ValueIdx b   = mst_dst_h[i];
+    ValueT delta = mst_weights_h[i];
 
     ValueIdx aa = u.find(a);
     ValueIdx bb = u.find(b);

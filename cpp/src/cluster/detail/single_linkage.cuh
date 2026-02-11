@@ -25,7 +25,7 @@ namespace cuvs::cluster::agglomerative::detail {
 /**
  * Constructs a linkage by computing the minimum spanning tree and dendrogram in the Mutual
  * Reachability space. Returns mst edges sorted by weight and the dendrogram.
- * @tparam value_t
+ * @tparam ValueT
  * @tparam ValueIdx
  * @tparam NnzT
  * @param[in] handle raft handle for resource reuse
@@ -40,20 +40,20 @@ namespace cuvs::cluster::agglomerative::detail {
  * @param[out] out_distances distances of output
  * @param[out] out_sizes cluster sizes of output
  */
-template <typename value_t  = float,  // NOLINT(readability-identifier-naming)
+template <typename ValueT   = float,  // NOLINT(readability-identifier-naming)
           typename ValueIdx = int,
           typename NnzT     = size_t,
-          typename Accessor = raft::device_accessor<cuda::std::default_accessor<value_t>>>
+          typename Accessor = raft::device_accessor<cuda::std::default_accessor<ValueT>>>
 void build_mr_linkage(
   raft::resources const& handle,
-  raft::mdspan<const value_t, raft::matrix_extent<ValueIdx>, raft::row_major, Accessor> X,
+  raft::mdspan<const ValueT, raft::matrix_extent<ValueIdx>, raft::row_major, Accessor> X,
   ValueIdx min_samples,
   float alpha,
   cuvs::distance::DistanceType metric,
-  raft::device_vector_view<value_t, ValueIdx> core_dists,
-  raft::device_coo_matrix_view<value_t, ValueIdx, ValueIdx, NnzT> out_mst,
+  raft::device_vector_view<ValueT, ValueIdx> core_dists,
+  raft::device_coo_matrix_view<ValueT, ValueIdx, ValueIdx, NnzT> out_mst,
   raft::device_matrix_view<ValueIdx, ValueIdx> out_dendrogram,
-  raft::device_vector_view<value_t, ValueIdx> out_distances,
+  raft::device_vector_view<ValueT, ValueIdx> out_distances,
   raft::device_vector_view<ValueIdx, ValueIdx> out_sizes,
   cuvs::neighbors::all_neighbors::all_neighbors_params all_neighbors_p)
 {
@@ -62,11 +62,11 @@ void build_mr_linkage(
   auto stream = raft::resource::get_cuda_stream(handle);
 
   {  // scope to drop mr_coo and mr_indptr early
-    std::optional<raft::sparse::COO<value_t, ValueIdx, NnzT>> mr_coo;
+    std::optional<raft::sparse::COO<ValueT, ValueIdx, NnzT>> mr_coo;
 
     {  // scope to drop inds and dists matrices early
       auto inds  = raft::make_device_matrix<ValueIdx, ValueIdx>(handle, m, min_samples);
-      auto dists = raft::make_device_matrix<value_t, ValueIdx>(handle, m, min_samples);
+      auto dists = raft::make_device_matrix<ValueT, ValueIdx>(handle, m, min_samples);
 
       if (all_neighbors_p.metric != metric) {
         RAFT_LOG_WARN("Setting all neighbors metric to given metrix for build_mr_linkage");
@@ -99,55 +99,55 @@ void build_mr_linkage(
     auto cols_view = raft::make_device_vector_view<const ValueIdx, NnzT>(mr_coo.value().cols(),
                                                                          mr_coo.value().nnz);
     auto vals_in_view =
-      raft::make_device_vector_view<const value_t, NnzT>(mr_coo.value().vals(), mr_coo.value().nnz);
+      raft::make_device_vector_view<const ValueT, NnzT>(mr_coo.value().vals(), mr_coo.value().nnz);
     auto vals_out_view =
-      raft::make_device_vector_view<value_t, NnzT>(mr_coo.value().vals(), mr_coo.value().nnz);
+      raft::make_device_vector_view<ValueT, NnzT>(mr_coo.value().vals(), mr_coo.value().nnz);
 
     raft::linalg::map(
       handle,
       vals_out_view,
-      [=] __device__(const ValueIdx row, const ValueIdx col, const value_t val) -> value_t {
-        return row == col ? std::numeric_limits<value_t>::max() : val;
+      [=] __device__(const ValueIdx row, const ValueIdx col, const ValueT val) -> ValueT {
+        return row == col ? std::numeric_limits<ValueT>::max() : val;
       },
       rows_view,
       cols_view,
       vals_in_view);
 
     rmm::device_uvector<ValueIdx> color(m, raft::resource::get_cuda_stream(handle));
-    cuvs::sparse::neighbors::mutual_reachability_fix_connectivities_red_op<ValueIdx, value_t>
+    cuvs::sparse::neighbors::mutual_reachability_fix_connectivities_red_op<ValueIdx, ValueT>
       reduction_op(core_dists.data_handle(), m);
 
     size_t nnz = m * min_samples;
 
-    detail::build_sorted_mst<ValueIdx, value_t>(handle,
-                                                X.data_handle(),
-                                                mr_indptr.data_handle(),
-                                                mr_coo.value().cols(),
-                                                mr_coo.value().vals(),
-                                                m,
-                                                n,
-                                                out_mst.structure_view().get_rows().data(),
-                                                out_mst.structure_view().get_cols().data(),
-                                                out_mst.get_elements().data(),
-                                                color.data(),
-                                                mr_coo.value().nnz,
-                                                reduction_op,
-                                                metric,
-                                                10);
+    detail::build_sorted_mst<ValueIdx, ValueT>(handle,
+                                               X.data_handle(),
+                                               mr_indptr.data_handle(),
+                                               mr_coo.value().cols(),
+                                               mr_coo.value().vals(),
+                                               m,
+                                               n,
+                                               out_mst.structure_view().get_rows().data(),
+                                               out_mst.structure_view().get_cols().data(),
+                                               out_mst.get_elements().data(),
+                                               color.data(),
+                                               mr_coo.value().nnz,
+                                               reduction_op,
+                                               metric,
+                                               10);
   }  // scope to drop mr_coo and mr_indptr early
   /**
    * Perform hierarchical labeling
    */
   size_t n_edges = m - 1;
 
-  detail::build_dendrogram_host<ValueIdx, value_t>(handle,
-                                                   out_mst.structure_view().get_rows().data(),
-                                                   out_mst.structure_view().get_cols().data(),
-                                                   out_mst.get_elements().data(),
-                                                   n_edges,
-                                                   out_dendrogram.data_handle(),
-                                                   out_distances.data_handle(),
-                                                   out_sizes.data_handle());
+  detail::build_dendrogram_host<ValueIdx, ValueT>(handle,
+                                                  out_mst.structure_view().get_rows().data(),
+                                                  out_mst.structure_view().get_cols().data(),
+                                                  out_mst.get_elements().data(),
+                                                  n_edges,
+                                                  out_dendrogram.data_handle(),
+                                                  out_distances.data_handle(),
+                                                  out_sizes.data_handle());
 }
 
 static const size_t kEMPTY = 0;
@@ -155,7 +155,7 @@ static const size_t kEMPTY = 0;
 /**
  * Constructs a linkage by computing the minimum spanning tree and dendrogram in the Mutual
  * Reachability space. Returns mst edges sorted by weight and the dendrogram.
- * @tparam value_t
+ * @tparam ValueT
  * @tparam ValueIdx
  * @tparam NnzT
  * @tparam dist_type method to use for constructing connectivities graph
@@ -169,17 +169,17 @@ static const size_t kEMPTY = 0;
  * @param[out] out_distances distances of output
  * @param[out] out_sizes cluster sizes of output
  */
-template <typename value_t,
+template <typename ValueT,
           typename ValueIdx,
           typename NnzT,
           Linkage dist_type>  // NOLINT(readability-identifier-naming)
 void build_dist_linkage(raft::resources const& handle,
-                        raft::device_matrix_view<const value_t, ValueIdx, raft::row_major> X,
+                        raft::device_matrix_view<const ValueT, ValueIdx, raft::row_major> X,
                         int c,
                         cuvs::distance::DistanceType metric,
-                        raft::device_coo_matrix_view<value_t, ValueIdx, ValueIdx, NnzT> out_mst,
+                        raft::device_coo_matrix_view<ValueT, ValueIdx, ValueIdx, NnzT> out_mst,
                         raft::device_matrix_view<ValueIdx, ValueIdx> out_dendrogram,
-                        raft::device_vector_view<value_t, ValueIdx> out_distances,
+                        raft::device_vector_view<ValueT, ValueIdx> out_distances,
                         raft::device_vector_view<ValueIdx, ValueIdx> out_sizes)
 {
   size_t m    = X.extent(0);
@@ -188,56 +188,56 @@ void build_dist_linkage(raft::resources const& handle,
 
   rmm::device_uvector<ValueIdx> indptr(kEMPTY, stream);
   rmm::device_uvector<ValueIdx> indices(kEMPTY, stream);
-  rmm::device_uvector<value_t> pw_dists(kEMPTY, stream);
+  rmm::device_uvector<ValueT> pw_dists(kEMPTY, stream);
 
   /**
    * 1. Construct distance graph
    */
-  detail::get_distance_graph<ValueIdx, value_t, dist_type>(handle,
-                                                           X.data_handle(),
-                                                           static_cast<ValueIdx>(m),
-                                                           static_cast<ValueIdx>(n),
-                                                           metric,
-                                                           indptr,
-                                                           indices,
-                                                           pw_dists,
-                                                           c);
+  detail::get_distance_graph<ValueIdx, ValueT, dist_type>(handle,
+                                                          X.data_handle(),
+                                                          static_cast<ValueIdx>(m),
+                                                          static_cast<ValueIdx>(n),
+                                                          metric,
+                                                          indptr,
+                                                          indices,
+                                                          pw_dists,
+                                                          c);
 
   /**
    * 2. Construct MST, sorted by weights
    */
   rmm::device_uvector<ValueIdx> color(m, stream);
-  cuvs::sparse::neighbors::fix_connectivities_red_op<ValueIdx, value_t> op(m);
+  cuvs::sparse::neighbors::fix_connectivities_red_op<ValueIdx, ValueT> op(m);
 
   size_t n_edges = m - 1;
 
-  detail::build_sorted_mst<ValueIdx, value_t>(handle,
-                                              X.data_handle(),
-                                              indptr.data(),
-                                              indices.data(),
-                                              pw_dists.data(),
-                                              m,
-                                              n,
-                                              out_mst.structure_view().get_rows().data(),
-                                              out_mst.structure_view().get_cols().data(),
-                                              out_mst.get_elements().data(),
-                                              color.data(),
-                                              indices.size(),
-                                              op,
-                                              metric);
+  detail::build_sorted_mst<ValueIdx, ValueT>(handle,
+                                             X.data_handle(),
+                                             indptr.data(),
+                                             indices.data(),
+                                             pw_dists.data(),
+                                             m,
+                                             n,
+                                             out_mst.structure_view().get_rows().data(),
+                                             out_mst.structure_view().get_cols().data(),
+                                             out_mst.get_elements().data(),
+                                             color.data(),
+                                             indices.size(),
+                                             op,
+                                             metric);
   pw_dists.release();
 
   /**
    * Perform hierarchical labeling
    */
-  detail::build_dendrogram_host<ValueIdx, value_t>(handle,
-                                                   out_mst.structure_view().get_rows().data(),
-                                                   out_mst.structure_view().get_cols().data(),
-                                                   out_mst.get_elements().data(),
-                                                   n_edges,
-                                                   out_dendrogram.data_handle(),
-                                                   out_distances.data_handle(),
-                                                   out_sizes.data_handle());
+  detail::build_dendrogram_host<ValueIdx, ValueT>(handle,
+                                                  out_mst.structure_view().get_rows().data(),
+                                                  out_mst.structure_view().get_cols().data(),
+                                                  out_mst.get_elements().data(),
+                                                  n_edges,
+                                                  out_dendrogram.data_handle(),
+                                                  out_distances.data_handle(),
+                                                  out_sizes.data_handle());
 }
 
 /**
@@ -247,7 +247,7 @@ void build_dist_linkage(raft::resources const& handle,
  * a knn graph when k is not large enough to connect it.
 
  * @tparam ValueIdx
- * @tparam value_t
+ * @tparam ValueT
  * @tparam dist_type method to use for constructing connectivities graph
  * @param[in] handle raft handle
  * @param[in] X dense input matrix in row-major layout
@@ -261,10 +261,10 @@ void build_dist_linkage(raft::resources const& handle,
  * @param[in] n_clusters number of clusters to assign data samples
  */
 template <typename ValueIdx,
-          typename value_t,
+          typename ValueT,
           Linkage dist_type>  // NOLINT(readability-identifier-naming)
 void single_linkage(raft::resources const& handle,
-                    const value_t* X,
+                    const ValueT* X,
                     size_t m,
                     size_t n,
                     cuvs::distance::DistanceType metric,
@@ -277,18 +277,18 @@ void single_linkage(raft::resources const& handle,
   ValueIdx n_edges    = m - 1;
   auto mst_rows       = raft::make_device_vector<ValueIdx, ValueIdx>(handle, n_edges);
   auto mst_cols       = raft::make_device_vector<ValueIdx, ValueIdx>(handle, n_edges);
-  auto mst_weights    = raft::make_device_vector<value_t, ValueIdx>(handle, n_edges);
+  auto mst_weights    = raft::make_device_vector<ValueT, ValueIdx>(handle, n_edges);
   auto structure_view = raft::make_device_coordinate_structure_view<ValueIdx, ValueIdx, ValueIdx>(
     mst_rows.data_handle(), mst_cols.data_handle(), m, m, n_edges);
-  auto mst_view = raft::make_device_coo_matrix_view<value_t, ValueIdx, ValueIdx, ValueIdx>(
+  auto mst_view = raft::make_device_coo_matrix_view<ValueT, ValueIdx, ValueIdx, ValueIdx>(
     mst_weights.data_handle(), structure_view);
 
-  auto out_delta = raft::make_device_vector<value_t, ValueIdx>(handle, n_edges);
+  auto out_delta = raft::make_device_vector<ValueT, ValueIdx>(handle, n_edges);
   auto out_sizes = raft::make_device_vector<ValueIdx, ValueIdx>(handle, n_edges);
 
-  build_dist_linkage<value_t, ValueIdx, ValueIdx, dist_type>(
+  build_dist_linkage<ValueT, ValueIdx, ValueIdx, dist_type>(
     handle,
-    raft::make_device_matrix_view<const value_t, ValueIdx, raft::row_major>(
+    raft::make_device_matrix_view<const ValueT, ValueIdx, raft::row_major>(
       X, static_cast<ValueIdx>(m), static_cast<ValueIdx>(n)),
     c,
     metric,

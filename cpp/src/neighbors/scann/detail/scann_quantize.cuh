@@ -26,12 +26,12 @@ template <uint32_t block_size,
           typename DataT,
           typename MathT,
           typename IdxT,
-          typename label_t>
+          typename LabelT>
 __launch_bounds__(block_size) RAFT_KERNEL process_and_fill_codes_subspaces_kernel(
   raft::device_matrix_view<uint8_t, IdxT, raft::row_major> out_codes,
   raft::device_matrix_view<const DataT, IdxT, raft::row_major> dataset,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> vq_centers,
-  raft::device_vector_view<const label_t, IdxT, raft::row_major> vq_labels,
+  raft::device_vector_view<const LabelT, IdxT, raft::row_major> vq_labels,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers)
 {
   constexpr uint32_t kSubWarpSize = std::min<uint32_t>(raft::WarpSize, 1u << PqBits);
@@ -42,10 +42,10 @@ __launch_bounds__(block_size) RAFT_KERNEL process_and_fill_codes_subspaces_kerne
   const uint32_t pq_dim = raft::div_rounding_up_unsafe(vq_centers.extent(1), pq_centers.extent(1));
 
   const uint32_t lane_id = raft::Pow2<kSubWarpSize>::mod(threadIdx.x);
-  const label_t vq_label = vq_labels(row_ix);
+  const LabelT vq_label  = vq_labels(row_ix);
 
   // write label
-  auto* out_label_ptr = reinterpret_cast<label_t*>(&out_codes(row_ix, 0));
+  auto* out_label_ptr = reinterpret_cast<LabelT*>(&out_codes(row_ix, 0));
   if (lane_id == 0) { *out_label_ptr = vq_label; }
 
   auto* out_codes_ptr = reinterpret_cast<uint8_t*>(out_label_ptr + 1);
@@ -154,11 +154,11 @@ auto create_pq_codebook(raft::resources const& res,
  * @param labels cluster labels, size [n_rows]
  * @return device matrix with the residuals, size [n_rows, dim]
  */
-template <typename T, typename label_t>
+template <typename T, typename LabelT>
 auto compute_residuals(raft::resources const& res,
                        raft::device_matrix_view<const T, int64_t> dataset,
                        raft::device_matrix_view<const T, int64_t> centers,
-                       raft::device_vector_view<const label_t, int64_t> labels)
+                       raft::device_vector_view<const LabelT, int64_t> labels)
   -> raft::device_matrix<T, int64_t, raft::row_major>
 {
   auto dim       = dataset.extent(1);
@@ -183,15 +183,15 @@ auto compute_residuals(raft::resources const& res,
  *
  * @tparam T
  * @tparam IdxT
- * @tparam label_t
+ * @tparam LabelT
  * @param res raft resources
  * @param residuals the residual vectors we're quantizing, size [n_rows, dim]
  * @param pq_codebook the codebook of PQ centers size [dim, 1 << pq_bits]
  * @oaran ps parameters used with vpq_dataset for pq quantization
  * @return device matrix with (packed) codes from vpq, size [n_rows, 1 +ceil((dim / pq_dim *
- * pq_bits) /( 8 * sizeof(label_t)))]
+ * pq_bits) /( 8 * sizeof(LabelT)))]
  */
-template <typename T, typename IdxT, typename label_t>
+template <typename T, typename IdxT, typename LabelT>
 auto quantize_residuals(raft::resources const& res,
                         raft::device_matrix_view<const T, int64_t> residuals,
                         raft::device_matrix_view<T, uint32_t, raft::row_major> pq_codebook,
@@ -232,7 +232,7 @@ auto quantize_residuals(raft::resources const& res,
  * @param res raft resources
  * @param unpacked_codes_view matrix of unpacked codes, size  [n_rows, dim / pq_dim]
  * @param codes_view packed codes from vpq, size [n_rows, 1 +ceil((dim / pq_dim * pq_bits) /( 8 *
- * sizeof(label_t)))]
+ * sizeof(LabelT)))]
  * @param pq_bits number of bits used for PQ
  * @param num_subspaces the number of pq_subspaces (dim / pq_dim)
  */
@@ -511,7 +511,7 @@ void quantize_bfloat16(raft::resources const& res,
  * @brief sample dataset vectors/labels and compute their residuals for PQ training
  *
  * @tparam T
- * @tparms label_t
+ * @tparms LabelT
  * @tparam Accessor
  * @param res raft resources
  * @param random_state state for random generator
@@ -522,7 +522,7 @@ void quantize_bfloat16(raft::resources const& res,
  * @return the sampled residuals for PQ training, size [n_samples, dim]
  */
 template <typename T,
-          typename label_t,
+          typename LabelT,
           typename Accessor =
             raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 auto sample_training_residuals(
@@ -530,7 +530,7 @@ auto sample_training_residuals(
   random::RngState random_state,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
   raft::device_matrix_view<const T, int64_t> centroids,
-  raft::device_vector_view<const label_t, int64_t> labels,
+  raft::device_vector_view<const LabelT, int64_t> labels,
   int64_t n_samples) -> raft::device_matrix<T, int64_t, raft::row_major>
 {
   int64_t n_dim = dataset.extent(1);
@@ -548,18 +548,18 @@ auto sample_training_residuals(
                                raft::resource::get_cuda_stream(res));
 
   // Considering labels as a single column matrix for use in gather
-  auto labels_view = raft::make_device_matrix_view<const label_t, int64_t>(
-    labels.data_handle(), labels.extent(0), 1);
-  auto trainset_labels = raft::make_device_matrix<label_t, int64_t>(res, n_samples, 1);
+  auto labels_view =
+    raft::make_device_matrix_view<const LabelT, int64_t>(labels.data_handle(), labels.extent(0), 1);
+  auto trainset_labels = raft::make_device_matrix<LabelT, int64_t>(res, n_samples, 1);
 
   raft::matrix::gather(
     res, labels_view, raft::make_const_mdspan(train_indices.view()), trainset_labels.view());
 
-  return compute_residuals<T, label_t>(res,
-                                       raft::make_const_mdspan(trainset.view()),
-                                       centroids,
-                                       raft::make_device_vector_view<const label_t, int64_t>(
-                                         trainset_labels.data_handle(), n_samples));
+  return compute_residuals<T, LabelT>(
+    res,
+    raft::make_const_mdspan(trainset.view()),
+    centroids,
+    raft::make_device_vector_view<const LabelT, int64_t>(trainset_labels.data_handle(), n_samples));
 }
 
 }  // namespace cuvs::neighbors::experimental::scann::detail

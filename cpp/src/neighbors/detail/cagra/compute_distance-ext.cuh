@@ -602,15 +602,15 @@ using descriptor_instances = instance_selector<
   standard_descriptor_spec<DistanceType::BitwiseHamming, 16, 256, uint8_t, uint32_t, float>,
   standard_descriptor_spec<DistanceType::BitwiseHamming, 32, 512, uint8_t, uint32_t, float>>;
 
-template <typename DataT, typename index_t, typename distance_t, typename DatasetT>
+template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
 auto dataset_descriptor_init(const cagra::search_params& params,
                              const DatasetT& dataset,
                              cuvs::distance::DistanceType metric,
-                             const distance_t* dataset_norms = nullptr)
-  -> dataset_descriptor_host<DataT, index_t, distance_t>
+                             const DistanceT* dataset_norms = nullptr)
+  -> dataset_descriptor_host<DataT, IndexT, DistanceT>
 {
-  auto [init, priority] = descriptor_instances::select<DataT, index_t, distance_t>(
-    params, dataset, metric, dataset_norms);
+  auto [init, priority] =
+    descriptor_instances::select<DataT, IndexT, DistanceT>(params, dataset, metric, dataset_norms);
   if (init == nullptr || priority < 0) {
     RAFT_FAIL("No dataset descriptor instance compiled for this parameter combination.");
   }

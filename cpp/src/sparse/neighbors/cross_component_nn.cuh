@@ -12,12 +12,12 @@
 
 namespace cuvs::sparse::neighbors {
 
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
-using fix_connectivities_red_op = detail::fix_connectivities_red_op<ValueIdx, value_t>;
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+using fix_connectivities_red_op = detail::fix_connectivities_red_op<ValueIdx, ValueT>;
 
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
 using mutual_reachability_fix_connectivities_red_op =
-  detail::mutual_reachability_fix_connectivities_red_op<ValueIdx, value_t>;
+  detail::mutual_reachability_fix_connectivities_red_op<ValueIdx, ValueT>;
 
 /**
  * Gets the number of unique components from array of
@@ -44,7 +44,7 @@ auto get_n_components(ValueIdx* colors, size_t n_rows, cudaStream_t stream) -> V
  * n_components^2 - n_components number of elements because many components
  * will likely not be contained in the neighborhoods of 1-nns.
  * @tparam ValueIdx
- * @tparam value_t
+ * @tparam ValueT
  * @param[in] handle raft handle
  * @param[out] out output edge list containing nearest cross-component
  *             edges.
@@ -65,12 +65,12 @@ auto get_n_components(ValueIdx* colors, size_t n_rows, cudaStream_t stream) -> V
  * @param[in] metric distance metric
  */
 template <typename ValueIdx,
-          typename value_t,
+          typename ValueT,
           typename RedOp>  // NOLINT(readability-identifier-naming)
 void cross_component_nn(
   raft::resources const& handle,
-  raft::sparse::COO<value_t, ValueIdx>& out,
-  const value_t* X,
+  raft::sparse::COO<ValueT, ValueIdx>& out,
+  const ValueT* X,
   const ValueIdx* orig_colors,
   ValueIdx n_rows,
   ValueIdx n_cols,

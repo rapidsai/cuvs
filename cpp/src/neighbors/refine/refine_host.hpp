@@ -28,23 +28,23 @@ namespace detail {
 //  Generic implementation
 // -----------------------------------------------------------------------------
 
-template <typename DC, typename distance_t, typename DataT>
-auto euclidean_distance_squared_generic(DataT const* a, DataT const* b, size_t n) -> distance_t
+template <typename DC, typename DistanceT, typename DataT>
+auto euclidean_distance_squared_generic(DataT const* a, DataT const* b, size_t n) -> DistanceT
 {
-  size_t constexpr kMaxVregLen = 512 / (8 * sizeof(distance_t));
+  size_t constexpr kMaxVregLen = 512 / (8 * sizeof(DistanceT));
 
   // kMaxVregLen is a power of two
-  size_t n_rounded                             = n - (n % kMaxVregLen);
-  std::array<distance_t, kMaxVregLen> distance = {0};
+  size_t n_rounded                            = n - (n % kMaxVregLen);
+  std::array<DistanceT, kMaxVregLen> distance = {0};
 
   for (size_t i = 0; i < n_rounded; i += kMaxVregLen) {
     for (size_t j = 0; j < kMaxVregLen; ++j) {
-      distance[j] += DC::template eval<distance_t>(a[i + j], b[i + j]);
+      distance[j] += DC::template eval<DistanceT>(a[i + j], b[i + j]);
     }
   }
 
   for (size_t i = n_rounded; i < n; ++i) {
-    distance[i - n_rounded] += DC::template eval<distance_t>(a[i], b[i]);
+    distance[i - n_rounded] += DC::template eval<DistanceT>(a[i], b[i]);
   }
 
   for (size_t i = 1; i < kMaxVregLen; ++i) {
@@ -63,10 +63,10 @@ struct distance_comp_inner;
 struct distance_comp_cosine;
 
 // fallback
-template <typename DC, typename distance_t, typename DataT>
-auto euclidean_distance_squared(DataT const* a, DataT const* b, size_t n) -> distance_t
+template <typename DC, typename DistanceT, typename DataT>
+auto euclidean_distance_squared(DataT const* a, DataT const* b, size_t n) -> DistanceT
 {
-  return euclidean_distance_squared_generic<DC, distance_t, DataT>(a, b, n);
+  return euclidean_distance_squared_generic<DC, DistanceT, DataT>(a, b, n);
 }
 
 #if defined(__arm__) || defined(__aarch64__)
@@ -332,8 +332,8 @@ inline float euclidean_distance_squared<distance_comp_inner, float, ::std::uint8
 // -----------------------------------------------------------------------------
 
 // Cosine distance: 1 - (a·b)/(||a||·||b||)
-template <typename distance_t, typename DataT>
-inline auto cosine_distance(DataT const* a, DataT const* b, size_t n) -> distance_t
+template <typename DistanceT, typename DataT>
+inline auto cosine_distance(DataT const* a, DataT const* b, size_t n) -> DistanceT
 {
   using acc_t = double;
   auto dot    = acc_t{0};
@@ -348,16 +348,16 @@ inline auto cosine_distance(DataT const* a, DataT const* b, size_t n) -> distanc
   }
   acc_t denom = std::sqrt(na2) * std::sqrt(nb2);
   acc_t dist  = denom > acc_t{0} ? acc_t{1} - (dot / denom) : acc_t{1};
-  return static_cast<distance_t>(dist);
+  return static_cast<DistanceT>(dist);
 }
 
-template <typename DC, typename IdxT, typename DataT, typename distance_t, typename ExtentsT>
+template <typename DC, typename IdxT, typename DataT, typename DistanceT, typename ExtentsT>
 [[gnu::optimize(3), gnu::optimize("tree-vectorize")]] void refine_host_impl(
   raft::host_matrix_view<const DataT, ExtentsT, raft::row_major> dataset,
   raft::host_matrix_view<const DataT, ExtentsT, raft::row_major> queries,
   raft::host_matrix_view<const IdxT, ExtentsT, raft::row_major> neighbor_candidates,
   raft::host_matrix_view<IdxT, ExtentsT, raft::row_major> indices,
-  raft::host_matrix_view<distance_t, ExtentsT, raft::row_major> distances)
+  raft::host_matrix_view<DistanceT, ExtentsT, raft::row_major> distances)
 {
   size_t n_queries = queries.extent(0);
   size_t n_rows    = dataset.extent(0);
@@ -375,8 +375,8 @@ template <typename DC, typename IdxT, typename DataT, typename distance_t, typen
   // the top-k calculation into separate loops, and apply finer-grained thread
   // parallelism to the distance calculation loop.
   if (std::cmp_less(n_queries, suggested_n_threads)) {
-    std::vector<std::vector<std::tuple<distance_t, IdxT>>> refined_pairs(
-      n_queries, std::vector<std::tuple<distance_t, IdxT>>(orig_k));
+    std::vector<std::vector<std::tuple<DistanceT, IdxT>>> refined_pairs(
+      n_queries, std::vector<std::tuple<DistanceT, IdxT>>(orig_k));
 
     // For efficiency, each thread should read a certain amount of array
     // elements. The number of threads for distance computation is determined
@@ -394,15 +394,15 @@ template <typename DC, typename IdxT, typename DataT, typename distance_t, typen
 #pragma omp parallel for collapse(2) num_threads(suggested_n_threads_for_distance)
     for (size_t i = 0; i < n_queries; i++) {
       for (size_t j = 0; j < orig_k; j++) {
-        const DataT* query  = queries.data_handle() + dim * i;
-        IdxT id             = neighbor_candidates(i, j);
-        distance_t distance = 0.0;
+        const DataT* query = queries.data_handle() + dim * i;
+        IdxT id            = neighbor_candidates(i, j);
+        DistanceT distance = 0.0;
         if (static_cast<size_t>(id) >= n_rows) {
-          distance = std::numeric_limits<distance_t>::max();
+          distance = std::numeric_limits<DistanceT>::max();
         } else {
           const DataT* row = dataset.data_handle() + dim * id;
           for (size_t k = 0; k < dim; k++) {
-            distance += DC::template eval<distance_t>(query[k], row[k]);
+            distance += DC::template eval<DistanceT>(query[k], row[k]);
           }
         }
         refined_pairs[i][j] = std::make_tuple(distance, id);
@@ -417,7 +417,7 @@ template <typename DC, typename IdxT, typename DataT, typename distance_t, typen
       for (size_t j = 0; j < refined_k; j++) {
         indices(i, j) = std::get<1>(refined_pairs[i][j]);
         if (distances.data_handle() != nullptr) {
-          distances(i, j) = DC::template postprocess<distance_t>(std::get<0>(refined_pairs[i][j]));
+          distances(i, j) = DC::template postprocess<DistanceT>(std::get<0>(refined_pairs[i][j]));
         }
       }
     }
@@ -427,8 +427,8 @@ template <typename DC, typename IdxT, typename DataT, typename distance_t, typen
   if (std::cmp_greater(suggested_n_threads, n_queries)) { suggested_n_threads = n_queries; }
 
   {
-    std::vector<std::vector<std::tuple<distance_t, IdxT>>> refined_pairs(
-      suggested_n_threads, std::vector<std::tuple<distance_t, IdxT>>(orig_k));
+    std::vector<std::vector<std::tuple<DistanceT, IdxT>>> refined_pairs(
+      suggested_n_threads, std::vector<std::tuple<DistanceT, IdxT>>(orig_k));
 #pragma omp parallel num_threads(suggested_n_threads)
     {
       auto tid = cuvs::core::omp::get_thread_num();
@@ -436,16 +436,16 @@ template <typename DC, typename IdxT, typename DataT, typename distance_t, typen
         // Compute the refined distance using original dataset vectors
         const DataT* query = queries.data_handle() + dim * i;
         for (size_t j = 0; j < orig_k; j++) {
-          IdxT id             = neighbor_candidates(i, j);
-          distance_t distance = 0.0;
+          IdxT id            = neighbor_candidates(i, j);
+          DistanceT distance = 0.0;
           if (static_cast<size_t>(id) >= n_rows) {
-            distance = std::numeric_limits<distance_t>::max();
+            distance = std::numeric_limits<DistanceT>::max();
           } else {
             const DataT* row = dataset.data_handle() + dim * id;
             if constexpr (std::is_same_v<DC, distance_comp_cosine>) {
-              distance = cosine_distance<distance_t, DataT>(query, row, dim);
+              distance = cosine_distance<DistanceT, DataT>(query, row, dim);
             } else {
-              distance = euclidean_distance_squared<DC, distance_t, DataT>(query, row, dim);
+              distance = euclidean_distance_squared<DC, DistanceT, DataT>(query, row, dim);
             }
           }
           refined_pairs[tid][j] = std::make_tuple(distance, id);
@@ -457,7 +457,7 @@ template <typename DC, typename IdxT, typename DataT, typename distance_t, typen
           indices(i, j) = std::get<1>(refined_pairs[tid][j]);
           if (distances.data_handle() != nullptr) {
             distances(i, j) =
-              DC::template postprocess<distance_t>(std::get<0>(refined_pairs[tid][j]));
+              DC::template postprocess<DistanceT>(std::get<0>(refined_pairs[tid][j]));
           }
         }
       }
@@ -466,40 +466,40 @@ template <typename DC, typename IdxT, typename DataT, typename distance_t, typen
 }
 
 struct distance_comp_l2 {
-  template <typename distance_t>
-  static inline auto eval(const distance_t& a, const distance_t& b) -> distance_t
+  template <typename DistanceT>
+  static inline auto eval(const DistanceT& a, const DistanceT& b) -> DistanceT
   {
     auto d = a - b;
     return d * d;
   }
-  template <typename distance_t>
-  static inline auto postprocess(const distance_t& a) -> distance_t
+  template <typename DistanceT>
+  static inline auto postprocess(const DistanceT& a) -> DistanceT
   {
     return a;
   }
 };
 
 struct distance_comp_inner {
-  template <typename distance_t>
-  static inline auto eval(const distance_t& a, const distance_t& b) -> distance_t
+  template <typename DistanceT>
+  static inline auto eval(const DistanceT& a, const DistanceT& b) -> DistanceT
   {
     return -a * b;
   }
-  template <typename distance_t>
-  static inline auto postprocess(const distance_t& a) -> distance_t
+  template <typename DistanceT>
+  static inline auto postprocess(const DistanceT& a) -> DistanceT
   {
     return -a;
   }
 };
 
 struct distance_comp_cosine {
-  template <typename distance_t>
-  static inline auto eval(const distance_t&, const distance_t&) -> distance_t
+  template <typename DistanceT>
+  static inline auto eval(const DistanceT&, const DistanceT&) -> DistanceT
   {
-    return distance_t{0};
+    return DistanceT{0};
   }
-  template <typename distance_t>
-  static inline auto postprocess(const distance_t& a) -> distance_t
+  template <typename DistanceT>
+  static inline auto postprocess(const DistanceT& a) -> DistanceT
   {
     return a;
   }
@@ -510,13 +510,13 @@ struct distance_comp_cosine {
  *
  * All pointers are expected to be accessible on the host.
  */
-template <typename IdxT, typename DataT, typename distance_t, typename ExtentsT>
+template <typename IdxT, typename DataT, typename DistanceT, typename ExtentsT>
 [[gnu::optimize(3), gnu::optimize("tree-vectorize")]] void refine_host(
   raft::host_matrix_view<const DataT, ExtentsT, raft::row_major> dataset,
   raft::host_matrix_view<const DataT, ExtentsT, raft::row_major> queries,
   raft::host_matrix_view<const IdxT, ExtentsT, raft::row_major> neighbor_candidates,
   raft::host_matrix_view<IdxT, ExtentsT, raft::row_major> indices,
-  raft::host_matrix_view<distance_t, ExtentsT, raft::row_major> distances,
+  raft::host_matrix_view<DistanceT, ExtentsT, raft::row_major> distances,
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded)
 {
   refine_check_input(dataset.extents(),
@@ -542,13 +542,13 @@ template <typename IdxT, typename DataT, typename distance_t, typename ExtentsT>
 
 }  // namespace detail
 
-template <typename IdxT, typename DataT, typename distance_t, typename MatrixIdx>
+template <typename IdxT, typename DataT, typename DistanceT, typename MatrixIdx>
 void refine_impl(raft::resources const& handle,
                  raft::host_matrix_view<const DataT, MatrixIdx, raft::row_major> dataset,
                  raft::host_matrix_view<const DataT, MatrixIdx, raft::row_major> queries,
                  raft::host_matrix_view<const IdxT, MatrixIdx, raft::row_major> neighbor_candidates,
                  raft::host_matrix_view<IdxT, MatrixIdx, raft::row_major> indices,
-                 raft::host_matrix_view<distance_t, MatrixIdx, raft::row_major> distances,
+                 raft::host_matrix_view<DistanceT, MatrixIdx, raft::row_major> distances,
                  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded)
 {
   detail::refine_host(dataset, queries, neighbor_candidates, indices, distances, metric);

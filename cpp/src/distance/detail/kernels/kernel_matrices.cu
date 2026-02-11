@@ -460,8 +460,8 @@ void RBFKernel<MathT>::applyKernel(MathT* inout,
 }
 
 template <typename MathT>
-void RBFKernel<MathT>::matrixRowNormL2(
-  raft::resources const& handle,  // NOLINT(readability-identifier-naming)
+void RBFKernel<MathT>::matrixRowNormL2(  // NOLINT(readability-identifier-naming)
+  raft::resources const& handle,
   dense_input_matrix_view_t<MathT> matrix,
   MathT* target)
 {
@@ -485,8 +485,8 @@ void RBFKernel<MathT>::matrixRowNormL2(
 }
 
 template <typename MathT>
-void RBFKernel<MathT>::matrixRowNormL2(
-  raft::resources const& handle,  // NOLINT(readability-identifier-naming)
+void RBFKernel<MathT>::matrixRowNormL2(  // NOLINT(readability-identifier-naming)
+  raft::resources const& handle,
   csr_input_matrix_view_t<MathT> matrix,
   MathT* target)
 {

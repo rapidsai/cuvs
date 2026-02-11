@@ -27,44 +27,44 @@ namespace cuvs::cluster::agglomerative::detail {
 
 template <Linkage dist_type,
           typename ValueIdx,
-          typename value_t>  // NOLINT(readability-identifier-naming)
+          typename ValueT>  // NOLINT(readability-identifier-naming)
 struct distance_graph_impl {
   void run(raft::resources const& handle,
-           const value_t* X,
+           const ValueT* X,
            ValueIdx m,
            ValueIdx n,
            cuvs::distance::DistanceType metric,
            rmm::device_uvector<ValueIdx>& indptr,
            rmm::device_uvector<ValueIdx>& indices,
-           rmm::device_uvector<value_t>& data,
+           rmm::device_uvector<ValueT>& data,
            int c);
 };
 
 /**
  * Connectivities specialization to build a knn graph
  * @tparam ValueIdx
- * @tparam value_t
+ * @tparam ValueT
  */
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
-struct distance_graph_impl<Linkage::KNN_GRAPH, ValueIdx, value_t> {
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+struct distance_graph_impl<Linkage::KNN_GRAPH, ValueIdx, ValueT> {
   void run(raft::resources const& handle,
-           const value_t* X,
+           const ValueT* X,
            ValueIdx m,
            ValueIdx n,
            cuvs::distance::DistanceType metric,
            rmm::device_uvector<ValueIdx>& indptr,
            rmm::device_uvector<ValueIdx>& indices,
-           rmm::device_uvector<value_t>& data,
+           rmm::device_uvector<ValueT>& data,
            int c)
   {
     auto stream        = raft::resource::get_cuda_stream(handle);
     auto thrust_policy = raft::resource::get_thrust_policy(handle);
 
     // Need to symmetrize knn into undirected graph
-    raft::sparse::COO<value_t, ValueIdx> knn_graph_coo(stream);
+    raft::sparse::COO<ValueT, ValueIdx> knn_graph_coo(stream);
 
-    auto x_view = raft::make_device_matrix_view<const value_t, ValueIdx, raft::row_major>(X, m, n);
-    cuvs::neighbors::detail::knn_graph<ValueIdx, value_t, size_t>(
+    auto x_view = raft::make_device_matrix_view<const ValueT, ValueIdx, raft::row_major>(X, m, n);
+    cuvs::neighbors::detail::knn_graph<ValueIdx, ValueT, size_t>(
       handle, x_view, metric, knn_graph_coo, c);
 
     indices.resize(knn_graph_coo.nnz, stream);
@@ -75,17 +75,17 @@ struct distance_graph_impl<Linkage::KNN_GRAPH, ValueIdx, value_t> {
                                                                              knn_graph_coo.nnz);
     auto cols_view = raft::make_device_vector_view<const ValueIdx, ValueIdx>(knn_graph_coo.cols(),
                                                                              knn_graph_coo.nnz);
-    auto vals_in_view = raft::make_device_vector_view<const value_t, ValueIdx>(knn_graph_coo.vals(),
-                                                                               knn_graph_coo.nnz);
+    auto vals_in_view = raft::make_device_vector_view<const ValueT, ValueIdx>(knn_graph_coo.vals(),
+                                                                              knn_graph_coo.nnz);
     auto vals_out_view =
-      raft::make_device_vector_view<value_t, ValueIdx>(knn_graph_coo.vals(), knn_graph_coo.nnz);
+      raft::make_device_vector_view<ValueT, ValueIdx>(knn_graph_coo.vals(), knn_graph_coo.nnz);
 
     raft::linalg::map(
       handle,
       vals_out_view,
-      [=] __device__(const ValueIdx row, const ValueIdx col, const value_t val) -> value_t {
+      [=] __device__(const ValueIdx row, const ValueIdx col, const ValueT val) -> ValueT {
         bool self_loop = row == col;
-        return (self_loop * std::numeric_limits<value_t>::max()) + (!self_loop * val);
+        return (self_loop * std::numeric_limits<ValueT>::max()) + (!self_loop * val);
       },
       rows_view,
       cols_view,
@@ -114,7 +114,7 @@ RAFT_KERNEL fill_indices2(ValueIdx* indices, size_t m, size_t nnz)
 /**
  * Compute connected CSR of pairwise distances
  * @tparam ValueIdx
- * @tparam value_t
+ * @tparam ValueT
  * @param handle
  * @param X
  * @param m
@@ -124,15 +124,15 @@ RAFT_KERNEL fill_indices2(ValueIdx* indices, size_t m, size_t nnz)
  * @param[out] indices
  * @param[out] data
  */
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
 void pairwise_distances(const raft::resources& handle,
-                        const value_t* X,
+                        const ValueT* X,
                         ValueIdx m,
                         ValueIdx n,
                         cuvs::distance::DistanceType metric,
                         ValueIdx* indptr,
                         ValueIdx* indices,
-                        value_t* data)
+                        ValueT* data)
 {
   auto stream      = raft::resource::get_cuda_stream(handle);
   auto exec_policy = raft::resource::get_thrust_policy(handle);
@@ -151,36 +151,36 @@ void pairwise_distances(const raft::resources& handle,
   // TODO(snanditale): It would ultimately be nice if the MST could accept
   // dense inputs directly so we don't need to double the memory
   // usage to hand it a sparse array here.
-  auto x_view = raft::make_device_matrix_view<const value_t, ValueIdx>(X, m, n);
+  auto x_view = raft::make_device_matrix_view<const ValueT, ValueIdx>(X, m, n);
 
-  cuvs::cluster::kmeans::detail::pairwise_distance_kmeans<value_t, ValueIdx>(
-    handle, x_view, x_view, raft::make_device_matrix_view<value_t, ValueIdx>(data, m, m), metric);
+  cuvs::cluster::kmeans::detail::pairwise_distance_kmeans<ValueT, ValueIdx>(
+    handle, x_view, x_view, raft::make_device_matrix_view<ValueT, ValueIdx>(data, m, m), metric);
 
   // self-loops get max distance
-  auto data_view = raft::make_device_vector_view<value_t, ValueIdx>(data, nnz);
+  auto data_view = raft::make_device_vector_view<ValueT, ValueIdx>(data, nnz);
 
-  raft::linalg::map_offset(handle, data_view, [=] __device__(ValueIdx idx) -> value_t {
-    value_t val    = data[idx];
+  raft::linalg::map_offset(handle, data_view, [=] __device__(ValueIdx idx) -> ValueT {
+    ValueT val     = data[idx];
     bool self_loop = idx % m == idx / m;
-    return (self_loop * std::numeric_limits<value_t>::max()) + (!self_loop * val);
+    return (self_loop * std::numeric_limits<ValueT>::max()) + (!self_loop * val);
   });
 }
 
 /**
  * Connectivities specialization for pairwise distances
  * @tparam ValueIdx
- * @tparam value_t
+ * @tparam ValueT
  */
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
-struct distance_graph_impl<Linkage::PAIRWISE, ValueIdx, value_t> {
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+struct distance_graph_impl<Linkage::PAIRWISE, ValueIdx, ValueT> {
   void run(const raft::resources& handle,
-           const value_t* X,
+           const ValueT* X,
            ValueIdx m,
            ValueIdx n,
            cuvs::distance::DistanceType metric,
            rmm::device_uvector<ValueIdx>& indptr,
            rmm::device_uvector<ValueIdx>& indices,
-           rmm::device_uvector<value_t>& data,
+           rmm::device_uvector<ValueT>& data,
            int c)
   {
     auto stream = raft::resource::get_cuda_stream(handle);
@@ -197,7 +197,7 @@ struct distance_graph_impl<Linkage::PAIRWISE, ValueIdx, value_t> {
 /**
  * Returns a CSR connectivities graph based on the given linkage distance.
  * @tparam ValueIdx
- * @tparam value_t
+ * @tparam ValueT
  * @tparam dist_type
  * @param[in] handle raft handle
  * @param[in] X dense data for which to construct connectivites
@@ -211,23 +211,23 @@ struct distance_graph_impl<Linkage::PAIRWISE, ValueIdx, value_t> {
  *             which will guarantee k <= log(n) + c
  */
 template <typename ValueIdx,
-          typename value_t,
+          typename ValueT,
           Linkage dist_type>  // NOLINT(readability-identifier-naming)
 void get_distance_graph(raft::resources const& handle,
-                        const value_t* X,
+                        const ValueT* X,
                         ValueIdx m,
                         ValueIdx n,
                         cuvs::distance::DistanceType metric,
                         rmm::device_uvector<ValueIdx>& indptr,
                         rmm::device_uvector<ValueIdx>& indices,
-                        rmm::device_uvector<value_t>& data,
+                        rmm::device_uvector<ValueT>& data,
                         int c)
 {
   auto stream = raft::resource::get_cuda_stream(handle);
 
   indptr.resize(m + 1, stream);
 
-  distance_graph_impl<dist_type, ValueIdx, value_t> dist_graph;
+  distance_graph_impl<dist_type, ValueIdx, ValueT> dist_graph;
   dist_graph.run(handle, X, m, n, metric, indptr, indices, data, c);
 }
 

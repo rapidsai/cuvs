@@ -30,16 +30,16 @@ CUCO_DECLARE_BITWISE_COMPARABLE(double);
 
 namespace cuvs::distance::detail::sparse {
 
-template <typename ValueIdx, typename value_t, int tpb>  // NOLINT(readability-identifier-naming)
-class hash_strategy : public coo_spmv_strategy<ValueIdx, value_t, tpb> {
+template <typename ValueIdx, typename ValueT, int tpb>  // NOLINT(readability-identifier-naming)
+class hash_strategy : public coo_spmv_strategy<ValueIdx, ValueT, tpb> {
  public:
-  static constexpr ValueIdx kEmptyKeySentinel  = ValueIdx{-1};
-  static constexpr value_t kEmptyValueSentinel = value_t{0};
+  static constexpr ValueIdx kEmptyKeySentinel = ValueIdx{-1};
+  static constexpr ValueT kEmptyValueSentinel = ValueT{0};
   using probing_scheme_type = cuco::linear_probing<1, cuco::murmurhash3_32<ValueIdx>>;
   using storage_ref_type =
-    cuco::bucket_storage_ref<cuco::pair<ValueIdx, value_t>, 1, cuco::extent<int>>;
+    cuco::bucket_storage_ref<cuco::pair<ValueIdx, ValueT>, 1, cuco::extent<int>>;
   using map_type = cuco::static_map_ref<ValueIdx,
-                                        value_t,
+                                        ValueT,
                                         cuda::thread_scope_block,
                                         cuda::std::equal_to<ValueIdx>,
                                         probing_scheme_type,
@@ -47,10 +47,10 @@ class hash_strategy : public coo_spmv_strategy<ValueIdx, value_t, tpb> {
                                         cuco::op::insert_tag,
                                         cuco::op::find_tag>;
 
-  explicit hash_strategy(const distances_config_t<ValueIdx, value_t>& config_,
+  explicit hash_strategy(const distances_config_t<ValueIdx, ValueT>& config_,
                          float capacity_threshold_ = 0.5,
                          int map_size_             = get_map_size())
-    : coo_spmv_strategy<ValueIdx, value_t, tpb>(config_),
+    : coo_spmv_strategy<ValueIdx, ValueT, tpb>(config_),
       capacity_threshold_(capacity_threshold_),
       map_size_(map_size_)
   {
@@ -82,7 +82,7 @@ class hash_strategy : public coo_spmv_strategy<ValueIdx, value_t, tpb> {
   }
 
   template <typename ProductF, typename AccumF, typename WriteF>
-  void dispatch(value_t* out_dists,
+  void dispatch(ValueT* out_dists,
                 ValueIdx* coo_rows_b,
                 ProductF product_func,
                 AccumF accum_func,
@@ -156,7 +156,7 @@ class hash_strategy : public coo_spmv_strategy<ValueIdx, value_t, tpb> {
   }
 
   template <typename ProductF, typename AccumF, typename WriteF>
-  void dispatch_rev(value_t* out_dists,
+  void dispatch_rev(ValueT* out_dists,
                     ValueIdx* coo_rows_a,
                     ProductF product_func,
                     AccumF accum_func,
@@ -233,7 +233,7 @@ class hash_strategy : public coo_spmv_strategy<ValueIdx, value_t, tpb> {
   {
     auto map_ref =
       map_type{cuco::empty_key<ValueIdx>{kEmptyKeySentinel},
-               cuco::empty_value<value_t>{kEmptyValueSentinel},
+               cuco::empty_value<ValueT>{kEmptyValueSentinel},
                cuda::std::equal_to<ValueIdx>{},
                probing_scheme_type{},
                cuco::cuda_thread_scope<cuda::thread_scope_block>{},
@@ -244,7 +244,7 @@ class hash_strategy : public coo_spmv_strategy<ValueIdx, value_t, tpb> {
     return map_ref;
   }
 
-  __device__ inline void insert(map_type& map_ref, const ValueIdx& key, const value_t& value)
+  __device__ inline void insert(map_type& map_ref, const ValueIdx& key, const ValueT& value)
   {
     map_ref.insert(cuco::pair{key, value});
   }
@@ -252,11 +252,11 @@ class hash_strategy : public coo_spmv_strategy<ValueIdx, value_t, tpb> {
   // Note: init_find is now merged with init_map since the new API uses the same ref for both
   // operations
 
-  __device__ inline auto find(map_type& map_ref, const ValueIdx& key) -> value_t
+  __device__ inline auto find(map_type& map_ref, const ValueIdx& key) -> ValueT
   {
     auto a_pair = map_ref.find(key);
 
-    value_t a_col = 0.0;
+    ValueT a_col = 0.0;
     if (a_pair != map_ref.end()) { a_col = a_pair->second; }
     return a_col;
   }
@@ -282,8 +282,8 @@ class hash_strategy : public coo_spmv_strategy<ValueIdx, value_t, tpb> {
 
   inline static auto get_map_size() -> int
   {
-    return (raft::getSharedMemPerBlock() - ((tpb / raft::warp_size()) * sizeof(value_t))) /
-           sizeof(cuco::pair<ValueIdx, value_t>);
+    return (raft::getSharedMemPerBlock() - ((tpb / raft::warp_size()) * sizeof(ValueT))) /
+           sizeof(cuco::pair<ValueIdx, ValueT>);
   }
 
  private:

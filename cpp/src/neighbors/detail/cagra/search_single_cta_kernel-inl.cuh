@@ -1866,14 +1866,14 @@ struct alignas(kCacheLineBytes) launcher_t {
 };
 
 template <typename DataT,
-          typename index_t,
-          typename distance_t,
+          typename IndexT,
+          typename DistanceT,
           typename SourceIndexT,
           typename SampleFilterT>
 struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_base_t {
-  using descriptor_base_type = dataset_descriptor_base_t<DataT, index_t, distance_t>;
-  using index_type           = index_t;
-  using distance_type        = distance_t;
+  using descriptor_base_type = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
+  using index_type           = IndexT;
+  using distance_type        = DistanceT;
   using data_type            = DataT;
   using kernel_config_type =
     search_kernel_config<true, descriptor_base_type, SourceIndexT, SampleFilterT>;
@@ -1881,7 +1881,7 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
   using job_desc_type = job_desc_t<descriptor_base_type>;
   kernel_type kernel;
   uint32_t block_size;
-  dataset_descriptor_host<DataT, index_t, distance_t> dd_host;
+  dataset_descriptor_host<DataT, IndexT, DistanceT> dd_host;
   rmm::device_uvector<worker_handle_t> worker_handles;
   rmm::device_uvector<job_desc_type> job_descriptors;
   rmm::device_uvector<uint32_t> completion_counters;
@@ -1894,7 +1894,7 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
    * NB: this must have the same argument types as the constructor.
    */
   static inline auto calculate_parameter_hash(
-    std::reference_wrapper<const dataset_descriptor_host<DataT, index_t, distance_t>> dataset_desc,
+    std::reference_wrapper<const dataset_descriptor_host<DataT, IndexT, DistanceT>> dataset_desc,
     raft::device_matrix_view<const index_type, int64_t, raft::row_major> graph,
     const SourceIndexT* source_indices_ptr,
     uint32_t max_candidates,
@@ -1925,7 +1925,7 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
   }
 
   persistent_runner_t(
-    std::reference_wrapper<const dataset_descriptor_host<DataT, index_t, distance_t>> dataset_desc,
+    std::reference_wrapper<const dataset_descriptor_host<DataT, IndexT, DistanceT>> dataset_desc,
     raft::device_matrix_view<const index_type, int64_t, raft::row_major> graph,
     const SourceIndexT* source_indices_ptr,
     uint32_t max_candidates,
@@ -2217,19 +2217,19 @@ auto get_runner(Args... args) -> std::shared_ptr<RunnerT>
 }
 
 template <typename DataT,
-          typename index_t,
-          typename distance_t,
+          typename IndexT,
+          typename DistanceT,
           typename SourceIndexT,
           typename SampleFilterT>
 void select_and_run(
-  const dataset_descriptor_host<DataT, index_t, distance_t>& dataset_desc,
-  raft::device_matrix_view<const index_t, int64_t, raft::row_major> graph,
+  const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
+  raft::device_matrix_view<const IndexT, int64_t, raft::row_major> graph,
   std::optional<raft::device_vector_view<const SourceIndexT, int64_t>> source_indices,
-  uintptr_t topk_indices_ptr,      // [num_queries, topk]
-  distance_t* topk_distances_ptr,  // [num_queries, topk]
-  const DataT* queries_ptr,        // [num_queries, dataset_dim]
+  uintptr_t topk_indices_ptr,     // [num_queries, topk]
+  DistanceT* topk_distances_ptr,  // [num_queries, topk]
+  const DataT* queries_ptr,       // [num_queries, dataset_dim]
   uint32_t num_queries,
-  const index_t* dev_seed_ptr,        // [num_queries, num_seeds]
+  const IndexT* dev_seed_ptr,         // [num_queries, num_seeds]
   uint32_t* num_executed_iterations,  // [num_queries,]
   const search_params& ps,
   uint32_t topk,
@@ -2237,7 +2237,7 @@ void select_and_run(
   uint32_t block_size,  //
   uint32_t smem_size,
   int64_t hash_bitlen,
-  index_t* hashmap_ptr,
+  IndexT* hashmap_ptr,
   size_t small_hash_bitlen,
   size_t small_hash_reset_interval,
   uint32_t num_seeds,
@@ -2280,8 +2280,7 @@ void select_and_run(
   }
 
   if (ps.persistent) {
-    using runner_type =
-      persistent_runner_t<DataT, index_t, distance_t, SourceIndexT, SampleFilterT>;
+    using runner_type = persistent_runner_t<DataT, IndexT, DistanceT, SourceIndexT, SampleFilterT>;
 
     get_runner<runner_type>(/*
 Note, we're passing the descriptor by reference here, and this reference is going to be passed to a
@@ -2311,7 +2310,7 @@ control is returned in this thread (in persistent_runner_t constructor), so we'r
                             ps.persistent_device_usage)
       ->launch(topk_indices_ptr, topk_distances_ptr, queries_ptr, num_queries, topk);
   } else {
-    using descriptor_base_type = dataset_descriptor_base_t<DataT, index_t, distance_t>;
+    using descriptor_base_type = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
     auto kernel = search_kernel_config<false, descriptor_base_type, SourceIndexT, SampleFilterT>::
       choose_itopk_and_mx_candidates(ps.itopk_size, num_itopk_candidates, block_size);
     RAFT_CUDA_TRY(

@@ -64,16 +64,16 @@ template <bool useNorms,
           typename DataT,
           typename AccT,
           typename IdxT,
-          typename policy,
+          typename Policy,
           typename CoreLambda,
           typename EpilogueLambda,
           typename FinalLambda,
           typename RowEpilogueLambda,
           bool isRowMajor    = true,
-          typename BaseClass = raft::linalg::Contractions_NT<DataT, IdxT, policy, isRowMajor>>
+          typename BaseClass = raft::linalg::Contractions_NT<DataT, IdxT, Policy, isRowMajor>>
 struct masked_distances : public BaseClass {
  private:
-  using p = policy;
+  using p = Policy;
   const DataT* xn_;
   const DataT* yn_;
   const DataT* const y_base_;

@@ -38,15 +38,15 @@ namespace cuvs::neighbors::cagra::detail {
 namespace single_cta_search {
 
 template <typename DataT,
-          typename index_t,
-          typename distance_t,
+          typename IndexT,
+          typename DistanceT,
           typename SAMPLE_FILTER_T,
-          typename SourceIndexT = index_t,
+          typename SourceIndexT = IndexT,
           typename OutputIndexT = SourceIndexT>
 struct search
-  : search_plan_impl<DataT, index_t, distance_t, SAMPLE_FILTER_T, SourceIndexT, OutputIndexT> {
+  : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, SourceIndexT, OutputIndexT> {
   using base_type =
-    search_plan_impl<DataT, index_t, distance_t, SAMPLE_FILTER_T, SourceIndexT, OutputIndexT>;
+    search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, SourceIndexT, OutputIndexT>;
   using DATA_T     = typename base_type::DATA_T;
   using INDEX_T    = typename base_type::INDEX_T;
   using DISTANCE_T = typename base_type::DISTANCE_T;
@@ -89,7 +89,7 @@ struct search
 
   search(raft::resources const& res,
          search_params params,
-         const dataset_descriptor_host<DataT, index_t, distance_t>& dataset_desc,
+         const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
          int64_t dim,
          int64_t dataset_size,
          int64_t graph_degree,

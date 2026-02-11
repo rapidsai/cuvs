@@ -43,10 +43,10 @@ struct cosine_distance_op {
 
   // Size of shared memory. This is normally decided by the kernel policy, but
   // some ops such as correlation_distance_op use more.
-  template <typename policy>
+  template <typename Policy>
   static constexpr auto shared_mem_size() -> size_t
   {
-    return policy::SmemSize + ((policy::Mblk + policy::Nblk) * sizeof(acc_t));
+    return Policy::SmemSize + ((Policy::Mblk + Policy::Nblk) * sizeof(acc_t));
   }
 
   DI auto core(acc_t& acc, data_t& x, data_t& y) const -> void
@@ -58,17 +58,17 @@ struct cosine_distance_op {
     }
   };
 
-  template <typename policy>
-  DI auto epilog(acc_t acc[policy::AccRowsPerTh][policy::AccColsPerTh],
+  template <typename Policy>
+  DI auto epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
                  acc_t* regxn,
                  acc_t* regyn,
                  idx_t gridStrideX,
                  idx_t gridStrideY) const -> void
   {
 #pragma unroll
-    for (int i = 0; i < policy::AccRowsPerTh; ++i) {
+    for (int i = 0; i < Policy::AccRowsPerTh; ++i) {
 #pragma unroll
-      for (int j = 0; j < policy::AccColsPerTh; ++j) {
+      for (int j = 0; j < Policy::AccColsPerTh; ++j) {
         if constexpr ((std::is_same_v<acc_t, float> && std::is_same_v<acc_t, half>)) {
           acc[i][j] = 1.0 - (acc[i][j] / (__half2float(regxn[i]) * __half2float(regyn[j])));
         } else {

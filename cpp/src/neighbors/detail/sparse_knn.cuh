@@ -26,13 +26,13 @@
 
 namespace cuvs::neighbors::detail {
 
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
 struct csr_batcher_t {
   csr_batcher_t(ValueIdx batch_size,
                 ValueIdx n_rows,
                 const ValueIdx* csr_indptr,
                 const ValueIdx* csr_indices,
-                const value_t* csr_data)
+                const ValueT* csr_data)
     : batch_start_(0),
       batch_stop_(0),
       batch_rows_(0),
@@ -69,7 +69,7 @@ struct csr_batcher_t {
     return batch_csr_stop_offset_ - batch_csr_start_offset_;
   }
 
-  void get_batch_csr_indices_data(ValueIdx* csr_indices, value_t* csr_data, cudaStream_t stream)
+  void get_batch_csr_indices_data(ValueIdx* csr_indices, ValueT* csr_data, cudaStream_t stream)
   {
     raft::sparse::op::csr_row_slice_populate(batch_csr_start_offset_,
                                              batch_csr_stop_offset_,
@@ -96,29 +96,29 @@ struct csr_batcher_t {
 
   const ValueIdx* csr_indptr_;
   const ValueIdx* csr_indices_;
-  const value_t* csr_data_;
+  const ValueT* csr_data_;
 
   ValueIdx batch_csr_start_offset_;
   ValueIdx batch_csr_stop_offset_;
 };
 
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
 class sparse_knn_t {
  public:
   sparse_knn_t(const ValueIdx* idxIndptr_,
                const ValueIdx* idxIndices_,
-               const value_t* idxData_,
+               const ValueT* idxData_,
                size_t idxNNZ_,
                int n_idx_rows_,
                int n_idx_cols_,
                const ValueIdx* queryIndptr_,
                const ValueIdx* queryIndices_,
-               const value_t* queryData_,
+               const ValueT* queryData_,
                size_t queryNNZ_,
                int n_query_rows_,
                int n_query_cols_,
                ValueIdx* output_indices_,
-               value_t* output_dists_,
+               ValueT* output_dists_,
                int k_,
                raft::resources const& handle_,
                size_t batch_size_index_             = 2 << 14,  // approx 1M
@@ -151,7 +151,7 @@ class sparse_knn_t {
   void run()
   {
     int n_batches_query = raft::ceildiv(static_cast<size_t>(n_query_rows_), batch_size_query_);
-    csr_batcher_t<ValueIdx, value_t> query_batcher(
+    csr_batcher_t<ValueIdx, ValueT> query_batcher(
       batch_size_query_, n_query_rows_, query_indptr_, query_indices_, query_data_);
 
     size_t rows_processed = 0;
@@ -174,8 +174,8 @@ class sparse_knn_t {
 
       rmm::device_uvector<ValueIdx> query_batch_indices(n_query_batch_nnz,
                                                         raft::resource::get_cuda_stream(handle));
-      rmm::device_uvector<value_t> query_batch_data(n_query_batch_nnz,
-                                                    raft::resource::get_cuda_stream(handle));
+      rmm::device_uvector<ValueT> query_batch_data(n_query_batch_nnz,
+                                                   raft::resource::get_cuda_stream(handle));
 
       query_batcher.get_batch_csr_indices_data(query_batch_indices.data(),
                                                query_batch_data.data(),
@@ -185,13 +185,13 @@ class sparse_knn_t {
       // batches and 1 space for the results of the merge, which get copied back to the top
       rmm::device_uvector<ValueIdx> merge_buffer_indices(0,
                                                          raft::resource::get_cuda_stream(handle));
-      rmm::device_uvector<value_t> merge_buffer_dists(0, raft::resource::get_cuda_stream(handle));
+      rmm::device_uvector<ValueT> merge_buffer_dists(0, raft::resource::get_cuda_stream(handle));
 
-      value_t* dists_merge_buffer_ptr;
+      ValueT* dists_merge_buffer_ptr;
       ValueIdx* indices_merge_buffer_ptr;
 
       int n_batches_idx = raft::ceildiv(static_cast<size_t>(n_idx_rows_), batch_size_index_);
-      csr_batcher_t<ValueIdx, value_t> idx_batcher(
+      csr_batcher_t<ValueIdx, ValueT> idx_batcher(
         batch_size_index_, n_idx_rows_, idx_indptr_, idx_indices_, idx_data_);
 
       for (int j = 0; j < n_batches_idx; j++) {
@@ -208,7 +208,7 @@ class sparse_knn_t {
         rmm::device_uvector<ValueIdx> idx_batch_indptr(idx_batcher.batch_rows() + 1,
                                                        raft::resource::get_cuda_stream(handle));
         rmm::device_uvector<ValueIdx> idx_batch_indices(0, raft::resource::get_cuda_stream(handle));
-        rmm::device_uvector<value_t> idx_batch_data(0, raft::resource::get_cuda_stream(handle));
+        rmm::device_uvector<ValueT> idx_batch_data(0, raft::resource::get_cuda_stream(handle));
 
         ValueIdx idx_batch_nnz = idx_batcher.get_batch_csr_indptr_nnz(
           idx_batch_indptr.data(), raft::resource::get_cuda_stream(handle));
@@ -224,10 +224,10 @@ class sparse_knn_t {
          */
         uint64_t dense_size = static_cast<uint64_t>(idx_batcher.batch_rows()) *
                               static_cast<uint64_t>(query_batcher.batch_rows());
-        rmm::device_uvector<value_t> batch_dists(dense_size,
-                                                 raft::resource::get_cuda_stream(handle));
+        rmm::device_uvector<ValueT> batch_dists(dense_size,
+                                                raft::resource::get_cuda_stream(handle));
 
-        RAFT_CUDA_TRY(cudaMemset(batch_dists.data(), 0, batch_dists.size() * sizeof(value_t)));
+        RAFT_CUDA_TRY(cudaMemset(batch_dists.data(), 0, batch_dists.size() * sizeof(ValueT)));
 
         compute_distances(idx_batcher,
                           query_batcher,
@@ -265,7 +265,7 @@ class sparse_knn_t {
                             dists_merge_buffer_ptr,
                             indices_merge_buffer_ptr);
 
-        value_t* dists_merge_buffer_tmp_ptr    = dists_merge_buffer_ptr;
+        ValueT* dists_merge_buffer_tmp_ptr     = dists_merge_buffer_ptr;
         ValueIdx* indices_merge_buffer_tmp_ptr = indices_merge_buffer_ptr;
 
         // Merge results of difference batches if necessary
@@ -287,10 +287,10 @@ class sparse_knn_t {
                                    indices_merge_buffer_tmp_ptr,
                                    batch_rows * k_,
                                    raft::resource::get_cuda_stream(handle));
-        raft::copy_async<value_t>(merge_buffer_dists.data(),
-                                  dists_merge_buffer_tmp_ptr,
-                                  batch_rows * k_,
-                                  raft::resource::get_cuda_stream(handle));
+        raft::copy_async<ValueT>(merge_buffer_dists.data(),
+                                 dists_merge_buffer_tmp_ptr,
+                                 batch_rows * k_,
+                                 raft::resource::get_cuda_stream(handle));
       }
 
       // Copy final merged batch to output array
@@ -298,21 +298,21 @@ class sparse_knn_t {
                                  merge_buffer_indices.data(),
                                  query_batcher.batch_rows() * k_,
                                  raft::resource::get_cuda_stream(handle));
-      raft::copy_async<value_t>(output_dists_ + (rows_processed * k_),
-                                merge_buffer_dists.data(),
-                                query_batcher.batch_rows() * k_,
-                                raft::resource::get_cuda_stream(handle));
+      raft::copy_async<ValueT>(output_dists_ + (rows_processed * k_),
+                               merge_buffer_dists.data(),
+                               query_batcher.batch_rows() * k_,
+                               raft::resource::get_cuda_stream(handle));
 
       rows_processed += query_batcher.batch_rows();
     }
   }
 
  private:
-  void merge_batches(csr_batcher_t<ValueIdx, value_t>& idx_batcher,
-                     csr_batcher_t<ValueIdx, value_t>& query_batcher,
-                     value_t* merge_buffer_dists,
+  void merge_batches(csr_batcher_t<ValueIdx, ValueT>& idx_batcher,
+                     csr_batcher_t<ValueIdx, ValueT>& query_batcher,
+                     ValueT* merge_buffer_dists,
                      ValueIdx* merge_buffer_indices,
-                     value_t* out_dists,
+                     ValueT* out_dists,
                      ValueIdx* out_indices)
   {
     // build translation buffer to shift resulting indices by the batch
@@ -328,18 +328,18 @@ class sparse_knn_t {
     auto rows = query_batcher.batch_rows();
     knn_merge_parts(
       handle,
-      raft::make_device_matrix_view<const value_t, int64_t>(merge_buffer_dists, rows, 2 * k_),
+      raft::make_device_matrix_view<const ValueT, int64_t>(merge_buffer_dists, rows, 2 * k_),
       raft::make_device_matrix_view<const ValueIdx, int64_t>(merge_buffer_indices, rows, 2 * k_),
-      raft::make_device_matrix_view<value_t, int64_t>(out_dists, rows, k_),
+      raft::make_device_matrix_view<ValueT, int64_t>(out_dists, rows, k_),
       raft::make_device_matrix_view<ValueIdx, int64_t>(out_indices, rows, k_),
       raft::make_device_vector_view<ValueIdx, int64_t>(trans.data(), id_ranges.size()));
   }
 
-  void perform_k_selection(csr_batcher_t<ValueIdx, value_t> idx_batcher,
-                           csr_batcher_t<ValueIdx, value_t> query_batcher,
-                           value_t* batch_dists,
+  void perform_k_selection(csr_batcher_t<ValueIdx, ValueT> idx_batcher,
+                           csr_batcher_t<ValueIdx, ValueT> query_batcher,
+                           ValueT* batch_dists,
                            ValueIdx* batch_indices,
-                           value_t* out_dists,
+                           ValueT* out_dists,
                            ValueIdx* out_indices)
   {
     // populate batch indices array
@@ -359,30 +359,30 @@ class sparse_knn_t {
     // kernel to slice first (min) k_ cols and copy into batched merge buffer
     cuvs::selection::select_k(
       handle,
-      raft::make_device_matrix_view<const value_t, int64_t>(batch_dists, batch_rows, batch_cols),
+      raft::make_device_matrix_view<const ValueT, int64_t>(batch_dists, batch_rows, batch_cols),
       raft::make_device_matrix_view<const ValueIdx, int64_t>(batch_indices, batch_rows, batch_cols),
-      raft::make_device_matrix_view<value_t, int64_t>(out_dists, batch_rows, n_neighbors),
+      raft::make_device_matrix_view<ValueT, int64_t>(out_dists, batch_rows, n_neighbors),
       raft::make_device_matrix_view<ValueIdx, int64_t>(out_indices, batch_rows, n_neighbors),
       ascending,
       true);
   }
 
-  void compute_distances(csr_batcher_t<ValueIdx, value_t>& idx_batcher,
-                         csr_batcher_t<ValueIdx, value_t>& query_batcher,
+  void compute_distances(csr_batcher_t<ValueIdx, ValueT>& idx_batcher,
+                         csr_batcher_t<ValueIdx, ValueT>& query_batcher,
                          size_t idx_batch_nnz,
                          size_t query_batch_nnz,
                          ValueIdx* idx_batch_indptr,
                          ValueIdx* idx_batch_indices,
-                         value_t* idx_batch_data,
+                         ValueT* idx_batch_data,
                          ValueIdx* query_batch_indptr,
                          ValueIdx* query_batch_indices,
-                         value_t* query_batch_data,
-                         value_t* batch_dists)
+                         ValueT* query_batch_data,
+                         ValueT* batch_dists)
   {
     /**
      * Compute distances
      */
-    cuvs::distance::detail::sparse::distances_config_t<ValueIdx, value_t> dist_config(handle);
+    cuvs::distance::detail::sparse::distances_config_t<ValueIdx, ValueT> dist_config(handle);
     dist_config.b_nrows = idx_batcher.batch_rows();
     dist_config.b_ncols = n_idx_cols_;
     dist_config.b_nnz   = idx_batch_nnz;
@@ -404,8 +404,8 @@ class sparse_knn_t {
 
   const ValueIdx *idx_indptr_, *idx_indices_, *query_indptr_, *query_indices_;
   ValueIdx* output_indices_;
-  const value_t *idx_data_, *query_data_;
-  value_t* output_dists_;
+  const ValueT *idx_data_, *query_data_;
+  ValueT* output_dists_;
 
   size_t idx_nnz_, query_nnz_, batch_size_index_, batch_size_query_;
 

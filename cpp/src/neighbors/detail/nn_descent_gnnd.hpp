@@ -24,7 +24,7 @@ using dist_data_t = float;
 constexpr int kDegreeOnDevice{32};
 constexpr int kSegmentSize{32};
 constexpr int kCounterInterval{100};
-template <typename index_t>
+template <typename IndexT>
 struct InternalID_t;
 
 inline auto round_up_32(size_t num) -> size_t { return (num + 31) / 32 * 32; }
@@ -68,7 +68,7 @@ struct build_config {
     cuvs::neighbors::nn_descent::DIST_COMP_DTYPE::AUTO};
 };
 
-template <typename index_t>
+template <typename IndexT>
 class bloom_filter {
  public:
   bloom_filter(size_t nrow, size_t num_sets_per_list, size_t num_hashs)
@@ -79,7 +79,7 @@ class bloom_filter {
   {
   }
 
-  void add(size_t list_id, index_t key)
+  void add(size_t list_id, IndexT key)
   {
     if (is_cleared_) { is_cleared_ = false; }
     uint32_t hash = hash_0(key);
@@ -94,7 +94,7 @@ class bloom_filter {
 
   void set_nrow(size_t nrow) { nrow_ = nrow; }
 
-  auto check(size_t list_id, index_t key) -> bool
+  auto check(size_t list_id, IndexT key) -> bool
   {
     bool is_present = true;
     uint32_t hash   = hash_0(key);
@@ -150,11 +150,11 @@ class bloom_filter {
   size_t num_hashs_;
 };
 
-template <typename index_t>
+template <typename IndexT>
 struct gnnd_graph {
   raft::resources const& res;
   static constexpr int kSegmentSize = 32;
-  InternalID_t<index_t>* h_graph;
+  InternalID_t<IndexT>* h_graph;
 
   size_t nrow;
   size_t node_degree;
@@ -163,12 +163,12 @@ struct gnnd_graph {
 
   raft::host_matrix<dist_data_t, size_t, raft::row_major> h_dists;
 
-  raft::pinned_matrix<index_t, size_t> h_graph_new;
+  raft::pinned_matrix<IndexT, size_t> h_graph_new;
   raft::pinned_vector<int2, size_t> h_list_sizes_new;
 
-  raft::pinned_matrix<index_t, size_t> h_graph_old;
+  raft::pinned_matrix<IndexT, size_t> h_graph_old;
   raft::pinned_vector<int2, size_t> h_list_sizes_old;
-  bloom_filter<index_t> bloom_filter;
+  bloom_filter<IndexT> bloom_filter;
 
   gnnd_graph(const gnnd_graph&)                    = delete;
   auto operator=(const gnnd_graph&) -> gnnd_graph& = delete;
@@ -181,9 +181,9 @@ struct gnnd_graph {
   // TODO(snanditale): Create a generic bloom filter utility
   // https://github.com/rapidsai/raft/issues/1827 Use Bloom filter to sample "new" neighbors for
   // local joining
-  void sample_graph_new(InternalID_t<index_t>* new_neighbors, const size_t width);
+  void sample_graph_new(InternalID_t<IndexT>* new_neighbors, const size_t width);
   void sample_graph(bool sample_new);
-  void update_graph(const InternalID_t<index_t>* new_neighbors,
+  void update_graph(const InternalID_t<IndexT>* new_neighbors,
                     const dist_data_t* new_dists,
                     const size_t width,
                     std::atomic<int64_t>& update_counter);
@@ -192,7 +192,7 @@ struct gnnd_graph {
   ~gnnd_graph();
 };
 
-template <typename DataT = float, typename index_t = int>
+template <typename DataT = float, typename IndexT = int>
 class gnnd {
  public:
   gnnd(raft::resources const& res, const build_config& build_config);
@@ -201,19 +201,19 @@ class gnnd {
 
   template <typename DistEpilogueT = raft::identity_op>
   void build(DataT* data,
-             const index_t nrow,
-             index_t* output_graph,
+             const IndexT nrow,
+             IndexT* output_graph,
              bool return_distances,
              dist_data_t* output_distances,
              DistEpilogueT dist_epilogue = DistEpilogueT{});
   ~gnnd()    = default;
-  using id_t = InternalID_t<index_t>;
+  using id_t = InternalID_t<IndexT>;
   void reset(raft::resources const& res);
 
  private:
-  void add_reverse_edges(index_t* graph_ptr,
-                         index_t* h_rev_graph_ptr,
-                         index_t* d_rev_graph_ptr,
+  void add_reverse_edges(IndexT* graph_ptr,
+                         IndexT* h_rev_graph_ptr,
+                         IndexT* d_rev_graph_ptr,
                          int2* list_sizes,
                          cudaStream_t stream = nullptr);
 
@@ -223,7 +223,7 @@ class gnnd {
   raft::resources const& res_;
 
   build_config build_config_;
-  gnnd_graph<index_t> graph_;
+  gnnd_graph<IndexT> graph_;
   std::atomic<int64_t> update_counter_;
 
   size_t nrow_;
@@ -241,9 +241,9 @@ class gnnd {
 
   raft::device_vector<int, size_t> d_locks_;
 
-  raft::pinned_matrix<index_t, size_t> h_rev_graph_new_;
-  raft::pinned_matrix<index_t, size_t> h_graph_old_;
-  raft::pinned_matrix<index_t, size_t> h_rev_graph_old_;
+  raft::pinned_matrix<IndexT, size_t> h_rev_graph_new_;
+  raft::pinned_matrix<IndexT, size_t> h_graph_old_;
+  raft::pinned_matrix<IndexT, size_t> h_rev_graph_old_;
   // int2.x is the number of forward edges, int2.y is the number of reverse edges
 
   raft::device_vector<int2, size_t> d_list_sizes_new_;

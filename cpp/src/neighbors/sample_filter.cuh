@@ -42,7 +42,7 @@ constexpr __forceinline__ _RAFT_HOST_DEVICE auto none_sample_filter::operator()(
 
 template <typename filter_t, typename = void>  // NOLINT(readability-identifier-naming)
 struct takes_three_args : std::false_type {};
-template <typename filter_t>
+template <typename filter_t>  // NOLINT(readability-identifier-naming)
 struct takes_three_args<
   filter_t,
   std::void_t<decltype(std::declval<filter_t>()(uint32_t{}, uint32_t{}, uint32_t{}))>>
@@ -83,14 +83,14 @@ inline _RAFT_HOST_DEVICE auto ivf_to_sample_filter<index_t, filter_t>::operator(
   }
 }
 
-template <typename BitsetT, typename index_t>
+template <typename BitsetT, typename index_t>  // NOLINT(readability-identifier-naming)
 _RAFT_HOST_DEVICE bitset_filter<BitsetT, index_t>::bitset_filter(
   const cuvs::core::bitset_view<BitsetT, index_t> bitset_for_filtering)
   : bitset_view_{bitset_for_filtering}
 {
 }
 
-template <typename BitsetT, typename index_t>
+template <typename BitsetT, typename index_t>  // NOLINT(readability-identifier-naming)
 constexpr __forceinline__ _RAFT_HOST_DEVICE auto bitset_filter<BitsetT, index_t>::operator()(
   // query index
   const uint32_t query_ix,
@@ -100,21 +100,21 @@ constexpr __forceinline__ _RAFT_HOST_DEVICE auto bitset_filter<BitsetT, index_t>
   return bitset_view_.test(sample_ix);
 }
 
-template <typename BitsetT, typename index_t>
-template <typename csr_matrix_t>  // NOLINT(readability-identifier-naming)
+template <typename BitsetT, typename index_t>  // NOLINT(readability-identifier-naming)
+template <typename csr_matrix_t>               // NOLINT(readability-identifier-naming)
 void bitset_filter<BitsetT, index_t>::to_csr(raft::resources const& handle, csr_matrix_t& csr)
 {
   raft::sparse::convert::bitset_to_csr(handle, bitset_view_, csr);
 }
 
-template <typename BitmapT, typename index_t>
+template <typename BitmapT, typename index_t>  // NOLINT(readability-identifier-naming)
 bitmap_filter<BitmapT, index_t>::bitmap_filter(
   const cuvs::core::bitmap_view<BitmapT, index_t> bitmap_for_filtering)
   : bitmap_view_{bitmap_for_filtering}
 {
 }
 
-template <typename BitmapT, typename index_t>
+template <typename BitmapT, typename index_t>  // NOLINT(readability-identifier-naming)
 inline _RAFT_HOST_DEVICE auto bitmap_filter<BitmapT, index_t>::operator()(
   // query index
   const uint32_t query_ix,
@@ -124,8 +124,8 @@ inline _RAFT_HOST_DEVICE auto bitmap_filter<BitmapT, index_t>::operator()(
   return bitmap_view_.test(query_ix, sample_ix);
 }
 
-template <typename BitmapT, typename index_t>
-template <typename csr_matrix_t>  // NOLINT(readability-identifier-naming)
+template <typename BitmapT, typename index_t>  // NOLINT(readability-identifier-naming)
+template <typename csr_matrix_t>               // NOLINT(readability-identifier-naming)
 void bitmap_filter<BitmapT, index_t>::to_csr(raft::resources const& handle, csr_matrix_t& csr)
 {
   raft::sparse::convert::bitmap_to_csr(handle, bitmap_view_, csr);

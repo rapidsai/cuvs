@@ -84,10 +84,10 @@ struct l2_exp_distance_op {
 
   // Size of shared memory. This is normally decided by the kernel policy, but
   // some ops such as correlation_distance_op use more.
-  template <typename policy>
+  template <typename Policy>
   static constexpr auto shared_mem_size() -> size_t
   {
-    return policy::SmemSize + ((policy::Mblk + policy::Nblk) * sizeof(acc_t));
+    return Policy::SmemSize + ((Policy::Mblk + Policy::Nblk) * sizeof(acc_t));
   }
 
   DI auto core(acc_t& acc, data_t& x, data_t& y) const -> void
@@ -99,17 +99,17 @@ struct l2_exp_distance_op {
     }
   };
 
-  template <typename policy>
-  DI auto epilog(acc_t acc[policy::AccRowsPerTh][policy::AccColsPerTh],
+  template <typename Policy>
+  DI auto epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
                  acc_t* regxn,
                  acc_t* regyn,
                  idx_t gridStrideX,
                  idx_t gridStrideY) const -> void
   {
 #pragma unroll
-    for (int i = 0; i < policy::AccRowsPerTh; ++i) {
+    for (int i = 0; i < Policy::AccRowsPerTh; ++i) {
 #pragma unroll
-      for (int j = 0; j < policy::AccColsPerTh; ++j) {
+      for (int j = 0; j < Policy::AccColsPerTh; ++j) {
         acc_t acc_val = acc[i][j];
         acc_t val     = regxn[i] + regyn[j] - static_cast<acc_t>(2.0) * acc_val;
 
@@ -125,9 +125,9 @@ struct l2_exp_distance_op {
     }
     if (sqrt) {
 #pragma unroll
-      for (int i = 0; i < policy::AccRowsPerTh; ++i) {
+      for (int i = 0; i < Policy::AccRowsPerTh; ++i) {
 #pragma unroll
-        for (int j = 0; j < policy::AccColsPerTh; ++j) {
+        for (int j = 0; j < Policy::AccColsPerTh; ++j) {
           acc[i][j] = raft::sqrt(acc[i][j]);
         }
       }

@@ -36,7 +36,7 @@ __device__ __inline__ auto get_lowest_peer(unsigned int peer_group) -> unsigned 
  * Reference: https://www.icl.utk.edu/files/publications/2020/icl-utk-1421-2020.pdf
  *
  * @tparam ValueIdx index type
- * @tparam value_t value type
+ * @tparam ValueT value type
  * @tparam tpb threads per block configured on launch
  * @tparam rev if this is true, the reduce/accumulate functions are only
  *         executed when a[col] == 0.0. when executed before/after !rev
@@ -44,13 +44,13 @@ __device__ __inline__ auto get_lowest_peer(unsigned int peer_group) -> unsigned 
  *         and intersection to be computed.
  * @tparam kv_t data type stored in shared mem cache
  * @tparam ProductF reduce function type (semiring product() function).
- *                  accepts two arguments of value_t and returns a value_t
+ *                  accepts two arguments of ValueT and returns a ValueT
  * @tparam AccumF accumulation function type (semiring sum() function).
- *                 accepts two arguments of value_t and returns a value_t
+ *                 accepts two arguments of ValueT and returns a ValueT
  * @tparam WriteF function to write value out. this should be mathematically
  *                 equivalent to the accumulate function but implemented as
  *                 an atomic operation on global memory. Accepts two arguments
- *                 of value_t* and value_t and updates the value given by the
+ *                 of ValueT* and ValueT and updates the value given by the
  *                 pointer.
  * @param[in] indptrA column pointer array for a
  * @param[in] indicesA column indices array for a
@@ -73,7 +73,7 @@ __device__ __inline__ auto get_lowest_peer(unsigned int peer_group) -> unsigned 
 template <typename StrategyT,
           typename IndptrIt,
           typename ValueIdx,
-          typename value_t,  // NOLINT(readability-identifier-naming)
+          typename ValueT,  // NOLINT(readability-identifier-naming)
           bool rev,
           int tpb,
           typename ProductF,
@@ -82,16 +82,16 @@ template <typename StrategyT,
 RAFT_KERNEL balanced_coo_generalized_spmv_kernel(StrategyT strategy,
                                                  IndptrIt indptrA,
                                                  ValueIdx* indicesA,
-                                                 value_t* dataA,
+                                                 ValueT* dataA,
                                                  ValueIdx nnz_a,
                                                  ValueIdx* rowsB,
                                                  ValueIdx* indicesB,
-                                                 value_t* dataB,
+                                                 ValueT* dataB,
                                                  ValueIdx m,
                                                  ValueIdx n,
                                                  int dim,
                                                  ValueIdx nnz_b,
-                                                 value_t* out,
+                                                 ValueT* out,
                                                  int n_blocks_per_row,
                                                  int chunk_size,
                                                  ValueIdx b_ncols,
@@ -99,7 +99,7 @@ RAFT_KERNEL balanced_coo_generalized_spmv_kernel(StrategyT strategy,
                                                  AccumF accum_func,
                                                  WriteF write_func)
 {
-  using warp_reduce = cub::WarpReduce<value_t>;
+  using warp_reduce = cub::WarpReduce<ValueT>;
 
   ValueIdx cur_row_a        = indptrA.get_row_idx(n_blocks_per_row);
   ValueIdx cur_chunk_offset = blockIdx.x % n_blocks_per_row;
@@ -152,7 +152,7 @@ RAFT_KERNEL balanced_coo_generalized_spmv_kernel(StrategyT strategy,
                                last_a_chunk);
 
   ValueIdx cur_row_b = -1;
-  value_t c          = 0.0;
+  ValueT c           = 0.0;
 
   auto warp_red = warp_reduce(*(temp_storage + warp_id));
 
@@ -163,7 +163,7 @@ RAFT_KERNEL balanced_coo_generalized_spmv_kernel(StrategyT strategy,
     auto in_bounds = indptrA.check_indices_bounds(start_index_a, stop_index_a, index_b);
 
     if (in_bounds) {
-      value_t a_col = strategy.find(map_ref, index_b);
+      ValueT a_col = strategy.find(map_ref, index_b);
       if (!rev || a_col == 0.0) { c = product_func(a_col, dataB[ind]); }
     }
   }
@@ -183,7 +183,7 @@ RAFT_KERNEL balanced_coo_generalized_spmv_kernel(StrategyT strategy,
       // because any other threads should have returned already.
       unsigned int peer_group = __match_any_sync(0xffffffff, cur_row_b);
       bool is_leader          = get_lowest_peer(peer_group) == lane_id;
-      value_t v               = warp_red.HeadSegmentedReduce(c, is_leader, accum_func);
+      ValueT v                = warp_red.HeadSegmentedReduce(c, is_leader, accum_func);
 
       // thread with lowest lane id among peers writes out
       if (is_leader && v != 0.0) {
@@ -201,7 +201,7 @@ RAFT_KERNEL balanced_coo_generalized_spmv_kernel(StrategyT strategy,
       auto index_b   = indicesB[ind];
       auto in_bounds = indptrA.check_indices_bounds(start_index_a, stop_index_a, index_b);
       if (in_bounds) {
-        value_t a_col = strategy.find(map_ref, index_b);
+        ValueT a_col = strategy.find(map_ref, index_b);
 
         if (!rev || a_col == 0.0) { c = accum_func(c, product_func(a_col, dataB[ind])); }
       }

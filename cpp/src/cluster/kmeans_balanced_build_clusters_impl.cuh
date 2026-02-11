@@ -20,8 +20,8 @@ namespace cuvs::cluster::kmeans_balanced::helpers {
  *
  * @tparam DataT Type of the input data.
  * @tparam MathT Type of the centroids and mapped data.
- * @tparam index_t Type used for indexing.
- * @tparam label_t Type of the output labels.
+ * @tparam IndexT Type used for indexing.
+ * @tparam LabelT Type of the output labels.
  * @tparam CounterT Counter type supported by CUDA's native atomicAdd.
  * @tparam MappingOpT Type of the mapping function.
  * @param[in]  handle        The raft resources
@@ -37,16 +37,16 @@ namespace cuvs::cluster::kmeans_balanced::helpers {
  */
 template <typename DataT,
           typename MathT,
-          typename index_t,
-          typename label_t,
+          typename IndexT,
+          typename LabelT,
           typename CounterT,
           typename MappingOpT>
 void build_clusters(const raft::resources& handle,
                     const cuvs::cluster::kmeans::balanced_params& params,
-                    raft::device_matrix_view<const DataT, index_t> X,
-                    raft::device_matrix_view<MathT, index_t> centroids,
-                    raft::device_vector_view<label_t, index_t> labels,
-                    raft::device_vector_view<CounterT, index_t> cluster_sizes,
+                    raft::device_matrix_view<const DataT, IndexT> X,
+                    raft::device_matrix_view<MathT, IndexT> centroids,
+                    raft::device_vector_view<LabelT, IndexT> labels,
+                    raft::device_vector_view<CounterT, IndexT> cluster_sizes,
                     MappingOpT mapping_op,
                     std::optional<raft::device_vector_view<const MathT>> X_norm)
 {

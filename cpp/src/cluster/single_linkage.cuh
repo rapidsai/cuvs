@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -23,7 +23,7 @@ namespace cuvs::cluster::agglomerative {
  * a knn graph when k is not large enough to connect it.
 
  * @tparam ValueIdx
- * @tparam value_t
+ * @tparam ValueT
  * @tparam dist_type method to use for constructing connectivities graph
  * @param[in] handle raft handle
  * @param[in] X dense input matrix in row-major layout
@@ -37,10 +37,10 @@ namespace cuvs::cluster::agglomerative {
  * @param[in] n_clusters number of clusters to assign data samples
  */
 template <typename ValueIdx,
-          typename value_t,
+          typename ValueT,
           Linkage dist_type = Linkage::KNN_GRAPH>  // NOLINT(readability-identifier-naming)
 void single_linkage(raft::resources const& handle,
-                    const value_t* X,
+                    const ValueT* X,
                     ValueIdx m,
                     ValueIdx n,
                     cuvs::distance::DistanceType metric,
@@ -48,7 +48,7 @@ void single_linkage(raft::resources const& handle,
                     int c,
                     size_t n_clusters)
 {
-  detail::single_linkage<ValueIdx, value_t, dist_type>(handle, X, m, n, metric, out, c, n_clusters);
+  detail::single_linkage<ValueIdx, ValueT, dist_type>(handle, X, m, n, metric, out, c, n_clusters);
 }
 
 /**
@@ -58,7 +58,7 @@ void single_linkage(raft::resources const& handle,
  * a knn graph when k is not large enough to connect it.
 
  * @tparam ValueIdx
- * @tparam value_t
+ * @tparam ValueT
  * @tparam dist_type method to use for constructing connectivities graph
  * @param[in] handle raft handle
  * @param[in] X dense input matrix in row-major layout
@@ -69,11 +69,11 @@ void single_linkage(raft::resources const& handle,
  * @param[in] c a constant used when constructing connectivities from knn graph. Allows the indirect
  control of k. The algorithm will set `k = log(n) + c`
  */
-template <typename value_t,
+template <typename ValueT,
           typename IdxT,
           Linkage dist_type = Linkage::KNN_GRAPH>  // NOLINT(readability-identifier-naming)
 void single_linkage(raft::resources const& handle,
-                    raft::device_matrix_view<const value_t, IdxT, raft::row_major> X,
+                    raft::device_matrix_view<const ValueT, IdxT, raft::row_major> X,
                     raft::device_matrix_view<IdxT, IdxT, raft::row_major> dendrogram,
                     raft::device_vector_view<IdxT, IdxT> labels,
                     cuvs::distance::DistanceType metric,
@@ -84,13 +84,13 @@ void single_linkage(raft::resources const& handle,
   out_arrs.children = dendrogram.data_handle();
   out_arrs.labels   = labels.data_handle();
 
-  single_linkage<IdxT, value_t, dist_type>(handle,
-                                           X.data_handle(),
-                                           X.extent(0),
-                                           X.extent(1),
-                                           metric,
-                                           &out_arrs,
-                                           c.has_value() ? c.value() : DEFAULT_CONST_C,
-                                           n_clusters);
+  single_linkage<IdxT, ValueT, dist_type>(handle,
+                                          X.data_handle(),
+                                          X.extent(0),
+                                          X.extent(1),
+                                          metric,
+                                          &out_arrs,
+                                          c.has_value() ? c.value() : DEFAULT_CONST_C,
+                                          n_clusters);
 }
 };  // namespace   cuvs::cluster::agglomerative

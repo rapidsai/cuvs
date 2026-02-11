@@ -33,7 +33,7 @@ namespace detail {
  * @brief kernel that calculates the average intra-cluster distance for every sample data point and
  * updates the cluster distance to max value
  * @tparam DataT: type of the data samples
- * @tparam label_t: type of the labels
+ * @tparam LabelT: type of the labels
  * @param sample_to_cluster_sum_of_distances: the pointer to the 2D array that contains the sum of
  * distances from every sample to every cluster (nRows x nLabels)
  * @param bin_count_array: pointer to the 1D array that contains the count of samples per cluster (1
@@ -45,11 +45,11 @@ namespace detail {
  * @param nLabels: number of Labels
  * @param MAX_VAL: DataT specific upper limit
  */
-template <typename DataT, typename label_t>
+template <typename DataT, typename LabelT>
 RAFT_KERNEL populate_a_kernel(DataT* sample_to_cluster_sum_of_distances,
                               DataT* bin_count_array,
                               DataT* d_a_array,
-                              const label_t* labels,
+                              const LabelT* labels,
                               int nRows,
                               int nLabels,
                               const DataT MAX_VAL)
@@ -63,7 +63,7 @@ RAFT_KERNEL populate_a_kernel(DataT* sample_to_cluster_sum_of_distances,
   DataT* sample_to_cluster_sum_of_distances_vector =
     &sample_to_cluster_sum_of_distances[sample_index * nLabels];
 
-  label_t sample_cluster = labels[sample_index];
+  LabelT sample_cluster = labels[sample_index];
 
   int sample_cluster_index = static_cast<int>(sample_cluster);
 
@@ -85,7 +85,7 @@ RAFT_KERNEL populate_a_kernel(DataT* sample_to_cluster_sum_of_distances,
 /**
  * @brief function to calculate the bincounts of number of samples in every label
  * @tparam DataT: type of the data samples
- * @tparam label_t: type of the labels
+ * @tparam LabelT: type of the labels
  * @param labels: the pointer to the array containing labels for every data sample (1 x nRows)
  * @param bin_count_array: pointer to the 1D array that contains the count of samples per cluster (1
  * x nLabels)
@@ -94,8 +94,8 @@ RAFT_KERNEL populate_a_kernel(DataT* sample_to_cluster_sum_of_distances,
  * @param workspace: device buffer containing workspace memory
  * @param stream: the cuda stream where to launch this kernel
  */
-template <typename DataT, typename label_t>
-void count_labels(const label_t* labels,
+template <typename DataT, typename LabelT>
+void count_labels(const LabelT* labels,
                   DataT* bin_count_array,
                   int nRows,
                   int nUniqueLabels,
@@ -103,8 +103,8 @@ void count_labels(const label_t* labels,
                   cudaStream_t stream)
 {
   int num_levels            = nUniqueLabels + 1;
-  label_t lower_level       = 0;
-  label_t upper_level       = nUniqueLabels;
+  LabelT lower_level        = 0;
+  LabelT upper_level        = nUniqueLabels;
   size_t temp_storage_bytes = 0;
 
   rmm::device_uvector<int> count_array(nUniqueLabels, stream);
@@ -171,7 +171,7 @@ struct sil_op {
  * @brief main function that returns the average silhouette score for a given set of data and its
  * clusterings
  * @tparam DataT: type of the data samples
- * @tparam label_t: type of the labels
+ * @tparam LabelT: type of the labels
  * @param X_in: pointer to the input Data samples array (nRows x nCols)
  * @param nRows: number of data samples
  * @param nCols: number of features
@@ -183,13 +183,13 @@ struct sil_op {
  * @param metric: the numerical value that maps to the type of distance metric to be used in the
  * calculations
  */
-template <typename DataT, typename label_t>
+template <typename DataT, typename LabelT>
 auto silhouette_score(
   raft::resources const& handle,
   const DataT* X_in,
   int nRows,
   int nCols,
-  const label_t* labels,
+  const LabelT* labels,
   int nLabels,
   DataT* silhouette_scorePerSample,
   cudaStream_t stream,

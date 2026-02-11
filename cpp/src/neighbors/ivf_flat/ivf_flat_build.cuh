@@ -91,7 +91,7 @@ auto clone(const raft::resources& res, const index<T, IdxT>& source) -> index<T,
  *
  * @tparam T      element type.
  * @tparam IdxT   type of the vector ids in the index (corresponds to second arg ofindex<T, IdxT>)
- * @tparam label_t label type
+ * @tparam LabelT label type
  * @tparam SourceIndexT input index type (usually same as IdxT)
  * @tparam gather_src if false, then we build the index from vectors source_vecs[i,:], otherwise
  *     we use source_vecs[source_ixs[i],:]. In both cases i=0..n_rows-1.
@@ -109,8 +109,8 @@ auto clone(const raft::resources& res, const index<T, IdxT>& source) -> index<T,
  * @param veclen size of vectorized loads/stores; must satisfy `dim % veclen == 0`.
  *
  */
-template <typename T, typename IdxT, typename label_t, typename SourceIdxT, bool gather_src = false>
-RAFT_KERNEL build_index_kernel(const label_t* labels,
+template <typename T, typename IdxT, typename LabelT, typename SourceIdxT, bool gather_src = false>
+RAFT_KERNEL build_index_kernel(const LabelT* labels,
                                const T* source_vecs,
                                const SourceIdxT* source_ixs,
                                T** list_data_ptrs,

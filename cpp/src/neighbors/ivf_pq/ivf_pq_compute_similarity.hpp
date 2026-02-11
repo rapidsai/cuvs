@@ -9,7 +9,7 @@
 
 namespace cuvs::neighbors::ivf_pq::detail {
 
-template <typename out_t, typename LutT>
+template <typename OutT, typename LutT>
 struct selected {
   dim3 grid_dim;
   dim3 block_dim;

@@ -35,7 +35,7 @@ constexpr int kMaxColQ = 3;
  * of their k closest landmarks. This is usually a very small portion
  * of the total points.
  * @tparam ValueIdx
- * @tparam value_t
+ * @tparam ValueT
  * @tparam ValueInt
  * @tparam tpb
  * @param X
@@ -51,15 +51,15 @@ constexpr int kMaxColQ = 3;
  * @param weight
  */
 template <typename ValueIdx,
-          typename value_t,
+          typename ValueT,
           typename ValueInt = std::uint32_t,
           int tpb           = 32>  // NOLINT(readability-identifier-naming)
-RAFT_KERNEL perform_post_filter_registers(const value_t* X,
+RAFT_KERNEL perform_post_filter_registers(const ValueT* X,
                                           int64_t n_cols,
                                           const ValueIdx* R_knn_inds,
-                                          const value_t* R_knn_dists,
-                                          const value_t* R_radius,
-                                          const value_t* landmarks,
+                                          const ValueT* R_knn_dists,
+                                          const ValueT* R_radius,
+                                          const ValueT* landmarks,
                                           int n_landmarks,
                                           ValueInt bitset_size,
                                           int64_t k,
@@ -78,12 +78,12 @@ RAFT_KERNEL perform_post_filter_registers(const value_t* X,
   __syncthreads();
 
   // TODO(snanditale): Would it be faster to use L1 for this?
-  value_t local_x_ptr[kMaxColQ];
+  ValueT local_x_ptr[kMaxColQ];
   for (ValueInt j = 0; j < n_cols; ++j) {
     local_x_ptr[j] = X[n_cols * blockIdx.x + j];
   }
 
-  value_t closest_r_dist = R_knn_dists[blockIdx.x * k + (k - 1)];
+  ValueT closest_r_dist = R_knn_dists[blockIdx.x * k + (k - 1)];
 
   // zero out bits for closest k landmarks
   for (ValueInt j = threadIdx.x; j < k; j += tpb) {
@@ -98,8 +98,7 @@ RAFT_KERNEL perform_post_filter_registers(const value_t* X,
   // its closest landmark + the radius of the current landmark.
   for (ValueInt l = threadIdx.x; l < n_landmarks; l += tpb) {
     // compute p(q, r)
-    value_t dist =
-      compute_distance_by_metric(local_x_ptr, landmarks + (n_cols * l), n_cols, metric);
+    ValueT dist = compute_distance_by_metric(local_x_ptr, landmarks + (n_cols * l), n_cols, metric);
     if (dist > weight * (closest_r_dist + R_radius[l]) || dist > 3 * closest_r_dist) {
       zero_bit(shared_mem, l);
     }
@@ -117,7 +116,7 @@ RAFT_KERNEL perform_post_filter_registers(const value_t* X,
 
 /**
  * @tparam ValueIdx
- * @tparam value_t
+ * @tparam ValueT
  * @tparam ValueInt
  * @tparam BitsetType
  * @tparam warp_q number of registers to use per warp
@@ -137,43 +136,43 @@ RAFT_KERNEL perform_post_filter_registers(const value_t* X,
  * @param k
  */
 template <typename ValueIdx,
-          typename value_t,  // NOLINT(readability-identifier-naming)
+          typename ValueT,  // NOLINT(readability-identifier-naming)
           typename ValueInt   = std::uint32_t,
           typename BitsetType = std::uint32_t,
           int warp_q          = 32,
           int thread_q        = 2,
           int tpb             = 128>
-RAFT_KERNEL compute_final_dists_registers(const value_t* X_reordered,
-                                          const value_t* X,
+RAFT_KERNEL compute_final_dists_registers(const ValueT* X_reordered,
+                                          const ValueT* X,
                                           const int64_t n_cols,
                                           BitsetType* bitset,
                                           ValueInt bitset_size,
-                                          const value_t* R_closest_landmark_dists,
+                                          const ValueT* R_closest_landmark_dists,
                                           const ValueIdx* R_indptr,
                                           const ValueIdx* R_1nn_inds,
-                                          const value_t* R_1nn_dists,
+                                          const ValueT* R_1nn_dists,
                                           ValueIdx* knn_inds,
-                                          value_t* knn_dists,
+                                          ValueT* knn_dists,
                                           int64_t n_landmarks,
                                           int64_t k,
                                           cuvs::distance::DistanceType metric)
 {
   static constexpr int kNumWarps = tpb / raft::WarpSize;
 
-  __shared__ value_t shared_mem_k[kNumWarps * warp_q];
-  __shared__ raft::KeyValuePair<value_t, ValueIdx> shared_mem_v[kNumWarps * warp_q];
+  __shared__ ValueT shared_mem_k[kNumWarps * warp_q];
+  __shared__ raft::KeyValuePair<ValueT, ValueIdx> shared_mem_v[kNumWarps * warp_q];
 
-  const value_t* x_ptr = X + (n_cols * blockIdx.x);
-  value_t local_x_ptr[kMaxColQ];
+  const ValueT* x_ptr = X + (n_cols * blockIdx.x);
+  ValueT local_x_ptr[kMaxColQ];
   for (ValueInt j = 0; j < n_cols; ++j) {
     local_x_ptr[j] = x_ptr[j];
   }
 
   using cuvs::neighbors::detail::faiss_select::comparator;
   using cuvs::neighbors::detail::faiss_select::key_value_block_select;
-  key_value_block_select<value_t, ValueIdx, false, comparator<value_t>, warp_q, thread_q, tpb> heap(
-    std::numeric_limits<value_t>::max(),
-    std::numeric_limits<value_t>::max(),
+  key_value_block_select<ValueT, ValueIdx, false, comparator<ValueT>, warp_q, thread_q, tpb> heap(
+    std::numeric_limits<ValueT>::max(),
+    std::numeric_limits<ValueT>::max(),
     -1,
     shared_mem_k,
     shared_mem_v,
@@ -211,22 +210,22 @@ RAFT_KERNEL compute_final_dists_registers(const value_t* X_reordered,
       i = threadIdx.x;
       for (; i < limit; i += tpb) {
         ValueIdx cur_candidate_ind = R_1nn_inds[r_start_offset + i];
-        value_t cur_candidate_dist = R_1nn_dists[r_start_offset + i];
+        ValueT cur_candidate_dist  = R_1nn_dists[r_start_offset + i];
 
-        value_t z = heap.warp_k_top_r_dist == 0.00
-                      ? 0.0
-                      : (abs(heap.warp_k_top - heap.warp_k_top_r_dist) *
-                           abs(heap.warp_k_top_r_dist - cur_candidate_dist) -
-                         heap.warp_k_top * cur_candidate_dist) /
-                          heap.warp_k_top_r_dist;
-        z         = isnan(z) || isinf(z) ? 0.0 : z;
+        ValueT z = heap.warp_k_top_r_dist == 0.00
+                     ? 0.0
+                     : (abs(heap.warp_k_top - heap.warp_k_top_r_dist) *
+                          abs(heap.warp_k_top_r_dist - cur_candidate_dist) -
+                        heap.warp_k_top * cur_candidate_dist) /
+                         heap.warp_k_top_r_dist;
+        z        = isnan(z) || isinf(z) ? 0.0 : z;
 
         // If lower bound on distance could possibly be in
         // the closest k neighbors, compute it and add to k-select
-        value_t dist = std::numeric_limits<value_t>::max();
+        ValueT dist = std::numeric_limits<ValueT>::max();
         if (z <= heap.warp_k_top) {
-          const value_t* y_ptr = X_reordered + (n_cols * (r_start_offset + i));
-          value_t local_y_ptr[kMaxColQ];
+          const ValueT* y_ptr = X_reordered + (n_cols * (r_start_offset + i));
+          ValueT local_y_ptr[kMaxColQ];
           for (ValueInt j = 0; j < n_cols; ++j) {
             local_y_ptr[j] = y_ptr[j];
           }
@@ -240,23 +239,23 @@ RAFT_KERNEL compute_final_dists_registers(const value_t* X_reordered,
       // second round guarantees to be only a single warp.
       if (i < r_size) {
         ValueIdx cur_candidate_ind = R_1nn_inds[r_start_offset + i];
-        value_t cur_candidate_dist = R_1nn_dists[r_start_offset + i];
+        ValueT cur_candidate_dist  = R_1nn_dists[r_start_offset + i];
 
-        value_t z = heap.warp_k_top_r_dist == 0.00
-                      ? 0.0
-                      : (abs(heap.warp_k_top - heap.warp_k_top_r_dist) *
-                           abs(heap.warp_k_top_r_dist - cur_candidate_dist) -
-                         heap.warp_k_top * cur_candidate_dist) /
-                          heap.warp_k_top_r_dist;
+        ValueT z = heap.warp_k_top_r_dist == 0.00
+                     ? 0.0
+                     : (abs(heap.warp_k_top - heap.warp_k_top_r_dist) *
+                          abs(heap.warp_k_top_r_dist - cur_candidate_dist) -
+                        heap.warp_k_top * cur_candidate_dist) /
+                         heap.warp_k_top_r_dist;
 
         z = isnan(z) || isinf(z) ? 0.0 : z;
 
         // If lower bound on distance could possibly be in
         // the closest k neighbors, compute it and add to k-select
-        value_t dist = std::numeric_limits<value_t>::max();
+        ValueT dist = std::numeric_limits<ValueT>::max();
         if (z <= heap.warp_k_top) {
-          const value_t* y_ptr = X_reordered + (n_cols * (r_start_offset + i));
-          value_t local_y_ptr[kMaxColQ];
+          const ValueT* y_ptr = X_reordered + (n_cols * (r_start_offset + i));
+          ValueT local_y_ptr[kMaxColQ];
           for (ValueInt j = 0; j < n_cols; ++j) {
             local_y_ptr[j] = y_ptr[j];
           }
@@ -279,12 +278,12 @@ RAFT_KERNEL compute_final_dists_registers(const value_t* X_reordered,
 /**
  * Random ball cover kernel for n_dims == 2
  * @tparam ValueIdx
- * @tparam value_t
+ * @tparam ValueT
  * @tparam warp_q
  * @tparam thread_q
  * @tparam tpb
  * @tparam ValueIdx
- * @tparam value_t
+ * @tparam ValueT
  * @param R_knn_inds
  * @param R_knn_dists
  * @param m
@@ -294,39 +293,39 @@ RAFT_KERNEL compute_final_dists_registers(const value_t* X_reordered,
  * @param R_1nn_dists
  */
 template <typename ValueIdx = std::int64_t,
-          typename value_t,  // NOLINT(readability-identifier-naming)
+          typename ValueT,  // NOLINT(readability-identifier-naming)
           int warp_q   = 32,
           int thread_q = 2,
           int tpb      = 128>
-RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
-                                       const value_t* X,
+RAFT_KERNEL block_rbc_kernel_registers(const ValueT* X_reordered,
+                                       const ValueT* X,
                                        int64_t n_cols,  // n_cols should be 2 or 3 dims
                                        const ValueIdx* R_knn_inds,
-                                       const value_t* R_knn_dists,
+                                       const ValueT* R_knn_dists,
                                        int64_t m,
                                        int64_t k,
                                        const ValueIdx* R_indptr,
                                        const ValueIdx* R_1nn_cols,
-                                       const value_t* R_1nn_dists,
+                                       const ValueT* R_1nn_dists,
                                        ValueIdx* out_inds,
-                                       value_t* out_dists,
-                                       const value_t* R_radius,
+                                       ValueT* out_dists,
+                                       const ValueT* R_radius,
                                        cuvs::distance::DistanceType metric,
                                        float weight = 1.0)
 {
   static constexpr int64_t kNumWarps = tpb / raft::WarpSize;
 
-  __shared__ value_t shared_mem_k[kNumWarps * warp_q];
-  __shared__ raft::KeyValuePair<value_t, ValueIdx> shared_mem_v[kNumWarps * warp_q];
+  __shared__ ValueT shared_mem_k[kNumWarps * warp_q];
+  __shared__ raft::KeyValuePair<ValueT, ValueIdx> shared_mem_v[kNumWarps * warp_q];
 
   // TODO(snanditale): Separate kernels for different widths:
   // 1. Very small (between 3 and 32) just use registers for columns of "blockIdx.x"
   // 2. Can fit comfortably in shared memory (32 to a few thousand?)
   // 3. Load each time individually.
-  const value_t* x_ptr = X + (n_cols * blockIdx.x);
+  const ValueT* x_ptr = X + (n_cols * blockIdx.x);
 
   // Use registers only for 2d or 3d
-  value_t local_x_ptr[kMaxColQ];
+  ValueT local_x_ptr[kMaxColQ];
   for (int64_t i = 0; i < n_cols; ++i) {
     local_x_ptr[i] = x_ptr[i];
   }
@@ -334,15 +333,15 @@ RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
   // Each warp works on 1 R
   using cuvs::neighbors::detail::faiss_select::comparator;
   using cuvs::neighbors::detail::faiss_select::key_value_block_select;
-  key_value_block_select<value_t, ValueIdx, false, comparator<value_t>, warp_q, thread_q, tpb> heap(
-    std::numeric_limits<value_t>::max(),
-    std::numeric_limits<value_t>::max(),
+  key_value_block_select<ValueT, ValueIdx, false, comparator<ValueT>, warp_q, thread_q, tpb> heap(
+    std::numeric_limits<ValueT>::max(),
+    std::numeric_limits<ValueT>::max(),
     -1,
     shared_mem_k,
     shared_mem_v,
     k);
 
-  value_t min_r_dist       = R_knn_dists[blockIdx.x * k + (k - 1)];
+  ValueT min_r_dist        = R_knn_dists[blockIdx.x * k + (k - 1)];
   int64_t n_dists_computed = 0;
 
   /**
@@ -353,7 +352,7 @@ RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
   // determining if the distance could even potentially be in the heap.
   for (int64_t cur_k = 0; cur_k < k; ++cur_k) {
     // index and distance to current blockIdx.x's closest landmark
-    value_t cur_r_dist = R_knn_dists[blockIdx.x * k + cur_k];
+    ValueT cur_r_dist  = R_knn_dists[blockIdx.x * k + cur_k];
     ValueIdx cur_r_ind = R_knn_inds[blockIdx.x * k + cur_k];
 
     // Equation (2) in Cayton's paper- prune out R's which are > 3 * p(q, r_q)
@@ -371,7 +370,7 @@ RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
     for (; i < limit; i += tpb) {
       // Index and distance of current candidate's nearest landmark
       ValueIdx cur_candidate_ind = R_1nn_cols[r_start_offset + i];
-      value_t cur_candidate_dist = R_1nn_dists[r_start_offset + i];
+      ValueT cur_candidate_dist  = R_1nn_dists[r_start_offset + i];
 
       // Take 2 landmarks l_1 and l_2 where l_1 is the furthest point in the heap
       // and l_2 is the current landmark R. s is the current data point and
@@ -384,19 +383,19 @@ RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
       // if d(s, t) < d(s, l_1) then we should compute the distance because it's possible it
       // could be smaller.
       //
-      value_t z = heap.warp_k_top_r_dist == 0.00
-                    ? 0.0
-                    : (abs(heap.warp_k_top - heap.warp_k_top_r_dist) *
-                         abs(heap.warp_k_top_r_dist - cur_candidate_dist) -
-                       heap.warp_k_top * cur_candidate_dist) /
-                        heap.warp_k_top_r_dist;
+      ValueT z = heap.warp_k_top_r_dist == 0.00
+                   ? 0.0
+                   : (abs(heap.warp_k_top - heap.warp_k_top_r_dist) *
+                        abs(heap.warp_k_top_r_dist - cur_candidate_dist) -
+                      heap.warp_k_top * cur_candidate_dist) /
+                       heap.warp_k_top_r_dist;
 
-      z            = isnan(z) || isinf(z) ? 0.0 : z;
-      value_t dist = std::numeric_limits<value_t>::max();
+      z           = isnan(z) || isinf(z) ? 0.0 : z;
+      ValueT dist = std::numeric_limits<ValueT>::max();
 
       if (z <= heap.warp_k_top) {
-        const value_t* y_ptr = X_reordered + (n_cols * (r_start_offset + i));
-        value_t local_y_ptr[kMaxColQ];
+        const ValueT* y_ptr = X_reordered + (n_cols * (r_start_offset + i));
+        ValueT local_y_ptr[kMaxColQ];
         for (int64_t j = 0; j < n_cols; ++j) {
           local_y_ptr[j] = y_ptr[j];
         }
@@ -409,20 +408,20 @@ RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
 
     if (i < r_size) {
       ValueIdx cur_candidate_ind = R_1nn_cols[r_start_offset + i];
-      value_t cur_candidate_dist = R_1nn_dists[r_start_offset + i];
-      value_t z                  = heap.warp_k_top_r_dist == 0.0
+      ValueT cur_candidate_dist  = R_1nn_dists[r_start_offset + i];
+      ValueT z                   = heap.warp_k_top_r_dist == 0.0
                                      ? 0.0
                                      : (abs(heap.warp_k_top - heap.warp_k_top_r_dist) *
-                         abs(heap.warp_k_top_r_dist - cur_candidate_dist) -
-                       heap.warp_k_top * cur_candidate_dist) /
-                        heap.warp_k_top_r_dist;
+                        abs(heap.warp_k_top_r_dist - cur_candidate_dist) -
+                      heap.warp_k_top * cur_candidate_dist) /
+                       heap.warp_k_top_r_dist;
 
-      z            = isnan(z) || isinf(z) ? 0.0 : z;
-      value_t dist = std::numeric_limits<value_t>::max();
+      z           = isnan(z) || isinf(z) ? 0.0 : z;
+      ValueT dist = std::numeric_limits<ValueT>::max();
 
       if (z <= heap.warp_k_top) {
-        const value_t* y_ptr = X_reordered + (n_cols * (r_start_offset + i));
-        value_t local_y_ptr[kMaxColQ];
+        const ValueT* y_ptr = X_reordered + (n_cols * (r_start_offset + i));
+        ValueT local_y_ptr[kMaxColQ];
         for (int64_t j = 0; j < n_cols; ++j) {
           local_y_ptr[j] = y_ptr[j];
         }
@@ -444,28 +443,28 @@ RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
   }
 }
 
-template <typename value_t>  // NOLINT(readability-identifier-naming)
-__device__ auto squared(const value_t& a) -> value_t
+template <typename ValueT>  // NOLINT(readability-identifier-naming)
+__device__ auto squared(const ValueT& a) -> ValueT
 {
   return a * a;
 }
 
 template <typename ValueIdx = std::int64_t,
-          typename value_t,  // NOLINT(readability-identifier-naming)
+          typename ValueT,  // NOLINT(readability-identifier-naming)
           int tpb = 128,
           typename DistanceFunc>
-RAFT_KERNEL block_rbc_kernel_eps_dense(const value_t* X_reordered,
-                                       const value_t* X,
+RAFT_KERNEL block_rbc_kernel_eps_dense(const ValueT* X_reordered,
+                                       const ValueT* X,
                                        const int64_t n_queries,
                                        const int64_t n_cols,
-                                       const value_t* R,
+                                       const ValueT* R,
                                        const int64_t m,
-                                       const value_t eps,
+                                       const ValueT eps,
                                        const int64_t n_landmarks,
                                        const ValueIdx* R_indptr,
                                        const ValueIdx* R_1nn_cols,
-                                       const value_t* R_1nn_dists,
-                                       const value_t* R_radius,
+                                       const ValueT* R_1nn_dists,
+                                       const ValueT* R_radius,
                                        DistanceFunc dfunc,
                                        bool* adj,
                                        ValueIdx* vd)
@@ -483,21 +482,21 @@ RAFT_KERNEL block_rbc_kernel_eps_dense(const value_t* X_reordered,
 
   ValueIdx column_count = 0;
 
-  const value_t* x_ptr = X + (n_cols * query_id);
+  const ValueT* x_ptr = X + (n_cols * query_id);
   adj += query_id * m;
 
   // we omit the sqrt() in the inner distance compute
-  const value_t eps2 = eps * eps;
+  const ValueT eps2 = eps * eps;
 
 #pragma nounroll
   for (uint32_t cur_k0 = 0; cur_k0 < n_landmarks; cur_k0 += raft::WarpSize) {
     // Pre-compute landmark_dist & triangularization checks for 32 iterations
-    const uint32_t lane_k        = cur_k0 + lid;
-    const value_t lane_r_dist_sq = lane_k < n_landmarks ? dfunc(x_ptr, R + lane_k * n_cols, n_cols)
-                                                        : std::numeric_limits<ValueIdx>::max();
-    const int lane_check         = lane_k < n_landmarks
-                                     ? static_cast<int>(lane_r_dist_sq <= squared(eps + R_radius[lane_k]))
-                                     : 0;
+    const uint32_t lane_k       = cur_k0 + lid;
+    const ValueT lane_r_dist_sq = lane_k < n_landmarks ? dfunc(x_ptr, R + lane_k * n_cols, n_cols)
+                                                       : std::numeric_limits<ValueIdx>::max();
+    const int lane_check        = lane_k < n_landmarks
+                                    ? static_cast<int>(lane_r_dist_sq <= squared(eps + R_radius[lane_k]))
+                                    : 0;
 
     int lane_mask = raft::ballot(lane_check);
     if (lane_mask == 0) continue;
@@ -519,7 +518,7 @@ RAFT_KERNEL block_rbc_kernel_eps_dense(const value_t* X_reordered,
       const uint32_t r_size = R_indptr[cur_k + 1] - r_start_offset;
 
       // we have precomputed the query<->landmark distance
-      const value_t cur_r_dist = raft::sqrt(raft::shfl(lane_r_dist_sq, k_offset));
+      const ValueT cur_r_dist = raft::sqrt(raft::shfl(lane_r_dist_sq, k_offset));
 
       const uint32_t limit = raft::Pow2<raft::WarpSize>::roundDown(r_size);
       uint32_t i           = limit + lid;
@@ -527,11 +526,11 @@ RAFT_KERNEL block_rbc_kernel_eps_dense(const value_t* X_reordered,
       // R_1nn_dists are sorted ascendingly for each landmark
       // Iterating backwards, after pruning the first point w.r.t. triangle
       // inequality all subsequent points can be pruned as well
-      const value_t* y_ptr = X_reordered + (n_cols * (r_start_offset + i));
+      const ValueT* y_ptr = X_reordered + (n_cols * (r_start_offset + i));
       {
-        const value_t min_warp_dist =
+        const ValueT min_warp_dist =
           limit < r_size ? R_1nn_dists[r_start_offset + limit] : cur_r_dist;
-        const value_t dist =
+        const ValueT dist =
           (i < r_size) ? dfunc(x_ptr, y_ptr, n_cols) : std::numeric_limits<ValueIdx>::max();
         const bool in_range = (dist <= eps2);
         if (in_range) {
@@ -548,9 +547,9 @@ RAFT_KERNEL block_rbc_kernel_eps_dense(const value_t* X_reordered,
       while (i0 >= raft::WarpSize) {
         y_ptr -= raft::WarpSize * n_cols;
         i0 -= raft::WarpSize;
-        const value_t min_warp_dist = R_1nn_dists[r_start_offset + i0];
-        const value_t dist          = dfunc(x_ptr, y_ptr, n_cols);
-        const bool in_range         = (dist <= eps2);
+        const ValueT min_warp_dist = R_1nn_dists[r_start_offset + i0];
+        const ValueT dist          = dfunc(x_ptr, y_ptr, n_cols);
+        const bool in_range        = (dist <= eps2);
         if (in_range) {
           auto index = R_1nn_cols[r_start_offset + i0 + lid];
           column_count++;
@@ -569,21 +568,21 @@ RAFT_KERNEL block_rbc_kernel_eps_dense(const value_t* X_reordered,
 }
 
 template <typename ValueIdx = std::int64_t,
-          typename value_t,  // NOLINT(readability-identifier-naming)
+          typename ValueT,  // NOLINT(readability-identifier-naming)
           int tpb = 128,
           typename DistanceFunc>
-RAFT_KERNEL block_rbc_kernel_eps_csr_pass(const value_t* X_reordered,
-                                          const value_t* X,
+RAFT_KERNEL block_rbc_kernel_eps_csr_pass(const ValueT* X_reordered,
+                                          const ValueT* X,
                                           const int64_t n_queries,
                                           const int64_t n_cols,
-                                          const value_t* R,
+                                          const ValueT* R,
                                           const int64_t m,
-                                          const value_t eps,
+                                          const ValueT eps,
                                           const int64_t n_landmarks,
                                           const ValueIdx* R_indptr,
                                           const ValueIdx* R_1nn_cols,
-                                          const value_t* R_1nn_dists,
-                                          const value_t* R_radius,
+                                          const ValueT* R_1nn_dists,
+                                          const ValueT* R_radius,
                                           DistanceFunc dfunc,
                                           ValueIdx* adj_ia,
                                           ValueIdx* adj_ja,
@@ -610,20 +609,20 @@ RAFT_KERNEL block_rbc_kernel_eps_csr_pass(const value_t* X_reordered,
     adj_ja += offset;
   }
 
-  const value_t* x_ptr = X + (n_cols * query_id);
+  const ValueT* x_ptr = X + (n_cols * query_id);
 
   // we omit the sqrt() in the inner distance compute
-  const value_t eps2 = eps * eps;
+  const ValueT eps2 = eps * eps;
 
 #pragma nounroll
   for (uint32_t cur_k0 = 0; cur_k0 < n_landmarks; cur_k0 += raft::WarpSize) {
     // Pre-compute landmark_dist & triangularization checks for 32 iterations
-    const uint32_t lane_k        = cur_k0 + lid;
-    const value_t lane_r_dist_sq = lane_k < n_landmarks ? dfunc(x_ptr, R + lane_k * n_cols, n_cols)
-                                                        : std::numeric_limits<ValueIdx>::max();
-    const int lane_check         = lane_k < n_landmarks
-                                     ? static_cast<int>(lane_r_dist_sq <= squared(eps + R_radius[lane_k]))
-                                     : 0;
+    const uint32_t lane_k       = cur_k0 + lid;
+    const ValueT lane_r_dist_sq = lane_k < n_landmarks ? dfunc(x_ptr, R + lane_k * n_cols, n_cols)
+                                                       : std::numeric_limits<ValueIdx>::max();
+    const int lane_check        = lane_k < n_landmarks
+                                    ? static_cast<int>(lane_r_dist_sq <= squared(eps + R_radius[lane_k]))
+                                    : 0;
 
     int lane_mask = raft::ballot(lane_check);
     if (lane_mask == 0) continue;
@@ -645,7 +644,7 @@ RAFT_KERNEL block_rbc_kernel_eps_csr_pass(const value_t* X_reordered,
       const uint32_t r_size = R_indptr[cur_k + 1] - r_start_offset;
 
       // we have precomputed the query<->landmark distance
-      const value_t cur_r_dist = raft::sqrt(raft::shfl(lane_r_dist_sq, k_offset));
+      const ValueT cur_r_dist = raft::sqrt(raft::shfl(lane_r_dist_sq, k_offset));
 
       const uint32_t limit = raft::Pow2<raft::WarpSize>::roundDown(r_size);
       uint32_t i           = limit + lid;
@@ -653,11 +652,11 @@ RAFT_KERNEL block_rbc_kernel_eps_csr_pass(const value_t* X_reordered,
       // R_1nn_dists are sorted ascendingly for each landmark
       // Iterating backwards, after pruning the first point w.r.t. triangle
       // inequality all subsequent points can be pruned as well
-      const value_t* y_ptr = X_reordered + (n_cols * (r_start_offset + i));
+      const ValueT* y_ptr = X_reordered + (n_cols * (r_start_offset + i));
       {
-        const value_t min_warp_dist =
+        const ValueT min_warp_dist =
           limit < r_size ? R_1nn_dists[r_start_offset + limit] : cur_r_dist;
-        const value_t dist =
+        const ValueT dist =
           (i < r_size) ? dfunc(x_ptr, y_ptr, n_cols) : std::numeric_limits<ValueIdx>::max();
         const bool in_range = (dist <= eps2);
         if (write_pass) {
@@ -680,9 +679,9 @@ RAFT_KERNEL block_rbc_kernel_eps_csr_pass(const value_t* X_reordered,
       while (i0 >= raft::WarpSize) {
         y_ptr -= raft::WarpSize * n_cols;
         i0 -= raft::WarpSize;
-        const value_t min_warp_dist = R_1nn_dists[r_start_offset + i0];
-        const value_t dist          = dfunc(x_ptr, y_ptr, n_cols);
-        const bool in_range         = (dist <= eps2);
+        const ValueT min_warp_dist = R_1nn_dists[r_start_offset + i0];
+        const ValueT dist          = dfunc(x_ptr, y_ptr, n_cols);
+        const bool in_range        = (dist <= eps2);
         if (write_pass) {
           const int mask = raft::ballot(in_range);
           if (in_range) {
@@ -707,22 +706,22 @@ RAFT_KERNEL block_rbc_kernel_eps_csr_pass(const value_t* X_reordered,
 }
 
 template <typename ValueIdx = std::int64_t,
-          typename value_t,  // NOLINT(readability-identifier-naming)
+          typename ValueT,  // NOLINT(readability-identifier-naming)
           int tpb = 128,
           typename DistanceFunc>
 RAFT_KERNEL __launch_bounds__(tpb)  // NOLINT(readability-identifier-naming)
-  block_rbc_kernel_eps_csr_pass_xd(const value_t* __restrict__ X_reordered,
-                                   const value_t* __restrict__ X,
+  block_rbc_kernel_eps_csr_pass_xd(const ValueT* __restrict__ X_reordered,
+                                   const ValueT* __restrict__ X,
                                    const int64_t n_queries,
                                    const int64_t n_cols,
-                                   const value_t* __restrict__ R,
+                                   const ValueT* __restrict__ R,
                                    const int64_t m,
-                                   const value_t eps,
+                                   const ValueT eps,
                                    const int64_t n_landmarks,
                                    const ValueIdx* __restrict__ R_indptr,
                                    const ValueIdx* __restrict__ R_1nn_cols,
-                                   const value_t* __restrict__ R_1nn_dists,
-                                   const value_t* __restrict__ R_radius,
+                                   const ValueT* __restrict__ R_1nn_dists,
+                                   const ValueT* __restrict__ R_radius,
                                    DistanceFunc dfunc,
                                    ValueIdx* __restrict__ adj_ia,
                                    ValueIdx* __restrict__ adj_ja,
@@ -750,25 +749,25 @@ RAFT_KERNEL __launch_bounds__(tpb)  // NOLINT(readability-identifier-naming)
     adj_ja += offset;
   }
 
-  const value_t* x_ptr = X + (dim * query_id);
-  value_t local_x_ptr[kMaxColQ];
+  const ValueT* x_ptr = X + (dim * query_id);
+  ValueT local_x_ptr[kMaxColQ];
 #pragma unroll
   for (uint32_t i = 0; i < dim; ++i) {
     local_x_ptr[i] = x_ptr[i];
   }
 
   // we omit the sqrt() in the inner distance compute
-  const value_t eps2 = eps * eps;
+  const ValueT eps2 = eps * eps;
 
 #pragma nounroll
   for (uint32_t cur_k0 = 0; cur_k0 < n_landmarks; cur_k0 += raft::WarpSize) {
     // Pre-compute landmark_dist & triangularization checks for 32 iterations
-    const uint32_t lane_k        = cur_k0 + lid;
-    const value_t lane_r_dist_sq = lane_k < n_landmarks ? dfunc(local_x_ptr, R + lane_k * dim, dim)
-                                                        : std::numeric_limits<ValueIdx>::max();
-    const int lane_check         = lane_k < n_landmarks
-                                     ? static_cast<int>(lane_r_dist_sq <= squared(eps + R_radius[lane_k]))
-                                     : 0;
+    const uint32_t lane_k       = cur_k0 + lid;
+    const ValueT lane_r_dist_sq = lane_k < n_landmarks ? dfunc(local_x_ptr, R + lane_k * dim, dim)
+                                                       : std::numeric_limits<ValueIdx>::max();
+    const int lane_check        = lane_k < n_landmarks
+                                    ? static_cast<int>(lane_r_dist_sq <= squared(eps + R_radius[lane_k]))
+                                    : 0;
 
     int lane_mask = raft::ballot(lane_check);
     if (lane_mask == 0) continue;
@@ -790,7 +789,7 @@ RAFT_KERNEL __launch_bounds__(tpb)  // NOLINT(readability-identifier-naming)
       const uint32_t r_size = R_indptr[cur_k + 1] - r_start_offset;
 
       // we have precomputed the query<->landmark distance
-      const value_t cur_r_dist = raft::sqrt(raft::shfl(lane_r_dist_sq, k_offset));
+      const ValueT cur_r_dist = raft::sqrt(raft::shfl(lane_r_dist_sq, k_offset));
 
       const uint32_t limit = raft::Pow2<raft::WarpSize>::roundDown(r_size);
       uint32_t i           = limit + lid;
@@ -798,11 +797,11 @@ RAFT_KERNEL __launch_bounds__(tpb)  // NOLINT(readability-identifier-naming)
       // R_1nn_dists are sorted ascendingly for each landmark
       // Iterating backwards, after pruning the first point w.r.t. triangle
       // inequality all subsequent points can be pruned as well
-      const value_t* y_ptr = X_reordered + (dim * (r_start_offset + i));
+      const ValueT* y_ptr = X_reordered + (dim * (r_start_offset + i));
       {
-        const value_t min_warp_dist =
+        const ValueT min_warp_dist =
           limit < r_size ? R_1nn_dists[r_start_offset + limit] : cur_r_dist;
-        const value_t dist =
+        const ValueT dist =
           (i < r_size) ? dfunc(local_x_ptr, y_ptr, dim) : std::numeric_limits<ValueIdx>::max();
         const bool in_range = (dist <= eps2);
         if (write_pass) {
@@ -825,9 +824,9 @@ RAFT_KERNEL __launch_bounds__(tpb)  // NOLINT(readability-identifier-naming)
       while (i0 >= raft::WarpSize) {
         y_ptr -= raft::WarpSize * dim;
         i0 -= raft::WarpSize;
-        const value_t min_warp_dist = R_1nn_dists[r_start_offset + i0];
-        const value_t dist          = dfunc(local_x_ptr, y_ptr, dim);
-        const bool in_range         = (dist <= eps2);
+        const ValueT min_warp_dist = R_1nn_dists[r_start_offset + i0];
+        const ValueT dist          = dfunc(local_x_ptr, y_ptr, dim);
+        const bool in_range        = (dist <= eps2);
         if (write_pass) {
           const int mask = raft::ballot(in_range);
           if (in_range) {
@@ -852,21 +851,21 @@ RAFT_KERNEL __launch_bounds__(tpb)  // NOLINT(readability-identifier-naming)
 }
 
 template <typename ValueIdx = std::int64_t,
-          typename value_t,  // NOLINT(readability-identifier-naming)
+          typename ValueT,  // NOLINT(readability-identifier-naming)
           int tpb = 128,
           typename DistanceFunc>
-RAFT_KERNEL block_rbc_kernel_eps_max_k(const value_t* X_reordered,
-                                       const value_t* X,
+RAFT_KERNEL block_rbc_kernel_eps_max_k(const ValueT* X_reordered,
+                                       const ValueT* X,
                                        const int64_t n_queries,
                                        const int64_t n_cols,
-                                       const value_t* R,
+                                       const ValueT* R,
                                        const int64_t m,
-                                       const value_t eps,
+                                       const ValueT eps,
                                        const int64_t n_landmarks,
                                        const ValueIdx* R_indptr,
                                        const ValueIdx* R_1nn_cols,
-                                       const value_t* R_1nn_dists,
-                                       const value_t* R_radius,
+                                       const ValueT* R_1nn_dists,
+                                       const ValueT* R_radius,
                                        DistanceFunc dfunc,
                                        ValueIdx* vd,
                                        int64_t max_k,
@@ -886,21 +885,21 @@ RAFT_KERNEL block_rbc_kernel_eps_max_k(const value_t* X_reordered,
 
   ValueIdx column_count = 0;
 
-  const value_t* x_ptr = X + (n_cols * query_id);
+  const ValueT* x_ptr = X + (n_cols * query_id);
   tmp += query_id * max_k;
 
   // we omit the sqrt() in the inner distance compute
-  const value_t eps2 = eps * eps;
+  const ValueT eps2 = eps * eps;
 
 #pragma nounroll
   for (uint32_t cur_k0 = 0; cur_k0 < n_landmarks; cur_k0 += raft::WarpSize) {
     // Pre-compute landmark_dist & triangularization checks for 32 iterations
-    const uint32_t lane_k        = cur_k0 + lid;
-    const value_t lane_r_dist_sq = lane_k < n_landmarks ? dfunc(x_ptr, R + lane_k * n_cols, n_cols)
-                                                        : std::numeric_limits<ValueIdx>::max();
-    const int lane_check         = lane_k < n_landmarks
-                                     ? static_cast<int>(lane_r_dist_sq <= squared(eps + R_radius[lane_k]))
-                                     : 0;
+    const uint32_t lane_k       = cur_k0 + lid;
+    const ValueT lane_r_dist_sq = lane_k < n_landmarks ? dfunc(x_ptr, R + lane_k * n_cols, n_cols)
+                                                       : std::numeric_limits<ValueIdx>::max();
+    const int lane_check        = lane_k < n_landmarks
+                                    ? static_cast<int>(lane_r_dist_sq <= squared(eps + R_radius[lane_k]))
+                                    : 0;
 
     int lane_mask = raft::ballot(lane_check);
     if (lane_mask == 0) continue;
@@ -922,7 +921,7 @@ RAFT_KERNEL block_rbc_kernel_eps_max_k(const value_t* X_reordered,
       const uint32_t r_size = R_indptr[cur_k + 1] - r_start_offset;
 
       // we have precomputed the query<->landmark distance
-      const value_t cur_r_dist = raft::sqrt(raft::shfl(lane_r_dist_sq, k_offset));
+      const ValueT cur_r_dist = raft::sqrt(raft::shfl(lane_r_dist_sq, k_offset));
 
       const uint32_t limit = raft::Pow2<raft::WarpSize>::roundDown(r_size);
       uint32_t i           = limit + lid;
@@ -930,11 +929,11 @@ RAFT_KERNEL block_rbc_kernel_eps_max_k(const value_t* X_reordered,
       // R_1nn_dists are sorted ascendingly for each landmark
       // Iterating backwards, after pruning the first point w.r.t. triangle
       // inequality all subsequent points can be pruned as well
-      const value_t* y_ptr = X_reordered + (n_cols * (r_start_offset + i));
+      const ValueT* y_ptr = X_reordered + (n_cols * (r_start_offset + i));
       {
-        const value_t min_warp_dist =
+        const ValueT min_warp_dist =
           limit < r_size ? R_1nn_dists[r_start_offset + limit] : cur_r_dist;
-        const value_t dist =
+        const ValueT dist =
           (i < r_size) ? dfunc(x_ptr, y_ptr, n_cols) : std::numeric_limits<ValueIdx>::max();
         const bool in_range = (dist <= eps2);
         const int mask      = raft::ballot(in_range);
@@ -956,10 +955,10 @@ RAFT_KERNEL block_rbc_kernel_eps_max_k(const value_t* X_reordered,
       while (i0 >= raft::WarpSize) {
         y_ptr -= raft::WarpSize * n_cols;
         i0 -= raft::WarpSize;
-        const value_t min_warp_dist = R_1nn_dists[r_start_offset + i0];
-        const value_t dist          = dfunc(x_ptr, y_ptr, n_cols);
-        const bool in_range         = (dist <= eps2);
-        const int mask              = raft::ballot(in_range);
+        const ValueT min_warp_dist = R_1nn_dists[r_start_offset + i0];
+        const ValueT dist          = dfunc(x_ptr, y_ptr, n_cols);
+        const bool in_range        = (dist <= eps2);
+        const int mask             = raft::ballot(in_range);
         if (in_range) {
           auto row_pos = column_count + __popc(mask & lid_mask);
           // we still continue to look for more hits to return valid vd
@@ -998,21 +997,21 @@ RAFT_KERNEL block_rbc_kernel_eps_max_k_copy(const int64_t max_k,
   if (i < num_cols) { adj_ja[col_start_idx + i] = tmp[offset + i]; }
 }
 
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
 void rbc_low_dim_pass_one(raft::resources const& handle,
-                          const cuvs::neighbors::ball_cover::index<ValueIdx, value_t>& index,
-                          const value_t* query,
+                          const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
+                          const ValueT* query,
                           const int64_t n_query_rows,
                           int64_t k,
                           const ValueIdx* R_knn_inds,
-                          const value_t* R_knn_dists,
+                          const ValueT* R_knn_dists,
                           ValueIdx* inds,
-                          value_t* dists,
+                          ValueT* dists,
                           float weight,
                           int dims)
 {
   if (k <= 32)
-    block_rbc_kernel_registers<ValueIdx, value_t, 32, 2, 128>
+    block_rbc_kernel_registers<ValueIdx, ValueT, 32, 2, 128>
       <<<n_query_rows, 128, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1031,7 +1030,7 @@ void rbc_low_dim_pass_one(raft::resources const& handle,
         weight);
 
   else if (k <= 64)
-    block_rbc_kernel_registers<ValueIdx, value_t, 64, 3, 128>
+    block_rbc_kernel_registers<ValueIdx, ValueT, 64, 3, 128>
       <<<n_query_rows, 128, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1049,7 +1048,7 @@ void rbc_low_dim_pass_one(raft::resources const& handle,
         index.metric,
         weight);
   else if (k <= 128)
-    block_rbc_kernel_registers<ValueIdx, value_t, 128, 3, 128>
+    block_rbc_kernel_registers<ValueIdx, ValueT, 128, 3, 128>
       <<<n_query_rows, 128, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1068,7 +1067,7 @@ void rbc_low_dim_pass_one(raft::resources const& handle,
         weight);
 
   else if (k <= 256)
-    block_rbc_kernel_registers<ValueIdx, value_t, 256, 4, 128>
+    block_rbc_kernel_registers<ValueIdx, ValueT, 256, 4, 128>
       <<<n_query_rows, 128, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1087,7 +1086,7 @@ void rbc_low_dim_pass_one(raft::resources const& handle,
         weight);
 
   else if (k <= 512)
-    block_rbc_kernel_registers<ValueIdx, value_t, 512, 8, 64>
+    block_rbc_kernel_registers<ValueIdx, ValueT, 512, 8, 64>
       <<<n_query_rows, 64, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1106,7 +1105,7 @@ void rbc_low_dim_pass_one(raft::resources const& handle,
         weight);
 
   else if (k <= 1024)
-    block_rbc_kernel_registers<ValueIdx, value_t, 1024, 8, 64>
+    block_rbc_kernel_registers<ValueIdx, ValueT, 1024, 8, 64>
       <<<n_query_rows, 64, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1125,16 +1124,16 @@ void rbc_low_dim_pass_one(raft::resources const& handle,
         weight);
 }
 
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
 void rbc_low_dim_pass_two(raft::resources const& handle,
-                          const cuvs::neighbors::ball_cover::index<ValueIdx, value_t>& index,
-                          const value_t* query,
+                          const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
+                          const ValueT* query,
                           const int64_t n_query_rows,
                           int64_t k,
                           const ValueIdx* R_knn_inds,
-                          const value_t* R_knn_dists,
+                          const ValueT* R_knn_dists,
                           ValueIdx* inds,
-                          value_t* dists,
+                          ValueT* dists,
                           float weight,
                           int dims)
 {
@@ -1145,7 +1144,7 @@ void rbc_low_dim_pass_two(raft::resources const& handle,
   thrust::fill(
     raft::resource::get_thrust_policy(handle), bitset.data(), bitset.data() + bitset.size(), 0);
 
-  perform_post_filter_registers<ValueIdx, value_t, std::uint32_t, 128>
+  perform_post_filter_registers<ValueIdx, ValueT, std::uint32_t, 128>
     <<<n_query_rows,
        128,
        bitset_size * sizeof(std::uint32_t),
@@ -1163,7 +1162,7 @@ void rbc_low_dim_pass_two(raft::resources const& handle,
                                                   weight);
 
   if (k <= 32)
-    compute_final_dists_registers<ValueIdx, value_t, std::uint32_t, std::uint32_t, 32, 2, 128>
+    compute_final_dists_registers<ValueIdx, ValueT, std::uint32_t, std::uint32_t, 32, 2, 128>
       <<<n_query_rows, 128, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1180,7 +1179,7 @@ void rbc_low_dim_pass_two(raft::resources const& handle,
         k,
         index.metric);
   else if (k <= 64)
-    compute_final_dists_registers<ValueIdx, value_t, std::uint32_t, std::uint32_t, 64, 3, 128>
+    compute_final_dists_registers<ValueIdx, ValueT, std::uint32_t, std::uint32_t, 64, 3, 128>
       <<<n_query_rows, 128, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1197,7 +1196,7 @@ void rbc_low_dim_pass_two(raft::resources const& handle,
         k,
         index.metric);
   else if (k <= 128)
-    compute_final_dists_registers<ValueIdx, value_t, std::uint32_t, std::uint32_t, 128, 3, 128>
+    compute_final_dists_registers<ValueIdx, ValueT, std::uint32_t, std::uint32_t, 128, 3, 128>
       <<<n_query_rows, 128, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1214,7 +1213,7 @@ void rbc_low_dim_pass_two(raft::resources const& handle,
         k,
         index.metric);
   else if (k <= 256)
-    compute_final_dists_registers<ValueIdx, value_t, std::uint32_t, std::uint32_t, 256, 4, 128>
+    compute_final_dists_registers<ValueIdx, ValueT, std::uint32_t, std::uint32_t, 256, 4, 128>
       <<<n_query_rows, 128, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1231,7 +1230,7 @@ void rbc_low_dim_pass_two(raft::resources const& handle,
         k,
         index.metric);
   else if (k <= 512)
-    compute_final_dists_registers<ValueIdx, value_t, std::uint32_t, std::uint32_t, 512, 8, 64>
+    compute_final_dists_registers<ValueIdx, ValueT, std::uint32_t, std::uint32_t, 512, 8, 64>
       <<<n_query_rows, 64, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1248,7 +1247,7 @@ void rbc_low_dim_pass_two(raft::resources const& handle,
         k,
         index.metric);
   else if (k <= 1024)
-    compute_final_dists_registers<ValueIdx, value_t, std::uint32_t, std::uint32_t, 1024, 8, 64>
+    compute_final_dists_registers<ValueIdx, ValueT, std::uint32_t, std::uint32_t, 1024, 8, 64>
       <<<n_query_rows, 64, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1267,19 +1266,19 @@ void rbc_low_dim_pass_two(raft::resources const& handle,
 }
 
 template <typename ValueIdx,
-          typename value_t,
+          typename ValueT,
           typename dist_func>  // NOLINT(readability-identifier-naming)
 void rbc_eps_pass(raft::resources const& handle,
-                  const cuvs::neighbors::ball_cover::index<ValueIdx, value_t>& index,
-                  const value_t* query,
+                  const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
+                  const ValueT* query,
                   const int64_t n_query_rows,
-                  value_t eps,
-                  const value_t* R,
+                  ValueT eps,
+                  const ValueT* R,
                   dist_func& dfunc,
                   bool* adj,
                   ValueIdx* vd)
 {
-  block_rbc_kernel_eps_dense<ValueIdx, value_t, 64>
+  block_rbc_kernel_eps_dense<ValueIdx, ValueT, 64>
     <<<n_query_rows, 64, 0, raft::resource::get_cuda_stream(handle)>>>(
       index.get_X_reordered().data_handle(),
       query,
@@ -1311,15 +1310,15 @@ void rbc_eps_pass(raft::resources const& handle,
 }
 
 template <typename ValueIdx,
-          typename value_t,
+          typename ValueT,
           typename dist_func>  // NOLINT(readability-identifier-naming)
 void rbc_eps_pass(raft::resources const& handle,
-                  const cuvs::neighbors::ball_cover::index<ValueIdx, value_t>& index,
-                  const value_t* query,
+                  const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
+                  const ValueT* query,
                   const int64_t n_query_rows,
-                  value_t eps,
+                  ValueT eps,
                   int64_t* max_k,
-                  const value_t* R,
+                  const ValueT* R,
                   dist_func& dfunc,
                   ValueIdx* adj_ia,
                   ValueIdx* adj_ja,
@@ -1331,7 +1330,7 @@ void rbc_eps_pass(raft::resources const& handle,
       // pass 1 -> only compute adj_ia / vd
       ValueIdx* vd_ptr = (vd != nullptr) ? vd : adj_ia;
       if (index.n == 2 || index.n == 3) {
-        block_rbc_kernel_eps_csr_pass_xd<ValueIdx, value_t, 64>
+        block_rbc_kernel_eps_csr_pass_xd<ValueIdx, ValueT, 64>
           <<<raft::ceildiv<int64_t>(n_query_rows, 2),
              64,
              0,
@@ -1353,7 +1352,7 @@ void rbc_eps_pass(raft::resources const& handle,
                                                         false,
                                                         index.n);
       } else {
-        block_rbc_kernel_eps_csr_pass<ValueIdx, value_t, 64>
+        block_rbc_kernel_eps_csr_pass<ValueIdx, ValueT, 64>
           <<<raft::ceildiv<int64_t>(n_query_rows, 2),
              64,
              0,
@@ -1384,7 +1383,7 @@ void rbc_eps_pass(raft::resources const& handle,
     } else {
       // pass 2 -> fill in adj_ja
       if (index.n == 2 || index.n == 3) {
-        block_rbc_kernel_eps_csr_pass_xd<ValueIdx, value_t, 64>
+        block_rbc_kernel_eps_csr_pass_xd<ValueIdx, ValueT, 64>
           <<<raft::ceildiv<int64_t>(n_query_rows, 2),
              64,
              0,
@@ -1406,7 +1405,7 @@ void rbc_eps_pass(raft::resources const& handle,
                                                         true,
                                                         index.n);
       } else {
-        block_rbc_kernel_eps_csr_pass<ValueIdx, value_t, 64>
+        block_rbc_kernel_eps_csr_pass<ValueIdx, ValueT, 64>
           <<<raft::ceildiv<int64_t>(n_query_rows, 2), 64, 0, resource::get_cuda_stream(handle)>>>(
             index.get_X_reordered().data_handle(),
             query,
@@ -1433,7 +1432,7 @@ void rbc_eps_pass(raft::resources const& handle,
     rmm::device_uvector<ValueIdx> tmp(n_query_rows * max_k_in,
                                       raft::resource::get_cuda_stream(handle));
 
-    block_rbc_kernel_eps_max_k<ValueIdx, value_t, 64>
+    block_rbc_kernel_eps_max_k<ValueIdx, ValueT, 64>
       <<<raft::ceildiv<int64_t>(n_query_rows, 2), 64, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,

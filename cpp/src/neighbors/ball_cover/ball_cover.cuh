@@ -41,17 +41,17 @@ namespace cuvs::neighbors::ball_cover::detail {
  * used as a set of index points, uniformly samples a subset
  * of points to be used as landmarks.
  * @tparam ValueIdx
- * @tparam value_t
+ * @tparam ValueT
  * @param handle
  * @param index
  */
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
 void sample_landmarks(raft::resources const& handle,
-                      cuvs::neighbors::ball_cover::index<ValueIdx, value_t>& index)
+                      cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index)
 {
   rmm::device_uvector<ValueIdx> r_1nn_cols2(index.n_landmarks,
                                             raft::resource::get_cuda_stream(handle));
-  rmm::device_uvector<value_t> r_1nn_ones(index.m, raft::resource::get_cuda_stream(handle));
+  rmm::device_uvector<ValueT> r_1nn_ones(index.m, raft::resource::get_cuda_stream(handle));
   rmm::device_uvector<ValueIdx> r_indices(index.n_landmarks,
                                           raft::resource::get_cuda_stream(handle));
 
@@ -83,30 +83,30 @@ void sample_landmarks(raft::resources const& handle,
   auto x = index.get_X();
   auto r = index.get_R();
 
-  raft::matrix::copy_rows<value_t, ValueIdx>(
+  raft::matrix::copy_rows<ValueT, ValueIdx>(
     handle,
-    raft::make_device_matrix_view<const value_t, ValueIdx>(
+    raft::make_device_matrix_view<const ValueT, ValueIdx>(
       x.data_handle(), x.extent(0), x.extent(1)),
-    raft::make_device_matrix_view<value_t, ValueIdx>(r.data_handle(), r.extent(0), r.extent(1)),
+    raft::make_device_matrix_view<ValueT, ValueIdx>(r.data_handle(), r.extent(0), r.extent(1)),
     raft::make_device_vector_view(r_1nn_cols2.data(), index.n_landmarks));
 }
 
 /**
  * Constructs a 1-nn index mapping each landmark to their closest points.
  * @tparam ValueIdx
- * @tparam value_t
+ * @tparam ValueT
  * @param handle
  * @param R_knn_inds_ptr
  * @param R_knn_dists_ptr
  * @param k
  * @param index
  */
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
 void construct_landmark_1nn(raft::resources const& handle,
                             const ValueIdx* R_knn_inds_ptr,
-                            const value_t* R_knn_dists_ptr,
+                            const ValueT* R_knn_dists_ptr,
                             int64_t k,
-                            cuvs::neighbors::ball_cover::index<ValueIdx, value_t>& index)
+                            cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index)
 {
   auto r_1nn_inds = raft::make_device_vector<ValueIdx, ValueIdx>(handle, index.m);
 
@@ -120,7 +120,7 @@ void construct_landmark_1nn(raft::resources const& handle,
       return R_knn_inds_ptr[i * k];
     });
   raft::linalg::map_offset(
-    handle, index.get_R_1nn_dists(), [R_knn_dists_ptr, k] __device__(ValueIdx i) -> value_t {
+    handle, index.get_R_1nn_dists(), [R_knn_dists_ptr, k] __device__(ValueIdx i) -> ValueT {
       return R_knn_dists_ptr[i * k];
     });
 
@@ -142,14 +142,14 @@ void construct_landmark_1nn(raft::resources const& handle,
                                            raft::resource::get_cuda_stream(handle));
 
   // reorder X to allow aligned access
-  raft::matrix::copy_rows<value_t, ValueIdx>(
+  raft::matrix::copy_rows<ValueT, ValueIdx>(
     handle, index.get_X(), index.get_X_reordered(), index.get_R_1nn_cols());
 }
 
 /**
  * Computes the k closest landmarks to a set of query points.
  * @tparam ValueIdx
- * @tparam value_t
+ * @tparam ValueT
  * @tparam value_int
  * @param handle
  * @param index
@@ -159,16 +159,16 @@ void construct_landmark_1nn(raft::resources const& handle,
  * @param r_knn_inds
  * @param r_knn_dists
  */
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
 void k_closest_landmarks(raft::resources const& handle,
-                         const cuvs::neighbors::ball_cover::index<ValueIdx, value_t>& index,
-                         const value_t* query_pts,
+                         const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
+                         const ValueT* query_pts,
                          int64_t n_query_pts,
                          int64_t k,
                          ValueIdx* r_knn_inds,
-                         value_t* r_knn_dists)
+                         ValueT* r_knn_dists)
 {
-  raft::device_matrix_view<const value_t, int64_t> inputs = index.get_R();
+  raft::device_matrix_view<const ValueT, int64_t> inputs = index.get_R();
   auto bf_index_params   = cuvs::neighbors::brute_force::index_params();
   bf_index_params.metric = index.get_metric();
   auto bfknn             = cuvs::neighbors::brute_force::build(handle, bf_index_params, inputs);
@@ -178,28 +178,28 @@ void k_closest_landmarks(raft::resources const& handle,
     handle,
     bf_search_params,
     bfknn,
-    raft::make_device_matrix_view<const value_t, int64_t>(query_pts, n_query_pts, inputs.extent(1)),
+    raft::make_device_matrix_view<const ValueT, int64_t>(query_pts, n_query_pts, inputs.extent(1)),
     raft::make_device_matrix_view<ValueIdx, int64_t>(r_knn_inds, n_query_pts, k),
-    raft::make_device_matrix_view<value_t, int64_t>(r_knn_dists, n_query_pts, k));
+    raft::make_device_matrix_view<ValueT, int64_t>(r_knn_dists, n_query_pts, k));
 }
 
 /**
  * Uses the sorted data points in the 1-nn landmark index to compute
  * an array of radii for each landmark.
  * @tparam ValueIdx
- * @tparam value_t
+ * @tparam ValueT
  * @param handle
  * @param index
  */
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
 void compute_landmark_radii(raft::resources const& handle,
-                            cuvs::neighbors::ball_cover::index<ValueIdx, value_t>& index)
+                            cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index)
 {
-  const ValueIdx* r_indptr_ptr   = index.get_R_indptr().data_handle();
-  const value_t* r_1nn_dists_ptr = index.get_R_1nn_dists().data_handle();
+  const ValueIdx* r_indptr_ptr  = index.get_R_indptr().data_handle();
+  const ValueT* r_1nn_dists_ptr = index.get_R_1nn_dists().data_handle();
   raft::linalg::map_offset(handle,
                            index.get_R_radius(),
-                           [r_indptr_ptr, r_1nn_dists_ptr] __device__(ValueIdx input) -> value_t {
+                           [r_indptr_ptr, r_1nn_dists_ptr] __device__(ValueIdx input) -> ValueT {
                              ValueIdx last_row_idx = r_indptr_ptr[input + 1] - 1;
                              return r_1nn_dists_ptr[last_row_idx];
                            });
@@ -215,16 +215,16 @@ void compute_landmark_radii(raft::resources const& handle,
  * marking the distance to be computed between x, y only
  * if knn[k].distance >= d(x_i, R_k) + d(R_k, y)
  */
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
 void perform_rbc_query(raft::resources const& handle,
-                       const cuvs::neighbors::ball_cover::index<ValueIdx, value_t>& index,
-                       const value_t* query,
+                       const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
+                       const ValueT* query,
                        int64_t n_query_pts,
                        int64_t k,
                        const ValueIdx* r_knn_inds,
-                       const value_t* r_knn_dists,
+                       const ValueT* r_knn_dists,
                        ValueIdx* inds,
-                       value_t* dists,
+                       ValueT* dists,
                        float weight                = 1.0,
                        bool perform_post_filtering = true)
 {
@@ -236,14 +236,14 @@ void perform_rbc_query(raft::resources const& handle,
   thrust::fill(raft::resource::get_thrust_policy(handle),
                dists,
                dists + (k * n_query_pts),
-               std::numeric_limits<value_t>::max());
+               std::numeric_limits<ValueT>::max());
 
   // Compute nearest k for each neighborhood in each closest R
-  rbc_low_dim_pass_one<ValueIdx, value_t>(
+  rbc_low_dim_pass_one<ValueIdx, ValueT>(
     handle, index, query, n_query_pts, k, r_knn_inds, r_knn_dists, inds, dists, weight, index.n);
 
   if (perform_post_filtering) {
-    rbc_low_dim_pass_two<ValueIdx, value_t>(
+    rbc_low_dim_pass_two<ValueIdx, ValueT>(
       handle, index, query, n_query_pts, k, r_knn_inds, r_knn_dists, inds, dists, weight, index.n);
   }
 }
@@ -253,14 +253,14 @@ void perform_rbc_query(raft::resources const& handle,
  *
  */
 template <typename ValueIdx,
-          typename value_t,
+          typename ValueT,
           typename dist_func>  // NOLINT(readability-identifier-naming)
 void perform_rbc_eps_nn_query(raft::resources const& handle,
-                              const cuvs::neighbors::ball_cover::index<ValueIdx, value_t>& index,
-                              const value_t* query,
+                              const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
+                              const ValueT* query,
                               int64_t n_query_pts,
-                              value_t eps,
-                              const value_t* landmarks,
+                              ValueT eps,
+                              const ValueT* landmarks,
                               dist_func dfunc,
                               bool* adj,
                               ValueIdx* vd)
@@ -271,28 +271,27 @@ void perform_rbc_eps_nn_query(raft::resources const& handle,
 
   raft::resource::sync_stream(handle);
 
-  rbc_eps_pass<ValueIdx, value_t>(
-    handle, index, query, n_query_pts, eps, landmarks, dfunc, adj, vd);
+  rbc_eps_pass<ValueIdx, ValueT>(handle, index, query, n_query_pts, eps, landmarks, dfunc, adj, vd);
 
   raft::resource::sync_stream(handle);
 }
 
 template <typename ValueIdx,
-          typename value_t,
+          typename ValueT,
           typename dist_func>  // NOLINT(readability-identifier-naming)
 void perform_rbc_eps_nn_query(raft::resources const& handle,
-                              const cuvs::neighbors::ball_cover::index<ValueIdx, value_t>& index,
-                              const value_t* query,
+                              const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
+                              const ValueT* query,
                               int64_t n_query_pts,
-                              value_t eps,
+                              ValueT eps,
                               int64_t* max_k,
-                              const value_t* landmarks,
+                              const ValueT* landmarks,
                               dist_func dfunc,
                               ValueIdx* adj_ia,
                               ValueIdx* adj_ja,
                               ValueIdx* vd)
 {
-  rbc_eps_pass<ValueIdx, value_t>(
+  rbc_eps_pass<ValueIdx, ValueT>(
     handle, index, query, n_query_pts, eps, max_k, landmarks, dfunc, adj_ia, adj_ja, vd);
 
   raft::resource::sync_stream(handle);
@@ -310,9 +309,9 @@ void perform_rbc_eps_nn_query(raft::resources const& handle,
  * A * A.T.
  */
 template <typename ValueIdx = std::int64_t,
-          typename value_t>  // NOLINT(readability-identifier-naming)
+          typename ValueT>  // NOLINT(readability-identifier-naming)
 void rbc_build_index(raft::resources const& handle,
-                     cuvs::neighbors::ball_cover::index<ValueIdx, value_t>& index)
+                     cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index)
 {
   ASSERT(!index.is_index_trained(), "index cannot be previously trained");
 
@@ -326,12 +325,12 @@ void rbc_build_index(raft::resources const& handle,
   thrust::fill(raft::resource::get_thrust_policy(handle),
                index.get_R_closest_landmark_dists().data_handle(),
                index.get_R_closest_landmark_dists().data_handle() + index.m,
-               std::numeric_limits<value_t>::max());
+               std::numeric_limits<ValueT>::max());
 
   /**
    * 1. Randomly sample sqrt(n) points from X
    */
-  sample_landmarks<ValueIdx, value_t>(handle, index);
+  sample_landmarks<ValueIdx, ValueT>(handle, index);
 
   /**
    * 2. Perform knn = bfknn(X, R, k)
@@ -365,12 +364,12 @@ void rbc_build_index(raft::resources const& handle,
  * Performs an all neighbors knn query (e.g. index == query)
  */
 template <typename ValueIdx = std::int64_t,
-          typename value_t>  // NOLINT(readability-identifier-naming)
+          typename ValueT>  // NOLINT(readability-identifier-naming)
 void rbc_all_knn_query(raft::resources const& handle,
-                       cuvs::neighbors::ball_cover::index<ValueIdx, value_t>& index,
+                       cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
                        int64_t k,
                        ValueIdx* inds,
-                       value_t* dists,
+                       ValueT* dists,
                        // approximate nn options
                        bool perform_post_filtering = true,
                        float weight                = 1.0)
@@ -380,7 +379,7 @@ void rbc_all_knn_query(raft::resources const& handle,
   ASSERT(!index.is_index_trained(), "index cannot be previously trained");
 
   rmm::device_uvector<ValueIdx> r_knn_inds(k * index.m, raft::resource::get_cuda_stream(handle));
-  rmm::device_uvector<value_t> r_knn_dists(k * index.m, raft::resource::get_cuda_stream(handle));
+  rmm::device_uvector<ValueT> r_knn_dists(k * index.m, raft::resource::get_cuda_stream(handle));
 
   // Initialize the uvectors
   thrust::fill(raft::resource::get_thrust_policy(handle),
@@ -390,7 +389,7 @@ void rbc_all_knn_query(raft::resources const& handle,
   thrust::fill(raft::resource::get_thrust_policy(handle),
                r_knn_dists.begin(),
                r_knn_dists.end(),
-               std::numeric_limits<value_t>::max());
+               std::numeric_limits<ValueT>::max());
 
   thrust::fill(raft::resource::get_thrust_policy(handle),
                inds,
@@ -399,9 +398,9 @@ void rbc_all_knn_query(raft::resources const& handle,
   thrust::fill(raft::resource::get_thrust_policy(handle),
                dists,
                dists + (k * index.m),
-               std::numeric_limits<value_t>::max());
+               std::numeric_limits<ValueT>::max());
 
-  sample_landmarks<ValueIdx, value_t>(handle, index);
+  sample_landmarks<ValueIdx, ValueT>(handle, index);
 
   k_closest_landmarks(
     handle, index, index.get_X().data_handle(), index.m, k, r_knn_inds.data(), r_knn_dists.data());
@@ -428,14 +427,14 @@ void rbc_all_knn_query(raft::resources const& handle,
  * already been built.
  */
 template <typename ValueIdx = std::int64_t,
-          typename value_t>  // NOLINT(readability-identifier-naming)
+          typename ValueT>  // NOLINT(readability-identifier-naming)
 void rbc_knn_query(raft::resources const& handle,
-                   const cuvs::neighbors::ball_cover::index<ValueIdx, value_t>& index,
+                   const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
                    int64_t k,
-                   const value_t* query,
+                   const ValueT* query,
                    int64_t n_query_pts,
                    ValueIdx* inds,
-                   value_t* dists,
+                   ValueT* dists,
                    // approximate nn options
                    bool perform_post_filtering = true,
                    float weight                = 1.0)
@@ -446,8 +445,7 @@ void rbc_knn_query(raft::resources const& handle,
 
   rmm::device_uvector<ValueIdx> r_knn_inds(k * n_query_pts,
                                            raft::resource::get_cuda_stream(handle));
-  rmm::device_uvector<value_t> r_knn_dists(k * n_query_pts,
-                                           raft::resource::get_cuda_stream(handle));
+  rmm::device_uvector<ValueT> r_knn_dists(k * n_query_pts, raft::resource::get_cuda_stream(handle));
 
   // Initialize the uvectors
   thrust::fill(raft::resource::get_thrust_policy(handle),
@@ -457,7 +455,7 @@ void rbc_knn_query(raft::resources const& handle,
   thrust::fill(raft::resource::get_thrust_policy(handle),
                r_knn_dists.begin(),
                r_knn_dists.end(),
-               std::numeric_limits<value_t>::max());
+               std::numeric_limits<ValueT>::max());
 
   thrust::fill(raft::resource::get_thrust_policy(handle),
                inds,
@@ -466,7 +464,7 @@ void rbc_knn_query(raft::resources const& handle,
   thrust::fill(raft::resource::get_thrust_policy(handle),
                dists,
                dists + (k * n_query_pts),
-               std::numeric_limits<value_t>::max());
+               std::numeric_limits<ValueT>::max());
 
   k_closest_landmarks(handle, index, query, n_query_pts, k, r_knn_inds.data(), r_knn_dists.data());
 
@@ -483,12 +481,12 @@ void rbc_knn_query(raft::resources const& handle,
                     perform_post_filtering);
 }
 
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
 void compute_landmark_dists(raft::resources const& handle,
-                            const cuvs::neighbors::ball_cover::index<ValueIdx, value_t>& index,
-                            const value_t* query_pts,
+                            const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
+                            const ValueT* query_pts,
                             int64_t n_query_pts,
-                            value_t* R_dists)
+                            ValueT* R_dists)
 {
   // compute distances for all queries against all landmarks
   // index.get_R() -- landmark points in row order (index.n_landmarks x index.k)
@@ -516,12 +514,12 @@ void compute_landmark_dists(raft::resources const& handle,
  * we are assuming that there are sufficiently many landmarks
  */
 template <typename ValueIdx = std::int64_t,
-          typename value_t,
+          typename ValueT,
           typename DistanceFunc>  // NOLINT(readability-identifier-naming)
 void rbc_eps_nn_query(raft::resources const& handle,
-                      const cuvs::neighbors::ball_cover::index<ValueIdx, value_t>& index,
-                      const value_t eps,
-                      const value_t* query,
+                      const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
+                      const ValueT eps,
+                      const ValueT* query,
                       int64_t n_query_pts,
                       bool* adj,
                       ValueIdx* vd,
@@ -535,13 +533,13 @@ void rbc_eps_nn_query(raft::resources const& handle,
 }
 
 template <typename ValueIdx = std::int64_t,
-          typename value_t,
+          typename ValueT,
           typename DistanceFunc>  // NOLINT(readability-identifier-naming)
 void rbc_eps_nn_query(raft::resources const& handle,
-                      const cuvs::neighbors::ball_cover::index<ValueIdx, value_t>& index,
-                      const value_t eps,
+                      const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
+                      const ValueT eps,
                       int64_t* max_k,
-                      const value_t* query,
+                      const ValueT* query,
                       int64_t n_query_pts,
                       ValueIdx* adj_ia,
                       ValueIdx* adj_ja,

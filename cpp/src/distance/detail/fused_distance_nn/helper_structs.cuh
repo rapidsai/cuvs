@@ -21,10 +21,10 @@
 
 namespace cuvs::distance::detail {
 
-template <typename label_t, typename DataT>
+template <typename LabelT, typename DataT>
 struct kvp_min_reduce_impl {
-  using kvp = raft::KeyValuePair<label_t, DataT>;
-  DI auto operator()(label_t rit, const kvp& a, const kvp& b) -> kvp
+  using kvp = raft::KeyValuePair<LabelT, DataT>;
+  DI auto operator()(LabelT rit, const kvp& a, const kvp& b) -> kvp
   {
     return b.value < a.value ? b : a;
   }
@@ -32,18 +32,18 @@ struct kvp_min_reduce_impl {
 
 };  // kvp_min_reduce
 
-template <typename label_t, typename DataT>
+template <typename LabelT, typename DataT>
 struct min_and_distance_reduce_op_impl {
-  using kvp = typename raft::KeyValuePair<label_t, DataT>;
+  using kvp = typename raft::KeyValuePair<LabelT, DataT>;
 
-  DI void operator()(label_t rid, kvp* out, const kvp& other) const
+  DI void operator()(LabelT rid, kvp* out, const kvp& other) const
   {
     if (other.value < out->value) {
       out->key   = other.key;
       out->value = other.value;
     }
   }
-  DI void operator()(label_t rid, volatile kvp* out, const kvp& other) const
+  DI void operator()(LabelT rid, volatile kvp* out, const kvp& other) const
   {
     if (other.value < out->value) {
       out->key   = other.key;
@@ -51,22 +51,22 @@ struct min_and_distance_reduce_op_impl {
     }
   }
 
-  DI void operator()(label_t rid, DataT* out, const kvp& other) const
+  DI void operator()(LabelT rid, DataT* out, const kvp& other) const
   {
     if (other.value < *out) { *out = other.value; }
   }
 
-  DI void operator()(label_t rid, volatile DataT* out, const kvp& other) const
+  DI void operator()(LabelT rid, volatile DataT* out, const kvp& other) const
   {
     if (other.value < *out) { *out = other.value; }
   }
 
-  DI void operator()(label_t rid, DataT* out, const DataT& other) const
+  DI void operator()(LabelT rid, DataT* out, const DataT& other) const
   {
     if (other < *out) { *out = other; }
   }
 
-  DI void operator()(label_t rid, volatile DataT* out, const DataT& other) const
+  DI void operator()(LabelT rid, volatile DataT* out, const DataT& other) const
   {
     if (other < *out) { *out = other; }
   }
@@ -78,17 +78,17 @@ struct min_and_distance_reduce_op_impl {
     out->key   = 0xfffffff0;
   }
 
-  DI void init_key(DataT& out, label_t idx) const { return; }
-  DI void init_key(kvp& out, label_t idx) const { out.key = idx; }
+  DI void init_key(DataT& out, LabelT idx) const { return; }
+  DI void init_key(kvp& out, LabelT idx) const { out.key = idx; }
 
   DI auto get_value(kvp& out) const -> DataT { return out.value; }
   DI auto get_value(DataT& out) const -> DataT { return out; }
 };
 
-template <typename label_t, typename DataT>
+template <typename LabelT, typename DataT>
 struct min_reduce_op_impl {
-  using kvp = typename raft::KeyValuePair<label_t, DataT>;
-  DI void operator()(label_t rid, DataT* out, const kvp& other)
+  using kvp = typename raft::KeyValuePair<LabelT, DataT>;
+  DI void operator()(LabelT rid, DataT* out, const kvp& other)
   {
     if (other.value < *out) { *out = other.value; }
   }

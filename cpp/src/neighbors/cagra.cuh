@@ -101,10 +101,10 @@ void index<T, IdxT>::compute_dataset_norms_(raft::resources const& res)
  * @param[out] knn_graph a host matrix view to store the output knn graph [n_rows, graph_degree]
  * @param[in] ivf_pq_params ivf-pq parameters for graph build
  */
-template <typename DataT, typename IdxT, typename accessor>
+template <typename DataT, typename IdxT, typename Accessor>
 void build_knn_graph(
   raft::resources const& res,
-  raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, accessor> dataset,
+  raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,
   cagra::graph_build_params::ivf_pq_params ivf_pq_params)
 {
@@ -115,7 +115,7 @@ void build_knn_graph(
     knn_graph.extent(0),
     knn_graph.extent(1));
   auto dataset_internal =
-    raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, accessor>(
+    raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, Accessor>(
       dataset.data_handle(), dataset.extent(0), dataset.extent(1));
 
   cagra::detail::build_knn_graph(res, dataset_internal, knn_graph_internal, ivf_pq_params);
@@ -163,11 +163,11 @@ void build_knn_graph(
  */
 template <typename DataT,
           typename IdxT     = uint32_t,
-          typename accessor = raft::host_device_accessor<cuda::std::default_accessor<DataT>,
+          typename Accessor = raft::host_device_accessor<cuda::std::default_accessor<DataT>,
                                                          raft::memory_type::device>>
 void build_knn_graph(
   raft::resources const& res,
-  raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, accessor> dataset,
+  raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,
   cuvs::neighbors::nn_descent::index_params build_params)
 {
@@ -207,21 +207,21 @@ void build_knn_graph(
  * knn_graph_degree]
  */
 template <typename DataT,
-          typename IdxT       = uint32_t,
-          typename d_accessor = raft::host_device_accessor<cuda::std::default_accessor<DataT>,
-                                                           raft::memory_type::device>,
-          typename g_accessor =
+          typename IdxT      = uint32_t,
+          typename DAccessor = raft::host_device_accessor<cuda::std::default_accessor<DataT>,
+                                                          raft::memory_type::device>,
+          typename GAccessor =
             raft::host_device_accessor<cuda::std::default_accessor<IdxT>, raft::memory_type::host>>
 void sort_knn_graph(
   raft::resources const& res,
   cuvs::distance::DistanceType metric,
-  raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, d_accessor> dataset,
-  raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph)
+  raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, DAccessor> dataset,
+  raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, GAccessor> knn_graph)
 {
   using internal_IdxT = typename std::make_unsigned<IdxT>::type;
 
   using g_accessor_internal =
-    raft::host_device_accessor<cuda::std::default_accessor<internal_IdxT>, g_accessor::mem_type>;
+    raft::host_device_accessor<cuda::std::default_accessor<internal_IdxT>, GAccessor::mem_type>;
   auto knn_graph_internal =
     raft::mdspan<internal_IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor_internal>(
       reinterpret_cast<internal_IdxT*>(knn_graph.data_handle()),
@@ -229,7 +229,7 @@ void sort_knn_graph(
       knn_graph.extent(1));
 
   auto dataset_internal =
-    raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, d_accessor>(
+    raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, DAccessor>(
       dataset.data_handle(), dataset.extent(0), dataset.extent(1));
 
   cagra::detail::graph::sort_knn_graph(res, metric, dataset_internal, knn_graph_internal);
@@ -250,11 +250,11 @@ void sort_knn_graph(
  * @param[out] new_graph a host matrix view of the optimized knn graph [n_rows, graph_degree]
  */
 template <typename IdxT = uint32_t,
-          typename g_accessor =
+          typename GAccessor =
             raft::host_device_accessor<cuda::std::default_accessor<IdxT>, raft::memory_type::host>>
 void optimize(
   raft::resources const& res,
-  raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph,
+  raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, GAccessor> knn_graph,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph,
   const bool guarantee_connectivity = false)
 {

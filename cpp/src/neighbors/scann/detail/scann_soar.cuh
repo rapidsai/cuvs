@@ -33,13 +33,13 @@
  * @param soar_labels the computed soar labels
  * @param lambda the weight for the projection of a residual r' onto r in the SOAR loss
  */
-template <typename T, typename label_t>
+template <typename T, typename LabelT>
 void compute_soar_labels(raft::resources const& dev_resources,
                          raft::device_matrix_view<const T, int64_t> dataset,
                          raft::device_matrix_view<const T, int64_t> residuals,
                          raft::device_matrix_view<T, int64_t> centers,
-                         raft::device_vector_view<const label_t, int64_t> labels,
-                         raft::device_vector_view<label_t, int64_t> soar_labels,
+                         raft::device_vector_view<const LabelT, int64_t> labels,
+                         raft::device_vector_view<LabelT, int64_t> soar_labels,
                          float lambda)
 {
   auto dim = dataset.extent(1);

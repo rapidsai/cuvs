@@ -20,10 +20,10 @@ template <cuvs::distance::DistanceType Metric,
           uint32_t PqLen,
           typename CodebookT,
           typename DataT,
-          typename index_t,
-          typename distance_t>
-struct vpq_descriptor_spec : public instance_spec<DataT, index_t, distance_t> {
-  using base_type = instance_spec<DataT, index_t, distance_t>;
+          typename IndexT,
+          typename DistanceT>
+struct vpq_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
+  using base_type = instance_spec<DataT, IndexT, DistanceT>;
   using typename base_type::data_type;
   using typename base_type::distance_type;
   using typename base_type::host_type;
@@ -47,14 +47,14 @@ struct vpq_descriptor_spec : public instance_spec<DataT, index_t, distance_t> {
   static auto init(const cagra::search_params& params,
                    const DatasetT& dataset,
                    cuvs::distance::DistanceType metric,
-                   const distance_t* dataset_norms = nullptr) -> host_type
+                   const DistanceT* dataset_norms = nullptr) -> host_type
   {
     return init_(params,
                  dataset.data.data_handle(),
                  dataset.encoded_row_length(),
                  dataset.vq_code_book.data_handle(),
                  dataset.pq_code_book.data_handle(),
-                 index_t(dataset.n_rows()),
+                 IndexT(dataset.n_rows()),
                  dataset.dim());
   }
 
@@ -83,8 +83,8 @@ struct vpq_descriptor_spec : public instance_spec<DataT, index_t, distance_t> {
                     uint32_t encoded_dataset_dim,
                     const CodebookT* vq_code_book_ptr,
                     const CodebookT* pq_code_book_ptr,
-                    index_t size,
-                    uint32_t dim) -> dataset_descriptor_host<DataT, index_t, distance_t>;
+                    IndexT size,
+                    uint32_t dim) -> dataset_descriptor_host<DataT, IndexT, DistanceT>;
 };
 
 }  // namespace cuvs::neighbors::cagra::detail

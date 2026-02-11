@@ -28,11 +28,11 @@ namespace cuvs::stats::batched::detail {
  * If the corresponding row is the only sample in its label, again 0
  * Only if the there are > 1 samples in the label, row is initialized to max
  */
-template <typename value_t,
+template <typename ValueT,
           typename ValueIdx,
           typename LabelIdx>  // NOLINT(readability-identifier-naming)
 RAFT_KERNEL fill_b_kernel(
-  value_t* b, const LabelIdx* y, ValueIdx n_rows, LabelIdx n_labels, const ValueIdx* cluster_counts)
+  ValueT* b, const LabelIdx* y, ValueIdx n_rows, LabelIdx n_labels, const ValueIdx* cluster_counts)
 {
   ValueIdx idx = threadIdx.x + blockIdx.x * blockDim.x;
   LabelIdx idy = threadIdx.y + blockIdx.y * blockDim.y;
@@ -51,7 +51,7 @@ RAFT_KERNEL fill_b_kernel(
     if (cluster_counts[row_cluster] == 1) {
       b[idx * n_labels + idy] = 0;
     } else {
-      b[idx * n_labels + idy] = std::numeric_limits<value_t>::max();
+      b[idx * n_labels + idy] = std::numeric_limits<ValueT>::max();
     }
   } else {
     b[idx * n_labels + idy] = 0;
@@ -65,17 +65,17 @@ RAFT_KERNEL fill_b_kernel(
  * intermediate values of a and b for the rows and columns present in the
  * current chunked pairwise distance matrix.
  */
-template <typename value_t,
+template <typename ValueT,
           typename ValueIdx,
           typename LabelIdx>  // NOLINT(readability-identifier-naming)
-RAFT_KERNEL compute_chunked_a_b_kernel(value_t* a,
-                                       value_t* b,
+RAFT_KERNEL compute_chunked_a_b_kernel(ValueT* a,
+                                       ValueT* b,
                                        ValueIdx row_offset,
                                        ValueIdx col_offset,
                                        const LabelIdx* y,
                                        LabelIdx n_labels,
                                        const ValueIdx* cluster_counts,
-                                       const value_t* distances,
+                                       const ValueT* distances,
                                        ValueIdx dist_rows,
                                        ValueIdx dist_cols)
 {
@@ -120,40 +120,40 @@ auto get_cluster_counts(raft::resources const& handle,
   return cluster_counts;
 }
 
-template <typename value_t, typename ValueIdx>  // NOLINT(readability-identifier-naming)
+template <typename ValueT, typename ValueIdx>  // NOLINT(readability-identifier-naming)
 auto get_pairwise_distance(raft::resources const& handle,
-                           const value_t* left_begin,
-                           const value_t* right_begin,
+                           const ValueT* left_begin,
+                           const ValueT* right_begin,
                            ValueIdx& n_left_rows,
                            ValueIdx& n_right_rows,
                            ValueIdx& n_cols,
                            cuvs::distance::DistanceType metric,
-                           cudaStream_t stream) -> rmm::device_uvector<value_t>
+                           cudaStream_t stream) -> rmm::device_uvector<ValueT>
 {
-  rmm::device_uvector<value_t> distances(n_left_rows * n_right_rows, stream);
+  rmm::device_uvector<ValueT> distances(n_left_rows * n_right_rows, stream);
 
   cuvs::distance::pairwise_distance(
     handle,
-    raft::make_device_matrix_view<const value_t, int64_t>(left_begin, n_left_rows, n_cols),
-    raft::make_device_matrix_view<const value_t, int64_t>(right_begin, n_right_rows, n_cols),
-    raft::make_device_matrix_view<value_t, int64_t>(distances.data(), n_left_rows, n_right_rows),
+    raft::make_device_matrix_view<const ValueT, int64_t>(left_begin, n_left_rows, n_cols),
+    raft::make_device_matrix_view<const ValueT, int64_t>(right_begin, n_right_rows, n_cols),
+    raft::make_device_matrix_view<ValueT, int64_t>(distances.data(), n_left_rows, n_right_rows),
     metric);
 
   return distances;
 }
 
-template <typename value_t,
+template <typename ValueT,
           typename ValueIdx,
           typename LabelIdx>  // NOLINT(readability-identifier-naming)
 void compute_chunked_a_b(raft::resources const& handle,
-                         value_t* a,
-                         value_t* b,
+                         ValueT* a,
+                         ValueT* b,
                          ValueIdx& row_offset,
                          ValueIdx& col_offset,
                          const LabelIdx* y,
                          LabelIdx& n_labels,
                          const ValueIdx* cluster_counts,
-                         const value_t* distances,
+                         const ValueT* distances,
                          ValueIdx& dist_rows,
                          ValueIdx& dist_cols,
                          cudaStream_t stream)
@@ -166,19 +166,19 @@ void compute_chunked_a_b(raft::resources const& handle,
     a, b, row_offset, col_offset, y, n_labels, cluster_counts, distances, dist_rows, dist_cols);
 }
 
-template <typename value_t,
+template <typename ValueT,
           typename ValueIdx,
           typename LabelIdx>  // NOLINT(readability-identifier-naming)
 auto silhouette_score(
   raft::resources const& handle,
-  const value_t* X,
+  const ValueT* X,
   ValueIdx n_rows,
   ValueIdx n_cols,
   const LabelIdx* y,
   LabelIdx n_labels,
-  value_t* scores,
+  ValueT* scores,
   ValueIdx chunk,
-  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded) -> value_t
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded) -> ValueT
 {
   ASSERT(n_labels >= 2 && n_labels <= (n_rows - 1),
          "silhouette Score not defined for the given number of labels!");
@@ -190,9 +190,9 @@ auto silhouette_score(
 
   auto b_size = n_rows * n_labels;
 
-  value_t *a_ptr, *b_ptr;
-  rmm::device_uvector<value_t> a(0, stream);
-  rmm::device_uvector<value_t> b(b_size, stream);
+  ValueT *a_ptr, *b_ptr;
+  rmm::device_uvector<ValueT> a(0, stream);
+  rmm::device_uvector<ValueT> b(b_size, stream);
 
   b_ptr = b.data();
 
@@ -228,7 +228,7 @@ auto silhouette_score(
       auto n_left_rows  = (i + chunk) < n_rows ? chunk : (n_rows - i);
       auto n_right_rows = (j + chunk) < n_rows ? chunk : (n_rows - j);
 
-      rmm::device_uvector<value_t> distances = get_pairwise_distance(
+      rmm::device_uvector<ValueT> distances = get_pairwise_distance(
         handle, left_begin, right_begin, n_left_rows, n_right_rows, n_cols, metric, chunk_stream);
 
       compute_chunked_a_b(handle,
@@ -250,22 +250,22 @@ auto silhouette_score(
 
   // calculating row-wise minimum in b
   // this prim only supports int indices for now
-  raft::linalg::reduce<true, true, value_t, value_t, ValueIdx, raft::identity_op, raft::min_op>(
+  raft::linalg::reduce<true, true, ValueT, ValueT, ValueIdx, raft::identity_op, raft::min_op>(
     b_ptr,
     b_ptr,
     n_labels,
     n_rows,
-    std::numeric_limits<value_t>::max(),
+    std::numeric_limits<ValueT>::max(),
     stream,
     false,
     raft::identity_op(),
     raft::min_op());
 
   // calculating the silhouette score per sample
-  raft::linalg::binaryOp<value_t, cuvs::stats::detail::sil_op<value_t>, value_t, ValueIdx>(
-    a_ptr, a_ptr, b_ptr, n_rows, cuvs::stats::detail::sil_op<value_t>(), stream);
+  raft::linalg::binaryOp<ValueT, cuvs::stats::detail::sil_op<ValueT>, ValueT, ValueIdx>(
+    a_ptr, a_ptr, b_ptr, n_rows, cuvs::stats::detail::sil_op<ValueT>(), stream);
 
-  return thrust::reduce(policy, a_ptr, a_ptr + n_rows, value_t(0)) / n_rows;
+  return thrust::reduce(policy, a_ptr, a_ptr + n_rows, ValueT(0)) / n_rows;
 }
 
 }  // namespace cuvs::stats::batched::detail

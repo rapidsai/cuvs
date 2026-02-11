@@ -16,11 +16,10 @@
 
 namespace cuvs::distance::detail::sparse {
 
-template <typename ValueIdx, typename value_t, int tpb>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, int tpb>  // NOLINT(readability-identifier-naming)
 class coo_spmv_strategy {
  public:
-  explicit coo_spmv_strategy(const distances_config_t<ValueIdx, value_t>& config_)
-    : config_(config_)
+  explicit coo_spmv_strategy(const distances_config_t<ValueIdx, ValueT>& config_) : config_(config_)
   {
     smem_ = raft::getSharedMemPerBlock();
   }
@@ -33,7 +32,7 @@ class coo_spmv_strategy {
   void dispatch_base(StrategyT& strategy,
                      int smem_dim,
                      IndptrIt& a_indptr,
-                     value_t* out_dists,
+                     ValueT* out_dists,
                      ValueIdx* coo_rows_b,
                      ProductF product_func,
                      AccumF accum_func,
@@ -45,7 +44,7 @@ class coo_spmv_strategy {
     RAFT_CUDA_TRY(cudaFuncSetCacheConfig(balanced_coo_generalized_spmv_kernel<StrategyT,
                                                                               IndptrIt,
                                                                               ValueIdx,
-                                                                              value_t,
+                                                                              ValueT,
                                                                               false,
                                                                               tpb,
                                                                               ProductF,
@@ -53,7 +52,7 @@ class coo_spmv_strategy {
                                                                               WriteF>,
                                          cudaFuncCachePreferShared));
 
-    balanced_coo_generalized_spmv_kernel<StrategyT, IndptrIt, ValueIdx, value_t, false, tpb>
+    balanced_coo_generalized_spmv_kernel<StrategyT, IndptrIt, ValueIdx, ValueT, false, tpb>
       <<<n_blocks, tpb, smem_, raft::resource::get_cuda_stream(config_.handle)>>>(strategy,
                                                                                   a_indptr,
                                                                                   config_.a_indices,
@@ -83,7 +82,7 @@ class coo_spmv_strategy {
   void dispatch_base_rev(StrategyT& strategy,
                          int smem_dim,
                          IndptrIt& b_indptr,
-                         value_t* out_dists,
+                         ValueT* out_dists,
                          ValueIdx* coo_rows_a,
                          ProductF product_func,
                          AccumF accum_func,
@@ -95,7 +94,7 @@ class coo_spmv_strategy {
     RAFT_CUDA_TRY(cudaFuncSetCacheConfig(balanced_coo_generalized_spmv_kernel<StrategyT,
                                                                               IndptrIt,
                                                                               ValueIdx,
-                                                                              value_t,
+                                                                              ValueT,
                                                                               true,
                                                                               tpb,
                                                                               ProductF,
@@ -103,7 +102,7 @@ class coo_spmv_strategy {
                                                                               WriteF>,
                                          cudaFuncCachePreferShared));
 
-    balanced_coo_generalized_spmv_kernel<StrategyT, IndptrIt, ValueIdx, value_t, true, tpb>
+    balanced_coo_generalized_spmv_kernel<StrategyT, IndptrIt, ValueIdx, ValueT, true, tpb>
       <<<n_blocks, tpb, smem_, raft::resource::get_cuda_stream(config_.handle)>>>(strategy,
                                                                                   b_indptr,
                                                                                   config_.b_indices,
@@ -127,7 +126,7 @@ class coo_spmv_strategy {
 
  protected:
   int smem_;
-  const distances_config_t<ValueIdx, value_t>& config_;
+  const distances_config_t<ValueIdx, ValueT>& config_;
 };
 
 }  // namespace cuvs::distance::detail::sparse

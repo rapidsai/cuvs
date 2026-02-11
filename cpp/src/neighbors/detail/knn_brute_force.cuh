@@ -56,7 +56,7 @@ namespace cuvs::neighbors::detail {
  */
 template <typename ElementType      = float,
           typename IndexType        = int64_t,
-          typename distance_t       = float,
+          typename DistanceT        = float,
           typename DistanceEpilogue = raft::identity_op>
 void tiled_brute_force_knn(const raft::resources& handle,
                            const ElementType* search,  // size (m ,d)
@@ -65,16 +65,16 @@ void tiled_brute_force_knn(const raft::resources& handle,
                            size_t n,
                            size_t d,
                            size_t k,
-                           distance_t* distances,  // size (m, k)
-                           IndexType* indices,     // size (m, k)
+                           DistanceT* distances,  // size (m, k)
+                           IndexType* indices,    // size (m, k)
                            cuvs::distance::DistanceType metric,
-                           distance_t metric_arg                      = 2.0,
-                           size_t max_row_tile_size                   = 0,
-                           size_t max_col_tile_size                   = 0,
-                           const distance_t* precomputed_index_norms  = nullptr,
-                           const distance_t* precomputed_search_norms = nullptr,
-                           const uint32_t* filter_bits                = nullptr,
-                           DistanceEpilogue distance_epilogue         = raft::identity_op(),
+                           DistanceT metric_arg                      = 2.0,
+                           size_t max_row_tile_size                  = 0,
+                           size_t max_col_tile_size                  = 0,
+                           const DistanceT* precomputed_index_norms  = nullptr,
+                           const DistanceT* precomputed_search_norms = nullptr,
+                           const uint32_t* filter_bits               = nullptr,
+                           DistanceEpilogue distance_epilogue        = raft::identity_op(),
                            cuvs::neighbors::filtering::FilterType filter_type =
                              cuvs::neighbors::filtering::FilterType::Bitmap)
 {
@@ -84,7 +84,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
   auto stream      = raft::resource::get_cuda_stream(handle);
 
   cuvs::neighbors::detail::faiss_select::choose_tile_size(
-    m, n, d, sizeof(distance_t), tile_rows, tile_cols);
+    m, n, d, sizeof(DistanceT), tile_rows, tile_cols);
 
   // for unittesting, its convenient to be able to put a max size on the tiles
   // so we can test the tiling logic without having to use huge inputs.
@@ -95,13 +95,13 @@ void tiled_brute_force_knn(const raft::resources& handle,
   tile_cols = std::max(tile_cols, k);
 
   // stores pairwise distances for the current tile
-  rmm::device_uvector<distance_t> temp_distances(tile_rows * tile_cols, stream);
+  rmm::device_uvector<DistanceT> temp_distances(tile_rows * tile_cols, stream);
 
   // calculate norms for L2 expanded distances - this lets us avoid calculating
   // norms repeatedly per-tile, and just do once for the entire input
   auto pairwise_metric = metric;
-  rmm::device_uvector<distance_t> search_norms(0, stream);
-  rmm::device_uvector<distance_t> index_norms(0, stream);
+  rmm::device_uvector<DistanceT> search_norms(0, stream);
+  rmm::device_uvector<DistanceT> index_norms(0, stream);
   if (metric == cuvs::distance::DistanceType::L2Expanded ||
       metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
       metric == cuvs::distance::DistanceType::CosineExpanded) {
@@ -145,14 +145,14 @@ void tiled_brute_force_knn(const raft::resources& handle,
   if (n < k) {
     raft::matrix::fill(handle,
                        raft::make_device_matrix_view(distances, m, k),
-                       std::numeric_limits<distance_t>::lowest());
+                       std::numeric_limits<DistanceT>::lowest());
 
     if constexpr (std::is_signed_v<IndexType>) {
       raft::matrix::fill(handle, raft::make_device_matrix_view(indices, m, k), IndexType{-1});
     }
   }
 
-  rmm::device_uvector<distance_t> temp_out_distances(tile_rows * temp_out_cols, stream);
+  rmm::device_uvector<DistanceT> temp_out_distances(tile_rows * temp_out_cols, stream);
   rmm::device_uvector<IndexType> temp_out_indices(tile_rows * temp_out_cols, stream);
 
   bool select_min = cuvs::distance::is_min_close(metric);
@@ -172,7 +172,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
           search + i * d, current_query_size, d),
         raft::make_device_matrix_view<const ElementType, int64_t>(
           index + j * d, current_centroid_size, d),
-        raft::make_device_matrix_view<distance_t, int64_t>(
+        raft::make_device_matrix_view<DistanceT, int64_t>(
           temp_distances.data(), current_query_size, current_centroid_size),
         pairwise_metric,
         metric_arg);
@@ -187,11 +187,11 @@ void tiled_brute_force_knn(const raft::resources& handle,
         raft::linalg::map_offset(
           handle,
           raft::make_device_vector_view(dist, current_query_size * current_centroid_size),
-          [=] __device__(IndexType idx) -> distance_t {
+          [=] __device__(IndexType idx) -> DistanceT {
             IndexType row = i + (idx / current_centroid_size);
             IndexType col = j + (idx % current_centroid_size);
 
-            cuvs::distance::detail::ops::l2_exp_cutlass_op<distance_t, distance_t> l2_op(sqrt);
+            cuvs::distance::detail::ops::l2_exp_cutlass_op<DistanceT, DistanceT> l2_op(sqrt);
             auto val = l2_op(row_norms[row], col_norms[col], dist[idx]);
             return distance_epilogue(val, row, col);
           });
@@ -203,10 +203,10 @@ void tiled_brute_force_knn(const raft::resources& handle,
         raft::linalg::map_offset(
           handle,
           raft::make_device_vector_view(dist, current_query_size * current_centroid_size),
-          [=] __device__(IndexType idx) -> distance_t {
+          [=] __device__(IndexType idx) -> DistanceT {
             IndexType row = i + (idx / current_centroid_size);
             IndexType col = j + (idx % current_centroid_size);
-            auto val = distance_t(1.0) - dist[idx] / distance_t(row_norms[row] * col_norms[col]);
+            auto val      = DistanceT(1.0) - dist[idx] / DistanceT(row_norms[row] * col_norms[col]);
             return distance_epilogue(val, row, col);
           });
       } else {
@@ -217,7 +217,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
             handle,
             raft::make_device_vector_view(temp_distances.data(),
                                           current_query_size * current_centroid_size),
-            [=] __device__(size_t idx) -> distance_t {
+            [=] __device__(size_t idx) -> DistanceT {
               IndexType row = i + (idx / current_centroid_size);
               IndexType col = j + (idx % current_centroid_size);
               return distance_epilogue(distances_ptr[idx], row, col);
@@ -225,10 +225,10 @@ void tiled_brute_force_knn(const raft::resources& handle,
         }
       }
 
-      auto distances_ptr         = temp_distances.data();
-      auto count                 = thrust::make_counting_iterator<IndexType>(0);
-      distance_t masked_distance = select_min ? std::numeric_limits<distance_t>::infinity()
-                                              : std::numeric_limits<distance_t>::lowest();
+      auto distances_ptr        = temp_distances.data();
+      auto count                = thrust::make_counting_iterator<IndexType>(0);
+      DistanceT masked_distance = select_min ? std::numeric_limits<DistanceT>::infinity()
+                                             : std::numeric_limits<DistanceT>::lowest();
 
       if (filter_bits != nullptr) {
         size_t n_cols = filter_type == cuvs::neighbors::filtering::FilterType::Bitmap ? n : 0;
@@ -252,10 +252,10 @@ void tiled_brute_force_knn(const raft::resources& handle,
         null_optional = std::nullopt;
       cuvs::selection::select_k(
         handle,
-        raft::make_device_matrix_view<const distance_t, int64_t, raft::row_major>(
+        raft::make_device_matrix_view<const DistanceT, int64_t, raft::row_major>(
           temp_distances.data(), current_query_size, current_centroid_size),
         null_optional,
-        raft::make_device_matrix_view<distance_t, int64_t, raft::row_major>(
+        raft::make_device_matrix_view<DistanceT, int64_t, raft::row_major>(
           distances + i * k, current_query_size, current_k),
         raft::make_device_matrix_view<IndexType, int64_t, raft::row_major>(
           indices + i * k, current_query_size, current_k),
@@ -271,10 +271,10 @@ void tiled_brute_force_knn(const raft::resources& handle,
       // concatenation.
       // Fix both of these problems in a single pass here
       if (tile_cols != n) {
-        const distance_t* in_distances = distances + i * k;
-        const IndexType* in_indices    = indices + i * k;
-        distance_t* out_distances      = temp_out_distances.data();
-        IndexType* out_indices         = temp_out_indices.data();
+        const DistanceT* in_distances = distances + i * k;
+        const IndexType* in_indices   = indices + i * k;
+        DistanceT* out_distances      = temp_out_distances.data();
+        IndexType* out_indices        = temp_out_indices.data();
 
         auto count = thrust::make_counting_iterator<IndexType>(0);
         thrust::for_each(raft::resource::get_thrust_policy(handle),
@@ -294,11 +294,11 @@ void tiled_brute_force_knn(const raft::resources& handle,
       // select the actual top-k items here from the temporary output
       cuvs::selection::select_k(
         handle,
-        raft::make_device_matrix_view<const distance_t, int64_t, raft::row_major>(
+        raft::make_device_matrix_view<const DistanceT, int64_t, raft::row_major>(
           temp_out_distances.data(), current_query_size, temp_out_cols),
         raft::make_device_matrix_view<const IndexType, int64_t, raft::row_major>(
           temp_out_indices.data(), current_query_size, temp_out_cols),
-        raft::make_device_matrix_view<distance_t, int64_t, raft::row_major>(
+        raft::make_device_matrix_view<DistanceT, int64_t, raft::row_major>(
           distances + i * k, current_query_size, k),
         raft::make_device_matrix_view<IndexType, int64_t, raft::row_major>(
           indices + i * k, current_query_size, k),
@@ -524,15 +524,15 @@ void brute_force_knn_impl(
 
 template <typename T,
           typename IdxT,
-          typename distance_t   = float,
+          typename DistanceT    = float,
           typename QueryLayoutT = raft::row_major>
 void brute_force_search(
   raft::resources const& res,
-  const cuvs::neighbors::brute_force::index<T, distance_t>& idx,
+  const cuvs::neighbors::brute_force::index<T, DistanceT>& idx,
   raft::device_matrix_view<const T, int64_t, QueryLayoutT> queries,
   raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,
-  raft::device_matrix_view<distance_t, int64_t, raft::row_major> distances,
-  std::optional<raft::device_vector_view<const distance_t, int64_t>> query_norms = std::nullopt)
+  raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
+  std::optional<raft::device_vector_view<const DistanceT, int64_t>> query_norms = std::nullopt)
 {
   RAFT_EXPECTS(neighbors.extent(1) == distances.extent(1), "Value of k must match for outputs");
   RAFT_EXPECTS(idx.dataset().extent(1) == queries.extent(1),
@@ -543,10 +543,10 @@ void brute_force_search(
 
   std::vector<T*> dataset    = {const_cast<T*>(idx.dataset().data_handle())};
   std::vector<int64_t> sizes = {idx.dataset().extent(0)};
-  std::vector<distance_t*> norms;
-  if (idx.has_norms()) { norms.push_back(const_cast<distance_t*>(idx.norms().data_handle())); }
+  std::vector<DistanceT*> norms;
+  if (idx.has_norms()) { norms.push_back(const_cast<DistanceT*>(idx.norms().data_handle())); }
 
-  brute_force_knn_impl<int64_t, IdxT, T, distance_t>(
+  brute_force_knn_impl<int64_t, IdxT, T, DistanceT>(
     res,
     dataset,
     sizes,
@@ -565,15 +565,15 @@ void brute_force_search(
     query_norms ? query_norms->data_handle() : nullptr);
 }
 
-template <typename T, typename IdxT, typename BitsT, typename distance_t = float>
+template <typename T, typename IdxT, typename BitsT, typename DistanceT = float>
 void brute_force_search_filtered(
   raft::resources const& res,
-  const cuvs::neighbors::brute_force::index<T, distance_t>& idx,
+  const cuvs::neighbors::brute_force::index<T, DistanceT>& idx,
   raft::device_matrix_view<const T, IdxT, raft::row_major> queries,
   const cuvs::neighbors::filtering::base_filter* filter,
   raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,
-  raft::device_matrix_view<distance_t, IdxT, raft::row_major> distances,
-  std::optional<raft::device_vector_view<const distance_t, IdxT>> query_norms = std::nullopt)
+  raft::device_matrix_view<DistanceT, IdxT, raft::row_major> distances,
+  std::optional<raft::device_vector_view<const DistanceT, IdxT>> query_norms = std::nullopt)
 {
   auto metric = idx.metric();
 
@@ -630,28 +630,28 @@ void brute_force_search_filtered(
   if (sparsity < 0.9f) {
     raft::resources stream_pool_handle(res);
     raft::resource::set_cuda_stream(stream_pool_handle, stream);
-    auto idx_norm = idx.has_norms() ? const_cast<distance_t*>(idx.norms().data_handle()) : nullptr;
+    auto idx_norm = idx.has_norms() ? const_cast<DistanceT*>(idx.norms().data_handle()) : nullptr;
 
-    tiled_brute_force_knn<T, IdxT, distance_t>(stream_pool_handle,
-                                               queries.data_handle(),
-                                               idx.dataset().data_handle(),
-                                               n_queries,
-                                               n_dataset,
-                                               dim,
-                                               k,
-                                               distances.data_handle(),
-                                               neighbors.data_handle(),
-                                               metric,
-                                               distance_t{2.0},
-                                               0,
-                                               0,
-                                               idx_norm,
-                                               nullptr,
-                                               filter_data,
-                                               raft::identity_op(),
-                                               filter_type);
+    tiled_brute_force_knn<T, IdxT, DistanceT>(stream_pool_handle,
+                                              queries.data_handle(),
+                                              idx.dataset().data_handle(),
+                                              n_queries,
+                                              n_dataset,
+                                              dim,
+                                              k,
+                                              distances.data_handle(),
+                                              neighbors.data_handle(),
+                                              metric,
+                                              DistanceT{2.0},
+                                              0,
+                                              0,
+                                              idx_norm,
+                                              nullptr,
+                                              filter_data,
+                                              raft::identity_op(),
+                                              filter_type);
   } else {
-    auto csr = raft::make_device_csr_matrix<distance_t, IdxT>(res, n_queries, n_dataset, nnz_h);
+    auto csr = raft::make_device_csr_matrix<DistanceT, IdxT>(res, n_queries, n_dataset, nnz_h);
     std::visit([&](const auto& actual_view) -> auto { actual_view.to_csr(res, csr); },
                *filter_view);
 
@@ -666,7 +666,7 @@ void brute_force_search_filtered(
     auto dataset_view = raft::make_device_matrix_view<const T, IdxT, raft::row_major>(
       idx.dataset().data_handle(), n_dataset, dim);
 
-    auto csr_view = raft::make_device_csr_matrix_view<distance_t, IdxT, IdxT, IdxT>(
+    auto csr_view = raft::make_device_csr_matrix_view<DistanceT, IdxT, IdxT, IdxT>(
       csr.get_elements().data(), compressed_csr_view);
 
     std::visit(
@@ -676,15 +676,15 @@ void brute_force_search_filtered(
       *filter_view);
 
     // post process
-    std::optional<raft::device_vector<distance_t, IdxT>> query_norms_;
+    std::optional<raft::device_vector<DistanceT, IdxT>> query_norms_;
     if (metric == cuvs::distance::DistanceType::L2Expanded ||
         metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
         metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         if (!query_norms) {
-          query_norms_ = raft::make_device_vector<distance_t, IdxT>(res, n_queries);
+          query_norms_ = raft::make_device_vector<DistanceT, IdxT>(res, n_queries);
           raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
-            (distance_t*)(query_norms_->data_handle()),
+            (DistanceT*)(query_norms_->data_handle()),
             queries.data_handle(),
             dim,
             n_queries,
@@ -693,9 +693,9 @@ void brute_force_search_filtered(
         }
       } else {
         if (!query_norms) {
-          query_norms_ = raft::make_device_vector<distance_t, IdxT>(res, n_queries);
+          query_norms_ = raft::make_device_vector<DistanceT, IdxT>(res, n_queries);
           raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
-            (distance_t*)(query_norms_->data_handle()),
+            (DistanceT*)(query_norms_->data_handle()),
             queries.data_handle(),
             dim,
             n_queries,
@@ -715,7 +715,7 @@ void brute_force_search_filtered(
     }
 
     // select k
-    auto const_csr_view = raft::make_device_csr_matrix_view<const distance_t, IdxT, IdxT, IdxT>(
+    auto const_csr_view = raft::make_device_csr_matrix_view<const DistanceT, IdxT, IdxT, IdxT>(
       csr.get_elements().data(), compressed_csr_view);
     std::optional<raft::device_vector_view<const IdxT, IdxT>> no_opt = std::nullopt;
     bool select_min = cuvs::distance::is_min_close(metric);

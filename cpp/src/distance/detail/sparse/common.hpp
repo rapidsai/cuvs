@@ -12,7 +12,7 @@ namespace distance {
 namespace detail {
 namespace sparse {
 
-template <typename value_idx, typename value_t>  // NOLINT(readability-identifier-naming)
+template <typename value_idx, typename ValueT>  // NOLINT(readability-identifier-naming)
 struct distances_config_t {
   explicit distances_config_t(raft::resources const& handle_) : handle(handle_) {}
 
@@ -22,7 +22,7 @@ struct distances_config_t {
   value_idx a_nnz;
   value_idx* a_indptr;
   value_idx* a_indices;
-  value_t* a_data;
+  ValueT* a_data;
 
   // right side
   value_idx b_nrows;
@@ -30,15 +30,15 @@ struct distances_config_t {
   value_idx b_nnz;
   value_idx* b_indptr;
   value_idx* b_indices;
-  value_t* b_data;
+  ValueT* b_data;
 
   raft::resources const& handle;
 };
 
-template <typename value_t>  // NOLINT(readability-identifier-naming)
+template <typename ValueT>  // NOLINT(readability-identifier-naming)
 class distances_t {
  public:
-  virtual void compute(value_t* out) {}
+  virtual void compute(ValueT* out) {}
   virtual ~distances_t() = default;
 };
 

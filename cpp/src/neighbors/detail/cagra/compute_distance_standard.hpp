@@ -16,10 +16,10 @@ template <cuvs::distance::DistanceType Metric,
           uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           typename DataT,
-          typename index_t,
-          typename distance_t>
-struct standard_descriptor_spec : public instance_spec<DataT, index_t, distance_t> {
-  using base_type = instance_spec<DataT, index_t, distance_t>;
+          typename IndexT,
+          typename DistanceT>
+struct standard_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
+  using base_type = instance_spec<DataT, IndexT, DistanceT>;
   using typename base_type::data_type;
   using typename base_type::distance_type;
   using typename base_type::host_type;
@@ -35,11 +35,11 @@ struct standard_descriptor_spec : public instance_spec<DataT, index_t, distance_
   static auto init(const cagra::search_params& params,
                    const DatasetT& dataset,
                    cuvs::distance::DistanceType metric,
-                   const distance_t* dataset_norms = nullptr) -> host_type
+                   const DistanceT* dataset_norms = nullptr) -> host_type
   {
     return init_(params,
                  dataset.view().data_handle(),
-                 index_t(dataset.n_rows()),
+                 IndexT(dataset.n_rows()),
                  dataset.dim(),
                  dataset.stride(),
                  dataset_norms);
@@ -60,11 +60,11 @@ struct standard_descriptor_spec : public instance_spec<DataT, index_t, distance_
  private:
   static auto init_(const cagra::search_params& params,
                     const DataT* ptr,
-                    index_t size,
+                    IndexT size,
                     uint32_t dim,
                     uint32_t ld,
-                    const distance_t* dataset_norms = nullptr)
-    -> dataset_descriptor_host<DataT, index_t, distance_t>;
+                    const DistanceT* dataset_norms = nullptr)
+    -> dataset_descriptor_host<DataT, IndexT, DistanceT>;
 };
 
 }  // namespace cuvs::neighbors::cagra::detail

@@ -26,14 +26,14 @@
 
 namespace cuvs::distance::detail::sparse {
 
-template <typename ValueIdx, typename value_t>  // NOLINT(readability-identifier-naming)
-class ip_distances_t : public distances_t<value_t> {
+template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+class ip_distances_t : public distances_t<ValueT> {
  public:
   /**
    * Computes simple sparse inner product distances as sum(x_y * y_k)
    * @param[in] config specifies inputs, outputs, and sizes
    */
-  explicit ip_distances_t(const distances_config_t<ValueIdx, value_t>& config)
+  explicit ip_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
     : config_(&config), coo_rows_b_(config.b_nnz, raft::resource::get_cuda_stream(config.handle))
   {
     raft::sparse::convert::csr_to_coo(config_->b_indptr,
@@ -47,25 +47,25 @@ class ip_distances_t : public distances_t<value_t> {
    * Performs pairwise distance computation and computes output distances
    * @param out_distances dense output matrix (size a_nrows * b_nrows)
    */
-  void compute(value_t* out_distances)
+  void compute(ValueT* out_distances)
   {
     /**
      * Compute pairwise distances and return dense matrix in row-major format
      */
-    balanced_coo_pairwise_generalized_spmv<ValueIdx, value_t>(out_distances,
-                                                              *config_,
-                                                              coo_rows_b_.data(),
-                                                              raft::mul_op(),
-                                                              raft::add_op(),
-                                                              raft::atomic_add_op());
+    balanced_coo_pairwise_generalized_spmv<ValueIdx, ValueT>(out_distances,
+                                                             *config_,
+                                                             coo_rows_b_.data(),
+                                                             raft::mul_op(),
+                                                             raft::add_op(),
+                                                             raft::atomic_add_op());
   }
 
   auto b_rows_coo() -> ValueIdx* { return coo_rows_b_.data(); }
 
-  auto b_data_coo() -> value_t* { return config_->b_data; }
+  auto b_data_coo() -> ValueT* { return config_->b_data; }
 
  private:
-  const distances_config_t<ValueIdx, value_t>* config_;
+  const distances_config_t<ValueIdx, ValueT>* config_;
   rmm::device_uvector<ValueIdx> coo_rows_b_;
 };
 

@@ -51,10 +51,10 @@ struct correlation_distance_op {
 
   // Size of shared memory. This is normally decided by the kernel policy, but
   // some ops such as correlation_distance_op use more.
-  template <typename policy>
+  template <typename Policy>
   static constexpr auto shared_mem_size() -> size_t
   {
-    return policy::SmemSize + (2 * (policy::Mblk + policy::Nblk) * sizeof(acc_t));
+    return Policy::SmemSize + (2 * (Policy::Mblk + Policy::Nblk) * sizeof(acc_t));
   }
 
   DI auto core(acc_t& acc, data_t& x, data_t& y) const -> void
@@ -62,8 +62,8 @@ struct correlation_distance_op {
     acc += raft::to_float(x) * raft::to_float(y);
   };
 
-  template <typename policy>
-  DI auto epilog(acc_t acc[policy::AccRowsPerTh][policy::AccColsPerTh],
+  template <typename Policy>
+  DI auto epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
                  acc_t* regxn,
                  acc_t* regyn,
                  idx_t gridStrideX,
@@ -74,39 +74,39 @@ struct correlation_distance_op {
     // changes, this will be where we find the bugs.
     extern __shared__ char smem[];
 
-    acc_t regx2n[policy::AccRowsPerTh], regy2n[policy::AccColsPerTh];
+    acc_t regx2n[Policy::AccRowsPerTh], regy2n[Policy::AccColsPerTh];
 
     auto* sx2_norm = reinterpret_cast<acc_t*>(
-      &smem[policy::SmemSize + (policy::Mblk + policy::Nblk) * sizeof(acc_t)]);
-    acc_t* sy2_norm = (&sx2_norm[policy::Mblk]);
+      &smem[Policy::SmemSize + (Policy::Mblk + Policy::Nblk) * sizeof(acc_t)]);
+    acc_t* sy2_norm = (&sx2_norm[Policy::Mblk]);
 
     // Load x & y norms required by this threadblock in shmem buffer
-    if (gridStrideX == blockIdx.x * policy::Nblk) {
-      for (int i = threadIdx.x; i < policy::Mblk; i += policy::Nthreads) {
+    if (gridStrideX == blockIdx.x * Policy::Nblk) {
+      for (int i = threadIdx.x; i < Policy::Mblk; i += Policy::Nthreads) {
         auto idx    = gridStrideY + i;
         sx2_norm[i] = idx < m ? raft::to_float(x2n[idx]) : 0;
       }
     }
 
-    for (int i = threadIdx.x; i < policy::Nblk; i += policy::Nthreads) {
+    for (int i = threadIdx.x; i < Policy::Nblk; i += Policy::Nthreads) {
       auto idx    = gridStrideX + i;
       sy2_norm[i] = idx < n ? raft::to_float(y2n[idx]) : 0;
     }
     __syncthreads();
 
 #pragma unroll
-    for (int i = 0; i < policy::AccRowsPerTh; ++i) {
-      regx2n[i] = sx2_norm[i * policy::AccThRows + (threadIdx.x / policy::AccThCols)];
+    for (int i = 0; i < Policy::AccRowsPerTh; ++i) {
+      regx2n[i] = sx2_norm[i * Policy::AccThRows + (threadIdx.x / Policy::AccThCols)];
     }
 #pragma unroll
-    for (int i = 0; i < policy::AccColsPerTh; ++i) {
-      regy2n[i] = sy2_norm[i * policy::AccThCols + (threadIdx.x % policy::AccThCols)];
+    for (int i = 0; i < Policy::AccColsPerTh; ++i) {
+      regy2n[i] = sy2_norm[i * Policy::AccThCols + (threadIdx.x % Policy::AccThCols)];
     }
 
 #pragma unroll
-    for (int i = 0; i < policy::AccRowsPerTh; ++i) {
+    for (int i = 0; i < Policy::AccRowsPerTh; ++i) {
 #pragma unroll
-      for (int j = 0; j < policy::AccColsPerTh; ++j) {
+      for (int j = 0; j < Policy::AccColsPerTh; ++j) {
         auto numer   = k * acc[i][j] - (regxn[i] * regyn[j]);
         auto q_denom = k * regx2n[i] - (regxn[i] * regxn[i]);
         auto r_denom = k * regy2n[j] - (regyn[j] * regyn[j]);

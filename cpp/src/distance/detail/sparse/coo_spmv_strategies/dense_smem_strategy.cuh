@@ -11,23 +11,23 @@
 
 namespace cuvs::distance::detail::sparse {
 
-template <typename ValueIdx, typename value_t, int tpb>  // NOLINT(readability-identifier-naming)
-class dense_smem_strategy : public coo_spmv_strategy<ValueIdx, value_t, tpb> {
+template <typename ValueIdx, typename ValueT, int tpb>  // NOLINT(readability-identifier-naming)
+class dense_smem_strategy : public coo_spmv_strategy<ValueIdx, ValueT, tpb> {
  public:
-  using map_type = value_t*;
+  using map_type = ValueT*;
 
-  explicit dense_smem_strategy(const distances_config_t<ValueIdx, value_t>& config_)
-    : coo_spmv_strategy<ValueIdx, value_t, tpb>(config_)
+  explicit dense_smem_strategy(const distances_config_t<ValueIdx, ValueT>& config_)
+    : coo_spmv_strategy<ValueIdx, ValueT, tpb>(config_)
   {
   }
 
   inline static auto smem_per_block(int n_cols) -> int
   {
-    return (n_cols * sizeof(value_t)) + ((1024 / raft::warp_size()) * sizeof(value_t));
+    return (n_cols * sizeof(ValueT)) + ((1024 / raft::warp_size()) * sizeof(ValueT));
   }
 
   template <typename ProductF, typename AccumF, typename WriteF>
-  void dispatch(value_t* out_dists,
+  void dispatch(ValueT* out_dists,
                 ValueIdx* coo_rows_b,
                 ProductF product_func,
                 AccumF accum_func,
@@ -53,7 +53,7 @@ class dense_smem_strategy : public coo_spmv_strategy<ValueIdx, value_t, tpb> {
   }
 
   template <typename ProductF, typename AccumF, typename WriteF>
-  void dispatch_rev(value_t* out_dists,
+  void dispatch_rev(ValueT* out_dists,
                     ValueIdx* coo_rows_a,
                     ProductF product_func,
                     AccumF accum_func,
@@ -80,22 +80,19 @@ class dense_smem_strategy : public coo_spmv_strategy<ValueIdx, value_t, tpb> {
 
   __device__ inline auto init_map(void* storage, const ValueIdx& cache_size) -> map_type
   {
-    auto cache = static_cast<value_t*>(storage);
+    auto cache = static_cast<ValueT*>(storage);
     for (int k = threadIdx.x; k < cache_size; k += blockDim.x) {
       cache[k] = 0.0;
     }
     return cache;
   }
 
-  __device__ inline void insert(map_type& cache, const ValueIdx& key, const value_t& value)
+  __device__ inline void insert(map_type& cache, const ValueIdx& key, const ValueT& value)
   {
     cache[key] = value;
   }
 
-  __device__ inline auto find(map_type& cache, const ValueIdx& key) -> value_t
-  {
-    return cache[key];
-  }
+  __device__ inline auto find(map_type& cache, const ValueIdx& key) -> ValueT { return cache[key]; }
 };
 
 }  // namespace cuvs::distance::detail::sparse

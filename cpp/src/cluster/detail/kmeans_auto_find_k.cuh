@@ -20,24 +20,24 @@
 
 namespace cuvs::cluster::kmeans::detail {
 
-template <typename value_t, typename IdxT>  // NOLINT(readability-identifier-naming)
+template <typename ValueT, typename IdxT>  // NOLINT(readability-identifier-naming)
 void compute_dispersion(raft::resources const& handle,
-                        raft::device_matrix_view<const value_t, IdxT> X,
+                        raft::device_matrix_view<const ValueT, IdxT> X,
                         cuvs::cluster::kmeans::params& params,
-                        raft::device_matrix_view<value_t, IdxT> centroids_view,
+                        raft::device_matrix_view<ValueT, IdxT> centroids_view,
                         raft::device_vector_view<IdxT, IdxT> labels,
                         raft::device_vector_view<IdxT, IdxT> cluster_sizes,
                         rmm::device_uvector<char>& workspace,
-                        raft::host_vector_view<value_t> cluster_dispertion_view,
-                        raft::host_vector_view<value_t> results_view,
-                        raft::host_scalar_view<value_t> residual,
+                        raft::host_vector_view<ValueT> cluster_dispertion_view,
+                        raft::host_vector_view<ValueT> results_view,
+                        raft::host_scalar_view<ValueT> residual,
                         raft::host_scalar_view<IdxT> n_iter,
                         int val,
                         IdxT n,
                         IdxT d)
 {
   auto centroids_const_view =
-    raft::make_device_matrix_view<const value_t, IdxT>(centroids_view.data_handle(), val, d);
+    raft::make_device_matrix_view<const ValueT, IdxT>(centroids_view.data_handle(), val, d);
 
   IdxT* cluster_sizes_ptr = cluster_sizes.data_handle();
   auto cluster_sizes_view = raft::make_device_vector_view<const IdxT, IdxT>(cluster_sizes_ptr, val);
@@ -55,16 +55,16 @@ void compute_dispersion(raft::resources const& handle,
     handle, centroids_const_view, cluster_sizes_view, std::nullopt, n);
 }
 
-template <typename IdxT, typename value_t>  // NOLINT(readability-identifier-naming)
+template <typename IdxT, typename ValueT>  // NOLINT(readability-identifier-naming)
 void find_k(raft::resources const& handle,
-            raft::device_matrix_view<const value_t, IdxT> X,
+            raft::device_matrix_view<const ValueT, IdxT> X,
             raft::host_scalar_view<IdxT> best_k,
-            raft::host_scalar_view<value_t> residual,
+            raft::host_scalar_view<ValueT> residual,
             raft::host_scalar_view<IdxT> n_iter,
             IdxT kmax,
             IdxT kmin    = 1,
             IdxT maxiter = 100,
-            value_t tol  = 1e-2)
+            ValueT tol   = 1e-2)
 {
   IdxT n = X.extent(0);
   IdxT d = X.extent(1);
@@ -78,7 +78,7 @@ void find_k(raft::resources const& handle,
   // Allocate memory
   // Device memory
 
-  auto centroids     = raft::make_device_matrix<value_t, IdxT>(handle, kmax, X.extent(1));
+  auto centroids     = raft::make_device_matrix<ValueT, IdxT>(handle, kmax, X.extent(1));
   auto cluster_sizes = raft::make_device_vector<IdxT>(handle, kmax);
   auto labels        = raft::make_device_vector<IdxT>(handle, n);
 
@@ -87,8 +87,8 @@ void find_k(raft::resources const& handle,
   IdxT* cluster_sizes_ptr = cluster_sizes.data_handle();
 
   // Host memory
-  auto results            = raft::make_host_vector<value_t>(kmax + 1);
-  auto cluster_dispersion = raft::make_host_vector<value_t>(kmax + 1);
+  auto results            = raft::make_host_vector<ValueT>(kmax + 1);
+  auto cluster_dispersion = raft::make_host_vector<ValueT>(kmax + 1);
 
   auto cluster_dispertion_view = cluster_dispersion.view();
   auto results_view            = results.view();
@@ -108,44 +108,43 @@ void find_k(raft::resources const& handle,
   params.tol      = tol;
 
   auto centroids_view =
-    raft::make_device_matrix_view<value_t, IdxT>(centroids.data_handle(), left, d);
+    raft::make_device_matrix_view<ValueT, IdxT>(centroids.data_handle(), left, d);
   auto labels_view = raft::make_device_vector_view<IdxT, IdxT>(labels.data_handle(), n);
   auto cluster_sizes_view =
     raft::make_device_vector_view<IdxT, IdxT>(cluster_sizes.data_handle(), kmax);
-  compute_dispersion<value_t, IdxT>(handle,
-                                    X,
-                                    params,
-                                    centroids_view,
-                                    labels_view,
-                                    cluster_sizes_view,
-                                    workspace,
-                                    cluster_dispertion_view,
-                                    results_view,
-                                    residual,
-                                    n_iter,
-                                    left,
-                                    n,
-                                    d);
+  compute_dispersion<ValueT, IdxT>(handle,
+                                   X,
+                                   params,
+                                   centroids_view,
+                                   labels_view,
+                                   cluster_sizes_view,
+                                   workspace,
+                                   cluster_dispertion_view,
+                                   results_view,
+                                   residual,
+                                   n_iter,
+                                   left,
+                                   n,
+                                   d);
 
   // eval right edge0
   results_view[right] = 1e20;
   while (results_view[right] > results_view[left] && tests < 3) {
-    centroids_view =
-      raft::make_device_matrix_view<value_t, IdxT>(centroids.data_handle(), right, d);
-    compute_dispersion<value_t, IdxT>(handle,
-                                      X,
-                                      params,
-                                      centroids_view,
-                                      labels_view,
-                                      cluster_sizes_view,
-                                      workspace,
-                                      cluster_dispertion_view,
-                                      results_view,
-                                      residual,
-                                      n_iter,
-                                      right,
-                                      n,
-                                      d);
+    centroids_view = raft::make_device_matrix_view<ValueT, IdxT>(centroids.data_handle(), right, d);
+    compute_dispersion<ValueT, IdxT>(handle,
+                                     X,
+                                     params,
+                                     centroids_view,
+                                     labels_view,
+                                     cluster_sizes_view,
+                                     workspace,
+                                     cluster_dispertion_view,
+                                     results_view,
+                                     residual,
+                                     n_iter,
+                                     right,
+                                     n,
+                                     d);
 
     tests += 1;
   }
@@ -156,22 +155,21 @@ void find_k(raft::resources const& handle,
     results_view[mid] = 1e20;
     tests             = 0;
     while (results_view[mid] > results_view[left] && tests < 3) {
-      centroids_view =
-        raft::make_device_matrix_view<value_t, IdxT>(centroids.data_handle(), mid, d);
-      compute_dispersion<value_t, IdxT>(handle,
-                                        X,
-                                        params,
-                                        centroids_view,
-                                        labels_view,
-                                        cluster_sizes_view,
-                                        workspace,
-                                        cluster_dispertion_view,
-                                        results_view,
-                                        residual,
-                                        n_iter,
-                                        mid,
-                                        n,
-                                        d);
+      centroids_view = raft::make_device_matrix_view<ValueT, IdxT>(centroids.data_handle(), mid, d);
+      compute_dispersion<ValueT, IdxT>(handle,
+                                       X,
+                                       params,
+                                       centroids_view,
+                                       labels_view,
+                                       cluster_sizes_view,
+                                       workspace,
+                                       cluster_dispertion_view,
+                                       results_view,
+                                       residual,
+                                       n_iter,
+                                       mid,
+                                       n,
+                                       d);
 
       if (results_view[mid] > results_view[left] && (mid + 1) < right) {
         mid += 1;
@@ -210,7 +208,7 @@ void find_k(raft::resources const& handle,
   // this saves memory
   if (best_k[0] != oldmid) {
     auto centroids_view =
-      raft::make_device_matrix_view<value_t, IdxT>(centroids.data_handle(), best_k[0], d);
+      raft::make_device_matrix_view<ValueT, IdxT>(centroids.data_handle(), best_k[0], d);
 
     params.n_clusters = best_k[0];
     cuvs::cluster::kmeans::fit_predict(handle,

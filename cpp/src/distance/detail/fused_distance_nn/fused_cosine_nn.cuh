@@ -24,7 +24,7 @@ namespace cuvs::distance::detail {
 template <typename DataT,
           typename OutT,
           typename IdxT,
-          typename policy,
+          typename Policy,
           typename ReduceOpT,
           typename KVPReduceOpT>
 void fused_cosine_nn(OutT* min,
@@ -42,7 +42,7 @@ void fused_cosine_nn(OutT* min,
                      cudaStream_t stream)
 {
   // The kernel policy is determined by fusedL2NN.
-  using policy_t = policy;
+  using policy_t = Policy;
 
   dim3 blk(policy_t::Nthreads);
   constexpr auto kMaxVal = std::numeric_limits<DataT>::max();
