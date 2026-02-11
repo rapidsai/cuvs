@@ -217,4 +217,145 @@ function(generate_jit_lto_kernels target)
       EMBEDDED_ARRAY "embedded_${kernel_name}"
     )
   endforeach()
+
+  # Generate CAGRA device function fragments
+  set(cagra_data_types "float" "__half" "uint8_t" "int8_t")
+  set(cagra_data_type_abbrevs "f" "h" "uc" "sc")
+  set(cagra_index_type "uint32_t")
+  set(cagra_index_abbrev "ui")
+  set(cagra_distance_type "float")
+  set(cagra_distance_abbrev "f")
+  set(cagra_metrics "L2Expanded" "InnerProduct" "CosineExpanded")
+  set(cagra_metric_abbrevs "l2" "ip" "cos")
+  set(cagra_team_sizes 8 16 32)
+  set(cagra_dataset_block_dims 128 256 512)
+  set(cagra_pq_bits 8)
+  set(cagra_pq_lens 2 4)
+  set(cagra_codebook_type "half")
+
+  # Generate standard descriptor fragments
+  foreach(data_idx IN ITEMS 0 1 2 3)
+    list(GET cagra_data_types ${data_idx} data_type)
+    list(GET cagra_data_type_abbrevs ${data_idx} type_abbrev)
+    foreach(metric_idx IN ITEMS 0 1 2)
+      list(GET cagra_metrics ${metric_idx} metric)
+      list(GET cagra_metric_abbrevs ${metric_idx} metric_name)
+      foreach(team_size IN LISTS cagra_team_sizes)
+        foreach(dataset_block_dim IN LISTS cagra_dataset_block_dims)
+          # setup_workspace_standard
+          set(kernel_name
+              "setup_workspace_standard_${metric_name}_t${team_size}_dim${dataset_block_dim}_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}"
+          )
+          set(filename "${generated_kernels_dir}/cagra_device_functions/fatbin_${kernel_name}.cu")
+          set(metric_cpp "cuvs::distance::DistanceType::${metric}")
+          set(data_type "${data_type}")
+          set(index_type "${cagra_index_type}")
+          set(distance_type "${cagra_distance_type}")
+          set(idx_abbrev "${cagra_index_abbrev}")
+          set(dist_abbrev "${cagra_distance_abbrev}")
+          configure_file(
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/setup_workspace_standard.cu.in"
+            "${filename}"
+            @ONLY
+          )
+          embed_jit_lto_fatbin(
+            FATBIN_TARGET "fatbin_${kernel_name}"
+            FATBIN_SOURCE "${filename}"
+            EMBEDDED_TARGET "${target}"
+            EMBEDDED_HEADER "${generated_kernels_dir}/cagra_device_functions/${kernel_name}.h"
+            EMBEDDED_ARRAY "embedded_${kernel_name}"
+          )
+
+          # compute_distance_standard
+          set(kernel_name
+              "compute_distance_standard_${metric_name}_t${team_size}_dim${dataset_block_dim}_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}"
+          )
+          set(filename "${generated_kernels_dir}/cagra_device_functions/fatbin_${kernel_name}.cu")
+          set(metric_cpp "cuvs::distance::DistanceType::${metric}")
+          set(data_type "${data_type}")
+          set(index_type "${cagra_index_type}")
+          set(distance_type "${cagra_distance_type}")
+          set(idx_abbrev "${cagra_index_abbrev}")
+          set(dist_abbrev "${cagra_distance_abbrev}")
+          configure_file(
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_standard.cu.in"
+            "${filename}"
+            @ONLY
+          )
+          embed_jit_lto_fatbin(
+            FATBIN_TARGET "fatbin_${kernel_name}"
+            FATBIN_SOURCE "${filename}"
+            EMBEDDED_TARGET "${target}"
+            EMBEDDED_HEADER "${generated_kernels_dir}/cagra_device_functions/${kernel_name}.h"
+            EMBEDDED_ARRAY "embedded_${kernel_name}"
+          )
+        endforeach()
+      endforeach()
+    endforeach()
+  endforeach()
+
+  # Generate VPQ descriptor fragments (only for L2Expanded and float/half)
+  foreach(data_idx IN ITEMS 0 1)
+    list(GET cagra_data_types ${data_idx} data_type)
+    list(GET cagra_data_type_abbrevs ${data_idx} type_abbrev)
+    foreach(team_size IN LISTS cagra_team_sizes)
+      foreach(dataset_block_dim IN LISTS cagra_dataset_block_dims)
+        foreach(pq_len IN LISTS cagra_pq_lens)
+          # setup_workspace_vpq
+          set(kernel_name
+              "setup_workspace_vpq_l2_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}"
+          )
+          set(filename "${generated_kernels_dir}/cagra_device_functions/fatbin_${kernel_name}.cu")
+          set(metric_cpp "cuvs::distance::DistanceType::L2Expanded")
+          set(metric_name "l2")
+          set(pq_bits "${cagra_pq_bits}")
+          set(codebook_type "${cagra_codebook_type}")
+          set(data_type "${data_type}")
+          set(index_type "${cagra_index_type}")
+          set(distance_type "${cagra_distance_type}")
+          set(idx_abbrev "${cagra_index_abbrev}")
+          set(dist_abbrev "${cagra_distance_abbrev}")
+          configure_file(
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/setup_workspace_vpq.cu.in"
+            "${filename}"
+            @ONLY
+          )
+          embed_jit_lto_fatbin(
+            FATBIN_TARGET "fatbin_${kernel_name}"
+            FATBIN_SOURCE "${filename}"
+            EMBEDDED_TARGET "${target}"
+            EMBEDDED_HEADER "${generated_kernels_dir}/cagra_device_functions/${kernel_name}.h"
+            EMBEDDED_ARRAY "embedded_${kernel_name}"
+          )
+
+          # compute_distance_vpq
+          set(kernel_name
+              "compute_distance_vpq_l2_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}"
+          )
+          set(filename "${generated_kernels_dir}/cagra_device_functions/fatbin_${kernel_name}.cu")
+          set(metric_cpp "cuvs::distance::DistanceType::L2Expanded")
+          set(metric_name "l2")
+          set(pq_bits "${cagra_pq_bits}")
+          set(codebook_type "${cagra_codebook_type}")
+          set(idx_abbrev "${cagra_index_abbrev}")
+          set(dist_abbrev "${cagra_distance_abbrev}")
+          set(data_type "${data_type}")
+          set(index_type "${cagra_index_type}")
+          set(distance_type "${cagra_distance_type}")
+          configure_file(
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_vpq.cu.in"
+            "${filename}"
+            @ONLY
+          )
+          embed_jit_lto_fatbin(
+            FATBIN_TARGET "fatbin_${kernel_name}"
+            FATBIN_SOURCE "${filename}"
+            EMBEDDED_TARGET "${target}"
+            EMBEDDED_HEADER "${generated_kernels_dir}/cagra_device_functions/${kernel_name}.h"
+            EMBEDDED_ARRAY "embedded_${kernel_name}"
+          )
+        endforeach()
+      endforeach()
+    endforeach()
+  endforeach()
 endfunction()

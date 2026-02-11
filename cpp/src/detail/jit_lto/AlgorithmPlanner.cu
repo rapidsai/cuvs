@@ -106,14 +106,6 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
   result = nvJitLinkGetLinkedCubin(handle, cubin.get());
   check_nvjitlink_result(handle, result);
 
-  // Dump CUBIN for analysis with cuobjdump
-  if (dump_cubin) {
-    std::string filename = "/tmp/jit_kernel_" + std::to_string(dump_counter++) + ".cubin";
-    std::ofstream out(filename, std::ios::binary);
-    out.write(cubin.get(), cubin_size);
-    std::cerr << "Dumped CUBIN to: " << filename << " (" << cubin_size << " bytes)" << std::endl;
-  }
-
   result = nvJitLinkDestroy(&handle);
   check_nvjitlink_result(handle, result);
 
