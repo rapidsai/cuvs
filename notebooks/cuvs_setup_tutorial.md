@@ -24,7 +24,7 @@ Paths auto-detect when scripts run from `notebooks/`:
 
 | Variable | Default | Override |
 |----------|---------|----------|
-| Tarball | `{repo_root}/libcuvs_c.tar.gz` | Pass tarball path as last argument |
+| Tarball | `{repo_root}/libcuvs_c.tar.gz` or `{repo_root}/build/libcuvs_c.tar.gz` (after build) | Pass tarball path as last argument |
 | Install prefix | `/usr/local` | `CUVS_INSTALL_PREFIX` |
 | Conda env | `cuvs` | `CUVS_CONSUMER_ENV` |
 | cuVS repo | `notebooks/..` (repo root) | `CUVS_REPO` |
@@ -53,14 +53,13 @@ If no options are given, the script runs build, extract, and test by default.
 
 ## Section 2: Build Phase (--build)
 
-**Purpose:** Compile cuVS from source and create a tarball.
+**Purpose:** Compile cuVS from source and create a tarball via `build.sh standalone`.
 
 **When to run:** When you have the cuVS repo and want to produce `libcuvs_c.tar.gz` yourself.
 
 **Steps:**
-1. Ensure `build_libcuvs_c.sh` exists in `notebooks/` (same directory)
-2. Run the build from the repo root or let paths auto-detect
-3. Package output into `libcuvs_c.tar.gz` at repo root
+1. Run the setup script with `--build`; it invokes `./build.sh standalone` in the repo root
+2. The tarball is created at `build/libcuvs_c.tar.gz`
 
 **Example:**
 ```bash
@@ -68,9 +67,15 @@ cd notebooks
 ./setup_and_test_cuvs_c.sh --build
 ```
 
+Or build directly from the repo root:
+```bash
+./build.sh standalone
+```
+
 For all GPU architectures:
 ```bash
 ./setup_and_test_cuvs_c.sh --build --allgpuarch
+# or: ./build.sh standalone --allgpuarch
 ```
 
 ---

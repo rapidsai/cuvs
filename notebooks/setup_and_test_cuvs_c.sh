@@ -18,7 +18,6 @@ TARBALL="${CUVS_REPO}/libcuvs_c.tar.gz"
 INSTALL_PREFIX="${CUVS_INSTALL_PREFIX:-/usr/local}"
 ENV_NAME="${CUVS_CONSUMER_ENV:-cuvs}"
 CUVS_YAML="${CUVS_YAML:-${CUVS_REPO}/conda/environments/all_cuda-131_arch-x86_64.yaml}"
-BUILD_SCRIPT="${SCRIPT_DIR}/build_libcuvs_c.sh"
 LIBCUVS_C="${INSTALL_PREFIX}/lib/libcuvs_c.so"
 
 # -----------------------------------------------------------------------------
@@ -72,23 +71,16 @@ echo "Phases: build=$DO_BUILD extract=$DO_EXTRACT test=$DO_TEST"
 echo ""
 
 # -----------------------------------------------------------------------------
-# Step -1: Build libcuvs tarball (optional --allgpuarch for multi-GPU support)
+# Step -1: Build libcuvs tarball via build.sh standalone (--allgpuarch for multi-GPU)
 # -----------------------------------------------------------------------------
 if [[ $DO_BUILD -eq 1 ]]; then
   info "Step -1: Building libcuvs tarball..."
-  [[ ! -f "${BUILD_SCRIPT}" ]] && fail "Build script not found: ${BUILD_SCRIPT}"
   [[ ! -d "${CUVS_REPO}" ]] && fail "cuvs repo not found: ${CUVS_REPO}"
-  CUVS_INSTALL_DIR="${CUVS_REPO}/cuvs_install"
-  if [[ $ALLGPUARCH -eq 1 ]]; then
-    info "Building for all GPU architectures..."
-    set +u
-    eval "$(micromamba shell hook -s bash)" 2>/dev/null || true
-    micromamba activate "${ENV_NAME}" 2>/dev/null || true
-    set -u
-    (cd "${CUVS_REPO}" && INSTALL_PREFIX="${CUVS_INSTALL_DIR}" ./build.sh libcuvs --allgpuarch && tar czvf libcuvs_c.tar.gz -C "${CUVS_INSTALL_DIR}" .)
-  else
-    CUVS_REPO="${CUVS_REPO}" "${BUILD_SCRIPT}" "${CUVS_INSTALL_DIR}"
-  fi
+  [[ ! -f "${CUVS_REPO}/build.sh" ]] && fail "build.sh not found in ${CUVS_REPO}"
+  set +u
+  (cd "${CUVS_REPO}" && ./build.sh standalone $([ "$ALLGPUARCH" -eq 1 ] && echo --allgpuarch))
+  set -u
+  TARBALL="${CUVS_REPO}/build/libcuvs_c.tar.gz"
   [[ ! -f "${TARBALL}" ]] && fail "Tarball was not created at ${TARBALL}"
   info "Build complete: $(ls -lh "${TARBALL}" 2>/dev/null | awk '{print $5}')"
   echo ""
@@ -101,7 +93,11 @@ if [[ $DO_EXTRACT -eq 1 || $DO_TEST -eq 1 ]]; then
   [[ ! -f "${TARBALL}" ]] && fail "Tarball not found: ${TARBALL}. Run with --build first."
   info "Step 0: Extracting to ${INSTALL_PREFIX}..."
   mkdir -p "${INSTALL_PREFIX}"
-  tar -xzf "${TARBALL}" -C "${INSTALL_PREFIX}"
+  case "${TARBALL}" in
+    *.tar.xz|*.txz) tar -xJf "${TARBALL}" -C "${INSTALL_PREFIX}" ;;
+    *.tar.gz|*.tgz) tar -xzf "${TARBALL}" -C "${INSTALL_PREFIX}" ;;
+    *)              tar -xf "${TARBALL}" -C "${INSTALL_PREFIX}" ;;
+  esac
   [[ ! -f "${LIBCUVS_C}" ]] && fail "libcuvs_c.so not found after extract."
   info "Located ${LIBCUVS_C}"
   echo ""
