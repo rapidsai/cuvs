@@ -37,14 +37,14 @@ struct template_distance_op {
     return Policy::SmemSize + TODO;
   }
 
-  DI void core(acc_t& acc, data_t& x, data_t& y) const { TODO; };
+  DI auto core(acc_t& acc, data_t& x, data_t& y) const -> void { TODO; };
 
   template <typename Policy>
-  DI void epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
+  DI auto epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
                  acc_t* regxn,
                  acc_t* regyn,
                  idx_t gridStrideX,
-                 idx_t gridStrideY) const
+                 idx_t gridStrideY) const -> void
   {
     TODO;
   }

@@ -44,7 +44,7 @@ struct kl_divergence_op {
     return Policy::SmemSize;
   }
 
-  DI void core(acc_t& acc, data_t& x, data_t& y) const
+  DI auto core(acc_t& acc, data_t& x, data_t& y) const -> void
   {
     // TODO(snanditale): make sure that these branches get hoisted out of main loop.. Could
     // be quite expensive otherwise.
@@ -72,11 +72,11 @@ struct kl_divergence_op {
   };
 
   template <typename Policy>
-  DI void epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
+  DI auto epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
                  acc_t* regxn,
                  acc_t* regyn,
                  idx_t gridStrideX,
-                 idx_t gridStrideY) const
+                 idx_t gridStrideY) const -> void
   {
 #pragma unroll
     for (int i = 0; i < Policy::AccRowsPerTh; ++i) {

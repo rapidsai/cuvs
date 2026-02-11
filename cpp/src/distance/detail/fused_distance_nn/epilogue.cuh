@@ -67,8 +67,7 @@ operation.
 
 namespace cuvs::epilogue::threadblock {
 
-// TODO (cjnolet): We shouldn't be doing `using namespace` in this file.
-using namespace cutlass::epilogue::threadblock;
+using cutlass::epilogue::threadblock::DefaultEpilogueTensorOp;
 
 ////////////////////////////////////////////////////////////////////////////////
 

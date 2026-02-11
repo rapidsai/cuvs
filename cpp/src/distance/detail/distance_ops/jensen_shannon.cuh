@@ -39,7 +39,7 @@ struct jensen_shannon_distance_op {
     return Policy::SmemSize;
   }
 
-  DI void core(acc_t& acc, data_t& x, data_t& y) const
+  DI auto core(acc_t& acc, data_t& x, data_t& y) const -> void
   {
     acc_t xv          = raft::to_float(x);
     acc_t yv          = raft::to_float(y);
@@ -53,11 +53,11 @@ struct jensen_shannon_distance_op {
   };
 
   template <typename Policy>
-  DI void epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
+  DI auto epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
                  acc_t* regxn,
                  acc_t* regyn,
                  idx_t gridStrideX,
-                 idx_t gridStrideY) const
+                 idx_t gridStrideY) const -> void
   {
 #pragma unroll
     for (int i = 0; i < Policy::AccRowsPerTh; ++i) {

@@ -62,8 +62,8 @@ Changes:
 
 namespace cuvs::gemm::kernel {
 
-// TODO (cjnolet): We shouldn't be doing `using namespace` in this file.
-using namespace cutlass::gemm::kernel;
+using cutlass::gemm::kernel::GemmGroupedProblemVisitor;
+using cutlass::gemm::kernel::GroupScheduleMode;
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 template <typename Mma_,                         ///! Threadblock-scoped matrix multiply-accumulate
@@ -344,8 +344,8 @@ struct FusedDistanceNNPersistent {
     return cutlass::Status::kSuccess;
   }
 
-  static size_t get_extra_workspace_size(Arguments const& args,
-                                         cutlass::gemm::GemmCoord const& grid_tiled_shape)
+  static auto get_extra_workspace_size(Arguments const& args,
+                                       cutlass::gemm::GemmCoord const& grid_tiled_shape) -> size_t
   {
     return 0;
   }

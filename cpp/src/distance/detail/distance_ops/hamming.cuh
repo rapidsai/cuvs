@@ -39,14 +39,14 @@ struct hamming_distance_op {
     return Policy::SmemSize;
   }
 
-  DI void core(acc_t& acc, data_t& x, data_t& y) const { acc += (x != y); };
+  DI auto core(acc_t& acc, data_t& x, data_t& y) const -> void { acc += (x != y); };
 
   template <typename Policy>
-  DI void epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
+  DI auto epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
                  acc_t* regxn,
                  acc_t* regyn,
                  idx_t gridStrideX,
-                 idx_t gridStrideY) const
+                 idx_t gridStrideY) const -> void
   {
     const acc_t one_over_k = acc_t(1.0) / k;
 #pragma unroll

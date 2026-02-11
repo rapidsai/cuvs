@@ -39,7 +39,7 @@ struct canberra_distance_op {
     return Policy::SmemSize;
   }
 
-  DI void core(acc_t& acc, data_t& x, data_t& y) const
+  DI auto core(acc_t& acc, data_t& x, data_t& y) const -> void
   {
     if constexpr ((std::is_same_v<acc_t, float> && std::is_same_v<data_t, half>)) {
       acc_t hx        = __half2float(x);
@@ -59,11 +59,11 @@ struct canberra_distance_op {
   };
 
   template <typename Policy>
-  DI void epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
+  DI auto epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
                  acc_t* regxn,
                  acc_t* regyn,
                  idx_t gridStrideX,
-                 idx_t gridStrideY) const
+                 idx_t gridStrideY) const -> void
   {
     return;
   }

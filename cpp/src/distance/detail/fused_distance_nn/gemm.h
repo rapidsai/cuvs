@@ -49,8 +49,8 @@
 
 namespace cuvs::gemm::kernel {
 
-// TODO (cjnolet): We shouldn't be doing `using namespace` in this file.
-using namespace cutlass::gemm::kernel;
+using cutlass::gemm::kernel::DefaultGemmUniversal;
+using cutlass::gemm::kernel::GroupScheduleMode;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 /*

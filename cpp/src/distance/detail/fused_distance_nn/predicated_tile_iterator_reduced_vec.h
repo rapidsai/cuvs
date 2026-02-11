@@ -79,8 +79,8 @@ namespace cg = cooperative_groups;
 
 namespace cuvs::epilogue::threadblock {
 
-// TODO (cjnolet): We shouldn't be doing `using namespace` in this file.
-using namespace cutlass::epilogue::threadblock;
+using cutlass::epilogue::threadblock::make_OutputTileThreadMapDesc;
+using cutlass::epilogue::threadblock::PredicatedTileIteratorParams;
 
 ////////////////////////////////////////////////////////////////////////////////
 

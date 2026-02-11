@@ -60,9 +60,6 @@
 
 namespace cuvs::epilogue::thread {
 
-// TODO (cjnolet): We shouldn't be doing `using namespace` in this file.
-using namespace cutlass::epilogue::thread;
-
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// This base class is meant to define the concept required of the

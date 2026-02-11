@@ -36,18 +36,18 @@ struct l_inf_distance_op {
     return Policy::SmemSize;
   }
 
-  DI void core(acc_t& acc, data_t& x, data_t& y) const
+  DI auto core(acc_t& acc, data_t& x, data_t& y) const -> void
   {
     const auto diff = raft::abs(x - y);
     acc             = raft::max(acc, diff);
   };
 
   template <typename Policy>
-  DI void epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
+  DI auto epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
                  acc_t* regxn,
                  acc_t* regyn,
                  idx_t gridStrideX,
-                 idx_t gridStrideY) const
+                 idx_t gridStrideY) const -> void
   {
     return;
   }

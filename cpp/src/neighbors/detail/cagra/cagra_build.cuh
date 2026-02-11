@@ -1725,13 +1725,14 @@ void build_knn_graph(
   bool first                    = true;
   const auto start_clock        = std::chrono::system_clock::now();
 
-  cuvs::spatial::knn::detail::utils::batch_load_iterator<DataT> vec_batches(
-    dataset.data_handle(),
-    dataset.extent(0),
-    dataset.extent(1),
-    static_cast<int64_t>(max_queries),
-    raft::resource::get_cuda_stream(res),
-    workspace_mr);
+  cuvs::spatial::knn::detail::utils::batch_load_iterator<
+    DataT>  // NOLINT(modernize-use-trailing-return-type)
+    vec_batches(dataset.data_handle(),
+                dataset.extent(0),
+                dataset.extent(1),
+                static_cast<int64_t>(max_queries),
+                raft::resource::get_cuda_stream(res),
+                workspace_mr);
 
   size_t next_report_offset = 0;
   size_t d_report_offset    = dataset.extent(0) / 100;  // Report progress in 1% steps.

@@ -57,17 +57,17 @@ struct correlation_distance_op {
     return Policy::SmemSize + (2 * (Policy::Mblk + Policy::Nblk) * sizeof(acc_t));
   }
 
-  DI void core(acc_t& acc, data_t& x, data_t& y) const
+  DI auto core(acc_t& acc, data_t& x, data_t& y) const -> void
   {
     acc += raft::to_float(x) * raft::to_float(y);
   };
 
   template <typename Policy>
-  DI void epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
+  DI auto epilog(acc_t acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
                  acc_t* regxn,
                  acc_t* regyn,
                  idx_t gridStrideX,
-                 idx_t gridStrideY) const
+                 idx_t gridStrideY) const -> void
   {
     // Note how we can sneakily get a pointer to shared memory here, to store
     // more data. If the implementation of PairwiseDistanceMatKernel ever
