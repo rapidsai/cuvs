@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <cuvs/neighbors/index_wrappers.hpp>
+#include <cuvs/neighbors/index_base.hpp>
 #include <memory>
 
 // Forward declarations to avoid circular dependencies
@@ -50,7 +50,7 @@ struct merge_params : cuvs::neighbors::merge_params {
  */
 
 /**
- * @brief Wrapper for CAGRA index implementing IndexWrapper.
+ * @brief Wrapper for CAGRA index implementing IndexBase.
  *
  * This class wraps a CAGRA index and provides compatibility with the IndexBase interface.
  * It serves as a bridge to help the CAGRA index implementation transition from its
@@ -67,9 +67,9 @@ struct merge_params : cuvs::neighbors::merge_params {
  * the unified interface from the start.
  */
 template <typename T, typename IdxT, typename OutputIdxT = IdxT>
-class IndexWrapper : public cuvs::neighbors::IndexWrapper<T, IdxT, OutputIdxT> {
+class IndexWrapper : public cuvs::neighbors::IndexBase<T, IdxT, OutputIdxT> {
  public:
-  using base_type         = cuvs::neighbors::IndexWrapper<T, IdxT, OutputIdxT>;
+  using base_type         = cuvs::neighbors::IndexBase<T, IdxT, OutputIdxT>;
   using value_type        = typename base_type::value_type;
   using index_type        = typename base_type::index_type;
   using out_index_type    = typename base_type::out_index_type;
@@ -145,7 +145,7 @@ class IndexWrapper : public cuvs::neighbors::IndexWrapper<T, IdxT, OutputIdxT> {
  * auto wrapped_index2 = cuvs::neighbors::cagra::make_index_wrapper(&cagra_index2);
  *
  * // Merge indices using the composite merge function
- * std::vector<std::shared_ptr<cuvs::neighbors::IndexWrapper<float, uint32_t>>> indices;
+ * std::vector<std::shared_ptr<cuvs::neighbors::IndexBase<float, uint32_t>>> indices;
  * indices.push_back(wrapped_index1);
  * indices.push_back(wrapped_index2);
  *
@@ -155,7 +155,7 @@ class IndexWrapper : public cuvs::neighbors::IndexWrapper<T, IdxT, OutputIdxT> {
  */
 template <typename T, typename IdxT, typename OutputIdxT = IdxT>
 inline auto make_index_wrapper(cuvs::neighbors::cagra::index<T, IdxT>* index)
-  -> std::shared_ptr<cuvs::neighbors::IndexWrapper<T, IdxT, OutputIdxT>>
+  -> std::shared_ptr<cuvs::neighbors::IndexBase<T, IdxT, OutputIdxT>>
 {
   return std::make_shared<IndexWrapper<T, IdxT, OutputIdxT>>(index);
 }

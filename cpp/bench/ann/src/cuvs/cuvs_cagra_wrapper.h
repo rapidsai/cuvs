@@ -457,7 +457,7 @@ void cuvs_cagra<T, IdxT>::search_base(
         merge_params.merge_strategy = cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL;
 
         // Create wrapped indices for composite merge
-        std::vector<std::shared_ptr<cuvs::neighbors::IndexWrapper<T, IdxT, algo_base::index_type>>>
+        std::vector<std::shared_ptr<cuvs::neighbors::IndexBase<T, IdxT, algo_base::index_type>>>
           wrapped_indices;
         wrapped_indices.reserve(sub_indices_.size());
         for (auto& ptr : sub_indices_) {
