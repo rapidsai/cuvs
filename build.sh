@@ -111,6 +111,26 @@ function hasArg {
     (( NUMARGS != 0 )) && (echo " ${ARGS} " | grep -q " $1 ")
 }
 
+# Ensure CMake meets minimum version (must match cmake_minimum_required in cpp/CMakeLists.txt)
+CMAKE_MIN_VERSION="3.30.4"
+function checkCmakeVersion {
+    if ! command -v cmake &>/dev/null; then
+        echo "Error: cmake is not installed. Install CMake ${CMAKE_MIN_VERSION} or higher (e.g. conda install -c conda-forge 'cmake>=3.30')."
+        exit 1
+    fi
+    local installed
+    installed=$(cmake --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    if [[ -z "${installed}" ]]; then
+        echo "Error: Could not determine cmake version. Got: $(cmake --version 2>&1 | head -1)"
+        exit 1
+    fi
+    if [[ "$(printf '%s\n%s\n' "${installed}" "${CMAKE_MIN_VERSION}" | sort -V | head -1)" != "${CMAKE_MIN_VERSION}" ]]; then
+        echo "Error: CMake ${CMAKE_MIN_VERSION} or higher is required. You have ${installed}."
+        echo "Install via: conda install -c conda-forge 'cmake>=3.30'  (or micromamba/conda equivalent)"
+        exit 1
+    fi
+}
+
 function cmakeArgs {
     # Check for multiple cmake args options
     if [[ $(echo "$ARGS" | { grep -Eo "\-\-cmake\-args" || true; } | wc -l ) -gt 1 ]]; then
@@ -380,6 +400,7 @@ fi
 ################################################################################
 # Configure for building all C++ targets
 if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg standalone || hasArg docs || hasArg tests || hasArg bench-prims || hasArg bench-ann || hasArg examples; then
+    checkCmakeVersion
     COMPILE_LIBRARY=ON
     if [[ "${BUILD_SHARED_LIBS}" != "OFF" ]]; then
         CMAKE_TARGET+=("cuvs")
