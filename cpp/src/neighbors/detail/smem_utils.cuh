@@ -4,7 +4,7 @@
  */
 #pragma once
 
-#include <raft/util/cuda_rt_essentials.hpp>
+#include <raft/core/error.hpp>
 
 #include <cstdint>
 #include <mutex>
@@ -29,8 +29,11 @@ void safely_launch_kernel_with_smem_size(KernelT const& kernel,
 {
   static auto mutex = std::mutex{};
   auto guard        = std::lock_guard<std::mutex>{mutex};
-  RAFT_CUDA_TRY(
-    cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
+  auto launch_status =
+    cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
+  RAFT_EXPECTS(launch_status == cudaSuccess,
+               "Failed to set max dynamic shared memory size to %zu bytes",
+               smem_size);
   launch(kernel);
 }
 
