@@ -16,8 +16,7 @@
 
 namespace cuvs::neighbors::cagra {
 
-class AnnCagraBugMultiCTACrash
-  : public ::testing::TestWithParam<cagra::search_algo> {  // NOLINT(readability-identifier-naming)
+class AnnCagraBugMultiCTACrash : public ::testing::TestWithParam<cagra::search_algo> {
  public:
   using data_type = half;
 
@@ -51,7 +50,7 @@ class AnnCagraBugMultiCTACrash
     raft::resource::sync_stream(res_search);
   }
 
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     dataset.emplace(raft::make_device_matrix<data_type, int64_t>(res, n_samples, n_dim));
     queries.emplace(raft::make_device_matrix<data_type, int64_t>(res, n_queries, n_dim));
@@ -66,7 +65,7 @@ class AnnCagraBugMultiCTACrash
     raft::resource::sync_stream(res);
   }
 
-  void TearDown() override  // NOLINT(readability-identifier-naming)
+  void TearDown() override
   {
     dataset.reset();
     queries.reset();
@@ -76,27 +75,26 @@ class AnnCagraBugMultiCTACrash
   }
 
  private:
-  raft::resources res;  // NOLINT(readability-identifier-naming)
+  raft::resources res;
   std::optional<raft::device_matrix<data_type, int64_t>> dataset  = std::nullopt;
   std::optional<raft::device_matrix<data_type, int64_t>> queries  = std::nullopt;
   std::optional<raft::device_matrix<uint32_t, int64_t>> neighbors = std::nullopt;
   std::optional<raft::device_matrix<float, int64_t>> distances    = std::nullopt;
 
-  constexpr static int64_t n_samples = 1183514;  // NOLINT(readability-identifier-naming)
-  constexpr static int64_t n_dim     = 100;      // NOLINT(readability-identifier-naming)
-  constexpr static int64_t n_queries = 30;       // NOLINT(readability-identifier-naming)
-  constexpr static int64_t k         = 10;       // NOLINT(readability-identifier-naming)
-  constexpr static cuvs::distance::DistanceType metric =
-    cuvs::distance::DistanceType::L2Expanded;  // NOLINT(readability-identifier-naming)
+  constexpr static int64_t n_samples                   = 1183514;
+  constexpr static int64_t n_dim                       = 100;
+  constexpr static int64_t n_queries                   = 30;
+  constexpr static int64_t k                           = 10;
+  constexpr static cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded;
 };
 
 TEST_P(AnnCagraBugMultiCTACrash, AnnCagraBugMultiCTACrash)
 {
   this->run();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(modernize-use-trailing-return-type)
 
 INSTANTIATE_TEST_CASE_P(
-  AnnCagraBugMultiCTACrashReproducer,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  AnnCagraBugMultiCTACrashReproducer,  // NOLINT(modernize-use-trailing-return-type)
   AnnCagraBugMultiCTACrash,
   ::testing::Values(cagra::search_algo::MULTI_CTA));
 

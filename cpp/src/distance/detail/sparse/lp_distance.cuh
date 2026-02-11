@@ -26,7 +26,7 @@
 namespace cuvs::distance::detail::sparse {
 
 template <typename ValueIdx = int,
-          typename ValueT   = float,  // NOLINT(readability-identifier-naming)
+          typename ValueT   = float,
           typename ProductF,
           typename AccumF,
           typename WriteF>
@@ -65,8 +65,7 @@ void unexpanded_lp_distances(ValueT* out_dists,
  * @tparam ValueIdx
  * @tparam ValueT
  */
-template <typename ValueIdx = int,
-          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = int, typename ValueT = float>
 class l1_unexpanded_distances_t : public distances_t<ValueT> {
  public:
   explicit l1_unexpanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
@@ -84,8 +83,7 @@ class l1_unexpanded_distances_t : public distances_t<ValueT> {
   const distances_config_t<ValueIdx, ValueT>* config_;
 };
 
-template <typename ValueIdx = int,
-          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = int, typename ValueT = float>
 class l2_unexpanded_distances_t : public distances_t<ValueT> {
  public:
   explicit l2_unexpanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
@@ -103,8 +101,7 @@ class l2_unexpanded_distances_t : public distances_t<ValueT> {
   const distances_config_t<ValueIdx, ValueT>* config_;
 };
 
-template <typename ValueIdx = int,
-          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = int, typename ValueT = float>
 class l2_sqrt_unexpanded_distances_t : public l2_unexpanded_distances_t<ValueIdx, ValueT> {
  public:
   explicit l2_sqrt_unexpanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
@@ -131,8 +128,7 @@ class l2_sqrt_unexpanded_distances_t : public l2_unexpanded_distances_t<ValueIdx
   }
 };
 
-template <typename ValueIdx = int,
-          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = int, typename ValueT = float>
 class linf_unexpanded_distances_t : public distances_t<ValueT> {
  public:
   explicit linf_unexpanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
@@ -150,8 +146,7 @@ class linf_unexpanded_distances_t : public distances_t<ValueT> {
   const distances_config_t<ValueIdx, ValueT>* config_;
 };
 
-template <typename ValueIdx = int,
-          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = int, typename ValueT = float>
 class canberra_unexpanded_distances_t : public distances_t<ValueT> {
  public:
   explicit canberra_unexpanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
@@ -179,8 +174,7 @@ class canberra_unexpanded_distances_t : public distances_t<ValueT> {
   const distances_config_t<ValueIdx, ValueT>* config_;
 };
 
-template <typename ValueIdx = int,
-          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = int, typename ValueT = float>
 class lp_unexpanded_distances_t : public distances_t<ValueT> {
  public:
   explicit lp_unexpanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config, ValueT p_)
@@ -212,8 +206,7 @@ class lp_unexpanded_distances_t : public distances_t<ValueT> {
   ValueT p_;
 };
 
-template <typename ValueIdx = int,
-          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = int, typename ValueT = float>
 class hamming_unexpanded_distances_t : public distances_t<ValueT> {
  public:
   explicit hamming_unexpanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
@@ -239,8 +232,7 @@ class hamming_unexpanded_distances_t : public distances_t<ValueT> {
   const distances_config_t<ValueIdx, ValueT>* config_;
 };
 
-template <typename ValueIdx = int,
-          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = int, typename ValueT = float>
 class jensen_shannon_unexpanded_distances_t : public distances_t<ValueT> {
  public:
   explicit jensen_shannon_unexpanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
@@ -283,8 +275,7 @@ class jensen_shannon_unexpanded_distances_t : public distances_t<ValueT> {
   const distances_config_t<ValueIdx, ValueT>* config_;
 };
 
-template <typename ValueIdx = int,
-          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = int, typename ValueT = float>
 class kl_divergence_unexpanded_distances_t : public distances_t<ValueT> {
  public:
   explicit kl_divergence_unexpanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)

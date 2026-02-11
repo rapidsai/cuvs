@@ -23,9 +23,9 @@
 
 namespace cuvs::neighbors::tiered_index {
 
-enum TieredIndexTestStrategy { TEST_EXTEND, TEST_MERGE };  // NOLINT(readability-identifier-naming)
+enum TieredIndexTestStrategy { TEST_EXTEND, TEST_MERGE };
 
-struct AnnTieredIndexInputs {  // NOLINT(readability-identifier-naming)
+struct AnnTieredIndexInputs {
   int n_rows;
   int dim;
   cuvs::distance::DistanceType metric;
@@ -52,11 +52,10 @@ inline auto operator<<(::std::ostream& os, const AnnTieredIndexInputs& p) -> ::s
 }
 
 template <typename UpstreamT>
-class ANNTieredIndexTest : public ::testing::TestWithParam<
-                             AnnTieredIndexInputs> {  // NOLINT(readability-identifier-naming)
+class ANNTieredIndexTest : public ::testing::TestWithParam<AnnTieredIndexInputs> {
  public:
   using value_type = typename UpstreamT::value_type;
-  ANNTieredIndexTest()  // NOLINT(modernize-use-equals-default)
+  ANNTieredIndexTest()
     : stream_(raft::resource::get_cuda_stream(handle_)),
       ps(::testing::TestWithParam<AnnTieredIndexInputs>::GetParam()),
       database(0, stream_),
@@ -65,7 +64,7 @@ class ANNTieredIndexTest : public ::testing::TestWithParam<
   }
 
  protected:
-  void testTieredIndex()  // NOLINT(readability-identifier-naming)
+  void testTieredIndex()
   {
     // Calculate the naive results
     std::vector<int64_t> indices_naive(ps.n_queries * ps.k);
@@ -181,7 +180,7 @@ class ANNTieredIndexTest : public ::testing::TestWithParam<
                                 min_recall));
   }
 
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     queries.resize(((size_t)ps.n_queries) * ps.dim, stream_);
@@ -193,7 +192,7 @@ class ANNTieredIndexTest : public ::testing::TestWithParam<
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override  // NOLINT(readability-identifier-naming)
+  void TearDown() override
   {
     raft::resource::sync_stream(handle_);
     database.resize(0, stream_);
@@ -203,12 +202,12 @@ class ANNTieredIndexTest : public ::testing::TestWithParam<
  private:
   raft::resources handle_;
   rmm::cuda_stream_view stream_;
-  AnnTieredIndexInputs ps;                   // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<value_type> database;  // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<value_type> queries;   // NOLINT(readability-identifier-naming)
+  AnnTieredIndexInputs ps;
+  rmm::device_uvector<value_type> database;
+  rmm::device_uvector<value_type> queries;
 };
 
-const std::vector<AnnTieredIndexInputs> inputs =  // NOLINT(readability-identifier-naming)
+const std::vector<AnnTieredIndexInputs> inputs =
   raft::util::itertools::product<AnnTieredIndexInputs>(
     {2000, 4000},   // n_rows
     {16, 29, 256},  // dim
@@ -222,26 +221,20 @@ using CAGRA_F = ANNTieredIndexTest<cagra::index<float, uint32_t>>;
 TEST_P(CAGRA_F, AnnTieredIndex)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testTieredIndex();
-}  // NOLINT(readability-identifier-naming)
-INSTANTIATE_TEST_CASE_P(ANNTieredIndexTest,
-                        CAGRA_F,
-                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
+}
+INSTANTIATE_TEST_CASE_P(ANNTieredIndexTest, CAGRA_F, ::testing::ValuesIn(inputs));
 
 using IvfFlat_F = ANNTieredIndexTest<ivf_flat::index<float, int64_t>>;
 TEST_P(IvfFlat_F, AnnTieredIndex)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testTieredIndex();
-}  // NOLINT(readability-identifier-naming)
-INSTANTIATE_TEST_CASE_P(ANNTieredIndexTest,
-                        IvfFlat_F,
-                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
+}
+INSTANTIATE_TEST_CASE_P(ANNTieredIndexTest, IvfFlat_F, ::testing::ValuesIn(inputs));
 
 using IvfPq_F = ANNTieredIndexTest<ivf_pq::typed_index<float, int64_t>>;
 TEST_P(IvfPq_F, AnnTieredIndex)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testTieredIndex();
-}  // NOLINT(readability-identifier-naming)
-INSTANTIATE_TEST_CASE_P(ANNTieredIndexTest,
-                        IvfPq_F,
-                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
+}
+INSTANTIATE_TEST_CASE_P(ANNTieredIndexTest, IvfPq_F, ::testing::ValuesIn(inputs));
 }  // namespace cuvs::neighbors::tiered_index

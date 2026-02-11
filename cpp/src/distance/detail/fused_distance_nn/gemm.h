@@ -61,15 +61,15 @@ using cutlass::gemm::kernel::GroupScheduleMode;
  */
 template <
   /// Element type for A matrix operand
-  typename ElementA_,  // NOLINT(readability-identifier-naming)
+  typename ElementA_,
   /// Layout type for A matrix operand
   int kAlignmentA,
   /// Element type for B matrix operand
-  typename ElementB_,  // NOLINT(readability-identifier-naming)
+  typename ElementB_,
   /// Layout type for B matrix operand
   int kAlignmentB,
   /// Element type for C and D matrix operands
-  typename ElementC_,  // NOLINT(readability-identifier-naming)
+  typename ElementC_,
   /// Element type for internal accumulation
   typename ElementAccumulator,
   /// Epilogue output operator      - must satisfy concept of 'EpilogueWithBroadcastOp'
@@ -78,15 +78,14 @@ template <
   int Stages,
   /// data layout row/column major of inputs
   bool isRowMajor>
-struct FusedDistanceNNGemm {  // NOLINT(readability-identifier-naming)
+struct FusedDistanceNNGemm {
   // This struct is specialized for fp32/3xTF32
 
   /// Threadblock-level tile size (concept: GemmShape)
   // <- threadblock tile M = 32, N = 256, K = 16
   // this is more performant but note that for veclen = 1
   // this shape has register spills
-  using ThreadblockShape =
-    cutlass::gemm::GemmShape<32, 256, 16>;  // NOLINT(readability-identifier-naming)
+  using ThreadblockShape = cutlass::gemm::GemmShape<32, 256, 16>;
 
   // <- threadblock tile M = 32, N = 128, K = 16
   // this shape has high occupancy but less perf
@@ -98,7 +97,7 @@ struct FusedDistanceNNGemm {  // NOLINT(readability-identifier-naming)
   // This code section describes tile size a warp will compute
   // <- warp tile M = 64, N = 64, K = 16
   // this is more performant for veclen 2,4.
-  using WarpShape = cutlass::gemm::GemmShape<32, 64, 16>;  // NOLINT(readability-identifier-naming)
+  using WarpShape = cutlass::gemm::GemmShape<32, 64, 16>;
 
   //  this shape has high occupancy but less perf used for 32x128x16
   // using WarpShape = cutlass::gemm::GemmShape<32, 32, 16>;
@@ -106,19 +105,18 @@ struct FusedDistanceNNGemm {  // NOLINT(readability-identifier-naming)
   /// Warp-level tile size (concept: GemmShape)
   // This code section describes the size of MMA op
   // <- MMA Op tile M = 16, N = 8, K = 4
-  using InstructionShape =
-    cutlass::gemm::GemmShape<16, 8, 4>;  // NOLINT(readability-identifier-naming)
+  using InstructionShape = cutlass::gemm::GemmShape<16, 8, 4>;
 
   /// Operation performed by GEMM
-  using Operator = cutlass::arch::OpMultiplyAddFastF32;  // NOLINT(readability-identifier-naming)
+  using Operator = cutlass::arch::OpMultiplyAddFastF32;
   // using Operator = cutlass::arch::OpMultiplyAdd; // this runs only 1xTF32 for float inputs
 
   // This code section describes whether you want to use tensor cores or regular SIMT cores on GPU
   // SM
-  using OperatorClass = cutlass::arch::OpClassTensorOp;  // NOLINT(readability-identifier-naming)
+  using OperatorClass = cutlass::arch::OpClassTensorOp;
 
   // This code section describes CUDA SM architecture number
-  using ArchTag = cutlass::arch::Sm80;  // NOLINT(readability-identifier-naming)
+  using ArchTag = cutlass::arch::Sm80;
 
   // This code section describes how threadblocks are scheduled on GPU
   /// Threadblock-level swizzling operator
@@ -126,7 +124,7 @@ struct FusedDistanceNNGemm {  // NOLINT(readability-identifier-naming)
 
   /// data layout for final output matrix.
   // we keep this same layout even for column major inputs
-  using LayoutOutput = cutlass::layout::RowMajor;  // NOLINT(readability-identifier-naming)
+  using LayoutOutput = cutlass::layout::RowMajor;
 
   using NormXLayout =
     std::conditional_t<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>;
@@ -185,7 +183,7 @@ struct FusedDistanceNNGemm {  // NOLINT(readability-identifier-naming)
  */
 template <
   /// Element type for C and D matrix operands
-  typename ElementC_,  // NOLINT(readability-identifier-naming)
+  typename ElementC_,
   /// Element type for internal accumulation
   typename ElementAccumulator,
   /// Epilogue output operator      - must satisfy concept of 'EpilogueWithBroadcastOp'
@@ -204,36 +202,34 @@ struct FusedDistanceNNGemm<float,  /// Element type for A matrix operand
                            Stages,
                            isRowMajor> {
   // This struct is specialized for fp32/3xTF32
-  using ElementA_ = float;  // NOLINT(readability-identifier-naming)
-  using ElementB_ = float;  // NOLINT(readability-identifier-naming)
+  using ElementA_ = float;
+  using ElementB_ = float;
 
   /// Threadblock-level tile size (concept: GemmShape)
   // <- threadblock tile M = 32, N = 128, K = 16
   // this shape has high occupancy and no register spills for veclen = 1.
-  using ThreadblockShape =
-    cutlass::gemm::GemmShape<32, 128, 16>;  // NOLINT(readability-identifier-naming)
+  using ThreadblockShape = cutlass::gemm::GemmShape<32, 128, 16>;
 
   /// Warp-level tile size (concept: GemmShape)
   // This code section describes tile size a warp will compute
   // <- warp tile M = 32, N = 32, K = 16
-  using WarpShape = cutlass::gemm::GemmShape<32, 32, 16>;  // NOLINT(readability-identifier-naming)
+  using WarpShape = cutlass::gemm::GemmShape<32, 32, 16>;
 
   /// Warp-level tile size (concept: GemmShape)
   // This code section describes the size of MMA op
   // <- MMA Op tile M = 16, N = 8, K = 4
-  using InstructionShape =
-    cutlass::gemm::GemmShape<16, 8, 4>;  // NOLINT(readability-identifier-naming)
+  using InstructionShape = cutlass::gemm::GemmShape<16, 8, 4>;
 
   /// Operation performed by GEMM
-  using Operator = cutlass::arch::OpMultiplyAddFastF32;  // NOLINT(readability-identifier-naming)
+  using Operator = cutlass::arch::OpMultiplyAddFastF32;
   // using Operator = cutlass::arch::OpMultiplyAdd; // this runs only 1xTF32 for float inputs
 
   // This code section describes whether you want to use tensor cores or regular SIMT cores on GPU
   // SM
-  using OperatorClass = cutlass::arch::OpClassTensorOp;  // NOLINT(readability-identifier-naming)
+  using OperatorClass = cutlass::arch::OpClassTensorOp;
 
   // This code section describes CUDA SM architecture number
-  using ArchTag = cutlass::arch::Sm80;  // NOLINT(readability-identifier-naming)
+  using ArchTag = cutlass::arch::Sm80;
 
   // This code section describes how threadblocks are scheduled on GPU
   /// Threadblock-level swizzling operator
@@ -241,7 +237,7 @@ struct FusedDistanceNNGemm<float,  /// Element type for A matrix operand
 
   /// data layout for final output matrix.
   // we keep this same layout even for column major inputs
-  using LayoutOutput = cutlass::layout::RowMajor;  // NOLINT(readability-identifier-naming)
+  using LayoutOutput = cutlass::layout::RowMajor;
 
   using NormXLayout =
     std::conditional_t<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>;
@@ -298,7 +294,7 @@ template <
   /// Layout type for B matrix operand
   int kAlignmentB,
   /// Element type for C and D matrix operands
-  typename ElementC_,  // NOLINT(readability-identifier-naming)
+  typename ElementC_,
   /// Element type for internal accumulation
   typename ElementAccumulator,
   /// Epilogue output operator      - must satisfy concept of 'EpilogueWithBroadcastOp'
@@ -318,27 +314,25 @@ struct FusedDistanceNNGemm<double,
                            isRowMajor> {
   // Threadblock-level tile size (concept: GemmShape)
   // <- threadblock tile M = 64, N = 64, K = 16
-  using ThreadblockShape =
-    cutlass::gemm::GemmShape<64, 64, 16>;  // NOLINT(readability-identifier-naming)
+  using ThreadblockShape = cutlass::gemm::GemmShape<64, 64, 16>;
   // using ThreadblockShape = cutlass::gemm::GemmShape<16, 128, 16>;
   /// Warp-level tile size (concept: GemmShape)
   // This code section describes tile size a warp will compute
   // <- warp tile M = 32, N = 32, K = 16
-  using WarpShape = cutlass::gemm::GemmShape<32, 32, 16>;  // NOLINT(readability-identifier-naming)
+  using WarpShape = cutlass::gemm::GemmShape<32, 32, 16>;
   // using WarpShape = cutlass::gemm::GemmShape<16, 32, 16>;
   /// Warp-level tile size (concept: GemmShape)
   // This code section describes the size of MMA op
-  using InstructionShape =
-    cutlass::gemm::GemmShape<8, 8, 4>;  // NOLINT(readability-identifier-naming)
+  using InstructionShape = cutlass::gemm::GemmShape<8, 8, 4>;
 
   // Operation performed by GEMM
-  using Operator = cutlass::arch::OpMultiplyAdd;  // NOLINT(readability-identifier-naming)
+  using Operator = cutlass::arch::OpMultiplyAdd;
   // This code section describes whether you want to use tensor cores or regular SIMT cores on GPU
   // SM
-  using OperatorClass = cutlass::arch::OpClassTensorOp;  // NOLINT(readability-identifier-naming)
+  using OperatorClass = cutlass::arch::OpClassTensorOp;
 
   // This code section describes CUDA SM architecture number
-  using ArchTag = cutlass::arch::Sm80;  // NOLINT(readability-identifier-naming)
+  using ArchTag = cutlass::arch::Sm80;
 
   // This code section describes how threadblocks are scheduled on GPU
   /// Threadblock-level swizzling operator
@@ -346,7 +340,7 @@ struct FusedDistanceNNGemm<double,
 
   /// data layout for final output matrix.
   // we keep this same layout even for column major inputs
-  using LayoutOutput = cutlass::layout::RowMajor;  // NOLINT(readability-identifier-naming)
+  using LayoutOutput = cutlass::layout::RowMajor;
 
   using NormXLayout =
     std::conditional_t<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>;

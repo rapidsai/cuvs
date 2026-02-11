@@ -39,7 +39,7 @@ class cagra_extreme_inputs_oob_test : public ::testing::Test {
     FAIL();
   }
 
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     dataset.emplace(raft::make_device_matrix<data_type, int64_t>(res, n_samples, n_dim));
     raft::random::RngState r(1234ULL);
@@ -52,20 +52,19 @@ class cagra_extreme_inputs_oob_test : public ::testing::Test {
     raft::resource::sync_stream(res);
   }
 
-  void TearDown() override  // NOLINT(readability-identifier-naming)
+  void TearDown() override
   {
     dataset.reset();
     raft::resource::sync_stream(res);
   }
 
  private:
-  raft::resources res;  // NOLINT(readability-identifier-naming)
+  raft::resources res;
   std::optional<raft::device_matrix<data_type, int64_t>> dataset = std::nullopt;
 
-  constexpr static int64_t n_samples = 100000;  // NOLINT(readability-identifier-naming)
-  constexpr static int64_t n_dim     = 200;     // NOLINT(readability-identifier-naming)
-  constexpr static cuvs::distance::DistanceType metric =
-    cuvs::distance::DistanceType::L2Expanded;  // NOLINT(readability-identifier-naming)
+  constexpr static int64_t n_samples                   = 100000;
+  constexpr static int64_t n_dim                       = 200;
+  constexpr static cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded;
 };
 
 TEST_F(
@@ -73,6 +72,6 @@ TEST_F(
   cagra_extreme_inputs_oob_test)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->run();
-}  // NOLINT(readability-identifier-naming)
+}
 
 }  // namespace cuvs::neighbors::cagra

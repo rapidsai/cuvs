@@ -21,7 +21,7 @@
 
 namespace cuvs::distance::detail::sparse {
 // @TODO: Move this into sparse prims (coo_norm)
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 RAFT_KERNEL compute_binary_row_norm_kernel(ValueT* out,
                                            const ValueIdx* __restrict__ coo_rows,
                                            const ValueT* __restrict__ data,
@@ -37,9 +37,7 @@ RAFT_KERNEL compute_binary_row_norm_kernel(ValueT* out,
   }
 }
 
-template <typename ValueIdx,
-          typename ValueT,
-          typename ExpansionF>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, typename ExpansionF>
 RAFT_KERNEL compute_binary_warp_kernel(ValueT* __restrict__ C,
                                        const ValueT* __restrict__ q_norms,
                                        const ValueT* __restrict__ r_norms,
@@ -59,10 +57,7 @@ RAFT_KERNEL compute_binary_warp_kernel(ValueT* __restrict__ C,
   C[(size_t)i * n_cols + j] = expansion_func(dot, q_norm, r_norm);
 }
 
-template <typename ValueIdx,
-          typename ValueT,
-          typename ExpansionF,
-          int tpb = 1024>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, typename ExpansionF, int tpb = 1024>
 void compute_binary(ValueT* C,
                     const ValueT* q_norms,
                     const ValueT* r_norms,
@@ -76,10 +71,7 @@ void compute_binary(ValueT* C,
     C, q_norms, r_norms, n_rows, n_cols, expansion_func);
 }
 
-template <typename ValueIdx,
-          typename ValueT,
-          typename ExpansionF,
-          int tpb = 1024>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, typename ExpansionF, int tpb = 1024>
 void compute_bin_distance(ValueT* out,
                           const ValueIdx* Q_coo_rows,
                           const ValueT* Q_data,
@@ -109,8 +101,7 @@ void compute_bin_distance(ValueT* out,
  * Jaccard distance using the expanded form:
  * 1 - (sum(x_k * y_k) / ((sum(x_k) + sum(y_k)) - sum(x_k * y_k))
  */
-template <typename ValueIdx = int,
-          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = int, typename ValueT = float>
 class jaccard_expanded_distances_t : public distances_t<ValueT> {
  public:
   explicit jaccard_expanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
@@ -170,8 +161,7 @@ class jaccard_expanded_distances_t : public distances_t<ValueT> {
  * Dice distance using the expanded form:
  * 1 - ((2 * sum(x_k * y_k)) / (sum(x_k) + sum(y_k)))
  */
-template <typename ValueIdx = int,
-          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = int, typename ValueT = float>
 class dice_expanded_distances_t : public distances_t<ValueT> {
  public:
   explicit dice_expanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)

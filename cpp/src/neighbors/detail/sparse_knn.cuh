@@ -26,7 +26,7 @@
 
 namespace cuvs::neighbors::detail {
 
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 struct csr_batcher_t {
   csr_batcher_t(ValueIdx batch_size,
                 ValueIdx n_rows,
@@ -102,7 +102,7 @@ struct csr_batcher_t {
   ValueIdx batch_csr_stop_offset_;
 };
 
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 class sparse_knn_t {
  public:
   sparse_knn_t(const ValueIdx* idxIndptr_,
@@ -415,7 +415,7 @@ class sparse_knn_t {
 
   int n_idx_rows_, n_idx_cols_, n_query_rows_, n_query_cols_, k_;
 
-  raft::resources const& handle;  // NOLINT(readability-identifier-naming)
+  raft::resources const& handle;
 };
 
 };  // namespace cuvs::neighbors::detail

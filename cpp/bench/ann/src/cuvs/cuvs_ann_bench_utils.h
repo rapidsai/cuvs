@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -155,8 +155,11 @@ class configured_raft_resources {
     return *this;
   }
 
-  operator raft::resources&() noexcept { return *res_; }              // NOLINT
-  operator const raft::resources&() const noexcept { return *res_; }  // NOLINT
+  operator raft::resources&() noexcept { return *res_; }  // NOLINT(google-explicit-constructor)
+  operator const raft::resources&() const noexcept        // NOLINT(google-explicit-constructor)
+  {
+    return *res_;
+  }
 
   /** Get the main stream */
   [[nodiscard]] auto get_sync_stream() const noexcept

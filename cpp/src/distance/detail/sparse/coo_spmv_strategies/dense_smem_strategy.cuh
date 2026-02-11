@@ -11,7 +11,7 @@
 
 namespace cuvs::distance::detail::sparse {
 
-template <typename ValueIdx, typename ValueT, int tpb>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, int tpb>
 class dense_smem_strategy : public coo_spmv_strategy<ValueIdx, ValueT, tpb> {
  public:
   using map_type = ValueT*;

@@ -352,9 +352,8 @@ auto view_impl<IdxT>::rotation_matrix() const noexcept
   return rotation_matrix_view_;
 }
 
-index_params index_params::from_dataset(  // NOLINT(readability-identifier-naming)
-  raft::matrix_extent<int64_t> dataset,
-  cuvs::distance::DistanceType metric)
+index_params index_params::from_dataset(raft::matrix_extent<int64_t> dataset,
+                                        cuvs::distance::DistanceType metric)
 {
   index_params params;
   params.n_lists =

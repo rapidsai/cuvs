@@ -11,10 +11,8 @@
 namespace cuvs {
 namespace stats {
 namespace {
-template <typename ValueT,  // NOLINT(readability-identifier-naming)
-          typename LabelT,
-          typename idx_t>  // NOLINT(readability-identifier-naming)
-auto _silhouette_score(    // NOLINT(readability-identifier-naming)
+template <typename ValueT, typename LabelT, typename idx_t>
+auto _silhouette_score(
   raft::resources const& handle,
   raft::device_matrix_view<const ValueT, idx_t, raft::row_major> X_in,
   raft::device_vector_view<const LabelT, idx_t> labels,
@@ -41,10 +39,8 @@ auto _silhouette_score(    // NOLINT(readability-identifier-naming)
                                   metric);
 }
 
-template <typename ValueT,  // NOLINT(readability-identifier-naming)
-          typename LabelT,
-          typename idx_t>        // NOLINT(readability-identifier-naming)
-auto _silhouette_score_batched(  // NOLINT(readability-identifier-naming)
+template <typename ValueT, typename LabelT, typename idx_t>
+auto _silhouette_score_batched(
   raft::resources const& handle,
   raft::device_matrix_view<const ValueT, idx_t, raft::row_major> X,
   raft::device_vector_view<const LabelT, idx_t> labels,

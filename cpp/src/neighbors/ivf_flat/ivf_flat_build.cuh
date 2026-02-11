@@ -35,7 +35,7 @@
 #include <cstdint>
 
 namespace cuvs::neighbors::ivf_flat {
-using namespace cuvs::spatial::knn::detail;  // NOLINT
+namespace utils = cuvs::spatial::knn::detail::utils;
 
 namespace detail {
 

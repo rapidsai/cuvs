@@ -7,12 +7,9 @@
 
 #include <raft/core/resources.hpp>
 
-namespace cuvs {  // NOLINT(modernize-concat-nested-namespaces)
-namespace distance {
-namespace detail {
-namespace sparse {
+namespace cuvs::distance::detail::sparse {
 
-template <typename value_idx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename value_idx, typename ValueT>
 struct distances_config_t {
   explicit distances_config_t(raft::resources const& handle_) : handle(handle_) {}
 
@@ -35,14 +32,11 @@ struct distances_config_t {
   raft::resources const& handle;
 };
 
-template <typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueT>
 class distances_t {
  public:
   virtual void compute(ValueT* out) {}
   virtual ~distances_t() = default;
 };
 
-}  // namespace sparse
-}  // namespace detail
-}  // namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance::detail::sparse

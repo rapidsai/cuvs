@@ -9,18 +9,15 @@
 
 namespace cuvs::neighbors::ivf_flat {
 
-using AnnIVFFlatTestF_uint8 =
-  AnnIVFFlatTest<float, uint8_t, int64_t>;  // NOLINT(readability-identifier-naming)
+using AnnIVFFlatTestF_uint8 = AnnIVFFlatTest<float, uint8_t, int64_t>;
 TEST_P(AnnIVFFlatTestF_uint8,  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
-       AnnIVFFlat)             // NOLINT(readability-identifier-naming)
+       AnnIVFFlat)
 {
   this->testIVFFlat();
   this->testPacker();
   this->testFilter();
 }
 
-INSTANTIATE_TEST_CASE_P(AnnIVFFlatTest,
-                        AnnIVFFlatTestF_uint8,
-                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(AnnIVFFlatTest, AnnIVFFlatTestF_uint8, ::testing::ValuesIn(inputs));
 
 }  // namespace cuvs::neighbors::ivf_flat

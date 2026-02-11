@@ -16,35 +16,35 @@
 namespace cuvs::bench {
 
 /** Benchmark mode: measuring latency vs throughput. */
-enum class Mode {  // NOLINT(readability-identifier-naming)
-  kThroughput,     // See how many vectors we can push through  //
-                   // NOLINT(readability-identifier-naming)
-  kLatency  // See how fast we can push a vector through  // NOLINT(readability-identifier-naming)
+enum class Mode {
+  kThroughput,  // See how many vectors we can push through  //
+
+  kLatency  // See how fast we can push a vector through
 };
 
-enum class MemoryType {  // NOLINT(readability-identifier-naming)
-  kHost,                 // NOLINT(readability-identifier-naming)
-  kHostMmap,             // NOLINT(readability-identifier-naming)
-  kHostPinned,           // NOLINT(readability-identifier-naming)
-  kDevice,               // NOLINT(readability-identifier-naming)
-  kManaged,              // NOLINT(readability-identifier-naming)
+enum class MemoryType {
+  kHost,
+  kHostMmap,
+  kHostPinned,
+  kDevice,
+  kManaged,
 };
 
 /** Request 2MB huge pages support for an allocation */
-enum class HugePages {  // NOLINT(readability-identifier-naming)
+enum class HugePages {
   /** Don't use huge pages if possible. */
-  kDisable = 0,  // NOLINT(readability-identifier-naming)
+  kDisable = 0,
   /** Enable huge pages if possible, ignore otherwise. */
-  kAsk = 1,  // NOLINT(readability-identifier-naming)
+  kAsk = 1,
   /** Enable huge pages if possible, warn the user otherwise. */
-  kRequire = 2,  // NOLINT(readability-identifier-naming)
+  kRequire = 2,
   /** Force enable huge pages, throw an exception if not possible. */
-  kDemand = 3  // NOLINT(readability-identifier-naming)
+  kDemand = 3
 };
 
-enum class Metric {  // NOLINT(readability-identifier-naming)
-  kInnerProduct,     // NOLINT(readability-identifier-naming)
-  kEuclidean,        // NOLINT(readability-identifier-naming)
+enum class Metric {
+  kInnerProduct,
+  kEuclidean,
 };
 
 inline auto parse_metric(const std::string& metric_str) -> Metric

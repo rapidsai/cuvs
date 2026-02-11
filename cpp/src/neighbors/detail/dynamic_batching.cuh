@@ -82,23 +82,21 @@ class cuda_event {
   cuda_event(cuda_event const&)               = delete;  // Copying disallowed: one event one owner
   auto operator=(cuda_event&) -> cuda_event&  = delete;
 
-  cuda_event()  // NOLINT(modernize-use-equals-default)
-    : event_{[]() {
-               cudaEvent_t* e = new cudaEvent_t;
-               RAFT_CUDA_TRY(cudaEventCreateWithFlags(e, cudaEventDisableTiming));
-               return e;
-             }(),
-             [](cudaEvent_t* e) {
-               RAFT_CUDA_TRY_NO_THROW(cudaEventDestroy(*e));
-               delete e;
-             }}
-  {
-  }
+  cuda_event() = default;
 
   [[nodiscard]] auto value() const -> cudaEvent_t { return *event_; }
 
  private:
-  std::unique_ptr<cudaEvent_t, std::function<void(cudaEvent_t*)>> event_;
+  std::unique_ptr<cudaEvent_t, std::function<void(cudaEvent_t*)>> event_{
+    []() {
+      cudaEvent_t* e = new cudaEvent_t;
+      RAFT_CUDA_TRY(cudaEventCreateWithFlags(e, cudaEventDisableTiming));
+      return e;
+    }(),
+    [](cudaEvent_t* e) {
+      RAFT_CUDA_TRY_NO_THROW(cudaEventDestroy(*e));
+      delete e;
+    }};
 };
 
 template <typename MdSpanOrArray>

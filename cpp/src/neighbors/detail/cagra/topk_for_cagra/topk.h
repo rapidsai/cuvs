@@ -11,7 +11,7 @@
 namespace cuvs::neighbors::cagra::detail {
 
 //
-auto _cuann_find_topk_bufferSize(uint32_t topK,  // NOLINT(readability-identifier-naming)
+auto _cuann_find_topk_bufferSize(uint32_t topK,
                                  uint32_t sizeBatch,
                                  uint32_t numElements,
                                  cudaDataType_t sampleDtype = CUDA_R_32F) -> size_t;
@@ -40,9 +40,7 @@ void cuann_find_topk(uint32_t topK,
 #define CUDA_DEVICE_HOST_FUNC
 #endif
 //
-CUDA_DEVICE_HOST_FUNC inline auto _cuann_aligned(  // NOLINT(readability-identifier-naming)
-  size_t size,
-  size_t unit = 128) -> size_t
+CUDA_DEVICE_HOST_FUNC inline auto _cuann_aligned(size_t size, size_t unit = 128) -> size_t
 {
   if (size % unit) { size += unit - (size % unit); }
   return size;

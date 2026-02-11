@@ -548,7 +548,7 @@ RAFT_KERNEL
   (__CUDA_ARCH__) == 1000
 __launch_bounds__(kBlockSize, 4)
 #else
-__launch_bounds__(kBlockSize)  // NOLINT(readability-identifier-naming)
+__launch_bounds__(kBlockSize)
 #endif
 #endif
   local_join_kernel(const IndexT* graph_new,
@@ -814,7 +814,7 @@ RAFT_KERNEL
   (__CUDA_ARCH__) == 1000
 __launch_bounds__(kBlockSize, 4)
 #else
-__launch_bounds__(kBlockSize)  // NOLINT(readability-identifier-naming)
+__launch_bounds__(kBlockSize)
 #endif
 #endif
   local_join_kernel(const IndexT* graph_new,

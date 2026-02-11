@@ -158,18 +158,10 @@ struct eps_unexp_l2_sq_neighborhood_impl : public BaseClass {
 };  // struct eps_unexp_l2_sq_neighborhood_impl
 
 template <typename DataT, typename IdxT, typename Policy>
-__launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL  // NOLINT(readability-identifier-naming)
-  epsUnexpL2SqNeighKernel(                          // NOLINT(readability-identifier-naming)
-    bool* adj_,
-    IdxT* vd_,
-    const DataT* x,
-    const DataT* y,
-    IdxT m,
-    IdxT n,
-    IdxT k,
-    DataT eps_)
+__launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL epsUnexpL2SqNeighKernel(
+  bool* adj_, IdxT* vd_, const DataT* x, const DataT* y, IdxT m, IdxT n, IdxT k, DataT eps_)
 {
-  extern __shared__ char smem[];  // NOLINT(modernize-avoid-c-arrays)
+  extern __shared__ char smem[];
   eps_unexp_l2_sq_neighborhood_impl<DataT, IdxT, Policy> obj(adj_, vd_, x, y, m, n, k, eps_, smem);
   obj.run();
 }

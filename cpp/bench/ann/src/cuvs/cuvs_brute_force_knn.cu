@@ -23,7 +23,7 @@ struct print_metric {
   cuvs::distance::DistanceType value;
 };
 
-struct RandomKNNInputs {  // NOLINT(readability-identifier-naming)
+struct RandomKNNInputs {
   int num_queries;
   int num_db_vecs;
   int dim;
@@ -69,7 +69,7 @@ auto operator<<(std::ostream& os, const RandomKNNInputs& input) -> std::ostream&
 }
 
 template <typename T, typename DistT = T>
-class BruteForceKNNBenchmark {  // NOLINT(readability-identifier-naming)
+class BruteForceKNNBenchmark {
  public:
   BruteForceKNNBenchmark(const RandomKNNInputs& params, const std::string& type_str)
     : stream_(raft::resource::get_cuda_stream(handle_)),
@@ -94,7 +94,7 @@ class BruteForceKNNBenchmark {  // NOLINT(readability-identifier-naming)
       DistT{0.0});
   }
 
-  void runBenchmark()  // NOLINT(readability-identifier-naming)
+  void runBenchmark()
   {
     DistT metric_arg = 3.0;
     rmm::device_uvector<char> workspace(0, stream_);
@@ -203,9 +203,9 @@ class BruteForceKNNBenchmark {  // NOLINT(readability-identifier-naming)
     printResult(params_, build_dur.count(), search_dur.count(), total_dur, throughput);
   }
 
-  void setUp()  // NOLINT(readability-identifier-naming)
+  void setUp()
   {
-    unsigned long long int seed = 1234ULL;  // NOLINT(google-runtime-int)
+    unsigned long long int seed = 1234ULL;
     raft::random::RngState r(seed);
 
     // JensenShannon distance requires positive values
@@ -225,7 +225,7 @@ class BruteForceKNNBenchmark {  // NOLINT(readability-identifier-naming)
     RAFT_CUDA_TRY(cudaMemsetAsync(scratch_buf_.data(), 0, scratch_buf_.size(), stream_));
   };
 
-  void printResult(const RandomKNNInputs& params,  // NOLINT(readability-identifier-naming)
+  void printResult(const RandomKNNInputs& params,
                    double build_time,
                    double search_time,
                    double total_time,
@@ -243,18 +243,18 @@ class BruteForceKNNBenchmark {  // NOLINT(readability-identifier-naming)
   raft::resources handle_;
   cudaStream_t stream_ = nullptr;
   RandomKNNInputs params_;
-  rmm::device_uvector<T> database;        // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<T> search_queries;  // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<T> database;
+  rmm::device_uvector<T> search_queries;
   rmm::device_uvector<int64_t> cuvs_indices_;
   rmm::device_uvector<DistT> cuvs_distances_;
   rmm::device_buffer scratch_buf_;
   std::string type_str_;
 };
 
-static std::vector<RandomKNNInputs> getInputs()  // NOLINT(readability-identifier-naming)
+static auto getInputs() -> std::vector<RandomKNNInputs>
 {
   std::vector<RandomKNNInputs> param_vec;
-  struct TestParams {  // NOLINT(readability-identifier-naming)
+  struct TestParams {
     int num_queries;
     int num_db_vecs;
     int dim;
@@ -264,10 +264,10 @@ static std::vector<RandomKNNInputs> getInputs()  // NOLINT(readability-identifie
   };
 
   const std::vector<TestParams> params_group = raft::util::itertools::product<TestParams>(
-    {int(10), int(100), int(1024)},
-    {int(1000000)},
-    {int(32), int(256), int(1024)},
-    {int(128), int(1024)},
+    {10, 100, 1024},
+    {1000000},
+    {32, 256, 1024},
+    {128, 1024},
     {cuvs::distance::DistanceType::InnerProduct, cuvs::distance::DistanceType::L2SqrtExpanded},
     {true, false});
 
@@ -283,7 +283,7 @@ static std::vector<RandomKNNInputs> getInputs()  // NOLINT(readability-identifie
   return param_vec;
 }
 
-void printHeader()  // NOLINT(readability-identifier-naming)
+void printHeader()
 {
   std::cout << std::left << std::setw(15) << "Type" << std::setw(10) << "Queries" << std::setw(10)
             << "Vectors" << std::setw(10) << "Dim" << std::setw(10) << "K" << std::setw(20)
@@ -295,7 +295,7 @@ void printHeader()  // NOLINT(readability-identifier-naming)
   std::cout << std::string(165, '-') << "\n";
 }
 
-void runBenchmarkForType()  // NOLINT(readability-identifier-naming)
+void runBenchmarkForType()
 {
   auto selected_inputs = getInputs();
   for (const auto& input : selected_inputs) {
@@ -314,7 +314,7 @@ void runBenchmarkForType()  // NOLINT(readability-identifier-naming)
 
 }  // namespace cuvs::neighbors::brute_force
 
-int main()
+auto main() -> int
 {
   cuvs::neighbors::brute_force::printHeader();
   cuvs::neighbors::brute_force::runBenchmarkForType();

@@ -176,7 +176,7 @@ class chunked_mask_row_it : public mask_row_it<ValueIdx> {
     return (index_b >= start_index_a && index_b <= stop_index_a);
   }
 
-  inline static ValueIdx total_row_blocks = 0;  // NOLINT(readability-identifier-naming)
+  inline static ValueIdx total_row_blocks = 0;
   const cudaStream_t stream;
   const ValueIdx *n_chunks_per_row, *chunk_indices;
   ValueIdx row_chunk_size;

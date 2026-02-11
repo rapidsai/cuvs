@@ -45,7 +45,7 @@ namespace cuvs::neighbors::ball_cover::detail {
  * @param handle
  * @param index
  */
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 void sample_landmarks(raft::resources const& handle,
                       cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index)
 {
@@ -101,7 +101,7 @@ void sample_landmarks(raft::resources const& handle,
  * @param k
  * @param index
  */
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 void construct_landmark_1nn(raft::resources const& handle,
                             const ValueIdx* R_knn_inds_ptr,
                             const ValueT* R_knn_dists_ptr,
@@ -159,7 +159,7 @@ void construct_landmark_1nn(raft::resources const& handle,
  * @param r_knn_inds
  * @param r_knn_dists
  */
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 void k_closest_landmarks(raft::resources const& handle,
                          const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
                          const ValueT* query_pts,
@@ -191,7 +191,7 @@ void k_closest_landmarks(raft::resources const& handle,
  * @param handle
  * @param index
  */
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 void compute_landmark_radii(raft::resources const& handle,
                             cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index)
 {
@@ -215,7 +215,7 @@ void compute_landmark_radii(raft::resources const& handle,
  * marking the distance to be computed between x, y only
  * if knn[k].distance >= d(x_i, R_k) + d(R_k, y)
  */
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 void perform_rbc_query(raft::resources const& handle,
                        const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
                        const ValueT* query,
@@ -252,9 +252,7 @@ void perform_rbc_query(raft::resources const& handle,
  * Perform eps-select
  *
  */
-template <typename ValueIdx,
-          typename ValueT,
-          typename dist_func>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, typename dist_func>
 void perform_rbc_eps_nn_query(raft::resources const& handle,
                               const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
                               const ValueT* query,
@@ -276,9 +274,7 @@ void perform_rbc_eps_nn_query(raft::resources const& handle,
   raft::resource::sync_stream(handle);
 }
 
-template <typename ValueIdx,
-          typename ValueT,
-          typename dist_func>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, typename dist_func>
 void perform_rbc_eps_nn_query(raft::resources const& handle,
                               const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
                               const ValueT* query,
@@ -308,8 +304,7 @@ void perform_rbc_eps_nn_query(raft::resources const& handle,
  * query which is useful for algorithms that need to perform
  * A * A.T.
  */
-template <typename ValueIdx = std::int64_t,
-          typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = std::int64_t, typename ValueT>
 void rbc_build_index(raft::resources const& handle,
                      cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index)
 {
@@ -363,8 +358,7 @@ void rbc_build_index(raft::resources const& handle,
 /**
  * Performs an all neighbors knn query (e.g. index == query)
  */
-template <typename ValueIdx = std::int64_t,
-          typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = std::int64_t, typename ValueT>
 void rbc_all_knn_query(raft::resources const& handle,
                        cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
                        int64_t k,
@@ -426,8 +420,7 @@ void rbc_all_knn_query(raft::resources const& handle,
  * Performs a knn query against an index. This assumes the index has
  * already been built.
  */
-template <typename ValueIdx = std::int64_t,
-          typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = std::int64_t, typename ValueT>
 void rbc_knn_query(raft::resources const& handle,
                    const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
                    int64_t k,
@@ -481,7 +474,7 @@ void rbc_knn_query(raft::resources const& handle,
                     perform_post_filtering);
 }
 
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 void compute_landmark_dists(raft::resources const& handle,
                             const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
                             const ValueT* query_pts,
@@ -513,9 +506,7 @@ void compute_landmark_dists(raft::resources const& handle,
  * Modified version that takes an eps as threshold and outputs to a dense adj matrix (row-major)
  * we are assuming that there are sufficiently many landmarks
  */
-template <typename ValueIdx = std::int64_t,
-          typename ValueT,
-          typename DistanceFunc>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = std::int64_t, typename ValueT, typename DistanceFunc>
 void rbc_eps_nn_query(raft::resources const& handle,
                       const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
                       const ValueT eps,
@@ -532,9 +523,7 @@ void rbc_eps_nn_query(raft::resources const& handle,
     handle, index, query, n_query_pts, eps, index.get_R().data_handle(), dfunc, adj, vd);
 }
 
-template <typename ValueIdx = std::int64_t,
-          typename ValueT,
-          typename DistanceFunc>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = std::int64_t, typename ValueT, typename DistanceFunc>
 void rbc_eps_nn_query(raft::resources const& handle,
                       const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
                       const ValueT eps,

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright (c) 2022-2023, NVIDIA CORPORATION.
+// SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
 // SPDX-License-Identifier: Apache-2.0
 #ifndef __CLANG_CUDA_ADDITIONAL_INTRINSICS_H__
 #define __CLANG_CUDA_ADDITIONAL_INTRINSICS_H__
@@ -6,6 +6,7 @@
 #error "This file is for CUDA compilation only."
 #endif
 
+// NOLINTBEGIN(modernize-use-trailing-return-type)
 // for some of these macros, see cuda_fp16.hpp
 #if defined(__cplusplus) && (!defined(__CUDA_ARCH__) || (__CUDA_ARCH__ >= 320))
 #if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__) || defined(__CUDACC_RTC__)
@@ -388,5 +389,6 @@ __MAKE_ST4(wt, float4, float, "f32", "f")
 #undef __LDG_PTR
 
 #endif  // defined(__cplusplus) && (!defined(__CUDA_ARCH__) || (__CUDA_ARCH__ >= 320))
+// NOLINTEND(modernize-use-trailing-return-type)
 
 #endif  // defined(__CLANG_CUDA_ADDITIONAL_INTRINSICS_H__)

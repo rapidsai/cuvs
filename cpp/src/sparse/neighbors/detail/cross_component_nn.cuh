@@ -49,7 +49,7 @@ namespace cuvs::sparse::neighbors::detail {
  * @tparam ValueIdx
  * @tparam ValueT
  */
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 struct fix_connectivities_red_op {
   ValueIdx m;
 
@@ -98,7 +98,7 @@ struct fix_connectivities_red_op {
   void scatter(const raft::resources& handle, ValueIdx* map) {}
 };
 
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 struct mutual_reachability_fix_connectivities_red_op {
   ValueT* core_dists;
   ValueIdx m;
@@ -250,7 +250,7 @@ auto get_n_components(ValueIdx* colors, size_t n_rows, cudaStream_t stream) -> V
  * @tparam ValueIdx
  * @tparam ValueT
  */
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 struct lookup_color_op {
   ValueIdx* colors;
 
@@ -281,9 +281,7 @@ struct lookup_color_op {
  * @param[in] col_batch_size column batch size for sorting and 'unsorting'
  * @param[in] reduction_op reduction operation for computing nearest neighbors
  */
-template <typename ValueIdx,
-          typename ValueT,
-          typename RedOp>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, typename RedOp>
 void perform_1nn(raft::resources const& handle,
                  raft::KeyValuePair<ValueIdx, ValueT>* kvp,
                  ValueIdx* nn_colors,
@@ -430,7 +428,7 @@ void perform_1nn(raft::resources const& handle,
  * @param n_rows number of components in `colors`
  * @param stream stream for which to order CUDA operations
  */
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 void sort_by_color(raft::resources const& handle,
                    ValueIdx* colors,
                    ValueIdx* nn_colors,
@@ -449,7 +447,7 @@ void sort_by_color(raft::resources const& handle,
   thrust::sort_by_key(exec_policy, keys, keys + n_rows, vals, tuple_comp());
 }
 
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 RAFT_KERNEL min_components_by_color_kernel(ValueIdx* out_rows,
                                            ValueIdx* out_cols,
                                            ValueT* out_vals,
@@ -483,7 +481,7 @@ RAFT_KERNEL min_components_by_color_kernel(ValueIdx* out_rows,
  * @param[in] n_colors number of components
  * @param[in] stream cuda stream for which to order cuda operations
  */
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 void min_components_by_color(raft::sparse::COO<ValueT, ValueIdx>& coo,
                              const ValueIdx* out_index,
                              const ValueIdx* indices,
@@ -530,10 +528,7 @@ void min_components_by_color(raft::sparse::COO<ValueT, ValueIdx>& coo,
  * is done
  * @param[in] metric distance metric
  */
-template <typename ValueIdx,
-          typename ValueT,
-          typename RedOp,
-          typename NnzT = size_t>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, typename RedOp, typename NnzT = size_t>
 void cross_component_nn(
   raft::resources const& handle,
   raft::sparse::COO<ValueT, ValueIdx, NnzT>& out,

@@ -18,7 +18,7 @@ using ivf_flat_i8 = dynamic_batching_test<uint8_t,
                                           ivf_flat::search>;
 
 TEST_P(ivf_flat_i8,  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
-       defaults)     // NOLINT(readability-identifier-naming)
+       defaults)
 {
   build_params_upsm.n_lists = std::round(std::sqrt(ps.n_rows));
   search_params_upsm.n_probes =
@@ -29,8 +29,6 @@ TEST_P(ivf_flat_i8,  // NOLINT(google-readability-avoid-underscore-in-googletest
   check_neighbors();
 }
 
-INSTANTIATE_TEST_CASE_P(dynamic_batching,
-                        ivf_flat_i8,
-                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(dynamic_batching, ivf_flat_i8, ::testing::ValuesIn(inputs));
 
 }  // namespace cuvs::neighbors::dynamic_batching

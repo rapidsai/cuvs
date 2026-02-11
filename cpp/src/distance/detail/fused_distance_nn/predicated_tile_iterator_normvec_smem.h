@@ -80,35 +80,33 @@ using cutlass::epilogue::threadblock::PredicatedTileIteratorParams;
 /// Satisfies: ReadableTileIterator | PredicatedTileIterator | ForwardTileIterator
 ///
 template <typename ThreadMap_,  ///< Thread map (conept: OutputTileThreadMap)  //
-                                ///< NOLINT(readability-identifier-naming)
-          typename Element_,    ///< Element data type  // NOLINT(readability-identifier-naming)
-          typename Layout_,     // NOLINT(readability-identifier-naming)
+
+          typename Element_,  ///< Element data type
+          typename Layout_,
           bool ScatterD     = false,  ///< Scatter D operand or not
           bool UseCUDAStore = false>
-class PredicatedTileIteratorNormVecSmem {  // NOLINT(readability-identifier-naming)
+class PredicatedTileIteratorNormVecSmem {
  public:
-  using ThreadMap = ThreadMap_;                 // NOLINT(readability-identifier-naming)
-  using Shape     = typename ThreadMap::Shape;  // NOLINT(readability-identifier-naming)
+  using ThreadMap = ThreadMap_;
+  using Shape     = typename ThreadMap::Shape;
 
-  using Element = Element_;  // NOLINT(readability-identifier-naming)
+  using Element = Element_;
 
-  using Layout    = Layout_;                              // NOLINT(readability-identifier-naming)
-  using TensorRef = cutlass::TensorRef<Element, Layout>;  // NOLINT(readability-identifier-naming)
-  using ConstTensorRef =
-    typename TensorRef::ConstTensorRef;  // NOLINT(readability-identifier-naming)
+  using Layout         = Layout_;
+  using TensorRef      = cutlass::TensorRef<Element, Layout>;
+  using ConstTensorRef = typename TensorRef::ConstTensorRef;
 
-  using Index       = typename Layout::Index;      // NOLINT(readability-identifier-naming)
-  using LongIndex   = typename Layout::LongIndex;  // NOLINT(readability-identifier-naming)
-  using TensorCoord = cutlass::MatrixCoord;        // NOLINT(readability-identifier-naming)
+  using Index       = typename Layout::Index;
+  using LongIndex   = typename Layout::LongIndex;
+  using TensorCoord = cutlass::MatrixCoord;
 
   static int const kElementsPerAccess = ThreadMap::kElementsPerAccess;
   static int const kThreads           = ThreadMap::kThreads;
   static int const kIterations        = ThreadMap::Count::kTile;
 
-  static int const total_rows =
-    ThreadMap::kWarpCount * ThreadMap::Iterations::kRow *  // NOLINT(readability-identifier-naming)
-    ThreadMap::Iterations::kGroup * ThreadMap::Iterations::kCluster * ThreadMap::Count::kTile *
-    ThreadMap::Delta::kRow;
+  static int const total_rows = ThreadMap::kWarpCount * ThreadMap::Iterations::kRow *
+                                ThreadMap::Iterations::kGroup * ThreadMap::Iterations::kCluster *
+                                ThreadMap::Count::kTile * ThreadMap::Delta::kRow;
 
   static_assert(ThreadMap::Iterations::kRow > 0, "ThreadMap::Iterations::kRow must be > 0");
   static_assert(ThreadMap::Iterations::kGroup > 0, "ThreadMap::Iterations::kGroup must be > 0");
@@ -128,8 +126,8 @@ class PredicatedTileIteratorNormVecSmem {  // NOLINT(readability-identifier-nami
   //
 
   /// Uses a non-template class
-  struct Params : PredicatedTileIteratorParams {  // NOLINT(readability-identifier-naming)
-    using Base = PredicatedTileIteratorParams;    // NOLINT(readability-identifier-naming)
+  struct Params : PredicatedTileIteratorParams {
+    using Base = PredicatedTileIteratorParams;
 
     CUTLASS_HOST_DEVICE
     Params() = default;
@@ -147,7 +145,7 @@ class PredicatedTileIteratorNormVecSmem {  // NOLINT(readability-identifier-nami
   };
 
   /// Mask object
-  struct Mask {  // NOLINT(readability-identifier-naming)
+  struct Mask {
     static int const kCount = ThreadMap::Iterations::kColumn;
 
     /// Predicate state
@@ -180,15 +178,14 @@ class PredicatedTileIteratorNormVecSmem {  // NOLINT(readability-identifier-nami
 
   /// Shared storage allocation needed by the predicated tile
   //  iterator for storing rowNorm chunk.
-  struct SharedStorage {  // NOLINT(readability-identifier-naming)
+  struct SharedStorage {
     //
     // Type definitions
     //
-    using Shape = cutlass::MatrixShape<total_rows, 1>;  // NOLINT(readability-identifier-naming)
+    using Shape = cutlass::MatrixShape<total_rows, 1>;
 
     /// Shape of the shared memory allocation
-    using StorageShape =
-      cutlass::MatrixShape<Shape::kRow, Shape::kColumn>;  // NOLINT(readability-identifier-naming)
+    using StorageShape = cutlass::MatrixShape<Shape::kRow, Shape::kColumn>;
 
     //
     // Data members
@@ -203,13 +200,13 @@ class PredicatedTileIteratorNormVecSmem {  // NOLINT(readability-identifier-nami
     SharedStorage() = default;
 
     CUTLASS_DEVICE
-    void initSmem(void* pointer,  // NOLINT(readability-identifier-naming)
+    void initSmem(void* pointer,
                   const Index& num_rows,
                   const Index& tb_row_offset,
                   const LongIndex& stride)
     {
-      Element* shared_elem_arr          = data();
-      uint8_t* first_tile_byte_pointer_ =  // NOLINT(readability-identifier-naming)
+      Element* shared_elem_arr = data();
+      uint8_t* first_tile_byte_pointer_ =
         reinterpret_cast<uint8_t*>(pointer) + LongIndex(tb_row_offset) * LongIndex(stride);
       const auto gmem_ptr = reinterpret_cast<Element*>(first_tile_byte_pointer_);
 

@@ -102,10 +102,10 @@ class faiss_cpu : public algo<T> {
 
  protected:
   template <typename Index>
-  void save_(const std::string& file) const;  // NOLINT
+  void save_(const std::string& file) const;
 
   template <typename Index>
-  void load_(const std::string& file);  // NOLINT
+  void load_(const std::string& file);
 
   std::shared_ptr<faiss::Index> index_;
   std::shared_ptr<faiss::Index> quantizer_;

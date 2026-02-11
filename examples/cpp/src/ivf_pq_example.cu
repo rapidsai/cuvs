@@ -19,9 +19,7 @@ void ivf_pq_build_search(raft::device_resources const& dev_resources,
                          raft::device_matrix_view<const float, int64_t> dataset,
                          raft::device_matrix_view<const float, int64_t> queries)
 {
-  using namespace cuvs::neighbors;  // NOLINT
-
-  ivf_pq::index_params index_params;
+  cuvs::neighbors::ivf_pq::index_params index_params;
   index_params.n_lists                  = 1024;
   index_params.kmeans_trainset_fraction = 0.1;
   index_params.metric                   = cuvs::distance::DistanceType::L2Expanded;
@@ -29,13 +27,13 @@ void ivf_pq_build_search(raft::device_resources const& dev_resources,
   index_params.pq_dim                   = 2;
 
   std::cout << "Building IVF-PQ index" << std::endl;
-  auto index = ivf_pq::build(dev_resources, index_params, dataset);
+  auto index = cuvs::neighbors::ivf_pq::build(dev_resources, index_params, dataset);
 
   std::cout << "Number of clusters " << index.n_lists() << ", number of vectors added to index "
             << index.size() << std::endl;
 
   // Set search parameters.
-  ivf_pq::search_params search_params;
+  cuvs::neighbors::ivf_pq::search_params search_params;
   search_params.n_probes = 50;
   // Set the internal search precision to 16-bit floats;
   // usually, this improves the performance at a slight cost to the recall.
@@ -49,7 +47,8 @@ void ivf_pq_build_search(raft::device_resources const& dev_resources,
   auto distances    = raft::make_device_matrix<float>(dev_resources, n_queries, topk);
 
   // Search K nearest neighbors for each of the queries.
-  ivf_pq::search(dev_resources, search_params, index, queries, neighbors.view(), distances.view());
+  cuvs::neighbors::ivf_pq::search(
+    dev_resources, search_params, index, queries, neighbors.view(), distances.view());
 
   // Re-ranking operation: refine the initial search results by computing exact distances
   int64_t topk_refined = 7;

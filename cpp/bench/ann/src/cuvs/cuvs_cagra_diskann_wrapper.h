@@ -58,7 +58,7 @@ class cuvs_cagra_diskann : public algo<T>, public algo_gpu {
 
   void save(const std::string& file) const override;
   void load(const std::string&) override;
-  std::unique_ptr<algo<T>> copy() override
+  auto copy() -> std::unique_ptr<algo<T>> override
   {
     return std::make_unique<cuvs_cagra_diskann<T, IdxT>>(*this);
   }
@@ -110,10 +110,10 @@ void cuvs_cagra_diskann<T, IdxT>::save(const std::string& file) const
   size_t num_frozen_points     = 0;
   uint32_t max_observed_degree = 0;
 
-  index_of.write((char*)&index_size, sizeof(uint64_t));
-  index_of.write((char*)&max_observed_degree, sizeof(uint32_t));
-  index_of.write((char*)&start, sizeof(uint32_t));
-  index_of.write((char*)&num_frozen_points, sizeof(size_t));
+  index_of.write(reinterpret_cast<char*>(&index_size), sizeof(uint64_t));
+  index_of.write(reinterpret_cast<char*>(&max_observed_degree), sizeof(uint32_t));
+  index_of.write(reinterpret_cast<char*>(&start), sizeof(uint32_t));
+  index_of.write(reinterpret_cast<char*>(&num_frozen_points), sizeof(size_t));
 
   auto d_graph = cagra_build_.get_index()->graph();
   auto h_graph = raft::make_host_matrix<IdxT, int64_t>(d_graph.extent(0), d_graph.extent(1));
@@ -137,18 +137,18 @@ void cuvs_cagra_diskann<T, IdxT>::save(const std::string& file) const
     if (node_edges < 2) num_single++;
     total_edges += node_edges;
 
-    index_of.write((char*)&node_edges, sizeof(uint32_t));
+    index_of.write(reinterpret_cast<char*>(&node_edges), sizeof(uint32_t));
     if constexpr (!std::is_same_v<IdxT, uint32_t>) {
       RAFT_FAIL("serialization is only implemented for uint32_t graph");
     }
-    index_of.write((char*)&h_graph(i, 0), node_edges * sizeof(uint32_t));
+    index_of.write(reinterpret_cast<char*>(&h_graph(i, 0)), node_edges * sizeof(uint32_t));
 
-    max_degree = node_edges > max_degree ? (uint32_t)node_edges : max_degree;
-    index_size += (size_t)(sizeof(uint32_t) * (node_edges + 1));
+    max_degree = node_edges > max_degree ? static_cast<uint32_t>(node_edges) : max_degree;
+    index_size += static_cast<size_t>(sizeof(uint32_t) * (node_edges + 1));
   }
   index_of.seekp(file_offset, index_of.beg);
-  index_of.write((char*)&index_size, sizeof(uint64_t));
-  index_of.write((char*)&max_degree, sizeof(uint32_t));
+  index_of.write(reinterpret_cast<char*>(&index_size), sizeof(uint64_t));
+  index_of.write(reinterpret_cast<char*>(&max_degree), sizeof(uint32_t));
 
   RAFT_LOG_DEBUG(
     "Wrote file out, index size:%lu, max_degree:%u, num_sparse:%ld, num_single:%ld, total "
@@ -184,11 +184,12 @@ void cuvs_cagra_diskann<T, IdxT>::save(const std::string& file) const
       int size                   = static_cast<int>(cagra_build_.get_index()->size());
       int dim                    = static_cast<int>(cagra_build_.get_index()->dim());
       dataset_of.seekp(dataset_file_offset, dataset_of.beg);
-      dataset_of.write((char*)&size, sizeof(int));
-      dataset_of.write((char*)&dim, sizeof(int));
+      dataset_of.write(reinterpret_cast<char*>(&size), sizeof(int));
+      dataset_of.write(reinterpret_cast<char*>(&dim), sizeof(int));
       for (int i = 0; i < size; i++) {
-        dataset_of.write((char*)(h_dataset.data_handle() + i * h_dataset.extent(1)),
-                         dim * sizeof(T));
+        dataset_of.write(
+          reinterpret_cast<const char*>(h_dataset.data_handle() + i * h_dataset.extent(1)),
+          dim * sizeof(T));
       }
       dataset_of.close();
       if (!dataset_of) { RAFT_FAIL("Error writing output %s", dataset_base_file.c_str()); }

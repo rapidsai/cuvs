@@ -696,11 +696,7 @@ class DistanceTestSameBuffer
 template <cuvs::distance::DistanceType distanceType>
 class BigMatrixDistanceTest : public ::testing::Test {
  public:
-  BigMatrixDistanceTest()  // NOLINT(modernize-use-equals-default)
-    : x(m * k, raft::resource::get_cuda_stream(handle)),
-      dist(std::size_t(m) * m, raft::resource::get_cuda_stream(handle))
-  {
-  }
+  BigMatrixDistanceTest() = default;
   void SetUp() override
   {
     auto testInfo = testing::UnitTest::GetInstance()->current_test_info();
@@ -722,6 +718,9 @@ class BigMatrixDistanceTest : public ::testing::Test {
   std::int64_t m = 48000;
   std::int64_t n = 48000;
   std::int64_t k = 1;
-  rmm::device_uvector<float> x, dist;
+  rmm::device_uvector<float> x{static_cast<std::size_t>(m * k),
+                               raft::resource::get_cuda_stream(handle)};
+  rmm::device_uvector<float> dist{static_cast<std::size_t>(m) * m,
+                                  raft::resource::get_cuda_stream(handle)};
 };
 }  // namespace cuvs::distance

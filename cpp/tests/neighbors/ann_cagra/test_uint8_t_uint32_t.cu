@@ -9,49 +9,39 @@
 
 namespace cuvs::neighbors::cagra {
 
-using AnnCagraTestU8_U32 =
-  AnnCagraTest<float, std::uint8_t, std::uint32_t>;  // NOLINT(readability-identifier-naming)
+using AnnCagraTestU8_U32 = AnnCagraTest<float, std::uint8_t, std::uint32_t>;
 TEST_P(AnnCagraTestU8_U32,
        AnnCagra)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testCagra();
-}  // NOLINT(readability-identifier-naming)
-using AnnCagraAddNodesTestU8_U32 =
-  AnnCagraAddNodesTest<float,
-                       std::uint8_t,
-                       std::uint32_t>;  // NOLINT(readability-identifier-naming)
+}
+using AnnCagraAddNodesTestU8_U32 = AnnCagraAddNodesTest<float, std::uint8_t, std::uint32_t>;
 TEST_P(AnnCagraAddNodesTestU8_U32,
        AnnCagra)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testCagra();
-}  // NOLINT(readability-identifier-naming)
-using AnnCagraFilterTestU8_U32 =
-  AnnCagraFilterTest<float, std::uint8_t, std::uint32_t>;  // NOLINT(readability-identifier-naming)
+}
+using AnnCagraFilterTestU8_U32 = AnnCagraFilterTest<float, std::uint8_t, std::uint32_t>;
 TEST_P(AnnCagraFilterTestU8_U32,
        AnnCagra)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testCagra();
-}  // NOLINT(readability-identifier-naming)
-using AnnCagraIndexMergeTestU8_U32 =
-  AnnCagraIndexMergeTest<float,
-                         std::uint8_t,
-                         std::uint32_t>;  // NOLINT(readability-identifier-naming)
+}
+using AnnCagraIndexMergeTestU8_U32 = AnnCagraIndexMergeTest<float, std::uint8_t, std::uint32_t>;
 TEST_P(AnnCagraIndexMergeTestU8_U32,
        AnnCagra)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testCagra();
-}  // NOLINT(readability-identifier-naming)
+}
 
-INSTANTIATE_TEST_CASE_P(AnnCagraTest,
-                        AnnCagraTestU8_U32,
-                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
-INSTANTIATE_TEST_CASE_P(AnnCagraAddNodesTest,          // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(AnnCagraTest, AnnCagraTestU8_U32, ::testing::ValuesIn(inputs));
+INSTANTIATE_TEST_CASE_P(AnnCagraAddNodesTest,
                         AnnCagraAddNodesTestU8_U32,
                         ::testing::ValuesIn(inputs_addnode));
-INSTANTIATE_TEST_CASE_P(AnnCagraFilterTest,  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(AnnCagraFilterTest,
                         AnnCagraFilterTestU8_U32,
                         ::testing::ValuesIn(inputs_filtering));
-INSTANTIATE_TEST_CASE_P(AnnCagraIndexMergeTest,  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(AnnCagraIndexMergeTest,
                         AnnCagraIndexMergeTestU8_U32,
                         ::testing::ValuesIn(inputs));
 

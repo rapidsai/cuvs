@@ -24,7 +24,7 @@
 namespace cuvs::distance::detail::sparse {
 
 template <typename ValueIdx,
-          typename ValueT,  // NOLINT(readability-identifier-naming)
+          typename ValueT,
           int threads_per_block = 1024,
           typename ProductF,
           typename AccumF,
@@ -81,7 +81,7 @@ inline void balanced_coo_pairwise_generalized_spmv(
  *            setting for both large and small densities
  */
 template <typename ValueIdx,
-          typename ValueT,  // NOLINT(readability-identifier-naming)
+          typename ValueT,
           int threads_per_block = 1024,
           typename ProductF,
           typename AccumF,
@@ -111,7 +111,7 @@ inline void balanced_coo_pairwise_generalized_spmv(
 };
 
 template <typename ValueIdx,
-          typename ValueT,  // NOLINT(readability-identifier-naming)
+          typename ValueT,
           int threads_per_block = 1024,
           typename ProductF,
           typename AccumF,
@@ -167,7 +167,7 @@ inline void balanced_coo_pairwise_generalized_spmv_rev(
  *            setting for both large and small densities
  */
 template <typename ValueIdx,
-          typename ValueT,  // NOLINT(readability-identifier-naming)
+          typename ValueT,
           int threads_per_block = 1024,
           typename ProductF,
           typename AccumF,

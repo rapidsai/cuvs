@@ -17,7 +17,7 @@
 namespace cuvs::neighbors::detail {
 
 template <typename ValueIdx = std::int64_t,
-          typename ValueT   = float,  // NOLINT(readability-identifier-naming)
+          typename ValueT   = float,
           int warp_q,
           int thread_q,
           int tpb>
@@ -95,10 +95,7 @@ RAFT_KERNEL knn_merge_parts_kernel(const ValueT* inK,
   }
 }
 
-template <typename ValueIdx = std::int64_t,
-          typename ValueT   = float,
-          int warp_q,
-          int thread_q>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = std::int64_t, typename ValueT = float, int warp_q, int thread_q>
 inline void knn_merge_parts_impl(const ValueT* inK,
                                  const ValueIdx* inV,
                                  ValueT* outK,
@@ -135,8 +132,7 @@ inline void knn_merge_parts_impl(const ValueT* inK,
  * @param stream CUDA stream to use
  * @param translations mapping of index offsets for each partition
  */
-template <typename ValueIdx = std::int64_t,
-          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = std::int64_t, typename ValueT = float>
 inline void knn_merge_parts(const ValueT* inK,
                             const ValueIdx* inV,
                             ValueT* outK,

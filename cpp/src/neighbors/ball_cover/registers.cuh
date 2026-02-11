@@ -50,10 +50,7 @@ constexpr int kMaxColQ = 3;
  * @param output
  * @param weight
  */
-template <typename ValueIdx,
-          typename ValueT,
-          typename ValueInt = std::uint32_t,
-          int tpb           = 32>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, typename ValueInt = std::uint32_t, int tpb = 32>
 RAFT_KERNEL perform_post_filter_registers(const ValueT* X,
                                           int64_t n_cols,
                                           const ValueIdx* R_knn_inds,
@@ -136,7 +133,7 @@ RAFT_KERNEL perform_post_filter_registers(const ValueT* X,
  * @param k
  */
 template <typename ValueIdx,
-          typename ValueT,  // NOLINT(readability-identifier-naming)
+          typename ValueT,
           typename ValueInt   = std::uint32_t,
           typename BitsetType = std::uint32_t,
           int warp_q          = 32,
@@ -293,7 +290,7 @@ RAFT_KERNEL compute_final_dists_registers(const ValueT* X_reordered,
  * @param R_1nn_dists
  */
 template <typename ValueIdx = std::int64_t,
-          typename ValueT,  // NOLINT(readability-identifier-naming)
+          typename ValueT,
           int warp_q   = 32,
           int thread_q = 2,
           int tpb      = 128>
@@ -443,16 +440,13 @@ RAFT_KERNEL block_rbc_kernel_registers(const ValueT* X_reordered,
   }
 }
 
-template <typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueT>
 __device__ auto squared(const ValueT& a) -> ValueT
 {
   return a * a;
 }
 
-template <typename ValueIdx = std::int64_t,
-          typename ValueT,  // NOLINT(readability-identifier-naming)
-          int tpb = 128,
-          typename DistanceFunc>
+template <typename ValueIdx = std::int64_t, typename ValueT, int tpb = 128, typename DistanceFunc>
 RAFT_KERNEL block_rbc_kernel_eps_dense(const ValueT* X_reordered,
                                        const ValueT* X,
                                        const int64_t n_queries,
@@ -567,10 +561,7 @@ RAFT_KERNEL block_rbc_kernel_eps_dense(const ValueT* X_reordered,
   }
 }
 
-template <typename ValueIdx = std::int64_t,
-          typename ValueT,  // NOLINT(readability-identifier-naming)
-          int tpb = 128,
-          typename DistanceFunc>
+template <typename ValueIdx = std::int64_t, typename ValueT, int tpb = 128, typename DistanceFunc>
 RAFT_KERNEL block_rbc_kernel_eps_csr_pass(const ValueT* X_reordered,
                                           const ValueT* X,
                                           const int64_t n_queries,
@@ -705,11 +696,8 @@ RAFT_KERNEL block_rbc_kernel_eps_csr_pass(const ValueT* X_reordered,
   }
 }
 
-template <typename ValueIdx = std::int64_t,
-          typename ValueT,  // NOLINT(readability-identifier-naming)
-          int tpb = 128,
-          typename DistanceFunc>
-RAFT_KERNEL __launch_bounds__(tpb)  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = std::int64_t, typename ValueT, int tpb = 128, typename DistanceFunc>
+RAFT_KERNEL __launch_bounds__(tpb)
   block_rbc_kernel_eps_csr_pass_xd(const ValueT* __restrict__ X_reordered,
                                    const ValueT* __restrict__ X,
                                    const int64_t n_queries,
@@ -850,10 +838,7 @@ RAFT_KERNEL __launch_bounds__(tpb)  // NOLINT(readability-identifier-naming)
   }
 }
 
-template <typename ValueIdx = std::int64_t,
-          typename ValueT,  // NOLINT(readability-identifier-naming)
-          int tpb = 128,
-          typename DistanceFunc>
+template <typename ValueIdx = std::int64_t, typename ValueT, int tpb = 128, typename DistanceFunc>
 RAFT_KERNEL block_rbc_kernel_eps_max_k(const ValueT* X_reordered,
                                        const ValueT* X,
                                        const int64_t n_queries,
@@ -997,7 +982,7 @@ RAFT_KERNEL block_rbc_kernel_eps_max_k_copy(const int64_t max_k,
   if (i < num_cols) { adj_ja[col_start_idx + i] = tmp[offset + i]; }
 }
 
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 void rbc_low_dim_pass_one(raft::resources const& handle,
                           const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
                           const ValueT* query,
@@ -1124,7 +1109,7 @@ void rbc_low_dim_pass_one(raft::resources const& handle,
         weight);
 }
 
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 void rbc_low_dim_pass_two(raft::resources const& handle,
                           const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
                           const ValueT* query,
@@ -1265,9 +1250,7 @@ void rbc_low_dim_pass_two(raft::resources const& handle,
         index.metric);
 }
 
-template <typename ValueIdx,
-          typename ValueT,
-          typename dist_func>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, typename dist_func>
 void rbc_eps_pass(raft::resources const& handle,
                   const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
                   const ValueT* query,
@@ -1309,9 +1292,7 @@ void rbc_eps_pass(raft::resources const& handle,
   raft::resource::sync_stream(handle);
 }
 
-template <typename ValueIdx,
-          typename ValueT,
-          typename dist_func>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, typename dist_func>
 void rbc_eps_pass(raft::resources const& handle,
                   const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
                   const ValueT* query,

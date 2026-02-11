@@ -17,10 +17,9 @@
 #include <utility>
 
 namespace {
-nlohmann::json collect_conf_with_prefix(
-  const nlohmann::json& conf,  // NOLINT(modernize-use-trailing-return-type)
-  const std::string& prefix,
-  bool remove_prefix = true)
+auto collect_conf_with_prefix(const nlohmann::json& conf,
+                              const std::string& prefix,
+                              bool remove_prefix = true) -> nlohmann::json
 {
   nlohmann::json out;
   for (auto& i : conf.items()) {

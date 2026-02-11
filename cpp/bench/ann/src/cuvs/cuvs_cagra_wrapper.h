@@ -133,7 +133,7 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
   void save(const std::string& file) const override;
   void load(const std::string&) override;
   void save_to_hnswlib(const std::string& file) const;
-  std::unique_ptr<algo<T>> copy() override;
+  auto copy() -> std::unique_ptr<algo<T>> override;
 
   auto get_index() const -> const cuvs::neighbors::cagra::index<T, IdxT>* { return index_.get(); }
 
@@ -421,7 +421,7 @@ void cuvs_cagra<T, IdxT>::load(const std::string& file)
 }
 
 template <typename T, typename IdxT>
-std::unique_ptr<algo<T>> cuvs_cagra<T, IdxT>::copy()
+auto cuvs_cagra<T, IdxT>::copy() -> std::unique_ptr<algo<T>>
 {
   return std::make_unique<cuvs_cagra<T, IdxT>>(std::cref(*this));  // use copy constructor
 }
@@ -452,8 +452,8 @@ void cuvs_cagra<T, IdxT>::search_base(
         handle_, search_params_, *index_, queries_view, neighbors_view, distances_view, *filter_);
     } else {
       if (index_params_.merge_type == CagraMergeType::kLogical) {
-        // TODO(cuvs): index merge must happen outside of search, otherwise what are we
-        // benchmarking?  // NOLINT(google-readability-todo)
+        // TODO(cuvs-bench): index merge must happen outside of search, otherwise what are we
+        // benchmarking?
         cuvs::neighbors::cagra::merge_params merge_params{cuvs::neighbors::cagra::index_params{}};
         merge_params.merge_strategy = cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL;
 

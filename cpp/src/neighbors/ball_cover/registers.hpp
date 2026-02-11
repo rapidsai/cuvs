@@ -12,7 +12,7 @@
 
 namespace cuvs::neighbors::ball_cover::detail {
 
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 void rbc_low_dim_pass_one(raft::resources const& handle,
                           const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
                           const ValueT* query,
@@ -25,7 +25,7 @@ void rbc_low_dim_pass_one(raft::resources const& handle,
                           float weight,
                           int dims);
 
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 void rbc_low_dim_pass_two(raft::resources const& handle,
                           const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
                           const ValueT* query,
@@ -38,9 +38,7 @@ void rbc_low_dim_pass_two(raft::resources const& handle,
                           float weight,
                           int dims);
 
-template <typename ValueIdx,
-          typename ValueT,     // NOLINT(readability-identifier-naming)
-          typename dist_func>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, typename dist_func>
 void rbc_eps_pass(raft::resources const& handle,
                   const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
                   const ValueT* query,
@@ -51,9 +49,7 @@ void rbc_eps_pass(raft::resources const& handle,
                   bool* adj,
                   ValueIdx* vd);
 
-template <typename ValueIdx,
-          typename ValueT,     // NOLINT(readability-identifier-naming)
-          typename dist_func>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, typename dist_func>
 void rbc_eps_pass(raft::resources const& handle,
                   const cuvs::neighbors::ball_cover::index<ValueIdx, ValueT>& index,
                   const ValueT* query,

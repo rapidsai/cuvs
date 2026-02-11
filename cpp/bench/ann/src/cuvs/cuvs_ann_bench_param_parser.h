@@ -62,8 +62,8 @@ void parse_dynamic_batching_params(const nlohmann::json& conf, ParamT& param)
   if (conf.contains("dynamic_batching_n_queues")) {
     param.dynamic_batching_n_queues = conf.at("dynamic_batching_n_queues");
   }
-  param.dynamic_batching_k =
-    uint32_t(uint32_t(conf.at("k")) * float(conf.value("refine_ratio", 1.0f)));
+  param.dynamic_batching_k = static_cast<uint32_t>(
+    static_cast<uint32_t>(conf.at("k")) * static_cast<float>(conf.value("refine_ratio", 1.0f)));
 }
 
 #if defined(CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT) || defined(CUVS_ANN_BENCH_USE_CUVS_MG)

@@ -248,7 +248,7 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
     }
   }
 
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     search_queries.resize(((size_t)ps.n_queries) * ps.dim, stream_);
@@ -266,7 +266,7 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override  // NOLINT(readability-identifier-naming)
+  void TearDown() override
   {
     raft::resource::sync_stream(handle_);
     database.resize(0, stream_);

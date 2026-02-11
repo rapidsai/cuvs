@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -71,7 +71,7 @@ class cuvs_ivf_flat : public algo<T>, public algo_gpu {
   }
   void save(const std::string& file) const override;
   void load(const std::string&) override;
-  std::unique_ptr<algo<T>> copy() override;
+  auto copy() -> std::unique_ptr<algo<T>> override;
 
  private:
   // handle_ must go first to make sure it dies last and all memory allocated in pool
@@ -129,7 +129,7 @@ void cuvs_ivf_flat<T, IdxT>::load(const std::string& file)
 }
 
 template <typename T, typename IdxT>
-std::unique_ptr<algo<T>> cuvs_ivf_flat<T, IdxT>::copy()
+auto cuvs_ivf_flat<T, IdxT>::copy() -> std::unique_ptr<algo<T>>
 {
   return std::make_unique<cuvs_ivf_flat<T, IdxT>>(*this);  // use copy constructor
 }

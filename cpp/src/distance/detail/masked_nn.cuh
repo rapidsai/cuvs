@@ -29,25 +29,24 @@ template <typename DataT,
           typename KVPReduceOpT,
           typename CoreLambda,
           typename FinalLambda>
-__launch_bounds__(P::Nthreads, 2) RAFT_KERNEL  // NOLINT(readability-identifier-naming)
-  masked_l2_nn_kernel(OutT* min,
-                      const DataT* x,
-                      const DataT* y,
-                      const DataT* xn,
-                      const DataT* yn,
-                      const uint64_t* adj,
-                      const IdxT* group_idxs,
-                      IdxT num_groups,
-                      IdxT m,
-                      IdxT n,
-                      IdxT k,
-                      bool sqrt,
-                      DataT maxVal,
-                      int* mutex,
-                      ReduceOpT redOp,
-                      KVPReduceOpT pairRedOp,
-                      CoreLambda core_op,
-                      FinalLambda fin_op)
+__launch_bounds__(P::Nthreads, 2) RAFT_KERNEL masked_l2_nn_kernel(OutT* min,
+                                                                  const DataT* x,
+                                                                  const DataT* y,
+                                                                  const DataT* xn,
+                                                                  const DataT* yn,
+                                                                  const uint64_t* adj,
+                                                                  const IdxT* group_idxs,
+                                                                  IdxT num_groups,
+                                                                  IdxT m,
+                                                                  IdxT n,
+                                                                  IdxT k,
+                                                                  bool sqrt,
+                                                                  DataT maxVal,
+                                                                  int* mutex,
+                                                                  ReduceOpT redOp,
+                                                                  KVPReduceOpT pairRedOp,
+                                                                  CoreLambda core_op,
+                                                                  FinalLambda fin_op)
 {
   extern __shared__ char smem[];
 
@@ -285,7 +284,7 @@ void masked_l2_nn_impl(raft::resources const& handle,
                                                    ReduceOpT,
                                                    KVPReduceOpT,
                                                    decltype(core_lambda),
-                                                   decltype(fin_op)>;  // NOLINT(readability-identifier-naming)
+                                                   decltype(fin_op)>;
   constexpr size_t kSmemSize = p::SmemSize + ((p::Mblk + p::Nblk) * sizeof(DataT));
   dim3 block(p::Nthreads);
   dim3 grid = launch_config_generator<p>(m, n, kSmemSize, kernel);

@@ -62,15 +62,14 @@ void fused_l2_nn_impl(OutT* min,
 
   raft::identity_op fin_op{};
 
-  auto kernel =
-    fused_distance_nn_kernel<DataT,
-                             OutT,
-                             IdxT,
-                             policy_t,
-                             ReduceOpT,
-                             KVPReduceOpT,
-                             decltype(distance_op),
-                             decltype(fin_op)>;  // NOLINT(readability-identifier-naming)
+  auto kernel = fused_distance_nn_kernel<DataT,
+                                         OutT,
+                                         IdxT,
+                                         policy_t,
+                                         ReduceOpT,
+                                         KVPReduceOpT,
+                                         decltype(distance_op),
+                                         decltype(fin_op)>;
 
   // Get pointer to fp32 SIMT kernel to determine the best compute architecture
   // out of all for which the kernel was compiled for that matches closely

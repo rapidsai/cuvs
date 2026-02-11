@@ -25,7 +25,7 @@
 
 namespace cuvs::neighbors::ivf_flat::detail {
 
-using namespace cuvs::spatial::knn::detail;  // NOLINT
+namespace utils = cuvs::spatial::knn::detail::utils;
 
 constexpr int kThreadsPerBlock = 128;
 
@@ -39,7 +39,7 @@ constexpr int kThreadsPerBlock = 128;
 template <int VecBytes = 16, typename T>
 __device__ inline void copy_vectorized(T* out, const T* in, uint32_t n)
 {
-  constexpr int VecElems = VecBytes / sizeof(T);  // NOLINT
+  constexpr int VecElems = VecBytes / sizeof(T);
   using align_bytes      = raft::Pow2<(size_t)VecBytes>;
   if constexpr (VecElems > 1) {
     using align_elems = raft::Pow2<VecElems>;
@@ -808,7 +808,7 @@ template <int Capacity,
           typename IvfSampleFilterT,
           typename Lambda,
           typename PostLambda>
-RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)  // NOLINT(readability-identifier-naming)
+RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)
   interleaved_scan_kernel(Lambda compute_dist,
                           PostLambda post_process,
                           const uint32_t query_smem_elems,

@@ -36,7 +36,6 @@ struct selected {
 
  private:
   const void* kernel_;  // Type-erased kernel_ pointer (compatible with any __global__ function)  //
-                        // NOLINT(readability-identifier-naming)
 };
 
 }  // namespace cuvs::neighbors::ivf_pq::detail

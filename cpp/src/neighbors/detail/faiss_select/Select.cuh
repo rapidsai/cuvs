@@ -512,7 +512,7 @@ struct warp_select {
   // This is what lane we should load an approximation (>=k) to the
   // kth element from the last register in the warp queue (i.e.,
   // warp_k[kNumWarpQRegisters - 1]).
-  int k_lane;  // NOLINT(modernize-use-default-member-init)
+  int k_lane{0};
 };
 
 /// Specialization for k == 1 (NumWarpQ == 1)

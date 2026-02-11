@@ -12,7 +12,7 @@
 
 namespace cuvs::neighbors::ball_cover::detail {
 
-template <typename ValueT, typename ValueInt>  // NOLINT(readability-identifier-naming)
+template <typename ValueT, typename ValueInt>
 struct dist_func {
   virtual __device__ __host__ __forceinline__ auto operator()(const ValueT* a,
                                                               const ValueT* b,
@@ -22,7 +22,7 @@ struct dist_func {
   };
 };
 
-template <typename ValueT, typename ValueInt>  // NOLINT(readability-identifier-naming)
+template <typename ValueT, typename ValueInt>
 struct haversine_func : public dist_func<ValueT, ValueInt> {
   __device__ __host__ __forceinline__ auto operator()(const ValueT* a,
                                                       const ValueT* b,
@@ -32,7 +32,7 @@ struct haversine_func : public dist_func<ValueT, ValueInt> {
   }
 };
 
-template <typename ValueT, typename ValueInt>  // NOLINT(readability-identifier-naming)
+template <typename ValueT, typename ValueInt>
 struct euclidean_func : public dist_func<ValueT, ValueInt> {
   __device__ __host__ __forceinline__ auto operator()(const ValueT* a,
                                                       const ValueT* b,
@@ -48,7 +48,7 @@ struct euclidean_func : public dist_func<ValueT, ValueInt> {
   }
 };
 
-template <typename ValueT, typename ValueInt>  // NOLINT(readability-identifier-naming)
+template <typename ValueT, typename ValueInt>
 struct euclidean_sq_func : public dist_func<ValueT, ValueInt> {
   __device__ __host__ __forceinline__ auto operator()(const ValueT* a,
                                                       const ValueT* b,
@@ -64,7 +64,7 @@ struct euclidean_sq_func : public dist_func<ValueT, ValueInt> {
 };
 
 // Direct distance function for use in kernels that need metric information
-template <typename ValueT, typename ValueInt>  // NOLINT(readability-identifier-naming)
+template <typename ValueT, typename ValueInt>
 __device__ __host__ __forceinline__ auto compute_distance_by_metric(
   const ValueT* a, const ValueT* b, const ValueInt n_dims, cuvs::distance::DistanceType metric)
   -> ValueT

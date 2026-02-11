@@ -16,7 +16,7 @@
 
 namespace cuvs::distance::detail::sparse {
 
-template <typename ValueIdx, typename ValueT, int tpb>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, int tpb>
 class coo_spmv_strategy {
  public:
   explicit coo_spmv_strategy(const distances_config_t<ValueIdx, ValueT>& config_) : config_(config_)

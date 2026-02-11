@@ -30,8 +30,8 @@ _RAFT_HOST_DEVICE auto fp_lt(const half& a, const half& b) -> bool
 
 template <typename T, typename QuantI, typename TempT = double>
 struct quantize_op {
-  const T min_;  // NOLINT(readability-identifier-naming)
-  const T max_;  // NOLINT(readability-identifier-naming)
+  const T min_;
+  const T max_;
   const QuantI q_type_min = std::numeric_limits<QuantI>::min();
   const QuantI q_type_max = std::numeric_limits<QuantI>::max();
   const TempT scalar;

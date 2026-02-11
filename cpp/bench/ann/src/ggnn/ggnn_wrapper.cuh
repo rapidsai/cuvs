@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -65,7 +65,7 @@ class ggnn : public algo<T>, public algo_gpu {
 
   void save(const std::string& file) const override { impl_->save(file); }
   void load(const std::string& file) override { impl_->load(file); }
-  std::unique_ptr<algo<T>> copy() override { return std::make_unique<ggnn<T>>(*this); };
+  auto copy() -> std::unique_ptr<algo<T>> override { return std::make_unique<ggnn<T>>(*this); };
 
   [[nodiscard]] auto get_preference() const -> algo_property override
   {
@@ -130,7 +130,7 @@ class ggnn_impl : public algo<T>, public algo_gpu {
 
   void save(const std::string& file) const override;
   void load(const std::string& file) override;
-  std::unique_ptr<algo<T>> copy() override
+  auto copy() -> std::unique_ptr<algo<T>> override
   {
     auto r = std::make_unique<ggnn_impl<T, measure, D, KBuild, KQuery, S>>(*this);
     // set the thread-local stream to the copied handle.

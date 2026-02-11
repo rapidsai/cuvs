@@ -28,7 +28,7 @@
 
 namespace cuvs::cluster::agglomerative::detail {
 
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 void merge_msts(raft::sparse::solver::Graph_COO<ValueIdx, ValueIdx, ValueT>& coo1,
                 raft::sparse::solver::Graph_COO<ValueIdx, ValueIdx, ValueT>& coo2,
                 cudaStream_t stream)
@@ -63,9 +63,7 @@ void merge_msts(raft::sparse::solver::Graph_COO<ValueIdx, ValueIdx, ValueT>& coo
  * @param[inout] color the color labels array returned from the mst invocation
  * @return updated MST edge list
  */
-template <typename ValueIdx,
-          typename ValueT,
-          typename RedOp>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, typename RedOp>
 void connect_knn_graph(
   raft::resources const& handle,
   raft::device_matrix_view<const ValueT, ValueIdx> X,
@@ -129,9 +127,7 @@ void connect_knn_graph(
  * @param[inout] color the color labels array returned from the mst invocation
  * @return updated MST edge list
  */
-template <typename ValueIdx,
-          typename ValueT,
-          typename RedOp = raft::identity_op>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, typename RedOp = raft::identity_op>
 void connect_knn_graph(
   raft::resources const& handle,
   raft::host_matrix_view<const ValueT, ValueIdx> X,
@@ -295,9 +291,7 @@ void connect_knn_graph(
  * @param[in] max_iter maximum iterations to run knn graph connection. This
  *  argument is really just a safeguard against the potential for infinite loops.
  */
-template <typename ValueIdx,
-          typename ValueT,
-          typename RedOp>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, typename RedOp>
 void build_sorted_mst(
   raft::resources const& handle,
   const ValueT* X,

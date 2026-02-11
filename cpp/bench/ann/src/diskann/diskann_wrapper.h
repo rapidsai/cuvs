@@ -251,12 +251,11 @@ diskann_ssd<T>::diskann_ssd(Metric metric, int dim, const build_param& param) : 
   std::snprintf(build_buf.data(), build_buf.size(), "%.2f", build_dram_budget);
   const std::string search_dram_budget_gb(search_buf.data());
   const std::string build_dram_budget_gb(build_buf.data());
-  index_build_params_str =
-    std::string(std::to_string(param.R)) + " " + std::string(std::to_string(param.L_build)) + " " +
-    search_dram_budget_gb + " " + build_dram_budget_gb + " " +
-    std::string(std::to_string(param.num_threads)) + " " + std::string(std::to_string(false)) +
-    " " + std::string(std::to_string(false)) + " " + std::string(std::to_string(0)) + " " +
-    std::string(std::to_string(param.QD));
+  index_build_params_str = std::to_string(param.R) + " " + std::to_string(param.L_build) + " " +
+                           search_dram_budget_gb + " " + build_dram_budget_gb + " " +
+                           std::to_string(param.num_threads) + " " + std::to_string(false) + " " +
+                           std::to_string(false) + " " + std::to_string(0) + " " +
+                           std::to_string(param.QD);
   base_file_         = param.dataset_base_file;
   index_path_prefix_ = param.index_file;
 }

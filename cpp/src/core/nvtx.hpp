@@ -11,12 +11,12 @@ namespace cuvs::common::nvtx {
 namespace domain {
 /** @brief The default NVTX domain. */
 struct app {
-  static constexpr char const* name{"application"};  // NOLINT(readability-identifier-naming)
+  static constexpr char const* name{"application"};
 };
 
 /** @brief This NVTX domain is supposed to be used within cuvs.  */
 struct cuvs {
-  static constexpr const char* name = "cuvs";  // NOLINT(readability-identifier-naming)
+  static constexpr const char* name = "cuvs";
 };
 }  // namespace domain
 

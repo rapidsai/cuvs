@@ -18,15 +18,13 @@ using brute_force_float32 = dynamic_batching_test<float,
                                                   brute_force::search>;
 
 TEST_P(brute_force_float32,  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
-       defaults)             // NOLINT(readability-identifier-naming)
+       defaults)
 {
   build_all();
   search_all();
   check_neighbors();
 }
 
-INSTANTIATE_TEST_CASE_P(dynamic_batching,
-                        brute_force_float32,
-                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(dynamic_batching, brute_force_float32, ::testing::ValuesIn(inputs));
 
 }  // namespace cuvs::neighbors::dynamic_batching

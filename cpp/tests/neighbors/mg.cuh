@@ -620,7 +620,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
     }
   }
 
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     d_index_dataset.resize(ps.num_db_vecs * ps.dim, resource::get_cuda_stream(clique_));
     d_queries.resize(ps.num_queries * ps.dim, resource::get_cuda_stream(clique_));
@@ -647,7 +647,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
     resource::sync_stream(clique_);
   }
 
-  void TearDown() override {}  // NOLINT(readability-identifier-naming)
+  void TearDown() override {}
 
  private:
   raft::device_resources_snmg clique_;

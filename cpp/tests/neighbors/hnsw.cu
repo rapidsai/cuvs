@@ -23,7 +23,7 @@
 
 namespace cuvs::neighbors::hnsw {
 
-struct AnnHNSWInputs {  // NOLINT(readability-identifier-naming)
+struct AnnHNSWInputs {
   int n_rows;
   int dim;
   int graph_degree;
@@ -45,10 +45,9 @@ inline auto operator<<(::std::ostream& os, const AnnHNSWInputs& p) -> ::std::ost
 }
 
 template <typename DistanceT, typename DataT, typename IdxT>
-class AnnHNSWTest
-  : public ::testing::TestWithParam<AnnHNSWInputs> {  // NOLINT(readability-identifier-naming)
+class AnnHNSWTest : public ::testing::TestWithParam<AnnHNSWInputs> {
  public:
-  AnnHNSWTest()  // NOLINT(modernize-use-equals-default)
+  AnnHNSWTest()
     : stream_(raft::resource::get_cuda_stream(handle_)),
       ps(::testing::TestWithParam<AnnHNSWInputs>::GetParam()),
       database(0, stream_),
@@ -57,11 +56,10 @@ class AnnHNSWTest
   }
 
  protected:
-  void testHNSW()  // NOLINT(readability-identifier-naming)
+  void testHNSW()
   {
-    std::vector<IdxT> indices_HNSW(ps.n_queries * ps.k);  // NOLINT(readability-identifier-naming)
-    std::vector<DistanceT> distances_HNSW(ps.n_queries *
-                                          ps.k);  // NOLINT(readability-identifier-naming)
+    std::vector<IdxT> indices_HNSW(ps.n_queries * ps.k);
+    std::vector<DistanceT> distances_HNSW(ps.n_queries * ps.k);
     std::vector<IdxT> indices_naive(ps.n_queries * ps.k);
     std::vector<DistanceT> distances_naive(ps.n_queries * ps.k);
 
@@ -103,12 +101,12 @@ class AnnHNSWTest
       cuvs::neighbors::hnsw::search_params search_params;
       search_params.ef = ps.ef;
       cuvs::neighbors::hnsw::index_params hnsw_params;
-      auto hnsw_index        = cuvs::neighbors::hnsw::from_cagra(handle_, hnsw_params, index);
-      auto queries_HNSW_view =  // NOLINT(readability-identifier-naming)
+      auto hnsw_index = cuvs::neighbors::hnsw::from_cagra(handle_, hnsw_params, index);
+      auto queries_HNSW_view =
         raft::make_host_matrix_view<DataT, int64_t>(queries_h.data(), ps.n_queries, ps.dim);
-      auto indices_HNSW_view =  // NOLINT(readability-identifier-naming)
+      auto indices_HNSW_view =
         raft::make_host_matrix_view<uint64_t, int64_t>(indices_HNSW.data(), ps.n_queries, ps.k);
-      auto distances_HNSW_view =  // NOLINT(readability-identifier-naming)
+      auto distances_HNSW_view =
         raft::make_host_matrix_view<float, int64_t>(distances_HNSW.data(), ps.n_queries, ps.k);
       cuvs::neighbors::hnsw::search(handle_,
                                     search_params,
@@ -129,7 +127,7 @@ class AnnHNSWTest
                                 min_recall));
   }
 
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     queries.resize(((size_t)ps.n_queries) * ps.dim, stream_);
@@ -148,7 +146,7 @@ class AnnHNSWTest
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override  // NOLINT(readability-identifier-naming)
+  void TearDown() override
   {
     raft::resource::sync_stream(handle_);
     database.resize(0, stream_);
@@ -158,62 +156,52 @@ class AnnHNSWTest
  private:
   raft::resources handle_;
   rmm::cuda_stream_view stream_;
-  AnnHNSWInputs ps;                     // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<DataT> database;  // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<DataT> queries;   // NOLINT(readability-identifier-naming)
+  AnnHNSWInputs ps;
+  rmm::device_uvector<DataT> database;
+  rmm::device_uvector<DataT> queries;
 };
 
-const std::vector<AnnHNSWInputs> inputs =
-  raft::util::itertools::product<AnnHNSWInputs>(  // NOLINT(readability-identifier-naming)
-    {1000, 2000},                                 // n_rows
-    {5, 10, 25, 50, 100, 250, 500, 1000},         // dim
-    {32, 64},                                     // graph_degree
-    {cuvs::distance::DistanceType::L2Expanded,
-     cuvs::distance::DistanceType::InnerProduct},  // metric
-    {50},                                          // k
-    {500},                                         // n_queries
-    {250},                                         // ef
-    {0.98}                                         // min_recall
-  );
+const std::vector<AnnHNSWInputs> inputs = raft::util::itertools::product<AnnHNSWInputs>(
+  {1000, 2000},                          // n_rows
+  {5, 10, 25, 50, 100, 250, 500, 1000},  // dim
+  {32, 64},                              // graph_degree
+  {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},  // metric
+  {50},                                                                                    // k
+  {500},  // n_queries
+  {250},  // ef
+  {0.98}  // min_recall
+);
 
-using AnnHNSW_F = AnnHNSWTest<float, float, uint64_t>;  // NOLINT(readability-identifier-naming)
+using AnnHNSW_F = AnnHNSWTest<float, float, uint64_t>;
 TEST_P(AnnHNSW_F, AnnHNSW)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testHNSW();
-}  // NOLINT(readability-identifier-naming)
+}
 
-INSTANTIATE_TEST_CASE_P(AnnHNSWTest,
-                        AnnHNSW_F,
-                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(AnnHNSWTest, AnnHNSW_F, ::testing::ValuesIn(inputs));
 
-using AnnHNSW_H = AnnHNSWTest<float, half, uint64_t>;  // NOLINT(readability-identifier-naming)
+using AnnHNSW_H = AnnHNSWTest<float, half, uint64_t>;
 TEST_P(AnnHNSW_H, AnnHNSW)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testHNSW();
-}  // NOLINT(readability-identifier-naming)
+}
 
-INSTANTIATE_TEST_CASE_P(AnnHNSWTest,
-                        AnnHNSW_H,
-                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(AnnHNSWTest, AnnHNSW_H, ::testing::ValuesIn(inputs));
 
-using AnnHNSW_I8 = AnnHNSWTest<float, int8_t, uint64_t>;  // NOLINT(readability-identifier-naming)
+using AnnHNSW_I8 = AnnHNSWTest<float, int8_t, uint64_t>;
 TEST_P(AnnHNSW_I8, AnnHNSW)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testHNSW();
-}  // NOLINT(readability-identifier-naming)
+}
 
-INSTANTIATE_TEST_CASE_P(AnnHNSWTest,
-                        AnnHNSW_I8,
-                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(AnnHNSWTest, AnnHNSW_I8, ::testing::ValuesIn(inputs));
 
-using AnnHNSW_U8 = AnnHNSWTest<float, uint8_t, uint64_t>;  // NOLINT(readability-identifier-naming)
+using AnnHNSW_U8 = AnnHNSWTest<float, uint8_t, uint64_t>;
 TEST_P(AnnHNSW_U8, AnnHNSW)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testHNSW();
-}  // NOLINT(readability-identifier-naming)
+}
 
-INSTANTIATE_TEST_CASE_P(AnnHNSWTest,
-                        AnnHNSW_U8,
-                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(AnnHNSWTest, AnnHNSW_U8, ::testing::ValuesIn(inputs));
 
 }  // namespace cuvs::neighbors::hnsw

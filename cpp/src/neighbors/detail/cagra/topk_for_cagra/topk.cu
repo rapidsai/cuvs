@@ -8,14 +8,13 @@
 namespace cuvs::neighbors::cagra::detail {
 
 //
-auto _cuann_find_topk_bufferSize(  // NOLINT(readability-identifier-naming)
-  uint32_t topK,
-  uint32_t sizeBatch,
-  uint32_t numElements,
-  cudaDataType_t sampleDtype) -> size_t
+auto _cuann_find_topk_bufferSize(uint32_t topK,
+                                 uint32_t sizeBatch,
+                                 uint32_t numElements,
+                                 cudaDataType_t sampleDtype) -> size_t
 {
-  constexpr int numThreads   = kNumThreads;      // NOLINT(readability-identifier-naming)
-  constexpr int kStateBitLen = kStateBitLength;  // NOLINT(readability-identifier-naming)
+  constexpr int numThreads   = kNumThreads;
+  constexpr int kStateBitLen = kStateBitLength;
   assert(kStateBitLen == 0 || kStateBitLen == 8);
 
   size_t workspace_size = 1;
@@ -29,7 +28,7 @@ auto _cuann_find_topk_bufferSize(  // NOLINT(readability-identifier-naming)
 }
 
 template <class ValT>
-void cuann_find_topk(uint32_t topK,  // NOLINT(readability-identifier-naming)
+void cuann_find_topk(uint32_t topK,
                      uint32_t sizeBatch,
                      uint32_t numElements,
                      const float* inputKeys,  // [sizeBatch, ldIK,]
@@ -50,12 +49,12 @@ void cuann_find_topk(uint32_t topK,  // NOLINT(readability-identifier-naming)
   assert(ldOK >= topK);
   assert(ldOV >= topK);
 
-  constexpr int numThreads   = kNumThreads;  // NOLINT(readability-identifier-naming)
+  constexpr int numThreads   = kNumThreads;
   constexpr int kStateBitLen = kStateBitLength;
   assert(kStateBitLen == 0 || kStateBitLen == 8);
 
   uint8_t* state = nullptr;
-  if (kStateBitLen == 8) { state = (uint8_t*)workspace; }  // NOLINT(google-readability-casting)
+  if (kStateBitLen == 8) { state = reinterpret_cast<uint8_t*>(workspace); }
 
   dim3 threads(numThreads, 1, 1);
   dim3 blocks(sizeBatch, 1, 1);
@@ -117,7 +116,7 @@ void cuann_find_topk(uint32_t topK,  // NOLINT(readability-identifier-naming)
     }                                                        \
   } while (0)
 
-  int _vecLen = get_vec_len(ldIK, 2);  // NOLINT(readability-identifier-naming)
+  int _vecLen = get_vec_len(ldIK, 2);
   if (_vecLen == 2) {
     SET_KERNEL_V(2, ValT);
   } else if (_vecLen == 1) {

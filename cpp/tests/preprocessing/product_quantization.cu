@@ -18,7 +18,7 @@
 namespace cuvs::preprocessing::quantize::pq {
 
 template <typename T>
-struct ProductQuantizationInputs {                    // NOLINT(readability-identifier-naming)
+struct ProductQuantizationInputs {
   int n_samples;                                      // Number of samples in the dataset
   int n_features;                                     // Number of features in the dataset
   uint32_t pq_bits;                                   // PQ bits
@@ -32,13 +32,11 @@ struct ProductQuantizationInputs {                    // NOLINT(readability-iden
 };
 
 template <typename T>
-auto operator<<(  // NOLINT(modernize-use-trailing-return-type)
-  std::ostream& os,
-  const ProductQuantizationInputs<T>& inputs) -> std::ostream&
+auto operator<<(std::ostream& os, const ProductQuantizationInputs<T>& inputs) -> std::ostream&
 {
   return os << "n_samples:" << inputs.n_samples << " n_features:" << inputs.n_features
-            << " pq_bits:" << inputs.pq_bits << " pq_dim:" << inputs.pq_dim << " pq_kmeans_type:"
-            << (int)inputs.pq_kmeans_type  // NOLINT(google-readability-casting)
+            << " pq_bits:" << inputs.pq_bits << " pq_dim:" << inputs.pq_dim
+            << " pq_kmeans_type:" << static_cast<int>(inputs.pq_kmeans_type)
             << " n_vq_centers:" << inputs.n_vq_centers << " use_vq:" << inputs.use_vq
             << " host_dataset:" << inputs.host_dataset << " seed:" << inputs.seed;
 }
@@ -91,9 +89,7 @@ void compare_vectors_l2(const raft::resources& res,
 }
 
 template <typename T>
-class product_quantization_test
-  : public ::testing::TestWithParam<
-      ProductQuantizationInputs<T>> {  // NOLINT(readability-identifier-naming)
+class product_quantization_test : public ::testing::TestWithParam<ProductQuantizationInputs<T>> {
  public:
   product_quantization_test()
     : params_(::testing::TestWithParam<ProductQuantizationInputs<T>>::GetParam()),
@@ -108,7 +104,7 @@ class product_quantization_test
   }
 
  protected:
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     if constexpr (std::is_same_v<T, half>) {
       raft::random::RngState r(params_.seed);
@@ -133,7 +129,7 @@ class product_quantization_test
       dataset_host_.data_handle(), dataset_.data_handle(), n_samples_ * n_features_, stream);
   }
 
-  void TearDown() override {}  // NOLINT(readability-identifier-naming)
+  void TearDown() override {}
 
   void check_reconstruction(const cuvs::preprocessing::quantize::pq::quantizer<T>& quantizer,
                             raft::device_matrix_view<uint8_t, int64_t, raft::row_major> codes,
@@ -162,9 +158,9 @@ class product_quantization_test
     compare_vectors_l2(handle, orig_data, rec_data.view(), compression_ratio, 0.04, false);
   }
 
-  void testProductQuantizationFromDataset()  // NOLINT(readability-identifier-naming)
+  void testProductQuantizationFromDataset()
   {
-    using LabelT = uint32_t;  // NOLINT(readability-identifier-naming)
+    using LabelT = uint32_t;
     config_      = cuvs::preprocessing::quantize::pq::params(params_.pq_bits,
                                                         params_.pq_dim,
                                                         params_.use_subspaces,
@@ -243,8 +239,8 @@ class product_quantization_test
   }
 
  private:
-  raft::resources handle;  // NOLINT(readability-identifier-naming)
-  cudaStream_t stream;     // NOLINT(readability-identifier-naming)
+  raft::resources handle;
+  cudaStream_t stream;
 
   ProductQuantizationInputs<T> params_;
   int n_samples_;
@@ -257,7 +253,7 @@ class product_quantization_test
 
 // Define test cases with different parameters
 template <typename T>
-const std::vector<ProductQuantizationInputs<T>> inputs = {  // NOLINT(readability-identifier-naming)
+const std::vector<ProductQuantizationInputs<T>> inputs = {
   // Extreme cases
   {1, 64, 4, 8, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, true, false, false, 42ULL},
   {512, 1, 8, 1, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, true, true, false, 42ULL},
@@ -369,16 +365,14 @@ const std::vector<ProductQuantizationInputs<T>> inputs = {  // NOLINT(readabilit
    true,
    42ULL}};
 
-using ProductQuantizationTestF =
-  product_quantization_test<float>;  // NOLINT(readability-identifier-naming)
+using ProductQuantizationTestF = product_quantization_test<float>;
 TEST_P(ProductQuantizationTestF, Result)
 {
   this->testProductQuantizationFromDataset();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(modernize-use-trailing-return-type)
 
-INSTANTIATE_TEST_CASE_P(
-  ProductQuantizationTests,  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-  ProductQuantizationTestF,
-  ::testing::ValuesIn(inputs<float>));
+INSTANTIATE_TEST_CASE_P(ProductQuantizationTests,  // NOLINT(modernize-use-trailing-return-type)
+                        ProductQuantizationTestF,
+                        ::testing::ValuesIn(inputs<float>));
 
 }  // namespace cuvs::preprocessing::quantize::pq

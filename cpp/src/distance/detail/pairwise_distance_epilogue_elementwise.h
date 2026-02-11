@@ -30,28 +30,28 @@ namespace cuvs::epilogue::thread {
 
 /// This base class is meant to define the concept required of the
 /// EpilogueWithBroadcast::OutputOp
-template <typename ElementC_,            // NOLINT(readability-identifier-naming)
-          typename ElementAccumulator_,  // NOLINT(readability-identifier-naming)
-          typename ElementCompute_,      // NOLINT(readability-identifier-naming)
-          typename ElementZ_,            // NOLINT(readability-identifier-naming)
-          typename ElementT_,            // NOLINT(readability-identifier-naming)
+template <typename ElementC_,
+          typename ElementAccumulator_,
+          typename ElementCompute_,
+          typename ElementZ_,
+          typename ElementT_,
           int ElementsPerAccess,
-          typename DistanceOp_,              // NOLINT(readability-identifier-naming)
-          typename FinalOp_>                 // NOLINT(readability-identifier-naming)
-class PairwiseDistanceEpilogueElementwise {  // NOLINT(readability-identifier-naming)
+          typename DistanceOp_,
+          typename FinalOp_>
+class PairwiseDistanceEpilogueElementwise {
  public:
-  using ElementOutput      = ElementC_;            // NOLINT(readability-identifier-naming)
-  using ElementC           = ElementC_;            // NOLINT(readability-identifier-naming)
-  using ElementAccumulator = ElementAccumulator_;  // NOLINT(readability-identifier-naming)
-  using ElementCompute     = ElementCompute_;      // NOLINT(readability-identifier-naming)
-  using ElementZ           = ElementZ_;            // NOLINT(readability-identifier-naming)
-  using ElementT           = ElementT_;            // NOLINT(readability-identifier-naming)
+  using ElementOutput                 = ElementC_;
+  using ElementC                      = ElementC_;
+  using ElementAccumulator            = ElementAccumulator_;
+  using ElementCompute                = ElementCompute_;
+  using ElementZ                      = ElementZ_;
+  using ElementT                      = ElementT_;
   static int const kElementsPerAccess = ElementsPerAccess;
   static int const kCount             = kElementsPerAccess;
   static bool const kIsSingleSource   = true;
 
-  using DistanceOp = DistanceOp_;  // NOLINT(readability-identifier-naming)
-  using FinalOp    = FinalOp_;     // NOLINT(readability-identifier-naming)
+  using DistanceOp = DistanceOp_;
+  using FinalOp    = FinalOp_;
 
   using FragmentAccumulator = cutlass::Array<ElementAccumulator, kElementsPerAccess>;
   using FragmentCompute     = cutlass::Array<ElementCompute, kElementsPerAccess>;
@@ -70,9 +70,9 @@ class PairwiseDistanceEpilogueElementwise {  // NOLINT(readability-identifier-na
   static bool const kStoreT = true;  // this is our final output storage.
 
   /// Host-constructable parameters structure
-  struct Params {          // NOLINT(readability-identifier-naming)
-    FinalOp_ final_op_;    // NOLINT(readability-identifier-naming)
-    DistanceOp_ dist_op_;  // NOLINT(readability-identifier-naming)
+  struct Params {
+    FinalOp_ final_op_;
+    DistanceOp_ dist_op_;
 
     //
     // Methods
@@ -88,8 +88,8 @@ class PairwiseDistanceEpilogueElementwise {  // NOLINT(readability-identifier-na
   //
   // Data members
   //
-  FinalOp_ final_op;           // NOLINT(readability-identifier-naming)
-  DistanceOp_ elementwise_op;  // NOLINT(readability-identifier-naming)
+  FinalOp_ final_op;
+  DistanceOp_ elementwise_op;
 
  public:
   //
@@ -122,12 +122,12 @@ class PairwiseDistanceEpilogueElementwise {  // NOLINT(readability-identifier-na
                   FragmentC const& frag_C,
                   FragmentCompute const& V) const
   {
-    FragmentCompute tmp_Accum =  // NOLINT(readability-identifier-naming)
+    FragmentCompute tmp_Accum =
       cutlass::NumericArrayConverter<ElementCompute, ElementAccumulator, kElementsPerAccess>()(AB);
-    FragmentCompute tmp_C =  // NOLINT(readability-identifier-naming)
+    FragmentCompute tmp_C =
       cutlass::NumericArrayConverter<ElementCompute, ElementC, kElementsPerAccess>()(frag_C);
-    FragmentCompute result_Z;  // NOLINT(readability-identifier-naming)
-    FragmentCompute result_T;  // NOLINT(readability-identifier-naming)
+    FragmentCompute result_Z;
+    FragmentCompute result_T;
 
     CUTLASS_PRAGMA_UNROLL
     for (int i = 0; i < kElementsPerAccess; ++i) {

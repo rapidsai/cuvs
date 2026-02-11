@@ -21,10 +21,10 @@
 
 namespace cuvs::distance::kernels {
 
-struct GramMatrixInputs {  // NOLINT(readability-identifier-naming)
-  int n1;                  // feature vectors in matrix 1
-  int n2;                  // featuer vectors in matrix 2
-  int n_cols;              // number of elements in a feature vector
+struct GramMatrixInputs {
+  int n1;      // feature vectors in matrix 1
+  int n2;      // featuer vectors in matrix 2
+  int n_cols;  // number of elements in a feature vector
   bool is_row_major;
   KernelParams kernel;
   int ld1;
@@ -64,9 +64,8 @@ const std::vector<GramMatrixInputs> kInputs = {
   // {42, 137, 2, true, {KernelType::RBF, 0, 0.5}, 64, 155, 143},
 };
 
-template <typename math_t>  // NOLINT(readability-identifier-naming)
-class GramMatrixTest        // NOLINT(readability-identifier-naming)
-  : public ::testing::TestWithParam<GramMatrixInputs> {
+template <typename math_t>
+class GramMatrixTest : public ::testing::TestWithParam<GramMatrixInputs> {
  protected:
   GramMatrixTest()
     : params(GetParam()),
@@ -98,9 +97,9 @@ class GramMatrixTest        // NOLINT(readability-identifier-naming)
     raft::random::uniform(handle, rng, x2.data(), x2.size(), math_t(0), math_t(1));
   }
 
-  ~GramMatrixTest() override {}  // NOLINT(modernize-use-equals-default)
+  ~GramMatrixTest() override = default;
 
-  void runTest()  // NOLINT(readability-identifier-naming)
+  void runTest()
   {
     std::unique_ptr<GramMatrixBase<math_t>> kernel =
       std::unique_ptr<GramMatrixBase<math_t>>(KernelFactory<math_t>::create(params.kernel));
@@ -145,27 +144,23 @@ class GramMatrixTest        // NOLINT(readability-identifier-naming)
       gram_host.data(), gram.data(), gram.size(), cuvs::CompareApprox<math_t>(1e-6f), stream));
   }
 
-  GramMatrixInputs params;  // NOLINT(readability-identifier-naming)
-  raft::resources handle;   // NOLINT(readability-identifier-naming)
+  GramMatrixInputs params;
+  raft::resources handle;
 
-  rmm::device_uvector<math_t> x1;    // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<math_t> x2;    // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<math_t> gram;  // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<math_t> x1;
+  rmm::device_uvector<math_t> x2;
+  rmm::device_uvector<math_t> gram;
 
-  std::vector<math_t> gram_host;  // NOLINT(readability-identifier-naming)
+  std::vector<math_t> gram_host;
 };
 
-using GramMatrixTestFloat  = GramMatrixTest<float>;   // NOLINT(readability-identifier-naming)
-using GramMatrixTestDouble = GramMatrixTest<double>;  // NOLINT(readability-identifier-naming)
+using GramMatrixTestFloat  = GramMatrixTest<float>;
+using GramMatrixTestDouble = GramMatrixTest<double>;
 
-TEST_P(GramMatrixTestFloat, Gram)
-{
-  runTest();
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+TEST_P(GramMatrixTestFloat, Gram) { runTest(); }  // NOLINT(modernize-use-trailing-return-type)
 
 INSTANTIATE_TEST_SUITE_P(
   GramMatrixTests,
   GramMatrixTestFloat,
-  ::testing::ValuesIn(
-    kInputs));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  ::testing::ValuesIn(kInputs));  // NOLINT(modernize-use-trailing-return-type)
 };  // namespace cuvs::distance::kernels

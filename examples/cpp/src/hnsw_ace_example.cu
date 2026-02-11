@@ -22,8 +22,6 @@ void hnsw_build_search_ace(raft::device_resources const& dev_resources,
                            raft::device_matrix_view<const float, int64_t> dataset,
                            raft::device_matrix_view<const float, int64_t> queries)
 {
-  using namespace cuvs::neighbors;  // NOLINT(google-build-using-namespace)
-
   int64_t topk      = 12;
   int64_t n_queries = queries.extent(0);
 
@@ -36,12 +34,12 @@ void hnsw_build_search_ace(raft::device_resources const& dev_resources,
   raft::resource::sync_stream(dev_resources);
 
   // HNSW index parameters
-  hnsw::index_params hnsw_params;
+  cuvs::neighbors::hnsw::index_params hnsw_params;
   hnsw_params.metric    = cuvs::distance::DistanceType::L2Expanded;
-  hnsw_params.hierarchy = hnsw::HnswHierarchy::GPU;
+  hnsw_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::GPU;
 
   // Parameters for GPU accelerated HNSW index building
-  auto ace_params = hnsw::graph_build_params::ace_params();
+  auto ace_params = cuvs::neighbors::hnsw::graph_build_params::ace_params();
   // Set the number of partitions. Small values might improve recall but potentially degrade
   // performance and increase memory usage. Partitions should not be too small to prevent issues in
   // KNN graph construction. The partition size is on average 2 * (n_rows / npartitions) * dim *
@@ -67,20 +65,20 @@ void hnsw_build_search_ace(raft::device_resources const& dev_resources,
 
   // Build the HNSW index using ACE
   std::cout << "Building HNSW index using ACE" << std::endl;
-  auto hnsw_index =
-    hnsw::build(dev_resources, hnsw_params, raft::make_const_mdspan(dataset_host.view()));
+  auto hnsw_index = cuvs::neighbors::hnsw::build(
+    dev_resources, hnsw_params, raft::make_const_mdspan(dataset_host.view()));
 
   // For disk-based indexes, the build function serializes the index to disk
   // We need to deserialize it before searching
   std::string hnsw_index_path = hnsw_index->file_path();
   std::cout << "Deserializing HNSW index from disk for search" << std::endl;
-  hnsw::index<float>* hnsw_index_deserialized = nullptr;
-  hnsw::deserialize(dev_resources,
-                    hnsw_params,
-                    hnsw_index_path,
-                    dataset.extent(1),
-                    hnsw_params.metric,
-                    &hnsw_index_deserialized);
+  cuvs::neighbors::hnsw::index<float>* hnsw_index_deserialized = nullptr;
+  cuvs::neighbors::hnsw::deserialize(dev_resources,
+                                     hnsw_params,
+                                     hnsw_index_path,
+                                     dataset.extent(1),
+                                     hnsw_params.metric,
+                                     &hnsw_index_deserialized);
 
   // Prepare queries on host for HNSW search
   auto queries_host = raft::make_host_matrix<float, int64_t>(n_queries, queries.extent(1));
@@ -95,18 +93,18 @@ void hnsw_build_search_ace(raft::device_resources const& dev_resources,
   auto distances_host = raft::make_host_matrix<float, int64_t>(n_queries, topk);
 
   // Configure search parameters
-  hnsw::search_params search_params;
+  cuvs::neighbors::hnsw::search_params search_params;
   search_params.ef          = std::max(200, static_cast<int>(topk) * 2);
   search_params.num_threads = 1;
 
   // Search the HNSW index
   std::cout << "Searching HNSW index" << std::endl;
-  hnsw::search(dev_resources,
-               search_params,
-               *hnsw_index_deserialized,
-               queries_host.view(),
-               indices_host.view(),
-               distances_host.view());
+  cuvs::neighbors::hnsw::search(dev_resources,
+                                search_params,
+                                *hnsw_index_deserialized,
+                                queries_host.view(),
+                                indices_host.view(),
+                                distances_host.view());
 
   // Convert results to device for printing
   auto neighbors = raft::make_device_matrix<uint32_t>(dev_resources, n_queries, topk);

@@ -159,7 +159,7 @@ class AnnNNDescentTest : public ::testing::TestWithParam<AnnNNDescentInputs> {
     }
   }
 
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     raft::random::RngState r(1234ULL);
@@ -174,7 +174,7 @@ class AnnNNDescentTest : public ::testing::TestWithParam<AnnNNDescentInputs> {
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override  // NOLINT(readability-identifier-naming)
+  void TearDown() override
   {
     raft::resource::sync_stream(handle_);
     database.resize(0, stream_);
@@ -324,7 +324,7 @@ class AnnNNDescentDistEpiTest : public ::testing::TestWithParam<AnnNNDescentInpu
                                 min_recall));
   }
 
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     raft::random::RngState r(1234ULL);
@@ -332,7 +332,7 @@ class AnnNNDescentDistEpiTest : public ::testing::TestWithParam<AnnNNDescentInpu
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override  // NOLINT(readability-identifier-naming)
+  void TearDown() override
   {
     raft::resource::sync_stream(handle_);
     database.resize(0, stream_);
@@ -437,7 +437,7 @@ class AnnNNDescentBatchTest : public ::testing::TestWithParam<AnnNNDescentBatchI
     }
   }
 
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     raft::random::RngState r(1234ULL);
@@ -450,7 +450,7 @@ class AnnNNDescentBatchTest : public ::testing::TestWithParam<AnnNNDescentBatchI
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override  // NOLINT(readability-identifier-naming)
+  void TearDown() override
   {
     raft::resource::sync_stream(handle_);
     database.resize(0, stream_);

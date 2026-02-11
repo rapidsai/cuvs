@@ -88,33 +88,30 @@ using cutlass::epilogue::threadblock::PredicatedTileIteratorParams;
 ///
 /// Satisfies: ReadableTileIterator | PredicatedTileIterator | ForwardTileIterator
 ///
-template <typename ThreadMap_,  // NOLINT(readability-identifier-naming) Thread map
+template <typename ThreadMap_,  ///< Thread map
                                 // (OutputTileThreadMap)
-          typename Element_,    ///< Element data type  // NOLINT(readability-identifier-naming)
-          typename Layout_,     // NOLINT(readability-identifier-naming)
-          typename EpilogueOpParams_,  // NOLINT(readability-identifier-naming)
-          bool ScatterD     = false,   ///< Scatter D operand or not
+          typename Element_,    ///< Element data type
+          typename Layout_,
+          typename EpilogueOpParams_,
+          bool ScatterD     = false,  ///< Scatter D operand or not
           bool UseCUDAStore = false>
-class PredicatedTileIteratorReducedVec {  // NOLINT(readability-identifier-naming)
+class PredicatedTileIteratorReducedVec {
  public:
-  using ThreadMap = ThreadMap_;                 // NOLINT(readability-identifier-naming)
-  using Shape     = typename ThreadMap::Shape;  // NOLINT(readability-identifier-naming)
+  using ThreadMap = ThreadMap_;
+  using Shape     = typename ThreadMap::Shape;
 
-  using Element = Element_;  // NOLINT(readability-identifier-naming)
+  using Element = Element_;
 
-  using Layout    = Layout_;                              // NOLINT(readability-identifier-naming)
-  using TensorRef = cutlass::TensorRef<Element, Layout>;  // NOLINT(readability-identifier-naming)
-  using ConstTensorRef =                                  // NOLINT(readability-identifier-naming)
-    typename TensorRef::ConstTensorRef;
+  using Layout         = Layout_;
+  using TensorRef      = cutlass::TensorRef<Element, Layout>;
+  using ConstTensorRef = typename TensorRef::ConstTensorRef;
 
-  using Index            = typename Layout::Index;      // NOLINT(readability-identifier-naming)
-  using LongIndex        = typename Layout::LongIndex;  // NOLINT(readability-identifier-naming)
-  using TensorCoord      = cutlass::MatrixCoord;        // NOLINT(readability-identifier-naming)
-  using EpilogueOpParams = EpilogueOpParams_;           // NOLINT(readability-identifier-naming)
-  using OutIdxT          =                              // NOLINT(readability-identifier-naming)
-    typename EpilogueOpParams::CGReduceT::index_t;
-  using OutValT =  // NOLINT(readability-identifier-naming)
-    typename EpilogueOpParams::CGReduceT::acc_type_t;
+  using Index            = typename Layout::Index;
+  using LongIndex        = typename Layout::LongIndex;
+  using TensorCoord      = cutlass::MatrixCoord;
+  using EpilogueOpParams = EpilogueOpParams_;
+  using OutIdxT          = typename EpilogueOpParams::CGReduceT::index_t;
+  using OutValT          = typename EpilogueOpParams::CGReduceT::acc_type_t;
 
   static int const kElementsPerAccess = ThreadMap::kElementsPerAccess;
   static int const kThreads           = ThreadMap::kThreads;
@@ -126,9 +123,9 @@ class PredicatedTileIteratorReducedVec {  // NOLINT(readability-identifier-namin
   static_assert(ThreadMap::Iterations::kColumn > 0, "ThreadMap::Iterations::kColumn must be > 0");
   static_assert(!UseCUDAStore, "UseCUDAStore path is not supported");
 
-  static int const total_rows =  // NOLINT(readability-identifier-naming)
-    ThreadMap::kWarpCount * ThreadMap::Iterations::kRow * ThreadMap::Iterations::kGroup *
-    ThreadMap::Iterations::kCluster * ThreadMap::Count::kTile * ThreadMap::Delta::kRow;
+  static int const total_rows = ThreadMap::kWarpCount * ThreadMap::Iterations::kRow *
+                                ThreadMap::Iterations::kGroup * ThreadMap::Iterations::kCluster *
+                                ThreadMap::Count::kTile * ThreadMap::Delta::kRow;
   /// Fragment object
   using Fragment = cutlass::Array<OutValT,
                                   ThreadMap::Iterations::kColumn * ThreadMap::Iterations::kRow *
@@ -144,8 +141,8 @@ class PredicatedTileIteratorReducedVec {  // NOLINT(readability-identifier-namin
   //
 
   /// Uses a non-template class
-  struct Params : PredicatedTileIteratorParams {  // NOLINT(readability-identifier-naming)
-    using Base = PredicatedTileIteratorParams;    // NOLINT(readability-identifier-naming)
+  struct Params : PredicatedTileIteratorParams {
+    using Base = PredicatedTileIteratorParams;
 
     EpilogueOpParams user_param;
     CUTLASS_HOST_DEVICE
@@ -172,7 +169,7 @@ class PredicatedTileIteratorReducedVec {  // NOLINT(readability-identifier-namin
   };
 
   /// Mask object
-  struct Mask {  // NOLINT(readability-identifier-naming)
+  struct Mask {
     // static int const kCount = ThreadMap::Iterations::kColumn;
     static int const kCount = ThreadMap::Iterations::kColumn * kElementsPerAccess;
 
@@ -206,15 +203,14 @@ class PredicatedTileIteratorReducedVec {  // NOLINT(readability-identifier-namin
 
   /// Shared storage allocation needed by the predicated tile
   //  iterator for reduction.
-  struct SharedStorage {  // NOLINT(readability-identifier-naming)
+  struct SharedStorage {
     //
     // Type definitions
     //
-    using Shape = cutlass::MatrixShape<total_rows, 1>;  // NOLINT(readability-identifier-naming)
+    using Shape = cutlass::MatrixShape<total_rows, 1>;
 
     /// Shape of the shared memory allocation for the reduced values store
-    using StorageShape =  // NOLINT(readability-identifier-naming)
-      cutlass::MatrixShape<Shape::kRow, Shape::kColumn>;
+    using StorageShape = cutlass::MatrixShape<Shape::kRow, Shape::kColumn>;
 
     //
     // Data members
@@ -230,7 +226,7 @@ class PredicatedTileIteratorReducedVec {  // NOLINT(readability-identifier-namin
     SharedStorage() = default;
 
     CUTLASS_DEVICE
-    void initSmem(EpilogueOpParams const& user_params)  // NOLINT(readability-identifier-naming)
+    void initSmem(EpilogueOpParams const& user_params)
     {
       Element* shared_elem_arr = data();
       constexpr auto kMaxVal   = std::numeric_limits<OutValT>::max();
@@ -241,8 +237,8 @@ class PredicatedTileIteratorReducedVec {  // NOLINT(readability-identifier-namin
     }
   };
 
-  template <typename cg_reduce_op_t,  // NOLINT(readability-identifier-naming)
-            typename cg_group_t,      // NOLINT(readability-identifier-naming)
+  template <typename cg_reduce_op_t,
+            typename cg_group_t,
             typename IdxT,
             typename ValT,
             typename OutT>
@@ -262,12 +258,10 @@ class PredicatedTileIteratorReducedVec {  // NOLINT(readability-identifier-namin
     }
   };
 
-  template <typename cg_reduce_op_t,  // NOLINT(readability-identifier-naming)
-            typename cg_group_t,      // NOLINT(readability-identifier-naming)
-            typename IdxT>            // NOLINT(readability-identifier-naming)
+  template <typename cg_reduce_op_t, typename cg_group_t, typename IdxT>
   struct select_reduce<cg_reduce_op_t, cg_group_t, IdxT, float, raft::KeyValuePair<IdxT, float>> {
-    using ValT = float;                           // NOLINT(readability-identifier-naming)
-    using Ty   = raft::KeyValuePair<IdxT, ValT>;  // NOLINT(readability-identifier-naming)
+    using ValT = float;
+    using Ty   = raft::KeyValuePair<IdxT, ValT>;
     /// Performs warp level reduction of key value pair and stores a reduced output to memory
     CUTLASS_DEVICE
     select_reduce(Ty val_to_red,
@@ -281,8 +275,7 @@ class PredicatedTileIteratorReducedVec {  // NOLINT(readability-identifier-namin
       if (cg_warp_group.any(cg_reduce_op.is_amin(val, prev_red_val))) {
         ValT reduced_val = cg::reduce(cg_warp_group, val, cg_reduce_op);
         bool pred        = (reduced_val == val);
-        auto sub_tile =
-          cg::binary_partition(cg_warp_group, pred);  // NOLINT(readability-identifier-naming)
+        auto sub_tile    = cg::binary_partition(cg_warp_group, pred);
         if (pred) {
           if (sub_tile.thread_rank() == 0) { shmem_ptr = val_to_red; }
         }
@@ -290,12 +283,10 @@ class PredicatedTileIteratorReducedVec {  // NOLINT(readability-identifier-namin
     }
   };
 
-  template <typename cg_reduce_op_t,  // NOLINT(readability-identifier-naming)
-            typename cg_group_t,      // NOLINT(readability-identifier-naming)
-            typename IdxT>            // NOLINT(readability-identifier-naming)
+  template <typename cg_reduce_op_t, typename cg_group_t, typename IdxT>
   struct select_reduce<cg_reduce_op_t, cg_group_t, IdxT, double, raft::KeyValuePair<IdxT, double>> {
-    using ValT = double;                          // NOLINT(readability-identifier-naming)
-    using Ty   = raft::KeyValuePair<IdxT, ValT>;  // NOLINT(readability-identifier-naming)
+    using ValT = double;
+    using Ty   = raft::KeyValuePair<IdxT, ValT>;
     /// Performs warp level reduction of key value pair and stores a reduced output to memory
     CUTLASS_DEVICE
     select_reduce(Ty val_to_red,
@@ -309,8 +300,7 @@ class PredicatedTileIteratorReducedVec {  // NOLINT(readability-identifier-namin
       if (cg_warp_group.any(cg_reduce_op.is_amin(val, prev_red_val))) {
         ValT reduced_val = cg::reduce(cg_warp_group, val, cg_reduce_op);
         bool pred        = (reduced_val == val);
-        auto sub_tile =
-          cg::binary_partition(cg_warp_group, pred);  // NOLINT(readability-identifier-naming)
+        auto sub_tile    = cg::binary_partition(cg_warp_group, pred);
         if (pred) {
           if (sub_tile.thread_rank() == 0) { shmem_ptr = val_to_red; }
         }
@@ -402,8 +392,8 @@ class PredicatedTileIteratorReducedVec {  // NOLINT(readability-identifier-namin
     // Initialize predicates
     CUTLASS_PRAGMA_UNROLL
     for (int c = 0; c < ThreadMap::Iterations::kColumn * kElementsPerAccess; ++c) {
-      int column_per_access = (c / kElementsPerAccess);    // NOLINT(readability-identifier-naming)
-      int columnWithinPerAccess = c % kElementsPerAccess;  // NOLINT(readability-identifier-naming)
+      int column_per_access     = (c / kElementsPerAccess);
+      int columnWithinPerAccess = c % kElementsPerAccess;
       mask_.predicates[c] =
         ((thread_offset.column() + ThreadMap::Delta::kColumn * column_per_access +
           columnWithinPerAccess) < extent.column());
@@ -428,18 +418,16 @@ class PredicatedTileIteratorReducedVec {  // NOLINT(readability-identifier-namin
     state_[0] = state_[1] = state_[2] = 0;
   }
 
-  CUTLASS_DEVICE void dumpToGmem()  // NOLINT(readability-identifier-naming)
+  CUTLASS_DEVICE void dumpToGmem()
   {
     if (block_start_row_first_tile_ >= extent_row_) { return; }
 
     if (do_gmem_reduction_) {
       EpilogueOpParams const& user_params = params_.user_param;
       const uint32_t mutex_id             = (block_start_row_first_tile_ / total_rows);
-      const bool use_gmem_mutex =
-        (gridDim.x !=
-         ((extent_row_ - 1 + total_rows) / total_rows));  // NOLINT(readability-identifier-naming)
-      int row                  = threadIdx.x;
-      Element* shared_elem_arr = shared_storage_.data();
+      const bool use_gmem_mutex = (gridDim.x != ((extent_row_ - 1 + total_rows) / total_rows));
+      int row                   = threadIdx.x;
+      Element* shared_elem_arr  = shared_storage_.data();
       Element row_local_min;
       if (row < total_rows) { row_local_min = shared_elem_arr[row]; }
 
@@ -512,11 +500,9 @@ class PredicatedTileIteratorReducedVec {  // NOLINT(readability-identifier-namin
             CUTLASS_PRAGMA_UNROLL
             for (int column = 0; column < ThreadMap::Iterations::kColumn * kElementsPerAccess;
                  ++column) {
-              int column_per_access =
-                column / kElementsPerAccess;  // NOLINT(readability-identifier-naming)
-              int column_with_per_access =
-                column % kElementsPerAccess;  // NOLINT(readability-identifier-naming)
-              bool guard = mask_.predicates[column];
+              int column_per_access      = column / kElementsPerAccess;
+              int column_with_per_access = column % kElementsPerAccess;
+              bool guard                 = mask_.predicates[column];
               if (guard) {
                 const OutIdxT key_id = thread_start_column_ +
                                        ThreadMap::Delta::kColumn * column_per_access +

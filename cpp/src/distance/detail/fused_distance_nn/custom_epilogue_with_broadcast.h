@@ -88,20 +88,20 @@ using cutlass::epilogue::threadblock::IsEpilogueFunctorHeavy;
 
 /// This base class is meant to define the concept required of the
 /// EpilogueWithBroadcast::OutputOp
-template <typename ElementC_,            // NOLINT(readability-identifier-naming)
-          typename ElementAccumulator_,  // NOLINT(readability-identifier-naming)
-          typename ElementCompute_,      // NOLINT(readability-identifier-naming)
-          typename ElementZ_,            // NOLINT(readability-identifier-naming)
-          typename ElementT_,            // NOLINT(readability-identifier-naming)
+template <typename ElementC_,
+          typename ElementAccumulator_,
+          typename ElementCompute_,
+          typename ElementZ_,
+          typename ElementT_,
           int ElementsPerAccess,
           bool StoreZ = true,
           bool StoreT = true>
-struct EpilogueWithBroadcastOpBaseCustom {         // NOLINT(readability-identifier-naming)
-  using ElementOutput      = ElementC_;            // NOLINT(readability-identifier-naming)
-  using ElementAccumulator = ElementAccumulator_;  // NOLINT(readability-identifier-naming)
-  using ElementCompute     = ElementCompute_;      // NOLINT(readability-identifier-naming)
-  using ElementZ           = ElementZ_;            // NOLINT(readability-identifier-naming)
-  using ElementT           = ElementT_;            // NOLINT(readability-identifier-naming)
+struct EpilogueWithBroadcastOpBaseCustom {
+  using ElementOutput                 = ElementC_;
+  using ElementAccumulator            = ElementAccumulator_;
+  using ElementCompute                = ElementCompute_;
+  using ElementZ                      = ElementZ_;
+  using ElementT                      = ElementT_;
   static int const kElementsPerAccess = ElementsPerAccess;
 
   using FragmentAccumulator = cutlass::Array<ElementAccumulator, kElementsPerAccess>;
@@ -117,7 +117,7 @@ struct EpilogueWithBroadcastOpBaseCustom {         // NOLINT(readability-identif
   static bool const kStoreT = StoreT;
 
   /// Parameters structure - required
-  struct Params {};  // NOLINT(readability-identifier-naming)
+  struct Params {};
 
   //
   // Methods
@@ -169,41 +169,40 @@ struct EpilogueWithBroadcastOpBaseCustom {         // NOLINT(readability-identif
 ///    store(v);
 ///  }
 ///
-template <typename Shape_,               ///< Shape of threadblock tile (concept: GemmShape)  //
-                                         ///< NOLINT(readability-identifier-naming)
-          typename WarpMmaOperator_,     ///< Warp-level MMA operator (concept:
-                                         ///< gemm::warp::MmaTensorOp)  //
-                                         ///< NOLINT(readability-identifier-naming)
+template <typename Shape_,  ///< Shape of threadblock tile (concept: GemmShape)  //
+
+          typename WarpMmaOperator_,  ///< Warp-level MMA operator (concept:
+                                      ///< gemm::warp::MmaTensorOp)  //
+
           int PartitionsK,               ///< Number of partitions of the K dimension
           typename OutputTileIterator_,  ///< Tile iterator reading and writing output tensors (z)
-                                         ///< // NOLINT(readability-identifier-naming)
+                                         ///<
           typename TensorTileIterator_,  ///< Additional tile iterator for tensor-valued operands
-                                         ///< (t)  // NOLINT(readability-identifier-naming)
+                                         ///< (t)
           typename ElementVector_,       ///< Pointer to broadcast vector  //
-                                         ///< NOLINT(readability-identifier-naming)
+
           typename AccumulatorFragmentIterator_,  ///< Fragment iterator selecting accumulators  //
-                                                  ///< NOLINT(readability-identifier-naming)
+
           typename WarpTileIterator_,    ///< Warp-scoped tile iterator writing accumulators to SMEM
-                                         ///< // NOLINT(readability-identifier-naming)
+                                         ///<
           typename SharedLoadIterator_,  ///< Threadblock-scoped tile iterator loading from SMEM  //
-                                         ///< NOLINT(readability-identifier-naming)
+
           typename OutputOp_,  ///< Output operator - concept is EpilogueWithBroadcastOp  //
-                               ///< NOLINT(readability-identifier-naming)
-          typename Padding_,   ///< Padding added to SMEM allocation to avoid bank conflicts
-                              ///< (concept:  // NOLINT(readability-identifier-naming) MatrixShape)
+
+          typename Padding_,  ///< Padding added to SMEM allocation to avoid bank conflicts
+                              ///< (concept:  ///< MatrixShape)
           int FragmentsPerPartition = 1,  ///< Used to coarsten the epilogue granularity
           int IterationsUnroll      =     ///< Used to reduce binary size when epilogue op is large
           (!IsEpilogueFunctorHeavy<OutputOp_>::value)>
-class EpilogueWithBroadcastCustom
-  : public EpilogueBase<Shape_,  // NOLINT(readability-identifier-naming)
-                        typename WarpMmaOperator_::Shape,
-                        PartitionsK,
-                        AccumulatorFragmentIterator_,
-                        WarpTileIterator_,
-                        Padding_,
-                        FragmentsPerPartition> {
+class EpilogueWithBroadcastCustom : public EpilogueBase<Shape_,
+                                                        typename WarpMmaOperator_::Shape,
+                                                        PartitionsK,
+                                                        AccumulatorFragmentIterator_,
+                                                        WarpTileIterator_,
+                                                        Padding_,
+                                                        FragmentsPerPartition> {
  public:
-  using Base = EpilogueBase<Shape_,  // NOLINT(readability-identifier-naming)
+  using Base = EpilogueBase<Shape_,
                             typename WarpMmaOperator_::Shape,
                             PartitionsK,
                             AccumulatorFragmentIterator_,
@@ -211,66 +210,57 @@ class EpilogueWithBroadcastCustom
                             Padding_,
                             FragmentsPerPartition>;
 
-  using Shape                   = Shape_;            // NOLINT(readability-identifier-naming)
-  using WarpMmaOperator         = WarpMmaOperator_;  // NOLINT(readability-identifier-naming)
-  static int const kPartitionsK = PartitionsK;
-  using OutputTileIterator      = OutputTileIterator_;  // NOLINT(readability-identifier-naming)
-  using TensorTileIterator      = TensorTileIterator_;  // NOLINT(readability-identifier-naming)
-  using ElementVector           = ElementVector_;       // NOLINT(readability-identifier-naming)
-  using AccumulatorFragmentIterator =
-    AccumulatorFragmentIterator_;                  // NOLINT(readability-identifier-naming)
-  using WarpTileIterator   = WarpTileIterator_;    // NOLINT(readability-identifier-naming)
-  using SharedLoadIterator = SharedLoadIterator_;  // NOLINT(readability-identifier-naming)
-  using OutputOp           = OutputOp_;            // NOLINT(readability-identifier-naming)
-  using Padding            = Padding_;             // NOLINT(readability-identifier-naming)
+  using Shape                       = Shape_;
+  using WarpMmaOperator             = WarpMmaOperator_;
+  static int const kPartitionsK     = PartitionsK;
+  using OutputTileIterator          = OutputTileIterator_;
+  using TensorTileIterator          = TensorTileIterator_;
+  using ElementVector               = ElementVector_;
+  using AccumulatorFragmentIterator = AccumulatorFragmentIterator_;
+  using WarpTileIterator            = WarpTileIterator_;
+  using SharedLoadIterator          = SharedLoadIterator_;
+  using OutputOp                    = OutputOp_;
+  using Padding                     = Padding_;
 
-  using Layout    = cutlass::layout::RowMajor;   // NOLINT(readability-identifier-naming)
-  using LongIndex = typename Layout::LongIndex;  // NOLINT(readability-identifier-naming)
+  using Layout    = cutlass::layout::RowMajor;
+  using LongIndex = typename Layout::LongIndex;
 
   /// The complete warp-level accumulator tile
-  using AccumulatorTile = typename Base::AccumulatorTile;  // NOLINT(readability-identifier-naming)
+  using AccumulatorTile = typename Base::AccumulatorTile;
 
   /// Accumulator element
-  using ElementAccumulator =
-    typename WarpTileIterator::Element;  // NOLINT(readability-identifier-naming)
+  using ElementAccumulator = typename WarpTileIterator::Element;
 
   /// Compute data type produced by the output op
-  using ElementCompute =
-    typename OutputOp::ElementCompute;  // NOLINT(readability-identifier-naming)
+  using ElementCompute = typename OutputOp::ElementCompute;
 
   /// Compute fragment
   using FragmentCompute = cutlass::Array<ElementCompute, OutputTileIterator::Fragment::kElements>;
 
   /// Thread map used by output tile iterators
-  using ThreadMap =
-    typename OutputTileIterator::ThreadMap;  // NOLINT(readability-identifier-naming)
+  using ThreadMap = typename OutputTileIterator::ThreadMap;
 
   /// Fragment object used to store the broadcast values
   using BroadcastFragment =
     cutlass::Array<ElementCompute, ThreadMap::Iterations::kColumn * ThreadMap::kElementsPerAccess>;
 
   /// Output element
-  using ElementOutput =
-    typename OutputTileIterator::Element;  // NOLINT(readability-identifier-naming)
+  using ElementOutput = typename OutputTileIterator::Element;
 
   /// Data type of additional tensor
-  using ElementTensor =
-    typename TensorTileIterator::Element;  // NOLINT(readability-identifier-naming)
+  using ElementTensor = typename TensorTileIterator::Element;
 
   /// Output access size
   static int const kElementsPerAccess = OutputTileIterator::kElementsPerAccess;
 
   /// Tensor reference to destination tensor
-  using TensorRef =
-    typename OutputTileIterator::TensorRef;  // NOLINT(readability-identifier-naming)
+  using TensorRef = typename OutputTileIterator::TensorRef;
 
   /// Tensor reference to sync tensor
-  using SyncTensorRef = typename cutlass::
-    TensorRef<int, cutlass::layout::PackedVectorLayout>;  // NOLINT(readability-identifier-naming)
+  using SyncTensorRef = typename cutlass::TensorRef<int, cutlass::layout::PackedVectorLayout>;
 
   /// Const tensor reference to source tensor
-  using ConstTensorRef =
-    typename OutputTileIterator::ConstTensorRef;  // NOLINT(readability-identifier-naming)
+  using ConstTensorRef = typename OutputTileIterator::ConstTensorRef;
 
   /// cutlass::Array type used to output
   using OutputAccessType =
@@ -287,17 +277,17 @@ class EpilogueWithBroadcastCustom
   using TensorAccessType = cutlass::Array<ElementTensor, OutputTileIterator::kElementsPerAccess>;
 
   /// Number of warps
-  using WarpCount = typename Base::WarpCount;  // NOLINT(readability-identifier-naming)
+  using WarpCount = typename Base::WarpCount;
 
   /// Shared memory allocation from epilogue base class
-  using BaseSharedStorage = typename Base::SharedStorage;  // NOLINT(readability-identifier-naming)
+  using BaseSharedStorage = typename Base::SharedStorage;
 
   static int constexpr kSmemTiles =
     Base::kFragmentsPerIteration > 1 ? Base::kFragmentsPerIteration : kPartitionsK;
   static int constexpr kSmemPointerOffset = Base::SharedStorage::StorageShape::kCount / kSmemTiles;
 
   /// Used for the broadcast
-  struct BroadcastDetail {  // NOLINT(readability-identifier-naming)
+  struct BroadcastDetail {
     /// Number of threads per warp
     static int const kWarpSize = 32;
 
@@ -326,8 +316,7 @@ class EpilogueWithBroadcastCustom
       const_max(1, (Shape::kN + kThreadCount - 1) / kThreadCount);
 
     /// Shape of the shared memory allocation for the epilogue
-    using StorageShape =
-      cutlass::MatrixShape<kThreadRows, Shape::kN>;  // NOLINT(readability-identifier-naming)
+    using StorageShape = cutlass::MatrixShape<kThreadRows, Shape::kN>;
 
     /// Debug printing
     CUTLASS_DEVICE
@@ -354,7 +343,7 @@ class EpilogueWithBroadcastCustom
   };
 
   /// Shared storage structure (shadows base) with additional SMEM buffer for reduction
-  struct SharedStorage {  // NOLINT(readability-identifier-naming)
+  struct SharedStorage {
     union {
       BaseSharedStorage base;
     };
@@ -420,7 +409,7 @@ class EpilogueWithBroadcastCustom
 
  private:
   CUTLASS_DEVICE
-  void load_broadcast_fragment_(  // NOLINT(readability-identifier-naming)
+  void load_broadcast_fragment_(
     BroadcastFragment&
       broadcast_fragment,  ///< Fragment containing the accumulated partial reduction over columns
     ElementVector const* broadcast_ptr,  ///< Broadcast vector
@@ -514,8 +503,8 @@ class EpilogueWithBroadcastCustom
 
   /// Streams the result to global memory
   CUTLASS_DEVICE
-  void compute_source_not_needed_(  // NOLINT(readability-identifier-naming)
-    OutputOp const& output_op,      ///< Output operator
+  void compute_source_not_needed_(
+    OutputOp const& output_op,  ///< Output operator
     BroadcastFragment const&
       broadcast_fragment,  ///< Fragment containing the accumulated partial reduction over columns
     OutputTileIterator destination_iterator,  ///< Tile iterator for destination
@@ -555,7 +544,7 @@ class EpilogueWithBroadcastCustom
 
   /// Streams the result to global memory
   CUTLASS_DEVICE
-  void compute_source_needed_(  // NOLINT(readability-identifier-naming)
+  void compute_source_needed_(
     OutputOp const& output_op,  ///< Output operator
     BroadcastFragment const&
       broadcast_fragment,  ///< Fragment containing the accumulated partial reduction over columns
@@ -603,7 +592,7 @@ class EpilogueWithBroadcastCustom
       // Apply output operation
       //
 
-      typename TensorTileIterator::Fragment frag_T;  // NOLINT(readability-identifier-naming)
+      typename TensorTileIterator::Fragment frag_T;
 
       //
       // Load the source
@@ -628,29 +617,26 @@ class EpilogueWithBroadcastCustom
 
   /// Helper to invoke the output functor over each vector of output
   CUTLASS_DEVICE
-  void apply_output_operator_(
-    typename TensorTileIterator::Fragment& frag_T,  // NOLINT(readability-identifier-naming)
-    OutputOp const& output_op,
-    typename SharedLoadIterator::Fragment const& frag_AB,
-    typename OutputTileIterator::Fragment const& frag_C,
-    BroadcastFragment const& frag_Broadcast)
+  void apply_output_operator_(typename TensorTileIterator::Fragment& frag_T,
+                              OutputOp const& output_op,
+                              typename SharedLoadIterator::Fragment const& frag_AB,
+                              typename OutputTileIterator::Fragment const& frag_C,
+                              BroadcastFragment const& frag_Broadcast)
   {
     using AccessTypeT = cutlass::Array<typename TensorTileIterator::OutValT, kElementsPerAccess>;
     using AccessTypeBroadcast = cutlass::Array<ElementCompute, kElementsPerAccess>;
 
-    AccessTypeT* frag_T_ptr =
-      reinterpret_cast<AccessTypeT*>(&frag_T);  // NOLINT(readability-identifier-naming)
+    AccessTypeT* frag_T_ptr = reinterpret_cast<AccessTypeT*>(&frag_T);
 
-    AccumulatorAccessType const* frag_AB_ptr =  // NOLINT(readability-identifier-naming)
+    AccumulatorAccessType const* frag_AB_ptr =
       reinterpret_cast<AccumulatorAccessType const*>(&frag_AB);
 
-    OutputAccessType const* frag_C_ptr =
-      reinterpret_cast<OutputAccessType const*>(&frag_C);  // NOLINT(readability-identifier-naming)
+    OutputAccessType const* frag_C_ptr = reinterpret_cast<OutputAccessType const*>(&frag_C);
 
-    AccessTypeBroadcast const* frag_Broadcast_ptr =  // NOLINT(readability-identifier-naming)
+    AccessTypeBroadcast const* frag_Broadcast_ptr =
       reinterpret_cast<AccessTypeBroadcast const*>(&frag_Broadcast);
 
-    int const kOutputOpIterations =  // NOLINT(readability-identifier-naming)
+    int const kOutputOpIterations =
       TensorTileIterator::Fragment::kElements / TensorTileIterator::kElementsPerAccess;
 
     CUTLASS_PRAGMA_UNROLL
@@ -664,7 +650,7 @@ class EpilogueWithBroadcastCustom
 
   /// Helper to invoke the output functor over each vector of output
   CUTLASS_DEVICE
-  void apply_output_operator_source_not_needed_(  // NOLINT(readability-identifier-naming)
+  void apply_output_operator_source_not_needed_(
     typename OutputTileIterator::Fragment& frag_Z,
     typename TensorTileIterator::Fragment& frag_T,
     OutputOp const& output_op,

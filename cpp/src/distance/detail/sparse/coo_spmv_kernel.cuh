@@ -73,7 +73,7 @@ __device__ __inline__ auto get_lowest_peer(unsigned int peer_group) -> unsigned 
 template <typename StrategyT,
           typename IndptrIt,
           typename ValueIdx,
-          typename ValueT,  // NOLINT(readability-identifier-naming)
+          typename ValueT,
           bool rev,
           int tpb,
           typename ProductF,

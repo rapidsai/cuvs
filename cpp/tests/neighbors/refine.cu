@@ -23,18 +23,17 @@
 namespace cuvs::neighbors {
 
 template <typename DataT, typename DistanceT, typename IdxT>
-class RefineTest
-  : public ::testing::TestWithParam<RefineInputs<IdxT>> {  // NOLINT(readability-identifier-naming)
+class RefineTest : public ::testing::TestWithParam<RefineInputs<IdxT>> {
  public:
-  RefineTest()  // NOLINT(modernize-use-equals-default)
+  RefineTest()
     : stream_(raft::resource::get_cuda_stream(handle_)),
       data(handle_, ::testing::TestWithParam<RefineInputs<IdxT>>::GetParam())
   {
   }
 
  protected:
- public:             // tamas remove
-  void testRefine()  // NOLINT(readability-identifier-naming)
+ public:  // tamas remove
+  void testRefine()
   {
     std::vector<IdxT> indices(data.p.n_queries * data.p.k);
     std::vector<DistanceT> distances(data.p.n_queries * data.p.k);
@@ -86,12 +85,12 @@ class RefineTest
   }
 
  public:
-  raft::resources handle_;        // NOLINT(readability-identifier-naming)
-  rmm::cuda_stream_view stream_;  // NOLINT(readability-identifier-naming)
+  raft::resources handle_;
+  rmm::cuda_stream_view stream_;
   RefineHelper<DataT, DistanceT, IdxT> data;
 };
 
-const std::vector<RefineInputs<int64_t>> inputs =  // NOLINT(readability-identifier-naming)
+const std::vector<RefineInputs<int64_t>> inputs =
   raft::util::itertools::product<RefineInputs<int64_t>>(
     {static_cast<int64_t>(137)},
     {static_cast<int64_t>(1000)},
@@ -101,33 +100,24 @@ const std::vector<RefineInputs<int64_t>> inputs =  // NOLINT(readability-identif
     {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false, true});
 
-using RefineTestF =
-  RefineTest<float, float, std::int64_t>;               // NOLINT(readability-identifier-naming)
-TEST_P(RefineTestF, AnnRefine) { this->testRefine(); }  // NOLINT(readability-identifier-naming)
+using RefineTestF = RefineTest<float, float, std::int64_t>;
+TEST_P(RefineTestF, AnnRefine) { this->testRefine(); }
 
-INSTANTIATE_TEST_CASE_P(RefineTest,
-                        RefineTestF,
-                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(RefineTest, RefineTestF, ::testing::ValuesIn(inputs));
 
-using RefineTestF_uint8 =
-  RefineTest<uint8_t, float, std::int64_t>;  // NOLINT(readability-identifier-naming)
+using RefineTestF_uint8 = RefineTest<uint8_t, float, std::int64_t>;
 TEST_P(RefineTestF_uint8,
        AnnRefine)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testRefine();
-}  // NOLINT(readability-identifier-naming)
-INSTANTIATE_TEST_CASE_P(RefineTest,
-                        RefineTestF_uint8,
-                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
+}
+INSTANTIATE_TEST_CASE_P(RefineTest, RefineTestF_uint8, ::testing::ValuesIn(inputs));
 
-using RefineTestF_int8 =
-  RefineTest<int8_t, float, std::int64_t>;  // NOLINT(readability-identifier-naming)
+using RefineTestF_int8 = RefineTest<int8_t, float, std::int64_t>;
 TEST_P(RefineTestF_int8,
        AnnRefine)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testRefine();
-}  // NOLINT(readability-identifier-naming)
-INSTANTIATE_TEST_CASE_P(RefineTest,
-                        RefineTestF_int8,
-                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
+}
+INSTANTIATE_TEST_CASE_P(RefineTest, RefineTestF_int8, ::testing::ValuesIn(inputs));
 }  // namespace cuvs::neighbors

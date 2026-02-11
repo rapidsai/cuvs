@@ -9,9 +9,9 @@
 
 namespace raft {
 
-TEST(Raft, print)
+TEST(Raft, print)  // NOLINT(modernize-use-trailing-return-type)
 {
   std::cout << test_raft() << std::endl;
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}
 
 }  // namespace raft

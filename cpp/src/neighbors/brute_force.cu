@@ -16,8 +16,7 @@ index<T, DistT>::index(raft::resources const& res)
   // this constructor is just for a temporary index, for use in the deserialization
   // api. all the parameters here will get replaced with loaded values - that aren't
   // necessarily known ahead of time before deserialization.
-  // TODO(cuvs): do we even need a handle here - could just construct one?  //
-  // NOLINT(google-readability-todo)
+  // TODO(cuvs-api): do we even need a handle here - could just construct one?
   : cuvs::neighbors::index(),
     metric_(cuvs::distance::DistanceType::L2Expanded),
     dataset_(raft::make_device_matrix<T, int64_t>(res, 0, 0)),

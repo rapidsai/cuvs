@@ -21,7 +21,7 @@
 
 namespace cuvs::neighbors::cagra::detail {
 namespace utils {
-template <class DATA_T>  // NOLINT(readability-identifier-naming)
+template <class DATA_T>
 inline auto get_cuda_data_type() -> cudaDataType_t;
 template <>
 inline auto get_cuda_data_type<float>() -> cudaDataType_t
@@ -108,7 +108,7 @@ _RAFT_HOST_DEVICE constexpr auto size_of<half2>() -> unsigned
 }
 
 // max values for data types
-template <class BS_T, class FP_T>  // NOLINT(readability-identifier-naming)
+template <class BS_T, class FP_T>
 union fp_conv {
   BS_T bs;
   FP_T fp;
@@ -138,7 +138,7 @@ _RAFT_HOST_DEVICE constexpr inline auto get_max_value<std::uint64_t>() -> std::u
 
 template <int A, int B, class = void>
 struct constexpr_max {
-  static const int value = A;  // NOLINT(readability-identifier-naming)
+  static const int value = A;
 };
 
 template <int A, int B>
@@ -148,9 +148,7 @@ struct constexpr_max<A, B, std::enable_if_t<(B > A), bool>> {
 
 template <class IdxT>
 struct gen_index_msb_1_mask {
-  static constexpr IdxT value = static_cast<IdxT>(1)
-                                << (utils::size_of<IdxT>() * 8 -
-                                    1);  // NOLINT(readability-identifier-naming)
+  static constexpr IdxT value = static_cast<IdxT>(1) << (utils::size_of<IdxT>() * 8 - 1);
 };
 }  // namespace utils
 
@@ -201,7 +199,7 @@ class device_matrix_view_from_host {
     if (!allocated_memory()) { raft::resource::sync_stream(res_); }
   }
 
-  raft::device_matrix_view<T, IdxT> view()  // NOLINT(modernize-use-trailing-return-type)
+  auto view() -> raft::device_matrix_view<T, IdxT>
   {
     return raft::make_device_matrix_view<T, IdxT>(
       device_ptr, host_view_.extent(0), host_view_.extent(1));
@@ -215,7 +213,7 @@ class device_matrix_view_from_host {
   const raft::resources& res_;
   std::optional<raft::device_matrix<T, IdxT>> device_mem_;
   raft::host_matrix_view<T, IdxT> host_view_;
-  T* device_ptr;  // NOLINT(readability-identifier-naming)
+  T* device_ptr;
 };
 
 /**
@@ -251,7 +249,7 @@ class host_matrix_view_from_device {
     }
   }
 
-  raft::host_matrix_view<T, IdxT> view()  // NOLINT(modernize-use-trailing-return-type)
+  auto view() -> raft::host_matrix_view<T, IdxT>
   {
     return raft::make_host_matrix_view<T, IdxT>(
       host_ptr, device_view_.extent(0), device_view_.extent(1));
@@ -264,11 +262,11 @@ class host_matrix_view_from_device {
  private:
   std::optional<raft::host_matrix<T, IdxT>> host_mem_;
   raft::device_matrix_view<T, IdxT> device_view_;
-  T* host_ptr;  // NOLINT(readability-identifier-naming)
+  T* host_ptr;
 };
 
 // Copy matrix src to dst. pad rows with 0 if necessary to make them 16 byte aligned.
-template <typename T, typename data_accessor>  // NOLINT(readability-identifier-naming)
+template <typename T, typename data_accessor>
 void copy_with_padding(
   raft::resources const& res,
   raft::device_matrix<T, int64_t, raft::row_major>& dst,

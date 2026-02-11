@@ -16,9 +16,9 @@
 
 #include <thrust/fill.h>
 
+#include <cstdio>
 #include <gtest/gtest.h>
 #include <nccl.h>
-#include <stdio.h>  // NOLINT(modernize-deprecated-headers)
 #include <test_utils.h>
 
 #include <vector>
@@ -35,7 +35,7 @@
 namespace cuvs {
 
 template <typename T>
-struct KmeansInputs {  // NOLINT(readability-identifier-naming)
+struct KmeansInputs {
   int n_row;
   int n_col;
   int n_clusters;
@@ -44,10 +44,9 @@ struct KmeansInputs {  // NOLINT(readability-identifier-naming)
 };
 
 template <typename T>
-class KmeansTest  // NOLINT(readability-identifier-naming)
-  : public ::testing::TestWithParam<KmeansInputs<T>> {
+class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
  protected:
-  KmeansTest()  // NOLINT(modernize-use-equals-default)
+  KmeansTest()
     : stream(handle.get_stream()),
       d_labels(0, stream),
       d_labels_ref(0, stream),
@@ -56,7 +55,7 @@ class KmeansTest  // NOLINT(readability-identifier-naming)
   {
   }
 
-  void basicTest()  // NOLINT(readability-identifier-naming)
+  void basicTest()
   {
     testparams = ::testing::TestWithParam<KmeansInputs<T>>::GetParam();
     ncclComm_t nccl_comm;
@@ -145,62 +144,58 @@ class KmeansTest  // NOLINT(readability-identifier-naming)
     ncclCommDestroy(nccl_comm);
   }
 
-  void SetUp() override { basicTest(); }  // NOLINT(readability-identifier-naming)
+  void SetUp() override { basicTest(); }
 
  protected:
-  raft::handle_t handle;                   // NOLINT(readability-identifier-naming)
-  cudaStream_t stream;                     // NOLINT(readability-identifier-naming)
-  KmeansInputs<T> testparams;              // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<int> d_labels;       // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<int> d_labels_ref;   // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<T> d_centroids;      // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<T> d_sample_weight;  // NOLINT(readability-identifier-naming)
-  double score;                            // NOLINT(readability-identifier-naming)
-  cuvs::cluster::kmeans::params params;    // NOLINT(readability-identifier-naming)
+  raft::handle_t handle;
+  cudaStream_t stream;
+  KmeansInputs<T> testparams;
+  rmm::device_uvector<int> d_labels;
+  rmm::device_uvector<int> d_labels_ref;
+  rmm::device_uvector<T> d_centroids;
+  rmm::device_uvector<T> d_sample_weight;
+  double score;
+  cuvs::cluster::kmeans::params params;
 };
 
-const std::vector<KmeansInputs<float>> kInputsf2 = {  // NOLINT(readability-identifier-naming)
-  {1000, 32, 5, 0.0001, true},
-  {1000, 32, 5, 0.0001, false},
-  {1000, 100, 20, 0.0001, true},
-  {1000, 100, 20, 0.0001, false},
-  {10000, 32, 10, 0.0001, true},
-  {10000, 32, 10, 0.0001, false},
-  {10000, 100, 50, 0.0001, true},
-  {10000, 100, 50, 0.0001, false}};
+const std::vector<KmeansInputs<float>> kInputsf2 = {{1000, 32, 5, 0.0001, true},
+                                                    {1000, 32, 5, 0.0001, false},
+                                                    {1000, 100, 20, 0.0001, true},
+                                                    {1000, 100, 20, 0.0001, false},
+                                                    {10000, 32, 10, 0.0001, true},
+                                                    {10000, 32, 10, 0.0001, false},
+                                                    {10000, 100, 50, 0.0001, true},
+                                                    {10000, 100, 50, 0.0001, false}};
 
-const std::vector<KmeansInputs<double>> kInputsd2 = {  // NOLINT(readability-identifier-naming)
-  {1000, 32, 5, 0.0001, true},
-  {1000, 32, 5, 0.0001, false},
-  {1000, 100, 20, 0.0001, true},
-  {1000, 100, 20, 0.0001, false},
-  {10000, 32, 10, 0.0001, true},
-  {10000, 32, 10, 0.0001, false},
-  {10000, 100, 50, 0.0001, true},
-  {10000, 100, 50, 0.0001, false}};
+const std::vector<KmeansInputs<double>> kInputsd2 = {{1000, 32, 5, 0.0001, true},
+                                                     {1000, 32, 5, 0.0001, false},
+                                                     {1000, 100, 20, 0.0001, true},
+                                                     {1000, 100, 20, 0.0001, false},
+                                                     {10000, 32, 10, 0.0001, true},
+                                                     {10000, 32, 10, 0.0001, false},
+                                                     {10000, 100, 50, 0.0001, true},
+                                                     {10000, 100, 50, 0.0001, false}};
 
-using KmeansTestF = KmeansTest<float>;  // NOLINT(readability-identifier-naming)
+using KmeansTestF = KmeansTest<float>;
 TEST_P(KmeansTestF, Result)
 {
   ASSERT_TRUE(score >= 0.99);
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(modernize-use-trailing-return-type)
 
-using KmeansTestD = KmeansTest<double>;  // NOLINT(readability-identifier-naming)
+using KmeansTestD = KmeansTest<double>;
 TEST_P(KmeansTestD, Result)
 {
   ASSERT_TRUE(score >= 0.99);
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+}  // NOLINT(modernize-use-trailing-return-type)
 
 INSTANTIATE_TEST_CASE_P(
   KmeansTests,
   KmeansTestF,
-  ::testing::ValuesIn(
-    kInputsf2));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  ::testing::ValuesIn(kInputsf2));  // NOLINT(modernize-use-trailing-return-type)
 
 INSTANTIATE_TEST_CASE_P(
   KmeansTests,
   KmeansTestD,
-  ::testing::ValuesIn(
-    kInputsd2));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  ::testing::ValuesIn(kInputsd2));  // NOLINT(modernize-use-trailing-return-type)
 
 }  // end namespace cuvs

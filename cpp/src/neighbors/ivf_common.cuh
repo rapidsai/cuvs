@@ -83,7 +83,7 @@ struct calc_chunk_indices {
  * @return chunk index (== n_probes when the input index is not in the valid range,
  *    which can happen if there is not enough data to output in the selected clusters).
  */
-__device__ inline auto find_chunk_ix(uint32_t& sample_ix,  // NOLINT
+__device__ inline auto find_chunk_ix(uint32_t& sample_ix,
                                      uint32_t n_probes,
                                      const uint32_t* chunk_indices) -> uint32_t
 {

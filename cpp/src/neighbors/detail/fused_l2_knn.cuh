@@ -185,23 +185,22 @@ template <typename DataT,
           int NumThreadQ,
           bool usePrevTopKs = false,
           bool isRowMajor   = true>
-__launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL  // NOLINT(readability-identifier-naming)
-  fused_l2_knn_kernel(const DataT* x,
-                      const DataT* y,
-                      const OutT* _xn,
-                      const OutT* _yn,
-                      const IdxT m,
-                      const IdxT n,
-                      const IdxT k,
-                      const IdxT lda,
-                      const IdxT ldb,
-                      const IdxT ldd,
-                      OpT distance_op,
-                      FinalLambda fin_op,
-                      unsigned int numOfNN,
-                      volatile int* mutexes,
-                      volatile OutT* out_dists,
-                      volatile IdxT* out_inds)
+__launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL fused_l2_knn_kernel(const DataT* x,
+                                                                       const DataT* y,
+                                                                       const OutT* _xn,
+                                                                       const OutT* _yn,
+                                                                       const IdxT m,
+                                                                       const IdxT n,
+                                                                       const IdxT k,
+                                                                       const IdxT lda,
+                                                                       const IdxT ldb,
+                                                                       const IdxT ldd,
+                                                                       OpT distance_op,
+                                                                       FinalLambda fin_op,
+                                                                       unsigned int numOfNN,
+                                                                       volatile int* mutexes,
+                                                                       volatile OutT* out_dists,
+                                                                       volatile IdxT* out_inds)
 {
   using AccT = typename OpT::acc_t;
   extern __shared__ char smem[];
@@ -550,28 +549,26 @@ auto fused_l2_unexp_knn_impl(const DataT* x,
   raft::identity_op fin_op{};
 
   if constexpr (isRowMajor) {
-    constexpr auto kFusedL2UnexpKnn32RowMajor =
-      fused_l2_knn_kernel<DataT,
-                          OutT,     // NOLINT(readability-identifier-naming)
-                          IdxT,     // NOLINT(readability-identifier-naming)
-                          KPolicy,  // NOLINT(readability-identifier-naming)
-                          decltype(distance_op),
-                          decltype(fin_op),
-                          32,
-                          2,
-                          usePrevTopKs,
-                          isRowMajor>;
-    constexpr auto kFusedL2UnexpKnn64RowMajor =
-      fused_l2_knn_kernel<DataT,
-                          OutT,     // NOLINT(readability-identifier-naming)
-                          IdxT,     // NOLINT(readability-identifier-naming)
-                          KPolicy,  // NOLINT(readability-identifier-naming)
-                          decltype(distance_op),
-                          decltype(fin_op),
-                          64,
-                          3,
-                          usePrevTopKs,
-                          isRowMajor>;
+    constexpr auto kFusedL2UnexpKnn32RowMajor = fused_l2_knn_kernel<DataT,
+                                                                    OutT,
+                                                                    IdxT,
+                                                                    KPolicy,
+                                                                    decltype(distance_op),
+                                                                    decltype(fin_op),
+                                                                    32,
+                                                                    2,
+                                                                    usePrevTopKs,
+                                                                    isRowMajor>;
+    constexpr auto kFusedL2UnexpKnn64RowMajor = fused_l2_knn_kernel<DataT,
+                                                                    OutT,
+                                                                    IdxT,
+                                                                    KPolicy,
+                                                                    decltype(distance_op),
+                                                                    decltype(fin_op),
+                                                                    64,
+                                                                    3,
+                                                                    usePrevTopKs,
+                                                                    isRowMajor>;
 
     auto fused_l2_unexp_knn_row_major = kFusedL2UnexpKnn32RowMajor;
     if (numOfNN <= 32) {
@@ -741,28 +738,26 @@ auto fused_l2_exp_knn_impl(const DataT* x,
   raft::identity_op fin_op{};
 
   if constexpr (isRowMajor) {
-    constexpr auto kFusedL2ExpKnn32RowMajor =
-      fused_l2_knn_kernel<DataT,
-                          OutT,     // NOLINT(readability-identifier-naming)
-                          IdxT,     // NOLINT(readability-identifier-naming)
-                          KPolicy,  // NOLINT(readability-identifier-naming)
-                          decltype(distance_op),
-                          decltype(fin_op),
-                          32,
-                          2,
-                          usePrevTopKs,
-                          isRowMajor>;
-    constexpr auto kFusedL2ExpKnn64RowMajor =
-      fused_l2_knn_kernel<DataT,
-                          OutT,     // NOLINT(readability-identifier-naming)
-                          IdxT,     // NOLINT(readability-identifier-naming)
-                          KPolicy,  // NOLINT(readability-identifier-naming)
-                          decltype(distance_op),
-                          decltype(fin_op),
-                          64,
-                          3,
-                          usePrevTopKs,
-                          isRowMajor>;  // NOLINT(readability-identifier-naming)
+    constexpr auto kFusedL2ExpKnn32RowMajor = fused_l2_knn_kernel<DataT,
+                                                                  OutT,
+                                                                  IdxT,
+                                                                  KPolicy,
+                                                                  decltype(distance_op),
+                                                                  decltype(fin_op),
+                                                                  32,
+                                                                  2,
+                                                                  usePrevTopKs,
+                                                                  isRowMajor>;
+    constexpr auto kFusedL2ExpKnn64RowMajor = fused_l2_knn_kernel<DataT,
+                                                                  OutT,
+                                                                  IdxT,
+                                                                  KPolicy,
+                                                                  decltype(distance_op),
+                                                                  decltype(fin_op),
+                                                                  64,
+                                                                  3,
+                                                                  usePrevTopKs,
+                                                                  isRowMajor>;
 
     auto fused_l2_exp_knn_row_major = kFusedL2ExpKnn32RowMajor;
     if (numOfNN <= 32) {

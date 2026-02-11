@@ -47,7 +47,7 @@ template <typename Shape,
           typename LayoutT,
           int ElementsPerAccess,
           bool ScatterD = false>
-struct PairwiseDistanceEpilogue {  // NOLINT(readability-identifier-naming)
+struct PairwiseDistanceEpilogue {
   /// Use defaults related to the existing epilogue
   using Base = cutlass::epilogue::threadblock::
     DefaultEpilogueTensorOp<Shape, WarpMmaTensorOp, PartitionsK, OutputOp, ElementsPerAccess>;

@@ -125,12 +125,9 @@ class scann_test : public ::testing::TestWithParam<scann_inputs> {
     ASSERT_EQ(index.bf16_dataset().size(), expected_bf16_size);
   }
 
-  void SetUp() override  // NOLINT
-  {
-    gen_data();
-  }
+  void SetUp() override { gen_data(); }
 
-  void TearDown() override  // NOLINT
+  void TearDown() override
   {
     cudaGetLastError();
     raft::resource::sync_stream(handle_);
@@ -140,8 +137,8 @@ class scann_test : public ::testing::TestWithParam<scann_inputs> {
  private:
   raft::resources handle_;
   rmm::cuda_stream_view stream_;
-  scann_inputs ps;                      // NOLINT
-  rmm::device_uvector<DataT> database;  // NOLINT
+  scann_inputs ps;
+  rmm::device_uvector<DataT> database;
 };
 
 /* Test cases */
@@ -248,22 +245,22 @@ inline auto soar() -> test_cases_t
 
 /* Test instantiations */
 
-#define TEST_BUILD(type)                                \
-  TEST_P(type, build) /* NOLINT */                      \
-  {                                                     \
-    this->run([this]() { return this->build_only(); }); \
+#define TEST_BUILD(type)                                        \
+  TEST_P(type, build) /* NOLINT */                              \
+  {                                                             \
+    this->run([this]() -> auto { return this->build_only(); }); \
   }
 
-#define TEST_BUILD_HOST_INPUT(type)                                \
-  TEST_P(type, build_host_input) /* NOLINT */                      \
-  {                                                                \
-    this->run([this]() { return this->build_only_host_input(); }); \
-  }
-
-#define TEST_BUILD_HOST_INPUT_OVERLAP(type)                                \
-  TEST_P(type, build_host_input_overlap) /* NOLINT */                      \
+#define TEST_BUILD_HOST_INPUT(type)                                        \
+  TEST_P(type, build_host_input) /* NOLINT */                              \
   {                                                                        \
-    this->run([this]() { return this->build_only_host_input_overlap(); }); \
+    this->run([this]() -> auto { return this->build_only_host_input(); }); \
+  }
+
+#define TEST_BUILD_HOST_INPUT_OVERLAP(type)                                        \
+  TEST_P(type, build_host_input_overlap) /* NOLINT */                              \
+  {                                                                                \
+    this->run([this]() -> auto { return this->build_only_host_input_overlap(); }); \
   }
 
 #define INSTANTIATE(type, vals) \

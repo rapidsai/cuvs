@@ -46,9 +46,7 @@ auto build_k(ValueIdx n_samples, int c) -> ValueIdx
  * @param[in] c a constant used when constructing linkage from knn graph. Allows the indirect
  control of k. The algorithm will set `k = log(n) + c`
  */
-template <typename ValueIdx = int,
-          typename ValueT   = float,
-          typename NnzT     = size_t>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = int, typename ValueT = float, typename NnzT = size_t>
 void knn_graph(raft::resources const& res,
                raft::device_matrix_view<const ValueT, ValueIdx> X,
                cuvs::distance::DistanceType metric,

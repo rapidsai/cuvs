@@ -36,7 +36,7 @@
 namespace cuvs::neighbors::brute_force {
 
 template <typename IndexT>
-struct PrefilteredBruteForceInputs {  // NOLINT(readability-identifier-naming)
+struct PrefilteredBruteForceInputs {
   IndexT n_queries;
   IndexT n_dataset;
   IndexT dim;
@@ -47,8 +47,8 @@ struct PrefilteredBruteForceInputs {  // NOLINT(readability-identifier-naming)
 };
 
 template <typename T>
-struct CompareApproxWithInf {                  // NOLINT(readability-identifier-naming)
-  CompareApproxWithInf(T eps_) : eps(eps_) {}  // NOLINT(google-explicit-constructor)
+struct CompareApproxWithInf {
+  explicit CompareApproxWithInf(T eps_) : eps(eps_) {}
   auto operator()(const T& a, const T& b) const -> bool
   {
     if (std::isinf(a) && std::isinf(b)) return true;
@@ -60,7 +60,7 @@ struct CompareApproxWithInf {                  // NOLINT(readability-identifier-
   }
 
  private:
-  T eps;  // NOLINT(readability-identifier-naming)
+  T eps;
 };
 
 template <typename OutT, typename InT>
@@ -86,10 +86,7 @@ RAFT_KERNEL normalize_kernel(
 }
 
 struct float_to_half {
-  __host__ __device__ auto operator()(const float x) const -> __half
-  {
-    return __float2half(x);
-  }  // NOLINT(readability-identifier-naming)
+  __host__ __device__ auto operator()(const float x) const -> __half { return __float2half(x); }
 };
 
 template <typename OutT, typename InT>
@@ -106,7 +103,7 @@ void normalize(OutT* theta,
   RAFT_CUDA_TRY(cudaGetLastError());
 }
 
-template <typename IndexT, typename bitmap_t = uint32_t>  // NOLINT(readability-identifier-naming)
+template <typename IndexT, typename bitmap_t = uint32_t>
 RAFT_KERNEL set_bitmap_kernel(
   const IndexT* src, const IndexT* dst, bitmap_t* bitmap, IndexT n_edges, IndexT n_cols)
 {
@@ -121,7 +118,7 @@ RAFT_KERNEL set_bitmap_kernel(
   }
 }
 
-template <typename IndexT, typename bitmap_t = uint32_t>  // NOLINT(readability-identifier-naming)
+template <typename IndexT, typename bitmap_t = uint32_t>
 void set_bitmap(const IndexT* src,
                 const IndexT* dst,
                 bitmap_t* bitmap,
@@ -136,7 +133,7 @@ void set_bitmap(const IndexT* src,
   RAFT_CUDA_TRY(cudaGetLastError());
 }
 
-auto isCuSparseVersionGreaterThan_12_0_1() -> bool  // NOLINT(readability-identifier-naming)
+auto isCuSparseVersionGreaterThan_12_0_1() -> bool
 {
   int version;
   cusparseHandle_t handle;
@@ -152,14 +149,11 @@ auto isCuSparseVersionGreaterThan_12_0_1() -> bool  // NOLINT(readability-identi
   return (major > 12) || (major == 12 && minor > 0) || (major == 12 && minor == 0 && patch >= 2);
 }
 
-template <typename value_t,
-          typename dist_t,
-          typename IndexT,
-          typename bitmap_t = uint32_t>  // NOLINT(readability-identifier-naming)
-class PrefilteredBruteForceOnBitmapTest  // NOLINT(readability-identifier-naming)
+template <typename value_t, typename dist_t, typename IndexT, typename bitmap_t = uint32_t>
+class PrefilteredBruteForceOnBitmapTest
   : public ::testing::TestWithParam<PrefilteredBruteForceInputs<IndexT>> {
  public:
-  PrefilteredBruteForceOnBitmapTest()  // NOLINT(modernize-use-equals-default)
+  PrefilteredBruteForceOnBitmapTest()
     : stream(raft::resource::get_cuda_stream(handle)),
       params(::testing::TestWithParam<PrefilteredBruteForceInputs<IndexT>>::GetParam()),
       filter_d(0, stream),
@@ -276,14 +270,14 @@ class PrefilteredBruteForceOnBitmapTest  // NOLINT(readability-identifier-naming
     for (IndexT i = 0; i < params.n_queries; ++i) {
       for (IndexT j = row_ptrs[i]; j < row_ptrs[i + 1]; ++j) {
         dist_t sum     = 0;
-        dist_t norms_A = 0;  // NOLINT(readability-identifier-naming)
-        dist_t norms_B = 0;  // NOLINT(readability-identifier-naming)
+        dist_t norms_A = 0;
+        dist_t norms_B = 0;
 
         for (IndexT l = 0; l < params.dim; ++l) {
           IndexT a_index = trans_a ? i * params.dim + l : l * params.n_queries + i;
           IndexT b_index = trans_b ? l * params.n_dataset + cols[j] : cols[j] * params.dim + l;
-          dist_t A_v;  // NOLINT(readability-identifier-naming)
-          dist_t B_v;  // NOLINT(readability-identifier-naming)
+          dist_t A_v;
+          dist_t B_v;
           if constexpr (sizeof(value_t) == 2) {
             A_v = __half2float(__float2half(A[a_index]));
             B_v = __half2float(__float2half(B[b_index]));
@@ -359,7 +353,7 @@ class PrefilteredBruteForceOnBitmapTest  // NOLINT(readability-identifier-naming
     }
   }
 
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     if (std::is_same_v<value_t, half> && !isCuSparseVersionGreaterThan_12_0_1()) {
       GTEST_SKIP() << "Skipping all tests for half-float as cuSparse doesn't support it.";
@@ -485,7 +479,7 @@ class PrefilteredBruteForceOnBitmapTest  // NOLINT(readability-identifier-naming
     raft::resource::sync_stream(handle);
   }
 
-  void Run()  // NOLINT(readability-identifier-naming)
+  void Run()
   {
     auto dataset_raw = raft::make_device_matrix_view<const value_t, IndexT, raft::row_major>(
       static_cast<const value_t*>(dataset_d.data()), params.n_dataset, params.dim);
@@ -495,11 +489,8 @@ class PrefilteredBruteForceOnBitmapTest  // NOLINT(readability-identifier-naming
 
     auto dataset = brute_force::build(handle, dataset_raw, params.metric);
 
-    auto filter =
-      cuvs::core::bitmap_view<bitmap_t, IndexT>(  // NOLINT(readability-identifier-naming)
-        (bitmap_t*)filter_d.data(),
-        params.n_queries,
-        params.n_dataset);
+    auto filter = cuvs::core::bitmap_view<bitmap_t, IndexT>(
+      (bitmap_t*)filter_d.data(), params.n_queries, params.n_dataset);
 
     auto out_val = raft::make_device_matrix_view<dist_t, IndexT, raft::row_major>(
       out_val_d.data(), params.n_queries, params.top_k);
@@ -530,32 +521,29 @@ class PrefilteredBruteForceOnBitmapTest  // NOLINT(readability-identifier-naming
   }
 
  protected:
-  raft::resources handle;  // NOLINT(readability-identifier-naming)
-  cudaStream_t stream;     // NOLINT(readability-identifier-naming)
+  raft::resources handle;
+  cudaStream_t stream;
 
-  PrefilteredBruteForceInputs<IndexT> params;  // NOLINT(readability-identifier-naming)
+  PrefilteredBruteForceInputs<IndexT> params;
 
-  IndexT nnz;  // NOLINT(readability-identifier-naming)
+  IndexT nnz;
 
-  rmm::device_uvector<value_t> dataset_d;  // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<value_t> queries_d;  // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<bitmap_t> filter_d;  // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<value_t> dataset_d;
+  rmm::device_uvector<value_t> queries_d;
+  rmm::device_uvector<bitmap_t> filter_d;
 
-  rmm::device_uvector<dist_t> out_val_d;           // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<dist_t> out_val_expected_d;  // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<dist_t> out_val_d;
+  rmm::device_uvector<dist_t> out_val_expected_d;
 
-  rmm::device_uvector<IndexT> out_idx_d;           // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<IndexT> out_idx_expected_d;  // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<IndexT> out_idx_d;
+  rmm::device_uvector<IndexT> out_idx_expected_d;
 };
 
-template <typename value_t,
-          typename dist_t,
-          typename IndexT,
-          typename bitset_t = uint32_t>  // NOLINT(readability-identifier-naming)
-class PrefilteredBruteForceOnBitsetTest  // NOLINT(readability-identifier-naming)
+template <typename value_t, typename dist_t, typename IndexT, typename bitset_t = uint32_t>
+class PrefilteredBruteForceOnBitsetTest
   : public ::testing::TestWithParam<PrefilteredBruteForceInputs<IndexT>> {
  public:
-  PrefilteredBruteForceOnBitsetTest()  // NOLINT(modernize-use-equals-default)
+  PrefilteredBruteForceOnBitsetTest()
     : stream(raft::resource::get_cuda_stream(handle)),
       params(::testing::TestWithParam<PrefilteredBruteForceInputs<IndexT>>::GetParam()),
       filter_d(0, stream),
@@ -700,14 +688,14 @@ class PrefilteredBruteForceOnBitsetTest  // NOLINT(readability-identifier-naming
     for (IndexT i = 0; i < params.n_queries; ++i) {
       for (IndexT j = row_ptrs[i]; j < row_ptrs[i + 1]; ++j) {
         dist_t sum     = 0;
-        dist_t norms_A = 0;  // NOLINT(readability-identifier-naming)
-        dist_t norms_B = 0;  // NOLINT(readability-identifier-naming)
+        dist_t norms_A = 0;
+        dist_t norms_B = 0;
 
         for (IndexT l = 0; l < params.dim; ++l) {
           IndexT a_index = trans_a ? i * params.dim + l : l * params.n_queries + i;
           IndexT b_index = trans_b ? l * params.n_dataset + cols[j] : cols[j] * params.dim + l;
-          dist_t A_v;  // NOLINT(readability-identifier-naming)
-          dist_t B_v;  // NOLINT(readability-identifier-naming)
+          dist_t A_v;
+          dist_t B_v;
           if constexpr (sizeof(value_t) == 2) {
             A_v = __half2float(__float2half(A[a_index]));
             B_v = __half2float(__float2half(B[b_index]));
@@ -783,7 +771,7 @@ class PrefilteredBruteForceOnBitsetTest  // NOLINT(readability-identifier-naming
     }
   }
 
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     if (std::is_same_v<value_t, half> && !isCuSparseVersionGreaterThan_12_0_1()) {
       GTEST_SKIP() << "Skipping all tests for half-float as cuSparse doesn't support it.";
@@ -912,7 +900,7 @@ class PrefilteredBruteForceOnBitsetTest  // NOLINT(readability-identifier-naming
     raft::resource::sync_stream(handle);
   }
 
-  void Run()  // NOLINT(readability-identifier-naming)
+  void Run()
   {
     auto dataset_raw = raft::make_device_matrix_view<const value_t, IndexT, raft::row_major>(
       static_cast<const value_t*>(dataset_d.data()), params.n_dataset, params.dim);
@@ -923,9 +911,7 @@ class PrefilteredBruteForceOnBitsetTest  // NOLINT(readability-identifier-naming
     auto dataset = brute_force::build(handle, dataset_raw, params.metric);
 
     auto filter =
-      cuvs::core::bitset_view<bitset_t, IndexT>(  // NOLINT(readability-identifier-naming)
-        (bitset_t*)filter_d.data(),
-        params.n_dataset);
+      cuvs::core::bitset_view<bitset_t, IndexT>((bitset_t*)filter_d.data(), params.n_dataset);
 
     auto out_val = raft::make_device_matrix_view<dist_t, IndexT, raft::row_major>(
       out_val_d.data(), params.n_queries, params.top_k);
@@ -956,22 +942,22 @@ class PrefilteredBruteForceOnBitsetTest  // NOLINT(readability-identifier-naming
   }
 
  protected:
-  raft::resources handle;  // NOLINT(readability-identifier-naming)
-  cudaStream_t stream;     // NOLINT(readability-identifier-naming)
+  raft::resources handle;
+  cudaStream_t stream;
 
-  PrefilteredBruteForceInputs<IndexT> params;  // NOLINT(readability-identifier-naming)
+  PrefilteredBruteForceInputs<IndexT> params;
 
-  IndexT nnz;  // NOLINT(readability-identifier-naming)
+  IndexT nnz;
 
-  rmm::device_uvector<value_t> dataset_d;  // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<value_t> queries_d;  // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<bitset_t> filter_d;  // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<value_t> dataset_d;
+  rmm::device_uvector<value_t> queries_d;
+  rmm::device_uvector<bitset_t> filter_d;
 
-  rmm::device_uvector<dist_t> out_val_d;           // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<dist_t> out_val_expected_d;  // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<dist_t> out_val_d;
+  rmm::device_uvector<dist_t> out_val_expected_d;
 
-  rmm::device_uvector<IndexT> out_idx_d;           // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<IndexT> out_idx_expected_d;  // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<IndexT> out_idx_d;
+  rmm::device_uvector<IndexT> out_idx_expected_d;
 };
 
 using PrefilteredBruteForceTestOnBitmap_float_int64 =
@@ -980,7 +966,7 @@ TEST_P(PrefilteredBruteForceTestOnBitmap_float_int64,
        Result)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   Run();
-}  // NOLINT(readability-identifier-naming)
+}
 
 using PrefilteredBruteForceTestOnBitmap_half_int64 =
   PrefilteredBruteForceOnBitmapTest<half, float, int64_t>;
@@ -988,7 +974,7 @@ TEST_P(PrefilteredBruteForceTestOnBitmap_half_int64,
        Result)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   Run();
-}  // NOLINT(readability-identifier-naming)
+}
 
 using PrefilteredBruteForceTestOnBitset_float_int64 =
   PrefilteredBruteForceOnBitsetTest<float, float, int64_t>;
@@ -996,7 +982,7 @@ TEST_P(PrefilteredBruteForceTestOnBitset_float_int64,
        Result)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   Run();
-}  // NOLINT(readability-identifier-naming)
+}
 
 using PrefilteredBruteForceTestOnBitset_half_int64 =
   PrefilteredBruteForceOnBitsetTest<half, float, int64_t>;
@@ -1004,71 +990,70 @@ TEST_P(PrefilteredBruteForceTestOnBitset_half_int64,
        Result)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   Run();
-}  // NOLINT(readability-identifier-naming)
+}
 
-template <typename IndexT>  // NOLINT(readability-identifier-naming)
-const std::vector<PrefilteredBruteForceInputs<IndexT>> kSelectkInputs =
-  {  // NOLINT(modernize-use-using)
-    {8, 131072, 255, 255, 0.01, cuvs::distance::DistanceType::L2Expanded},
-    {8, 131072, 255, 255, 0.01, cuvs::distance::DistanceType::InnerProduct},
-    {8, 131072, 255, 255, 0.01, cuvs::distance::DistanceType::L2SqrtExpanded},
-    {8, 131072, 255, 255, 0.01, cuvs::distance::DistanceType::CosineExpanded},
-    {2, 131072, 255, 255, 0.4, cuvs::distance::DistanceType::L2Expanded},
+template <typename IndexT>
+const std::vector<PrefilteredBruteForceInputs<IndexT>> kSelectkInputs = {
+  {8, 131072, 255, 255, 0.01, cuvs::distance::DistanceType::L2Expanded},
+  {8, 131072, 255, 255, 0.01, cuvs::distance::DistanceType::InnerProduct},
+  {8, 131072, 255, 255, 0.01, cuvs::distance::DistanceType::L2SqrtExpanded},
+  {8, 131072, 255, 255, 0.01, cuvs::distance::DistanceType::CosineExpanded},
+  {2, 131072, 255, 255, 0.4, cuvs::distance::DistanceType::L2Expanded},
 
-    {8, 131072, 512, 16, 0.5, cuvs::distance::DistanceType::L2Expanded},
-    {16, 131072, 2052, 16, 0.2, cuvs::distance::DistanceType::L2Expanded},
-    {2, 8192, 255, 16, 0.01, cuvs::distance::DistanceType::InnerProduct},
-    {2, 8192, 255, 16, 0.4, cuvs::distance::DistanceType::InnerProduct},
-    {16, 8192, 512, 16, 0.5, cuvs::distance::DistanceType::InnerProduct},
+  {8, 131072, 512, 16, 0.5, cuvs::distance::DistanceType::L2Expanded},
+  {16, 131072, 2052, 16, 0.2, cuvs::distance::DistanceType::L2Expanded},
+  {2, 8192, 255, 16, 0.01, cuvs::distance::DistanceType::InnerProduct},
+  {2, 8192, 255, 16, 0.4, cuvs::distance::DistanceType::InnerProduct},
+  {16, 8192, 512, 16, 0.5, cuvs::distance::DistanceType::InnerProduct},
 
-    {128, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::InnerProduct},
-    {1024, 8192, 1, 0, 0.1, cuvs::distance::DistanceType::L2Expanded},
-    {1024, 8192, 3, 0, 0.1, cuvs::distance::DistanceType::InnerProduct},
-    {1024, 8192, 5, 0, 0.1, cuvs::distance::DistanceType::L2SqrtExpanded},
-    {1024, 8192, 8, 0, 0.1, cuvs::distance::DistanceType::CosineExpanded},
+  {128, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::InnerProduct},
+  {1024, 8192, 1, 0, 0.1, cuvs::distance::DistanceType::L2Expanded},
+  {1024, 8192, 3, 0, 0.1, cuvs::distance::DistanceType::InnerProduct},
+  {1024, 8192, 5, 0, 0.1, cuvs::distance::DistanceType::L2SqrtExpanded},
+  {1024, 8192, 8, 0, 0.1, cuvs::distance::DistanceType::CosineExpanded},
 
-    {1024, 8192, 1, 1, 0.1, cuvs::distance::DistanceType::L2Expanded},
-    {1024, 8192, 3, 1, 0.1, cuvs::distance::DistanceType::InnerProduct},
-    {1024, 8192, 5, 1, 0.1, cuvs::distance::DistanceType::L2SqrtExpanded},
-    {1024, 8192, 8, 1, 0.1, cuvs::distance::DistanceType::CosineExpanded},
-    {1024, 8192, 2050, 16, 0.4, cuvs::distance::DistanceType::L2Expanded},
+  {1024, 8192, 1, 1, 0.1, cuvs::distance::DistanceType::L2Expanded},
+  {1024, 8192, 3, 1, 0.1, cuvs::distance::DistanceType::InnerProduct},
+  {1024, 8192, 5, 1, 0.1, cuvs::distance::DistanceType::L2SqrtExpanded},
+  {1024, 8192, 8, 1, 0.1, cuvs::distance::DistanceType::CosineExpanded},
+  {1024, 8192, 2050, 16, 0.4, cuvs::distance::DistanceType::L2Expanded},
 
-    {1024, 8192, 2051, 16, 0.5, cuvs::distance::DistanceType::L2Expanded},
-    {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::L2Expanded},
-    {1024, 8192, 2050, 16, 0.4, cuvs::distance::DistanceType::InnerProduct},
-    {1024, 8192, 2051, 16, 0.5, cuvs::distance::DistanceType::InnerProduct},
-    {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::InnerProduct},
+  {1024, 8192, 2051, 16, 0.5, cuvs::distance::DistanceType::L2Expanded},
+  {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::L2Expanded},
+  {1024, 8192, 2050, 16, 0.4, cuvs::distance::DistanceType::InnerProduct},
+  {1024, 8192, 2051, 16, 0.5, cuvs::distance::DistanceType::InnerProduct},
+  {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::InnerProduct},
 
-    {1024, 8192, 2050, 16, 0.4, cuvs::distance::DistanceType::L2SqrtExpanded},
-    {1024, 8192, 2051, 16, 0.5, cuvs::distance::DistanceType::L2SqrtExpanded},
-    {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::L2SqrtExpanded},
-    {1024, 8192, 2050, 16, 0.4, cuvs::distance::DistanceType::CosineExpanded},
-    {1024, 8192, 2051, 16, 0.5, cuvs::distance::DistanceType::CosineExpanded},
+  {1024, 8192, 2050, 16, 0.4, cuvs::distance::DistanceType::L2SqrtExpanded},
+  {1024, 8192, 2051, 16, 0.5, cuvs::distance::DistanceType::L2SqrtExpanded},
+  {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::L2SqrtExpanded},
+  {1024, 8192, 2050, 16, 0.4, cuvs::distance::DistanceType::CosineExpanded},
+  {1024, 8192, 2051, 16, 0.5, cuvs::distance::DistanceType::CosineExpanded},
 
-    {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::CosineExpanded},
-    {1024, 8192, 1, 16, 0.5, cuvs::distance::DistanceType::L2Expanded},
-    {1024, 8192, 2, 16, 0.2, cuvs::distance::DistanceType::L2Expanded},
+  {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::CosineExpanded},
+  {1024, 8192, 1, 16, 0.5, cuvs::distance::DistanceType::L2Expanded},
+  {1024, 8192, 2, 16, 0.2, cuvs::distance::DistanceType::L2Expanded},
 
-    {1024, 8192, 3, 16, 0.4, cuvs::distance::DistanceType::InnerProduct},
-    {1024, 8192, 4, 16, 0.5, cuvs::distance::DistanceType::InnerProduct},
-    {1024, 8192, 5, 16, 0.2, cuvs::distance::DistanceType::L2SqrtExpanded},
-    {1024, 8192, 8, 16, 0.4, cuvs::distance::DistanceType::L2SqrtExpanded},
-    {1024, 8192, 5, 16, 0.5, cuvs::distance::DistanceType::CosineExpanded},
-    {1024, 8192, 8, 16, 0.2, cuvs::distance::DistanceType::CosineExpanded}};
+  {1024, 8192, 3, 16, 0.4, cuvs::distance::DistanceType::InnerProduct},
+  {1024, 8192, 4, 16, 0.5, cuvs::distance::DistanceType::InnerProduct},
+  {1024, 8192, 5, 16, 0.2, cuvs::distance::DistanceType::L2SqrtExpanded},
+  {1024, 8192, 8, 16, 0.4, cuvs::distance::DistanceType::L2SqrtExpanded},
+  {1024, 8192, 5, 16, 0.5, cuvs::distance::DistanceType::CosineExpanded},
+  {1024, 8192, 8, 16, 0.2, cuvs::distance::DistanceType::CosineExpanded}};
 
-INSTANTIATE_TEST_CASE_P(PrefilteredBruteForceOnBitmapTest,  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(PrefilteredBruteForceOnBitmapTest,
                         PrefilteredBruteForceTestOnBitmap_float_int64,
                         ::testing::ValuesIn(kSelectkInputs<int64_t>));
 
-INSTANTIATE_TEST_CASE_P(PrefilteredBruteForceOnBitmapTest,  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(PrefilteredBruteForceOnBitmapTest,
                         PrefilteredBruteForceTestOnBitmap_half_int64,
                         ::testing::ValuesIn(kSelectkInputs<int64_t>));
 
-INSTANTIATE_TEST_CASE_P(PrefilteredBruteForceOnBitsetTest,  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(PrefilteredBruteForceOnBitsetTest,
                         PrefilteredBruteForceTestOnBitset_float_int64,
                         ::testing::ValuesIn(kSelectkInputs<int64_t>));
 
-INSTANTIATE_TEST_CASE_P(PrefilteredBruteForceOnBitsetTest,  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(PrefilteredBruteForceOnBitsetTest,
                         PrefilteredBruteForceTestOnBitset_half_int64,
                         ::testing::ValuesIn(kSelectkInputs<int64_t>));
 

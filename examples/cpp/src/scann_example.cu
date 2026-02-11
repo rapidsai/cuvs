@@ -20,10 +20,8 @@ template <typename T>
 void scann_build_and_write(raft::device_resources const& dev_resources,
                            raft::device_matrix_view<const T, int64_t> dataset)
 {
-  using namespace cuvs::neighbors::experimental;  // NOLINT(google-build-using-namespace)
-
   // use default index parameters
-  scann::index_params index_params;
+  cuvs::neighbors::experimental::scann::index_params index_params;
 
   index_params.n_leaves            = 1000;
   index_params.kmeans_n_rows_train = 10000;
@@ -37,7 +35,7 @@ void scann_build_and_write(raft::device_resources const& dev_resources,
   std::cout << "Building ScaNN index" << std::endl;
 
   auto start = std::chrono::system_clock::now();
-  auto index = scann::build(dev_resources, index_params, dataset);
+  auto index = cuvs::neighbors::experimental::scann::build(dev_resources, index_params, dataset);
   auto end   = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;
 
@@ -46,7 +44,7 @@ void scann_build_and_write(raft::device_resources const& dev_resources,
   std::cout << "Time to build index: " << elapsed_seconds.count() << "s\n";
 
   // Output index to files in /tmp directory
-  serialize(dev_resources, "/tmp", index);
+  cuvs::neighbors::experimental::scann::serialize(dev_resources, "/tmp", index);
 }
 
 auto main(int argc, char* argv[]) -> int

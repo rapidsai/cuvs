@@ -84,8 +84,6 @@ void dynamic_batching_example(raft::resources const& res,
                               raft::device_matrix_view<const float, int64_t> dataset,
                               raft::device_matrix_view<const float, int64_t> queries)
 {
-  using namespace cuvs::neighbors;  // NOLINT(google-build-using-namespace)
-
   // Number of neighbors to search
   int64_t topk = 100;
 
@@ -112,10 +110,10 @@ void dynamic_batching_example(raft::resources const& res,
   auto distances_b = slice_matrix(distances, n_queries_a, n_queries_b);
 
   // use default index parameters
-  cagra::index_params orig_index_params;
+  cuvs::neighbors::cagra::index_params orig_index_params;
 
   std::cout << "Building CAGRA index (search graph)" << std::endl;
-  auto orig_index = cagra::build(res, orig_index_params, dataset);
+  auto orig_index = cuvs::neighbors::cagra::build(res, orig_index_params, dataset);
 
   std::cout << "CAGRA index has " << orig_index.size() << " vectors" << std::endl;
   std::cout << "CAGRA graph has degree " << orig_index.graph_degree() << ", graph size ["
@@ -123,14 +121,14 @@ void dynamic_batching_example(raft::resources const& res,
             << std::endl;
 
   // use default search parameters
-  cagra::search_params orig_search_params;
+  cuvs::neighbors::cagra::search_params orig_search_params;
   // get a decent recall by increasing the internal topk list
   orig_search_params.itopk_size = 512;
-  orig_search_params.algo       = cagra::search_algo::SINGLE_CTA;
+  orig_search_params.algo       = cuvs::neighbors::cagra::search_algo::SINGLE_CTA;
 
   // Set up dynamic batching parameters
-  dynamic_batching::index_params dynb_index_params{
-    /* default-initializing the parent `neighbors::index_params`
+  cuvs::neighbors::dynamic_batching::index_params dynb_index_params{
+    /* default-initializing the parent `cuvs::neighbors::index_params`
        (not used anyway) */
     {},
     /* Set the K in advance (the batcher needs to allocate buffers) */
@@ -141,12 +139,12 @@ void dynamic_batching_example(raft::resources const& res,
 
   // "build" the index (it's a low-cost index wrapping),
   //  that is we need to pass the original index and its search params here
-  dynamic_batching::index<float, uint32_t> dynb_index(
+  cuvs::neighbors::dynamic_batching::index<float, uint32_t> dynb_index(
     res, dynb_index_params, orig_index, orig_search_params);
 
   // You can implement job priorities by varying the deadlines of individual
   // requests
-  dynamic_batching::search_params dynb_search_params;
+  cuvs::neighbors::dynamic_batching::search_params dynb_search_params;
   dynb_search_params.dispatch_timeout_ms = 0.1;
 
   // Define the big-batch setting as a baseline for measuring the throughput.
@@ -154,7 +152,8 @@ void dynamic_batching_example(raft::resources const& res,
                              raft::device_matrix_view<const float, int64_t> queries,
                              raft::device_matrix_view<uint32_t, int64_t> neighbors,
                              raft::device_matrix_view<float, int64_t> distances) -> void {
-    cagra::search(res, orig_search_params, orig_index, queries, neighbors, distances);
+    cuvs::neighbors::cagra::search(
+      res, orig_search_params, orig_index, queries, neighbors, distances);
     raft::resource::sync_stream(res);
   };
 
@@ -184,12 +183,12 @@ void dynamic_batching_example(raft::resources const& res,
       // submit a new job
       if (i < work_size) {
         auto& res = resource_pool[i % kNumWorkerStreams];
-        cagra::search(res,
-                      orig_search_params,
-                      orig_index,
-                      slice_matrix(queries, i, 1),
-                      slice_matrix(neighbors, i, 1),
-                      slice_matrix(distances, i, 1));
+        cuvs::neighbors::cagra::search(res,
+                                       orig_search_params,
+                                       orig_index,
+                                       slice_matrix(queries, i, 1),
+                                       slice_matrix(neighbors, i, 1),
+                                       slice_matrix(distances, i, 1));
         futures[i % kMaxJobs] = cuda_work_completion_promise(res).get_future();
       }
     }
@@ -210,12 +209,12 @@ void dynamic_batching_example(raft::resources const& res,
       // submit a new job
       if (i < work_size) {
         auto& res = resource_pool[i % kNumWorkerStreams];
-        dynamic_batching::search(res,
-                                 dynb_search_params,
-                                 dynb_index,
-                                 slice_matrix(queries, i, 1),
-                                 slice_matrix(neighbors, i, 1),
-                                 slice_matrix(distances, i, 1));
+        cuvs::neighbors::dynamic_batching::search(res,
+                                                  dynb_search_params,
+                                                  dynb_index,
+                                                  slice_matrix(queries, i, 1),
+                                                  slice_matrix(neighbors, i, 1),
+                                                  slice_matrix(distances, i, 1));
         futures[i % kMaxJobs] = cuda_work_completion_promise(res).get_future();
       }
     }

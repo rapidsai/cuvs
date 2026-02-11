@@ -15,10 +15,7 @@
 
 namespace cuvs::neighbors::detail {
 
-template <typename ValueIdx,
-          typename ValueT,
-          typename OutputT,
-          typename ExpansionF>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, typename OutputT, typename ExpansionF>
 RAFT_KERNEL epilogue_on_csr_kernel(OutputT* __restrict__ compressed_C,
                                    const ValueIdx* __restrict__ rows,
                                    const ValueIdx* __restrict__ cols,
@@ -36,10 +33,7 @@ RAFT_KERNEL epilogue_on_csr_kernel(OutputT* __restrict__ compressed_C,
   compressed_C[tid] = expansion_func(compressed_C[tid], Q_sq_norms[i], R_sq_norms[j]);
 }
 
-template <typename ValueIdx,
-          typename ValueT,
-          typename OutputT,
-          int tpb = 256>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, typename OutputT, int tpb = 256>
 void epilogue_on_csr(raft::resources const& handle,
                      OutputT* compressed_C,
                      const ValueIdx nnz,

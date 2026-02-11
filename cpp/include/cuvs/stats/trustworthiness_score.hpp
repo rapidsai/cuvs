@@ -8,8 +8,7 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 
-namespace cuvs {  // NOLINT(modernize-concat-nested-namespaces)
-namespace stats {
+namespace cuvs::stats {
 /**
  * @defgroup stats_trustworthiness Trustworthiness
  * @{
@@ -36,5 +35,5 @@ auto trustworthiness_score(
   int batch_size                      = 512) -> double;
 
 /** @} */  // end group stats_trustworthiness
-}  // namespace stats
-}  // namespace cuvs
+
+}  // namespace cuvs::stats

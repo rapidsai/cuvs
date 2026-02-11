@@ -15,7 +15,7 @@
 namespace cuvs::preprocessing::quantize::binary {
 
 template <typename T>
-struct BinaryQuantizationInputs {  // NOLINT(readability-identifier-naming)
+struct BinaryQuantizationInputs {
   int rows;
   int cols;
   cuvs::preprocessing::quantize::binary::bit_threshold threshold;
@@ -38,11 +38,9 @@ auto operator<<(std::ostream& os, const BinaryQuantizationInputs<T>& inputs) -> 
 }
 
 template <typename T, typename QuantI>
-class BinaryQuantizationTest
-  : public ::testing::TestWithParam<
-      BinaryQuantizationInputs<T>> {  // NOLINT(readability-identifier-naming)
+class BinaryQuantizationTest : public ::testing::TestWithParam<BinaryQuantizationInputs<T>> {
  public:
-  BinaryQuantizationTest()  // NOLINT(modernize-use-equals-default)
+  BinaryQuantizationTest()
     : params_(::testing::TestWithParam<BinaryQuantizationInputs<T>>::GetParam()),
       stream(raft::resource::get_cuda_stream(handle)),
       input_(0, stream)
@@ -50,7 +48,7 @@ class BinaryQuantizationTest
   }
 
  protected:
-  void testBinaryQuantization()  // NOLINT(readability-identifier-naming)
+  void testBinaryQuantization()
   {
     // dataset identical on host / device
     auto dataset = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
@@ -88,7 +86,7 @@ class BinaryQuantizationTest
     }
   }
 
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     rows_ = params_.rows;
     cols_ = params_.cols;
@@ -100,7 +98,7 @@ class BinaryQuantizationTest
     train_host_ = params_.train_host;
 
     // random input
-    unsigned long long int seed = 1234ULL;  // NOLINT(google-runtime-int)
+    unsigned long long int seed = 1234ULL;
     raft::random::RngState r(seed);
     uniform(handle, r, input_.data(), input_.size(), static_cast<T>(-1), static_cast<T>(1));
 
@@ -110,8 +108,8 @@ class BinaryQuantizationTest
   }
 
  private:
-  raft::resources handle;  // NOLINT(readability-identifier-naming)
-  cudaStream_t stream;     // NOLINT(readability-identifier-naming)
+  raft::resources handle;
+  cudaStream_t stream;
 
   BinaryQuantizationInputs<T> params_;
   int rows_;
@@ -134,37 +132,34 @@ auto generate_inputs() -> const std::vector<BinaryQuantizationInputs<T>>
   return inputs;
 }
 
-using QuantizationTest_float_uint8t =
-  BinaryQuantizationTest<float, uint8_t>;  // NOLINT(readability-identifier-naming)
+using QuantizationTest_float_uint8t = BinaryQuantizationTest<float, uint8_t>;
 TEST_P(QuantizationTest_float_uint8t,
        BinaryQuantizationTest)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testBinaryQuantization();
-}  // NOLINT(readability-identifier-naming)
+}
 
-using QuantizationTest_double_uint8t =
-  BinaryQuantizationTest<double, uint8_t>;  // NOLINT(readability-identifier-naming)
+using QuantizationTest_double_uint8t = BinaryQuantizationTest<double, uint8_t>;
 TEST_P(QuantizationTest_double_uint8t,
        BinaryQuantizationTest)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testBinaryQuantization();
-}  // NOLINT(readability-identifier-naming)
+}
 
-using QuantizationTest_half_uint8t =
-  BinaryQuantizationTest<half, uint8_t>;  // NOLINT(readability-identifier-naming)
+using QuantizationTest_half_uint8t = BinaryQuantizationTest<half, uint8_t>;
 TEST_P(QuantizationTest_half_uint8t,
        BinaryQuantizationTest)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testBinaryQuantization();
-}  // NOLINT(readability-identifier-naming)
+}
 
-INSTANTIATE_TEST_CASE_P(BinaryQuantizationTest,  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(BinaryQuantizationTest,
                         QuantizationTest_float_uint8t,
                         ::testing::ValuesIn(generate_inputs<float>()));
-INSTANTIATE_TEST_CASE_P(BinaryQuantizationTest,  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(BinaryQuantizationTest,
                         QuantizationTest_double_uint8t,
                         ::testing::ValuesIn(generate_inputs<double>()));
-INSTANTIATE_TEST_CASE_P(BinaryQuantizationTest,  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(BinaryQuantizationTest,
                         QuantizationTest_half_uint8t,
                         ::testing::ValuesIn(generate_inputs<half>()));
 

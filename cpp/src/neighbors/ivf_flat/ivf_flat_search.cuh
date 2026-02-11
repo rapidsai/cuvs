@@ -28,7 +28,7 @@
 
 namespace cuvs::neighbors::ivf_flat::detail {
 
-using namespace cuvs::spatial::knn::detail;  // NOLINT
+namespace utils = cuvs::spatial::knn::detail::utils;
 
 auto RAFT_WEAK_FUNCTION is_local_topk_feasible(uint32_t k) -> bool
 {

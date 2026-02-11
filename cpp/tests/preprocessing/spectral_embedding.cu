@@ -14,16 +14,16 @@
 namespace cuvs::preprocessing::spectral_embedding {
 
 template <typename T>
-struct SpectralEmbeddingInputs {  // NOLINT(readability-identifier-naming)
-  int n_samples;                  // Number of samples in the dataset
-  int n_features;                 // Number of features in the dataset
-  int n_clusters;                 // Number of clusters to generate
-  int n_components;               // Number of components in the embedding
-  int n_neighbors;                // Number of neighbors for KNN
-  T cluster_std;                  // Standard deviation of clusters
-  bool norm_laplacian;            // Whether to use normalized Laplacian
-  bool drop_first;                // Whether to drop the first eigenvector
-  uint64_t seed;                  // Random seed
+struct SpectralEmbeddingInputs {
+  int n_samples;        // Number of samples in the dataset
+  int n_features;       // Number of features in the dataset
+  int n_clusters;       // Number of clusters to generate
+  int n_components;     // Number of components in the embedding
+  int n_neighbors;      // Number of neighbors for KNN
+  T cluster_std;        // Standard deviation of clusters
+  bool norm_laplacian;  // Whether to use normalized Laplacian
+  bool drop_first;      // Whether to drop the first eigenvector
+  uint64_t seed;        // Random seed
 };
 
 template <typename T>
@@ -37,11 +37,9 @@ auto operator<<(std::ostream& os, const SpectralEmbeddingInputs<T>& inputs) -> s
 }
 
 template <typename T>
-class SpectralEmbeddingTest
-  : public ::testing::TestWithParam<
-      SpectralEmbeddingInputs<T>> {  // NOLINT(readability-identifier-naming)
+class SpectralEmbeddingTest : public ::testing::TestWithParam<SpectralEmbeddingInputs<T>> {
  public:
-  SpectralEmbeddingTest()  // NOLINT(modernize-use-equals-default)
+  SpectralEmbeddingTest()
     : params_(::testing::TestWithParam<SpectralEmbeddingInputs<T>>::GetParam()),
       stream(raft::resource::get_cuda_stream(handle)),
       input_(raft::make_device_matrix<T, int, raft::row_major>(
@@ -53,7 +51,7 @@ class SpectralEmbeddingTest
   }
 
  protected:
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     n_samples_    = params_.n_samples;
     n_features_   = params_.n_features;
@@ -87,9 +85,9 @@ class SpectralEmbeddingTest
     config_.n_components = params_.drop_first ? n_components_ + 1 : n_components_;
   }
 
-  void TearDown() override {}  // NOLINT(readability-identifier-naming)
+  void TearDown() override {}
 
-  void testSpectralEmbedding()  // NOLINT(readability-identifier-naming)
+  void testSpectralEmbedding()
   {
     // Call the spectral embedding function
     transform(handle, config_, input_.view(), embedding_.view());
@@ -167,8 +165,8 @@ class SpectralEmbeddingTest
   }
 
  private:
-  raft::resources handle;  // NOLINT(readability-identifier-naming)
-  cudaStream_t stream;     // NOLINT(readability-identifier-naming)
+  raft::resources handle;
+  cudaStream_t stream;
 
   SpectralEmbeddingInputs<T> params_;
   int n_samples_;
@@ -185,7 +183,7 @@ class SpectralEmbeddingTest
 
 // Define test cases with different parameters
 template <typename T>
-const std::vector<SpectralEmbeddingInputs<T>> inputs = {  // NOLINT(readability-identifier-naming)
+const std::vector<SpectralEmbeddingInputs<T>> inputs = {
   // Small dataset with 2 components
   {100, 10, 3, 2, 10, 1.0f, true, false, 42ULL},
 
@@ -204,14 +202,10 @@ const std::vector<SpectralEmbeddingInputs<T>> inputs = {  // NOLINT(readability-
   // Larger dataset
   {10000, 20, 8, 2, 12, 1.0f, true, true, 42ULL}};
 
-using SpectralEmbeddingTestF =
-  SpectralEmbeddingTest<float>;  // NOLINT(readability-identifier-naming)
-TEST_P(SpectralEmbeddingTestF, Result)
-{
-  this->testSpectralEmbedding();
-}  // NOLINT(readability-identifier-naming)
+using SpectralEmbeddingTestF = SpectralEmbeddingTest<float>;
+TEST_P(SpectralEmbeddingTestF, Result) { this->testSpectralEmbedding(); }
 
-INSTANTIATE_TEST_CASE_P(SpectralEmbeddingTests,  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(SpectralEmbeddingTests,
                         SpectralEmbeddingTestF,
                         ::testing::ValuesIn(inputs<float>));
 

@@ -78,10 +78,10 @@ struct with_mapped_memory_t {
     switch (utils::check_pointer_residency(ptr)) {
       case utils::pointer_residency::DEVICE_ONLY:
       case utils::pointer_residency::HOST_AND_DEVICE: {
-        dev_ptr_ = (void*)ptr;  // NOLINT
+        dev_ptr_ = const_cast<void*>(static_cast<const void*>(ptr));
       } break;
       default: {
-        host_ptr_ = (void*)ptr;  // NOLINT
+        host_ptr_ = const_cast<void*>(static_cast<const void*>(ptr));
         RAFT_CUDA_TRY(cudaHostRegister(host_ptr_, size, choose_flags(ptr)));
         RAFT_CUDA_TRY(cudaHostGetDevicePointer(&dev_ptr_, host_ptr_, 0));
       } break;
@@ -93,7 +93,7 @@ struct with_mapped_memory_t {
     if (host_ptr_ != nullptr) { cudaHostUnregister(host_ptr_); }
   }
 
-  auto operator()() { return action_((PtrT)dev_ptr_); }  // NOLINT
+  auto operator()() { return action_(reinterpret_cast<PtrT>(dev_ptr_)); }
 
  private:
   Action action_;

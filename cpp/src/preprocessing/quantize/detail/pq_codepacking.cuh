@@ -29,7 +29,7 @@ struct bitfield_ref_t {
   uint32_t offset;
   uint32_t bits;
 
-  __host__ __device__ operator uint8_t() const  // NOLINT
+  __host__ __device__ operator uint8_t() const  // NOLINT(google-explicit-constructor)
   {
     const auto mask = static_cast<uint8_t>((1u << bits) - 1u);
     auto pair       = static_cast<uint32_t>(ptr[0]);
@@ -37,7 +37,7 @@ struct bitfield_ref_t {
     return static_cast<uint8_t>((pair >> offset) & mask);
   }
 
-  __host__ __device__ operator uint16_t() const  // NOLINT
+  __host__ __device__ operator uint16_t() const  // NOLINT(google-explicit-constructor)
   {
     const auto mask = static_cast<uint16_t>((1u << bits) - 1u);
     auto pair       = static_cast<uint32_t>(ptr[0]);

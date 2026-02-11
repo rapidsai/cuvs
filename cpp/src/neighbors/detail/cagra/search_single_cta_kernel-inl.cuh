@@ -1186,7 +1186,7 @@ struct alignas(kCacheLineBytes) job_desc_t {
     raft::div_rounding_up_safe(sizeof(value_t), sizeof(blob_elem_type));
   // Union facilitates loading the input by a warp in a single request
   union input_t {
-    blob_elem_type blob[kBlobSize];  // NOLINT
+    blob_elem_type blob[kBlobSize];
     value_t value;
   } input;
   // Last thread triggers this flag.
@@ -1717,7 +1717,7 @@ struct alignas(kCacheLineBytes) launcher_t {
     }
   }
 
-  inline ~launcher_t() noexcept  // NOLINT
+  inline ~launcher_t() noexcept
   {
     // bookkeeping: update the expected latency to wait more efficiently later
     constexpr size_t kWindow = 100;  // moving average memory
@@ -2026,30 +2026,29 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
     uint32_t* num_executed_iterations = nullptr;  // optional arg [num_queries]
     const index_type* dev_seed_ptr    = nullptr;  // optional arg [num_queries, num_seeds]
 
-    void* args[] =  // NOLINT
-      {&dd_dev_ptr,
-       &worker_handles_ptr,
-       &job_descriptors_ptr,
-       &completion_counters_ptr,
-       &graph_ptr,  // [dataset_size, graph_degree]
-       &graph_degree,
-       &source_indices_ptr,
-       &num_random_samplings,
-       &rand_xor_mask,
-       &dev_seed_ptr,
-       &num_seeds,
-       &hashmap_ptr,  // visited_hashmap_ptr: [num_queries, 1 << hash_bitlen]
-       &max_candidates,
-       &max_itopk,
-       &itopk_size,
-       &search_width,
-       &min_iterations,
-       &max_iterations,
-       &num_executed_iterations,
-       &hash_bitlen,
-       &small_hash_bitlen,
-       &small_hash_reset_interval,
-       &sample_filter};
+    void* args[] = {&dd_dev_ptr,
+                    &worker_handles_ptr,
+                    &job_descriptors_ptr,
+                    &completion_counters_ptr,
+                    &graph_ptr,  // [dataset_size, graph_degree]
+                    &graph_degree,
+                    &source_indices_ptr,
+                    &num_random_samplings,
+                    &rand_xor_mask,
+                    &dev_seed_ptr,
+                    &num_seeds,
+                    &hashmap_ptr,  // visited_hashmap_ptr: [num_queries, 1 << hash_bitlen]
+                    &max_candidates,
+                    &max_itopk,
+                    &itopk_size,
+                    &search_width,
+                    &min_iterations,
+                    &max_iterations,
+                    &num_executed_iterations,
+                    &hash_bitlen,
+                    &small_hash_bitlen,
+                    &small_hash_reset_interval,
+                    &sample_filter};
     cuda::atomic_thread_fence(cuda::memory_order_seq_cst, cuda::thread_scope_system);
     RAFT_CUDA_TRY(cudaLaunchCooperativeKernel<std::remove_pointer_t<kernel_type>>(
       kernel, gs, bs, args, smem_size, stream));

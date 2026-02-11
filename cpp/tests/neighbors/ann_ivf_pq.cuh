@@ -689,13 +689,13 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     }
   }
 
-  void SetUp() override  // NOLINT
+  void SetUp() override
   {
     gen_data();
     calc_ref();
   }
 
-  void TearDown() override  // NOLINT
+  void TearDown() override
   {
     cudaGetLastError();
     raft::resource::sync_stream(handle_);
@@ -706,11 +706,11 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
  private:
   raft::resources handle_;
   rmm::cuda_stream_view stream_;
-  ivf_pq_inputs ps;                           // NOLINT
-  rmm::device_uvector<DataT> database;        // NOLINT
-  rmm::device_uvector<DataT> search_queries;  // NOLINT
-  std::vector<IdxT> indices_ref;              // NOLINT
-  std::vector<EvalT> distances_ref;           // NOLINT
+  ivf_pq_inputs ps;
+  rmm::device_uvector<DataT> database;
+  rmm::device_uvector<DataT> search_queries;
+  std::vector<IdxT> indices_ref;
+  std::vector<EvalT> distances_ref;
 };
 
 /**
@@ -851,13 +851,13 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
       << ps;
   }
 
-  void SetUp() override  // NOLINT
+  void SetUp() override
   {
     gen_data();
     calc_ref();
   }
 
-  void TearDown() override  // NOLINT
+  void TearDown() override
   {
     cudaGetLastError();
     raft::resource::sync_stream(handle_);
@@ -868,11 +868,11 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
  private:
   raft::resources handle_;
   rmm::cuda_stream_view stream_;
-  ivf_pq_inputs ps;                           // NOLINT
-  rmm::device_uvector<DataT> database;        // NOLINT
-  rmm::device_uvector<DataT> search_queries;  // NOLINT
-  std::vector<IdxT> indices_ref;              // NOLINT
-  std::vector<EvalT> distances_ref;           // NOLINT
+  ivf_pq_inputs ps;
+  rmm::device_uvector<DataT> database;
+  rmm::device_uvector<DataT> search_queries;
+  std::vector<IdxT> indices_ref;
+  std::vector<EvalT> distances_ref;
 };
 
 /* Test cases */
@@ -1247,34 +1247,34 @@ inline auto special_cases() -> test_cases_t
 
 /* Test instantiations */
 
-#define TEST_BUILD_SEARCH(type)                         \
-  TEST_P(type, build_search) /* NOLINT */               \
-  {                                                     \
-    this->run([this]() { return this->build_only(); }); \
+#define TEST_BUILD_SEARCH(type)                                 \
+  TEST_P(type, build_search) /* NOLINT */                       \
+  {                                                             \
+    this->run([this]() -> auto { return this->build_only(); }); \
   }
 
-#define TEST_BUILD_HOST_INPUT_SEARCH(type)                         \
-  TEST_P(type, build_host_input_search) /* NOLINT */               \
-  {                                                                \
-    this->run([this]() { return this->build_only_host_input(); }); \
-  }
-
-#define TEST_BUILD_HOST_INPUT_OVERLAP_SEARCH(type)                         \
-  TEST_P(type, build_host_input_overlap_search) /* NOLINT */               \
+#define TEST_BUILD_HOST_INPUT_SEARCH(type)                                 \
+  TEST_P(type, build_host_input_search) /* NOLINT */                       \
   {                                                                        \
-    this->run([this]() { return this->build_only_host_input_overlap(); }); \
+    this->run([this]() -> auto { return this->build_only_host_input(); }); \
   }
 
-#define TEST_BUILD_EXTEND_SEARCH(type)                       \
-  TEST_P(type, build_extend_search) /* NOLINT */             \
-  {                                                          \
-    this->run([this]() { return this->build_2_extends(); }); \
+#define TEST_BUILD_HOST_INPUT_OVERLAP_SEARCH(type)                                 \
+  TEST_P(type, build_host_input_overlap_search) /* NOLINT */                       \
+  {                                                                                \
+    this->run([this]() -> auto { return this->build_only_host_input_overlap(); }); \
   }
 
-#define TEST_BUILD_SERIALIZE_SEARCH(type)                    \
-  TEST_P(type, build_serialize_search) /* NOLINT */          \
-  {                                                          \
-    this->run([this]() { return this->build_serialize(); }); \
+#define TEST_BUILD_EXTEND_SEARCH(type)                               \
+  TEST_P(type, build_extend_search) /* NOLINT */                     \
+  {                                                                  \
+    this->run([this]() -> auto { return this->build_2_extends(); }); \
+  }
+
+#define TEST_BUILD_SERIALIZE_SEARCH(type)                            \
+  TEST_P(type, build_serialize_search) /* NOLINT */                  \
+  {                                                                  \
+    this->run([this]() -> auto { return this->build_serialize(); }); \
   }
 
 #define TEST_BUILD_PRECOMPUTED(type) \

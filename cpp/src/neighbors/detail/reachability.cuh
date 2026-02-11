@@ -32,9 +32,7 @@ namespace cuvs::neighbors::detail::reachability {
  * @param[out] out output array (size n)
  * @param[in] stream stream for which to order cuda operations
  */
-template <typename ValueIdx,
-          typename ValueT,
-          int tpb = 256>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, int tpb = 256>
 void core_distances(raft::resources const& handle,
                     ValueT* knn_dists,
                     int min_samples,
@@ -67,7 +65,7 @@ void core_distances(raft::resources const& handle,
  * @param[in] k number of nearest neighbors
  * @param[in] metric distance metric to use
  */
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 void compute_knn(const raft::resources& handle,
                  const ValueT* X,
                  ValueIdx* inds,
@@ -87,7 +85,7 @@ void compute_knn(const raft::resources& handle,
   @brief Internal function for CPU->GPU interop
          to compute core_dists
 */
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 void compute_core_dists(const raft::resources& handle,
                         const ValueT* X,
                         ValueT* core_dists,
@@ -112,7 +110,7 @@ void compute_core_dists(const raft::resources& handle,
 }
 
 //  Functor to post-process distances into reachability space
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 struct reachability_post_process {
   DI auto operator()(ValueT value, ValueIdx row, ValueIdx col) const -> ValueT
   {
@@ -138,7 +136,7 @@ struct reachability_post_process {
  * @param[in] k neighborhood size (includes self-loop)
  * @param[in] core_dists array of core distances (size m)
  */
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 void mutual_reachability_knn_l2(const raft::resources& handle,
                                 ValueIdx* out_inds,
                                 ValueT* out_dists,
@@ -177,9 +175,7 @@ void mutual_reachability_knn_l2(const raft::resources& handle,
       epilogue);
 }
 
-template <typename ValueIdx,
-          typename ValueT,
-          typename NnzT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, typename NnzT>
 void mutual_reachability_graph(const raft::resources& handle,
                                const ValueT* X,
                                ValueIdx m,

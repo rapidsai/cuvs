@@ -47,7 +47,7 @@ struct cuda_lib_handle {
 #ifdef ANN_BENCH_LINK_CUDART
     constexpr int kFlags = RTLD_NOW | RTLD_GLOBAL | RTLD_DEEPBIND | RTLD_NODELETE;
     // The full name of the linked cudart library 'cudart.so.MAJOR.MINOR.PATCH'
-    char libname[] = ANN_BENCH_LINK_CUDART;  // NOLINT
+    char libname[] = ANN_BENCH_LINK_CUDART;
     handle         = dlopen(ANN_BENCH_LINK_CUDART, kFlags);
     if (handle != nullptr) { return; }
     // try strip the PATCH

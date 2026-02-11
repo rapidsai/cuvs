@@ -18,7 +18,7 @@ namespace cuvs::neighbors::ivf::detail {
  * number of samples per query (sum of the cluster sizes that we probe) is returned in n_samples.
  */
 template <int BlockDim>
-__launch_bounds__(BlockDim) RAFT_KERNEL  // NOLINT(readability-identifier-naming)
+__launch_bounds__(BlockDim) RAFT_KERNEL
   calc_chunk_indices_kernel(uint32_t n_probes,
                             const uint32_t* cluster_sizes,      // [n_clusters]
                             const uint32_t* clusters_to_probe,  // [n_queries, n_probes]
@@ -67,8 +67,7 @@ void calc_chunk_indices::configured::operator()(const uint32_t* cluster_sizes,
                 block_dim.x);
   }
 
-  void* args[] =  // NOLINT
-    {&n_probes, &cluster_sizes, &clusters_to_probe, &chunk_indices, &n_samples};
+  void* args[] = {&n_probes, &cluster_sizes, &clusters_to_probe, &chunk_indices, &n_samples};
   RAFT_CUDA_TRY(cudaLaunchKernel(kernel, grid_dim, block_dim, args, 0, stream));
 }
 

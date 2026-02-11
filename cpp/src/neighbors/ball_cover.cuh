@@ -47,7 +47,7 @@ namespace cuvs::neighbors::ball_cover::detail {
  * @param[inout] index an empty (and not previous built) instance of
  * cuvs::neighbors::ball_cover::index
  */
-template <typename IdxT, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename IdxT, typename ValueT>
 void build_index(raft::resources const& handle,
                  cuvs::neighbors::ball_cover::index<IdxT, ValueT>& index)
 {
@@ -90,7 +90,7 @@ void build_index(raft::resources const& handle,
  *               many datasets can still have great recall even by only
  *               looking in the closest landmark.
  */
-template <typename IdxT, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename IdxT, typename ValueT>
 void all_knn_query(raft::resources const& handle,
                    cuvs::neighbors::ball_cover::index<IdxT, ValueT>& index,
                    int64_t k,
@@ -164,7 +164,7 @@ void all_knn_query(raft::resources const& handle,
  *               many datasets can still have great recall even by only
  *               looking in the closest landmark.
  */
-template <typename IdxT, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename IdxT, typename ValueT>
 void all_knn_query(raft::resources const& handle,
                    cuvs::neighbors::ball_cover::index<IdxT, ValueT>& index,
                    raft::device_matrix_view<IdxT, int64_t, raft::row_major> inds,
@@ -222,7 +222,7 @@ void all_knn_query(raft::resources const& handle,
  *               looking in the closest landmark.
  * @param[in] n_query_pts number of query points
  */
-template <typename IdxT, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename IdxT, typename ValueT>
 void knn_query(raft::resources const& handle,
                const cuvs::neighbors::ball_cover::index<IdxT, ValueT>& index,
                int64_t k,
@@ -257,7 +257,7 @@ void knn_query(raft::resources const& handle,
  * @param[in]  query  first matrix [row-major] [on device] [dim = m x k]
  * @param[in]  eps    defines epsilon neighborhood radius
  */
-template <typename IdxT, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename IdxT, typename ValueT>
 void eps_nn(raft::resources const& handle,
             const cuvs::neighbors::ball_cover::index<IdxT, ValueT>& index,
             raft::device_matrix_view<bool, int64_t, raft::row_major> adj,
@@ -309,7 +309,7 @@ void eps_nn(raft::resources const& handle,
  *                     Upon return max_k is overwritten with the actual max_k found during
  *                     computation.
  */
-template <typename IdxT, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename IdxT, typename ValueT>
 void eps_nn(raft::resources const& handle,
             const cuvs::neighbors::ball_cover::index<IdxT, ValueT>& index,
             raft::device_vector_view<IdxT, int64_t> adj_ia,
@@ -397,7 +397,7 @@ void eps_nn(raft::resources const& handle,
  *               many datasets can still have great recall even by only
  *               looking in the closest landmark.
  */
-template <typename IdxT, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename IdxT, typename ValueT>
 void knn_query(raft::resources const& handle,
                const cuvs::neighbors::ball_cover::index<IdxT, ValueT>& index,
                raft::device_matrix_view<const ValueT, int64_t, raft::row_major> query,

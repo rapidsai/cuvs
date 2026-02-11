@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -65,7 +65,7 @@ class cuvs_cagra_hnswlib : public algo<T>, public algo_gpu {
 
   void save(const std::string& file) const override;
   void load(const std::string&) override;
-  std::unique_ptr<algo<T>> copy() override
+  auto copy() -> std::unique_ptr<algo<T>> override
   {
     return std::make_unique<cuvs_cagra_hnswlib<T, IdxT>>(*this);
   }
@@ -91,7 +91,7 @@ void cuvs_cagra_hnswlib<T, IdxT>::build(const T* dataset, size_t nrow)
   // so it takes a lambda to do it. Even though we know the shape, we want to use the wrapper as-is,
   // so we just modify that lambda.
   bps.cagra_params = [dataset_is_on_host, orig_cagra_params = bps.cagra_params](
-                       auto dataset_extents, auto metric) {
+                       auto dataset_extents, auto metric) -> auto {
     auto params                    = orig_cagra_params(dataset_extents, metric);
     params.attach_dataset_on_build = !dataset_is_on_host;
     return params;

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -93,8 +93,8 @@ auto create_algo(const std::string& algo,
 }
 
 template <typename T>
-std::unique_ptr<typename cuvs::bench::algo<T>::search_param> create_search_param(
-  const std::string& algo, const nlohmann::json& conf)
+auto create_search_param(const std::string& algo, const nlohmann::json& conf)
+  -> std::unique_ptr<typename cuvs::bench::algo<T>::search_param>
 {
   static auto fname = get_fun_name(reinterpret_cast<void*>(&create_search_param<T>));
   auto handle       = load_lib_raft_compat(algo);

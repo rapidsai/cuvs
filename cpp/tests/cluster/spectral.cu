@@ -23,7 +23,7 @@
 
 namespace cuvs {
 
-struct SpectralClusteringInputs {  // NOLINT(readability-identifier-naming)
+struct SpectralClusteringInputs {
   int n_row;
   int n_col;
   int n_clusters;
@@ -35,17 +35,11 @@ struct SpectralClusteringInputs {  // NOLINT(readability-identifier-naming)
 };
 
 template <typename T>
-class SpectralClusteringTest
-  : public ::testing::TestWithParam<
-      SpectralClusteringInputs> {  // NOLINT(readability-identifier-naming)
+class SpectralClusteringTest : public ::testing::TestWithParam<SpectralClusteringInputs> {
  public:
-  SpectralClusteringTest()  // NOLINT(modernize-use-equals-default)
-    : d_labels(0, raft::resource::get_cuda_stream(handle)),
-      d_labels_ref(0, raft::resource::get_cuda_stream(handle))
-  {
-  }
+  SpectralClusteringTest() = default;
 
-  void basicTest()  // NOLINT(readability-identifier-naming)
+  void basicTest()
   {
     testparams = ::testing::TestWithParam<SpectralClusteringInputs>::GetParam();
 
@@ -60,8 +54,7 @@ class SpectralClusteringTest
     params.tolerance    = 0.0f;
     params.rng_state    = raft::random::RngState(testparams.seed);
 
-    auto X = raft::make_device_matrix<float, int>(
-      handle, n_samples, n_features);  // NOLINT(readability-identifier-naming)
+    auto X      = raft::make_device_matrix<float, int>(handle, n_samples, n_features);
     auto labels = raft::make_device_vector<int, int>(handle, n_samples);
     auto stream = raft::resource::get_cuda_stream(handle);
 
@@ -149,19 +142,19 @@ class SpectralClusteringTest
     }
   }
 
-  void SetUp() override { basicTest(); }  // NOLINT(readability-identifier-naming)
+  void SetUp() override { basicTest(); }
 
  protected:
-  raft::resources handle;                 // NOLINT(readability-identifier-naming)
-  SpectralClusteringInputs testparams;    // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<int> d_labels;      // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<int> d_labels_ref;  // NOLINT(readability-identifier-naming)
-  double score;                           // NOLINT(readability-identifier-naming)
-  cluster::spectral::params params;       // NOLINT(readability-identifier-naming)
+  raft::resources handle;
+  SpectralClusteringInputs testparams;
+  rmm::device_uvector<int> d_labels{0, raft::resource::get_cuda_stream(handle)};
+  rmm::device_uvector<int> d_labels_ref{0, raft::resource::get_cuda_stream(handle)};
+  double score;
+  cluster::spectral::params params;
 };
 
 const std::vector<SpectralClusteringInputs> inputs = {
-  // NOLINT(readability-identifier-naming)
+
   // Small datasets with well-separated clusters
   {100, 10, 2, 2, 10, 3, 0.3f, 42ULL},  // Tighter clusters for better separation
   {200, 20, 3, 3, 15, 3, 0.3f, 123ULL},
@@ -183,28 +176,24 @@ const std::vector<SpectralClusteringInputs> inputs = {
   {500, 20, 3, 3, 15, 3, 0.5f, 777ULL},  // More spread but still reasonable
 };
 
-using SpectralClusteringTestF =
-  SpectralClusteringTest<float>;  // NOLINT(readability-identifier-naming)
-using SpectralClusteringTestD =
-  SpectralClusteringTest<double>;  // NOLINT(readability-identifier-naming)
+using SpectralClusteringTestF = SpectralClusteringTest<float>;
+using SpectralClusteringTestD = SpectralClusteringTest<double>;
 
-TEST_P(SpectralClusteringTestF,
-       Result)  // NOLINT(readability-identifier-naming)
+TEST_P(SpectralClusteringTestF, Result)
 {
   ASSERT_GT(score, 0.7) << "Adjusted Rand Index is too low: " << score;
 }
 
-TEST_P(SpectralClusteringTestD,
-       Result)  // NOLINT(readability-identifier-naming)
+TEST_P(SpectralClusteringTestD, Result)
 {
   ASSERT_GT(score, 0.7) << "Adjusted Rand Index (double) is too low: " << score;
 }
 
-INSTANTIATE_TEST_CASE_P(SpectralClusteringTests,  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(SpectralClusteringTests,
                         SpectralClusteringTestF,
                         ::testing::ValuesIn(inputs));
 
-INSTANTIATE_TEST_CASE_P(SpectralClusteringTests,  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(SpectralClusteringTests,
                         SpectralClusteringTestD,
                         ::testing::ValuesIn(inputs));
 

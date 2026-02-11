@@ -70,7 +70,7 @@ class cuvs_gpu : public algo<T>, public algo_gpu {
   void set_search_dataset(const T* dataset, size_t nrow) override;
   void save(const std::string& file) const override;
   void load(const std::string&) override;
-  std::unique_ptr<algo<T>> copy() override;
+  auto copy() -> std::unique_ptr<algo<T>> override;
 
  protected:
   // handle_ must go first to make sure it dies last and all memory allocated in pool
@@ -151,7 +151,7 @@ void cuvs_gpu<T>::search(
 }
 
 template <typename T>
-std::unique_ptr<algo<T>> cuvs_gpu<T>::copy()
+auto cuvs_gpu<T>::copy() -> std::unique_ptr<algo<T>>
 {
   return std::make_unique<cuvs_gpu<T>>(*this);  // use copy constructor
 }

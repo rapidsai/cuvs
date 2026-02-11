@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -11,7 +11,7 @@
 #include <raft/core/device_resources_snmg.hpp>
 
 namespace cuvs::bench {
-using namespace cuvs::neighbors;
+namespace ivf_pq = cuvs::neighbors::ivf_pq;
 
 template <typename T, typename IdxT>
 class cuvs_mg_ivf_pq : public algo<T>, public algo_gpu {
@@ -59,7 +59,7 @@ class cuvs_mg_ivf_pq : public algo<T>, public algo_gpu {
 
   void save(const std::string& file) const override;
   void load(const std::string&) override;
-  std::unique_ptr<algo<T>> copy() override;
+  auto copy() -> std::unique_ptr<algo<T>> override;
 
  private:
   raft::device_resources_snmg clique_;
@@ -106,7 +106,7 @@ void cuvs_mg_ivf_pq<T, IdxT>::load(const std::string& file)
 }
 
 template <typename T, typename IdxT>
-std::unique_ptr<algo<T>> cuvs_mg_ivf_pq<T, IdxT>::copy()
+auto cuvs_mg_ivf_pq<T, IdxT>::copy() -> std::unique_ptr<algo<T>>
 {
   return std::make_unique<cuvs_mg_ivf_pq<T, IdxT>>(*this);  // use copy constructor
 }

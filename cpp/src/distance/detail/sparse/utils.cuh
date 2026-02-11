@@ -19,9 +19,7 @@ namespace cuvs::distance::detail::sparse {
  * and precision.
  * @return the maximum number of columns that can be stored in smem
  */
-template <typename ValueIdx,
-          typename ValueT,
-          int kTpb = 1024>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, int kTpb = 1024>
 inline auto max_cols_per_block() -> int
 {
   // max cols = (total smem available - cub reduction smem)
@@ -29,9 +27,7 @@ inline auto max_cols_per_block() -> int
          sizeof(ValueT);
 }
 
-template <typename ValueIdx,
-          typename ValueT,
-          typename DotT = ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, typename DotT = ValueT>
 RAFT_KERNEL faster_dot_on_csr_kernel(DotT* __restrict__ dot,
                                      const ValueIdx* __restrict__ indptr,
                                      const ValueIdx* __restrict__ cols,
@@ -83,9 +79,7 @@ RAFT_KERNEL faster_dot_on_csr_kernel(DotT* __restrict__ dot,
   }
 }
 
-template <typename ValueIdx,
-          typename ValueT,
-          typename DotT = ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, typename DotT = ValueT>
 void faster_dot_on_csr(raft::resources const& handle,
                        DotT* dot,
                        const ValueIdx nnz,

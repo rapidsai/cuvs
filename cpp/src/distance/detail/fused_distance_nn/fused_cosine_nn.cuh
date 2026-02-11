@@ -54,15 +54,14 @@ void fused_cosine_nn(OutT* min,
 
   raft::identity_op fin_op{};
 
-  auto kernel =
-    fused_distance_nn_kernel<DataT,
-                             OutT,
-                             IdxT,
-                             policy_t,
-                             ReduceOpT,
-                             KVPReduceOpT,
-                             decltype(distance_op),
-                             decltype(fin_op)>;  // NOLINT(readability-identifier-naming)
+  auto kernel = fused_distance_nn_kernel<DataT,
+                                         OutT,
+                                         IdxT,
+                                         policy_t,
+                                         ReduceOpT,
+                                         KVPReduceOpT,
+                                         decltype(distance_op),
+                                         decltype(fin_op)>;
 
   // Get pointer to fp32 SIMT kernel to determine the runtime architecture of the
   // current system. Other methods to determine the architecture (that do not

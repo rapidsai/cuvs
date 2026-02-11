@@ -28,9 +28,7 @@ namespace cuvs::stats::batched::detail {
  * If the corresponding row is the only sample in its label, again 0
  * Only if the there are > 1 samples in the label, row is initialized to max
  */
-template <typename ValueT,
-          typename ValueIdx,
-          typename LabelIdx>  // NOLINT(readability-identifier-naming)
+template <typename ValueT, typename ValueIdx, typename LabelIdx>
 RAFT_KERNEL fill_b_kernel(
   ValueT* b, const LabelIdx* y, ValueIdx n_rows, LabelIdx n_labels, const ValueIdx* cluster_counts)
 {
@@ -65,9 +63,7 @@ RAFT_KERNEL fill_b_kernel(
  * intermediate values of a and b for the rows and columns present in the
  * current chunked pairwise distance matrix.
  */
-template <typename ValueT,
-          typename ValueIdx,
-          typename LabelIdx>  // NOLINT(readability-identifier-naming)
+template <typename ValueT, typename ValueIdx, typename LabelIdx>
 RAFT_KERNEL compute_chunked_a_b_kernel(ValueT* a,
                                        ValueT* b,
                                        ValueIdx row_offset,
@@ -120,7 +116,7 @@ auto get_cluster_counts(raft::resources const& handle,
   return cluster_counts;
 }
 
-template <typename ValueT, typename ValueIdx>  // NOLINT(readability-identifier-naming)
+template <typename ValueT, typename ValueIdx>
 auto get_pairwise_distance(raft::resources const& handle,
                            const ValueT* left_begin,
                            const ValueT* right_begin,
@@ -142,9 +138,7 @@ auto get_pairwise_distance(raft::resources const& handle,
   return distances;
 }
 
-template <typename ValueT,
-          typename ValueIdx,
-          typename LabelIdx>  // NOLINT(readability-identifier-naming)
+template <typename ValueT, typename ValueIdx, typename LabelIdx>
 void compute_chunked_a_b(raft::resources const& handle,
                          ValueT* a,
                          ValueT* b,
@@ -166,9 +160,7 @@ void compute_chunked_a_b(raft::resources const& handle,
     a, b, row_offset, col_offset, y, n_labels, cluster_counts, distances, dist_rows, dist_cols);
 }
 
-template <typename ValueT,
-          typename ValueIdx,
-          typename LabelIdx>  // NOLINT(readability-identifier-naming)
+template <typename ValueT, typename ValueIdx, typename LabelIdx>
 auto silhouette_score(
   raft::resources const& handle,
   const ValueT* X,

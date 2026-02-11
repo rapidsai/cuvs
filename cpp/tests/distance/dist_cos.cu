@@ -6,21 +6,20 @@
 #include "../test_utils.cuh"
 #include "distance_base.cuh"
 
-namespace cuvs {  // NOLINT(modernize-concat-nested-namespaces)
-namespace distance {
+namespace cuvs::distance {
 
 template <typename DataType, typename OutputType = DataType>
-class DistanceExpCos  // NOLINT(readability-identifier-naming)
+class DistanceExpCos
   : public DistanceTest<cuvs::distance::DistanceType::CosineExpanded, DataType, OutputType> {};
 
 template <typename DataType, typename OutputType = DataType>
-class DistanceExpCosXequalY  // NOLINT(readability-identifier-naming)
+class DistanceExpCosXequalY
   : public DistanceTestSameBuffer<cuvs::distance::DistanceType::CosineExpanded,
                                   DataType,
                                   OutputType> {};
 
 const std::vector<DistanceInputs<float>> inputsf = {
-  // NOLINT(readability-identifier-naming)
+
   {0.001f, 128, (65536 + 128) * 128, 8, true, 1234ULL},
   {0.001f, 1024, 1024, 32, true, 1234ULL},
   {0.001f, 1024, 32, 1024, true, 1234ULL},
@@ -34,7 +33,7 @@ const std::vector<DistanceInputs<float>> inputsf = {
 };
 
 const std::vector<DistanceInputs<float>> inputsXeqYf = {
-  // NOLINT(readability-identifier-naming)
+
   {0.01f, 1024, 1024, 32, true, 1234ULL},
   {0.01f, 1024, 32, 1024, true, 1234ULL},
   {0.01f, 32, 1024, 1024, true, 1234ULL},
@@ -46,7 +45,7 @@ const std::vector<DistanceInputs<float>> inputsXeqYf = {
 };
 
 const std::vector<DistanceInputs<half, float>> inputsh = {
-  // NOLINT(readability-identifier-naming)
+
   {0.001f, 128, (65536 + 128) * 128, 8, true, 1234ULL},
   {0.001f, 1024, 1024, 32, true, 1234ULL},
   {0.001f, 1024, 32, 1024, true, 1234ULL},
@@ -60,7 +59,7 @@ const std::vector<DistanceInputs<half, float>> inputsh = {
 };
 
 const std::vector<DistanceInputs<half, float>> inputsXeqYh = {
-  // NOLINT(readability-identifier-naming)
+
   {0.01f, 1024, 1024, 32, true, 1234ULL},
   {0.01f, 1024, 32, 1024, true, 1234ULL},
   {0.01f, 32, 1024, 1024, true, 1234ULL},
@@ -71,9 +70,9 @@ const std::vector<DistanceInputs<half, float>> inputsXeqYh = {
   {0.03f, 1024, 1024, 1024, false, 1234ULL},
 };
 
-using DistanceExpCosF = DistanceExpCos<float>;  // NOLINT(readability-identifier-naming)
+using DistanceExpCosF = DistanceExpCos<float>;
 TEST_P(DistanceExpCosF,
-       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+       Result)  // NOLINT(modernize-use-trailing-return-type)
 {
   int m = params.isRowMajor ? params.m : params.n;
   int n = params.isRowMajor ? params.n : params.m;
@@ -83,12 +82,11 @@ TEST_P(DistanceExpCosF,
 INSTANTIATE_TEST_CASE_P(
   DistanceTests,
   DistanceExpCosF,
-  ::testing::ValuesIn(
-    inputsf));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  ::testing::ValuesIn(inputsf));  // NOLINT(modernize-use-trailing-return-type)
 
-using DistanceExpCosH = DistanceExpCos<half, float>;  // NOLINT(readability-identifier-naming)
+using DistanceExpCosH = DistanceExpCos<half, float>;
 TEST_P(DistanceExpCosH,
-       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+       Result)  // NOLINT(modernize-use-trailing-return-type)
 {
   int m = params.isRowMajor ? params.m : params.n;
   int n = params.isRowMajor ? params.n : params.m;
@@ -98,12 +96,11 @@ TEST_P(DistanceExpCosH,
 INSTANTIATE_TEST_CASE_P(
   DistanceTests,
   DistanceExpCosH,
-  ::testing::ValuesIn(
-    inputsh));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  ::testing::ValuesIn(inputsh));  // NOLINT(modernize-use-trailing-return-type)
 
-using DistanceExpCosXequalYF = DistanceExpCosXequalY<float>;  // NOLINT(readability-identifier-naming)
+using DistanceExpCosXequalYF = DistanceExpCosXequalY<float>;
 TEST_P(DistanceExpCosXequalYF,
-       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+       Result)  // NOLINT(modernize-use-trailing-return-type)
 {
   int m = params.m;
   int n = params.m;
@@ -126,12 +123,11 @@ TEST_P(DistanceExpCosXequalYF,
 INSTANTIATE_TEST_CASE_P(
   DistanceTests,
   DistanceExpCosXequalYF,
-  ::testing::ValuesIn(
-    inputsXeqYf));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  ::testing::ValuesIn(inputsXeqYf));  // NOLINT(modernize-use-trailing-return-type)
 
-using DistanceExpCosXequalYH = DistanceExpCosXequalY<half, float>;  // NOLINT(readability-identifier-naming)
+using DistanceExpCosXequalYH = DistanceExpCosXequalY<half, float>;
 TEST_P(DistanceExpCosXequalYH,
-       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+       Result)  // NOLINT(modernize-use-trailing-return-type)
 {
   int m = params.m;
   int n = params.m;
@@ -154,11 +150,10 @@ TEST_P(DistanceExpCosXequalYH,
 INSTANTIATE_TEST_CASE_P(
   DistanceTests,
   DistanceExpCosXequalYH,
-  ::testing::ValuesIn(
-    inputsXeqYh));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  ::testing::ValuesIn(inputsXeqYh));  // NOLINT(modernize-use-trailing-return-type)
 
 const std::vector<DistanceInputs<double>> inputsd = {
-  // NOLINT(readability-identifier-naming)
+
   {0.001, 1024, 1024, 32, true, 1234ULL},
   {0.001, 1024, 32, 1024, true, 1234ULL},
   {0.001, 32, 1024, 1024, true, 1234ULL},
@@ -168,9 +163,9 @@ const std::vector<DistanceInputs<double>> inputsd = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-using DistanceExpCosD = DistanceExpCos<double>;  // NOLINT(readability-identifier-naming)
+using DistanceExpCosD = DistanceExpCos<double>;
 TEST_P(DistanceExpCosD,
-       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+       Result)  // NOLINT(modernize-use-trailing-return-type)
 {
   int m = params.isRowMajor ? params.m : params.n;
   int n = params.isRowMajor ? params.n : params.m;
@@ -180,13 +175,9 @@ TEST_P(DistanceExpCosD,
 INSTANTIATE_TEST_CASE_P(
   DistanceTests,
   DistanceExpCosD,
-  ::testing::ValuesIn(
-    inputsd));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  ::testing::ValuesIn(inputsd));  // NOLINT(modernize-use-trailing-return-type)
 
-class BigMatrixCos : public BigMatrixDistanceTest<cuvs::distance::DistanceType::CosineExpanded> {
-};  // NOLINT(readability-identifier-naming)
-TEST_F(BigMatrixCos, Result) {
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+class BigMatrixCos : public BigMatrixDistanceTest<cuvs::distance::DistanceType::CosineExpanded> {};
+TEST_F(BigMatrixCos, Result) {}  // NOLINT(modernize-use-trailing-return-type)
 
-}  // end namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance

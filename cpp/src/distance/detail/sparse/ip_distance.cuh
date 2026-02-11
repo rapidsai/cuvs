@@ -26,7 +26,7 @@
 
 namespace cuvs::distance::detail::sparse {
 
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 class ip_distances_t : public distances_t<ValueT> {
  public:
   /**

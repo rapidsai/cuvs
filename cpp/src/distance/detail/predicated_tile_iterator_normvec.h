@@ -44,26 +44,25 @@ namespace cuvs::epilogue::threadblock {
 /// Satisfies: ReadableTileIterator | PredicatedTileIterator | ForwardTileIterator
 ///
 template <typename ThreadMap_,  ///< Thread map (conept: OutputTileThreadMap)  //
-                                ///< NOLINT(readability-identifier-naming)
-          typename Element_,    ///< Element data type  // NOLINT(readability-identifier-naming)
-          typename Layout_,     // NOLINT(readability-identifier-naming)
+
+          typename Element_,  ///< Element data type
+          typename Layout_,
           bool ScatterD     = false,  ///< Scatter D operand or not
           bool UseCUDAStore = false>
-class PredicatedTileIteratorNormVec {  // NOLINT(readability-identifier-naming)
+class PredicatedTileIteratorNormVec {
  public:
-  using ThreadMap = ThreadMap_;                 // NOLINT(readability-identifier-naming)
-  using Shape     = typename ThreadMap::Shape;  // NOLINT(readability-identifier-naming)
+  using ThreadMap = ThreadMap_;
+  using Shape     = typename ThreadMap::Shape;
 
-  using Element = Element_;  // NOLINT(readability-identifier-naming)
+  using Element = Element_;
 
-  using Layout    = Layout_;                              // NOLINT(readability-identifier-naming)
-  using TensorRef = cutlass::TensorRef<Element, Layout>;  // NOLINT(readability-identifier-naming)
-  using ConstTensorRef =
-    typename TensorRef::ConstTensorRef;  // NOLINT(readability-identifier-naming)
+  using Layout         = Layout_;
+  using TensorRef      = cutlass::TensorRef<Element, Layout>;
+  using ConstTensorRef = typename TensorRef::ConstTensorRef;
 
-  using Index       = typename Layout::Index;      // NOLINT(readability-identifier-naming)
-  using LongIndex   = typename Layout::LongIndex;  // NOLINT(readability-identifier-naming)
-  using TensorCoord = cutlass::MatrixCoord;        // NOLINT(readability-identifier-naming)
+  using Index       = typename Layout::Index;
+  using LongIndex   = typename Layout::LongIndex;
+  using TensorCoord = cutlass::MatrixCoord;
 
   static int const kElementsPerAccess = ThreadMap::kElementsPerAccess;
   static int const kThreads           = ThreadMap::kThreads;
@@ -89,10 +88,8 @@ class PredicatedTileIteratorNormVec {  // NOLINT(readability-identifier-naming)
   //
 
   /// Uses a non-template class
-  struct Params : cutlass::epilogue::threadblock::
-                    PredicatedTileIteratorParams {  // NOLINT(readability-identifier-naming)
-    using Base = cutlass::epilogue::threadblock::
-      PredicatedTileIteratorParams;  // NOLINT(readability-identifier-naming)
+  struct Params : cutlass::epilogue::threadblock::PredicatedTileIteratorParams {
+    using Base = cutlass::epilogue::threadblock::PredicatedTileIteratorParams;
 
     CUTLASS_HOST_DEVICE
     Params() = default;
@@ -110,7 +107,7 @@ class PredicatedTileIteratorNormVec {  // NOLINT(readability-identifier-naming)
   };
 
   /// Mask object
-  struct Mask {  // NOLINT(readability-identifier-naming)
+  struct Mask {
     static int const kCount = ThreadMap::Iterations::kColumn;
 
     /// Predicate state
@@ -400,12 +397,10 @@ class PredicatedTileIteratorNormVec {  // NOLINT(readability-identifier-naming)
           bool row_guard = ((row_offset + thread_start_row_) < extent_row_);
 
           int output_row = row_offset + thread_start_row_;
-          int output_N =
-            output_row / (convolution_P * convolution_Q);  // NOLINT(readability-identifier-naming)
-          int output_PQ =
-            output_row % (convolution_P * convolution_Q);  // NOLINT(readability-identifier-naming)
-          int output_P = output_PQ / convolution_Q;        // NOLINT(readability-identifier-naming)
-          int output_Q = output_PQ % convolution_Q;        // NOLINT(readability-identifier-naming)
+          int output_N   = output_row / (convolution_P * convolution_Q);
+          int output_PQ  = output_row % (convolution_P * convolution_Q);
+          int output_P   = output_PQ / convolution_Q;
+          int output_Q   = output_PQ % convolution_Q;
 
           int input_row = output_N * 2 * convolution_P * 2 * convolution_Q +
                           (2 * output_P + add_P) * 2 * convolution_Q + 2 * output_Q + add_Q;
@@ -464,14 +459,12 @@ class PredicatedTileIteratorNormVec {  // NOLINT(readability-identifier-naming)
           bool row_guard = ((row_offset + thread_start_row_) < extent_row_);
 
           int output_row = row_offset + thread_start_row_;
-          int output_N =
-            output_row / (convolution_P * convolution_Q);  // NOLINT(readability-identifier-naming)
-          int output_PQ =
-            output_row % (convolution_P * convolution_Q);  // NOLINT(readability-identifier-naming)
-          int output_P  = output_PQ / convolution_Q;       // NOLINT(readability-identifier-naming)
-          int output_Q  = output_PQ % convolution_Q;       // NOLINT(readability-identifier-naming)
-          int row_add_P = add_P;                           // NOLINT(readability-identifier-naming)
-          int row_add_Q = add_Q;                           // NOLINT(readability-identifier-naming)
+          int output_N   = output_row / (convolution_P * convolution_Q);
+          int output_PQ  = output_row % (convolution_P * convolution_Q);
+          int output_P   = output_PQ / convolution_Q;
+          int output_Q   = output_PQ % convolution_Q;
+          int row_add_P  = add_P;
+          int row_add_Q  = add_Q;
           if (output_P > convolution_P - 2) row_add_P = 0;
           if (output_Q > convolution_Q - 2) row_add_Q = 0;
 

@@ -28,7 +28,7 @@
 namespace cuvs::distance::detail::sparse {
 
 // @TODO: Move this into sparse prims (coo_norm)
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 RAFT_KERNEL compute_row_norm_kernel(ValueT* out,
                                     const ValueIdx* __restrict__ coo_rows,
                                     const ValueT* __restrict__ data,
@@ -38,7 +38,7 @@ RAFT_KERNEL compute_row_norm_kernel(ValueT* out,
   if (i < nnz) { atomicAdd(&out[coo_rows[i]], data[i] * data[i]); }
 }
 
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 RAFT_KERNEL compute_row_sum_kernel(ValueT* out,
                                    const ValueIdx* __restrict__ coo_rows,
                                    const ValueT* __restrict__ data,
@@ -48,9 +48,7 @@ RAFT_KERNEL compute_row_sum_kernel(ValueT* out,
   if (i < nnz) { atomicAdd(&out[coo_rows[i]], data[i]); }
 }
 
-template <typename ValueIdx,
-          typename ValueT,
-          typename ExpansionF>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, typename ExpansionF>
 RAFT_KERNEL compute_euclidean_warp_kernel(ValueT* __restrict__ C,
                                           const ValueT* __restrict__ q_sq_norms,
                                           const ValueT* __restrict__ r_sq_norms,
@@ -73,7 +71,7 @@ RAFT_KERNEL compute_euclidean_warp_kernel(ValueT* __restrict__ C,
   C[(size_t)i * n_cols + j] = val * (fabs(val) >= 0.0001);
 }
 
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 RAFT_KERNEL compute_correlation_warp_kernel(ValueT* __restrict__ C,
                                             const ValueT* __restrict__ q_sq_norms,
                                             const ValueT* __restrict__ r_sq_norms,
@@ -106,10 +104,7 @@ RAFT_KERNEL compute_correlation_warp_kernel(ValueT* __restrict__ C,
   C[(size_t)i * n_cols + j] = val * (fabs(val) >= 0.0001);
 }
 
-template <typename ValueIdx,
-          typename ValueT,
-          int tpb = 256,
-          typename ExpansionF>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, int tpb = 256, typename ExpansionF>
 void compute_euclidean(ValueT* C,
                        const ValueT* q_sq_norms,
                        const ValueT* r_sq_norms,
@@ -123,10 +118,7 @@ void compute_euclidean(ValueT* C,
     C, q_sq_norms, r_sq_norms, n_rows, n_cols, expansion_func);
 }
 
-template <typename ValueIdx,
-          typename ValueT,
-          int tpb = 256,
-          typename ExpansionF>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, int tpb = 256, typename ExpansionF>
 void compute_l2(ValueT* out,
                 const ValueIdx* Q_coo_rows,
                 const ValueT* Q_data,
@@ -152,9 +144,7 @@ void compute_l2(ValueT* out,
   compute_euclidean(out, q_sq_norms.data(), r_sq_norms.data(), m, n, stream, expansion_func);
 }
 
-template <typename ValueIdx,
-          typename ValueT,
-          int tpb = 256>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, int tpb = 256>
 void compute_correlation(ValueT* C,
                          const ValueT* q_sq_norms,
                          const ValueT* r_sq_norms,
@@ -170,9 +160,7 @@ void compute_correlation(ValueT* C,
     C, q_sq_norms, r_sq_norms, q_norms, r_norms, n_rows, n_cols, n);
 }
 
-template <typename ValueIdx,
-          typename ValueT,
-          int tpb = 256>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, int tpb = 256>
 void compute_corr(ValueT* out,
                   const ValueIdx* Q_coo_rows,
                   const ValueT* Q_data,
@@ -224,8 +212,7 @@ void compute_corr(ValueT* out,
  * L2 distance using the expanded form: sum(x_k)^2 + sum(y_k)^2 - 2 * sum(x_k * y_k)
  * The expanded form is more efficient for sparse data.
  */
-template <typename ValueIdx = int,
-          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = int, typename ValueT = float>
 class l2_expanded_distances_t : public distances_t<ValueT> {
  public:
   explicit l2_expanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
@@ -274,8 +261,7 @@ class l2_expanded_distances_t : public distances_t<ValueT> {
  * L2 sqrt distance performing the sqrt operation after the distance computation
  * The expanded form is more efficient for sparse data.
  */
-template <typename ValueIdx = int,
-          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = int, typename ValueT = float>
 class l2_sqrt_expanded_distances_t : public l2_expanded_distances_t<ValueIdx, ValueT> {
  public:
   explicit l2_sqrt_expanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
@@ -301,7 +287,7 @@ class l2_sqrt_expanded_distances_t : public l2_expanded_distances_t<ValueIdx, Va
   ~l2_sqrt_expanded_distances_t() = default;
 };
 
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 class correlation_expanded_distances_t : public distances_t<ValueT> {
  public:
   explicit correlation_expanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
@@ -348,8 +334,7 @@ class correlation_expanded_distances_t : public distances_t<ValueT> {
  * Cosine distance using the expanded form: 1 - ( sum(x_k * y_k) / (sqrt(sum(x_k)^2) *
  * sqrt(sum(y_k)^2))) The expanded form is more efficient for sparse data.
  */
-template <typename ValueIdx = int,
-          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = int, typename ValueT = float>
 class cosine_expanded_distances_t : public distances_t<ValueT> {
  public:
   explicit cosine_expanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
@@ -412,8 +397,7 @@ class cosine_expanded_distances_t : public distances_t<ValueT> {
  * it is possible that the values in A and B might differ slightly
  * after this is invoked.
  */
-template <typename ValueIdx = int,
-          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = int, typename ValueT = float>
 class hellinger_expanded_distances_t : public distances_t<ValueT> {
  public:
   explicit hellinger_expanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)
@@ -459,8 +443,7 @@ class hellinger_expanded_distances_t : public distances_t<ValueT> {
   rmm::device_uvector<char> workspace_;
 };
 
-template <typename ValueIdx = int,
-          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = int, typename ValueT = float>
 class russelrao_expanded_distances_t : public distances_t<ValueT> {
  public:
   explicit russelrao_expanded_distances_t(const distances_config_t<ValueIdx, ValueT>& config)

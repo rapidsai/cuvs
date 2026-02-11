@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -51,7 +51,10 @@ class cuvs_vamana : public algo<T>, public algo_gpu {
 
   void save(const std::string& file) const override;
   void load(const std::string&) override;
-  std::unique_ptr<algo<T>> copy() override { return std::make_unique<cuvs_vamana<T, IdxT>>(*this); }
+  auto copy() -> std::unique_ptr<algo<T>> override
+  {
+    return std::make_unique<cuvs_vamana<T, IdxT>>(*this);
+  }
 
  private:
   configured_raft_resources handle_{};

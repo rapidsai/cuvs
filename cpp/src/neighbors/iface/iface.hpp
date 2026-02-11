@@ -70,10 +70,7 @@ void extend(
   resource::sync_stream(handle);
 }
 
-template <typename AnnIndexType,
-          typename T,
-          typename IdxT,
-          typename searchIdxT>  // NOLINT(readability-identifier-naming)
+template <typename AnnIndexType, typename T, typename IdxT, typename searchIdxT>
 void search(const raft::resources& handle,
             const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
             const cuvs::neighbors::search_params* search_params,
@@ -109,10 +106,7 @@ void search(const raft::resources& handle,
 }
 
 // for MG ANN only
-template <typename AnnIndexType,
-          typename T,
-          typename IdxT,
-          typename searchIdxT>  // NOLINT(readability-identifier-naming)
+template <typename AnnIndexType, typename T, typename IdxT, typename searchIdxT>
 void search(const raft::resources& handle,
             const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
             const cuvs::neighbors::search_params* search_params,

@@ -14,7 +14,7 @@
 #include <cuda_fp16.h>
 
 namespace cuvs::neighbors::detail {
-template <typename ValueT, typename DistanceT>  // NOLINT(readability-identifier-naming)
+template <typename ValueT, typename DistanceT>
 DI auto compute_haversine(ValueT x1, ValueT y1, ValueT x2, ValueT y2) -> DistanceT
 {
   if constexpr ((std::is_same_v<DistanceT, float> && std::is_same_v<ValueT, half>)) {
@@ -51,7 +51,7 @@ DI auto compute_haversine(ValueT x1, ValueT y1, ValueT x2, ValueT y2) -> Distanc
  * @param[in] k number of closest neighbors to return
  */
 template <typename ValueIdx,
-          typename ValueT,  // NOLINT(readability-identifier-naming)
+          typename ValueT,
           int warp_q         = 1024,
           int thread_q       = 8,
           int tpb            = 128,
@@ -127,9 +127,7 @@ RAFT_KERNEL haversine_knn_kernel(ValueIdx* out_inds,
  * @param[in] k number of closest neighbors to return
  * @param[in] stream stream to order kernel launch
  */
-template <typename ValueIdx,
-          typename ValueT,
-          typename DistanceT = float>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, typename DistanceT = float>
 void haversine_knn(ValueIdx* out_inds,
                    DistanceT* out_dists,
                    const ValueT* index,

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -64,11 +64,10 @@ void print_results(raft::device_resources const& dev_resources,
 }
 
 /** Subsample the dataset to create a training set*/
-raft::device_matrix<float, int64_t> subsample(
-  raft::device_resources const& dev_resources,
-  raft::device_matrix_view<const float, int64_t> dataset,
-  raft::device_vector_view<const int64_t, int64_t> data_indices,
-  float fraction)
+auto subsample(raft::device_resources const& dev_resources,
+               raft::device_matrix_view<const float, int64_t> dataset,
+               raft::device_vector_view<const int64_t, int64_t> data_indices,
+               float fraction) -> raft::device_matrix<float, int64_t>
 {
   int64_t n_samples = dataset.extent(0);
   int64_t n_dim     = dataset.extent(1);
@@ -89,16 +88,16 @@ raft::device_matrix<float, int64_t> subsample(
 }
 
 template <typename T, typename idxT>
-raft::device_matrix<T, idxT> read_bin_dataset(raft::device_resources const& dev_resources,
-                                              std::string fname,
-                                              int max_N = INT_MAX)
+auto read_bin_dataset(raft::device_resources const& dev_resources,
+                      std::string fname,
+                      int max_N = INT_MAX) -> raft::device_matrix<T, idxT>
 {
   // Read datafile in
   std::ifstream datafile(fname, std::ifstream::binary);
   uint32_t N;
   uint32_t dim;
-  datafile.read((char*)&N, sizeof(uint32_t));
-  datafile.read((char*)&dim, sizeof(uint32_t));
+  datafile.read(reinterpret_cast<char*>(&N), sizeof(uint32_t));
+  datafile.read(reinterpret_cast<char*>(&dim), sizeof(uint32_t));
 
   if (N > max_N) N = max_N;
   printf("Read in file - N:%u, dim:%u\n", N, dim);

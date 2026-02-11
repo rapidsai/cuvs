@@ -190,7 +190,7 @@ struct dynamic_batching_test : public ::testing::TestWithParam<dynamic_batching_
       << ps;
   }
 
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     dataset.emplace(raft::make_device_matrix<data_type, int64_t>(res, ps.n_rows, ps.dim));
     queries.emplace(raft::make_device_matrix<data_type, int64_t>(res, ps.n_queries, ps.dim));
@@ -216,7 +216,7 @@ struct dynamic_batching_test : public ::testing::TestWithParam<dynamic_batching_
     raft::resource::sync_stream(res);
   }
 
-  void TearDown() override  // NOLINT(readability-identifier-naming)
+  void TearDown() override
   {
     index_dynb.reset();
     index_upsm.reset();

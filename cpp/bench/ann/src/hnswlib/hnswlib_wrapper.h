@@ -182,7 +182,7 @@ template <typename T>
 void hnsw_lib<T>::search(
   const T* query, int batch_size, int k, algo_base::index_type* indices, float* distances) const
 {
-  auto f = [&](int i) {
+  auto f = [&](int i) -> void {
     // hnsw can only handle a single vector at a time.
     get_search_knn_results(query + i * dim_, k, indices + i * k, distances + i * k);
   };
@@ -198,7 +198,7 @@ void hnsw_lib<T>::search(
 template <typename T>
 void hnsw_lib<T>::save(const std::string& path_to_index) const
 {
-  appr_alg_->saveIndex(std::string(path_to_index));
+  appr_alg_->saveIndex(path_to_index);
 }
 
 template <typename T>

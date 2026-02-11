@@ -36,9 +36,7 @@ namespace cuvs::cluster::agglomerative {
  *            of k. The algorithm will set `k = log(n) + c`
  * @param[in] n_clusters number of clusters to assign data samples
  */
-template <typename ValueIdx,
-          typename ValueT,
-          Linkage dist_type = Linkage::KNN_GRAPH>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, Linkage dist_type = Linkage::KNN_GRAPH>
 void single_linkage(raft::resources const& handle,
                     const ValueT* X,
                     ValueIdx m,
@@ -69,9 +67,7 @@ void single_linkage(raft::resources const& handle,
  * @param[in] c a constant used when constructing connectivities from knn graph. Allows the indirect
  control of k. The algorithm will set `k = log(n) + c`
  */
-template <typename ValueT,
-          typename IdxT,
-          Linkage dist_type = Linkage::KNN_GRAPH>  // NOLINT(readability-identifier-naming)
+template <typename ValueT, typename IdxT, Linkage dist_type = Linkage::KNN_GRAPH>
 void single_linkage(raft::resources const& handle,
                     raft::device_matrix_view<const ValueT, IdxT, raft::row_major> X,
                     raft::device_matrix_view<IdxT, IdxT, raft::row_major> dendrogram,

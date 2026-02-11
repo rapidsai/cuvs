@@ -67,24 +67,22 @@ using cutlass::gemm::kernel::GroupScheduleMode;
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 template <typename Mma_,                 ///! Threadblock-scoped matrix multiply-accumulate  //
-                                         ///NOLINT(readability-identifier-naming)
-          typename Epilogue_,            ///! Epilogue  // NOLINT(readability-identifier-naming)
+          typename Epilogue_,            ///! Epilogue
           typename ThreadblockSwizzle_,  ///! Threadblock swizzling function  //
-                                         ///NOLINT(readability-identifier-naming)
           GroupScheduleMode GroupScheduleMode_,  ///! Type of scheduling to perform
           bool Transposed = false>
-struct FusedDistanceNNPersistent {  // NOLINT(readability-identifier-naming)
+struct FusedDistanceNNPersistent {
  public:
-  using Mma                = Mma_;                         // NOLINT(readability-identifier-naming)
-  using Epilogue           = Epilogue_;                    // NOLINT(readability-identifier-naming)
-  using EpilogueOutputOp   = typename Epilogue::OutputOp;  // NOLINT(readability-identifier-naming)
-  using ThreadblockSwizzle = ThreadblockSwizzle_;          // NOLINT(readability-identifier-naming)
+  using Mma                                         = Mma_;
+  using Epilogue                                    = Epilogue_;
+  using EpilogueOutputOp                            = typename Epilogue::OutputOp;
+  using ThreadblockSwizzle                          = ThreadblockSwizzle_;
   static GroupScheduleMode const kGroupScheduleMode = GroupScheduleMode_;
   static bool const kTransposed                     = Transposed;
 
   // Optional transpose
   // TODO(snanditale): This is dangerous- we shouldn't be using `detail` APIs from cutlass
-  using MapArguments =  // NOLINT(readability-identifier-naming)
+  using MapArguments =
     cutlass::gemm::kernel::detail::MapArguments<typename Mma::IteratorA::Element,
                                                 typename Mma::IteratorA::Layout,
                                                 Mma::kTransformA,
@@ -98,26 +96,23 @@ struct FusedDistanceNNPersistent {  // NOLINT(readability-identifier-naming)
 
   // Public-facing type definitions related to operand element type, layout, and complex conjugate
   // operation. Must interact with the 'kTransposed' notion.
-  using ElementA = typename MapArguments::ElementA;  // NOLINT(readability-identifier-naming)
-  using LayoutA  = typename MapArguments::LayoutA;   // NOLINT(readability-identifier-naming)
-  using ElementB = typename MapArguments::ElementB;  // NOLINT(readability-identifier-naming)
-  using LayoutB  = typename MapArguments::LayoutB;   // NOLINT(readability-identifier-naming)
-  using ElementC =
-    typename Epilogue::OutputTileIterator::Element;  // NOLINT(readability-identifier-naming)
-  using LayoutC = typename MapArguments::LayoutC;    // NOLINT(readability-identifier-naming)
+  using ElementA = typename MapArguments::ElementA;
+  using LayoutA  = typename MapArguments::LayoutA;
+  using ElementB = typename MapArguments::ElementB;
+  using LayoutB  = typename MapArguments::LayoutB;
+  using ElementC = typename Epilogue::OutputTileIterator::Element;
+  using LayoutC  = typename MapArguments::LayoutC;
 
   static cutlass::ComplexTransform const kTransformA = MapArguments::kTransformA;
   static cutlass::ComplexTransform const kTransformB = MapArguments::kTransformB;
 
   // Type definitions about the mainloop.
-  using Operator = typename Mma::Operator;  // NOLINT(readability-identifier-naming)
-  using OperatorClass =
-    typename Mma::Operator::OperatorClass;                 // NOLINT(readability-identifier-naming)
-  using ThreadblockShape = typename Mma::Shape;            // NOLINT(readability-identifier-naming)
-  using WarpShape        = typename Mma::Operator::Shape;  // NOLINT(readability-identifier-naming)
-  using InstructionShape =
-    typename Mma::Policy::Operator::InstructionShape;  // NOLINT(readability-identifier-naming)
-  using ArchTag = typename Mma::ArchTag;               // NOLINT(readability-identifier-naming)
+  using Operator         = typename Mma::Operator;
+  using OperatorClass    = typename Mma::Operator::OperatorClass;
+  using ThreadblockShape = typename Mma::Shape;
+  using WarpShape        = typename Mma::Operator::Shape;
+  using InstructionShape = typename Mma::Policy::Operator::InstructionShape;
+  using ArchTag          = typename Mma::ArchTag;
 
   static int const kStages     = Mma::kStages;
   static int const kAlignmentA = MapArguments::kAlignmentA;
@@ -125,15 +120,14 @@ struct FusedDistanceNNPersistent {  // NOLINT(readability-identifier-naming)
   static int const kAlignmentC = Epilogue::OutputTileIterator::kElementsPerAccess;
 
   /// Warp count (concept: GemmShape)
-  using WarpCount               = typename Mma::WarpCount;  // NOLINT(readability-identifier-naming)
+  using WarpCount               = typename Mma::WarpCount;
   static int const kThreadCount = 32 * WarpCount::kCount;
 
-  using ProblemVisitor =
-    GemmGroupedProblemVisitor<ThreadblockShape,  // NOLINT(readability-identifier-naming)
-                              kGroupScheduleMode,
-                              kThreadCount,
-                              kThreadCount,
-                              kTransposed>;
+  using ProblemVisitor = GemmGroupedProblemVisitor<ThreadblockShape,
+                                                   kGroupScheduleMode,
+                                                   kThreadCount,
+                                                   kThreadCount,
+                                                   kTransposed>;
 
   //
   // Structures
@@ -148,7 +142,7 @@ struct FusedDistanceNNPersistent {  // NOLINT(readability-identifier-naming)
   };
 
   /// Argument structure
-  struct Arguments {  // NOLINT(readability-identifier-naming)
+  struct Arguments {
     //
     // Data members
     //
@@ -159,11 +153,11 @@ struct FusedDistanceNNPersistent {  // NOLINT(readability-identifier-naming)
 
     typename EpilogueOutputOp::Params output_op;
 
-    void const* ptr_A;  // NOLINT(readability-identifier-naming)
-    void const* ptr_B;  // NOLINT(readability-identifier-naming)
-    void const* ptr_C;  // NOLINT(readability-identifier-naming)
-    void* ptr_Vector;   // NOLINT(readability-identifier-naming)
-    void* ptr_Tensor;   // NOLINT(readability-identifier-naming)
+    void const* ptr_A;
+    void const* ptr_B;
+    void const* ptr_C;
+    void* ptr_Vector;
+    void* ptr_Tensor;
 
     typename LayoutA::Stride::Index lda;
     typename LayoutB::Stride::Index ldb;
@@ -233,24 +227,22 @@ struct FusedDistanceNNPersistent {  // NOLINT(readability-identifier-naming)
   //
 
   /// Parameters structure
-  struct Params {  // NOLINT(readability-identifier-naming)
+  struct Params {
     temp_problem_visitor problem_visitor;
     int threadblock_count;
 
-    typename Mma::IteratorA::Params params_A;  // NOLINT(readability-identifier-naming)
-    typename Mma::IteratorB::Params params_B;  // NOLINT(readability-identifier-naming)
-    typename Epilogue::OutputTileIterator::Params
-      params_C;  // NOLINT(readability-identifier-naming)
-    typename Epilogue::TensorTileIterator::Params
-      params_Tensor;  // NOLINT(readability-identifier-naming)
+    typename Mma::IteratorA::Params params_A;
+    typename Mma::IteratorB::Params params_B;
+    typename Epilogue::OutputTileIterator::Params params_C;
+    typename Epilogue::TensorTileIterator::Params params_Tensor;
 
     typename EpilogueOutputOp::Params output_op;
 
-    void* ptr_A;       // NOLINT(readability-identifier-naming)
-    void* ptr_B;       // NOLINT(readability-identifier-naming)
-    void* ptr_C;       // NOLINT(readability-identifier-naming)
-    void* ptr_Vector;  // NOLINT(readability-identifier-naming)
-    void* ptr_Tensor;  // NOLINT(readability-identifier-naming)
+    void* ptr_A;
+    void* ptr_B;
+    void* ptr_C;
+    void* ptr_Vector;
+    void* ptr_Tensor;
 
     cutlass::gemm::GemmCoord problem_size;
     typename LayoutA::Stride::Index lda;
@@ -323,7 +315,7 @@ struct FusedDistanceNNPersistent {  // NOLINT(readability-identifier-naming)
   };
 
   /// Shared memory storage structure
-  struct SharedStorage {  // NOLINT(readability-identifier-naming)
+  struct SharedStorage {
     union {
       typename Mma::SharedStorage main_loop;
       typename Epilogue::SharedStorage epilogue;

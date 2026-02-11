@@ -24,17 +24,13 @@
 namespace cuvs::distance::masked_nn {
 
 // The adjacency pattern determines what distances get computed.
-enum AdjacencyPattern {  // NOLINT(readability-identifier-naming)
+enum AdjacencyPattern {
   checkerboard = 0,  // adjacency matrix looks like a checkerboard (half the distances are computed)
-                     // // NOLINT(readability-identifier-naming)
-  checkerboard_4 =
-    1,  // checkerboard with tiles of size 4x4  // NOLINT(readability-identifier-naming)
-  checkerboard_64 =
-    2,  // checkerboard with tiles of size 64x64  // NOLINT(readability-identifier-naming)
-  all_true =
-    3,  // no distance computations can be skipped  // NOLINT(readability-identifier-naming)
-  all_false =
-    4  // all distance computations can be skipped  // NOLINT(readability-identifier-naming)
+                     //
+  checkerboard_4  = 1,  // checkerboard with tiles of size 4x4
+  checkerboard_64 = 2,  // checkerboard with tiles of size 64x64
+  all_true        = 3,  // no distance computations can be skipped
+  all_false       = 4   // all distance computations can be skipped
 };
 
 // Kernels:
@@ -82,19 +78,18 @@ RAFT_KERNEL init_adj(AdjacencyPattern pattern,
 }
 
 template <typename DataT, typename ReduceOpT, int NWARPS>
-__launch_bounds__(32 * NWARPS, 2) RAFT_KERNEL           // NOLINT(readability-identifier-naming)
-  referenceKernel(raft::KeyValuePair<int, DataT>* min,  // NOLINT(readability-identifier-naming)
-                  const DataT* x,
-                  const DataT* y,
-                  const bool* adj,
-                  const int* group_idxs,
-                  int m,
-                  int n,
-                  int k,
-                  int num_groups,
-                  bool sqrt,
-                  int* workspace,
-                  DataT maxVal)
+__launch_bounds__(32 * NWARPS, 2) RAFT_KERNEL referenceKernel(raft::KeyValuePair<int, DataT>* min,
+                                                              const DataT* x,
+                                                              const DataT* y,
+                                                              const bool* adj,
+                                                              const int* group_idxs,
+                                                              int m,
+                                                              int n,
+                                                              int k,
+                                                              int num_groups,
+                                                              bool sqrt,
+                                                              int* workspace,
+                                                              DataT maxVal)
 {
   const int m_stride = blockDim.y * gridDim.y;
   const int m_offset = threadIdx.y + blockIdx.y * blockDim.y;
@@ -122,19 +117,16 @@ __launch_bounds__(32 * NWARPS, 2) RAFT_KERNEL           // NOLINT(readability-id
         acc += diff * diff;
       }
       if (sqrt) { acc = raft::sqrt(acc); }
-      ReduceOpT redOp;  // NOLINT(readability-identifier-naming)
-      using WarpReduce =
-        cub::WarpReduce<raft::KeyValuePair<int, DataT>>;  // NOLINT(readability-identifier-naming)
+      ReduceOpT redOp;
+      using WarpReduce = cub::WarpReduce<raft::KeyValuePair<int, DataT>>;
       __shared__ typename WarpReduce::TempStorage temp[NWARPS];
-      int warpId = threadIdx.x / raft::WarpSize;  // NOLINT(readability-identifier-naming)
+      int warpId = threadIdx.x / raft::WarpSize;
       raft::KeyValuePair<int, DataT> tmp;
       tmp.key   = include_dist ? nidx : -1;
       tmp.value = include_dist ? acc : maxVal;
       tmp = WarpReduce(temp[warpId]).Reduce(tmp, cuvs::distance::kvp_min_reduce<int, DataT>{});
       if (threadIdx.x % raft::WarpSize == 0 && midx < m) {
-        while (atomicCAS(workspace + midx, 0, 1) ==
-               1)  // NOLINT(google-readability-braces-around-statements)
-          ;
+        while (atomicCAS(workspace + midx, 0, 1) == 1) {}
         __threadfence();
         redOp(midx, min + midx, tmp);
         __threadfence();
@@ -149,11 +141,11 @@ __launch_bounds__(32 * NWARPS, 2) RAFT_KERNEL           // NOLINT(readability-id
 // - Params: holds parameters for test case
 // - Inputs: holds the inputs to the functions under test (x, y, adj, group_idxs). Is generated from
 //   the inputs.
-struct Params {  // NOLINT(readability-identifier-naming)
+struct Params {
   double tolerance;
   int m, n, k, num_groups;
   bool sqrt;
-  unsigned long long int seed;  // NOLINT(google-runtime-int)
+  unsigned long long int seed;
   AdjacencyPattern pattern;
 };
 
@@ -165,8 +157,8 @@ inline auto operator<<(std::ostream& os, const Params& p) -> std::ostream&
 }
 
 template <typename DataT>
-struct Inputs {      // NOLINT(readability-identifier-naming)
-  using IdxT = int;  // NOLINT(readability-identifier-naming)
+struct Inputs {
+  using IdxT = int;
 
   raft::device_matrix<DataT, IdxT> x, y;
   raft::device_matrix<bool, IdxT> adj;
@@ -220,7 +212,7 @@ auto reference(const raft::handle_t& handle, const Inputs<DataT>& inp, const Par
 
   // Launch reference kernel
   const int nwarps = 16;
-  static const dim3 TPB(32, nwarps, 1);  // NOLINT(readability-identifier-naming)
+  static const dim3 TPB(32, nwarps, 1);
   dim3 nblks(1, 200, 1);
   referenceKernel<DataT, decltype(op), nwarps>
     <<<nblks, TPB, 0, stream>>>(out.data_handle(),
@@ -254,7 +246,7 @@ auto run_masked_nn(const raft::handle_t& handle, const Inputs<DataT>& inp, const
     handle, std::as_const(inp.y).view(), y_norm.view());
 
   // Create parameters for masked_l2_nn
-  using IdxT       = int;  // NOLINT(readability-identifier-naming)
+  using IdxT       = int;
   using RedOpT     = cuvs::distance::min_and_distance_reduce_op<int, DataT>;
   using PairRedOpT = cuvs::distance::kvp_min_reduce<int, DataT>;
   using ParamT     = cuvs::distance::masked_l2_nn_params<RedOpT, PairRedOpT>;
@@ -282,9 +274,9 @@ auto run_masked_nn(const raft::handle_t& handle, const Inputs<DataT>& inp, const
 }
 
 template <typename T>
-struct CompareApproxAbsKVP {                        // NOLINT(readability-identifier-naming)
-  using KVP = typename raft::KeyValuePair<int, T>;  // NOLINT(readability-identifier-naming)
-  CompareApproxAbsKVP(T eps_) : eps(eps_) {}        // NOLINT(google-explicit-constructor)
+struct CompareApproxAbsKVP {
+  using KVP = typename raft::KeyValuePair<int, T>;
+  explicit CompareApproxAbsKVP(T eps_) : eps(eps_) {}
   auto operator()(const KVP& a, const KVP& b) const -> bool
   {
     T diff  = raft::abs(raft::abs(a.value) - raft::abs(b.value));
@@ -294,19 +286,19 @@ struct CompareApproxAbsKVP {                        // NOLINT(readability-identi
   }
 
  private:
-  T eps;  // NOLINT(readability-identifier-naming)
+  T eps;
 };
 
 template <typename K, typename V, typename L>
-auto devArrMatch(const raft::KeyValuePair<K, V>* expected,  // NOLINT(readability-identifier-naming)
+auto devArrMatch(const raft::KeyValuePair<K, V>* expected,
                  const raft::KeyValuePair<K, V>* actual,
                  size_t size,
                  L eq_compare,
                  cudaStream_t stream = nullptr) -> ::testing::AssertionResult
 {
-  using KVP = typename raft::KeyValuePair<K, V>;  // NOLINT(readability-identifier-naming)
-  std::shared_ptr<KVP[]> exp_h(new KVP[size]);    // NOLINT(modernize-avoid-c-arrays)
-  std::shared_ptr<KVP[]> act_h(new KVP[size]);    // NOLINT(modernize-avoid-c-arrays)
+  using KVP = typename raft::KeyValuePair<K, V>;
+  std::shared_ptr<KVP[]> exp_h(new KVP[size]);
+  std::shared_ptr<KVP[]> act_h(new KVP[size]);
   raft::update_host<KVP>(exp_h.get(), expected, size, stream);
   raft::update_host<KVP>(act_h.get(), actual, size, stream);
   RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
@@ -354,16 +346,14 @@ inline auto gen_params() -> std::vector<Params>
   return regular;
 }
 
-class MaskedL2NNTest
-  : public ::testing::TestWithParam<Params> {  // NOLINT(readability-identifier-naming)
+class MaskedL2NNTest : public ::testing::TestWithParam<Params> {
   // Empty.
 };
 
 //
-TEST_P(MaskedL2NNTest,
-       ReferenceCheckFloat)  // NOLINT(readability-identifier-naming)
+TEST_P(MaskedL2NNTest, ReferenceCheckFloat)
 {
-  using DataT = float;  // NOLINT(readability-identifier-naming)
+  using DataT = float;
 
   // Get parameters; create handle and input data.
   Params p = GetParam();
@@ -384,10 +374,9 @@ TEST_P(MaskedL2NNTest,
 
 // This test checks whether running the masked_l2_nn twice returns the same
 // output.
-TEST_P(MaskedL2NNTest,
-       DeterminismCheck)  // NOLINT(readability-identifier-naming)
+TEST_P(MaskedL2NNTest, DeterminismCheck)
 {
-  using DataT = float;  // NOLINT(readability-identifier-naming)
+  using DataT = float;
 
   // Get parameters; create handle and input data.
   Params p = GetParam();
@@ -406,10 +395,9 @@ TEST_P(MaskedL2NNTest,
                           raft::resource::get_cuda_stream(handle)));
 }
 
-TEST_P(MaskedL2NNTest,
-       ReferenceCheckDouble)  // NOLINT(readability-identifier-naming)
+TEST_P(MaskedL2NNTest, ReferenceCheckDouble)
 {
-  using DataT = double;  // NOLINT(readability-identifier-naming)
+  using DataT = double;
 
   // Get parameters; create handle and input data.
   Params p = GetParam();
@@ -428,9 +416,6 @@ TEST_P(MaskedL2NNTest,
                           raft::resource::get_cuda_stream(handle)));
 }
 
-INSTANTIATE_TEST_CASE_P(
-  MaskedL2NNTests,
-  MaskedL2NNTest,
-  ::testing::ValuesIn(gen_params()));  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(MaskedL2NNTests, MaskedL2NNTest, ::testing::ValuesIn(gen_params()));
 
 }  // end namespace cuvs::distance::masked_nn

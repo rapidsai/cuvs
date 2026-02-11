@@ -19,8 +19,6 @@ void cagra_build_search_simple(raft::device_resources const& dev_resources,
                                raft::device_matrix_view<const float, int64_t> dataset,
                                raft::device_matrix_view<const float, int64_t> queries)
 {
-  using namespace cuvs::neighbors;  // NOLINT(google-build-using-namespace)
-
   int64_t topk      = 12;
   int64_t n_queries = queries.extent(0);
 
@@ -29,22 +27,23 @@ void cagra_build_search_simple(raft::device_resources const& dev_resources,
   auto distances = raft::make_device_matrix<float>(dev_resources, n_queries, topk);
 
   // use default index parameters
-  cagra::index_params index_params;
+  cuvs::neighbors::cagra::index_params index_params;
 
   std::cout << "Building CAGRA index (search graph)" << std::endl;
-  auto index = cagra::build(dev_resources, index_params, dataset);
+  auto index = cuvs::neighbors::cagra::build(dev_resources, index_params, dataset);
 
   std::cout << "CAGRA index has " << index.size() << " vectors" << std::endl;
   std::cout << "CAGRA graph has degree " << index.graph_degree() << ", graph size ["
             << index.graph().extent(0) << ", " << index.graph().extent(1) << "]" << std::endl;
 
   // use default search parameters
-  cagra::search_params search_params;
+  cuvs::neighbors::cagra::search_params search_params;
   // search K nearest neighbors
-  cagra::search(dev_resources, search_params, index, queries, neighbors.view(), distances.view());
+  cuvs::neighbors::cagra::search(
+    dev_resources, search_params, index, queries, neighbors.view(), distances.view());
 
-  // The call to cagra::search is asynchronous. Before accessing the data, sync by calling
-  // raft::resource::sync_stream(dev_resources);
+  // The call to cuvs::neighbors::cagra::search is asynchronous. Before accessing the data, sync
+  // by calling raft::resource::sync_stream(dev_resources);
 
   print_results(dev_resources, neighbors.view(), distances.view());
 }

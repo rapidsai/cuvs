@@ -31,7 +31,6 @@ inline auto graph_params_heuristic(raft::matrix_extent<int64_t> dataset,
   }
 }
 
-// NOLINTNEXTLINE(readability-identifier-naming)
 auto index_params::from_hnsw_params(raft::matrix_extent<int64_t> dataset,
                                     int M,
                                     int ef_construction,

@@ -495,7 +495,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
     }
   }
 
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     search_queries.resize(ps.n_queries * ps.dim, stream_);
@@ -505,7 +505,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override  // NOLINT(readability-identifier-naming)
+  void TearDown() override
   {
     raft::resource::sync_stream(handle_);
     database.resize(0, stream_);
@@ -710,7 +710,7 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
     }
   }
 
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     search_queries.resize(ps.n_queries * ps.dim, stream_);
@@ -720,7 +720,7 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override  // NOLINT(readability-identifier-naming)
+  void TearDown() override
   {
     raft::resource::sync_stream(handle_);
     database.resize(0, stream_);
@@ -930,7 +930,7 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
     }
   }
 
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     search_queries.resize(ps.n_queries * ps.dim, stream_);
@@ -940,7 +940,7 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override  // NOLINT(readability-identifier-naming)
+  void TearDown() override
   {
     raft::resource::sync_stream(handle_);
     database.resize(0, stream_);
@@ -1175,7 +1175,7 @@ class AnnCagraIndexFilteredMergeTest : public ::testing::TestWithParam<AnnCagraI
     }
   }
 
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     search_queries.resize(ps.n_queries * ps.dim, stream_);
@@ -1185,7 +1185,7 @@ class AnnCagraIndexFilteredMergeTest : public ::testing::TestWithParam<AnnCagraI
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override  // NOLINT(readability-identifier-naming)
+  void TearDown() override
   {
     raft::resource::sync_stream(handle_);
     database.resize(0, stream_);
@@ -1390,7 +1390,7 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
     }
   }
 
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     search_queries.resize(ps.n_queries * ps.dim, stream_);
@@ -1400,7 +1400,7 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override  // NOLINT(readability-identifier-naming)
+  void TearDown() override
   {
     raft::resource::sync_stream(handle_);
     database.resize(0, stream_);

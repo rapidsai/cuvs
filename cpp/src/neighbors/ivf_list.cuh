@@ -64,7 +64,7 @@ list<SpecT, SizeT, SpecExtraArgs...>::list(raft::resources const& res,
 
 template <typename ListT>
 void resize_list(raft::resources const& res,
-                 std::shared_ptr<ListT>& orig_list,  // NOLINT
+                 std::shared_ptr<ListT>& orig_list,
                  const typename ListT::spec_type& spec,
                  typename ListT::size_type new_used_size,
                  typename ListT::size_type old_used_size)

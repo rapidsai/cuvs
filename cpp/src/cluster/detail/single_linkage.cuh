@@ -40,7 +40,7 @@ namespace cuvs::cluster::agglomerative::detail {
  * @param[out] out_distances distances of output
  * @param[out] out_sizes cluster sizes of output
  */
-template <typename ValueT   = float,  // NOLINT(readability-identifier-naming)
+template <typename ValueT   = float,
           typename ValueIdx = int,
           typename NnzT     = size_t,
           typename Accessor = raft::device_accessor<cuda::std::default_accessor<ValueT>>>
@@ -169,10 +169,7 @@ static const size_t kEMPTY = 0;
  * @param[out] out_distances distances of output
  * @param[out] out_sizes cluster sizes of output
  */
-template <typename ValueT,
-          typename ValueIdx,
-          typename NnzT,
-          Linkage dist_type>  // NOLINT(readability-identifier-naming)
+template <typename ValueT, typename ValueIdx, typename NnzT, Linkage dist_type>
 void build_dist_linkage(raft::resources const& handle,
                         raft::device_matrix_view<const ValueT, ValueIdx, raft::row_major> X,
                         int c,
@@ -260,9 +257,7 @@ void build_dist_linkage(raft::resources const& handle,
  *            of k. The algorithm will set `k = log(n) + c`
  * @param[in] n_clusters number of clusters to assign data samples
  */
-template <typename ValueIdx,
-          typename ValueT,
-          Linkage dist_type>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, Linkage dist_type>
 void single_linkage(raft::resources const& handle,
                     const ValueT* X,
                     size_t m,

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -10,7 +10,7 @@
 namespace cuvs::neighbors {
 namespace {
 template <typename T, typename IdxT>
-void _knn_merge_parts(raft::resources const& res,  // NOLINT(readability-identifier-naming)
+void _knn_merge_parts(raft::resources const& res,
                       raft::device_matrix_view<const T, int64_t> inK,
                       raft::device_matrix_view<const IdxT, int64_t> inV,
                       raft::device_matrix_view<T, int64_t> outK,

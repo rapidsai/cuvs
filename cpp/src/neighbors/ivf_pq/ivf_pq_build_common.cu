@@ -10,8 +10,7 @@
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <raft/core/mdspan_types.hpp>
 
-namespace cuvs::neighbors::ivf_pq {  // NOLINT(modernize-concat-nested-namespaces)
-namespace helpers {
+namespace cuvs::neighbors::ivf_pq::helpers {
 
 namespace codepacker {
 
@@ -409,6 +408,4 @@ void resize_list(raft::resources const& res,
   orig_list = typed_list;
 }
 
-}  // namespace helpers
-
-}  // namespace cuvs::neighbors::ivf_pq
+}  // namespace cuvs::neighbors::ivf_pq::helpers

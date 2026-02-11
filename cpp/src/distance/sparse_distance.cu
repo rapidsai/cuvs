@@ -8,8 +8,7 @@
 
 #include "sparse_distance.cuh"
 
-namespace cuvs {  // NOLINT(modernize-concat-nested-namespaces)
-namespace distance {
+namespace cuvs::distance {
 
 template <typename ElementType, typename IndexType>
 void pairwise_distance(
@@ -70,5 +69,4 @@ void pairwise_distance(raft::resources const& handle,
 {
   pairwise_distance<double, int>(handle, x, y, dist, metric, metric_arg);
 }
-}  // namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance

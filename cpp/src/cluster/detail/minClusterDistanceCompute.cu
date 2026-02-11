@@ -11,7 +11,7 @@ namespace cuvs::cluster::kmeans::detail {
 // index to an sample in 'centroids' (index of the nearest centroid) and 'value'
 // is the distance between the sample and the 'centroid[key]'
 template <typename DataT, typename IndexT>
-void min_cluster_and_distance_compute(  // NOLINT(readability-identifier-naming)
+void min_cluster_and_distance_compute(
   raft::resources const& handle,
   raft::device_matrix_view<const DataT, IndexT> X,
   raft::device_matrix_view<const DataT, IndexT> centroids,
@@ -42,8 +42,8 @@ void min_cluster_and_distance_compute(  // NOLINT(readability-identifier-naming)
                                                       centroids.extent(0),
                                                       stream);
   } else {
-    // TODO(cuvs): Unless pool allocator is used, passing in a workspace for this  //
-    // NOLINT(google-readability-todo) isn't really increasing performance because this needs to do
+    // TODO(cuvs-perf): Unless pool allocator is used, passing in a workspace for this
+    // isn't really increasing performance because this needs to do
     // a re-allocation anyways. ref https://github.com/rapidsai/raft/issues/930
     L2NormBuf_OR_DistBuf.resize(data_batch_size * centroids_batch_size, stream);
   }
@@ -168,17 +168,16 @@ INSTANTIATE_MIN_CLUSTER_AND_DISTANCE(double, int)
 #undef INSTANTIATE_MIN_CLUSTER_AND_DISTANCE
 
 template <typename DataT, typename IndexT>
-void min_cluster_distance_compute(  // NOLINT(readability-identifier-naming)
-  raft::resources const& handle,
-  raft::device_matrix_view<const DataT, IndexT> X,
-  raft::device_matrix_view<DataT, IndexT> centroids,
-  raft::device_vector_view<DataT, IndexT> minClusterDistance,
-  raft::device_vector_view<DataT, IndexT> L2NormX,
-  rmm::device_uvector<DataT>& L2NormBuf_OR_DistBuf,
-  cuvs::distance::DistanceType metric,
-  int batch_samples,
-  int batch_centroids,
-  rmm::device_uvector<char>& workspace)
+void min_cluster_distance_compute(raft::resources const& handle,
+                                  raft::device_matrix_view<const DataT, IndexT> X,
+                                  raft::device_matrix_view<DataT, IndexT> centroids,
+                                  raft::device_vector_view<DataT, IndexT> minClusterDistance,
+                                  raft::device_vector_view<DataT, IndexT> L2NormX,
+                                  rmm::device_uvector<DataT>& L2NormBuf_OR_DistBuf,
+                                  cuvs::distance::DistanceType metric,
+                                  int batch_samples,
+                                  int batch_centroids,
+                                  rmm::device_uvector<char>& workspace)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   auto n_samples      = X.extent(0);

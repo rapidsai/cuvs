@@ -21,7 +21,7 @@ template <typename Policy,
           typename DataT,
           typename OutT,
           typename FinOpT>
-__launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL  // NOLINT(readability-identifier-naming)
+__launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL
   pairwise_matrix_kernel(OpT distance_op, pairwise_matrix_params<IdxT, DataT, OutT, FinOpT> params)
 {
   // Early exit to minimize the size of the kernel when it is not supposed to be compiled.
@@ -134,7 +134,6 @@ auto make_pairwise_matrix_sm60_wrapper(OpT distance_op,
   // https://en.cppreference.com/w/cpp/language/dependent_name)
   int smem_size = OpT::template shared_mem_size<Policy>();
   // Obtain function pointer to kernel
-  // NOLINTNEXTLINE(readability-identifier-naming)
   auto kernel =
     pairwise_matrix_kernel<Policy, row_major, SmCompatT, OpT, IdxT, DataT, OutT, FinOpT>;
   dim3 grid = launch_config_generator<Policy>(params.m, params.n, smem_size, kernel);

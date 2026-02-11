@@ -9,8 +9,8 @@
 
 namespace cuvs::neighbors::epsilon_neighborhood {
 
-template <typename ValueT, typename IdxT>     // NOLINT(readability-identifier-naming)
-void eps_unexp_l2_sq_neighborhood(bool* adj,  // NOLINT(readability-identifier-naming)
+template <typename ValueT, typename IdxT>
+void eps_unexp_l2_sq_neighborhood(bool* adj,
                                   IdxT* vd,
                                   const ValueT* x,
                                   const ValueT* y,
@@ -23,9 +23,7 @@ void eps_unexp_l2_sq_neighborhood(bool* adj,  // NOLINT(readability-identifier-n
   detail::eps_unexp_l2_sq_neighborhood<ValueT, IdxT>(adj, vd, x, y, m, n, k, eps, stream);
 }
 
-template <typename ValueT,  // NOLINT(readability-identifier-naming)
-          typename IdxT,
-          typename matrix_idx_t>  // NOLINT(readability-identifier-naming)
+template <typename ValueT, typename IdxT, typename matrix_idx_t>
 void compute(raft::resources const& handle,
              raft::device_matrix_view<const ValueT, matrix_idx_t, raft::row_major> x,
              raft::device_matrix_view<const ValueT, matrix_idx_t, raft::row_major> y,

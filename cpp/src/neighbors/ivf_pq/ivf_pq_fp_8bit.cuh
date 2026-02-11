@@ -32,8 +32,8 @@ namespace cuvs::neighbors::ivf_pq::detail {
 template <uint32_t ExpBits, bool Signed>
 struct fp_8bit {
   static_assert(ExpBits + uint8_t{Signed} <= 8, "The type does not fit in 8 bits.");
-  constexpr static uint32_t ExpMask = (1u << (ExpBits - 1u)) - 1u;  // NOLINT
-  constexpr static uint32_t ValBits = 8u - ExpBits;                 // NOLINT
+  constexpr static uint32_t ExpMask = (1u << (ExpBits - 1u)) - 1u;
+  constexpr static uint32_t ValBits = 8u - ExpBits;
 
  public:
   uint8_t bitstring;

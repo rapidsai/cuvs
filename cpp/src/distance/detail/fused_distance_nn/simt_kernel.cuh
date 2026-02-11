@@ -55,21 +55,20 @@ template <typename DataT,
           typename KVPReduceOpT,
           typename OpT,
           typename FinalLambda>
-__launch_bounds__(P::Nthreads, 2) RAFT_KERNEL  // NOLINT(readability-identifier-naming)
-  fused_distance_nn_kernel(OutT* min,
-                           const DataT* x,
-                           const DataT* y,
-                           const DataT* xn,
-                           const DataT* yn,
-                           IdxT m,
-                           IdxT n,
-                           IdxT k,
-                           DataT maxVal,
-                           int* mutex,
-                           ReduceOpT redOp,
-                           KVPReduceOpT pairRedOp,
-                           OpT distance_op,
-                           FinalLambda fin_op)
+__launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fused_distance_nn_kernel(OutT* min,
+                                                                       const DataT* x,
+                                                                       const DataT* y,
+                                                                       const DataT* xn,
+                                                                       const DataT* yn,
+                                                                       IdxT m,
+                                                                       IdxT n,
+                                                                       IdxT k,
+                                                                       DataT maxVal,
+                                                                       int* mutex,
+                                                                       ReduceOpT redOp,
+                                                                       KVPReduceOpT pairRedOp,
+                                                                       OpT distance_op,
+                                                                       FinalLambda fin_op)
 {
 // compile only if below non-ampere arch.
 #if __CUDA_ARCH__ < 800

@@ -83,7 +83,7 @@ template <typename Shape,
           int ElementsPerAccess,
           bool ScatterD = false>
 struct FusedDistanceNNEpilogue {
-  /// Use defaults related to the existing epilogue  // NOLINT(readability-identifier-naming)
+  /// Use defaults related to the existing epilogue
   using Base =
     DefaultEpilogueTensorOp<Shape, WarpMmaTensorOp, PartitionsK, OutputOp, ElementsPerAccess>;
 

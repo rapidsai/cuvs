@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -67,7 +67,7 @@ inline auto apply_overrides(const std::vector<nlohmann::json>& configs,
 
 inline auto apply_overrides(const nlohmann::json& config,
                             const kv_series& overrides,
-                            std::size_t override_idx = 0)
+                            std::size_t override_idx = 0) -> std::vector<nlohmann::json>
 {
   return apply_overrides(std::vector{config}, overrides, 0);
 }
@@ -628,7 +628,7 @@ inline auto run_main(int argc, char** argv) -> int
   std::vector<int> threads    = {1, -1};  // min_thread, max_thread
   kv_series override_kv{};
 
-  char arg0_default[] = "benchmark";  // NOLINT
+  char arg0_default[] = "benchmark";
   char* args_default  = arg0_default;
   if (!argv) {
     argc = 1;

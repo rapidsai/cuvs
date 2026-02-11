@@ -23,22 +23,19 @@
 namespace cuvs::neighbors::epsilon_neighborhood {
 
 template <typename T, typename IdxT>
-struct EpsInputs {  // NOLINT(readability-identifier-naming)
+struct EpsInputs {
   IdxT n_row, n_col, n_centers, n_batches;
   T eps;
 };
 
 template <typename T, typename IdxT>
-auto operator<<(  // NOLINT(modernize-use-trailing-return-type)
-  ::std::ostream& os,
-  const EpsInputs<T, IdxT>& p) -> ::std::ostream&
+auto operator<<(::std::ostream& os, const EpsInputs<T, IdxT>& p) -> ::std::ostream&
 {
   return os;
 }
 
 template <typename T, typename IdxT>
-class EpsNeighTest  // NOLINT(readability-identifier-naming)
-  : public ::testing::TestWithParam<EpsInputs<T, IdxT>> {
+class EpsNeighTest : public ::testing::TestWithParam<EpsInputs<T, IdxT>> {
  protected:
   EpsNeighTest()
     : data(0, raft::resource::get_cuda_stream(handle)),
@@ -48,7 +45,7 @@ class EpsNeighTest  // NOLINT(readability-identifier-naming)
   {
   }
 
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     auto stream = raft::resource::get_cuda_stream(handle);
     param       = ::testing::TestWithParam<EpsInputs<T, IdxT>>::GetParam();
@@ -71,17 +68,17 @@ class EpsNeighTest  // NOLINT(readability-identifier-naming)
                                       false);
   }
 
-  const raft::resources handle;          // NOLINT(readability-identifier-naming)
-  EpsInputs<T, IdxT> param;              // NOLINT(readability-identifier-naming)
-  cudaStream_t stream = nullptr;         // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<T> data;           // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<bool> adj;         // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<IdxT> labels, vd;  // NOLINT(readability-identifier-naming)
-  IdxT batchSize;                        // NOLINT(readability-identifier-naming)
+  const raft::resources handle;
+  EpsInputs<T, IdxT> param;
+  cudaStream_t stream = nullptr;
+  rmm::device_uvector<T> data;
+  rmm::device_uvector<bool> adj;
+  rmm::device_uvector<IdxT> labels, vd;
+  IdxT batchSize;
 };  // class EpsNeighTest
 
 const std::vector<EpsInputs<float, int64_t>> kInputsfi = {
-  // NOLINT(readability-identifier-naming)
+
   {100, 16, 5, 2, 2.f},
   {1500, 16, 5, 3, 2.f},
   {15000, 16, 5, 1, 2.f},
@@ -98,11 +95,10 @@ const std::vector<EpsInputs<float, int64_t>> kInputsfi = {
   {20000, 10000, 10, 2, 2.f},
 };
 
-using EpsNeighTestFI = EpsNeighTest<float, int64_t>;  // NOLINT(readability-identifier-naming)
+using EpsNeighTestFI = EpsNeighTest<float, int64_t>;
 
-TEST_P(
-  EpsNeighTestFI,
-  ResultBruteForce)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+TEST_P(EpsNeighTestFI,
+       ResultBruteForce)  // NOLINT(modernize-use-trailing-return-type)
 {
   for (int i = 0; i < param.n_batches; ++i) {
     RAFT_CUDA_TRY(cudaMemsetAsync(adj.data(), 0, sizeof(bool) * param.n_row * batchSize, stream));
@@ -133,12 +129,11 @@ TEST_P(
 INSTANTIATE_TEST_CASE_P(
   EpsNeighTests,
   EpsNeighTestFI,
-  ::testing::ValuesIn(
-    kInputsfi));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  ::testing::ValuesIn(kInputsfi));  // NOLINT(modernize-use-trailing-return-type)
 
 // rbc examples take fewer points as correctness checks are very costly
 const std::vector<EpsInputs<float, int64_t>> kInputsfiRbc = {
-  // NOLINT(readability-identifier-naming)
+
   {100, 16, 5, 2, 2.f},
   {1500, 16, 5, 3, 2.f},
   {1500, 16, 5, 1, 2.f},
@@ -155,10 +150,10 @@ const std::vector<EpsInputs<float, int64_t>> kInputsfiRbc = {
   {2000, 1000, 10, 2, 2.f},
 };
 
-using EpsNeighRbcTestFI = EpsNeighTest<float, int64_t>;  // NOLINT(readability-identifier-naming)
+using EpsNeighRbcTestFI = EpsNeighTest<float, int64_t>;
 
 TEST_P(EpsNeighRbcTestFI,
-       DenseRbc)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+       DenseRbc)  // NOLINT(modernize-use-trailing-return-type)
 {
   auto adj_baseline = raft::make_device_matrix<bool, int64_t>(handle, batchSize, param.n_row);
 
@@ -211,15 +206,9 @@ TEST_P(EpsNeighRbcTestFI,
 }
 
 template <typename T>
-testing::AssertionResult
-assertCsrEqualUnordered(  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-  T* ia_exp,
-  T* ja_exp,
-  T* ia_act,
-  T* ja_act,
-  size_t rows,
-  size_t cols,
-  cudaStream_t stream)
+auto assertCsrEqualUnordered(
+  T* ia_exp, T* ja_exp, T* ia_act, T* ja_act, size_t rows, size_t cols, cudaStream_t stream)
+  -> testing::AssertionResult
 {
   std::unique_ptr<T[]> ia_exp_h(new T[rows + 1]);
   std::unique_ptr<T[]> ia_act_h(new T[rows + 1]);
@@ -255,7 +244,7 @@ assertCsrEqualUnordered(  // NOLINT(modernize-use-trailing-return-type,readabili
 }
 
 TEST_P(EpsNeighRbcTestFI,
-       SparseRbc)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+       SparseRbc)  // NOLINT(modernize-use-trailing-return-type)
 {
   auto adj_ia          = raft::make_device_vector<int64_t>(handle, batchSize + 1);
   auto adj_ja          = raft::make_device_vector<int64_t>(handle, param.n_row * batchSize);
@@ -336,7 +325,7 @@ TEST_P(EpsNeighRbcTestFI,
 }
 
 TEST_P(EpsNeighRbcTestFI,
-       SparseRbcMaxK)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+       SparseRbcMaxK)  // NOLINT(modernize-use-trailing-return-type)
 {
   auto adj_ia          = raft::make_device_vector<int64_t>(handle, batchSize + 1);
   auto adj_ja          = raft::make_device_vector<int64_t>(handle, param.n_row * batchSize);
@@ -441,7 +430,6 @@ TEST_P(EpsNeighRbcTestFI,
 INSTANTIATE_TEST_CASE_P(
   EpsNeighTests,
   EpsNeighRbcTestFI,
-  ::testing::ValuesIn(
-    kInputsfiRbc));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  ::testing::ValuesIn(kInputsfiRbc));  // NOLINT(modernize-use-trailing-return-type)
 
 };  // namespace cuvs::neighbors::epsilon_neighborhood

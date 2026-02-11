@@ -30,7 +30,7 @@
 
 namespace cuvs {
 
-struct ConnectKNNInputs {  // NOLINT(readability-identifier-naming)
+struct ConnectKNNInputs {
   int n_rows;
   int dim;
   int n_clusters;
@@ -40,17 +40,16 @@ struct ConnectKNNInputs {  // NOLINT(readability-identifier-naming)
 };
 
 template <typename T>
-class ConnectKNNTest
-  : public ::testing::TestWithParam<ConnectKNNInputs> {  // NOLINT(readability-identifier-naming)
+class ConnectKNNTest : public ::testing::TestWithParam<ConnectKNNInputs> {
  public:
-  ConnectKNNTest()  // NOLINT(modernize-use-equals-default)
+  ConnectKNNTest()
     : stream(handle.get_stream()),
       ps(::testing::TestWithParam<ConnectKNNInputs>::GetParam()),
       database(0, stream)
   {
   }
 
-  void basicTest()  // NOLINT(readability-identifier-naming)
+  void basicTest()
   {
     int queries_size = ps.n_rows * ps.k;
     rmm::device_uvector<T> dists(queries_size, stream);
@@ -171,7 +170,7 @@ class ConnectKNNTest
     ASSERT_TRUE(n_components == 1);
   }
 
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream);
     auto database_view =
@@ -183,26 +182,23 @@ class ConnectKNNTest
   }
 
  protected:
-  raft::handle_t handle;            // NOLINT(readability-identifier-naming)
-  cudaStream_t stream;              // NOLINT(readability-identifier-naming)
-  ConnectKNNInputs ps;              // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<T> database;  // NOLINT(readability-identifier-naming)
+  raft::handle_t handle;
+  cudaStream_t stream;
+  ConnectKNNInputs ps;
+  rmm::device_uvector<T> database;
 };
 
-const std::vector<ConnectKNNInputs> inputs =
-  raft::util::itertools::product<ConnectKNNInputs>(  // NOLINT(readability-identifier-naming)
-    {5000, 7151},                                    // n_rows
-    {64, 137},                                       // dim
-    {5, 10},                                         // n_clusters of make_blobs data
-    {16},                                            // k
-    {cuvs::distance::DistanceType::L2SqrtExpanded},  // metric
-    {true, false});                                  // mutual_reach
+const std::vector<ConnectKNNInputs> inputs = raft::util::itertools::product<ConnectKNNInputs>(
+  {5000, 7151},                                    // n_rows
+  {64, 137},                                       // dim
+  {5, 10},                                         // n_clusters of make_blobs data
+  {16},                                            // k
+  {cuvs::distance::DistanceType::L2SqrtExpanded},  // metric
+  {true, false});                                  // mutual_reach
 
-using ConnectKNNTestF = ConnectKNNTest<float>;              // NOLINT(readability-identifier-naming)
-TEST_P(ConnectKNNTestF, ConnectKNN) { this->basicTest(); }  // NOLINT(readability-identifier-naming)
+using ConnectKNNTestF = ConnectKNNTest<float>;
+TEST_P(ConnectKNNTestF, ConnectKNN) { this->basicTest(); }
 
-INSTANTIATE_TEST_CASE_P(ConnectKNNTests,
-                        ConnectKNNTestF,
-                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(ConnectKNNTests, ConnectKNNTestF, ::testing::ValuesIn(inputs));
 
 }  // end namespace cuvs

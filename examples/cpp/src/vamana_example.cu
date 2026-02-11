@@ -26,23 +26,22 @@ void vamana_build_and_write(raft::device_resources const& dev_resources,
                             float iters,
                             std::string codebook_prefix)
 {
-  using namespace cuvs::neighbors;  // NOLINT(google-build-using-namespace)
-
   // use default index parameters
-  vamana::index_params index_params;
+  cuvs::neighbors::vamana::index_params index_params;
   index_params.max_fraction = max_fraction;
   index_params.visited_size = visited_size;
   index_params.graph_degree = degree;
   index_params.vamana_iters = iters;
 
   if (codebook_prefix != "") {
-    index_params.codebooks = vamana::deserialize_codebooks(codebook_prefix, dataset.extent(1));
+    index_params.codebooks =
+      cuvs::neighbors::vamana::deserialize_codebooks(codebook_prefix, dataset.extent(1));
   }
 
   std::cout << "Building Vamana index (search graph)" << std::endl;
 
   auto start = std::chrono::system_clock::now();
-  auto index = vamana::build(dev_resources, index_params, dataset);
+  auto index = cuvs::neighbors::vamana::build(dev_resources, index_params, dataset);
   auto end   = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;
 

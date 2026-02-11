@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -147,8 +147,8 @@ auto deserialize_vpq(raft::resources const& res, std::istream& is)
     raft::make_device_matrix<MathT, uint32_t, raft::row_major>(res, vq_n_centers, dim);
   auto pq_code_book =
     raft::make_device_matrix<MathT, uint32_t, raft::row_major>(res, pq_n_centers, pq_len);
-  auto data = raft::make_device_matrix<uint8_t, IdxT, raft::row_major>(
-    res, n_rows, encoded_row_length);  // NOLINT(readability-identifier-naming)
+  auto data =
+    raft::make_device_matrix<uint8_t, IdxT, raft::row_major>(res, n_rows, encoded_row_length);
 
   raft::deserialize_mdspan(res, is, vq_code_book.view());
   raft::deserialize_mdspan(res, is, pq_code_book.view());

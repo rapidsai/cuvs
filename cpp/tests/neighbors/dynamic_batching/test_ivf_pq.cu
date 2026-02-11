@@ -14,9 +14,8 @@ namespace cuvs::neighbors::dynamic_batching {
 using ivf_pq_f16 =
   dynamic_batching_test<half, int64_t, ivf_pq::index<int64_t>, ivf_pq::build, ivf_pq::search>;
 
-TEST_P(
-  ivf_pq_f16,
-  defaults)  // NOLINT(readability-identifier-naming,google-readability-avoid-underscore-in-googletest-name)
+TEST_P(ivf_pq_f16,
+       defaults)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   build_params_upsm.n_lists = std::round(std::sqrt(ps.n_rows));
   search_params_upsm.n_probes =
@@ -27,8 +26,6 @@ TEST_P(
   check_neighbors();
 }
 
-INSTANTIATE_TEST_CASE_P(dynamic_batching,
-                        ivf_pq_f16,
-                        ::testing::ValuesIn(inputs));  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(dynamic_batching, ivf_pq_f16, ::testing::ValuesIn(inputs));
 
 }  // namespace cuvs::neighbors::dynamic_batching

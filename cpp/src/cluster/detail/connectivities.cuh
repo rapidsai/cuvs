@@ -25,9 +25,7 @@
 
 namespace cuvs::cluster::agglomerative::detail {
 
-template <Linkage dist_type,
-          typename ValueIdx,
-          typename ValueT>  // NOLINT(readability-identifier-naming)
+template <Linkage dist_type, typename ValueIdx, typename ValueT>
 struct distance_graph_impl {
   void run(raft::resources const& handle,
            const ValueT* X,
@@ -45,7 +43,7 @@ struct distance_graph_impl {
  * @tparam ValueIdx
  * @tparam ValueT
  */
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 struct distance_graph_impl<Linkage::KNN_GRAPH, ValueIdx, ValueT> {
   void run(raft::resources const& handle,
            const ValueT* X,
@@ -124,7 +122,7 @@ RAFT_KERNEL fill_indices2(ValueIdx* indices, size_t m, size_t nnz)
  * @param[out] indices
  * @param[out] data
  */
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 void pairwise_distances(const raft::resources& handle,
                         const ValueT* X,
                         ValueIdx m,
@@ -171,7 +169,7 @@ void pairwise_distances(const raft::resources& handle,
  * @tparam ValueIdx
  * @tparam ValueT
  */
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 struct distance_graph_impl<Linkage::PAIRWISE, ValueIdx, ValueT> {
   void run(const raft::resources& handle,
            const ValueT* X,
@@ -210,9 +208,7 @@ struct distance_graph_impl<Linkage::PAIRWISE, ValueIdx, ValueT> {
  * @param[out] c constant 'c' used for nearest neighbors-based distances
  *             which will guarantee k <= log(n) + c
  */
-template <typename ValueIdx,
-          typename ValueT,
-          Linkage dist_type>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, Linkage dist_type>
 void get_distance_graph(raft::resources const& handle,
                         const ValueT* X,
                         ValueIdx m,

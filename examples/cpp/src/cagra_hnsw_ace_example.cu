@@ -23,8 +23,6 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
                             raft::device_matrix_view<const float, int64_t> dataset,
                             raft::device_matrix_view<const float, int64_t> queries)
 {
-  using namespace cuvs::neighbors;  // NOLINT(google-build-using-namespace)
-
   int64_t topk      = 12;
   int64_t n_queries = queries.extent(0);
 
@@ -33,12 +31,12 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
   auto distances = raft::make_device_matrix<float>(dev_resources, n_queries, topk);
 
   // CAGRA index parameters
-  cagra::index_params index_params;
+  cuvs::neighbors::cagra::index_params index_params;
   index_params.intermediate_graph_degree = 128;
   index_params.graph_degree              = 64;
 
   // ACE index parameters
-  auto ace_params = cagra::graph_build_params::ace_params();
+  auto ace_params = cuvs::neighbors::cagra::graph_build_params::ace_params();
   // Set the number of partitions. Small values might improve recall but potentially degrade
   // performance and increase memory usage. Partitions should not be too small to prevent issues in
   // KNN graph construction. The partition size is on average 2 * (n_rows / npartitions) * dim *
@@ -68,9 +66,9 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
     dataset_host.data_handle(), dataset_host.extent(0), dataset_host.extent(1));
 
   std::cout << "Building CAGRA index (search graph)" << std::endl;
-  auto index = cagra::build(dev_resources, index_params, dataset_host_view);
+  auto index = cuvs::neighbors::cagra::build(dev_resources, index_params, dataset_host_view);
   // In-memory build of ACE provides the index in memory, so we can search it directly using
-  // cagra::search
+  // cuvs::neighbors::cagra::search
 
   // On-disk build of ACE stores the reordered dataset, the dataset mapping, and the graph on disk.
   // The index is not directly usable for CAGRA search. Convert to HNSW for search operations.
@@ -79,8 +77,8 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
   // For disk-based indices: serializes CAGRA to HNSW format on disk, returns an index with file
   // descriptor For in-memory indices: creates HNSW index in memory
   std::cout << "Converting CAGRA index to HNSW" << std::endl;
-  hnsw::index_params hnsw_params;
-  auto hnsw_index = hnsw::from_cagra(dev_resources, hnsw_params, index);
+  cuvs::neighbors::hnsw::index_params hnsw_params;
+  auto hnsw_index = cuvs::neighbors::hnsw::from_cagra(dev_resources, hnsw_params, index);
 
   // HNSW search requires host matrices
   auto queries_host = raft::make_host_matrix<float, int64_t>(n_queries, queries.extent(1));
@@ -94,13 +92,13 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
   auto indices_hnsw_host   = raft::make_host_matrix<uint64_t, int64_t>(n_queries, topk);
   auto distances_hnsw_host = raft::make_host_matrix<float, int64_t>(n_queries, topk);
 
-  hnsw::search_params hnsw_search_params;
+  cuvs::neighbors::hnsw::search_params hnsw_search_params;
   hnsw_search_params.ef          = std::max(200, static_cast<int>(topk) * 2);
   hnsw_search_params.num_threads = 1;
 
   // If the HNSW index is in memory, search directly
   // std::cout << "HNSW index in memory. Searching..." << std::endl;
-  // hnsw::search(dev_resources,
+  // cuvs::neighbors::hnsw::search(dev_resources,
   //              hnsw_search_params,
   //              *hnsw_index,
   //              queries_host.view(),
@@ -115,19 +113,19 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
   std::cout << "HNSW index file location: " << hnsw_index_path << std::endl;
   std::cout << "Deserializing HNSW index from disk for search." << std::endl;
 
-  hnsw::index<float>* hnsw_index_raw = nullptr;
-  hnsw::deserialize(
+  cuvs::neighbors::hnsw::index<float>* hnsw_index_raw = nullptr;
+  cuvs::neighbors::hnsw::deserialize(
     dev_resources, hnsw_params, hnsw_index_path, index.dim(), index.metric(), &hnsw_index_raw);
 
-  std::unique_ptr<hnsw::index<float>> hnsw_index_deserialized(hnsw_index_raw);
+  std::unique_ptr<cuvs::neighbors::hnsw::index<float>> hnsw_index_deserialized(hnsw_index_raw);
 
   std::cout << "Searching HNSW index." << std::endl;
-  hnsw::search(dev_resources,
-               hnsw_search_params,
-               *hnsw_index_deserialized,
-               queries_host.view(),
-               indices_hnsw_host.view(),
-               distances_hnsw_host.view());
+  cuvs::neighbors::hnsw::search(dev_resources,
+                                hnsw_search_params,
+                                *hnsw_index_deserialized,
+                                queries_host.view(),
+                                indices_hnsw_host.view(),
+                                distances_hnsw_host.view());
 
   // Convert HNSW uint64_t indices back to uint32_t for printing
   auto neighbors_host = raft::make_host_matrix<uint32_t, int64_t>(n_queries, topk);

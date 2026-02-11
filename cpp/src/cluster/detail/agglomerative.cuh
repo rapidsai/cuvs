@@ -27,7 +27,7 @@
 #include <cstddef>
 
 namespace cuvs::cluster::agglomerative::detail {
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 class union_find {
  public:
   ValueIdx next_label;
@@ -90,7 +90,7 @@ class union_find {
  * @param[out] out_delta distances of output
  * @param[out] out_size cluster sizes of output
  */
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 void build_dendrogram_host(raft::resources const& handle,
                            const ValueIdx* rows,
                            const ValueIdx* cols,

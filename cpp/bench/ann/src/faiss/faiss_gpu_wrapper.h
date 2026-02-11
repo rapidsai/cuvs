@@ -131,10 +131,10 @@ class faiss_gpu : public algo<T>, public algo_gpu {
 
  protected:
   template <typename GpuIndex, typename CpuIndex>
-  void save_(const std::string& file) const;  // NOLINT
+  void save_(const std::string& file) const;
 
   template <typename GpuIndex, typename CpuIndex>
-  void load_(const std::string& file);  // NOLINT
+  void load_(const std::string& file);
 
   /** [NOTE Multithreading]
    *
@@ -344,7 +344,7 @@ class faiss_gpu_ivf_flat : public faiss_gpu<T> {
   {
     this->template load_<faiss::gpu::GpuIndexIVFFlat, faiss::IndexIVFFlat>(file);
   }
-  std::unique_ptr<algo<T>> copy() override
+  auto copy() -> std::unique_ptr<algo<T>> override
   {
     return std::make_unique<faiss_gpu_ivf_flat<T>>(*this);
   }
@@ -413,7 +413,10 @@ class faiss_gpu_ivfpq : public faiss_gpu<T> {
   {
     this->template load_<faiss::gpu::GpuIndexIVFPQ, faiss::IndexIVFPQ>(file);
   }
-  std::unique_ptr<algo<T>> copy() override { return std::make_unique<faiss_gpu_ivfpq<T>>(*this); };
+  auto copy() -> std::unique_ptr<algo<T>> override
+  {
+    return std::make_unique<faiss_gpu_ivfpq<T>>(*this);
+  };
 };
 
 // TODO(snanditale): Enable this in cmake
@@ -474,7 +477,10 @@ class faiss_gpu_ivfsq : public faiss_gpu<T> {
     this->template load_<faiss::gpu::GpuIndexIVFScalarQuantizer, faiss::IndexIVFScalarQuantizer>(
       file);
   }
-  std::unique_ptr<algo<T>> copy() override { return std::make_unique<faiss_gpu_ivfsq<T>>(*this); };
+  auto copy() -> std::unique_ptr<algo<T>> override
+  {
+    return std::make_unique<faiss_gpu_ivfsq<T>>(*this);
+  };
 };
 
 template <typename T>
@@ -508,7 +514,10 @@ class faiss_gpu_flat : public faiss_gpu<T> {
   {
     this->template load_<faiss::gpu::GpuIndexFlat, faiss::IndexFlat>(file);
   }
-  std::unique_ptr<algo<T>> copy() override { return std::make_unique<faiss_gpu_flat<T>>(*this); };
+  auto copy() -> std::unique_ptr<algo<T>> override
+  {
+    return std::make_unique<faiss_gpu_flat<T>>(*this);
+  };
 };
 
 template <typename T>
@@ -577,7 +586,10 @@ class faiss_gpu_cagra : public faiss_gpu<T> {
   {
     this->template load_<faiss::gpu::GpuIndexCagra, faiss::IndexHNSWCagra>(file);
   }
-  std::unique_ptr<algo<T>> copy() override { return std::make_unique<faiss_gpu_cagra<T>>(*this); };
+  auto copy() -> std::unique_ptr<algo<T>> override
+  {
+    return std::make_unique<faiss_gpu_cagra<T>>(*this);
+  };
 
   auto faiss_index() -> std::shared_ptr<faiss::gpu::GpuIndex> { return this->index_; }
 
@@ -650,7 +662,7 @@ class faiss_gpu_cagra_hnsw : public faiss_gpu<T> {
     if (this->gpu_resource_ == nullptr) { return nullptr; }
     return this->gpu_resource_->getDefaultStream(this->device_);
   }
-  std::unique_ptr<algo<T>> copy() override
+  auto copy() -> std::unique_ptr<algo<T>> override
   {
     auto new_instance          = std::make_unique<faiss_gpu_cagra_hnsw<T>>(*this);
     new_instance->build_index_ = nullptr;

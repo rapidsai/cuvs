@@ -7,22 +7,21 @@
 
 #include "./detail/trustworthiness_score.cuh"
 
-namespace cuvs {  // NOLINT(modernize-concat-nested-namespaces)
-namespace stats {
+namespace cuvs::stats {
 
-double trustworthiness_score(  // NOLINT(modernize-use-trailing-return-type)
+auto trustworthiness_score(
   raft::resources const& handle,
   raft::device_matrix_view<const float, int64_t, raft::row_major> X,
   raft::device_matrix_view<const float, int64_t, raft::row_major> X_embedded,
   int n_neighbors,
   cuvs::distance::DistanceType metric,
-  int batch_size)
+  int batch_size) -> double
 {
   RAFT_EXPECTS(X.extent(0) == X_embedded.extent(0), "Size mismatch between X and X_embedded");
   RAFT_EXPECTS(X.extent(0) <= std::numeric_limits<int>::max(), "Index type not supported");
 
-  // TODO(cuvs): Change the underlying implementation to remove the need to const_cast X_embedded.  //
-  // NOLINT(google-readability-todo)
+  // TODO(cuvs-impl): Change the underlying implementation to remove the need to const_cast
+  // X_embedded.
   return detail::trustworthiness_score<float>(handle,
                                               X.data_handle(),
                                               const_cast<float*>(X_embedded.data_handle()),
@@ -34,5 +33,4 @@ double trustworthiness_score(  // NOLINT(modernize-use-trailing-return-type)
                                               batch_size);
 }
 
-}  // namespace stats
-}  // namespace cuvs
+}  // namespace cuvs::stats

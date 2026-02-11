@@ -45,8 +45,6 @@ void cagra_build_search_variants(raft::device_resources const& res,
                                  raft::device_matrix_view<const float, int64_t> dataset,
                                  raft::device_matrix_view<const float, int64_t> queries)
 {
-  using namespace cuvs::neighbors;  // NOLINT(google-build-using-namespace)
-
   // Number of neighbors to search
   int64_t topk = 100;
   // We split the queries set into three subsets for our experiment, one for a
@@ -67,25 +65,25 @@ void cagra_build_search_variants(raft::device_resources const& res,
   auto distances_b = slice_matrix(distances, n_queries_a, n_queries_b);
 
   // use default index parameters
-  cagra::index_params index_params;
+  cuvs::neighbors::cagra::index_params index_params;
 
   std::cout << "Building CAGRA index (search graph)" << std::endl;
-  auto index = cagra::build(res, index_params, dataset);
+  auto index = cuvs::neighbors::cagra::build(res, index_params, dataset);
 
   std::cout << "CAGRA index has " << index.size() << " vectors" << std::endl;
   std::cout << "CAGRA graph has degree " << index.graph_degree() << ", graph size ["
             << index.graph().extent(0) << ", " << index.graph().extent(1) << "]" << std::endl;
 
   // use default search parameters
-  cagra::search_params search_params;
+  cuvs::neighbors::cagra::search_params search_params;
   // get a decent recall by increasing the internal topk list
   search_params.itopk_size = 512;
 
   // Another copy of search parameters to enable persistent kernel
-  cagra::search_params search_params_persistent = search_params;
-  search_params_persistent.persistent           = true;
+  cuvs::neighbors::cagra::search_params search_params_persistent = search_params;
+  search_params_persistent.persistent                            = true;
   // Persistent kernel only support single-cta search algorithm for now.
-  search_params_persistent.algo = cagra::search_algo::SINGLE_CTA;
+  search_params_persistent.algo = cuvs::neighbors::cagra::search_algo::SINGLE_CTA;
   // Slightly reduce the kernel grid size to make this example program work
   // smooth on workstations, which use the same GPU for other tasks (e.g.
   // rendering GUI).
@@ -99,11 +97,11 @@ void cagra_build_search_variants(raft::device_resources const& res,
   parameters need some adjustment.
   */
   auto search_batch = [&res, &index](bool needs_sync,
-                                     const cagra::search_params& ps,
+                                     const cuvs::neighbors::cagra::search_params& ps,
                                      raft::device_matrix_view<const float, int64_t> queries,
                                      raft::device_matrix_view<uint32_t, int64_t> neighbors,
                                      raft::device_matrix_view<float, int64_t> distances) -> void {
-    cagra::search(res, ps, index, queries, neighbors, distances);
+    cuvs::neighbors::cagra::search(res, ps, index, queries, neighbors, distances);
     /*
     To make a fair comparison, standard implementation needs to synchronize
     with the device to make sure the kernel has finished the work.
@@ -142,7 +140,7 @@ void cagra_build_search_variants(raft::device_resources const& res,
        data in cuda streams.
   */
   auto search_async = [&res, &index](bool needs_sync,
-                                     const cagra::search_params& ps,
+                                     const cuvs::neighbors::cagra::search_params& ps,
                                      raft::device_matrix_view<const float, int64_t> queries,
                                      raft::device_matrix_view<uint32_t, int64_t> neighbors,
                                      raft::device_matrix_view<float, int64_t> distances) -> void {
@@ -157,12 +155,12 @@ void cagra_build_search_variants(raft::device_resources const& res,
       // submit a new job
       if (i < work_size) {
         futures[i % kMaxJobs] = std::async(std::launch::async, [&]() -> void {
-          cagra::search(res,
-                        ps,
-                        index,
-                        slice_matrix(queries, i, 1),
-                        slice_matrix(neighbors, i, 1),
-                        slice_matrix(distances, i, 1));
+          cuvs::neighbors::cagra::search(res,
+                                         ps,
+                                         index,
+                                         slice_matrix(queries, i, 1),
+                                         slice_matrix(neighbors, i, 1),
+                                         slice_matrix(distances, i, 1));
         });
       }
     }

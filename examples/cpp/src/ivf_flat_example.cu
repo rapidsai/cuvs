@@ -21,15 +21,13 @@ void ivf_flat_build_search_simple(raft::device_resources const& dev_resources,
                                   raft::device_matrix_view<const float, int64_t> dataset,
                                   raft::device_matrix_view<const float, int64_t> queries)
 {
-  using namespace cuvs::neighbors;  // NOLINT(google-build-using-namespace)
-
-  ivf_flat::index_params index_params;
+  cuvs::neighbors::ivf_flat::index_params index_params;
   index_params.n_lists                  = 1024;
   index_params.kmeans_trainset_fraction = 0.1;
   index_params.metric                   = cuvs::distance::DistanceType::L2Expanded;
 
   std::cout << "Building IVF-Flat index" << std::endl;
-  auto index = ivf_flat::build(dev_resources, index_params, dataset);
+  auto index = cuvs::neighbors::ivf_flat::build(dev_resources, index_params, dataset);
 
   std::cout << "Number of clusters " << index.n_lists() << ", number of vectors added to index "
             << index.size() << std::endl;
@@ -41,11 +39,11 @@ void ivf_flat_build_search_simple(raft::device_resources const& dev_resources,
   auto distances    = raft::make_device_matrix<float>(dev_resources, n_queries, topk);
 
   // Set search parameters.
-  ivf_flat::search_params search_params;
+  cuvs::neighbors::ivf_flat::search_params search_params;
   search_params.n_probes = 50;
 
   // Search K nearest neighbors for each of the queries.
-  ivf_flat::search(
+  cuvs::neighbors::ivf_flat::search(
     dev_resources, search_params, index, queries, neighbors.view(), distances.view());
 
   // The call to ivf_flat::search is asynchronous. Before accessing the data, sync by calling
@@ -58,8 +56,6 @@ void ivf_flat_build_extend_search(raft::device_resources const& dev_resources,
                                   raft::device_matrix_view<const float, int64_t> dataset,
                                   raft::device_matrix_view<const float, int64_t> queries)
 {
-  using namespace cuvs::neighbors;  // NOLINT(google-build-using-namespace)
-
   // Define dataset indices.
   auto data_indices = raft::make_device_vector<int64_t, int64_t>(dev_resources, dataset.extent(0));
   raft::linalg::map_offset(dev_resources, data_indices.view(), raft::identity_op{});
@@ -68,28 +64,29 @@ void ivf_flat_build_extend_search(raft::device_resources const& dev_resources,
   auto trainset =
     subsample(dev_resources, dataset, raft::make_const_mdspan(data_indices.view()), 0.1);
 
-  ivf_flat::index_params index_params;
+  cuvs::neighbors::ivf_flat::index_params index_params;
   index_params.n_lists           = 100;
   index_params.metric            = cuvs::distance::DistanceType::L2Expanded;
   index_params.add_data_on_build = false;
 
   std::cout << "\nRun k-means clustering using the training set" << std::endl;
-  auto index =
-    ivf_flat::build(dev_resources, index_params, raft::make_const_mdspan(trainset.view()));
+  auto index = cuvs::neighbors::ivf_flat::build(
+    dev_resources, index_params, raft::make_const_mdspan(trainset.view()));
 
   std::cout << "Number of clusters " << index.n_lists() << ", number of vectors added to index "
             << index.size() << std::endl;
 
   std::cout << "Filling index with the dataset vectors" << std::endl;
-  index = ivf_flat::extend(dev_resources,
-                           dataset,
-                           std::make_optional(raft::make_const_mdspan(data_indices.view())),
-                           index);
+  index = cuvs::neighbors::ivf_flat::extend(
+    dev_resources,
+    dataset,
+    std::make_optional(raft::make_const_mdspan(data_indices.view())),
+    index);
 
   std::cout << "Index size after addin dataset vectors " << index.size() << std::endl;
 
   // Set search parameters.
-  ivf_flat::search_params search_params;
+  cuvs::neighbors::ivf_flat::search_params search_params;
   search_params.n_probes = 10;
 
   // Create output arrays.
@@ -99,7 +96,7 @@ void ivf_flat_build_extend_search(raft::device_resources const& dev_resources,
   auto distances    = raft::make_device_matrix<float, int64_t>(dev_resources, n_queries, topk);
 
   // Search K nearest neighbors for each queries.
-  ivf_flat::search(
+  cuvs::neighbors::ivf_flat::search(
     dev_resources, search_params, index, queries, neighbors.view(), distances.view());
 
   // The call to ivf_flat::search is asynchronous. Before accessing the data, sync using:

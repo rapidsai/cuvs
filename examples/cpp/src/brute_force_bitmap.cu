@@ -21,7 +21,6 @@ void load_dataset(const raft::device_resources& res, float* data_ptr, int n_vect
 
 auto main() -> int
 {
-  using namespace cuvs::neighbors;  // NOLINT(google-build-using-namespace)
   using dataset_dtype  = float;
   using indexing_dtype = int64_t;
   auto dim             = 128;
@@ -31,14 +30,15 @@ auto main() -> int
 
   // ... build index ...
   raft::device_resources res;
-  brute_force::index_params index_params;
-  brute_force::search_params search_params;
+  cuvs::neighbors::brute_force::index_params index_params;
+  cuvs::neighbors::brute_force::search_params search_params;
   auto dataset = raft::make_device_matrix<dataset_dtype, indexing_dtype>(res, n_vectors, dim);
   auto queries = raft::make_device_matrix<dataset_dtype, indexing_dtype>(res, n_queries, dim);
 
   load_dataset(res, dataset.data_handle(), n_vectors, dim);
   load_dataset(res, queries.data_handle(), n_queries, dim);
-  auto index = brute_force::build(res, index_params, raft::make_const_mdspan(dataset.view()));
+  auto index =
+    cuvs::neighbors::brute_force::build(res, index_params, raft::make_const_mdspan(dataset.view()));
 
   // Load a list of all the samples that will get filtered
   std::vector<indexing_dtype> removed_indices_host = {2, 13, 21, 8};
@@ -56,19 +56,19 @@ auto main() -> int
   cuvs::core::bitmap_view<const uint32_t, indexing_dtype> removed_indices_bitmap(
     removed_indices_bitset.data(), n_queries, n_vectors);
 
-  // Use a `bitmap_filter` in the `brute_force::search` function call.
-  auto bitmap_filter = cuvs::neighbors::filtering::bitmap_filter(removed_indices_bitmap);
+  // Use a `bitmap_filter` in the `cuvs::neighbors::brute_force::search` function call.
+  auto bitmap_filter = cuvs::cuvs::neighbors::filtering::bitmap_filter(removed_indices_bitmap);
 
   auto neighbors = raft::make_device_matrix<indexing_dtype, indexing_dtype>(res, n_queries, k);
   auto distances = raft::make_device_matrix<dataset_dtype, indexing_dtype>(res, n_queries, k);
   std::cout << "Searching..." << std::endl;
-  brute_force::search(res,
-                      search_params,
-                      index,
-                      raft::make_const_mdspan(queries.view()),
-                      neighbors.view(),
-                      distances.view(),
-                      bitmap_filter);
+  cuvs::neighbors::brute_force::search(res,
+                                       search_params,
+                                       index,
+                                       raft::make_const_mdspan(queries.view()),
+                                       neighbors.view(),
+                                       distances.view(),
+                                       bitmap_filter);
   std::cout << "Success!" << std::endl;
   return 0;
 }

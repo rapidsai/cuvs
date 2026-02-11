@@ -30,8 +30,7 @@ namespace distance {
  * @param[in] metric distance metric to use
  * @param[in] metric_arg metric argument (used for Minkowski distance)
  */
-template <typename ValueIdx = int,
-          typename ValueT   = float>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx = int, typename ValueT = float>
 void pairwise_distance(ValueT* out,
                        detail::sparse::distances_config_t<ValueIdx, ValueT> input_config,
                        cuvs::distance::DistanceType metric,

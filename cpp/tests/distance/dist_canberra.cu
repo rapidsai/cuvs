@@ -6,15 +6,14 @@
 #include "../test_utils.cuh"
 #include "distance_base.cuh"
 
-namespace cuvs {  // NOLINT(modernize-concat-nested-namespaces)
-namespace distance {
+namespace cuvs::distance {
 
 template <typename DataType, typename OutputType = DataType>
-class DistanceCanberra  // NOLINT(readability-identifier-naming)
+class DistanceCanberra
   : public DistanceTest<cuvs::distance::DistanceType::Canberra, DataType, OutputType> {};
 
 const std::vector<DistanceInputs<float>> inputsf = {
-  // NOLINT(readability-identifier-naming)
+
   {0.001f, 1024, 1024, 32, true, 1234ULL},
   {0.001f, 1024, 32, 1024, true, 1234ULL},
   {0.001f, 32, 1024, 1024, true, 1234ULL},
@@ -24,9 +23,9 @@ const std::vector<DistanceInputs<float>> inputsf = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-using DistanceCanberraF = DistanceCanberra<float>;  // NOLINT(readability-identifier-naming)
+using DistanceCanberraF = DistanceCanberra<float>;
 TEST_P(DistanceCanberraF,
-       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+       Result)  // NOLINT(modernize-use-trailing-return-type)
 {
   int m = params.isRowMajor ? params.m : params.n;
   int n = params.isRowMajor ? params.n : params.m;
@@ -36,11 +35,10 @@ TEST_P(DistanceCanberraF,
 INSTANTIATE_TEST_CASE_P(
   DistanceTests,
   DistanceCanberraF,
-  ::testing::ValuesIn(
-    inputsf));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  ::testing::ValuesIn(inputsf));  // NOLINT(modernize-use-trailing-return-type)
 
 const std::vector<DistanceInputs<double>> inputsd = {
-  // NOLINT(readability-identifier-naming)
+
   {0.001, 1024, 1024, 32, true, 1234ULL},
   {0.001, 1024, 32, 1024, true, 1234ULL},
   {0.001, 32, 1024, 1024, true, 1234ULL},
@@ -50,9 +48,9 @@ const std::vector<DistanceInputs<double>> inputsd = {
   {0.001, 32, 1024, 1024, false, 1234ULL},
   {0.003, 1024, 1024, 1024, false, 1234ULL},
 };
-using DistanceCanberraD = DistanceCanberra<double>;  // NOLINT(readability-identifier-naming)
+using DistanceCanberraD = DistanceCanberra<double>;
 TEST_P(DistanceCanberraD,
-       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+       Result)  // NOLINT(modernize-use-trailing-return-type)
 {
   int m = params.isRowMajor ? params.m : params.n;
   int n = params.isRowMajor ? params.n : params.m;
@@ -62,11 +60,10 @@ TEST_P(DistanceCanberraD,
 INSTANTIATE_TEST_CASE_P(
   DistanceTests,
   DistanceCanberraD,
-  ::testing::ValuesIn(
-    inputsd));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  ::testing::ValuesIn(inputsd));  // NOLINT(modernize-use-trailing-return-type)
 
 const std::vector<DistanceInputs<half, float>> inputsh = {
-  // NOLINT(readability-identifier-naming)
+
   {0.001f, 1024, 1024, 32, true, 1234ULL},
   {0.001f, 1024, 32, 1024, true, 1234ULL},
   {0.001f, 32, 1024, 1024, true, 1234ULL},
@@ -76,9 +73,9 @@ const std::vector<DistanceInputs<half, float>> inputsh = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-using DistanceCanberraH = DistanceCanberra<half, float>;  // NOLINT(readability-identifier-naming)
+using DistanceCanberraH = DistanceCanberra<half, float>;
 TEST_P(DistanceCanberraH,
-       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+       Result)  // NOLINT(modernize-use-trailing-return-type)
 {
   int m = params.isRowMajor ? params.m : params.n;
   int n = params.isRowMajor ? params.n : params.m;
@@ -88,13 +85,9 @@ TEST_P(DistanceCanberraH,
 INSTANTIATE_TEST_CASE_P(
   DistanceTests,
   DistanceCanberraH,
-  ::testing::ValuesIn(
-    inputsh));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  ::testing::ValuesIn(inputsh));  // NOLINT(modernize-use-trailing-return-type)
 
-class BigMatrixCanberra : public BigMatrixDistanceTest<cuvs::distance::DistanceType::Canberra> {
-};  // NOLINT(readability-identifier-naming)
-TEST_F(BigMatrixCanberra, Result) {
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+class BigMatrixCanberra : public BigMatrixDistanceTest<cuvs::distance::DistanceType::Canberra> {};
+TEST_F(BigMatrixCanberra, Result) {}  // NOLINT(modernize-use-trailing-return-type)
 
-}  // end namespace distance
-}  // namespace cuvs
+}  // namespace cuvs::distance

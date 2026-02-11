@@ -33,7 +33,7 @@ struct bitfield_ref_t {
   PtrT* ptr;
   uint32_t offset;
 
-  constexpr operator uint8_t()  // NOLINT
+  constexpr operator uint8_t()  // NOLINT(google-explicit-constructor)
   {
     auto pair = static_cast<uint16_t>(ptr[0]);
     if (offset + Bits > 8) { pair |= static_cast<uint16_t>(ptr[1]) << 8; }

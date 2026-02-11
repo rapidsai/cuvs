@@ -6,15 +6,14 @@
 #include "../test_utils.cuh"
 #include "distance_base.cuh"
 
-namespace cuvs {  // NOLINT(modernize-concat-nested-namespaces)
-namespace distance {
+namespace cuvs::distance {
 
 template <typename DataType, typename OutputType = DataType>
-class DistanceEucUnexpTest  // NOLINT(readability-identifier-naming)
+class DistanceEucUnexpTest
   : public DistanceTest<cuvs::distance::DistanceType::L2Unexpanded, DataType, OutputType> {};
 
 const std::vector<DistanceInputs<float>> inputsf = {
-  // NOLINT(readability-identifier-naming)
+
   {0.001f, 1024, 1024, 32, true, 1234ULL},
   {0.001f, 1024, 32, 1024, true, 1234ULL},
   {0.001f, 32, 1024, 1024, true, 1234ULL},
@@ -24,9 +23,9 @@ const std::vector<DistanceInputs<float>> inputsf = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-using DistanceEucUnexpTestF = DistanceEucUnexpTest<float>;  // NOLINT(readability-identifier-naming)
+using DistanceEucUnexpTestF = DistanceEucUnexpTest<float>;
 TEST_P(DistanceEucUnexpTestF,
-       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+       Result)  // NOLINT(modernize-use-trailing-return-type)
 {
   int m = params.isRowMajor ? params.m : params.n;
   int n = params.isRowMajor ? params.n : params.m;
@@ -36,11 +35,10 @@ TEST_P(DistanceEucUnexpTestF,
 INSTANTIATE_TEST_CASE_P(
   DistanceTests,
   DistanceEucUnexpTestF,
-  ::testing::ValuesIn(
-    inputsf));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  ::testing::ValuesIn(inputsf));  // NOLINT(modernize-use-trailing-return-type)
 
 const std::vector<DistanceInputs<double>> inputsd = {
-  // NOLINT(readability-identifier-naming)
+
   {0.001, 1024, 1024, 32, true, 1234ULL},
   {0.001, 1024, 32, 1024, true, 1234ULL},
   {0.001, 32, 1024, 1024, true, 1234ULL},
@@ -50,9 +48,9 @@ const std::vector<DistanceInputs<double>> inputsd = {
   {0.001, 32, 1024, 1024, false, 1234ULL},
   {0.003, 1024, 1024, 1024, false, 1234ULL},
 };
-using DistanceEucUnexpTestD = DistanceEucUnexpTest<double>;  // NOLINT(readability-identifier-naming)
+using DistanceEucUnexpTestD = DistanceEucUnexpTest<double>;
 TEST_P(DistanceEucUnexpTestD,
-       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+       Result)  // NOLINT(modernize-use-trailing-return-type)
 {
   int m = params.isRowMajor ? params.m : params.n;
   int n = params.isRowMajor ? params.n : params.m;
@@ -62,11 +60,10 @@ TEST_P(DistanceEucUnexpTestD,
 INSTANTIATE_TEST_CASE_P(
   DistanceTests,
   DistanceEucUnexpTestD,
-  ::testing::ValuesIn(
-    inputsd));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  ::testing::ValuesIn(inputsd));  // NOLINT(modernize-use-trailing-return-type)
 
 const std::vector<DistanceInputs<half, float>> inputsh = {
-  // NOLINT(readability-identifier-naming)
+
   {0.001f, 1024, 1024, 32, true, 1234ULL},
   {0.001f, 1024, 32, 1024, true, 1234ULL},
   {0.001f, 32, 1024, 1024, true, 1234ULL},
@@ -76,9 +73,9 @@ const std::vector<DistanceInputs<half, float>> inputsh = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-using DistanceEucUnexpTestH = DistanceEucUnexpTest<half, float>;  // NOLINT(readability-identifier-naming)
+using DistanceEucUnexpTestH = DistanceEucUnexpTest<half, float>;
 TEST_P(DistanceEucUnexpTestH,
-       Result)  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+       Result)  // NOLINT(modernize-use-trailing-return-type)
 {
   int m = params.isRowMajor ? params.m : params.n;
   int n = params.isRowMajor ? params.n : params.m;
@@ -88,14 +85,9 @@ TEST_P(DistanceEucUnexpTestH,
 INSTANTIATE_TEST_CASE_P(
   DistanceTests,
   DistanceEucUnexpTestH,
-  ::testing::ValuesIn(
-    inputsh));  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
+  ::testing::ValuesIn(inputsh));  // NOLINT(modernize-use-trailing-return-type)
 
-class BigMatrixEucUnexp
-  : public BigMatrixDistanceTest<
-      cuvs::distance::DistanceType::L2Unexpanded> {  // NOLINT(readability-identifier-naming)
+class BigMatrixEucUnexp : public BigMatrixDistanceTest<cuvs::distance::DistanceType::L2Unexpanded> {
 };
-TEST_F(BigMatrixEucUnexp, Result) {
-}  // NOLINT(modernize-use-trailing-return-type,readability-identifier-naming)
-}  // end namespace distance
-}  // namespace cuvs
+TEST_F(BigMatrixEucUnexp, Result) {}  // NOLINT(modernize-use-trailing-return-type)
+}  // namespace cuvs::distance

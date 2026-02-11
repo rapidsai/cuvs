@@ -21,17 +21,12 @@ namespace stats {
 
 class trustworthiness_score_test : public ::testing::Test {
  public:
-  trustworthiness_score_test()  // NOLINT(modernize-use-equals-default)
-    : d_X(0, raft::resource::get_cuda_stream(handle)),
-      d_X_embedded(0, raft::resource::get_cuda_stream(handle))
-  {
-  }
+  trustworthiness_score_test() = default;
 
  protected:
-  void basicTest()  // NOLINT(readability-identifier-naming)
+  void basicTest()
   {
-    std::vector<float> X = {// NOLINT(readability-identifier-naming)
-                            5.6142087,
+    std::vector<float> X = {5.6142087,
                             8.59787,
                             -4.382763,
                             -3.6452143,
@@ -1532,8 +1527,7 @@ class trustworthiness_score_test : public ::testing::Test {
                             5.3101015,
                             -4.2400866};
 
-    std::vector<float> X_embedded = {// NOLINT(readability-identifier-naming)
-                                     -0.41849962,
+    std::vector<float> X_embedded = {-0.41849962,
                                      -0.53906363,
                                      0.46958843,
                                      -0.35832694,
@@ -1954,21 +1948,20 @@ class trustworthiness_score_test : public ::testing::Test {
       cuvs::distance::DistanceType::L2SqrtUnexpanded);
   }
 
-  void SetUp() override { basicTest(); }  // NOLINT(readability-identifier-naming)
+  void SetUp() override { basicTest(); }
 
-  void TearDown() override {}  // NOLINT(readability-identifier-naming)
+  void TearDown() override {}
 
  protected:
-  raft::resources handle;  // NOLINT(readability-identifier-naming)
+  raft::resources handle;
 
-  rmm::device_uvector<float> d_X;           // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<float> d_X_embedded;  // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<float> d_X{0, raft::resource::get_cuda_stream(handle)};
+  rmm::device_uvector<float> d_X_embedded{0, raft::resource::get_cuda_stream(handle)};
 
-  double score;  // NOLINT(readability-identifier-naming)
+  double score;
 };
 
 using trustworthiness_score_test_f = trustworthiness_score_test;
-// NOLINTNEXTLINE(readability-identifier-naming)
 TEST_F(trustworthiness_score_test_f, Result)
 {
   ASSERT_TRUE(0.9375 < score && score < 0.9379);

@@ -259,7 +259,7 @@ class AnnHnswAceTest : public ::testing::TestWithParam<AnnHnswAceInputs> {
     std::filesystem::remove_all(temp_dir);
   }
 
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     database_dev.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     search_queries.resize(ps.n_queries * ps.dim, stream_);
@@ -271,7 +271,7 @@ class AnnHnswAceTest : public ::testing::TestWithParam<AnnHnswAceInputs> {
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override  // NOLINT(readability-identifier-naming)
+  void TearDown() override
   {
     raft::resource::sync_stream(handle_);
     database_dev.resize(0, stream_);

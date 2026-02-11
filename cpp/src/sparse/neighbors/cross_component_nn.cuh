@@ -12,10 +12,10 @@
 
 namespace cuvs::sparse::neighbors {
 
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 using fix_connectivities_red_op = detail::fix_connectivities_red_op<ValueIdx, ValueT>;
 
-template <typename ValueIdx, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT>
 using mutual_reachability_fix_connectivities_red_op =
   detail::mutual_reachability_fix_connectivities_red_op<ValueIdx, ValueT>;
 
@@ -64,9 +64,7 @@ auto get_n_components(ValueIdx* colors, size_t n_rows, cudaStream_t stream) -> V
  * increase in compute time as the col_batch_size is reduced
  * @param[in] metric distance metric
  */
-template <typename ValueIdx,
-          typename ValueT,
-          typename RedOp>  // NOLINT(readability-identifier-naming)
+template <typename ValueIdx, typename ValueT, typename RedOp>
 void cross_component_nn(
   raft::resources const& handle,
   raft::sparse::COO<ValueT, ValueIdx>& out,

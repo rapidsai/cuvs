@@ -29,7 +29,7 @@ namespace cuvs::util {
  */
 class fd_streambuf : public std::streambuf {
   int fd_;
-  std::unique_ptr<char[]> buffer_;  // NOLINT(modernize-avoid-c-arrays)
+  std::unique_ptr<char[]> buffer_;
   size_t buffer_size_;
 
  protected:

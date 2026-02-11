@@ -8,8 +8,7 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 
-namespace cuvs {  // NOLINT(modernize-concat-nested-namespaces)
-namespace stats {
+namespace cuvs::stats {
 
 /**
  * @defgroup stats_silhouette_score Silhouette Score
@@ -106,5 +105,4 @@ auto silhouette_score_batched(
   int64_t batch_size,
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded) -> double;
 
-}  // namespace stats
-}  // namespace cuvs
+}  // namespace cuvs::stats

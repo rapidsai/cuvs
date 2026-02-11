@@ -219,7 +219,7 @@ class AllNeighborsTest : public ::testing::TestWithParam<AllNeighborsInputs> {
     EXPECT_TRUE(eval_recall(indices_bf, indices_allNN, ps.n_rows, ps.k, 0.01, min_recall, true));
   }
 
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     auto database_view =
@@ -229,7 +229,7 @@ class AllNeighborsTest : public ::testing::TestWithParam<AllNeighborsInputs> {
     raft::resource::sync_stream(handle_);
   }
 
-  void TearDown() override  // NOLINT(readability-identifier-naming)
+  void TearDown() override
   {
     raft::resource::sync_stream(handle_);
     database.resize(0, stream_);

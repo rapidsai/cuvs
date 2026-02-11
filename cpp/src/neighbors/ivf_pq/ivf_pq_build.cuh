@@ -63,7 +63,7 @@
 #include <variant>
 
 namespace cuvs::neighbors::ivf_pq::detail {
-using namespace cuvs::spatial::knn::detail;  // NOLINT
+namespace utils = cuvs::spatial::knn::detail::utils;
 
 using internal_extents_t = int64_t;  // The default mdspan extent type used internally.
 
@@ -239,7 +239,7 @@ auto calculate_offsets_and_indices(IdxT n_rows,
   rmm::device_uvector<IdxT> data_offsets_buf(n_lists, stream);
   auto data_offsets = data_offsets_buf.data();
   raft::copy(data_offsets, cluster_offsets, n_lists, stream);
-  constexpr uint32_t n_threads = 128;  // NOLINT
+  constexpr uint32_t n_threads = 128;
   const IdxT n_blocks          = raft::div_rounding_up_unsafe(n_rows, n_threads);
   fill_indices_kernel<n_threads>
     <<<n_blocks, n_threads, 0, stream>>>(n_rows, data_indices, data_offsets, labels);

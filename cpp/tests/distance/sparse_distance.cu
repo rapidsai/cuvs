@@ -16,14 +16,13 @@
 #include <cusparse_v2.h>
 #include <gtest/gtest.h>
 
-namespace cuvs {  // NOLINT(modernize-concat-nested-namespaces)
-namespace distance {
+namespace cuvs::distance {
 
 using raft::update_device;
 namespace resource = raft::resource;
 
-template <typename value_idx, typename value_t>  // NOLINT(readability-identifier-naming)
-struct SparseDistanceInputs {                    // NOLINT(readability-identifier-naming)
+template <typename value_idx, typename value_t>
+struct SparseDistanceInputs {
   value_idx n_cols;
 
   std::vector<value_idx> indptr_h;
@@ -37,15 +36,15 @@ struct SparseDistanceInputs {                    // NOLINT(readability-identifie
   float metric_arg = 0.0;
 };
 
-template <typename value_idx, typename value_t>  // NOLINT(readability-identifier-naming)
+template <typename value_idx, typename value_t>
 auto operator<<(::std::ostream& os, const SparseDistanceInputs<value_idx, value_t>& dims)
   -> ::std::ostream&
 {
   return os;
 }
 
-template <typename value_idx, typename value_t>  // NOLINT(readability-identifier-naming)
-class SparseDistanceTest                         // NOLINT(readability-identifier-naming)
+template <typename value_idx, typename value_t>
+class SparseDistanceTest
   : public ::testing::TestWithParam<SparseDistanceInputs<value_idx, value_t>> {
  public:
   SparseDistanceTest()
@@ -58,7 +57,7 @@ class SparseDistanceTest                         // NOLINT(readability-identifie
   {
   }
 
-  void SetUp() override  // NOLINT(readability-identifier-naming)
+  void SetUp() override
   {
     make_data();
 
@@ -119,20 +118,20 @@ class SparseDistanceTest                         // NOLINT(readability-identifie
                   resource::get_cuda_stream(handle));
   }
 
-  raft::resources handle;  // NOLINT(readability-identifier-naming)
+  raft::resources handle;
 
   // input data
-  rmm::device_uvector<value_idx> indptr, indices;  // NOLINT(readability-identifier-naming)
-  rmm::device_uvector<value_t> data;               // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<value_idx> indptr, indices;
+  rmm::device_uvector<value_t> data;
 
   // output data
-  rmm::device_uvector<value_t> out_dists, out_dists_ref;  // NOLINT(readability-identifier-naming)
+  rmm::device_uvector<value_t> out_dists, out_dists_ref;
 
-  SparseDistanceInputs<value_idx, value_t> params;  // NOLINT(readability-identifier-naming)
+  SparseDistanceInputs<value_idx, value_t> params;
 };
 
 const std::vector<SparseDistanceInputs<int, float>> inputs_i32_f = {
-  // NOLINT(readability-identifier-naming)
+
   {5,
    {0, 0, 1, 2},
 
@@ -834,12 +833,10 @@ const std::vector<SparseDistanceInputs<int, float>> inputs_i32_f = {
 
 };
 
-using SparseDistanceTestF =
-  SparseDistanceTest<int, float>;                   // NOLINT(readability-identifier-naming)
-TEST_P(SparseDistanceTestF, Result) { compare(); }  // NOLINT(readability-identifier-naming)
-INSTANTIATE_TEST_CASE_P(SparseDistanceTests,        // NOLINT(readability-identifier-naming)
+using SparseDistanceTestF = SparseDistanceTest<int, float>;
+TEST_P(SparseDistanceTestF, Result) { compare(); }
+INSTANTIATE_TEST_CASE_P(SparseDistanceTests,
                         SparseDistanceTestF,
                         ::testing::ValuesIn(inputs_i32_f));
 
-}  // end namespace distance
-}  // end namespace cuvs
+}  // namespace cuvs::distance

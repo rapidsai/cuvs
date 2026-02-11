@@ -20,7 +20,7 @@
 
 namespace cuvs::cluster::kmeans::detail {
 
-template <typename ValueT, typename IdxT>  // NOLINT(readability-identifier-naming)
+template <typename ValueT, typename IdxT>
 void compute_dispersion(raft::resources const& handle,
                         raft::device_matrix_view<const ValueT, IdxT> X,
                         cuvs::cluster::kmeans::params& params,
@@ -55,7 +55,7 @@ void compute_dispersion(raft::resources const& handle,
     handle, centroids_const_view, cluster_sizes_view, std::nullopt, n);
 }
 
-template <typename IdxT, typename ValueT>  // NOLINT(readability-identifier-naming)
+template <typename IdxT, typename ValueT>
 void find_k(raft::resources const& handle,
             raft::device_matrix_view<const ValueT, IdxT> X,
             raft::host_scalar_view<IdxT> best_k,

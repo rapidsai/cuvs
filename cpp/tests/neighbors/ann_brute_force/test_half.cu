@@ -14,9 +14,9 @@ TEST_P(AnnBruteForceTest_half_float,
        AnnBruteForce)  // NOLINT(google-readability-avoid-underscore-in-googletest-name)
 {
   this->testBruteForce();
-}  // NOLINT(readability-identifier-naming)
+}
 
-INSTANTIATE_TEST_CASE_P(AnnBruteForceTest,  // NOLINT(readability-identifier-naming)
+INSTANTIATE_TEST_CASE_P(AnnBruteForceTest,
                         AnnBruteForceTest_half_float,
                         ::testing::ValuesIn(inputs));
 

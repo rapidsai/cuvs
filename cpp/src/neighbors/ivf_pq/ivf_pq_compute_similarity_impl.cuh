@@ -111,7 +111,7 @@ template <typename OutT,
           uint32_t PqBits,
           uint32_t BitsLeft = 0,
           uint32_t Ix       = 0>
-__device__ __forceinline__ void ivfpq_compute_chunk(OutT& score /* NOLINT */,
+__device__ __forceinline__ void ivfpq_compute_chunk(OutT& score,
                                                     typename VecT::math_t& pq_code,
                                                     const VecT& pq_codes,
                                                     const LutT*& lut_head,
@@ -289,11 +289,11 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
     * topk::block_sort: some amount of shared memory, but overlaps with the rest:
         block_sort only needs shared memory for `.done()` operation, which can come very last.
   */
-  extern __shared__ __align__(256) uint8_t smem_buf[];  // NOLINT
+  extern __shared__ __align__(256) uint8_t smem_buf[];
   constexpr bool kManageLocalTopK = Capacity > 0;
 
-  constexpr uint32_t PqShift = 1u << PqBits;  // NOLINT
-  constexpr uint32_t PqMask  = PqShift - 1u;  // NOLINT
+  constexpr uint32_t PqShift = 1u << PqBits;
+  constexpr uint32_t PqMask  = PqShift - 1u;
 
   const uint32_t pq_len   = dim / pq_dim;
   const uint32_t lut_size = pq_dim * PqShift;

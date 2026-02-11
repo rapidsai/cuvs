@@ -27,7 +27,7 @@
 #include "scann_soar.cuh"
 
 namespace cuvs::neighbors::experimental::scann::detail {
-using namespace cuvs::spatial::knn::detail;  // NOLINT
+namespace utils = cuvs::spatial::knn::detail::utils;
 
 /* @defgroup scann_build_detail scann build
  * @{
@@ -99,6 +99,7 @@ auto build(raft::resources const& res,
     }
   }
 
+  // NOLINTNEXTLINE(modernize-use-trailing-return-type)
   utils::batch_load_iterator<T> dataset_vec_batches(dataset.data_handle(),
                                                     dataset.extent(0),
                                                     dataset.extent(1),

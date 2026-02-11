@@ -67,38 +67,35 @@ namespace cuvs::epilogue::thread {
 template <typename ElementC_,
           typename ElementAccumulator_,
           typename ElementCompute_,
-          typename ElementZ_,     // NOLINT(readability-identifier-naming)
-          typename ElementT_,     // NOLINT(readability-identifier-naming)
-          int ElementsPerAccess,  // NOLINT(readability-identifier-naming)
-          typename DistanceOp_,   // NOLINT(readability-identifier-naming)
-          typename CGReduceOp_,   // NOLINT(readability-identifier-naming)
+          typename ElementZ_,
+          typename ElementT_,
+          int ElementsPerAccess,
+          typename DistanceOp_,
+          typename CGReduceOp_,
           typename ReduceOpT_,
-          typename KVPReduceOpT_>                   // NOLINT(readability-identifier-naming)
-class FusedDistanceNNEpilogueElementwise {          // NOLINT(readability-identifier-naming)
- public:                                            // NOLINT(readability-identifier-naming)
-  using ElementOutput                 = ElementC_;  // NOLINT(readability-identifier-naming)
-  using ElementC                      = ElementC_;  // NOLINT(readability-identifier-naming)
+          typename KVPReduceOpT_>
+class FusedDistanceNNEpilogueElementwise {
+ public:
+  using ElementOutput                 = ElementC_;
+  using ElementC                      = ElementC_;
   using ElementAccumulator            = ElementAccumulator_;
-  using ElementCompute                = ElementCompute_;    // NOLINT(readability-identifier-naming)
-  using ElementZ                      = ElementZ_;          // NOLINT(readability-identifier-naming)
-  using ElementT                      = ElementT_;          // NOLINT(readability-identifier-naming)
-  static int const kElementsPerAccess = ElementsPerAccess;  // NOLINT(readability-identifier-naming)
-  static int const kCount = kElementsPerAccess;             // NOLINT(readability-identifier-naming)
-  // NOLINT(readability-identifier-naming)
+  using ElementCompute                = ElementCompute_;
+  using ElementZ                      = ElementZ_;
+  using ElementT                      = ElementT_;
+  static int const kElementsPerAccess = ElementsPerAccess;
+  static int const kCount             = kElementsPerAccess;
+
   using DistanceOp = DistanceOp_;
   using CGReduceOp = CGReduceOp_;
 
-  using FragmentAccumulator =
-    cutlass::Array<ElementAccumulator,
-                   kElementsPerAccess>;  // NOLINT(readability-identifier-naming)
-  using FragmentCompute =
-    cutlass::Array<ElementCompute, kElementsPerAccess>;  // NOLINT(readability-identifier-naming)
-  using FragmentC = cutlass::Array<ElementOutput, kElementsPerAccess>;
-  using FragmentZ = cutlass::Array<ElementZ, kElementsPerAccess>;
-  using OutValT   = typename CGReduceOp::acc_type_t;
-  using FragmentT = cutlass::Array<OutValT, kElementsPerAccess>;
+  using FragmentAccumulator = cutlass::Array<ElementAccumulator, kElementsPerAccess>;
+  using FragmentCompute     = cutlass::Array<ElementCompute, kElementsPerAccess>;
+  using FragmentC           = cutlass::Array<ElementOutput, kElementsPerAccess>;
+  using FragmentZ           = cutlass::Array<ElementZ, kElementsPerAccess>;
+  using OutValT             = typename CGReduceOp::acc_type_t;
+  using FragmentT           = cutlass::Array<OutValT, kElementsPerAccess>;
 
-  using FragmentOutput = FragmentZ;  // NOLINT(readability-identifier-naming)
+  using FragmentOutput = FragmentZ;
 
   static bool const kIsHeavy = true;  // ElementwiseOp::kIsHeavy;
 
@@ -112,15 +109,14 @@ class FusedDistanceNNEpilogueElementwise {          // NOLINT(readability-identi
   struct Params {
     CGReduceOp_ cg_reduce_op;
     DistanceOp_ dist_op_;
-    KVPReduceOpT_ pair_redop_;  // NOLINT(readability-identifier-naming)
+    KVPReduceOpT_ pair_redop_;
     ReduceOpT_ red_op_;
-    int* mutexes_;  // NOLINT(readability-identifier-naming)
-    cuda::binary_semaphore<cuda::thread_scope_device>*
-      bin_mutex_;                   // NOLINT(readability-identifier-naming)
-    using CGReduceT = CGReduceOp_;  // NOLINT(readability-identifier-naming)
-    //  // NOLINT(readability-identifier-naming)
-    // Methods  // NOLINT(readability-identifier-naming)
-    //  // NOLINT(readability-identifier-naming)
+    int* mutexes_;
+    cuda::binary_semaphore<cuda::thread_scope_device>* bin_mutex_;
+    using CGReduceT = CGReduceOp_;
+    //
+    // Methods
+    //
     CUTLASS_HOST_DEVICE
     Params(DistanceOp_ dist_op,
            CGReduceOp cg_reduce_op,
@@ -148,8 +144,8 @@ class FusedDistanceNNEpilogueElementwise {          // NOLINT(readability-identi
   DistanceOp_ elementwise_op;
   KVPReduceOpT_ pair_redop;
 
- public:              // NOLINT(readability-identifier-naming)
-  ReduceOpT_ red_op;  // NOLINT(readability-identifier-naming)
+ public:
+  ReduceOpT_ red_op;
 
   //
   // Methods
@@ -183,16 +179,15 @@ class FusedDistanceNNEpilogueElementwise {          // NOLINT(readability-identi
     FragmentCompute tmp_Accum =
       cutlass::NumericArrayConverter<ElementCompute, ElementAccumulator, kElementsPerAccess>()(AB);
     FragmentCompute tmp_C =
-      cutlass::NumericArrayConverter<ElementCompute, ElementC, kElementsPerAccess>()(
-        frag_C);  // NOLINT(readability-identifier-naming)
+      cutlass::NumericArrayConverter<ElementCompute, ElementC, kElementsPerAccess>()(frag_C);
     FragmentCompute result_Z;
-    // NOLINT(readability-identifier-naming)
+
     CUTLASS_PRAGMA_UNROLL
-    for (int i = 0; i < kElementsPerAccess; ++i) {  // NOLINT(readability-identifier-naming)
+    for (int i = 0; i < kElementsPerAccess; ++i) {
       ElementCompute res_Z = elementwise_op(tmp_C[i], V[i], tmp_Accum[i]);
       frag_T[i]            = res_Z;
     }
-  }  // NOLINT(readability-identifier-naming)
+  }
 
   /// Applies the operation when is_source_needed() is false
   CUTLASS_HOST_DEVICE

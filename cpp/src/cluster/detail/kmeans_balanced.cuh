@@ -494,8 +494,7 @@ template <uint32_t BlockDimY,
           typename LabelT,
           typename CounterT,
           typename MappingOpT>
-__launch_bounds__((raft::WarpSize *  // NOLINT(readability-identifier-naming)
-                   BlockDimY)) RAFT_KERNEL
+__launch_bounds__((raft::WarpSize * BlockDimY)) RAFT_KERNEL
   adjust_centers_kernel(MathT* centers,  // [n_clusters, dim]
                         IdxT n_clusters,
                         IdxT dim,

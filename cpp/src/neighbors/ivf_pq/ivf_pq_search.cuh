@@ -49,7 +49,7 @@
 
 namespace cuvs::neighbors::ivf_pq::detail {
 
-using namespace cuvs::spatial::knn::detail;  // NOLINT
+namespace utils = cuvs::spatial::knn::detail::utils;
 
 /**
  * Select the clusters to probe and, as a side-effect, translate the queries type `T -> float`
