@@ -2046,7 +2046,7 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
        &small_hash_bitlen,
        &small_hash_reset_interval,
        &sample_filter};
-    auto const& invoke_kernel = [&]() {
+    auto const& kernel_launcher = [&](auto const& kernel) -> void {
       cuda::atomic_thread_fence(cuda::memory_order_seq_cst, cuda::thread_scope_system);
       RAFT_CUDA_TRY(cudaLaunchCooperativeKernel<std::remove_pointer_t<kernel_type>>(
         kernel, gs, bs, args, smem_size, stream));
@@ -2058,7 +2058,8 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
         worker_queue.capacity());
     };
     // set kernel attributes same as in normal kernel
-    cuvs::neighbors::detail::safely_invoke_kernel_with_smem_size(kernel, smem_size, invoke_kernel);
+    cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
+      kernel, smem_size, kernel_launcher);
     last_touch.store(std::chrono::system_clock::now(), std::memory_order_relaxed);
   }
 
@@ -2317,7 +2318,7 @@ control is returned in this thread (in persistent_runner_t constructor), so we'r
     dim3 block_dims(1, num_queries, 1);
     RAFT_LOG_DEBUG(
       "Launching kernel with %u threads, %u block %u smem", block_size, num_queries, smem_size);
-    auto const& invoke_kernel = [&]() {
+    auto const& kernel_launcher = [&](auto const& kernel) -> void {
       kernel<<<block_dims, thread_dims, smem_size, stream>>>(topk_indices_ptr,
                                                              topk_distances_ptr,
                                                              topk,
@@ -2343,7 +2344,8 @@ control is returned in this thread (in persistent_runner_t constructor), so we'r
                                                              small_hash_reset_interval,
                                                              sample_filter);
     };
-    cuvs::neighbors::detail::safely_invoke_kernel_with_smem_size(kernel, smem_size, invoke_kernel);
+    cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
+      kernel, smem_size, kernel_launcher);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
 }

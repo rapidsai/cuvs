@@ -20,18 +20,18 @@ namespace cuvs::neighbors::detail {
  * @tparam InvocationT The type of the invocation function.
  * @param kernel The kernel function address (for whom the smem-size is specified).
  * @param smem_size The size of the dynamic shared memory to be set.
- * @param invoke_kernel The kernel invocation function/lambda.
+ * @param launch The kernel launch function/lambda.
  */
-template <typename KernelT, typename InvocationT>
-void safely_invoke_kernel_with_smem_size(KernelT& kernel,
+template <typename KernelT, typename KernelLauncherT>
+void safely_launch_kernel_with_smem_size(KernelT const& kernel,
                                          uint32_t smem_size,
-                                         InvocationT const& invoke_kernel)
+                                         KernelLauncherT const& launch)
 {
   static auto mutex = std::mutex{};
   auto guard        = std::lock_guard<std::mutex>{mutex};
   RAFT_CUDA_TRY(
     cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
-  invoke_kernel();
+  launch(kernel);
 }
 
 }  // namespace cuvs::neighbors::detail

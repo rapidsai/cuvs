@@ -607,7 +607,7 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
                  num_queries,
                  smem_size);
 
-  auto const& invoke_kernel = [&]() {
+  auto const& kernel_launcher = [&](auto const& kernel) -> void {
     kernel<<<grid_dims, block_dims, smem_size, stream>>>(topk_indices_ptr,
                                                          topk_distances_ptr,
                                                          dataset_desc.dev_ptr(stream),
@@ -629,7 +629,7 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
                                                          num_executed_iterations,
                                                          sample_filter);
   };
-  cuvs::neighbors::detail::safely_invoke_kernel_with_smem_size(kernel, smem_size, invoke_kernel);
+  cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(kernel, smem_size, kernel_launcher);
 }
 
 }  // namespace multi_cta_search
