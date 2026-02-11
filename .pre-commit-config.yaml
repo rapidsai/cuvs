@@ -52,6 +52,7 @@ repos:
                 entry: ./cpp/scripts/run-clang-tidy-hook.sh
                 language: system
                 types_or: [c, c++, cuda]
+                exclude: ^(examples/c/|c/|rust/)
                 verbose: true
               - id: no-deprecationwarning
                 name: no-deprecationwarning

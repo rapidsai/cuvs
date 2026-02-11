@@ -26,7 +26,7 @@ void vamana_build_and_write(raft::device_resources const& dev_resources,
                             float iters,
                             std::string codebook_prefix)
 {
-  using cuvs::neighbors::vamana;
+  using namespace cuvs::neighbors;  // NOLINT(google-build-using-namespace)
 
   // use default index parameters
   vamana::index_params index_params;

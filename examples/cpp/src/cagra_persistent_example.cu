@@ -45,7 +45,7 @@ void cagra_build_search_variants(raft::device_resources const& res,
                                  raft::device_matrix_view<const float, int64_t> dataset,
                                  raft::device_matrix_view<const float, int64_t> queries)
 {
-  using cuvs::neighbors::cagra;
+  using namespace cuvs::neighbors;  // NOLINT(google-build-using-namespace)
 
   // Number of neighbors to search
   int64_t topk = 100;

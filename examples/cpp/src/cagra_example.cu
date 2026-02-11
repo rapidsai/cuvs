@@ -19,7 +19,7 @@ void cagra_build_search_simple(raft::device_resources const& dev_resources,
                                raft::device_matrix_view<const float, int64_t> dataset,
                                raft::device_matrix_view<const float, int64_t> queries)
 {
-  using cuvs::neighbors::cagra;
+  using namespace cuvs::neighbors;  // NOLINT(google-build-using-namespace)
 
   int64_t topk      = 12;
   int64_t n_queries = queries.extent(0);

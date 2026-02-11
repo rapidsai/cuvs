@@ -22,7 +22,7 @@ void hnsw_build_search_ace(raft::device_resources const& dev_resources,
                            raft::device_matrix_view<const float, int64_t> dataset,
                            raft::device_matrix_view<const float, int64_t> queries)
 {
-  using cuvs::neighbors::hnsw;
+  using namespace cuvs::neighbors;  // NOLINT(google-build-using-namespace)
 
   int64_t topk      = 12;
   int64_t n_queries = queries.extent(0);

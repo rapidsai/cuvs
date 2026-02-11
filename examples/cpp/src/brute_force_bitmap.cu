@@ -21,8 +21,7 @@ void load_dataset(const raft::device_resources& res, float* data_ptr, int n_vect
 
 auto main() -> int
 {
-  using cuvs::neighbors::brute_force;
-  using cuvs::neighbors::filtering;
+  using namespace cuvs::neighbors;  // NOLINT(google-build-using-namespace)
   using dataset_dtype  = float;
   using indexing_dtype = int64_t;
   auto dim             = 128;

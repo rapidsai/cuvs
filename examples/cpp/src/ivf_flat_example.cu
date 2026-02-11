@@ -21,7 +21,7 @@ void ivf_flat_build_search_simple(raft::device_resources const& dev_resources,
                                   raft::device_matrix_view<const float, int64_t> dataset,
                                   raft::device_matrix_view<const float, int64_t> queries)
 {
-  using cuvs::neighbors::ivf_flat;
+  using namespace cuvs::neighbors;  // NOLINT(google-build-using-namespace)
 
   ivf_flat::index_params index_params;
   index_params.n_lists                  = 1024;
@@ -58,7 +58,7 @@ void ivf_flat_build_extend_search(raft::device_resources const& dev_resources,
                                   raft::device_matrix_view<const float, int64_t> dataset,
                                   raft::device_matrix_view<const float, int64_t> queries)
 {
-  using cuvs::neighbors::ivf_flat;
+  using namespace cuvs::neighbors;  // NOLINT(google-build-using-namespace)
 
   // Define dataset indices.
   auto data_indices = raft::make_device_vector<int64_t, int64_t>(dev_resources, dataset.extent(0));

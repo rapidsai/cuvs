@@ -84,8 +84,7 @@ void dynamic_batching_example(raft::resources const& res,
                               raft::device_matrix_view<const float, int64_t> dataset,
                               raft::device_matrix_view<const float, int64_t> queries)
 {
-  using cuvs::neighbors::cagra;
-  using cuvs::neighbors::dynamic_batching;
+  using namespace cuvs::neighbors;  // NOLINT(google-build-using-namespace)
 
   // Number of neighbors to search
   int64_t topk = 100;
