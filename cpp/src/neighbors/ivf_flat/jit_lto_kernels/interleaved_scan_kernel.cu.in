@@ -7,7 +7,7 @@
 
 #ifdef BUILD_KERNEL
 
-#include <neighbors/ivf_flat/ivf_flat_interleaved_scan_kernel.cuh>
+#include <neighbors/ivf_flat/jit_lto_kernels/ivf_flat_interleaved_scan_kernel.cuh>
 
 namespace cuvs::neighbors::ivf_flat::detail {
 

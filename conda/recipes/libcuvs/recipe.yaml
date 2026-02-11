@@ -423,6 +423,9 @@ outputs:
         - libcurand-dev
         - libcusolver-dev
         - libcusparse-dev
+        - if: cuda_major == "13"
+          then:
+            - libnvjitlink-dev
       run:
         - ${{ pin_subpackage("libcuvs-headers", exact=True) }}
         - ${{ pin_subpackage("libcuvs", exact=True) }}
@@ -433,6 +436,9 @@ outputs:
         - libcurand
         - libcusolver
         - libcusparse
+        - if: cuda_major == "13"
+          then:
+            - libnvjitlink
       ignore_run_exports:
         by_name:
           - cuda-cudart
@@ -443,6 +449,9 @@ outputs:
           - libcurand
           - libcusolver
           - libcusparse
+          - if: cuda_major == "13"
+            then:
+              - libnvjitlink
           - librmm
           - mkl
           - nccl
