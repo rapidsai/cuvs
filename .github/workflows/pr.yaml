@@ -327,6 +327,8 @@ jobs:
       build_type: pull-request
       script: ci/test_cpp.sh
       sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
+      # Skip failing tests on RTX PRO 6000 (Blackwell). xref: https://github.com/rapidsai/cuvs/issues/1782
+      matrix_filter: map(select(.GPU != "rtxpro6000"))
   conda-cpp-checks:
     needs: conda-cpp-build
     secrets: inherit
@@ -350,6 +352,8 @@ jobs:
       build_type: pull-request
       script: ci/test_python.sh
       sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
+      # Skip failing tests on RTX PRO 6000 (Blackwell). xref: https://github.com/rapidsai/cuvs/issues/1782
+      matrix_filter: map(select(.GPU != "rtxpro6000"))
   rocky8-clib-standalone-build:
     needs: [checks]
     secrets: inherit
