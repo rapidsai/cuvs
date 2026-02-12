@@ -3,6 +3,13 @@ package cuvs
 // #include <stdlib.h>
 // #include <dlpack/dlpack.h>
 // #include <cuvs/core/c_api.h>
+//
+// void tensor_deleter_free(DLManagedTensor *dlm) {
+//     if (dlm->deleter != NULL) {
+//         dlm->deleter(dlm);
+//	   dlm->deleter = NULL;
+//     }
+// }
 import "C"
 
 import (
@@ -157,28 +164,35 @@ func NewTensorOnDevice[T TensorNumberType](res *Resource, shape []int64) (Tensor
 // Destroys Tensor, freeing the memory it was allocated on.
 func (t *Tensor[T]) Close() error {
 	if t.C_tensor != nil {
-		if t.C_tensor.dl_tensor.device.device_type == C.kDLCUDA {
-			bytes := t.sizeInBytes()
-			if t.resource == nil {
-				// We cannot free device memory without the resource,
-				// so we must return an error here.
-				return errors.New("resource not found for CUDA tensor")
-			}
-			err := CheckCuvs(CuvsError(C.cuvsRMMFree(t.resource.Resource, t.C_tensor.dl_tensor.data, C.size_t(bytes))))
-			if err != nil {
-				return err
-			}
-			t.C_tensor.dl_tensor.data = nil
-		} else if t.C_tensor.dl_tensor.device.device_type == C.kDLCPU {
-			if t.C_tensor.dl_tensor.data != nil {
-				C.free(t.C_tensor.dl_tensor.data)
-				t.C_tensor.dl_tensor.data = nil
-			}
-		}
+		if t.C_tensor.deleter != nil {
+			C.tensor_deleter_free((*C.DLManagedTensor)(unsafe.Pointer(t.C_tensor)))
+		} else {
 
-		if t.C_tensor.dl_tensor.shape != nil {
-			C.free(unsafe.Pointer(t.C_tensor.dl_tensor.shape))
-			t.C_tensor.dl_tensor.shape = nil
+			if t.C_tensor.dl_tensor.device.device_type == C.kDLCUDA {
+				bytes := t.sizeInBytes()
+				if t.resource == nil {
+					// We cannot free device memory without the resource,
+					// so we must return an error here.
+					return errors.New("resource not found for CUDA tensor")
+				}
+				if t.C_tensor.dl_tensor.data != nil {
+					err := CheckCuvs(CuvsError(C.cuvsRMMFree(t.resource.Resource, t.C_tensor.dl_tensor.data, C.size_t(bytes))))
+					if err != nil {
+						return err
+					}
+					t.C_tensor.dl_tensor.data = nil
+				}
+			} else if t.C_tensor.dl_tensor.device.device_type == C.kDLCPU {
+				if t.C_tensor.dl_tensor.data != nil {
+					C.free(t.C_tensor.dl_tensor.data)
+					t.C_tensor.dl_tensor.data = nil
+				}
+			}
+
+			if t.C_tensor.dl_tensor.shape != nil {
+				C.free(unsafe.Pointer(t.C_tensor.dl_tensor.shape))
+				t.C_tensor.dl_tensor.shape = nil
+			}
 		}
 
 		C.free(unsafe.Pointer(t.C_tensor))
@@ -329,11 +343,13 @@ func (t *Tensor[T]) ToHost(res *Resource) (*Tensor[T], error) {
 		return nil, err
 	}
 
-	err = CheckCuvs(CuvsError(
-		C.cuvsRMMFree(res.Resource, t.C_tensor.dl_tensor.data, C.size_t(bytes))))
-	if err != nil {
-		C.free(addr)
-		return nil, err
+	if t.C_tensor.deleter == nil {
+		err = CheckCuvs(CuvsError(
+			C.cuvsRMMFree(res.Resource, t.C_tensor.dl_tensor.data, C.size_t(bytes))))
+		if err != nil {
+			C.free(addr)
+			return nil, err
+		}
 	}
 
 	runtime.KeepAlive(res)
@@ -342,6 +358,38 @@ func (t *Tensor[T]) ToHost(res *Resource) (*Tensor[T], error) {
 	t.resource = nil
 
 	return t, nil
+}
+
+// Creates a new Tensor with nil data on the current device.
+func NewTensorNoDataOnDevice[T TensorNumberType](res *Resource, shape []int64) (Tensor[T], error) {
+	if len(shape) < 2 {
+		return Tensor[T]{}, errors.New("shape must be at least 2")
+	}
+
+	dlm := (*C.DLManagedTensor)(C.malloc(C.size_t(unsafe.Sizeof(C.DLManagedTensor{}))))
+	dtype := getDLDataType[T]()
+
+	dlm.dl_tensor.data = nil
+	dlm.dl_tensor.device = C.DLDevice{
+		device_type: C.DLDeviceType(C.kDLCUDA),
+		device_id:   0,
+	}
+	dlm.dl_tensor.dtype = dtype
+	dlm.dl_tensor.ndim = C.int(len(shape))
+	dlm.dl_tensor.shape = nil
+	dlm.dl_tensor.strides = nil
+	dlm.dl_tensor.byte_offset = 0
+	dlm.manager_ctx = nil
+	dlm.deleter = nil
+
+	shapeCopy := make([]int64, len(shape))
+	copy(shapeCopy, shape)
+
+	return Tensor[T]{
+		C_tensor: dlm,
+		shape:    shapeCopy,
+		resource: res,
+	}, nil
 }
 
 // Returns a slice of the data in the Tensor.
@@ -407,7 +455,6 @@ func calculateBytes(shape []int64, dtype C.DLDataType) int64 {
 	}
 
 	bytes *= int64(dtype.bits) / 8
-
 
 	return bytes
 }

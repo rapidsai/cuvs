@@ -55,11 +55,6 @@ func getCenters(vecs [][]float32, dim int, clusterCnt int, distanceType cuvs.Dis
 		return nil, err
 	}
 
-	centers, err := cuvs.NewTensorOnDevice[float32](&resource, []int64{int64(clusterCnt), int64(dim)})
-	if err != nil {
-		return nil, err
-	}
-
 	if err := ivf_flat.BuildIndex(resource, indexParams, &dataset, index); err != nil {
 		return nil, err
 	}
@@ -68,7 +63,17 @@ func getCenters(vecs [][]float32, dim int, clusterCnt int, distanceType cuvs.Dis
 		return nil, err
 	}
 
+	centers, err := cuvs.NewTensorNoDataOnDevice[float32](&resource, []int64{int64(clusterCnt), int64(dim)})
+	if err != nil {
+		return nil, err
+	}
+	defer centers.Close()
+
 	if err := ivf_flat.GetCenters(index, &centers); err != nil {
+		return nil, err
+	}
+
+	if err := resource.Sync(); err != nil {
 		return nil, err
 	}
 
@@ -86,7 +91,6 @@ func getCenters(vecs [][]float32, dim int, clusterCnt int, distanceType cuvs.Dis
 	}
 
 	return result, nil
-
 }
 
 func Search(datasetvec [][]float32, queriesvec [][]float32, limit uint, distanceType cuvs.Distance) (retkeys any, retdistances []float64, err error) {
@@ -207,29 +211,28 @@ func Search(datasetvec [][]float32, queriesvec [][]float32, limit uint, distance
 	return
 }
 
-
 func TestIssueGpu(t *testing.T) {
-        runtime.LockOSThread()
-        defer runtime.UnlockOSThread()
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 
-        dimension := uint(128)
-        /*
-                ncpu := uint(1)
-                elemsz := uint(4) // float32
-        */
+	dimension := uint(128)
+	/*
+	   ncpu := uint(1)
+	   elemsz := uint(4) // float32
+	*/
 
-        dsize := 100000
-        nlist := 128
-        vecs := make([][]float32, dsize)
-        for i := range vecs {
-                vecs[i] = make([]float32, dimension)
-                for j := range vecs[i] {
-                        vecs[i][j] = rand.Float32()
-                }
-        }
+	dsize := 100000
+	nlist := 128
+	vecs := make([][]float32, dsize)
+	for i := range vecs {
+		vecs[i] = make([]float32, dimension)
+		for j := range vecs[i] {
+			vecs[i][j] = rand.Float32()
+		}
+	}
 
-        _, err := getCenters(vecs, int(dimension), nlist, cuvs.DistanceL2, 10)
-        require.NoError(t, err)
+	_, err := getCenters(vecs, int(dimension), nlist, cuvs.DistanceL2, 10)
+	require.NoError(t, err)
 }
 
 func TestIvfAndBruteForceForIssue(t *testing.T) {
@@ -272,15 +275,13 @@ func TestIvfAndBruteForceForIssue(t *testing.T) {
 				_, _, err := Search(centers, queries, limit, cuvs.DistanceL2)
 				require.NoError(t, err)
 
-				/*
-					keys_i64, ok := keys.([]int64)
-					require.Equal(t, ok, true)
-
-					for j, key := range keys_i64 {
-						require.Equal(t, key, int64(j))
-						require.Equal(t, distances[j], float64(0))
-					}
-				*/
+				//	keys_i64, ok := keys.([]int64)
+				//	require.Equal(t, ok, true)
+				//
+				//					for j, key := range keys_i64 {
+				//						require.Equal(t, key, int64(j))
+				//						require.Equal(t, distances[j], float64(0))
+				//					}
 				// fmt.Printf("keys %v, dist %v\n", keys, distances)
 			}
 		}()

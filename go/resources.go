@@ -29,7 +29,7 @@ func (s *CudaStream) Close() error {
 // Creates a new CUDA stream
 func NewCudaStream() (*CudaStream, error) {
 	var stream C.cudaStream_t
-  	err := CheckCuda(C.cudaStreamCreate(&stream))
+	err := CheckCuda(C.cudaStreamCreate(&stream))
 	if err != nil {
 		return nil, err
 	}
