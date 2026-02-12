@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,8 +9,8 @@
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_resources.hpp>
 #include <raft/random/make_blobs.cuh>
+#include <rmm/mr/arena_memory_resource.hpp>
 #include <rmm/mr/device_memory_resource.hpp>
-#include <rmm/mr/pool_memory_resource.hpp>
 
 #include <array>
 #include <chrono>
@@ -156,7 +156,7 @@ void cagra_build_search_variants(raft::device_resources const& res,
       if (i >= kMaxJobs) { futures[i % kMaxJobs].wait(); }
       // submit a new job
       if (i < work_size) {
-        futures[i % kMaxJobs] = std::async(std::launch::async, [&]() {
+        futures[i % kMaxJobs] = std::async(std::launch::async, [&, i]() {
           cagra::search(res,
                         ps,
                         index,
@@ -230,18 +230,26 @@ int main()
 {
   raft::device_resources res;
 
-  // Set pool memory resource with 1 GiB initial pool size. All allocations use
-  // the same pool.
-  rmm::mr::pool_memory_resource<rmm::mr::device_memory_resource> pool_mr(
-    rmm::mr::get_current_device_resource(), 1024 * 1024 * 1024ull);
-  rmm::mr::set_current_device_resource(&pool_mr);
-
-  // Create input arrays.
+  // Parameters for the dataset and queries
   int64_t n_samples = 1000000;
   int64_t n_dim     = 128;
   int64_t n_queries = 100000;
-  auto dataset      = raft::make_device_matrix<float, int64_t>(res, n_samples, n_dim);
-  auto queries      = raft::make_device_matrix<float, int64_t>(res, n_queries, n_dim);
+
+  // Calculate an upper bound on the memory size for everything
+  int64_t mem_size = (n_samples + n_queries) * sizeof(float) * n_dim * 2 + 1024ll * 1024ll * 1024ll;
+  // Using an arena memory resource globally.
+  // This is important because we run the async loop with a very large number of jobs,
+  // which would otherwise swamp a normal pool memory resource.
+  // (the non-persistent implementation would hang forever).
+  rmm::mr::arena_memory_resource<rmm::mr::device_memory_resource> mr(
+    rmm::mr::get_current_device_resource(), mem_size);
+  rmm::mr::set_current_device_resource(&mr);
+  std::cout << "GPU Arena memory resource size: " << mem_size / (1024ll * 1024ll) << " MiB"
+            << std::endl;
+
+  // Create input arrays.
+  auto dataset = raft::make_device_matrix<float, int64_t>(res, n_samples, n_dim);
+  auto queries = raft::make_device_matrix<float, int64_t>(res, n_queries, n_dim);
   generate_dataset(res, dataset.view(), queries.view());
 
   // run the interesting part of the program
