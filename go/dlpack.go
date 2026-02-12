@@ -14,7 +14,6 @@ import "C"
 
 import (
 	"errors"
-	"runtime"
 	"strconv"
 	"unsafe"
 )
@@ -197,7 +196,6 @@ func (t *Tensor[T]) Close() error {
 
 		C.free(unsafe.Pointer(t.C_tensor))
 		t.C_tensor = nil
-		runtime.KeepAlive(t.resource)
 	}
 	return nil
 }
@@ -234,7 +232,6 @@ func (t *Tensor[T]) ToDevice(res *Resource) (*Tensor[T], error) {
 	t.C_tensor.dl_tensor.data = DeviceDataPointer
 	t.resource = res
 
-	runtime.KeepAlive(res)
 	return t, nil
 }
 
@@ -322,7 +319,6 @@ func (t *Tensor[T]) Expand(res *Resource, newData [][]T) (*Tensor[T], error) {
 		C.free(unsafe.Pointer(oldShapePtr))
 	}
 
-	runtime.KeepAlive(res)
 	return t, nil
 }
 
@@ -352,7 +348,6 @@ func (t *Tensor[T]) ToHost(res *Resource) (*Tensor[T], error) {
 		}
 	}
 
-	runtime.KeepAlive(res)
 	t.C_tensor.dl_tensor.device.device_type = C.kDLCPU
 	t.C_tensor.dl_tensor.data = addr
 	t.resource = nil

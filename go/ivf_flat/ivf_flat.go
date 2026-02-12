@@ -5,7 +5,6 @@ import "C"
 
 import (
 	"errors"
-	"runtime"
 	"unsafe"
 
 	cuvs "github.com/rapidsai/cuvs/go"
@@ -24,7 +23,6 @@ func CreateIndex[T any](params *IndexParams) (*IvfFlatIndex, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer runtime.KeepAlive(index)
 	return &IvfFlatIndex{index: index, trained: false}, nil
 }
 
@@ -42,10 +40,6 @@ func BuildIndex[T any](Resources cuvs.Resource, params *IndexParams, dataset *cu
 		return err
 	}
 	index.trained = true
-	runtime.KeepAlive(Resources)
-	runtime.KeepAlive(params)
-	runtime.KeepAlive(dataset)
-	runtime.KeepAlive(index)
 
 	return nil
 }
@@ -56,7 +50,6 @@ func (index *IvfFlatIndex) Close() error {
 	if err != nil {
 		return err
 	}
-	runtime.KeepAlive(index)
 	return nil
 }
 
@@ -79,14 +72,6 @@ func SearchIndex[T any](Resources cuvs.Resource, params *SearchParams, index *Iv
 		_type: C.NO_FILTER,
 	}
 
-	defer func() {
-		runtime.KeepAlive(Resources)
-		runtime.KeepAlive(params)
-		runtime.KeepAlive(index)
-		runtime.KeepAlive(queries)
-		runtime.KeepAlive(neighbors)
-		runtime.KeepAlive(distances)
-	}()
 	return cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatSearch(C.cuvsResources_t(Resources.Resource), params.params, index.index, (*C.DLManagedTensor)(unsafe.Pointer(queries.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(neighbors.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(distances.C_tensor)), prefilter)))
 }
 
@@ -100,7 +85,6 @@ func GetNLists(index *IvfFlatIndex) (nlist int64, err error) {
 	if err != nil {
 		return
 	}
-	runtime.KeepAlive(index)
 	nlist = int64(ret)
 	return
 }
@@ -115,7 +99,6 @@ func GetDim(index *IvfFlatIndex) (dim int64, err error) {
 	if err != nil {
 		return
 	}
-	runtime.KeepAlive(index)
 	dim = int64(ret)
 	return
 }
@@ -126,7 +109,5 @@ func GetCenters[T any](index *IvfFlatIndex, centers *cuvs.Tensor[T]) error {
 	}
 
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatIndexGetCenters(index.index, (*C.DLManagedTensor)(unsafe.Pointer(centers.C_tensor)))))
-	runtime.KeepAlive(index)
-	runtime.KeepAlive(centers)
 	return err
 }
