@@ -27,6 +27,18 @@ struct NNInputs {
   double tol;
 };
 
+__global__ void fill_int8(int8_t* buff, int len)
+{
+  int tid = threadIdx.x + blockIdx.x * blockDim.x;
+  // Fill the buffer with pseudo-random int8_t values using a simple LCG
+  if (tid < len) {
+    // Simple LCG: x_n+1 = (a * x_n + c) % m
+    // Use tid as seed, constants chosen for decent distribution
+    int seed  = tid * 1103515245 + 12345;
+    buff[tid] = static_cast<int8_t>((seed >> 16) & 0xFF);
+  }
+}
+
 template <typename DataT, typename AccT, typename IdxT, ImplType impl>
 class NNTest : public ::testing::TestWithParam<NNInputs<IdxT>> {
  public:
@@ -52,8 +64,13 @@ class NNTest : public ::testing::TestWithParam<NNInputs<IdxT>> {
   void SetUp() override
   {
     raft::random::RngState rng{params_.rng_seed};
-    raft::random::uniform(handle, rng, x.data_handle(), m * k, DataT(-1.0), DataT(1.0));
-    raft::random::uniform(handle, rng, y.data_handle(), n * k, DataT(-1.0), DataT(1.0));
+    if constexpr (std::is_same_v<DataT, int8_t>) {
+      fill_int8<<<1000, 256, 0, stream>>>(x.data_handle(), m * k);
+      fill_int8<<<1000, 256, 0, stream>>>(y.data_handle(), n * k);
+    } else {
+      raft::random::uniform(handle, rng, x.data_handle(), m * k, DataT(-1.0), DataT(1.0));
+      raft::random::uniform(handle, rng, y.data_handle(), n * k, DataT(-1.0), DataT(1.0));
+    }
 
     // Pre-compute norms
     raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
@@ -204,12 +221,21 @@ const std::vector<NNInputs<IdxT>> input_int8 = {
 
 // Test unfused implementation with fp16, int8
 // Fused implementation has no support for fp16, int8 so no test for it
-// typedef NNTest<int8_t, int32_t, int32_t, ImplType::unfused> NNTest_int8_unfused;
-// TEST_P(NNTest_int8_unfused, test)
-// {
-//   this->compute_1nn();
-//   this->compare();
-// }
-//
-// INSTANTIATE_TEST_CASE_P(NNTest, NNTest_int8_unfused, ::testing::ValuesIn(input_int8<int>));
+typedef NNTest<int8_t, int32_t, int32_t, ImplType::unfused> NNTest_int8_unfused;
+TEST_P(NNTest_int8_unfused, test)
+{
+  this->compute_1nn();
+  this->compare();
+}
+
+INSTANTIATE_TEST_CASE_P(NNTest, NNTest_int8_unfused, ::testing::ValuesIn(input_int8<int>));
+
+typedef NNTest<int8_t, float, int32_t, ImplType::unfused> NNTest_int8_unfused2;
+TEST_P(NNTest_int8_unfused2, test)
+{
+  this->compute_1nn();
+  this->compare();
+}
+
+INSTANTIATE_TEST_CASE_P(NNTest, NNTest_int8_unfused2, ::testing::ValuesIn(input_int8<int>));
 }  // namespace cuvs::neighbors
