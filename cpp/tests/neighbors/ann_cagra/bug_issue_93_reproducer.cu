@@ -64,7 +64,7 @@ TEST(Issue93Reproducer, ConcurrentSearchDifferentGraphDegrees)
       handle, rng, database.data_handle(), n_rows * dim, -1.0F, 1.0F);  // NOLINT
 
     cagra::index_params ip;
-    ip.metric                   = cuvs::distance::DistanceType::L2Expanded;
+    ip.metric                    = cuvs::distance::DistanceType::L2Expanded;
     ip.intermediate_graph_degree = 128;  // NOLINT
     ip.graph_degree              = 64;   // NOLINT
     ip.graph_build_params =
