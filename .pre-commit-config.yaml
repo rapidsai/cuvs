@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
 repos:
@@ -100,7 +100,7 @@ repos:
                     ^CHANGELOG[.]md$|
                     ^cpp/cmake/patches/cutlass/build-export[.]patch$
       - repo: https://github.com/rapidsai/pre-commit-hooks
-        rev: v1.2.1
+        rev: v1.3.3
         hooks:
           - id: verify-copyright
             name: verify-copyright-cuvs
@@ -164,6 +164,12 @@ repos:
           - id: verify-alpha-spec
           - id: verify-codeowners
             args: [--fix, --project-prefix=cuvs]
+          - id: verify-pyproject-license
+            # ignore the top-level pyproject.toml, which doesn't
+            # have or need a [project] table
+            exclude: |
+              (?x)
+                ^pyproject[.]toml$
       - repo: https://github.com/rapidsai/dependency-file-generator
         rev: v1.20.0
         hooks:

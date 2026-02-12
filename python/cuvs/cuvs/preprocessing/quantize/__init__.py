@@ -1,7 +1,7 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
 
-from cuvs.preprocessing.quantize import binary, scalar
+from cuvs.preprocessing.quantize import binary, pq, scalar
 
-__all__ = ["binary", "scalar"]
+__all__ = ["binary", "pq", "scalar"]

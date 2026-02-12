@@ -19,7 +19,8 @@ class index_impl : public index_iface<IdxT> {
              uint32_t dim,
              uint32_t pq_bits,
              uint32_t pq_dim,
-             bool conservative_memory_allocation);
+             bool conservative_memory_allocation,
+             list_layout codes_layout = list_layout::INTERLEAVED);
 
   ~index_impl()                            = default;
   index_impl(index_impl&&)                 = default;
@@ -29,6 +30,7 @@ class index_impl : public index_iface<IdxT> {
 
   cuvs::distance::DistanceType metric() const noexcept override;
   codebook_gen codebook_kind() const noexcept override;
+  list_layout codes_layout() const noexcept override;
   IdxT size() const noexcept override;
   uint32_t dim() const noexcept override;
   uint32_t dim_ext() const noexcept override;
@@ -40,8 +42,8 @@ class index_impl : public index_iface<IdxT> {
   uint32_t n_lists() const noexcept override;
   bool conservative_memory_allocation() const noexcept override;
 
-  std::vector<std::shared_ptr<list_data<IdxT>>>& lists() noexcept override;
-  const std::vector<std::shared_ptr<list_data<IdxT>>>& lists() const noexcept override;
+  std::vector<std::shared_ptr<list_data_base<IdxT>>>& lists() noexcept override;
+  const std::vector<std::shared_ptr<list_data_base<IdxT>>>& lists() const noexcept override;
 
   raft::device_vector_view<uint32_t, uint32_t, raft::row_major> list_sizes() noexcept override;
   raft::device_vector_view<const uint32_t, uint32_t, raft::row_major> list_sizes()
@@ -73,13 +75,14 @@ class index_impl : public index_iface<IdxT> {
  protected:
   cuvs::distance::DistanceType metric_;
   codebook_gen codebook_kind_;
+  list_layout codes_layout_;
   uint32_t dim_;
   uint32_t pq_bits_;
   uint32_t pq_dim_;
   bool conservative_memory_allocation_;
 
   // Primary data members
-  std::vector<std::shared_ptr<list_data<IdxT>>> lists_;
+  std::vector<std::shared_ptr<list_data_base<IdxT>>> lists_;
   raft::device_vector<uint32_t, uint32_t, raft::row_major> list_sizes_;
 
   // Lazy-initialized low-precision variants of index members - for low-precision coarse search.
@@ -109,7 +112,8 @@ class owning_impl : public index_impl<IdxT> {
               uint32_t dim,
               uint32_t pq_bits,
               uint32_t pq_dim,
-              bool conservative_memory_allocation);
+              bool conservative_memory_allocation,
+              list_layout codes_layout = list_layout::INTERLEAVED);
 
   ~owning_impl()                             = default;
   owning_impl(owning_impl&&)                 = default;
@@ -154,7 +158,8 @@ class view_impl : public index_impl<IdxT> {
             raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers_view,
             raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_view,
             raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot_view,
-            raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix_view);
+            raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix_view,
+            list_layout codes_layout = list_layout::INTERLEAVED);
 
   ~view_impl()                           = default;
   view_impl(view_impl&&)                 = default;

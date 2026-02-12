@@ -24,9 +24,13 @@ cdef extern from "library_types.h":
 
 cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
 
-    ctypedef enum codebook_gen:
-        PER_SUBSPACE
-        PER_CLUSTER
+    ctypedef enum cuvsIvfPqCodebookGen:
+        CUVS_IVF_PQ_CODEBOOK_GEN_PER_SUBSPACE
+        CUVS_IVF_PQ_CODEBOOK_GEN_PER_CLUSTER
+
+    ctypedef enum cuvsIvfPqListLayout:
+        CUVS_IVF_PQ_LIST_LAYOUT_FLAT
+        CUVS_IVF_PQ_LIST_LAYOUT_INTERLEAVED
 
     ctypedef struct cuvsIvfPqIndexParams:
         cuvsDistanceType metric
@@ -37,10 +41,11 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
         double kmeans_trainset_fraction
         uint32_t pq_bits
         uint32_t pq_dim
-        codebook_gen codebook_kind
+        cuvsIvfPqCodebookGen codebook_kind
         bool force_random_rotation
         bool conservative_memory_allocation
         uint32_t max_train_points_per_pq_code
+        cuvsIvfPqListLayout codes_layout
 
     ctypedef cuvsIvfPqIndexParams* cuvsIvfPqIndexParams_t
 
@@ -92,11 +97,20 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
     cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index,
                                          DLManagedTensor * centers)
 
+    cuvsError_t cuvsIvfPqIndexGetCentersPadded(cuvsIvfPqIndex_t index,
+                                               DLManagedTensor * centers)
+
     cuvsError_t cuvsIvfPqIndexGetListSizes(cuvsIvfPqIndex_t index,
                                            DLManagedTensor * list_sizes)
 
     cuvsError_t cuvsIvfPqIndexGetPqCenters(cuvsIvfPqIndex_t index,
                                            DLManagedTensor * centers)
+
+    cuvsError_t cuvsIvfPqIndexGetCentersRot(cuvsIvfPqIndex_t index,
+                                            DLManagedTensor * centers_rot)
+
+    cuvsError_t cuvsIvfPqIndexGetRotationMatrix(cuvsIvfPqIndex_t index,
+                                                DLManagedTensor * rotation_matrix)
 
     cuvsError_t cuvsIvfPqIndexUnpackContiguousListData(cuvsResources_t res,
                                                        cuvsIvfPqIndex_t index,
@@ -112,6 +126,15 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
                                cuvsIvfPqIndexParams* params,
                                DLManagedTensor* dataset,
                                cuvsIvfPqIndex_t index)
+
+    cuvsError_t cuvsIvfPqBuildPrecomputed(cuvsResources_t res,
+                                          cuvsIvfPqIndexParams_t params,
+                                          uint32_t dim,
+                                          DLManagedTensor* pq_centers,
+                                          DLManagedTensor* centers,
+                                          DLManagedTensor* centers_rot,
+                                          DLManagedTensor* rotation_matrix,
+                                          cuvsIvfPqIndex_t index)
 
     cuvsError_t cuvsIvfPqSearch(cuvsResources_t res,
                                 cuvsIvfPqSearchParams* params,
@@ -132,6 +155,12 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
                                 DLManagedTensor* new_vectors,
                                 DLManagedTensor* new_indices,
                                 cuvsIvfPqIndex_t index)
+
+    cuvsError_t cuvsIvfPqTransform(cuvsResources_t res,
+                                   cuvsIvfPqIndex_t index,
+                                   DLManagedTensor* input_dataset,
+                                   DLManagedTensor* output_labels,
+                                   DLManagedTensor* output_dataset)
 
 
 cdef class IndexParams:

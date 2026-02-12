@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -42,6 +42,7 @@ void deserialize_and_distribute(const raft::resources& clique,
                                 mg_index<AnnIndexType, T, IdxT>& index,
                                 const std::string& filename)
 {
+  index.ann_interfaces_.reserve(index.num_ranks_);
   for (int rank = 0; rank < index.num_ranks_; rank++) {
     const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);
     auto& ann_if                   = index.ann_interfaces_.emplace_back();
@@ -72,6 +73,7 @@ void deserialize(const raft::resources& clique,
               raft::resource::get_num_ranks(clique));
   }
 
+  index.ann_interfaces_.reserve(index.num_ranks_);
   for (int rank = 0; rank < index.num_ranks_; rank++) {
     const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);
     auto& ann_if                   = index.ann_interfaces_.emplace_back();
@@ -597,26 +599,31 @@ void search(const raft::resources& clique,
       RAFT_LOG_DEBUG(
         "REPLICATED SEARCH IN LOAD BALANCER MODE: %d*%drows", n_batches, n_rows_per_batch);
 
-#pragma omp parallel for
-      for (int64_t batch_idx = 0; batch_idx < n_batches; batch_idx++) {
-        int rank                        = batch_idx % index.num_ranks_;  // alternate GPUs
-        int64_t offset                  = batch_idx * n_rows_per_batch;
-        int64_t query_offset            = offset * n_cols;
-        int64_t output_offset           = offset * n_neighbors;
-        int64_t n_rows_of_current_batch = std::min(n_rows_per_batch, n_rows - offset);
+      cuvs::core::omp::check_threads(index.num_ranks_);
+// Each rank gets its own thread; that thread handles all batches for that rank sequentially.
+// This prevents concurrent access to the same GPU from multiple threads. (see
+// https://github.com/rapidsai/cuvs/issues/1720)
+#pragma omp parallel for num_threads(index.num_ranks_)
+      for (int rank = 0; rank < index.num_ranks_; rank++) {
+        for (int64_t batch_idx = rank; batch_idx < n_batches; batch_idx += index.num_ranks_) {
+          int64_t offset                  = batch_idx * n_rows_per_batch;
+          int64_t query_offset            = offset * n_cols;
+          int64_t output_offset           = offset * n_neighbors;
+          int64_t n_rows_of_current_batch = std::min(n_rows_per_batch, n_rows - offset);
 
-        run_search_batch(clique,
-                         index,
-                         rank,
-                         search_params,
-                         queries,
-                         neighbors,
-                         distances,
-                         query_offset,
-                         output_offset,
-                         n_rows_of_current_batch,
-                         n_cols,
-                         n_neighbors);
+          run_search_batch(clique,
+                           index,
+                           rank,
+                           search_params,
+                           queries,
+                           neighbors,
+                           distances,
+                           query_offset,
+                           output_offset,
+                           n_rows_of_current_batch,
+                           n_cols,
+                           n_neighbors);
+        }
       }
     } else if (search_mode == ROUND_ROBIN) {
       RAFT_LOG_DEBUG("REPLICATED SEARCH IN ROUND ROBIN MODE: %d*%drows", 1, n_rows);

@@ -21,8 +21,8 @@ const (
 )
 
 var cCodebookKinds = map[codebookKind]int{
-	Subspace: C.PER_SUBSPACE,
-	Cluster:  C.PER_CLUSTER,
+	Subspace: C.CUVS_IVF_PQ_CODEBOOK_GEN_PER_SUBSPACE,
+	Cluster:  C.CUVS_IVF_PQ_CODEBOOK_GEN_PER_CLUSTER,
 }
 
 // Creates a new IndexParams

@@ -16,7 +16,7 @@ jobs:
         cuda_version:
           - '12.9.1'
     container:
-      image: "rapidsai/ci-conda:26.02-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
+      image: "rapidsai/ci-conda:26.04-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
     steps:
       - uses: actions/checkout@v4
       - name: Check if release build

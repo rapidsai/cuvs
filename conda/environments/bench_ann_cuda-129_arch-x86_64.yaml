@@ -17,7 +17,7 @@ dependencies:
 - cuda-python>=12.9.2,<13.0
 - cuda-version=12.9
 - cupy>=13.6.0
-- cuvs==26.2.*,>=0.0.0a0
+- cuvs==26.4.*,>=0.0.0a0
 - cxx-compiler
 - cython>=3.0.0,<3.2.0
 - dlpack>=0.8,<1.0
@@ -31,8 +31,8 @@ dependencies:
 - libcurand-dev
 - libcusolver-dev
 - libcusparse-dev
-- libcuvs==26.2.*,>=0.0.0a0
-- librmm==26.2.*,>=0.0.0a0
+- libcuvs==26.4.*,>=0.0.0a0
+- librmm==26.4.*,>=0.0.0a0
 - matplotlib-base>=3.9
 - mkl-devel=2023
 - nccl>=2.19
@@ -40,7 +40,7 @@ dependencies:
 - nlohmann_json>=3.12.0
 - openblas
 - pandas
-- pylibraft==26.2.*,>=0.0.0a0
+- pylibraft==26.4.*,>=0.0.0a0
 - pyyaml
 - rapids-build-backend>=0.4.0,<0.5.0
 - requests

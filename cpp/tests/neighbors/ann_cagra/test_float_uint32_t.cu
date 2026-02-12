@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -23,6 +23,13 @@ typedef AnnCagraIndexMergeTest<float, float, std::uint32_t> AnnCagraIndexMergeTe
 TEST_P(AnnCagraIndexMergeTestF_U32, AnnCagraIndexMerge_U32) { this->testCagra<uint32_t>(); }
 TEST_P(AnnCagraIndexMergeTestF_U32, AnnCagraIndexMerge_I64) { this->testCagra<int64_t>(); }
 
+typedef AnnCagraIndexFilteredMergeTest<float, float, std::uint32_t>
+  AnnCagraIndexFilteredMergeTestF_U32;
+TEST_P(AnnCagraIndexFilteredMergeTestF_U32, AnnCagraIndexFilteredMerge_U32)
+{
+  this->testCagra<uint32_t>();
+}
+
 INSTANTIATE_TEST_CASE_P(AnnCagraTest, AnnCagraTestF_U32, ::testing::ValuesIn(inputs));
 INSTANTIATE_TEST_CASE_P(AnnCagraAddNodesTest,
                         AnnCagraAddNodesTestF_U32,
@@ -32,6 +39,10 @@ INSTANTIATE_TEST_CASE_P(AnnCagraFilterTest,
                         ::testing::ValuesIn(inputs_filtering));
 INSTANTIATE_TEST_CASE_P(AnnCagraIndexMergeTest,
                         AnnCagraIndexMergeTestF_U32,
+                        ::testing::ValuesIn(inputs));
+
+INSTANTIATE_TEST_CASE_P(AnnCagraIndexFilteredMergeTest,
+                        AnnCagraIndexFilteredMergeTestF_U32,
                         ::testing::ValuesIn(inputs));
 
 }  // namespace cuvs::neighbors::cagra

@@ -253,6 +253,23 @@ inline void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::vpq_p
   if (conf.contains("pq_kmeans_trainset_fraction")) {
     param.pq_kmeans_trainset_fraction = conf.at("pq_kmeans_trainset_fraction");
   }
+  if (conf.contains("pq_kmeans_type")) {
+    std::string type = conf.at("pq_kmeans_type");
+    if (type == "KMeans") {
+      param.pq_kmeans_type = cuvs::cluster::kmeans::kmeans_type::KMeans;
+    } else if (type == "KMeansBalanced") {
+      param.pq_kmeans_type = cuvs::cluster::kmeans::kmeans_type::KMeansBalanced;
+    } else {
+      throw std::runtime_error("pq_kmeans_type: '" + type +
+                               "', should be either 'KMeans' or 'KMeansBalanced'");
+    }
+  }
+  if (conf.contains("max_train_points_per_pq_code")) {
+    param.max_train_points_per_pq_code = conf.at("max_train_points_per_pq_code");
+  }
+  if (conf.contains("max_train_points_per_vq_cluster")) {
+    param.max_train_points_per_vq_cluster = conf.at("max_train_points_per_vq_cluster");
+  }
 }
 
 nlohmann::json collect_conf_with_prefix(const nlohmann::json& conf,

@@ -113,6 +113,15 @@ cdef class IndexParams:
         PER_SUBSPACE and PER_CLUSTER. In both cases, we will use
         pq_book_size * max_train_points_per_pq_code training points to
         train each codebook.
+    codes_layout : string, default = "interleaved"
+        Memory layout of the IVF-PQ list data.
+        Valid values ["flat", "interleaved"]
+
+            - flat: Codes are stored contiguously, one vector's codes after
+              another.
+            - interleaved: Codes are interleaved for optimized search
+              performance. This is the default and recommended for search
+              workloads.
     """
 
     def __cinit__(self):
@@ -134,7 +143,8 @@ cdef class IndexParams:
                  force_random_rotation=False,
                  add_data_on_build=True,
                  conservative_memory_allocation=False,
-                 max_train_points_per_pq_code=256):
+                 max_train_points_per_pq_code=256,
+                 codes_layout="interleaved"):
         self.params.n_lists = n_lists
         self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
         self.params.metric_arg = metric_arg
@@ -143,9 +153,9 @@ cdef class IndexParams:
         self.params.pq_bits = pq_bits
         self.params.pq_dim = pq_dim
         if codebook_kind == "subspace":
-            self.params.codebook_kind = codebook_gen.PER_SUBSPACE
+            self.params.codebook_kind = cuvsIvfPqCodebookGen.CUVS_IVF_PQ_CODEBOOK_GEN_PER_SUBSPACE
         elif codebook_kind == "cluster":
-            self.params.codebook_kind = codebook_gen.PER_CLUSTER
+            self.params.codebook_kind = cuvsIvfPqCodebookGen.CUVS_IVF_PQ_CODEBOOK_GEN_PER_CLUSTER
         else:
             raise ValueError("Incorrect codebook kind %s" % codebook_kind)
         self.params.force_random_rotation = force_random_rotation
@@ -154,6 +164,12 @@ cdef class IndexParams:
             conservative_memory_allocation
         self.params.max_train_points_per_pq_code = \
             max_train_points_per_pq_code
+        if codes_layout == "flat":
+            self.params.codes_layout = cuvsIvfPqListLayout.CUVS_IVF_PQ_LIST_LAYOUT_FLAT
+        elif codes_layout == "interleaved":
+            self.params.codes_layout = cuvsIvfPqListLayout.CUVS_IVF_PQ_LIST_LAYOUT_INTERLEAVED
+        else:
+            raise ValueError("Incorrect codes layout %s" % codes_layout)
 
     def get_handle(self):
         return <size_t> self.params
@@ -209,6 +225,13 @@ cdef class IndexParams:
     @property
     def max_train_points_per_pq_code(self):
         return self.params.max_train_points_per_pq_code
+
+    @property
+    def codes_layout(self):
+        if self.params.codes_layout == cuvsIvfPqListLayout.CUVS_IVF_PQ_LIST_LAYOUT_FLAT:
+            return "flat"
+        else:
+            return "interleaved"
 
     def get_handle(self):
         return <size_t>self.params
@@ -293,6 +316,22 @@ cdef class Index:
         return output
 
     @property
+    def centers_padded(self):
+        """ Get the padded cluster centers [n_lists, dim_ext]
+        where dim_ext = round_up(dim + 1, 8).
+        This returns contiguous data suitable for build_precomputed. """
+        if not self.trained:
+            raise ValueError("Index needs to be built before getting"
+                             " centers_padded")
+
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsIvfPqIndexGetCentersPadded(self.index, tensor))
+        output.parent = self
+        return output
+
+    @property
     def pq_centers(self):
         """ Get the PQ cluster centers """
         if not self.trained:
@@ -303,6 +342,36 @@ cdef class Index:
         cdef cydlpack.DLManagedTensor * tensor = \
             <cydlpack.DLManagedTensor*><size_t>output.get_handle()
         check_cuvs(cuvsIvfPqIndexGetPqCenters(self.index, tensor))
+        output.parent = self
+        return output
+
+    @property
+    def centers_rot(self):
+        """ Get the rotated cluster centers [n_lists, rot_dim]
+        where rot_dim = pq_len * pq_dim """
+        if not self.trained:
+            raise ValueError("Index needs to be built before getting"
+                             " centers_rot")
+
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsIvfPqIndexGetCentersRot(self.index, tensor))
+        output.parent = self
+        return output
+
+    @property
+    def rotation_matrix(self):
+        """ Get the rotation matrix [rot_dim, dim]
+        Transform matrix (original space -> rotated padded space) """
+        if not self.trained:
+            raise ValueError("Index needs to be built before getting"
+                             " rotation_matrix")
+
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsIvfPqIndexGetRotationMatrix(self.index, tensor))
         output.parent = self
         return output
 
@@ -463,6 +532,122 @@ def build(IndexParams index_params, dataset, resources=None):
             res,
             params,
             dataset_dlpack,
+            idx.index
+        ))
+        idx.trained = True
+
+    return idx
+
+
+@auto_sync_resources
+def build_precomputed(IndexParams index_params, uint32_t dim, pq_centers, centers,
+                      centers_rot, rotation_matrix, resources=None):
+    """
+    Build a view-type IVF-PQ index from precomputed centroids and codebook.
+
+    This function creates a non-owning index that stores a reference to the provided device data.
+    All parameters must be provided with correct extents. The caller is responsible for ensuring
+    the lifetime of the input data exceeds the lifetime of the returned index.
+
+    The index_params must be consistent with the provided matrices. Specifically:
+    - index_params.codebook_kind determines the expected shape of pq_centers
+    - index_params.metric will be stored in the index
+    - index_params.conservative_memory_allocation will be stored in the index
+
+    Parameters
+    ----------
+    index_params : :py:class:`cuvs.neighbors.ivf_pq.IndexParams`
+        Parameters that must be consistent with the provided matrices
+    dim : int
+        Dimensionality of the input data
+    pq_centers : CUDA array interface compliant tensor
+        PQ codebook on device memory with required shape:
+        - codebook_kind "subspace": [pq_dim, pq_len, pq_book_size]
+        - codebook_kind "cluster":  [n_lists, pq_len, pq_book_size]
+        Supported dtype: float32
+    centers : CUDA array interface compliant matrix
+        Cluster centers in the original space [n_lists, dim_ext]
+        where dim_ext = round_up(dim + 1, 8).
+        Supported dtype: float32
+    centers_rot : CUDA array interface compliant matrix
+        Rotated cluster centers [n_lists, rot_dim]
+        where rot_dim = pq_len * pq_dim.
+        Supported dtype: float32
+    rotation_matrix : CUDA array interface compliant matrix
+        Transform matrix (original space -> rotated padded space) [rot_dim, dim].
+        Supported dtype: float32
+    {resources_docstring}
+
+    Returns
+    -------
+    index: :py:class:`cuvs.neighbors.ivf_pq.Index`
+
+    Examples
+    --------
+
+    >>> import cupy as cp
+    >>> from cuvs.neighbors import ivf_pq
+    >>> n_lists = 100
+    >>> dim = 128
+    >>> pq_dim = 16
+    >>> pq_bits = 8
+    >>> pq_len = (dim + pq_dim - 1) // pq_dim  # ceil division
+    >>> pq_book_size = 1 << pq_bits
+    >>> rot_dim = pq_len * pq_dim
+    >>> dim_ext = ((dim + 1 + 7) // 8) * 8  # round_up(dim + 1, 8)
+    >>>
+    >>> # Prepare precomputed matrices (example with random data)
+    >>> pq_centers = cp.random.random((pq_dim, pq_len, pq_book_size),
+    ...                               dtype=cp.float32)
+    >>> centers = cp.random.random((n_lists, dim_ext), dtype=cp.float32)
+    >>> centers_rot = cp.random.random((n_lists, rot_dim), dtype=cp.float32)
+    >>> rotation_matrix = cp.random.random((rot_dim, dim), dtype=cp.float32)
+    >>>
+    >>> # Build index from precomputed data
+    >>> build_params = ivf_pq.IndexParams(n_lists=n_lists, pq_dim=pq_dim,
+    ...                                    pq_bits=pq_bits,
+    ...                                    codebook_kind="subspace")
+    >>> index = ivf_pq.build_precomputed(build_params, dim, pq_centers,
+    ...                                   centers, centers_rot, rotation_matrix)
+    """
+    # Wrap and validate inputs
+    pq_centers_ai = wrap_array(pq_centers)
+    _check_input_array(pq_centers_ai, [np.dtype('float32')])
+
+    centers_ai = wrap_array(centers)
+    _check_input_array(centers_ai, [np.dtype('float32')])
+
+    centers_rot_ai = wrap_array(centers_rot)
+    _check_input_array(centers_rot_ai, [np.dtype('float32')])
+
+    rotation_matrix_ai = wrap_array(rotation_matrix)
+    _check_input_array(rotation_matrix_ai, [np.dtype('float32')])
+
+    # Create index
+    cdef Index idx = Index()
+
+    # Convert to DLPack
+    cdef cydlpack.DLManagedTensor* pq_centers_dlpack = \
+        cydlpack.dlpack_c(pq_centers_ai)
+    cdef cydlpack.DLManagedTensor* centers_dlpack = \
+        cydlpack.dlpack_c(centers_ai)
+    cdef cydlpack.DLManagedTensor* centers_rot_dlpack = \
+        cydlpack.dlpack_c(centers_rot_ai)
+    cdef cydlpack.DLManagedTensor* rotation_matrix_dlpack = \
+        cydlpack.dlpack_c(rotation_matrix_ai)
+
+    cdef cuvsIvfPqIndexParams* params = index_params.params
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
+    with cuda_interruptible():
+        check_cuvs(cuvsIvfPqBuildPrecomputed(
+            res,
+            params,
+            dim,
+            pq_centers_dlpack,
+            centers_dlpack,
+            centers_rot_dlpack,
+            rotation_matrix_dlpack,
             idx.index
         ))
         idx.trained = True
@@ -796,3 +981,70 @@ def extend(Index index, new_vectors, new_indices, resources=None):
         ))
 
     return index
+
+
+@auto_sync_resources
+def transform(Index index, input_dataset, output_labels=None, output_dataset=None, resources=None):
+    """
+    Transform a dataset by applying pq-encoding to the vectors.
+
+
+    Parameters
+    ----------
+    index : ivf_pq.Index
+        Trained ivf_pq object.
+    input_dataset : array interface compliant matrix shape (n_samples, dim)
+        Supported dtype [float]
+    new_indices : Optional array interface compliant vector shape (n_samples)
+        Supported dtype [uint32]
+    output_dataset : Optional array interface compliant matrix shape (n_samples, pq_dim)
+        Supported dtype [uint8]
+
+    {resources_docstring}
+
+    Returns
+    -------
+    output_labels, output_dataset:
+        The cluster that each point in the dataset belongs to, and the transformed dataset
+    """
+
+    input_dataset_ai = wrap_array(input_dataset)
+    _check_input_array(input_dataset_ai, [np.dtype('float32'), np.dtype('float16'),
+                                          np.dtype('int8'), np.dtype('uint8')])
+
+    cdef uint32_t n_samples = input_dataset_ai.shape[0]
+    cdef uint32_t pq_dim = index.pq_dim
+
+    if output_labels is None:
+        output_labels = device_ndarray.empty((n_samples), dtype='uint32')
+    output_labels_ai = wrap_array(output_labels)
+    _check_input_array(output_labels_ai, [np.dtype('uint32')],
+                       exp_rows=n_samples)
+
+    n_output_cols = int(np.ceil(index.pq_dim * index.pq_bits / 8))
+
+    if output_dataset is None:
+        output_dataset = device_ndarray.empty((n_samples, n_output_cols), dtype='uint8')
+    output_dataset_ai = wrap_array(output_dataset)
+    _check_input_array(output_dataset_ai, [np.dtype('uint8')],
+                       exp_rows=n_samples, exp_cols=n_output_cols)
+
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
+    cdef cydlpack.DLManagedTensor* input_dataset_dlpack = \
+        cydlpack.dlpack_c(input_dataset_ai)
+    cdef cydlpack.DLManagedTensor* output_labels_dlpack = \
+        cydlpack.dlpack_c(output_labels_ai)
+    cdef cydlpack.DLManagedTensor* output_dataset_dlpack = \
+        cydlpack.dlpack_c(output_dataset_ai)
+
+    with cuda_interruptible():
+        check_cuvs(cuvsIvfPqTransform(
+            res,
+            index.index,
+            input_dataset_dlpack,
+            output_labels_dlpack,
+            output_dataset_dlpack
+        ))
+
+    return output_labels, output_dataset

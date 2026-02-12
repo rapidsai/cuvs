@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -42,8 +42,9 @@ struct unpack_codes {
 template <uint32_t BlockSize, uint32_t PqBits>
 __launch_bounds__(BlockSize) static __global__ void unpack_list_data_kernel(
   raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> out_codes,
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    in_list_data,
+  raft::device_mdspan<const uint8_t,
+                      list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                      raft::row_major> in_list_data,
   std::variant<uint32_t, const uint32_t*> offset_or_indices)
 {
   const uint32_t pq_dim = out_codes.extent(1);
@@ -62,8 +63,9 @@ __launch_bounds__(BlockSize) static __global__ void unpack_list_data_kernel(
  */
 inline void unpack_list_data_impl(
   raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> codes,
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
+  raft::device_mdspan<const uint8_t,
+                      list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                      raft::row_major> list_data,
   std::variant<uint32_t, const uint32_t*> offset_or_indices,
   uint32_t pq_bits,
   rmm::cuda_stream_view stream)
@@ -113,8 +115,9 @@ struct pass_codes {
 
 template <uint32_t BlockSize, uint32_t PqBits>
 __launch_bounds__(BlockSize) static __global__ void pack_list_data_kernel(
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
+  raft::device_mdspan<uint8_t,
+                      list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                      raft::row_major> list_data,
   raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes,
   std::variant<uint32_t, const uint32_t*> offset_or_indices)
 {
@@ -134,8 +137,9 @@ __launch_bounds__(BlockSize) static __global__ void pack_list_data_kernel(
  * @param[in] stream
  */
 inline void pack_list_data_impl(
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
+  raft::device_mdspan<uint8_t,
+                      list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                      raft::row_major> list_data,
   raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes,
   std::variant<uint32_t, const uint32_t*> offset_or_indices,
   uint32_t pq_bits,

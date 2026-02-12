@@ -1,3 +1,81 @@
+# cuvs 26.02.00 (4 Feb 2026)
+
+### 🚨 Breaking Changes
+* Use CCCL's mdspan implementation by @divyegala in https://github.com/rapidsai/cuvs/pull/1605
+* Add filter for cagra::merge  by @benfred in https://github.com/rapidsai/cuvs/pull/1755
+### 🐛 Bug Fixes
+* fix(ci): remove unknown parameter `name` from rocky8 build job by @gforsyth in https://github.com/rapidsai/cuvs/pull/1554
+* CMake check for FAISS use in benchmarks by @irina-resh-nvda in https://github.com/rapidsai/cuvs/pull/1591
+* Fix overflow in `preprocess_data_kernel` of NN Descent by @jinsolp in https://github.com/rapidsai/cuvs/pull/1596
+* cmake is missing `sparse/gram.cu` gtest by @aamijar in https://github.com/rapidsai/cuvs/pull/1611
+* Correctly specify the ninja-build version to download by @robertmaynard in https://github.com/rapidsai/cuvs/pull/1634
+* Remove Flaky Python ACE Example by @julianmi in https://github.com/rapidsai/cuvs/pull/1641
+* Fix integer overflow in get_free_host_memory() on systems with >2TB RAM by @bdice in https://github.com/rapidsai/cuvs/pull/1636
+* Fix libclang download for Rust, CUDA initialization for C tests by @KyleFromNVIDIA in https://github.com/rapidsai/cuvs/pull/1652
+* Skip Python Multi-GPU Doctests by @julianmi in https://github.com/rapidsai/cuvs/pull/1671
+* [Bug] Fix memory allocation test in CAGRA graph optimization by @enp1s0 in https://github.com/rapidsai/cuvs/pull/1675
+* Fix multi-GPU All Neighbors memory coherence issue on older platforms by @viclafargue in https://github.com/rapidsai/cuvs/pull/1713
+### 📖 Documentation
+* Clean `raft/neighbors` comments by @aamijar in https://github.com/rapidsai/cuvs/pull/1651
+* Clean `raft::neighbors` comments by @aamijar in https://github.com/rapidsai/cuvs/pull/1665
+### 🚀 New Features
+* Assign the c/ folder to the the c code ownder group by @robertmaynard in https://github.com/rapidsai/cuvs/pull/1573
+* Add arm64 builds to the libcuvs_c rocky8 matrix by @robertmaynard in https://github.com/rapidsai/cuvs/pull/1570
+* [FEA]  Enforce tighter link restrictions on libcuvs_c by @robertmaynard in https://github.com/rapidsai/cuvs/pull/1614
+* [FEA] IVF-PQ Build Factories for Precomputed Centroids and Codebooks by @tarang-jain in https://github.com/rapidsai/cuvs/pull/1483
+* Add HNSW ACE build method by @julianmi in https://github.com/rapidsai/cuvs/pull/1597
+* [FEA] C + Python API for IVF-PQ Build Factories with Precomputed Centroids by @tarang-jain in https://github.com/rapidsai/cuvs/pull/1664
+* Add arm64 builds to the libcuvs_c build.yaml matrix by @robertmaynard in https://github.com/rapidsai/cuvs/pull/1701
+* pre-built libcuvs_c.so now use the new ABI major/minor values by @robertmaynard in https://github.com/rapidsai/cuvs/pull/1708
+* Correct base release for cuvs abi 1 major by @robertmaynard in https://github.com/rapidsai/cuvs/pull/1724
+* Add support for PQ preprocessing API by @lowener in https://github.com/rapidsai/cuvs/pull/1278
+* [FEA] IVF-PQ to Write Flat PQ Codes by @tarang-jain in https://github.com/rapidsai/cuvs/pull/1607
+* Enable collation of all license files into pre-built binaries by @robertmaynard in https://github.com/rapidsai/cuvs/pull/1679
+### 🛠️ Improvements
+* Update FAISS patch for RMM memory resource header migration by @bdice in https://github.com/rapidsai/cuvs/pull/1566
+* Use strict priority in CI conda tests by @bdice in https://github.com/rapidsai/cuvs/pull/1583
+* Update FAISS from 1.12.0 to 1.13.0 by @bdice in https://github.com/rapidsai/cuvs/pull/1585
+* Use strict priority in CI conda tests by @bdice in https://github.com/rapidsai/cuvs/pull/1606
+* Deduplicate `{unpack/pack}_list_data_kernel` by @jinsolp in https://github.com/rapidsai/cuvs/pull/1609
+* Expose NN Descent fp16 data type support to python by @jinsolp in https://github.com/rapidsai/cuvs/pull/1616
+* Remove alpha specs from non-RAPIDS dependencies by @bdice in https://github.com/rapidsai/cuvs/pull/1618
+* Enable merge barriers by @KyleFromNVIDIA in https://github.com/rapidsai/cuvs/pull/1625
+* Add devcontainer fallback for C++ test location by @bdice in https://github.com/rapidsai/cuvs/pull/1631
+* Dispatch to use fp32 distance computation in NN Descent depending on data dimensions by @jinsolp in https://github.com/rapidsai/cuvs/pull/1415
+* Prepare cuvs for removal of deprecated raft apis by @aamijar in https://github.com/rapidsai/cuvs/pull/1610
+* Shorten the Test Duration of test_cagra_ace.py by @julianmi in https://github.com/rapidsai/cuvs/pull/1640
+* Optional seed spectral embedding by @aamijar in https://github.com/rapidsai/cuvs/pull/1639
+* FAISS patch for removed raft headers by @aamijar in https://github.com/rapidsai/cuvs/pull/1654
+* Empty commit to trigger a build by @bdice in https://github.com/rapidsai/cuvs/pull/1662
+* Spectral Clustering dataset api by @aamijar in https://github.com/rapidsai/cuvs/pull/1653
+* Hide kernel symbols  by @divyegala in https://github.com/rapidsai/cuvs/pull/1663
+* Update cuVS to c++20 by @divyegala in https://github.com/rapidsai/cuvs/pull/1649
+* Move faiss_select from raft to cuvs by @aamijar in https://github.com/rapidsai/cuvs/pull/1658
+* Fix DiskANN Override by @tarang-jain in https://github.com/rapidsai/cuvs/pull/1666
+* Use SPDX license identifiers in pyproject.toml, bump build dependency floors by @jameslamb in https://github.com/rapidsai/cuvs/pull/1667
+* Add CUDA 13.1 support by @bdice in https://github.com/rapidsai/cuvs/pull/1642
+* Remove faiss patch by @aamijar in https://github.com/rapidsai/cuvs/pull/1668
+* Expose pq list data to python by @benfred in https://github.com/rapidsai/cuvs/pull/1428
+* Add rust bindings for vamana index by @benfred in https://github.com/rapidsai/cuvs/pull/1608
+* build and test against CUDA 13.1.0 by @jameslamb in https://github.com/rapidsai/cuvs/pull/1677
+* [Improvement] Allow Configurable DRAM in DiskANN SSD Wrapper by @tarang-jain in https://github.com/rapidsai/cuvs/pull/1598
+* prefer CUDA 13.1 devcontainers, react to some cutlass removals in RAFT by @jameslamb in https://github.com/rapidsai/cuvs/pull/1686
+* Empty commit to trigger a build by @jameslamb in https://github.com/rapidsai/cuvs/pull/1694
+* Spectral Embedding `nnz_t` by @aamijar in https://github.com/rapidsai/cuvs/pull/1628
+* Avoid installing CCCL headers in wheels by @divyegala in https://github.com/rapidsai/cuvs/pull/1692
+* Use main shared-workflows branch by @jameslamb in https://github.com/rapidsai/cuvs/pull/1707
+* Add Helper to Create NumPy Files by @julianmi in https://github.com/rapidsai/cuvs/pull/1645
+* Spectral Embedding with `all_neighbors` by @aamijar in https://github.com/rapidsai/cuvs/pull/1693
+* Deduplicate `calc_chunk_indices_kernel` by @jinsolp in https://github.com/rapidsai/cuvs/pull/1657
+* wheel builds: react to changes in pip's handling of build constraints by @mmccarty in https://github.com/rapidsai/cuvs/pull/1710
+* fix(build): build package on merge to `release/*` branch by @gforsyth in https://github.com/rapidsai/cuvs/pull/1733
+* Add a `transform` function to ivf_pq by @benfred in https://github.com/rapidsai/cuvs/pull/1732
+
+## New Contributors
+* @irina-resh-nvda made their first contribution in https://github.com/rapidsai/cuvs/pull/1591
+
+**Full Changelog**: https://github.com/rapidsai/cuvs/compare/v26.02.00a...release/26.02
+
 # cuvs 25.12.00 (10 Dec 2025)
 
 ### 🚨 Breaking Changes

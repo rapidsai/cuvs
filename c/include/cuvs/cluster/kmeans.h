@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -120,6 +120,11 @@ cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params);
  * @return cuvsError_t
  */
 cuvsError_t cuvsKMeansParamsDestroy(cuvsKMeansParams_t params);
+
+/**
+ * @brief Type of k-means algorithm.
+ */
+typedef enum { CUVS_KMEANS_TYPE_KMEANS = 0, CUVS_KMEANS_TYPE_KMEANS_BALANCED = 1 } cuvsKMeansType;
 
 /**
  * @}
