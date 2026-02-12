@@ -7,7 +7,7 @@ package cuvs
 // void tensor_deleter_free(DLManagedTensor *dlm) {
 //     if (dlm->deleter != NULL) {
 //         dlm->deleter(dlm);
-//	   dlm->deleter = NULL;
+//         dlm->deleter = NULL;
 //     }
 // }
 import "C"
