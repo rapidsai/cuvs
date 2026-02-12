@@ -144,7 +144,6 @@ void pairwise_distance_gemm(raft::resources const& handle,
   const float f_alpha = 1.0, f_beta = 0.0;
   const double d_alpha = 1.0, d_beta = 0.0;
   const int32_t i32_alpha = 1, i32_beta = 0;
-  const int8_t i8_alpha = 1, i8_beta = 0;
 
   const void* alpha = nullptr;
   const void* beta  = nullptr;
@@ -188,8 +187,8 @@ void pairwise_distance_gemm(raft::resources const& handle,
     } else if constexpr (std::is_same_v<AccT, float>) {
       zType       = CUDA_R_32F;
       computeType = CUBLAS_COMPUTE_32F;
-      alpha       = reinterpret_cast<const void*>(&i8_alpha);
-      beta        = reinterpret_cast<const void*>(&i8_beta);
+      alpha       = reinterpret_cast<const void*>(&f_alpha);
+      beta        = reinterpret_cast<const void*>(&f_beta);
     }
   }
   auto cublas_h = raft::resource::get_cublas_handle(handle);
