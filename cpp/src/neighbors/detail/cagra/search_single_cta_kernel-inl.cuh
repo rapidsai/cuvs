@@ -2046,20 +2046,15 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
        &small_hash_bitlen,
        &small_hash_reset_interval,
        &sample_filter};
-    auto const& kernel_launcher = [&](auto const& kernel) -> void {
-      cuda::atomic_thread_fence(cuda::memory_order_seq_cst, cuda::thread_scope_system);
-      RAFT_CUDA_TRY(cudaLaunchCooperativeKernel<std::remove_pointer_t<kernel_type>>(
-        kernel, gs, bs, args, smem_size, stream));
-      RAFT_LOG_INFO(
-        "Initialized the kernel %p in stream %zd; job_queue size = %u; worker_queue size = %u",
-        reinterpret_cast<void*>(kernel),
-        int64_t((cudaStream_t)stream),
-        job_queue.capacity(),
-        worker_queue.capacity());
-    };
-    // set kernel attributes same as in normal kernel
-    cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
-      kernel, smem_size, kernel_launcher);
+    cuda::atomic_thread_fence(cuda::memory_order_seq_cst, cuda::thread_scope_system);
+    RAFT_CUDA_TRY(cudaLaunchCooperativeKernel<std::remove_pointer_t<kernel_type>>(
+      kernel, gs, bs, args, smem_size, stream));
+    RAFT_LOG_INFO(
+      "Initialized the kernel %p in stream %zd; job_queue size = %u; worker_queue size = %u",
+      reinterpret_cast<void*>(kernel),
+      int64_t((cudaStream_t)stream),
+      job_queue.capacity(),
+      worker_queue.capacity());
     last_touch.store(std::chrono::system_clock::now(), std::memory_order_relaxed);
   }
 
