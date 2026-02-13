@@ -60,4 +60,3 @@ void safely_launch_kernel_with_smem_size(KernelT const& kernel,
 }
 
 }  // namespace cuvs::neighbors::detail
-
