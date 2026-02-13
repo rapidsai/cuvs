@@ -17,6 +17,8 @@ The cuVS software development kit provides APIs for C, C++, Python, and Rust lan
 
   * `C and C++ Libraries`_
 
+    * `Tarball (Build from Source)`_
+
     * `Building the Googletests`_
 
   * `Python Library`_
@@ -26,6 +28,8 @@ The cuVS software development kit provides APIs for C, C++, Python, and Rust lan
   * `Using CMake Directly`_
 
 - `Build Documentation`_
+
+- `Installation & Environment Verification FAQ`_
 
 
 Installing Pre-compiled Packages
@@ -76,6 +80,16 @@ The cuVS Python package can also be `installed through pip <https://docs.rapids.
     pip install cuvs-cu12 --extra-index-url=https://pypi.nvidia.com
 
 Note: these packages statically link the C and C++ libraries so the `libcuvs` and `libcuvs_c` shared libraries won't be readily available to use in your code.
+
+Tarball
+^^^^^^^
+
+The cuVS tarball includes the C and C++ APIs along with core dependencies (RAFT, RMM). It requires a compatible CUDA Toolkit, NVIDIA driver, and system libraries such as NCCL, OpenMP, and GLIBC.
+
+Two pre-built tarballs are available:
+
+1. **Open Source:** Download from `developer.nvidia.com <https://developer.nvidia.com/cuvs>`_.
+2. **Enterprise Supported:** Download from `NVIDIA NGC <https://catalog.ngc.nvidia.com/>`_ (requires NVAIE license).
 
 Build from source
 -----------------
@@ -130,6 +144,18 @@ To disable the multi-gpu features run :
 .. code-block:: bash
 
     ./build.sh libcuvs --no-mg
+
+
+Tarball (Build from Source)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To build a standalone tarball (``libcuvs_c.tar.gz``) from source, use the ``standalone`` target with ``--allgpuarch`` to build for all supported GPU architectures:
+
+.. code-block:: bash
+
+    ./build.sh standalone --allgpuarch -v
+
+The tarball will be created in the ``cpp/build/`` directory.
 
 
 Building the Googletests
@@ -256,3 +282,226 @@ The documentation requires that the C, C++ and Python libraries have been built 
 .. code-block:: bash
 
     ./build.sh libcuvs python docs
+
+
+Installation & Environment Verification FAQ
+--------------------------------------------
+
+This guide helps verify that NVIDIA drivers, CUDA runtime, and cuVS are correctly installed and compatible.
+
+Quick Summary
+^^^^^^^^^^^^^
+
+If you can successfully run the Python cuVS sanity check below and see: **cuVS sanity check PASSED**
+
+Then:
+
+- NVIDIA driver is working
+- CUDA runtime is accessible
+- cuVS is correctly installed and loadable
+- Basic GPU execution works
+
+Prerequisites
+^^^^^^^^^^^^^
+
+Same as the installation requirements (Linux, NVIDIA GPU) described in the sections above. Additionally, Python 3.x is required to run the sanity check script.
+
+Library Path Setup (Commonly Required)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If cuVS is installed in a non-standard location, the dynamic loader must be told where to find it:
+
+.. code-block:: bash
+
+    export LD_LIBRARY_PATH=/path/to/cuvs/lib:$LD_LIBRARY_PATH
+
+
+Step 1: Locate libcuvs_c.so
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Before running any checks, confirm where cuVS is installed.
+
+Option A: Using ldconfig (preferred)
+
+.. code-block:: bash
+
+    ldconfig -p | grep libcuvs
+
+Example output:
+
+    libcuvs_c.so (libc6,x86-64) => /usr/local/cuvs/lib/libcuvs_c.so
+
+Option B: Using find (if not registered)
+
+.. code-block:: bash
+
+    sudo find / -name "libcuvs_c.so" 2>/dev/null
+
+Once located, ensure the directory containing `libcuvs_c.so` is included in ``LD_LIBRARY_PATH``.
+
+
+Step 2: Verify NVIDIA Driver
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: bash
+
+    nvidia-smi
+
+**Expected result:** GPU is listed, driver version is shown, no error messages.
+
+**Common failure:** ``NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver`` — indicates a driver installation or kernel mismatch.
+
+
+Step 3: Verify CUDA Runtime Availability
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+cuVS requires the CUDA runtime provided by the NVIDIA driver.
+
+.. code-block:: bash
+
+    ldconfig -p | grep libcuda
+
+**Expected result:** ``libcuda.so.1 (libc6,x86-64) => /usr/lib/...``
+
+If nothing appears, the NVIDIA driver is not correctly installed.
+
+
+Step 4: Verify cuVS Shared Library Dependencies
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Once `libcuvs_c.so` has been located, run:
+
+.. code-block:: bash
+
+    ldd /full/path/to/libcuvs_c.so
+
+**Expected result:** No lines containing ``not found``; ``libcudart.so``, ``libstdc++.so`` resolve correctly.
+
+**Optional (advanced):**
+
+.. code-block:: bash
+
+    objdump -p /full/path/to/libcuvs_c.so | grep NEEDED
+
+Shows required shared library versions.
+
+
+Step 5: cuVS Runtime Sanity Check (Python)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This test dynamically loads cuVS, creates GPU resources, synchronizes a CUDA stream, and cleans up.
+
+Copy-paste script: ``cuvs_sanity.py``
+
+.. code-block:: python
+
+    import ctypes
+    import sys
+
+    def fail(msg):
+        print(f"FAILED: {msg}")
+        sys.exit(1)
+
+    # Check NVIDIA driver
+    try:
+        ctypes.CDLL("libcuda.so.1")
+    except OSError:
+        fail("libcuda.so.1 not found (NVIDIA driver missing or not loaded)")
+
+    # Load cuVS
+    try:
+        cuvs = ctypes.CDLL("libcuvs_c.so")
+    except OSError as e:
+        fail(f"Could not load libcuvs_c.so: {e}")
+
+    # Define function signatures
+    try:
+        cuvs.cuvsResourcesCreate.argtypes = [ctypes.POINTER(ctypes.c_void_p)]
+        cuvs.cuvsResourcesCreate.restype = ctypes.c_int
+
+        cuvs.cuvsStreamSync.argtypes = [ctypes.c_void_p]
+        cuvs.cuvsStreamSync.restype = ctypes.c_int
+
+        cuvs.cuvsResourcesDestroy.argtypes = [ctypes.c_void_p]
+        cuvs.cuvsResourcesDestroy.restype = ctypes.c_int
+    except AttributeError as e:
+        fail(f"Missing cuVS symbol: {e}")
+
+    # Create resources
+    res = ctypes.c_void_p()
+    if cuvs.cuvsResourcesCreate(ctypes.byref(res)) == 0:
+        fail("cuvsResourcesCreate failed")
+
+    # Sync stream
+    if cuvs.cuvsStreamSync(res) == 0:
+        fail("cuvsStreamSync failed")
+
+    # Destroy resources
+    if cuvs.cuvsResourcesDestroy(res) == 0:
+        fail("cuvsResourcesDestroy failed")
+
+    print("cuVS sanity check PASSED")
+
+
+Step 6: Run the Test
+^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: bash
+
+    python3 cuvs_sanity.py
+
+**Expected output:** ``cuVS sanity check PASSED``
+
+
+Common Errors & What They Mean
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. list-table:: Common Errors
+   :header-rows: 1
+
+   * - Error Message
+     - Likely Cause
+   * - libcuda.so.1 not found
+     - NVIDIA driver not installed or not loaded
+   * - Could not load libcuvs_c.so
+     - LD_LIBRARY_PATH not set or cuVS not installed
+   * - Missing cuVS symbol
+     - cuVS version mismatch
+   * - cuvsResourcesCreate failed
+     - CUDA runtime / driver incompatibility
+   * - cuvsStreamSync failed
+     - GPU execution failure
+
+
+Optional: Debug Library Loading
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For advanced troubleshooting:
+
+.. code-block:: bash
+
+    LD_DEBUG=libs python3 cuvs_sanity.py
+
+This prints exactly which shared libraries are loaded and from where.
+
+
+FAQ
+^^^
+
+- **Do I need gcc, nvcc, or CUDA headers?** No. This check uses Python's dynamic loader and requires no compilation.
+
+- **Does this test run on the GPU?** Yes. It creates cuVS resources and synchronizes a CUDA stream.
+
+- **Is this safe to run on production systems?** Yes. It performs a minimal, non-destructive GPU operation.
+
+- **Can this be used in containers?** Yes, as long as NVIDIA Container Toolkit is installed and GPU access is enabled (``--gpus ..``).
+
+
+Support Checklist
+^^^^^^^^^^^^^^^^^
+
+When reporting issues, please include:
+
+- Output of ``nvidia-smi``
+- Output of ``ldd libcuvs_c.so``
+- Output of ``python3 cuvs_sanity.py``
