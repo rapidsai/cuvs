@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -41,10 +41,9 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
   auto ace_params = cagra::graph_build_params::ace_params();
   // Set the number of partitions. Small values might improve recall but potentially degrade
   // performance and increase memory usage. Partitions should not be too small to prevent issues in
-  // KNN graph construction. 100k - 5M vectors per partition is recommended depending on the
-  // available host and GPU memory. The partition size is on average 2 * (n_rows / npartitions) *
-  // dim * sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance
-  // in the partition sizes (up to 3x in our tests).
+  // KNN graph construction. The partition size is on average 2 * (n_rows / npartitions) * dim *
+  // sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance in the
+  // partition sizes (up to 3x in our tests).
   ace_params.npartitions = 4;
   // Set the index quality for the ACE build. Bigger values increase the index quality. At some
   // point, increasing this will no longer improve the quality.
@@ -81,7 +80,8 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
   // descriptor For in-memory indices: creates HNSW index in memory
   std::cout << "Converting CAGRA index to HNSW" << std::endl;
   hnsw::index_params hnsw_params;
-  auto hnsw_index = hnsw::from_cagra(dev_resources, hnsw_params, index);
+  hnsw_params.hierarchy = hnsw::HnswHierarchy::GPU;  // Offload hierarchy construction to GPU
+  auto hnsw_index       = hnsw::from_cagra(dev_resources, hnsw_params, index);
 
   // HNSW search requires host matrices
   auto queries_host = raft::make_host_matrix<float, int64_t>(n_queries, queries.extent(1));

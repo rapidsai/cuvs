@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs;
@@ -10,6 +10,7 @@ import static org.junit.Assert.*;
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
 import com.nvidia.cuvs.CagraIndexParams.CuvsDistanceType;
+import com.nvidia.cuvs.HnswIndexParams.HnswHierarchy;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -23,8 +24,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Integration tests for CAGRA index using ACE (Augmented Core Extraction) build algorithm.
- * ACE enables building indices for datasets too large to fit in GPU memory by partitioning
- * the dataset and building sub-indices.
+ * ACE enables building indexes for datasets too large to fit in GPU memory by partitioning
+ * the dataset and building sub-indexes.
  *
  * @since 25.12
  */
@@ -186,7 +187,7 @@ public class CagraAceBuildAndSearchIT extends CuVSTestCase {
         // Convert CAGRA index to HNSW using fromCagra
         // This automatically handles disk-based indices
         HnswIndexParams hnswIndexParams =
-            new HnswIndexParams.Builder().withVectorDimension(2).build();
+            new HnswIndexParams.Builder().withVectorDimension(2).withHierarchy(HnswHierarchy.GPU).build();
 
         try (var hnswIndexSerialized = HnswIndex.fromCagra(hnswIndexParams, index)) {
           var hnswIndexSerializedPath = buildDir.resolve("hnsw_index.bin");
