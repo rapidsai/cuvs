@@ -4,7 +4,7 @@
 #
 # cython: language_level=3
 
-from libc.stdint cimport uintptr_t
+from libc.stdint cimport int64_t, uintptr_t
 from libcpp cimport bool
 
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
@@ -68,3 +68,12 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
                                       DLManagedTensor* X,
                                       DLManagedTensor* centroids,
                                       double* cost)
+
+    cuvsError_t cuvsKMeansFitBatched(cuvsResources_t res,
+                                     cuvsKMeansParams_t params,
+                                     DLManagedTensor* X,
+                                     int64_t batch_size,
+                                     DLManagedTensor* sample_weight,
+                                     DLManagedTensor* centroids,
+                                     double* inertia,
+                                     int64_t* n_iter) except +

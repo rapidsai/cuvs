@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
@@ -34,6 +34,7 @@ from libc.stdint cimport (
     uint64_t,
     uintptr_t,
 )
+from libc.stdlib cimport free, malloc
 
 from cuvs.common.exceptions import check_cuvs
 
@@ -431,3 +432,118 @@ def cluster_cost(X, centroids, resources=None):
             &inertia))
 
     return inertia
+
+
+@auto_sync_resources
+@auto_convert_output
+def fit_batched(
+    KMeansParams params, X, batch_size, centroids=None, sample_weights=None,
+    resources=None
+):
+    """
+    Find clusters with the k-means algorithm using batched processing.
+
+    This function processes data from HOST memory in batches, streaming
+    to the GPU. Useful when the dataset is too large to fit in GPU memory.
+
+    Parameters
+    ----------
+
+    params : KMeansParams
+        Parameters to use to fit KMeans model
+    X : numpy array or array with __array_interface__
+        Input HOST memory array shape (n_samples, n_features).
+        Must be C-contiguous. Supported dtypes: float32, float64, uint8, int8, float16.
+    batch_size : int
+        Number of samples to process per batch. Recommended: 500K-2M
+        depending on GPU memory.
+    centroids : Optional writable CUDA array interface compliant matrix
+                shape (n_clusters, n_features)
+    sample_weights : Optional input HOST memory array shape (n_samples,)
+                     default: None
+    {resources_docstring}
+
+    Returns
+    -------
+    centroids : raft.device_ndarray
+        The computed centroids for each cluster (on device)
+    inertia : float
+       Sum of squared distances of samples to their closest cluster center
+    n_iter : int
+        The number of iterations used to fit the model
+
+    Examples
+    --------
+
+    >>> import numpy as np
+    >>> import cupy as cp
+    >>>
+    >>> from cuvs.cluster.kmeans import fit_batched, KMeansParams
+    >>>
+    >>> n_samples = 10_000_000
+    >>> n_features = 128
+    >>> n_clusters = 1000
+    >>>
+    >>> # Data on host (numpy array)
+    >>> X = np.random.random((n_samples, n_features)).astype(np.float32)
+    >>>
+    >>> params = KMeansParams(n_clusters=n_clusters, max_iter=20)
+    >>> centroids, inertia, n_iter = fit_batched(params, X, batch_size=1_000_000)
+    """
+    # Ensure X is a numpy array (host memory)
+    if not isinstance(X, np.ndarray):
+        X = np.asarray(X)
+
+    if not X.flags['C_CONTIGUOUS']:
+        X = np.ascontiguousarray(X)
+
+    _check_input_array(wrap_array(X), [np.dtype('float32'), np.dtype('float64'),
+                                       np.dtype('uint8'), np.dtype('int8'),
+                                       np.dtype('float16')])
+
+    cdef int64_t n_samples = X.shape[0]
+    cdef int64_t n_features = X.shape[1]
+
+    # Create DLPack tensor for host data
+    cdef cydlpack.DLManagedTensor* x_dlpack = cydlpack.dlpack_c(wrap_array(X))
+    cdef cydlpack.DLManagedTensor* sample_weight_dlpack = NULL
+
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
+    cdef double inertia = 0
+    cdef int64_t n_iter = 0
+    cdef int64_t c_batch_size = batch_size
+
+    if centroids is None:
+        # For integer/half types, centroids are always float32
+        # (centroids are averages, can't be represented as integers)
+        if X.dtype in (np.uint8, np.int8, np.float16):
+            centroids_dtype = np.float32
+        else:
+            centroids_dtype = X.dtype
+        centroids = device_ndarray.empty((params.n_clusters, n_features),
+                                         dtype=centroids_dtype)
+
+    centroids_ai = wrap_array(centroids)
+    cdef cydlpack.DLManagedTensor* centroids_dlpack = \
+        cydlpack.dlpack_c(centroids_ai)
+
+    if sample_weights is not None:
+        if not isinstance(sample_weights, np.ndarray):
+            sample_weights = np.asarray(sample_weights)
+        if not sample_weights.flags['C_CONTIGUOUS']:
+            sample_weights = np.ascontiguousarray(sample_weights)
+        sample_weight_dlpack = cydlpack.dlpack_c(wrap_array(sample_weights))
+
+    with cuda_interruptible():
+        check_cuvs(cuvsKMeansFitBatched(
+            res,
+            params.params,
+            x_dlpack,
+            c_batch_size,
+            sample_weight_dlpack,
+            centroids_dlpack,
+            &inertia,
+            &n_iter))
+
+    return FitOutput(centroids, inertia, n_iter)
