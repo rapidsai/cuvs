@@ -11,6 +11,7 @@
 
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/linalg/norm.cuh>
+#include <raft/matrix/init.cuh>
 
 namespace cuvs::neighbors {
 
@@ -86,7 +87,7 @@ class NNTest : public ::testing::TestWithParam<NNInputs<IdxT>> {
 
     // Reset buffers
     RAFT_CUDA_TRY(cudaMemsetAsync(out.data_handle(), 0, m * sizeof(OutT)));
-    RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
+    raft::resource::sync_stream(handle, stream);
   }
 
   void compute_1nn()
