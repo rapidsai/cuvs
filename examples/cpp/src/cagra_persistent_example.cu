@@ -153,7 +153,7 @@ void cagra_build_search_variants(raft::device_resources const& res,
       futures.push_back(std::async(std::launch::async, [&, j]() {
         auto work_size = static_cast<size_t>(queries.extent(0));
         for (size_t i = j; i < work_size; i += n_threads) {
-          // Note, the standard implementation does wait till the kernel is finished,
+          // Note, the standard implementation does not wait till the kernel is finished,
           // so this loop may submit all jobs quickly and then wait for the stream to finish.
           // This is not very realistic, because normally one waits to get the results back.
           // The persistent implementation though does not return until the results are back.
