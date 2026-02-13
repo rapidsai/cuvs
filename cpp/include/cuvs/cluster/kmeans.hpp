@@ -62,8 +62,7 @@ struct params : base_params {
     /**
      * Mini-batch k-means: update centroids incrementally after each randomly
      * sampled batch using an online learning rule. Converges faster but may
-     * produce slightly different results each run. Recommended for very large
-     * datasets where multiple full passes are too expensive.
+     * produce slightly different results each run.
      */
     MiniBatch
   };
@@ -253,9 +252,6 @@ void fit_batched(raft::resources const& handle,
 /**
  * @brief Find clusters with k-means algorithm using batched processing.
  *
- * Supports both FullBatch (Lloyd's algorithm) and MiniBatch modes via
- * params.update_mode. See the int-indexed overload for detailed documentation.
- *
  * @param[in]     handle        The raft handle.
  * @param[in]     params        Parameters for KMeans model (including update_mode).
  * @param[in]     X             Training instances on HOST memory.
@@ -278,9 +274,6 @@ void fit_batched(raft::resources const& handle,
 
 /**
  * @brief Find clusters with k-means algorithm using batched processing.
- *
- * Supports both FullBatch (Lloyd's algorithm) and MiniBatch modes via
- * params.update_mode. See the float int-indexed overload for detailed documentation.
  *
  * @param[in]     handle        The raft handle.
  * @param[in]     params        Parameters for KMeans model (including update_mode).
@@ -305,9 +298,6 @@ void fit_batched(raft::resources const& handle,
 /**
  * @brief Find clusters with k-means algorithm using batched processing.
  *
- * Supports both FullBatch (Lloyd's algorithm) and MiniBatch modes via
- * params.update_mode. See the float int-indexed overload for detailed documentation.
- *
  * @param[in]     handle        The raft handle.
  * @param[in]     params        Parameters for KMeans model (including update_mode).
  * @param[in]     X             Training instances on HOST memory.
@@ -330,10 +320,6 @@ void fit_batched(raft::resources const& handle,
 
 /**
  * @brief Find clusters with k-means algorithm using batched processing for uint8 data.
- *
- * Supports both FullBatch (Lloyd's algorithm) and MiniBatch modes via
- * params.update_mode. Input data is uint8 but centroids are float (since
- * centroids are averages). Conversion happens on GPU using mapping operators.
  *
  * @param[in]     handle        The raft handle.
  * @param[in]     params        Parameters for KMeans model (including update_mode).
@@ -358,10 +344,6 @@ void fit_batched(raft::resources const& handle,
 /**
  * @brief Find clusters with k-means algorithm using batched processing for int8 data.
  *
- * Supports both FullBatch (Lloyd's algorithm) and MiniBatch modes via
- * params.update_mode. Input data is int8 but centroids are float (since
- * centroids are averages). Conversion happens on GPU using mapping operators.
- *
  * @param[in]     handle        The raft handle.
  * @param[in]     params        Parameters for KMeans model (including update_mode).
  * @param[in]     X             Training instances on HOST memory (int8).
@@ -384,10 +366,6 @@ void fit_batched(raft::resources const& handle,
 
 /**
  * @brief Find clusters with k-means algorithm using batched processing for half data.
- *
- * Supports both FullBatch (Lloyd's algorithm) and MiniBatch modes via
- * params.update_mode. Input data is half but centroids are float (for
- * numerical stability). Conversion happens on GPU using mapping operators.
  *
  * @param[in]     handle        The raft handle.
  * @param[in]     params        Parameters for KMeans model (including update_mode).
