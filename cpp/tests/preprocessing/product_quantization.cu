@@ -416,10 +416,11 @@ class ProductQuantizationViewTest : public ::testing::Test {
     auto vq_centers_view = owning_quant.vpq_codebooks.vq_code_book();
 
     // Create view-type quantizer from the same codebooks
-    auto view_quant = build(handle, owning_quant.params_quantizer, pq_centers_view, vq_centers_view);
+    auto view_quant =
+      build(handle, owning_quant.params_quantizer, pq_centers_view, vq_centers_view);
 
     // Transform using owning quantizer
-    auto n_encoded_cols   = get_quantized_dim(owning_quant.params_quantizer);
+    auto n_encoded_cols = get_quantized_dim(owning_quant.params_quantizer);
     auto codes_owning =
       raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, n_encoded_cols);
     transform(handle,
@@ -429,7 +430,8 @@ class ProductQuantizationViewTest : public ::testing::Test {
               std::nullopt);
 
     // Transform using view-type quantizer
-    auto codes_view = raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, n_encoded_cols);
+    auto codes_view =
+      raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, n_encoded_cols);
     transform(handle,
               view_quant,
               raft::make_const_mdspan(dataset_.view()),

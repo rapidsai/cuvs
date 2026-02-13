@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../../../neighbors/vpq_dataset_impl.hpp"
 #include "../../../sparse/neighbors/cross_component_nn.cuh"
 #include "../../detail/ann_utils.cuh"
 #include "greedy_search.cuh"

@@ -150,11 +150,10 @@ quantizer<float> build(raft::resources const& res,
  *
  * @return A view-type quantizer that references the provided data
  */
-quantizer<float> build(
-  raft::resources const& res,
-  const params params,
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> pq_centers,
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> vq_centers);
+quantizer<float> build(raft::resources const& res,
+                       const params params,
+                       raft::device_matrix_view<const float, uint32_t, raft::row_major> pq_centers,
+                       raft::device_matrix_view<const float, uint32_t, raft::row_major> vq_centers);
 
 /**
  * @brief Applies quantization transform to given dataset

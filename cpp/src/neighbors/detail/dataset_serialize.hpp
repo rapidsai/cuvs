@@ -1,9 +1,10 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
+#include "../../neighbors/vpq_dataset_impl.hpp"
 #include <cuvs/neighbors/common.hpp>
 
 #include <raft/core/host_mdarray.hpp>

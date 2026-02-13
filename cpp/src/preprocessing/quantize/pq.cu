@@ -26,7 +26,7 @@ namespace cuvs::preprocessing::quantize::pq {
              const params params,                                                      \
              raft::device_matrix_view<const T, uint32_t, raft::row_major> pq_centers,  \
              raft::device_matrix_view<const T, uint32_t, raft::row_major> vq_centers)  \
-    ->quantizer<T>                                                                     \
+    -> quantizer<T>                                                                    \
   {                                                                                    \
     return detail::build_view<T>(res, params, pq_centers, vq_centers);                 \
   }                                                                                    \

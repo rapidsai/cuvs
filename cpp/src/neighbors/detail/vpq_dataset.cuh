@@ -4,6 +4,7 @@
  */
 #pragma once
 
+#include "../../neighbors/vpq_dataset_impl.hpp"
 #include <cuvs/neighbors/common.hpp>
 
 #include "../../cluster/kmeans_balanced.cuh"
