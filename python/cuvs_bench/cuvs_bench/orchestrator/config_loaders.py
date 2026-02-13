@@ -26,7 +26,7 @@ import yaml
 class IndexConfig:
     """
     Configuration for a single index (one build configuration).
-    
+
     Attributes
     ----------
     name : str
@@ -40,6 +40,7 @@ class IndexConfig:
     file : str
         Path where index will be stored
     """
+
     name: str
     algo: str
     build_param: Dict[str, Any]
@@ -51,11 +52,11 @@ class IndexConfig:
 class BenchmarkConfig:
     """
     Configuration for a benchmark run (may contain multiple indexes).
-    
+
     This is the standardized format that all ConfigLoaders produce,
     regardless of the backend type. For C++ backend, multiple indexes
     are batched into ONE config and ONE C++ command (matching runners.py).
-    
+
     Attributes
     ----------
     indexes : List[IndexConfig]
@@ -64,26 +65,27 @@ class BenchmarkConfig:
         Backend-specific configuration (e.g., executable_path for C++,
         host/port for Milvus)
     """
+
     indexes: List[IndexConfig]
     backend_config: Dict[str, Any] = field(default_factory=dict)
-    
+
     # Convenience properties for single-index access (backward compatibility)
     @property
     def index_name(self) -> str:
         return self.indexes[0].name if self.indexes else ""
-    
+
     @property
     def algo(self) -> str:
         return self.indexes[0].algo if self.indexes else ""
-    
+
     @property
     def build_params(self) -> Dict[str, Any]:
         return self.indexes[0].build_param if self.indexes else {}
-    
+
     @property
     def search_params_list(self) -> List[Dict[str, Any]]:
         return self.indexes[0].search_params if self.indexes else []
-    
+
     @property
     def index_path(self) -> Path:
         return Path(self.indexes[0].file) if self.indexes else Path("")
@@ -93,7 +95,7 @@ class BenchmarkConfig:
 class DatasetConfig:
     """
     Dataset configuration for benchmarking.
-    
+
     Attributes
     ----------
     name : str
@@ -111,6 +113,7 @@ class DatasetConfig:
     subset_size : Optional[int]
         Subset size for testing
     """
+
     name: str
     base_file: Optional[str] = None
     query_file: Optional[str] = None
@@ -123,26 +126,26 @@ class DatasetConfig:
 class ConfigLoader(ABC):
     """
     Abstract base class for configuration loaders.
-    
+
     Each backend type has its own ConfigLoader that knows how to:
     - Load configuration from files or other sources
     - Expand parameter combinations
     - Validate constraints
     - Produce standardized BenchmarkConfig objects
     """
-    
+
     @abstractmethod
     def load(self, **kwargs) -> Tuple[DatasetConfig, List[BenchmarkConfig]]:
         """
         Load and prepare benchmark configurations.
-        
+
         Returns
         -------
         Tuple[DatasetConfig, List[BenchmarkConfig]]
             Dataset configuration and list of benchmark configurations to run
         """
         pass
-    
+
     @property
     @abstractmethod
     def backend_type(self) -> str:
@@ -153,20 +156,20 @@ class ConfigLoader(ABC):
 class CppGBenchConfigLoader(ConfigLoader):
     """
     Configuration loader for C++ Google Benchmark backend.
-    
+
     This loader handles:
     - Loading YAML configuration files
     - Finding C++ executables
     - Expanding build/search parameter combinations
     - Validating constraints
-    
+
     All the C++ specific preprocessing logic from run.py is encapsulated here.
     """
-    
+
     def __init__(self, config_path: Optional[str] = None):
         """
         Initialize the config loader.
-        
+
         Parameters
         ----------
         config_path : Optional[str]
@@ -176,22 +179,23 @@ class CppGBenchConfigLoader(ConfigLoader):
             os.path.dirname(os.path.realpath(__file__)), "../config"
         )
         self._gpu_present: Optional[bool] = None
-    
+
     @property
     def backend_type(self) -> str:
         return "cpp_gbench"
-    
+
     @property
     def gpu_present(self) -> bool:
         """Check if GPU is available (cached)."""
         if self._gpu_present is None:
             try:
                 import rmm  # noqa: F401
+
                 self._gpu_present = True
             except ImportError:
                 self._gpu_present = False
         return self._gpu_present
-    
+
     def load(
         self,
         dataset: str,
@@ -204,11 +208,11 @@ class CppGBenchConfigLoader(ConfigLoader):
         count: int = 10,
         batch_size: int = 10000,
         subset_size: Optional[int] = None,
-        **kwargs
+        **kwargs,
     ) -> Tuple[DatasetConfig, List[BenchmarkConfig]]:
         """
         Load C++ benchmark configurations from YAML files.
-        
+
         Parameters
         ----------
         dataset : str
@@ -234,7 +238,7 @@ class CppGBenchConfigLoader(ConfigLoader):
         **kwargs
             Additional keyword arguments. In tune mode, the orchestrator
             passes these internal kwargs:
-            
+
             - _tune_mode : bool
                 If True, returns single config with exact params instead of
                 Cartesian product expansion from YAML.
@@ -244,7 +248,7 @@ class CppGBenchConfigLoader(ConfigLoader):
             - _tune_search_params : dict
                 Exact search parameters suggested by Optuna
                 (e.g., {"nprobe": 73})
-            
+
         Returns
         -------
         Tuple[DatasetConfig, List[BenchmarkConfig]]
@@ -256,36 +260,45 @@ class CppGBenchConfigLoader(ConfigLoader):
         tune_mode = kwargs.pop("_tune_mode", False)
         tune_build_params = kwargs.pop("_tune_build_params", None)
         tune_search_params = kwargs.pop("_tune_search_params", None)
-        
+
         config_path = self.config_path
-        
+
         # Load dataset configuration
         dataset_conf_all = self.load_yaml_file(
             dataset_configuration
             or os.path.join(config_path, "datasets", "datasets.yaml")
         )
-        dataset_conf = self.get_dataset_configuration(dataset, dataset_conf_all)
-        
+        dataset_conf = self.get_dataset_configuration(
+            dataset, dataset_conf_all
+        )
+
         # Create DatasetConfig
         dataset_config = DatasetConfig(
             name=dataset_conf["name"],
             base_file=dataset_conf.get("base_file"),
             query_file=dataset_conf.get("query_file"),
-            groundtruth_neighbors_file=dataset_conf.get("groundtruth_neighbors_file"),
+            groundtruth_neighbors_file=dataset_conf.get(
+                "groundtruth_neighbors_file"
+            ),
             distance=dataset_conf.get("distance", "euclidean"),
             dims=dataset_conf.get("dims"),
-            subset_size=subset_size
+            subset_size=subset_size,
         )
-        
+
         # Prepare conf_file for constraint validation
         conf_file = {"dataset": dataset_conf}
         if subset_size:
             conf_file["dataset"]["subset_size"] = subset_size
-        conf_file["search_basic_param"] = {"k": count, "batch_size": batch_size}
-        
+        conf_file["search_basic_param"] = {
+            "k": count,
+            "batch_size": batch_size,
+        }
+
         # Gather and load algorithm configs
-        algos_conf_fs = self.gather_algorithm_configs(config_path, algorithm_configuration)
-        
+        algos_conf_fs = self.gather_algorithm_configs(
+            config_path, algorithm_configuration
+        )
+
         allowed_algos = algorithms.split(",") if algorithms else None
         allowed_groups = groups.split(",") if groups else None
         allowed_algo_groups = (
@@ -293,19 +306,19 @@ class CppGBenchConfigLoader(ConfigLoader):
             if algo_groups
             else None
         )
-        
+
         algos_conf = self.load_algorithms_conf(
             algos_conf_fs,
             allowed_algos,
             allowed_groups,
             tuple(zip(*allowed_algo_groups)) if allowed_algo_groups else None,
         )
-        
+
         # Load algorithms.yaml for executable info
         algos_yaml = self.load_yaml_file(
             os.path.join(config_path, "algorithms.yaml")
         )
-        
+
         # Prepare executables and convert to BenchmarkConfig list
         benchmark_configs = self._prepare_benchmark_configs(
             algos_conf,
@@ -320,9 +333,9 @@ class CppGBenchConfigLoader(ConfigLoader):
             tune_build_params=tune_build_params,
             tune_search_params=tune_search_params,
         )
-        
+
         return dataset_config, benchmark_configs
-    
+
     def _prepare_benchmark_configs(
         self,
         algos_conf: dict,
@@ -339,11 +352,11 @@ class CppGBenchConfigLoader(ConfigLoader):
     ) -> List[BenchmarkConfig]:
         """
         Prepare list of BenchmarkConfig from algorithm configurations.
-        
+
         This matches the old workflow (run.py prepare_executables) by grouping
         ALL indexes for the same executable into ONE BenchmarkConfig.
         This ensures ONE C++ command runs ALL indexes together.
-        
+
         In tune mode, generates a single config with exact Optuna-suggested params
         instead of Cartesian product expansion.
         """
@@ -351,23 +364,25 @@ class CppGBenchConfigLoader(ConfigLoader):
         # Key: (executable, executable_path, output_filename)
         # Value: {"index": [...], "algo_info": {...}}
         executables_to_run = {}
-        
+
         for algo, algo_conf in algos_conf.items():
             if not self.validate_algorithm(algos_yaml, algo, gpu_present):
                 continue
-                
+
             for group, group_conf in algo_conf["groups"].items():
                 try:
-                    executable, executable_path, file_name = self.find_executable(
-                        algos_yaml, algo, group, count, batch_size
+                    executable, executable_path, file_name = (
+                        self.find_executable(
+                            algos_yaml, algo, group, count, batch_size
+                        )
                     )
                 except FileNotFoundError:
                     warnings.warn(f"Executable not found for {algo}")
                     continue
-                
+
                 # Get algorithm info from algorithms.yaml
                 algo_info = algos_yaml.get(algo, {})
-                
+
                 # Prepare index configurations
                 indexes = self.prepare_indexes(
                     group_conf,
@@ -383,7 +398,7 @@ class CppGBenchConfigLoader(ConfigLoader):
                     tune_build_params=tune_build_params,
                     tune_search_params=tune_search_params,
                 )
-                
+
                 # Group by executable (matches run.py)
                 key = (executable, executable_path, file_name)
                 if key not in executables_to_run:
@@ -394,11 +409,15 @@ class CppGBenchConfigLoader(ConfigLoader):
                         "dataset": dataset,
                     }
                 executables_to_run[key]["index"].extend(indexes)
-        
+
         # Convert grouped indexes to BenchmarkConfig objects
         # ONE BenchmarkConfig per executable (with ALL indexes)
         benchmark_configs = []
-        for (executable, executable_path, file_name), data in executables_to_run.items():
+        for (
+            executable,
+            executable_path,
+            file_name,
+        ), data in executables_to_run.items():
             # Convert raw index dicts to IndexConfig objects
             index_configs = [
                 IndexConfig(
@@ -410,26 +429,28 @@ class CppGBenchConfigLoader(ConfigLoader):
                 )
                 for idx in data["index"]
             ]
-            
+
             config = BenchmarkConfig(
                 indexes=index_configs,
                 backend_config={
                     "executable_path": executable_path,
-                    "requires_gpu": data["algo_info"].get("requires_gpu", False),
+                    "requires_gpu": data["algo_info"].get(
+                        "requires_gpu", False
+                    ),
                     "data_prefix": data["dataset_path"],
                     "dataset": data["dataset"],
                     "output_filename": file_name,  # Tuple: (build_name, search_name)
                     "algo": index_configs[0].algo if index_configs else "",
-                }
+                },
             )
             benchmark_configs.append(config)
-        
+
         return benchmark_configs
-    
+
     # =========================================================================
     # `Helper methods (copied from run.py as-is)`
     # =========================================================================
-    
+
     def load_yaml_file(self, file_path: str) -> dict:
         """
         Load a YAML file and return its contents as a dictionary.
@@ -446,8 +467,10 @@ class CppGBenchConfigLoader(ConfigLoader):
         """
         with open(file_path, "r") as f:
             return yaml.safe_load(f)
-    
-    def get_dataset_configuration(self, dataset: str, dataset_conf_all: list) -> dict:
+
+    def get_dataset_configuration(
+        self, dataset: str, dataset_conf_all: list
+    ) -> dict:
         """
         Retrieve the configuration for a specific dataset.
 
@@ -472,7 +495,7 @@ class CppGBenchConfigLoader(ConfigLoader):
             if dataset == d["name"]:
                 return d
         raise ValueError("Could not find a dataset configuration")
-    
+
     def gather_algorithm_configs(
         self, config_path: str, algorithm_configuration: Optional[str]
     ) -> list:
@@ -491,9 +514,7 @@ class CppGBenchConfigLoader(ConfigLoader):
         list
             A list of paths to the algorithm configuration files.
         """
-        algos_conf_fs = os.listdir(
-            os.path.join(config_path, "algos")
-        )
+        algos_conf_fs = os.listdir(os.path.join(config_path, "algos"))
         algos_conf_fs = [
             os.path.join(config_path, "algos", f)
             for f in algos_conf_fs
@@ -513,7 +534,7 @@ class CppGBenchConfigLoader(ConfigLoader):
             elif os.path.isfile(algorithm_configuration):
                 algos_conf_fs.append(algorithm_configuration)
         return algos_conf_fs
-    
+
     def load_algorithms_conf(
         self,
         algos_conf_fs: list,
@@ -544,13 +565,17 @@ class CppGBenchConfigLoader(ConfigLoader):
             try:
                 algo = self.load_yaml_file(algo_f)
             except Exception as e:
-                warnings.warn(f"Could not load YAML config {algo_f} due to {e}")
+                warnings.warn(
+                    f"Could not load YAML config {algo_f} due to {e}"
+                )
                 continue
             if allowed_algos and algo["name"] not in allowed_algos:
                 continue
             groups = algo.get("groups", {})
             if allowed_groups:
-                groups = {k: v for k, v in groups.items() if k in allowed_groups}
+                groups = {
+                    k: v for k, v in groups.items() if k in allowed_groups
+                }
             algos_conf[algo["name"]] = {
                 "groups": groups,
                 "constraints": algo.get("constraints", {}),
@@ -564,8 +589,10 @@ class CppGBenchConfigLoader(ConfigLoader):
                     }
                 )
         return algos_conf
-    
-    def validate_algorithm(self, algos_conf: dict, algo: str, gpu_present: bool) -> bool:
+
+    def validate_algorithm(
+        self, algos_conf: dict, algo: str, gpu_present: bool
+    ) -> bool:
         """
         Validate the algorithm based on the available hardware (GPU presence).
 
@@ -588,9 +615,10 @@ class CppGBenchConfigLoader(ConfigLoader):
         if gpu_present:
             return algo in algos_conf_keys
         return (
-            algo in algos_conf_keys and algos_conf[algo]["requires_gpu"] is False
+            algo in algos_conf_keys
+            and algos_conf[algo]["requires_gpu"] is False
         )
-    
+
     def find_executable(
         self, algos_conf: dict, algo: str, group: str, k: int, batch_size: int
     ) -> Tuple[str, str, Tuple[str, str]]:
@@ -622,7 +650,7 @@ class CppGBenchConfigLoader(ConfigLoader):
         if build_path:
             return executable, build_path, file_name
         raise FileNotFoundError(executable)
-    
+
     def get_build_path(self, executable: str) -> Optional[str]:
         """
         Get the build path for the given executable.
@@ -655,13 +683,15 @@ class CppGBenchConfigLoader(ConfigLoader):
 
         conda_path = os.getenv("CONDA_PREFIX")
         if conda_path:
-            conda_executable = os.path.join(conda_path, "bin", "ann", executable)
+            conda_executable = os.path.join(
+                conda_path, "bin", "ann", executable
+            )
             if os.path.exists(conda_executable):
                 print("-- Using cuVS bench found in conda environment.")
                 return conda_executable
 
         return None
-    
+
     def prepare_indexes(
         self,
         group_conf: dict,
@@ -715,7 +745,7 @@ class CppGBenchConfigLoader(ConfigLoader):
         indexes = []
         build_params = group_conf.get("build", {})
         search_params = group_conf.get("search", {})
-        
+
         if tune_mode and tune_build_params is not None:
             # TUNE MODE: Use exact params from Optuna (single config)
             param_names = list(tune_build_params.keys())
@@ -747,7 +777,7 @@ class CppGBenchConfigLoader(ConfigLoader):
                     "algo": algo,
                     "build_param": dict(zip(build_params.keys(), params)),
                 }
-            
+
             # Build index name from params
             index_name = f"{algo}_{group}" if group != "base" else f"{algo}"
             for i in range(len(params)):
@@ -775,7 +805,7 @@ class CppGBenchConfigLoader(ConfigLoader):
             index["file"] = os.path.join(
                 dataset_path, dataset, "index", index_filename
             )
-            
+
             # Handle search params
             if tune_mode and tune_search_params is not None:
                 # Tune mode: use exact search params from Optuna (as single-item list)
@@ -793,11 +823,11 @@ class CppGBenchConfigLoader(ConfigLoader):
                     count,
                     batch_size,
                 )
-            
+
             if index["search_params"]:
                 indexes.append(index)
         return indexes
-    
+
     def validate_search_params(
         self,
         all_search_params,
@@ -851,7 +881,7 @@ class CppGBenchConfigLoader(ConfigLoader):
             ):
                 search_params_list.append(search_dict)
         return search_params_list
-    
+
     def validate_constraints(
         self,
         algos_conf: Dict[str, Any],
@@ -907,4 +937,3 @@ class CppGBenchConfigLoader(ConfigLoader):
             else:
                 return constraints_func(param, build_param, k, batch_size)
         return True
-

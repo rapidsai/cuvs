@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
 """
@@ -12,7 +12,6 @@ along with standardized data structures for datasets and results.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Dict, List, Any, Optional, TYPE_CHECKING
-from pathlib import Path
 import numpy as np
 
 if TYPE_CHECKING:
@@ -23,7 +22,7 @@ if TYPE_CHECKING:
 class Dataset:
     """
     Dataset representation for benchmarking.
-    
+
     Attributes
     ----------
     name : str
@@ -47,6 +46,7 @@ class Dataset:
     metadata : Dict[str, Any]
         Additional dataset metadata like {"source": "ann-benchmarks"}
     """
+
     name: str
     base_vectors: np.ndarray
     query_vectors: np.ndarray
@@ -57,19 +57,19 @@ class Dataset:
     query_file: Optional[str] = None
     groundtruth_neighbors_file: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     @property
     def dims(self) -> int:
         """Vector dimensionality."""
         if self.base_vectors.size == 0:
             return 0
         return self.base_vectors.shape[1]
-    
+
     @property
     def n_base(self) -> int:
         """Number of base vectors."""
         return self.base_vectors.shape[0]
-    
+
     @property
     def n_queries(self) -> int:
         """Number of query vectors."""
@@ -80,7 +80,7 @@ class Dataset:
 class BuildResult:
     """
     Results from index building phase.
-    
+
     Attributes
     ----------
     index_path : str
@@ -100,6 +100,7 @@ class BuildResult:
     error_message : Optional[str]
         Error message if build failed
     """
+
     index_path: str
     build_time_seconds: float
     index_size_bytes: int
@@ -108,11 +109,11 @@ class BuildResult:
     metadata: Dict[str, Any] = field(default_factory=dict)
     success: bool = True
     error_message: Optional[str] = None
-    
+
     def to_json(self) -> Dict[str, Any]:
         """
         Convert to JSON-serializable format (Google Benchmark compatible).
-        
+
         Returns
         -------
         Dict[str, Any]
@@ -125,7 +126,7 @@ class BuildResult:
             "index_size": self.index_size_bytes,
             "success": self.success,
             **self.build_params,
-            **self.metadata
+            **self.metadata,
         }
 
 
@@ -133,7 +134,7 @@ class BuildResult:
 class SearchResult:
     """
     Results from search phase.
-    
+
     Attributes
     ----------
     neighbors : np.ndarray
@@ -164,6 +165,7 @@ class SearchResult:
     error_message : Optional[str]
         Error message if search failed
     """
+
     neighbors: np.ndarray
     distances: np.ndarray
     search_time_ms: float
@@ -177,11 +179,11 @@ class SearchResult:
     metadata: Dict[str, Any] = field(default_factory=dict)
     success: bool = True
     error_message: Optional[str] = None
-    
+
     def to_json(self) -> Dict[str, Any]:
         """
         Convert to JSON-serializable format (Google Benchmark compatible).
-        
+
         Returns
         -------
         Dict[str, Any]
@@ -195,37 +197,37 @@ class SearchResult:
             "Recall": self.recall,
             "success": self.success,
             "search_params": self.search_params,
-            **self.metadata
+            **self.metadata,
         }
-        
+
         if self.latency_percentiles:
             result.update(self.latency_percentiles)
-        
+
         if self.gpu_time_seconds is not None:
             result["GPU"] = self.gpu_time_seconds
-        
+
         if self.cpu_time_seconds is not None:
             result["cpu_time"] = self.cpu_time_seconds
-        
+
         return result
 
 
 class BenchmarkBackend(ABC):
     """
     Abstract base class for all benchmark backends.
-    
+
     All backends must implement this interface to be compatible with
     the cuvs-bench execution layer.
-    
+
     Parameters
     ----------
     config : Dict[str, Any]
         Backend-specific configuration. Common keys include:
-        
+
         Required (enforced by base class):
         - name : str - User-defined label for this index configuration
             e.g., "cuvs_ivf_flat_test.nlist1024.ratio1" or "cuvs_cagra.graph_degree64"
-        
+
         C++ backend keys (CppGoogleBenchmarkBackend):
         - executable_path : str - Path to C++ benchmark executable (required)
         - data_prefix : str - Prefix for dataset paths (default: "")
@@ -234,31 +236,31 @@ class BenchmarkBackend(ABC):
         - output_filename : Tuple[str, str] - (build_name, search_name) (default: ("", ""))
         - algo : str - Algorithm name e.g., "cuvs_cagra" (default: "") FIXME: Should this be required?
         - requires_gpu : bool - Whether backend requires GPU (default: False)
-        
+
         Network backend keys (e.g., Milvus, Qdrant):
         - host : str - Server hostname
         - port : int - Server port
         - api_key : str - Authentication key
         - requires_network : bool - Whether backend requires network (default: False)
     """
-    
+
     def __init__(self, config: Dict[str, Any]):
         """Initialize backend with configuration."""
         self.config = config
-    
+
     @abstractmethod
     def build(
         self,
         dataset: Dataset,
         indexes: List["IndexConfig"],
         force: bool = False,
-        dry_run: bool = False
+        dry_run: bool = False,
     ) -> BuildResult:
         """
         Build indexes from the given dataset.
-        
+
         ALL indexes are batched into ONE command execution (matches runners.py).
-        
+
         Parameters
         ----------
         dataset : Dataset
@@ -271,19 +273,19 @@ class BenchmarkBackend(ABC):
             If True, rebuild even if index exists; if False, skip if exists
         dry_run : bool, optional
             If True, print command without executing
-            
+
         Returns
         -------
         BuildResult
             Build timing, index size, and metadata
-            
+
         Raises
         ------
         NotImplementedError
             This is an abstract method that must be implemented by subclasses
         """
         pass
-    
+
     @abstractmethod
     def search(
         self,
@@ -294,15 +296,15 @@ class BenchmarkBackend(ABC):
         mode: str = "latency",
         force: bool = False,
         search_threads: Optional[int] = None,
-        dry_run: bool = False
+        dry_run: bool = False,
     ) -> SearchResult:
         """
         Search for nearest neighbors using the built indexes.
-        
+
         ALL indexes are batched into ONE command execution (matches runners.py).
         Each index has its own search_params list, so total benchmarks =
         sum(len(idx.search_params) for idx in indexes).
-        
+
         Parameters
         ----------
         dataset : Dataset
@@ -323,53 +325,53 @@ class BenchmarkBackend(ABC):
             Number of threads to use for searching (default: None)
         dry_run : bool, optional
             If True, print command without executing
-            
+
         Returns
         -------
         SearchResult
             Search timing, results, and recall metrics
-            
+
         Raises
         ------
         NotImplementedError
             This is an abstract method that must be implemented by subclasses
         """
         pass
-    
+
     def initialize(self) -> None:
         """
         Initialize backend (called once before any build/search operations).
-        
+
         Note: C++ backends handle initialization internally via subprocess.
-        
+
         Use this for:
         - Establishing persistent connections (for network backends like Milvus)
         - Loading shared resources (for Python-native backends)
         - Pre-allocating memory pools
-        
+
         Default implementation does nothing. Override if needed.
         """
         pass
-    
+
     def cleanup(self) -> None:
         """
         Clean up backend resources (called once after all benchmarks complete).
-        
+
         Note: C++ backends handle cleanup internally via subprocess.
-        
+
         Use this for:
         - Closing network connections (for backends like Milvus, Elasticsearch)
         - Deleting temporary files
         - Freeing shared resources
-        
+
         Default implementation does nothing. Override if needed.
         """
         pass
-    
+
     def _check_gpu_available(self) -> bool:
         """
         Check if GPU is available (same logic as run.py rmm_present()).
-        
+
         Returns
         -------
         bool
@@ -377,28 +379,29 @@ class BenchmarkBackend(ABC):
         """
         try:
             import rmm  # noqa: F401
+
             return True
         except ImportError:
             return False
-    
+
     def _check_network_available(self) -> bool:
         """
         Check if network is available.
-        
+
         Default returns False to ensure network backends implement their own check.
         Network backends MUST override with actual connectivity checks.
-        
+
         Returns
         -------
         bool
             True if network is available, False otherwise
         """
         return False
-    
+
     def _pre_flight_check(self) -> Optional[str]:
         """
         Run pre-flight checks before build/search operations.
-        
+
         Returns
         -------
         Optional[str]
@@ -410,80 +413,81 @@ class BenchmarkBackend(ABC):
         if self.requires_network and not self._check_network_available():
             return "no_network"
         return None
-    
+
     @property
     def name(self) -> str:
         """
         User-defined name for this index configuration.
-        
+
         Must be provided in the config dict. Matches 'name' field in runners.py config.
-        
+
         Returns
         -------
         str
             User-defined index name
-            
+
         Raises
         ------
         ValueError
             If 'name' is not provided in config
         """
         if "name" not in self.config:
-            raise ValueError("'name' is required in config (user-defined index label)")
+            raise ValueError(
+                "'name' is required in config (user-defined index label)"
+            )
         return self.config["name"]
-    
+
     @property
     @abstractmethod
     def algo(self) -> str:
         """
         Algorithm name (e.g., 'cuvs_ivf_flat', 'cuvs_cagra', 'hnswlib').
-        
+
         Used for logging, result organization, and mapping to executables.
-        
+
         Returns
         -------
         str
             Algorithm name
-            
+
         Raises
         ------
         NotImplementedError
             This is an abstract property that must be implemented by subclasses
         """
         pass
-    
+
     @property
     def requires_gpu(self) -> bool:
         """
         Whether this backend requires GPU acceleration.
-        
+
         Reads from config["requires_gpu"], matching algorithms.yaml structure.
-        
+
         Note
         ----
         If requires_gpu=True and no GPU is available (checked via RMM import),
         the backend will be skipped during pre-flight checks. This matches the
         legacy run.py behavior where GPU-requiring algorithms are not executed
         on CPU-only systems.
-        
+
         Returns
         -------
         bool
             True if backend requires GPU, False otherwise (default)
         """
         return self.config.get("requires_gpu", False)
-    
+
     @property
     def requires_network(self) -> bool:
         """
         Whether this backend requires network connectivity.
-        
+
         Reads from config["requires_network"], similar to requires_gpu.
-        
+
         Returns
         -------
         bool
             True if backend needs network (e.g., remote VDB), False otherwise (default)
         """
         return self.config.get("requires_network", False)
-

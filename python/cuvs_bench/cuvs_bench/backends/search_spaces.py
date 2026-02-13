@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 
@@ -18,7 +18,6 @@ from typing import Dict, Any
 
 
 ALGORITHM_SEARCH_SPACES: Dict[str, Dict[str, Dict[str, Any]]] = {
-    
     # =========================================================================
     # cuVS IVF-Flat
     # =========================================================================
@@ -32,7 +31,6 @@ ALGORITHM_SEARCH_SPACES: Dict[str, Dict[str, Dict[str, Any]]] = {
             "nprobe": {"type": "int", "min": 1, "max": "nlist"},
         },
     },
-    
     # =========================================================================
     # cuVS IVF-PQ
     # =========================================================================
@@ -46,27 +44,38 @@ ALGORITHM_SEARCH_SPACES: Dict[str, Dict[str, Dict[str, Any]]] = {
         },
         "search": {
             "nprobe": {"type": "int", "min": 1, "max": "nlist"},
-            "internalDistanceDtype": {"type": "categorical", "choices": ["float", "half"]},
-            "smemLutDtype": {"type": "categorical", "choices": ["float", "fp8", "half"]},
+            "internalDistanceDtype": {
+                "type": "categorical",
+                "choices": ["float", "half"],
+            },
+            "smemLutDtype": {
+                "type": "categorical",
+                "choices": ["float", "fp8", "half"],
+            },
             "refine_ratio": {"type": "float", "min": 1.0, "max": 10.0},
         },
     },
-    
     # =========================================================================
     # cuVS CAGRA
     # =========================================================================
     "cuvs_cagra": {
         "build": {
             "graph_degree": {"type": "int", "min": 16, "max": 256},
-            "intermediate_graph_degree": {"type": "int", "min": 32, "max": 256},
-            "graph_build_algo": {"type": "categorical", "choices": ["IVF_PQ", "NN_DESCENT"]},
+            "intermediate_graph_degree": {
+                "type": "int",
+                "min": 32,
+                "max": 256,
+            },
+            "graph_build_algo": {
+                "type": "categorical",
+                "choices": ["IVF_PQ", "NN_DESCENT"],
+            },
         },
         "search": {
             "itopk": {"type": "int", "min": 32, "max": 1024},
             "search_width": {"type": "int", "min": 1, "max": 64},
         },
     },
-    
     # =========================================================================
     # cuVS Brute Force (no tunable params)
     # =========================================================================
@@ -74,7 +83,6 @@ ALGORITHM_SEARCH_SPACES: Dict[str, Dict[str, Dict[str, Any]]] = {
         "build": {},
         "search": {},
     },
-    
     # =========================================================================
     # HNSW (hnswlib)
     # =========================================================================
@@ -87,7 +95,6 @@ ALGORITHM_SEARCH_SPACES: Dict[str, Dict[str, Dict[str, Any]]] = {
             "ef": {"type": "int", "min": 10, "max": 1000},
         },
     },
-    
     # =========================================================================
     # FAISS GPU IVF-Flat
     # =========================================================================
@@ -99,7 +106,6 @@ ALGORITHM_SEARCH_SPACES: Dict[str, Dict[str, Dict[str, Any]]] = {
             "nprobe": {"type": "int", "min": 1, "max": "nlist"},
         },
     },
-    
     # =========================================================================
     # FAISS GPU IVF-PQ
     # =========================================================================
@@ -108,13 +114,15 @@ ALGORITHM_SEARCH_SPACES: Dict[str, Dict[str, Dict[str, Any]]] = {
             "nlist": {"type": "int", "min": 256, "max": 65536, "log": True},
             "M": {"type": "int", "min": 8, "max": 128},
             "useFloat16": {"type": "categorical", "choices": [True, False]},
-            "usePrecomputed": {"type": "categorical", "choices": [True, False]},
+            "usePrecomputed": {
+                "type": "categorical",
+                "choices": [True, False],
+            },
         },
         "search": {
             "nprobe": {"type": "int", "min": 1, "max": "nlist"},
         },
     },
-    
     # =========================================================================
     # FAISS CPU IVF-Flat
     # =========================================================================
@@ -126,7 +134,6 @@ ALGORITHM_SEARCH_SPACES: Dict[str, Dict[str, Dict[str, Any]]] = {
             "nprobe": {"type": "int", "min": 1, "max": "nlist"},
         },
     },
-    
     # =========================================================================
     # FAISS CPU IVF-PQ
     # =========================================================================
@@ -139,7 +146,6 @@ ALGORITHM_SEARCH_SPACES: Dict[str, Dict[str, Dict[str, Any]]] = {
             "nprobe": {"type": "int", "min": 1, "max": "nlist"},
         },
     },
-    
     # =========================================================================
     # FAISS CPU HNSW
     # =========================================================================
@@ -158,23 +164,23 @@ ALGORITHM_SEARCH_SPACES: Dict[str, Dict[str, Dict[str, Any]]] = {
 def get_search_space(algorithm: str) -> Dict[str, Dict[str, Any]]:
     """
     Get default search space for an algorithm.
-    
+
     Parameters
     ----------
     algorithm : str
         Algorithm name (e.g., "cuvs_ivf_flat")
-    
+
     Returns
     -------
     dict
         Search space with "build" and "search" parameter definitions.
         Each parameter has: type, min/max (for numeric) or choices (for categorical)
-    
+
     Raises
     ------
     ValueError
         If algorithm has no defined search space
-    
+
     Examples
     --------
     >>> space = get_search_space("cuvs_ivf_flat")

@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
 """
@@ -20,44 +20,46 @@ from .base import BenchmarkBackend
 class BackendRegistry:
     """
     Central registry for all benchmark backends.
-    
+
     The registry maintains a mapping of backend names to backend classes,
     and provides methods for registering, discovering, and instantiating backends.
-    
+
     Supports:
     - Built-in backends (auto-registered at initialization)
     - User-defined plugins via YAML configuration
     - Dynamic loading from Python modules
-    
+
     Examples
     --------
     >>> registry = BackendRegistry()
     >>> backend = registry.get_backend("cpp_gbench", config={"executable_path": "..."})
     >>> backend.build(dataset, params, index_path)
     """
-    
+
     def __init__(self):
         """Initialize the registry with an empty backend mapping."""
         self._backends: Dict[str, Type[BenchmarkBackend]] = {}
-    
-    def register(self, name: str, backend_class: Type[BenchmarkBackend]) -> None:
+
+    def register(
+        self, name: str, backend_class: Type[BenchmarkBackend]
+    ) -> None:
         """
         Register a backend class with the given name.
-        
+
         Parameters
         ----------
         name : str
             Unique backend name (e.g., "cpp_gbench", "milvus")
         backend_class : Type[BenchmarkBackend]
             Backend class that inherits from BenchmarkBackend
-            
+
         Raises
         ------
         TypeError
             If backend_class does not inherit from BenchmarkBackend
         ValueError
             If a backend with this name is already registered
-            
+
         Examples
         --------
         >>> from .base import BenchmarkBackend
@@ -73,25 +75,27 @@ class BackendRegistry:
             raise TypeError(
                 f"{backend_class.__name__} must inherit from BenchmarkBackend"
             )
-        
+
         if name in self._backends:
             raise ValueError(
                 f"Backend '{name}' is already registered. "
                 f"Use unregister() first if you want to replace it."
             )
-        
+
         self._backends[name] = backend_class
-        print(f"[Registry] Registered backend: {name} ({backend_class.__name__})")
-    
+        print(
+            f"[Registry] Registered backend: {name} ({backend_class.__name__})"
+        )
+
     def unregister(self, name: str) -> None:
         """
         Unregister a backend by name.
-        
+
         Parameters
         ----------
         name : str
             Backend name to unregister
-            
+
         Raises
         ------
         KeyError
@@ -99,31 +103,31 @@ class BackendRegistry:
         """
         if name not in self._backends:
             raise KeyError(f"Backend '{name}' is not registered")
-        
+
         del self._backends[name]
         print(f"[Registry] Unregistered backend: {name}")
-    
+
     def get_backend(self, name: str, config: Dict) -> BenchmarkBackend:
         """
         Get a backend instance by name.
-        
+
         Parameters
         ----------
         name : str
             Backend name
         config : Dict
             Backend-specific configuration
-            
+
         Returns
         -------
         BenchmarkBackend
             Instantiated backend
-            
+
         Raises
         ------
         ValueError
             If backend is not registered
-            
+
         Examples
         --------
         >>> registry = BackendRegistry()
@@ -138,35 +142,35 @@ class BackendRegistry:
             raise ValueError(
                 f"Backend '{name}' not found. Available backends: {available or '(none)'}"
             )
-        
+
         backend_class = self._backends[name]
         return backend_class(config)
-    
+
     def is_registered(self, name: str) -> bool:
         """
         Check if a backend is registered.
-        
+
         Parameters
         ----------
         name : str
             Backend name
-            
+
         Returns
         -------
         bool
             True if registered, False otherwise
         """
         return name in self._backends
-    
+
     def list_backends(self) -> Dict[str, Type[BenchmarkBackend]]:
         """
         List all registered backends.
-        
+
         Returns
         -------
         Dict[str, Type[BenchmarkBackend]]
             Copy of the backend registry mapping
-            
+
         Examples
         --------
         >>> registry = BackendRegistry()
@@ -175,18 +179,15 @@ class BackendRegistry:
         ...     print(f"{name}: {cls.__name__}")
         """
         return self._backends.copy()
-    
+
     def load_from_module(
-        self,
-        module_path: str,
-        class_name: str,
-        backend_name: str
+        self, module_path: str, class_name: str, backend_name: str
     ) -> None:
         """
         Dynamically load a backend from a Python module.
-        
+
         This enables loading external plugins without modifying core code.
-        
+
         Parameters
         ----------
         module_path : str
@@ -195,7 +196,7 @@ class BackendRegistry:
             Class name within the module (e.g., "QdrantBackend")
         backend_name : str
             Name to register the backend under (e.g., "qdrant")
-            
+
         Raises
         ------
         ModuleNotFoundError
@@ -204,7 +205,7 @@ class BackendRegistry:
             If the class does not exist in the module
         TypeError
             If the class does not inherit from BenchmarkBackend
-            
+
         Examples
         --------
         >>> registry = BackendRegistry()
@@ -221,24 +222,24 @@ class BackendRegistry:
             raise ModuleNotFoundError(
                 f"Cannot import module '{module_path}': {e}"
             )
-        
+
         try:
             backend_class = getattr(module, class_name)
         except AttributeError:
             raise AttributeError(
                 f"Class '{class_name}' not found in module '{module_path}'"
             )
-        
+
         self.register(backend_name, backend_class)
-    
+
     def load_from_config(self, config_path: Path) -> None:
         """
         Load backends from a YAML configuration file.
-        
+
         The YAML file should have the following structure:
-        
+
         .. code-block:: yaml
-        
+
             backends:
               - name: qdrant
                 module: custom_backends.qdrant
@@ -246,12 +247,12 @@ class BackendRegistry:
               - name: elasticsearch
                 module: custom_backends.elasticsearch
                 class: ElasticsearchBackend
-        
+
         Parameters
         ----------
         config_path : Path
             Path to YAML configuration file
-            
+
         Raises
         ------
         FileNotFoundError
@@ -260,7 +261,7 @@ class BackendRegistry:
             If config file is not valid YAML
         KeyError
             If required fields are missing from config
-            
+
         Examples
         --------
         >>> registry = BackendRegistry()
@@ -270,15 +271,15 @@ class BackendRegistry:
         """
         if not config_path.exists():
             raise FileNotFoundError(f"Config file not found: {config_path}")
-        
+
         with open(config_path) as f:
             config = yaml.safe_load(f)
-        
+
         backends_config = config.get("backends", [])
         if not backends_config:
             print(f"[Registry] Warning: No backends found in {config_path}")
             return
-        
+
         for backend_config in backends_config:
             try:
                 name = backend_config["name"]
@@ -290,11 +291,13 @@ class BackendRegistry:
                     f"{backend_config}"
                 )
                 continue
-            
+
             try:
                 self.load_from_module(module_path, class_name, name)
             except (ModuleNotFoundError, AttributeError, TypeError) as e:
-                print(f"[Registry] Warning: Failed to load backend '{name}': {e}")
+                print(
+                    f"[Registry] Warning: Failed to load backend '{name}': {e}"
+                )
 
 
 # Global registry instance
@@ -304,12 +307,12 @@ _global_registry: Optional[BackendRegistry] = None
 def get_registry() -> BackendRegistry:
     """
     Get the global backend registry instance (singleton pattern).
-    
+
     Returns
     -------
     BackendRegistry
         The global registry
-        
+
     Examples
     --------
     >>> registry = get_registry()
@@ -324,14 +327,14 @@ def get_registry() -> BackendRegistry:
 def register_backend(name: str, backend_class: Type[BenchmarkBackend]) -> None:
     """
     Convenience function to register a backend with the global registry.
-    
+
     Parameters
     ----------
     name : str
         Unique backend name
     backend_class : Type[BenchmarkBackend]
         Backend class
-        
+
     Examples
     --------
     >>> from .base import BenchmarkBackend
@@ -350,19 +353,19 @@ def register_backend(name: str, backend_class: Type[BenchmarkBackend]) -> None:
 def get_backend(name: str, config: Dict) -> BenchmarkBackend:
     """
     Convenience function to get a backend instance from the global registry.
-    
+
     Parameters
     ----------
     name : str
         Backend name
     config : Dict
         Backend configuration
-        
+
     Returns
     -------
     BenchmarkBackend
         Instantiated backend
-        
+
     Examples
     --------
     >>> backend = get_backend("cpp_gbench", {"executable_path": "..."})
@@ -375,12 +378,12 @@ def get_backend(name: str, config: Dict) -> BenchmarkBackend:
 def get_backend_class(name: str) -> Type[BenchmarkBackend]:
     """
     Get the backend class (not instance) from the global registry.
-    
+
     Parameters
     ----------
     name : str
         Backend name
-        
+
     Returns
     -------
     Type[BenchmarkBackend]
@@ -415,36 +418,38 @@ _CONFIG_LOADER_REGISTRY: Dict[str, Type] = {}
 def register_config_loader(name: str, loader_class: Type) -> None:
     """
     Register a config loader class.
-    
+
     Parameters
     ----------
     name : str
         Backend name (e.g., 'cpp_gbench', 'milvus')
     loader_class : Type
         Config loader class to register
-        
+
     Examples
     --------
     >>> register_config_loader("cpp_gbench", CppGBenchConfigLoader)
     """
     _CONFIG_LOADER_REGISTRY[name] = loader_class
-    print(f"[Registry] Registered config loader: {name} ({loader_class.__name__})")
+    print(
+        f"[Registry] Registered config loader: {name} ({loader_class.__name__})"
+    )
 
 
 def get_config_loader(name: str) -> Type:
     """
     Get a registered config loader class by name.
-    
+
     Parameters
     ----------
     name : str
         Backend name
-        
+
     Returns
     -------
     Type
         Config loader class
-        
+
     Raises
     ------
     ValueError
