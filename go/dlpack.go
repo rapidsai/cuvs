@@ -335,6 +335,11 @@ func (t *Tensor[T]) Expand(res *Resource, newData [][]T) (*Tensor[T], error) {
 
 // Transfers the data in the Tensor to the host.
 func (t *Tensor[T]) ToHost(res *Resource) (*Tensor[T], error) {
+	if t.C_tensor.dl_tensor.device.device_type == C.kDLCPU {
+		// tensor is already in CPU
+		return t, nil
+	}
+
 	bytes := t.sizeInBytes()
 
 	addr := (C.malloc(C.size_t(bytes)))
