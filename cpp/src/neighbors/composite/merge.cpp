@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #include <cstddef>
@@ -7,7 +7,6 @@
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/composite/merge.hpp>
 #include <cuvs/neighbors/index_base.hpp>
-#include <cuvs/neighbors/index_wrappers.hpp>
 #include <memory>
 #include <raft/core/error.hpp>
 #include <raft/core/resources.hpp>
@@ -27,14 +26,14 @@ namespace cuvs::neighbors::composite {
  * @tparam OutputIdxT Output index type
  * @param[in] handle RAFT resources for executing operations
  * @param[in] params Merge parameters containing strategy and algorithm-specific settings
- * @param[in] indices Vector of IndexWrapper pointers to merge
+ * @param[in] indices Vector of IndexBase pointers to merge
  * @return Shared pointer to merged composite index
  */
 template <typename T, typename IdxT, typename OutputIdxT>
 std::shared_ptr<cuvs::neighbors::IndexBase<T, IdxT, OutputIdxT>> merge(
   const raft::resources& handle,
   const cuvs::neighbors::merge_params& params,
-  std::vector<std::shared_ptr<cuvs::neighbors::IndexWrapper<T, IdxT, OutputIdxT>>>& indices)
+  std::vector<std::shared_ptr<cuvs::neighbors::IndexBase<T, IdxT, OutputIdxT>>>& indices)
 {
   if (indices.empty()) { RAFT_FAIL("Cannot merge empty indices vector"); }
 
@@ -55,7 +54,7 @@ std::shared_ptr<cuvs::neighbors::IndexBase<T, IdxT, OutputIdxT>> merge(
   merge<T, IdxT, OutputIdxT>(                                               \
     const raft::resources&,                                                 \
     const cuvs::neighbors::merge_params&,                                   \
-    std::vector<std::shared_ptr<cuvs::neighbors::IndexWrapper<T, IdxT, OutputIdxT>>>&);
+    std::vector<std::shared_ptr<cuvs::neighbors::IndexBase<T, IdxT, OutputIdxT>>>&);
 
 INSTANTIATE(float, uint32_t, uint32_t);
 INSTANTIATE(half, uint32_t, uint32_t);

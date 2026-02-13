@@ -13,7 +13,7 @@
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/composite/merge.hpp>
-#include <cuvs/neighbors/index_wrappers.hpp>
+#include <cuvs/neighbors/index_base.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/device_resources.hpp>
@@ -1320,12 +1320,12 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
         };
 
         // Convert traditional CAGRA indices to wrappers for polymorphic usage
-        std::vector<std::shared_ptr<cuvs::neighbors::IndexWrapper<DataT, IdxT, SearchIdxT>>>
+        std::vector<std::shared_ptr<cuvs::neighbors::IndexBase<DataT, IdxT, SearchIdxT>>>
           wrapped_indices;
         wrapped_indices.push_back(
-          std::make_shared<cuvs::neighbors::cagra::IndexWrapper<DataT, IdxT, SearchIdxT>>(&index0));
+          cuvs::neighbors::cagra::make_index_wrapper<DataT, IdxT, SearchIdxT>(&index0));
         wrapped_indices.push_back(
-          std::make_shared<cuvs::neighbors::cagra::IndexWrapper<DataT, IdxT, SearchIdxT>>(&index1));
+          cuvs::neighbors::cagra::make_index_wrapper<DataT, IdxT, SearchIdxT>(&index1));
 
         cagra::merge_params merge_params{index_params};
         merge_params.merge_strategy = ps.merge_strategy;
