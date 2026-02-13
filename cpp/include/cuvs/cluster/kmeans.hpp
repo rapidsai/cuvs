@@ -50,16 +50,20 @@ struct params : base_params {
 
   /**
    * Centroid update mode determines when centroids are updated during training.
+   * This is primarily used with fit_batched() for out-of-core / host data processing.
    */
   enum CentroidUpdateMode {
     /**
-     * Standard k-means (Lloyd's algorithm): accumulate assignments over the
+     * Standard k-means (Lloyd's algorithm): accumulate partial sums over the
      * entire dataset, then update centroids once per iteration.
      */
     FullBatch,
 
     /**
-     * Mini-batch k-means: update centroids after each randomly sampled batch.
+     * Mini-batch k-means: update centroids incrementally after each randomly
+     * sampled batch using an online learning rule. Converges faster but may
+     * produce slightly different results each run. Recommended for very large
+     * datasets where multiple full passes are too expensive.
      */
     MiniBatch
   };
@@ -123,9 +127,12 @@ struct params : base_params {
   int batch_centroids = 0;
 
   /**
-   * Centroid update mode:
-   *  - FullBatch: Standard Lloyd's algorithm, update centroids after full dataset pass
-   *  - MiniBatch: Mini-batch k-means, update centroids after each batch
+   * Centroid update mode for fit_batched():
+   *  - FullBatch (default): Standard Lloyd's algorithm. Accumulate partial sums
+   *    across all batches, update centroids once per iteration. Deterministic and
+   *    mathematically equivalent to standard k-means.
+   *  - MiniBatch: Online mini-batch k-means. Update centroids incrementally after
+   *    each randomly sampled batch. Faster convergence but non-deterministic.
    */
   CentroidUpdateMode update_mode = FullBatch;
 
@@ -171,9 +178,19 @@ enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
  * @brief Find clusters with k-means algorithm using batched processing.
  *
  * This version supports out-of-core computation where the dataset resides
- * on the host. Data is processed in batches, with partial sums accumulated
- * across batches and centroids finalized at the end of each iteration.
- * This is mathematically equivalent to standard kmeans.
+ * on the host. Data is processed in batches, streaming from host to device.
+ *
+ * Two centroid update modes are supported (controlled by params.update_mode):
+ *
+ * - **FullBatch** (default): Standard Lloyd's algorithm. Partial sums are
+ *   accumulated across all batches, and centroids are updated once at the
+ *   end of each iteration. This is mathematically equivalent to standard
+ *   k-means and produces deterministic results.
+ *
+ * - **MiniBatch**: Mini-batch k-means. Centroids are updated incrementally
+ *   after each randomly sampled batch using an online learning rule. This
+ *   converges faster but may produce slightly different results each run.
+ *   Useful for very large datasets where full passes are expensive.
  *
  * @code{.cpp}
  *   #include <raft/core/resources.hpp>
@@ -182,6 +199,8 @@ enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
  *   ...
  *   raft::resources handle;
  *   cuvs::cluster::kmeans::params params;
+ *   params.n_clusters = 100;
+ *   // params.update_mode = kmeans::params::MiniBatch;  // for mini-batch mode
  *   int n_features = 15;
  *   float inertia;
  *   int n_iter;
@@ -204,7 +223,8 @@ enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
  * @endcode
  *
  * @param[in]     handle        The raft handle.
- * @param[in]     params        Parameters for KMeans model.
+ * @param[in]     params        Parameters for KMeans model. Use params.update_mode
+ *                              to select FullBatch or MiniBatch mode.
  * @param[in]     X             Training instances on HOST memory. The data must
  *                              be in row-major format.
  *                              [dim = n_samples x n_features]
@@ -233,8 +253,11 @@ void fit_batched(raft::resources const& handle,
 /**
  * @brief Find clusters with k-means algorithm using batched processing.
  *
+ * Supports both FullBatch (Lloyd's algorithm) and MiniBatch modes via
+ * params.update_mode. See the int-indexed overload for detailed documentation.
+ *
  * @param[in]     handle        The raft handle.
- * @param[in]     params        Parameters for KMeans model.
+ * @param[in]     params        Parameters for KMeans model (including update_mode).
  * @param[in]     X             Training instances on HOST memory.
  *                              [dim = n_samples x n_features]
  * @param[in]     batch_size    Number of samples to process per batch.
@@ -256,8 +279,11 @@ void fit_batched(raft::resources const& handle,
 /**
  * @brief Find clusters with k-means algorithm using batched processing.
  *
+ * Supports both FullBatch (Lloyd's algorithm) and MiniBatch modes via
+ * params.update_mode. See the float int-indexed overload for detailed documentation.
+ *
  * @param[in]     handle        The raft handle.
- * @param[in]     params        Parameters for KMeans model.
+ * @param[in]     params        Parameters for KMeans model (including update_mode).
  * @param[in]     X             Training instances on HOST memory.
  *                              [dim = n_samples x n_features]
  * @param[in]     batch_size    Number of samples to process per batch.
@@ -279,8 +305,11 @@ void fit_batched(raft::resources const& handle,
 /**
  * @brief Find clusters with k-means algorithm using batched processing.
  *
+ * Supports both FullBatch (Lloyd's algorithm) and MiniBatch modes via
+ * params.update_mode. See the float int-indexed overload for detailed documentation.
+ *
  * @param[in]     handle        The raft handle.
- * @param[in]     params        Parameters for KMeans model.
+ * @param[in]     params        Parameters for KMeans model (including update_mode).
  * @param[in]     X             Training instances on HOST memory.
  *                              [dim = n_samples x n_features]
  * @param[in]     batch_size    Number of samples to process per batch.
@@ -302,8 +331,12 @@ void fit_batched(raft::resources const& handle,
 /**
  * @brief Find clusters with k-means algorithm using batched processing for uint8 data.
  *
+ * Supports both FullBatch (Lloyd's algorithm) and MiniBatch modes via
+ * params.update_mode. Input data is uint8 but centroids are float (since
+ * centroids are averages). Conversion happens on GPU using mapping operators.
+ *
  * @param[in]     handle        The raft handle.
- * @param[in]     params        Parameters for KMeans model.
+ * @param[in]     params        Parameters for KMeans model (including update_mode).
  * @param[in]     X             Training instances on HOST memory (uint8).
  *                              [dim = n_samples x n_features]
  * @param[in]     batch_size    Number of samples to process per batch.
@@ -325,8 +358,12 @@ void fit_batched(raft::resources const& handle,
 /**
  * @brief Find clusters with k-means algorithm using batched processing for int8 data.
  *
+ * Supports both FullBatch (Lloyd's algorithm) and MiniBatch modes via
+ * params.update_mode. Input data is int8 but centroids are float (since
+ * centroids are averages). Conversion happens on GPU using mapping operators.
+ *
  * @param[in]     handle        The raft handle.
- * @param[in]     params        Parameters for KMeans model.
+ * @param[in]     params        Parameters for KMeans model (including update_mode).
  * @param[in]     X             Training instances on HOST memory (int8).
  *                              [dim = n_samples x n_features]
  * @param[in]     batch_size    Number of samples to process per batch.
@@ -348,8 +385,12 @@ void fit_batched(raft::resources const& handle,
 /**
  * @brief Find clusters with k-means algorithm using batched processing for half data.
  *
+ * Supports both FullBatch (Lloyd's algorithm) and MiniBatch modes via
+ * params.update_mode. Input data is half but centroids are float (for
+ * numerical stability). Conversion happens on GPU using mapping operators.
+ *
  * @param[in]     handle        The raft handle.
- * @param[in]     params        Parameters for KMeans model.
+ * @param[in]     params        Parameters for KMeans model (including update_mode).
  * @param[in]     X             Training instances on HOST memory (half).
  *                              [dim = n_samples x n_features]
  * @param[in]     batch_size    Number of samples to process per batch.

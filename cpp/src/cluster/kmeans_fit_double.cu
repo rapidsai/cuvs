@@ -49,7 +49,7 @@ void fit_batched(raft::resources const& handle,
                  raft::host_scalar_view<double> inertia,
                  raft::host_scalar_view<int> n_iter)
 {
-  cuvs::cluster::kmeans::batched::detail::fit<double, double, int>(
+  cuvs::cluster::kmeans::detail::fit<double, double, int>(
     handle, params, X, batch_size, sample_weight, centroids, inertia, n_iter, raft::identity_op{});
 }
 
@@ -62,7 +62,7 @@ void fit_batched(raft::resources const& handle,
                  raft::host_scalar_view<double> inertia,
                  raft::host_scalar_view<int64_t> n_iter)
 {
-  cuvs::cluster::kmeans::batched::detail::fit<double, double, int64_t>(
+  cuvs::cluster::kmeans::detail::fit<double, double, int64_t>(
     handle, params, X, batch_size, sample_weight, centroids, inertia, n_iter, raft::identity_op{});
 }
 

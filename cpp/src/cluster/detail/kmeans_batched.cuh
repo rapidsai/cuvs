@@ -45,7 +45,7 @@
 #include <type_traits>
 #include <vector>
 
-namespace cuvs::cluster::kmeans::batched::detail {
+namespace cuvs::cluster::kmeans::detail {
 
 /**
  * @brief Sample data from host to device for initialization, with optional type conversion
@@ -127,15 +127,17 @@ void init_centroids_from_host_sample(raft::resources const& handle,
   auto init_sample = raft::make_device_matrix<MathT, IdxT>(handle, init_sample_size, n_features);
   prepare_init_sample(handle, X, init_sample.view(), params.rng_state.seed, mapping_op);
 
-  // Run k-means++ on the sample
   if (params.init == cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus) {
-    cuvs::cluster::kmeans::detail::kmeansPlusPlus<MathT, IdxT>(
-      handle,
-      params,
-      raft::make_device_matrix_view<const MathT, IdxT>(
-        init_sample.data_handle(), init_sample_size, n_features),
-      centroids,
-      workspace);
+    auto init_sample_view = raft::make_device_matrix_view<const MathT, IdxT>(
+      init_sample.data_handle(), init_sample_size, n_features);
+
+    if (params.oversampling_factor == 0) {
+      cuvs::cluster::kmeans::detail::kmeansPlusPlus<MathT, IdxT>(
+        handle, params, init_sample_view, centroids, workspace);
+    } else {
+      cuvs::cluster::kmeans::detail::initScalableKMeansPlusPlus<MathT, IdxT>(
+        handle, params, init_sample_view, centroids, workspace);
+    }
   } else if (params.init == cuvs::cluster::kmeans::params::InitMethod::Random) {
     // Just use the first n_clusters samples
     raft::copy(centroids.data_handle(), init_sample.data_handle(), n_clusters * n_features, stream);
@@ -700,4 +702,4 @@ void fit(raft::resources const& handle,
   RAFT_LOG_DEBUG("KMeans batched: Completed with inertia=%f", static_cast<double>(inertia[0]));
 }
 
-}  // namespace cuvs::cluster::kmeans::batched::detail
+}  // namespace cuvs::cluster::kmeans::detail
