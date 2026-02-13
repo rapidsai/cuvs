@@ -175,7 +175,7 @@ void pairwise_distance_gemm(raft::resources const& handle,
   }
 
   const AccT alpha = static_cast<AccT>(1);
-  const AccT beta = static_cast<AccT>(0);
+  const AccT beta  = static_cast<AccT>(0);
 
   auto cublas_h = raft::resource::get_cublas_handle(handle);
   RAFT_CUBLAS_TRY(cublasGemmEx(cublas_h,
