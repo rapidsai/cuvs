@@ -333,12 +333,12 @@ dependencies:
               cuda: "12.*"
               use_cuda_wheels: "true"
             packages:
-              - cuda-toolkit[cublas,curand,cusolver,cusparse]==12.*
+              - cuda-toolkit[cublas,curand,cusolver,cusparse,nvjitlink]==12.*
           - matrix:
               cuda: "13.*"
               use_cuda_wheels: "true"
             packages:
-              - cuda-toolkit[cublas,curand,cusolver,cusparse]==13.*
+              - cuda-toolkit[cublas,curand,cusolver,cusparse,nvjitlink]==13.*
           - matrix:
               use_cuda_wheels: "false"
             packages:
@@ -346,7 +346,7 @@ dependencies:
           # (just as a source of documentation, as this populates pyproject.toml in source control)
           - matrix:
             packages:
-              - cuda-toolkit[cublas,curand,cusolver,cusparse]>=12,<14
+              - cuda-toolkit[cublas,curand,cusolver,cusparse,nvjitlink]>=12,<14
   depends_on_cupy:
     common:
       - output_types: conda
