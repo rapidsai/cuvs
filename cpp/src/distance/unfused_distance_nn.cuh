@@ -140,57 +140,43 @@ void pairwise_distance_gemm(raft::resources const& handle,
   cudaDataType_t xyType, zType;
   cublasComputeType_t computeType;
 
-  const half h_alpha = 1.0, h_beta = 0.0;
-  const float f_alpha = 1.0, f_beta = 0.0;
-  const double d_alpha = 1.0, d_beta = 0.0;
-  const int32_t i32_alpha = 1, i32_beta = 0;
-
-  const void* alpha = nullptr;
-  const void* beta  = nullptr;
-  if constexpr (std::is_same_v<DataT, float>) {
-    xyType      = CUDA_R_32F;
-    zType       = CUDA_R_32F;
-    computeType = CUBLAS_COMPUTE_32F;
-    // computeType = CUBLAS_COMPUTE_32F_FAST_TF32;
-    // computeType = CUBLAS_COMPUTE_32F_FAST_16F;
-    // computeType = CUBLAS_COMPUTE_32F_FAST_16BF;
-    // computeType = CUBLAS_COMPUTE_32F_EMULATED_16BFX9;
-    alpha = reinterpret_cast<const void*>(&f_alpha);
-    beta  = reinterpret_cast<const void*>(&f_beta);
-  } else if constexpr (std::is_same_v<DataT, double>) {
-    xyType      = CUDA_R_64F;
-    zType       = CUDA_R_64F;
-    computeType = CUBLAS_COMPUTE_64F;
-    alpha       = reinterpret_cast<const void*>(&d_alpha);
-    beta        = reinterpret_cast<const void*>(&d_beta);
+  if constexpr (std::is_same_v<DataT, int8_t>) {
+    xyType = CUDA_R_8I;
+    if constexpr (std::is_same_v<AccT, int32_t>) {
+      zType       = CUDA_R_32I;
+      computeType = CUBLAS_COMPUTE_32I;
+    } else if constexpr (std::is_same_v<AccT, float>) {
+      zType       = CUDA_R_32F;
+      computeType = CUBLAS_COMPUTE_32F;
+    }
   } else if constexpr (std::is_same_v<DataT, half>) {
     xyType = CUDA_R_16F;
     if constexpr (std::is_same_v<AccT, half>) {
       zType       = CUDA_R_16F;
       computeType = CUBLAS_COMPUTE_16F;
-      // computeType = CUBLAS_COMPUTE_32F;
-      alpha = reinterpret_cast<const void*>(&h_alpha);
-      beta  = reinterpret_cast<const void*>(&h_beta);
+      // Alternative: CUBLAS_COMPUTE_32F can be used for higher precision,
+      // but requires changing alpha and beta to float type instead of half.
+      // See: https://docs.nvidia.com/cuda/cublas/index.html#cublasgemmex
     } else if constexpr (std::is_same_v<AccT, float>) {
       zType       = CUDA_R_32F;
       computeType = CUBLAS_COMPUTE_32F;
-      alpha       = reinterpret_cast<const void*>(&f_alpha);
-      beta        = reinterpret_cast<const void*>(&f_beta);
     }
-  } else if constexpr (std::is_same_v<DataT, int8_t>) {
-    xyType = CUDA_R_8I;
-    if constexpr (std::is_same_v<AccT, int32_t>) {
-      zType       = CUDA_R_32I;
-      computeType = CUBLAS_COMPUTE_32I;
-      alpha       = reinterpret_cast<const void*>(&i32_alpha);
-      beta        = reinterpret_cast<const void*>(&i32_beta);
-    } else if constexpr (std::is_same_v<AccT, float>) {
-      zType       = CUDA_R_32F;
-      computeType = CUBLAS_COMPUTE_32F;
-      alpha       = reinterpret_cast<const void*>(&f_alpha);
-      beta        = reinterpret_cast<const void*>(&f_beta);
-    }
+  } else if constexpr (std::is_same_v<DataT, float>) {
+    xyType      = CUDA_R_32F;
+    zType       = CUDA_R_32F;
+    computeType = CUBLAS_COMPUTE_32F_FAST_TF32;
+    // Note: Alternative compute types that can be used include:
+    // CUBLAS_COMPUTE_32F, CUBLAS_COMPUTE_32F_FAST_16F,
+    // CUBLAS_COMPUTE_32F_FAST_16BF, CUBLAS_COMPUTE_32F_EMULATED_16BFX9
+  } else if constexpr (std::is_same_v<DataT, double>) {
+    xyType      = CUDA_R_64F;
+    zType       = CUDA_R_64F;
+    computeType = CUBLAS_COMPUTE_64F;
   }
+
+  const AccT alpha = static_cast<AccT>(1);
+  const AccT beta = static_cast<AccT>(0);
+
   auto cublas_h = raft::resource::get_cublas_handle(handle);
   RAFT_CUBLAS_TRY(cublasGemmEx(cublas_h,
                                CUBLAS_OP_T,
@@ -198,14 +184,14 @@ void pairwise_distance_gemm(raft::resources const& handle,
                                N,  // Dimensions (swapped due to row/col-major difference)
                                M,
                                K,
-                               alpha,
+                               reinterpret_cast<const void*>(&alpha),
                                y,
                                xyType,
                                K,
                                x,
                                xyType,
                                K,
-                               beta,
+                               reinterpret_cast<const void*>(&beta),
                                z,
                                zType,
                                N,
