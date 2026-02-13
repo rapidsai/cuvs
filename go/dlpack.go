@@ -202,6 +202,12 @@ func (t *Tensor[T]) Close() error {
 
 // Transfers the data in the Tensor to the device.
 func (t *Tensor[T]) ToDevice(res *Resource) (*Tensor[T], error) {
+
+	if t.C_tensor.dl_tensor.device.device_type == C.kDLCUDA {
+		// tensor already in device
+		return t, nil
+	}
+
 	bytes := t.sizeInBytes()
 
 	var DeviceDataPointer unsafe.Pointer
@@ -223,9 +229,14 @@ func (t *Tensor[T]) ToDevice(res *Resource) (*Tensor[T], error) {
 		return nil, err
 	}
 
-	if t.C_tensor.dl_tensor.data != nil {
-		C.free(t.C_tensor.dl_tensor.data)
-		t.C_tensor.dl_tensor.data = nil
+	if t.C_tensor.deleter != nil {
+		C.tensor_deleter_free(t.C_tensor)
+
+	} else {
+		if t.C_tensor.dl_tensor.data != nil {
+			C.free(t.C_tensor.dl_tensor.data)
+			t.C_tensor.dl_tensor.data = nil
+		}
 	}
 
 	t.C_tensor.dl_tensor.device.device_type = C.kDLCUDA
