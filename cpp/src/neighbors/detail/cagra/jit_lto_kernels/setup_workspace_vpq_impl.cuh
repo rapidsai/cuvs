@@ -12,9 +12,12 @@
 #include <raft/util/integer_utils.hpp>
 #include <raft/util/pow2_utils.cuh>
 
-namespace cuvs::neighbors::cagra::detail::single_cta_search {
+namespace cuvs::neighbors::cagra::detail {
 
 // Extern function implementation for setup_workspace_vpq (VPQ descriptor)
+// Takes the concrete descriptor pointer and calls the free function directly (not through function
+// pointer) For JIT LTO, the descriptor's setup_workspace_impl is nullptr, so we must call the free
+// function directly
 template <cuvs::distance::DistanceType Metric,
           uint32_t TeamSize,
           uint32_t DatasetBlockDim,
@@ -24,44 +27,43 @@ template <cuvs::distance::DistanceType Metric,
           typename DataT,
           typename IndexT,
           typename DistanceT>
-__device__ uint32_t setup_workspace_vpq(void* smem,
-                                        const DataT* queries,
-                                        uint32_t query_id,
-                                        const uint8_t* encoded_dataset_ptr,
-                                        uint32_t encoded_dataset_dim,
-                                        const CodebookT* vq_code_book_ptr,
-                                        const CodebookT* pq_code_book_ptr,
-                                        IndexT dataset_size,
-                                        uint32_t dim)
+__device__ const cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<Metric,
+                                                                              TeamSize,
+                                                                              DatasetBlockDim,
+                                                                              PQ_BITS,
+                                                                              PQ_LEN,
+                                                                              CodebookT,
+                                                                              DataT,
+                                                                              IndexT,
+                                                                              DistanceT>*
+setup_workspace_vpq(
+  const cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<Metric,
+                                                                     TeamSize,
+                                                                     DatasetBlockDim,
+                                                                     PQ_BITS,
+                                                                     PQ_LEN,
+                                                                     CodebookT,
+                                                                     DataT,
+                                                                     IndexT,
+                                                                     DistanceT>* desc,
+  void* smem,
+  const DataT* queries,
+  uint32_t query_id)
 {
-  using desc_type = cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<Metric,
-                                                                                 TeamSize,
-                                                                                 DatasetBlockDim,
-                                                                                 PQ_BITS,
-                                                                                 PQ_LEN,
-                                                                                 CodebookT,
-                                                                                 DataT,
-                                                                                 IndexT,
-                                                                                 DistanceT>;
-
-  // Create a temporary descriptor on the stack
-  desc_type temp_desc(reinterpret_cast<typename desc_type::setup_workspace_type*>(
-                        &cuvs::neighbors::cagra::detail::setup_workspace_vpq<desc_type>),
-                      reinterpret_cast<typename desc_type::compute_distance_type*>(
-                        &cuvs::neighbors::cagra::detail::compute_distance_vpq<desc_type>),
-                      encoded_dataset_ptr,
-                      encoded_dataset_dim,
-                      vq_code_book_ptr,
-                      pq_code_book_ptr,
-                      dataset_size,
-                      dim);
-
-  // Call the free function setup_workspace_vpq which copies descriptor to smem
-  const desc_type* result = cuvs::neighbors::cagra::detail::setup_workspace_vpq<desc_type>(
-    &temp_desc, smem, queries, query_id);
-
-  // Return the smem_ws_ptr from the descriptor's args
-  return result->args.smem_ws_ptr;
+  // Call the free function directly (not desc->setup_workspace() which uses a function pointer)
+  // The free function is in compute_distance_vpq-impl.cuh
+  using desc_t = cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<Metric,
+                                                                              TeamSize,
+                                                                              DatasetBlockDim,
+                                                                              PQ_BITS,
+                                                                              PQ_LEN,
+                                                                              CodebookT,
+                                                                              DataT,
+                                                                              IndexT,
+                                                                              DistanceT>;
+  const auto* result =
+    cuvs::neighbors::cagra::detail::setup_workspace_vpq<desc_t>(desc, smem, queries, query_id);
+  return result;
 }
 
-}  // namespace cuvs::neighbors::cagra::detail::single_cta_search
+}  // namespace cuvs::neighbors::cagra::detail

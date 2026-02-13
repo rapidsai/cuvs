@@ -12,42 +12,28 @@
 #include <raft/util/integer_utils.hpp>
 #include <raft/util/pow2_utils.cuh>
 
-namespace cuvs::neighbors::cagra::detail::single_cta_search {
+namespace cuvs::neighbors::cagra::detail {
 
 // Extern function implementation for compute_distance_standard (standard descriptor)
+// Returns per-thread distance (team_sum must be called by the caller)
 template <cuvs::distance::DistanceType Metric,
           uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           typename DataT,
           typename IndexT,
           typename DistanceT>
-__device__ DistanceT compute_distance_standard(const DataT* dataset_ptr,
-                                               uint32_t smem_ws_ptr,
-                                               IndexT dataset_index,
-                                               uint32_t dim,
-                                               uint32_t ld,
-                                               uint32_t team_size_bitshift,
-                                               const DistanceT* dataset_norms)
+__device__ DistanceT
+compute_distance_standard(const typename cuvs::neighbors::cagra::detail::
+                            dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t args,
+                          IndexT dataset_index)
 {
-  using desc_type = cuvs::neighbors::cagra::detail::
+  // Call the free function compute_distance_standard directly with args (already loaded)
+  // Returns per-thread distance (caller must do team_sum)
+  using desc_t = cuvs::neighbors::cagra::detail::
     standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
-  using base_type = typename desc_type::base_type;
-  using args_t    = typename base_type::args_t;
-
-  // Reconstruct args_t from parameters
-  args_t args;
-  args.smem_ws_ptr = smem_ws_ptr;
-  args.dim         = dim;
-  args.extra_word1 = ld;                    // dataset_ld
-  args.extra_ptr1  = (void*)dataset_ptr;    // dataset_ptr
-  args.extra_ptr2  = (void*)dataset_norms;  // dataset_norms
-
-  // Call the free function compute_distance_standard
-  auto per_thread_distances =
-    cuvs::neighbors::cagra::detail::compute_distance_standard<desc_type>(args, dataset_index);
-
-  // Use team_sum with the provided team_size_bitshift
-  return device::team_sum(per_thread_distances, team_size_bitshift);
+  auto per_thread_distance =
+    cuvs::neighbors::cagra::detail::compute_distance_standard<desc_t>(args, dataset_index);
+  return per_thread_distance;
 }
 
-}  // namespace cuvs::neighbors::cagra::detail::single_cta_search
+}  // namespace cuvs::neighbors::cagra::detail

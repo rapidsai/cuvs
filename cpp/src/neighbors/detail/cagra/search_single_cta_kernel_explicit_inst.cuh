@@ -6,7 +6,7 @@
 #pragma once
 
 #ifdef CUVS_ENABLE_JIT_LTO
-#include "search_single_cta_kernel_jit.cuh"
+#include "search_single_cta_kernel_launcher_jit.cuh"
 #else
-#include "search_single_cta_kernel-inl.cuh"
+#include "search_single_cta_kernel_launcher.cuh"
 #endif

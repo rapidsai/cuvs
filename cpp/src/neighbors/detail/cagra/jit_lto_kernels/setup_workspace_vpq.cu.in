@@ -9,13 +9,12 @@
 
 #include <neighbors/detail/cagra/jit_lto_kernels/setup_workspace_vpq_impl.cuh>
 
-namespace cuvs::neighbors::cagra::detail::single_cta_search {
+namespace cuvs::neighbors::cagra::detail {
 
 // Instantiate the setup_workspace_vpq function for VPQ descriptor
-template __device__ uint32_t setup_workspace_vpq<@metric_cpp@, @team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@>(
-    void*, const @data_type@*, uint32_t, const uint8_t*, uint32_t, const @codebook_type@*, const @codebook_type@*, @index_type@, uint32_t);
+template __device__ const cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<@metric_cpp@, @team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@>* setup_workspace_vpq<@metric_cpp@, @team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@>(const cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<@metric_cpp@, @team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@>*, void*, const @data_type@*, uint32_t);
 
-}  // namespace cuvs::neighbors::cagra::detail::single_cta_search
+}  // namespace cuvs::neighbors::cagra::detail
 
 #else
 
@@ -29,7 +28,8 @@ __attribute__((__constructor__)) static void register_setup_workspace_vpq_@metri
 {
   registerAlgorithm<tag_@type_abbrev@,
     tag_idx_@idx_abbrev@,
-    tag_dist_@dist_abbrev@>(
+    tag_dist_@dist_abbrev@,
+    tag_codebook_half>(
     "setup_workspace_vpq_@metric_name@_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd",
     embedded_setup_workspace_vpq_@metric_name@_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@,
     sizeof(embedded_setup_workspace_vpq_@metric_name@_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@));

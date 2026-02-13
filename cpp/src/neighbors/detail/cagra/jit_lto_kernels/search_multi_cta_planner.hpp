@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,10 +9,8 @@
 #include <cuvs/detail/jit_lto/cagra/search_single_cta_tags.hpp>
 
 #include <cuvs/detail/jit_lto/AlgorithmPlanner.hpp>
-#include <cuvs/detail/jit_lto/FragmentDatabase.hpp>
 #include <cuvs/detail/jit_lto/MakeFragmentKey.hpp>
 #include <cuvs/distance/distance.hpp>
-#include <iostream>
 #include <raft/core/logger.hpp>
 #include <string>
 
@@ -21,44 +19,30 @@ namespace cuvs {
 namespace neighbors {
 namespace cagra {
 namespace detail {
-namespace single_cta_search {
+namespace multi_cta_search {
 
 template <typename DataTag, typename IndexTag, typename DistanceTag, typename SourceIndexTag>
-struct CagraSearchPlanner : AlgorithmPlanner {
-  CagraSearchPlanner(cuvs::distance::DistanceType metric,
-                     bool topk_by_bitonic_sort,
-                     bool bitonic_sort_and_merge_multi_warps,
-                     uint32_t team_size,
-                     uint32_t dataset_block_dim,
-                     bool is_vpq      = false,
-                     uint32_t pq_bits = 0,
-                     uint32_t pq_len  = 0,
-                     bool persistent  = false)
-    : AlgorithmPlanner(build_entrypoint_name(metric,
-                                             topk_by_bitonic_sort,
-                                             bitonic_sort_and_merge_multi_warps,
-                                             team_size,
-                                             dataset_block_dim,
-                                             is_vpq,
-                                             pq_bits,
-                                             pq_len,
-                                             persistent),
-                       is_vpq
-                         ? make_fragment_key<DataTag,
-                                             IndexTag,
-                                             DistanceTag,
-                                             SourceIndexTag,
-                                             cuvs::neighbors::cagra::detail::tag_codebook_half>()
-                         : make_fragment_key<DataTag, IndexTag, DistanceTag, SourceIndexTag>())
+struct CagraMultiCtaSearchPlanner : AlgorithmPlanner {
+  CagraMultiCtaSearchPlanner(cuvs::distance::DistanceType metric,
+                             uint32_t team_size,
+                             uint32_t dataset_block_dim,
+                             bool is_vpq      = false,
+                             uint32_t pq_bits = 0,
+                             uint32_t pq_len  = 0)
+    : AlgorithmPlanner(
+        build_entrypoint_name(metric, team_size, dataset_block_dim, is_vpq, pq_bits, pq_len),
+        is_vpq ? make_fragment_key<DataTag,
+                                   IndexTag,
+                                   DistanceTag,
+                                   SourceIndexTag,
+                                   cuvs::neighbors::cagra::detail::tag_codebook_half>()
+               : make_fragment_key<DataTag, IndexTag, DistanceTag, SourceIndexTag>()),
+      entrypoint_name_(
+        build_entrypoint_name(metric, team_size, dataset_block_dim, is_vpq, pq_bits, pq_len))
   {
-    std::string kernel_type = persistent ? "persistent" : "regular";
-    std::cerr << "[JIT] CagraSearchPlanner created for " << kernel_type
-              << " JIT kernel (topk_by_bitonic_sort=" << bool_to_string(topk_by_bitonic_sort)
-              << ", bitonic_sort_and_merge_multi_warps="
-              << bool_to_string(bitonic_sort_and_merge_multi_warps)
-              << ", metric=" << metric_to_string(metric) << ")" << std::endl;
-    std::cerr.flush();
   }
+
+  const std::string& get_entrypoint_name() const { return entrypoint_name_; }
 
   void add_setup_workspace_device_function(cuvs::distance::DistanceType metric,
                                            uint32_t team_size,
@@ -70,17 +54,14 @@ struct CagraSearchPlanner : AlgorithmPlanner {
     std::string key = "setup_workspace_";
     if (is_vpq) {
       key += "vpq_";
-      // For VPQ, include codebook type tag in template parameters
       using CodebookTag = cuvs::neighbors::cagra::detail::tag_codebook_half;
-      // Use template tags only for types, strings for integers/enums
-      auto params = make_fragment_key<DataTag, IndexTag, DistanceTag, CodebookTag>();
+      auto params       = make_fragment_key<DataTag, IndexTag, DistanceTag, CodebookTag>();
       key += metric_to_string(metric);
       key += "_t" + std::to_string(team_size);
       key += "_dim" + std::to_string(dataset_block_dim);
       key += "_" + std::to_string(pq_bits) + "pq_" + std::to_string(pq_len) + "subd";
       key += "_" + params;
     } else {
-      // Use template tags only for types, strings for integers/enums
       auto params = make_fragment_key<DataTag, IndexTag, DistanceTag>();
       key += metric_to_string(metric);
       key += "_t" + std::to_string(team_size);
@@ -100,17 +81,14 @@ struct CagraSearchPlanner : AlgorithmPlanner {
     std::string key = "compute_distance_";
     if (is_vpq) {
       key += "vpq_";
-      // For VPQ, include codebook type tag in template parameters
       using CodebookTag = cuvs::neighbors::cagra::detail::tag_codebook_half;
-      // Use template tags only for types, strings for integers/enums
-      auto params = make_fragment_key<DataTag, IndexTag, DistanceTag, CodebookTag>();
+      auto params       = make_fragment_key<DataTag, IndexTag, DistanceTag, CodebookTag>();
       key += metric_to_string(metric);
       key += "_t" + std::to_string(team_size);
       key += "_dim" + std::to_string(dataset_block_dim);
       key += "_" + std::to_string(pq_bits) + "pq_" + std::to_string(pq_len) + "subd";
       key += "_" + params;
     } else {
-      // Use template tags only for types, strings for integers/enums
       auto params = make_fragment_key<DataTag, IndexTag, DistanceTag>();
       key += metric_to_string(metric);
       key += "_t" + std::to_string(team_size);
@@ -126,28 +104,23 @@ struct CagraSearchPlanner : AlgorithmPlanner {
   }
 
  private:
+  std::string entrypoint_name_;
+
   static std::string build_entrypoint_name(cuvs::distance::DistanceType metric,
-                                           bool topk_by_bitonic_sort,
-                                           bool bitonic_sort_and_merge_multi_warps,
                                            uint32_t team_size,
                                            uint32_t dataset_block_dim,
                                            bool is_vpq,
                                            uint32_t pq_bits,
-                                           uint32_t pq_len,
-                                           bool persistent)
+                                           uint32_t pq_len)
   {
-    std::string name = (persistent ? "search_single_cta_kernel_p_" : "search_single_cta_kernel_");
+    std::string name = "search_multi_cta_kernel_";
     if (is_vpq) { name += "vpq_"; }
-    name += bool_to_string(topk_by_bitonic_sort) + "_";
-    name += bool_to_string(bitonic_sort_and_merge_multi_warps) + "_";
     name += metric_to_string(metric);
     name += "_t" + std::to_string(team_size);
     name += "_dim" + std::to_string(dataset_block_dim);
     if (is_vpq) { name += "_" + std::to_string(pq_bits) + "pq_" + std::to_string(pq_len) + "subd"; }
     return name;
   }
-
-  static std::string bool_to_string(bool b) { return b ? "true" : "false"; }
 
   static std::string metric_to_string(cuvs::distance::DistanceType metric)
   {
@@ -162,7 +135,7 @@ struct CagraSearchPlanner : AlgorithmPlanner {
   }
 };
 
-}  // namespace single_cta_search
+}  // namespace multi_cta_search
 }  // namespace detail
 }  // namespace cagra
 }  // namespace neighbors

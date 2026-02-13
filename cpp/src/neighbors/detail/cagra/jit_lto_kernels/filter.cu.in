@@ -1,0 +1,32 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) @year@, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+// This file is auto-generated. Do not edit manually.
+
+#ifdef BUILD_KERNEL
+
+#include <neighbors/detail/cagra/jit_lto_kernels/@filter_name_var@.cuh>
+
+namespace cuvs::neighbors::cagra::detail {
+
+// Instantiate the sample_filter device function template
+template __device__ bool sample_filter<@source_index_type@>(uint32_t, @source_index_type@, void*);
+
+}  // namespace cuvs::neighbors::cagra::detail
+
+#else
+
+#include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
+#include "@kernel_name_var@.h"
+
+__attribute__((__constructor__)) static void register_@kernel_name_var@()
+{
+  registerAlgorithm(
+    "sample_filter_@filter_name_var@",
+    embedded_@kernel_name_var@,
+    sizeof(embedded_@kernel_name_var@));
+}
+
+#endif

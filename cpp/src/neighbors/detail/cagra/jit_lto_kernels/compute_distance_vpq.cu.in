@@ -9,13 +9,15 @@
 
 #include <neighbors/detail/cagra/jit_lto_kernels/compute_distance_vpq_impl.cuh>
 
-namespace cuvs::neighbors::cagra::detail::single_cta_search {
+namespace cuvs::neighbors::cagra::detail {
 
 // Instantiate the compute_distance_vpq function for VPQ descriptor
+using desc_t = cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<@metric_cpp@, @team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@>;
+using args_t = typename cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<@data_type@, @index_type@, @distance_type@>::args_t;
 template __device__ @distance_type@ compute_distance_vpq<@metric_cpp@, @team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@>(
-    const uint8_t*, uint32_t, @index_type@, uint32_t, const @codebook_type@*, const @codebook_type@*, uint32_t);
+    const args_t, @index_type@);
 
-}  // namespace cuvs::neighbors::cagra::detail::single_cta_search
+}  // namespace cuvs::neighbors::cagra::detail
 
 #else
 
@@ -29,7 +31,8 @@ __attribute__((__constructor__)) static void register_compute_distance_vpq_@metr
 {
   registerAlgorithm<tag_@type_abbrev@,
     tag_idx_@idx_abbrev@,
-    tag_dist_@dist_abbrev@>(
+    tag_dist_@dist_abbrev@,
+    tag_codebook_half>(
     "compute_distance_vpq_@metric_name@_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd",
     embedded_compute_distance_vpq_@metric_name@_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@,
     sizeof(embedded_compute_distance_vpq_@metric_name@_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@));

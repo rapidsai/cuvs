@@ -1,8 +1,15 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
+
+// Include tags header before any namespace declarations to avoid issues when it's included inside
+// functions
+#ifdef CUVS_ENABLE_JIT_LTO
+#include "search_multi_kernel_launcher_jit.cuh"
+#include <cuvs/detail/jit_lto/cagra/search_single_cta_tags.hpp>
+#endif
 
 #include "compute_distance-ext.cuh"
 #include "device_common.hpp"
@@ -168,24 +175,47 @@ void random_pickup(const dataset_descriptor_host<DataT, IndexT, DistanceT>& data
                    std::uint32_t hash_bitlen,
                    cudaStream_t cuda_stream)
 {
-  const auto block_size                = 256u;
-  const auto num_teams_per_threadblock = block_size / dataset_desc.team_size;
-  const dim3 grid_size((num_pickup + num_teams_per_threadblock - 1) / num_teams_per_threadblock,
-                       num_queries);
+#ifdef CUVS_ENABLE_JIT_LTO
+  // Use JIT version when JIT is enabled
+  random_pickup_jit(dataset_desc,
+                    queries_ptr,
+                    num_queries,
+                    num_pickup,
+                    num_distilation,
+                    rand_xor_mask,
+                    seed_ptr,
+                    num_seeds,
+                    result_indices_ptr,
+                    result_distances_ptr,
+                    ldr,
+                    visited_hashmap_ptr,
+                    hash_bitlen,
+                    cuda_stream);
+#else
+  // Non-JIT path
+  {
+    const auto block_size                = 256u;
+    const auto num_teams_per_threadblock = block_size / dataset_desc.team_size;
+    const dim3 grid_size((num_pickup + num_teams_per_threadblock - 1) / num_teams_per_threadblock,
+                         num_queries);
 
-  random_pickup_kernel<<<grid_size, block_size, dataset_desc.smem_ws_size_in_bytes, cuda_stream>>>(
-    dataset_desc.dev_ptr(cuda_stream),
-    queries_ptr,
-    num_pickup,
-    num_distilation,
-    rand_xor_mask,
-    seed_ptr,
-    num_seeds,
-    result_indices_ptr,
-    result_distances_ptr,
-    ldr,
-    visited_hashmap_ptr,
-    hash_bitlen);
+    random_pickup_kernel<<<grid_size,
+                           block_size,
+                           dataset_desc.smem_ws_size_in_bytes,
+                           cuda_stream>>>(dataset_desc.dev_ptr(cuda_stream),
+                                          queries_ptr,
+                                          num_pickup,
+                                          num_distilation,
+                                          rand_xor_mask,
+                                          seed_ptr,
+                                          num_seeds,
+                                          result_indices_ptr,
+                                          result_distances_ptr,
+                                          ldr,
+                                          visited_hashmap_ptr,
+                                          hash_bitlen);
+  }
+#endif
 }
 
 template <class INDEX_T>
@@ -402,30 +432,55 @@ void compute_distance_to_child_nodes(
   SAMPLE_FILTER_T sample_filter,
   cudaStream_t cuda_stream)
 {
-  const auto block_size      = 128;
-  const auto teams_per_block = block_size / dataset_desc.team_size;
-  const dim3 grid_size((search_width * graph_degree + teams_per_block - 1) / teams_per_block,
-                       num_queries);
+#ifdef CUVS_ENABLE_JIT_LTO
+  // Use JIT version when JIT is enabled
+  compute_distance_to_child_nodes_jit(parent_node_list,
+                                      parent_candidates_ptr,
+                                      parent_distance_ptr,
+                                      lds,
+                                      search_width,
+                                      dataset_desc,
+                                      neighbor_graph_ptr,
+                                      graph_degree,
+                                      source_indices_ptr,
+                                      query_ptr,
+                                      num_queries,
+                                      visited_hashmap_ptr,
+                                      hash_bitlen,
+                                      result_indices_ptr,
+                                      result_distances_ptr,
+                                      ldd,
+                                      sample_filter,
+                                      cuda_stream);
+#else
+  // Non-JIT path
+  {
+    const auto block_size      = 128;
+    const auto teams_per_block = block_size / dataset_desc.team_size;
+    const dim3 grid_size((search_width * graph_degree + teams_per_block - 1) / teams_per_block,
+                         num_queries);
 
-  compute_distance_to_child_nodes_kernel<<<grid_size,
-                                           block_size,
-                                           dataset_desc.smem_ws_size_in_bytes,
-                                           cuda_stream>>>(parent_node_list,
-                                                          parent_candidates_ptr,
-                                                          parent_distance_ptr,
-                                                          lds,
-                                                          search_width,
-                                                          dataset_desc.dev_ptr(cuda_stream),
-                                                          neighbor_graph_ptr,
-                                                          graph_degree,
-                                                          source_indices_ptr,
-                                                          query_ptr,
-                                                          visited_hashmap_ptr,
-                                                          hash_bitlen,
-                                                          result_indices_ptr,
-                                                          result_distances_ptr,
-                                                          ldd,
-                                                          sample_filter);
+    compute_distance_to_child_nodes_kernel<<<grid_size,
+                                             block_size,
+                                             dataset_desc.smem_ws_size_in_bytes,
+                                             cuda_stream>>>(parent_node_list,
+                                                            parent_candidates_ptr,
+                                                            parent_distance_ptr,
+                                                            lds,
+                                                            search_width,
+                                                            dataset_desc.dev_ptr(cuda_stream),
+                                                            neighbor_graph_ptr,
+                                                            graph_degree,
+                                                            source_indices_ptr,
+                                                            query_ptr,
+                                                            visited_hashmap_ptr,
+                                                            hash_bitlen,
+                                                            result_indices_ptr,
+                                                            result_distances_ptr,
+                                                            ldd,
+                                                            sample_filter);
+  }
+#endif
 }
 
 template <class INDEX_T>
@@ -497,17 +552,33 @@ void apply_filter(const SourceIndexT* source_indices_ptr,
                   SAMPLE_FILTER_T sample_filter,
                   cudaStream_t cuda_stream)
 {
-  const std::uint32_t block_size = 256;
-  const std::uint32_t grid_size  = raft::ceildiv(num_queries * result_buffer_size, block_size);
+#ifdef CUVS_ENABLE_JIT_LTO
+  // Use JIT version when JIT is enabled
+  apply_filter_jit(source_indices_ptr,
+                   result_indices_ptr,
+                   result_distances_ptr,
+                   lds,
+                   result_buffer_size,
+                   num_queries,
+                   query_id_offset,
+                   sample_filter,
+                   cuda_stream);
+#else
+  // Non-JIT path
+  {
+    const std::uint32_t block_size = 256;
+    const std::uint32_t grid_size  = raft::ceildiv(num_queries * result_buffer_size, block_size);
 
-  apply_filter_kernel<<<grid_size, block_size, 0, cuda_stream>>>(source_indices_ptr,
-                                                                 result_indices_ptr,
-                                                                 result_distances_ptr,
-                                                                 lds,
-                                                                 result_buffer_size,
-                                                                 num_queries,
-                                                                 query_id_offset,
-                                                                 sample_filter);
+    apply_filter_kernel<<<grid_size, block_size, 0, cuda_stream>>>(source_indices_ptr,
+                                                                   result_indices_ptr,
+                                                                   result_distances_ptr,
+                                                                   lds,
+                                                                   result_buffer_size,
+                                                                   num_queries,
+                                                                   query_id_offset,
+                                                                   sample_filter);
+  }
+#endif
 }
 
 template <class T, class S>

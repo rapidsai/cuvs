@@ -12,44 +12,37 @@
 #include <raft/util/integer_utils.hpp>
 #include <raft/util/pow2_utils.cuh>
 
-namespace cuvs::neighbors::cagra::detail::single_cta_search {
+namespace cuvs::neighbors::cagra::detail {
 
 // Extern function implementation for setup_workspace_standard (standard descriptor)
+// Takes the concrete descriptor pointer and calls the free function directly (not through function
+// pointer) For JIT LTO, the descriptor's setup_workspace_impl is nullptr, so we must call the free
+// function directly
 template <cuvs::distance::DistanceType Metric,
           uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           typename DataT,
           typename IndexT,
           typename DistanceT>
-__device__ uint32_t setup_workspace_standard(void* smem,
-                                             const DataT* queries,
-                                             uint32_t query_id,
-                                             const DataT* dataset_ptr,
-                                             IndexT dataset_size,
-                                             uint32_t dim,
-                                             uint32_t ld,
-                                             const DistanceT* dataset_norms)
+__device__ const cuvs::neighbors::cagra::detail::
+  standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>*
+  setup_workspace_standard(
+    const cuvs::neighbors::cagra::detail::
+      standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>*
+        desc,
+    void* smem,
+    const DataT* queries,
+    uint32_t query_id)
 {
-  using desc_type = cuvs::neighbors::cagra::detail::
+  // CRITICAL: This function uses __syncthreads() and expects ALL threads to call it
+  // If only thread 0 calls it, __syncthreads() will hang forever
+  // Call the free function directly (not desc->setup_workspace() which uses a function pointer)
+  // The free function is in compute_distance_standard-impl.cuh
+  using desc_t = cuvs::neighbors::cagra::detail::
     standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
-
-  // Create a temporary descriptor on the stack
-  desc_type temp_desc(reinterpret_cast<typename desc_type::setup_workspace_type*>(
-                        &cuvs::neighbors::cagra::detail::setup_workspace_standard<desc_type>),
-                      reinterpret_cast<typename desc_type::compute_distance_type*>(
-                        &cuvs::neighbors::cagra::detail::compute_distance_standard<desc_type>),
-                      dataset_ptr,
-                      dataset_size,
-                      dim,
-                      ld,
-                      dataset_norms);
-
-  // Call the free function setup_workspace_standard which copies descriptor to smem
-  const desc_type* result = cuvs::neighbors::cagra::detail::setup_workspace_standard<desc_type>(
-    &temp_desc, smem, queries, query_id);
-
-  // Return the smem_ws_ptr from the descriptor's args
-  return result->args.smem_ws_ptr;
+  const auto* result =
+    cuvs::neighbors::cagra::detail::setup_workspace_standard<desc_t>(desc, smem, queries, query_id);
+  return result;
 }
 
-}  // namespace cuvs::neighbors::cagra::detail::single_cta_search
+}  // namespace cuvs::neighbors::cagra::detail

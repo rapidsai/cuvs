@@ -317,6 +317,10 @@ if(NOT BUILD_CPU_ONLY)
                CUDA_SEPARABLE_COMPILATION ON
                POSITION_INDEPENDENT_CODE ON
   )
+  target_compile_definitions(
+    cuvs-cagra-search PRIVATE $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
+                              $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
+  )
   target_link_libraries(
     cuvs-cagra-search PRIVATE cuvs::cuvs_cpp_headers
                               $<TARGET_NAME_IF_EXISTS:nvidia::cutlass::cutlass>
@@ -350,6 +354,11 @@ if(NOT BUILD_CPU_ONLY)
     set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
     set(JIT_LTO_COMPILATION ON)
   endif()
+
+  # Set JIT LTO compile definition for cuvs-cagra-search AFTER JIT_LTO_COMPILATION is determined
+  target_compile_definitions(
+    cuvs-cagra-search PRIVATE $<$<BOOL:${JIT_LTO_COMPILATION}>:CUVS_ENABLE_JIT_LTO>
+  )
 
   if(JIT_LTO_COMPILATION)
     # Generate interleaved scan kernel files at build time

@@ -1,0 +1,42 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) @year@, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+// This file is auto-generated. Do not edit manually.
+
+#ifdef BUILD_KERNEL
+
+#include <neighbors/detail/cagra/jit_lto_kernels/search_multi_kernel_jit.cuh>
+#include <neighbors/detail/cagra/compute_distance_standard-impl.cuh>
+#include <cuvs/neighbors/common.hpp>
+
+namespace cuvs::neighbors::cagra::detail::multi_kernel_search {
+
+// Instantiate the compute_distance_to_child_nodes_kernel_jit function with concrete descriptor type
+using desc_t = cuvs::neighbors::cagra::detail::standard_dataset_descriptor_t<cuvs::distance::DistanceType::@metric_name_full@, @team_size@, @dataset_block_dim@, @data_type@, @index_type@, @distance_type@>;
+template __global__ void compute_distance_to_child_nodes_kernel_jit<desc_t, @source_index_type@, cuvs::neighbors::filtering::none_sample_filter>(
+    const @index_type@* const, @index_type@* const, @distance_type@* const, const std::size_t, const std::uint32_t, const desc_t*, const @index_type@* const, const std::uint32_t, const @source_index_type@*, const @data_type@*, @index_type@* const, const std::uint32_t, @index_type@* const, @distance_type@* const, const std::uint32_t, cuvs::neighbors::filtering::none_sample_filter);
+
+}  // namespace cuvs::neighbors::cagra::detail::multi_kernel_search
+
+#else
+
+#include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
+#include <cuvs/detail/jit_lto/cagra/search_single_cta_tags.hpp>
+#include "compute_distance_to_child_nodes_kernel_@metric_name_full@_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@src_idx_abbrev@.h"
+
+using namespace cuvs::neighbors::cagra::detail;
+
+__attribute__((__constructor__)) static void register_compute_distance_to_child_nodes_kernel_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@src_idx_abbrev@()
+{
+  registerAlgorithm<tag_@type_abbrev@,
+    tag_idx_@idx_abbrev@,
+    tag_dist_@dist_abbrev@,
+    tag_idx_@src_idx_abbrev@>(
+    "compute_distance_to_child_nodes_kernel_@metric_name_full@_t@team_size@_dim@dataset_block_dim@",
+    embedded_compute_distance_to_child_nodes_kernel_@metric_name_full@_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@src_idx_abbrev@,
+    sizeof(embedded_compute_distance_to_child_nodes_kernel_@metric_name_full@_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@src_idx_abbrev@));
+}
+
+#endif

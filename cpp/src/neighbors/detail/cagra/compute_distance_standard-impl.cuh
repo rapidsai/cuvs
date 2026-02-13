@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -117,12 +117,14 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
     static_assert(alignof(standard_dataset_descriptor_t) == alignof(base_type));
   }
 
- private:
+  // Public static method to compute smem size without constructing descriptor
   RAFT_INLINE_FUNCTION constexpr static auto get_smem_ws_size_in_bytes(uint32_t dim) -> uint32_t
   {
     return sizeof(standard_dataset_descriptor_t) +
            raft::round_up_safe<uint32_t>(dim, DatasetBlockDim) * sizeof(QUERY_T);
   }
+
+ private:
 };
 
 template <typename DescriptorT>
@@ -169,7 +171,6 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_standard(
       buf[j] = 0;
     }
   }
-
   return const_cast<const DescriptorT*>(r);
 }
 
@@ -259,6 +260,18 @@ RAFT_KERNEL __launch_bounds__(1, 1)
   using desc_type =
     standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
   using base_type = typename desc_type::base_type;
+#ifdef CUVS_ENABLE_JIT_LTO
+  // For JIT, we don't use the function pointers, so set them to nullptr
+  // The free functions are called directly instead
+  new (out) desc_type(nullptr,  // setup_workspace_impl - not used in JIT
+                      nullptr,  // compute_distance_impl - not used in JIT
+                      ptr,
+                      size,
+                      dim,
+                      ld,
+                      dataset_norms);
+#else
+  // For CUDA 12 (non-JIT), set the function pointers properly
   new (out) desc_type(reinterpret_cast<typename base_type::setup_workspace_type*>(
                         &setup_workspace_standard<desc_type>),
                       reinterpret_cast<typename base_type::compute_distance_type*>(
@@ -268,6 +281,7 @@ RAFT_KERNEL __launch_bounds__(1, 1)
                       dim,
                       ld,
                       dataset_norms);
+#endif
 }
 
 template <cuvs::distance::DistanceType Metric,
@@ -292,10 +306,11 @@ standard_descriptor_spec<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, Dista
   RAFT_EXPECTS(Metric != cuvs::distance::DistanceType::CosineExpanded || dataset_norms != nullptr,
                "Dataset norms must be provided for CosineExpanded metric");
 
-  desc_type dd_host{nullptr, nullptr, ptr, size, dim, ld, dataset_norms};
-  return host_type{dd_host,
+  return host_type{desc_type{nullptr, nullptr, ptr, size, dim, ld, dataset_norms},
                    [=](dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dev_ptr,
                        rmm::cuda_stream_view stream) {
+                     // Use init kernel for both JIT and CUDA 12
+                     // The kernel handles JIT vs non-JIT via ifdef internally
                      standard_dataset_descriptor_init_kernel<Metric,
                                                              TeamSize,
                                                              DatasetBlockDim,
@@ -304,7 +319,12 @@ standard_descriptor_spec<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, Dista
                                                              DistanceT>
                        <<<1, 1, 0, stream>>>(dev_ptr, ptr, size, dim, ld, dataset_norms);
                      RAFT_CUDA_TRY(cudaPeekAtLastError());
-                   }};
+                   },
+                   Metric,
+                   DatasetBlockDim,
+                   false,  // is_vpq
+                   0,      // pq_bits
+                   0};     // pq_len
 }
 
 }  // namespace cuvs::neighbors::cagra::detail

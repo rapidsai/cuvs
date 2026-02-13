@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -110,7 +110,7 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
     static_assert(alignof(cagra_q_dataset_descriptor_t) == alignof(base_type));
   }
 
- private:
+  // Public static method to compute smem size without constructing descriptor
   RAFT_INLINE_FUNCTION constexpr static auto get_smem_ws_size_in_bytes(uint32_t dim) -> uint32_t
   {
     /* SMEM workspace layout:
@@ -121,6 +121,8 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
     return sizeof(cagra_q_dataset_descriptor_t) + kSMemCodeBookSizeInBytes +
            raft::round_up_safe<uint32_t>(dim, DatasetBlockDim) * sizeof(QUERY_T);
   }
+
+ private:
 };
 
 template <auto Block, auto Stride, typename T>
@@ -375,6 +377,19 @@ RAFT_KERNEL __launch_bounds__(1, 1)
                                                  IndexT,
                                                  DistanceT>;
   using base_type = typename desc_type::base_type;
+#ifdef CUVS_ENABLE_JIT_LTO
+  // For JIT, we don't use the function pointers, so set them to nullptr
+  // The free functions are called directly instead
+  new (out) desc_type(nullptr,  // setup_workspace_impl - not used in JIT
+                      nullptr,  // compute_distance_impl - not used in JIT
+                      encoded_dataset_ptr,
+                      encoded_dataset_dim,
+                      vq_code_book_ptr,
+                      pq_code_book_ptr,
+                      size,
+                      dim);
+#else
+  // For CUDA 12 (non-JIT), set the function pointers properly
   new (out) desc_type(
     reinterpret_cast<typename base_type::setup_workspace_type*>(&setup_workspace_vpq<desc_type>),
     reinterpret_cast<typename base_type::compute_distance_type*>(&compute_distance_vpq<desc_type>),
@@ -384,6 +399,7 @@ RAFT_KERNEL __launch_bounds__(1, 1)
     pq_code_book_ptr,
     size,
     dim);
+#endif
 }
 
 template <cuvs::distance::DistanceType Metric,
@@ -423,17 +439,18 @@ vpq_descriptor_spec<Metric,
                                                  DistanceT>;
   using base_type = typename desc_type::base_type;
 
-  desc_type dd_host{nullptr,
-                    nullptr,
-                    encoded_dataset_ptr,
-                    encoded_dataset_dim,
-                    vq_code_book_ptr,
-                    pq_code_book_ptr,
-                    size,
-                    dim};
-  return host_type{dd_host,
+  return host_type{desc_type{nullptr,
+                             nullptr,
+                             encoded_dataset_ptr,
+                             encoded_dataset_dim,
+                             vq_code_book_ptr,
+                             pq_code_book_ptr,
+                             size,
+                             dim},
                    [=](dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dev_ptr,
                        rmm::cuda_stream_view stream) {
+                     // Use init kernel for both JIT and CUDA 12
+                     // The kernel handles JIT vs non-JIT via ifdef internally
                      vpq_dataset_descriptor_init_kernel<Metric,
                                                         TeamSize,
                                                         DatasetBlockDim,
@@ -451,7 +468,12 @@ vpq_descriptor_spec<Metric,
                                              size,
                                              dim);
                      RAFT_CUDA_TRY(cudaPeekAtLastError());
-                   }};
+                   },
+                   Metric,
+                   DatasetBlockDim,
+                   true,    // is_vpq
+                   PqBits,  // pq_bits
+                   PqLen};  // pq_len
 }
 
 }  // namespace cuvs::neighbors::cagra::detail
