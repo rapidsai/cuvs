@@ -9,6 +9,7 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
+# rapids-pre-commit-hooks: disable-next-line[verify-hardcoded-version]
 ffi = { package = "cuvs-sys", path = "../cuvs-sys", version = "26.4.0" }
 ndarray = "0.15"
 
