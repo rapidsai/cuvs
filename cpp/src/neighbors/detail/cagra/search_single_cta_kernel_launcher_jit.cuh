@@ -331,6 +331,9 @@ struct alignas(kCacheLineBytes) persistent_runner_jit_t : public persistent_runn
   rmm::device_uvector<index_type> hashmap;
   std::atomic<std::chrono::time_point<std::chrono::system_clock>> last_touch;
   uint64_t param_hash;
+  uint32_t* bitset_ptr;         // Bitset data pointer (nullptr for none_filter)
+  SourceIndexT bitset_len;      // Bitset length
+  SourceIndexT original_nbits;  // Original number of bits
 
   static inline auto calculate_parameter_hash(
     std::reference_wrapper<const dataset_descriptor_host<DataT, IndexT, DistanceT>> dataset_desc,
@@ -420,6 +423,23 @@ struct alignas(kCacheLineBytes) persistent_runner_jit_t : public persistent_runn
                                           launcher_ptr,
                                           nullptr))  // descriptor not needed in hash
   {
+    // Extract bitset data from filter object (if it's a bitset_filter)
+    bitset_ptr     = nullptr;
+    bitset_len     = 0;
+    original_nbits = 0;
+
+    if constexpr (!std::is_same_v<SampleFilterT, cuvs::neighbors::filtering::none_sample_filter>) {
+      // Try to extract bitset data from the filter
+      if constexpr (std::is_same_v<
+                      SampleFilterT,
+                      cuvs::neighbors::filtering::bitset_filter<uint32_t, SourceIndexT>>) {
+        auto bitset_view = sample_filter.view();
+        bitset_ptr       = const_cast<uint32_t*>(bitset_view.data());
+        bitset_len       = static_cast<SourceIndexT>(bitset_view.size());
+        original_nbits   = static_cast<SourceIndexT>(bitset_view.get_original_nbits());
+      }
+    }
+
     // set kernel launch parameters
     dim3 gs = calc_coop_grid_size(block_size, smem_size, persistent_device_usage);
     dim3 bs(block_size, 1, 1);
@@ -731,7 +751,7 @@ void select_and_run_jit(
                                                  dataset_desc.is_vpq,
                                                  dataset_desc.pq_bits,
                                                  dataset_desc.pq_len);
-    planner.add_sample_filter_device_function(get_sample_filter_name());
+    planner.add_sample_filter_device_function(get_sample_filter_name<SampleFilterT>());
 
     // Get launcher
     auto launcher = planner.get_launcher();

@@ -96,7 +96,41 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_jit(
     }
     // Also write to indices
     if (result_indices_ptr != nullptr) { *result_indices_ptr = static_cast<IndexT>(0xCAFEBABE); }
+
+    // Debug: Check if descriptor runtime values match kernel compile-time constants
+    // The kernel uses DescriptorT::kTeamSize and DescriptorT::kDatasetBlockDim (compile-time)
+    // The descriptor object has runtime values that should match
+    uint32_t desc_team_size_bitshift  = dataset_desc->team_size_bitshift();
+    uint32_t desc_team_size_actual    = 1u << desc_team_size_bitshift;
+    uint32_t kernel_team_size         = DescriptorT::kTeamSize;
+    uint32_t kernel_dataset_block_dim = DescriptorT::kDatasetBlockDim;
+
+    // For standard descriptors, dataset_block_dim is stored in args.extra_word1 as 'ld'
+    // For VPQ descriptors, it's a compile-time constant only
+    uint32_t desc_dataset_block_dim = kernel_dataset_block_dim;  // Use compile-time constant
+    if constexpr (!has_kpq_bits_v<DescriptorT>) {
+      // Standard descriptor - can read from args.ld
+      desc_dataset_block_dim = DescriptorT::ld(dataset_desc->args);
+    }
+
     printf("JIT KERNEL EXECUTING: threadIdx=0, wrote magic values\n");
+    printf("JIT KERNEL: Descriptor team_size (from bitshift): %u, Kernel kTeamSize: %u\n",
+           desc_team_size_actual,
+           kernel_team_size);
+    printf("JIT KERNEL: Descriptor dataset_block_dim: %u, Kernel kDatasetBlockDim: %u\n",
+           desc_dataset_block_dim,
+           kernel_dataset_block_dim);
+    if (desc_team_size_actual != kernel_team_size ||
+        desc_dataset_block_dim != kernel_dataset_block_dim) {
+      printf(
+        "JIT KERNEL ERROR: Parameter mismatch! team_size: %u vs %u, dataset_block_dim: %u vs %u\n",
+        desc_team_size_actual,
+        kernel_team_size,
+        desc_dataset_block_dim,
+        kernel_dataset_block_dim);
+    } else {
+      printf("JIT KERNEL: Parameters match correctly\n");
+    }
   }
   __syncthreads();
 
