@@ -98,53 +98,134 @@ Tuning Considerations
 The 3 hyper-parameters that are most often tuned are `graph_degree`, `intermediate_graph_degree`, and `itopk_size`.
 
 Memory footprint
-----------------
+================
 
-CAGRA builds a graph that ultimately ends up on the host while it needs to keep the original dataset around (can be on host or device).
+CAGRA builds a nearest-neighbor graph (stored on host) while keeping the original dataset vectors around. During index build, the dataset must reside in device (GPU) memory. After building, the dataset can optionally be detached from the index — for example, when immediately converting the CAGRA graph to a CPU-based format like HNSW for search.
 
-IVFPQ or NN-DESCENT can be used to build the graph (additions to the peak memory usage calculated as in the respective build algo above).
+Baseline Memory Footprint
+-------------------------
 
-Dataset on device (graph on host):
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Index memory footprint (device): :math:`n\_index\_vectors * n\_dims * sizeof(T)`
-
-Index memory footprint (host): :math:`graph\_degree * n\_index\_vectors * sizeof(T)``
-
-Dataset on host (graph on host):
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Index memory footprint (host): :math:`n\_index\_vectors * n\_dims * sizeof(T) + graph\_degree * n\_index\_vectors * sizeof(T)`
-
-Build peak memory usage:
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-When built using NN-descent / IVF-PQ, the build process consists of two phases: (1) building an initial/(intermediate) graph and then (2) optimizing the graph. Key input parameters are n_vectors, intermediate_graph_degree, graph_degree.
-The memory usage in the first phase (building) depends on the chosen method. The biggest allocation is the graph (n_vectors*intermediate_graph_degree), but it’s stored in the host memory.
-Usually, the second phase (optimize) uses the most device memory. The peak memory usage is achieved during the pruning step (graph_core.cuh/optimize)
-Optimize: formula for peak memory usage (device): :math:`n\_vectors * (4 + (sizeof(IdxT) + 1) * intermediate_degree)``
-
-Build with out-of-core IVF-PQ peak memory usage:
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Out-of-core CAGA build consists of IVF-PQ build, IVF-PQ search, CAGRA optimization. Note that these steps are performed sequentially, so they are not additive.
-
-IVF-PQ Build:
+The baseline memory footprint after index construction:
 
 .. math::
 
-   n\_vectors / train\_set\_ratio * dim * sizeof_{float}   // trainset, may be in managed mem
-
-   + n\_vectors / train\_set\_ratio * sizeof(uint32_t)    // labels, may be in managed mem
-
-   + n\_clusters * n\_dim * sizeof_{float}                // cluster centers
-
-IVF-PQ Search (max batch size 1024 vectors on device at a time):
+   \text{dataset\_size (device)}
+   \;=\;
+   \text{number\_vectors} \times \text{vector\_dimension} \times \text{bytes\_per\_dimension}
 
 .. math::
 
-   [n\_vectors * (pq\_dim * pq\_bits / 8 + sizeof_{int64\_t}) + O(n\_clusters)]
+   \text{graph\_size (host)}
+   \;=\;
+   \text{number\_vectors} \times \text{graph\_degree} \times \operatorname{sizeof}\!\big(\mathrm{IdxT}\big)
 
-   + [batch\_size * n\_dim * sizeof_{float}] + [batch\_size * intermediate\_degree * sizeof_{uint32\_t}]
+Note: The dataset must be in GPU memory during index build, but can be detached afterward if not needed for search.
 
-   + [batch\_size * intermediate\_degree * sizeof_{float}]
+**Example** (1,000,000 vectors, dim = 1024, fp32, graph\_degree = 64, IdxT = int32):
+
+- dataset\_size = 4,096,000,000 B = 3906.25 MB
+- graph\_size   = 256,000,000 B = 244.14 MB
+
+Build peak memory usage
+-----------------------
+
+Index build has two phases: (1) construct a knn graph, then (2) optimize it to remove redundant and unecessary paths.
+The initial knn graph can be built with IVF-PQ or nn-descent. IVF-PQ has the additional benefit that it supports out-of-core construction, allowing CAGRA to be trained on datasets larger than available GPU memory.
+The steps below are sequential with distinct peak memory consumption. The overall peak memory utilization depends on the configured RMM memory resource.
+
+knn graph build phase
+~~~~~~~~~~~~~~~~~~~~~
+
+The knn graph can be constructed using the IVF-PQ algorithm, which works in two stages: first, an IVF-PQ index is trained on a subset of vectors to learn cluster centroids; then, the full dataset is queried against this index in batches to find approximate nearest neighbors for each vector.
+
+**IVF-PQ Build (centroid training)** — uses a training subset to compute cluster centroids and PQ codebooks.
+
+.. math::
+
+   \text{IVFPQ\_build\_peak}
+   \;=\;
+   \frac{n\_{\text{vectors}}}{\text{train\_set\_ratio}} \times \text{dim} \times 4
+   \;+\;
+   n\_{\text{clusters}} \times \text{dim} \times 4
+   \;+\;
+   \frac{n\_{\text{vectors}}}{\text{train\_set\_ratio}} \times \operatorname{sizeof}(\mathrm{uint32\_t})
+
+**Example** (n = 1e6; dim = 1024; n\_clusters = 1024; train\_set\_ratio = 10): 395.01 MB
+
+**IVF-PQ Search (forms the intermediate graph)** — Constructs the knn graph in batches by querying the IVF-PQ index for the nearest neighbors of all training points.
+
+.. math::
+
+   \text{IVFPQ\_search\_peak}
+   \;=\;
+   \text{batch\_size} \times \text{dim} \times 4
+   \;+\;
+   \text{batch\_size} \times \text{intermediate\_degree} \times \operatorname{sizeof}(\mathrm{uint32\_t})
+   \;+\;
+   \text{batch\_size} \times \text{intermediate\_degree} \times 4
+
+**Example** (batch = 1024, dim = 1024, intermediate\_degree = 128): 5.00 MB
+
+Optimize phase
+~~~~~~~~~~~~~~
+
+Pruning/reordering the intermediate graph; peak scales linearly with intermediate degree.
+
+.. math::
+
+   \text{optimize\_peak}
+   \;=\;
+   n\_{\text{vectors}} \times
+   \Big( 4 + \big(\operatorname{sizeof}(\mathrm{IdxT}) + 1\big)\times \text{intermediate\_degree} \Big)
+
+**Example** (n = 1e6, intermediate\_degree = 128, IdxT = int32): 614.17 MB
+
+Overall Build Peak Memory Usage
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The overall peak memory footprint on the device is the maximum allocation across each sequential step, since RMM's ``device_memory_resource`` releases memory between steps.
+
+.. math::
+
+   \text{build\_peak}
+   \;=\;
+   \text{dataset\_size}
+   \;+\;
+   \max\!\big(\text{IVFPQ\_build\_peak},\ \text{IVFPQ\_search\_peak},\ \text{optimize\_peak}\big)
+
+**Example:** 3906.25 + max(395.01, 5.00, 614.17) = 4520.42 MB
+
+Search peak memory usage
+------------------------
+
+CAGRA search requires the dataset and graph to already be resident in GPU memory. When using CAGRA-Q (compressed/quantized), the original dataset can reside in host memory instead. Additionally, temporary workspace memory is needed to store the search results for a batch of queries.
+If multiple batches are to be launched concurrently or overlapped, separate results buffers will be needed for each. 
+The below memory estimate assumes just one batch of queries being run at a time and reusing the buffers.
+
+.. math::
+
+   \text{search\_memory}
+   \;=\;
+   \text{dataset\_size} + \text{graph\_size} + \text{workspace\_size}
+
+Where ``workspace_size`` is the temporary memory used for query vectors and result storage:
+
+.. math::
+
+   \text{query\_size}
+   \;=\;
+   \text{batch\_size} \times \text{dim} \times \operatorname{sizeof}(\mathrm{float})
+
+.. math::
+
+   \text{result\_size}
+   \;=\;
+   \text{batch\_size} \times \text{topk} \times
+   \big(\operatorname{sizeof}(\mathrm{IdxT}) + \operatorname{sizeof}(\mathrm{float})\big)
+
+**Example** (dim = 1024, batch\_size = 100, topk = 10, IdxT = int32):
+
+- query\_size  = 409,600 B = 0.39 MB
+- result\_size = 8,000 B = 0.0076 MB
+- workspace\_size = query\_size + result\_size = 0.40 MB
+- Total search memory ≈ 3906.25 + 244.14 + 0.40 = 4150.79 MB
