@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "../ivf_common.cuh"
+#include "../../ivf_common.cuh"
 
 #include <cuvs/neighbors/ivf_flat.hpp>
 
@@ -619,7 +619,7 @@ struct loadAndComputeDist<kUnroll, 2, int8_t, int32_t, ComputeNorm> {
         int32_t q    = raft::shfl(queryReg, i * kUnroll + j, raft::WarpSize);
         compute_dist<2, int8_t, int32_t>(dist, q, encV);
         if constexpr (ComputeNorm) {
-          norm_query = raft::dp4a(queryReg, queryReg, norm_query);
+          norm_query = raft::dp4a(q, q, norm_query);
           norm_data  = raft::dp4a(encV, encV, norm_data);
         }
       }
