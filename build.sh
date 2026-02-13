@@ -19,7 +19,7 @@ ARGS=$*
 # scripts, and that this script resides in the repo dir!
 REPODIR=$(cd "$(dirname "$0")"; pwd)
 
-VALIDARGS="clean libcuvs python rust go java docs tests bench-ann examples --uninstall  -v -g -n --allgpuarch --no-mg --no-cpu --cpu-only --no-shared-libs --no-nvtx --show_depr_warn --incl-cache-stats --time -h --run-java-tests"
+VALIDARGS="clean libcuvs python rust go java docs tests bench-ann examples standalone --uninstall  -v -g -n --allgpuarch --no-mg --no-cpu --cpu-only --no-shared-libs --no-nvtx --show_depr_warn --incl-cache-stats --time -h --run-java-tests"
 HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<tool>] [--limit-tests=<targets>] [--limit-bench-ann=<targets>] [--build-metrics=<filename>]
  where <target> is:
    clean            - remove all existing build artifacts and configuration (start over)
@@ -33,6 +33,8 @@ HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<to
    tests            - build the tests
    bench-ann        - build end-to-end ann benchmarks
    examples         - build the examples
+   standalone       - build libcuvs C library and create libcuvs_c.tar.gz in build/
+                      (equivalent to: build libcuvs into build/libcuvs_c, then package)
 
  and <flag> is:
    -v                          - verbose build mode
@@ -347,6 +349,12 @@ fi
 if hasArg clean; then
     CLEAN=1
 fi
+if hasArg standalone; then
+    mkdir -p "${REPODIR}/build"
+    INSTALL_PREFIX="${REPODIR}/build/libcuvs_c"
+    BUILD_TESTS=OFF
+    BUILD_CUVS_BENCH=OFF
+fi
 if hasArg --incl-cache-stats; then
     BUILD_REPORT_INCL_CACHE_STATS=ON
 fi
@@ -371,11 +379,11 @@ fi
 
 ################################################################################
 # Configure for building all C++ targets
-if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg bench-prims || hasArg bench-ann || hasArg examples; then
+if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg standalone || hasArg docs || hasArg tests || hasArg bench-prims || hasArg bench-ann || hasArg examples; then
     COMPILE_LIBRARY=ON
     if [[ "${BUILD_SHARED_LIBS}" != "OFF" ]]; then
         CMAKE_TARGET+=("cuvs")
-        if hasArg examples; then
+        if hasArg examples || hasArg standalone; then
             CMAKE_TARGET+=("cuvs_c")
         fi
     fi
@@ -470,6 +478,14 @@ if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg
       PATH=".:$PATH" python rapids-build-metrics-reporter.py "${LIBCUVS_BUILD_DIR}"/.ninja_log --fmt html --msg "${MSG_OUTFILE}" > "${BMR_DIR}"/"${BUILD_REPORT_METRICS}".html
       cp "${LIBCUVS_BUILD_DIR}"/.ninja_log "${BMR_DIR}"/ninja.log
   fi
+fi
+
+# Create standalone tarball when requested
+if hasArg standalone; then
+    echo "Creating libcuvs_c.tar.gz in build/"
+    tar czvf "${REPODIR}/build/libcuvs_c.tar.gz" -C "${INSTALL_PREFIX}" .
+    ls -lh "${REPODIR}/build/libcuvs_c.tar.gz"
+    echo "Standalone tarball ready: ${REPODIR}/build/libcuvs_c.tar.gz"
 fi
 
 # Build and (optionally) install the cuvs Python package
