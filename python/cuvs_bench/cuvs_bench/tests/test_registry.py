@@ -196,7 +196,7 @@ class TestSearchResult:
             queries_per_second=20.0,
             recall=0.95,
             algorithm="test_algo",
-            search_params={"nprobe": 10},
+            search_params=[{"nprobe": 10}],
         )
 
         assert result.recall == 0.95
@@ -215,7 +215,7 @@ class TestSearchResult:
             queries_per_second=20.0,
             recall=0.95,
             algorithm="test_algo",
-            search_params={"nprobe": 10},
+            search_params=[{"nprobe": 10}],
             gpu_time_seconds=0.04,
             latency_percentiles={"p50": 50.0, "p95": 95.0, "p99": 99.0},
         )
@@ -224,7 +224,7 @@ class TestSearchResult:
 
         assert json_result["name"] == "test_algo/search"
         assert json_result["Recall"] == 0.95
-        assert json_result["nprobe"] == 10
+        assert json_result["search_params"][0]["nprobe"] == 10
         assert json_result["GPU"] == 0.04
         assert json_result["p50"] == 50.0
         assert json_result["p95"] == 95.0
@@ -351,7 +351,7 @@ class TestBackendIntegration:
 
         result = backend.search(
             dataset=dataset,
-            search_params={"nprobe": 10},
+            search_params=[{"nprobe": 10}],
             index_path=Path("/tmp/test_index"),
             k=10,
         )
@@ -359,7 +359,7 @@ class TestBackendIntegration:
         assert result.success
         assert result.recall == 0.95
         assert result.neighbors.shape == (100, 10)
-        assert result.search_params["nprobe"] == 10
+        assert result.search_params[0]["nprobe"] == 10
 
 
 class TestGlobalRegistry:
