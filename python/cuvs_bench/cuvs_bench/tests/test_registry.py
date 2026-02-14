@@ -25,6 +25,11 @@ from cuvs_bench.backends import (
 class DummyBackend(BenchmarkBackend):
     """Dummy backend for testing."""
 
+    @property
+    def algo(self) -> str:
+        """Return dummy algorithm name."""
+        return "dummy_algo"
+
     def build(self, dataset, build_params, index_path, force=False):
         return BuildResult(
             index_path=str(index_path),
