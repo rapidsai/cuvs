@@ -20,6 +20,7 @@
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/norm.cuh>
+#include <raft/linalg/reduce_cols_by_key.cuh>
 #include <raft/linalg/reduce_rows_by_key.cuh>
 #include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/gather.cuh>
@@ -468,5 +469,63 @@ void countSamplesInCluster(raft::resources const& handle,
               (IndexT)n_samples,
               (IndexT)n_clusters,
               workspace);
+}
+
+/**
+ * @brief Compute centroid adjustments (weighted sums and counts per cluster)
+ *
+ * This helper function computes:
+ * 1. Weighted sum of samples per cluster using reduce_rows_by_key
+ * 2. Sum of weights per cluster using reduce_cols_by_key
+ *
+ * @tparam DataT Data type for samples and weights
+ * @tparam IndexT Index type
+ * @tparam LabelsIterator Iterator type for cluster labels
+ *
+ * @param[in]  handle             RAFT resources handle
+ * @param[in]  X                  Input samples [n_samples x n_features]
+ * @param[in]  sample_weights     Weights for each sample [n_samples]
+ * @param[in]  cluster_labels     Cluster assignment for each sample (iterator)
+ * @param[in]  n_clusters         Number of clusters
+ * @param[out] centroid_sums      Output weighted sum per cluster [n_clusters x n_features]
+ * @param[out] weight_per_cluster Output sum of weights per cluster [n_clusters]
+ * @param[inout] workspace        Workspace buffer for intermediate operations
+ */
+template <typename DataT, typename IndexT, typename LabelsIterator>
+void compute_centroid_adjustments(
+  raft::resources const& handle,
+  raft::device_matrix_view<const DataT, IndexT, raft::row_major> X,
+  raft::device_vector_view<const DataT, IndexT> sample_weights,
+  LabelsIterator cluster_labels,
+  IndexT n_clusters,
+  raft::device_matrix_view<DataT, IndexT, raft::row_major> centroid_sums,
+  raft::device_vector_view<DataT, IndexT> weight_per_cluster,
+  rmm::device_uvector<char>& workspace)
+{
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
+  auto n_samples      = X.extent(0);
+
+  workspace.resize(n_samples, stream);
+
+  // Compute weighted sum of samples per cluster
+  raft::linalg::reduce_rows_by_key(const_cast<DataT*>(X.data_handle()),
+                                   X.extent(1),
+                                   cluster_labels,
+                                   sample_weights.data_handle(),
+                                   workspace.data(),
+                                   X.extent(0),
+                                   X.extent(1),
+                                   n_clusters,
+                                   centroid_sums.data_handle(),
+                                   stream);
+
+  // Compute sum of weights per cluster
+  raft::linalg::reduce_cols_by_key(sample_weights.data_handle(),
+                                   cluster_labels,
+                                   weight_per_cluster.data_handle(),
+                                   static_cast<IndexT>(1),
+                                   static_cast<IndexT>(n_samples),
+                                   n_clusters,
+                                   stream);
 }
 }  // namespace cuvs::cluster::kmeans::detail
