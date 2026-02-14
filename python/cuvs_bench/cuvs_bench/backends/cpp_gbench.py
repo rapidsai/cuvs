@@ -11,9 +11,9 @@ backward compatibility with the current cuvs-bench infrastructure.
 
 import subprocess
 import json
+import tempfile
 import time
 import os
-import uuid
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 import numpy as np
@@ -147,8 +147,14 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         # Create temporary JSON config (Google Benchmark format)
         # Structure matches runners.py temp_conf exactly
         # Contains ALL indexes in one config (matches old workflow)
-        temp_conf_filename = f"{self.dataset_name}_{self.output_filename[0]}_{uuid.uuid1()}.json"
-        with open(temp_conf_filename, "w") as f:
+        # delete=False because C++ subprocess needs to read file after Python closes it
+        with tempfile.NamedTemporaryFile(
+            mode='w',
+            suffix='.json',
+            prefix=f"{self.dataset_name}_build_",
+            delete=False
+        ) as f:
+            temp_config_path = f.name
             dataset_config = {
                 "name": dataset.name,
                 "base_file": dataset.base_file,
@@ -179,7 +185,6 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
                 "index": index_list,
             }
             json.dump(config, f, indent=2)
-        temp_config_path = temp_conf_filename
 
         # Prepare output directory and file (matches runners.py path structure)
         # OLD: {dataset_path}/{dataset}/result/build/{algo},{group}.json.lock
@@ -385,8 +390,14 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         # Create temporary JSON config
         # Structure matches runners.py temp_conf exactly
         # Contains ALL indexes with their search_params (matches old workflow)
-        temp_conf_filename = f"{self.dataset_name}_{self.output_filename[1]}_{uuid.uuid1()}.json"
-        with open(temp_conf_filename, "w") as f:
+        # delete=False because C++ subprocess needs to read file after Python closes it
+        with tempfile.NamedTemporaryFile(
+            mode='w',
+            suffix='.json',
+            prefix=f"{self.dataset_name}_search_",
+            delete=False
+        ) as f:
+            temp_config_path = f.name
             dataset_config = {
                 "name": dataset.name,
                 "base_file": dataset.base_file,
@@ -417,7 +428,6 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
                 "index": index_list,
             }
             json.dump(config, f, indent=2)
-        temp_config_path = temp_conf_filename
 
         # Prepare output file (matches runners.py path structure)
         # OLD: {dataset_path}/{dataset}/result/search/{algo},{group},k{k},bs{batch_size}.json
