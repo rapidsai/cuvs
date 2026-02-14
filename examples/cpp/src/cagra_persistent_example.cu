@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,10 +9,9 @@
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_resources.hpp>
 #include <raft/random/make_blobs.cuh>
+#include <rmm/mr/arena_memory_resource.hpp>
 #include <rmm/mr/device_memory_resource.hpp>
-#include <rmm/mr/pool_memory_resource.hpp>
 
-#include <array>
 #include <chrono>
 #include <cstdint>
 #include <future>
@@ -142,29 +141,33 @@ void cagra_build_search_variants(raft::device_resources const& res,
        data in cuda streams.
   */
   auto search_async = [&res, &index](bool needs_sync,
+                                     size_t n_threads,
                                      const cagra::search_params& ps,
                                      raft::device_matrix_view<const float, int64_t> queries,
                                      raft::device_matrix_view<uint32_t, int64_t> neighbors,
                                      raft::device_matrix_view<float, int64_t> distances) {
-    auto work_size   = queries.extent(0);
-    using index_type = typeof(work_size);
     // Limit the maximum number of concurrent jobs
-    constexpr index_type kMaxJobs = 1000;
-    std::array<std::future<void>, kMaxJobs> futures;
-    for (index_type i = 0; i < work_size + kMaxJobs; i++) {
-      // wait for previous job in the same slot to finish
-      if (i >= kMaxJobs) { futures[i % kMaxJobs].wait(); }
-      // submit a new job
-      if (i < work_size) {
-        futures[i % kMaxJobs] = std::async(std::launch::async, [&]() {
+    std::vector<std::future<void>> futures;
+    futures.reserve(n_threads);
+    for (size_t j = 0; j < n_threads; j++) {
+      futures.push_back(std::async(std::launch::async, [&, j]() {
+        auto work_size = static_cast<size_t>(queries.extent(0));
+        for (size_t i = j; i < work_size; i += n_threads) {
+          // Note, the standard implementation does not wait till the kernel is finished,
+          // so this loop may submit all jobs quickly and then wait for the stream to finish.
+          // This is not very realistic, because normally one waits to get the results back.
+          // The persistent implementation though does not return until the results are back.
           cagra::search(res,
                         ps,
                         index,
                         slice_matrix(queries, i, 1),
                         slice_matrix(neighbors, i, 1),
                         slice_matrix(distances, i, 1));
-        });
-      }
+        }
+      }));
+    }
+    for (auto& future : futures) {
+      future.wait();
     }
     /* See the remark for search_batch */
     if (needs_sync) { raft::resource::sync_stream(res); }
@@ -178,16 +181,32 @@ void cagra_build_search_variants(raft::device_resources const& res,
 
   // Try to handle the same amount of work in the async setting using the
   // standard implementation.
-  // (Warning: suboptimal - it uses a single stream for all async jobs)
-  time_it(
-    "standard/async A", search_async, true, search_params, queries_a, neighbors_a, distances_a);
-  time_it(
-    "standard/async B", search_async, true, search_params, queries_b, neighbors_b, distances_b);
+  auto n_threads = std::thread::hardware_concurrency();
+  time_it("standard/async A",
+          search_async,
+          true,
+          n_threads,
+          search_params,
+          queries_a,
+          neighbors_a,
+          distances_a);
+  time_it("standard/async B",
+          search_async,
+          true,
+          n_threads,
+          search_params,
+          queries_b,
+          neighbors_b,
+          distances_b);
 
   // Do the same using persistent kernel.
+  // We use much more threads to fully utilize the GPU;
+  // the internal logic tries to balance the idle time and the latency.
+  auto n_threads_persistent = n_threads * 16;
   time_it("persistent/async A",
           search_async,
           false,
+          n_threads_persistent,
           search_params_persistent,
           queries_a,
           neighbors_a,
@@ -195,6 +214,7 @@ void cagra_build_search_variants(raft::device_resources const& res,
   time_it("persistent/async B",
           search_async,
           false,
+          n_threads_persistent,
           search_params_persistent,
           queries_b,
           neighbors_b,
@@ -230,18 +250,26 @@ int main()
 {
   raft::device_resources res;
 
-  // Set pool memory resource with 1 GiB initial pool size. All allocations use
-  // the same pool.
-  rmm::mr::pool_memory_resource<rmm::mr::device_memory_resource> pool_mr(
-    rmm::mr::get_current_device_resource(), 1024 * 1024 * 1024ull);
-  rmm::mr::set_current_device_resource(&pool_mr);
-
-  // Create input arrays.
+  // Parameters for the dataset and queries
   int64_t n_samples = 1000000;
   int64_t n_dim     = 128;
-  int64_t n_queries = 100000;
-  auto dataset      = raft::make_device_matrix<float, int64_t>(res, n_samples, n_dim);
-  auto queries      = raft::make_device_matrix<float, int64_t>(res, n_queries, n_dim);
+  int64_t n_queries = 300000;
+
+  // Calculate an upper bound on the memory size for everything
+  int64_t mem_size = (n_samples + n_queries) * sizeof(float) * n_dim * 2 + 1024ll * 1024ll * 1024ll;
+  // Using an arena memory resource globally.
+  // This is important because we run the async loop with a very large number of jobs,
+  // which would otherwise swamp a normal pool memory resource.
+  // (the non-persistent implementation would hang forever).
+  rmm::mr::arena_memory_resource<rmm::mr::device_memory_resource> mr(
+    rmm::mr::get_current_device_resource(), mem_size);
+  rmm::mr::set_current_device_resource(&mr);
+  std::cout << "GPU Arena memory resource size: " << mem_size / (1024ll * 1024ll) << " MiB"
+            << std::endl;
+
+  // Create input arrays.
+  auto dataset = raft::make_device_matrix<float, int64_t>(res, n_samples, n_dim);
+  auto queries = raft::make_device_matrix<float, int64_t>(res, n_queries, n_dim);
   generate_dataset(res, dataset.view(), queries.view());
 
   // run the interesting part of the program
