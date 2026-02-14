@@ -775,14 +775,13 @@ class CppGBenchConfigLoader(ConfigLoader):
                 # Sweep mode: use YAML param names
                 index = {
                     "algo": algo,
-                    "build_param": dict(zip(build_params.keys(), params)),
+                    "build_param": dict(zip(param_names, params)),
                 }
 
             # Build index name from params
             index_name = f"{algo}_{group}" if group != "base" else f"{algo}"
-            for i in range(len(params)):
-                index["build_param"][param_names[i]] = params[i]
-                index_name += "." + f"{param_names[i]}{params[i]}"
+            for name, val in zip(param_names, params):
+                index_name += f".{name}{val}"
 
             # Skip constraint validation in tune mode (Optuna handles bounds)
             if not tune_mode:
