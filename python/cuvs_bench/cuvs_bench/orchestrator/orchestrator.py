@@ -538,7 +538,9 @@ class BenchmarkOrchestrator:
             )
 
         config = benchmark_configs[0]
-        backend = self.backend_class(config.backend_config)
+        # Pass append_results via config (backend-specific, not in base class)
+        backend_config = {**config.backend_config, "append_results": append_results}
+        backend = self.backend_class(backend_config)
 
         result = None
 
@@ -562,7 +564,6 @@ class BenchmarkOrchestrator:
                 force=force,
                 search_threads=search_threads,
                 dry_run=dry_run,
-                append_results=append_results,
             )
 
         return result

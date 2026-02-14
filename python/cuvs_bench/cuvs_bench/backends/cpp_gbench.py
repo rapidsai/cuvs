@@ -304,7 +304,6 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         force: bool = False,
         search_threads: Optional[int] = None,
         dry_run: bool = False,
-        append_results: bool = False,
     ) -> SearchResult:
         """
         Search using C++ Google Benchmark executable.
@@ -332,9 +331,6 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
             The number of threads to use for searching.
         dry_run : bool
             Whether to perform a dry run without actual execution.
-        append_results : bool
-            If True, append results to existing JSON file.
-            If False, overwrite existing results (default).
 
         Returns
         -------
@@ -498,7 +494,9 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
 
             new_benchmarks = gbench_results.get("benchmarks", [])
 
-            # Handle result accumulation based on append_results flag
+            # Handle result accumulation based on append_results config
+            # (set by orchestrator for tune mode: trial 0 overwrites, trial 1+ appends)
+            append_results = self.config.get("append_results", False)
             if append_results and output_json.exists():
                 # Append new benchmarks to accumulated file (tune mode)
                 with open(output_json) as f:
