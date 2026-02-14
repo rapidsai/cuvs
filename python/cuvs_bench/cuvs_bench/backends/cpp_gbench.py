@@ -149,10 +149,10 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         # Contains ALL indexes in one config (matches old workflow)
         # delete=False because C++ subprocess needs to read file after Python closes it
         with tempfile.NamedTemporaryFile(
-            mode='w',
-            suffix='.json',
+            mode="w",
+            suffix=".json",
             prefix=f"{self.dataset_name}_build_",
-            delete=False
+            delete=False,
         ) as f:
             temp_config_path = f.name
             dataset_config = {
@@ -392,10 +392,10 @@ class CppGoogleBenchmarkBackend(BenchmarkBackend):
         # Contains ALL indexes with their search_params (matches old workflow)
         # delete=False because C++ subprocess needs to read file after Python closes it
         with tempfile.NamedTemporaryFile(
-            mode='w',
-            suffix='.json',
+            mode="w",
+            suffix=".json",
             prefix=f"{self.dataset_name}_search_",
-            delete=False
+            delete=False,
         ) as f:
             temp_config_path = f.name
             dataset_config = {
