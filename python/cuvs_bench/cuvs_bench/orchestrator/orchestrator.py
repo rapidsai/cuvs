@@ -108,10 +108,8 @@ class BenchmarkOrchestrator:
             For tune mode: optimization target and hard limits.
             - One metric should have "maximize" or "minimize" as value (the target)
             - Other metrics have {"min": X} or {"max": X} as bounds (hard limits)
-
-            Examples:
-                {"recall": "maximize", "latency": {"max": 10}}
-                {"latency": "minimize", "recall": {"min": 0.95}}
+            E.g., {"recall": "maximize", "latency": {"max": 10}} or
+            {"latency": "minimize", "recall": {"min": 0.95}}
         n_trials : int
             For tune mode: maximum number of Optuna trials per parameter configuration.
             default is 100.

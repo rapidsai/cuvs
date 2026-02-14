@@ -192,7 +192,7 @@ class SearchResult:
         result = {
             "name": f"{self.algorithm}/search",
             "real_time": self.search_time_ms,
-            "time_unit": "s",
+            "time_unit": "ms",
             "items_per_second": self.queries_per_second,
             "Recall": self.recall,
             "success": self.success,
