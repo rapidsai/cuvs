@@ -304,6 +304,12 @@ class BenchmarkOrchestrator:
             Note: Internally, tune mode adds _tune_mode, _tune_build_params,
             and _tune_search_params to these kwargs for each Optuna trial.
         """
+        # Tune mode requires search to be enabled (metrics come from SearchResult)
+        if not search:
+            raise ValueError(
+                "tune mode requires search=True to optimize metrics (recall, latency, throughput)"
+            )
+
         # Import Optuna (optional dependency)
         try:
             import optuna
