@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import uuid
+import warnings
 from typing import Dict, List, Optional, Tuple
 
 
@@ -65,6 +66,13 @@ def cuvs_bench_cpp(
     -------
     None
     """
+    warnings.warn(
+        "cuvs_bench_cpp() is deprecated and will be removed in a future release. "
+        "Use CppGoogleBenchmarkBackend from cuvs_bench.backends instead.",
+        FutureWarning,
+        stacklevel=2,
+    )
+
     for (
         executable,
         ann_executable_path,
