@@ -1,10 +1,12 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <cstdint>
 #include <dlpack/dlpack.h>
+
+#include <cuda_fp16.h>
 
 #include <cuvs/cluster/kmeans.h>
 #include <cuvs/cluster/kmeans.hpp>
@@ -17,16 +19,20 @@ namespace {
 
 cuvs::cluster::kmeans::params convert_params(const cuvsKMeansParams& params)
 {
-  auto kmeans_params       = cuvs::cluster::kmeans::params();
-  kmeans_params.metric     = static_cast<cuvs::distance::DistanceType>(params.metric);
-  kmeans_params.init       = static_cast<cuvs::cluster::kmeans::params::InitMethod>(params.init);
-  kmeans_params.n_clusters = params.n_clusters;
-  kmeans_params.max_iter   = params.max_iter;
-  kmeans_params.tol        = params.tol;
+  auto kmeans_params                = cuvs::cluster::kmeans::params();
+  kmeans_params.metric              = static_cast<cuvs::distance::DistanceType>(params.metric);
+  kmeans_params.init = static_cast<cuvs::cluster::kmeans::params::InitMethod>(params.init);
+  kmeans_params.n_clusters          = params.n_clusters;
+  kmeans_params.max_iter            = params.max_iter;
+  kmeans_params.tol                 = params.tol;
+  kmeans_params.n_init              = params.n_init;
   kmeans_params.oversampling_factor = params.oversampling_factor;
   kmeans_params.batch_samples       = params.batch_samples;
   kmeans_params.batch_centroids     = params.batch_centroids;
   kmeans_params.inertia_check       = params.inertia_check;
+  kmeans_params.final_inertia_check = params.final_inertia_check;
+  kmeans_params.update_mode =
+    static_cast<cuvs::cluster::kmeans::params::CentroidUpdateMode>(params.update_mode);
   return kmeans_params;
 }
 
@@ -177,6 +183,139 @@ void _cluster_cost(cuvsResources_t res,
 
   *cost = cost_temp;
 }
+
+template <typename T, typename IdxT = int64_t>
+void _fit_batched(cuvsResources_t res,
+                  const cuvsKMeansParams& params,
+                  DLManagedTensor* X_tensor,
+                  IdxT batch_size,
+                  DLManagedTensor* sample_weight_tensor,
+                  DLManagedTensor* centroids_tensor,
+                  double* inertia,
+                  IdxT* n_iter)
+{
+  auto X          = X_tensor->dl_tensor;
+  auto centroids  = centroids_tensor->dl_tensor;
+  auto res_ptr    = reinterpret_cast<raft::resources*>(res);
+  auto n_samples  = static_cast<IdxT>(X.shape[0]);
+  auto n_features = static_cast<IdxT>(X.shape[1]);
+
+  // X must be on host (CPU) memory
+  if (X.device.device_type != kDLCPU) {
+    RAFT_FAIL("X dataset must be on host (CPU) memory for fit_batched");
+  }
+
+  // centroids must be on device memory
+  if (!cuvs::core::is_dlpack_device_compatible(centroids)) {
+    RAFT_FAIL("centroids must be on device memory");
+  }
+
+  using device_matrix_type = raft::device_matrix_view<T, IdxT, raft::row_major>;
+
+  // Create host matrix view from X
+  auto X_view = raft::make_host_matrix_view<T const, IdxT>(
+    reinterpret_cast<T const*>(X.data), n_samples, n_features);
+
+  // Create device matrix view for centroids
+  auto centroids_view = cuvs::core::from_dlpack<device_matrix_type>(centroids_tensor);
+
+  // Handle optional sample weights
+  std::optional<raft::host_vector_view<T const, IdxT>> sample_weight;
+  if (sample_weight_tensor != NULL) {
+    auto sw = sample_weight_tensor->dl_tensor;
+    if (sw.device.device_type != kDLCPU) {
+      RAFT_FAIL("sample_weight must be on host (CPU) memory for fit_batched");
+    }
+    sample_weight = raft::make_host_vector_view<T const, IdxT>(
+      reinterpret_cast<T const*>(sw.data), n_samples);
+  }
+
+  T inertia_temp;
+  IdxT n_iter_temp;
+
+  auto kmeans_params = convert_params(params);
+  cuvs::cluster::kmeans::fit_batched(*res_ptr,
+                                     kmeans_params,
+                                     X_view,
+                                     batch_size,
+                                     sample_weight,
+                                     centroids_view,
+                                     raft::make_host_scalar_view<T>(&inertia_temp),
+                                     raft::make_host_scalar_view<IdxT>(&n_iter_temp));
+
+  *inertia = inertia_temp;
+  *n_iter  = n_iter_temp;
+}
+
+// Specialized version for integer/half types where X is InputT but centroids are float
+template <typename InputT, typename IdxT = int64_t>
+void _fit_batched_mixed(cuvsResources_t res,
+                        const cuvsKMeansParams& params,
+                        DLManagedTensor* X_tensor,
+                        IdxT batch_size,
+                        DLManagedTensor* sample_weight_tensor,
+                        DLManagedTensor* centroids_tensor,
+                        double* inertia,
+                        IdxT* n_iter)
+{
+  auto X          = X_tensor->dl_tensor;
+  auto centroids  = centroids_tensor->dl_tensor;
+  auto res_ptr    = reinterpret_cast<raft::resources*>(res);
+  auto n_samples  = static_cast<IdxT>(X.shape[0]);
+  auto n_features = static_cast<IdxT>(X.shape[1]);
+
+  // X must be on host (CPU) memory
+  if (X.device.device_type != kDLCPU) {
+    RAFT_FAIL("X dataset must be on host (CPU) memory for fit_batched");
+  }
+
+  // centroids must be on device memory and float type
+  if (!cuvs::core::is_dlpack_device_compatible(centroids)) {
+    RAFT_FAIL("centroids must be on device memory");
+  }
+  if (centroids.dtype.code != kDLFloat || centroids.dtype.bits != 32) {
+    RAFT_FAIL("centroids must be float32 for integer/half input types");
+  }
+
+  using device_matrix_type = raft::device_matrix_view<float, IdxT, raft::row_major>;
+
+  // Create host matrix view from X (InputT)
+  auto X_view = raft::make_host_matrix_view<InputT const, IdxT>(
+    reinterpret_cast<InputT const*>(X.data), n_samples, n_features);
+
+  // Create device matrix view for centroids (float)
+  auto centroids_view = cuvs::core::from_dlpack<device_matrix_type>(centroids_tensor);
+
+  // Handle optional sample weights (float)
+  std::optional<raft::host_vector_view<float const, IdxT>> sample_weight;
+  if (sample_weight_tensor != NULL) {
+    auto sw = sample_weight_tensor->dl_tensor;
+    if (sw.device.device_type != kDLCPU) {
+      RAFT_FAIL("sample_weight must be on host (CPU) memory for fit_batched");
+    }
+    if (sw.dtype.code != kDLFloat || sw.dtype.bits != 32) {
+      RAFT_FAIL("sample_weight must be float32 for integer/half input types");
+    }
+    sample_weight = raft::make_host_vector_view<float const, IdxT>(
+      reinterpret_cast<float const*>(sw.data), n_samples);
+  }
+
+  float inertia_temp;
+  IdxT n_iter_temp;
+
+  auto kmeans_params = convert_params(params);
+  cuvs::cluster::kmeans::fit_batched(*res_ptr,
+                                     kmeans_params,
+                                     X_view,
+                                     batch_size,
+                                     sample_weight,
+                                     centroids_view,
+                                     raft::make_host_scalar_view<float>(&inertia_temp),
+                                     raft::make_host_scalar_view<IdxT>(&n_iter_temp));
+
+  *inertia = inertia_temp;
+  *n_iter  = n_iter_temp;
+}
 }  // namespace
 
 extern "C" cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params)
@@ -184,17 +323,21 @@ extern "C" cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params)
   return cuvs::core::translate_exceptions([=] {
     cuvs::cluster::kmeans::params cpp_params;
     cuvs::cluster::kmeans::balanced_params cpp_balanced_params;
-    *params =
-      new cuvsKMeansParams{.metric     = static_cast<cuvsDistanceType>(cpp_params.metric),
-                           .n_clusters = cpp_params.n_clusters,
-                           .init       = static_cast<cuvsKMeansInitMethod>(cpp_params.init),
-                           .max_iter   = cpp_params.max_iter,
-                           .tol        = cpp_params.tol,
-                           .oversampling_factor  = cpp_params.oversampling_factor,
-                           .batch_samples        = cpp_params.batch_samples,
-                           .inertia_check        = cpp_params.inertia_check,
-                           .hierarchical         = false,
-                           .hierarchical_n_iters = static_cast<int>(cpp_balanced_params.n_iters)};
+    *params = new cuvsKMeansParams{
+      .metric               = static_cast<cuvsDistanceType>(cpp_params.metric),
+      .n_clusters           = cpp_params.n_clusters,
+      .init                 = static_cast<cuvsKMeansInitMethod>(cpp_params.init),
+      .max_iter             = cpp_params.max_iter,
+      .tol                  = cpp_params.tol,
+      .n_init               = cpp_params.n_init,
+      .oversampling_factor  = cpp_params.oversampling_factor,
+      .batch_samples        = cpp_params.batch_samples,
+      .batch_centroids      = cpp_params.batch_centroids,
+      .update_mode          = static_cast<cuvsKMeansCentroidUpdateMode>(cpp_params.update_mode),
+      .inertia_check        = cpp_params.inertia_check,
+      .final_inertia_check  = cpp_params.final_inertia_check,
+      .hierarchical         = false,
+      .hierarchical_n_iters = static_cast<int>(cpp_balanced_params.n_iters)};
   });
 }
 
@@ -260,6 +403,38 @@ extern "C" cuvsError_t cuvsKMeansClusterCost(cuvsResources_t res,
       _cluster_cost<float>(res, X, centroids, cost);
     } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 64) {
       _cluster_cost<double>(res, X, centroids, cost);
+    } else {
+      RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
+                dataset.dtype.code,
+                dataset.dtype.bits);
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsKMeansFitBatched(cuvsResources_t res,
+                                            cuvsKMeansParams_t params,
+                                            DLManagedTensor* X,
+                                            int64_t batch_size,
+                                            DLManagedTensor* sample_weight,
+                                            DLManagedTensor* centroids,
+                                            double* inertia,
+                                            int64_t* n_iter)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto dataset = X->dl_tensor;
+    if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
+      _fit_batched<float>(res, *params, X, batch_size, sample_weight, centroids, inertia, n_iter);
+    } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 64) {
+      _fit_batched<double>(res, *params, X, batch_size, sample_weight, centroids, inertia, n_iter);
+    } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
+      // uint8 input -> float centroids
+      _fit_batched_mixed<uint8_t>(res, *params, X, batch_size, sample_weight, centroids, inertia, n_iter);
+    } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
+      // int8 input -> float centroids
+      _fit_batched_mixed<int8_t>(res, *params, X, batch_size, sample_weight, centroids, inertia, n_iter);
+    } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 16) {
+      // half input -> float centroids
+      _fit_batched_mixed<half>(res, *params, X, batch_size, sample_weight, centroids, inertia, n_iter);
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
                 dataset.dtype.code,

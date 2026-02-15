@@ -113,7 +113,14 @@ struct cuvsKMeansParams {
    */
   cuvsKMeansCentroidUpdateMode update_mode;
 
+  /** Check inertia during iterations for early convergence. */
   bool inertia_check;
+
+  /**
+   * Compute final inertia after fit_batched completes (requires extra data pass).
+   * Only used by fit_batched; regular fit always computes final inertia.
+   */
+  bool final_inertia_check;
 
   /**
    * Whether to use hierarchical (balanced) kmeans or not
