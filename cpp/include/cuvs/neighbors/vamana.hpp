@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -39,6 +28,18 @@ namespace cuvs::neighbors::vamana {
  */
 
 /**
+ * @brief Parameters used to build quantized DiskANN index; to be generated using
+ * deserialize_codebooks()
+ */
+template <typename T = float>
+struct codebook_params {
+  int pq_codebook_size;
+  int pq_dim;
+  std::vector<T> pq_encoding_table;
+  std::vector<T> rotation_matrix;
+};
+
+/**
  * @brief Parameters used to build DiskANN index
  *
  * `graph_degree`: Maximum degree of graph; correspods to the R parameter of
@@ -53,17 +54,6 @@ namespace cuvs::neighbors::vamana {
  */
 
 struct index_params : cuvs::neighbors::index_params {
-  /**
-   * @brief Parameters used to build quantized DiskANN index; to be generated using
-   * deserialize_codebooks()
-   */
-  template <typename T = float>
-  struct codebook_params {
-    int pq_codebook_size;
-    int pq_dim;
-    std::vector<T> pq_encoding_table;
-    std::vector<T> rotation_matrix;
-  };
   /** Maximum degree of output graph corresponds to the R parameter in the original Vamana
    * literature. */
   uint32_t graph_degree = 32;
@@ -159,11 +149,13 @@ struct index : cuvs::neighbors::index {
   [[nodiscard]] inline auto medoid() const noexcept -> IdxT { return medoid_id_; }
 
   // Don't allow copying the index for performance reasons (try avoiding copying data)
+  /** \cond */
   index(const index&)                    = delete;
   index(index&&)                         = default;
   auto operator=(const index&) -> index& = delete;
   auto operator=(index&&) -> index&      = default;
   ~index()                               = default;
+  /** \endcond */
 
   /** Construct an empty index. */
   index(raft::resources const& res,
@@ -486,6 +478,10 @@ auto build(raft::resources const& res,
   -> cuvs::neighbors::vamana::index<uint8_t, uint32_t>;
 
 /**
+ * @}
+ */
+
+/**
  * @defgroup vamana_cpp_serialize Vamana serialize functions
  * @{
  */
@@ -613,7 +609,7 @@ void serialize(raft::resources const& handle,
  *
  */
 auto deserialize_codebooks(const std::string& codebook_prefix, const int dim)
-  -> index_params::codebook_params<float>;
+  -> codebook_params<float>;
 
 /**
  * @}

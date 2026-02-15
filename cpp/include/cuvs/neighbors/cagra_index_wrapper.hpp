@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -23,10 +12,42 @@
 namespace cuvs::neighbors::cagra {
 template <typename T, typename IdxT>
 struct index;
-struct merge_params;
+struct index_params;
 }  // namespace cuvs::neighbors::cagra
 
 namespace cuvs::neighbors::cagra {
+
+/**
+ * @defgroup cagra_cpp_merge_params CAGRA index merge parameters
+ * @{
+ */
+
+/**
+ * @brief Parameters for merging CAGRA indexes.
+ */
+struct merge_params : cuvs::neighbors::merge_params {
+  merge_params() = default;
+
+  /**
+   * @brief Constructs merge parameters with given index parameters.
+   * @param params Parameters for creating the output index.
+   */
+  explicit merge_params(const cagra::index_params& params) : output_index_params(params) {}
+
+  /// Parameters for creating the output index.
+  cagra::index_params output_index_params;
+
+  /// Strategy for merging. Defaults to `MergeStrategy::MERGE_STRATEGY_PHYSICAL`.
+  cuvs::neighbors::MergeStrategy merge_strategy =
+    cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL;
+
+  /// Implementation of the polymorphic strategy() method
+  cuvs::neighbors::MergeStrategy strategy() const { return merge_strategy; }
+};
+
+/**
+ * @}
+ */
 
 /**
  * @brief Wrapper for CAGRA index implementing IndexWrapper.

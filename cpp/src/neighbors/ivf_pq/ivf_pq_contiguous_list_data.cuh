@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
@@ -24,8 +13,9 @@ namespace cuvs::neighbors::ivf_pq::detail {
 
 void unpack_contiguous_list_data(
   uint8_t* codes,
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
+  raft::device_mdspan<const uint8_t,
+                      list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                      raft::row_major> list_data,
   uint32_t n_rows,
   uint32_t pq_dim,
   std::variant<uint32_t, const uint32_t*> offset_or_indices,
@@ -40,8 +30,13 @@ void unpack_contiguous_list_data(raft::resources const& res,
                                  uint32_t label,
                                  std::variant<uint32_t, const uint32_t*> offset_or_indices)
 {
+  // Currently only supports interleaved layout
+  RAFT_EXPECTS(index.codes_layout() == list_layout::INTERLEAVED,
+               "unpack_contiguous_list_data currently only supports INTERLEAVED layout");
+  auto typed_list =
+    std::static_pointer_cast<const list_data_interleaved<IdxT>>(index.lists()[label]);
   unpack_contiguous_list_data(out_codes,
-                              index.lists()[label]->data.view(),
+                              typed_list->data.view(),
                               n_rows,
                               index.pq_dim(),
                               offset_or_indices,
@@ -50,8 +45,9 @@ void unpack_contiguous_list_data(raft::resources const& res,
 };
 
 void pack_contiguous_list_data(
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
+  raft::device_mdspan<uint8_t,
+                      list_spec_interleaved<uint32_t, uint32_t>::list_extents,
+                      raft::row_major> list_data,
   const uint8_t* codes,
   uint32_t n_rows,
   uint32_t pq_dim,
@@ -67,7 +63,11 @@ void pack_contiguous_list_data(raft::resources const& res,
                                uint32_t label,
                                std::variant<uint32_t, const uint32_t*> offset_or_indices)
 {
-  pack_contiguous_list_data(index->lists()[label]->data.view(),
+  // Currently only supports interleaved layout
+  RAFT_EXPECTS(index->codes_layout() == list_layout::INTERLEAVED,
+               "pack_contiguous_list_data currently only supports INTERLEAVED layout");
+  auto typed_list = std::static_pointer_cast<list_data_interleaved<IdxT>>(index->lists()[label]);
+  pack_contiguous_list_data(typed_list->data.view(),
                             new_codes,
                             n_rows,
                             index->pq_dim(),

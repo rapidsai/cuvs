@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs;
 
@@ -53,10 +42,10 @@ public interface CagraIndex extends AutoCloseable {
 
   /** Returns the CAGRA graph
    *
-   * @return a {@link CuVSMatrix} encapsulating the native int (uint32_t) array used to represent
+   * @return a {@link CuVSDeviceMatrix} encapsulating the native int (uint32_t) array used to represent
    * the cagra graph
    */
-  CuVSMatrix getGraph();
+  CuVSDeviceMatrix getGraph();
 
   /**
    * A method to persist a CAGRA index using an instance of {@link OutputStream}
@@ -187,7 +176,7 @@ public interface CagraIndex extends AutoCloseable {
    * @return A new merged CAGRA index
    * @throws Throwable if an error occurs during the merge operation
    */
-  static CagraIndex merge(CagraIndex[] indexes, CagraMergeParams mergeParams) throws Throwable {
+  static CagraIndex merge(CagraIndex[] indexes, CagraIndexParams mergeParams) throws Throwable {
     if (indexes == null || indexes.length == 0) {
       throw new IllegalArgumentException("At least one index must be provided for merging");
     }
@@ -246,14 +235,6 @@ public interface CagraIndex extends AutoCloseable {
      * @return An instance of this Builder.
      */
     Builder withIndexParams(CagraIndexParams cagraIndexParameters);
-
-    /**
-     * Sets the quantizer to use for building the index with quantized data.
-     *
-     * @param quantizer The quantizer to apply to the dataset during index construction
-     * @return An instance of this Builder
-     */
-    Builder withQuantizer(CuVSQuantizer quantizer);
 
     /**
      * Builds and returns an instance of CagraIndex.

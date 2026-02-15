@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -20,10 +9,14 @@
 
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
+#include <raft/util/cuda_dev_essentials.cuh>
 
 #include <cuco/static_map.cuh>
 #include <thrust/copy.h>
 #include <thrust/iterator/counting_iterator.h>
+
+#include <cooperative_groups.h>
+#include <rmm/device_uvector.hpp>
 
 // this is needed by cuco as key, value must be bitwise comparable.
 // compilers don't declare float/double as bitwise comparable
@@ -43,11 +36,19 @@ namespace sparse {
 template <typename value_idx, typename value_t, int tpb>
 class hash_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
  public:
-  using insert_type = typename cuco::legacy::
-    static_map<value_idx, value_t, cuda::thread_scope_block>::device_mutable_view;
-  using smem_type = typename insert_type::slot_type*;
-  using find_type =
-    typename cuco::legacy::static_map<value_idx, value_t, cuda::thread_scope_block>::device_view;
+  static constexpr value_idx empty_key_sentinel = value_idx{-1};
+  static constexpr value_t empty_value_sentinel = value_t{0};
+  using probing_scheme_type = cuco::linear_probing<1, cuco::murmurhash3_32<value_idx>>;
+  using storage_ref_type =
+    cuco::bucket_storage_ref<cuco::pair<value_idx, value_t>, 1, cuco::extent<int>>;
+  using map_type = cuco::static_map_ref<value_idx,
+                                        value_t,
+                                        cuda::thread_scope_block,
+                                        cuda::std::equal_to<value_idx>,
+                                        probing_scheme_type,
+                                        storage_ref_type,
+                                        cuco::op::insert_tag,
+                                        cuco::op::find_tag>;
 
   hash_strategy(const distances_config_t<value_idx, value_t>& config_,
                 float capacity_threshold_ = 0.5,
@@ -231,32 +232,35 @@ class hash_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
     }
   }
 
-  __device__ inline insert_type init_insert(smem_type cache, const value_idx& cache_size)
+  __device__ inline map_type init_map(void* storage, const value_idx& cache_size)
   {
-    return insert_type::make_from_uninitialized_slots(cooperative_groups::this_thread_block(),
-                                                      cache,
-                                                      cache_size,
-                                                      cuco::empty_key{value_idx{-1}},
-                                                      cuco::empty_value{value_t{0}});
+    auto map_ref =
+      map_type{cuco::empty_key<value_idx>{empty_key_sentinel},
+               cuco::empty_value<value_t>{empty_value_sentinel},
+               cuda::std::equal_to<value_idx>{},
+               probing_scheme_type{},
+               cuco::cuda_thread_scope<cuda::thread_scope_block>{},
+               storage_ref_type{cuco::extent<int>{cache_size},
+                                static_cast<typename storage_ref_type::value_type*>(storage)}};
+    map_ref.initialize(cooperative_groups::this_thread_block());
+
+    return map_ref;
   }
 
-  __device__ inline void insert(insert_type cache, const value_idx& key, const value_t& value)
+  __device__ inline void insert(map_type& map_ref, const value_idx& key, const value_t& value)
   {
-    auto success = cache.insert(cuco::pair<value_idx, value_t>(key, value));
+    map_ref.insert(cuco::pair{key, value});
   }
 
-  __device__ inline find_type init_find(smem_type cache, const value_idx& cache_size)
-  {
-    return find_type(
-      cache, cache_size, cuco::empty_key{value_idx{-1}}, cuco::empty_value{value_t{0}});
-  }
+  // Note: init_find is now merged with init_map since the new API uses the same ref for both
+  // operations
 
-  __device__ inline value_t find(find_type cache, const value_idx& key)
+  __device__ inline value_t find(map_type& map_ref, const value_idx& key)
   {
-    auto a_pair = cache.find(key);
+    auto a_pair = map_ref.find(key);
 
     value_t a_col = 0.0;
-    if (a_pair != cache.end()) { a_col = a_pair->second; }
+    if (a_pair != map_ref.end()) { a_col = a_pair->second; }
     return a_col;
   }
 
@@ -282,7 +286,7 @@ class hash_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
   inline static int get_map_size()
   {
     return (raft::getSharedMemPerBlock() - ((tpb / raft::warp_size()) * sizeof(value_t))) /
-           sizeof(typename insert_type::slot_type);
+           sizeof(cuco::pair<value_idx, value_t>);
   }
 
  private:

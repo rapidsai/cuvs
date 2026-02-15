@@ -1,24 +1,13 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
 #include "base_strategy.cuh"
 
-#include <raft/util/cuda_dev_essentials.cuh>  // raft::ceildiv
+#include <raft/util/cuda_dev_essentials.cuh>
 
 namespace cuvs {
 namespace distance {
@@ -28,9 +17,7 @@ namespace sparse {
 template <typename value_idx, typename value_t, int tpb>
 class dense_smem_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
  public:
-  using smem_type   = value_t*;
-  using insert_type = smem_type;
-  using find_type   = smem_type;
+  using map_type = value_t*;
 
   dense_smem_strategy(const distances_config_t<value_idx, value_t>& config_)
     : coo_spmv_strategy<value_idx, value_t, tpb>(config_)
@@ -94,25 +81,21 @@ class dense_smem_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
                              n_blocks_per_row);
   }
 
-  __device__ inline insert_type init_insert(smem_type cache, const value_idx& cache_size)
+  __device__ inline map_type init_map(void* storage, const value_idx& cache_size)
   {
+    auto cache = static_cast<value_t*>(storage);
     for (int k = threadIdx.x; k < cache_size; k += blockDim.x) {
       cache[k] = 0.0;
     }
     return cache;
   }
 
-  __device__ inline void insert(insert_type cache, const value_idx& key, const value_t& value)
+  __device__ inline void insert(map_type& cache, const value_idx& key, const value_t& value)
   {
     cache[key] = value;
   }
 
-  __device__ inline find_type init_find(smem_type cache, const value_idx& cache_size)
-  {
-    return cache;
-  }
-
-  __device__ inline value_t find(find_type cache, const value_idx& key) { return cache[key]; }
+  __device__ inline value_t find(map_type& cache, const value_idx& key) { return cache[key]; }
 };
 
 }  // namespace sparse

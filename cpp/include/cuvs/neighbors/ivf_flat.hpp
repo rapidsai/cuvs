@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -1412,6 +1401,9 @@ void extend(raft::resources const& handle,
 
 /**
  * @brief Search ANN using the constructed index.
+ * This function JIT compiles the kernel for the very first usage, after which it maintains an
+ * in-memory and disk-based cache of the compiled kernels. We recommend running a warmup search
+ * before the actual searches to avoid the first-time JIT compilation overhead.
  *
  * See the [ivf_flat::build](#ivf_flat::build) documentation for a usage example.
  *
@@ -1453,6 +1445,9 @@ void search(raft::resources const& handle,
 
 /**
  * @brief Search ANN using the constructed index.
+ * This function JIT compiles the kernel for the very first usage, after which it maintains an
+ * in-memory and disk-based cache of the compiled kernels. We recommend running a warmup search
+ * before the actual searches to avoid the first-time JIT compilation overhead.
  *
  * See the [ivf_flat::build](#ivf_flat::build) documentation for a usage example.
  *
@@ -1493,6 +1488,9 @@ void search(raft::resources const& handle,
               cuvs::neighbors::filtering::none_sample_filter{});
 /**
  * @brief Search ANN using the constructed index.
+ * This function JIT compiles the kernel for the very first usage, after which it maintains an
+ * in-memory and disk-based cache of the compiled kernels. We recommend running a warmup search
+ * before the actual searches to avoid the first-time JIT compilation overhead.
  *
  * See the [ivf_flat::build](#ivf_flat::build) documentation for a usage example.
  *
@@ -1534,6 +1532,9 @@ void search(raft::resources const& handle,
 
 /**
  * @brief Search ANN using the constructed index.
+ * This function JIT compiles the kernel for the very first usage, after which it maintains an
+ * in-memory and disk-based cache of the compiled kernels. We recommend running a warmup search
+ * before the actual searches to avoid the first-time JIT compilation overhead.
  *
  * See the [ivf_flat::build](#ivf_flat::build) documentation for a usage example.
  *
@@ -2061,6 +2062,28 @@ auto build(const raft::resources& clique,
  */
 auto build(const raft::resources& clique,
            const cuvs::neighbors::mg_index_params<ivf_flat::index_params>& index_params,
+           raft::host_matrix_view<const half, int64_t, row_major> index_dataset)
+  -> cuvs::neighbors::mg_index<ivf_flat::index<half, int64_t>, half, int64_t>;
+
+/// \ingroup mg_cpp_index_build
+/**
+ * @brief Builds a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<ivf_flat::index_params> index_params;
+ * auto index = cuvs::neighbors::ivf_flat::build(clique, index_params, index_dataset);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index_params configure the index building
+ * @param[in] index_dataset a row-major matrix on host [n_rows, dim]
+ *
+ * @return the constructed IVF-Flat MG index
+ */
+auto build(const raft::resources& clique,
+           const cuvs::neighbors::mg_index_params<ivf_flat::index_params>& index_params,
            raft::host_matrix_view<const int8_t, int64_t, row_major> index_dataset)
   -> cuvs::neighbors::mg_index<ivf_flat::index<int8_t, int64_t>, int8_t, int64_t>;
 
@@ -2110,6 +2133,30 @@ auto build(const raft::resources& clique,
 void extend(const raft::resources& clique,
             cuvs::neighbors::mg_index<ivf_flat::index<float, int64_t>, float, int64_t>& index,
             raft::host_matrix_view<const float, int64_t, row_major> new_vectors,
+            std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
+
+/// \ingroup mg_cpp_index_extend
+/**
+ * @brief Extends a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<ivf_flat::index_params> index_params;
+ * auto index = cuvs::neighbors::ivf_flat::build(clique, index_params, index_dataset);
+ * cuvs::neighbors::ivf_flat::extend(clique, index, new_vectors, std::nullopt);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] new_vectors a row-major matrix on host [n_rows, dim]
+ * @param[in] new_indices optional vector on host [n_rows],
+ * `std::nullopt` means default continuous range `[0...n_rows)`
+ *
+ */
+void extend(const raft::resources& clique,
+            cuvs::neighbors::mg_index<ivf_flat::index<half, int64_t>, half, int64_t>& index,
+            raft::host_matrix_view<const half, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
 
 /// \ingroup mg_cpp_index_extend
@@ -2213,6 +2260,35 @@ void search(const raft::resources& clique,
  * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
  *
  */
+void search(const raft::resources& clique,
+            const cuvs::neighbors::mg_index<ivf_flat::index<half, int64_t>, half, int64_t>& index,
+            const cuvs::neighbors::mg_search_params<ivf_flat::search_params>& search_params,
+            raft::host_matrix_view<const half, int64_t, row_major> queries,
+            raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
+            raft::host_matrix_view<float, int64_t, row_major> distances);
+
+/// \ingroup mg_cpp_index_search
+/**
+ * @brief Searches a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<ivf_flat::index_params> index_params;
+ * auto index = cuvs::neighbors::ivf_flat::build(clique, index_params, index_dataset);
+ * cuvs::neighbors::mg_search_params<ivf_flat::search_params> search_params;
+ * cuvs::neighbors::ivf_flat::search(clique, index, search_params, queries, neighbors,
+ * distances);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] search_params configure the index search
+ * @param[in] queries a row-major matrix on host [n_rows, dim]
+ * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
+ * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
+ *
+ */
 void search(
   const raft::resources& clique,
   const cuvs::neighbors::mg_index<ivf_flat::index<int8_t, int64_t>, int8_t, int64_t>& index,
@@ -2274,6 +2350,29 @@ void search(
 void serialize(
   const raft::resources& clique,
   const cuvs::neighbors::mg_index<ivf_flat::index<float, int64_t>, float, int64_t>& index,
+  const std::string& filename);
+
+/// \ingroup mg_cpp_serialize
+/**
+ * @brief Serializes a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<ivf_flat::index_params> index_params;
+ * auto index = cuvs::neighbors::ivf_flat::build(clique, index_params, index_dataset);
+ * const std::string filename = "mg_index.cuvs";
+ * cuvs::neighbors::ivf_flat::serialize(clique, index, filename);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] filename path to the file to be serialized
+ *
+ */
+void serialize(
+  const raft::resources& clique,
+  const cuvs::neighbors::mg_index<ivf_flat::index<half, int64_t>, half, int64_t>& index,
   const std::string& filename);
 
 /// \ingroup mg_cpp_serialize
@@ -2846,17 +2945,17 @@ void reset_index(const raft::resources& res, index<uint8_t, int64_t>* index);
  *   ivf_flat::index<uint8_t, int64_t> index(res, index_params, D);
  *   ivf_flat::helpers::reset_index(res, &index);
  *   // resize the first IVF list to hold 5 records
- *   auto spec = list_spec<uint32_t, uint8_t, int64_t>{
- *     index->dim(), index->conservative_memory_allocation()};
+ *   auto spec = list_spec<uint32_t, float, int64_t>{
+ *     index.dim(), index.conservative_memory_allocation()};
  *   uint32_t new_size = 5;
- *   ivf::resize_list(res, list, spec, new_size, 0);
+ *   ivf::resize_list(res, index.lists()[0], spec, new_size, 0);
  *   raft::update_device(index.list_sizes(), &new_size, 1, stream);
  *   // recompute the internal state of the index
  *   ivf_flat::helpers::recompute_internal_state(res, index);
  * @endcode
  *
  * @param[in] res raft resource
- * @param[inout] index pointer to IVF-PQ index
+ * @param[inout] index pointer to IVF-Flat index
  */
 void recompute_internal_state(const raft::resources& res, index<float, int64_t>* index);
 
@@ -2874,17 +2973,17 @@ void recompute_internal_state(const raft::resources& res, index<float, int64_t>*
  *   ivf_flat::index<uint8_t, int64_t> index(res, index_params, D);
  *   ivf_flat::helpers::reset_index(res, &index);
  *   // resize the first IVF list to hold 5 records
- *   auto spec = list_spec<uint32_t, uint8_t, int64_t>{
- *     index->dim(), index->conservative_memory_allocation()};
+ *   auto spec = list_spec<uint32_t, half, int64_t>{
+ *     index.dim(), index.conservative_memory_allocation()};
  *   uint32_t new_size = 5;
- *   ivf::resize_list(res, list, spec, new_size, 0);
+ *   ivf::resize_list(res, index.lists()[0], spec, new_size, 0);
  *   raft::update_device(index.list_sizes(), &new_size, 1, stream);
  *   // recompute the internal state of the index
  *   ivf_flat::helpers::recompute_internal_state(res, index);
  * @endcode
  *
  * @param[in] res raft resource
- * @param[inout] index pointer to IVF-PQ index
+ * @param[inout] index pointer to IVF-Flat index
  */
 void recompute_internal_state(const raft::resources& res, index<half, int64_t>* index);
 
@@ -2902,17 +3001,17 @@ void recompute_internal_state(const raft::resources& res, index<half, int64_t>* 
  *   ivf_flat::index<uint8_t, int64_t> index(res, index_params, D);
  *   ivf_flat::helpers::reset_index(res, &index);
  *   // resize the first IVF list to hold 5 records
- *   auto spec = list_spec<uint32_t, uint8_t, int64_t>{
- *     index->dim(), index->conservative_memory_allocation()};
+ *   auto spec = list_spec<uint32_t, int8_t, int64_t>{
+ *     index.dim(), index.conservative_memory_allocation()};
  *   uint32_t new_size = 5;
- *   ivf::resize_list(res, list, spec, new_size, 0);
+ *   ivf::resize_list(res, index.lists()[0], spec, new_size, 0);
  *   raft::update_device(index.list_sizes(), &new_size, 1, stream);
  *   // recompute the internal state of the index
  *   ivf_flat::helpers::recompute_internal_state(res, index);
  * @endcode
  *
  * @param[in] res raft resource
- * @param[inout] index pointer to IVF-PQ index
+ * @param[inout] index pointer to IVF-Flat index
  */
 void recompute_internal_state(const raft::resources& res, index<int8_t, int64_t>* index);
 
@@ -2931,9 +3030,9 @@ void recompute_internal_state(const raft::resources& res, index<int8_t, int64_t>
  *   ivf_flat::helpers::reset_index(res, &index);
  *   // resize the first IVF list to hold 5 records
  *   auto spec = list_spec<uint32_t, uint8_t, int64_t>{
- *     index->dim(), index->conservative_memory_allocation()};
+ *     index.dim(), index.conservative_memory_allocation()};
  *   uint32_t new_size = 5;
- *   ivf::resize_list(res, list, spec, new_size, 0);
+ *   ivf::resize_list(res, index.lists()[0], spec, new_size, 0);
  *   raft::update_device(index.list_sizes(), &new_size, 1, stream);
  *   // recompute the internal state of the index
  *   ivf_flat::helpers::recompute_internal_state(res, index);

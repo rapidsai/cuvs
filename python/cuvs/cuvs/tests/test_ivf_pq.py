@@ -1,17 +1,8 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
+
+import tempfile
 
 import numpy as np
 import pytest
@@ -44,6 +35,7 @@ def run_ivf_pq_build_search_test(
     compare=True,
     inplace=True,
     array_type="device",
+    serialize=False,
 ):
     dataset = generate_data((n_rows, n_cols), dtype)
     if metric == "inner_product":
@@ -66,6 +58,12 @@ def run_ivf_pq_build_search_test(
         index = ivf_pq.build(build_params, dataset_device)
     else:
         index = ivf_pq.build(build_params, dataset)
+
+    if serialize:
+        with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as f:
+            temp_filename = f.name
+        ivf_pq.save(temp_filename, index)
+        index = ivf_pq.load(temp_filename)
 
     if not add_data_on_build:
         dataset_1 = dataset[: n_rows // 2, :]
@@ -112,6 +110,16 @@ def run_ivf_pq_build_search_test(
 
     centers = index.centers
     assert centers.shape[0] == n_lists
+    assert centers.shape[1] == index.dim
+
+    pq_centers = index.pq_centers
+    assert len(pq_centers.shape) == 3
+    assert pq_centers.shape[2] == 1 << pq_bits
+
+    all_list_ids = set()
+    for list_ids, list_data in index.lists():
+        all_list_ids.update(list_ids.copy_to_host())
+    assert all_list_ids == set(np.arange(n_rows))
 
     if not compare:
         return
@@ -211,9 +219,160 @@ def test_extend(dtype, array_type):
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("dtype", [np.float32, np.float16, np.int8, np.uint8])
 @pytest.mark.parametrize("array_type", ["host", "device"])
-def test_ivf_pq_dtype(inplace, dtype, array_type):
+@pytest.mark.parametrize("serialize", [True, False])
+def test_ivf_pq_dtype(inplace, dtype, array_type, serialize):
     run_ivf_pq_build_search_test(
         dtype=dtype,
         inplace=inplace,
         array_type=array_type,
+        serialize=serialize,
     )
+
+
+@pytest.mark.parametrize("codebook_kind", ["subspace", "cluster"])
+@pytest.mark.parametrize(
+    "metric", ["sqeuclidean", "inner_product", "euclidean"]
+)
+def test_build_precomputed(codebook_kind, metric):
+    n_rows = 5000
+    n_cols = 32
+    n_queries = 100
+    k = 10
+    n_lists = 50
+    pq_bits = 8
+    pq_dim = 8
+    n_probes = 50
+    dtype = np.float32
+
+    # Generate dataset
+    dataset = generate_data((n_rows, n_cols), dtype)
+    if metric == "inner_product":
+        dataset = normalize(dataset, norm="l2", axis=1)
+    dataset_device = device_ndarray(dataset)
+
+    # Build regular index with data
+    build_params = ivf_pq.IndexParams(
+        n_lists=n_lists,
+        metric=metric,
+        kmeans_n_iters=20,
+        kmeans_trainset_fraction=1.0,
+        pq_bits=pq_bits,
+        pq_dim=pq_dim,
+        codebook_kind=codebook_kind,
+        force_random_rotation=False,
+        add_data_on_build=True,
+    )
+    regular_index = ivf_pq.build(build_params, dataset_device)
+
+    # Extract trained components from regular index
+    # Use centers_padded which returns contiguous data suitable for build_precomputed
+    pq_centers = regular_index.pq_centers
+    centers = regular_index.centers_padded
+    centers_rot = regular_index.centers_rot
+    rotation_matrix = regular_index.rotation_matrix
+    dim = regular_index.dim
+
+    # Build precomputed index with extracted components
+    precomputed_build_params = ivf_pq.IndexParams(
+        n_lists=n_lists,
+        metric=metric,
+        pq_bits=pq_bits,
+        pq_dim=pq_dim,
+        codebook_kind=codebook_kind,
+    )
+    precomputed_index = ivf_pq.build_precomputed(
+        precomputed_build_params,
+        dim,
+        pq_centers,
+        centers,
+        centers_rot,
+        rotation_matrix,
+    )
+
+    # Extend precomputed index with the same data
+    indices = np.arange(n_rows, dtype=np.int64)
+    indices_device = device_ndarray(indices)
+    precomputed_index = ivf_pq.extend(
+        precomputed_index, dataset_device, indices_device
+    )
+
+    # Verify both indexes have the same size
+    assert len(regular_index) == len(precomputed_index)
+    assert len(regular_index) == n_rows
+
+    # Generate queries
+    queries = generate_data((n_queries, n_cols), dtype)
+    queries_device = device_ndarray(queries)
+
+    # Search regular index
+    search_params = ivf_pq.SearchParams(n_probes=n_probes)
+    regular_dist, regular_idx = ivf_pq.search(
+        search_params, regular_index, queries_device, k
+    )
+
+    # Search precomputed index
+    precomputed_dist, precomputed_idx = ivf_pq.search(
+        search_params, precomputed_index, queries_device, k
+    )
+
+    # Copy results to host for comparison
+    regular_idx_host = regular_idx.copy_to_host()
+    regular_dist_host = regular_dist.copy_to_host()
+    precomputed_idx_host = precomputed_idx.copy_to_host()
+    precomputed_dist_host = precomputed_dist.copy_to_host()
+
+    # Compare results for exact match
+    np.testing.assert_array_equal(
+        regular_idx_host,
+        precomputed_idx_host,
+        err_msg="Neighbor indices should match exactly",
+    )
+    np.testing.assert_allclose(
+        regular_dist_host,
+        precomputed_dist_host,
+        rtol=1e-5,
+        atol=1e-5,
+        err_msg="Distances should match closely",
+    )
+
+
+@pytest.mark.parametrize("codebook_kind", ["subspace", "cluster"])
+@pytest.mark.parametrize("dtype", [np.float32, np.float16, np.int8, np.uint8])
+@pytest.mark.parametrize("n_rows", [500, 100000])
+@pytest.mark.parametrize("pq_bits", [6, 8])
+def test_transform(codebook_kind, dtype, n_rows, pq_bits):
+    n_cols = 32
+    n_lists = 50
+    pq_dim = 8
+
+    # build the ivf-pq index
+    dataset = generate_data((n_rows, n_cols), dtype)
+    dataset_device = device_ndarray(dataset)
+
+    build_params = ivf_pq.IndexParams(
+        n_lists=n_lists,
+        pq_bits=pq_bits,
+        pq_dim=pq_dim,
+        codebook_kind=codebook_kind,
+    )
+    index = ivf_pq.build(build_params, dataset_device)
+
+    # test out the ivf_pq.transform function - by transforming
+    # the input dataset ,and making sure the transformed data
+    # matches the encoded version stored with the index
+
+    # collect the pq-encoded data from the index for the expected data
+    labels_exp = np.zeros((n_rows), dtype="uint32")
+    transformed_exp = np.zeros(
+        (n_rows, int(np.ceil(index.pq_dim * index.pq_bits / 8))), dtype="uint8"
+    )
+    for cluster_id in range(n_lists):
+        ids = index.list_indices(cluster_id).copy_to_host()
+        labels_exp[ids] = cluster_id
+        transformed_exp[ids] = index.list_data(cluster_id).copy_to_host()
+
+    # call transform to get actual results, and make sure we're equal to expected values
+    labels, transformed = ivf_pq.transform(index, dataset_device)
+
+    np.testing.assert_array_equal(labels.copy_to_host(), labels_exp)
+    np.testing.assert_array_equal(transformed.copy_to_host(), transformed_exp)

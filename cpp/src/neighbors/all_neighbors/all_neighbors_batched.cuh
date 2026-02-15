@@ -1,20 +1,10 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
+#include "../../core/omp_wrapper.hpp"
 #include "../detail/reachability.cuh"
 #include "all_neighbors_builder.cuh"
 #include "raft/core/logger_macros.hpp"
@@ -126,13 +116,15 @@ void single_gpu_assign_clusters(
   std::optional<raft::device_vector_view<const T, int64_t>> norms_view;
   cuvs::neighbors::brute_force::index<T> brute_force_index(res, centroids, norms_view, metric);
 
+  auto stream = resource::get_cuda_stream(res);
+
   for (size_t i = 0; i < num_batches; i++) {
     size_t row_offset              = n_rows_per_batch * i + base_row_offset;
     size_t n_rows_of_current_batch = std::min(n_rows_per_batch, num_rows - row_offset);
     raft::copy(dataset_batch_d.data_handle(),
                dataset.data_handle() + row_offset * num_cols,
                n_rows_of_current_batch * num_cols,
-               resource::get_cuda_stream(res));
+               stream);
 
     // n_clusters is usually not large, so okay to do this brute-force
     cuvs::neighbors::brute_force::search(res,
@@ -143,7 +135,7 @@ void single_gpu_assign_clusters(
     raft::copy(global_nearest_cluster.data_handle() + row_offset * overlap_factor,
                nearest_clusters_idx_d.data_handle(),
                n_rows_of_current_batch * overlap_factor,
-               resource::get_cuda_stream(res));
+               stream);
   }
 }
 
@@ -185,7 +177,8 @@ void assign_clusters(raft::resources const& res,
     for (int rank = 0; rank < num_ranks; rank++) {
       auto dev_res = raft::resource::set_current_device_to_rank(res, rank);
 
-      auto centroids_matrix = raft::make_device_matrix<T, IdxT>(res, params.n_clusters, num_cols);
+      auto centroids_matrix =
+        raft::make_device_matrix<T, IdxT>(dev_res, params.n_clusters, num_cols);
       raft::copy(centroids_matrix.data_handle(),
                  centroids_h.data_handle(),
                  params.n_clusters * num_cols,
@@ -372,6 +365,9 @@ void multi_gpu_batch_build(const raft::resources& handle,
                raft::resource::get_cuda_stream(handle));
   }
 
+  // Ensure all async copies complete before starting parallel region
+  raft::resource::sync_stream(handle);
+
 #pragma omp parallel for num_threads(num_ranks)
   for (int rank = 0; rank < num_ranks; rank++) {
     auto dev_res = raft::resource::set_current_device_to_rank(handle, rank);
@@ -480,7 +476,7 @@ void batch_build(
 {
   if (raft::resource::is_multi_gpu(handle)) {
     // For efficient CPU-computation of omp parallel for regions per GPU
-    omp_set_nested(1);
+    cuvs::core::omp::set_nested(1);
   }
 
   size_t num_rows = static_cast<size_t>(dataset.extent(0));
@@ -533,9 +529,49 @@ void batch_build(
   auto global_neighbors = raft::make_managed_matrix<IdxT, IdxT>(handle, num_rows, k);
   auto global_distances = raft::make_managed_matrix<T, IdxT>(handle, num_rows, k);
 
+  if (raft::resource::is_multi_gpu(handle)) {
+    // Check if any GPU is Turing (SM 7.5) or older. These architectures have issues with
+    // multi-GPU managed memory coherence for concurrent writes. Force CPU-resident memory
+    // to ensure all GPUs access through host memory, avoiding page migration issues.
+    // Ampere (SM 8.0+) and newer architectures handle this correctly.
+    int num_ranks         = raft::resource::get_num_ranks(handle);
+    bool needs_workaround = false;
+    int original_device;
+    RAFT_CUDA_TRY(cudaGetDevice(&original_device));
+    for (int rank = 0; rank < num_ranks; rank++) {
+      raft::resource::set_current_device_to_rank(handle, rank);
+      int device_id;
+      RAFT_CUDA_TRY(cudaGetDevice(&device_id));
+      int major = 0;
+      RAFT_CUDA_TRY(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device_id));
+      if (major < 8) {
+        needs_workaround = true;
+        break;
+      }  // Turing is 7.x, Ampere is 8.x
+    }
+    RAFT_CUDA_TRY(cudaSetDevice(original_device));
+
+    if (needs_workaround) {
+      RAFT_LOG_DEBUG("Applying managed memory workaround for pre-Ampere GPU architecture");
+      cudaMemLocation cpu_location = {cudaMemLocationTypeHost, 0};
+      RAFT_CUDA_TRY(cudaMemAdvise(global_neighbors.data_handle(),
+                                  num_rows * k * sizeof(IdxT),
+                                  cudaMemAdviseSetPreferredLocation,
+                                  cpu_location));
+      RAFT_CUDA_TRY(cudaMemAdvise(global_distances.data_handle(),
+                                  num_rows * k * sizeof(T),
+                                  cudaMemAdviseSetPreferredLocation,
+                                  cpu_location));
+    }
+  }
+
   reset_global_matrices(handle, params.metric, global_neighbors.view(), global_distances.view());
 
   if (raft::resource::is_multi_gpu(handle)) {
+    // For multi-GPU: sync the stream to ensure fill completes before other GPUs access
+    // the managed memory.
+    raft::resource::sync_stream(handle);
+
     multi_gpu_batch_build(handle,
                           params,
                           dataset,

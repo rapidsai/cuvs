@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2018-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2026, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 // XXX: We allow the instantiation of masked_l2_nn here:
@@ -34,7 +23,7 @@
 #include <raft/sparse/convert/csr.cuh>
 #include <raft/sparse/coo.hpp>
 #include <raft/sparse/linalg/symmetrize.cuh>
-#include <raft/sparse/mst/mst.cuh>
+#include <raft/sparse/solver/mst.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
 
@@ -100,16 +89,17 @@ class ConnectComponentsTest
      */
     rmm::device_uvector<value_idx> colors(params.n_row, stream);
 
-    auto mst_coo = raft::mst::mst<value_idx, value_idx, value_t, double>(handle,
-                                                                         indptr.data(),
-                                                                         knn_graph_coo.cols(),
-                                                                         knn_graph_coo.vals(),
-                                                                         params.n_row,
-                                                                         knn_graph_coo.nnz,
-                                                                         colors.data(),
-                                                                         stream,
-                                                                         false,
-                                                                         true);
+    auto mst_coo =
+      raft::sparse::solver::mst<value_idx, value_idx, value_t, double>(handle,
+                                                                       indptr.data(),
+                                                                       knn_graph_coo.cols(),
+                                                                       knn_graph_coo.vals(),
+                                                                       params.n_row,
+                                                                       knn_graph_coo.nnz,
+                                                                       colors.data(),
+                                                                       stream,
+                                                                       false,
+                                                                       true);
 
     /**
      * 3. cross_component_nn to fix connectivities
@@ -154,16 +144,16 @@ class ConnectComponentsTest
     raft::sparse::convert::sorted_coo_to_csr(
       out_edges.rows(), out_edges.nnz, indptr2.data(), params.n_row + 1, stream);
 
-    auto output_mst = raft::mst::mst<value_idx, value_idx, value_t>(handle,
-                                                                    indptr2.data(),
-                                                                    out_edges.cols(),
-                                                                    out_edges.vals(),
-                                                                    params.n_row,
-                                                                    out_edges.nnz,
-                                                                    colors.data(),
-                                                                    stream,
-                                                                    false,
-                                                                    false);
+    auto output_mst = raft::sparse::solver::mst<value_idx, value_idx, value_t>(handle,
+                                                                               indptr2.data(),
+                                                                               out_edges.cols(),
+                                                                               out_edges.vals(),
+                                                                               params.n_row,
+                                                                               out_edges.nnz,
+                                                                               colors.data(),
+                                                                               stream,
+                                                                               false,
+                                                                               false);
 
     raft::resource::sync_stream(handle, stream);
 

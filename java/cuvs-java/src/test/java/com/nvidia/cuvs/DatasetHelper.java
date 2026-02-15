@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs;
 
@@ -23,11 +12,35 @@ public class DatasetHelper {
 
   private static final MethodHandle createDataset$mh =
       CuVSProvider.provider().newNativeMatrixBuilder();
+  private static final MethodHandle createDatasetWithStrides$mh =
+      CuVSProvider.provider().newNativeMatrixBuilderWithStrides();
 
   public static CuVSMatrix fromMemorySegment(
       MemorySegment memorySegment, int size, int dimensions, CuVSMatrix.DataType dataType) {
     try {
       return (CuVSMatrix) createDataset$mh.invokeExact(memorySegment, size, dimensions, dataType);
+    } catch (Throwable e) {
+      if (e instanceof Error err) {
+        throw err;
+      } else if (e instanceof RuntimeException re) {
+        throw re;
+      } else {
+        throw new RuntimeException(e);
+      }
+    }
+  }
+
+  public static CuVSMatrix fromMemorySegment(
+      MemorySegment memorySegment,
+      int size,
+      int dimensions,
+      int rowStride,
+      int columnStride,
+      CuVSMatrix.DataType dataType) {
+    try {
+      return (CuVSMatrix)
+          createDatasetWithStrides$mh.invokeExact(
+              memorySegment, size, dimensions, rowStride, columnStride, dataType);
     } catch (Throwable e) {
       if (e instanceof Error err) {
         throw err;

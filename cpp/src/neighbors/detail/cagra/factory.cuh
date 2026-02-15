@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -30,14 +19,15 @@ template <typename DataT,
           typename IndexT,
           typename DistanceT,
           typename CagraSampleFilterT = cuvs::neighbors::filtering::none_sample_filter,
-          typename OutputIndexT       = IndexT>
+          typename SourceIndexT       = IndexT,
+          typename OutputIndexT       = SourceIndexT>
 class factory {
  public:
   /**
    * Create a search structure for dataset with dim features.
    */
   static std::unique_ptr<
-    search_plan_impl<DataT, IndexT, DistanceT, CagraSampleFilterT, OutputIndexT>>
+    search_plan_impl<DataT, IndexT, DistanceT, CagraSampleFilterT, SourceIndexT, OutputIndexT>>
   create(raft::resources const& res,
          search_params const& params,
          const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
@@ -52,22 +42,25 @@ class factory {
 
  private:
   static std::unique_ptr<
-    search_plan_impl<DataT, IndexT, DistanceT, CagraSampleFilterT, OutputIndexT>>
+    search_plan_impl<DataT, IndexT, DistanceT, CagraSampleFilterT, SourceIndexT, OutputIndexT>>
   dispatch_kernel(raft::resources const& res,
                   search_plan_impl_base& plan,
                   const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc)
   {
     if (plan.algo == search_algo::SINGLE_CTA) {
       return std::make_unique<
-        single_cta_search::search<DataT, IndexT, DistanceT, CagraSampleFilterT, OutputIndexT>>(
+        single_cta_search::
+          search<DataT, IndexT, DistanceT, CagraSampleFilterT, SourceIndexT, OutputIndexT>>(
         res, plan, dataset_desc, plan.dim, plan.dataset_size, plan.graph_degree, plan.topk);
     } else if (plan.algo == search_algo::MULTI_CTA) {
       return std::make_unique<
-        multi_cta_search::search<DataT, IndexT, DistanceT, CagraSampleFilterT, OutputIndexT>>(
+        multi_cta_search::
+          search<DataT, IndexT, DistanceT, CagraSampleFilterT, SourceIndexT, OutputIndexT>>(
         res, plan, dataset_desc, plan.dim, plan.dataset_size, plan.graph_degree, plan.topk);
     } else {
       return std::make_unique<
-        multi_kernel_search::search<DataT, IndexT, DistanceT, CagraSampleFilterT, OutputIndexT>>(
+        multi_kernel_search::
+          search<DataT, IndexT, DistanceT, CagraSampleFilterT, SourceIndexT, OutputIndexT>>(
         res, plan, dataset_desc, plan.dim, plan.dataset_size, plan.graph_degree, plan.topk);
     }
   }
@@ -160,7 +153,8 @@ template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT
 auto dataset_descriptor_init_with_cache(const raft::resources& res,
                                         const cagra::search_params& params,
                                         const DatasetT& dataset,
-                                        cuvs::distance::DistanceType metric)
+                                        cuvs::distance::DistanceType metric,
+                                        const DistanceT* dataset_norms = nullptr)
   -> dataset_descriptor_host<DataT, IndexT, DistanceT>
 {
   auto key = descriptor_cache::make_key(params, dataset, metric);
@@ -169,7 +163,8 @@ auto dataset_descriptor_init_with_cache(const raft::resources& res,
       ->value;
   dataset_descriptor_host<DataT, IndexT, DistanceT> desc;
   if (!cache.get(key, &desc)) {
-    desc = dataset_descriptor_init<DataT, IndexT, DistanceT>(params, dataset, metric);
+    desc =
+      dataset_descriptor_init<DataT, IndexT, DistanceT>(params, dataset, metric, dataset_norms);
     cache.set(key, desc);
   }
   return desc;

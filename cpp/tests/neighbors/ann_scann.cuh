@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
@@ -24,7 +13,7 @@
 #include <raft/linalg/add.cuh>
 #include <raft/matrix/gather.cuh>
 #include <rmm/cuda_stream_pool.hpp>
-#include <rmm/mr/device/managed_memory_resource.hpp>
+#include <rmm/mr/managed_memory_resource.hpp>
 #include <thrust/sequence.h>
 
 namespace cuvs::neighbors::experimental::scann {
@@ -131,7 +120,7 @@ class scann_test : public ::testing::TestWithParam<scann_inputs> {
     ASSERT_EQ(index.pq_codebook().extent(0), num_pq_clusters);
     ASSERT_EQ(index.pq_codebook().extent(1), ps.dim);
 
-    IdxT expected_bf16_size = ps.index_params.bf16_enabled ? ps.dim * ps.num_db_vecs : 0;
+    IdxT expected_bf16_size = ps.index_params.reordering_bf16 ? ps.dim * ps.num_db_vecs : 0;
 
     ASSERT_EQ(index.bf16_dataset().size(), expected_bf16_size);
   }
@@ -227,7 +216,16 @@ inline auto big_dims_all_pq_bits() -> test_cases_t
 inline auto bf16() -> test_cases_t
 {
   scann_inputs ts;
-  ts.index_params.bf16_enabled = true;
+  ts.index_params.reordering_bf16 = true;
+
+  return {ts};
+}
+
+inline auto bf16_avq() -> test_cases_t
+{
+  scann_inputs ts;
+  ts.index_params.reordering_bf16                    = true;
+  ts.index_params.reordering_noise_shaping_threshold = 0.2;
 
   return {ts};
 }

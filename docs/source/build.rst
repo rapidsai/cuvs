@@ -31,6 +31,8 @@ The cuVS software development kit provides APIs for C, C++, Python, and Rust lan
 Installing Pre-compiled Packages
 --------------------------------
 
+**Note:** The cuVS pre-compiled packages are available for **Linux** only (x86_64 and aarch64 architectures). Native Windows support is not available at this time. On Windows, use **WSL2** with GPU passthrough. See the `RAPIDS WSL2 guide <https://rapids.ai/start.html#wsl2>`_.
+
 C, C++, and Python through Conda
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -43,6 +45,10 @@ C/C++ Package
 
 .. code-block:: bash
 
+   # CUDA 13
+   conda install -c rapidsai -c conda-forge libcuvs cuda-version=13.1
+
+   # CUDA 12
    conda install -c rapidsai -c conda-forge libcuvs cuda-version=12.9
 
 Python Package
@@ -50,6 +56,10 @@ Python Package
 
 .. code-block:: bash
 
+   # CUDA 13
+   conda install -c rapidsai -c conda-forge cuvs cuda-version=13.1
+
+   # CUDA 12
    conda install -c rapidsai -c conda-forge cuvs cuda-version=12.9
 
 Python through Pip
@@ -57,10 +67,12 @@ Python through Pip
 
 The cuVS Python package can also be `installed through pip <https://docs.rapids.ai/install#pip>`_.
 
-For CUDA 12 packages:
-
 .. code-block:: bash
 
+    # CUDA 13
+    pip install cuvs-cu13 --extra-index-url=https://pypi.nvidia.com
+
+    # CUDA 12
     pip install cuvs-cu12 --extra-index-url=https://pypi.nvidia.com
 
 Note: these packages statically link the C and C++ libraries so the `libcuvs` and `libcuvs_c` shared libraries won't be readily available to use in your code.
@@ -76,7 +88,7 @@ Prerequisites
 
 - CMake 3.26.4+
 - GCC 9.3+ (11.4+ recommended)
-- CUDA Toolkit 12.0+
+- CUDA Toolkit 12.2+
 - Ampere architecture or better (compute capability >= 8.0)
 
 Create a build environment
@@ -86,7 +98,7 @@ Conda environment scripts are provided for installing the necessary dependencies
 
 .. code-block:: bash
 
-    conda env create --name cuvs -f conda/environments/all_cuda-128_arch-x86_64.yaml
+    conda env create --name cuvs -f conda/environments/all_cuda-131_arch-$(uname -m).yaml
     conda activate cuvs
 
 The recommended way to build and install cuVS from source is to use the `build.sh` script in the root of the repository. This script can build both the C++ and Python artifacts and provides CMake options for building and installing the headers, tests, benchmarks, and the pre-compiled shared library.

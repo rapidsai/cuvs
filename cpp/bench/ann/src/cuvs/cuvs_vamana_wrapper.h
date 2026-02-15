@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
@@ -65,10 +54,10 @@ class cuvs_vamana : public algo<T>, public algo_gpu {
   std::unique_ptr<algo<T>> copy() override { return std::make_unique<cuvs_vamana<T, IdxT>>(*this); }
 
  private:
-  std::shared_ptr<cuvs::neighbors::vamana::index<T, IdxT>> vamana_index_;
-  std::shared_ptr<diskann_memory<T>> diskann_memory_search_;
   configured_raft_resources handle_{};
   build_param vamana_index_params_;
+  std::shared_ptr<cuvs::neighbors::vamana::index<T, IdxT>> vamana_index_;
+  std::shared_ptr<diskann_memory<T>> diskann_memory_search_;
 };
 
 template <typename T, typename IdxT>
@@ -85,7 +74,7 @@ void cuvs_vamana<T, IdxT>::build(const T* dataset, size_t nrow)
 {
   auto dataset_view_host = raft::make_mdspan<const T, int64_t, raft::row_major, true, false>(
     dataset, raft::make_extents<int64_t>(nrow, this->dim_));
-  auto dataset_view_device = raft::make_mdspan<const T, int64_t, raft::row_major, true, false>(
+  auto dataset_view_device = raft::make_mdspan<const T, int64_t, raft::row_major, false, true>(
     dataset, raft::make_extents<int64_t>(nrow, this->dim_));
   bool dataset_is_on_host = raft::get_device_for_address(dataset) == -1;
 

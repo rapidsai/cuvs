@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs;
 
@@ -20,6 +9,7 @@ import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
 import com.nvidia.cuvs.CagraIndexParams.CuvsDistanceType;
+import com.nvidia.cuvs.HnswIndexParams.HnswHierarchy;
 import java.lang.invoke.MethodHandles;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -114,7 +104,7 @@ public class HnswRandomizedIT extends CuVSTestCase {
       final CagraIndex index;
       if (useNativeMemoryDataset) {
         var datasetBuilder =
-            CuVSMatrix.builder(vectors.length, vectors[0].length, CuVSMatrix.DataType.FLOAT);
+            CuVSMatrix.hostBuilder(vectors.length, vectors[0].length, CuVSMatrix.DataType.FLOAT);
         for (float[] v : vectors) {
           datasetBuilder.addVector(v);
         }
@@ -140,8 +130,9 @@ public class HnswRandomizedIT extends CuVSTestCase {
           index.serializeToHNSW(outputStream); // fails here
         }
 
+        // Use NONE hierarchy since serializeToHNSW creates a base-layer-only index
         HnswIndexParams hnswIndexParams =
-            new HnswIndexParams.Builder().withVectorDimension(dimensions).build();
+            new HnswIndexParams.Builder().withVectorDimension(dimensions).withHierarchy(HnswHierarchy.NONE).build();
 
         try (var inputStreamHNSW = Files.newInputStream(hnswIndexPath)) {
           HnswIndex hnswIndex =

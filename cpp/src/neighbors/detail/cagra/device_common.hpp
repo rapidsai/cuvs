@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
@@ -87,11 +76,11 @@ template <typename T>
 RAFT_DEVICE_INLINE_FUNCTION auto team_sum(T x, uint32_t team_size_bitshift) -> T
 {
   switch (team_size_bitshift) {
-    case 5: x += raft::shfl_xor(x, 16);
-    case 4: x += raft::shfl_xor(x, 8);
-    case 3: x += raft::shfl_xor(x, 4);
-    case 2: x += raft::shfl_xor(x, 2);
-    case 1: x += raft::shfl_xor(x, 1);
+    case 5: x += raft::shfl_xor(x, 16); [[fallthrough]];
+    case 4: x += raft::shfl_xor(x, 8); [[fallthrough]];
+    case 3: x += raft::shfl_xor(x, 4); [[fallthrough]];
+    case 2: x += raft::shfl_xor(x, 2); [[fallthrough]];
+    case 1: x += raft::shfl_xor(x, 1); [[fallthrough]];
     default: return x;
   }
 }
@@ -117,7 +106,6 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
 {
   const auto team_size_bits = dataset_desc.team_size_bitshift_from_smem();
   const auto max_i = raft::round_up_safe<uint32_t>(num_pickup, warp_size >> team_size_bits);
-  const auto compute_distance = dataset_desc.compute_distance_impl;
 
   for (uint32_t i = threadIdx.x >> team_size_bits; i < max_i; i += (blockDim.x >> team_size_bits)) {
     const bool valid_i = (i < num_pickup);
@@ -126,7 +114,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
     DistanceT best_norm2_team_local = raft::upper_bound<DistanceT>();
     for (uint32_t j = 0; j < num_distilation; j++) {
       // Select a node randomly and compute the distance to it
-      IndexT seed_index;
+      IndexT seed_index = 0;
       if (valid_i) {
         // uint32_t gid = i + (num_pickup * (j + (num_distilation * block_id)));
         uint32_t gid = block_id + (num_blocks * (i + (num_pickup * j)));

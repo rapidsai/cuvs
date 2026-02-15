@@ -1,14 +1,18 @@
 #!/bin/bash
-# Copyright (c) 2023-2024, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 
 set -euo pipefail
 
 rapids-logger "Downloading artifacts from previous jobs"
 CPP_CHANNEL=$(rapids-download-conda-from-github cpp)
-PYTHON_CHANNEL=$(rapids-download-conda-from-github python)
+PYTHON_CHANNEL=$(rapids-download-from-github "$(rapids-package-name "conda_python" cuvs --stable --cuda "$RAPIDS_CUDA_VERSION")")
 
 rapids-logger "Create test conda environment"
 . /opt/conda/etc/profile.d/conda.sh
+
+rapids-logger "Configuring conda strict channel priority"
+conda config --set channel_priority strict
 
 RAPIDS_VERSION_MAJOR_MINOR="$(rapids-version-major-minor)"
 export RAPIDS_VERSION_MAJOR_MINOR
@@ -41,17 +45,17 @@ popd
 
 rapids-logger "Build Rust docs"
 pushd rust
-LIBCLANG_PATH=$(dirname "$(find /opt/conda -name libclang.so | head -n 1)")
+LIBCLANG_PATH=$(dirname "$(find "$CONDA_PREFIX" -name libclang.so | head -n 1)")
 export LIBCLANG_PATH
 cargo doc -p cuvs --no-deps
 popd
 
 rapids-logger "Build Python docs"
 pushd docs
-sphinx-build -b dirhtml source _html
-mv ../rust/target/doc ./_html/_static/rust
+make dirhtml
+mv ../rust/target/doc ./build/dirhtml/_static/rust
 mkdir -p "${RAPIDS_DOCS_DIR}/cuvs/"html
-mv _html/* "${RAPIDS_DOCS_DIR}/cuvs/html"
+mv build/dirhtml/* "${RAPIDS_DOCS_DIR}/cuvs/html"
 popd
 
 RAPIDS_VERSION_NUMBER="${RAPIDS_VERSION_MAJOR_MINOR}" rapids-upload-docs

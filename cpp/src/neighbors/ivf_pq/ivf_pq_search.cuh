@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2022-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -26,7 +15,6 @@
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/selection/select_k.hpp>
-#include <raft/core/cudart_utils.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/operators.hpp>
@@ -45,13 +33,14 @@
 #include <raft/matrix/select_k.cuh>
 #include <raft/util/cache.hpp>
 #include <raft/util/cuda_utils.cuh>
+#include <raft/util/cudart_utils.hpp>
 #include <raft/util/device_atomics.cuh>
 #include <raft/util/device_loads_stores.cuh>
 #include <raft/util/pow2_utils.cuh>
 #include <raft/util/vectorized.cuh>
 
 #include <rmm/cuda_stream_view.hpp>
-#include <rmm/mr/device/per_device_resource.hpp>
+#include <rmm/mr/per_device_resource.hpp>
 
 #include <cub/cub.cuh>
 #include <cuda_fp16.h>
@@ -417,10 +406,7 @@ template <typename OutT, typename LutT, typename IvfSampleFilterT>
 struct search_kernel_cache {
   /** Number of matmul invocations to cache. */
   static constexpr size_t kDefaultSize = 100;
-  raft::cache::lru<search_kernel_key,
-                   search_kernel_key_hash,
-                   std::equal_to<>,
-                   selected<OutT, LutT, IvfSampleFilterT>>
+  raft::cache::lru<search_kernel_key, search_kernel_key_hash, std::equal_to<>, selected<OutT, LutT>>
     value{kDefaultSize};
 };
 
@@ -557,7 +543,7 @@ void ivfpq_search_worker(raft::resources const& handle,
     } break;
   }
 
-  selected<ScoreT, LutT, IvfSampleFilterT> search_instance;
+  selected<ScoreT, LutT> search_instance;
   search_kernel_key search_key{manage_local_topk,
                                coresidency,
                                preferred_shmem_carveout,
@@ -571,17 +557,17 @@ void ivfpq_search_worker(raft::resources const& handle,
     raft::resource::get_custom_resource<search_kernel_cache<ScoreT, LutT, IvfSampleFilterT>>(handle)
       ->value;
   if (!cache.get(search_key, &search_instance)) {
-    search_instance = compute_similarity_select<ScoreT, LutT, IvfSampleFilterT>(
-      raft::resource::get_device_properties(handle),
-      manage_local_topk,
-      coresidency,
-      preferred_shmem_carveout,
-      index.pq_bits(),
-      index.pq_dim(),
-      precomp_data_count,
-      n_queries,
-      n_probes,
-      topK);
+    search_instance =
+      compute_similarity_select<ScoreT, LutT>(raft::resource::get_device_properties(handle),
+                                              manage_local_topk,
+                                              coresidency,
+                                              preferred_shmem_carveout,
+                                              index.pq_bits(),
+                                              index.pq_dim(),
+                                              precomp_data_count,
+                                              n_queries,
+                                              n_probes,
+                                              topK);
     cache.set(search_key, search_instance);
   }
 
@@ -835,7 +821,7 @@ inline auto get_centers(const raft::resources& res, const index<IdxT>& index)
   if constexpr (std::is_same_v<T, int8_t>) { return index.centers_int8(res); }
 }
 
-/** See raft::spatial::knn::ivf_pq::search docs */
+/** See cuvs::spatial::knn::ivf_pq::search docs */
 template <typename T,
           typename IdxT,
           typename IvfSampleFilterT = cuvs::neighbors::filtering::none_sample_filter>
@@ -852,12 +838,6 @@ inline void search(raft::resources const& handle,
   static_assert(std::is_same_v<T, float> || std::is_same_v<T, half> || std::is_same_v<T, uint8_t> ||
                   std::is_same_v<T, int8_t>,
                 "Unsupported element type.");
-  if (index.metric() == distance::DistanceType::CosineExpanded) {
-    if constexpr (std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>)
-      RAFT_FAIL(
-        "CosineExpanded distance metric is currently not supported for uint8_t and int8_t data "
-        "type");
-  }
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_pq::search(n_queries = %u, n_probes = %u, k = %u, dim = %zu)",
     n_queries,
@@ -879,6 +859,9 @@ inline void search(raft::resources const& handle,
     static_cast<uint64_t>(index.size()));
   RAFT_EXPECTS(params.n_probes > 0,
                "n_probes (number of clusters to probe in the search) must be positive.");
+  RAFT_EXPECTS(index.codes_layout() == list_layout::INTERLEAVED,
+               "IVF-PQ search requires INTERLEAVED codes layout. FLAT layout is not supported for "
+               "GPU search.");
 
   switch (utils::check_pointer_residency(queries, neighbors, distances)) {
     case utils::pointer_residency::device_only:

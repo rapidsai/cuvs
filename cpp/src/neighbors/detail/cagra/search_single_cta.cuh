@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
@@ -52,9 +41,12 @@ template <typename DataT,
           typename IndexT,
           typename DistanceT,
           typename SAMPLE_FILTER_T,
-          typename OutputIndexT = IndexT>
-struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, OutputIndexT> {
-  using base_type  = search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, OutputIndexT>;
+          typename SourceIndexT = IndexT,
+          typename OutputIndexT = SourceIndexT>
+struct search
+  : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, SourceIndexT, OutputIndexT> {
+  using base_type =
+    search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, SourceIndexT, OutputIndexT>;
   using DATA_T     = typename base_type::DATA_T;
   using INDEX_T    = typename base_type::INDEX_T;
   using DISTANCE_T = typename base_type::DISTANCE_T;
@@ -125,7 +117,7 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, Outp
     //
     // Determine the thread block size
     //
-    constexpr unsigned min_block_size       = 64;  // 32 or 64
+    constexpr unsigned min_block_size       = 64;
     constexpr unsigned min_block_size_radix = 256;
     constexpr unsigned max_block_size       = 1024;
     //
@@ -137,13 +129,17 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, Outp
       sizeof(std::uint32_t) * topk_ws_size + sizeof(std::uint32_t);
 
     std::uint32_t additional_smem_size = 0;
-    if (num_itopk_candidates > 256) {
-      // Tentatively calculate the required share memory size when radix
-      // sort based topk is used, assuming the block size is the maximum.
+    if (num_itopk_candidates > 256) {  // radix sort
+      // Tentatively calculate the required shared memory size when radix sort based topk is used,
+      // assuming the block size is the maximum.
       if (itopk_size <= 256) {
-        additional_smem_size += topk_by_radix_sort<256, INDEX_T>::smem_size * sizeof(std::uint32_t);
+        constexpr unsigned MAX_ITOPK = 256;
+        additional_smem_size +=
+          topk_by_radix_sort<INDEX_T>::smem_size(MAX_ITOPK) * sizeof(std::uint32_t);
       } else {
-        additional_smem_size += topk_by_radix_sort<512, INDEX_T>::smem_size * sizeof(std::uint32_t);
+        constexpr unsigned MAX_ITOPK = 512;
+        additional_smem_size +=
+          topk_by_radix_sort<INDEX_T>::smem_size(MAX_ITOPK) * sizeof(std::uint32_t);
       }
     }
 
@@ -160,7 +156,7 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, Outp
     if (block_size == 0) {
       block_size = min_block_size;
 
-      if (num_itopk_candidates > 256) {
+      if (num_itopk_candidates > 256) {  // radix sort
         // radix-based topk is used.
         block_size = min_block_size_radix;
 
@@ -198,19 +194,6 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, Outp
                  max_block_size);
     thread_block_size = block_size;
 
-    if (num_itopk_candidates <= 256) {
-      RAFT_LOG_DEBUG("# bitonic-sort based topk routine is used");
-    } else {
-      RAFT_LOG_DEBUG("# radix-sort based topk routine is used");
-      smem_size = base_smem_size;
-      if (itopk_size <= 256) {
-        constexpr unsigned MAX_ITOPK = 256;
-        smem_size += topk_by_radix_sort<MAX_ITOPK, INDEX_T>::smem_size * sizeof(std::uint32_t);
-      } else {
-        constexpr unsigned MAX_ITOPK = 512;
-        smem_size += topk_by_radix_sort<MAX_ITOPK, INDEX_T>::smem_size * sizeof(std::uint32_t);
-      }
-    }
     RAFT_LOG_DEBUG("# smem_size: %u", smem_size);
     hashmap_size = 0;
     if (small_hash_bitlen == 0 && !this->persistent) {
@@ -220,16 +203,18 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, Outp
     RAFT_LOG_DEBUG("# hashmap_size: %lu", hashmap_size);
   }
 
-  void operator()(raft::resources const& res,
-                  raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,
-                  OutputIndexT* const result_indices_ptr,  // [num_queries, topk]
-                  DISTANCE_T* const result_distances_ptr,  // [num_queries, topk]
-                  const DATA_T* const queries_ptr,         // [num_queries, dataset_dim]
-                  const std::uint32_t num_queries,
-                  const INDEX_T* dev_seed_ptr,                   // [num_queries, num_seeds]
-                  std::uint32_t* const num_executed_iterations,  // [num_queries]
-                  uint32_t topk,
-                  SAMPLE_FILTER_T sample_filter)
+  void operator()(
+    raft::resources const& res,
+    raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,
+    std::optional<raft::device_vector_view<const SourceIndexT, int64_t>> source_indices,
+    OutputIndexT* const result_indices_ptr,  // [num_queries, topk]
+    DISTANCE_T* const result_distances_ptr,  // [num_queries, topk]
+    const DATA_T* const queries_ptr,         // [num_queries, dataset_dim]
+    const std::uint32_t num_queries,
+    const INDEX_T* dev_seed_ptr,                   // [num_queries, num_seeds]
+    std::uint32_t* const num_executed_iterations,  // [num_queries]
+    uint32_t topk,
+    SAMPLE_FILTER_T sample_filter)
   {
     cudaStream_t stream                 = raft::resource::get_cuda_stream(res);
     constexpr uintptr_t kOutputIndexTag = raft::Pow2<sizeof(OutputIndexT)>::Log2;
@@ -242,6 +227,7 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, Outp
     }
     select_and_run(dataset_desc,
                    graph,
+                   source_indices,
                    // NB: tag the indices pointer with its element size.
                    //     This allows us to avoid multiplying kernel instantiations
                    //     and any costs for extra registers in the kernel signature.

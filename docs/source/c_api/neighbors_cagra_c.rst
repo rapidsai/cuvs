@@ -8,7 +8,7 @@ CAGRA is a graph-based nearest neighbors algorithm that was built from the groun
    :language: c
    :class: highlight
 
-``#include <raft/neighbors/cagra.h>``
+``#include <cuvs/neighbors/cagra.h>``
 
 Index build parameters
 ----------------------
@@ -51,7 +51,7 @@ Index search
     :content-only:
 
 Index serialize
-------------
+---------------
 
 .. doxygengroup:: cagra_c_index_serialize
     :project: cuvs

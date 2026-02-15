@@ -1,10 +1,10 @@
 #!/bin/bash
-# Copyright (c) 2022-2024, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 
 set -euo pipefail
 
 source rapids-configure-sccache
-
 source rapids-date-string
 
 export CMAKE_GENERATOR=Ninja
@@ -19,9 +19,6 @@ version=$(rapids-generate-version)
 export RAPIDS_PACKAGE_VERSION=${version}
 echo "${version}" > VERSION
 
-sccache --zero-stats
-
-
 # populates `RATTLER_CHANNELS` array and `RATTLER_ARGS` array
 source rapids-rattler-channel-string
 
@@ -29,9 +26,9 @@ rapids-logger "Prepending channel ${CPP_CHANNEL} to RATTLER_CHANNELS"
 
 RATTLER_CHANNELS=("--channel" "${CPP_CHANNEL}" "${RATTLER_CHANNELS[@]}")
 
-sccache --zero-stats
-
 rapids-logger "Building cuvs"
+
+sccache --stop-server 2>/dev/null || true
 
 # --no-build-id allows for caching with `sccache`
 # more info is available at
@@ -41,7 +38,7 @@ rattler-build build --recipe conda/recipes/cuvs \
                     "${RATTLER_CHANNELS[@]}"
 
 sccache --show-adv-stats
-sccache --zero-stats
+sccache --stop-server >/dev/null 2>&1 || true
 
 rattler-build build --recipe conda/recipes/cuvs-bench \
                     --test skip \
@@ -49,14 +46,18 @@ rattler-build build --recipe conda/recipes/cuvs-bench \
                     "${RATTLER_CHANNELS[@]}"
 
 sccache --show-adv-stats
-sccache --zero-stats
+sccache --stop-server >/dev/null 2>&1 || true
 
 # Build cuvs-bench-cpu only in one CUDA major version since it only depends on
 # python version
 RAPIDS_CUDA_MAJOR="${RAPIDS_CUDA_VERSION%%.*}"
-if [[ ${RAPIDS_CUDA_MAJOR} == "12" ]]; then
+if [[ ${RAPIDS_CUDA_MAJOR} == "13" ]]; then
   rattler-build build --recipe conda/recipes/cuvs-bench-cpu \
                       "${RATTLER_ARGS[@]}" \
                       "${RATTLER_CHANNELS[@]}"
   sccache --show-adv-stats
+  sccache --stop-server >/dev/null 2>&1 || true
 fi
+
+RAPIDS_PACKAGE_NAME="$(rapids-package-name conda_python cuvs --stable --cuda "$RAPIDS_CUDA_VERSION")"
+export RAPIDS_PACKAGE_NAME

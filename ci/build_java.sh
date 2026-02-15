@@ -1,7 +1,14 @@
 #!/bin/bash
-# Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 
 set -euo pipefail
+
+source rapids-configure-sccache
+
+export SCCACHE_S3_KEY_PREFIX="cuvs-java/${RAPIDS_CONDA_ARCH}/cuda${RAPIDS_CUDA_VERSION%%.*}/maven/objects-cache"
+export SCCACHE_S3_PREPROCESSOR_CACHE_KEY_PREFIX="cuvs-java/${RAPIDS_CONDA_ARCH}/cuda${RAPIDS_CUDA_VERSION%%.*}/maven/preprocessor-cache"
+export SCCACHE_S3_USE_PREPROCESSOR_CACHE_MODE=true
 
 # TODO: Remove this argument-handling when build and test workflows are separated,
 #       and test_java.sh no longer calls build_java.sh
@@ -11,7 +18,12 @@ if [[ "${1:-}" == "--run-java-tests" ]]; then
   EXTRA_BUILD_ARGS+=("--run-java-tests")
 fi
 
-. /opt/conda/etc/profile.d/conda.sh
+if [ -e "/opt/conda/etc/profile.d/conda.sh" ]; then
+  . /opt/conda/etc/profile.d/conda.sh
+fi
+
+rapids-logger "Configuring conda strict channel priority"
+conda config --set channel_priority strict
 
 rapids-logger "Downloading artifacts from previous jobs"
 CPP_CHANNEL=$(rapids-download-conda-from-github cpp)
@@ -41,7 +53,13 @@ set +e
 
 rapids-logger "Run Java build"
 
+RAPIDS_CUDA_MAJOR="${RAPIDS_CUDA_VERSION%%.*}"
+export RAPIDS_CUDA_MAJOR
+
 bash ./build.sh java "${EXTRA_BUILD_ARGS[@]}"
+
+sccache --show-adv-stats
+sccache --stop-server >/dev/null 2>&1 || true
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}

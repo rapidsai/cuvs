@@ -14,7 +14,7 @@ RMM currently has APIs for C++ and Python.
 C++
 ^^^
 
-Here's an example of configuring RMM to use a pool allocator in C++ (derived from the RMM example `here <https://github.com/rapidsai/rmm?tab=readme-ov-file#example>`_):
+Here's an example of configuring RMM to use a pool allocator in C++ (derived from the RMM example `here <https://github.com/rapidsai/rmm?tab=readme-ov-file#example>`__):
 
 .. code-block:: c++
 
@@ -29,7 +29,7 @@ Here's an example of configuring RMM to use a pool allocator in C++ (derived fro
 Python
 ^^^^^^
 
-And the corresponding code in Python (derived from the RMM example `here <https://github.com/rapidsai/rmm?tab=readme-ov-file#memoryresource-objects>`_):
+And the corresponding code in Python (derived from the RMM example `here <https://github.com/rapidsai/rmm?tab=readme-ov-file#memoryresource-objects>`__):
 
 .. code-block:: python
 

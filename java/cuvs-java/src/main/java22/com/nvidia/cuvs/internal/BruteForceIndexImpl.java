@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.internal;
 
@@ -28,15 +17,7 @@ import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.common.Util.concatenate;
 import static com.nvidia.cuvs.internal.common.Util.cudaMemcpy;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceBuild;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceDeserialize;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceIndexCreate;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceIndexDestroy;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceIndex_t;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceSearch;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceSerialize;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
-import static com.nvidia.cuvs.internal.panama.headers_h.omp_set_num_threads;
+import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import com.nvidia.cuvs.BruteForceIndex;
 import com.nvidia.cuvs.BruteForceIndexParams;
@@ -86,8 +67,8 @@ public class BruteForceIndexImpl implements BruteForceIndex {
     Objects.requireNonNull(dataset);
     try (dataset) {
       this.resources = resources;
-      assert dataset instanceof CuVSMatrixBaseImpl;
-      this.bruteForceIndexReference = build((CuVSMatrixBaseImpl) dataset, bruteForceIndexParams);
+      assert dataset instanceof CuVSMatrixInternal;
+      this.bruteForceIndexReference = build((CuVSMatrixInternal) dataset, bruteForceIndexParams);
     }
   }
 
@@ -132,7 +113,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
    * index
    */
   private IndexReference build(
-      CuVSMatrixBaseImpl dataset, BruteForceIndexParams bruteForceIndexParams) {
+      CuVSMatrixInternal dataset, BruteForceIndexParams bruteForceIndexParams) {
     long rows = dataset.size();
     long cols = dataset.columns();
 
@@ -153,7 +134,8 @@ public class BruteForceIndexImpl implements BruteForceIndex {
         long[] datasetShape = {rows, cols};
         var tensorDataArena = Arena.ofShared();
         MemorySegment datasetTensor =
-            prepareTensor(tensorDataArena, datasetMemorySegmentP, datasetShape, 2, 32, 2, 1);
+            prepareTensor(
+                tensorDataArena, datasetMemorySegmentP, datasetShape, kDLFloat(), 32, kDLCUDA());
 
         var returnValue = cuvsStreamSync(cuvsResources);
         checkCuVSError(returnValue, "cuvsStreamSync");
@@ -236,13 +218,16 @@ public class BruteForceIndexImpl implements BruteForceIndex {
 
           long[] queriesShape = {numQueries, vectorDimension};
           MemorySegment queriesTensor =
-              prepareTensor(localArena, queriesDP.handle(), queriesShape, 2, 32, 2, 1);
+              prepareTensor(
+                  localArena, queriesDP.handle(), queriesShape, kDLFloat(), 32, kDLCUDA());
           long[] neighborsShape = {numQueries, topk};
           MemorySegment neighborsTensor =
-              prepareTensor(localArena, neighborsDP.handle(), neighborsShape, 0, 64, 2, 1);
+              prepareTensor(
+                  localArena, neighborsDP.handle(), neighborsShape, kDLInt(), 64, kDLCUDA());
           long[] distancesShape = {numQueries, topk};
           MemorySegment distancesTensor =
-              prepareTensor(localArena, distancesDP.handle(), distancesShape, 2, 32, 2, 1);
+              prepareTensor(
+                  localArena, distancesDP.handle(), distancesShape, kDLFloat(), 32, kDLCUDA());
 
           MemorySegment prefilter = cuvsFilter.allocate(localArena);
           MemorySegment prefilterTensor;
@@ -255,8 +240,10 @@ public class BruteForceIndexImpl implements BruteForceIndex {
             cudaMemcpy(
                 prefilterDP.handle(), prefilterDataMemorySegment, prefilterBytes, HOST_TO_DEVICE);
 
+            // TODO: check if this is correct: filters is a long[] (64 bits)
             prefilterTensor =
-                prepareTensor(localArena, prefilterDP.handle(), prefilterShape, 1, 32, 2, 1);
+                prepareTensor(
+                    localArena, prefilterDP.handle(), prefilterShape, kDLUInt(), 32, kDLCUDA());
 
             cuvsFilter.type(prefilter, 2);
             cuvsFilter.addr(prefilter, prefilterTensor.address());

@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# Copyright (c) 2020-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2020-2026, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 
 # cuvs build scripts
 
@@ -53,7 +54,7 @@ HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<to
    --no-nvtx                   - disable nvtx (profiling markers), but allow enabling it in downstream projects
    --no-shared-libs            - build without shared libraries
    --show_depr_warn            - show cmake deprecation warnings
-   --run-java-test             - run Java tests after building
+   --run-java-tests            - run Java tests after building
    --build-metrics             - filename for generating build metrics report for libcuvs
    --incl-cache-stats          - include cache statistics in build metrics report
    --cmake-args=\\\"<args>\\\" - pass arbitrary list of CMake configuration options (escape all quotes in argument)
@@ -223,7 +224,7 @@ function gpuArch {
 
     # Check for gpu-arch option
     if [[ -n $(echo "$ARGS" | { grep -E "\-\-gpu\-arch" || true; } ) ]]; then
-        GPU_ARCH_ARG=$(echo "$ARGS" | { grep -Eo "\-\-gpu\-arch=.+( |$)" || true; })
+        GPU_ARCH_ARG=$(echo "$ARGS" | { grep -Eo "\-\-gpu\-arch=[^ ]+" || true; })
         if [[ -n ${GPU_ARCH_ARG} ]]; then
             # Remove the full argument from ARGS
             ARGS=${ARGS//$GPU_ARCH_ARG/}
@@ -370,10 +371,13 @@ fi
 
 ################################################################################
 # Configure for building all C++ targets
-if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg bench-prims || hasArg bench-ann; then
+if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg bench-prims || hasArg bench-ann || hasArg examples; then
     COMPILE_LIBRARY=ON
     if [[ "${BUILD_SHARED_LIBS}" != "OFF" ]]; then
         CMAKE_TARGET+=("cuvs")
+        if hasArg examples; then
+            CMAKE_TARGET+=("cuvs_c")
+        fi
     fi
 
     # get the current count before the compile starts
@@ -468,16 +472,33 @@ if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg
   fi
 fi
 
+
+PYTHON_ARGS_FOR_INSTALL=(
+    "-v"
+    "--no-build-isolation"
+    "--no-deps"
+    "--config-settings"
+    "rapidsai.disable-cuda=true"
+)
+
+# If `RAPIDS_PY_VERSION` is set, use that as the lower-bound for the stable ABI CPython version
+if [ -n "${RAPIDS_PY_VERSION:-}" ]; then
+    RAPIDS_PY_API="cp${RAPIDS_PY_VERSION//./}"
+    PYTHON_ARGS_FOR_INSTALL+=("--config-settings" "skbuild.wheel.py-api=${RAPIDS_PY_API}")
+fi
+
 # Build and (optionally) install the cuvs Python package
 if (( NUMARGS == 0 )) || hasArg python; then
     SKBUILD_CMAKE_ARGS="${EXTRA_CMAKE_ARGS[*]}" \
         SKBUILD_BUILD_OPTIONS="-j${PARALLEL_LEVEL}" \
-        python -m pip install --no-build-isolation --no-deps --config-settings rapidsai.disable-cuda=true "${REPODIR}"/python/cuvs
+        python -m pip install \
+        "${PYTHON_ARGS_FOR_INSTALL[@]}" "${REPODIR}"/python/cuvs
 fi
 
 # Build and (optionally) install the cuvs-bench Python package
 if (( NUMARGS == 0 )) || (hasArg bench-ann && ! hasArg -n); then
-    python -m pip install --no-build-isolation --no-deps --config-settings rapidsai.disable-cuda=true "${REPODIR}"/python/cuvs_bench
+    python -m pip install \
+        "${PYTHON_ARGS_FOR_INSTALL[@]}" "${REPODIR}"/python/cuvs_bench
 fi
 
 # Build the cuvs Rust bindings
@@ -517,10 +538,10 @@ if hasArg docs; then
     cd "${DOXYGEN_BUILD_DIR}"
     doxygen Doxyfile
     cd "${SPHINX_BUILD_DIR}"
-    sphinx-build -b html source _html
+    make html
     cd "${REPODIR}"/rust
     cargo doc -p cuvs --no-deps
-    rsync -av "${RUST_BUILD_DIR}"/doc/ "${SPHINX_BUILD_DIR}"/_html/_static/rust
+    rsync -av "${RUST_BUILD_DIR}"/doc/ "${SPHINX_BUILD_DIR}"/build/html/_static/rust
 fi
 
 ################################################################################

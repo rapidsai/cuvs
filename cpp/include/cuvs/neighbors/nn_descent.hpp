@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2023-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -36,6 +25,16 @@ namespace cuvs::neighbors::nn_descent {
  */
 
 /**
+ * @brief Dtype to use for distance computation
+ * - `AUTO`: Automatically determine the best dtype for distance computation based on the dataset
+ * dimensions.
+ * - `FP32`: Use fp32 distance computation for better precision at the cost of performance and
+ * memory usage.
+ * - `FP16`: Use fp16 distance computation.
+ */
+enum class DIST_COMP_DTYPE { AUTO = 0, FP32 = 1, FP16 = 2 };
+
+/**
  * @brief Parameters used to build an nn-descent index
  * - `graph_degree`: For an input dataset of dimensions (N, D),
  * determines the final dimensions of the all-neighbors knn graph
@@ -48,6 +47,11 @@ namespace cuvs::neighbors::nn_descent {
  * the graph for. More iterations produce a better quality graph at cost of performance
  * - `termination_threshold`: The delta at which nn-descent will terminate its iterations
  * - `return_distances`: Boolean to decide whether to return distances array
+ * - `dist_comp_dtype`: dtype to use for distance computation. Defaults to `AUTO` which
+ * automatically determines the best dtype for distance computation based on the dataset dimensions.
+ * Use `FP32` for better precision at the cost of performance and memory usage. This option is only
+ * valid when data type is fp32. Use `FP16` for better performance and memory usage at the cost of
+ * precision.
  */
 struct index_params : cuvs::neighbors::index_params {
   size_t graph_degree              = 64;
@@ -55,6 +59,7 @@ struct index_params : cuvs::neighbors::index_params {
   size_t max_iterations            = 20;
   float termination_threshold      = 0.0001;
   bool return_distances            = true;
+  DIST_COMP_DTYPE dist_comp_dtype  = DIST_COMP_DTYPE::AUTO;
 
   /** @brief Construct NN descent parameters for a specific kNN graph degree
    *
