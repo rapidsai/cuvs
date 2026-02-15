@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "../../ivf_common_jit.cuh"
+#include "../../ivf_common.cuh"
 
 #include <cuvs/neighbors/ivf_flat.hpp>
 

@@ -53,19 +53,6 @@ auto get_runner_jit(Args... args) -> std::shared_ptr<RunnerT>;
 template <typename RunnerT, typename... Args>
 auto create_runner_jit(Args... args) -> std::shared_ptr<RunnerT>;
 
-// Debug: Verify JIT launcher is being compiled - force instantiation
-struct JitLauncherVerifier {
-  JitLauncherVerifier()
-  {
-    std::cerr << "[JIT] JIT launcher header file included!" << std::endl;
-    std::cerr.flush();
-  }
-};
-// Force instantiation by creating a static instance
-namespace {
-static JitLauncherVerifier g_jit_verifier;
-}
-
 // Helper functions to get tags for JIT LTO
 namespace {
 template <typename T>
@@ -477,7 +464,6 @@ struct alignas(kCacheLineBytes) persistent_runner_jit_t : public persistent_runn
     }
 
     // Prepare kernel arguments
-    // Note: For non-VPQ, the dataset pointer is accessed via the descriptor on device
     // Get the device descriptor pointer - kernel will use the concrete type from template
     const auto* dev_desc = dataset_desc.get().dev_ptr(stream);
 
@@ -616,10 +602,6 @@ void select_and_run_jit(
   SampleFilterT sample_filter,
   cudaStream_t stream)
 {
-  std::cerr << "[JIT] select_and_run_jit called (num_queries=" << num_queries << ", topk=" << topk
-            << ", persistent=" << (ps.persistent ? "true" : "false") << ")" << std::endl;
-  std::cerr.flush();
-
   const SourceIndexT* source_indices_ptr =
     source_indices.has_value() ? source_indices->data_handle() : nullptr;
 
@@ -658,9 +640,6 @@ void select_and_run_jit(
     using IndexTag  = decltype(get_index_type_tag<IndexT>());
     using DistTag   = decltype(get_distance_type_tag<DistanceT>());
     using SourceTag = decltype(get_source_index_type_tag<SourceIndexT>());
-
-    std::cerr << "[JIT] Using JIT path for CAGRA persistent search" << std::endl;
-    std::cerr.flush();
 
     CagraSearchPlanner<DataTag, IndexTag, DistTag, SourceTag> planner(
       dataset_desc.metric,
@@ -725,9 +704,6 @@ void select_and_run_jit(
     using DistTag   = decltype(get_distance_type_tag<DistanceT>());
     using SourceTag = decltype(get_source_index_type_tag<SourceIndexT>());
 
-    std::cerr << "[JIT] Using JIT path for CAGRA search" << std::endl;
-    std::cerr.flush();
-
     CagraSearchPlanner<DataTag, IndexTag, DistTag, SourceTag> planner(
       dataset_desc.metric,
       topk_by_bitonic_sort,
@@ -769,16 +745,6 @@ void select_and_run_jit(
                    smem_size);
 
     // Dispatch kernel via launcher
-    // The kernel signature expects const desc_t* where desc_t is the concrete descriptor type
-    // We pass the base pointer (const dataset_descriptor_base_t*), and since both concrete types
-    // inherit from the base class with the base class at offset 0, the pointer value is the same.
-    // The dispatch() function takes the address of each argument (&dev_desc), so the kernel
-    // receives a pointer to the descriptor pointer. The JIT-compiled kernel expects const desc_t*,
-    // so it will interpret the pointer value as the concrete type it was compiled for. Note: We
-    // cannot use dynamic_cast because the base class has no virtual functions (uses function
-    // pointers for performance). We also cannot use static_cast because the concrete type is only
-    // known at JIT compile time, not at launcher compile time. The pointer value is correct, so
-    // the kernel can safely use it as the concrete type.
     launcher->dispatch(
       stream,
       grid,
@@ -845,33 +811,6 @@ void select_and_run(
   SampleFilterT sample_filter,
   cudaStream_t stream)
 {
-  // CRITICAL: Write to file to prove function is called
-  {
-    std::ofstream f("/tmp/jit_wrapper_called.txt", std::ios::app);
-    f << "[JIT] select_and_run wrapper CALLED! num_queries=" << num_queries << ", topk=" << topk
-      << std::endl;
-    f.close();
-  }
-
-  // Also try all output methods
-  fprintf(stderr, "\n[JIT] ========================================\n");
-  fprintf(stderr, "[JIT] select_and_run JIT WRAPPER CALLED!\n");
-  fprintf(stderr, "[JIT] num_queries=%u, topk=%u\n", num_queries, topk);
-  fprintf(stderr, "[JIT] ========================================\n\n");
-  fflush(stderr);
-  printf("[JIT] select_and_run JIT WRAPPER CALLED! (stdout)\n");
-  fflush(stdout);
-
-  // Verify JIT launcher is loaded (static initializer already ran)
-  std::cerr << "[JIT] select_and_run wrapper called (JIT path active)" << std::endl;
-  std::cerr.flush();
-
-  // Extract parameters for JIT version
-  // Note: These parameters are not stored in dataset_descriptor_host, so we need to
-  // compute them or use defaults. For now, we'll need to pass them through the interface
-  // or compute from available information. For the JIT path, we'll use reasonable defaults
-  // and let the kernel handle missing information.
-  // For JIT version, we pass the descriptor directly - all dataset info is in the descriptor
   select_and_run_jit(dataset_desc,
                      graph,
                      source_indices,

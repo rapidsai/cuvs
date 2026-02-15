@@ -9,13 +9,6 @@
 #include "../device_common.hpp"
 #include "../hashmap.hpp"
 #include "../utils.hpp"
-// Note:
-// - Extern function declarations (setup_workspace_standard, compute_distance_standard, etc.) use
-// types from compute_distance-ext.cuh
-// - Type definitions (standard_dataset_descriptor_t, etc.) are in the -impl.cuh files, included by
-// the .cu.in files for template instantiation
-// - pickup_next_parent and topk_by_bitonic_sort_wrapper_* are included via
-// search_multi_cta_helpers.cuh in the .cu.in file
 
 #include <cuvs/distance/distance.hpp>   // For DistanceType enum
 #include <raft/core/operators.hpp>      // For raft::upper_bound
@@ -23,10 +16,10 @@
 
 #include <cstdint>
 #include <cuda_fp16.h>
-#include <type_traits>  // For std::is_same_v, std::true_type, std::false_type
+#include <type_traits>
 
 #ifdef _CLK_BREAKDOWN
-#include <cstdio>  // For printf in debug code
+#include <cstdio>
 #endif
 
 // Include extern function declarations before namespace so they're available to kernel definitions
@@ -77,9 +70,8 @@ __global__ __launch_bounds__(1024, 1) void search_kernel_jit(
   uint32_t* const num_executed_iterations, /* stats */
   uint32_t* bitset_ptr,                    // Bitset data pointer (nullptr for none_filter)
   SourceIndexT bitset_len,                 // Bitset length
-  SourceIndexT original_nbits)             // Original number of bits
+  SourceIndexT original_nbits)
 {
-  printf("IN THE KERNEL\n");
   using DATA_T     = DataT;
   using INDEX_T    = IndexT;
   using DISTANCE_T = DistanceT;
@@ -87,55 +79,6 @@ __global__ __launch_bounds__(1024, 1) void search_kernel_jit(
   auto to_source_index = [source_indices_ptr](INDEX_T x) {
     return source_indices_ptr == nullptr ? static_cast<SourceIndexT>(x) : source_indices_ptr[x];
   };
-
-  // CRITICAL DEBUG: Write to result buffer IMMEDIATELY to verify kernel is executing
-  // Write a magic value that we can check on host - do this before ANY other code
-  // Write from the first thread of the first block to maximize chance of execution
-  if (threadIdx.x == 0 && blockIdx.x == 0 && blockIdx.y == 0 && result_distances_ptr != nullptr &&
-      result_indices_ptr != nullptr) {
-    // Write magic value to first distance to verify kernel execution
-    if (result_distances_ptr != nullptr) {
-      *result_distances_ptr = static_cast<DistanceT>(3735928559.0f);  // 0xDEADBEEF as float
-    }
-    // Also write to indices
-    if (result_indices_ptr != nullptr) { *result_indices_ptr = static_cast<IndexT>(0xCAFEBABE); }
-
-    // Debug: Check if descriptor runtime values match kernel compile-time constants
-    // The kernel uses DescriptorT::kTeamSize and DescriptorT::kDatasetBlockDim (compile-time)
-    // The descriptor object has runtime values that should match
-    uint32_t desc_team_size_bitshift  = dataset_desc->team_size_bitshift();
-    uint32_t desc_team_size_actual    = 1u << desc_team_size_bitshift;
-    uint32_t kernel_team_size         = DescriptorT::kTeamSize;
-    uint32_t kernel_dataset_block_dim = DescriptorT::kDatasetBlockDim;
-
-    // For standard descriptors, dataset_block_dim is stored in args.extra_word1 as 'ld'
-    // For VPQ descriptors, it's a compile-time constant only
-    uint32_t desc_dataset_block_dim = kernel_dataset_block_dim;  // Use compile-time constant
-    if constexpr (!has_kpq_bits_v<DescriptorT>) {
-      // Standard descriptor - can read from args.ld
-      desc_dataset_block_dim = DescriptorT::ld(dataset_desc->args);
-    }
-
-    printf("JIT KERNEL EXECUTING: threadIdx=0, wrote magic values\n");
-    printf("JIT KERNEL: Descriptor team_size (from bitshift): %u, Kernel kTeamSize: %u\n",
-           desc_team_size_actual,
-           kernel_team_size);
-    printf("JIT KERNEL: Descriptor dataset_block_dim: %u, Kernel kDatasetBlockDim: %u\n",
-           desc_dataset_block_dim,
-           kernel_dataset_block_dim);
-    if (desc_team_size_actual != kernel_team_size ||
-        desc_dataset_block_dim != kernel_dataset_block_dim) {
-      printf(
-        "JIT KERNEL ERROR: Parameter mismatch! team_size: %u vs %u, dataset_block_dim: %u vs %u\n",
-        desc_team_size_actual,
-        kernel_team_size,
-        desc_dataset_block_dim,
-        kernel_dataset_block_dim);
-    } else {
-      printf("JIT KERNEL: Parameters match correctly\n");
-    }
-  }
-  __syncthreads();
 
   const auto num_queries       = gridDim.y;
   const auto query_id          = blockIdx.y;
@@ -394,13 +337,6 @@ __global__ __launch_bounds__(1024, 1) void search_kernel_jit(
 
   // Output search results (1st warp only).
   if (threadIdx.x < 32) {
-    // Debug: print buffer contents before output
-    if (query_id == 0 && cta_id == 0 && threadIdx.x < 5) {
-      printf("JIT pre-output: i=%u idx=%u dist=%.6f\n",
-             threadIdx.x,
-             result_indices_buffer[threadIdx.x],
-             (float)result_distances_buffer[threadIdx.x]);
-    }
     uint32_t offset = 0;
     for (uint32_t i = threadIdx.x; i < result_buffer_size_32; i += 32) {
       INDEX_T index = result_indices_buffer[i];
@@ -426,17 +362,6 @@ __global__ __launch_bounds__(1024, 1) void search_kernel_jit(
           if (result_distances_ptr != nullptr) {
             DISTANCE_T dist         = result_distances_buffer[i];
             result_distances_ptr[k] = dist;
-            // Debug: print first query, first CTA, first few results
-            if (query_id == 0 && cta_id == 0 && j < 5) {
-              printf("JIT: query=%u cta=%u j=%u i=%u idx=%u dist=%.6f buf_dist=%.6f\n",
-                     query_id,
-                     cta_id,
-                     j,
-                     i,
-                     index & ~index_msb_1_mask,
-                     (float)dist,
-                     (float)result_distances_buffer[i]);
-            }
           }
         } else {
           // If it is valid and registered in the traversed hash table but is

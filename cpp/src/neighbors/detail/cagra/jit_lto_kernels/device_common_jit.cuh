@@ -130,13 +130,6 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes_jit(
       }
       result_distances_ptr[i] = best_norm2_team_local;
       result_indices_ptr[i]   = best_index_team_local;
-      // Debug: print first few random node distances
-      if (i < 3 && block_id == 0) {
-        printf("JIT random: i=%u idx=%u dist=%.6f\n",
-               i,
-               best_index_team_local,
-               (float)best_norm2_team_local);
-      }
     }
   }
 }
@@ -247,13 +240,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes_jit(
     __syncwarp();
 
     // Store the distance
-    if (valid_i && lead_lane) {
-      result_child_distances_ptr[j] = child_dist;
-      // Debug: print first few child node distances
-      if (j < 3 && threadIdx.x < 32) {
-        printf("JIT child: j=%u idx=%u dist=%.6f\n", j, child_id, (float)child_dist);
-      }
-    }
+    if (valid_i && lead_lane) { result_child_distances_ptr[j] = child_dist; }
   }
 }
 

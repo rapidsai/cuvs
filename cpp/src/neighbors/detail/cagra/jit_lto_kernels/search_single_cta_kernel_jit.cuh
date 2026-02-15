@@ -72,7 +72,6 @@ namespace cuvs::neighbors::cagra::detail::single_cta_search {
 // Use fully qualified name since it's a template variable
 using cuvs::neighbors::cagra::detail::device::has_kpq_bits_v;
 
-// Note: Helper functions (pickup_next_parents, move_invalid_to_end_of_list, hashmap_restore)
 // are defined in search_single_cta_kernel-inl.cuh which is included by the launcher.
 // We don't redefine them here to avoid duplicate definitions.
 

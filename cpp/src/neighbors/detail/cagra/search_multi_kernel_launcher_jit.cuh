@@ -24,7 +24,6 @@
 #include <cuda_runtime.h>
 #include <string>
 #include <type_traits>
-// Note: We don't include search_multi_kernel_jit.cuh here because:
 // - The launcher doesn't need the kernel function definitions
 // - The kernel is dispatched via the JIT LTO launcher system
 // - Including it would pull in impl files that cause namespace issues

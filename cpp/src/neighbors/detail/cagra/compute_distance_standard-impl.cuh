@@ -207,7 +207,6 @@ RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_standard_worker(
       if (k >= dim) break;
 #pragma unroll
       for (uint32_t v = 0; v < vlen; v++) {
-        // Note this loop can go above the dataset_dim for padded arrays. This is not a problem
         // because:
         // - Above the last element (dataset_dim-1), the query array is filled with zeros.
         // - The data buffer has to be also padded with zeros.
@@ -264,19 +263,6 @@ RAFT_KERNEL __launch_bounds__(1, 1)
   using desc_type =
     standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
   using base_type = typename desc_type::base_type;
-
-  // Debug: Verify we're constructing the right type
-  if (threadIdx.x == 0 && blockIdx.x == 0) {
-    printf(
-      "[INIT KERNEL] Constructing desc_type with: Metric=%d, TeamSize=%u, DatasetBlockDim=%u, "
-      "DataT=float, IndexT=uint32_t, DistanceT=float\n",
-      static_cast<int>(Metric),
-      TeamSize,
-      DatasetBlockDim);
-    printf("[INIT KERNEL] desc_type::kTeamSize=%u, desc_type::kDatasetBlockDim=%u\n",
-           desc_type::kTeamSize,
-           desc_type::kDatasetBlockDim);
-  }
 
 #ifdef CUVS_ENABLE_JIT_LTO
   // For JIT, we don't use the function pointers, so set them to nullptr

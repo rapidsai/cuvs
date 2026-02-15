@@ -9,7 +9,6 @@
 #include "../device_common.hpp"
 #include "../hashmap.hpp"
 #include "../utils.hpp"
-// Note: The .cu.in files include the -impl.cuh files directly when instantiating kernels
 
 #include <cuvs/distance/distance.hpp>  // For DistanceType enum
 #include <raft/core/operators.hpp>     // For raft::upper_bound

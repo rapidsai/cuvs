@@ -25,10 +25,6 @@
 #include <cuda_runtime.h>
 #include <string>
 #include <type_traits>
-// Note: We don't include search_multi_cta_kernel_jit.cuh here because:
-// - The launcher doesn't need the kernel function definitions
-// - The kernel is dispatched via the JIT LTO launcher system
-// - Including it would pull in impl files that cause namespace issues
 
 namespace cuvs::neighbors::cagra::detail::multi_cta_search {
 
@@ -112,10 +108,6 @@ void select_and_run_jit(
   SampleFilterT sample_filter,
   cudaStream_t stream)
 {
-  std::cerr << "[JIT] select_and_run_jit (multi_cta) called (num_queries=" << num_queries
-            << ", topk=" << topk << ", num_cta_per_query=" << num_cta_per_query << ")" << std::endl;
-  std::cerr.flush();
-
   // Extract bitset data from filter object (if it's a bitset_filter)
   uint32_t* bitset_ptr        = nullptr;
   SourceIndexT bitset_len     = 0;
@@ -139,9 +131,6 @@ void select_and_run_jit(
   using DistTag   = decltype(get_distance_type_tag<DistanceT>());
   using SourceTag = decltype(get_source_index_type_tag<SourceIndexT>());
 
-  std::cerr << "[JIT] Using JIT path for CAGRA multi_cta search" << std::endl;
-  std::cerr.flush();
-
   // For multi_cta, we don't use topk_by_bitonic_sort or bitonic_sort_and_merge_multi_warps
   // These are handled inside the kernel based on max_elements
   // We need to construct the entrypoint name manually since it's different from single_cta
@@ -156,13 +145,6 @@ void select_and_run_jit(
     RAFT_FAIL("Unsupported metric for multi_cta JIT kernel");
   }
 
-  // Debug: Check descriptor parameters
-  std::cerr << "[JIT] Dataset descriptor - is_vpq: " << dataset_desc.is_vpq
-            << ", pq_bits: " << dataset_desc.pq_bits << ", pq_len: " << dataset_desc.pq_len
-            << ", team_size: " << dataset_desc.team_size
-            << ", dataset_block_dim: " << dataset_desc.dataset_block_dim << std::endl;
-  std::cerr.flush();
-
   // Create planner and register device functions
   // Pass team_size, dataset_block_dim, and VPQ parameters to match the kernel entrypoint name
   CagraMultiCtaSearchPlanner<DataTag, IndexTag, DistTag, SourceTag> planner(
@@ -173,19 +155,6 @@ void select_and_run_jit(
     dataset_desc.pq_bits,
     dataset_desc.pq_len);
 
-  // Debug: Verify entrypoint name matches descriptor parameters
-  std::cerr << "[JIT] Planner entrypoint: " << planner.get_entrypoint_name() << std::endl;
-
-  // CRITICAL: Verify descriptor runtime values match what kernel was compiled for
-  // The kernel uses DescriptorT::kTeamSize and DescriptorT::kDatasetBlockDim (compile-time)
-  // But the descriptor object has runtime values that might differ
-  // We need to check if the kernel we're about to call was compiled for the same values
-  std::cerr << "[JIT] WARNING: Kernel was compiled for team_size=" << dataset_desc.team_size
-            << ", dataset_block_dim=" << dataset_desc.dataset_block_dim << " (from entrypoint name)"
-            << std::endl;
-  std::cerr << "[JIT] Descriptor runtime values - team_size: " << dataset_desc.team_size
-            << ", dataset_block_dim: " << dataset_desc.dataset_block_dim << std::endl;
-  std::cerr.flush();
   planner.add_setup_workspace_device_function(dataset_desc.metric,
                                               dataset_desc.team_size,
                                               dataset_desc.dataset_block_dim,
@@ -204,23 +173,11 @@ void select_and_run_jit(
   auto params   = make_fragment_key<DataTag, IndexTag, DistTag, SourceTag>();
   auto launcher = planner.get_launcher();
 
-  if (!launcher) {
-    std::cerr << "[JIT] ERROR: Failed to get launcher - planner.get_launcher() returned null!"
-              << std::endl;
-    std::cerr.flush();
-    RAFT_FAIL("Failed to get JIT launcher");
-  }
+  if (!launcher) { RAFT_FAIL("Failed to get JIT launcher"); }
 
   // Verify kernel handle is valid
   cudaKernel_t kernel_handle = launcher->get_kernel();
-  if (kernel_handle == nullptr) {
-    std::cerr << "[JIT] ERROR: Launcher has null kernel handle!" << std::endl;
-    std::cerr.flush();
-    RAFT_FAIL("JIT launcher has null kernel handle");
-  }
-  std::cerr << "[JIT] Launcher obtained successfully, kernel handle: " << kernel_handle
-            << std::endl;
-  std::cerr.flush();
+  if (kernel_handle == nullptr) { RAFT_FAIL("JIT launcher has null kernel handle"); }
 
   uint32_t max_elements{};
   if (result_buffer_size <= 64) {
@@ -254,61 +211,11 @@ void select_and_run_jit(
                  smem_size);
 
   // Get the device descriptor pointer
-  // CRITICAL: dev_ptr() returns const dataset_descriptor_base_t*, but kernel expects const
-  // DescriptorT* where DescriptorT is the specific derived type (standard_dataset_descriptor_t or
-  // cagra_q_dataset_descriptor_t)
-  //
-  // In C++, you cannot implicitly convert a base pointer to a derived pointer - this requires an
-  // explicit cast. However, since:
-  // 1. The object on device is actually of the derived type (we created it that way)
-  // 2. Base class is at offset 0 in single inheritance (pointer value is the same)
-  // 3. The kernel was JIT-compiled for the exact derived type matching these parameters
-  //
-  // We can safely use reinterpret_cast to convert the base pointer to the derived pointer type.
-  // The kernel will receive this as the derived type it expects.
   const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dev_desc_base =
     dataset_desc.dev_ptr(stream);
-
-  // Cast to the derived type pointer - the kernel expects this specific type
-  // Note: We're casting to the base type pointer, but the kernel signature expects the derived
-  // type. This works because the pointer value is the same (base at offset 0), and the kernel will
-  // treat it as the derived type it was compiled for. However, this is technically undefined
-  // behavior in C++ but works in practice for CUDA kernels due to how they're dispatched.
   const auto* dev_desc = dev_desc_base;
 
-  // CRITICAL: Check if descriptor host values match kernel compile-time constants
-  // The kernel was compiled for specific team_size and dataset_block_dim values (from entrypoint
-  // name) The descriptor_host object has runtime values that MUST match what the kernel was
-  // compiled for
-  std::cerr << "[JIT] CRITICAL CHECK - Verifying descriptor matches kernel:" << std::endl;
-  std::cerr << "[JIT]   Descriptor host values - team_size: " << dataset_desc.team_size
-            << ", dataset_block_dim: " << dataset_desc.dataset_block_dim << std::endl;
-  std::cerr << "[JIT]   Kernel compiled for (from entrypoint) - team_size: "
-            << dataset_desc.team_size << ", dataset_block_dim: " << dataset_desc.dataset_block_dim
-            << std::endl;
-
-  // The kernel uses DescriptorT::kTeamSize and DescriptorT::kDatasetBlockDim (compile-time)
-  // These MUST match dataset_desc.team_size and dataset_desc.dataset_block_dim
-  // If they don't match, the kernel will use wrong values and produce incorrect results
-  if (dataset_desc.team_size != dataset_desc.team_size ||
-      dataset_desc.dataset_block_dim != dataset_desc.dataset_block_dim) {
-    std::cerr << "[JIT] ERROR: This should never happen - values should always match!" << std::endl;
-  } else {
-    std::cerr << "[JIT] OK: Descriptor values match (they're the same source)" << std::endl;
-  }
-  std::cerr.flush();
-
-  // Dispatch kernel via launcher
-  std::cerr << "[JIT] About to dispatch kernel with:" << std::endl;
-  std::cerr << "[JIT]   grid: (" << grid_dims.x << ", " << grid_dims.y << ", " << grid_dims.z << ")"
-            << std::endl;
-  std::cerr << "[JIT]   block: (" << block_dims.x << ", " << block_dims.y << ", " << block_dims.z
-            << ")" << std::endl;
-  std::cerr << "[JIT]   smem_size: " << smem_size << std::endl;
-  std::cerr << "[JIT]   dev_desc pointer: " << dev_desc << std::endl;
-  std::cerr.flush();
-
-  // CRITICAL: Cast size_t/int64_t parameters to match kernel signature exactly
+  // Cast size_t/int64_t parameters to match kernel signature exactly
   // The dispatch mechanism uses void* pointers, so parameter sizes must match exactly
   // graph.extent(1) returns int64_t but kernel expects uint32_t
   // traversed_hash_bitlen is int64_t but kernel expects uint32_t
@@ -349,46 +256,8 @@ void select_and_run_jit(
                      bitset_len,
                      original_nbits);
 
-  // Check for errors immediately after launch
-  cudaError_t err = cudaPeekAtLastError();
-  if (err != cudaSuccess) {
-    std::cerr << "[JIT] ERROR after kernel launch (peek): " << cudaGetErrorString(err) << " ("
-              << err << ")" << std::endl;
-    std::cerr.flush();
-  } else {
-    std::cerr << "[JIT] No error after kernel launch (peek)" << std::endl;
-    std::cerr.flush();
-  }
-  RAFT_CUDA_TRY(err);
-
-  // Synchronize and check again - this will catch kernel execution errors
-  std::cerr << "[JIT] Synchronizing stream to check for kernel execution errors..." << std::endl;
-  std::cerr.flush();
-  err = cudaStreamSynchronize(stream);
-  if (err != cudaSuccess) {
-    std::cerr << "[JIT] ERROR after kernel sync: " << cudaGetErrorString(err) << " (" << err << ")"
-              << std::endl;
-    std::cerr.flush();
-  } else {
-    std::cerr << "[JIT] Stream synchronized successfully - kernel completed" << std::endl;
-    std::cerr.flush();
-
-    // Check if kernel wrote magic value to verify execution
-    if (topk_distances_ptr != nullptr && num_queries > 0) {
-      DistanceT first_distance;
-      RAFT_CUDA_TRY(
-        cudaMemcpy(&first_distance, topk_distances_ptr, sizeof(DistanceT), cudaMemcpyDeviceToHost));
-      if (first_distance == static_cast<DistanceT>(3735928559.0f)) {  // 0xDEADBEEF
-        std::cerr << "[JIT] VERIFIED: Kernel wrote magic value 0xDEADBEEF to first distance!"
-                  << std::endl;
-      } else {
-        std::cerr << "[JIT] WARNING: Kernel did NOT write magic value. First distance: "
-                  << first_distance << std::endl;
-      }
-      std::cerr.flush();
-    }
-  }
-  RAFT_CUDA_TRY(err);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
 }
 
 }  // namespace cuvs::neighbors::cagra::detail::multi_cta_search
