@@ -3076,7 +3076,7 @@ struct point {
 
   storage_type data_;
 
-  __device__ __host__ point() = default;
+  point() = default;
   __device__ __host__ explicit point(storage_type d) : data_(d) {}
 
   __device__ __forceinline__ storage_type raw() const { return data_; }
@@ -3117,7 +3117,7 @@ struct metric_interface {
   using point_type = point<T, AccT, Veclen>;
 
   virtual __device__ void operator()(AccT& acc, point_type x, point_type y) = 0;
-  virtual __device__ ~metric_interface()                                    = default;
+  virtual ~metric_interface()                                               = default;
 };
 
 // ============================================================
@@ -3225,7 +3225,7 @@ struct point {
 
   storage_type data_;
 
-  __device__ __host__ point() = default;
+  point() = default;
   __device__ __host__ explicit point(storage_type d) : data_(d) {}
 
   __device__ __forceinline__ storage_type raw() const { return data_; }
@@ -3265,7 +3265,7 @@ struct metric_interface {
   using point_type = point<T, AccT, Veclen>;
 
   virtual __device__ void operator()(AccT& acc, point_type x, point_type y) = 0;
-  virtual __device__ ~metric_interface() = default;
+  virtual ~metric_interface() = default;
 };
 )";
 
