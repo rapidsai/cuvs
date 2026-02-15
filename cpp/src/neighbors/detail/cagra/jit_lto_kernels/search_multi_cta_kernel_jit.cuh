@@ -55,7 +55,7 @@ template <typename DescriptorT,  // Concrete descriptor type
           typename IndexT,
           typename DistanceT,
           typename SourceIndexT>
-RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_jit(
+__global__ __launch_bounds__(1024, 1) void search_kernel_jit(
   IndexT* const result_indices_ptr,       // [num_queries, num_cta_per_query, itopk_size]
   DistanceT* const result_distances_ptr,  // [num_queries, num_cta_per_query, itopk_size]
   const DescriptorT* dataset_desc,        // Concrete descriptor type from template
@@ -79,6 +79,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_jit(
   SourceIndexT bitset_len,                 // Bitset length
   SourceIndexT original_nbits)             // Original number of bits
 {
+  printf("IN THE KERNEL\n");
   using DATA_T     = DataT;
   using INDEX_T    = IndexT;
   using DISTANCE_T = DistanceT;
@@ -89,7 +90,9 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_jit(
 
   // CRITICAL DEBUG: Write to result buffer IMMEDIATELY to verify kernel is executing
   // Write a magic value that we can check on host - do this before ANY other code
-  if (threadIdx.x == 0 && blockIdx.x == 0 && blockIdx.y == 0) {
+  // Write from the first thread of the first block to maximize chance of execution
+  if (threadIdx.x == 0 && blockIdx.x == 0 && blockIdx.y == 0 && result_distances_ptr != nullptr &&
+      result_indices_ptr != nullptr) {
     // Write magic value to first distance to verify kernel execution
     if (result_distances_ptr != nullptr) {
       *result_distances_ptr = static_cast<DistanceT>(3735928559.0f);  // 0xDEADBEEF as float

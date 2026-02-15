@@ -28,6 +28,8 @@
 #include "../topk_by_radix.cuh"
 #include "../topk_for_cagra/topk.h"
 
+#include <cub/warp/warp_scan.cuh>
+
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_properties.hpp>

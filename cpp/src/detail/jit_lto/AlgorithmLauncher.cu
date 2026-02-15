@@ -5,6 +5,8 @@
 
 #include <cuvs/detail/jit_lto/AlgorithmLauncher.hpp>
 
+#include <iostream>
+
 #include <raft/util/cuda_rt_essentials.hpp>
 
 AlgorithmLauncher::AlgorithmLauncher(cudaKernel_t k) : kernel{k} {}

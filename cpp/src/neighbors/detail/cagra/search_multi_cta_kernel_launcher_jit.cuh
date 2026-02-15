@@ -204,6 +204,24 @@ void select_and_run_jit(
   auto params   = make_fragment_key<DataTag, IndexTag, DistTag, SourceTag>();
   auto launcher = planner.get_launcher();
 
+  if (!launcher) {
+    std::cerr << "[JIT] ERROR: Failed to get launcher - planner.get_launcher() returned null!"
+              << std::endl;
+    std::cerr.flush();
+    RAFT_FAIL("Failed to get JIT launcher");
+  }
+
+  // Verify kernel handle is valid
+  cudaKernel_t kernel_handle = launcher->get_kernel();
+  if (kernel_handle == nullptr) {
+    std::cerr << "[JIT] ERROR: Launcher has null kernel handle!" << std::endl;
+    std::cerr.flush();
+    RAFT_FAIL("JIT launcher has null kernel handle");
+  }
+  std::cerr << "[JIT] Launcher obtained successfully, kernel handle: " << kernel_handle
+            << std::endl;
+  std::cerr.flush();
+
   uint32_t max_elements{};
   if (result_buffer_size <= 64) {
     max_elements = 64;

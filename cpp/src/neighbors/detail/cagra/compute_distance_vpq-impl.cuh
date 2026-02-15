@@ -349,6 +349,10 @@ _RAFT_DEVICE __noinline__ auto compute_distance_vpq(
     args.smem_ws_ptr);
 }
 
+#ifndef BUILD_KERNEL
+// The init kernel is not needed when building JIT fragments (BUILD_KERNEL is defined)
+// It's only needed for non-JIT initialization. When BUILD_KERNEL is defined, we're building
+// a JIT fragment and don't want this kernel to be instantiated.
 template <cuvs::distance::DistanceType Metric,
           uint32_t TeamSize,
           uint32_t DatasetBlockDim,
@@ -401,7 +405,12 @@ RAFT_KERNEL __launch_bounds__(1, 1)
     dim);
 #endif
 }
+#endif  // #ifndef BUILD_KERNEL
 
+#ifndef BUILD_KERNEL
+// The init_ function is not needed when building JIT fragments (BUILD_KERNEL is defined)
+// It's only needed for non-JIT initialization. When BUILD_KERNEL is defined, we're building
+// a JIT fragment and don't want this host function to be included.
 template <cuvs::distance::DistanceType Metric,
           uint32_t TeamSize,
           uint32_t DatasetBlockDim,
@@ -475,5 +484,6 @@ vpq_descriptor_spec<Metric,
                    PqBits,  // pq_bits
                    PqLen};  // pq_len
 }
+#endif  // #ifndef BUILD_KERNEL
 
 }  // namespace cuvs::neighbors::cagra::detail

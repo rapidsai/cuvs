@@ -5,7 +5,11 @@
 
 #pragma once
 
-#include "../../../sample_filter.cuh"
+#include <cstdint>
+
+// Note: We don't include sample_filter.cuh here because it's not needed for JIT
+// The JIT version defines its own sample_filter function directly
+// #include "../../../sample_filter.cuh"
 
 namespace cuvs::neighbors::cagra::detail {
 

@@ -317,8 +317,9 @@ function(generate_jit_lto_kernels target)
     endforeach()
   endforeach()
 
-  # Generate VPQ descriptor fragments (only for L2Expanded and float/half)
-  foreach(data_idx IN ITEMS 0 1)
+  # Generate VPQ descriptor fragments (for L2Expanded and all data types: float, half, int8_t,
+  # uint8_t)
+  foreach(data_idx IN ITEMS 0 1 2 3)
     list(GET cagra_data_types ${data_idx} data_type)
     list(GET cagra_data_type_abbrevs ${data_idx} type_abbrev)
     foreach(team_size IN LISTS cagra_team_sizes)
@@ -501,7 +502,7 @@ function(generate_jit_lto_kernels target)
 
   # Generate single_cta VPQ kernel entrypoints VPQ kernels need pq_bits and pq_len in addition to
   # team_size and dataset_block_dim
-  foreach(data_idx IN ITEMS 0 1)
+  foreach(data_idx IN ITEMS 0 1 2 3)
     list(GET cagra_data_types ${data_idx} data_type)
     list(GET cagra_data_type_abbrevs ${data_idx} type_abbrev)
     foreach(topk_idx IN ITEMS 0 1)

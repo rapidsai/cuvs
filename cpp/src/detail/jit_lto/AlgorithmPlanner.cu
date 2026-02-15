@@ -5,7 +5,9 @@
 
 #include "nvjitlink_checker.hpp"
 
+#include <algorithm>
 #include <chrono>
+#include <cstdio>
 #include <iostream>
 #include <iterator>
 #include <memory>
@@ -144,6 +146,25 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
   result = nvJitLinkDestroy(&handle);
   RAFT_EXPECTS(result == NVJITLINK_SUCCESS, "nvJitLinkDestroy failed");
 
+  // Debug: Save cubin to disk for inspection with cuobjdump
+  std::string cubin_path = "/tmp/linked_cubin_" + this->entrypoint + ".cubin";
+  // Sanitize filename (replace special chars)
+  std::replace(cubin_path.begin(), cubin_path.end(), '/', '_');
+  std::replace(cubin_path.begin(), cubin_path.end(), ':', '_');
+  std::replace(cubin_path.begin(), cubin_path.end(), '<', '_');
+  std::replace(cubin_path.begin(), cubin_path.end(), '>', '_');
+  std::replace(cubin_path.begin(), cubin_path.end(), ' ', '_');
+  FILE* f = fopen(cubin_path.c_str(), "wb");
+  if (f) {
+    fwrite(cubin.get(), 1, cubin_size, f);
+    fclose(f);
+    std::cerr << "[JIT] Saved linked cubin to: " << cubin_path << " (size: " << cubin_size
+              << " bytes)" << std::endl;
+    std::cerr << "[JIT] Run: cuobjdump --dump-elf-symbols " << cubin_path
+              << " to see kernel symbols" << std::endl;
+    std::cerr.flush();
+  }
+
   // cubin is linked, so now load it
   // NOTE: cudaLibrary_t does not need to be freed explicitly
   cudaLibrary_t library;
@@ -162,13 +183,20 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
   // Enumerate kernels - we expect only 1 kernel from the entrypoint fragment
   // Device function fragments contain only __device__ functions, not __global__ kernels
   // So they shouldn't show up in kernel enumeration
-  constexpr unsigned int count = 1;  // We expect only 1 kernel from the entrypoint fragment
-  unsigned int kernel_count    = count;
-  std::unique_ptr<cudaKernel_t[]> kernels{new cudaKernel_t[count]};
-  RAFT_CUDA_TRY(cudaLibraryEnumerateKernels(kernels.get(), kernel_count, library));
+  // First, query the actual number of kernels using cudaLibraryGetKernelCount (runtime API)
+  unsigned int kernel_count = 0;
+  cudaError_t cuda_result   = cudaLibraryGetKernelCount(&kernel_count, library);
+  if (cuda_result != cudaSuccess) {
+    std::cerr << "[JIT] ERROR: cudaLibraryGetKernelCount failed with error: " << cuda_result << " ("
+              << cudaGetErrorString(cuda_result) << ")" << std::endl;
+    std::cerr.flush();
+    RAFT_FAIL("cudaLibraryGetKernelCount failed with error: %d (%s)",
+              cuda_result,
+              cudaGetErrorString(cuda_result));
+  }
 
-  std::cerr << "[JIT] AlgorithmPlanner::build - Requested " << count
-            << " kernel(s), enumeration returned count: " << kernel_count << std::endl;
+  std::cerr << "[JIT] AlgorithmPlanner::build - Actual kernel count in library: " << kernel_count
+            << std::endl;
   std::cerr.flush();
 
   if (kernel_count == 0) {
@@ -176,14 +204,64 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
   }
 
   if (kernel_count > 1) {
-    std::cerr << "[JIT] WARNING: Expected 1 kernel but enumeration reports " << kernel_count
-              << " - using first kernel only" << std::endl;
+    std::cerr << "[JIT] WARNING: Found " << kernel_count
+              << " kernels in library! This might be the issue - we're using kernel [0]"
+              << std::endl;
+    std::cerr << "[JIT]   Entrypoint we're looking for: " << this->entrypoint << std::endl;
+    std::cerr << "[JIT]   This suggests multiple kernels are being linked together!" << std::endl;
     std::cerr.flush();
   }
 
-  // Use the first (and should be only) kernel from the entrypoint fragment
-  // Entrypoint fragment is added first, so its kernel should be at index 0
-  auto kernel = kernels.release()[0];
+  // Now allocate the right size and enumerate
+  std::unique_ptr<cudaKernel_t[]> kernels{new cudaKernel_t[kernel_count]};
+  unsigned int kernel_count_verify = kernel_count;
+  RAFT_CUDA_TRY(cudaLibraryEnumerateKernels(kernels.get(), kernel_count_verify, library));
+
+  if (kernel_count_verify != kernel_count) {
+    std::cerr << "[JIT] WARNING: Kernel count mismatch - cudaLibraryGetKernelCount returned "
+              << kernel_count << " but cudaLibraryEnumerateKernels returned " << kernel_count_verify
+              << std::endl;
+    std::cerr.flush();
+  }
+
+  // With runtime API, we can't get kernel names directly
+  // If there are multiple kernels, we'll use the first one
+  // The entrypoint fragment should be added first, so its kernel should be at index 0
+  if (kernel_count > 1) {
+    std::cerr << "[JIT] WARNING: Multiple kernels found (" << kernel_count << "), using kernel [0]"
+              << std::endl;
+    std::cerr << "[JIT]   Entrypoint we're looking for: " << this->entrypoint << std::endl;
+    std::cerr << "[JIT]   This suggests multiple kernels are being linked together!" << std::endl;
+    std::cerr << "[JIT]   Fragments added:" << std::endl;
+    for (size_t i = 0; i < this->fragments.size(); ++i) {
+      std::cerr << "[JIT]     Fragment [" << i << "]: ";
+      if (i == 0) {
+        std::cerr << "Entrypoint fragment" << std::endl;
+      } else {
+        std::cerr << "Device function fragment: " << this->device_functions[i - 1] << std::endl;
+      }
+    }
+    std::cerr.flush();
+  }
+
+  // When multiple kernels are found, one is often CUB's EmptyKernel (a weak symbol
+  // instantiated when CUB headers are included). The entrypoint fragment is added first,
+  // so its kernel should be at index 0. However, the order is not guaranteed - sometimes
+  // CUB's EmptyKernel is at index 0, sometimes at index 1.
+  // Strategy: Try kernel[0] first. If it's EmptyKernel, it will be a no-op and won't affect
+  // results. We can't distinguish EmptyKernel from our kernel without names, so we'll use kernel[0]
+  // and rely on the fact that EmptyKernel does nothing.
+  unsigned int kernel_index = 0;
+  if (kernel_count > 1) {
+    std::cerr << "[JIT] WARNING: Found " << kernel_count
+              << " kernels (CUB EmptyKernel may be present). Using kernel [0]" << std::endl;
+    std::cerr << "[JIT]   If kernel [0] is EmptyKernel, results will be incorrect" << std::endl;
+    std::cerr << "[JIT]   Entrypoint fragment is added first, so kernel [0] should be correct"
+              << std::endl;
+    std::cerr.flush();
+  }
+
+  auto kernel = kernels.release()[kernel_index];
 
   // Validate the kernel pointer is reasonable (not null, not obviously garbage)
   if (kernel == nullptr) {

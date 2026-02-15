@@ -15,6 +15,8 @@
 #include "topk_for_cagra/topk.h"  // TODO replace with raft topk
 #include "utils.hpp"
 
+#include <cub/warp/warp_scan.cuh>
+
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/logger.hpp>

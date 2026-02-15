@@ -243,6 +243,10 @@ _RAFT_DEVICE __noinline__ auto compute_distance_standard(
   return distance;
 }
 
+#ifndef BUILD_KERNEL
+// The init kernel is not needed when building JIT fragments (BUILD_KERNEL is defined)
+// It's only needed for non-JIT initialization. When BUILD_KERNEL is defined, we're building
+// a JIT fragment and don't want this kernel to be instantiated.
 template <cuvs::distance::DistanceType Metric,
           uint32_t TeamSize,
           uint32_t DatasetBlockDim,
@@ -260,6 +264,20 @@ RAFT_KERNEL __launch_bounds__(1, 1)
   using desc_type =
     standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
   using base_type = typename desc_type::base_type;
+
+  // Debug: Verify we're constructing the right type
+  if (threadIdx.x == 0 && blockIdx.x == 0) {
+    printf(
+      "[INIT KERNEL] Constructing desc_type with: Metric=%d, TeamSize=%u, DatasetBlockDim=%u, "
+      "DataT=float, IndexT=uint32_t, DistanceT=float\n",
+      static_cast<int>(Metric),
+      TeamSize,
+      DatasetBlockDim);
+    printf("[INIT KERNEL] desc_type::kTeamSize=%u, desc_type::kDatasetBlockDim=%u\n",
+           desc_type::kTeamSize,
+           desc_type::kDatasetBlockDim);
+  }
+
 #ifdef CUVS_ENABLE_JIT_LTO
   // For JIT, we don't use the function pointers, so set them to nullptr
   // The free functions are called directly instead
@@ -283,7 +301,12 @@ RAFT_KERNEL __launch_bounds__(1, 1)
                       dataset_norms);
 #endif
 }
+#endif  // #ifndef BUILD_KERNEL
 
+#ifndef BUILD_KERNEL
+// The init_ function is not needed when building JIT fragments (BUILD_KERNEL is defined)
+// It's only needed for non-JIT initialization. When BUILD_KERNEL is defined, we're building
+// a JIT fragment and don't want this host function to be included.
 template <cuvs::distance::DistanceType Metric,
           uint32_t TeamSize,
           uint32_t DatasetBlockDim,
@@ -326,5 +349,6 @@ standard_descriptor_spec<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, Dista
                    0,      // pq_bits
                    0};     // pq_len
 }
+#endif  // #ifndef BUILD_KERNEL
 
 }  // namespace cuvs::neighbors::cagra::detail
