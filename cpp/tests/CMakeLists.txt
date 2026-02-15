@@ -138,20 +138,6 @@ ConfigureTest(
   PERCENT 100
 )
 
-# UDF benchmark executable (not a gtest, outputs CSV)
-add_executable(NEIGHBORS_ANN_IVF_FLAT_UDF_BENCH neighbors/ann_ivf_flat/ivf_flat_udf_bench.cu)
-target_link_libraries(
-  NEIGHBORS_ANN_IVF_FLAT_UDF_BENCH PRIVATE cuvs $<TARGET_NAME_IF_EXISTS:conda_env>
-)
-set_target_properties(
-  NEIGHBORS_ANN_IVF_FLAT_UDF_BENCH
-  PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bench"
-             CXX_STANDARD 17
-             CXX_STANDARD_REQUIRED ON
-             CUDA_STANDARD 17
-             CUDA_STANDARD_REQUIRED ON
-)
-
 ConfigureTest(
   NAME NEIGHBORS_ANN_IVF_PQ_TEST
   PATH neighbors/ann_ivf_pq/test_float_int64_t.cu neighbors/ann_ivf_pq/test_int8_t_int64_t.cu

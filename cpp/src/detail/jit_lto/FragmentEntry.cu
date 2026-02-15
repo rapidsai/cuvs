@@ -26,6 +26,7 @@ bool FatbinFragmentEntry::add_to(nvJitLinkHandle& handle) const
   check_nvjitlink_result(handle, result);
   return true;
 }
+<<<<<<< HEAD
 
 NVRTCFragmentEntry::NVRTCFragmentEntry(std::string const& key,
                                        std::unique_ptr<char[]>&& program,
@@ -42,3 +43,5 @@ bool NVRTCFragmentEntry::add_to(nvJitLinkHandle& handle) const
 
   return true;
 }
+=======
+>>>>>>> origin/main

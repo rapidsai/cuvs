@@ -80,8 +80,8 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
 
   // Load the generated LTO IR and link them together
   nvJitLinkHandle handle;
-  const char* lopts[] = {"-lto", archs.c_str(), "-O3"};
-  auto result         = nvJitLinkCreate(&handle, 3, lopts);
+  const char* lopts[] = {"-lto", archs.c_str()};
+  auto result         = nvJitLinkCreate(&handle, 2, lopts);
   check_nvjitlink_result(handle, result);
 
   for (auto& frag : this->fragments) {
@@ -93,10 +93,6 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
   result = nvJitLinkComplete(handle);
   check_nvjitlink_result(handle, result);
 
-  // Dump CUBIN if CUVS_DUMP_CUBIN is set
-  static int dump_counter = 0;
-  bool dump_cubin         = std::getenv("CUVS_DUMP_CUBIN") != nullptr;
-
   // get cubin from nvJitLink
   size_t cubin_size;
   result = nvJitLinkGetLinkedCubinSize(handle, &cubin_size);
@@ -105,14 +101,6 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
   std::unique_ptr<char[]> cubin{new char[cubin_size]};
   result = nvJitLinkGetLinkedCubin(handle, cubin.get());
   check_nvjitlink_result(handle, result);
-
-  // Dump CUBIN for analysis with cuobjdump
-  if (dump_cubin) {
-    std::string filename = "/tmp/jit_kernel_" + std::to_string(dump_counter++) + ".cubin";
-    std::ofstream out(filename, std::ios::binary);
-    out.write(cubin.get(), cubin_size);
-    std::cerr << "Dumped CUBIN to: " << filename << " (" << cubin_size << " bytes)" << std::endl;
-  }
 
   result = nvJitLinkDestroy(&handle);
   RAFT_EXPECTS(result == NVJITLINK_SUCCESS, "nvJitLinkDestroy failed");
