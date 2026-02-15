@@ -6,6 +6,7 @@
 #include "nvjitlink_checker.hpp"
 
 #include <algorithm>
+#include <cerrno>
 #include <chrono>
 #include <cstdio>
 #include <iostream>
@@ -156,12 +157,24 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
   std::replace(cubin_path.begin(), cubin_path.end(), ' ', '_');
   FILE* f = fopen(cubin_path.c_str(), "wb");
   if (f) {
-    fwrite(cubin.get(), 1, cubin_size, f);
+    size_t written = fwrite(cubin.get(), 1, cubin_size, f);
     fclose(f);
-    std::cerr << "[JIT] Saved linked cubin to: " << cubin_path << " (size: " << cubin_size
-              << " bytes)" << std::endl;
-    std::cerr << "[JIT] Run: cuobjdump --dump-elf-symbols " << cubin_path
-              << " to see kernel symbols" << std::endl;
+    if (written == cubin_size) {
+      std::cerr << "[JIT] =========================================" << std::endl;
+      std::cerr << "[JIT] Saved linked cubin to: " << cubin_path << " (size: " << cubin_size
+                << " bytes)" << std::endl;
+      std::cerr << "[JIT] Run: cuobjdump --dump-elf-symbols " << cubin_path
+                << " to see kernel symbols" << std::endl;
+      std::cerr << "[JIT] =========================================" << std::endl;
+      std::cerr.flush();
+    } else {
+      std::cerr << "[JIT] WARNING: Failed to write full cubin (wrote " << written << " of "
+                << cubin_size << " bytes)" << std::endl;
+      std::cerr.flush();
+    }
+  } else {
+    std::cerr << "[JIT] WARNING: Failed to open cubin file for writing: " << cubin_path
+              << " (errno: " << errno << ")" << std::endl;
     std::cerr.flush();
   }
 
