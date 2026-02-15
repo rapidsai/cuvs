@@ -310,8 +310,8 @@ void finalize_centroids(raft::resources const& handle,
  * This is a unified function that handles both same-type (T == MathT) and
  * mixed-type (T != MathT) cases, following the kmeans_balanced pattern.
  *
- * @tparam T         Input data type (float, double, uint8_t, int8_t, half)
- * @tparam MathT     Computation/centroid type (typically float)
+ * @tparam T         Input data type (float, double)
+ * @tparam MathT     Computation/centroid type (same as T for float/double)
  * @tparam IdxT      Index type (int, int64_t)
  * @tparam MappingOpT Mapping operator (T -> MathT)
  *
@@ -746,8 +746,8 @@ void fit(raft::resources const& handle,
 /**
  * @brief Predict cluster labels for host data using batched processing.
  *
- * @tparam T         Input data type (float, double, uint8_t, int8_t, half)
- * @tparam MathT     Computation/centroid type (typically float)
+ * @tparam T         Input data type (float, double)
+ * @tparam MathT     Computation/centroid type (same as T for float/double)
  * @tparam IdxT      Index type (int, int64_t)
  * @tparam MappingOpT Mapping operator (T -> MathT)
  */

@@ -331,75 +331,6 @@ void fit_batched(raft::resources const& handle,
                  raft::host_scalar_view<int64_t> n_iter);
 
 /**
- * @brief Find clusters with k-means algorithm using batched processing for uint8 data.
- *
- * @param[in]     handle        The raft handle.
- * @param[in]     params        Parameters for KMeans model (including update_mode).
- * @param[in]     X             Training instances on HOST memory (uint8).
- *                              [dim = n_samples x n_features]
- * @param[in]     batch_size    Number of samples to process per batch.
- * @param[in]     sample_weight Optional weights for each observation in X (on host, float).
- * @param[inout]  centroids     Cluster centers on device (float, as centroids are averages).
- *                              [dim = n_clusters x n_features]
- * @param[out]    inertia       Sum of squared distances to nearest centroid.
- * @param[out]    n_iter        Number of iterations run.
- */
-void fit_batched(raft::resources const& handle,
-                 const cuvs::cluster::kmeans::params& params,
-                 raft::host_matrix_view<const uint8_t, int64_t> X,
-                 int64_t batch_size,
-                 std::optional<raft::host_vector_view<const float, int64_t>> sample_weight,
-                 raft::device_matrix_view<float, int64_t> centroids,
-                 raft::host_scalar_view<float> inertia,
-                 raft::host_scalar_view<int64_t> n_iter);
-
-/**
- * @brief Find clusters with k-means algorithm using batched processing for int8 data.
- *
- * @param[in]     handle        The raft handle.
- * @param[in]     params        Parameters for KMeans model (including update_mode).
- * @param[in]     X             Training instances on HOST memory (int8).
- *                              [dim = n_samples x n_features]
- * @param[in]     batch_size    Number of samples to process per batch.
- * @param[in]     sample_weight Optional weights for each observation in X (on host, float).
- * @param[inout]  centroids     Cluster centers on device (float, as centroids are averages).
- *                              [dim = n_clusters x n_features]
- * @param[out]    inertia       Sum of squared distances to nearest centroid.
- * @param[out]    n_iter        Number of iterations run.
- */
-void fit_batched(raft::resources const& handle,
-                 const cuvs::cluster::kmeans::params& params,
-                 raft::host_matrix_view<const int8_t, int64_t> X,
-                 int64_t batch_size,
-                 std::optional<raft::host_vector_view<const float, int64_t>> sample_weight,
-                 raft::device_matrix_view<float, int64_t> centroids,
-                 raft::host_scalar_view<float> inertia,
-                 raft::host_scalar_view<int64_t> n_iter);
-
-/**
- * @brief Find clusters with k-means algorithm using batched processing for half data.
- *
- * @param[in]     handle        The raft handle.
- * @param[in]     params        Parameters for KMeans model (including update_mode).
- * @param[in]     X             Training instances on HOST memory (half).
- *                              [dim = n_samples x n_features]
- * @param[in]     batch_size    Number of samples to process per batch.
- * @param[in]     sample_weight Optional weights for each observation in X (on host, float).
- * @param[inout]  centroids     Cluster centers on device (float, as centroids are averages).
- *                              [dim = n_clusters x n_features]
- * @param[out]    inertia       Sum of squared distances to nearest centroid.
- * @param[out]    n_iter        Number of iterations run.
- */
-void fit_batched(raft::resources const& handle,
-                 const cuvs::cluster::kmeans::params& params,
-                 raft::host_matrix_view<const half, int64_t> X,
-                 int64_t batch_size,
-                 std::optional<raft::host_vector_view<const float, int64_t>> sample_weight,
-                 raft::device_matrix_view<float, int64_t> centroids,
-                 raft::host_scalar_view<float> inertia,
-                 raft::host_scalar_view<int64_t> n_iter);
-
-/**
  * @defgroup predict_batched Batched K-Means Predict
  * @{
  */
@@ -418,8 +349,7 @@ void fit_batched(raft::resources const& handle,
  * @param[in]     centroids     Cluster centers on device. [dim = n_clusters x n_features]
  * @param[out]    labels        Predicted cluster labels on HOST memory. [dim = n_samples]
  * @param[in]     normalize_weight Whether to normalize sample weights.
- * @param[out]    inertia       Sum of squared distances to nearest centroid (only if
- *                              params.final_inertia_check is true, otherwise 0).
+ * @param[out]    inertia       Sum of squared distances to nearest centroid.
  */
 void predict_batched(raft::resources const& handle,
                      const cuvs::cluster::kmeans::params& params,
@@ -443,51 +373,6 @@ void predict_batched(raft::resources const& handle,
                      raft::host_vector_view<int64_t, int64_t> labels,
                      bool normalize_weight,
                      raft::host_scalar_view<double> inertia);
-
-/**
- * @brief Predict cluster labels for host uint8 data using batched processing.
- *
- * Input data is uint8 on host, centroids are float on device.
- */
-void predict_batched(raft::resources const& handle,
-                     const cuvs::cluster::kmeans::params& params,
-                     raft::host_matrix_view<const uint8_t, int64_t> X,
-                     int64_t batch_size,
-                     std::optional<raft::host_vector_view<const float, int64_t>> sample_weight,
-                     raft::device_matrix_view<const float, int64_t> centroids,
-                     raft::host_vector_view<int64_t, int64_t> labels,
-                     bool normalize_weight,
-                     raft::host_scalar_view<float> inertia);
-
-/**
- * @brief Predict cluster labels for host int8 data using batched processing.
- *
- * Input data is int8 on host, centroids are float on device.
- */
-void predict_batched(raft::resources const& handle,
-                     const cuvs::cluster::kmeans::params& params,
-                     raft::host_matrix_view<const int8_t, int64_t> X,
-                     int64_t batch_size,
-                     std::optional<raft::host_vector_view<const float, int64_t>> sample_weight,
-                     raft::device_matrix_view<const float, int64_t> centroids,
-                     raft::host_vector_view<int64_t, int64_t> labels,
-                     bool normalize_weight,
-                     raft::host_scalar_view<float> inertia);
-
-/**
- * @brief Predict cluster labels for host half data using batched processing.
- *
- * Input data is half on host, centroids are float on device.
- */
-void predict_batched(raft::resources const& handle,
-                     const cuvs::cluster::kmeans::params& params,
-                     raft::host_matrix_view<const half, int64_t> X,
-                     int64_t batch_size,
-                     std::optional<raft::host_vector_view<const float, int64_t>> sample_weight,
-                     raft::device_matrix_view<const float, int64_t> centroids,
-                     raft::host_vector_view<int64_t, int64_t> labels,
-                     bool normalize_weight,
-                     raft::host_scalar_view<float> inertia);
 
 /**
  * @}
@@ -534,45 +419,6 @@ void fit_predict_batched(raft::resources const& handle,
                          raft::device_matrix_view<double, int64_t> centroids,
                          raft::host_vector_view<int64_t, int64_t> labels,
                          raft::host_scalar_view<double> inertia,
-                         raft::host_scalar_view<int64_t> n_iter);
-
-/**
- * @brief Fit k-means and predict cluster labels for uint8 data using batched processing.
- */
-void fit_predict_batched(raft::resources const& handle,
-                         const cuvs::cluster::kmeans::params& params,
-                         raft::host_matrix_view<const uint8_t, int64_t> X,
-                         int64_t batch_size,
-                         std::optional<raft::host_vector_view<const float, int64_t>> sample_weight,
-                         raft::device_matrix_view<float, int64_t> centroids,
-                         raft::host_vector_view<int64_t, int64_t> labels,
-                         raft::host_scalar_view<float> inertia,
-                         raft::host_scalar_view<int64_t> n_iter);
-
-/**
- * @brief Fit k-means and predict cluster labels for int8 data using batched processing.
- */
-void fit_predict_batched(raft::resources const& handle,
-                         const cuvs::cluster::kmeans::params& params,
-                         raft::host_matrix_view<const int8_t, int64_t> X,
-                         int64_t batch_size,
-                         std::optional<raft::host_vector_view<const float, int64_t>> sample_weight,
-                         raft::device_matrix_view<float, int64_t> centroids,
-                         raft::host_vector_view<int64_t, int64_t> labels,
-                         raft::host_scalar_view<float> inertia,
-                         raft::host_scalar_view<int64_t> n_iter);
-
-/**
- * @brief Fit k-means and predict cluster labels for half data using batched processing.
- */
-void fit_predict_batched(raft::resources const& handle,
-                         const cuvs::cluster::kmeans::params& params,
-                         raft::host_matrix_view<const half, int64_t> X,
-                         int64_t batch_size,
-                         std::optional<raft::host_vector_view<const float, int64_t>> sample_weight,
-                         raft::device_matrix_view<float, int64_t> centroids,
-                         raft::host_vector_view<int64_t, int64_t> labels,
-                         raft::host_scalar_view<float> inertia,
                          raft::host_scalar_view<int64_t> n_iter);
 
 /**

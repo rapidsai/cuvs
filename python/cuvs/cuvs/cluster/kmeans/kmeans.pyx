@@ -453,7 +453,7 @@ def fit_batched(
         Parameters to use to fit KMeans model
     X : numpy array or array with __array_interface__
         Input HOST memory array shape (n_samples, n_features).
-        Must be C-contiguous. Supported dtypes: float32, float64, uint8, int8, float16.
+        Must be C-contiguous. Supported dtypes: float32, float64.
     batch_size : int
         Number of samples to process per batch. Recommended: 500K-2M
         depending on GPU memory.
@@ -497,9 +497,7 @@ def fit_batched(
     if not X.flags['C_CONTIGUOUS']:
         X = np.ascontiguousarray(X)
 
-    _check_input_array(wrap_array(X), [np.dtype('float32'), np.dtype('float64'),
-                                       np.dtype('uint8'), np.dtype('int8'),
-                                       np.dtype('float16')])
+    _check_input_array(wrap_array(X), [np.dtype('float32'), np.dtype('float64')])
 
     cdef int64_t n_samples = X.shape[0]
     cdef int64_t n_features = X.shape[1]
@@ -515,14 +513,8 @@ def fit_batched(
     cdef int64_t c_batch_size = batch_size
 
     if centroids is None:
-        # For integer/half types, centroids are always float32
-        # (centroids are averages, can't be represented as integers)
-        if X.dtype in (np.uint8, np.int8, np.float16):
-            centroids_dtype = np.float32
-        else:
-            centroids_dtype = X.dtype
         centroids = device_ndarray.empty((params.n_clusters, n_features),
-                                         dtype=centroids_dtype)
+                                         dtype=X.dtype)
 
     centroids_ai = wrap_array(centroids)
     cdef cydlpack.DLManagedTensor* centroids_dlpack = \

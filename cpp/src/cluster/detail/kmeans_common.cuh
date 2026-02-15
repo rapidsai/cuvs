@@ -507,7 +507,6 @@ void compute_centroid_adjustments(
 
   workspace.resize(n_samples, stream);
 
-  // Compute weighted sum of samples per cluster
   raft::linalg::reduce_rows_by_key(const_cast<DataT*>(X.data_handle()),
                                    X.extent(1),
                                    cluster_labels,
@@ -519,7 +518,6 @@ void compute_centroid_adjustments(
                                    centroid_sums.data_handle(),
                                    stream);
 
-  // Compute sum of weights per cluster
   raft::linalg::reduce_cols_by_key(sample_weights.data_handle(),
                                    cluster_labels,
                                    weight_per_cluster.data_handle(),

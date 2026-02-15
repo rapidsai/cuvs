@@ -6,8 +6,6 @@
 #include <cstdint>
 #include <dlpack/dlpack.h>
 
-#include <cuda_fp16.h>
-
 #include <cuvs/cluster/kmeans.h>
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/core/c_api.h>
@@ -246,76 +244,6 @@ void _fit_batched(cuvsResources_t res,
   *inertia = inertia_temp;
   *n_iter  = n_iter_temp;
 }
-
-// Specialized version for integer/half types where X is InputT but centroids are float
-template <typename InputT, typename IdxT = int64_t>
-void _fit_batched_mixed(cuvsResources_t res,
-                        const cuvsKMeansParams& params,
-                        DLManagedTensor* X_tensor,
-                        IdxT batch_size,
-                        DLManagedTensor* sample_weight_tensor,
-                        DLManagedTensor* centroids_tensor,
-                        double* inertia,
-                        IdxT* n_iter)
-{
-  auto X          = X_tensor->dl_tensor;
-  auto centroids  = centroids_tensor->dl_tensor;
-  auto res_ptr    = reinterpret_cast<raft::resources*>(res);
-  auto n_samples  = static_cast<IdxT>(X.shape[0]);
-  auto n_features = static_cast<IdxT>(X.shape[1]);
-
-  // X must be on host (CPU) memory
-  if (X.device.device_type != kDLCPU) {
-    RAFT_FAIL("X dataset must be on host (CPU) memory for fit_batched");
-  }
-
-  // centroids must be on device memory and float type
-  if (!cuvs::core::is_dlpack_device_compatible(centroids)) {
-    RAFT_FAIL("centroids must be on device memory");
-  }
-  if (centroids.dtype.code != kDLFloat || centroids.dtype.bits != 32) {
-    RAFT_FAIL("centroids must be float32 for integer/half input types");
-  }
-
-  using device_matrix_type = raft::device_matrix_view<float, IdxT, raft::row_major>;
-
-  // Create host matrix view from X (InputT)
-  auto X_view = raft::make_host_matrix_view<InputT const, IdxT>(
-    reinterpret_cast<InputT const*>(X.data), n_samples, n_features);
-
-  // Create device matrix view for centroids (float)
-  auto centroids_view = cuvs::core::from_dlpack<device_matrix_type>(centroids_tensor);
-
-  // Handle optional sample weights (float)
-  std::optional<raft::host_vector_view<float const, IdxT>> sample_weight;
-  if (sample_weight_tensor != NULL) {
-    auto sw = sample_weight_tensor->dl_tensor;
-    if (sw.device.device_type != kDLCPU) {
-      RAFT_FAIL("sample_weight must be on host (CPU) memory for fit_batched");
-    }
-    if (sw.dtype.code != kDLFloat || sw.dtype.bits != 32) {
-      RAFT_FAIL("sample_weight must be float32 for integer/half input types");
-    }
-    sample_weight = raft::make_host_vector_view<float const, IdxT>(
-      reinterpret_cast<float const*>(sw.data), n_samples);
-  }
-
-  float inertia_temp;
-  IdxT n_iter_temp;
-
-  auto kmeans_params = convert_params(params);
-  cuvs::cluster::kmeans::fit_batched(*res_ptr,
-                                     kmeans_params,
-                                     X_view,
-                                     batch_size,
-                                     sample_weight,
-                                     centroids_view,
-                                     raft::make_host_scalar_view<float>(&inertia_temp),
-                                     raft::make_host_scalar_view<IdxT>(&n_iter_temp));
-
-  *inertia = inertia_temp;
-  *n_iter  = n_iter_temp;
-}
 }  // namespace
 
 extern "C" cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params)
@@ -426,15 +354,6 @@ extern "C" cuvsError_t cuvsKMeansFitBatched(cuvsResources_t res,
       _fit_batched<float>(res, *params, X, batch_size, sample_weight, centroids, inertia, n_iter);
     } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 64) {
       _fit_batched<double>(res, *params, X, batch_size, sample_weight, centroids, inertia, n_iter);
-    } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
-      // uint8 input -> float centroids
-      _fit_batched_mixed<uint8_t>(res, *params, X, batch_size, sample_weight, centroids, inertia, n_iter);
-    } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
-      // int8 input -> float centroids
-      _fit_batched_mixed<int8_t>(res, *params, X, batch_size, sample_weight, centroids, inertia, n_iter);
-    } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 16) {
-      // half input -> float centroids
-      _fit_batched_mixed<half>(res, *params, X, batch_size, sample_weight, centroids, inertia, n_iter);
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
                 dataset.dtype.code,
