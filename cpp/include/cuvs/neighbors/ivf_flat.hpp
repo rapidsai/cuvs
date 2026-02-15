@@ -3052,6 +3052,7 @@ void recompute_internal_state(const raft::resources& res, index<uint8_t, int64_t
 
 }  // namespace helpers
 
+#ifdef CUVS_ENABLE_JIT_LTO
 namespace udf {
 
 // ============================================================================
@@ -3468,5 +3469,6 @@ __device__ __forceinline__ void compute_dist(AccT& acc, AccT x, AccT y)         
   }
 
 }  // namespace udf
+#endif
 
 }  // namespace cuvs::neighbors::ivf_flat
