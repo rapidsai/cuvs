@@ -621,13 +621,6 @@ if(NOT BUILD_CPU_ONLY)
     INTERFACE "$<INSTALL_INTERFACE:include>"
   )
 
-  target_include_directories(
-    cuvs_objs
-    PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-           "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
-    INTERFACE "$<INSTALL_INTERFACE:include>"
-  )
-
   # Endian detection
   include(TestBigEndian)
   test_big_endian(BIG_ENDIAN)
@@ -702,12 +695,7 @@ if(NOT BUILD_CPU_ONLY)
         $<COMPILE_ONLY:nvidia::cutlass::cutlass>
         $<COMPILE_ONLY:cuco::cuco>
         $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
-        <<<<<<<
-        HEAD
         $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvrtc>
-        =======
-        >>>>>>>
-        origin/main
         $<$<BOOL:${JIT_LTO_COMPILATION}>:$<LINK_LIBRARY:WHOLE_ARCHIVE,cuvs::cuvs_jit_lto_kernels>>
     )
 
@@ -768,12 +756,7 @@ SECTIONS
       PRIVATE
         $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
         $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
-        <<<<<<<
-        HEAD
         $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvrtc>
-        =======
-        >>>>>>>
-        origin/main
         $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
         $<COMPILE_ONLY:nvidia::cutlass::cutlass>
         $<COMPILE_ONLY:cuco::cuco>
