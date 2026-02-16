@@ -31,6 +31,7 @@ dependencies:
 - libcurand-dev
 - libcusolver-dev
 - libcusparse-dev
+- libnvjitlink-dev
 - librmm==26.4.*,>=0.0.0a0
 - make
 - nccl>=2.19
