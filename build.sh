@@ -224,7 +224,7 @@ function gpuArch {
 
     # Check for gpu-arch option
     if [[ -n $(echo "$ARGS" | { grep -E "\-\-gpu\-arch" || true; } ) ]]; then
-        GPU_ARCH_ARG=$(echo "$ARGS" | { grep -Eo "\-\-gpu\-arch=.+( |$)" || true; })
+        GPU_ARCH_ARG=$(echo "$ARGS" | { grep -Eo "\-\-gpu\-arch=[^ ]+" || true; })
         if [[ -n ${GPU_ARCH_ARG} ]]; then
             # Remove the full argument from ARGS
             ARGS=${ARGS//$GPU_ARCH_ARG/}
@@ -371,10 +371,13 @@ fi
 
 ################################################################################
 # Configure for building all C++ targets
-if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg bench-prims || hasArg bench-ann; then
+if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg bench-prims || hasArg bench-ann || hasArg examples; then
     COMPILE_LIBRARY=ON
     if [[ "${BUILD_SHARED_LIBS}" != "OFF" ]]; then
         CMAKE_TARGET+=("cuvs")
+        if hasArg examples; then
+            CMAKE_TARGET+=("cuvs_c")
+        fi
     fi
 
     # get the current count before the compile starts
@@ -469,16 +472,33 @@ if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg
   fi
 fi
 
+
+PYTHON_ARGS_FOR_INSTALL=(
+    "-v"
+    "--no-build-isolation"
+    "--no-deps"
+    "--config-settings"
+    "rapidsai.disable-cuda=true"
+)
+
+# If `RAPIDS_PY_VERSION` is set, use that as the lower-bound for the stable ABI CPython version
+if [ -n "${RAPIDS_PY_VERSION:-}" ]; then
+    RAPIDS_PY_API="cp${RAPIDS_PY_VERSION//./}"
+    PYTHON_ARGS_FOR_INSTALL+=("--config-settings" "skbuild.wheel.py-api=${RAPIDS_PY_API}")
+fi
+
 # Build and (optionally) install the cuvs Python package
 if (( NUMARGS == 0 )) || hasArg python; then
     SKBUILD_CMAKE_ARGS="${EXTRA_CMAKE_ARGS[*]}" \
         SKBUILD_BUILD_OPTIONS="-j${PARALLEL_LEVEL}" \
-        python -m pip install --no-build-isolation --no-deps --config-settings rapidsai.disable-cuda=true "${REPODIR}"/python/cuvs
+        python -m pip install \
+        "${PYTHON_ARGS_FOR_INSTALL[@]}" "${REPODIR}"/python/cuvs
 fi
 
 # Build and (optionally) install the cuvs-bench Python package
 if (( NUMARGS == 0 )) || (hasArg bench-ann && ! hasArg -n); then
-    python -m pip install --no-build-isolation --no-deps --config-settings rapidsai.disable-cuda=true "${REPODIR}"/python/cuvs_bench
+    python -m pip install \
+        "${PYTHON_ARGS_FOR_INSTALL[@]}" "${REPODIR}"/python/cuvs_bench
 fi
 
 # Build the cuvs Rust bindings
