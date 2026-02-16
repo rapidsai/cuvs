@@ -16,7 +16,8 @@ namespace cuvs::preprocessing::pca::detail {
 /**
  * @brief Convert cuvs::preprocessing::pca::params to raft::linalg::paramsPCA.
  */
-inline raft::linalg::paramsPCA to_raft_params(params config, std::size_t n_rows, std::size_t n_cols)
+inline auto to_raft_params(params config, std::size_t n_rows, std::size_t n_cols)
+  -> raft::linalg::paramsPCA
 {
   raft::linalg::paramsPCA prms;
   prms.n_rows       = n_rows;
