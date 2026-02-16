@@ -31,16 +31,16 @@ inline raft::linalg::paramsPCA to_raft_params(params config, std::size_t n_rows,
   return prms;
 }
 
-template <typename math_t>
+template <typename DataT, typename IndexT>
 void fit(raft::resources const& handle,
          params config,
-         raft::device_matrix_view<math_t, int64_t, raft::col_major> input,
-         raft::device_matrix_view<math_t, int64_t, raft::col_major> components,
-         raft::device_vector_view<math_t, int64_t> explained_var,
-         raft::device_vector_view<math_t, int64_t> explained_var_ratio,
-         raft::device_vector_view<math_t, int64_t> singular_vals,
-         raft::device_vector_view<math_t, int64_t> mu,
-         raft::device_scalar_view<math_t, int64_t> noise_vars,
+         raft::device_matrix_view<DataT, IndexT, raft::col_major> input,
+         raft::device_matrix_view<DataT, IndexT, raft::col_major> components,
+         raft::device_vector_view<DataT, IndexT> explained_var,
+         raft::device_vector_view<DataT, IndexT> explained_var_ratio,
+         raft::device_vector_view<DataT, IndexT> singular_vals,
+         raft::device_vector_view<DataT, IndexT> mu,
+         raft::device_scalar_view<DataT, IndexT> noise_vars,
          bool flip_signs_based_on_U)
 {
   auto raft_prms = to_raft_params(config, input.extent(0), input.extent(1));
@@ -56,17 +56,17 @@ void fit(raft::resources const& handle,
                         flip_signs_based_on_U);
 }
 
-template <typename math_t>
+template <typename DataT, typename IndexT>
 void fit_transform(raft::resources const& handle,
                    params config,
-                   raft::device_matrix_view<math_t, int64_t, raft::col_major> input,
-                   raft::device_matrix_view<math_t, int64_t, raft::col_major> trans_input,
-                   raft::device_matrix_view<math_t, int64_t, raft::col_major> components,
-                   raft::device_vector_view<math_t, int64_t> explained_var,
-                   raft::device_vector_view<math_t, int64_t> explained_var_ratio,
-                   raft::device_vector_view<math_t, int64_t> singular_vals,
-                   raft::device_vector_view<math_t, int64_t> mu,
-                   raft::device_scalar_view<math_t, int64_t> noise_vars,
+                   raft::device_matrix_view<DataT, IndexT, raft::col_major> input,
+                   raft::device_matrix_view<DataT, IndexT, raft::col_major> trans_input,
+                   raft::device_matrix_view<DataT, IndexT, raft::col_major> components,
+                   raft::device_vector_view<DataT, IndexT> explained_var,
+                   raft::device_vector_view<DataT, IndexT> explained_var_ratio,
+                   raft::device_vector_view<DataT, IndexT> singular_vals,
+                   raft::device_vector_view<DataT, IndexT> mu,
+                   raft::device_scalar_view<DataT, IndexT> noise_vars,
                    bool flip_signs_based_on_U)
 {
   auto raft_prms = to_raft_params(config, input.extent(0), input.extent(1));
@@ -83,27 +83,27 @@ void fit_transform(raft::resources const& handle,
                                   flip_signs_based_on_U);
 }
 
-template <typename math_t>
+template <typename DataT, typename IndexT>
 void transform(raft::resources const& handle,
                params config,
-               raft::device_matrix_view<math_t, int64_t, raft::col_major> input,
-               raft::device_matrix_view<math_t, int64_t, raft::col_major> components,
-               raft::device_vector_view<math_t, int64_t> singular_vals,
-               raft::device_vector_view<math_t, int64_t> mu,
-               raft::device_matrix_view<math_t, int64_t, raft::col_major> trans_input)
+               raft::device_matrix_view<DataT, IndexT, raft::col_major> input,
+               raft::device_matrix_view<DataT, IndexT, raft::col_major> components,
+               raft::device_vector_view<DataT, IndexT> singular_vals,
+               raft::device_vector_view<DataT, IndexT> mu,
+               raft::device_matrix_view<DataT, IndexT, raft::col_major> trans_input)
 {
   auto raft_prms = to_raft_params(config, input.extent(0), input.extent(1));
   raft::linalg::pca_transform(handle, raft_prms, input, components, singular_vals, mu, trans_input);
 }
 
-template <typename math_t>
+template <typename DataT, typename IndexT>
 void inverse_transform(raft::resources const& handle,
                        params config,
-                       raft::device_matrix_view<math_t, int64_t, raft::col_major> trans_input,
-                       raft::device_matrix_view<math_t, int64_t, raft::col_major> components,
-                       raft::device_vector_view<math_t, int64_t> singular_vals,
-                       raft::device_vector_view<math_t, int64_t> mu,
-                       raft::device_matrix_view<math_t, int64_t, raft::col_major> output)
+                       raft::device_matrix_view<DataT, IndexT, raft::col_major> trans_input,
+                       raft::device_matrix_view<DataT, IndexT, raft::col_major> components,
+                       raft::device_vector_view<DataT, IndexT> singular_vals,
+                       raft::device_vector_view<DataT, IndexT> mu,
+                       raft::device_matrix_view<DataT, IndexT, raft::col_major> output)
 {
   auto raft_prms = to_raft_params(config, output.extent(0), output.extent(1));
   raft::linalg::pca_inverse_transform(
