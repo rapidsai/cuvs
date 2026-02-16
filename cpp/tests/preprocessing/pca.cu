@@ -5,10 +5,10 @@
 
 #include "../test_utils.cuh"
 
+#include <cuvs/preprocessing/pca.hpp>
+
 #include <raft/core/device_resources.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-// #include <raft/linalg/pca.cuh>
-#include <cuvs/preprocessing/pca.hpp>
 #include <raft/random/rng.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
