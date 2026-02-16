@@ -538,7 +538,8 @@ void compute_centroid_adjustments(
  * @param[in]  handle          RAFT resources handle
  * @param[in]  centroid_sums   Accumulated weighted sums per cluster [n_clusters x n_features]
  * @param[in]  cluster_counts  Sum of weights per cluster [n_clusters]
- * @param[in]  old_centroids   Previous centroids (used for empty clusters) [n_clusters x n_features]
+ * @param[in]  old_centroids   Previous centroids (used for empty clusters) [n_clusters x
+ * n_features]
  * @param[out] new_centroids   Output centroids [n_clusters x n_features]
  */
 template <typename DataT, typename IndexT>
@@ -570,9 +571,7 @@ void finalize_centroids(raft::resources const& handle,
     itr_wt,
     static_cast<int>(cluster_counts.size()),
     new_centroids.data_handle(),
-    [=] __device__(raft::KeyValuePair<ptrdiff_t, DataT> map) {
-      return map.value == DataT{0};
-    },
+    [=] __device__(raft::KeyValuePair<ptrdiff_t, DataT> map) { return map.value == DataT{0}; },
     raft::key_op{},
     stream);
 }

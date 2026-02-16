@@ -292,12 +292,11 @@ void update_centroids(raft::resources const& handle,
                                                               workspace);
 
   // Divide sums by counts to get new centroids; preserve old centroids for empty clusters
-  cuvs::cluster::kmeans::detail::finalize_centroids(
-    handle,
-    raft::make_const_mdspan(new_centroids),
-    raft::make_const_mdspan(weight_per_cluster),
-    centroids,
-    new_centroids);
+  cuvs::cluster::kmeans::detail::finalize_centroids(handle,
+                                                    raft::make_const_mdspan(new_centroids),
+                                                    raft::make_const_mdspan(weight_per_cluster),
+                                                    centroids,
+                                                    new_centroids);
 }
 
 // TODO: Resizing is needed to use mdarray instead of rmm::device_uvector
