@@ -680,15 +680,8 @@ void fit_predict(raft::resources const& handle,
   auto centroids_const = raft::make_device_matrix_view<const T, IdxT>(
     centroids.data_handle(), centroids.extent(0), centroids.extent(1));
 
-  predict<T, IdxT>(handle,
-                   params,
-                   X,
-                   batch_size,
-                   sample_weight,
-                   centroids_const,
-                   labels,
-                   false,
-                   inertia);
+  predict<T, IdxT>(
+    handle, params, X, batch_size, sample_weight, centroids_const, labels, false, inertia);
 }
 
 }  // namespace cuvs::cluster::kmeans::detail

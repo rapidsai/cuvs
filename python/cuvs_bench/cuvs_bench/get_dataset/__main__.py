@@ -1,13 +1,9 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
-import gzip
 import os
-import shutil
-import struct
 import subprocess
-import tarfile
 
 import click
 import h5py
@@ -32,266 +28,6 @@ def download_dataset(url, path):
                 for chunk in r.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
-
-
-def download_with_wget(url, path):
-    """Download file using wget (better for large FTP files)."""
-    if not os.path.exists(path):
-        print(f"downloading {url} -> {path}...")
-        subprocess.run(["wget", "-O", path, url], check=True)
-
-
-def read_bvecs(filename, n_vectors=None):
-    """
-    Read .bvecs file format from TEXMEX.
-    Format: each vector is [dim (4 bytes int)] [dim bytes uint8 data]
-    Returns float32 array.
-    """
-    print(f"Reading {filename}...")
-    with open(filename, "rb") as f:
-        # Read dimension from first vector
-        dim = struct.unpack("i", f.read(4))[0]
-        f.seek(0)
-
-        # Calculate number of vectors
-        f.seek(0, 2)  # Seek to end
-        file_size = f.tell()
-        record_size = 4 + dim
-        total_vectors = file_size // record_size
-        f.seek(0)
-
-        if n_vectors is None:
-            n_vectors = total_vectors
-        else:
-            n_vectors = min(n_vectors, total_vectors)
-
-        print(f"  Reading {n_vectors:,} vectors of dimension {dim}")
-
-        data = np.zeros((n_vectors, dim), dtype=np.float32)
-        for i in range(n_vectors):
-            f.read(4)  # Skip dimension
-            vec = np.frombuffer(f.read(dim), dtype=np.uint8)
-            data[i] = vec.astype(np.float32)
-
-            if (i + 1) % 10_000_000 == 0:
-                print(f"    Loaded {i + 1:,} / {n_vectors:,} vectors...")
-
-    return data
-
-
-def read_ivecs(filename, n_vectors=None):
-    """
-    Read .ivecs file format (groundtruth neighbors).
-    Format: each vector is [dim (4 bytes int)] [dim int32 values]
-    """
-    print(f"Reading {filename}...")
-    with open(filename, "rb") as f:
-        dim = struct.unpack("i", f.read(4))[0]
-        f.seek(0)
-
-        f.seek(0, 2)
-        file_size = f.tell()
-        record_size = 4 + dim * 4
-        total_vectors = file_size // record_size
-        f.seek(0)
-
-        if n_vectors is None:
-            n_vectors = total_vectors
-        else:
-            n_vectors = min(n_vectors, total_vectors)
-
-        print(f"  Reading {n_vectors:,} vectors of dimension {dim}")
-
-        data = np.zeros((n_vectors, dim), dtype=np.int32)
-        for i in range(n_vectors):
-            d = struct.unpack("i", f.read(4))[0]
-            data[i] = np.frombuffer(f.read(dim * 4), dtype=np.int32)
-
-    return data
-
-
-def read_fvecs(filename, n_vectors=None):
-    """
-    Read .fvecs file format.
-    Format: each vector is [dim (4 bytes int)] [dim float32 values]
-    """
-    print(f"Reading {filename}...")
-    with open(filename, "rb") as f:
-        dim = struct.unpack("i", f.read(4))[0]
-        f.seek(0)
-
-        f.seek(0, 2)
-        file_size = f.tell()
-        record_size = 4 + dim * 4
-        total_vectors = file_size // record_size
-        f.seek(0)
-
-        if n_vectors is None:
-            n_vectors = total_vectors
-        else:
-            n_vectors = min(n_vectors, total_vectors)
-
-        print(f"  Reading {n_vectors:,} vectors of dimension {dim}")
-
-        data = np.zeros((n_vectors, dim), dtype=np.float32)
-        for i in range(n_vectors):
-            f.read(4)  # Skip dimension
-            data[i] = np.frombuffer(f.read(dim * 4), dtype=np.float32)
-
-            if (i + 1) % 10_000_000 == 0:
-                print(f"    Loaded {i + 1:,} / {n_vectors:,} vectors...")
-
-    return data
-
-
-def write_fbin(filename, data):
-    """Write data in .fbin format (used by cuVS benchmarks)."""
-    print(f"Writing {filename}...")
-    n, d = data.shape
-    with open(filename, "wb") as f:
-        f.write(struct.pack("i", n))
-        f.write(struct.pack("i", d))
-        data.astype(np.float32).tofile(f)
-    print(f"  Wrote {n:,} x {d} float32 array")
-
-
-def write_ibin(filename, data):
-    """Write data in .ibin format (used by cuVS benchmarks for groundtruth)."""
-    print(f"Writing {filename}...")
-    n, d = data.shape
-    with open(filename, "wb") as f:
-        f.write(struct.pack("i", n))
-        f.write(struct.pack("i", d))
-        data.astype(np.int32).tofile(f)
-    print(f"  Wrote {n:,} x {d} int32 array")
-
-
-def download_sift1b(ann_bench_data_path, n_base_vectors=None):
-    """
-    Download and convert SIFT1B dataset from TEXMEX corpus.
-    http://corpus-texmex.irisa.fr/
-
-    The dataset contains:
-    - bigann_base.bvecs: 1B base vectors (128-dim uint8)
-    - bigann_query.bvecs: 10K query vectors
-    - bigann_learn.bvecs: 100M learning vectors
-    - bigann_gnd.tar.gz: Groundtruth for various subset sizes
-    """
-    base_url = "ftp://ftp.irisa.fr/local/texmex/corpus"
-
-    # Create output directory
-    if n_base_vectors is None:
-        output_dir = os.path.join(ann_bench_data_path, "sift-1B")
-    else:
-        size_suffix = f"{n_base_vectors // 1_000_000}M"
-        output_dir = os.path.join(ann_bench_data_path, f"sift-{size_suffix}")
-
-    os.makedirs(output_dir, exist_ok=True)
-
-    # Temporary directory for downloads
-    tmp_dir = os.path.join(ann_bench_data_path, "tmp_sift1b")
-    os.makedirs(tmp_dir, exist_ok=True)
-
-    try:
-        # Download and process base vectors
-        base_gz = os.path.join(tmp_dir, "bigann_base.bvecs.gz")
-        base_file = os.path.join(tmp_dir, "bigann_base.bvecs")
-
-        if not os.path.exists(os.path.join(output_dir, "base.fbin")):
-            if not os.path.exists(base_file):
-                if not os.path.exists(base_gz):
-                    download_with_wget(
-                        f"{base_url}/bigann_base.bvecs.gz", base_gz
-                    )
-                print(f"Decompressing {base_gz}...")
-                with gzip.open(base_gz, "rb") as f_in:
-                    with open(base_file, "wb") as f_out:
-                        shutil.copyfileobj(f_in, f_out)
-
-            base_data = read_bvecs(base_file, n_base_vectors)
-            write_fbin(os.path.join(output_dir, "base.fbin"), base_data)
-            del base_data
-
-        # Download and process query vectors
-        query_gz = os.path.join(tmp_dir, "bigann_query.bvecs.gz")
-        query_file = os.path.join(tmp_dir, "bigann_query.bvecs")
-
-        if not os.path.exists(os.path.join(output_dir, "query.fbin")):
-            if not os.path.exists(query_file):
-                if not os.path.exists(query_gz):
-                    download_with_wget(
-                        f"{base_url}/bigann_query.bvecs.gz", query_gz
-                    )
-                print(f"Decompressing {query_gz}...")
-                with gzip.open(query_gz, "rb") as f_in:
-                    with open(query_file, "wb") as f_out:
-                        shutil.copyfileobj(f_in, f_out)
-
-            query_data = read_bvecs(query_file)
-            write_fbin(os.path.join(output_dir, "query.fbin"), query_data)
-            del query_data
-
-        # Download and process groundtruth
-        gnd_tar = os.path.join(tmp_dir, "bigann_gnd.tar.gz")
-
-        if not os.path.exists(
-            os.path.join(output_dir, "groundtruth.neighbors.ibin")
-        ):
-            if not os.path.exists(gnd_tar):
-                download_with_wget(f"{base_url}/bigann_gnd.tar.gz", gnd_tar)
-
-            print(f"Extracting {gnd_tar}...")
-            with tarfile.open(gnd_tar, "r:gz") as tar:
-                tar.extractall(tmp_dir)
-
-            # Choose appropriate groundtruth file based on n_base_vectors
-            if n_base_vectors is None:
-                gnd_file = os.path.join(tmp_dir, "gnd", "idx_1000M.ivecs")
-            else:
-                # Find closest available groundtruth
-                sizes = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]
-                target_m = n_base_vectors // 1_000_000
-                closest = min(
-                    sizes,
-                    key=lambda x: abs(x - target_m)
-                    if x >= target_m
-                    else float("inf"),
-                )
-                if closest > target_m:
-                    closest = max(
-                        [s for s in sizes if s <= target_m], default=sizes[0]
-                    )
-                gnd_file = os.path.join(
-                    tmp_dir, "gnd", f"idx_{closest}M.ivecs"
-                )
-
-            if os.path.exists(gnd_file):
-                gnd_data = read_ivecs(gnd_file)
-                write_ibin(
-                    os.path.join(output_dir, "groundtruth.neighbors.ibin"),
-                    gnd_data,
-                )
-            else:
-                print(f"Warning: Groundtruth file {gnd_file} not found")
-                # List available files
-                gnd_dir = os.path.join(tmp_dir, "gnd")
-                if os.path.exists(gnd_dir):
-                    print(
-                        f"Available groundtruth files: {os.listdir(gnd_dir)}"
-                    )
-
-        print(f"\nSIFT1B dataset prepared in: {output_dir}")
-        print("Files:")
-        for f in os.listdir(output_dir):
-            fpath = os.path.join(output_dir, f)
-            size_mb = os.path.getsize(fpath) / 1e6
-            print(f"  {f}: {size_mb:.1f} MB")
-
-    finally:
-        # Optionally clean up temp files
-        # shutil.rmtree(tmp_dir)
-        print(f"\nTemp files kept in: {tmp_dir}")
-        print("You can delete them manually after verifying the dataset.")
 
 
 def convert_hdf5_to_fbin(path, normalize):
@@ -411,8 +147,7 @@ def get_default_dataset_path():
 @click.option(
     "--dataset",
     default="glove-100-angular",
-    help="Dataset to download. Use 'sift-1B' for TEXMEX SIFT1B dataset, "
-    "or 'sift-100M', 'sift-10M' etc for subsets.",
+    help="Dataset to download.",
 )
 @click.option(
     "--test-data-n-train",
@@ -450,13 +185,6 @@ def get_default_dataset_path():
     is_flag=True,
     help="Normalize cosine distance to inner product.",
 )
-@click.option(
-    "--n-vectors",
-    default=None,
-    type=int,
-    help="Number of base vectors to use (for sift-1B dataset). "
-    "E.g., 300000000 for 300M vectors.",
-)
 def main(
     dataset,
     test_data_n_train,
@@ -466,7 +194,6 @@ def main(
     test_data_output_file,
     dataset_path,
     normalize,
-    n_vectors,
 ):
     # Compute default dataset_path if not provided.
     if dataset_path is None:
@@ -483,24 +210,6 @@ def main(
             metric="euclidean",
             dataset_path=dataset_path,
         )
-    elif dataset.startswith("sift-"):
-        # Handle SIFT1B and subsets from TEXMEX
-        # Parse dataset name for size hint (e.g., sift-100M, sift-1B)
-        size_str = dataset.split("-")[1].upper()
-        if n_vectors is None:
-            if size_str == "1B":
-                n_vectors = None  # Use all 1B vectors
-            elif size_str.endswith("M"):
-                n_vectors = int(size_str[:-1]) * 1_000_000
-            elif size_str.endswith("K"):
-                n_vectors = int(size_str[:-1]) * 1_000
-            else:
-                try:
-                    n_vectors = int(size_str)
-                except ValueError:
-                    n_vectors = None
-
-        download_sift1b(dataset_path, n_vectors)
     else:
         download(dataset, normalize, dataset_path)
 
