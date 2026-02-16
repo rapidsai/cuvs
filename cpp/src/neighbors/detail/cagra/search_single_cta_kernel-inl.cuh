@@ -2348,7 +2348,7 @@ control is returned in this thread (in persistent_runner_t constructor), so we'r
                                                            small_hash_bitlen,
                                                            small_hash_reset_interval,
                                                            sample_filter,
-                                                           static_cast<uint32_t>(graph.extent(0)));
+                                                           static_cast<IndexT>(graph.extent(0)));
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
 }

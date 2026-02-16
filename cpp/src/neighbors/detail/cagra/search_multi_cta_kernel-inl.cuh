@@ -630,7 +630,7 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
                                                        ps.max_iterations,
                                                        num_executed_iterations,
                                                        sample_filter,
-                                                       static_cast<uint32_t>(graph.extent(0)));
+                                                       static_cast<IndexT>(graph.extent(0)));
 }
 
 }  // namespace multi_cta_search
