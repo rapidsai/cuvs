@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 
@@ -137,7 +137,7 @@ def cuvs_bench_cpp(
                 "--benchmark_counters_tabular=true",
                 f"--override_kv=k:{k}",
                 f"--override_kv=n_queries:{batch_size}",
-                "--benchmark_min_warmup_time=1",
+                "--benchmark_min_warmup_time=4",
                 "--benchmark_out_format=json",
                 f"--mode={mode}",
                 f"--benchmark_out={os.path.join(search_folder, search_file)}",
