@@ -6,7 +6,13 @@ import numpy as np
 import pytest
 from pylibraft.common import device_ndarray
 
-from cuvs.cluster.kmeans import KMeansParams, cluster_cost, fit, predict
+from cuvs.cluster.kmeans import (
+    KMeansParams,
+    cluster_cost,
+    fit,
+    fit_batched,
+    predict,
+)
 from cuvs.distance import pairwise_distance
 
 
@@ -72,80 +78,201 @@ def test_cluster_cost(n_rows, n_cols, n_clusters, dtype):
 
 
 @pytest.mark.parametrize("n_rows", [1000])
+@pytest.mark.parametrize("n_cols", [10, 50])
+@pytest.mark.parametrize("n_clusters", [5, 20])
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_fit_batched_fullbatch(n_rows, n_cols, n_clusters, dtype):
+    """
+    Test that fit_batched in FullBatch mode produces centroids that reduce
+    inertia compared to the initial centroids.
+    """
+    rng = np.random.default_rng(42)
+    X = rng.random((n_rows, n_cols)).astype(dtype)
+
+    initial_centroids = device_ndarray(X[:n_clusters].copy())
+    X_device = device_ndarray(X)
+    original_inertia = cluster_cost(X_device, initial_centroids)
+
+    params = KMeansParams(
+        n_clusters=n_clusters,
+        init_method="Array",
+        max_iter=50,
+    )
+
+    centroids, inertia, n_iter = fit_batched(
+        params, X, batch_size=256, centroids=initial_centroids
+    )
+    assert n_iter >= 1
+
+    fitted_inertia = cluster_cost(X_device, centroids)
+    assert fitted_inertia < original_inertia
+
+
+@pytest.mark.parametrize("n_rows", [1000])
+@pytest.mark.parametrize("n_cols", [10])
+@pytest.mark.parametrize("n_clusters", [8])
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_fit_batched_minibatch(n_rows, n_cols, n_clusters, dtype):
+    """
+    Test that fit_batched in MiniBatch mode converges (reduces inertia).
+    """
+    rng = np.random.default_rng(123)
+    X = rng.random((n_rows, n_cols)).astype(dtype)
+
+    initial_centroids = device_ndarray(X[:n_clusters].copy())
+    X_device = device_ndarray(X)
+    original_inertia = cluster_cost(X_device, initial_centroids)
+
+    params = KMeansParams(
+        n_clusters=n_clusters,
+        init_method="Array",
+        max_iter=200,
+        update_mode="mini_batch",
+    )
+
+    centroids, inertia, n_iter = fit_batched(
+        params, X, batch_size=128, centroids=initial_centroids
+    )
+    assert n_iter >= 1
+
+    fitted_inertia = cluster_cost(X_device, centroids)
+    assert fitted_inertia < original_inertia
+
+
+@pytest.mark.parametrize("n_rows", [1000])
 @pytest.mark.parametrize("n_cols", [10])
 @pytest.mark.parametrize("n_clusters", [8])
 @pytest.mark.parametrize("dtype", [np.float32])
-@pytest.mark.parametrize(
-    "batch_samples_list",
-    [
-        [32, 64, 128, 256, 512],  # various batch sizes
-    ],
-)
-def test_kmeans_batch_size_determinism(
-    n_rows, n_cols, n_clusters, dtype, batch_samples_list
-):
+def test_fit_batched_matches_fit(n_rows, n_cols, n_clusters, dtype):
     """
-    Test that different batch sizes produce identical centroids.
-
-    When starting from the same initial centroids, the k-means algorithm
-    should produce identical final centroids regardless of the batch_samples
-    parameter. This is because the accumulated adjustments to centroids after
-    the entire dataset pass should be the same.
+    Test that fit_batched FullBatch produces the same centroids as regular fit
+    when given the same initial centroids.
     """
-    # Use fixed seed for reproducibility
-    rng = np.random.default_rng(42)
-
-    # Generate random data
+    rng = np.random.default_rng(99)
     X_host = rng.random((n_rows, n_cols)).astype(dtype)
-    X = device_ndarray(X_host)
-
-    # Generate fixed initial centroids (using first n_clusters rows)
     initial_centroids_host = X_host[:n_clusters].copy()
 
-    # Store results from each batch size
-    results = []
+    # Regular fit (device data)
+    params = KMeansParams(
+        n_clusters=n_clusters,
+        init_method="Array",
+        max_iter=20,
+        tol=1e-10,
+    )
+    centroids_regular, _, _ = fit(
+        params,
+        device_ndarray(X_host),
+        device_ndarray(initial_centroids_host.copy()),
+    )
+    centroids_regular = centroids_regular.copy_to_host()
 
-    for batch_samples in batch_samples_list:
-        # Create fresh copy of initial centroids for each run
-        centroids = device_ndarray(initial_centroids_host.copy())
+    # Batched fit (host data, full batch mode)
+    centroids_batched, _, _ = fit_batched(
+        params,
+        X_host,
+        batch_size=256,
+        centroids=device_ndarray(initial_centroids_host.copy()),
+    )
+    centroids_batched = centroids_batched.copy_to_host()
 
-        params = KMeansParams(
-            n_clusters=n_clusters,
-            init_method="Array",  # Use provided centroids
-            max_iter=100,
-            tol=1e-10,  # Very small tolerance to ensure convergence
-            batch_samples=batch_samples,
-        )
+    assert np.allclose(
+        centroids_regular, centroids_batched, rtol=1e-4, atol=1e-4
+    ), f"max diff: {np.max(np.abs(centroids_regular - centroids_batched))}"
 
-        centroids_out, inertia, n_iter = fit(params, X, centroids)
-        results.append(
-            {
-                "batch_samples": batch_samples,
-                "centroids": centroids_out.copy_to_host(),
-                "inertia": inertia,
-                "n_iter": n_iter,
-            }
-        )
 
-    # Compare all results against the first one
-    reference = results[0]
-    for result in results[1:]:
-        # Centroids should be identical (or very close due to float precision)
-        assert np.allclose(
-            reference["centroids"],
-            result["centroids"],
-            rtol=1e-5,
-            atol=1e-5,
-        ), (
-            f"Centroids differ between batch_samples="
-            f"{reference['batch_samples']} and {result['batch_samples']}"
-        )
+@pytest.mark.parametrize("n_rows", [500])
+@pytest.mark.parametrize("n_cols", [10])
+@pytest.mark.parametrize("n_clusters", [5])
+@pytest.mark.parametrize("dtype", [np.float32])
+@pytest.mark.parametrize("batch_size", [64, 128, 256, 500])
+def test_fit_batched_batch_size_determinism(
+    n_rows, n_cols, n_clusters, dtype, batch_size
+):
+    """
+    Test that fit_batched FullBatch produces identical centroids regardless
+    of batch_size, since the full dataset is accumulated before updating.
+    """
+    rng = np.random.default_rng(77)
+    X = rng.random((n_rows, n_cols)).astype(dtype)
+    initial_centroids_host = X[:n_clusters].copy()
 
-        # Inertia should also be identical
-        assert np.allclose(
-            reference["inertia"], result["inertia"], rtol=1e-5, atol=1e-5
-        ), (
-            f"Inertia differs between batch_samples="
-            f"{reference['batch_samples']} and {result['batch_samples']}: "
-            f"{reference['inertia']} vs {result['inertia']}"
-        )
+    params = KMeansParams(
+        n_clusters=n_clusters,
+        init_method="Array",
+        max_iter=20,
+        tol=1e-10,
+    )
+
+    # Reference: batch_size = full dataset
+    centroids_ref, _, _ = fit_batched(
+        params,
+        X,
+        batch_size=n_rows,
+        centroids=device_ndarray(initial_centroids_host.copy()),
+    )
+    centroids_ref = centroids_ref.copy_to_host()
+
+    centroids_test, _, _ = fit_batched(
+        params,
+        X,
+        batch_size=batch_size,
+        centroids=device_ndarray(initial_centroids_host.copy()),
+    )
+    centroids_test = centroids_test.copy_to_host()
+
+    assert np.allclose(centroids_ref, centroids_test, rtol=1e-5, atol=1e-5), (
+        f"batch_size={batch_size}: max diff="
+        f"{np.max(np.abs(centroids_ref - centroids_test))}"
+    )
+
+
+@pytest.mark.parametrize("n_rows", [1000])
+@pytest.mark.parametrize("n_cols", [10])
+@pytest.mark.parametrize("n_clusters", [8])
+@pytest.mark.parametrize("dtype", [np.float32])
+def test_fit_batched_auto_init(n_rows, n_cols, n_clusters, dtype):
+    """
+    Test fit_batched without providing initial centroids (auto-initialization).
+    """
+    rng = np.random.default_rng(55)
+    X = rng.random((n_rows, n_cols)).astype(dtype)
+
+    params = KMeansParams(n_clusters=n_clusters, max_iter=50)
+
+    centroids, inertia, n_iter = fit_batched(params, X, batch_size=256)
+    assert centroids.shape == (n_clusters, n_cols)
+    assert n_iter >= 1
+
+
+@pytest.mark.parametrize("n_rows", [500])
+@pytest.mark.parametrize("n_cols", [10])
+@pytest.mark.parametrize("n_clusters", [5])
+@pytest.mark.parametrize("dtype", [np.float32])
+def test_fit_batched_with_sample_weights(n_rows, n_cols, n_clusters, dtype):
+    """
+    Test that fit_batched accepts and runs with sample weights.
+    """
+    rng = np.random.default_rng(66)
+    X = rng.random((n_rows, n_cols)).astype(dtype)
+    weights = np.ones(n_rows, dtype=dtype)
+
+    initial_centroids = device_ndarray(X[:n_clusters].copy())
+    X_device = device_ndarray(X)
+    original_inertia = cluster_cost(X_device, initial_centroids)
+
+    params = KMeansParams(
+        n_clusters=n_clusters,
+        init_method="Array",
+        max_iter=50,
+    )
+
+    centroids, inertia, n_iter = fit_batched(
+        params,
+        X,
+        batch_size=128,
+        centroids=initial_centroids,
+        sample_weights=weights,
+    )
+
+    fitted_inertia = cluster_cost(X_device, centroids)
+    assert fitted_inertia < original_inertia
