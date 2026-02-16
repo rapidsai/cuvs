@@ -166,14 +166,20 @@ __global__ void kern_prune(const IdxT* const knn_graph,  // [graph_chunk_size, g
                            uint64_t* const stats)
 {
   __shared__ uint32_t smem_num_detour[MAX_DEGREE];
+  extern __shared__ unsigned char smem_buf[];
+  IdxT* const smem_knn_iA_neighbors = reinterpret_cast<IdxT*>(smem_buf);
+
   uint64_t* const num_retain = stats;
   uint64_t* const num_full   = stats + 1;
 
   const uint64_t iA = blockIdx.x + (batch_size * batch_id);
   if (iA >= graph_size) { return; }
+
+  // Load this node's neighbor row into shared memory to reduce global reads
   for (uint32_t k = threadIdx.x; k < graph_degree; k += blockDim.x) {
-    smem_num_detour[k] = 0;
-    if (knn_graph[k + ((uint64_t)graph_degree * iA)] == iA) {
+    smem_num_detour[k]       = 0;
+    smem_knn_iA_neighbors[k] = knn_graph[k + ((uint64_t)graph_degree * iA)];
+    if (smem_knn_iA_neighbors[k] == iA) {
       // Lower the priority of self-edge
       smem_num_detour[k] = graph_degree;
     }
@@ -182,14 +188,14 @@ __global__ void kern_prune(const IdxT* const knn_graph,  // [graph_chunk_size, g
 
   // count number of detours (A->D->B)
   for (uint32_t kAD = 0; kAD < graph_degree - 1; kAD++) {
-    const uint64_t iD = knn_graph[kAD + (graph_degree * iA)];
+    const uint64_t iD = smem_knn_iA_neighbors[kAD];
     if (iD >= graph_size) { continue; }
     for (uint32_t kDB = threadIdx.x; kDB < graph_degree; kDB += blockDim.x) {
       const uint64_t iB_candidate = knn_graph[kDB + ((uint64_t)graph_degree * iD)];
       for (uint32_t kAB = kAD + 1; kAB < graph_degree; kAB++) {
         // if ( kDB < kAB )
         {
-          const uint64_t iB = knn_graph[kAB + (graph_degree * iA)];
+          const uint64_t iB = smem_knn_iA_neighbors[kAB];
           if (iB == iB_candidate) {
             atomicAdd(smem_num_detour + kAB, 1);
             break;
@@ -1298,9 +1304,10 @@ void optimize(
       RAFT_CUDA_TRY(cudaMemsetAsync(
         dev_stats.data_handle(), 0, sizeof(uint64_t) * 2, raft::resource::get_cuda_stream(res)));
 
+      const size_t prune_smem_size = knn_graph_degree * sizeof(IdxT);
       for (uint32_t i_batch = 0; i_batch < num_batch; i_batch++) {
         kern_prune<MAX_DEGREE, IdxT>
-          <<<blocks_prune, threads_prune, 0, raft::resource::get_cuda_stream(res)>>>(
+          <<<blocks_prune, threads_prune, prune_smem_size, raft::resource::get_cuda_stream(res)>>>(
             d_input_graph.data_handle(),
             graph_size,
             knn_graph_degree,
