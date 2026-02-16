@@ -208,16 +208,12 @@ void _fit_batched(cuvsResources_t res,
     RAFT_FAIL("centroids must be on device memory");
   }
 
-  using device_matrix_type = raft::device_matrix_view<T, IdxT, raft::row_major>;
-
   // Create host matrix view from X
   auto X_view = raft::make_host_matrix_view<T const, IdxT>(
     reinterpret_cast<T const*>(X.data), n_samples, n_features);
 
-  // Create device matrix view for centroids
-  auto centroids_view = cuvs::core::from_dlpack<device_matrix_type>(centroids_tensor);
+  auto centroids_view = cuvs::core::from_dlpack<raft::device_matrix_view<T, IdxT, raft::row_major>>(centroids_tensor);
 
-  // Handle optional sample weights
   std::optional<raft::host_vector_view<T const, IdxT>> sample_weight;
   if (sample_weight_tensor != NULL) {
     auto sw = sample_weight_tensor->dl_tensor;

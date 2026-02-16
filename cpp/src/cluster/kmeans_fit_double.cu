@@ -49,8 +49,8 @@ void fit_batched(raft::resources const& handle,
                  raft::host_scalar_view<double> inertia,
                  raft::host_scalar_view<int> n_iter)
 {
-  cuvs::cluster::kmeans::detail::fit<double, double, int>(
-    handle, params, X, batch_size, sample_weight, centroids, inertia, n_iter, raft::identity_op{});
+  cuvs::cluster::kmeans::detail::fit<double, int>(
+    handle, params, X, batch_size, sample_weight, centroids, inertia, n_iter);
 }
 
 void fit_batched(raft::resources const& handle,
@@ -62,8 +62,8 @@ void fit_batched(raft::resources const& handle,
                  raft::host_scalar_view<double> inertia,
                  raft::host_scalar_view<int64_t> n_iter)
 {
-  cuvs::cluster::kmeans::detail::fit<double, double, int64_t>(
-    handle, params, X, batch_size, sample_weight, centroids, inertia, n_iter, raft::identity_op{});
+  cuvs::cluster::kmeans::detail::fit<double, int64_t>(
+    handle, params, X, batch_size, sample_weight, centroids, inertia, n_iter);
 }
 
 void fit(raft::resources const& handle,
@@ -100,16 +100,8 @@ void predict_batched(raft::resources const& handle,
                      bool normalize_weight,
                      raft::host_scalar_view<double> inertia)
 {
-  cuvs::cluster::kmeans::detail::predict<double, double, int64_t>(handle,
-                                                                  params,
-                                                                  X,
-                                                                  batch_size,
-                                                                  sample_weight,
-                                                                  centroids,
-                                                                  labels,
-                                                                  normalize_weight,
-                                                                  inertia,
-                                                                  raft::identity_op{});
+  cuvs::cluster::kmeans::detail::predict<double, int64_t>(
+    handle, params, X, batch_size, sample_weight, centroids, labels, normalize_weight, inertia);
 }
 
 void fit_predict_batched(raft::resources const& handle,
@@ -122,16 +114,8 @@ void fit_predict_batched(raft::resources const& handle,
                          raft::host_scalar_view<double> inertia,
                          raft::host_scalar_view<int64_t> n_iter)
 {
-  cuvs::cluster::kmeans::detail::fit_predict<double, double, int64_t>(handle,
-                                                                      params,
-                                                                      X,
-                                                                      batch_size,
-                                                                      sample_weight,
-                                                                      centroids,
-                                                                      labels,
-                                                                      inertia,
-                                                                      n_iter,
-                                                                      raft::identity_op{});
+  cuvs::cluster::kmeans::detail::fit_predict<double, int64_t>(
+    handle, params, X, batch_size, sample_weight, centroids, labels, inertia, n_iter);
 }
 
 }  // namespace cuvs::cluster::kmeans

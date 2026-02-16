@@ -191,18 +191,6 @@ enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
  * This version supports out-of-core computation where the dataset resides
  * on the host. Data is processed in batches, streaming from host to device.
  *
- * Two centroid update modes are supported (controlled by params.update_mode):
- *
- * - **FullBatch** (default): Standard Lloyd's algorithm. Partial sums are
- *   accumulated across all batches, and centroids are updated once at the
- *   end of each iteration. This is mathematically equivalent to standard
- *   k-means and produces deterministic results.
- *
- * - **MiniBatch**: Mini-batch k-means. Centroids are updated incrementally
- *   after each randomly sampled batch using an online learning rule. This
- *   converges faster but may produce slightly different results each run.
- *   Useful for very large datasets where full passes are expensive.
- *
  * @code{.cpp}
  *   #include <raft/core/resources.hpp>
  *   #include <cuvs/cluster/kmeans.hpp>
