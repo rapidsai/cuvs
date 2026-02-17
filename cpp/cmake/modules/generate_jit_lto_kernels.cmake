@@ -146,7 +146,6 @@ function(generate_jit_lto_kernels source_list_var)
       MATRIX_JSON_ENTRY "${matrix_json_entry}"
       KERNEL_LINK_LIBRARIES ${_JIT_LTO_KERNEL_LINK_LIBRARIES}
     )
-    list(APPEND ${source_list_var} "${embedded_file}")
   endforeach()
 
   set(${source_list_var}

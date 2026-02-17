@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
 # This algorithm takes a JSON dictionary and computes a matrix product of all
@@ -43,6 +43,86 @@ def iterate_matrix_product(
     warn_unused=True,
     warn_used=True,
 ) -> "Generator[dict[str, MatrixValue]]":
+    """Computes a matrix product of a JSON document
+
+    This algorithm computes the product of a matrix in a more sophisticated
+    way than can be done with itertools.product(). Multiple related values
+    can be grouped together, and a dimension can have sub-dimensions. Given
+    the following JSON document:
+
+    .. code-block:: json
+
+      {
+        "value": ["one", "two"],
+        "_group": [
+          {
+            "subgroup_value": "three"
+            "subgroup_subdim": ["four", "five"]
+          },
+          {
+            "subgroup_value": "six",
+            "subgroup_subdim": ["seven", "eight"]
+          }
+        ]
+      }
+
+    The following matrix product entries will be produced:
+
+    .. code-block:: json
+
+      {"subgroup_subdim": "four", "subgroup_value": "three", "value": "one"}
+      {"subgroup_subdim": "five", "subgroup_value": "three", "value": "one"}
+      {"subgroup_subdim": "seven", "subgroup_value": "six", "value": "one"}
+      {"subgroup_subdim": "eight", "subgroup_value": "six", "value": "one"}
+      {"subgroup_subdim": "four", "subgroup_value": "three", "value": "two"}
+      {"subgroup_subdim": "five", "subgroup_value": "three", "value": "two"}
+      {"subgroup_subdim": "seven", "subgroup_value": "six", "value": "two"}
+      {"subgroup_subdim": "eight", "subgroup_value": "six", "value": "two"}
+
+    Notice that the name ``_group`` does not appear in any of the matrix
+    product entries. This is because all leaf nodes beneath it are under
+    a different key that's closer to them in the hierarchy, which is used in
+    the final product. If a key is used only for grouping and does not appear
+    in the final product, it should be prefixed with an underscore (``_``) to
+    indicate that they are hidden. Likewise, keys that appear in the final
+    product should not be prefixed with an underscore. Failure to follow this
+    convention will not affect the proper functioning of the algorithm, but a
+    warning will be emitted unless the respective ``warn_unused`` and/or
+    ``warn_used`` parameters are set to ``False``.
+
+    Every leaf node in the input document must have at least one dictionary key
+    in its path, or else a ``NoKeyError`` will be thrown. For example, a
+    document consisting only of an array of strings is invalid.
+
+    Parameters
+    ----------
+    matrix : Matrix
+        JSON document on which to compute the product.
+    warn_unused : bool
+        Whether or not to warn if unused keys are not prefixed with underscores
+        (true by default).
+    warn_used : bool
+        Whether or not to warn if used keys are prefixed with underscores (true
+        by default).
+
+    Returns
+    -------
+    Generator[dict[str, MatrixValue]]
+        Iterator of matrix product entries.
+
+    Raises
+    ------
+    NoKeyError
+        If a leaf node in the document does not have any key leading to it.
+
+    Warns
+    -----
+    UnusedKeyWarning
+        If an unused key is not prefixed with an underscore.
+    UsedKeyWarning
+        If a used key is prefixed with an underscore.
+    """
+
     def iterate_next_dimension(
         queue: "Iterator[tuple[tuple[str | int, ...], str | None, Matrix]]",
         entry: "dict[str, MatrixValue]",
