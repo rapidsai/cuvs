@@ -35,7 +35,7 @@ class UsedKeyWarning(UserWarning):
     pass
 
 
-IDENTIFIER_RE: re.Pattern = re.compile("^(?P<underscores>_*)(?P<rest>.*)$")
+IDENTIFIER_RE: re.Pattern = re.compile(r"^(?P<underscores>_*)(?P<rest>.*)$")
 
 
 def iterate_matrix_product(
