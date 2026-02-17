@@ -9,7 +9,10 @@
 
 AlgorithmLauncher::AlgorithmLauncher(cudaKernel_t k, cudaLibrary_t lib) : kernel{k}, library{lib} {}
 
-AlgorithmLauncher::~AlgorithmLauncher() { RAFT_CUDA_TRY(cudaLibraryUnload(library)); }
+AlgorithmLauncher::~AlgorithmLauncher()
+{
+  if (library != nullptr) { (void)cudaLibraryUnload(library); }
+}
 
 AlgorithmLauncher::AlgorithmLauncher(AlgorithmLauncher&& other) noexcept
   : kernel{other.kernel}, library{other.library}

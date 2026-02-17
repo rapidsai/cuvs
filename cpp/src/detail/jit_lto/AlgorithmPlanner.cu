@@ -139,7 +139,7 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
     }
 
     // Only keep the kernel if it's not EmptyKernel
-    if (!is_empty_kernel) { valid_kernels.push_back(kernels.release()[i]); }
+    if (!is_empty_kernel) { valid_kernels.push_back(kernels[i]); }
   }
 
   RAFT_EXPECTS(
