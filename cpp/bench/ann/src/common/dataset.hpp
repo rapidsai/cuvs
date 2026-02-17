@@ -40,6 +40,11 @@ struct dataset {
   static inline constexpr size_t kBitsPerCarrierValue = sizeof(bitset_carrier_type) * 8;
 
  private:
+  // Protects the lazy mutations of the blobs accessed by multiple threads
+  mutable std::mutex mutex_;
+  // The dim can be read either from the training set or from the query set.
+  // This cache variable is filled from either of the two sets loaded first.
+  mutable std::atomic<int> dim_ = -1;
   std::string name_;
   std::string distance_;
   blob<DataT> base_set_;
@@ -53,12 +58,6 @@ struct dataset {
     uint32_t filter_pass_count;
   };
   mutable std::vector<gt_set_cache_entry_t> gt_set_cache_;
-
-  // Protects the lazy mutations of the blobs accessed by multiple threads
-  mutable std::mutex mutex_;
-  // The dim can be read either from the training set or from the query set.
-  // This cache variable is filled from either of the two sets loaded first.
-  mutable std::atomic<int> dim_ = -1;
 
   // Cache the dim value from the passed blob.
   inline void cache_dim(const blob<DataT>& blob) const
