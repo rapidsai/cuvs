@@ -115,10 +115,11 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
   const std::uint32_t small_hash_bitlen,
   const std::uint32_t small_hash_reset_interval,
   const std::uint32_t query_id,
-  const DescriptorT* dataset_desc,  // Concrete descriptor type from template
-  uint32_t* bitset_ptr,             // Bitset data pointer (nullptr for none_filter)
-  SourceIndexT bitset_len,          // Bitset length
-  SourceIndexT original_nbits)      // Original number of bits
+  const std::uint32_t query_id_offset,  // Offset to add to query_id when calling filter
+  const DescriptorT* dataset_desc,      // Concrete descriptor type from template
+  uint32_t* bitset_ptr,                 // Bitset data pointer (nullptr for none_filter)
+  SourceIndexT bitset_len,              // Bitset length
+  SourceIndexT original_nbits)          // Original number of bits
 {
   using LOAD_T = device::LOAD_128BIT_T;
 
@@ -371,7 +372,7 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
         // Construct filter_data struct (bitset data is in global memory)
         cuvs::neighbors::cagra::detail::bitset_filter_data_t<SourceIndexT> filter_data(
           bitset_ptr, bitset_len, original_nbits);
-        if (!sample_filter<SourceIndexT>(query_id,
+        if (!sample_filter<SourceIndexT>(query_id + query_id_offset,
                                          to_source_index(parent_id),
                                          bitset_ptr != nullptr ? &filter_data : nullptr)) {
           result_distances_buffer[parent_list_buffer[p]] = utils::get_max_value<DistanceT>();
@@ -395,8 +396,9 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
     cuvs::neighbors::cagra::detail::bitset_filter_data_t<SourceIndexT> filter_data(
       bitset_ptr, bitset_len, original_nbits);
     if (node_id != (invalid_index & ~index_msb_1_mask) &&
-        !sample_filter<SourceIndexT>(
-          query_id, to_source_index(node_id), bitset_ptr != nullptr ? &filter_data : nullptr)) {
+        !sample_filter<SourceIndexT>(query_id + query_id_offset,
+                                     to_source_index(node_id),
+                                     bitset_ptr != nullptr ? &filter_data : nullptr)) {
       result_distances_buffer[i] = utils::get_max_value<DistanceT>();
       result_indices_buffer[i]   = invalid_index;
     }
@@ -527,33 +529,34 @@ template <bool TOPK_BY_BITONIC_SORT,
           typename IndexT,
           typename DistanceT,
           typename SourceIndexT>
-RAFT_KERNEL __launch_bounds__(1024, 1)
-  search_kernel_jit(uintptr_t result_indices_ptr,
-                    DistanceT* const result_distances_ptr,
-                    const std::uint32_t top_k,
-                    const DataT* const queries_ptr,
-                    const IndexT* const knn_graph,
-                    const std::uint32_t graph_degree,
-                    const SourceIndexT* source_indices_ptr,
-                    const unsigned num_distilation,
-                    const uint64_t rand_xor_mask,
-                    const IndexT* seed_ptr,
-                    const uint32_t num_seeds,
-                    IndexT* const visited_hashmap_ptr,
-                    const std::uint32_t max_candidates,
-                    const std::uint32_t max_itopk,
-                    const std::uint32_t internal_topk,
-                    const std::uint32_t search_width,
-                    const std::uint32_t min_iteration,
-                    const std::uint32_t max_iteration,
-                    std::uint32_t* const num_executed_iterations,
-                    const std::uint32_t hash_bitlen,
-                    const std::uint32_t small_hash_bitlen,
-                    const std::uint32_t small_hash_reset_interval,
-                    const DescriptorT* dataset_desc,  // Concrete descriptor type from template
-                    uint32_t* bitset_ptr,         // Bitset data pointer (nullptr for none_filter)
-                    SourceIndexT bitset_len,      // Bitset length
-                    SourceIndexT original_nbits)  // Original number of bits
+RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_jit(
+  uintptr_t result_indices_ptr,
+  DistanceT* const result_distances_ptr,
+  const std::uint32_t top_k,
+  const DataT* const queries_ptr,
+  const IndexT* const knn_graph,
+  const std::uint32_t graph_degree,
+  const SourceIndexT* source_indices_ptr,
+  const unsigned num_distilation,
+  const uint64_t rand_xor_mask,
+  const IndexT* seed_ptr,
+  const uint32_t num_seeds,
+  IndexT* const visited_hashmap_ptr,
+  const std::uint32_t max_candidates,
+  const std::uint32_t max_itopk,
+  const std::uint32_t internal_topk,
+  const std::uint32_t search_width,
+  const std::uint32_t min_iteration,
+  const std::uint32_t max_iteration,
+  std::uint32_t* const num_executed_iterations,
+  const std::uint32_t hash_bitlen,
+  const std::uint32_t small_hash_bitlen,
+  const std::uint32_t small_hash_reset_interval,
+  const std::uint32_t query_id_offset,  // Offset to add to query_id when calling filter
+  const DescriptorT* dataset_desc,      // Concrete descriptor type from template
+  uint32_t* bitset_ptr,                 // Bitset data pointer (nullptr for none_filter)
+  SourceIndexT bitset_len,              // Bitset length
+  SourceIndexT original_nbits)          // Original number of bits
 {
   const auto query_id = blockIdx.y;
   search_core<TOPK_BY_BITONIC_SORT,
@@ -585,6 +588,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1)
                             small_hash_bitlen,
                             small_hash_reset_interval,
                             query_id,
+                            query_id_offset,
                             dataset_desc,
                             bitset_ptr,
                             bitset_len,
@@ -630,10 +634,11 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_p_jit(
   const std::uint32_t hash_bitlen,
   const std::uint32_t small_hash_bitlen,
   const std::uint32_t small_hash_reset_interval,
-  const DescriptorT* dataset_desc,  // Concrete descriptor type from template
-  uint32_t* bitset_ptr,             // Bitset data pointer (nullptr for none_filter)
-  SourceIndexT bitset_len,          // Bitset length
-  SourceIndexT original_nbits)      // Original number of bits
+  const std::uint32_t query_id_offset,  // Offset to add to query_id when calling filter
+  const DescriptorT* dataset_desc,      // Concrete descriptor type from template
+  uint32_t* bitset_ptr,                 // Bitset data pointer (nullptr for none_filter)
+  SourceIndexT bitset_len,              // Bitset length
+  SourceIndexT original_nbits)          // Original number of bits
 {
   using job_desc_type = job_desc_t<job_desc_jit_helper_desc<DataT, IndexT, DistanceT>>;
   __shared__ typename job_desc_type::input_t job_descriptor;
@@ -706,6 +711,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_p_jit(
                               small_hash_bitlen,
                               small_hash_reset_interval,
                               query_id,
+                              query_id_offset,
                               dataset_desc,
                               bitset_ptr,
                               bitset_len,

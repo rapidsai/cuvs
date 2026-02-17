@@ -30,12 +30,16 @@ struct CagraMultiKernelSearchPlanner : AlgorithmPlanner {
     : AlgorithmPlanner(
         build_entrypoint_name(
           kernel_name, metric, team_size, dataset_block_dim, is_vpq, pq_bits, pq_len),
-        is_vpq ? make_fragment_key<DataTag,
-                                   IndexTag,
-                                   DistanceTag,
-                                   SourceIndexTag,
-                                   cuvs::neighbors::cagra::detail::tag_codebook_half>()
-               : make_fragment_key<DataTag, IndexTag, DistanceTag, SourceIndexTag>()),
+        // Special case: apply_filter_kernel doesn't use DataTag, only IndexTag, DistanceTag,
+        // SourceIndexTag
+        (kernel_name == "apply_filter_kernel")
+          ? make_fragment_key<IndexTag, DistanceTag, SourceIndexTag>()
+          : (is_vpq ? make_fragment_key<DataTag,
+                                        IndexTag,
+                                        DistanceTag,
+                                        SourceIndexTag,
+                                        cuvs::neighbors::cagra::detail::tag_codebook_half>()
+                    : make_fragment_key<DataTag, IndexTag, DistanceTag, SourceIndexTag>())),
       entrypoint_name_(build_entrypoint_name(
         kernel_name, metric, team_size, dataset_block_dim, is_vpq, pq_bits, pq_len))
   {

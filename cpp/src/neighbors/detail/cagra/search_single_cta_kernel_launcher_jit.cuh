@@ -9,14 +9,19 @@
 #error "search_single_cta_kernel_launcher_jit.cuh included but CUVS_ENABLE_JIT_LTO not defined!"
 #endif
 
+#include <iostream>
+#include <typeinfo>
+
 // Include tags header before any other includes that might open namespaces
 #include <cuvs/detail/jit_lto/cagra/search_single_cta_tags.hpp>
 
 #include "compute_distance.hpp"  // For dataset_descriptor_host
 #include "jit_lto_kernels/search_single_cta_planner.hpp"
-#include "search_plan.cuh"  // For search_params
+#include "sample_filter_utils.cuh"  // For CagraSampleFilterWithQueryIdOffset
+#include "search_plan.cuh"          // For search_params
 #include "search_single_cta_kernel-inl.cuh"  // For resource_queue_t, local_deque_t, launcher_t, persistent_runner_base_t, etc.
 #include "search_single_cta_kernel_launcher_common.cuh"
+#include "shared_launcher_jit.hpp"  // For shared JIT helper functions
 
 #include <cuvs/detail/jit_lto/AlgorithmLauncher.hpp>
 #include <cuvs/detail/jit_lto/MakeFragmentKey.hpp>
@@ -40,8 +45,16 @@
 #include <string>
 #include <thread>
 #include <type_traits>
+#include <typeinfo>
 
 namespace cuvs::neighbors::cagra::detail::single_cta_search {
+
+// Import shared JIT helper functions
+using cuvs::neighbors::cagra::detail::get_data_type_tag;
+using cuvs::neighbors::cagra::detail::get_distance_type_tag;
+using cuvs::neighbors::cagra::detail::get_index_type_tag;
+using cuvs::neighbors::cagra::detail::get_sample_filter_name;
+using cuvs::neighbors::cagra::detail::get_source_index_type_tag;
 
 // The launcher uses types from search_single_cta_kernel-inl.cuh (worker_handle_t, job_desc_t)
 // The JIT kernel headers define _jit versions that are compatible
@@ -53,55 +66,7 @@ auto get_runner_jit(Args... args) -> std::shared_ptr<RunnerT>;
 template <typename RunnerT, typename... Args>
 auto create_runner_jit(Args... args) -> std::shared_ptr<RunnerT>;
 
-// Helper functions to get tags for JIT LTO
-namespace {
-template <typename T>
-constexpr auto get_data_type_tag()
-{
-  if constexpr (std::is_same_v<T, float>) { return cuvs::neighbors::cagra::detail::tag_f{}; }
-  if constexpr (std::is_same_v<T, __half>) { return cuvs::neighbors::cagra::detail::tag_h{}; }
-  if constexpr (std::is_same_v<T, int8_t>) { return cuvs::neighbors::cagra::detail::tag_sc{}; }
-  if constexpr (std::is_same_v<T, uint8_t>) { return cuvs::neighbors::cagra::detail::tag_uc{}; }
-}
-
-template <typename T>
-constexpr auto get_index_type_tag()
-{
-  if constexpr (std::is_same_v<T, uint32_t>) {
-    return cuvs::neighbors::cagra::detail::tag_idx_ui{};
-  }
-}
-
-template <typename T>
-constexpr auto get_distance_type_tag()
-{
-  if constexpr (std::is_same_v<T, float>) { return cuvs::neighbors::cagra::detail::tag_dist_f{}; }
-}
-
-template <typename T>
-constexpr auto get_source_index_type_tag()
-{
-  if constexpr (std::is_same_v<T, uint32_t>) {
-    return cuvs::neighbors::cagra::detail::tag_idx_ui{};
-  }
-}
-
-template <class SAMPLE_FILTER_T>
-std::string get_sample_filter_name()
-{
-  if constexpr (std::is_same_v<SAMPLE_FILTER_T, cuvs::neighbors::filtering::none_sample_filter>) {
-    return "filter_none";
-  } else if constexpr (
-    std::is_same_v<SAMPLE_FILTER_T,
-                   cuvs::neighbors::filtering::bitset_filter<uint32_t, uint32_t>> ||
-    std::is_same_v<SAMPLE_FILTER_T, cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>>) {
-    return "filter_bitset";
-  } else {
-    // Default to none filter for unknown types
-    return "filter_none";
-  }
-}
-}  // namespace
+// Helper functions are now in shared_launcher_jit.hpp
 
 // JIT-compatible launcher_t that works with worker_handle_t (same as non-JIT version)
 struct alignas(kCacheLineBytes) launcher_jit_t {
@@ -411,16 +376,21 @@ struct alignas(kCacheLineBytes) persistent_runner_jit_t : public persistent_runn
                                           nullptr))  // descriptor not needed in hash
   {
     // Extract bitset data from filter object (if it's a bitset_filter)
-    bitset_ptr     = nullptr;
-    bitset_len     = 0;
-    original_nbits = 0;
+    // Handle both direct bitset_filter and CagraSampleFilterWithQueryIdOffset wrapper
+    bitset_ptr               = nullptr;
+    bitset_len               = 0;
+    original_nbits           = 0;
+    uint32_t query_id_offset = 0;
 
     if constexpr (!std::is_same_v<SampleFilterT, cuvs::neighbors::filtering::none_sample_filter>) {
-      // Try to extract bitset data from the filter
+      // All non-none filters are wrapped in CagraSampleFilterWithQueryIdOffset
+      // Access .filter and .offset directly
+      query_id_offset   = sample_filter.offset;
+      using InnerFilter = decltype(sample_filter.filter);
       if constexpr (std::is_same_v<
-                      SampleFilterT,
+                      InnerFilter,
                       cuvs::neighbors::filtering::bitset_filter<uint32_t, SourceIndexT>>) {
-        auto bitset_view = sample_filter.view();
+        auto bitset_view = sample_filter.filter.view();
         bitset_ptr       = const_cast<uint32_t*>(bitset_view.data());
         bitset_len       = static_cast<SourceIndexT>(bitset_view.size());
         original_nbits   = static_cast<SourceIndexT>(bitset_view.get_original_nbits());
@@ -469,35 +439,37 @@ struct alignas(kCacheLineBytes) persistent_runner_jit_t : public persistent_runn
 
     // Launch the persistent kernel via AlgorithmLauncher
     // The persistent kernel now takes the descriptor pointer directly
-    launcher->dispatch_cooperative(stream,
-                                   gs,
-                                   bs,
-                                   smem_size,
-                                   worker_handles_ptr,
-                                   job_descriptors_ptr,
-                                   completion_counters_ptr,
-                                   graph.data_handle(),
-                                   graph.extent(1),
-                                   source_indices_ptr,
-                                   num_random_samplings,
-                                   rand_xor_mask,
-                                   nullptr,  // seed_ptr
-                                   num_seeds,
-                                   hashmap_ptr,
-                                   max_candidates,
-                                   max_itopk,
-                                   itopk_size,
-                                   search_width,
-                                   min_iterations,
-                                   max_iterations,
-                                   nullptr,  // num_executed_iterations
-                                   hash_bitlen,
-                                   small_hash_bitlen,
-                                   small_hash_reset_interval,
-                                   dev_desc,  // Pass descriptor pointer
-                                   bitset_ptr,
-                                   bitset_len,
-                                   original_nbits);
+    launcher->dispatch_cooperative(
+      stream,
+      gs,
+      bs,
+      smem_size,
+      worker_handles_ptr,
+      job_descriptors_ptr,
+      completion_counters_ptr,
+      graph.data_handle(),
+      graph.extent(1),
+      source_indices_ptr,
+      num_random_samplings,
+      rand_xor_mask,
+      nullptr,  // seed_ptr
+      num_seeds,
+      hashmap_ptr,
+      max_candidates,
+      max_itopk,
+      itopk_size,
+      search_width,
+      min_iterations,
+      max_iterations,
+      nullptr,  // num_executed_iterations
+      hash_bitlen,
+      small_hash_bitlen,
+      small_hash_reset_interval,
+      query_id_offset,  // Offset to add to query_id when calling filter
+      dev_desc,         // Pass descriptor pointer
+      bitset_ptr,
+      bitset_len,
+      original_nbits);
 
     RAFT_LOG_INFO(
       "Initialized the JIT persistent kernel in stream %zd; job_queue size = %u; worker_queue size "
@@ -606,16 +578,21 @@ void select_and_run_jit(
     source_indices.has_value() ? source_indices->data_handle() : nullptr;
 
   // Extract bitset data from filter object (if it's a bitset_filter)
+  // Handle both direct bitset_filter and CagraSampleFilterWithQueryIdOffset wrapper
   uint32_t* bitset_ptr        = nullptr;
   SourceIndexT bitset_len     = 0;
   SourceIndexT original_nbits = 0;
+  uint32_t query_id_offset    = 0;
 
   if constexpr (!std::is_same_v<SampleFilterT, cuvs::neighbors::filtering::none_sample_filter>) {
-    // Try to extract bitset data from the filter
+    // All non-none filters are wrapped in CagraSampleFilterWithQueryIdOffset
+    // Access .filter and .offset directly
+    query_id_offset   = sample_filter.offset;
+    using InnerFilter = decltype(sample_filter.filter);
     if constexpr (std::is_same_v<
-                    SampleFilterT,
+                    InnerFilter,
                     cuvs::neighbors::filtering::bitset_filter<uint32_t, SourceIndexT>>) {
-      auto bitset_view = sample_filter.view();
+      auto bitset_view = sample_filter.filter.view();
       bitset_ptr       = const_cast<uint32_t*>(bitset_view.data());
       bitset_len       = static_cast<SourceIndexT>(bitset_view.size());
       original_nbits   = static_cast<SourceIndexT>(bitset_view.get_original_nbits());
@@ -665,7 +642,7 @@ void select_and_run_jit(
                                                  dataset_desc.is_vpq,
                                                  dataset_desc.pq_bits,
                                                  dataset_desc.pq_len);
-    planner.add_sample_filter_device_function(get_sample_filter_name<SampleFilterT>());
+    planner.add_sample_filter_device_function(get_sample_filter_name<SampleFilterT>(true));
 
     // Get launcher for persistent kernel
     auto launcher = planner.get_launcher();
@@ -727,7 +704,7 @@ void select_and_run_jit(
                                                  dataset_desc.is_vpq,
                                                  dataset_desc.pq_bits,
                                                  dataset_desc.pq_len);
-    planner.add_sample_filter_device_function(get_sample_filter_name<SampleFilterT>());
+    planner.add_sample_filter_device_function(get_sample_filter_name<SampleFilterT>(true));
 
     // Get launcher
     auto launcher = planner.get_launcher();
@@ -772,6 +749,7 @@ void select_and_run_jit(
       hash_bitlen,
       small_hash_bitlen,
       small_hash_reset_interval,
+      query_id_offset,  // Offset to add to query_id when calling filter
       dev_desc,  // Pass base pointer - kernel expects concrete type but pointer value is same
       bitset_ptr,
       bitset_len,

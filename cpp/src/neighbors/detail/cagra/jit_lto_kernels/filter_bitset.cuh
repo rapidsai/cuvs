@@ -60,8 +60,14 @@ __device__ bool sample_filter(uint32_t query_id, SourceIndexT node_id, void* fil
   }
 
   // Directly test the bitset without needing bitset_filter wrapper
-  return bitset_view_test<uint32_t, SourceIndexT>(
+  // bitset_view_test returns true if the bit is set (node_id is in the bitset)
+  // For a bitset created from removed_indices, if the bit is set, the node should be filtered out
+  // So we return the inverse: if the bit is set, return false to reject the node
+  bool is_in_bitset = bitset_view_test<uint32_t, SourceIndexT>(
     bitset_data->bitset_ptr, bitset_data->bitset_len, bitset_data->original_nbits, node_id);
+  // If node_id is in the bitset (removed set), return false to reject it
+  // If node_id is not in the bitset, return true to allow it
+  return !is_in_bitset;
 }
 
 }  // namespace cuvs::neighbors::cagra::detail

@@ -14,7 +14,9 @@
 
 #include "compute_distance.hpp"  // For dataset_descriptor_host
 #include "jit_lto_kernels/search_multi_kernel_planner.hpp"
-#include "search_plan.cuh"  // For search_params
+#include "sample_filter_utils.cuh"  // For CagraSampleFilterWithQueryIdOffset
+#include "search_plan.cuh"          // For search_params
+#include "shared_launcher_jit.hpp"  // For shared JIT helper functions
 #include <cuvs/detail/jit_lto/AlgorithmLauncher.hpp>
 #include <cuvs/detail/jit_lto/MakeFragmentKey.hpp>
 #include <cuvs/distance/distance.hpp>
@@ -30,55 +32,12 @@
 
 namespace cuvs::neighbors::cagra::detail::multi_kernel_search {
 
-// Helper functions to get tags for JIT LTO
-namespace {
-template <typename T>
-constexpr auto get_data_type_tag()
-{
-  if constexpr (std::is_same_v<T, float>) { return cuvs::neighbors::cagra::detail::tag_f{}; }
-  if constexpr (std::is_same_v<T, __half>) { return cuvs::neighbors::cagra::detail::tag_h{}; }
-  if constexpr (std::is_same_v<T, int8_t>) { return cuvs::neighbors::cagra::detail::tag_sc{}; }
-  if constexpr (std::is_same_v<T, uint8_t>) { return cuvs::neighbors::cagra::detail::tag_uc{}; }
-}
-
-template <typename T>
-constexpr auto get_index_type_tag()
-{
-  if constexpr (std::is_same_v<T, uint32_t>) {
-    return cuvs::neighbors::cagra::detail::tag_idx_ui{};
-  }
-}
-
-template <typename T>
-constexpr auto get_distance_type_tag()
-{
-  if constexpr (std::is_same_v<T, float>) { return cuvs::neighbors::cagra::detail::tag_dist_f{}; }
-}
-
-template <typename T>
-constexpr auto get_source_index_type_tag()
-{
-  if constexpr (std::is_same_v<T, uint32_t>) {
-    return cuvs::neighbors::cagra::detail::tag_idx_ui{};
-  }
-}
-
-template <class SAMPLE_FILTER_T>
-std::string get_sample_filter_name()
-{
-  if constexpr (std::is_same_v<SAMPLE_FILTER_T, cuvs::neighbors::filtering::none_sample_filter>) {
-    return "filter_none";
-  } else if constexpr (
-    std::is_same_v<SAMPLE_FILTER_T,
-                   cuvs::neighbors::filtering::bitset_filter<uint32_t, uint32_t>> ||
-    std::is_same_v<SAMPLE_FILTER_T, cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>>) {
-    return "filter_bitset";
-  } else {
-    // Default to none filter for unknown types
-    return "filter_none";
-  }
-}
-}  // namespace
+// Import shared JIT helper functions
+using cuvs::neighbors::cagra::detail::get_data_type_tag;
+using cuvs::neighbors::cagra::detail::get_distance_type_tag;
+using cuvs::neighbors::cagra::detail::get_index_type_tag;
+using cuvs::neighbors::cagra::detail::get_sample_filter_name;
+using cuvs::neighbors::cagra::detail::get_source_index_type_tag;
 
 // JIT version of random_pickup
 template <typename DataT, typename IndexT, typename DistanceT>
