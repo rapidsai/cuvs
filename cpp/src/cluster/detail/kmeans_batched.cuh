@@ -490,7 +490,9 @@ void fit(raft::resources const& handle,
         raft::make_device_vector_view<const T, IdxT>(cluster_counts.data_handle(), n_clusters);
 
       finalize_centroids<T, IdxT>(
-        handle, centroid_sums_const, cluster_counts_const, centroids_const, centroids);
+        handle, centroid_sums_const, cluster_counts_const, centroids_const, new_centroids.view());
+
+      raft::copy(centroids.data_handle(), new_centroids.data_handle(), centroids.size(), stream);
     }
 
     auto sqrdNorm = raft::make_device_scalar<T>(handle, T{0});
