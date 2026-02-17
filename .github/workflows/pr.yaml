@@ -59,7 +59,7 @@ jobs:
         with:
           repo: ${{ github.repository }}
           target-branch: ${{ fromJSON(steps.get-pr-info.outputs.pr-info).base.ref }}
-          max_days_without_success: 30
+          max-days-without-success: 30
   changed-files:
     needs: telemetry-setup
     secrets: inherit
