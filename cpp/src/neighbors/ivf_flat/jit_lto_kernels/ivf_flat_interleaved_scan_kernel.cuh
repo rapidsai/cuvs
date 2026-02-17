@@ -5,10 +5,6 @@
 
 #pragma once
 
-#include "../../ivf_common.cuh"
-
-#include <cuvs/neighbors/ivf_flat.hpp>
-
 #include <raft/matrix/detail/select_warpsort.cuh>
 #include <raft/util/device_loads_stores.cuh>
 #include <raft/util/integer_utils.hpp>
@@ -18,6 +14,19 @@
 // when compiling JIT-LTO kernel fragments (when BUILD_KERNEL is defined).
 
 namespace cuvs::neighbors::ivf_flat::detail {
+
+// Define kIndexGroupSize locally to avoid including ivf_flat.hpp which transitively includes Thrust
+constexpr static uint32_t kIndexGroupSize = 32;
+
+// Define dummy_block_sort_t locally to avoid including ivf_common.cuh which transitively includes
+// Thrust
+template <typename T, typename IdxT, bool Ascending = true>
+struct dummy_block_sort_t {
+  using queue_t = raft::matrix::detail::select::warpsort::
+    warp_sort_distributed<raft::WarpSize, Ascending, T, IdxT>;
+  template <typename... Args>
+  __device__ dummy_block_sort_t(int k, Args...) {};
+};
 
 static constexpr int kThreadsPerBlock = 128;
 
@@ -725,9 +734,8 @@ struct flat_block_sort {
 };
 
 template <typename T, bool Ascending, typename IdxT>
-struct flat_block_sort<0, Ascending, T, IdxT>
-  : ivf::detail::dummy_block_sort_t<T, IdxT, Ascending> {
-  using type = ivf::detail::dummy_block_sort_t<T, IdxT, Ascending>;
+struct flat_block_sort<0, Ascending, T, IdxT> : dummy_block_sort_t<T, IdxT, Ascending> {
+  using type = dummy_block_sort_t<T, IdxT, Ascending>;
 };
 
 template <int Capacity, bool Ascending, typename T, typename IdxT>
@@ -805,7 +813,7 @@ RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)
   }
 
   // Copy a part of the query into shared memory for faster processing
-  copy_vectorized(query_shared, query, std::min(dim, query_smem_elems));
+  raft::copy_vectorized(query_shared, query, std::min(dim, query_smem_elems));
   __syncthreads();
 
   using local_topk_t = block_sort_t<Capacity, Ascending, float, uint32_t>;

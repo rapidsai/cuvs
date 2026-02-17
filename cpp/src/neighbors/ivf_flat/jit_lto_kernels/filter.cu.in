@@ -12,7 +12,7 @@
 namespace cuvs::neighbors::ivf_flat::detail {
 
 // Instantiate the device function template
-template __device__ bool sample_filter<int64_t>(int64_t* const* const, const uint32_t, const uint32_t, const uint32_t, uint32_t*, int64_t, int64_t);
+template __device__ bool sample_filter<int64_t>(int64_t* const* const, uint32_t, uint32_t, uint32_t, uint32_t*, int64_t, int64_t);
 
 }  // namespace cuvs::neighbors::ivf_flat::detail
 

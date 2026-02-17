@@ -5,11 +5,45 @@
 
 #pragma once
 
-#include "../../../sample_filter.cuh"
 #include "filter_data.h"
-#include <raft/core/bitset.cuh>
 
 namespace cuvs::neighbors::cagra::detail {
+
+// Inline implementation of bitset_view::test() to avoid including bitset.cuh
+// which transitively includes Thrust
+template <typename bitset_t, typename index_t>
+__device__ inline bool bitset_view_test(const bitset_t* bitset_ptr,
+                                        index_t bitset_len,
+                                        index_t original_nbits,
+                                        index_t sample_index)
+{
+  constexpr index_t bitset_element_size = sizeof(bitset_t) * 8;
+  const index_t nbits                   = sizeof(bitset_t) * 8;
+  index_t bit_index                     = 0;
+  index_t bit_offset                    = 0;
+
+  if (original_nbits == 0 || nbits == original_nbits) {
+    bit_index  = sample_index / bitset_element_size;
+    bit_offset = sample_index % bitset_element_size;
+  } else {
+    // Handle original_nbits != nbits case
+    const index_t original_bit_index  = sample_index / original_nbits;
+    const index_t original_bit_offset = sample_index % original_nbits;
+    bit_index                         = original_bit_index * original_nbits / nbits;
+    bit_offset                        = 0;
+    if (original_nbits > nbits) {
+      bit_index += original_bit_offset / nbits;
+      bit_offset = original_bit_offset % nbits;
+    } else {
+      index_t ratio = nbits / original_nbits;
+      bit_offset += (original_bit_index % ratio) * original_nbits;
+      bit_offset += original_bit_offset % nbits;
+    }
+  }
+  const bitset_t bit_element = bitset_ptr[bit_index];
+  const bool is_bit_set      = (bit_element & (bitset_t{1} << bit_offset)) != 0;
+  return is_bit_set;
+}
 
 template <typename SourceIndexT>
 __device__ bool sample_filter(uint32_t query_id, SourceIndexT node_id, void* filter_data)
@@ -25,12 +59,9 @@ __device__ bool sample_filter(uint32_t query_id, SourceIndexT node_id, void* fil
     return true;  // No bitset provided, allow all
   }
 
-  // Create bitset_view and filter, matching non-JIT behavior
-  auto bitset_view = raft::core::bitset_view<uint32_t, SourceIndexT>{
-    bitset_data->bitset_ptr, bitset_data->bitset_len, bitset_data->original_nbits};
-  auto bitset_filter =
-    cuvs::neighbors::filtering::bitset_filter<uint32_t, SourceIndexT>{bitset_view};
-  return bitset_filter(query_id, node_id);
+  // Directly test the bitset without needing bitset_filter wrapper
+  return bitset_view_test<uint32_t, SourceIndexT>(
+    bitset_data->bitset_ptr, bitset_data->bitset_len, bitset_data->original_nbits, node_id);
 }
 
 }  // namespace cuvs::neighbors::cagra::detail

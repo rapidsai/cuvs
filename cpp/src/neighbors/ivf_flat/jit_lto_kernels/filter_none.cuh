@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "../../sample_filter.cuh"
+#include <cstdint>
 
 namespace cuvs::neighbors::ivf_flat::detail {
 

@@ -9,7 +9,41 @@
 
 #include <raft/util/cuda_rt_essentials.hpp>
 
-AlgorithmLauncher::AlgorithmLauncher(cudaKernel_t k) : kernel{k} {}
+AlgorithmLauncher::AlgorithmLauncher(cudaKernel_t k, cudaLibrary_t lib) : kernel{k}, library{lib} {}
+
+AlgorithmLauncher::~AlgorithmLauncher()
+{
+  if (library != nullptr) {
+    cudaError_t err = cudaLibraryUnload(library);
+    if (err != cudaSuccess) {
+      // Log error but don't throw in destructor
+      std::cerr << "[JIT] WARNING: Failed to unload library in destructor: "
+                << cudaGetErrorString(err) << std::endl;
+      std::cerr.flush();
+    }
+    library = nullptr;
+  }
+}
+
+AlgorithmLauncher::AlgorithmLauncher(AlgorithmLauncher&& other) noexcept
+  : kernel{other.kernel}, library{other.library}
+{
+  other.kernel  = nullptr;
+  other.library = nullptr;
+}
+
+AlgorithmLauncher& AlgorithmLauncher::operator=(AlgorithmLauncher&& other) noexcept
+{
+  if (this != &other) {
+    // Unload current library if it exists
+    if (library != nullptr) { cudaLibraryUnload(library); }
+    kernel        = other.kernel;
+    library       = other.library;
+    other.kernel  = nullptr;
+    other.library = nullptr;
+  }
+  return *this;
+}
 
 void AlgorithmLauncher::call(
   cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, void** kernel_args)

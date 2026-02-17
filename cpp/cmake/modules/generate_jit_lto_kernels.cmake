@@ -327,11 +327,11 @@ function(generate_jit_lto_kernels target)
         foreach(pq_len IN LISTS cagra_pq_lens)
           # setup_workspace_vpq
           set(kernel_name
-              "setup_workspace_vpq_l2_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}"
+              "setup_workspace_vpq_L2Expanded_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}"
           )
           set(filename "${generated_kernels_dir}/cagra_device_functions/fatbin_${kernel_name}.cu")
           set(metric_cpp "cuvs::distance::DistanceType::L2Expanded")
-          set(metric_name "l2")
+          set(metric_name "L2Expanded")
           set(metric_tag "l2")
           set(pq_bits "${cagra_pq_bits}")
           set(codebook_type "${cagra_codebook_type}")
@@ -355,11 +355,11 @@ function(generate_jit_lto_kernels target)
 
           # compute_distance_vpq
           set(kernel_name
-              "compute_distance_vpq_l2_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}"
+              "compute_distance_vpq_L2Expanded_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}"
           )
           set(filename "${generated_kernels_dir}/cagra_device_functions/fatbin_${kernel_name}.cu")
           set(metric_cpp "cuvs::distance::DistanceType::L2Expanded")
-          set(metric_name "l2")
+          set(metric_name "L2Expanded")
           set(metric_tag "l2")
           set(pq_bits "${cagra_pq_bits}")
           set(codebook_type "${cagra_codebook_type}")

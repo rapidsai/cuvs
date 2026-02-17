@@ -77,6 +77,54 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
 
   std::string archs = "-arch=sm_" + std::to_string((major * 10 + minor));
 
+  // Generate individual cubin for each device function fragment for debugging
+  // Skip entrypoint fragment as it depends on device functions and will fail to link alone
+  for (auto& frag : this->fragments) {
+    // Skip if this is the entrypoint fragment
+    if (frag->compute_key == this->entrypoint) { continue; }
+
+    nvJitLinkHandle frag_handle;
+    const char* frag_lopts[] = {"-lto", archs.c_str()};
+    auto frag_result         = nvJitLinkCreate(&frag_handle, 2, frag_lopts);
+    check_nvjitlink_result(frag_handle, frag_result);
+
+    frag->add_to(frag_handle);
+
+    frag_result = nvJitLinkComplete(frag_handle);
+    check_nvjitlink_result(frag_handle, frag_result);
+
+    size_t frag_cubin_size;
+    frag_result = nvJitLinkGetLinkedCubinSize(frag_handle, &frag_cubin_size);
+    check_nvjitlink_result(frag_handle, frag_result);
+
+    if (frag_cubin_size > 0) {
+      std::unique_ptr<char[]> frag_cubin{new char[frag_cubin_size]};
+      frag_result = nvJitLinkGetLinkedCubin(frag_handle, frag_cubin.get());
+      check_nvjitlink_result(frag_handle, frag_result);
+
+      // Save individual fragment cubin
+      std::string frag_cubin_path = "/tmp/fragment_cubin_" + frag->compute_key + ".cubin";
+      std::replace(frag_cubin_path.begin(), frag_cubin_path.end(), '/', '_');
+      std::replace(frag_cubin_path.begin(), frag_cubin_path.end(), ':', '_');
+      std::replace(frag_cubin_path.begin(), frag_cubin_path.end(), '<', '_');
+      std::replace(frag_cubin_path.begin(), frag_cubin_path.end(), '>', '_');
+      std::replace(frag_cubin_path.begin(), frag_cubin_path.end(), ' ', '_');
+      FILE* frag_f = fopen(frag_cubin_path.c_str(), "wb");
+      if (frag_f) {
+        size_t written = fwrite(frag_cubin.get(), 1, frag_cubin_size, frag_f);
+        fclose(frag_f);
+        if (written == frag_cubin_size) {
+          std::cerr << "[JIT] Saved fragment cubin: " << frag_cubin_path
+                    << " (size: " << frag_cubin_size << " bytes)" << std::endl;
+          std::cerr << "[JIT] Run: cuobjdump --dump-elf-symbols " << frag_cubin_path << std::endl;
+        }
+      }
+    }
+
+    frag_result = nvJitLinkDestroy(&frag_handle);
+    RAFT_EXPECTS(frag_result == NVJITLINK_SUCCESS, "nvJitLinkDestroy failed for fragment");
+  }
+
   // Load the generated LTO IR and link them together
   nvJitLinkHandle handle;
   const char* lopts[] = {"-lto", archs.c_str()};
@@ -171,13 +219,58 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
       kernel_count_verify);
   }
 
-  unsigned int kernel_index = 0;
+  // Filter out EmptyKernel by checking kernel names using cudaFuncGetName
+  const char* empty_kernel_name = "_ZN3cub6detail11EmptyKernelIvEEvv";
+  std::vector<cudaKernel_t> valid_kernels;
+  valid_kernels.reserve(kernel_count);
 
-  auto kernel = kernels.release()[kernel_index];
+  for (unsigned int i = 0; i < kernel_count; ++i) {
+    // cudaFuncGetName can be used with cudaKernel_t by casting to void*
+    const void* func_ptr    = reinterpret_cast<const void*>(kernels[i]);
+    const char* func_name   = nullptr;
+    cudaError_t name_result = cudaFuncGetName(&func_name, func_ptr);
+
+    bool is_empty_kernel = false;
+    if (name_result == cudaSuccess && func_name != nullptr) {
+      std::string kernel_name(func_name);
+      // Check if this is EmptyKernel
+      if (kernel_name.find(empty_kernel_name) != std::string::npos ||
+          kernel_name == empty_kernel_name) {
+        std::cerr << "[JIT] Filtering out EmptyKernel: " << kernel_name << std::endl;
+        std::cerr.flush();
+        is_empty_kernel = true;
+      } else {
+        std::cerr << "[JIT] Found kernel: " << kernel_name << std::endl;
+        std::cerr.flush();
+      }
+    } else {
+      // If we can't get the name, keep the kernel (better safe than sorry)
+      std::cerr << "[JIT] Warning: Could not get name for kernel [" << i
+                << "], keeping it (error: " << cudaGetErrorString(name_result) << ")" << std::endl;
+      std::cerr.flush();
+    }
+
+    // Only keep the kernel if it's not EmptyKernel
+    if (!is_empty_kernel) { valid_kernels.push_back(kernels[i]); }
+  }
+
+  if (valid_kernels.empty()) {
+    RAFT_FAIL("No valid kernels found after filtering EmptyKernel for entrypoint: %s",
+              this->entrypoint.c_str());
+  }
+
+  if (valid_kernels.size() > 1) {
+    std::cerr << "[JIT] WARNING: Found " << valid_kernels.size()
+              << " valid kernels after filtering! Using kernel [0]" << std::endl;
+    std::cerr.flush();
+  }
+
+  unsigned int kernel_index = 0;
+  auto kernel               = valid_kernels[kernel_index];
 
   if (kernel == nullptr) {
     RAFT_FAIL("Entrypoint kernel is NULL for: %s", this->entrypoint.c_str());
   }
 
-  return std::make_shared<AlgorithmLauncher>(kernel);
+  return std::make_shared<AlgorithmLauncher>(kernel, library);
 }
