@@ -308,9 +308,13 @@ void fit(raft::resources const& handle,
     weighted_dist         = std::discrete_distribution<IdxT>(weights.begin(), weights.end());
     use_weighted_sampling = true;
   }
-  if (use_minibatch) { raft::matrix::fill(handle, total_counts.view(), T{0}); }
+  IdxT n_steps = params.max_iter;
+  if (use_minibatch) {
+    raft::matrix::fill(handle, total_counts.view(), T{0});
+    n_steps = (params.max_iter * n_samples) / batch_size;
+  }
 
-  for (n_iter[0] = 1; n_iter[0] <= params.max_iter; ++n_iter[0]) {
+  for (n_iter[0] = 1; n_iter[0] <= n_steps; ++n_iter[0]) {
     RAFT_LOG_DEBUG("KMeans batched: Iteration %d", n_iter[0]);
 
     raft::copy(new_centroids.data_handle(), centroids.data_handle(), centroids.size(), stream);
