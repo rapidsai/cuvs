@@ -2,11 +2,11 @@
   "_metric": [
     {
       "metric_name": "euclidean",
-      "header_file": "neighbors/ivf_flat/jit_lto_kernels/metric_euclidean_dist.cuh"
+      "header_file": "neighbors/ivf_flat/jit_lto_kernels/metric_euclidean.cuh"
     },
     {
       "metric_name": "inner_prod",
-      "header_file": "neighbors/ivf_flat/jit_lto_kernels/metric_inner_product.cuh"
+      "header_file": "neighbors/ivf_flat/jit_lto_kernels/metric_inner_prod.cuh"
     }
   ],
   "_data_type": [
