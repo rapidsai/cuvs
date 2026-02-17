@@ -58,7 +58,16 @@ public class HnswIndexParams {
     }
   };
 
-  private CuvsHnswHierarchy hierarchy = CuvsHnswHierarchy.NONE;
+  /**
+   * Alias for {@link CuvsHnswHierarchy} for convenience.
+   */
+  public static class HnswHierarchy {
+    public static final CuvsHnswHierarchy NONE = CuvsHnswHierarchy.NONE;
+    public static final CuvsHnswHierarchy CPU = CuvsHnswHierarchy.CPU;
+    public static final CuvsHnswHierarchy GPU = CuvsHnswHierarchy.GPU;
+  }
+
+  private CuvsHnswHierarchy hierarchy = CuvsHnswHierarchy.GPU;
   private int efConstruction = 200;
   private int numThreads = 2;
   private int vectorDimension;
@@ -168,7 +177,7 @@ public class HnswIndexParams {
    */
   public static class Builder {
 
-    private CuvsHnswHierarchy hierarchy = CuvsHnswHierarchy.NONE;
+    private CuvsHnswHierarchy hierarchy = CuvsHnswHierarchy.GPU;
     private int efConstruction = 200;
     private int numThreads = 2;
     private int vectorDimension;

@@ -45,7 +45,7 @@ enum class HnswHierarchy {
 
 struct index_params : cuvs::neighbors::index_params {
   /** Hierarchy build type for HNSW index when converting from CAGRA index */
-  HnswHierarchy hierarchy = HnswHierarchy::NONE;
+  HnswHierarchy hierarchy = HnswHierarchy::GPU;
   /** Size of the candidate list during hierarchy construction when hierarchy is `CPU`*/
   int ef_construction = 200;
   /** Number of host threads to use to construct hierarchy when hierarchy is `CPU` or `GPU`.
