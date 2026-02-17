@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 schema_version: 1
 
@@ -8,10 +8,10 @@ context:
   cuda_version: ${{ (env.get("RAPIDS_CUDA_VERSION") | split("."))[:2] | join(".") }}
   cuda_major: '${{ (env.get("RAPIDS_CUDA_VERSION") | split("."))[0] }}'
   date_string: '${{ env.get("RAPIDS_DATE_STRING") }}'
-  py_version: ${{ env.get("RAPIDS_PY_VERSION") }}
-  py_buildstring: ${{ py_version | version_to_buildstring }}
   head_rev: '${{ git.head_rev(".")[:8] }}'
-  linux64: ${{ linux and x86_64 }}
+  py_abi_min: ${{ env.get("RAPIDS_PY_VERSION") }}
+  py_buildstring : ${{ py_abi_min | version_to_buildstring }}
+  py_runtime_latest: "3.13"
 
 package:
   name: cuvs-bench
@@ -21,7 +21,9 @@ source:
   path: ../../..
 
 build:
-  string: cuda${{ cuda_major }}_py${{ py_buildstring }}_${{ date_string }}_${{ head_rev }}
+  python:
+    version_independent: true
+  string: cuda${{ cuda_major }}_cp${{ py_buildstring }}_abi3_${{ date_string }}_${{ head_rev }}
   script:
     content: |
       python -m pip install --no-build-isolation --no-deps --config-settings rapidsai.disable-cuda=true ./python/cuvs_bench
@@ -31,7 +33,8 @@ requirements:
     - cuda-version =${{ cuda_version }}
     - libcuvs =${{ version }}
     - libcuvs-bench-ann =${{ version }}
-    - python =${{ py_version }}
+    - python =${{ py_abi_min }}
+    - python-abi3 ${{ py_abi_min }}.*
     - pip
     - rapids-build-backend >=0.4.0,<0.5.0
     - rmm =${{ minor_version }}
@@ -59,7 +62,17 @@ requirements:
 tests:
   - package_contents:
       files:
-        - lib/python*/site-packages/cuvs_bench/config/datasets/datasets.yaml
+        - site-packages/cuvs_bench/config/datasets/datasets.yaml
+  - python:
+      imports:
+        - cuvs_bench
+        - cuvs_bench.generate_groundtruth
+        - cuvs_bench.get_dataset
+        - cuvs_bench.plot
+        - cuvs_bench.run
+        - cuvs_bench.split_groundtruth
+      python_version: ${{ py_runtime_latest }}.*
+      pip_check: false
 
 about:
   homepage: ${{ load_from_file("python/cuvs_bench/pyproject.toml").project.urls.Homepage }}
