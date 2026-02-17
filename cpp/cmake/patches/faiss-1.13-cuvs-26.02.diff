@@ -1,5 +1,22 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 8e398785..0789e59d 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -53,11 +53,7 @@ project(faiss
+   LANGUAGES ${FAISS_LANGUAGES})
+ include(GNUInstallDirs)
+
+-if(FAISS_ENABLE_CUVS)
+-  set(CMAKE_CXX_STANDARD 17)
+-else()
+-  set(CMAKE_CXX_STANDARD 20)
+-endif()
++set(CMAKE_CXX_STANDARD 20)
+
+ list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
+
 diff --git a/faiss/gpu/impl/CuvsIVFPQ.cu b/faiss/gpu/impl/CuvsIVFPQ.cu
-index 1e2fef225..2ee40da46 100644
+index 1e2fef22..f2f29302 100644
 --- a/faiss/gpu/impl/CuvsIVFPQ.cu
 +++ b/faiss/gpu/impl/CuvsIVFPQ.cu
 @@ -129,8 +129,14 @@ void CuvsIVFPQ::updateQuantizer(Index* quantizer) {
@@ -138,19 +155,16 @@ index 1e2fef225..2ee40da46 100644
 
      for (size_t i = 0; i < nlist; ++i) {
          size_t listSize = ivf->list_size(i);
-@@ -426,9 +490,9 @@ void CuvsIVFPQ::copyInvertedListsFrom(const InvertedLists* ivf) {
+@@ -426,7 +490,7 @@ void CuvsIVFPQ::copyInvertedListsFrom(const InvertedLists* ivf) {
          // This cuVS list must currently be empty
          FAISS_ASSERT(getListLength(i) == 0);
 
 -        cuvs::neighbors::ivf::resize_list(
 +        cuvs::neighbors::ivf_pq::helpers::resize_list(
                  raft_handle,
--                cuvs_index_lists[i],
-+                cuvs_index_lists[i],
+                 cuvs_index_lists[i],
                  ivf_list_spec,
-                 static_cast<uint32_t>(listSize),
-                 static_cast<uint32_t>(0));
-@@ -520,7 +587,7 @@ void CuvsIVFPQ::setPQCentroids_() {
+@@ -520,7 +584,7 @@ void CuvsIVFPQ::setPQCentroids_() {
      auto stream = resources_->getDefaultStreamCurrentDevice();
 
      raft::copy(
