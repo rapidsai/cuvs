@@ -143,7 +143,7 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
   }
 
   RAFT_EXPECTS(
-    valid_kernels.size() == 1, "Expected 1 valid JIT kernel, got %d", valid_kernels.size());
+    valid_kernels.size() == 1, "Expected 1 valid JIT kernel, got %zu", valid_kernels.size());
 
   return std::make_shared<AlgorithmLauncher>(valid_kernels[0], library);
 }
