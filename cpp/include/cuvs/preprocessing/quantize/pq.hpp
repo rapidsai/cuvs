@@ -79,8 +79,10 @@ struct params {
 /**
  * @brief Defines and stores VPQ codebooks upon training
  *
- * @tparam T data element type
+ * The quantizer holds a vpq_dataset, which can be either owning (trained from data)
+ * or non-owning (referencing external codebooks).
  *
+ * @tparam T data element type
  */
 template <typename T>
 struct quantizer {
@@ -89,7 +91,7 @@ struct quantizer {
 };
 
 /**
- * @brief Initializes a product quantizer to be used later for quantizing the dataset.
+ * @brief Initializes a product quantizer by training on the dataset (owning).
  *
  * The use of a pool memory resource is recommended for more consistent training performance.
  *
@@ -103,7 +105,7 @@ struct quantizer {
  * @endcode
  *
  * @param[in] res raft resource
- * @param[in] params configure product quantizer, e.g. quantile
+ * @param[in] params configure product quantizer, e.g. pq_bits, pq_dim
  * @param[in] dataset a row-major matrix view on device or host
  *
  * @return quantizer
@@ -116,6 +118,42 @@ quantizer<float> build(raft::resources const& res,
 quantizer<float> build(raft::resources const& res,
                        const params params,
                        raft::host_matrix_view<const float, int64_t> dataset);
+
+/**
+ * @brief Creates a view-type product quantizer from pre-computed codebooks.
+ *
+ * This function creates a non-owning quantizer that references the provided device data.
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::handle_t handle;
+ * // Assume pq_centers and vq_centers are pre-computed on device
+ * cuvs::preprocessing::quantize::pq::params params;
+ * params.pq_bits = 8;
+ * params.pq_dim = 32;
+ * params.use_vq = true;
+ * params.use_subspaces = true;
+ * auto quant_view = cuvs::preprocessing::quantize::pq::build(handle, params,
+ *                                                             pq_centers_view, vq_centers_view);
+ * // Use quant_view for transform/inverse_transform operations
+ * @endcode
+ *
+ * @param[in] res raft resource
+ * @param[in] params configure product quantizer parameters. Must be fully specified
+ *   (pq_bits, pq_dim must be set; use_subspaces and use_vq must match the codebook shapes).
+ * @param[in] pq_centers PQ codebook on device memory:
+ *   - For use_subspaces=true: [pq_dim * pq_n_centers, pq_len]
+ *   - For use_subspaces=false: [pq_n_centers, pq_len]
+ *   where pq_n_centers = (1 << pq_bits), pq_len = dim / pq_dim
+ * @param[in] vq_centers VQ codebook on device memory [vq_n_centers, dim].
+ *   Pass an empty view if use_vq=false.
+ *
+ * @return A view-type quantizer that references the provided data
+ */
+quantizer<float> build(raft::resources const& res,
+                       const params params,
+                       raft::device_matrix_view<const float, uint32_t, raft::row_major> pq_centers,
+                       raft::device_matrix_view<const float, uint32_t, raft::row_major> vq_centers);
 
 /**
  * @brief Applies quantization transform to given dataset

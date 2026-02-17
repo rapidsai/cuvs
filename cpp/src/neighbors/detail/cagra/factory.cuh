@@ -106,10 +106,10 @@ auto make_key(const cagra::search_params& params,
               cuvs::distance::DistanceType metric)
   -> std::enable_if_t<is_vpq_dataset_v<DatasetT>, key>
 {
-  return key{reinterpret_cast<uint64_t>(dataset.data.data_handle()),
+  return key{reinterpret_cast<uint64_t>(dataset.data().data_handle()),
              uint64_t(dataset.n_rows()),
              dataset.dim(),
-             uint32_t(reinterpret_cast<uint64_t>(dataset.pq_code_book.data_handle()) >> 6),
+             uint32_t(reinterpret_cast<uint64_t>(dataset.pq_code_book().data_handle()) >> 6),
              uint32_t(params.team_size),
              uint32_t(metric)};
 }
