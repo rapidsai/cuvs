@@ -79,47 +79,46 @@ def test_cluster_cost(n_rows, n_cols, n_clusters, dtype):
     assert np.allclose(inertia, sum(cluster_distances), rtol=tol, atol=tol)
 
 
-# @pytest.mark.parametrize("n_rows", [1000])
-# @pytest.mark.parametrize("n_cols", [10])
-# @pytest.mark.parametrize("n_clusters", [8])
-# @pytest.mark.parametrize("dtype", [np.float32])
-# @pytest.mark.parametrize("update_mode", ["full_batch", "mini_batch"])
-# def test_fit_batched_matches_fit(n_rows, n_cols, n_clusters, dtype, update_mode):
-#     """
-#     Test that fit_batched FullBatch produces the same centroids as regular fit
-#     when given the same initial centroids.
-#     """
-#     rng = np.random.default_rng(99)
-#     X_host = rng.random((n_rows, n_cols)).astype(dtype)
-#     initial_centroids_host = X_host[:n_clusters].copy()
+@pytest.mark.parametrize("n_rows", [1000, 5000])
+@pytest.mark.parametrize("n_cols", [10, 100])
+@pytest.mark.parametrize("n_clusters", [8, 16])
+@pytest.mark.parametrize("batch_size", [100, 500])
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_fit_batched_matches_fit(
+    n_rows, n_cols, n_clusters, batch_size, dtype
+):
+    """
+    Test that fit_batched FullBatch produces the same centroids as regular fit
+    when given the same initial centroids.
+    """
+    rng = np.random.default_rng(99)
+    X_host = rng.random((n_rows, n_cols)).astype(dtype)
+    initial_centroids_host = X_host[:n_clusters].copy()
 
-#     # Regular fit (device data)
-#     params = KMeansParams(
-#         n_clusters=n_clusters,
-#         init_method="Array",
-#         max_iter=20,
-#         tol=1e-10,
-#         update_mode=update_mode,
-#     )
-#     centroids_regular, _, _ = fit(
-#         params,
-#         device_ndarray(X_host),
-#         device_ndarray(initial_centroids_host.copy()),
-#     )
-#     centroids_regular = centroids_regular.copy_to_host()
+    params = KMeansParams(
+        n_clusters=n_clusters,
+        init_method="Array",
+        max_iter=100,
+        tol=1e-10,
+    )
+    centroids_regular, _, _ = fit(
+        params,
+        device_ndarray(X_host),
+        device_ndarray(initial_centroids_host.copy()),
+    )
+    centroids_regular = centroids_regular.copy_to_host()
 
-#     # Batched fit (host data, full batch mode)
-#     centroids_batched, _, _ = fit_batched(
-#         params,
-#         X_host,
-#         batch_size=1000,
-#         centroids=device_ndarray(initial_centroids_host.copy()),
-#     )
-#     centroids_batched = centroids_batched.copy_to_host()
+    centroids_batched, _, _ = fit_batched(
+        params,
+        X_host,
+        batch_size=batch_size,
+        centroids=device_ndarray(initial_centroids_host.copy()),
+    )
+    centroids_batched = centroids_batched.copy_to_host()
 
-#     assert np.allclose(
-#         centroids_regular, centroids_batched, rtol=0.05, atol=0.05
-#     ), f"max diff: {np.max(np.abs(centroids_regular - centroids_batched))}"
+    assert np.allclose(
+        centroids_regular, centroids_batched, rtol=0.05, atol=0.05
+    ), f"max diff: {np.max(np.abs(centroids_regular - centroids_batched))}"
 
 
 @pytest.mark.parametrize("n_rows", [1000])

@@ -491,8 +491,6 @@ void fit(raft::resources const& handle,
 
       finalize_centroids<T, IdxT>(
         handle, centroid_sums_const, cluster_counts_const, centroids_const, new_centroids.view());
-
-      raft::copy(centroids.data_handle(), new_centroids.data_handle(), centroids.size(), stream);
     }
 
     auto sqrdNorm = raft::make_device_scalar<T>(handle, T{0});
@@ -502,6 +500,10 @@ void fit(raft::resources const& handle,
                                    stream,
                                    new_centroids.data_handle(),
                                    centroids.data_handle());
+
+    if (!use_minibatch) {
+      raft::copy(centroids.data_handle(), new_centroids.data_handle(), centroids.size(), stream);
+    }
 
     T sqrdNormError = 0;
     raft::copy(&sqrdNormError, sqrdNorm.data_handle(), 1, stream);
