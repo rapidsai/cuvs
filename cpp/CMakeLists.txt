@@ -427,6 +427,7 @@ if(NOT BUILD_CPU_ONLY)
       cuvs_jit_lto_kernels STATIC ${interleaved_scan_files} ${metric_files} ${filter_files}
                                   ${post_lambda_files}
     )
+    set_target_properties(cuvs_jit_lto_kernels PROPERTIES POSITION_INDEPENDENT_CODE ON)
     target_include_directories(
       cuvs_jit_lto_kernels
       PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_SOURCE_DIR}/src"
