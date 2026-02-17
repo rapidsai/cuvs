@@ -15,27 +15,20 @@ function(compute_matrix_product output_var)
   cmake_parse_arguments(_JIT_LTO "${options}" "${one_value}" "${multi_value}" ${ARGN})
 
   if(_JIT_LTO_MATRIX_JSON_FILE)
-    set(commands #
-        COMMAND
-        "${Python3_EXECUTABLE}"
-        "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/compute_matrix_product.py"
-        "${_JIT_LTO_MATRIX_JSON_FILE}" #
+    execute_process(
+      COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/compute_matrix_product.py"
+              "${_JIT_LTO_MATRIX_JSON_FILE}" #
+      OUTPUT_VARIABLE output COMMAND_ERROR_IS_FATAL ANY
     )
   else()
-    set(commands #
-        COMMAND
-        "${CMAKE_COMMAND}"
-        -E
-        echo
-        "${_JIT_LTO_MATRIX_JSON_STRING}" #
-        COMMAND
-        "${Python3_EXECUTABLE}"
-        "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/compute_matrix_product.py"
-        - #
+    execute_process(
+      COMMAND "${CMAKE_COMMAND}" -E echo "${_JIT_LTO_MATRIX_JSON_STRING}"
+      COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/compute_matrix_product.py"
+              -
+      OUTPUT_VARIABLE output COMMAND_ERROR_IS_FATAL ANY
     )
   endif()
 
-  execute_process(${commands} OUTPUT_VARIABLE output COMMAND_ERROR_IS_FATAL ANY)
   set(${output_var}
       "${output}"
       PARENT_SCOPE
