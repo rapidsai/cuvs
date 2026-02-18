@@ -365,12 +365,12 @@ if(NOT BUILD_CPU_ONLY)
       jit_lto_kernel_usage_requirements INTERFACE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
                                                   "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
     )
-    target_compile_features(jit_lto_kernel_usage_requirements INTERFACE cuda_std_20 cxx_std_20)
+    target_compile_features(jit_lto_kernel_usage_requirements INTERFACE cuda_std_20)
     target_link_libraries(
       jit_lto_kernel_usage_requirements INTERFACE rmm::rmm raft::raft CCCL::CCCL
     )
 
-    block()
+    block(PROPAGATE interleaved_scan_files metric_files filter_files post_lambda_files)
     set(CMAKE_CUDA_ARCHITECTURES ${JIT_LTO_TARGET_ARCHITECTURE})
     generate_jit_lto_kernels(
       interleaved_scan_files
@@ -427,7 +427,9 @@ if(NOT BUILD_CPU_ONLY)
       cuvs_jit_lto_kernels STATIC ${interleaved_scan_files} ${metric_files} ${filter_files}
                                   ${post_lambda_files}
     )
-    set_target_properties(cuvs_jit_lto_kernels PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    set_target_properties(
+      cuvs_jit_lto_kernels PROPERTIES POSITION_INDEPENDENT_CODE ON CXX_STANDARD 20
+    )
     target_include_directories(
       cuvs_jit_lto_kernels
       PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_SOURCE_DIR}/src"
