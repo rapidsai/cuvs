@@ -94,10 +94,11 @@ class PcaTest : public ::testing::TestWithParam<PcaInputs<T>> {
     // prms.n_rows       = params.n_row;
     prms.n_components = params.n_col;
     prms.whiten       = false;
-    if (params.algo == 0)
+    if (params.algo == 0) {
       prms.algorithm = solver::COV_EIG_DQ;
-    else
+    } else {
       prms.algorithm = solver::COV_EIG_JACOBI;
+    }
 
     auto input_view = raft::make_device_matrix_view<T, int64_t, raft::col_major>(
       data.data(), params.n_row, params.n_col);
@@ -145,10 +146,11 @@ class PcaTest : public ::testing::TestWithParam<PcaInputs<T>> {
     // prms.n_rows       = params.n_row2;
     prms.n_components = params.n_col2;
     prms.whiten       = false;
-    if (params.algo == 0)
+    if (params.algo == 0) {
       prms.algorithm = solver::COV_EIG_DQ;
-    else if (params.algo == 1)
+    } else if (params.algo == 1) {
       prms.algorithm = solver::COV_EIG_JACOBI;
+    }
 
     r.uniform(data2.data(), len, T(-1.0), T(1.0), stream);
     rmm::device_uvector<T> data2_trans(params.n_row2 * prms.n_components, stream);

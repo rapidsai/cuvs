@@ -7,21 +7,11 @@
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/linalg/pca_types.hpp>
 
 namespace cuvs::preprocessing::pca {
 
-/**
- * @brief Solver algorithm for PCA decomposition.
- *
- * @param COV_EIG_DQ: covariance of input will be used along with eigen decomposition using divide
- * and conquer method for symmetric matrices
- * @param COV_EIG_JACOBI: covariance of input will be used along with eigen decomposition using
- * jacobi method for symmetric matrices
- */
-enum class solver : int {
-  COV_EIG_DQ,
-  COV_EIG_JACOBI,
-};
+using solver = raft::linalg::solver;
 
 /**
  * @brief Parameters for PCA decomposition. Ref:
@@ -49,13 +39,12 @@ struct params {
 
   /**
    * @brief Tolerance for singular values computed by svd_solver == 'arpack' or
-   * svd_solver == 'COV_EIG_JACOBI'.
+   * the Jacobi solver.
    */
   float tol = 0.0f;
 
   /**
-   * @brief Number of iterations for the power method computed by jacobi method
-   * (svd_solver == 'COV_EIG_JACOBI').
+   * @brief Number of iterations for the power method computed by the Jacobi solver.
    */
   int n_iterations = 15;
 

@@ -22,11 +22,10 @@ inline auto to_raft_params(params config, std::size_t n_rows, std::size_t n_cols
   raft::linalg::paramsPCA prms;
   prms.n_rows       = n_rows;
   prms.n_cols       = n_cols;
-  prms.n_components = static_cast<std::size_t>(config.n_components);
-  prms.algorithm    = static_cast<raft::linalg::solver>(static_cast<int>(config.algorithm));
+  prms.n_components = config.n_components;
+  prms.algorithm    = config.algorithm;
   prms.tol          = config.tol;
-  prms.n_iterations = static_cast<std::uint32_t>(config.n_iterations);
-  prms.verbose      = config.verbose;
+  prms.n_iterations = config.n_iterations;
   prms.copy         = config.copy;
   prms.whiten       = config.whiten;
   return prms;
