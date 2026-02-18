@@ -49,13 +49,6 @@
 
 namespace cuvs::neighbors::cagra::detail::single_cta_search {
 
-// Import shared JIT helper functions
-using cuvs::neighbors::cagra::detail::get_data_type_tag;
-using cuvs::neighbors::cagra::detail::get_distance_type_tag;
-using cuvs::neighbors::cagra::detail::get_index_type_tag;
-using cuvs::neighbors::cagra::detail::get_sample_filter_name;
-using cuvs::neighbors::cagra::detail::get_source_index_type_tag;
-
 // The launcher uses types from search_single_cta_kernel-inl.cuh (worker_handle_t, job_desc_t)
 // The JIT kernel headers define _jit versions that are compatible
 
@@ -382,19 +375,30 @@ struct alignas(kCacheLineBytes) persistent_runner_jit_t : public persistent_runn
     original_nbits           = 0;
     uint32_t query_id_offset = 0;
 
-    if constexpr (!std::is_same_v<SampleFilterT, cuvs::neighbors::filtering::none_sample_filter>) {
-      // All non-none filters are wrapped in CagraSampleFilterWithQueryIdOffset
-      // Access .filter and .offset directly
-      query_id_offset   = sample_filter.offset;
+    // Check if it has the wrapper members (CagraSampleFilterWithQueryIdOffset)
+    if constexpr (requires {
+                    sample_filter.filter;
+                    sample_filter.offset;
+                  }) {
       using InnerFilter = decltype(sample_filter.filter);
-      if constexpr (std::is_same_v<
-                      InnerFilter,
-                      cuvs::neighbors::filtering::bitset_filter<uint32_t, SourceIndexT>>) {
+      // Always extract offset for wrapped filters
+      query_id_offset = sample_filter.offset;
+      RAFT_LOG_INFO("Extracted query_id_offset: %u", query_id_offset);
+      if constexpr (is_bitset_filter<InnerFilter>::value) {
+        // Extract bitset data for bitset_filter (works for any bitset_filter instantiation)
         auto bitset_view = sample_filter.filter.view();
         bitset_ptr       = const_cast<uint32_t*>(bitset_view.data());
         bitset_len       = static_cast<SourceIndexT>(bitset_view.size());
         original_nbits   = static_cast<SourceIndexT>(bitset_view.get_original_nbits());
+        RAFT_LOG_INFO("Extracted bitset data: bitset_ptr=%p, bitset_len=%zu, original_nbits=%zu",
+                      bitset_ptr,
+                      static_cast<size_t>(bitset_len),
+                      static_cast<size_t>(original_nbits));
+      } else {
+        RAFT_LOG_INFO("InnerFilter is not bitset_filter, skipping bitset extraction");
       }
+    } else {
+      RAFT_LOG_INFO("Filter does not have wrapper members (.filter/.offset), skipping extraction");
     }
 
     // set kernel launch parameters
@@ -437,6 +441,18 @@ struct alignas(kCacheLineBytes) persistent_runner_jit_t : public persistent_runn
     // Get the device descriptor pointer - kernel will use the concrete type from template
     const auto* dev_desc = dataset_desc.get().dev_ptr(stream);
 
+    // Cast size_t/int64_t parameters to match kernel signature exactly
+    // The dispatch mechanism uses void* pointers, so parameter sizes must match exactly
+    const uint32_t graph_degree_u32              = static_cast<uint32_t>(graph.extent(1));
+    const uint32_t hash_bitlen_u32               = static_cast<uint32_t>(hash_bitlen);
+    const uint32_t small_hash_bitlen_u32         = static_cast<uint32_t>(small_hash_bitlen);
+    const uint32_t small_hash_reset_interval_u32 = static_cast<uint32_t>(small_hash_reset_interval);
+    const uint32_t itopk_size_u32                = static_cast<uint32_t>(itopk_size);
+    const uint32_t search_width_u32              = static_cast<uint32_t>(search_width);
+    const uint32_t min_iterations_u32            = static_cast<uint32_t>(min_iterations);
+    const uint32_t max_iterations_u32            = static_cast<uint32_t>(max_iterations);
+    const unsigned num_random_samplings_u        = static_cast<unsigned>(num_random_samplings);
+
     // Launch the persistent kernel via AlgorithmLauncher
     // The persistent kernel now takes the descriptor pointer directly
     launcher->dispatch_cooperative(
@@ -448,25 +464,25 @@ struct alignas(kCacheLineBytes) persistent_runner_jit_t : public persistent_runn
       job_descriptors_ptr,
       completion_counters_ptr,
       graph.data_handle(),
-      graph.extent(1),
+      graph_degree_u32,  // Cast int64_t to uint32_t
       source_indices_ptr,
-      num_random_samplings,
-      rand_xor_mask,
-      nullptr,  // seed_ptr
+      num_random_samplings_u,  // Cast uint32_t to unsigned for consistency
+      rand_xor_mask,           // uint64_t matches kernel (8 bytes)
+      nullptr,                 // seed_ptr
       num_seeds,
       hashmap_ptr,
       max_candidates,
       max_itopk,
-      itopk_size,
-      search_width,
-      min_iterations,
-      max_iterations,
-      nullptr,  // num_executed_iterations
-      hash_bitlen,
-      small_hash_bitlen,
-      small_hash_reset_interval,
-      query_id_offset,  // Offset to add to query_id when calling filter
-      dev_desc,         // Pass descriptor pointer
+      itopk_size_u32,                 // Cast size_t to uint32_t
+      search_width_u32,               // Cast size_t to uint32_t
+      min_iterations_u32,             // Cast size_t to uint32_t
+      max_iterations_u32,             // Cast size_t to uint32_t
+      nullptr,                        // num_executed_iterations
+      hash_bitlen_u32,                // Cast int64_t to uint32_t
+      small_hash_bitlen_u32,          // Cast size_t to uint32_t
+      small_hash_reset_interval_u32,  // Cast size_t to uint32_t
+      query_id_offset,                // Offset to add to query_id when calling filter
+      dev_desc,                       // Pass descriptor pointer
       bitset_ptr,
       bitset_len,
       original_nbits);
@@ -574,6 +590,11 @@ void select_and_run_jit(
   SampleFilterT sample_filter,
   cudaStream_t stream)
 {
+  RAFT_LOG_INFO(
+    "[JIT LAUNCHER] Entering SINGLE_CTA launcher (persistent=%d, num_queries=%u, topk=%u)",
+    ps.persistent ? 1 : 0,
+    num_queries,
+    topk);
   const SourceIndexT* source_indices_ptr =
     source_indices.has_value() ? source_indices->data_handle() : nullptr;
 
@@ -584,19 +605,34 @@ void select_and_run_jit(
   SourceIndexT original_nbits = 0;
   uint32_t query_id_offset    = 0;
 
-  if constexpr (!std::is_same_v<SampleFilterT, cuvs::neighbors::filtering::none_sample_filter>) {
-    // All non-none filters are wrapped in CagraSampleFilterWithQueryIdOffset
-    // Access .filter and .offset directly
-    query_id_offset   = sample_filter.offset;
+  // Check if it has the wrapper members (CagraSampleFilterWithQueryIdOffset)
+  if constexpr (requires {
+                  sample_filter.filter;
+                  sample_filter.offset;
+                }) {
     using InnerFilter = decltype(sample_filter.filter);
-    if constexpr (std::is_same_v<
-                    InnerFilter,
-                    cuvs::neighbors::filtering::bitset_filter<uint32_t, SourceIndexT>>) {
+    // Always extract offset for wrapped filters
+    query_id_offset = sample_filter.offset;
+    RAFT_LOG_INFO("Extracted query_id_offset: %u", query_id_offset);
+    if constexpr (is_bitset_filter<InnerFilter>::value) {
+      // Extract bitset data for bitset_filter (works for any bitset_filter instantiation)
       auto bitset_view = sample_filter.filter.view();
       bitset_ptr       = const_cast<uint32_t*>(bitset_view.data());
       bitset_len       = static_cast<SourceIndexT>(bitset_view.size());
       original_nbits   = static_cast<SourceIndexT>(bitset_view.get_original_nbits());
+      RAFT_LOG_INFO("Extracted bitset data: bitset_ptr=%p, bitset_len=%zu, original_nbits=%zu",
+                    bitset_ptr,
+                    static_cast<size_t>(bitset_len),
+                    static_cast<size_t>(original_nbits));
+      RAFT_LOG_INFO("InnerFilter type: %s, bitset_view.size() type: %s, SourceIndexT: %s",
+                    typeid(InnerFilter).name(),
+                    typeid(decltype(bitset_view.size())).name(),
+                    typeid(SourceIndexT).name());
+    } else {
+      RAFT_LOG_INFO("InnerFilter is not bitset_filter, skipping bitset extraction");
     }
+  } else {
+    RAFT_LOG_INFO("Filter does not have wrapper members (.filter/.offset), skipping extraction");
   }
 
   // Use common logic to compute launch config
@@ -713,6 +749,18 @@ void select_and_run_jit(
     // Get the device descriptor pointer - dev_ptr() initializes it if needed
     const auto* dev_desc = dataset_desc.dev_ptr(stream);
 
+    // Cast size_t/int64_t parameters to match kernel signature exactly
+    // The dispatch mechanism uses void* pointers, so parameter sizes must match exactly
+    const uint32_t graph_degree_u32              = static_cast<uint32_t>(graph.extent(1));
+    const uint32_t hash_bitlen_u32               = static_cast<uint32_t>(hash_bitlen);
+    const uint32_t small_hash_bitlen_u32         = static_cast<uint32_t>(small_hash_bitlen);
+    const uint32_t small_hash_reset_interval_u32 = static_cast<uint32_t>(small_hash_reset_interval);
+    const uint32_t itopk_size_u32                = static_cast<uint32_t>(ps.itopk_size);
+    const uint32_t search_width_u32              = static_cast<uint32_t>(ps.search_width);
+    const uint32_t min_iterations_u32            = static_cast<uint32_t>(ps.min_iterations);
+    const uint32_t max_iterations_u32            = static_cast<uint32_t>(ps.max_iterations);
+    const unsigned num_random_samplings_u        = static_cast<unsigned>(ps.num_random_samplings);
+
     dim3 grid(1, num_queries, 1);
     dim3 block(block_size, 1, 1);
 
@@ -732,30 +780,71 @@ void select_and_run_jit(
       topk,
       queries_ptr,
       graph.data_handle(),
-      graph.extent(1),
+      graph_degree_u32,  // Cast int64_t to uint32_t
       source_indices_ptr,
-      ps.num_random_samplings,
-      ps.rand_xor_mask,
+      num_random_samplings_u,  // Cast uint32_t to unsigned for consistency
+      ps.rand_xor_mask,        // uint64_t matches kernel (8 bytes)
       dev_seed_ptr,
       num_seeds,
       hashmap_ptr,
       max_candidates,
       max_itopk,
-      ps.itopk_size,  // internal_topk
-      ps.search_width,
-      ps.min_iterations,
-      ps.max_iterations,
+      itopk_size_u32,      // Cast size_t to uint32_t
+      search_width_u32,    // Cast size_t to uint32_t
+      min_iterations_u32,  // Cast size_t to uint32_t
+      max_iterations_u32,  // Cast size_t to uint32_t
       num_executed_iterations,
-      hash_bitlen,
-      small_hash_bitlen,
-      small_hash_reset_interval,
-      query_id_offset,  // Offset to add to query_id when calling filter
+      hash_bitlen_u32,                // Cast int64_t to uint32_t
+      small_hash_bitlen_u32,          // Cast size_t to uint32_t
+      small_hash_reset_interval_u32,  // Cast size_t to uint32_t
+      query_id_offset,                // Offset to add to query_id when calling filter
       dev_desc,  // Pass base pointer - kernel expects concrete type but pointer value is same
       bitset_ptr,
       bitset_len,
       original_nbits);
 
-    RAFT_CUDA_TRY(cudaPeekAtLastError());
+    // Check for launch errors immediately
+    cudaError_t launch_err = cudaPeekAtLastError();
+    if (launch_err != cudaSuccess) {
+      RAFT_LOG_ERROR("[JIT LAUNCHER] SINGLE_CTA kernel launch error detected: %s (error code: %d)",
+                     cudaGetErrorString(launch_err),
+                     launch_err);
+      RAFT_LOG_ERROR(
+        "[JIT LAUNCHER] SINGLE_CTA parameters: graph_degree=%u, itopk_size=%u, num_queries=%u, "
+        "topk=%u",
+        graph_degree_u32,
+        itopk_size_u32,
+        num_queries,
+        topk);
+      RAFT_CUDA_TRY(launch_err);
+    }
+
+    // Synchronize to catch kernel execution errors before they propagate
+    // This ensures the kernel completes before we return, preventing parameter lifetime issues
+    cudaError_t sync_err = cudaStreamSynchronize(stream);
+    if (sync_err != cudaSuccess) {
+      RAFT_LOG_ERROR("[JIT LAUNCHER] SINGLE_CTA kernel execution failed: %s (error code: %d)",
+                     cudaGetErrorString(sync_err),
+                     sync_err);
+      RAFT_LOG_ERROR(
+        "[JIT LAUNCHER] SINGLE_CTA parameters: graph_degree=%u, itopk_size=%u, num_queries=%u, "
+        "topk=%u, search_width=%u",
+        graph_degree_u32,
+        itopk_size_u32,
+        num_queries,
+        topk,
+        search_width_u32);
+      RAFT_LOG_ERROR(
+        "[JIT LAUNCHER] SINGLE_CTA pointers: topk_indices=%p, topk_distances=%p, graph=%p, "
+        "dev_desc=%p",
+        reinterpret_cast<void*>(topk_indices_ptr),
+        topk_distances_ptr,
+        graph.data_handle(),
+        dev_desc);
+      RAFT_CUDA_TRY(sync_err);
+    }
+
+    RAFT_LOG_INFO("[JIT LAUNCHER] SINGLE_CTA kernel completed successfully");
   }
 }
 

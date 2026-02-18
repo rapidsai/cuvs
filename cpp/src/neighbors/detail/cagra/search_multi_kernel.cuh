@@ -91,6 +91,7 @@ void get_value(T* const host_ptr, const T* const dev_ptr, cudaStream_t cuda_stre
 template <class T>
 auto get_value(const T* const dev_ptr, cudaStream_t stream) -> T
 {
+  if (dev_ptr == nullptr) { RAFT_FAIL("get_value: dev_ptr is NULL"); }
   T value;
   RAFT_CUDA_TRY(cudaMemcpyAsync(&value, dev_ptr, sizeof(value), cudaMemcpyDefault, stream));
   RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
@@ -755,6 +756,9 @@ struct search
     RAFT_LOG_DEBUG("# topk_workspace_size: %lu", topk_workspace_size);
     topk_workspace.resize(topk_workspace_size, raft::resource::get_cuda_stream(res));
     terminate_flag.resize(1, raft::resource::get_cuda_stream(res));
+    if (terminate_flag.data() == nullptr) {
+      RAFT_FAIL("Failed to allocate terminate_flag: resize returned nullptr");
+    }
     hashmap.resize(hashmap_size, raft::resource::get_cuda_stream(res));
   }
 
@@ -924,11 +928,34 @@ struct search
         break;
       }
 
-      if (iter + 1 >= min_iterations) { set_value<uint32_t>(terminate_flag.data(), 1, stream); }
+      if (iter + 1 >= min_iterations) {
+        if (terminate_flag.data() == nullptr) {
+          RAFT_FAIL("terminate_flag.data() is NULL before set_value at iteration %zu", iter + 1);
+        }
+        set_value<uint32_t>(terminate_flag.data(), 1, stream);
+      }
 
       // pickup parent nodes
       uint32_t _small_hash_bitlen = 0;
       if ((iter + 1) % small_hash_reset_interval == 0) { _small_hash_bitlen = small_hash_bitlen; }
+
+      // Validate all pointers before passing to kernel to prevent memory corruption
+      if (terminate_flag.data() == nullptr) {
+        RAFT_FAIL("terminate_flag.data() is NULL before pickup_next_parents at iteration %zu",
+                  iter + 1);
+      }
+      if (result_indices.data() == nullptr) {
+        RAFT_FAIL("result_indices.data() is NULL before pickup_next_parents at iteration %zu",
+                  iter + 1);
+      }
+      if (hashmap.data() == nullptr) {
+        RAFT_FAIL("hashmap.data() is NULL before pickup_next_parents at iteration %zu", iter + 1);
+      }
+      if (parent_node_list.data() == nullptr) {
+        RAFT_FAIL("parent_node_list.data() is NULL before pickup_next_parents at iteration %zu",
+                  iter + 1);
+      }
+
       pickup_next_parents(result_indices.data() + (1 - (iter & 0x1)) * result_buffer_size,
                           result_buffer_allocation_size,
                           itopk_size,
@@ -943,9 +970,14 @@ struct search
                           stream);
 
       // termination (2)
-      if (iter + 1 >= min_iterations && get_value(terminate_flag.data(), stream)) {
-        iter++;
-        break;
+      if (iter + 1 >= min_iterations) {
+        if (terminate_flag.data() == nullptr) {
+          RAFT_FAIL("terminate_flag.data() is NULL at iteration %zu", iter + 1);
+        }
+        if (get_value(terminate_flag.data(), stream)) {
+          iter++;
+          break;
+        }
       }
 
       // Compute distance to child nodes that are adjacent to the parent node

@@ -7,12 +7,10 @@
 
 #include <cstdint>
 
-// Note: We don't include sample_filter.cuh here because it's not needed for JIT
-// The JIT version defines its own sample_filter function directly
-// #include "../../../sample_filter.cuh"
+namespace cuvs::neighbors::detail {
 
-namespace cuvs::neighbors::cagra::detail {
-
+// Unified sample_filter: takes query_id, node_id, and void* filter_data
+// Used by both CAGRA and IVF Flat
 template <typename SourceIndexT>
 __device__ bool sample_filter(uint32_t query_id, SourceIndexT node_id, void* filter_data)
 {
@@ -21,4 +19,4 @@ __device__ bool sample_filter(uint32_t query_id, SourceIndexT node_id, void* fil
   return true;
 }
 
-}  // namespace cuvs::neighbors::cagra::detail
+}  // namespace cuvs::neighbors::detail

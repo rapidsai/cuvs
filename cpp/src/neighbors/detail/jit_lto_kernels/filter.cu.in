@@ -7,14 +7,15 @@
 
 #ifdef BUILD_KERNEL
 
-#include <neighbors/detail/cagra/jit_lto_kernels/@filter_name_var@.cuh>
+#include <neighbors/detail/jit_lto_kernels/@filter_name_var@.cuh>
 
-namespace cuvs::neighbors::cagra::detail {
+namespace @namespace@ {
 
 // Instantiate the sample_filter device function template
+// CAGRA style: sample_filter(query_id, node_id, filter_data)
 template __device__ bool sample_filter<@source_index_type@>(uint32_t, @source_index_type@, void*);
 
-}  // namespace cuvs::neighbors::cagra::detail
+}  // namespace @namespace@
 
 #else
 
@@ -24,7 +25,7 @@ template __device__ bool sample_filter<@source_index_type@>(uint32_t, @source_in
 __attribute__((__constructor__)) static void register_@kernel_name_var@()
 {
   registerAlgorithm(
-    "sample_filter_@filter_name_var@",
+    "sample_filter_@kernel_name_var@",
     embedded_@kernel_name_var@,
     sizeof(embedded_@kernel_name_var@));
 }

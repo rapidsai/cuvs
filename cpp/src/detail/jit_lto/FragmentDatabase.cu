@@ -7,6 +7,7 @@
 #include <cuvs/detail/jit_lto/FragmentEntry.hpp>
 
 #include <raft/core/error.hpp>
+#include <raft/core/logger.hpp>
 
 FragmentDatabase::FragmentDatabase() {}
 
@@ -32,7 +33,13 @@ FragmentEntry* FragmentDatabase::get_fragment(std::string const& key)
   auto& db = fragment_database();
   auto val = db.cache.find(key);
   RAFT_EXPECTS(val != db.cache.end(), "FragmentDatabase: Key not found: %s", key.c_str());
-  return val->second.get();
+  auto* fragment = val->second.get();
+  if (fragment == nullptr) {
+    RAFT_LOG_WARN("[JIT FRAGMENT] Fragment key exists but entry is NULL: %s (cache size: %zu)",
+                  key.c_str(),
+                  db.cache.size());
+  }
+  return fragment;
 }
 
 void registerFatbinFragment(std::string const& algo,

@@ -77,6 +77,7 @@ using cuvs::neighbors::cagra::detail::device::has_kpq_bits_v;
 
 // Sample filter extern function
 // sample_filter is declared in extern_device_functions.cuh
+using cuvs::neighbors::detail::sample_filter;
 
 // JIT versions of compute_distance_to_random_nodes and compute_distance_to_child_nodes
 // are now shared in device_common_jit.cuh - use fully qualified names
@@ -370,7 +371,7 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
       if (parent_list_buffer[p] != invalid_index) {
         const auto parent_id = result_indices_buffer[parent_list_buffer[p]] & ~index_msb_1_mask;
         // Construct filter_data struct (bitset data is in global memory)
-        cuvs::neighbors::cagra::detail::bitset_filter_data_t<SourceIndexT> filter_data(
+        cuvs::neighbors::detail::bitset_filter_data_t<SourceIndexT> filter_data(
           bitset_ptr, bitset_len, original_nbits);
         if (!sample_filter<SourceIndexT>(query_id + query_id_offset,
                                          to_source_index(parent_id),
@@ -393,7 +394,7 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
   for (unsigned i = threadIdx.x; i < internal_topk + search_width * graph_degree; i += blockDim.x) {
     const auto node_id = result_indices_buffer[i] & ~index_msb_1_mask;
     // Construct filter_data struct (bitset data is in global memory)
-    cuvs::neighbors::cagra::detail::bitset_filter_data_t<SourceIndexT> filter_data(
+    cuvs::neighbors::detail::bitset_filter_data_t<SourceIndexT> filter_data(
       bitset_ptr, bitset_len, original_nbits);
     if (node_id != (invalid_index & ~index_msb_1_mask) &&
         !sample_filter<SourceIndexT>(query_id + query_id_offset,

@@ -111,6 +111,10 @@ extern __device__ DistanceT compute_distance_vpq(
   const typename dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t args,
   IndexT dataset_index);
 
+}  // namespace cuvs::neighbors::cagra::detail
+
+namespace cuvs::neighbors::detail {
+
 // Sample filter extern function - linked separately via JIT LTO
 // Takes 3 params: query_id, node_id, and filter_data (void* pointer to filter-specific data)
 // For none_filter: filter_data can be nullptr
@@ -118,4 +122,4 @@ extern __device__ DistanceT compute_distance_vpq(
 template <typename SourceIndexT>
 extern __device__ bool sample_filter(uint32_t query_id, SourceIndexT node_id, void* filter_data);
 
-}  // namespace cuvs::neighbors::cagra::detail
+}  // namespace cuvs::neighbors::detail

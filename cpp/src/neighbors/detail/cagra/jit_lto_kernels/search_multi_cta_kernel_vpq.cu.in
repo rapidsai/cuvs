@@ -11,20 +11,15 @@
 #include <neighbors/detail/cagra/jit_lto_kernels/search_multi_cta_helpers.cuh>  // For pickup_next_parent and topk_by_bitonic_sort_wrapper_*
 
 #include <neighbors/detail/cagra/jit_lto_kernels/search_multi_cta_kernel_jit.cuh>
-#include <neighbors/detail/cagra/jit_lto_kernels/setup_workspace_standard_impl.cuh>
 #include <neighbors/detail/cagra/jit_lto_kernels/setup_workspace_vpq_impl.cuh>
-#include <neighbors/detail/cagra/jit_lto_kernels/compute_distance_standard_impl.cuh>
 #include <neighbors/detail/cagra/jit_lto_kernels/compute_distance_vpq_impl.cuh>
-#include <neighbors/detail/cagra/compute_distance_standard-impl.cuh>
-#include <cuvs/neighbors/common.hpp>
-#include <neighbors/detail/cagra/jit_lto_kernels/filter_none.cuh>
 
 namespace cuvs::neighbors::cagra::detail::multi_cta_search {
 
 // Instantiate the search_kernel_jit function with concrete VPQ descriptor type
 using desc_t = cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<cuvs::distance::DistanceType::@metric_name_full@, @team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@>;
 template __global__ __launch_bounds__(1024, 1) void search_kernel_jit<desc_t, @data_type@, @index_type@, @distance_type@, @source_index_type@>(
-    @index_type@* const, @distance_type@* const, const desc_t*, const @data_type@* const, const @index_type@* const, const std::uint32_t, const std::uint32_t, const @source_index_type@*, const unsigned, const uint64_t, const @index_type@*, const std::uint32_t, const std::uint32_t, @index_type@* const, const std::uint32_t, const std::uint32_t, const std::uint32_t, const std::uint32_t, std::uint32_t* const, uint32_t*, @source_index_type@, @source_index_type@);
+    @index_type@* const, @distance_type@* const, const desc_t*, const @data_type@* const, const @index_type@* const, const std::uint32_t, const std::uint32_t, const @source_index_type@*, const unsigned, const uint64_t, const @index_type@*, const std::uint32_t, const std::uint32_t, @index_type@* const, const std::uint32_t, const std::uint32_t, const std::uint32_t, const std::uint32_t, std::uint32_t* const, const std::uint32_t, uint32_t*, @source_index_type@, @source_index_type@);
 
 }  // namespace cuvs::neighbors::cagra::detail::multi_cta_search
 

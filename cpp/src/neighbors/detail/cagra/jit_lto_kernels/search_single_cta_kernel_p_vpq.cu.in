@@ -8,15 +8,14 @@
 #ifdef BUILD_KERNEL
 
 #include <neighbors/detail/cagra/jit_lto_kernels/search_single_cta_kernel_jit.cuh>
-#include <neighbors/detail/cagra/compute_distance_standard-impl.cuh>
-#include <cuvs/neighbors/common.hpp>
+#include <neighbors/detail/cagra/compute_distance_vpq-impl.cuh>
 
 namespace cuvs::neighbors::cagra::detail::single_cta_search {
 
 // Instantiate the search_kernel_p_jit function with concrete VPQ descriptor type
 using desc_t = cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<cuvs::distance::DistanceType::@metric_name_full@, @team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@>;
 template __global__ __launch_bounds__(1024, 1) void search_kernel_p_jit<@topk_by_bitonic_sort@, @bitonic_sort_and_merge_multi_warps@, desc_t, @data_type@, @index_type@, @distance_type@, @source_index_type@>(
-    worker_handle_t*, job_desc_t<job_desc_jit_helper_desc<@data_type@, @index_type@, @distance_type@>>*, uint32_t*, const @index_type@* const, const std::uint32_t, const @source_index_type@*, const unsigned, const uint64_t, const @index_type@*, const uint32_t, @index_type@* const, const std::uint32_t, const std::uint32_t, const std::uint32_t, const std::uint32_t, const std::uint32_t, const std::uint32_t, std::uint32_t* const, const std::uint32_t, const std::uint32_t, const std::uint32_t, const desc_t*, uint32_t*, @source_index_type@, @source_index_type@);
+    worker_handle_t*, job_desc_t<job_desc_jit_helper_desc<@data_type@, @index_type@, @distance_type@>>*, uint32_t*, const @index_type@* const, const std::uint32_t, const @source_index_type@*, const unsigned, const uint64_t, const @index_type@*, const uint32_t, @index_type@* const, const std::uint32_t, const std::uint32_t, const std::uint32_t, const std::uint32_t, const std::uint32_t, const std::uint32_t, std::uint32_t* const, const std::uint32_t, const std::uint32_t, const std::uint32_t, const std::uint32_t, const desc_t*, uint32_t*, @source_index_type@, @source_index_type@);
 
 }  // namespace cuvs::neighbors::cagra::detail::single_cta_search
 

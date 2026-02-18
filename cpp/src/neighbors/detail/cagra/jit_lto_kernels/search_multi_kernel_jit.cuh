@@ -304,6 +304,7 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel_jit(
 // JIT version of apply_filter_kernel - uses extern sample_filter function
 // Bitset data is passed as kernel parameters (matching non-JIT where filter object contains
 // bitset_view) The bitset data is in global memory (not shared memory), just like non-JIT
+using cuvs::neighbors::detail::sample_filter;
 template <typename IndexT,
           typename DistanceT,
           typename SourceIndexT>
@@ -334,10 +335,10 @@ RAFT_KERNEL apply_filter_kernel_jit(
                              : source_indices_ptr[result_indices_ptr[index]];
 
     // Construct filter_data struct in registers (bitset data is in global memory)
-    cuvs::neighbors::cagra::detail::bitset_filter_data_t<SourceIndexT> filter_data(
+    cuvs::neighbors::detail::bitset_filter_data_t<SourceIndexT> filter_data(
       bitset_ptr, bitset_len, original_nbits);
 
-    if (!cuvs::neighbors::cagra::detail::sample_filter<SourceIndexT>(
+    if (!sample_filter<SourceIndexT>(
           query_id_offset + j, node_id, bitset_ptr != nullptr ? &filter_data : nullptr)) {
       result_indices_ptr[index]   = utils::get_max_value<IndexT>();
       result_distances_ptr[index] = utils::get_max_value<DistanceT>();

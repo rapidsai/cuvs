@@ -12,6 +12,7 @@
 namespace cuvs::neighbors::ivf_flat::detail {
 
 // Instantiate the kernel template
+// Pass individual filter parameters like CAGRA does
 template __global__ void interleaved_scan_kernel<@capacity@, @veclen@, @ascending@, @compute_norm@, @data_type@, @acc_type@, @idx_type@>(
     const uint32_t, const @data_type@*, const uint32_t*, const @data_type@* const*, const uint32_t*,
     const uint32_t, const uint32_t, const uint32_t, const uint32_t, const uint32_t*, const uint32_t,

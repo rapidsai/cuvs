@@ -15,6 +15,7 @@ struct tag_uc {};  // uint8_t
 
 // Tag types for index types
 struct tag_idx_ui {};  // uint32_t
+struct tag_idx_l {};   // int64_t
 
 // Tag types for distance types
 struct tag_dist_f {};  // float

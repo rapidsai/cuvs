@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../detail/jit_lto_kernels/filter_data.h"
 #include "../ivf_common.cuh"
 #include "jit_lto_kernels/interleaved_scan_planner.hpp"
 #include <cstdint>
@@ -96,10 +97,10 @@ template <typename IvfSampleFilterTag>
 constexpr auto get_filter_name()
 {
   if constexpr (std::is_same_v<IvfSampleFilterTag, tag_filter<tag_idx_l, tag_filter_none_impl>>) {
-    return "filter_none";
+    return "filter_none_l";
   }
   if constexpr (std::is_same_v<IvfSampleFilterTag, tag_filter<tag_idx_l, tag_filter_bitset_impl>>) {
-    return "filter_bitset";
+    return "filter_bitset_l";
   }
 }
 
@@ -227,6 +228,9 @@ void launch_kernel(const index<T, IdxT>& index,
     return;
   }
 
+  // Pass individual filter parameters like CAGRA does
+  // The kernel will construct filter_data struct internally when needed
+
   for (uint32_t query_offset = 0; query_offset < num_queries; query_offset += kMaxGridY) {
     uint32_t grid_dim_y = std::min<uint32_t>(kMaxGridY, num_queries - query_offset);
     dim3 grid_dim(grid_dim_x, grid_dim_y, 1);
@@ -254,7 +258,6 @@ void launch_kernel(const index<T, IdxT>& index,
                               max_samples,
                               chunk_indices,
                               index.dim(),
-                              // sample_filter,
                               inds_ptrs,
                               bitset_ptr.value_or(nullptr),
                               bitset_len.value_or(0),

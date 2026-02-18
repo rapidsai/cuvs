@@ -35,6 +35,7 @@ namespace cuvs::neighbors::cagra::detail::multi_cta_search {
 using cuvs::neighbors::cagra::detail::device::has_kpq_bits_v;
 
 // sample_filter is declared in extern_device_functions.cuh
+using cuvs::neighbors::detail::sample_filter;
 
 // JIT versions of compute_distance_to_random_nodes and compute_distance_to_child_nodes
 // are now shared in device_common_jit.cuh - use fully qualified names
@@ -68,6 +69,7 @@ __global__ __launch_bounds__(1024, 1) void search_kernel_jit(
   const uint32_t min_iteration,
   const uint32_t max_iteration,
   uint32_t* const num_executed_iterations, /* stats */
+  const uint32_t query_id_offset,          // Offset to add to query_id when calling filter
   uint32_t* bitset_ptr,                    // Bitset data pointer (nullptr for none_filter)
   SourceIndexT bitset_len,                 // Bitset length
   SourceIndexT original_nbits)
@@ -303,9 +305,9 @@ __global__ __launch_bounds__(1024, 1) void search_kernel_jit(
       if (parent_indices_buffer[p] != invalid_index) {
         const auto parent_id = result_indices_buffer[parent_indices_buffer[p]] & ~index_msb_1_mask;
         // Construct filter_data struct (bitset data is in global memory)
-        cuvs::neighbors::cagra::detail::bitset_filter_data_t<SourceIndexT> filter_data(
+        cuvs::neighbors::detail::bitset_filter_data_t<SourceIndexT> filter_data(
           bitset_ptr, bitset_len, original_nbits);
-        if (!sample_filter<SourceIndexT>(query_id,
+        if (!sample_filter<SourceIndexT>(query_id + query_id_offset,
                                          to_source_index(parent_id),
                                          bitset_ptr != nullptr ? &filter_data : nullptr)) {
           // If the parent must not be in the resulting top-k list, remove from the parent list
@@ -325,10 +327,11 @@ __global__ __launch_bounds__(1024, 1) void search_kernel_jit(
     if (index == invalid_index) { continue; }
     index &= ~index_msb_1_mask;
     // Construct filter_data struct (bitset data is in global memory)
-    cuvs::neighbors::cagra::detail::bitset_filter_data_t<SourceIndexT> filter_data(
+    cuvs::neighbors::detail::bitset_filter_data_t<SourceIndexT> filter_data(
       bitset_ptr, bitset_len, original_nbits);
-    if (!sample_filter<SourceIndexT>(
-          query_id, to_source_index(index), bitset_ptr != nullptr ? &filter_data : nullptr)) {
+    if (!sample_filter<SourceIndexT>(query_id + query_id_offset,
+                                     to_source_index(index),
+                                     bitset_ptr != nullptr ? &filter_data : nullptr)) {
       result_indices_buffer[i]   = invalid_index;
       result_distances_buffer[i] = utils::get_max_value<DISTANCE_T>();
     }

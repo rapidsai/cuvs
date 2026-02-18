@@ -32,13 +32,6 @@
 
 namespace cuvs::neighbors::cagra::detail::multi_kernel_search {
 
-// Import shared JIT helper functions
-using cuvs::neighbors::cagra::detail::get_data_type_tag;
-using cuvs::neighbors::cagra::detail::get_distance_type_tag;
-using cuvs::neighbors::cagra::detail::get_index_type_tag;
-using cuvs::neighbors::cagra::detail::get_sample_filter_name;
-using cuvs::neighbors::cagra::detail::get_source_index_type_tag;
-
 // JIT version of random_pickup
 template <typename DataT, typename IndexT, typename DistanceT>
 void random_pickup_jit(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
@@ -56,6 +49,11 @@ void random_pickup_jit(const dataset_descriptor_host<DataT, IndexT, DistanceT>& 
                        std::uint32_t hash_bitlen,
                        cudaStream_t cuda_stream)
 {
+  RAFT_LOG_INFO(
+    "[JIT LAUNCHER] Entering MULTI_KERNEL launcher (random_pickup: num_queries=%zu, "
+    "num_pickup=%zu)",
+    num_queries,
+    num_pickup);
   // Create planner with tags
   using DataTag   = decltype(get_data_type_tag<DataT>());
   using IndexTag  = decltype(get_index_type_tag<IndexT>());
@@ -93,6 +91,10 @@ void random_pickup_jit(const dataset_descriptor_host<DataT, IndexT, DistanceT>& 
   // Get the device descriptor pointer
   const auto* dev_desc = dataset_desc.dev_ptr(cuda_stream);
 
+  // Cast size_t parameters to match kernel signature exactly
+  // The dispatch mechanism uses void* pointers, so parameter sizes must match exactly
+  const uint32_t ldr_u32 = static_cast<uint32_t>(ldr);
+
   // Dispatch kernel via launcher
   launcher->dispatch(cuda_stream,
                      grid_size,
@@ -107,11 +109,38 @@ void random_pickup_jit(const dataset_descriptor_host<DataT, IndexT, DistanceT>& 
                      num_seeds,
                      result_indices_ptr,
                      result_distances_ptr,
-                     ldr,
+                     ldr_u32,  // Cast size_t to uint32_t
                      visited_hashmap_ptr,
                      hash_bitlen);
 
-  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  // Check for launch errors immediately
+  cudaError_t launch_err = cudaPeekAtLastError();
+  if (launch_err != cudaSuccess) {
+    RAFT_LOG_ERROR(
+      "[JIT LAUNCHER] MULTI_KERNEL (random_pickup) kernel launch error detected: %s (error code: "
+      "%d)",
+      cudaGetErrorString(launch_err),
+      launch_err);
+    RAFT_CUDA_TRY(launch_err);
+  }
+
+  // Synchronize to catch kernel execution errors before they propagate
+  cudaError_t sync_err = cudaStreamSynchronize(cuda_stream);
+  if (sync_err != cudaSuccess) {
+    RAFT_LOG_ERROR(
+      "[JIT LAUNCHER] MULTI_KERNEL (random_pickup) kernel execution failed: %s (error code: %d)",
+      cudaGetErrorString(sync_err),
+      sync_err);
+    RAFT_LOG_ERROR(
+      "[JIT LAUNCHER] MULTI_KERNEL (random_pickup) parameters: num_queries=%zu, num_pickup=%zu, "
+      "ldr=%u",
+      num_queries,
+      num_pickup,
+      ldr_u32);
+    RAFT_CUDA_TRY(sync_err);
+  }
+
+  RAFT_LOG_INFO("[JIT LAUNCHER] MULTI_KERNEL (random_pickup) kernel completed successfully");
 }
 
 // JIT version of compute_distance_to_child_nodes
@@ -140,6 +169,11 @@ void compute_distance_to_child_nodes_jit(
   SAMPLE_FILTER_T sample_filter,
   cudaStream_t cuda_stream)
 {
+  RAFT_LOG_INFO(
+    "[JIT LAUNCHER] Entering MULTI_KERNEL launcher (compute_distance_to_child_nodes: "
+    "num_queries=%u, search_width=%u)",
+    num_queries,
+    search_width);
   // Create planner with tags
   using DataTag   = decltype(get_data_type_tag<DataT>());
   using IndexTag  = decltype(get_index_type_tag<IndexT>());
@@ -200,7 +234,36 @@ void compute_distance_to_child_nodes_jit(
                      ldd,
                      sample_filter);
 
-  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  // Check for launch errors immediately
+  cudaError_t launch_err = cudaPeekAtLastError();
+  if (launch_err != cudaSuccess) {
+    RAFT_LOG_ERROR(
+      "[JIT LAUNCHER] MULTI_KERNEL (compute_distance_to_child_nodes) kernel launch error detected: "
+      "%s (error code: %d)",
+      cudaGetErrorString(launch_err),
+      launch_err);
+    RAFT_CUDA_TRY(launch_err);
+  }
+
+  // Synchronize to catch kernel execution errors before they propagate
+  cudaError_t sync_err = cudaStreamSynchronize(cuda_stream);
+  if (sync_err != cudaSuccess) {
+    RAFT_LOG_ERROR(
+      "[JIT LAUNCHER] MULTI_KERNEL (compute_distance_to_child_nodes) kernel execution failed: %s "
+      "(error code: %d)",
+      cudaGetErrorString(sync_err),
+      sync_err);
+    RAFT_LOG_ERROR(
+      "[JIT LAUNCHER] MULTI_KERNEL (compute_distance_to_child_nodes) parameters: num_queries=%u, "
+      "search_width=%u, graph_degree=%u",
+      num_queries,
+      search_width,
+      graph_degree);
+    RAFT_CUDA_TRY(sync_err);
+  }
+
+  RAFT_LOG_INFO(
+    "[JIT LAUNCHER] MULTI_KERNEL (compute_distance_to_child_nodes) kernel completed successfully");
 }
 
 // JIT version of apply_filter
@@ -215,22 +278,39 @@ void apply_filter_jit(const SourceIndexT* source_indices_ptr,
                       SAMPLE_FILTER_T sample_filter,
                       cudaStream_t cuda_stream)
 {
+  RAFT_LOG_INFO(
+    "[JIT LAUNCHER] Entering MULTI_KERNEL launcher (apply_filter: num_queries=%u, "
+    "result_buffer_size=%u)",
+    num_queries,
+    result_buffer_size);
   // Extract bitset data from filter object (if it's a bitset_filter)
   uint32_t* bitset_ptr        = nullptr;
   SourceIndexT bitset_len     = 0;
   SourceIndexT original_nbits = 0;
 
-  if constexpr (!std::is_same_v<SAMPLE_FILTER_T, cuvs::neighbors::filtering::none_sample_filter>) {
-    // Try to extract bitset data from the filter
-    // bitset_filter has a view() method that returns the bitset_view
-    if constexpr (std::is_same_v<
-                    SAMPLE_FILTER_T,
-                    cuvs::neighbors::filtering::bitset_filter<uint32_t, SourceIndexT>>) {
-      auto bitset_view = sample_filter.view();
+  // Check if it has the wrapper members (CagraSampleFilterWithQueryIdOffset)
+  // Note: query_id_offset is already a parameter to this function, so we don't extract it here
+  if constexpr (requires {
+                  sample_filter.filter;
+                  sample_filter.offset;
+                }) {
+    using InnerFilter = decltype(sample_filter.filter);
+    RAFT_LOG_INFO("Filter has wrapper members, query_id_offset parameter: %u", query_id_offset);
+    if constexpr (is_bitset_filter<InnerFilter>::value) {
+      // Extract bitset data for bitset_filter (works for any bitset_filter instantiation)
+      auto bitset_view = sample_filter.filter.view();
       bitset_ptr       = const_cast<uint32_t*>(bitset_view.data());
       bitset_len       = static_cast<SourceIndexT>(bitset_view.size());
       original_nbits   = static_cast<SourceIndexT>(bitset_view.get_original_nbits());
+      RAFT_LOG_INFO("Extracted bitset data: bitset_ptr=%p, bitset_len=%zu, original_nbits=%zu",
+                    bitset_ptr,
+                    static_cast<size_t>(bitset_len),
+                    static_cast<size_t>(original_nbits));
+    } else {
+      RAFT_LOG_INFO("InnerFilter is not bitset_filter, skipping bitset extraction");
     }
+  } else {
+    RAFT_LOG_INFO("Filter does not have wrapper members (.filter/.offset), skipping extraction");
   }
 
   // Create planner with tags
@@ -275,7 +355,36 @@ void apply_filter_jit(const SourceIndexT* source_indices_ptr,
                      bitset_len,
                      original_nbits);
 
-  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  // Check for launch errors immediately
+  cudaError_t launch_err = cudaPeekAtLastError();
+  if (launch_err != cudaSuccess) {
+    RAFT_LOG_ERROR(
+      "[JIT LAUNCHER] MULTI_KERNEL (apply_filter) kernel launch error detected: %s (error code: "
+      "%d)",
+      cudaGetErrorString(launch_err),
+      launch_err);
+    RAFT_CUDA_TRY(launch_err);
+  }
+
+  // Synchronize to catch kernel execution errors before they propagate
+  cudaError_t sync_err = cudaStreamSynchronize(cuda_stream);
+  if (sync_err != cudaSuccess) {
+    RAFT_LOG_ERROR(
+      "[JIT LAUNCHER] MULTI_KERNEL (apply_filter) kernel execution failed: %s (error code: %d)",
+      cudaGetErrorString(sync_err),
+      sync_err);
+    RAFT_LOG_ERROR(
+      "[JIT LAUNCHER] MULTI_KERNEL (apply_filter) parameters: num_queries=%u, "
+      "result_buffer_size=%u, bitset_len=%u, original_nbits=%u, query_id_offset=%u",
+      num_queries,
+      result_buffer_size,
+      static_cast<uint32_t>(bitset_len),
+      static_cast<uint32_t>(original_nbits),
+      query_id_offset);
+    RAFT_CUDA_TRY(sync_err);
+  }
+
+  RAFT_LOG_INFO("[JIT LAUNCHER] MULTI_KERNEL (apply_filter) kernel completed successfully");
 }
 
 }  // namespace cuvs::neighbors::cagra::detail::multi_kernel_search

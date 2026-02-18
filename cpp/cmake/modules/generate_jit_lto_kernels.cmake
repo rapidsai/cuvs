@@ -182,14 +182,18 @@ function(generate_jit_lto_kernels target)
     endforeach()
   endforeach()
 
+  # Generate IVF Flat sample filter fragments using shared implementation
   foreach(filter_name IN LISTS filter_configs)
-    set(header_file "neighbors/ivf_flat/jit_lto_kernels/${filter_name}.cuh")
-
-    set(kernel_name "${filter_name}")
+    set(header_file "neighbors/detail/jit_lto_kernels/${filter_name}.cuh")
+    set(kernel_name "${filter_name}_${idx_abbrev}")
     set(filename "${generated_kernels_dir}/filter_device_functions/fatbin_${kernel_name}.cu")
+    set(source_index_type "int64_t")
+    set(namespace "cuvs::neighbors::detail")
+    set(filter_name_var "${filter_name}")
+    set(kernel_name_var "${kernel_name}")
     configure_file(
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/filter.cu.in"
-      "${filename}" @ONLY
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/jit_lto_kernels/filter.cu.in" "${filename}"
+      @ONLY
     )
     embed_jit_lto_fatbin(
       FATBIN_TARGET "fatbin_${kernel_name}"
@@ -232,6 +236,9 @@ function(generate_jit_lto_kernels target)
   set(cagra_pq_bits 8)
   set(cagra_pq_lens 2 4)
   set(cagra_codebook_type "half")
+  # CAGRA kernels only use uint32_t as SourceIndexT (matching non-JIT path)
+  set(cagra_source_index_types "uint32_t")
+  set(cagra_source_index_abbrevs "ui")
 
   # Generate standard descriptor fragments
   foreach(data_idx IN ITEMS 0 1 2 3)
@@ -434,9 +441,12 @@ function(generate_jit_lto_kernels target)
           )
           foreach(team_size IN LISTS cagra_team_sizes)
             foreach(dataset_block_dim IN LISTS cagra_dataset_block_dims)
-              # Regular kernel entrypoint - generate for each combination
+              # CAGRA only uses uint32_t as SourceIndexT
+              set(source_index_type "uint32_t")
+              set(src_idx_abbrev "ui")
+              # Regular kernel entrypoint
               set(kernel_name
-                  "search_single_cta_kernel_${topk_by_bitonic_sort_str}_${bitonic_sort_and_merge_multi_warps_str}_${metric_name_full}_t${team_size}_dim${dataset_block_dim}_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}_${cagra_index_abbrev}"
+                  "search_single_cta_kernel_${topk_by_bitonic_sort_str}_${bitonic_sort_and_merge_multi_warps_str}_${metric_name_full}_t${team_size}_dim${dataset_block_dim}_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}_${src_idx_abbrev}"
               )
               set(filename
                   "${generated_kernels_dir}/cagra_kernel_entrypoints/fatbin_${kernel_name}.cu"
@@ -447,10 +457,8 @@ function(generate_jit_lto_kernels target)
               set(dataset_block_dim "${dataset_block_dim}")
               set(index_type "${cagra_index_type}")
               set(distance_type "${cagra_distance_type}")
-              set(source_index_type "${cagra_index_type}")
               set(idx_abbrev "${cagra_index_abbrev}")
               set(dist_abbrev "${cagra_distance_abbrev}")
-              set(src_idx_abbrev "${cagra_index_abbrev}")
               configure_file(
                 "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_kernel.cu.in"
                 "${filename}"
@@ -464,9 +472,9 @@ function(generate_jit_lto_kernels target)
                 EMBEDDED_ARRAY "embedded_${kernel_name}"
               )
 
-              # Persistent kernel entrypoint - generate for each combination
+              # Persistent kernel entrypoint
               set(kernel_name
-                  "search_single_cta_kernel_p_${topk_by_bitonic_sort_str}_${bitonic_sort_and_merge_multi_warps_str}_${metric_name_full}_t${team_size}_dim${dataset_block_dim}_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}_${cagra_index_abbrev}"
+                  "search_single_cta_kernel_p_${topk_by_bitonic_sort_str}_${bitonic_sort_and_merge_multi_warps_str}_${metric_name_full}_t${team_size}_dim${dataset_block_dim}_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}_${src_idx_abbrev}"
               )
               set(filename
                   "${generated_kernels_dir}/cagra_kernel_entrypoints/fatbin_${kernel_name}.cu"
@@ -477,10 +485,8 @@ function(generate_jit_lto_kernels target)
               set(dataset_block_dim "${dataset_block_dim}")
               set(index_type "${cagra_index_type}")
               set(distance_type "${cagra_distance_type}")
-              set(source_index_type "${cagra_index_type}")
               set(idx_abbrev "${cagra_index_abbrev}")
               set(dist_abbrev "${cagra_distance_abbrev}")
-              set(src_idx_abbrev "${cagra_index_abbrev}")
               configure_file(
                 "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_kernel_p.cu.in"
                 "${filename}"
@@ -493,12 +499,12 @@ function(generate_jit_lto_kernels target)
                 EMBEDDED_HEADER "${generated_kernels_dir}/cagra_kernel_entrypoints/${kernel_name}.h"
                 EMBEDDED_ARRAY "embedded_${kernel_name}"
               )
-            endforeach()
-          endforeach()
-        endforeach()
-      endforeach()
-    endforeach()
-  endforeach()
+            endforeach() # dataset_block_dim
+          endforeach() # team_size
+        endforeach() # merge_idx
+      endforeach() # topk_idx
+    endforeach() # metric_idx
+  endforeach() # data_idx
 
   # Generate single_cta VPQ kernel entrypoints VPQ kernels need pq_bits and pq_len in addition to
   # team_size and dataset_block_dim
@@ -518,9 +524,12 @@ function(generate_jit_lto_kernels target)
         foreach(team_size IN LISTS cagra_team_sizes)
           foreach(dataset_block_dim IN LISTS cagra_dataset_block_dims)
             foreach(pq_len IN LISTS cagra_pq_lens)
+              # CAGRA only uses uint32_t as SourceIndexT
+              set(source_index_type "uint32_t")
+              set(src_idx_abbrev "ui")
               # Regular VPQ kernel entrypoint
               set(kernel_name
-                  "search_single_cta_kernel_vpq_${topk_by_bitonic_sort_str}_${bitonic_sort_and_merge_multi_warps_str}_L2Expanded_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}_${cagra_index_abbrev}"
+                  "search_single_cta_kernel_vpq_${topk_by_bitonic_sort_str}_${bitonic_sort_and_merge_multi_warps_str}_L2Expanded_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}_${src_idx_abbrev}"
               )
               set(filename
                   "${generated_kernels_dir}/cagra_kernel_entrypoints/fatbin_${kernel_name}.cu"
@@ -535,10 +544,8 @@ function(generate_jit_lto_kernels target)
               set(codebook_type "${cagra_codebook_type}")
               set(index_type "${cagra_index_type}")
               set(distance_type "${cagra_distance_type}")
-              set(source_index_type "${cagra_index_type}")
               set(idx_abbrev "${cagra_index_abbrev}")
               set(dist_abbrev "${cagra_distance_abbrev}")
-              set(src_idx_abbrev "${cagra_index_abbrev}")
               configure_file(
                 "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_kernel_vpq.cu.in"
                 "${filename}"
@@ -554,7 +561,7 @@ function(generate_jit_lto_kernels target)
 
               # Persistent VPQ kernel entrypoint
               set(kernel_name
-                  "search_single_cta_kernel_p_vpq_${topk_by_bitonic_sort_str}_${bitonic_sort_and_merge_multi_warps_str}_L2Expanded_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}_${cagra_index_abbrev}"
+                  "search_single_cta_kernel_p_vpq_${topk_by_bitonic_sort_str}_${bitonic_sort_and_merge_multi_warps_str}_L2Expanded_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}_${src_idx_abbrev}"
               )
               set(filename
                   "${generated_kernels_dir}/cagra_kernel_entrypoints/fatbin_${kernel_name}.cu"
@@ -569,10 +576,8 @@ function(generate_jit_lto_kernels target)
               set(codebook_type "${cagra_codebook_type}")
               set(index_type "${cagra_index_type}")
               set(distance_type "${cagra_distance_type}")
-              set(source_index_type "${cagra_index_type}")
               set(idx_abbrev "${cagra_index_abbrev}")
               set(dist_abbrev "${cagra_distance_abbrev}")
-              set(src_idx_abbrev "${cagra_index_abbrev}")
               configure_file(
                 "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_kernel_p_vpq.cu.in"
                 "${filename}"
@@ -585,19 +590,20 @@ function(generate_jit_lto_kernels target)
                 EMBEDDED_HEADER "${generated_kernels_dir}/cagra_kernel_entrypoints/${kernel_name}.h"
                 EMBEDDED_ARRAY "embedded_${kernel_name}"
               )
-            endforeach()
-          endforeach()
-        endforeach()
-      endforeach()
-    endforeach()
-  endforeach()
+            endforeach() # pq_len
+          endforeach() # dataset_block_dim
+        endforeach() # team_size
+      endforeach() # merge_idx
+    endforeach() # topk_idx
+  endforeach() # data_idx
 
   # Generate multi_cta kernel entrypoints Multi_cta kernels don't use topk_by_bitonic_sort or
   # bitonic_sort_and_merge_multi_warps as template parameters (those are handled inside the kernel
   # based on max_elements) IMPORTANT: Need to generate kernels for all combinations of team_size and
   # dataset_block_dim because the kernel template uses DescriptorT::kTeamSize and
   # DescriptorT::kDatasetBlockDim as template parameters when calling
-  # setup_workspace_standard/compute_distance_standard
+  # setup_workspace_standard/compute_distance_standard CAGRA only uses uint32_t as SourceIndexT
+  # (matching non-JIT path)
   foreach(data_idx IN ITEMS 0 1 2 3)
     list(GET cagra_data_types ${data_idx} data_type)
     list(GET cagra_data_type_abbrevs ${data_idx} type_abbrev)
@@ -626,9 +632,12 @@ function(generate_jit_lto_kernels target)
       endif()
       foreach(team_size IN LISTS cagra_team_sizes)
         foreach(dataset_block_dim IN LISTS cagra_dataset_block_dims)
-          # Multi_cta kernel entrypoint - generate for each combination
+          # CAGRA only uses uint32_t as SourceIndexT
+          set(source_index_type "uint32_t")
+          set(src_idx_abbrev "ui")
+          # Multi_cta kernel entrypoint
           set(kernel_name
-              "search_multi_cta_kernel_${metric_name_full}_t${team_size}_dim${dataset_block_dim}_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}_${cagra_index_abbrev}"
+              "search_multi_cta_kernel_${metric_name_full}_t${team_size}_dim${dataset_block_dim}_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}_${src_idx_abbrev}"
           )
           set(filename "${generated_kernels_dir}/cagra_kernel_entrypoints/fatbin_${kernel_name}.cu")
           set(metric "${metric}")
@@ -637,10 +646,8 @@ function(generate_jit_lto_kernels target)
           set(dataset_block_dim "${dataset_block_dim}")
           set(index_type "${cagra_index_type}")
           set(distance_type "${cagra_distance_type}")
-          set(source_index_type "${cagra_index_type}")
           set(idx_abbrev "${cagra_index_abbrev}")
           set(dist_abbrev "${cagra_distance_abbrev}")
-          set(src_idx_abbrev "${cagra_index_abbrev}")
           configure_file(
             "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_multi_cta_kernel.cu.in"
             "${filename}"
@@ -653,23 +660,26 @@ function(generate_jit_lto_kernels target)
             EMBEDDED_HEADER "${generated_kernels_dir}/cagra_kernel_entrypoints/${kernel_name}.h"
             EMBEDDED_ARRAY "embedded_${kernel_name}"
           )
-        endforeach()
-      endforeach()
-    endforeach()
-  endforeach()
+        endforeach() # dataset_block_dim
+      endforeach() # team_size
+    endforeach() # metric_idx
+  endforeach() # data_idx
 
   # Generate multi_cta VPQ kernel entrypoints VPQ kernels need pq_bits and pq_len in addition to
   # team_size and dataset_block_dim VPQ is supported for all data types (float, half, int8_t,
-  # uint8_t)
+  # uint8_t) CAGRA only uses uint32_t as SourceIndexT
   foreach(data_idx IN ITEMS 0 1 2 3)
     list(GET cagra_data_types ${data_idx} data_type)
     list(GET cagra_data_type_abbrevs ${data_idx} type_abbrev)
     foreach(team_size IN LISTS cagra_team_sizes)
       foreach(dataset_block_dim IN LISTS cagra_dataset_block_dims)
         foreach(pq_len IN LISTS cagra_pq_lens)
-          # Multi_cta VPQ kernel entrypoint - generate for each combination
+          # CAGRA only uses uint32_t as SourceIndexT
+          set(source_index_type "uint32_t")
+          set(src_idx_abbrev "ui")
+          # Multi_cta VPQ kernel entrypoint
           set(kernel_name
-              "search_multi_cta_kernel_vpq_L2Expanded_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}_${cagra_index_abbrev}"
+              "search_multi_cta_kernel_vpq_L2Expanded_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}_${src_idx_abbrev}"
           )
           set(filename "${generated_kernels_dir}/cagra_kernel_entrypoints/fatbin_${kernel_name}.cu")
           set(metric "L2Expanded")
@@ -682,10 +692,8 @@ function(generate_jit_lto_kernels target)
           set(codebook_type "${cagra_codebook_type}")
           set(index_type "${cagra_index_type}")
           set(distance_type "${cagra_distance_type}")
-          set(source_index_type "${cagra_index_type}")
           set(idx_abbrev "${cagra_index_abbrev}")
           set(dist_abbrev "${cagra_distance_abbrev}")
-          set(src_idx_abbrev "${cagra_index_abbrev}")
           configure_file(
             "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_multi_cta_kernel_vpq.cu.in"
             "${filename}"
@@ -698,10 +706,10 @@ function(generate_jit_lto_kernels target)
             EMBEDDED_HEADER "${generated_kernels_dir}/cagra_kernel_entrypoints/${kernel_name}.h"
             EMBEDDED_ARRAY "embedded_${kernel_name}"
           )
-        endforeach()
-      endforeach()
-    endforeach()
-  endforeach()
+        endforeach() # pq_len
+      endforeach() # dataset_block_dim
+    endforeach() # team_size
+  endforeach() # data_idx
 
   # Generate multi_kernel kernel entrypoints Multi_kernel has two separate kernels:
   # random_pickup_kernel and compute_distance_to_child_nodes_kernel
@@ -734,7 +742,8 @@ function(generate_jit_lto_kernels target)
 
       foreach(team_size IN LISTS cagra_team_sizes)
         foreach(dataset_block_dim IN LISTS cagra_dataset_block_dims)
-          # random_pickup_kernel entrypoint - generate for each combination
+          # random_pickup_kernel entrypoint - generate for each combination Note:
+          # random_pickup_kernel doesn't use SourceIndexT, so no loop needed
           set(kernel_name
               "random_pickup_kernel_${metric_name_full}_t${team_size}_dim${dataset_block_dim}_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}"
           )
@@ -760,9 +769,12 @@ function(generate_jit_lto_kernels target)
             EMBEDDED_ARRAY "embedded_${kernel_name}"
           )
 
-          # compute_distance_to_child_nodes_kernel entrypoint - generate for each combination
+          # CAGRA only uses uint32_t as SourceIndexT
+          set(source_index_type "uint32_t")
+          set(src_idx_abbrev "ui")
+          # compute_distance_to_child_nodes_kernel entrypoint
           set(kernel_name
-              "compute_distance_to_child_nodes_kernel_${metric_name_full}_t${team_size}_dim${dataset_block_dim}_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}_${cagra_index_abbrev}"
+              "compute_distance_to_child_nodes_kernel_${metric_name_full}_t${team_size}_dim${dataset_block_dim}_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}_${src_idx_abbrev}"
           )
           set(filename "${generated_kernels_dir}/cagra_kernel_entrypoints/fatbin_${kernel_name}.cu")
           set(metric "${metric}")
@@ -771,10 +783,8 @@ function(generate_jit_lto_kernels target)
           set(dataset_block_dim "${dataset_block_dim}")
           set(index_type "${cagra_index_type}")
           set(distance_type "${cagra_distance_type}")
-          set(source_index_type "${cagra_index_type}")
           set(idx_abbrev "${cagra_index_abbrev}")
           set(dist_abbrev "${cagra_distance_abbrev}")
-          set(src_idx_abbrev "${cagra_index_abbrev}")
           configure_file(
             "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_to_child_nodes_kernel.cu.in"
             "${filename}"
@@ -787,10 +797,10 @@ function(generate_jit_lto_kernels target)
             EMBEDDED_HEADER "${generated_kernels_dir}/cagra_kernel_entrypoints/${kernel_name}.h"
             EMBEDDED_ARRAY "embedded_${kernel_name}"
           )
-        endforeach()
-      endforeach()
-    endforeach()
-  endforeach()
+        endforeach() # dataset_block_dim
+      endforeach() # team_size
+    endforeach() # metric_idx
+  endforeach() # data_idx
 
   # Generate multi_kernel VPQ kernel entrypoints VPQ kernels need pq_bits and pq_len in addition to
   # team_size and dataset_block_dim VPQ is supported for all data types (float, half, int8_t,
@@ -831,9 +841,12 @@ function(generate_jit_lto_kernels target)
             EMBEDDED_ARRAY "embedded_${kernel_name}"
           )
 
+          # CAGRA only uses uint32_t as SourceIndexT
+          set(source_index_type "uint32_t")
+          set(src_idx_abbrev "ui")
           # compute_distance_to_child_nodes_kernel VPQ entrypoint
           set(kernel_name
-              "compute_distance_to_child_nodes_kernel_vpq_L2Expanded_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}_${cagra_index_abbrev}"
+              "compute_distance_to_child_nodes_kernel_vpq_L2Expanded_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}_${src_idx_abbrev}"
           )
           set(filename "${generated_kernels_dir}/cagra_kernel_entrypoints/fatbin_${kernel_name}.cu")
           set(metric "L2Expanded")
@@ -846,10 +859,8 @@ function(generate_jit_lto_kernels target)
           set(codebook_type "${cagra_codebook_type}")
           set(index_type "${cagra_index_type}")
           set(distance_type "${cagra_distance_type}")
-          set(source_index_type "${cagra_index_type}")
           set(idx_abbrev "${cagra_index_abbrev}")
           set(dist_abbrev "${cagra_distance_abbrev}")
-          set(src_idx_abbrev "${cagra_index_abbrev}")
           configure_file(
             "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_to_child_nodes_kernel_vpq.cu.in"
             "${filename}"
@@ -862,23 +873,23 @@ function(generate_jit_lto_kernels target)
             EMBEDDED_HEADER "${generated_kernels_dir}/cagra_kernel_entrypoints/${kernel_name}.h"
             EMBEDDED_ARRAY "embedded_${kernel_name}"
           )
-        endforeach()
-      endforeach()
-    endforeach()
-  endforeach()
+        endforeach() # pq_len
+      endforeach() # dataset_block_dim
+    endforeach() # team_size
+  endforeach() # data_idx
 
   # Generate apply_filter_kernel entrypoints apply_filter_kernel doesn't use dataset_descriptor, so
-  # it only needs index types
+  # it only needs index types CAGRA only uses uint32_t as SourceIndexT
+  set(source_index_type "uint32_t")
+  set(src_idx_abbrev "ui")
   set(kernel_name
-      "apply_filter_kernel_${cagra_index_abbrev}_${cagra_distance_abbrev}_${cagra_index_abbrev}"
+      "apply_filter_kernel_${cagra_index_abbrev}_${cagra_distance_abbrev}_${src_idx_abbrev}"
   )
   set(filename "${generated_kernels_dir}/cagra_kernel_entrypoints/fatbin_${kernel_name}.cu")
   set(index_type "${cagra_index_type}")
   set(distance_type "${cagra_distance_type}")
-  set(source_index_type "${cagra_index_type}")
   set(idx_abbrev "${cagra_index_abbrev}")
   set(dist_abbrev "${cagra_distance_abbrev}")
-  set(src_idx_abbrev "${cagra_index_abbrev}")
   configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_filter_kernel.cu.in"
     "${filename}"
@@ -892,19 +903,22 @@ function(generate_jit_lto_kernels target)
     EMBEDDED_ARRAY "embedded_${kernel_name}"
   )
 
-  # Generate CAGRA sample filter fragments
+  # Generate CAGRA sample filter fragments using shared implementation CAGRA only uses uint32_t as
+  # SourceIndexT (matching non-JIT path)
   set(cagra_filter_configs "filter_none" "filter_bitset")
   foreach(filter_name IN LISTS cagra_filter_configs)
-    set(header_file "neighbors/detail/cagra/jit_lto_kernels/${filter_name}.cuh")
-    set(kernel_name "${filter_name}_${cagra_index_abbrev}")
+    set(source_index_type "uint32_t")
+    set(src_idx_abbrev "ui")
+    set(header_file "neighbors/detail/jit_lto_kernels/${filter_name}.cuh")
+    set(kernel_name "${filter_name}_${src_idx_abbrev}")
     set(filename "${generated_kernels_dir}/cagra_filter_device_functions/fatbin_${kernel_name}.cu")
-    set(source_index_type "${cagra_index_type}")
+    set(namespace "cuvs::neighbors::detail")
     # Pass both filter_name (for include) and kernel_name (for registration)
     set(filter_name_var "${filter_name}")
     set(kernel_name_var "${kernel_name}")
     configure_file(
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/filter.cu.in"
-      "${filename}" @ONLY
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/jit_lto_kernels/filter.cu.in" "${filename}"
+      @ONLY
     )
     embed_jit_lto_fatbin(
       FATBIN_TARGET "fatbin_${kernel_name}"
@@ -913,5 +927,5 @@ function(generate_jit_lto_kernels target)
       EMBEDDED_HEADER "${generated_kernels_dir}/cagra_filter_device_functions/${kernel_name}.h"
       EMBEDDED_ARRAY "embedded_${kernel_name}"
     )
-  endforeach()
+  endforeach() # filter_name
 endfunction()

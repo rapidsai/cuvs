@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "../../detail/cagra/jit_lto_kernels/extern_device_functions.cuh"
+#include "../../detail/jit_lto_kernels/filter_data.h"
 #include <raft/matrix/detail/select_warpsort.cuh>
 #include <raft/util/device_loads_stores.cuh>
 #include <raft/util/integer_utils.hpp>
@@ -34,14 +36,10 @@ static constexpr int kThreadsPerBlock = 128;
 template <int Veclen, typename T, typename AccT>
 extern __device__ void compute_dist(AccT& acc, AccT x, AccT y);
 
-template <typename index_t>
-extern __device__ bool sample_filter(index_t* const* const inds_ptrs,
-                                     const uint32_t query_ix,
-                                     const uint32_t cluster_ix,
-                                     const uint32_t sample_ix,
-                                     uint32_t* bitset_ptr,
-                                     index_t bitset_len,
-                                     index_t original_nbits);
+// Unified sample_filter interface: takes query_id, node_id, and void* filter_data
+// For IVF Flat: node_id should be computed from (cluster_ix, sample_ix) using inds_ptrs from
+// filter_data sample_filter is declared in extern_device_functions.cuh (shared with CAGRA)
+using cuvs::neighbors::detail::sample_filter;
 
 template <typename T>
 extern __device__ T post_process(T val);
@@ -784,10 +782,11 @@ RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)
                           const uint32_t max_samples,
                           const uint32_t* chunk_indices,
                           const uint32_t dim,
-                          IdxT* const* const inds_ptrs,
-                          uint32_t* bitset_ptr,
-                          IdxT bitset_len,
-                          IdxT original_nbits,
+                          IdxT* const* const inds_ptrs,  // Always needed for IVF Flat to convert
+                                                         // (list_id, vec_id) to node_id
+                          uint32_t* bitset_ptr,  // Bitset data pointer (nullptr for none_filter)
+                          IdxT bitset_len,       // Bitset length
+                          IdxT original_nbits,   // Original number of bits
                           uint32_t* neighbors,
                           float* distances)
 {
@@ -859,13 +858,15 @@ RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)
 
         // This is the vector a given lane/thread handles
         const uint32_t vec_id = group_id * raft::WarpSize + lane_id;
-        const bool valid      = vec_id < list_length && sample_filter(inds_ptrs,
-                                                                 queries_offset + blockIdx.y,
-                                                                 list_id,
-                                                                 vec_id,
-                                                                 bitset_ptr,
-                                                                 bitset_len,
-                                                                 original_nbits);
+        // For IVF Flat, convert (list_id, vec_id) to node_id using inds_ptrs
+        const IdxT node_id = inds_ptrs[list_id][vec_id];
+        // Construct filter_data struct (bitset data is in global memory)
+        cuvs::neighbors::detail::bitset_filter_data_t<IdxT> filter_data(
+          bitset_ptr, bitset_len, original_nbits);
+        const bool valid =
+          vec_id < list_length &&
+          sample_filter<IdxT>(
+            queries_offset + blockIdx.y, node_id, bitset_ptr != nullptr ? &filter_data : nullptr);
 
         if (valid) {
           // Process first shm_assisted_dim dimensions (always using shared memory)

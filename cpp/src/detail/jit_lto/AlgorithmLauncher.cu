@@ -48,16 +48,16 @@ AlgorithmLauncher& AlgorithmLauncher::operator=(AlgorithmLauncher&& other) noexc
 void AlgorithmLauncher::call(
   cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, void** kernel_args)
 {
+  // Validate kernel and library handles before use
+  if (kernel == nullptr) { RAFT_FAIL("AlgorithmLauncher::call - kernel is NULL!"); }
+  if (library == nullptr) { RAFT_FAIL("AlgorithmLauncher::call - library is NULL!"); }
+  if (kernel_args == nullptr) { RAFT_FAIL("AlgorithmLauncher::call - kernel_args is NULL!"); }
+
   // Debug: verify kernel is being called
-  if (kernel != nullptr) {
-    std::cerr << "[JIT] AlgorithmLauncher::call - kernel is not null, launching with grid=("
-              << grid.x << "," << grid.y << "," << grid.z << ") block=(" << block.x << ","
-              << block.y << "," << block.z << ")" << std::endl;
-    std::cerr.flush();
-  } else {
-    std::cerr << "[JIT] ERROR: AlgorithmLauncher::call - kernel is NULL!" << std::endl;
-    std::cerr.flush();
-  }
+  std::cerr << "[JIT] AlgorithmLauncher::call - kernel is not null, launching with grid=(" << grid.x
+            << "," << grid.y << "," << grid.z << ") block=(" << block.x << "," << block.y << ","
+            << block.z << ")" << std::endl;
+  std::cerr.flush();
 
   cudaLaunchAttribute attribute[1];
   attribute[0].id = cudaLaunchAttributeProgrammaticStreamSerialization;
@@ -74,6 +74,8 @@ void AlgorithmLauncher::call(
   std::cerr << "[JIT] AlgorithmLauncher::call - About to launch kernel" << std::endl;
   std::cerr.flush();
 
+  // NOTE: cudaLaunchKernelExC copies parameter values synchronously before returning,
+  // so the kernel_args array and the values it points to are safe even though the launch is async
   cudaError_t err = cudaLaunchKernelExC(&config, kernel, kernel_args);
   if (err != cudaSuccess) {
     std::cerr << "[JIT] ERROR: cudaLaunchKernelExC failed with: " << cudaGetErrorString(err) << " ("
@@ -84,6 +86,14 @@ void AlgorithmLauncher::call(
     std::cerr.flush();
   }
   RAFT_CUDA_TRY(err);
+
+  // Check for immediate errors after launch (catches parameter issues early)
+  cudaError_t peek_err = cudaPeekAtLastError();
+  if (peek_err != cudaSuccess) {
+    std::cerr << "[JIT] WARNING: Error detected immediately after kernel launch: "
+              << cudaGetErrorString(peek_err) << " (" << peek_err << ")" << std::endl;
+    std::cerr.flush();
+  }
 }
 
 void AlgorithmLauncher::call_cooperative(

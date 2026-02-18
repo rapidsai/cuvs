@@ -25,17 +25,29 @@
 
 void AlgorithmPlanner::add_entrypoint()
 {
+  RAFT_LOG_INFO("[JIT FRAGMENT] Looking up entrypoint fragment: %s", this->entrypoint.c_str());
   auto entrypoint_fragment = fragment_database().get_fragment(this->entrypoint);
   if (entrypoint_fragment == nullptr) {
     RAFT_FAIL("Entrypoint fragment is NULL for: %s", this->entrypoint.c_str());
   }
+  RAFT_LOG_INFO("[JIT FRAGMENT] Entrypoint fragment found: %s (ptr: %p)",
+                this->entrypoint.c_str(),
+                entrypoint_fragment);
   this->fragments.push_back(entrypoint_fragment);
 }
 
 void AlgorithmPlanner::add_device_functions()
 {
   for (const auto& device_function_key : this->device_functions) {
+    RAFT_LOG_INFO("[JIT FRAGMENT] Looking up device function fragment: %s",
+                  device_function_key.c_str());
     auto device_function_fragment = fragment_database().get_fragment(device_function_key);
+    if (device_function_fragment == nullptr) {
+      RAFT_FAIL("Device function fragment is NULL for: %s", device_function_key.c_str());
+    }
+    RAFT_LOG_INFO("[JIT FRAGMENT] Device function fragment found: %s (ptr: %p)",
+                  device_function_key.c_str(),
+                  device_function_fragment);
     this->fragments.push_back(device_function_fragment);
   }
 }
@@ -57,11 +69,24 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::get_launcher()
   static std::mutex cache_mutex;
   std::lock_guard<std::mutex> lock(cache_mutex);
   if (launchers.count(launch_key) == 0) {
+    RAFT_LOG_INFO(
+      "[JIT CACHE] Cache MISS - Building new launcher for key: %s (entrypoint: %s, "
+      "device_functions: %s)",
+      launch_key.c_str(),
+      this->entrypoint.c_str(),
+      this->get_device_functions_key().c_str());
     add_entrypoint();
     add_device_functions();
     launchers[launch_key] = this->build();
+    RAFT_LOG_INFO("[JIT CACHE] Launcher built and cached (kernel handle: %p)",
+                  launchers[launch_key]->get_kernel());
   } else {
-    RAFT_LOG_DEBUG("Using cached JIT launcher for entrypoint: %s", this->entrypoint.c_str());
+    RAFT_LOG_INFO(
+      "[JIT CACHE] Cache HIT - Reusing cached launcher for key: %s (entrypoint: %s, kernel handle: "
+      "%p)",
+      launch_key.c_str(),
+      this->entrypoint.c_str(),
+      launchers[launch_key]->get_kernel());
   }
   return launchers[launch_key];
 }
@@ -79,51 +104,52 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
 
   // Generate individual cubin for each device function fragment for debugging
   // Skip entrypoint fragment as it depends on device functions and will fail to link alone
-  for (auto& frag : this->fragments) {
-    // Skip if this is the entrypoint fragment
-    if (frag->compute_key == this->entrypoint) { continue; }
+  // for (auto& frag : this->fragments) {
+  //   // Skip if this is the entrypoint fragment
+  //   if (frag->compute_key == this->entrypoint) { continue; }
 
-    nvJitLinkHandle frag_handle;
-    const char* frag_lopts[] = {"-lto", archs.c_str()};
-    auto frag_result         = nvJitLinkCreate(&frag_handle, 2, frag_lopts);
-    check_nvjitlink_result(frag_handle, frag_result);
+  //   nvJitLinkHandle frag_handle;
+  //   const char* frag_lopts[] = {"-lto", archs.c_str()};
+  //   auto frag_result         = nvJitLinkCreate(&frag_handle, 2, frag_lopts);
+  //   check_nvjitlink_result(frag_handle, frag_result);
 
-    frag->add_to(frag_handle);
+  //   frag->add_to(frag_handle);
 
-    frag_result = nvJitLinkComplete(frag_handle);
-    check_nvjitlink_result(frag_handle, frag_result);
+  //   frag_result = nvJitLinkComplete(frag_handle);
+  //   check_nvjitlink_result(frag_handle, frag_result);
 
-    size_t frag_cubin_size;
-    frag_result = nvJitLinkGetLinkedCubinSize(frag_handle, &frag_cubin_size);
-    check_nvjitlink_result(frag_handle, frag_result);
+  //   size_t frag_cubin_size;
+  //   frag_result = nvJitLinkGetLinkedCubinSize(frag_handle, &frag_cubin_size);
+  //   check_nvjitlink_result(frag_handle, frag_result);
 
-    if (frag_cubin_size > 0) {
-      std::unique_ptr<char[]> frag_cubin{new char[frag_cubin_size]};
-      frag_result = nvJitLinkGetLinkedCubin(frag_handle, frag_cubin.get());
-      check_nvjitlink_result(frag_handle, frag_result);
+  //   if (frag_cubin_size > 0) {
+  //     std::unique_ptr<char[]> frag_cubin{new char[frag_cubin_size]};
+  //     frag_result = nvJitLinkGetLinkedCubin(frag_handle, frag_cubin.get());
+  //     check_nvjitlink_result(frag_handle, frag_result);
 
-      // Save individual fragment cubin
-      std::string frag_cubin_path = "/tmp/fragment_cubin_" + frag->compute_key + ".cubin";
-      std::replace(frag_cubin_path.begin(), frag_cubin_path.end(), '/', '_');
-      std::replace(frag_cubin_path.begin(), frag_cubin_path.end(), ':', '_');
-      std::replace(frag_cubin_path.begin(), frag_cubin_path.end(), '<', '_');
-      std::replace(frag_cubin_path.begin(), frag_cubin_path.end(), '>', '_');
-      std::replace(frag_cubin_path.begin(), frag_cubin_path.end(), ' ', '_');
-      FILE* frag_f = fopen(frag_cubin_path.c_str(), "wb");
-      if (frag_f) {
-        size_t written = fwrite(frag_cubin.get(), 1, frag_cubin_size, frag_f);
-        fclose(frag_f);
-        if (written == frag_cubin_size) {
-          std::cerr << "[JIT] Saved fragment cubin: " << frag_cubin_path
-                    << " (size: " << frag_cubin_size << " bytes)" << std::endl;
-          std::cerr << "[JIT] Run: cuobjdump --dump-elf-symbols " << frag_cubin_path << std::endl;
-        }
-      }
-    }
+  //     // Save individual fragment cubin
+  //     std::string frag_cubin_path = "/tmp/fragment_cubin_" + frag->compute_key + ".cubin";
+  //     std::replace(frag_cubin_path.begin(), frag_cubin_path.end(), '/', '_');
+  //     std::replace(frag_cubin_path.begin(), frag_cubin_path.end(), ':', '_');
+  //     std::replace(frag_cubin_path.begin(), frag_cubin_path.end(), '<', '_');
+  //     std::replace(frag_cubin_path.begin(), frag_cubin_path.end(), '>', '_');
+  //     std::replace(frag_cubin_path.begin(), frag_cubin_path.end(), ' ', '_');
+  //     FILE* frag_f = fopen(frag_cubin_path.c_str(), "wb");
+  //     if (frag_f) {
+  //       size_t written = fwrite(frag_cubin.get(), 1, frag_cubin_size, frag_f);
+  //       fclose(frag_f);
+  //       if (written == frag_cubin_size) {
+  //         std::cerr << "[JIT] Saved fragment cubin: " << frag_cubin_path
+  //                   << " (size: " << frag_cubin_size << " bytes)" << std::endl;
+  //         std::cerr << "[JIT] Run: cuobjdump --dump-elf-symbols " << frag_cubin_path <<
+  //         std::endl;
+  //       }
+  //     }
+  //   }
 
-    frag_result = nvJitLinkDestroy(&frag_handle);
-    RAFT_EXPECTS(frag_result == NVJITLINK_SUCCESS, "nvJitLinkDestroy failed for fragment");
-  }
+  //   frag_result = nvJitLinkDestroy(&frag_handle);
+  //   RAFT_EXPECTS(frag_result == NVJITLINK_SUCCESS, "nvJitLinkDestroy failed for fragment");
+  // }
 
   // Load the generated LTO IR and link them together
   nvJitLinkHandle handle;
@@ -150,35 +176,35 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
   RAFT_EXPECTS(result == NVJITLINK_SUCCESS, "nvJitLinkDestroy failed");
 
   // Save cubin to disk for inspection with cuobjdump
-  std::string cubin_path = "/tmp/linked_cubin_" + this->entrypoint + ".cubin";
-  // Sanitize filename (replace special chars)
-  std::replace(cubin_path.begin(), cubin_path.end(), '/', '_');
-  std::replace(cubin_path.begin(), cubin_path.end(), ':', '_');
-  std::replace(cubin_path.begin(), cubin_path.end(), '<', '_');
-  std::replace(cubin_path.begin(), cubin_path.end(), '>', '_');
-  std::replace(cubin_path.begin(), cubin_path.end(), ' ', '_');
-  FILE* f = fopen(cubin_path.c_str(), "wb");
-  if (f) {
-    size_t written = fwrite(cubin.get(), 1, cubin_size, f);
-    fclose(f);
-    if (written == cubin_size) {
-      std::cerr << "[JIT] =========================================" << std::endl;
-      std::cerr << "[JIT] Saved linked cubin to: " << cubin_path << " (size: " << cubin_size
-                << " bytes)" << std::endl;
-      std::cerr << "[JIT] Run: cuobjdump --dump-elf-symbols " << cubin_path
-                << " to see kernel symbols" << std::endl;
-      std::cerr << "[JIT] =========================================" << std::endl;
-      std::cerr.flush();
-    } else {
-      std::cerr << "[JIT] WARNING: Failed to write full cubin (wrote " << written << " of "
-                << cubin_size << " bytes)" << std::endl;
-      std::cerr.flush();
-    }
-  } else {
-    std::cerr << "[JIT] WARNING: Failed to open cubin file for writing: " << cubin_path
-              << " (errno: " << errno << ")" << std::endl;
-    std::cerr.flush();
-  }
+  // std::string cubin_path = "/tmp/linked_cubin_" + this->entrypoint + ".cubin";
+  // // Sanitize filename (replace special chars)
+  // std::replace(cubin_path.begin(), cubin_path.end(), '/', '_');
+  // std::replace(cubin_path.begin(), cubin_path.end(), ':', '_');
+  // std::replace(cubin_path.begin(), cubin_path.end(), '<', '_');
+  // std::replace(cubin_path.begin(), cubin_path.end(), '>', '_');
+  // std::replace(cubin_path.begin(), cubin_path.end(), ' ', '_');
+  // FILE* f = fopen(cubin_path.c_str(), "wb");
+  // if (f) {
+  //   size_t written = fwrite(cubin.get(), 1, cubin_size, f);
+  //   fclose(f);
+  //   if (written == cubin_size) {
+  //     std::cerr << "[JIT] =========================================" << std::endl;
+  //     std::cerr << "[JIT] Saved linked cubin to: " << cubin_path << " (size: " << cubin_size
+  //               << " bytes)" << std::endl;
+  //     std::cerr << "[JIT] Run: cuobjdump --dump-elf-symbols " << cubin_path
+  //               << " to see kernel symbols" << std::endl;
+  //     std::cerr << "[JIT] =========================================" << std::endl;
+  //     std::cerr.flush();
+  //   } else {
+  //     std::cerr << "[JIT] WARNING: Failed to write full cubin (wrote " << written << " of "
+  //               << cubin_size << " bytes)" << std::endl;
+  //     std::cerr.flush();
+  //   }
+  // } else {
+  //   std::cerr << "[JIT] WARNING: Failed to open cubin file for writing: " << cubin_path
+  //             << " (errno: " << errno << ")" << std::endl;
+  //   std::cerr.flush();
+  // }
 
   // cubin is linked, so now load it
   cudaLibrary_t library;

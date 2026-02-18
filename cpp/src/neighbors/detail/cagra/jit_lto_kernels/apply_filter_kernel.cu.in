@@ -8,7 +8,6 @@
 #ifdef BUILD_KERNEL
 
 #include <neighbors/detail/cagra/jit_lto_kernels/search_multi_kernel_jit.cuh>
-#include <cuvs/neighbors/common.hpp>
 
 namespace cuvs::neighbors::cagra::detail::multi_kernel_search {
 

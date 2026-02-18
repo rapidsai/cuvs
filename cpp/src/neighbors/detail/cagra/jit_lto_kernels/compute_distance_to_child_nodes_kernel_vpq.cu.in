@@ -9,7 +9,6 @@
 
 #include <neighbors/detail/cagra/jit_lto_kernels/search_multi_kernel_jit.cuh>
 #include <neighbors/detail/cagra/compute_distance_vpq-impl.cuh>
-#include <cuvs/neighbors/common.hpp>
 
 namespace cuvs::neighbors::cagra::detail::multi_kernel_search {
 

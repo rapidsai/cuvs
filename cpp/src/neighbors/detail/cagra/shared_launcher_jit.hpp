@@ -48,6 +48,7 @@ template <typename T>
 constexpr auto get_source_index_type_tag()
 {
   if constexpr (std::is_same_v<T, uint32_t>) { return tag_idx_ui{}; }
+  if constexpr (std::is_same_v<T, int64_t>) { return tag_idx_l{}; }
 }
 
 // Helper trait to detect if a type is a bitset_filter (regardless of template parameters)
@@ -71,8 +72,8 @@ std::string get_sample_filter_name(bool debug_output = false)
 
   // First check for none_sample_filter (the only unwrapped case)
   if constexpr (std::is_same_v<DecayedFilter, none_sample_filter>) {
-    if (debug_output) { std::cerr << "[JIT] Returning: filter_none" << std::endl; }
-    return "filter_none";
+    if (debug_output) { std::cerr << "[JIT] Returning: filter_none_ui" << std::endl; }
+    return "filter_none_ui";
   }
 
   // All other filters are wrapped in CagraSampleFilterWithQueryIdOffset
@@ -83,15 +84,17 @@ std::string get_sample_filter_name(bool debug_output = false)
                   std::is_same_v<InnerFilter, bitset_filter<uint32_t, int64_t>> ||
                   std::is_same_v<InnerFilter, bitset_filter<uint32_t, uint32_t>>) {
       if (debug_output) {
-        std::cerr << "[JIT] Returning: filter_bitset (via wrapped filter)" << std::endl;
+        std::cerr << "[JIT] Returning: filter_bitset_ui (via wrapped filter)" << std::endl;
       }
-      return "filter_bitset";
+      return "filter_bitset_ui";
     }
   }
 
   // Default to none filter for unknown types
-  if (debug_output) { std::cerr << "[JIT] Returning: filter_none (default/unknown)" << std::endl; }
-  return "filter_none";
+  if (debug_output) {
+    std::cerr << "[JIT] Returning: filter_none_ui (default/unknown)" << std::endl;
+  }
+  return "filter_none_ui";
 }
 
 }  // namespace cuvs::neighbors::cagra::detail
