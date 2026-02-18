@@ -1,6 +1,7 @@
 package cuvs
 
 // #include <cuvs/core/c_api.h>
+// #include <cuvs/version_config.h>
 import "C"
 
 type cuvsResource C.cuvsResources_t
@@ -12,8 +13,31 @@ type Resource struct {
 	Resource C.cuvsResources_t
 }
 
+type CudaStream struct {
+	stream C.cudaStream_t
+}
+
+func (s *CudaStream) Close() error {
+	err := CheckCuda(C.cudaStreamDestroy(s.stream))
+	if err != nil {
+		return err
+	}
+	s.stream = nil
+	return nil
+}
+
+// Creates a new CUDA stream
+func NewCudaStream() (*CudaStream, error) {
+	var stream C.cudaStream_t
+	err := CheckCuda(C.cudaStreamCreate(&stream))
+	if err != nil {
+		return nil, err
+	}
+	return &CudaStream{stream: stream}, nil
+}
+
 // Returns a new Resource object
-func NewResource(stream C.cudaStream_t) (Resource, error) {
+func NewResource(stream *CudaStream) (Resource, error) {
 	res := C.cuvsResources_t(0)
 	err := CheckCuvs(CuvsError(C.cuvsResourcesCreate(&res)))
 	if err != nil {
@@ -21,8 +45,9 @@ func NewResource(stream C.cudaStream_t) (Resource, error) {
 	}
 
 	if stream != nil {
-		err := CheckCuvs(CuvsError(C.cuvsStreamSet(res, stream)))
+		err := CheckCuvs(CuvsError(C.cuvsStreamSet(res, stream.stream)))
 		if err != nil {
+			C.cuvsResourcesDestroy(res) // Clean up the resource created
 			return Resource{}, err
 		}
 	}

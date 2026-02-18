@@ -16,7 +16,16 @@ func TestBruteForce(t *testing.T) {
 		epsilon     = 0.001
 	)
 
-	resource, _ := cuvs.NewResource(nil)
+	cudaStream, err := cuvs.NewCudaStream()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cudaStream.Close()
+
+	resource, err := cuvs.NewResource(cudaStream)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer resource.Close()
 
 	testDataset := make([][]float32, nDataPoints)
@@ -75,7 +84,7 @@ func TestBruteForce(t *testing.T) {
 		t.Fatalf("error moving queries to device: %v", err)
 	}
 
-	err = SearchIndex(resource, *index, &queries, &neighbors, &distances)
+	err = SearchIndex(resource, index, &queries, &neighbors, &distances)
 	if err != nil {
 		t.Fatalf("error searching index: %v", err)
 	}
