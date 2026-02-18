@@ -365,12 +365,12 @@ if(NOT BUILD_CPU_ONLY)
       jit_lto_kernel_usage_requirements INTERFACE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
                                                   "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
     )
-    target_compile_features(jit_lto_kernel_usage_requirements INTERFACE cuda_std_17)
+    target_compile_features(jit_lto_kernel_usage_requirements INTERFACE cuda_std_20 cxx_std_20)
     target_link_libraries(
       jit_lto_kernel_usage_requirements INTERFACE rmm::rmm raft::raft CCCL::CCCL
     )
 
-    set(cuda_architectures_old ${CMAKE_CUDA_ARCHITECTURES})
+    block()
     set(CMAKE_CUDA_ARCHITECTURES ${JIT_LTO_TARGET_ARCHITECTURE})
     generate_jit_lto_kernels(
       interleaved_scan_files
@@ -421,7 +421,7 @@ if(NOT BUILD_CPU_ONLY)
       OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/post_lambda"
       KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
     )
-    set(CMAKE_CUDA_ARCHITECTURES ${cuda_architectures_old})
+    endblock()
 
     add_library(
       cuvs_jit_lto_kernels STATIC ${interleaved_scan_files} ${metric_files} ${filter_files}
