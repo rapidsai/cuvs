@@ -58,6 +58,9 @@ function(add_jit_lto_kernel kernel_target)
   cmake_parse_arguments(_JIT_LTO "${options}" "${one_value}" "${multi_value}" ${ARGN})
 
   add_library(${kernel_target} OBJECT EXCLUDE_FROM_ALL "${_JIT_LTO_KERNEL_FILE}")
+  # Do not modify these properties, options, and libraries. Usage requirements (including CUDA
+  # version, etc.) should be propagated to the kernel targets via INTERFACE libraries passed in
+  # through the LINK_LIBRARIES argument.
   target_link_libraries(${kernel_target} PRIVATE ${_JIT_LTO_LINK_LIBRARIES})
   target_compile_options(${kernel_target} PRIVATE -Xfatbin=--compress-all --compress-mode=size)
   set_target_properties(
