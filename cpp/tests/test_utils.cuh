@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -15,6 +15,7 @@
 #include <raft/util/cudart_utils.hpp>
 #include <rmm/exec_policy.hpp>
 #include <thrust/for_each.h>
+#include <thrust/iterator/counting_iterator.h>
 
 #include <fstream>
 #include <sstream>
