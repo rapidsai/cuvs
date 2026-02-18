@@ -1805,7 +1805,7 @@ struct alignas(kCacheLineBytes) launcher_t {
   {
     // Don't sleep this many times hoping for smoother run
     constexpr auto kSpinLimit = 3;
-    // It doesn't make much sense to slee less than this
+    // It doesn't make much sense to sleep less than this
     constexpr auto kPauseTimeMin = std::chrono::nanoseconds(1000);
     // Bound sleeping time
     constexpr auto kPauseTimeMax = std::chrono::nanoseconds(50000);
@@ -2290,6 +2290,7 @@ control is returned in this thread (in persistent_runner_t constructor), so we'r
                             std::cref(dataset_desc),
                             graph,
                             source_indices_ptr,
+                            max_candidates,
                             num_itopk_candidates,
                             block_size,
                             smem_size,
@@ -2299,7 +2300,6 @@ control is returned in this thread (in persistent_runner_t constructor), so we'r
                             ps.num_random_samplings,
                             ps.rand_xor_mask,
                             num_seeds,
-                            max_candidates,
                             max_itopk,
                             ps.itopk_size,
                             ps.search_width,
