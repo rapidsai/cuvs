@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -7,7 +7,7 @@
 #include "../utils.hpp"
 #include "topk.h"
 
-#include <cub/cub.cuh>
+#include <cub/block/block_scan.cuh>
 
 #include <raft/core/detail/macros.hpp>
 #include <raft/core/error.hpp>
@@ -749,7 +749,7 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t topk,
   // Sorting by thread
   if (thread_id < numSortThreads) {
     const bool ascending = ((thread_id & mask) == 0);
-    if (numTopkPerThread == 3) {
+    if constexpr (numTopkPerThread == 3) {
       swap_if_needed<float, ValT>(my_keys[0], my_keys[1], my_vals[0], my_vals[1], ascending);
       swap_if_needed<float, ValT>(my_keys[0], my_keys[2], my_vals[0], my_vals[2], ascending);
       swap_if_needed<float, ValT>(my_keys[1], my_keys[2], my_vals[1], my_vals[2], ascending);
@@ -812,7 +812,7 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t topk,
 
     if (thread_id < numSortThreads) {
       const bool ascending = ((thread_id & next_mask) == 0);
-      if (numTopkPerThread == 3) {
+      if constexpr (numTopkPerThread == 3) {
         swap_if_needed<float, ValT>(my_keys[0], my_keys[1], my_vals[0], my_vals[1], ascending);
         swap_if_needed<float, ValT>(my_keys[0], my_keys[2], my_vals[0], my_vals[2], ascending);
         swap_if_needed<float, ValT>(my_keys[1], my_keys[2], my_vals[1], my_vals[2], ascending);

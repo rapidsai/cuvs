@@ -1,6 +1,6 @@
 # =============================================================================
 # cmake-format: off
-# SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 
@@ -17,7 +17,7 @@ include(rapids-find)
 
 # ------------- configure project --------------#
 
-rapids_cuda_init_architectures(test_cuvs)
+rapids_cuda_init_architectures(test_cuvs_c)
 
 project(test_cuvs_c LANGUAGES C CXX CUDA)
 
@@ -27,6 +27,7 @@ rapids_cpm_init()
 set(BUILD_CUVS_C_LIBRARY ON)
 include(../cmake/thirdparty/get_dlpack.cmake)
 include(../cmake/thirdparty/get_cuvs.cmake)
+find_package(CUDAToolkit REQUIRED)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Werror")
 

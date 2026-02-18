@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -13,7 +13,6 @@
 #include "../../distance/distance.cuh"
 
 #include <cuvs/distance/distance.hpp>
-#include <raft/core/cudart_utils.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -30,6 +29,7 @@
 #include <raft/matrix/argmin.cuh>
 #include <raft/matrix/gather.cuh>
 #include <raft/util/cuda_utils.cuh>
+#include <raft/util/cudart_utils.hpp>
 #include <raft/util/device_atomics.cuh>
 #include <raft/util/integer_utils.hpp>
 
@@ -500,7 +500,7 @@ __launch_bounds__((raft::WarpSize * BlockDimY)) RAFT_KERNEL
                         IdxT* count,
                         MappingOpT mapping_op)
 {
-  IdxT l = threadIdx.y + BlockDimY * static_cast<IdxT>(blockIdx.y);
+  IdxT l = threadIdx.y + BlockDimY * static_cast<IdxT>(blockIdx.x);
   if (l >= n_clusters) return;
   auto csize = static_cast<IdxT>(cluster_sizes[l]);
   // skip big clusters
@@ -605,7 +605,7 @@ auto adjust_centers(MathT* centers,
 
   constexpr uint32_t kBlockDimY = 4;
   const dim3 block_dim(raft::WarpSize, kBlockDimY, 1);
-  const dim3 grid_dim(1, raft::ceildiv(n_clusters, static_cast<IdxT>(kBlockDimY)), 1);
+  const dim3 grid_dim(raft::ceildiv(n_clusters, static_cast<IdxT>(kBlockDimY)), 1, 1);
   rmm::device_scalar<IdxT> update_count(0, stream, device_memory);
   adjust_centers_kernel<kBlockDimY><<<grid_dim, block_dim, 0, stream>>>(centers,
                                                                         n_clusters,

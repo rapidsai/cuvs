@@ -106,10 +106,10 @@ If installing a version that has not yet been released, the `rapidsai` channel c
 
 ```bash
 # CUDA 13
-conda install -c rapidsai-nightly -c conda-forge cuvs=26.02 cuda-version=13.1
+conda install -c rapidsai-nightly -c conda-forge cuvs=26.04 cuda-version=13.1
 
 # CUDA 12
-conda install -c rapidsai-nightly -c conda-forge cuvs=26.02 cuda-version=12.9
+conda install -c rapidsai-nightly -c conda-forge cuvs=26.04 cuda-version=12.9
 ```
 
 > [!NOTE]

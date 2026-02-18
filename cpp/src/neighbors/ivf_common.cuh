@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,9 +9,14 @@
 #include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/detail/select_warpsort.cuh>  // matrix::detail::select::warpsort::warp_sort_distributed
 
-#include <cub/cub.cuh>
-
 namespace cuvs::neighbors::ivf::detail {
+
+// Forward declaration of helper function to avoid including cub/device/* in header
+void sort_cluster_sizes_descending(uint32_t* input,
+                                   uint32_t* output,
+                                   uint32_t n_lists,
+                                   rmm::cuda_stream_view stream,
+                                   rmm::mr::device_memory_resource* tmp_res);
 
 /**
  * Default value returned by `search` when the `n_probes` is too small and top-k is too large.
@@ -30,59 +35,25 @@ struct dummy_block_sort_t {
 };
 
 /**
- * For each query, we calculate a cumulative sum of the cluster sizes that we probe, and return that
- * in chunk_indices. Essentially this is a segmented inclusive scan of the cluster sizes. The total
- * number of samples per query (sum of the cluster sizes that we probe) is returned in n_samples.
+ * Struct to configure and launch calc_chunk_indices_kernel.
+ *
+ * Both configure() and operator() are defined in ivf_common.cu to comply
+ * with CUDA whole compilation rules - the kernel pointer must be obtained
+ * and used within the same translation unit. See
+ * https://developer.nvidia.com/blog/cuda-c-compiler-updates-impacting-elf-visibility-and-linkage/
  */
-template <int BlockDim>
-__launch_bounds__(BlockDim) RAFT_KERNEL
-  calc_chunk_indices_kernel(uint32_t n_probes,
-                            const uint32_t* cluster_sizes,      // [n_clusters]
-                            const uint32_t* clusters_to_probe,  // [n_queries, n_probes]
-                            uint32_t* chunk_indices,            // [n_queries, n_probes]
-                            uint32_t* n_samples                 // [n_queries]
-  )
-{
-  using block_scan = cub::BlockScan<uint32_t, BlockDim>;
-  __shared__ typename block_scan::TempStorage shm;
-
-  // locate the query data
-  clusters_to_probe += n_probes * blockIdx.x;
-  chunk_indices += n_probes * blockIdx.x;
-
-  // block scan
-  const uint32_t n_probes_aligned = raft::Pow2<BlockDim>::roundUp(n_probes);
-  uint32_t total                  = 0;
-  for (uint32_t probe_ix = threadIdx.x; probe_ix < n_probes_aligned; probe_ix += BlockDim) {
-    auto label = probe_ix < n_probes ? clusters_to_probe[probe_ix] : 0u;
-    auto chunk = probe_ix < n_probes ? cluster_sizes[label] : 0u;
-    if (threadIdx.x == 0) { chunk += total; }
-    block_scan(shm).InclusiveSum(chunk, chunk, total);
-    __syncthreads();
-    if (probe_ix < n_probes) { chunk_indices[probe_ix] = chunk; }
-  }
-  // save the total size
-  if (threadIdx.x == 0) { n_samples[blockIdx.x] = total; }
-}
-
 struct calc_chunk_indices {
  public:
   struct configured {
-    void* kernel;
     dim3 block_dim;
     dim3 grid_dim;
     uint32_t n_probes;
 
-    inline void operator()(const uint32_t* cluster_sizes,
-                           const uint32_t* clusters_to_probe,
-                           uint32_t* chunk_indices,
-                           uint32_t* n_samples,
-                           rmm::cuda_stream_view stream)
-    {
-      void* args[] =  // NOLINT
-        {&n_probes, &cluster_sizes, &clusters_to_probe, &chunk_indices, &n_samples};
-      RAFT_CUDA_TRY(cudaLaunchKernel(kernel, grid_dim, block_dim, args, 0, stream));
-    }
+    void operator()(const uint32_t* cluster_sizes,
+                    const uint32_t* clusters_to_probe,
+                    uint32_t* chunk_indices,
+                    uint32_t* n_samples,
+                    rmm::cuda_stream_view stream);
   };
 
   static inline auto configure(uint32_t n_probes, uint32_t n_queries) -> configured
@@ -97,10 +68,7 @@ struct calc_chunk_indices {
     if constexpr (BlockDim >= raft::WarpSize * 2) {
       if (BlockDim >= n_probes * 2) { return try_block_dim<(BlockDim / 2)>(n_probes, n_queries); }
     }
-    return {reinterpret_cast<void*>(calc_chunk_indices_kernel<BlockDim>),
-            dim3(BlockDim, 1, 1),
-            dim3(n_queries, 1, 1),
-            n_probes};
+    return {dim3(BlockDim, 1, 1), dim3(n_queries, 1, 1), n_probes};
   }
 };
 
@@ -277,33 +245,16 @@ void recompute_internal_state(const raft::resources& res, Index& index)
   auto inds_ptrs = index.inds_ptrs();
   for (uint32_t label = 0; label < index.n_lists(); label++) {
     auto& list          = index.lists()[label];
-    const auto data_ptr = list ? list->data.data_handle() : nullptr;
-    const auto inds_ptr = list ? list->indices.data_handle() : nullptr;
+    const auto data_ptr = list ? list->data_ptr() : nullptr;
+    const auto inds_ptr = list ? list->indices_ptr() : nullptr;
     raft::copy(&data_ptrs(label), &data_ptr, 1, stream);
     raft::copy(&inds_ptrs(label), &inds_ptr, 1, stream);
   }
 
   // Sort the cluster sizes in the descending order.
-  int begin_bit             = 0;
-  int end_bit               = sizeof(uint32_t) * 8;
-  size_t cub_workspace_size = 0;
-  cub::DeviceRadixSort::SortKeysDescending(nullptr,
-                                           cub_workspace_size,
-                                           index.list_sizes().data_handle(),
-                                           sorted_sizes.data(),
-                                           index.n_lists(),
-                                           begin_bit,
-                                           end_bit,
-                                           stream);
-  rmm::device_buffer cub_workspace(cub_workspace_size, stream, tmp_res);
-  cub::DeviceRadixSort::SortKeysDescending(cub_workspace.data(),
-                                           cub_workspace_size,
-                                           index.list_sizes().data_handle(),
-                                           sorted_sizes.data(),
-                                           index.n_lists(),
-                                           begin_bit,
-                                           end_bit,
-                                           stream);
+  // Use helper function to avoid including cub/device/* in this header
+  sort_cluster_sizes_descending(
+    index.list_sizes().data_handle(), sorted_sizes.data(), index.n_lists(), stream, tmp_res);
   // copy the results to CPU
   std::vector<uint32_t> sorted_sizes_host(index.n_lists());
   raft::copy(sorted_sizes_host.data(), sorted_sizes.data(), index.n_lists(), stream);

@@ -222,6 +222,7 @@ public class HnswIndexImpl implements HnswIndex {
    */
   private CloseableHandle segmentFromIndexParams(HnswIndexParams params) {
     var hnswParams = createHnswIndexParams();
+    cuvsHnswIndexParams.hierarchy(hnswParams.handle(), params.getHierarchy().value);
     cuvsHnswIndexParams.ef_construction(hnswParams.handle(), params.getEfConstruction());
     cuvsHnswIndexParams.num_threads(hnswParams.handle(), params.getNumThreads());
     return hnswParams;
@@ -306,6 +307,8 @@ public class HnswIndexImpl implements HnswIndex {
 
     cuvsHnswAceParams.npartitions(seg, aceParams.getNpartitions());
     cuvsHnswAceParams.use_disk(seg, aceParams.isUseDisk());
+    cuvsHnswAceParams.max_host_memory_gb(seg, aceParams.getMaxHostMemoryGb());
+    cuvsHnswAceParams.max_gpu_memory_gb(seg, aceParams.getMaxGpuMemoryGb());
 
     String buildDir = aceParams.getBuildDir();
     if (buildDir != null) {

@@ -38,16 +38,36 @@ cdef class AceParams:
 
     Parameters
     ----------
-    npartitions : int, default = 1 (optional)
-        Number of partitions for ACE partitioned build. Small values might
-        improve recall but potentially degrade performance. 100k - 5M vectors
-        per partition is recommended depending on available memory.
+    npartitions : int, default = 0 (optional)
+        Number of partitions for ACE partitioned build. When set to 0 (default),
+        the number of partitions is automatically derived based on available
+        host and GPU memory to maximize partition size while ensuring the build
+        fits in memory.
+
+        Small values might improve recall but potentially degrade performance
+        and increase memory usage. Partitions should not be too small to prevent
+        issues in KNN graph construction. The partition size is on average 2 *
+        (n_rows / npartitions) * dim * sizeof(T). 2 is because of the core and
+        augmented vectors. Please account for imbalance in the partition sizes
+        (up to 3x in our tests).
+
+        If the specified number of partitions results in partitions that exceed
+        available memory, the value will be automatically increased to fit
+        memory constraints and a warning will be issued.
     build_dir : string, default = "/tmp/hnsw_ace_build" (optional)
         Directory to store ACE build artifacts (KNN graph, optimized graph).
         Used when `use_disk` is true or when the graph does not fit in memory.
     use_disk : bool, default = False (optional)
         Whether to use disk-based storage for ACE build. When true, enables
         disk-based operations for memory-efficient graph construction.
+    max_host_memory_gb : float, default = 0 (optional)
+        Maximum host memory to use for ACE build in GiB. When set to 0
+        (default), uses available host memory. Useful for testing or
+        when running alongside other memory-intensive processes.
+    max_gpu_memory_gb : float, default = 0 (optional)
+        Maximum GPU memory to use for ACE build in GiB. When set to 0
+        (default), uses available GPU memory. Useful for testing or
+        when running alongside other memory-intensive processes.
     """
 
     cdef cuvsHnswAceParams* params
@@ -62,13 +82,17 @@ cdef class AceParams:
             check_cuvs(cuvsHnswAceParamsDestroy(self.params))
 
     def __init__(self, *,
-                 npartitions=1,
+                 npartitions=0,
                  build_dir="/tmp/hnsw_ace_build",
-                 use_disk=False):
+                 use_disk=False,
+                 max_host_memory_gb=0,
+                 max_gpu_memory_gb=0):
         self.params.npartitions = npartitions
         self._build_dir_bytes = build_dir.encode('utf-8')
         self.params.build_dir = self._build_dir_bytes
         self.params.use_disk = use_disk
+        self.params.max_host_memory_gb = max_host_memory_gb
+        self.params.max_gpu_memory_gb = max_gpu_memory_gb
 
     @property
     def npartitions(self):
@@ -84,6 +108,14 @@ cdef class AceParams:
     def use_disk(self):
         return self.params.use_disk
 
+    @property
+    def max_host_memory_gb(self):
+        return self.params.max_host_memory_gb
+
+    @property
+    def max_gpu_memory_gb(self):
+        return self.params.max_gpu_memory_gb
+
 
 cdef class IndexParams:
     """
@@ -91,8 +123,8 @@ cdef class IndexParams:
 
     Parameters
     ----------
-    hierarchy : string, default = "none" (optional)
-        The hierarchy of the HNSW index. Valid values are ["none", "cpu"].
+    hierarchy : string, default = "gpu" (optional)
+        The hierarchy of the HNSW index. Valid values are ["none", "cpu", "gpu"].
         - "none": No hierarchy is built.
         - "cpu": Hierarchy is built using CPU.
         - "gpu": Hierarchy is built using GPU.
@@ -129,7 +161,7 @@ cdef class IndexParams:
         check_cuvs(cuvsHnswIndexParamsDestroy(self.params))
 
     def __init__(self, *,
-                 hierarchy="none",
+                 hierarchy="gpu",
                  ef_construction=200,
                  num_threads=0,
                  M=32,

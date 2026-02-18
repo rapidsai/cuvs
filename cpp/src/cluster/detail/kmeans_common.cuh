@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -10,7 +10,6 @@
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/distance/distance.hpp>
 
-#include <raft/core/cudart_utils.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/kvp.hpp>
@@ -27,11 +26,15 @@
 #include <raft/random/permute.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/util/cuda_utils.cuh>
+#include <raft/util/cudart_utils.hpp>
 
 #include <rmm/device_scalar.hpp>
 #include <rmm/device_uvector.hpp>
 
-#include <cub/cub.cuh>
+#include <cub/device/device_histogram.cuh>
+#include <cub/device/device_reduce.cuh>
+#include <cub/device/device_select.cuh>
+#include <cub/iterator/arg_index_input_iterator.cuh>
 #include <cuda.h>
 #include <thrust/fill.h>
 #include <thrust/for_each.h>
