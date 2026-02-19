@@ -12,7 +12,8 @@
 namespace cuvs::neighbors::cagra::detail {
 
 // Instantiate the setup_workspace_standard function for standard descriptor
-template __device__ const cuvs::neighbors::cagra::detail::standard_dataset_descriptor_t<@metric_cpp@, @team_size@, @dataset_block_dim@, @data_type@, @index_type@, @distance_type@>* setup_workspace_standard<@metric_cpp@, @team_size@, @dataset_block_dim@, @data_type@, @index_type@, @distance_type@>(const cuvs::neighbors::cagra::detail::standard_dataset_descriptor_t<@metric_cpp@, @team_size@, @dataset_block_dim@, @data_type@, @index_type@, @distance_type@>*, void*, const @data_type@*, uint32_t);
+// Note: Metric is no longer a template parameter - it's linked via dist_op and normalization fragments
+template __device__ const cuvs::neighbors::cagra::detail::standard_dataset_descriptor_t<@team_size@, @dataset_block_dim@, @data_type@, @index_type@, @distance_type@>* setup_workspace_standard<@team_size@, @dataset_block_dim@, @data_type@, @index_type@, @distance_type@>(const cuvs::neighbors::cagra::detail::standard_dataset_descriptor_t<@team_size@, @dataset_block_dim@, @data_type@, @index_type@, @distance_type@>*, void*, const @data_type@*, uint32_t);
 
 }  // namespace cuvs::neighbors::cagra::detail
 
@@ -20,18 +21,18 @@ template __device__ const cuvs::neighbors::cagra::detail::standard_dataset_descr
 
 #include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
 #include <cuvs/detail/jit_lto/cagra/search_single_cta_tags.hpp>
-#include "setup_workspace_standard_@metric_name@_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@.h"
+#include "setup_workspace_standard_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@.h"
 
 using namespace cuvs::neighbors::cagra::detail;
 
-__attribute__((__constructor__)) static void register_setup_workspace_standard_@metric_name@_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@()
+__attribute__((__constructor__)) static void register_setup_workspace_standard_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@()
 {
   registerAlgorithm<tag_@type_abbrev@,
     tag_idx_@idx_abbrev@,
     tag_dist_@dist_abbrev@>(
-    "setup_workspace_@metric_name@_t@team_size@_dim@dataset_block_dim@",
-    embedded_setup_workspace_standard_@metric_name@_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@,
-    sizeof(embedded_setup_workspace_standard_@metric_name@_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@));
+    "setup_workspace_standard_t@team_size@_dim@dataset_block_dim@",
+    embedded_setup_workspace_standard_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@,
+    sizeof(embedded_setup_workspace_standard_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@));
 }
 
 #endif

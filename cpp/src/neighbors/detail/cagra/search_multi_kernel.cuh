@@ -930,7 +930,7 @@ struct search
 
       if (iter + 1 >= min_iterations) {
         if (terminate_flag.data() == nullptr) {
-          RAFT_FAIL("terminate_flag.data() is NULL before set_value at iteration %zu", iter + 1);
+          RAFT_FAIL("terminate_flag.data() is NULL before set_value at iteration %u", iter + 1);
         }
         set_value<uint32_t>(terminate_flag.data(), 1, stream);
       }
@@ -941,18 +941,18 @@ struct search
 
       // Validate all pointers before passing to kernel to prevent memory corruption
       if (terminate_flag.data() == nullptr) {
-        RAFT_FAIL("terminate_flag.data() is NULL before pickup_next_parents at iteration %zu",
+        RAFT_FAIL("terminate_flag.data() is NULL before pickup_next_parents at iteration %u",
                   iter + 1);
       }
       if (result_indices.data() == nullptr) {
-        RAFT_FAIL("result_indices.data() is NULL before pickup_next_parents at iteration %zu",
+        RAFT_FAIL("result_indices.data() is NULL before pickup_next_parents at iteration %u",
                   iter + 1);
       }
       if (hashmap.data() == nullptr) {
-        RAFT_FAIL("hashmap.data() is NULL before pickup_next_parents at iteration %zu", iter + 1);
+        RAFT_FAIL("hashmap.data() is NULL before pickup_next_parents at iteration %u", iter + 1);
       }
       if (parent_node_list.data() == nullptr) {
-        RAFT_FAIL("parent_node_list.data() is NULL before pickup_next_parents at iteration %zu",
+        RAFT_FAIL("parent_node_list.data() is NULL before pickup_next_parents at iteration %u",
                   iter + 1);
       }
 
@@ -972,7 +972,7 @@ struct search
       // termination (2)
       if (iter + 1 >= min_iterations) {
         if (terminate_flag.data() == nullptr) {
-          RAFT_FAIL("terminate_flag.data() is NULL at iteration %zu", iter + 1);
+          RAFT_FAIL("terminate_flag.data() is NULL at iteration %u", iter + 1);
         }
         if (get_value(terminate_flag.data(), stream)) {
           iter++;

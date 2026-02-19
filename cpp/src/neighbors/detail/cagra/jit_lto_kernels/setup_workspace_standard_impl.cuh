@@ -18,18 +18,18 @@ namespace cuvs::neighbors::cagra::detail {
 // Takes the concrete descriptor pointer and calls the free function directly (not through function
 // pointer) For JIT LTO, the descriptor's setup_workspace_impl is nullptr, so we must call the free
 // function directly
-template <cuvs::distance::DistanceType Metric,
-          uint32_t TeamSize,
+// Note: Metric is no longer a template parameter - it's linked via dist_op and normalization
+// fragments
+template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           typename DataT,
           typename IndexT,
           typename DistanceT>
 __device__ const cuvs::neighbors::cagra::detail::
-  standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>*
+  standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>*
   setup_workspace_standard(
     const cuvs::neighbors::cagra::detail::
-      standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>*
-        desc,
+      standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>* desc,
     void* smem,
     const DataT* queries,
     uint32_t query_id)
@@ -39,7 +39,7 @@ __device__ const cuvs::neighbors::cagra::detail::
   // Call the free function directly (not desc->setup_workspace() which uses a function pointer)
   // The free function is in compute_distance_standard-impl.cuh
   using desc_t = cuvs::neighbors::cagra::detail::
-    standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
+    standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
   const auto* result =
     cuvs::neighbors::cagra::detail::setup_workspace_standard<desc_t>(desc, smem, queries, query_id);
   return result;

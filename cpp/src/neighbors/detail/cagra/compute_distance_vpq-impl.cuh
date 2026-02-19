@@ -15,15 +15,19 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
-template <cuvs::distance::DistanceType Metric,
-          uint32_t TeamSize,
+template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           uint32_t PQ_BITS,
           uint32_t PQ_LEN,
           typename CodebookT,
           typename DataT,
           typename IndexT,
-          typename DistanceT>
+          typename DistanceT
+#if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
+          ,
+          cuvs::distance::DistanceType Metric
+#endif
+          >
 struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, IndexT, DistanceT> {
   using base_type   = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
   using CODE_BOOK_T = CodebookT;
@@ -37,7 +41,9 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
   using typename base_type::INDEX_T;
   using typename base_type::LOAD_T;
   using typename base_type::setup_workspace_type;
-  constexpr static inline auto kMetric          = Metric;
+#if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
+  constexpr static inline auto kMetric = Metric;
+#endif
   constexpr static inline auto kTeamSize        = TeamSize;
   constexpr static inline auto kDatasetBlockDim = DatasetBlockDim;
   constexpr static inline auto kPqBits          = PQ_BITS;
@@ -371,8 +377,7 @@ RAFT_KERNEL __launch_bounds__(1, 1)
                                      IndexT size,
                                      uint32_t dim)
 {
-  using desc_type = cagra_q_dataset_descriptor_t<Metric,
-                                                 TeamSize,
+  using desc_type = cagra_q_dataset_descriptor_t<TeamSize,
                                                  DatasetBlockDim,
                                                  PqBits,
                                                  PqLen,
@@ -437,8 +442,7 @@ vpq_descriptor_spec<Metric,
                                       IndexT size,
                                       uint32_t dim)
 {
-  using desc_type = cagra_q_dataset_descriptor_t<Metric,
-                                                 TeamSize,
+  using desc_type = cagra_q_dataset_descriptor_t<TeamSize,
                                                  DatasetBlockDim,
                                                  PqBits,
                                                  PqLen,

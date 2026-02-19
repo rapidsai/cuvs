@@ -18,8 +18,8 @@ namespace cuvs::neighbors::cagra::detail {
 // Takes the concrete descriptor pointer and calls the free function directly (not through function
 // pointer) For JIT LTO, the descriptor's setup_workspace_impl is nullptr, so we must call the free
 // function directly
-template <cuvs::distance::DistanceType Metric,
-          uint32_t TeamSize,
+// Note: Metric is no longer a template parameter - VPQ only supports L2Expanded
+template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           uint32_t PQ_BITS,
           uint32_t PQ_LEN,
@@ -27,8 +27,7 @@ template <cuvs::distance::DistanceType Metric,
           typename DataT,
           typename IndexT,
           typename DistanceT>
-__device__ const cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<Metric,
-                                                                              TeamSize,
+__device__ const cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<TeamSize,
                                                                               DatasetBlockDim,
                                                                               PQ_BITS,
                                                                               PQ_LEN,
@@ -37,8 +36,7 @@ __device__ const cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<Me
                                                                               IndexT,
                                                                               DistanceT>*
 setup_workspace_vpq(
-  const cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<Metric,
-                                                                     TeamSize,
+  const cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<TeamSize,
                                                                      DatasetBlockDim,
                                                                      PQ_BITS,
                                                                      PQ_LEN,
@@ -52,8 +50,8 @@ setup_workspace_vpq(
 {
   // Call the free function directly (not desc->setup_workspace() which uses a function pointer)
   // The free function is in compute_distance_vpq-impl.cuh
-  using desc_t = cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<Metric,
-                                                                              TeamSize,
+  // VPQ only supports L2Expanded, so Metric is hardcoded
+  using desc_t = cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<TeamSize,
                                                                               DatasetBlockDim,
                                                                               PQ_BITS,
                                                                               PQ_LEN,

@@ -12,9 +12,10 @@
 namespace cuvs::neighbors::cagra::detail {
 
 // Instantiate the compute_distance_vpq function for VPQ descriptor
-using desc_t = cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<@metric_cpp@, @team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@>;
+// Note: Metric is no longer a template parameter - VPQ only supports L2Expanded
+using desc_t = cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@>;
 using args_t = typename cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<@data_type@, @index_type@, @distance_type@>::args_t;
-template __device__ @distance_type@ compute_distance_vpq<@metric_cpp@, @team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@>(
+template __device__ @distance_type@ compute_distance_vpq<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@>(
     const args_t, @index_type@);
 
 }  // namespace cuvs::neighbors::cagra::detail
@@ -23,19 +24,19 @@ template __device__ @distance_type@ compute_distance_vpq<@metric_cpp@, @team_siz
 
 #include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
 #include <cuvs/detail/jit_lto/cagra/search_single_cta_tags.hpp>
-#include "compute_distance_vpq_@metric_name@_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@.h"
+#include "compute_distance_vpq_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@.h"
 
 using namespace cuvs::neighbors::cagra::detail;
 
-__attribute__((__constructor__)) static void register_compute_distance_vpq_@metric_name@_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@()
+__attribute__((__constructor__)) static void register_compute_distance_vpq_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@()
 {
   registerAlgorithm<tag_@type_abbrev@,
     tag_idx_@idx_abbrev@,
     tag_dist_@dist_abbrev@,
     tag_codebook_half>(
-    "compute_distance_vpq_@metric_name@_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd",
-    embedded_compute_distance_vpq_@metric_name@_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@,
-    sizeof(embedded_compute_distance_vpq_@metric_name@_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@));
+    "compute_distance_vpq_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd",
+    embedded_compute_distance_vpq_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@,
+    sizeof(embedded_compute_distance_vpq_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@));
 }
 
 #endif

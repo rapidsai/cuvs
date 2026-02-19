@@ -5,23 +5,24 @@
 
 #pragma once
 
-#include "../compute_distance.hpp"
+// This file contains extern function declarations for JIT LTO
+// The actual descriptor type definitions are in -impl.cuh files which are included
+// directly by the .cu.in files with CUVS_ENABLE_JIT_LTO defined
+// Forward declarations must match the JIT LTO version (no Metric parameter)
+
+#include "../compute_distance.hpp"  // For dataset_descriptor_base_t
 #include <cuvs/distance/distance.hpp>
 
-// Forward declarations of descriptor types (full definitions are in -impl.cuh files)
-// This file is only included by JIT kernel headers which are included by .cu.in files
-// The .cu.in files include the -impl.cuh files directly for full type definitions
 namespace cuvs::neighbors::cagra::detail {
-template <cuvs::distance::DistanceType Metric,
-          uint32_t TeamSize,
+// Forward declarations matching the JIT LTO version (no Metric parameter)
+template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           typename DataT,
           typename IndexT,
           typename DistanceT>
 struct standard_dataset_descriptor_t;
 
-template <cuvs::distance::DistanceType Metric,
-          uint32_t TeamSize,
+template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           uint32_t PQ_BITS,
           uint32_t PQ_LEN,
@@ -38,26 +39,24 @@ namespace cuvs::neighbors::cagra::detail {
 // so they can be used by all search modes without being beholden to any specific sub-namespace
 
 // Standard descriptor extern functions
-template <cuvs::distance::DistanceType Metric,
-          uint32_t TeamSize,
+// Note: Metric is no longer a template parameter - it's linked via dist_op and normalization
+// fragments
+template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           typename DataT,
           typename IndexT,
           typename DistanceT>
 extern __device__ const
-  standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>*
-  setup_workspace_standard(const standard_dataset_descriptor_t<Metric,
-                                                               TeamSize,
-                                                               DatasetBlockDim,
-                                                               DataT,
-                                                               IndexT,
-                                                               DistanceT>* desc,
-                           void* smem,
-                           const DataT* queries,
-                           uint32_t query_id);
+  standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>*
+  setup_workspace_standard(
+    const standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>* desc,
+    void* smem,
+    const DataT* queries,
+    uint32_t query_id);
 
-template <cuvs::distance::DistanceType Metric,
-          uint32_t TeamSize,
+// Note: Metric is no longer a template parameter - it's linked via dist_op and normalization
+// fragments
+template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           typename DataT,
           typename IndexT,
@@ -67,8 +66,8 @@ extern __device__ DistanceT compute_distance_standard(
   IndexT dataset_index);
 
 // VPQ descriptor extern functions
-template <cuvs::distance::DistanceType Metric,
-          uint32_t TeamSize,
+// Note: Metric is no longer a template parameter - VPQ only supports L2Expanded
+template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           uint32_t PQ_BITS,
           uint32_t PQ_LEN,
@@ -76,8 +75,7 @@ template <cuvs::distance::DistanceType Metric,
           typename DataT,
           typename IndexT,
           typename DistanceT>
-extern __device__ const cagra_q_dataset_descriptor_t<Metric,
-                                                     TeamSize,
+extern __device__ const cagra_q_dataset_descriptor_t<TeamSize,
                                                      DatasetBlockDim,
                                                      PQ_BITS,
                                                      PQ_LEN,
@@ -85,8 +83,7 @@ extern __device__ const cagra_q_dataset_descriptor_t<Metric,
                                                      DataT,
                                                      IndexT,
                                                      DistanceT>*
-setup_workspace_vpq(const cagra_q_dataset_descriptor_t<Metric,
-                                                       TeamSize,
+setup_workspace_vpq(const cagra_q_dataset_descriptor_t<TeamSize,
                                                        DatasetBlockDim,
                                                        PQ_BITS,
                                                        PQ_LEN,
@@ -98,8 +95,8 @@ setup_workspace_vpq(const cagra_q_dataset_descriptor_t<Metric,
                     const DataT* queries,
                     uint32_t query_id);
 
-template <cuvs::distance::DistanceType Metric,
-          uint32_t TeamSize,
+// Note: Metric is no longer a template parameter - VPQ only supports L2Expanded
+template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           uint32_t PQ_BITS,
           uint32_t PQ_LEN,

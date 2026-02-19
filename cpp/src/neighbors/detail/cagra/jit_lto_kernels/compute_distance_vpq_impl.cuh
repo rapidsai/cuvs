@@ -16,8 +16,8 @@ namespace cuvs::neighbors::cagra::detail {
 
 // Extern function implementation for compute_distance_vpq (VPQ descriptor)
 // Returns per-thread distance (team_sum must be called by the caller)
-template <cuvs::distance::DistanceType Metric,
-          uint32_t TeamSize,
+// Note: Metric is no longer a template parameter - VPQ only supports L2Expanded
+template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           uint32_t PQ_BITS,
           uint32_t PQ_LEN,
@@ -32,8 +32,8 @@ compute_distance_vpq(const typename cuvs::neighbors::cagra::detail::
 {
   // Call the free function compute_distance_vpq directly with args (already loaded)
   // Returns per-thread distance (caller must do team_sum)
-  using desc_t = cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<Metric,
-                                                                              TeamSize,
+  // VPQ only supports L2Expanded, so Metric is hardcoded
+  using desc_t = cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<TeamSize,
                                                                               DatasetBlockDim,
                                                                               PQ_BITS,
                                                                               PQ_LEN,

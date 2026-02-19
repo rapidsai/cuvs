@@ -163,21 +163,16 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
   // Check if DescriptorT is a standard_dataset_descriptor_t by checking if it doesn't have kPqBits
   // (standard descriptors don't have kPqBits, VPQ descriptors do)
   if constexpr (!has_kpq_bits_v<DescriptorT>) {
-    // Standard descriptor - use the metric from the descriptor type itself
-    // DescriptorT should already be standard_dataset_descriptor_t<Metric, ...> where Metric matches
-    // DescriptorT::kMetric
-    smem_desc = setup_workspace_standard<DescriptorT::kMetric,
-                                         DescriptorT::kTeamSize,
+    // Standard descriptor - Metric is no longer a template parameter, linked via dist_op and
+    // normalization fragments
+    smem_desc = setup_workspace_standard<DescriptorT::kTeamSize,
                                          DescriptorT::kDatasetBlockDim,
                                          DataT,
                                          IndexT,
                                          DistanceT>(dataset_desc, smem, queries_ptr, query_id);
   } else {
-    // Must be cagra_q_dataset_descriptor_t - use the metric from the descriptor type itself
-    // DescriptorT should already be cagra_q_dataset_descriptor_t<Metric, ...> where Metric matches
-    // DescriptorT::kMetric
-    smem_desc = setup_workspace_vpq<DescriptorT::kMetric,
-                                    DescriptorT::kTeamSize,
+    // Must be cagra_q_dataset_descriptor_t - VPQ only supports L2Expanded, so Metric is not needed
+    smem_desc = setup_workspace_vpq<DescriptorT::kTeamSize,
                                     DescriptorT::kDatasetBlockDim,
                                     DescriptorT::kPqBits,
                                     DescriptorT::kPqLen,

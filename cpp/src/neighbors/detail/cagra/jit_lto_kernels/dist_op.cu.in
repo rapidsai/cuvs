@@ -1,0 +1,37 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) @year@, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+// This file is auto-generated. Do not edit manually.
+
+#ifdef BUILD_KERNEL
+
+#include <neighbors/detail/cagra/jit_lto_kernels/dist_op_@metric_tag@_impl.cuh>
+
+namespace cuvs::neighbors::cagra::detail {
+
+// Instantiate the dist_op function for the specific metric
+// Each fragment provides dist_op for a specific metric - planner links the appropriate one
+template __device__ @distance_type@ dist_op<@data_type@, @distance_type@>(@data_type@, @data_type@);
+
+}  // namespace cuvs::neighbors::cagra::detail
+
+#else
+
+#include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
+#include <cuvs/detail/jit_lto/cagra/search_single_cta_tags.hpp>
+#include "dist_op_@metric_tag@_@type_abbrev@_@dist_abbrev@.h"
+
+using namespace cuvs::neighbors::cagra::detail;
+
+__attribute__((__constructor__)) static void register_dist_op_@metric_tag@_@type_abbrev@_@dist_abbrev@()
+{
+  registerAlgorithm<tag_@type_abbrev@,
+    tag_dist_@dist_abbrev@>(
+    "dist_op_@metric_tag@",
+    embedded_dist_op_@metric_tag@_@type_abbrev@_@dist_abbrev@,
+    sizeof(embedded_dist_op_@metric_tag@_@type_abbrev@_@dist_abbrev@));
+}
+
+#endif

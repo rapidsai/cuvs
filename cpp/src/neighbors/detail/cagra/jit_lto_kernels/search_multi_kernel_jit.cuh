@@ -73,21 +73,16 @@ RAFT_KERNEL random_pickup_kernel_jit(
   // Check if DescriptorT is a standard_dataset_descriptor_t by checking if it doesn't have kPqBits
   // (standard descriptors don't have kPqBits, VPQ descriptors do)
   if constexpr (!has_kpq_bits_v<DescriptorT>) {
-    // Standard descriptor - use the metric from the descriptor type itself
-    // DescriptorT should already be standard_dataset_descriptor_t<Metric, ...> where Metric matches
-    // DescriptorT::kMetric
-    smem_desc = setup_workspace_standard<DescriptorT::kMetric,
-                                         DescriptorT::kTeamSize,
+    // Standard descriptor - Metric is no longer a template parameter, linked via dist_op and
+    // normalization fragments
+    smem_desc = setup_workspace_standard<DescriptorT::kTeamSize,
                                          DescriptorT::kDatasetBlockDim,
                                          DataT,
                                          IndexT,
                                          DistanceT>(dataset_desc, smem, queries_ptr, query_id);
   } else {
-    // Must be cagra_q_dataset_descriptor_t - use the metric from the descriptor type itself
-    // DescriptorT should already be cagra_q_dataset_descriptor_t<Metric, ...> where Metric matches
-    // DescriptorT::kMetric
-    smem_desc = setup_workspace_vpq<DescriptorT::kMetric,
-                                    DescriptorT::kTeamSize,
+    // Must be cagra_q_dataset_descriptor_t - VPQ only supports L2Expanded, so Metric is not needed
+    smem_desc = setup_workspace_vpq<DescriptorT::kTeamSize,
                                     DescriptorT::kDatasetBlockDim,
                                     DescriptorT::kPqBits,
                                     DescriptorT::kPqLen,
@@ -120,17 +115,17 @@ RAFT_KERNEL random_pickup_kernel_jit(
     // its per-thread distance, then team_sum reduces across all threads in the team.
     DistanceT per_thread_norm2 = 0;
     if constexpr (!has_kpq_bits_v<DescriptorT>) {
-      // Standard descriptor - use the metric from the descriptor type itself
-      per_thread_norm2 = compute_distance_standard<DescriptorT::kMetric,
-                                                   DescriptorT::kTeamSize,
+      // Standard descriptor - Metric is no longer a template parameter, linked via dist_op and
+      // normalization fragments
+      per_thread_norm2 = compute_distance_standard<DescriptorT::kTeamSize,
                                                    DescriptorT::kDatasetBlockDim,
                                                    DataT,
                                                    IndexT,
                                                    DistanceT>(args, seed_index);
     } else {
-      // Must be cagra_q_dataset_descriptor_t - use the metric from the descriptor type itself
-      per_thread_norm2 = compute_distance_vpq<DescriptorT::kMetric,
-                                              DescriptorT::kTeamSize,
+      // Must be cagra_q_dataset_descriptor_t - VPQ only supports L2Expanded, so Metric is not
+      // needed
+      per_thread_norm2 = compute_distance_vpq<DescriptorT::kTeamSize,
                                               DescriptorT::kDatasetBlockDim,
                                               DescriptorT::kPqBits,
                                               DescriptorT::kPqLen,
@@ -200,17 +195,16 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel_jit(
   // NOTE: setup_workspace must be called by ALL threads (it uses __syncthreads())
   const DescriptorT* smem_desc = nullptr;
   if constexpr (!has_kpq_bits_v<DescriptorT>) {
-    // Standard descriptor - use the metric from the descriptor type itself
-    smem_desc = setup_workspace_standard<DescriptorT::kMetric,
-                                         DescriptorT::kTeamSize,
+    // Standard descriptor - Metric is no longer a template parameter, linked via dist_op and
+    // normalization fragments
+    smem_desc = setup_workspace_standard<DescriptorT::kTeamSize,
                                          DescriptorT::kDatasetBlockDim,
                                          DataT,
                                          INDEX_T,
                                          DISTANCE_T>(dataset_desc, smem, query_ptr, query_id);
   } else {
-    // Must be cagra_q_dataset_descriptor_t - use the metric from the descriptor type itself
-    smem_desc = setup_workspace_vpq<DescriptorT::kMetric,
-                                    DescriptorT::kTeamSize,
+    // Must be cagra_q_dataset_descriptor_t - VPQ only supports L2Expanded, so Metric is not needed
+    smem_desc = setup_workspace_vpq<DescriptorT::kTeamSize,
                                     DescriptorT::kDatasetBlockDim,
                                     DescriptorT::kPqBits,
                                     DescriptorT::kPqLen,
@@ -255,17 +249,17 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel_jit(
   DISTANCE_T per_thread_norm2 = 0;
   if (compute_distance_flag) {
     if constexpr (!has_kpq_bits_v<DescriptorT>) {
-      // Standard descriptor - use the metric from the descriptor type itself
-      per_thread_norm2 = compute_distance_standard<DescriptorT::kMetric,
-                                                   DescriptorT::kTeamSize,
+      // Standard descriptor - Metric is no longer a template parameter, linked via dist_op and
+      // normalization fragments
+      per_thread_norm2 = compute_distance_standard<DescriptorT::kTeamSize,
                                                    DescriptorT::kDatasetBlockDim,
                                                    DataT,
                                                    INDEX_T,
                                                    DISTANCE_T>(args, child_id);
     } else {
-      // Must be cagra_q_dataset_descriptor_t - use the metric from the descriptor type itself
-      per_thread_norm2 = compute_distance_vpq<DescriptorT::kMetric,
-                                              DescriptorT::kTeamSize,
+      // Must be cagra_q_dataset_descriptor_t - VPQ only supports L2Expanded, so Metric is not
+      // needed
+      per_thread_norm2 = compute_distance_vpq<DescriptorT::kTeamSize,
                                               DescriptorT::kDatasetBlockDim,
                                               DescriptorT::kPqBits,
                                               DescriptorT::kPqLen,

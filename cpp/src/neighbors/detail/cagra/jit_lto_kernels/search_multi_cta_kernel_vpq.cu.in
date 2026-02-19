@@ -17,7 +17,8 @@
 namespace cuvs::neighbors::cagra::detail::multi_cta_search {
 
 // Instantiate the search_kernel_jit function with concrete VPQ descriptor type
-using desc_t = cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<cuvs::distance::DistanceType::@metric_name_full@, @team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@>;
+// Note: Metric is no longer a template parameter - VPQ only supports L2Expanded
+using desc_t = cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@>;
 template __global__ __launch_bounds__(1024, 1) void search_kernel_jit<desc_t, @data_type@, @index_type@, @distance_type@, @source_index_type@>(
     @index_type@* const, @distance_type@* const, const desc_t*, const @data_type@* const, const @index_type@* const, const std::uint32_t, const std::uint32_t, const @source_index_type@*, const unsigned, const uint64_t, const @index_type@*, const std::uint32_t, const std::uint32_t, @index_type@* const, const std::uint32_t, const std::uint32_t, const std::uint32_t, const std::uint32_t, std::uint32_t* const, const std::uint32_t, uint32_t*, @source_index_type@, @source_index_type@);
 
@@ -27,7 +28,7 @@ template __global__ __launch_bounds__(1024, 1) void search_kernel_jit<desc_t, @d
 
 #include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
 #include <cuvs/detail/jit_lto/cagra/search_single_cta_tags.hpp>
-#include "search_multi_cta_kernel_vpq_@metric_name_full@_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@src_idx_abbrev@.h"
+#include "search_multi_cta_kernel_vpq_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@src_idx_abbrev@.h"
 
 using namespace cuvs::neighbors::cagra::detail;
 
@@ -38,9 +39,9 @@ __attribute__((__constructor__)) static void register_search_multi_cta_kernel_vp
     tag_dist_@dist_abbrev@,
     tag_idx_@src_idx_abbrev@,
     tag_codebook_half>(
-    "search_multi_cta_kernel_vpq_@metric_name_full@_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd",
-    embedded_search_multi_cta_kernel_vpq_@metric_name_full@_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@src_idx_abbrev@,
-    sizeof(embedded_search_multi_cta_kernel_vpq_@metric_name_full@_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@src_idx_abbrev@));
+    "search_multi_cta_kernel_vpq_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd",
+    embedded_search_multi_cta_kernel_vpq_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@src_idx_abbrev@,
+    sizeof(embedded_search_multi_cta_kernel_vpq_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@src_idx_abbrev@));
 }
 
 #endif
