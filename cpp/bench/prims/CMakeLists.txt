@@ -32,10 +32,6 @@ function(ConfigurePrimsBench)
   set(oneValueArgs NAME)
   set(multiValueArgs PATH LINKS CXXFLAGS)
 
-  #if(NOT BUILD_CPU_ONLY)
-    set(GPU_BUILD ON)
-  #endif()
-
   cmake_parse_arguments(
     ConfigurePrimsBench "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN}
   )
@@ -53,7 +49,7 @@ function(ConfigurePrimsBench)
     PRIVATE ${ConfigurePrimsBench_LINKS}
             nlohmann_json::nlohmann_json
             Threads::Threads
-            $<$<BOOL:${GPU_BUILD}>:CUDA::cudart_static>
+            CUDA::cudart_static
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
             $<TARGET_NAME_IF_EXISTS:conda_env>
   )
