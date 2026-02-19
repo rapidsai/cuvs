@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -12,6 +12,8 @@
 #include <raft/linalg/transpose.cuh>
 #include <raft/sparse/coo.hpp>
 #include <raft/util/cudart_utils.hpp>
+
+#include <cub/block/block_reduce.cuh>
 
 #include <rmm/device_uvector.hpp>
 
