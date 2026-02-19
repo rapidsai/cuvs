@@ -161,8 +161,8 @@ __global__ void kern_prune(const IdxT* const knn_graph,  // [graph_chunk_size, g
                            const uint32_t degree,
                            const uint32_t batch_size,
                            const uint32_t batch_id,
-                           uint8_t* const detour_count,          // [graph_chunk_size, graph_degree]
-                           uint32_t* const num_no_detour_edges,  // [graph_size]
+                           uint8_t* const detour_count,          // [batch_size, graph_degree]
+                           uint32_t* const num_no_detour_edges,  // [batch_size]
                            uint64_t* const stats)
 {
   __shared__ uint32_t smem_num_detour[MAX_DEGREE];
@@ -172,7 +172,9 @@ __global__ void kern_prune(const IdxT* const knn_graph,  // [graph_chunk_size, g
   uint64_t* const num_retain = stats;
   uint64_t* const num_full   = stats + 1;
 
-  const uint64_t iA = blockIdx.x + (batch_size * batch_id);
+  const uint64_t iA       = blockIdx.x + (batch_size * batch_id);
+  const uint64_t iA_batch = iA % static_cast<uint64_t>(batch_size);
+
   if (iA >= graph_size) { return; }
 
   // Load this node's neighbor row into shared memory to reduce global reads
@@ -208,7 +210,7 @@ __global__ void kern_prune(const IdxT* const knn_graph,  // [graph_chunk_size, g
 
   uint32_t num_edges_no_detour = 0;
   for (uint32_t k = threadIdx.x; k < graph_degree; k += blockDim.x) {
-    detour_count[k + (graph_degree * iA)] = min(smem_num_detour[k], (uint32_t)255);
+    detour_count[k + (graph_degree * iA_batch)] = min(smem_num_detour[k], (uint32_t)255);
     if (smem_num_detour[k] == 0) { num_edges_no_detour++; }
   }
   num_edges_no_detour += __shfl_xor_sync(0xffffffff, num_edges_no_detour, 1);
@@ -219,7 +221,7 @@ __global__ void kern_prune(const IdxT* const knn_graph,  // [graph_chunk_size, g
   num_edges_no_detour = min(num_edges_no_detour, degree);
 
   if (threadIdx.x == 0) {
-    num_no_detour_edges[iA] = num_edges_no_detour;
+    num_no_detour_edges[iA_batch] = num_edges_no_detour;
     atomicAdd((unsigned long long int*)num_retain, (unsigned long long int)num_edges_no_detour);
     if (num_edges_no_detour >= degree) { atomicAdd((unsigned long long int*)num_full, 1); }
   }
@@ -244,26 +246,179 @@ __global__ void kern_make_rev_graph(const IdxT* const dest_nodes,     // [graph_
   }
 }
 
-// Build reverse graph from column k of output_graph (avoids per-column host fill and H2D copy).
+// Select output_graph_degree neighbors with smallest detour count per node (writes to device).
 template <class IdxT>
-__global__ void kern_make_rev_graph_column(const IdxT* const output_graph,  // [graph_size, degree]
-                                           IdxT* const rev_graph,
-                                           uint32_t* const rev_graph_count,
-                                           const uint32_t graph_size,
-                                           const uint32_t degree,
-                                           const uint32_t k)
+__global__ void kern_select_smallest_detour_neighbors(
+  const IdxT* const knn_graph,
+  uint64_t graph_size,
+  uint64_t knn_graph_degree,
+  uint64_t output_graph_degree,
+  const uint8_t* const d_detour_count,  // [batch_size, graph_degree]
+  IdxT* output_graph_ptr,               // [batch_size, output_graph_degree]
+  const uint32_t batch_size,
+  const uint32_t batch_id)
 {
-  const uint64_t tid  = threadIdx.x + (blockDim.x * blockIdx.x);
-  const uint64_t tnum = blockDim.x * gridDim.x;
+  // FIXME: this does not really work for num_warps > 1
+  constexpr unsigned warp_mask = 0xffffffff;
+  const uint32_t num_warps     = blockDim.x / raft::WarpSize;
+  extern __shared__ unsigned char smem_buf[];
+  uint32_t* smem_indices = reinterpret_cast<uint32_t*>(smem_buf);
+  uint16_t* smem_detour_count =
+    reinterpret_cast<uint16_t*>(&smem_indices[knn_graph_degree * num_warps]);
 
-  for (uint64_t src_id = tid; src_id < graph_size; src_id += tnum) {
-    const IdxT dest_id = output_graph[k + (static_cast<uint64_t>(degree) * src_id)];
-    if (dest_id >= graph_size) continue;
+  const uint32_t wid     = threadIdx.x / raft::WarpSize;
+  const uint32_t lane_id = threadIdx.x % raft::WarpSize;
+  const uint64_t nid     = static_cast<uint64_t>(blockIdx.x) * num_warps +
+                       (static_cast<uint64_t>(batch_size) * batch_id * num_warps) + wid;
 
-    const uint32_t pos = atomicAdd(rev_graph_count + dest_id, 1);
-    if (pos < degree) {
-      rev_graph[(static_cast<uint64_t>(degree) * dest_id) + pos] = static_cast<IdxT>(src_id);
+  const uint64_t nid_batch = nid % static_cast<uint64_t>(batch_size);
+
+  if (nid >= graph_size) return;
+
+  for (uint32_t k = lane_id; k < knn_graph_degree; k += raft::WarpSize) {
+    smem_detour_count[(knn_graph_degree * wid) + k] =
+      d_detour_count[nid_batch * knn_graph_degree + k];
+    smem_indices[(knn_graph_degree * wid) + k] = k;
+  }
+  __syncwarp(warp_mask);
+
+  for (uint32_t i = 0; i < output_graph_degree; i++) {
+    uint32_t local_min = 256;
+    uint32_t local_idx = 0xffffffff;
+    for (uint32_t k = lane_id; k < knn_graph_degree; k += raft::WarpSize) {
+      uint32_t c = smem_detour_count[(knn_graph_degree * wid) + k];
+      if (c < local_min) {
+        local_min = c;
+        local_idx = smem_indices[(knn_graph_degree * wid) + k];
+      }
     }
+    uint32_t local_min_with_tag = (local_min << 16) | local_idx;
+    for (int offset = raft::WarpSize / 2; offset > 0; offset /= 2) {
+      uint32_t other     = __shfl_down_sync(warp_mask, local_min_with_tag, offset);
+      local_min_with_tag = (local_min_with_tag <= other) ? local_min_with_tag : other;
+    }
+    uint32_t warp_min_tag   = __shfl_sync(warp_mask, local_min_with_tag, 0);
+    uint32_t warp_local_idx = warp_min_tag & 0xffff;
+
+    if (local_idx == warp_local_idx) {
+      output_graph_ptr[nid_batch * output_graph_degree + i] =
+        knn_graph[knn_graph_degree * nid + warp_local_idx];
+      smem_detour_count[knn_graph_degree * wid + warp_local_idx] = 255;
+    }
+    __syncwarp(warp_mask);
+  }
+}
+
+// Helper functions for merging the graph
+template <typename T>
+__device__ unsigned int warp_pos_in_array(T val, const T* array, uint64_t num)
+{
+  unsigned int ret       = num;
+  const uint32_t lane_id = threadIdx.x % 32;
+  for (uint64_t i = lane_id; i < num; i += 32) {
+    if (val == array[i]) {
+      ret = i;
+      break;
+    }
+  }
+  ret = __reduce_min_sync(0xffffffff, ret);
+  return ret;
+}
+
+template <typename T>
+__device__ void thread_shift_array(T* array, uint64_t num)
+{
+  for (uint64_t i = num; i > 0; i--) {
+    array[i] = array[i - 1];
+  }
+}
+
+template <typename IdxT>
+__global__ void kern_merge_graph(IdxT* output_graph,
+                                 const IdxT* const rev_graph,
+                                 uint32_t* const rev_graph_count,  // [graph_size]
+                                 const uint32_t graph_size,
+                                 const uint32_t output_graph_degree,
+                                 const IdxT* const mst_graph,
+                                 const uint32_t mst_graph_degree,
+                                 const uint32_t* const mst_graph_num_edges_ptr,
+                                 const uint32_t batch_size,
+                                 const uint32_t batch_id,
+                                 bool guarantee_connectivity,
+                                 bool* check_num_protected_edges)
+{
+  extern __shared__ unsigned char smem_buf[];
+  IdxT* smem_sorted_output_graph = reinterpret_cast<IdxT*>(smem_buf);
+
+  const uint32_t wid       = threadIdx.x / 32;
+  const uint32_t lane_id   = threadIdx.x % 32;
+  const uint32_t num_warps = blockDim.x / 32;
+  const uint64_t nid       = blockIdx.x * num_warps + (batch_size * batch_id * num_warps) + wid;
+  if (nid >= graph_size) { return; }
+
+  if (lane_id == 0) check_num_protected_edges[0] = true;
+
+  const auto mst_graph_num_edges = mst_graph_num_edges_ptr[nid];
+  // If guarantee_connectivity == true, use a temporal list to merge the
+  // neighbor lists of the graphs.
+  if (guarantee_connectivity) {
+    for (uint32_t i = lane_id; i < mst_graph_degree; i += 32) {
+      smem_sorted_output_graph[i] = mst_graph[nid * mst_graph_degree + i];
+    }
+    __syncwarp();
+    for (uint32_t pruned_j = 0, output_j = mst_graph_num_edges;
+         (pruned_j < output_graph_degree) && (output_j < output_graph_degree);
+         pruned_j++) {
+      const auto v     = output_graph[output_graph_degree * nid + pruned_j];
+      unsigned int dup = 0;
+      for (uint32_t m = lane_id; m < output_j; m += 32) {
+        if (v == smem_sorted_output_graph[m]) {
+          dup = 1;
+          break;
+        }
+      }
+
+      unsigned int warp_dup = __ballot_sync(0xffffffff, dup);
+      if (warp_dup == 0) {
+        if (lane_id == 0) smem_sorted_output_graph[output_j] = v;
+        output_j++;
+      }
+      __syncwarp();
+    }
+  }
+
+  else {
+    for (uint32_t i = lane_id; i < output_graph_degree; i += 32) {
+      smem_sorted_output_graph[i] = output_graph[output_graph_degree * nid + i];
+    }
+    __syncwarp();
+  }
+
+  const auto num_protected_edges = max(mst_graph_num_edges, output_graph_degree / 2);
+
+  if (num_protected_edges > output_graph_degree) { check_num_protected_edges[0] = false; }
+  if (num_protected_edges == output_graph_degree) { return; }
+
+  auto kr = min(rev_graph_count[nid], output_graph_degree);
+
+  while (kr) {
+    kr -= 1;
+    if (rev_graph[kr + (output_graph_degree * nid)] < graph_size) {
+      uint64_t pos = warp_pos_in_array<IdxT>(
+        rev_graph[kr + (output_graph_degree * nid)], smem_sorted_output_graph, output_graph_degree);
+      if (pos < num_protected_edges) { continue; }
+      uint64_t num_shift = pos - num_protected_edges;
+      if (pos >= output_graph_degree) { num_shift = output_graph_degree - num_protected_edges - 1; }
+      if (lane_id == 0) {
+        thread_shift_array<IdxT>(smem_sorted_output_graph + num_protected_edges, num_shift);
+        smem_sorted_output_graph[num_protected_edges] = rev_graph[kr + (output_graph_degree * nid)];
+      }
+      __syncwarp();
+    }
+  }
+
+  for (uint32_t i = lane_id; i < output_graph_degree; i += 32) {
+    output_graph[(output_graph_degree * nid) + i] = smem_sorted_output_graph[i];
   }
 }
 
@@ -737,11 +892,11 @@ void mst_opt_update_graph(IdxT* mst_graph_ptr,
 //   an approximate MST.
 // * If the input kNN graph is disconnected, random connection is added to the largest cluster.
 //
-template <typename IdxT = uint32_t>
+template <typename IdxT, typename InputMatrixView, typename OutputMatrixView, typename VectorView>
 void mst_optimization(raft::resources const& res,
-                      raft::host_matrix_view<IdxT, int64_t, raft::row_major> input_graph,
-                      raft::host_matrix_view<IdxT, int64_t, raft::row_major> output_graph,
-                      raft::host_vector_view<uint32_t, int64_t> mst_graph_num_edges,
+                      InputMatrixView input_graph,
+                      OutputMatrixView output_graph,
+                      VectorView mst_graph_num_edges,
                       bool use_gpu = true)
 {
   if (use_gpu) {
@@ -1185,6 +1340,7 @@ void count_2hop_detours(raft::host_matrix_view<IdxT, int64_t, raft::row_major> k
   }
 }
 
+// TODO allow pinned input for both knn_graph and new_graph
 template <typename IdxT = uint32_t,
           typename g_accessor =
             raft::host_device_accessor<cuda::std::default_accessor<IdxT>, raft::memory_type::host>>
@@ -1213,9 +1369,10 @@ void optimize(
     "cagra::graph::optimize(%zu, %zu, %u)", graph_size, knn_graph_degree, output_graph_degree);
 
   // MST optimization
-  auto mst_graph               = raft::make_host_matrix<IdxT, int64_t, raft::row_major>(0, 0);
-  auto mst_graph_num_edges     = raft::make_host_vector<uint32_t, int64_t>(graph_size);
+  auto mst_graph           = raft::make_pinned_matrix<IdxT, int64_t, raft::row_major>(res, 0, 0);
+  auto mst_graph_num_edges = raft::make_pinned_vector<uint32_t, int64_t>(res, graph_size);
   auto mst_graph_num_edges_ptr = mst_graph_num_edges.data_handle();
+
 #pragma omp parallel for
   for (uint64_t i = 0; i < graph_size; i++) {
     mst_graph_num_edges_ptr[i] = 0;
@@ -1223,15 +1380,46 @@ void optimize(
   if (guarantee_connectivity) {
     raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
       "cagra::graph::optimize/check_connectivity");
-    mst_graph =
-      raft::make_host_matrix<IdxT, int64_t, raft::row_major>(graph_size, output_graph_degree);
+    mst_graph = raft::make_pinned_matrix<IdxT, int64_t, raft::row_major>(
+      res, graph_size, output_graph_degree);
     RAFT_LOG_INFO("MST optimization is used to guarantee graph connectivity.");
-    mst_optimization(res, knn_graph, mst_graph.view(), mst_graph_num_edges.view(), use_gpu);
+    mst_optimization<IdxT>(res, knn_graph, mst_graph.view(), mst_graph_num_edges.view(), use_gpu);
 
     for (uint64_t i = 0; i < graph_size; i++) {
       if (i < 8 || i >= graph_size - 8) {
         RAFT_LOG_DEBUG("# mst_graph_num_edges_ptr[%lu]: %u\n", i, mst_graph_num_edges_ptr[i]);
       }
+    }
+  }
+
+  uint32_t batch_size =
+    std::min(static_cast<uint32_t>(graph_size), static_cast<uint32_t>(256 * 1024));
+  const uint32_t num_batch = (graph_size + batch_size - 1) / batch_size;
+
+  //
+  // If the available device memory is insufficient, do not use the GPU to count
+  // the number of 2-hop detours, but use the CPU.
+  //
+  // TODO: we should decide on a global strategy for this in a single place
+  // it comes down to input memory type and available memory which data should be copied to GPU
+  bool _use_gpu_prune = use_gpu;
+  if (_use_gpu_prune) {
+    try {
+      auto d_detour_count = raft::make_device_mdarray<uint8_t>(
+        res, large_tmp_mr, raft::make_extents<int64_t>(batch_size, knn_graph_degree));
+      auto d_num_no_detour_edges = raft::make_device_mdarray<uint32_t>(
+        res, large_tmp_mr, raft::make_extents<int64_t>(batch_size));
+      auto d_output_graph = raft::make_device_mdarray<IdxT>(
+        res, large_tmp_mr, raft::make_extents<int64_t>(batch_size, output_graph_degree));
+      // TODO we also want to consider pinned memory in case we are short on memory
+      auto d_input_graph = raft::make_device_mdarray<IdxT>(
+        res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, knn_graph_degree));
+    } catch (std::bad_alloc& e) {
+      RAFT_LOG_DEBUG("Insufficient memory for pruning on GPU");
+      _use_gpu_prune = false;
+    } catch (raft::logic_error& e) {
+      RAFT_LOG_DEBUG("Insufficient memory for pruning on GPU (logic error)");
+      _use_gpu_prune = false;
     }
   }
 
@@ -1253,62 +1441,9 @@ void optimize(
     // specified number of edges are picked up for each node, starting with the
     // edge with the lowest number of 2-hop detours.
     //
-    auto detour_count = raft::make_host_matrix<uint8_t, int64_t>(graph_size, knn_graph_degree);
-
-    //
-    // If the available device memory is insufficient, do not use the GPU to count
-    // the number of 2-hop detours, but use the CPU.
-    //
-    bool _use_gpu = use_gpu;
-    if (_use_gpu) {
-      try {
-        auto d_detour_count = raft::make_device_mdarray<uint8_t>(
-          res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, knn_graph_degree));
-        auto d_num_no_detour_edges = raft::make_device_mdarray<uint32_t>(
-          res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
-        auto d_input_graph = raft::make_device_mdarray<IdxT>(
-          res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, knn_graph_degree));
-      } catch (std::bad_alloc& e) {
-        RAFT_LOG_DEBUG("Insufficient memory for 2-hop node counting on GPU");
-        _use_gpu = false;
-      } catch (raft::logic_error& e) {
-        RAFT_LOG_DEBUG("Insufficient memory for 2-hop node counting on GPU (logic error)");
-        _use_gpu = false;
-      }
-    }
-    if (_use_gpu) {
-      // Count 2-hop detours on GPU
-      raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
-        "cagra::graph::optimize/prune/2-hop-counting-by-GPU");
-      const double time_2hop_count_start = cur_time();
-
-      uint64_t num_keep __attribute__((unused)) = 0;
-      uint64_t num_full __attribute__((unused)) = 0;
-      auto d_detour_count                       = raft::make_device_mdarray<uint8_t>(
-        res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, knn_graph_degree));
-
-      RAFT_CUDA_TRY(cudaMemsetAsync(d_detour_count.data_handle(),
-                                    0xff,
-                                    graph_size * knn_graph_degree * sizeof(uint8_t),
-                                    raft::resource::get_cuda_stream(res)));
-
-      auto d_num_no_detour_edges = raft::make_device_mdarray<uint32_t>(
-        res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
-      RAFT_CUDA_TRY(cudaMemsetAsync(d_num_no_detour_edges.data_handle(),
-                                    0x00,
-                                    graph_size * sizeof(uint32_t),
-                                    raft::resource::get_cuda_stream(res)));
-
-      auto dev_stats  = raft::make_device_vector<uint64_t>(res, 2);
-      auto host_stats = raft::make_host_vector<uint64_t>(2);
-
+    if (_use_gpu_prune) {
+      // Pruning on GPU
       RAFT_LOG_DEBUG("# Pruning kNN Graph on GPUs\r");
-
-      // Copy knn_graph over to device if necessary
-      device_matrix_view_from_host d_input_graph(
-        res,
-        raft::make_host_matrix_view<IdxT, int64_t>(
-          knn_graph.data_handle(), graph_size, knn_graph_degree));
 
       constexpr int MAX_DEGREE = 1024;
       if (knn_graph_degree > MAX_DEGREE) {
@@ -1318,17 +1453,47 @@ void optimize(
           knn_graph_degree,
           MAX_DEGREE);
       }
-      const uint32_t batch_size =
-        std::min(static_cast<uint32_t>(graph_size), static_cast<uint32_t>(256 * 1024));
-      const uint32_t num_batch = (graph_size + batch_size - 1) / batch_size;
-      const dim3 threads_prune(32, 1, 1);
-      const dim3 blocks_prune(batch_size, 1, 1);
 
+      const double prune_start = cur_time();
+
+      uint64_t num_keep __attribute__((unused)) = 0;
+      uint64_t num_full __attribute__((unused)) = 0;
+      auto dev_stats                            = raft::make_device_vector<uint64_t>(res, 2);
+      auto host_stats                           = raft::make_host_vector<uint64_t>(2);
       RAFT_CUDA_TRY(cudaMemsetAsync(
         dev_stats.data_handle(), 0, sizeof(uint64_t) * 2, raft::resource::get_cuda_stream(res)));
 
-      const size_t prune_smem_size = knn_graph_degree * sizeof(IdxT);
+      // Copy knn_graph over to device if necessary
+      // TODO: should we use pinned memory if we have issues fitting on GPU?
+      device_matrix_view_from_host d_input_graph(
+        res,
+        raft::make_host_matrix_view<IdxT, int64_t>(
+          knn_graph.data_handle(), graph_size, knn_graph_degree));
+
+      // data structures per batch
+      auto d_detour_count = raft::make_device_mdarray<uint8_t>(
+        res, large_tmp_mr, raft::make_extents<int64_t>(batch_size, knn_graph_degree));
+      auto d_num_no_detour_edges = raft::make_device_mdarray<uint32_t>(
+        res, large_tmp_mr, raft::make_extents<int64_t>(batch_size));
+      auto d_output_graph = raft::make_device_mdarray<IdxT>(
+        res, large_tmp_mr, raft::make_extents<int64_t>(batch_size, output_graph_degree));
+
       for (uint32_t i_batch = 0; i_batch < num_batch; i_batch++) {
+        // initialize the detour_count and num_no_detour_edges for the current batch
+        RAFT_CUDA_TRY(cudaMemsetAsync(d_detour_count.data_handle(),
+                                      0xff,
+                                      batch_size * knn_graph_degree * sizeof(uint8_t),
+                                      raft::resource::get_cuda_stream(res)));
+
+        RAFT_CUDA_TRY(cudaMemsetAsync(d_num_no_detour_edges.data_handle(),
+                                      0x00,
+                                      batch_size * sizeof(uint32_t),
+                                      raft::resource::get_cuda_stream(res)));
+
+        // count 2-hop detours for the current batch
+        const dim3 threads_prune(32, 1, 1);
+        const dim3 blocks_prune(batch_size, 1, 1);
+        const size_t prune_smem_size = knn_graph_degree * sizeof(IdxT);
         kern_prune<MAX_DEGREE, IdxT>
           <<<blocks_prune, threads_prune, prune_smem_size, raft::resource::get_cuda_stream(res)>>>(
             d_input_graph.data_handle(),
@@ -1340,6 +1505,30 @@ void optimize(
             d_detour_count.data_handle(),
             d_num_no_detour_edges.data_handle(),
             dev_stats.data_handle());
+
+        // select smallest-detour neighbors for the current batch
+        const size_t select_smem_size =
+          (knn_graph_degree * knn_graph_degree) * (sizeof(uint16_t) + sizeof(uint32_t));
+        const dim3 threads_select(32, 1, 1);
+        const dim3 blocks_select(batch_size, 1, 1);
+        kern_select_smallest_detour_neighbors<IdxT>
+          <<<blocks_select,
+             threads_select,
+             select_smem_size,
+             raft::resource::get_cuda_stream(res)>>>(d_input_graph.data_handle(),
+                                                     graph_size,
+                                                     knn_graph_degree,
+                                                     output_graph_degree,
+                                                     d_detour_count.data_handle(),
+                                                     d_output_graph.data_handle(),
+                                                     batch_size,
+                                                     i_batch);
+
+        raft::copy(output_graph_ptr,
+                   d_output_graph.data_handle() + i_batch * batch_size * output_graph_degree,
+                   static_cast<size_t>(batch_size) * output_graph_degree,
+                   raft::resource::get_cuda_stream(res));
+
         raft::resource::sync_stream(res);
         RAFT_LOG_DEBUG(
           "# Pruning kNN Graph on GPUs (%.1lf %%)\r",
@@ -1348,96 +1537,93 @@ void optimize(
       raft::resource::sync_stream(res);
       RAFT_LOG_DEBUG("\n");
 
-      raft::copy(detour_count.data_handle(),
-                 d_detour_count.data_handle(),
-                 detour_count.size(),
-                 raft::resource::get_cuda_stream(res));
-
       raft::copy(
         host_stats.data_handle(), dev_stats.data_handle(), 2, raft::resource::get_cuda_stream(res));
       num_keep = host_stats.data_handle()[0];
       num_full = host_stats.data_handle()[1];
 
-      const double time_2hop_count_end = cur_time();
+      const double prune_end = cur_time();
       RAFT_LOG_DEBUG(
-        "# Time for 2-hop detour counting on GPU: %.1lf sec, "
+        "# Time for pruning on GPU: %.1lf sec, "
         "avg_no_detour_edges_per_node: %.2lf/%u, "
         "nodes_with_no_detour_at_all_edges: %.1lf%%",
-        time_2hop_count_end - time_2hop_count_start,
+        prune_end - prune_start,
         (double)num_keep / graph_size,
         output_graph_degree,
         (double)num_full / graph_size * 100);
     } else {
-      // Count 2-hop detours on CPU
-      raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
-        "cagra::graph::optimize/prune/2-hop-counting-by-CPU");
-      const double time_2hop_count_start = cur_time();
+      // Pruning on CPU
+      auto detour_count = raft::make_host_matrix<uint8_t, int64_t>(graph_size, knn_graph_degree);
 
-      count_2hop_detours(knn_graph, detour_count.view());
+      {
+        raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
+          "cagra::graph::optimize/prune/2-hop-counting-by-CPU");
+        const double time_2hop_count_start = cur_time();
 
-      const double time_2hop_count_end = cur_time();
-      RAFT_LOG_DEBUG("# Time for 2-hop detour counting on CPU: %.1lf sec",
-                     time_2hop_count_end - time_2hop_count_start);
-    }
+        count_2hop_detours(knn_graph, detour_count.view());
 
-    // Create pruned kNN graph
-    bool invalid_neighbor_list = false;
+        const double time_2hop_count_end = cur_time();
+        RAFT_LOG_DEBUG("# Time for 2-hop detour counting on CPU: %.1lf sec",
+                       time_2hop_count_end - time_2hop_count_start);
+      }
+      bool invalid_neighbor_list = false;
 #pragma omp parallel for
-    for (uint64_t i = 0; i < graph_size; i++) {
-      // Find the `output_graph_degree` smallest detourable count nodes by checking the detourable
-      // count of the neighbors while increasing the target detourable count from zero.
-      uint64_t pk         = 0;
-      uint32_t num_detour = 0;
-      for (uint32_t l = 0; l < knn_graph_degree && pk < output_graph_degree; l++) {
-        uint32_t next_num_detour = std::numeric_limits<uint32_t>::max();
-        for (uint64_t k = 0; k < knn_graph_degree; k++) {
-          const auto num_detour_k = detour_count(i, k);
-          // Find the detourable count to check in the next iteration
-          if (num_detour_k > num_detour) {
-            next_num_detour = std::min(static_cast<uint32_t>(num_detour_k), next_num_detour);
-          }
-
-          // Store the neighbor index if its detourable count is equal to `num_detour`.
-          if (num_detour_k != num_detour) { continue; }
-
-          // Check duplication and append
-          const auto candidate_node = knn_graph(i, k);
-          bool dup                  = false;
-          for (uint32_t dk = 0; dk < pk; dk++) {
-            if (candidate_node == output_graph_ptr[i * output_graph_degree + dk]) {
-              dup = true;
-              break;
+      for (uint64_t i = 0; i < graph_size; i++) {
+        // Find the `output_graph_degree` smallest detourable count nodes by checking the detourable
+        // count of the neighbors while increasing the target detourable count from zero.
+        uint64_t pk         = 0;
+        uint32_t num_detour = 0;
+        for (uint32_t l = 0; l < knn_graph_degree && pk < output_graph_degree; l++) {
+          uint32_t next_num_detour = std::numeric_limits<uint32_t>::max();
+          for (uint64_t k = 0; k < knn_graph_degree; k++) {
+            const auto num_detour_k = detour_count(i, k);
+            // Find the detourable count to check in the next iteration
+            if (num_detour_k > num_detour) {
+              next_num_detour = std::min(static_cast<uint32_t>(num_detour_k), next_num_detour);
             }
-          }
-          if (!dup && candidate_node < graph_size) {
-            output_graph_ptr[i * output_graph_degree + pk] = candidate_node;
-            pk += 1;
+
+            // Store the neighbor index if its detourable count is equal to `num_detour`.
+            if (num_detour_k != num_detour) { continue; }
+
+            // Check duplication and append
+            const auto candidate_node = knn_graph(i, k);
+            bool dup                  = false;
+            for (uint32_t dk = 0; dk < pk; dk++) {
+              if (candidate_node == output_graph_ptr[i * output_graph_degree + dk]) {
+                dup = true;
+                break;
+              }
+            }
+            if (!dup && candidate_node < graph_size) {
+              output_graph_ptr[i * output_graph_degree + pk] = candidate_node;
+              pk += 1;
+            }
+            if (pk >= output_graph_degree) break;
           }
           if (pk >= output_graph_degree) break;
-        }
-        if (pk >= output_graph_degree) break;
 
-        if (next_num_detour == std::numeric_limits<uint32_t>::max()) {
-          // There are no valid edges enough in the initial kNN graph. Break the loop here and catch
-          // the error at the next validation (pk != output_graph_degree).
-          break;
+          if (next_num_detour == std::numeric_limits<uint32_t>::max()) {
+            // There are no valid edges enough in the initial kNN graph. Break the loop here and
+            // catch the error at the next validation (pk != output_graph_degree).
+            break;
+          }
+          num_detour = next_num_detour;
         }
-        num_detour = next_num_detour;
+        if (pk != output_graph_degree) {
+          RAFT_LOG_DEBUG(
+            "Couldn't find the output_graph_degree (%lu) smallest detourable count nodes for "
+            "node %lu in the rank-based node reranking process",
+            output_graph_degree,
+            i);
+          invalid_neighbor_list = true;
+        }
       }
-      if (pk != output_graph_degree) {
-        RAFT_LOG_DEBUG(
-          "Couldn't find the output_graph_degree (%lu) smallest detourable count nodes for "
-          "node %lu in the rank-based node reranking process",
-          output_graph_degree,
-          i);
-        invalid_neighbor_list = true;
-      }
+      RAFT_EXPECTS(
+        !invalid_neighbor_list,
+        "Could not generate an intermediate CAGRA graph because the initial kNN graph contains too "
+        "many invalid or duplicated neighbor nodes. This error can occur, for example, if too many "
+        "overflows occur during the norm computation between the dataset vectors.");
     }
-    RAFT_EXPECTS(
-      !invalid_neighbor_list,
-      "Could not generate an intermediate CAGRA graph because the initial kNN graph contains too "
-      "many invalid or duplicated neighbor nodes. This error can occur, for example, if too many "
-      "overflows occur during the norm computation between the dataset vectors.");
 
     const double time_prune_end = cur_time();
     RAFT_LOG_DEBUG("# Pruning time: %.1lf ms", (time_prune_end - time_prune_start) * 1000.0);
@@ -1446,155 +1632,281 @@ void optimize(
   auto rev_graph       = raft::make_host_matrix<IdxT, int64_t>(graph_size, output_graph_degree);
   auto rev_graph_count = raft::make_host_vector<uint32_t, int64_t>(graph_size);
 
-  {
-    raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
-      "cagra::graph::optimize/reverse");
-    //
-    // Make reverse graph
-    //
-    const double time_make_start = cur_time();
-
-    device_matrix_view_from_host<IdxT, int64_t> d_rev_graph(res, rev_graph.view());
-    RAFT_CUDA_TRY(cudaMemsetAsync(d_rev_graph.data_handle(),
-                                  0xff,
-                                  graph_size * output_graph_degree * sizeof(IdxT),
-                                  raft::resource::get_cuda_stream(res)));
-
-    auto d_rev_graph_count = raft::make_device_mdarray<uint32_t>(
-      res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
-    RAFT_CUDA_TRY(cudaMemsetAsync(d_rev_graph_count.data_handle(),
-                                  0x00,
-                                  graph_size * sizeof(uint32_t),
-                                  raft::resource::get_cuda_stream(res)));
-
-    // Copy full output graph to device once; kernel indexes by column k (no per-column H2D copy).
-    // TODO: depending on available device memory, this may need to be split into multiple copies.
-    auto d_output_graph = raft::make_device_mdarray<IdxT>(
-      res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, output_graph_degree));
-    raft::copy(d_output_graph.data_handle(),
-               output_graph_ptr,
-               static_cast<size_t>(graph_size) * output_graph_degree,
-               raft::resource::get_cuda_stream(res));
-
-    dim3 threads(256, 1, 1);
-    dim3 blocks(1024, 1, 1);
-    for (uint32_t k = 0; k < output_graph_degree; k++) {
-      kern_make_rev_graph_column<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
-        d_output_graph.data_handle(),
-        d_rev_graph.data_handle(),
-        d_rev_graph_count.data_handle(),
-        graph_size,
-        output_graph_degree,
-        k);
-      RAFT_LOG_DEBUG("# Making reverse graph on GPUs: %u / %u    \r", k, output_graph_degree);
+  bool _use_gpu_rev_graph = use_gpu;
+  // TODO: should we use pinned memory if we have issues fitting on GPU?
+  if (_use_gpu_rev_graph) {
+    try {
+      auto d_rev_graph_count = raft::make_device_mdarray<uint32_t>(
+        res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
+      auto d_dest_nodes =
+        raft::make_device_mdarray<IdxT>(res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
+      auto d_rev_graph = raft::make_device_mdarray<IdxT>(
+        res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, output_graph_degree));
+    } catch (std::bad_alloc& e) {
+      RAFT_LOG_DEBUG("Insufficient memory for reverse graph on GPU");
+      _use_gpu_rev_graph = false;
+    } catch (raft::logic_error& e) {
+      RAFT_LOG_DEBUG("Insufficient memory for reverse graph on GPU (logic error)");
+      _use_gpu_rev_graph = false;
     }
-
-    raft::resource::sync_stream(res);
-    RAFT_LOG_DEBUG("\n");
-
-    if (d_rev_graph.allocated_memory()) {
-      raft::copy(rev_graph.data_handle(),
-                 d_rev_graph.data_handle(),
-                 graph_size * output_graph_degree,
-                 raft::resource::get_cuda_stream(res));
-    }
-    raft::copy(rev_graph_count.data_handle(),
-               d_rev_graph_count.data_handle(),
-               graph_size,
-               raft::resource::get_cuda_stream(res));
-
-    const double time_make_end = cur_time();
-    RAFT_LOG_DEBUG("# Making reverse graph time: %.1lf ms",
-                   (time_make_end - time_make_start) * 1000.0);
   }
 
-  {
-    raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
-      "cagra::graph::optimize/combine");
+  const double time_make_start = cur_time();
+  if (_use_gpu_rev_graph) {
     //
-    // Create search graphs from MST and pruned and reverse graphs
+    // Make reverse graph on GPU
     //
-    const double time_replace_start = cur_time();
+    auto d_rev_graph_count = raft::make_device_mdarray<uint32_t>(
+      res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
 
-    bool check_num_protected_edges = true;
+    device_matrix_view_from_host<IdxT, int64_t> d_rev_graph(res, rev_graph.view());
+    device_matrix_view_from_host<IdxT, int64_t> d_output_graph(
+      res,
+      raft::make_host_matrix_view<IdxT, int64_t>(
+        output_graph_ptr, graph_size, output_graph_degree));
+
+    {
+      raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
+        "cagra::graph::optimize/reverse");
+      auto dest_nodes = raft::make_host_vector<IdxT, int64_t>(graph_size);
+      auto d_dest_nodes =
+        raft::make_device_mdarray<IdxT>(res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
+
+      RAFT_CUDA_TRY(cudaMemsetAsync(d_rev_graph.data_handle(),
+                                    0xff,
+                                    graph_size * output_graph_degree * sizeof(IdxT),
+                                    raft::resource::get_cuda_stream(res)));
+
+      RAFT_CUDA_TRY(cudaMemsetAsync(d_rev_graph_count.data_handle(),
+                                    0x00,
+                                    graph_size * sizeof(uint32_t),
+                                    raft::resource::get_cuda_stream(res)));
+
+      for (uint64_t k = 0; k < output_graph_degree; k++) {
 #pragma omp parallel for
-    for (uint64_t i = 0; i < graph_size; i++) {
-      auto my_rev_graph = rev_graph.data_handle() + (output_graph_degree * i);
-      auto my_out_graph = output_graph_ptr + (output_graph_degree * i);
-
-      // If guarantee_connectivity == true, use a temporal list to merge the neighbor lists of the
-      // graphs.
-      std::vector<IdxT> temp_output_neighbor_list;
-      if (guarantee_connectivity) {
-        temp_output_neighbor_list.resize(output_graph_degree);
-        my_out_graph                   = temp_output_neighbor_list.data();
-        const auto mst_graph_num_edges = mst_graph_num_edges_ptr[i];
-
-        // Set MST graph edges
-        for (uint32_t j = 0; j < mst_graph_num_edges; j++) {
-          my_out_graph[j] = mst_graph(i, j);
+        for (uint64_t i = 0; i < graph_size; i++) {
+          // dest_nodes.data_handle()[i] = output_graph_ptr[k + (output_graph_degree * i)];
+          dest_nodes(i) = output_graph_ptr[k + (output_graph_degree * i)];
         }
+        raft::resource::sync_stream(res);
 
-        // Set pruned graph edges
-        for (uint32_t pruned_j = 0, output_j = mst_graph_num_edges;
-             (pruned_j < output_graph_degree) && (output_j < output_graph_degree);
-             pruned_j++) {
-          const auto v = output_graph_ptr[output_graph_degree * i + pruned_j];
+        raft::copy(d_dest_nodes.data_handle(),
+                   dest_nodes.data_handle(),
+                   graph_size,
+                   raft::resource::get_cuda_stream(res));
 
-          // duplication check
-          bool dup = false;
-          for (uint32_t m = 0; m < output_j; m++) {
-            if (v == my_out_graph[m]) {
-              dup = true;
-              break;
+        dim3 threads(256, 1, 1);
+        dim3 blocks(1024, 1, 1);
+        kern_make_rev_graph<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
+          d_dest_nodes.data_handle(),
+          d_rev_graph.data_handle(),
+          d_rev_graph_count.data_handle(),
+          graph_size,
+          output_graph_degree);
+        RAFT_LOG_DEBUG("# Making reverse graph on GPUs: %lu / %u    \r", k, output_graph_degree);
+      }
+
+      raft::resource::sync_stream(res);
+      RAFT_LOG_DEBUG("\n");
+
+      if (d_rev_graph.allocated_memory()) {
+        raft::copy(rev_graph.data_handle(),
+                   d_rev_graph.data_handle(),
+                   graph_size * output_graph_degree,
+                   raft::resource::get_cuda_stream(res));
+      }
+      raft::copy(rev_graph_count.data_handle(),
+                 d_rev_graph_count.data_handle(),
+                 graph_size,
+                 raft::resource::get_cuda_stream(res));
+
+      const double time_make_end = cur_time();
+      RAFT_LOG_DEBUG("# Making reverse graph time: %.1lf ms",
+                     (time_make_end - time_make_start) * 1000.0);
+    }
+
+    {
+      raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
+        "cagra::graph::optimize/combine");
+
+      // Merging the prunned graph and the reverse graph
+      const double merge_graph_start = cur_time();
+
+      // Create a boolean variable on the GPU using RAFT device allocator
+      auto d_check_num_protected_edges = raft::make_device_scalar<bool>(res, true);
+
+      const dim3 threads_merge(32, 1, 1);
+      const dim3 blocks_merge(batch_size, 1, 1);
+      const size_t merge_smem_size = (output_graph_degree + output_graph_degree) * sizeof(IdxT);
+      for (uint32_t i_batch = 0; i_batch < num_batch; i_batch++) {
+        kern_merge_graph<IdxT>
+          <<<blocks_merge, threads_merge, merge_smem_size, raft::resource::get_cuda_stream(res)>>>(
+            d_output_graph.data_handle(),
+            d_rev_graph.data_handle(),
+            d_rev_graph_count.data_handle(),
+            graph_size,
+            output_graph_degree,
+            mst_graph.data_handle(),
+            output_graph_degree,
+            mst_graph_num_edges_ptr,
+            batch_size,
+            i_batch,
+            guarantee_connectivity,
+            d_check_num_protected_edges.data_handle());
+      }
+
+      bool check_num_protected_edges = true;
+      raft::copy(&check_num_protected_edges,
+                 d_check_num_protected_edges.data_handle(),
+                 1,
+                 raft::resource::get_cuda_stream(res));
+      raft::resource::sync_stream(res);
+
+      // TODO: is this required?
+      if (d_output_graph.allocated_memory()) {
+        raft::copy(output_graph_ptr,
+                   d_output_graph.data_handle(),
+                   graph_size * output_graph_degree,
+                   raft::resource::get_cuda_stream(res));
+      }
+
+      const auto merge_graph_end = cur_time();
+      RAFT_EXPECTS(check_num_protected_edges,
+                   "Failed to merge the MST, pruned, and reverse edge graphs. "
+                   "Some nodes have too "
+                   "many MST optimization edges.");
+
+      RAFT_LOG_DEBUG("# Time for merging graphs: %.1lf ms",
+                     (merge_graph_end - merge_graph_start) * 1000.0);
+    }
+  } else {
+    {
+      // Make reverse graph on CPU
+      raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
+        "cagra::graph::optimize/reverse");
+
+      auto rev_graph_ptr       = rev_graph.data_handle();
+      auto rev_graph_count_ptr = rev_graph_count.data_handle();
+
+#pragma omp parallel for
+      for (uint64_t i = 0; i < graph_size; i++) {
+        rev_graph_count_ptr[i] = 0;
+      }
+
+      for (uint32_t k = 0; k < output_graph_degree; k++) {
+#pragma omp parallel for
+        for (uint64_t src_id = 0; src_id < graph_size; src_id++) {
+          const IdxT dest_id =
+            output_graph_ptr[k + (static_cast<uint64_t>(output_graph_degree) * src_id)];
+          if (dest_id >= graph_size) continue;
+          uint32_t pos;
+#pragma omp atomic capture
+          pos = rev_graph_count_ptr[dest_id]++;
+          if (pos < output_graph_degree) {
+            rev_graph_ptr[(static_cast<uint64_t>(output_graph_degree) * dest_id) + pos] =
+              static_cast<IdxT>(src_id);
+          }
+        }
+      }
+
+      const double time_make_end = cur_time();
+      RAFT_LOG_DEBUG("# Making reverse graph time (CPU): %.1lf ms",
+                     (time_make_end - time_make_start) * 1000.0);
+    }
+
+    {
+      raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
+        "cagra::graph::optimize/combine");
+      //
+      // Create search graphs from MST and pruned and reverse graphs
+      //
+      const double time_replace_start = cur_time();
+
+      bool check_num_protected_edges = true;
+#pragma omp parallel for
+      for (uint64_t i = 0; i < graph_size; i++) {
+        auto my_rev_graph = rev_graph.data_handle() + (output_graph_degree * i);
+        auto my_out_graph = output_graph_ptr + (output_graph_degree * i);
+
+        // If guarantee_connectivity == true, use a temporal list to merge the neighbor lists of the
+        // graphs.
+        std::vector<IdxT> temp_output_neighbor_list;
+        if (guarantee_connectivity) {
+          temp_output_neighbor_list.resize(output_graph_degree);
+          my_out_graph                   = temp_output_neighbor_list.data();
+          const auto mst_graph_num_edges = mst_graph_num_edges_ptr[i];
+
+          // Set MST graph edges
+          for (uint32_t j = 0; j < mst_graph_num_edges; j++) {
+            my_out_graph[j] = mst_graph(i, j);
+          }
+
+          // Set pruned graph edges
+          for (uint32_t pruned_j = 0, output_j = mst_graph_num_edges;
+               (pruned_j < output_graph_degree) && (output_j < output_graph_degree);
+               pruned_j++) {
+            const auto v = output_graph_ptr[output_graph_degree * i + pruned_j];
+
+            // duplication check
+            bool dup = false;
+            for (uint32_t m = 0; m < output_j; m++) {
+              if (v == my_out_graph[m]) {
+                dup = true;
+                break;
+              }
+            }
+
+            if (!dup) {
+              my_out_graph[output_j] = v;
+              output_j++;
             }
           }
+        }
 
-          if (!dup) {
-            my_out_graph[output_j] = v;
-            output_j++;
+        const auto num_protected_edges =
+          std::max<uint64_t>(mst_graph_num_edges_ptr[i], output_graph_degree / 2);
+        if (num_protected_edges > output_graph_degree) { check_num_protected_edges = false; }
+        if (num_protected_edges == output_graph_degree) continue;
+
+        // Replace some edges of the output graph with edges of the reverse graph.
+        auto kr = std::min<uint32_t>(rev_graph_count.data_handle()[i], output_graph_degree);
+        while (kr) {
+          kr -= 1;
+          if (my_rev_graph[kr] < graph_size) {
+            uint64_t pos = pos_in_array<IdxT>(my_rev_graph[kr], my_out_graph, output_graph_degree);
+            if (pos < num_protected_edges) { continue; }
+            uint64_t num_shift = pos - num_protected_edges;
+            if (pos >= output_graph_degree) {
+              num_shift = output_graph_degree - num_protected_edges - 1;
+            }
+            shift_array<IdxT>(my_out_graph + num_protected_edges, num_shift);
+            my_out_graph[num_protected_edges] = my_rev_graph[kr];
+          }
+        }
+
+        // If guarantee_connectivity == true, move the output neighbor list from the temporal list
+        // to the output list. If false, the copy is not needed because my_out_graph is a pointer to
+        // the output buffer.
+        if (guarantee_connectivity) {
+          for (uint32_t j = 0; j < output_graph_degree; j++) {
+            output_graph_ptr[(output_graph_degree * i) + j] = my_out_graph[j];
           }
         }
       }
+      RAFT_EXPECTS(check_num_protected_edges,
+                   "Failed to merge the MST, pruned, and reverse edge graphs. Some nodes have too "
+                   "many MST optimization edges.");
 
-      const auto num_protected_edges =
-        std::max<uint64_t>(mst_graph_num_edges_ptr[i], output_graph_degree / 2);
-      if (num_protected_edges > output_graph_degree) { check_num_protected_edges = false; }
-      if (num_protected_edges == output_graph_degree) continue;
-
-      // Replace some edges of the output graph with edges of the reverse graph.
-      auto kr = std::min<uint32_t>(rev_graph_count.data_handle()[i], output_graph_degree);
-      while (kr) {
-        kr -= 1;
-        if (my_rev_graph[kr] < graph_size) {
-          uint64_t pos = pos_in_array<IdxT>(my_rev_graph[kr], my_out_graph, output_graph_degree);
-          if (pos < num_protected_edges) { continue; }
-          uint64_t num_shift = pos - num_protected_edges;
-          if (pos >= output_graph_degree) {
-            num_shift = output_graph_degree - num_protected_edges - 1;
-          }
-          shift_array<IdxT>(my_out_graph + num_protected_edges, num_shift);
-          my_out_graph[num_protected_edges] = my_rev_graph[kr];
-        }
-      }
-
-      // If guarantee_connectivity == true, move the output neighbor list from the temporal list to
-      // the output list. If false, the copy is not needed because my_out_graph is a pointer to the
-      // output buffer.
-      if (guarantee_connectivity) {
-        for (uint32_t j = 0; j < output_graph_degree; j++) {
-          output_graph_ptr[(output_graph_degree * i) + j] = my_out_graph[j];
-        }
-      }
+      const double time_replace_end = cur_time();
+      RAFT_LOG_DEBUG("# Replacing edges time: %.1lf ms",
+                     (time_replace_end - time_replace_start) * 1000.0);
     }
-    RAFT_EXPECTS(check_num_protected_edges,
-                 "Failed to merge the MST, pruned, and reverse edge graphs. Some nodes have too "
-                 "many MST optimization edges.");
+  }
 
-    const double time_replace_end = cur_time();
-    RAFT_LOG_DEBUG("# Replacing edges time: %.1lf ms",
-                   (time_replace_end - time_replace_start) * 1000.0);
-
+  // Check stats
+  {
+    raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
+      "cagra::graph::optimize/stats");
     /* stats */
     uint64_t num_replaced_edges = 0;
 #pragma omp parallel for reduction(+ : num_replaced_edges)
