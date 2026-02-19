@@ -3053,7 +3053,7 @@ void recompute_internal_state(const raft::resources& res, index<uint8_t, int64_t
 }  // namespace helpers
 
 #ifdef CUVS_ENABLE_JIT_LTO
-namespace udf {
+namespace experimental::udf {
 
 // ============================================================================
 // Real C++ implementations for compile-time validation
@@ -3393,6 +3393,7 @@ template <typename T, typename U> inline constexpr bool is_same_v = is_same<T, U
  * This macro creates:
  * 1. A struct that inherits from metric_interface (compile-time validation)
  * 2. A function NAME_udf() that returns a metric_source for JIT compilation
+ * 3. A BODY that needs to be compiled by nvrtc and must be valid CUDA device code
  *
  * @param NAME The name of your metric (becomes struct name and function prefix)
  * @param BODY The body of operator()(AccT& acc, point_type x, point_type y)
@@ -3428,26 +3429,26 @@ template <typename T, typename U> inline constexpr bool is_same_v = is_same<T, U
  *       }
  *   })
  */
-#define CUVS_METRIC(NAME, BODY)                                                         \
-  template <typename T, typename AccT, int Veclen>                                      \
-  struct NAME : cuvs::neighbors::ivf_flat::udf::metric_interface<T, AccT, Veclen> {     \
-    using point_type = cuvs::neighbors::ivf_flat::udf::point<T, AccT, Veclen>;          \
-    __device__ void operator()(AccT& acc, point_type x, point_type y) override { BODY } \
-  };                                                                                    \
-                                                                                        \
-  inline std::string NAME##_udf()                                                       \
-  {                                                                                     \
-    using namespace cuvs::neighbors::ivf_flat::udf;                                     \
-    std::string result;                                                                 \
-    result += jit_preamble_code;                                                        \
-    result += point_code;                                                               \
-    result += squared_diff_code;                                                        \
-    result += abs_diff_code;                                                            \
-    result += dot_product_code;                                                         \
-    result += product_code;                                                             \
-    result += sum_code;                                                                 \
-    result += max_elem_code;                                                            \
-    result += metric_interface_code;                                                    \
+#define CUVS_METRIC(NAME, BODY)                                                                   \
+  template <typename T, typename AccT, int Veclen>                                                \
+  struct NAME : cuvs::neighbors::ivf_flat::experimental::udf::metric_interface<T, AccT, Veclen> { \
+    using point_type = cuvs::neighbors::ivf_flat::experimental::udf::point<T, AccT, Veclen>;      \
+    __device__ void operator()(AccT& acc, point_type x, point_type y) override { BODY }           \
+  };                                                                                              \
+                                                                                                  \
+  inline std::string NAME##_udf()                                                                 \
+  {                                                                                               \
+    using namespace cuvs::neighbors::ivf_flat::experimental::udf;                                 \
+    std::string result;                                                                           \
+    result += jit_preamble_code;                                                                  \
+    result += point_code;                                                                         \
+    result += squared_diff_code;                                                                  \
+    result += abs_diff_code;                                                                      \
+    result += dot_product_code;                                                                   \
+    result += product_code;                                                                       \
+    result += sum_code;                                                                           \
+    result += max_elem_code;                                                                      \
+    result += metric_interface_code;                                                              \
     result += R"(                                                                        \
 template <typename T, typename AccT, int Veclen>                                       \
 struct )" #NAME R"( : metric_interface<T, AccT, Veclen> {                              \
@@ -3464,11 +3465,11 @@ __device__ __forceinline__ void compute_dist(AccT& acc, AccT x, AccT y)         
   metric(acc, ::point<T, AccT, Veclen>(x), ::point<T, AccT, Veclen>(y));               \
 }                                                                                      \
 }}}}                                                                                   \
-)";                                                                                     \
-    return result;                                                                      \
+)";                                                                                               \
+    return result;                                                                                \
   }
 
-}  // namespace udf
+}  // namespace experimental::udf
 #endif
 
 }  // namespace cuvs::neighbors::ivf_flat

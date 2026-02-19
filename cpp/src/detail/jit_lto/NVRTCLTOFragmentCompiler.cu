@@ -11,15 +11,12 @@
 #include "cuda.h"
 #include <nvrtc.h>
 
-#define NVRTC_SAFE_CALL(_call)                                                             \
-  do {                                                                                     \
-    nvrtcResult result = _call;                                                            \
-    if (result != NVRTC_SUCCESS) {                                                         \
-      std::cerr << "\nerror: " #_call " failed with error " << nvrtcGetErrorString(result) \
-                << '\n';                                                                   \
-      exit(1);                                                                             \
-    }                                                                                      \
-  } while (0)
+#define NVRTC_SAFE_CALL(_call)                                                \
+  {                                                                           \
+    nvrtcResult result = _call;                                               \
+    RAFT_EXPECTS(result == NVRTC_SUCCESS,                                     \
+                 "nvrtc error: " + std::string(nvrtcGetErrorString(result))); \
+  }
 
 NVRTCLTOFragmentCompiler::NVRTCLTOFragmentCompiler()
 {
@@ -86,4 +83,10 @@ void NVRTCLTOFragmentCompiler::compile(std::string const& key, std::string const
   NVRTC_SAFE_CALL(nvrtcDestroyProgram(&prog));
 
   registerNVRTCFragment(key, std::move(program), ltoIRSize);
+}
+
+NVRTCLTOFragmentCompiler& nvrtc_compiler()
+{
+  static NVRTCLTOFragmentCompiler compiler;
+  return compiler;
 }
