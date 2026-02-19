@@ -7,7 +7,7 @@
 #include <cuda_runtime.h>
 #include <raft/util/cuda_rt_essentials.hpp>
 
-namespace cuvs::neighbors::cagra::detail::multi_cta_search {
+namespace cuvs::neighbors::cagra::detail {
 
 template <class T>
 __global__ void set_value_batch_kernel(T* const dev_ptr,
@@ -37,4 +37,4 @@ void set_value_batch(T* const dev_ptr,
     <<<grid_size, block_size, 0, cuda_stream>>>(dev_ptr, ld, val, count, batch_size);
 }
 
-}  // namespace cuvs::neighbors::cagra::detail::multi_cta_search
+}  // namespace cuvs::neighbors::cagra::detail

@@ -16,6 +16,8 @@
 
 #ifdef CUVS_ENABLE_JIT_LTO
 #include "search_multi_cta_kernel_launcher_jit.cuh"
+#else
+#include "set_value_batch.cuh"
 #endif
 
 #include <raft/core/device_mdspan.hpp>
@@ -515,8 +517,6 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
   }
 #endif
 }
-
-#include "set_value_batch.cuh"
 
 template <typename DATASET_DESCRIPTOR_T, typename SourceIndexT, typename SAMPLE_FILTER_T>
 struct search_kernel_config {
