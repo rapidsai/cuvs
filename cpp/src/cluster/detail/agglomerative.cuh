@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -13,6 +13,7 @@
 
 #include <rmm/device_uvector.hpp>
 
+#include <cuda/std/tuple>
 #include <thrust/device_ptr.h>
 #include <thrust/execution_policy.h>
 #include <thrust/extrema.h>
@@ -22,7 +23,6 @@
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/sort.h>
-#include <thrust/tuple.h>
 
 #include <cstddef>
 
@@ -205,7 +205,7 @@ struct init_label_roots {
   template <typename Tuple>
   __host__ __device__ void operator()(Tuple t)
   {
-    labels[thrust::get<1>(t)] = thrust::get<0>(t);
+    labels[cuda::std::get<1>(t)] = cuda::std::get<0>(t);
   }
 
  private:
@@ -293,7 +293,7 @@ void extract_flattened_clusters(raft::resources const& handle,
     thrust::counting_iterator<uint> first(0);
 
     auto z_iter = thrust::make_zip_iterator(
-      thrust::make_tuple(first, label_roots.data() + (label_roots.size() - n_clusters)));
+      cuda::std::make_tuple(first, label_roots.data() + (label_roots.size() - n_clusters)));
 
     thrust::for_each(
       thrust_policy, z_iter, z_iter + n_clusters, init_label_roots<value_idx>(tmp_labels.data()));
