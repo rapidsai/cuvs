@@ -123,6 +123,13 @@ struct cuvsKMeansParams {
   bool final_inertia_check;
 
   /**
+   * Maximum number of consecutive mini-batch steps without improvement in smoothed inertia
+   * before early stopping. Only used when update_mode is CUVS_KMEANS_UPDATE_MINI_BATCH.
+   * If 0, this convergence criterion is disabled.
+   */
+  int max_no_improvement;
+
+  /**
    * Whether to use hierarchical (balanced) kmeans or not
    */
   bool hierarchical;

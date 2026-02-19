@@ -148,6 +148,14 @@ struct params : base_params {
    * Default: false (skip final inertia computation for performance).
    */
   bool final_inertia_check = false;
+
+  /**
+   * Maximum number of consecutive mini-batch steps without improvement in smoothed inertia
+   * before early stopping. Only used when update_mode is MiniBatch.
+   * If None/0, this convergence criterion is disabled.
+   * Default: 10
+   */
+  int max_no_improvement = 10;
 };
 
 /**

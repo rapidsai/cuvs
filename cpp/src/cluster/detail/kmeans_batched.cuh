@@ -309,6 +309,14 @@ void fit(raft::resources const& handle,
     use_weighted_sampling = true;
   }
   IdxT n_steps = params.max_iter;
+
+  // Mini-batch convergence tracking
+  T ewa_inertia        = T{0};
+  T ewa_inertia_min    = T{0};
+  int no_improvement   = 0;
+  bool ewa_initialized = false;
+  auto prev_centroids  = raft::make_device_matrix<T, IdxT>(handle, n_clusters, n_features);
+
   if (use_minibatch) {
     raft::matrix::fill(handle, total_counts.view(), T{0});
     n_steps = (params.max_iter * n_samples) / batch_size;
@@ -363,6 +371,9 @@ void fit(raft::resources const& handle,
                                                           stream);
       }
 
+      // Save centroids before update for convergence check
+      raft::copy(prev_centroids.data_handle(), centroids.data_handle(), centroids.size(), stream);
+
       auto centroids_const = raft::make_device_matrix_view<const T, IdxT>(
         centroids.data_handle(), n_clusters, n_features);
       auto L2NormBatch_const =
@@ -379,6 +390,17 @@ void fit(raft::resources const& handle,
         params.batch_samples,
         params.batch_centroids,
         workspace);
+
+      // Compute batch inertia (normalized by batch_size for comparison)
+      T batch_inertia = 0;
+      cuvs::cluster::kmeans::detail::computeClusterCost(
+        handle,
+        minClusterAndDistance_view,
+        workspace,
+        raft::make_device_scalar_view(clusterCostD.data()),
+        raft::value_op{},
+        raft::add_op{});
+      batch_inertia = clusterCostD.value(stream) / static_cast<T>(current_batch_size);
 
       raft::matrix::fill(handle, centroid_sums.view(), T{0});
       raft::matrix::fill(handle, cluster_counts.view(), T{0});
@@ -402,6 +424,71 @@ void fit(raft::resources const& handle,
       minibatch_update_centroids<T, IdxT>(
         handle, centroids, centroid_sums_const, cluster_counts_const, total_counts.view());
 
+      // Compute squared difference of centers (for convergence check)
+      auto sqrdNorm = raft::make_device_scalar<T>(handle, T{0});
+      raft::linalg::mapThenSumReduce(sqrdNorm.data_handle(),
+                                     centroids.size(),
+                                     raft::sqdiff_op{},
+                                     stream,
+                                     prev_centroids.data_handle(),
+                                     centroids.data_handle());
+      T centers_squared_diff = 0;
+      raft::copy(&centers_squared_diff, sqrdNorm.data_handle(), 1, stream);
+      raft::resource::sync_stream(handle, stream);
+
+      // Skip first step (inertia from initialization)
+      if (n_iter[0] > 1) {
+        // Update Exponentially Weighted Average of inertia
+        T alpha = static_cast<T>(current_batch_size * 2.0) / static_cast<T>(n_samples + 1);
+        alpha   = std::min(alpha, T{1});
+
+        if (!ewa_initialized) {
+          ewa_inertia     = batch_inertia;
+          ewa_inertia_min = batch_inertia;
+          ewa_initialized = true;
+        } else {
+          ewa_inertia = ewa_inertia * (T{1} - alpha) + batch_inertia * alpha;
+        }
+
+        RAFT_LOG_DEBUG(
+          "KMeans minibatch step %d/%d: batch_inertia=%f, ewa_inertia=%f, centers_squared_diff=%f",
+          n_iter[0],
+          n_steps,
+          static_cast<double>(batch_inertia),
+          static_cast<double>(ewa_inertia),
+          static_cast<double>(centers_squared_diff));
+
+        // Early stopping: absolute tolerance on squared change of centers
+        // Disabled if tol == 0.0
+        if (params.tol > 0.0 && centers_squared_diff <= params.tol) {
+          RAFT_LOG_DEBUG(
+            "KMeans minibatch: Converged (small centers change) at step %d/%d", n_iter[0], n_steps);
+          break;
+        }
+
+        // Early stopping: lack of improvement in smoothed inertia
+        // Disabled if max_no_improvement == 0
+        if (params.max_no_improvement > 0) {
+          if (ewa_inertia < ewa_inertia_min) {
+            no_improvement  = 0;
+            ewa_inertia_min = ewa_inertia;
+          } else {
+            no_improvement++;
+          }
+
+          if (no_improvement >= params.max_no_improvement) {
+            RAFT_LOG_DEBUG("KMeans minibatch: Converged (lack of improvement) at step %d/%d",
+                           n_iter[0],
+                           n_steps);
+            break;
+          }
+        }
+      } else {
+        RAFT_LOG_DEBUG("KMeans minibatch step %d/%d: mean batch inertia: %f",
+                       n_iter[0],
+                       n_steps,
+                       static_cast<double>(batch_inertia));
+      }
     } else {
       raft::matrix::fill(handle, centroid_sums.view(), T{0});
       raft::matrix::fill(handle, cluster_counts.view(), T{0});
@@ -493,34 +580,35 @@ void fit(raft::resources const& handle,
         handle, centroid_sums_const, cluster_counts_const, centroids_const, new_centroids.view());
     }
 
-    auto sqrdNorm = raft::make_device_scalar<T>(handle, T{0});
-    raft::linalg::mapThenSumReduce(sqrdNorm.data_handle(),
-                                   centroids.size(),
-                                   raft::sqdiff_op{},
-                                   stream,
-                                   new_centroids.data_handle(),
-                                   centroids.data_handle());
-
+    // Convergence check for full-batch mode only
     if (!use_minibatch) {
+      auto sqrdNorm = raft::make_device_scalar<T>(handle, T{0});
+      raft::linalg::mapThenSumReduce(sqrdNorm.data_handle(),
+                                     centroids.size(),
+                                     raft::sqdiff_op{},
+                                     stream,
+                                     new_centroids.data_handle(),
+                                     centroids.data_handle());
+
       raft::copy(centroids.data_handle(), new_centroids.data_handle(), centroids.size(), stream);
-    }
 
-    T sqrdNormError = 0;
-    raft::copy(&sqrdNormError, sqrdNorm.data_handle(), 1, stream);
+      T sqrdNormError = 0;
+      raft::copy(&sqrdNormError, sqrdNorm.data_handle(), 1, stream);
 
-    bool done = false;
-    if (!use_minibatch && params.inertia_check && n_iter[0] > 1) {
-      T delta = total_cost / priorClusteringCost;
-      if (delta > 1 - params.tol) done = true;
-      priorClusteringCost = total_cost;
-    }
+      bool done = false;
+      if (params.inertia_check && n_iter[0] > 1) {
+        T delta = total_cost / priorClusteringCost;
+        if (delta > 1 - params.tol) done = true;
+        priorClusteringCost = total_cost;
+      }
 
-    raft::resource::sync_stream(handle, stream);
-    if (sqrdNormError < params.tol) done = true;
+      raft::resource::sync_stream(handle, stream);
+      if (sqrdNormError < params.tol) done = true;
 
-    if (done) {
-      RAFT_LOG_DEBUG("KMeans batched: Converged after %d iterations", n_iter[0]);
-      break;
+      if (done) {
+        RAFT_LOG_DEBUG("KMeans batched: Converged after %d iterations", n_iter[0]);
+        break;
+      }
     }
   }
 

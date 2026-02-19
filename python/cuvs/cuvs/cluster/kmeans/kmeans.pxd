@@ -38,6 +38,8 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
         int batch_centroids,
         cuvsKMeansCentroidUpdateMode update_mode,
         bool inertia_check,
+        bool final_inertia_check,
+        int max_no_improvement,
         bool hierarchical,
         int hierarchical_n_iters
 

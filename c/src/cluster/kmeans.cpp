@@ -29,6 +29,7 @@ cuvs::cluster::kmeans::params convert_params(const cuvsKMeansParams& params)
   kmeans_params.batch_centroids     = params.batch_centroids;
   kmeans_params.inertia_check       = params.inertia_check;
   kmeans_params.final_inertia_check = params.final_inertia_check;
+  kmeans_params.max_no_improvement  = params.max_no_improvement;
   kmeans_params.update_mode =
     static_cast<cuvs::cluster::kmeans::params::CentroidUpdateMode>(params.update_mode);
   return kmeans_params;
@@ -260,6 +261,7 @@ extern "C" cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params)
       .update_mode          = static_cast<cuvsKMeansCentroidUpdateMode>(cpp_params.update_mode),
       .inertia_check        = cpp_params.inertia_check,
       .final_inertia_check  = cpp_params.final_inertia_check,
+      .max_no_improvement   = cpp_params.max_no_improvement,
       .hierarchical         = false,
       .hierarchical_n_iters = static_cast<int>(cpp_balanced_params.n_iters)};
   });
