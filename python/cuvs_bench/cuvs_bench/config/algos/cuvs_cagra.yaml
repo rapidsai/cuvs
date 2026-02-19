@@ -11,7 +11,7 @@ groups:
     search:
       itopk: [32, 64, 128, 256, 512]
       max_iterations: [0, 16]
-      search_width: [1, 2, 4, 8, 16, 32]
+      search_width: [1, 2, 4, 8]
   test:
     build:
       graph_degree: [32]
