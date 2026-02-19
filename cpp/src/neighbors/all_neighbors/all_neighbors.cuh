@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -32,10 +32,20 @@ GRAPH_BUILD_ALGO check_params_validity(const all_neighbors_params& params,
       auto allowed_metrics = params.metric == cuvs::distance::DistanceType::L2Expanded ||
                              params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
                              params.metric == cuvs::distance::DistanceType::CosineExpanded ||
-                             params.metric == cuvs::distance::DistanceType::InnerProduct;
-      RAFT_EXPECTS(allowed_metrics,
-                   "Distance metric for all-neighbors build with brute force should be L2Expanded, "
-                   "L2SqrtExpanded, CosineExpanded, or InnerProduct.");
+                             params.metric == cuvs::distance::DistanceType::L1 ||
+                             params.metric == cuvs::distance::DistanceType::L2Unexpanded ||
+                             params.metric == cuvs::distance::DistanceType::L2SqrtUnexpanded ||
+                             params.metric == cuvs::distance::DistanceType::InnerProduct ||
+                             params.metric == cuvs::distance::DistanceType::Linf ||
+                             params.metric == cuvs::distance::DistanceType::Canberra ||
+                             params.metric == cuvs::distance::DistanceType::LpUnexpanded ||
+                             params.metric == cuvs::distance::DistanceType::CorrelationExpanded ||
+                             params.metric == cuvs::distance::DistanceType::JensenShannon;
+      RAFT_EXPECTS(
+        allowed_metrics,
+        "Distance metric for all-neighbors build with brute force should be L2Expanded, "
+        "L2SqrtExpanded, CosineExpanded, L1, L2Unexpanded, L2SqrtUnexpanded, InnerProduct, Linf, "
+        "Canberra, LpUnexpanded, CorrelationExpanded, or JensenShannon.");
     }
     return GRAPH_BUILD_ALGO::BRUTE_FORCE;
   } else if (std::holds_alternative<graph_build_params::nn_descent_params>(
