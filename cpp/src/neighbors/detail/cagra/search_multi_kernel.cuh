@@ -701,18 +701,18 @@ struct search
   using base_type::num_seeds;
 
   size_t result_buffer_allocation_size;
-  lightweight_uvector<INDEX_T> result_indices;       // results_indices_buffer
-  lightweight_uvector<DISTANCE_T> result_distances;  // result_distances_buffer
-  lightweight_uvector<INDEX_T> parent_node_list;
-  lightweight_uvector<uint32_t> topk_hint;
-  lightweight_uvector<uint32_t> terminate_flag;  // dev_terminate_flag, host_terminate_flag.;
-  lightweight_uvector<uint32_t> topk_workspace;
+  rmm::device_uvector<INDEX_T> result_indices;       // results_indices_buffer
+  rmm::device_uvector<DISTANCE_T> result_distances;  // result_distances_buffer
+  rmm::device_uvector<INDEX_T> parent_node_list;
+  rmm::device_uvector<uint32_t> topk_hint;
+  rmm::device_uvector<uint32_t> terminate_flag;  // dev_terminate_flag, host_terminate_flag.;
+  rmm::device_uvector<uint32_t> topk_workspace;
 
   // temporary storage for _find_topk
-  lightweight_uvector<float> input_keys_storage;
-  lightweight_uvector<float> output_keys_storage;
-  lightweight_uvector<INDEX_T> input_values_storage;
-  lightweight_uvector<INDEX_T> output_values_storage;
+  rmm::device_uvector<float> input_keys_storage;
+  rmm::device_uvector<float> output_keys_storage;
+  rmm::device_uvector<INDEX_T> input_values_storage;
+  rmm::device_uvector<INDEX_T> output_values_storage;
 
   search(raft::resources const& res,
          search_params params,
@@ -722,16 +722,16 @@ struct search
          int64_t graph_degree,
          uint32_t topk)
     : base_type(res, params, dataset_desc, dim, dataset_size, graph_degree, topk),
-      result_indices(res),
-      result_distances(res),
-      parent_node_list(res),
-      topk_hint(res),
-      topk_workspace(res),
-      terminate_flag(res),
-      input_keys_storage(res),
-      output_keys_storage(res),
-      input_values_storage(res),
-      output_values_storage(res)
+      result_indices(0, raft::resource::get_cuda_stream(res)),
+      result_distances(0, raft::resource::get_cuda_stream(res)),
+      parent_node_list(0, raft::resource::get_cuda_stream(res)),
+      topk_hint(0, raft::resource::get_cuda_stream(res)),
+      topk_workspace(0, raft::resource::get_cuda_stream(res)),
+      terminate_flag(0, raft::resource::get_cuda_stream(res)),
+      input_keys_storage(0, raft::resource::get_cuda_stream(res)),
+      output_keys_storage(0, raft::resource::get_cuda_stream(res)),
+      input_values_storage(0, raft::resource::get_cuda_stream(res)),
+      output_values_storage(0, raft::resource::get_cuda_stream(res))
   {
     set_params(res);
   }

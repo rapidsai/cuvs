@@ -384,7 +384,12 @@ RAFT_KERNEL __launch_bounds__(1, 1)
                                                  CodebookT,
                                                  DataT,
                                                  IndexT,
-                                                 DistanceT>;
+                                                 DistanceT
+#if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
+                                                 ,
+                                                 Metric
+#endif
+                                                 >;
   using base_type = typename desc_type::base_type;
 #ifdef CUVS_ENABLE_JIT_LTO
   // For JIT, we don't use the function pointers, so set them to nullptr
@@ -449,7 +454,12 @@ vpq_descriptor_spec<Metric,
                                                  CodebookT,
                                                  DataT,
                                                  IndexT,
-                                                 DistanceT>;
+                                                 DistanceT
+#if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
+                                                 ,
+                                                 Metric
+#endif
+                                                 >;
   using base_type = typename desc_type::base_type;
 
   return host_type{desc_type{nullptr,
