@@ -113,7 +113,7 @@ void benchmark_distance_nn(benchmark::State& state)
   cudaEventCreate(&stop);
 
   for (auto _ : state) {
-    cudaEventRecord(start, 0);
+    cudaEventRecord(start, stream);
     if constexpr (algo == AlgorithmType::fused) {
       fusedDistanceNNMinReduce<DataT, OutT, IdxT>(out.data_handle(),
                                                   x.data_handle(),
