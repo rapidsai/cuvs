@@ -11,12 +11,13 @@
 #include "cuda.h"
 #include <nvrtc.h>
 
-#define NVRTC_SAFE_CALL(_call)                                                \
-  {                                                                           \
-    nvrtcResult result = _call;                                               \
-    RAFT_EXPECTS(result == NVRTC_SUCCESS,                                     \
-                 "nvrtc error: " + std::string(nvrtcGetErrorString(result))); \
-  }
+#define NVRTC_SAFE_CALL(_call)  \
+  {                             \
+    nvrtcResult result = _call; \
+    std::string error_string =  \
+      std::string("nvrtc error: ") + std::string(nvrtcGetErrorString(result));
+RAFT_EXPECTS(result == NVRTC_SUCCESS, error_string.c_str());
+}
 
 NVRTCLTOFragmentCompiler::NVRTCLTOFragmentCompiler()
 {
@@ -68,7 +69,7 @@ void NVRTCLTOFragmentCompiler::compile(std::string const& key, std::string const
     NVRTC_SAFE_CALL(nvrtcGetProgramLogSize(prog, &log_size));
     std::unique_ptr<char[]> log{new char[log_size]};
     NVRTC_SAFE_CALL(nvrtcGetProgramLog(prog, log.get()));
-    RAFT_FAIL("nvrtc compile error log: \n", log.get());
+    RAFT_FAIL("nvrtc compile error log: \n%s", log.get());
   }
 
   // Obtain generated LTO IR from the program.
