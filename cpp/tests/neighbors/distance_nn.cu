@@ -168,9 +168,13 @@ class NNTest : public ::testing::TestWithParam<NNInputs<IdxT>> {
 template <typename IdxT>
 const std::vector<NNInputs<IdxT>> input_fp32 = {
   {4096, 4096, 64, DistanceType::L2Expanded, false, uint64_t(31415926), 0.1},
+  {16384, 4096, 64, DistanceType::L2Expanded, false, uint64_t(31415926), 0.1},
   {4096, 4096, 128, DistanceType::L2Expanded, true, uint64_t(31415926), 0.1},
+  {4096, 16384, 128, DistanceType::L2Expanded, true, uint64_t(31415926), 0.1},
   {4096, 4096, 64, DistanceType::CosineExpanded, false, uint64_t(31415926), 0.1},
+  {8192, 4096, 64, DistanceType::CosineExpanded, false, uint64_t(31415926), 0.1},
   {4096, 4096, 128, DistanceType::CosineExpanded, true, uint64_t(31415926), 0.1},
+  {4096, 8192, 128, DistanceType::CosineExpanded, true, uint64_t(31415926), 0.1},
 };
 
 // Test fused implementation with single-precision
