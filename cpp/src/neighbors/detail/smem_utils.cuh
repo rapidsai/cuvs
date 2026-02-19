@@ -51,7 +51,7 @@ void safely_launch_kernel_with_smem_size(KernelT const& kernel,
       auto launch_status =
         cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
       RAFT_EXPECTS(launch_status == cudaSuccess,
-                   "Failed to set max dynamic shared memory size to %zu bytes",
+                   "Failed to set max dynamic shared memory size to %u bytes",
                    smem_size);
     }
   }
