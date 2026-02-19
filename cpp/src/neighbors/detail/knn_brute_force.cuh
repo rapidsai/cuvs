@@ -42,7 +42,6 @@
 #include <rmm/device_uvector.hpp>
 #include <thrust/for_each.h>
 #include <thrust/iterator/counting_iterator.h>
-#include <thrust/iterator/transform_iterator.h>
 
 #include <cstdint>
 #include <iostream>
