@@ -168,6 +168,80 @@ struct CagraSearchPlanner : AlgorithmPlanner {
     this->device_functions.push_back("sample_filter_" + filter_name);
   }
 
+  void add_descriptor_accessor_device_functions(uint32_t team_size,
+                                                uint32_t dataset_block_dim,
+                                                bool is_vpq,
+                                                uint32_t pq_bits = 0,
+                                                uint32_t pq_len  = 0)
+  {
+    // Register all descriptor accessor fragments (get_dim, get_size, get_team_size_bitshift,
+    // get_args, get_smem_ws_size_in_bytes)
+    // These fragments allow kernels to access descriptor members via void* pointers
+    if (is_vpq) {
+      using CodebookTag = cuvs::neighbors::cagra::detail::tag_codebook_half;
+      auto params       = make_fragment_key<DataTag, IndexTag, DistanceTag, CodebookTag>();
+      std::string base  = "get_dim_vpq_t" + std::to_string(team_size);
+      base += "_dim" + std::to_string(dataset_block_dim);
+      base += "_" + std::to_string(pq_bits) + "pq_" + std::to_string(pq_len) + "subd";
+      base += "_" + params;
+      this->device_functions.push_back(base);
+
+      base = "get_size_vpq_t" + std::to_string(team_size);
+      base += "_dim" + std::to_string(dataset_block_dim);
+      base += "_" + std::to_string(pq_bits) + "pq_" + std::to_string(pq_len) + "subd";
+      base += "_" + params;
+      this->device_functions.push_back(base);
+
+      // Single CTA kernels only use shared memory descriptors (after setup_workspace),
+      // so we only need get_team_size_bitshift_from_smem
+      base = "get_team_size_bitshift_from_smem_vpq_t" + std::to_string(team_size);
+      base += "_dim" + std::to_string(dataset_block_dim);
+      base += "_" + std::to_string(pq_bits) + "pq_" + std::to_string(pq_len) + "subd";
+      base += "_" + params;
+      this->device_functions.push_back(base);
+
+      base = "get_args_vpq_t" + std::to_string(team_size);
+      base += "_dim" + std::to_string(dataset_block_dim);
+      base += "_" + std::to_string(pq_bits) + "pq_" + std::to_string(pq_len) + "subd";
+      base += "_" + params;
+      this->device_functions.push_back(base);
+
+      base = "get_smem_ws_size_in_bytes_vpq_t" + std::to_string(team_size);
+      base += "_dim" + std::to_string(dataset_block_dim);
+      base += "_" + std::to_string(pq_bits) + "pq_" + std::to_string(pq_len) + "subd";
+      base += "_" + params;
+      this->device_functions.push_back(base);
+    } else {
+      auto params      = make_fragment_key<DataTag, IndexTag, DistanceTag>();
+      std::string base = "get_dim_standard_t" + std::to_string(team_size);
+      base += "_dim" + std::to_string(dataset_block_dim);
+      base += "_" + params;
+      this->device_functions.push_back(base);
+
+      base = "get_size_standard_t" + std::to_string(team_size);
+      base += "_dim" + std::to_string(dataset_block_dim);
+      base += "_" + params;
+      this->device_functions.push_back(base);
+
+      // Single CTA kernels only use shared memory descriptors (after setup_workspace),
+      // so we only need get_team_size_bitshift_from_smem
+      base = "get_team_size_bitshift_from_smem_standard_t" + std::to_string(team_size);
+      base += "_dim" + std::to_string(dataset_block_dim);
+      base += "_" + params;
+      this->device_functions.push_back(base);
+
+      base = "get_args_standard_t" + std::to_string(team_size);
+      base += "_dim" + std::to_string(dataset_block_dim);
+      base += "_" + params;
+      this->device_functions.push_back(base);
+
+      base = "get_smem_ws_size_in_bytes_standard_t" + std::to_string(team_size);
+      base += "_dim" + std::to_string(dataset_block_dim);
+      base += "_" + params;
+      this->device_functions.push_back(base);
+    }
+  }
+
  private:
   static std::string build_entrypoint_name(cuvs::distance::DistanceType metric,
                                            bool topk_by_bitonic_sort,
@@ -180,10 +254,7 @@ struct CagraSearchPlanner : AlgorithmPlanner {
                                            bool persistent)
   {
     std::string name = (persistent ? "search_single_cta_kernel_p_" : "search_single_cta_kernel_");
-    if (is_vpq) {
-      name += "vpq_";
-      // Note: Metric is no longer in VPQ kernel names - VPQ only supports L2Expanded
-    }
+    // Note: "vpq" is no longer in the name - PQ parameters distinguish VPQ from standard
     name += bool_to_string(topk_by_bitonic_sort) + "_";
     name += bool_to_string(bitonic_sort_and_merge_multi_warps) + "_";
     // Note: Metric is no longer in kernel names - it's linked via dist_op and normalization

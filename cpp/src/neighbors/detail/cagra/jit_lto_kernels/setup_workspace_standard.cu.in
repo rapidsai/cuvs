@@ -7,13 +7,14 @@
 
 #ifdef BUILD_KERNEL
 
-#include <neighbors/detail/cagra/jit_lto_kernels/setup_workspace_standard_impl.cuh>
+#include <neighbors/detail/cagra/jit_lto_kernels/setup_workspace_standard_impl_unified.cuh>
 
 namespace cuvs::neighbors::cagra::detail {
 
-// Instantiate the setup_workspace_standard function for standard descriptor
-// Note: Metric is no longer a template parameter - it's linked via dist_op and normalization fragments
-template __device__ const cuvs::neighbors::cagra::detail::standard_dataset_descriptor_t<@team_size@, @dataset_block_dim@, @data_type@, @index_type@, @distance_type@>* setup_workspace_standard<@team_size@, @dataset_block_dim@, @data_type@, @index_type@, @distance_type@>(const cuvs::neighbors::cagra::detail::standard_dataset_descriptor_t<@team_size@, @dataset_block_dim@, @data_type@, @index_type@, @distance_type@>*, void*, const @data_type@*, uint32_t);
+// Instantiate the unified setup_workspace function for standard descriptor
+// PQ_BITS=0, PQ_LEN=0, CodebookT=void for standard descriptors
+template __device__ void* setup_workspace<@team_size@, @dataset_block_dim@, 0, 0, void, @data_type@, @index_type@, @distance_type@>(
+    void*, void*, const @data_type@*, uint32_t);
 
 }  // namespace cuvs::neighbors::cagra::detail
 
@@ -27,6 +28,8 @@ using namespace cuvs::neighbors::cagra::detail;
 
 __attribute__((__constructor__)) static void register_setup_workspace_standard_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@()
 {
+  // This fragment provides setup_workspace (standard version)
+  // The planner links the appropriate fragment (standard or VPQ) based on descriptor type
   registerAlgorithm<tag_@type_abbrev@,
     tag_idx_@idx_abbrev@,
     tag_dist_@dist_abbrev@>(

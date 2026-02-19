@@ -69,6 +69,12 @@ void random_pickup_jit(const dataset_descriptor_host<DataT, IndexT, DistanceT>& 
     dataset_desc.is_vpq,
     dataset_desc.pq_bits,
     dataset_desc.pq_len);
+  // Register descriptor accessor fragments first (needed for void* descriptor access)
+  planner.add_descriptor_accessor_device_functions(dataset_desc.team_size,
+                                                   dataset_desc.dataset_block_dim,
+                                                   dataset_desc.is_vpq,
+                                                   dataset_desc.pq_bits,
+                                                   dataset_desc.pq_len);
   planner.add_setup_workspace_device_function(dataset_desc.metric,
                                               dataset_desc.team_size,
                                               dataset_desc.dataset_block_dim,
@@ -90,12 +96,31 @@ void random_pickup_jit(const dataset_descriptor_host<DataT, IndexT, DistanceT>& 
 
   // Get the device descriptor pointer
   const auto* dev_desc = dataset_desc.dev_ptr(cuda_stream);
+  if (dev_desc == nullptr) {
+    RAFT_FAIL("[JIT LAUNCHER] MULTI_KERNEL (random_pickup) dev_desc is NULL");
+  }
+
+  // Validate all pointers before kernel launch to prevent illegal memory access
+  if (queries_ptr == nullptr) {
+    RAFT_FAIL("[JIT LAUNCHER] MULTI_KERNEL (random_pickup) queries_ptr is NULL");
+  }
+  if (result_indices_ptr == nullptr) {
+    RAFT_FAIL("[JIT LAUNCHER] MULTI_KERNEL (random_pickup) result_indices_ptr is NULL");
+  }
+  if (result_distances_ptr == nullptr) {
+    RAFT_FAIL("[JIT LAUNCHER] MULTI_KERNEL (random_pickup) result_distances_ptr is NULL");
+  }
+  if (visited_hashmap_ptr == nullptr) {
+    RAFT_FAIL("[JIT LAUNCHER] MULTI_KERNEL (random_pickup) visited_hashmap_ptr is NULL");
+  }
 
   // Cast size_t parameters to match kernel signature exactly
   // The dispatch mechanism uses void* pointers, so parameter sizes must match exactly
   const uint32_t ldr_u32 = static_cast<uint32_t>(ldr);
 
   // Dispatch kernel via launcher
+  RAFT_LOG_INFO("[JIT LAUNCHER] MULTI_KERNEL (random_pickup) launching kernel on stream=%p",
+                cuda_stream);
   launcher->dispatch(cuda_stream,
                      grid_size,
                      dim3(block_size, 1, 1),
@@ -189,6 +214,12 @@ void compute_distance_to_child_nodes_jit(
     dataset_desc.is_vpq,
     dataset_desc.pq_bits,
     dataset_desc.pq_len);
+  // Register descriptor accessor fragments first (needed for void* descriptor access)
+  planner.add_descriptor_accessor_device_functions(dataset_desc.team_size,
+                                                   dataset_desc.dataset_block_dim,
+                                                   dataset_desc.is_vpq,
+                                                   dataset_desc.pq_bits,
+                                                   dataset_desc.pq_len);
   planner.add_setup_workspace_device_function(dataset_desc.metric,
                                               dataset_desc.team_size,
                                               dataset_desc.dataset_block_dim,

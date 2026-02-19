@@ -7,13 +7,14 @@
 
 #ifdef BUILD_KERNEL
 
-#include <neighbors/detail/cagra/jit_lto_kernels/setup_workspace_vpq_impl.cuh>
+#include <neighbors/detail/cagra/jit_lto_kernels/setup_workspace_vpq_impl_unified.cuh>
 
 namespace cuvs::neighbors::cagra::detail {
 
-// Instantiate the setup_workspace_vpq function for VPQ descriptor
-// Note: Metric is no longer a template parameter - VPQ only supports L2Expanded
-template __device__ const cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@>* setup_workspace_vpq<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@>(const cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@>*, void*, const @data_type@*, uint32_t);
+// Instantiate the unified setup_workspace function for VPQ descriptor
+// PQ_BITS>0, PQ_LEN>0, CodebookT=half for VPQ descriptors
+template __device__ void* setup_workspace<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@>(
+    void*, void*, const @data_type@*, uint32_t);
 
 }  // namespace cuvs::neighbors::cagra::detail
 
@@ -27,6 +28,8 @@ using namespace cuvs::neighbors::cagra::detail;
 
 __attribute__((__constructor__)) static void register_setup_workspace_vpq_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@()
 {
+  // This fragment provides setup_workspace (VPQ version)
+  // The planner links the appropriate fragment (standard or VPQ) based on descriptor type
   registerAlgorithm<tag_@type_abbrev@,
     tag_idx_@idx_abbrev@,
     tag_dist_@dist_abbrev@,

@@ -8,15 +8,16 @@
 #ifdef BUILD_KERNEL
 
 #include <neighbors/detail/cagra/jit_lto_kernels/search_single_cta_kernel_jit.cuh>
-#include <neighbors/detail/cagra/compute_distance_standard-impl.cuh>
 
 namespace cuvs::neighbors::cagra::detail::single_cta_search {
 
-// Instantiate the search_kernel_p_jit function with concrete descriptor type
+// Instantiate the search_kernel_p_jit function with unified template parameters
+// For standard descriptors: PQ_BITS=0, PQ_LEN=0, CodebookT=void
+// For VPQ descriptors: PQ_BITS>0, PQ_LEN>0, CodebookT=half
 // Note: Metric is no longer a template parameter - it's linked via dist_op and normalization fragments
-using desc_t = cuvs::neighbors::cagra::detail::standard_dataset_descriptor_t<@team_size@, @dataset_block_dim@, @data_type@, @index_type@, @distance_type@>;
-template __global__ __launch_bounds__(1024, 1) void search_kernel_p_jit<@topk_by_bitonic_sort@, @bitonic_sort_and_merge_multi_warps@, desc_t, @data_type@, @index_type@, @distance_type@, @source_index_type@>(
-    worker_handle_t*, job_desc_t<job_desc_jit_helper_desc<@data_type@, @index_type@, @distance_type@>>*, uint32_t*, const @index_type@* const, const std::uint32_t, const @source_index_type@*, const unsigned, const uint64_t, const @index_type@*, const uint32_t, @index_type@* const, const std::uint32_t, const std::uint32_t, const std::uint32_t, const std::uint32_t, const std::uint32_t, const std::uint32_t, std::uint32_t* const, const std::uint32_t, const std::uint32_t, const std::uint32_t, const std::uint32_t, const desc_t*, uint32_t*, @source_index_type@, @source_index_type@);
+// Note: Descriptor type is no longer instantiated here - kernels use void* and accessor fragments
+template __global__ __launch_bounds__(1024, 1) void search_kernel_p_jit<@topk_by_bitonic_sort@, @bitonic_sort_and_merge_multi_warps@, @team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@, @source_index_type@>(
+    worker_handle_t*, job_desc_t<job_desc_jit_helper_desc<@data_type@, @index_type@, @distance_type@>>*, uint32_t*, const @index_type@* const, const std::uint32_t, const @source_index_type@*, const unsigned, const uint64_t, const @index_type@*, const uint32_t, @index_type@* const, const std::uint32_t, const std::uint32_t, const std::uint32_t, const std::uint32_t, const std::uint32_t, const std::uint32_t, std::uint32_t* const, const std::uint32_t, const std::uint32_t, const std::uint32_t, const std::uint32_t, void*, uint32_t*, @source_index_type@, @source_index_type@);
 
 }  // namespace cuvs::neighbors::cagra::detail::single_cta_search
 
@@ -24,7 +25,7 @@ template __global__ __launch_bounds__(1024, 1) void search_kernel_p_jit<@topk_by
 
 #include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
 #include <cuvs/detail/jit_lto/cagra/search_single_cta_tags.hpp>
-#include "search_single_cta_kernel_p_@topk_by_bitonic_sort_str@_@bitonic_sort_and_merge_multi_warps_str@_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@src_idx_abbrev@.h"
+#include "search_single_cta_kernel_p_@topk_by_bitonic_sort_str@_@bitonic_sort_and_merge_multi_warps_str@_t@team_size@_dim@dataset_block_dim@@pq_suffix@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@src_idx_abbrev@.h"
 
 using namespace cuvs::neighbors::cagra::detail;
 
@@ -33,10 +34,10 @@ __attribute__((__constructor__)) static void register_search_single_cta_kernel_p
   registerAlgorithm<tag_@type_abbrev@,
     tag_idx_@idx_abbrev@,
     tag_dist_@dist_abbrev@,
-    tag_idx_@src_idx_abbrev@>(
-    "search_single_cta_kernel_p_@topk_by_bitonic_sort_str@_@bitonic_sort_and_merge_multi_warps_str@_t@team_size@_dim@dataset_block_dim@",
-    embedded_search_single_cta_kernel_p_@topk_by_bitonic_sort_str@_@bitonic_sort_and_merge_multi_warps_str@_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@src_idx_abbrev@,
-    sizeof(embedded_search_single_cta_kernel_p_@topk_by_bitonic_sort_str@_@bitonic_sort_and_merge_multi_warps_str@_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@src_idx_abbrev@));
+    tag_idx_@src_idx_abbrev@@codebook_tag@>(
+    "search_single_cta_kernel_p_@topk_by_bitonic_sort_str@_@bitonic_sort_and_merge_multi_warps_str@_t@team_size@_dim@dataset_block_dim@@pq_suffix@",
+    embedded_search_single_cta_kernel_p_@topk_by_bitonic_sort_str@_@bitonic_sort_and_merge_multi_warps_str@_t@team_size@_dim@dataset_block_dim@@pq_suffix@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@src_idx_abbrev@,
+    sizeof(embedded_search_single_cta_kernel_p_@topk_by_bitonic_sort_str@_@bitonic_sort_and_merge_multi_warps_str@_t@team_size@_dim@dataset_block_dim@@pq_suffix@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@src_idx_abbrev@));
 }
 
 #endif

@@ -30,16 +30,21 @@ struct has_kpq_bits {
 template <typename T>
 inline constexpr bool has_kpq_bits_v = has_kpq_bits<T>::value;
 
-// JIT version of compute_distance_to_random_nodes - uses extern functions
+// JIT version of compute_distance_to_random_nodes - uses extern functions with void* descriptor
 // Shared between single_cta and multi_cta JIT kernels
-template <typename DescriptorT,
+// Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT
+template <uint32_t TeamSize,
+          uint32_t DatasetBlockDim,
+          uint32_t PQ_BITS,
+          uint32_t PQ_LEN,
+          typename CodebookT,
           typename IndexT,
           typename DistanceT,
           typename DataT>
 RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes_jit(
   IndexT* __restrict__ result_indices_ptr,       // [num_pickup]
   DistanceT* __restrict__ result_distances_ptr,  // [num_pickup]
-  const DescriptorT* smem_desc,                  // Concrete descriptor type from template
+  void* smem_desc,  // void* descriptor pointer (reconstructed in fragments)
   const uint32_t num_pickup,
   const uint32_t num_distilation,
   const uint64_t rand_xor_mask,
@@ -53,13 +58,29 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes_jit(
   const uint32_t num_blocks = 1)
 {
   constexpr unsigned warp_size = 32;
-  const auto team_size_bits    = smem_desc->team_size_bitshift_from_smem();
-  const auto max_i = raft::round_up_safe<uint32_t>(num_pickup, warp_size >> team_size_bits);
 
-  // Load args once for better performance (avoid repeated loads in the loop)
+  // Get team_size_bits and args using accessor fragments
+  // Planner links the right fragment (standard or VPQ) at runtime based on descriptor type
   using args_t = typename cuvs::neighbors::cagra::detail::
     dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t;
-  const args_t args = smem_desc->args.load();
+
+  // Use get_team_size_bitshift_from_smem since smem_desc is in shared memory
+  uint32_t team_size_bits = get_team_size_bitshift_from_smem<TeamSize,
+                                                             DatasetBlockDim,
+                                                             PQ_BITS,
+                                                             PQ_LEN,
+                                                             CodebookT,
+                                                             DataT,
+                                                             IndexT,
+                                                             DistanceT>(smem_desc);
+  args_t args =
+    get_args<TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, DataT, IndexT, DistanceT>(
+      smem_desc);
+  IndexT dataset_size =
+    get_size<TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, DataT, IndexT, DistanceT>(
+      smem_desc);
+
+  const auto max_i = raft::round_up_safe<uint32_t>(num_pickup, warp_size >> team_size_bits);
 
   for (uint32_t i = threadIdx.x >> team_size_bits; i < max_i; i += (blockDim.x >> team_size_bits)) {
     const bool valid_i = (i < num_pickup);
@@ -74,35 +95,24 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes_jit(
         if (seed_ptr && (gid < num_seeds)) {
           seed_index = seed_ptr[gid];
         } else {
-          seed_index = device::xorshift64(gid ^ rand_xor_mask) % smem_desc->size;
+          seed_index = device::xorshift64(gid ^ rand_xor_mask) % dataset_size;
         }
       }
 
       // CRITICAL: ALL threads in the team must participate in compute_distance and team_sum
-      // Otherwise warp shuffles will hang. Each thread calls the extern function to get
+      // Otherwise warp shuffles will hang. Each thread calls the unified extern function to get
       // its per-thread distance, then team_sum reduces across all threads in the team.
       DistanceT per_thread_norm2 = 0;
       if (valid_i) {
-        if constexpr (!has_kpq_bits_v<DescriptorT>) {
-          // Standard descriptor - Metric is no longer a template parameter, linked via dist_op and
-          // normalization fragments
-          per_thread_norm2 = compute_distance_standard<DescriptorT::kTeamSize,
-                                                       DescriptorT::kDatasetBlockDim,
-                                                       DataT,
-                                                       IndexT,
-                                                       DistanceT>(args, seed_index);
-        } else {
-          // Must be cagra_q_dataset_descriptor_t - VPQ only supports L2Expanded, so Metric is not
-          // needed
-          per_thread_norm2 = compute_distance_vpq<DescriptorT::kTeamSize,
-                                                  DescriptorT::kDatasetBlockDim,
-                                                  DescriptorT::kPqBits,
-                                                  DescriptorT::kPqLen,
-                                                  typename DescriptorT::CODE_BOOK_T,
-                                                  DataT,
-                                                  IndexT,
-                                                  DistanceT>(args, seed_index);
-        }
+        // Use unified compute_distance function (links standard or VPQ fragment at runtime)
+        per_thread_norm2 = compute_distance<TeamSize,
+                                            DatasetBlockDim,
+                                            PQ_BITS,
+                                            PQ_LEN,
+                                            CodebookT,
+                                            DataT,
+                                            IndexT,
+                                            DistanceT>(args, seed_index);
       }
       // Now ALL threads in the team participate in team_sum
       const auto norm2_sum = device::team_sum(per_thread_norm2, team_size_bits);
@@ -134,9 +144,14 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes_jit(
   }
 }
 
-// JIT version of compute_distance_to_child_nodes - uses extern functions
+// JIT version of compute_distance_to_child_nodes - uses extern functions with void* descriptor
 // Shared between single_cta and multi_cta JIT kernels
-template <typename DescriptorT,
+// Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT
+template <uint32_t TeamSize,
+          uint32_t DatasetBlockDim,
+          uint32_t PQ_BITS,
+          uint32_t PQ_LEN,
+          typename CodebookT,
           typename IndexT,
           typename DistanceT,
           typename DataT,
@@ -144,7 +159,7 @@ template <typename DescriptorT,
 RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes_jit(
   IndexT* __restrict__ result_child_indices_ptr,
   DistanceT* __restrict__ result_child_distances_ptr,
-  const DescriptorT* smem_desc,  // Concrete descriptor type from template
+  void* smem_desc,  // void* descriptor pointer (reconstructed in fragments)
   const IndexT* __restrict__ knn_graph,
   const uint32_t knn_k,
   IndexT* __restrict__ visited_hashmap_ptr,
@@ -187,18 +202,31 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes_jit(
   }
   __syncthreads();
 
-  // Compute the distance to child nodes using extern compute_distance
+  // Compute the distance to child nodes using unified extern compute_distance
   constexpr unsigned warp_size = 32;
-  const auto team_size_bits    = smem_desc->team_size_bitshift_from_smem();
-  const auto num_k             = knn_k * search_width;
-  const auto max_i             = raft::round_up_safe(num_k, warp_size >> team_size_bits);
-  const bool lead_lane         = (threadIdx.x & ((1u << team_size_bits) - 1u)) == 0;
-  const uint32_t ofst          = STATIC_RESULT_POSITION ? 0 : result_position[0];
 
-  // Load args once for better performance (avoid repeated loads in the loop)
+  // Get team_size_bits and args using accessor fragments
+  // Planner links the right fragment (standard or VPQ) at runtime based on descriptor type
   using args_t = typename cuvs::neighbors::cagra::detail::
     dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t;
-  const args_t args = smem_desc->args.load();
+
+  // Use get_team_size_bitshift_from_smem since smem_desc is in shared memory
+  uint32_t team_size_bits = get_team_size_bitshift_from_smem<TeamSize,
+                                                             DatasetBlockDim,
+                                                             PQ_BITS,
+                                                             PQ_LEN,
+                                                             CodebookT,
+                                                             DataT,
+                                                             IndexT,
+                                                             DistanceT>(smem_desc);
+  args_t args =
+    get_args<TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, DataT, IndexT, DistanceT>(
+      smem_desc);
+
+  const auto num_k     = knn_k * search_width;
+  const auto max_i     = raft::round_up_safe(num_k, warp_size >> team_size_bits);
+  const bool lead_lane = (threadIdx.x & ((1u << team_size_bits) - 1u)) == 0;
+  const uint32_t ofst  = STATIC_RESULT_POSITION ? 0 : result_position[0];
 
   for (uint32_t i = threadIdx.x >> team_size_bits; i < max_i; i += blockDim.x >> team_size_bits) {
     const auto j        = i + ofst;
@@ -206,30 +234,19 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes_jit(
     const auto child_id = valid_i ? result_child_indices_ptr[j] : invalid_index;
 
     // CRITICAL: ALL threads in the team must participate in compute_distance and team_sum
-    // Otherwise warp shuffles will hang. Each thread calls the extern function to get
+    // Otherwise warp shuffles will hang. Each thread calls the unified extern function to get
     // its per-thread distance, then team_sum reduces across all threads in the team.
     DistanceT per_thread_dist = 0;
     if (child_id != invalid_index) {
-      if constexpr (!has_kpq_bits_v<DescriptorT>) {
-        // Standard descriptor - Metric is no longer a template parameter, linked via dist_op and
-        // normalization fragments
-        per_thread_dist = compute_distance_standard<DescriptorT::kTeamSize,
-                                                    DescriptorT::kDatasetBlockDim,
-                                                    DataT,
-                                                    IndexT,
-                                                    DistanceT>(args, child_id);
-      } else {
-        // Must be cagra_q_dataset_descriptor_t - VPQ only supports L2Expanded, so Metric is not
-        // needed
-        per_thread_dist = compute_distance_vpq<DescriptorT::kTeamSize,
-                                               DescriptorT::kDatasetBlockDim,
-                                               DescriptorT::kPqBits,
-                                               DescriptorT::kPqLen,
-                                               typename DescriptorT::CODE_BOOK_T,
-                                               DataT,
-                                               IndexT,
-                                               DistanceT>(args, child_id);
-      }
+      // Use unified compute_distance function (links standard or VPQ fragment at runtime)
+      per_thread_dist = compute_distance<TeamSize,
+                                         DatasetBlockDim,
+                                         PQ_BITS,
+                                         PQ_LEN,
+                                         CodebookT,
+                                         DataT,
+                                         IndexT,
+                                         DistanceT>(args, child_id);
     } else {
       // Invalid child_id: lead lane gets upper_bound, others get 0
       per_thread_dist = lead_lane ? raft::upper_bound<DistanceT>() : 0;

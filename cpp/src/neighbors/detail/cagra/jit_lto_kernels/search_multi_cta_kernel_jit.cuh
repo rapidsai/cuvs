@@ -42,9 +42,14 @@ using cuvs::neighbors::detail::sample_filter;
 using cuvs::neighbors::cagra::detail::device::compute_distance_to_child_nodes_jit;
 using cuvs::neighbors::cagra::detail::device::compute_distance_to_random_nodes_jit;
 
-// JIT version of search_kernel - uses extern functions with concrete descriptor type
+// JIT version of search_kernel - uses extern functions with void* descriptor pointer
+// Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT
 // Filter is linked separately via JIT LTO, so we use none_sample_filter directly
-template <typename DescriptorT,  // Concrete descriptor type
+template <uint32_t TeamSize,
+          uint32_t DatasetBlockDim,
+          uint32_t PQ_BITS,
+          uint32_t PQ_LEN,
+          typename CodebookT,
           typename DataT,
           typename IndexT,
           typename DistanceT,
@@ -52,7 +57,7 @@ template <typename DescriptorT,  // Concrete descriptor type
 __global__ __launch_bounds__(1024, 1) void search_kernel_jit(
   IndexT* const result_indices_ptr,       // [num_queries, num_cta_per_query, itopk_size]
   DistanceT* const result_distances_ptr,  // [num_queries, num_cta_per_query, itopk_size]
-  const DescriptorT* dataset_desc,        // Concrete descriptor type from template
+  void* dataset_desc,                     // void* descriptor pointer (reconstructed in fragments)
   const DataT* const queries_ptr,         // [num_queries, dataset_dim]
   const IndexT* const knn_graph,          // [dataset_size, graph_degree]
   const uint32_t max_elements,
@@ -114,35 +119,30 @@ __global__ __launch_bounds__(1024, 1) void search_kernel_jit(
   const auto result_buffer_size_32 = raft::round_up_safe<uint32_t>(result_buffer_size, 32);
   assert(result_buffer_size_32 <= max_elements);
 
-  // Get smem_ws_size_in_bytes using static method (dim is in descriptor args)
-  uint32_t dim                   = dataset_desc->args.dim;
-  uint32_t smem_ws_size_in_bytes = DescriptorT::get_smem_ws_size_in_bytes(dim);
+  // Get dim and smem_ws_size_in_bytes using accessor fragments
+  // Planner links the right fragment (standard or VPQ) at runtime based on descriptor type
+  uint32_t dim =
+    get_dim<TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, DataT, IndexT, DistanceT>(
+      dataset_desc);
+  uint32_t smem_ws_size_in_bytes = get_smem_ws_size_in_bytes<TeamSize,
+                                                             DatasetBlockDim,
+                                                             PQ_BITS,
+                                                             PQ_LEN,
+                                                             CodebookT,
+                                                             DataT,
+                                                             IndexT,
+                                                             DistanceT>(dataset_desc, dim);
 
-  // Set smem working buffer for the distance calculation using extern function
-  // setup_workspace copies the descriptor to shared memory and returns pointer to smem descriptor
-  // NOTE: setup_workspace must be called by ALL threads (it uses __syncthreads())
-  const DescriptorT* smem_desc = nullptr;
-  // Check if DescriptorT is a standard_dataset_descriptor_t by checking if it doesn't have kPqBits
-  // (standard descriptors don't have kPqBits, VPQ descriptors do)
-  if constexpr (!has_kpq_bits_v<DescriptorT>) {
-    // Standard descriptor - Metric is no longer a template parameter, linked via dist_op and
-    // normalization fragments
-    smem_desc = setup_workspace_standard<DescriptorT::kTeamSize,
-                                         DescriptorT::kDatasetBlockDim,
-                                         DataT,
-                                         IndexT,
-                                         DistanceT>(dataset_desc, smem, queries_ptr, query_id);
-  } else {
-    // Must be cagra_q_dataset_descriptor_t - VPQ only supports L2Expanded, so Metric is not needed
-    smem_desc = setup_workspace_vpq<DescriptorT::kTeamSize,
-                                    DescriptorT::kDatasetBlockDim,
-                                    DescriptorT::kPqBits,
-                                    DescriptorT::kPqLen,
-                                    typename DescriptorT::CODE_BOOK_T,
+  // Set smem working buffer using unified setup_workspace
+  // Planner links the right fragment (standard or VPQ) at runtime based on descriptor type
+  void* smem_desc = setup_workspace<TeamSize,
+                                    DatasetBlockDim,
+                                    PQ_BITS,
+                                    PQ_LEN,
+                                    CodebookT,
                                     DataT,
                                     IndexT,
                                     DistanceT>(dataset_desc, smem, queries_ptr, query_id);
-  }
 
   auto* __restrict__ result_indices_buffer =
     reinterpret_cast<INDEX_T*>(smem + smem_ws_size_in_bytes);
@@ -174,21 +174,27 @@ __global__ __launch_bounds__(1024, 1) void search_kernel_jit(
   uint32_t block_id                   = cta_id + (num_cta_per_query * query_id);
   uint32_t num_blocks                 = num_cta_per_query * num_queries;
 
-  compute_distance_to_random_nodes_jit<DescriptorT, IndexT, DistanceT, DataT>(
-    result_indices_buffer,
-    result_distances_buffer,
-    smem_desc,
-    graph_degree,
-    num_distilation,
-    rand_xor_mask,
-    local_seed_ptr,
-    num_seeds,
-    local_visited_hashmap_ptr,
-    visited_hash_bitlen,
-    local_traversed_hashmap_ptr,
-    traversed_hash_bitlen,
-    block_id,
-    num_blocks);
+  compute_distance_to_random_nodes_jit<TeamSize,
+                                       DatasetBlockDim,
+                                       PQ_BITS,
+                                       PQ_LEN,
+                                       CodebookT,
+                                       IndexT,
+                                       DistanceT,
+                                       DataT>(result_indices_buffer,
+                                              result_distances_buffer,
+                                              smem_desc,
+                                              graph_degree,
+                                              num_distilation,
+                                              rand_xor_mask,
+                                              local_seed_ptr,
+                                              num_seeds,
+                                              local_visited_hashmap_ptr,
+                                              visited_hash_bitlen,
+                                              local_traversed_hashmap_ptr,
+                                              traversed_hash_bitlen,
+                                              block_id,
+                                              num_blocks);
   __syncthreads();
   _CLK_REC(clk_compute_1st_distance);
 
@@ -268,21 +274,28 @@ __global__ __launch_bounds__(1024, 1) void search_kernel_jit(
     __syncthreads();
 
     // Compute the norms between child nodes and query node using JIT version
-    compute_distance_to_child_nodes_jit<DescriptorT, IndexT, DistanceT, DataT, 0>(
-      result_indices_buffer,
-      result_distances_buffer,
-      smem_desc,
-      knn_graph,
-      graph_degree,
-      local_visited_hashmap_ptr,
-      visited_hash_bitlen,
-      local_traversed_hashmap_ptr,
-      traversed_hash_bitlen,
-      parent_indices_buffer,
-      result_indices_buffer,
-      1,
-      result_position,
-      result_buffer_size_32);
+    compute_distance_to_child_nodes_jit<TeamSize,
+                                        DatasetBlockDim,
+                                        PQ_BITS,
+                                        PQ_LEN,
+                                        CodebookT,
+                                        IndexT,
+                                        DistanceT,
+                                        DataT,
+                                        0>(result_indices_buffer,
+                                           result_distances_buffer,
+                                           smem_desc,
+                                           knn_graph,
+                                           graph_degree,
+                                           local_visited_hashmap_ptr,
+                                           visited_hash_bitlen,
+                                           local_traversed_hashmap_ptr,
+                                           traversed_hash_bitlen,
+                                           parent_indices_buffer,
+                                           result_indices_buffer,
+                                           1,
+                                           result_position,
+                                           result_buffer_size_32);
     __syncthreads();
 
     // Check the state of the nodes in the result buffer which were not updated

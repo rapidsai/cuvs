@@ -292,7 +292,7 @@ function(generate_jit_lto_kernels target)
         set(idx_abbrev "${cagra_index_abbrev}")
         set(dist_abbrev "${cagra_distance_abbrev}")
         configure_file(
-          "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_standard.cu.in"
+          "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_standard_unified.cu.in"
           "${filename}"
           @ONLY
         )
@@ -303,6 +303,255 @@ function(generate_jit_lto_kernels target)
           EMBEDDED_HEADER "${generated_kernels_dir}/cagra_device_functions/${kernel_name}.h"
           EMBEDDED_ARRAY "embedded_${kernel_name}"
         )
+      endforeach()
+    endforeach()
+  endforeach()
+
+  # Generate descriptor accessor fragments for standard descriptors These fragments provide get_dim,
+  # get_size, get_team_size_bitshift, get_args, get_smem_ws_size_in_bytes
+  foreach(data_idx IN ITEMS 0 1 2 3)
+    list(GET cagra_data_types ${data_idx} data_type)
+    list(GET cagra_data_type_abbrevs ${data_idx} type_abbrev)
+    foreach(team_size IN LISTS cagra_team_sizes)
+      foreach(dataset_block_dim IN LISTS cagra_dataset_block_dims)
+        # get_dim_standard
+        set(kernel_name
+            "get_dim_standard_t${team_size}_dim${dataset_block_dim}_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}"
+        )
+        set(filename "${generated_kernels_dir}/cagra_device_functions/fatbin_${kernel_name}.cu")
+        set(data_type "${data_type}")
+        set(index_type "${cagra_index_type}")
+        set(distance_type "${cagra_distance_type}")
+        set(idx_abbrev "${cagra_index_abbrev}")
+        set(dist_abbrev "${cagra_distance_abbrev}")
+        configure_file(
+          "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/get_dim_standard.cu.in"
+          "${filename}"
+          @ONLY
+        )
+        embed_jit_lto_fatbin(
+          FATBIN_TARGET "fatbin_${kernel_name}"
+          FATBIN_SOURCE "${filename}"
+          EMBEDDED_TARGET "${target}"
+          EMBEDDED_HEADER "${generated_kernels_dir}/cagra_device_functions/${kernel_name}.h"
+          EMBEDDED_ARRAY "embedded_${kernel_name}"
+        )
+
+        # get_size_standard
+        set(kernel_name
+            "get_size_standard_t${team_size}_dim${dataset_block_dim}_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}"
+        )
+        set(filename "${generated_kernels_dir}/cagra_device_functions/fatbin_${kernel_name}.cu")
+        configure_file(
+          "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/get_size_standard.cu.in"
+          "${filename}"
+          @ONLY
+        )
+        embed_jit_lto_fatbin(
+          FATBIN_TARGET "fatbin_${kernel_name}"
+          FATBIN_SOURCE "${filename}"
+          EMBEDDED_TARGET "${target}"
+          EMBEDDED_HEADER "${generated_kernels_dir}/cagra_device_functions/${kernel_name}.h"
+          EMBEDDED_ARRAY "embedded_${kernel_name}"
+        )
+
+        # get_team_size_bitshift_standard
+        set(kernel_name
+            "get_team_size_bitshift_standard_t${team_size}_dim${dataset_block_dim}_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}"
+        )
+        set(filename "${generated_kernels_dir}/cagra_device_functions/fatbin_${kernel_name}.cu")
+        configure_file(
+          "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/get_team_size_bitshift_standard.cu.in"
+          "${filename}"
+          @ONLY
+        )
+        embed_jit_lto_fatbin(
+          FATBIN_TARGET "fatbin_${kernel_name}"
+          FATBIN_SOURCE "${filename}"
+          EMBEDDED_TARGET "${target}"
+          EMBEDDED_HEADER "${generated_kernels_dir}/cagra_device_functions/${kernel_name}.h"
+          EMBEDDED_ARRAY "embedded_${kernel_name}"
+        )
+
+        # get_team_size_bitshift_from_smem_standard
+        set(kernel_name
+            "get_team_size_bitshift_from_smem_standard_t${team_size}_dim${dataset_block_dim}_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}"
+        )
+        set(filename "${generated_kernels_dir}/cagra_device_functions/fatbin_${kernel_name}.cu")
+        configure_file(
+          "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/get_team_size_bitshift_from_smem_standard.cu.in"
+          "${filename}"
+          @ONLY
+        )
+        embed_jit_lto_fatbin(
+          FATBIN_TARGET "fatbin_${kernel_name}"
+          FATBIN_SOURCE "${filename}"
+          EMBEDDED_TARGET "${target}"
+          EMBEDDED_HEADER "${generated_kernels_dir}/cagra_device_functions/${kernel_name}.h"
+          EMBEDDED_ARRAY "embedded_${kernel_name}"
+        )
+
+        # get_args_standard
+        set(kernel_name
+            "get_args_standard_t${team_size}_dim${dataset_block_dim}_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}"
+        )
+        set(filename "${generated_kernels_dir}/cagra_device_functions/fatbin_${kernel_name}.cu")
+        configure_file(
+          "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/get_args_standard.cu.in"
+          "${filename}"
+          @ONLY
+        )
+        embed_jit_lto_fatbin(
+          FATBIN_TARGET "fatbin_${kernel_name}"
+          FATBIN_SOURCE "${filename}"
+          EMBEDDED_TARGET "${target}"
+          EMBEDDED_HEADER "${generated_kernels_dir}/cagra_device_functions/${kernel_name}.h"
+          EMBEDDED_ARRAY "embedded_${kernel_name}"
+        )
+
+        # get_smem_ws_size_in_bytes_standard
+        set(kernel_name
+            "get_smem_ws_size_in_bytes_standard_t${team_size}_dim${dataset_block_dim}_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}"
+        )
+        set(filename "${generated_kernels_dir}/cagra_device_functions/fatbin_${kernel_name}.cu")
+        configure_file(
+          "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/get_smem_ws_size_in_bytes_standard.cu.in"
+          "${filename}"
+          @ONLY
+        )
+        embed_jit_lto_fatbin(
+          FATBIN_TARGET "fatbin_${kernel_name}"
+          FATBIN_SOURCE "${filename}"
+          EMBEDDED_TARGET "${target}"
+          EMBEDDED_HEADER "${generated_kernels_dir}/cagra_device_functions/${kernel_name}.h"
+          EMBEDDED_ARRAY "embedded_${kernel_name}"
+        )
+      endforeach()
+    endforeach()
+  endforeach()
+
+  # Generate descriptor accessor fragments for VPQ descriptors
+  foreach(data_idx IN ITEMS 0 1 2 3)
+    list(GET cagra_data_types ${data_idx} data_type)
+    list(GET cagra_data_type_abbrevs ${data_idx} type_abbrev)
+    foreach(team_size IN LISTS cagra_team_sizes)
+      foreach(dataset_block_dim IN LISTS cagra_dataset_block_dims)
+        foreach(pq_len IN LISTS cagra_pq_lens)
+          # get_dim_vpq
+          set(kernel_name
+              "get_dim_vpq_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}"
+          )
+          set(filename "${generated_kernels_dir}/cagra_device_functions/fatbin_${kernel_name}.cu")
+          set(pq_bits "${cagra_pq_bits}")
+          set(codebook_type "${cagra_codebook_type}")
+          set(data_type "${data_type}")
+          set(index_type "${cagra_index_type}")
+          set(distance_type "${cagra_distance_type}")
+          set(idx_abbrev "${cagra_index_abbrev}")
+          set(dist_abbrev "${cagra_distance_abbrev}")
+          configure_file(
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/get_dim_vpq.cu.in"
+            "${filename}"
+            @ONLY
+          )
+          embed_jit_lto_fatbin(
+            FATBIN_TARGET "fatbin_${kernel_name}"
+            FATBIN_SOURCE "${filename}"
+            EMBEDDED_TARGET "${target}"
+            EMBEDDED_HEADER "${generated_kernels_dir}/cagra_device_functions/${kernel_name}.h"
+            EMBEDDED_ARRAY "embedded_${kernel_name}"
+          )
+
+          # get_size_vpq
+          set(kernel_name
+              "get_size_vpq_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}"
+          )
+          set(filename "${generated_kernels_dir}/cagra_device_functions/fatbin_${kernel_name}.cu")
+          configure_file(
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/get_size_vpq.cu.in"
+            "${filename}"
+            @ONLY
+          )
+          embed_jit_lto_fatbin(
+            FATBIN_TARGET "fatbin_${kernel_name}"
+            FATBIN_SOURCE "${filename}"
+            EMBEDDED_TARGET "${target}"
+            EMBEDDED_HEADER "${generated_kernels_dir}/cagra_device_functions/${kernel_name}.h"
+            EMBEDDED_ARRAY "embedded_${kernel_name}"
+          )
+
+          # get_team_size_bitshift_vpq
+          set(kernel_name
+              "get_team_size_bitshift_vpq_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}"
+          )
+          set(filename "${generated_kernels_dir}/cagra_device_functions/fatbin_${kernel_name}.cu")
+          configure_file(
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/get_team_size_bitshift_vpq.cu.in"
+            "${filename}"
+            @ONLY
+          )
+          embed_jit_lto_fatbin(
+            FATBIN_TARGET "fatbin_${kernel_name}"
+            FATBIN_SOURCE "${filename}"
+            EMBEDDED_TARGET "${target}"
+            EMBEDDED_HEADER "${generated_kernels_dir}/cagra_device_functions/${kernel_name}.h"
+            EMBEDDED_ARRAY "embedded_${kernel_name}"
+          )
+
+          # get_team_size_bitshift_from_smem_vpq
+          set(kernel_name
+              "get_team_size_bitshift_from_smem_vpq_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}"
+          )
+          set(filename "${generated_kernels_dir}/cagra_device_functions/fatbin_${kernel_name}.cu")
+          configure_file(
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/get_team_size_bitshift_from_smem_vpq.cu.in"
+            "${filename}"
+            @ONLY
+          )
+          embed_jit_lto_fatbin(
+            FATBIN_TARGET "fatbin_${kernel_name}"
+            FATBIN_SOURCE "${filename}"
+            EMBEDDED_TARGET "${target}"
+            EMBEDDED_HEADER "${generated_kernels_dir}/cagra_device_functions/${kernel_name}.h"
+            EMBEDDED_ARRAY "embedded_${kernel_name}"
+          )
+
+          # get_args_vpq
+          set(kernel_name
+              "get_args_vpq_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}"
+          )
+          set(filename "${generated_kernels_dir}/cagra_device_functions/fatbin_${kernel_name}.cu")
+          configure_file(
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/get_args_vpq.cu.in"
+            "${filename}"
+            @ONLY
+          )
+          embed_jit_lto_fatbin(
+            FATBIN_TARGET "fatbin_${kernel_name}"
+            FATBIN_SOURCE "${filename}"
+            EMBEDDED_TARGET "${target}"
+            EMBEDDED_HEADER "${generated_kernels_dir}/cagra_device_functions/${kernel_name}.h"
+            EMBEDDED_ARRAY "embedded_${kernel_name}"
+          )
+
+          # get_smem_ws_size_in_bytes_vpq
+          set(kernel_name
+              "get_smem_ws_size_in_bytes_vpq_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}"
+          )
+          set(filename "${generated_kernels_dir}/cagra_device_functions/fatbin_${kernel_name}.cu")
+          configure_file(
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/get_smem_ws_size_in_bytes_vpq.cu.in"
+            "${filename}"
+            @ONLY
+          )
+          embed_jit_lto_fatbin(
+            FATBIN_TARGET "fatbin_${kernel_name}"
+            FATBIN_SOURCE "${filename}"
+            EMBEDDED_TARGET "${target}"
+            EMBEDDED_HEADER "${generated_kernels_dir}/cagra_device_functions/${kernel_name}.h"
+            EMBEDDED_ARRAY "embedded_${kernel_name}"
+          )
+        endforeach()
       endforeach()
     endforeach()
   endforeach()
@@ -444,7 +693,7 @@ function(generate_jit_lto_kernels target)
           set(index_type "${cagra_index_type}")
           set(distance_type "${cagra_distance_type}")
           configure_file(
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_vpq.cu.in"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_vpq_unified.cu.in"
             "${filename}"
             @ONLY
           )
@@ -498,6 +747,12 @@ function(generate_jit_lto_kernels target)
             )
             set(team_size "${team_size}")
             set(dataset_block_dim "${dataset_block_dim}")
+            set(pq_bits "0")
+            set(pq_len "0")
+            set(codebook_type "void")
+            set(pq_suffix "")
+            set(pq_prefix "")
+            set(codebook_tag "")
             set(index_type "${cagra_index_type}")
             set(distance_type "${cagra_distance_type}")
             set(idx_abbrev "${cagra_index_abbrev}")
@@ -524,6 +779,12 @@ function(generate_jit_lto_kernels target)
             )
             set(team_size "${team_size}")
             set(dataset_block_dim "${dataset_block_dim}")
+            set(pq_bits "0")
+            set(pq_len "0")
+            set(codebook_type "void")
+            set(pq_suffix "")
+            set(pq_prefix "")
+            set(codebook_tag "")
             set(index_type "${cagra_index_type}")
             set(distance_type "${cagra_distance_type}")
             set(idx_abbrev "${cagra_index_abbrev}")
@@ -567,10 +828,11 @@ function(generate_jit_lto_kernels target)
               # CAGRA only uses uint32_t as SourceIndexT
               set(source_index_type "uint32_t")
               set(src_idx_abbrev "ui")
-              # Regular VPQ kernel entrypoint Note: Metric is no longer in the kernel name - VPQ
-              # only supports L2Expanded
+              # Regular VPQ kernel entrypoint Note: "vpq" is no longer in the kernel name - PQ
+              # parameters distinguish VPQ Metric is no longer in the kernel name - VPQ only
+              # supports L2Expanded
               set(kernel_name
-                  "search_single_cta_kernel_vpq_${topk_by_bitonic_sort_str}_${bitonic_sort_and_merge_multi_warps_str}_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}_${src_idx_abbrev}"
+                  "search_single_cta_kernel_${topk_by_bitonic_sort_str}_${bitonic_sort_and_merge_multi_warps_str}_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}_${src_idx_abbrev}"
               )
               set(filename
                   "${generated_kernels_dir}/cagra_kernel_entrypoints/fatbin_${kernel_name}.cu"
@@ -582,12 +844,15 @@ function(generate_jit_lto_kernels target)
               set(pq_bits "${cagra_pq_bits}")
               set(pq_len "${pq_len}")
               set(codebook_type "${cagra_codebook_type}")
+              set(pq_suffix "_${cagra_pq_bits}pq_${pq_len}subd")
+              set(pq_prefix "")
+              set(codebook_tag ", tag_codebook_half")
               set(index_type "${cagra_index_type}")
               set(distance_type "${cagra_distance_type}")
               set(idx_abbrev "${cagra_index_abbrev}")
               set(dist_abbrev "${cagra_distance_abbrev}")
               configure_file(
-                "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_kernel_vpq.cu.in"
+                "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_kernel.cu.in"
                 "${filename}"
                 @ONLY
               )
@@ -599,10 +864,11 @@ function(generate_jit_lto_kernels target)
                 EMBEDDED_ARRAY "embedded_${kernel_name}"
               )
 
-              # Persistent VPQ kernel entrypoint Note: Metric is no longer in the kernel name - VPQ
-              # only supports L2Expanded
+              # Persistent VPQ kernel entrypoint Note: "vpq" is no longer in the kernel name - PQ
+              # parameters distinguish VPQ Metric is no longer in the kernel name - VPQ only
+              # supports L2Expanded
               set(kernel_name
-                  "search_single_cta_kernel_p_vpq_${topk_by_bitonic_sort_str}_${bitonic_sort_and_merge_multi_warps_str}_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}_${src_idx_abbrev}"
+                  "search_single_cta_kernel_p_${topk_by_bitonic_sort_str}_${bitonic_sort_and_merge_multi_warps_str}_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}_${src_idx_abbrev}"
               )
               set(filename
                   "${generated_kernels_dir}/cagra_kernel_entrypoints/fatbin_${kernel_name}.cu"
@@ -614,12 +880,15 @@ function(generate_jit_lto_kernels target)
               set(pq_bits "${cagra_pq_bits}")
               set(pq_len "${pq_len}")
               set(codebook_type "${cagra_codebook_type}")
+              set(pq_suffix "_${cagra_pq_bits}pq_${pq_len}subd")
+              set(pq_prefix "")
+              set(codebook_tag ", tag_codebook_half")
               set(index_type "${cagra_index_type}")
               set(distance_type "${cagra_distance_type}")
               set(idx_abbrev "${cagra_index_abbrev}")
               set(dist_abbrev "${cagra_distance_abbrev}")
               configure_file(
-                "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_kernel_p_vpq.cu.in"
+                "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_kernel_p.cu.in"
                 "${filename}"
                 @ONLY
               )
@@ -659,6 +928,12 @@ function(generate_jit_lto_kernels target)
         set(filename "${generated_kernels_dir}/cagra_kernel_entrypoints/fatbin_${kernel_name}.cu")
         set(team_size "${team_size}")
         set(dataset_block_dim "${dataset_block_dim}")
+        set(pq_bits "0")
+        set(pq_len "0")
+        set(codebook_type "void")
+        set(pq_suffix "")
+        set(pq_prefix "")
+        set(codebook_tag "")
         set(index_type "${cagra_index_type}")
         set(distance_type "${cagra_distance_type}")
         set(idx_abbrev "${cagra_index_abbrev}")
@@ -704,12 +979,15 @@ function(generate_jit_lto_kernels target)
           set(pq_bits "${cagra_pq_bits}")
           set(pq_len "${pq_len}")
           set(codebook_type "${cagra_codebook_type}")
+          set(pq_suffix "_${cagra_pq_bits}pq_${pq_len}subd")
+          set(pq_prefix "_vpq")
+          set(codebook_tag ", tag_codebook_half")
           set(index_type "${cagra_index_type}")
           set(distance_type "${cagra_distance_type}")
           set(idx_abbrev "${cagra_index_abbrev}")
           set(dist_abbrev "${cagra_distance_abbrev}")
           configure_file(
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_multi_cta_kernel_vpq.cu.in"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_multi_cta_kernel.cu.in"
             "${filename}"
             @ONLY
           )
@@ -740,6 +1018,12 @@ function(generate_jit_lto_kernels target)
         set(filename "${generated_kernels_dir}/cagra_kernel_entrypoints/fatbin_${kernel_name}.cu")
         set(team_size "${team_size}")
         set(dataset_block_dim "${dataset_block_dim}")
+        set(pq_bits "0")
+        set(pq_len "0")
+        set(codebook_type "void")
+        set(pq_suffix "")
+        set(pq_prefix "")
+        set(codebook_tag "")
         set(index_type "${cagra_index_type}")
         set(distance_type "${cagra_distance_type}")
         set(idx_abbrev "${cagra_index_abbrev}")
@@ -767,6 +1051,12 @@ function(generate_jit_lto_kernels target)
         set(filename "${generated_kernels_dir}/cagra_kernel_entrypoints/fatbin_${kernel_name}.cu")
         set(team_size "${team_size}")
         set(dataset_block_dim "${dataset_block_dim}")
+        set(pq_bits "0")
+        set(pq_len "0")
+        set(codebook_type "void")
+        set(pq_suffix "")
+        set(pq_prefix "")
+        set(codebook_tag "")
         set(index_type "${cagra_index_type}")
         set(distance_type "${cagra_distance_type}")
         set(idx_abbrev "${cagra_index_abbrev}")
@@ -808,12 +1098,15 @@ function(generate_jit_lto_kernels target)
           set(pq_bits "${cagra_pq_bits}")
           set(pq_len "${pq_len}")
           set(codebook_type "${cagra_codebook_type}")
+          set(pq_suffix "_${cagra_pq_bits}pq_${pq_len}subd")
+          set(pq_prefix "_vpq")
+          set(codebook_tag ", tag_codebook_half")
           set(index_type "${cagra_index_type}")
           set(distance_type "${cagra_distance_type}")
           set(idx_abbrev "${cagra_index_abbrev}")
           set(dist_abbrev "${cagra_distance_abbrev}")
           configure_file(
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/random_pickup_kernel_vpq.cu.in"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/random_pickup_kernel.cu.in"
             "${filename}"
             @ONLY
           )
@@ -840,12 +1133,15 @@ function(generate_jit_lto_kernels target)
           set(pq_bits "${cagra_pq_bits}")
           set(pq_len "${pq_len}")
           set(codebook_type "${cagra_codebook_type}")
+          set(pq_suffix "_${cagra_pq_bits}pq_${pq_len}subd")
+          set(pq_prefix "_vpq")
+          set(codebook_tag ", tag_codebook_half")
           set(index_type "${cagra_index_type}")
           set(distance_type "${cagra_distance_type}")
           set(idx_abbrev "${cagra_index_abbrev}")
           set(dist_abbrev "${cagra_distance_abbrev}")
           configure_file(
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_to_child_nodes_kernel_vpq.cu.in"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_to_child_nodes_kernel.cu.in"
             "${filename}"
             @ONLY
           )

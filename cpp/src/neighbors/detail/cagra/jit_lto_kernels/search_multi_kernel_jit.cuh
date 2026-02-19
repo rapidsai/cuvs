@@ -36,67 +36,72 @@ struct has_kpq_bits {
 template <typename T>
 inline constexpr bool has_kpq_bits_v = has_kpq_bits<T>::value;
 
-// JIT version of random_pickup_kernel - uses extern functions
-template <typename DescriptorT,  // Concrete descriptor type
+// JIT version of random_pickup_kernel - uses extern functions with void* descriptor pointer
+// Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT
+template <uint32_t TeamSize,
+          uint32_t DatasetBlockDim,
+          uint32_t PQ_BITS,
+          uint32_t PQ_LEN,
+          typename CodebookT,
           typename DataT,
           typename IndexT,
           typename DistanceT>
 RAFT_KERNEL random_pickup_kernel_jit(
-  const DescriptorT* dataset_desc,                        // Concrete descriptor type from template
-  const typename DescriptorT::DATA_T* const queries_ptr,  // [num_queries, dataset_dim]
+  void* dataset_desc,              // void* descriptor pointer (reconstructed in fragments)
+  const DataT* const queries_ptr,  // [num_queries, dataset_dim]
   const std::size_t num_pickup,
   const unsigned num_distilation,
   const uint64_t rand_xor_mask,
-  const typename DescriptorT::INDEX_T* seed_ptr,  // [num_queries, num_seeds]
+  const IndexT* seed_ptr,  // [num_queries, num_seeds]
   const uint32_t num_seeds,
-  typename DescriptorT::INDEX_T* const result_indices_ptr,       // [num_queries, ldr]
-  typename DescriptorT::DISTANCE_T* const result_distances_ptr,  // [num_queries, ldr]
-  const std::uint32_t ldr,                                       // (*) ldr >= num_pickup
-  typename DescriptorT::INDEX_T* const visited_hashmap_ptr,      // [num_queries, 1 << bitlen]
+  IndexT* const result_indices_ptr,       // [num_queries, ldr]
+  DistanceT* const result_distances_ptr,  // [num_queries, ldr]
+  const std::uint32_t ldr,                // (*) ldr >= num_pickup
+  IndexT* const visited_hashmap_ptr,      // [num_queries, 1 << bitlen]
   const std::uint32_t hash_bitlen)
 {
-  using DATA_T     = typename DescriptorT::DATA_T;
-  using INDEX_T    = typename DescriptorT::INDEX_T;
-  using DISTANCE_T = typename DescriptorT::DISTANCE_T;
+  using DATA_T     = DataT;
+  using INDEX_T    = IndexT;
+  using DISTANCE_T = DistanceT;
 
-  const auto team_size_bits    = dataset_desc->team_size_bitshift();
+  // Get team_size_bits using accessor fragment (planner links the right fragment at runtime)
+  uint32_t team_size_bits = get_team_size_bitshift<TeamSize,
+                                                   DatasetBlockDim,
+                                                   PQ_BITS,
+                                                   PQ_LEN,
+                                                   CodebookT,
+                                                   DataT,
+                                                   IndexT,
+                                                   DistanceT>(dataset_desc);
+
   const auto ldb               = hashmap::get_size(hash_bitlen);
   const auto global_team_index = (blockIdx.x * blockDim.x + threadIdx.x) >> team_size_bits;
   const uint32_t query_id      = blockIdx.y;
   if (global_team_index >= num_pickup) { return; }
   extern __shared__ uint8_t smem[];
 
-  // Set smem working buffer for the distance calculation using extern function
-  // setup_workspace copies the descriptor to shared memory and returns pointer to smem descriptor
+  // Set smem working buffer using unified setup_workspace
+  // setup_workspace copies the descriptor to shared memory and returns void* to smem descriptor
   // NOTE: setup_workspace must be called by ALL threads (it uses __syncthreads())
-  const DescriptorT* smem_desc = nullptr;
-  // Check if DescriptorT is a standard_dataset_descriptor_t by checking if it doesn't have kPqBits
-  // (standard descriptors don't have kPqBits, VPQ descriptors do)
-  if constexpr (!has_kpq_bits_v<DescriptorT>) {
-    // Standard descriptor - Metric is no longer a template parameter, linked via dist_op and
-    // normalization fragments
-    smem_desc = setup_workspace_standard<DescriptorT::kTeamSize,
-                                         DescriptorT::kDatasetBlockDim,
-                                         DataT,
-                                         IndexT,
-                                         DistanceT>(dataset_desc, smem, queries_ptr, query_id);
-  } else {
-    // Must be cagra_q_dataset_descriptor_t - VPQ only supports L2Expanded, so Metric is not needed
-    smem_desc = setup_workspace_vpq<DescriptorT::kTeamSize,
-                                    DescriptorT::kDatasetBlockDim,
-                                    DescriptorT::kPqBits,
-                                    DescriptorT::kPqLen,
-                                    typename DescriptorT::CODE_BOOK_T,
+  void* smem_desc = setup_workspace<TeamSize,
+                                    DatasetBlockDim,
+                                    PQ_BITS,
+                                    PQ_LEN,
+                                    CodebookT,
                                     DataT,
                                     IndexT,
                                     DistanceT>(dataset_desc, smem, queries_ptr, query_id);
-  }
   __syncthreads();
 
   // Load args once for better performance (avoid repeated loads in the loop)
   using args_t = typename cuvs::neighbors::cagra::detail::
     dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t;
-  const args_t args = smem_desc->args.load();
+  args_t args =
+    get_args<TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, DataT, IndexT, DistanceT>(
+      smem_desc);
+  IndexT dataset_size =
+    get_size<TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, DataT, IndexT, DistanceT>(
+      smem_desc);
 
   INDEX_T best_index_team_local;
   DISTANCE_T best_norm2_team_local = utils::get_max_value<DISTANCE_T>();
@@ -106,34 +111,22 @@ RAFT_KERNEL random_pickup_kernel_jit(
       seed_index = seed_ptr[global_team_index + (num_seeds * query_id)];
     } else {
       // Chose a seed node randomly
-      seed_index =
-        device::xorshift64((global_team_index ^ rand_xor_mask) * (i + 1)) % smem_desc->size;
+      seed_index = device::xorshift64((global_team_index ^ rand_xor_mask) * (i + 1)) % dataset_size;
     }
 
     // CRITICAL: ALL threads in the team must participate in compute_distance and team_sum
-    // Otherwise warp shuffles will hang. Each thread calls the extern function to get
+    // Otherwise warp shuffles will hang. Each thread calls the unified extern function to get
     // its per-thread distance, then team_sum reduces across all threads in the team.
     DistanceT per_thread_norm2 = 0;
-    if constexpr (!has_kpq_bits_v<DescriptorT>) {
-      // Standard descriptor - Metric is no longer a template parameter, linked via dist_op and
-      // normalization fragments
-      per_thread_norm2 = compute_distance_standard<DescriptorT::kTeamSize,
-                                                   DescriptorT::kDatasetBlockDim,
-                                                   DataT,
-                                                   IndexT,
-                                                   DistanceT>(args, seed_index);
-    } else {
-      // Must be cagra_q_dataset_descriptor_t - VPQ only supports L2Expanded, so Metric is not
-      // needed
-      per_thread_norm2 = compute_distance_vpq<DescriptorT::kTeamSize,
-                                              DescriptorT::kDatasetBlockDim,
-                                              DescriptorT::kPqBits,
-                                              DescriptorT::kPqLen,
-                                              typename DescriptorT::CODE_BOOK_T,
-                                              DataT,
-                                              IndexT,
-                                              DistanceT>(args, seed_index);
-    }
+    // Use unified compute_distance function (planner links standard or VPQ fragment at runtime)
+    per_thread_norm2 = compute_distance<TeamSize,
+                                        DatasetBlockDim,
+                                        PQ_BITS,
+                                        PQ_LEN,
+                                        CodebookT,
+                                        DataT,
+                                        IndexT,
+                                        DistanceT>(args, seed_index);
     // Now ALL threads in the team participate in team_sum
     const auto norm2 = device::team_sum(per_thread_norm2, team_size_bits);
 
@@ -156,33 +149,49 @@ RAFT_KERNEL random_pickup_kernel_jit(
   }
 }
 
-// JIT version of compute_distance_to_child_nodes_kernel - uses extern functions
-template <typename DescriptorT,  // Concrete descriptor type
+// JIT version of compute_distance_to_child_nodes_kernel - uses extern functions with void*
+// descriptor Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT
+template <uint32_t TeamSize,
+          uint32_t DatasetBlockDim,
+          uint32_t PQ_BITS,
+          uint32_t PQ_LEN,
+          typename CodebookT,
+          typename DataT,
+          typename IndexT,
+          typename DistanceT,
           typename SourceIndexT,
           typename SAMPLE_FILTER_T>
 RAFT_KERNEL compute_distance_to_child_nodes_kernel_jit(
-  const typename DescriptorT::INDEX_T* const parent_node_list,  // [num_queries, search_width]
-  typename DescriptorT::INDEX_T* const parent_candidates_ptr,   // [num_queries, search_width]
-  typename DescriptorT::DISTANCE_T* const parent_distance_ptr,  // [num_queries, search_width]
+  const IndexT* const parent_node_list,  // [num_queries, search_width]
+  IndexT* const parent_candidates_ptr,   // [num_queries, search_width]
+  DistanceT* const parent_distance_ptr,  // [num_queries, search_width]
   const std::size_t lds,
   const std::uint32_t search_width,
-  const DescriptorT* dataset_desc,  // Concrete descriptor type from template
-  const typename DescriptorT::INDEX_T* const neighbor_graph_ptr,  // [dataset_size, graph_degree]
+  void* dataset_desc,                      // void* descriptor pointer (reconstructed in fragments)
+  const IndexT* const neighbor_graph_ptr,  // [dataset_size, graph_degree]
   const std::uint32_t graph_degree,
   const SourceIndexT* source_indices_ptr,
-  const typename DescriptorT::DATA_T* query_ptr,             // [num_queries, data_dim]
-  typename DescriptorT::INDEX_T* const visited_hashmap_ptr,  // [num_queries, 1 << hash_bitlen]
+  const DataT* query_ptr,             // [num_queries, data_dim]
+  IndexT* const visited_hashmap_ptr,  // [num_queries, 1 << hash_bitlen]
   const std::uint32_t hash_bitlen,
-  typename DescriptorT::INDEX_T* const result_indices_ptr,       // [num_queries, ldd]
-  typename DescriptorT::DISTANCE_T* const result_distances_ptr,  // [num_queries, ldd]
-  const std::uint32_t ldd,  // (*) ldd >= search_width * graph_degree
+  IndexT* const result_indices_ptr,       // [num_queries, ldd]
+  DistanceT* const result_distances_ptr,  // [num_queries, ldd]
+  const std::uint32_t ldd,                // (*) ldd >= search_width * graph_degree
   SAMPLE_FILTER_T sample_filter)
 {
-  using INDEX_T    = typename DescriptorT::INDEX_T;
-  using DISTANCE_T = typename DescriptorT::DISTANCE_T;
-  using DataT      = typename DescriptorT::DATA_T;
+  using INDEX_T    = IndexT;
+  using DISTANCE_T = DistanceT;
 
-  const auto team_size_bits = dataset_desc->team_size_bitshift();
+  // Get team_size_bits using accessor fragment (planner links the right fragment at runtime)
+  uint32_t team_size_bits = get_team_size_bitshift<TeamSize,
+                                                   DatasetBlockDim,
+                                                   PQ_BITS,
+                                                   PQ_LEN,
+                                                   CodebookT,
+                                                   DataT,
+                                                   IndexT,
+                                                   DistanceT>(dataset_desc);
+
   const auto team_size      = 1u << team_size_bits;
   const uint32_t ldb        = hashmap::get_size(hash_bitlen);
   const auto tid            = threadIdx.x + blockDim.x * blockIdx.x;
@@ -190,29 +199,17 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel_jit(
   const auto query_id       = blockIdx.y;
 
   extern __shared__ uint8_t smem[];
-  // Load a query using extern function
-  // setup_workspace copies the descriptor to shared memory and returns pointer to smem descriptor
+  // Load a query using unified setup_workspace
+  // setup_workspace copies the descriptor to shared memory and returns void* to smem descriptor
   // NOTE: setup_workspace must be called by ALL threads (it uses __syncthreads())
-  const DescriptorT* smem_desc = nullptr;
-  if constexpr (!has_kpq_bits_v<DescriptorT>) {
-    // Standard descriptor - Metric is no longer a template parameter, linked via dist_op and
-    // normalization fragments
-    smem_desc = setup_workspace_standard<DescriptorT::kTeamSize,
-                                         DescriptorT::kDatasetBlockDim,
-                                         DataT,
-                                         INDEX_T,
-                                         DISTANCE_T>(dataset_desc, smem, query_ptr, query_id);
-  } else {
-    // Must be cagra_q_dataset_descriptor_t - VPQ only supports L2Expanded, so Metric is not needed
-    smem_desc = setup_workspace_vpq<DescriptorT::kTeamSize,
-                                    DescriptorT::kDatasetBlockDim,
-                                    DescriptorT::kPqBits,
-                                    DescriptorT::kPqLen,
-                                    typename DescriptorT::CODE_BOOK_T,
+  void* smem_desc = setup_workspace<TeamSize,
+                                    DatasetBlockDim,
+                                    PQ_BITS,
+                                    PQ_LEN,
+                                    CodebookT,
                                     DataT,
-                                    INDEX_T,
-                                    DISTANCE_T>(dataset_desc, smem, query_ptr, query_id);
-  }
+                                    IndexT,
+                                    DistanceT>(dataset_desc, smem, query_ptr, query_id);
 
   __syncthreads();
   if (global_team_id >= search_width * graph_degree) { return; }
@@ -241,33 +238,24 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel_jit(
   // Load args once for better performance (avoid repeated loads)
   using args_t = typename cuvs::neighbors::cagra::detail::
     dataset_descriptor_base_t<DataT, INDEX_T, DISTANCE_T>::args_t;
-  const args_t args = smem_desc->args.load();
+  args_t args =
+    get_args<TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, DataT, IndexT, DistanceT>(
+      smem_desc);
 
   // CRITICAL: ALL threads in the team must participate in compute_distance and team_sum
-  // Otherwise warp shuffles will hang. Each thread calls the extern function to get
+  // Otherwise warp shuffles will hang. Each thread calls the unified extern function to get
   // its per-thread distance, then team_sum reduces across all threads in the team.
   DISTANCE_T per_thread_norm2 = 0;
   if (compute_distance_flag) {
-    if constexpr (!has_kpq_bits_v<DescriptorT>) {
-      // Standard descriptor - Metric is no longer a template parameter, linked via dist_op and
-      // normalization fragments
-      per_thread_norm2 = compute_distance_standard<DescriptorT::kTeamSize,
-                                                   DescriptorT::kDatasetBlockDim,
-                                                   DataT,
-                                                   INDEX_T,
-                                                   DISTANCE_T>(args, child_id);
-    } else {
-      // Must be cagra_q_dataset_descriptor_t - VPQ only supports L2Expanded, so Metric is not
-      // needed
-      per_thread_norm2 = compute_distance_vpq<DescriptorT::kTeamSize,
-                                              DescriptorT::kDatasetBlockDim,
-                                              DescriptorT::kPqBits,
-                                              DescriptorT::kPqLen,
-                                              typename DescriptorT::CODE_BOOK_T,
-                                              DataT,
-                                              INDEX_T,
-                                              DISTANCE_T>(args, child_id);
-    }
+    // Use unified compute_distance function (planner links standard or VPQ fragment at runtime)
+    per_thread_norm2 = compute_distance<TeamSize,
+                                        DatasetBlockDim,
+                                        PQ_BITS,
+                                        PQ_LEN,
+                                        CodebookT,
+                                        DataT,
+                                        IndexT,
+                                        DistanceT>(args, child_id);
   }
   // Now ALL threads in the team participate in team_sum
   DISTANCE_T norm2 = device::team_sum(per_thread_norm2, team_size_bits);

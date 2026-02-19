@@ -130,6 +130,12 @@ void select_and_run_jit(
     dataset_desc.pq_bits,
     dataset_desc.pq_len);
 
+  // Register descriptor accessor fragments first (needed for void* descriptor access)
+  planner.add_descriptor_accessor_device_functions(dataset_desc.team_size,
+                                                   dataset_desc.dataset_block_dim,
+                                                   dataset_desc.is_vpq,
+                                                   dataset_desc.pq_bits,
+                                                   dataset_desc.pq_len);
   planner.add_setup_workspace_device_function(dataset_desc.metric,
                                               dataset_desc.team_size,
                                               dataset_desc.dataset_block_dim,
@@ -248,6 +254,7 @@ void select_and_run_jit(
     graph.extent(0),
     graph.extent(1));
 
+  RAFT_LOG_INFO("[JIT LAUNCHER] MULTI_CTA launching kernel on stream=%p", stream);
   launcher->dispatch(stream,
                      grid_dims,
                      block_dims,

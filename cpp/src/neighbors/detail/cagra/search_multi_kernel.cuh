@@ -888,6 +888,14 @@ struct search
     }
 
     // Choose initial entry point candidates at random
+    // Validate all pointers before kernel launch to prevent illegal memory access
+    if (result_indices.data() == nullptr) {
+      RAFT_FAIL("result_indices.data() is NULL before random_pickup");
+    }
+    if (result_distances.data() == nullptr) {
+      RAFT_FAIL("result_distances.data() is NULL before random_pickup");
+    }
+    if (hashmap.data() == nullptr) { RAFT_FAIL("hashmap.data() is NULL before random_pickup"); }
     random_pickup<DataT, IndexT, DistanceT>(dataset_desc,
                                             queries_ptr,
                                             num_queries,
@@ -1085,7 +1093,6 @@ struct search
         num_executed_iterations[i] = iter;
       }
     }
-    RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
 };
 

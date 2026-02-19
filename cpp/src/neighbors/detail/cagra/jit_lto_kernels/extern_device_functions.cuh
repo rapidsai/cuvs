@@ -38,9 +38,102 @@ namespace cuvs::neighbors::cagra::detail {
 // All extern function declarations are in the cuvs::neighbors::cagra::detail namespace
 // so they can be used by all search modes without being beholden to any specific sub-namespace
 
-// Standard descriptor extern functions
-// Note: Metric is no longer a template parameter - it's linked via dist_op and normalization
-// fragments
+// Descriptor accessor extern functions (standard and VPQ versions use same function names)
+// These take void* and reconstruct the descriptor inside
+// Planner links the right fragment (standard or VPQ) at runtime based on descriptor type
+// Uses unified template parameters: for standard descriptors, PQ_BITS=0, PQ_LEN=0, CodebookT=void
+template <uint32_t TeamSize,
+          uint32_t DatasetBlockDim,
+          uint32_t PQ_BITS,
+          uint32_t PQ_LEN,
+          typename CodebookT,
+          typename DataT,
+          typename IndexT,
+          typename DistanceT>
+extern __device__ uint32_t get_dim(void* desc_ptr);
+
+template <uint32_t TeamSize,
+          uint32_t DatasetBlockDim,
+          uint32_t PQ_BITS,
+          uint32_t PQ_LEN,
+          typename CodebookT,
+          typename DataT,
+          typename IndexT,
+          typename DistanceT>
+extern __device__ IndexT get_size(void* desc_ptr);
+
+template <uint32_t TeamSize,
+          uint32_t DatasetBlockDim,
+          uint32_t PQ_BITS,
+          uint32_t PQ_LEN,
+          typename CodebookT,
+          typename DataT,
+          typename IndexT,
+          typename DistanceT>
+extern __device__ uint32_t get_team_size_bitshift(void* desc_ptr);
+
+template <uint32_t TeamSize,
+          uint32_t DatasetBlockDim,
+          uint32_t PQ_BITS,
+          uint32_t PQ_LEN,
+          typename CodebookT,
+          typename DataT,
+          typename IndexT,
+          typename DistanceT>
+extern __device__ uint32_t get_team_size_bitshift_from_smem(void* desc_ptr);
+
+template <uint32_t TeamSize,
+          uint32_t DatasetBlockDim,
+          uint32_t PQ_BITS,
+          uint32_t PQ_LEN,
+          typename CodebookT,
+          typename DataT,
+          typename IndexT,
+          typename DistanceT>
+extern __device__ typename dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t get_args(
+  void* desc_ptr);
+
+template <uint32_t TeamSize,
+          uint32_t DatasetBlockDim,
+          uint32_t PQ_BITS,
+          uint32_t PQ_LEN,
+          typename CodebookT,
+          typename DataT,
+          typename IndexT,
+          typename DistanceT>
+extern __device__ uint32_t get_smem_ws_size_in_bytes(void* desc_ptr, uint32_t dim);
+
+// Unified setup_workspace and compute_distance extern functions
+// These take void* and reconstruct the descriptor inside
+// Standard and VPQ versions are in separate impl headers but use the same function name
+template <uint32_t TeamSize,
+          uint32_t DatasetBlockDim,
+          uint32_t PQ_BITS,
+          uint32_t PQ_LEN,
+          typename CodebookT,
+          typename DataT,
+          typename IndexT,
+          typename DistanceT>
+extern __device__ void* setup_workspace(void* desc_ptr,
+                                        void* smem,
+                                        const DataT* queries,
+                                        uint32_t query_id);
+
+template <uint32_t TeamSize,
+          uint32_t DatasetBlockDim,
+          uint32_t PQ_BITS,
+          uint32_t PQ_LEN,
+          typename CodebookT,
+          typename DataT,
+          typename IndexT,
+          typename DistanceT>
+extern __device__ DistanceT
+compute_distance(const typename dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t args,
+                 IndexT dataset_index);
+
+// Standard descriptor extern functions (kept for backward compatibility, but prefer unified
+// versions) Note: Metric is no longer a template parameter - it's linked via dist_op and
+// normalization fragments
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           typename DataT,

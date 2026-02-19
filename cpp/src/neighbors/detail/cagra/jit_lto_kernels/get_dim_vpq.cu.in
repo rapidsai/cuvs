@@ -1,0 +1,38 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) @year@, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+// This file is auto-generated. Do not edit manually.
+
+#ifdef BUILD_KERNEL
+
+#include <neighbors/detail/cagra/jit_lto_kernels/descriptor_accessors_vpq_impl.cuh>
+
+namespace cuvs::neighbors::cagra::detail {
+
+// Instantiate the get_dim function for VPQ descriptor
+template __device__ uint32_t get_dim<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@>(void*);
+
+}  // namespace cuvs::neighbors::cagra::detail
+
+#else
+
+#include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
+#include <cuvs/detail/jit_lto/cagra/search_single_cta_tags.hpp>
+#include "get_dim_vpq_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@.h"
+
+using namespace cuvs::neighbors::cagra::detail;
+
+__attribute__((__constructor__)) static void register_get_dim_vpq_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@()
+{
+  registerAlgorithm<tag_@type_abbrev@,
+    tag_idx_@idx_abbrev@,
+    tag_dist_@dist_abbrev@,
+    tag_codebook_half>(
+    "get_dim_vpq_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd",
+    embedded_get_dim_vpq_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@,
+    sizeof(embedded_get_dim_vpq_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@));
+}
+
+#endif
