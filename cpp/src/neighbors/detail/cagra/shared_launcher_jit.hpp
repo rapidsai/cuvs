@@ -10,7 +10,7 @@
 #endif
 
 // Include tags header before any other includes that might open namespaces
-#include <cuvs/detail/jit_lto/cagra/search_single_cta_tags.hpp>
+#include <cuvs/detail/jit_lto/registration_tags.hpp>
 
 #include "../../sample_filter.cuh"  // For none_sample_filter, bitset_filter
 

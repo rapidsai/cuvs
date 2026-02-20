@@ -24,7 +24,7 @@ template __global__ void search_kernel_p_jit<@topk_by_bitonic_sort@, @bitonic_so
 #else
 
 #include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
-#include <cuvs/detail/jit_lto/cagra/search_single_cta_tags.hpp>
+#include <cuvs/detail/jit_lto/registration_tags.hpp>
 #include "search_single_cta_kernel_p_@topk_by_bitonic_sort_str@_@bitonic_sort_and_merge_multi_warps_str@_t@team_size@_dim@dataset_block_dim@@pq_suffix@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@query_type_abbrev@_@src_idx_abbrev@.h"
 
 using namespace cuvs::neighbors::cagra::detail;

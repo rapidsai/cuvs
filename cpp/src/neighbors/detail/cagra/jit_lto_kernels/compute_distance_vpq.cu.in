@@ -11,9 +11,6 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
-// Instantiate the unified compute_distance function for VPQ descriptor
-// PQ_BITS>0, PQ_LEN>0, CodebookT=half for VPQ descriptors
-// QueryT is always half for VPQ
 using args_t = typename cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<@data_type@, @index_type@, @distance_type@>::args_t;
 template __device__ @distance_type@ compute_distance<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@, half>(
     const args_t, @index_type@);
@@ -23,19 +20,19 @@ template __device__ @distance_type@ compute_distance<@team_size@, @dataset_block
 #else
 
 #include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
-#include <cuvs/detail/jit_lto/cagra/search_single_cta_tags.hpp>
+#include <cuvs/detail/jit_lto/registration_tags.hpp>
 #include "compute_distance_vpq_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@.h"
 
 using namespace cuvs::neighbors::cagra::detail;
 
 __attribute__((__constructor__)) static void register_compute_distance_vpq_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@()
 {
-  // This fragment provides compute_distance (VPQ version)
-  // The planner links the appropriate fragment (standard or VPQ) based on descriptor type
+  using QueryTag = cuvs::neighbors::cagra::detail::tag_h;
   registerAlgorithm<tag_@type_abbrev@,
     tag_idx_@idx_abbrev@,
     tag_dist_@dist_abbrev@,
-    tag_codebook_half>(
+    tag_codebook_half,
+    QueryTag>(
     "compute_distance_vpq_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd",
     embedded_compute_distance_vpq_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@,
     sizeof(embedded_compute_distance_vpq_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@));

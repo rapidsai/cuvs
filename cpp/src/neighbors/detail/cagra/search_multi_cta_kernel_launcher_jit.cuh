@@ -10,7 +10,7 @@
 #endif
 
 // Include tags header before any other includes that might open namespaces
-#include <cuvs/detail/jit_lto/cagra/search_single_cta_tags.hpp>
+#include <cuvs/detail/jit_lto/registration_tags.hpp>
 
 #include "compute_distance.hpp"  // For dataset_descriptor_host
 #include "jit_lto_kernels/search_multi_cta_planner.hpp"

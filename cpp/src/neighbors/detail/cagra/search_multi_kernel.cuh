@@ -8,7 +8,7 @@
 // functions
 #ifdef CUVS_ENABLE_JIT_LTO
 #include "search_multi_kernel_launcher_jit.cuh"
-#include <cuvs/detail/jit_lto/cagra/search_single_cta_tags.hpp>
+#include <cuvs/detail/jit_lto/registration_tags.hpp>
 #endif
 
 #include "set_value_batch.cuh"

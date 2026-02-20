@@ -21,31 +21,16 @@ struct AlgorithmLauncher {
 
   ~AlgorithmLauncher();
 
-  // Delete copy constructor and assignment to prevent accidental copying
   AlgorithmLauncher(const AlgorithmLauncher&)            = delete;
   AlgorithmLauncher& operator=(const AlgorithmLauncher&) = delete;
 
-  // Allow move constructor and assignment
   AlgorithmLauncher(AlgorithmLauncher&& other) noexcept;
   AlgorithmLauncher& operator=(AlgorithmLauncher&& other) noexcept;
 
   template <typename... Args>
   void dispatch(cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, Args&&... args)
   {
-    // Create array of pointers to arguments
-    // NOTE: cudaLaunchKernelExC copies the parameter values synchronously before returning,
-    // so the local array and argument references are safe even though the kernel launch is async
     void* kernel_args[] = {const_cast<void*>(static_cast<void const*>(&args))...};
-
-    // Validate that we're not passing null pointers for critical parameters
-    // (This is a sanity check - actual validation should be done by callers)
-    for (size_t i = 0; i < sizeof...(args); ++i) {
-      if (kernel_args[i] == nullptr) {
-        // Some parameters might legitimately be nullptr, so we just log a warning
-        // The kernel itself should validate critical pointers
-      }
-    }
-
     this->call(stream, grid, block, shared_mem, kernel_args);
   }
 

@@ -24,7 +24,7 @@ template __global__ void compute_distance_to_child_nodes_kernel_jit<@team_size@,
 #else
 
 #include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
-#include <cuvs/detail/jit_lto/cagra/search_single_cta_tags.hpp>
+#include <cuvs/detail/jit_lto/registration_tags.hpp>
 #include "compute_distance_to_child_nodes_kernel@pq_prefix@_t@team_size@_dim@dataset_block_dim@@pq_suffix@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@query_type_abbrev@_@src_idx_abbrev@.h"
 
 using namespace cuvs::neighbors::cagra::detail;

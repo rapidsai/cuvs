@@ -20,7 +20,7 @@ template __global__ void apply_filter_kernel_jit<@index_type@, @distance_type@, 
 #else
 
 #include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
-#include <cuvs/detail/jit_lto/cagra/search_single_cta_tags.hpp>
+#include <cuvs/detail/jit_lto/registration_tags.hpp>
 #include "apply_filter_kernel_@idx_abbrev@_@dist_abbrev@_@src_idx_abbrev@.h"
 
 using namespace cuvs::neighbors::cagra::detail;

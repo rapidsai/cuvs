@@ -10,7 +10,7 @@
 #include "jit_lto_kernels/interleaved_scan_planner.hpp"
 #include <cstdint>
 #include <cuvs/detail/jit_lto/NVRTCLTOFragmentCompiler.hpp>
-#include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>
+#include <cuvs/detail/jit_lto/registration_tags.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
 
@@ -72,12 +72,9 @@ constexpr auto get_filter_type_tag()
 {
   using namespace cuvs::neighbors::filtering;
 
-  // Determine the filter implementation tag
-  if constexpr (std::is_same_v<FilterT, none_sample_filter>) {
-    return tag_filter<tag_idx_l, tag_filter_none_impl>{};
-  }
+  if constexpr (std::is_same_v<FilterT, none_sample_filter>) { return tag_filter_none{}; }
   if constexpr (std::is_same_v<FilterT, bitset_filter<uint32_t, int64_t>>) {
-    return tag_filter<tag_idx_l, tag_filter_bitset_impl>{};
+    return tag_filter_bitset{};
   }
 }
 
@@ -96,12 +93,8 @@ constexpr auto get_metric_name()
 template <typename IvfSampleFilterTag>
 constexpr auto get_filter_name()
 {
-  if constexpr (std::is_same_v<IvfSampleFilterTag, tag_filter<tag_idx_l, tag_filter_none_impl>>) {
-    return "filter_none_l";
-  }
-  if constexpr (std::is_same_v<IvfSampleFilterTag, tag_filter<tag_idx_l, tag_filter_bitset_impl>>) {
-    return "filter_bitset_l";
-  }
+  if constexpr (std::is_same_v<IvfSampleFilterTag, tag_filter_none>) { return "filter_none_l"; }
+  if constexpr (std::is_same_v<IvfSampleFilterTag, tag_filter_bitset>) { return "filter_bitset_l"; }
 }
 
 template <typename PostLambdaTag>
