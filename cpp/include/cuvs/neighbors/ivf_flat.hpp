@@ -71,6 +71,8 @@ struct index_params : cuvs::neighbors::index_params {
 struct search_params : cuvs::neighbors::search_params {
   /** The number of clusters to search. */
   uint32_t n_probes = 20;
+  /** Custom metric UDF code. */
+  std::optional<std::string> metric_udf = std::nullopt;
 };
 
 static_assert(std::is_aggregate_v<index_params>);
@@ -166,6 +168,8 @@ struct index : cuvs::neighbors::index {
 
   /** Distance metric used for clustering. */
   cuvs::distance::DistanceType metric() const noexcept;
+
+  void set_metric(cuvs::distance::DistanceType metric);
 
   /** Whether `centers()` change upon extending the index (ivf_flat::extend). */
   bool adaptive_centers() const noexcept;
@@ -3047,4 +3051,417 @@ void recompute_internal_state(const raft::resources& res, index<uint8_t, int64_t
  */
 
 }  // namespace helpers
+
+#ifdef CUVS_ENABLE_JIT_LTO
+namespace experimental::udf {
+
+// ============================================================================
+// Real C++ implementations for compile-time validation
+// ============================================================================
+
+/**
+ * @brief Wrapper for vector elements that provides both packed and unpacked access.
+ *
+ * For float/half: trivial wrapper around scalar values
+ * For int8/uint8 with Veclen > 1: wraps packed bytes in a 32-bit word
+ *
+ * @tparam T Data type (float, __half, int8_t, uint8_t)
+ * @tparam AccT Storage/accumulator type (float, __half, int32_t, uint32_t)
+ * @tparam Veclen Vector length (1, 2, 4, 8, 16)
+ */
+template <typename T, typename AccT, int Veclen>
+struct point {
+  using element_type          = T;
+  using storage_type          = AccT;
+  static constexpr int veclen = Veclen;
+
+  storage_type data_;
+
+  point() = default;
+  __device__ __host__ explicit point(storage_type d) : data_(d) {}
+
+  __device__ __forceinline__ storage_type raw() const { return data_; }
+  __device__ __forceinline__ storage_type& raw() { return data_; }
+
+  __device__ __host__ static constexpr int size()
+  {
+    if constexpr ((std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) && Veclen > 1) {
+      return 4;
+    } else {
+      return 1;
+    }
+  }
+
+  __device__ __host__ static constexpr bool is_packed()
+  {
+    return (std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) && Veclen > 1;
+  }
+
+  __device__ __forceinline__ T operator[](int i) const
+  {
+    if constexpr (std::is_same_v<T, int8_t> && Veclen > 1) {
+      return static_cast<int8_t>((data_ >> (i * 8)) & 0xFF);
+    } else if constexpr (std::is_same_v<T, uint8_t> && Veclen > 1) {
+      return static_cast<uint8_t>((data_ >> (i * 8)) & 0xFF);
+    } else {
+      (void)i;
+      return static_cast<T>(data_);
+    }
+  }
+};
+
+/**
+ * @brief Base interface for custom distance metrics.
+ */
+template <typename T, typename AccT, int Veclen = 1>
+struct metric_interface {
+  using point_type = point<T, AccT, Veclen>;
+
+  virtual __device__ void operator()(AccT& acc, point_type x, point_type y) = 0;
+  virtual ~metric_interface()                                               = default;
+};
+
+// ============================================================
+// Helper Operations - Deduce Veclen from point type!
+// ============================================================
+
+/** @brief Squared difference: (x - y)² */
+template <typename T, typename AccT, int V>
+__device__ __forceinline__ AccT squared_diff(point<T, AccT, V> x, point<T, AccT, V> y)
+{
+  if constexpr (std::is_same_v<T, uint8_t> && V > 1) {
+    auto diff = __vabsdiffu4(x.raw(), y.raw());
+    return __dp4a(diff, diff, AccT{0});
+  } else if constexpr (std::is_same_v<T, int8_t> && V > 1) {
+    auto diff = __vabsdiffs4(x.raw(), y.raw());
+    return __dp4a(diff, diff, static_cast<uint32_t>(0));
+  } else {
+    auto diff = x.raw() - y.raw();
+    return diff * diff;
+  }
+}
+
+/** @brief Absolute difference: |x - y| */
+template <typename T, typename AccT, int V>
+__device__ __forceinline__ AccT abs_diff(point<T, AccT, V> x, point<T, AccT, V> y)
+{
+  if constexpr (std::is_same_v<T, uint8_t> && V > 1) {
+    auto diff = __vabsdiffu4(x.raw(), y.raw());
+  } else if constexpr (std::is_same_v<T, int8_t> && V > 1) {
+    auto diff = __vabsdiffs4(x.raw(), y.raw());
+  } else {
+    auto a = x.raw();
+    auto b = y.raw();
+    return (a > b) ? (a - b) : (b - a);
+  }
+}
+
+/** @brief Dot product: x · y */
+template <typename T, typename AccT, int V>
+__device__ __forceinline__ AccT dot_product(point<T, AccT, V> x, point<T, AccT, V> y)
+{
+  if constexpr ((std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>) && V > 1) {
+    return __dp4a(x.raw(), y.raw(), AccT{0});
+  } else {
+    return x.raw() * y.raw();
+  }
+}
+
+/** @brief Element-wise product: x * y */
+template <typename T, typename AccT, int V>
+__device__ __forceinline__ AccT product(point<T, AccT, V> x, point<T, AccT, V> y)
+{
+  return dot_product(x, y);
+}
+
+/** @brief Element-wise sum: x + y */
+template <typename T, typename AccT, int V>
+__device__ __forceinline__ AccT sum(point<T, AccT, V> x, point<T, AccT, V> y)
+{
+  if constexpr ((std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>) && V > 1) {
+    AccT result = 0;
+    for (int i = 0; i < x.size(); ++i) {
+      result += static_cast<AccT>(x[i]) + static_cast<AccT>(y[i]);
+    }
+    return result;
+  } else {
+    return x.raw() + y.raw();
+  }
+}
+
+/** @brief Maximum element: max(x, y) */
+template <typename T, typename AccT, int V>
+__device__ __forceinline__ AccT max_elem(point<T, AccT, V> x, point<T, AccT, V> y)
+{
+  if constexpr ((std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>) && V > 1) {
+    AccT result = 0;
+    for (int i = 0; i < x.size(); ++i) {
+      auto xi  = static_cast<AccT>(x[i]);
+      auto yi  = static_cast<AccT>(y[i]);
+      auto val = (xi > yi) ? xi : yi;
+      if (val > result) result = val;
+    }
+    return result;
+  } else {
+    auto a = x.raw();
+    auto b = y.raw();
+    return (a > b) ? a : b;
+  }
+}
+
+// ============================================================================
+// String versions for JIT compilation
+// ============================================================================
+
+constexpr std::string_view point_code = R"(
+template <typename T, typename AccT, int Veclen>
+struct point {
+  using element_type = T;
+  using storage_type = AccT;
+  static constexpr int veclen = Veclen;
+
+  storage_type data_;
+
+  point() = default;
+  __device__ __host__ explicit point(storage_type d) : data_(d) {}
+
+  __device__ __forceinline__ storage_type raw() const { return data_; }
+  __device__ __forceinline__ storage_type& raw() { return data_; }
+
+  __device__ __host__ static constexpr int size()
+  {
+    if constexpr ((std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) && Veclen > 1) {
+      return 4;
+    } else {
+      return 1;
+    }
+  }
+
+  __device__ __host__ static constexpr bool is_packed()
+  {
+    return (std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) && Veclen > 1;
+  }
+
+  __device__ __forceinline__ T operator[](int i) const
+  {
+    if constexpr (std::is_same_v<T, int8_t> && Veclen > 1) {
+      return static_cast<int8_t>((data_ >> (i * 8)) & 0xFF);
+    } else if constexpr (std::is_same_v<T, uint8_t> && Veclen > 1) {
+      return static_cast<uint8_t>((data_ >> (i * 8)) & 0xFF);
+    } else {
+      (void)i;
+      return static_cast<T>(data_);
+    }
+  }
+};
+)";
+
+constexpr std::string_view metric_interface_code = R"(
+template <typename T, typename AccT, int Veclen = 1>
+struct metric_interface {
+  using point_type = point<T, AccT, Veclen>;
+
+  virtual __device__ void operator()(AccT& acc, point_type x, point_type y) = 0;
+  virtual ~metric_interface() = default;
+};
+)";
+
+constexpr std::string_view squared_diff_code = R"(
+template <typename T, typename AccT, int V>
+__device__ __forceinline__ AccT squared_diff(point<T, AccT, V> x, point<T, AccT, V> y)
+{
+  if constexpr (std::is_same_v<T, uint8_t> && V > 1) {
+    auto diff = __vabsdiffu4(x.raw(), y.raw());
+    return __dp4a(diff, diff, AccT{0});
+  } else if constexpr (std::is_same_v<T, int8_t> && V > 1) {
+    auto diff = __vabsdiffs4(x.raw(), y.raw());
+    return __dp4a(diff, diff, static_cast<uint32_t>(0));
+  } else {
+    auto diff = x.raw() - y.raw();
+    return diff * diff;
+  }
+}
+)";
+
+constexpr std::string_view abs_diff_code = R"(
+template <typename T, typename AccT, int V>
+__device__ __forceinline__ AccT abs_diff(point<T, AccT, V> x, point<T, AccT, V> y)
+{
+  if constexpr (std::is_same_v<T, uint8_t> && V > 1) {
+    auto diff = __vabsdiffu4(x.raw(), y.raw());
+  } else if constexpr (std::is_same_v<T, int8_t> && V > 1) {
+    auto diff = __vabsdiffs4(x.raw(), y.raw());
+  } else {
+    auto a = x.raw();
+    auto b = y.raw();
+    return (a > b) ? (a - b) : (b - a);
+  }
+}
+)";
+
+constexpr std::string_view dot_product_code = R"(
+template <typename T, typename AccT, int V>
+__device__ __forceinline__ AccT dot_product(point<T, AccT, V> x, point<T, AccT, V> y)
+{
+  if constexpr ((std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>) && V > 1) {
+    return __dp4a(x.raw(), y.raw(), AccT{0});
+  } else {
+    return x.raw() * y.raw();
+  }
+}
+)";
+
+constexpr std::string_view product_code = R"(
+template <typename T, typename AccT, int V>
+__device__ __forceinline__ AccT product(point<T, AccT, V> x, point<T, AccT, V> y)
+{
+  return dot_product(x, y);
+}
+)";
+
+constexpr std::string_view sum_code = R"(
+template <typename T, typename AccT, int V>
+__device__ __forceinline__ AccT sum(point<T, AccT, V> x, point<T, AccT, V> y)
+{
+  if constexpr ((std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>) && V > 1) {
+    AccT result = 0;
+    for (int i = 0; i < x.size(); ++i) {
+      result += static_cast<AccT>(x[i]) + static_cast<AccT>(y[i]);
+    }
+    return result;
+  } else {
+    return x.raw() + y.raw();
+  }
+}
+)";
+
+constexpr std::string_view max_elem_code = R"(
+template <typename T, typename AccT, int V>
+__device__ __forceinline__ AccT max_elem(point<T, AccT, V> x, point<T, AccT, V> y)
+{
+  if constexpr ((std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>) && V > 1) {
+    AccT result = 0;
+    for (int i = 0; i < x.size(); ++i) {
+      auto xi  = static_cast<AccT>(x[i]);
+      auto yi  = static_cast<AccT>(y[i]);
+      auto val = (xi > yi) ? xi : yi;
+      if (val > result) result = val;
+    }
+    return result;
+  } else {
+    auto a = x.raw();
+    auto b = y.raw();
+    return (a > b) ? a : b;
+  }
+}
+)";
+
+/**
+ * @brief Preamble code for JIT compilation.
+ *
+ * nvrtc doesn't have access to standard library headers, so we define
+ * the necessary types and utilities inline.
+ */
+constexpr std::string_view jit_preamble_code = R"(
+/* Fixed-width integer types for nvrtc */
+using int8_t = signed char;
+using uint8_t = unsigned char;
+using int32_t = int;
+using uint32_t = unsigned int;
+using int64_t = long long;
+using uint64_t = unsigned long long;
+
+/* std::is_same_v implementation for nvrtc */
+namespace std {
+template <typename T, typename U> struct is_same { static constexpr bool value = false; };
+template <typename T> struct is_same<T, T> { static constexpr bool value = true; };
+template <typename T, typename U> inline constexpr bool is_same_v = is_same<T, U>::value;
+}
+)";
+
+/**
+ * @brief Define a custom distance metric with compile-time validation.
+ *
+ * This macro creates:
+ * 1. A struct that inherits from metric_interface (compile-time validation)
+ * 2. A function NAME_udf() that returns a metric_source for JIT compilation
+ * 3. A BODY that needs to be compiled by nvrtc and must be valid CUDA device code
+ *
+ * @param NAME The name of your metric (becomes struct name and function prefix)
+ * @param BODY The body of operator()(AccT& acc, point_type x, point_type y)
+ *
+ * Available in BODY:
+ *   acc    - Accumulated distance (AccT&, modify in-place)
+ *   x, y   - Vector elements (point<T, AccT, Veclen>)
+ *   T      - Data type (float, __half, int8_t, uint8_t)
+ *   AccT   - Accumulator type
+ *   Veclen - Vector length (compile-time constant)
+ *
+ * x and y provide:
+ *   x.raw()     - Raw packed storage (for power users)
+ *   x[i]        - Unpacked element access
+ *   x.size()    - Number of elements (4 for packed int8, 1 for float)
+ *   x.is_packed() - Whether data is packed (constexpr)
+ *
+ * Helper functions (Veclen deduced automatically!):
+ *   squared_diff(x, y) - (x-y)² optimized for all types
+ *   abs_diff(x, y)     - |x-y| optimized for all types
+ *   dot_product(x, y)  - x·y optimized for all types
+ *   product(x, y)      - element-wise product
+ *
+ * Example:
+ *   CUVS_METRIC(my_l2, {
+ *       acc += squared_diff(x, y);  // Just works for all types!
+ *   })
+ *
+ *   CUVS_METRIC(my_chebyshev, {
+ *       for (int i = 0; i < x.size(); ++i) {
+ *           auto diff = (x[i] > y[i]) ? (x[i] - y[i]) : (y[i] - x[i]);
+ *           if (diff > acc) acc = diff;
+ *       }
+ *   })
+ */
+#define CUVS_METRIC(NAME, BODY)                                                                   \
+  template <typename T, typename AccT, int Veclen>                                                \
+  struct NAME : cuvs::neighbors::ivf_flat::experimental::udf::metric_interface<T, AccT, Veclen> { \
+    using point_type = cuvs::neighbors::ivf_flat::experimental::udf::point<T, AccT, Veclen>;      \
+    __device__ void operator()(AccT& acc, point_type x, point_type y) override { BODY }           \
+  };                                                                                              \
+                                                                                                  \
+  inline std::string NAME##_udf()                                                                 \
+  {                                                                                               \
+    using namespace cuvs::neighbors::ivf_flat::experimental::udf;                                 \
+    std::string result;                                                                           \
+    result += jit_preamble_code;                                                                  \
+    result += point_code;                                                                         \
+    result += squared_diff_code;                                                                  \
+    result += abs_diff_code;                                                                      \
+    result += dot_product_code;                                                                   \
+    result += product_code;                                                                       \
+    result += sum_code;                                                                           \
+    result += max_elem_code;                                                                      \
+    result += metric_interface_code;                                                              \
+    result += R"(                                                                        \
+template <typename T, typename AccT, int Veclen>                                       \
+struct )" #NAME R"( : metric_interface<T, AccT, Veclen> {                              \
+  using point_type = point<T, AccT, Veclen>;                                           \
+  __device__ void operator()(AccT& acc, point_type x, point_type y) override           \
+)" #BODY R"(                                                                           \
+};                                                                                     \
+                                                                                       \
+namespace cuvs { namespace neighbors { namespace ivf_flat { namespace detail {         \
+template <int Veclen, typename T, typename AccT>                                       \
+__device__ __forceinline__ void compute_dist(AccT& acc, AccT x, AccT y)                \
+{                                                                                      \
+  ::)" #NAME R"(<T, AccT, Veclen> metric;                                              \
+  metric(acc, ::point<T, AccT, Veclen>(x), ::point<T, AccT, Veclen>(y));               \
+}                                                                                      \
+}}}}                                                                                   \
+)";                                                                                               \
+    return result;                                                                                \
+  }
+
+}  // namespace experimental::udf
+#endif
+
 }  // namespace cuvs::neighbors::ivf_flat
