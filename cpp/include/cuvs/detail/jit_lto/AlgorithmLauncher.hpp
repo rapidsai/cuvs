@@ -34,10 +34,20 @@ struct AlgorithmLauncher {
     this->call(stream, grid, block, shared_mem, kernel_args);
   }
 
+  template <typename... Args>
+  void dispatch_cooperative(
+    cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, Args&&... args)
+  {
+    void* kernel_args[] = {const_cast<void*>(static_cast<void const*>(&args))...};
+    this->call_cooperative(stream, grid, block, shared_mem, kernel_args);
+  }
+
   cudaKernel_t get_kernel() { return this->kernel; }
 
  private:
   void call(cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, void** args);
+  void call_cooperative(
+    cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, void** args);
   cudaKernel_t kernel;
   cudaLibrary_t library;
 };

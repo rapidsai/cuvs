@@ -213,6 +213,13 @@ endif()
 # ##################################################################################################
 # * cuvs ---------------------------------------------------------------------
 if(NOT BUILD_CPU_ONLY)
+  set(JIT_LTO_TARGET_ARCHITECTURE "")
+  set(JIT_LTO_COMPILATION OFF)
+  set(JIT_LTO_FILES "")
+  if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
+    set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
+    set(JIT_LTO_COMPILATION ON)
+  endif()
 
   add_library(cuvs_cpp_headers INTERFACE)
   add_library(cuvs::cuvs_cpp_headers ALIAS cuvs_cpp_headers)
@@ -221,6 +228,9 @@ if(NOT BUILD_CPU_ONLY)
     INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
               "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
               "$<INSTALL_INTERFACE:include>"
+  )
+  target_compile_definitions(
+    cuvs_cpp_headers INTERFACE $<$<BOOL:${JIT_LTO_COMPILATION}>:CUVS_ENABLE_JIT_LTO>
   )
   target_link_libraries(cuvs_cpp_headers INTERFACE raft::raft rmm::rmm)
 
@@ -317,6 +327,10 @@ if(NOT BUILD_CPU_ONLY)
                CUDA_SEPARABLE_COMPILATION ON
                POSITION_INDEPENDENT_CODE ON
   )
+  target_compile_definitions(
+    cuvs-cagra-search PRIVATE $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
+                              $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
+  )
   target_link_libraries(
     cuvs-cagra-search PRIVATE cuvs::cuvs_cpp_headers
                               $<TARGET_NAME_IF_EXISTS:nvidia::cutlass::cutlass>
@@ -343,14 +357,6 @@ if(NOT BUILD_CPU_ONLY)
     )
   endif()
 
-  set(JIT_LTO_TARGET_ARCHITECTURE "")
-  set(JIT_LTO_COMPILATION OFF)
-  set(JIT_LTO_FILES "")
-  if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
-    set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
-    set(JIT_LTO_COMPILATION ON)
-  endif()
-
   if(JIT_LTO_COMPILATION)
     # Generate interleaved scan kernel files at build time
     include(cmake/modules/generate_jit_lto_kernels.cmake)
@@ -363,6 +369,7 @@ if(NOT BUILD_CPU_ONLY)
         src/detail/jit_lto/FragmentDatabase.cu
         src/detail/jit_lto/FragmentEntry.cu
         src/detail/jit_lto/nvjitlink_checker.cpp
+        src/detail/jit_lto/NVRTCLTOFragmentCompiler.cu
     )
   endif()
 
@@ -610,6 +617,7 @@ if(NOT BUILD_CPU_ONLY)
             ${CUVS_CTK_MATH_DEPENDENCIES}
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
             $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
+            $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvrtc>
   )
 
   target_include_directories(
@@ -693,6 +701,7 @@ if(NOT BUILD_CPU_ONLY)
         $<COMPILE_ONLY:nvidia::cutlass::cutlass>
         $<COMPILE_ONLY:cuco::cuco>
         $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
+        $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvrtc>
         $<$<BOOL:${JIT_LTO_COMPILATION}>:$<LINK_LIBRARY:WHOLE_ARCHIVE,cuvs::cuvs_jit_lto_kernels>>
     )
 
@@ -753,6 +762,7 @@ SECTIONS
       PRIVATE
         $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
         $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
+        $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvrtc>
         $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
         $<COMPILE_ONLY:nvidia::cutlass::cutlass>
         $<COMPILE_ONLY:cuco::cuco>

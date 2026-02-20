@@ -5,13 +5,14 @@
 
 #include "nvjitlink_checker.hpp"
 
-#include <chrono>
-#include <iterator>
+#include <algorithm>
+#include <cerrno>
+#include <cstdio>
+#include <iostream>
 #include <memory>
 #include <mutex>
 #include <new>
 #include <string>
-#include <vector>
 
 #include <cuvs/detail/jit_lto/AlgorithmPlanner.hpp>
 #include <cuvs/detail/jit_lto/FragmentDatabase.hpp>
@@ -55,13 +56,14 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::get_launcher()
   if (launchers.count(launch_key) == 0) {
     add_entrypoint();
     add_device_functions();
+    RAFT_LOG_INFO("A first-time JIT compilation has been triggered for your algorithm");
     std::string log_message =
       "JIT compiling launcher for entrypoint: " + this->entrypoint + " and device functions: ";
     for (const auto& device_function : this->device_functions) {
       log_message += device_function + ",";
     }
     log_message.pop_back();
-    RAFT_LOG_INFO("%s", log_message.c_str());
+    RAFT_LOG_DEBUG("%s", log_message.c_str());
     launchers[launch_key] = this->build();
   }
   return launchers[launch_key];
@@ -78,22 +80,19 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
 
   std::string archs = "-arch=sm_" + std::to_string((major * 10 + minor));
 
-  // Load the generated LTO IR and link them together
   nvJitLinkHandle handle;
-  const char* lopts[] = {"-lto", archs.c_str()};
-  auto result         = nvJitLinkCreate(&handle, 2, lopts);
+  const char* lopts[] = {
+    "-lto", "-split-compile=0", "-split-compile-extended=0", "-maxrregcount=64", archs.c_str()};
+  auto result = nvJitLinkCreate(&handle, 5, lopts);
   check_nvjitlink_result(handle, result);
 
   for (auto& frag : this->fragments) {
     frag->add_to(handle);
   }
 
-  // Call to nvJitLinkComplete causes linker to link together all the LTO-IR
-  // modules perform any optimizations and generate cubin from it.
   result = nvJitLinkComplete(handle);
   check_nvjitlink_result(handle, result);
 
-  // get cubin from nvJitLink
   size_t cubin_size;
   result = nvJitLinkGetLinkedCubinSize(handle, &cubin_size);
   check_nvjitlink_result(handle, result);
@@ -105,7 +104,6 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
   result = nvJitLinkDestroy(&handle);
   RAFT_EXPECTS(result == NVJITLINK_SUCCESS, "nvJitLinkDestroy failed");
 
-  // cubin is linked, so now load it
   cudaLibrary_t library;
   RAFT_CUDA_TRY(
     cudaLibraryLoadData(&library, cubin.get(), nullptr, nullptr, 0, nullptr, nullptr, 0));
@@ -113,17 +111,14 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
   unsigned int kernel_count = 0;
   RAFT_CUDA_TRY(cudaLibraryGetKernelCount(&kernel_count, library));
 
-  // NOTE: cudaKernel_t does not need to be freed explicitly
   std::unique_ptr<cudaKernel_t[]> kernels{new cudaKernel_t[kernel_count]};
   RAFT_CUDA_TRY(cudaLibraryEnumerateKernels(kernels.get(), kernel_count, library));
 
-  // Filter out EmptyKernel by checking kernel names using cudaFuncGetName
   const char* empty_kernel_name = "_ZN3cub6detail11EmptyKernelIvEEvv";
   std::vector<cudaKernel_t> valid_kernels;
   valid_kernels.reserve(kernel_count);
 
   for (unsigned int i = 0; i < kernel_count; ++i) {
-    // cudaFuncGetName can be used with cudaKernel_t by casting to void*
     const void* func_ptr  = reinterpret_cast<const void*>(kernels[i]);
     const char* func_name = nullptr;
     RAFT_CUDA_TRY(cudaFuncGetName(&func_name, func_ptr));
@@ -131,14 +126,12 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
     bool is_empty_kernel = false;
     if (func_name != nullptr) {
       std::string kernel_name(func_name);
-      // Check if this is EmptyKernel
       if (kernel_name.find(empty_kernel_name) != std::string::npos ||
           kernel_name == empty_kernel_name) {
         is_empty_kernel = true;
       }
     }
 
-    // Only keep the kernel if it's not EmptyKernel
     if (!is_empty_kernel) { valid_kernels.push_back(kernels[i]); }
   }
 
