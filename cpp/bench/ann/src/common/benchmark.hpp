@@ -187,6 +187,9 @@ void bench_search(::benchmark::State& state,
   cuvs::bench::benchmark_thread_id = state.thread_index();
   cuvs::bench::benchmark_n_threads = state.threads();
   std::size_t queries_processed    = 0;
+  // Maximum number of queries to process for recall calculation (the actual number of recall
+  // calculations may exceed this value by up to n_queries)
+  constexpr size_t max_queries_for_recall = 10'000;
 
   const auto& sp_json = index.search_params[search_param_ix];
 
@@ -373,7 +376,7 @@ void bench_search(::benchmark::State& state,
     size_t batch_offset = (state.thread_index() * n_queries) % query_set_size;
     // Avoid CPU oversubscription when calculating match_count with OMP
     uint32_t num_probe_threads = std::thread::hardware_concurrency() / benchmark_n_threads;
-    while (out_offset < rows) {
+    while (out_offset < rows && out_offset <= max_queries_for_recall) {
 #pragma omp parallel for reduction(+ : match_count, total_count) num_threads(num_probe_threads)
       for (std::size_t i = 0; i < n_queries; i++) {
         size_t i_orig_idx = batch_offset + i;
@@ -381,31 +384,24 @@ void bench_search(::benchmark::State& state,
         if (i_out_idx < rows) {
           /* NOTE: recall correctness & filtering
 
-          In the `call_once` call below, we generate the filtered ground truth values as needed and
-          cache them to avoid recomputing them for the same queries. We need enough ground truth
-          values to compute recall correctly though. But the ground truth file only contains `max_k`
-          values per row; if there are less valid values than k among them, we overestimate the
-          recall. Essentially, we compare the first `filter_pass_count` values of the algorithm
-          output, and this counter can be less than `k`. In the extreme case of very high filtering
-          rate, we may be bypassing entire rows of results. However, this is still better than no
-          recall estimate at all.
+          We generate the filtered ground truth values and build an unordered_set with them to
+          enable O(1) lookup. We need enough ground truth values to compute recall correctly though.
+          But the ground truth file only contains `max_k` values per row; if there are less valid
+          values than k among them, we overestimate the recall. Essentially, we compare the first
+          `filter_pass_count` values of the algorithm output, and this counter can be less than
+          `k`. In the extreme case of very high filtering rate, we may be bypassing entire rows of
+          results. However, this is still better than no recall estimate at all.
 
           */
-          auto& flag              = dataset->gt_set_cache(i_orig_idx).flag;
-          auto& gt_set            = dataset->gt_set_cache(i_orig_idx).gt_set;
-          auto& filter_pass_count = dataset->gt_set_cache(i_orig_idx).filter_pass_count;
-          std::call_once(flag, [&]() {
-            filter_pass_count = 0;
-            // If filtering is not enabled, we can pre-allocate the ground truth set to avoid
-            // rehashing.
-            if (!filter_bitset) { gt_set.reserve(max_k); }
-            for (std::uint32_t l = 0; l < max_k && filter_pass_count < k; l++) {
-              auto exp_idx = gt[i_orig_idx * max_k + l];
-              if (!filter(exp_idx)) { continue; }
-              gt_set.insert(exp_idx);
-              filter_pass_count++;
-            }
-          });
+          std::unordered_set<std::int32_t> gt_set;
+          if (!filter_bitset) { gt_set.reserve(max_k); }
+          uint32_t filter_pass_count{};
+          for (std::uint32_t l = 0; l < max_k && filter_pass_count < k; l++) {
+            auto exp_idx = gt[i_orig_idx * max_k + l];
+            if (!filter(exp_idx)) { continue; }
+            gt_set.insert(exp_idx);
+            filter_pass_count++;
+          }
 
           total_count += filter_pass_count;
 
