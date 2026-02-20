@@ -239,11 +239,13 @@ struct dataset_descriptor_host {
     template <typename InitF>
     state(InitF init, size_t size) : ready{false}, value{std::make_tuple(init, size)}
     {
+      // RAFT_LOG_INFO("trying to create a descriptor state %p", reinterpret_cast<std::uintptr_t>(this));
     }
 
     ~state() noexcept
     {
       if (std::holds_alternative<ready_t>(value)) {
+        // RAFT_LOG_INFO("trying to free descriptor state %p", reinterpret_cast<std::uintptr_t>(this));
         auto& [ptr, stream] = std::get<ready_t>(value);
         RAFT_CUDA_TRY_NO_THROW(cudaFreeAsync(ptr, stream));
       }
