@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -14,7 +14,7 @@
 #include <raft/linalg/contractions.cuh>
 #include <raft/util/cuda_utils.cuh>
 
-#include <cub/cub.cuh>
+#include <cub/util_type.cuh>
 
 #include <stdint.h>
 
