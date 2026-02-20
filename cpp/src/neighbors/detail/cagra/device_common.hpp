@@ -103,11 +103,11 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
   const uint32_t traversed_hash_bitlen,
   const uint32_t block_id   = 0,
   const uint32_t num_blocks = 1,
-  const IndexT graph_size = 0)
+  const IndexT graph_size   = 0)
 {
   const auto team_size_bits = dataset_desc.team_size_bitshift_from_smem();
   const auto max_i = raft::round_up_safe<uint32_t>(num_pickup, warp_size >> team_size_bits);
-  const auto compute_distance = dataset_desc.compute_distance_impl;
+  const auto compute_distance   = dataset_desc.compute_distance_impl;
   const IndexT seed_index_limit = graph_size > 0 ? graph_size : dataset_desc.size;
 
   for (uint32_t i = threadIdx.x >> team_size_bits; i < max_i; i += (blockDim.x >> team_size_bits)) {
