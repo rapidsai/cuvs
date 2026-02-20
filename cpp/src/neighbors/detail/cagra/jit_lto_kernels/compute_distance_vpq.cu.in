@@ -11,11 +11,11 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
-// Instantiate the compute_distance_vpq function for VPQ descriptor
-// Note: Metric is no longer a template parameter - VPQ only supports L2Expanded
-using desc_t = cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@>;
+// Instantiate the unified compute_distance function for VPQ descriptor
+// PQ_BITS>0, PQ_LEN>0, CodebookT=half for VPQ descriptors
+// QueryT is always half for VPQ
 using args_t = typename cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<@data_type@, @index_type@, @distance_type@>::args_t;
-template __device__ @distance_type@ compute_distance_vpq<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@>(
+template __device__ @distance_type@ compute_distance<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@, half>(
     const args_t, @index_type@);
 
 }  // namespace cuvs::neighbors::cagra::detail
@@ -30,6 +30,8 @@ using namespace cuvs::neighbors::cagra::detail;
 
 __attribute__((__constructor__)) static void register_compute_distance_vpq_t@team_size@_dim@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_@type_abbrev@_@idx_abbrev@_@dist_abbrev@()
 {
+  // This fragment provides compute_distance (VPQ version)
+  // The planner links the appropriate fragment (standard or VPQ) based on descriptor type
   registerAlgorithm<tag_@type_abbrev@,
     tag_idx_@idx_abbrev@,
     tag_dist_@dist_abbrev@,

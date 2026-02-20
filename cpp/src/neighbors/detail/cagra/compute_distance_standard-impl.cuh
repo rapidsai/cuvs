@@ -21,17 +21,20 @@ namespace cuvs::neighbors::cagra::detail {
 // InnerProduct, etc.) The planner will link the appropriate fragment based on the metric Note:
 // extern functions cannot be constexpr, so we remove constexpr here Note: These are in the detail
 // namespace (not anonymous) so they can be found by JIT linking
-template <typename DATA_T, typename DISTANCE_T>
-extern __device__ DISTANCE_T dist_op(DATA_T a, DATA_T b);
+// QueryT can be float (for most metrics) or uint8_t (for BitwiseHamming)
+template <typename QUERY_T, typename DISTANCE_T>
+extern __device__ DISTANCE_T dist_op(QUERY_T a, QUERY_T b);
 
 // Normalization is also JIT linked from fragments (no-op for most metrics, cosine normalization for
 // CosineExpanded) The planner will link the appropriate fragment (cosine or noop) based on the
 // metric
+// QueryT is needed to match the descriptor template signature (always float for normalization)
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           typename DataT,
           typename IndexT,
-          typename DistanceT>
+          typename DistanceT,
+          typename QueryT>
 extern __device__ DistanceT apply_normalization_standard(
   DistanceT distance,
   const typename dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t args,
@@ -83,18 +86,20 @@ template <uint32_t TeamSize,
 #if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
           ,
           cuvs::distance::DistanceType Metric
+#else
+          ,
+          typename QueryT
 #endif
           >
 struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, IndexT, DistanceT> {
   using base_type = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
-#if defined(CUVS_ENABLE_JIT_LTO) || defined(BUILD_KERNEL)
-  // When JIT LTO is enabled or building kernel fragments, Metric is not a template parameter
-  // QUERY_T is always float (BitwiseHamming uses uint8_t as DataT, but query is still float)
-  using QUERY_T = float;
-#else
+#if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
   // When JIT LTO is disabled, Metric is a template parameter
   using QUERY_T = typename std::
     conditional_t<Metric == cuvs::distance::DistanceType::BitwiseHamming, DataT, float>;
+#else
+  // When JIT LTO is enabled, QueryT is passed as a template parameter
+  using QUERY_T = QueryT;
 #endif
   using base_type::args;
   using base_type::smem_ws_size_in_bytes;
@@ -294,7 +299,8 @@ _RAFT_DEVICE __noinline__ auto compute_distance_standard(
                                  DescriptorT::kDatasetBlockDim,
                                  typename DescriptorT::DATA_T,
                                  typename DescriptorT::INDEX_T,
-                                 typename DescriptorT::DISTANCE_T>(distance, args, dataset_index);
+                                 typename DescriptorT::DISTANCE_T,
+                                 typename DescriptorT::QUERY_T>(distance, args, dataset_index);
 #else
   // When JIT LTO is disabled, kMetric is always available as a compile-time constant
   if constexpr (DescriptorT::kMetric == cuvs::distance::DistanceType::CosineExpanded) {
@@ -343,8 +349,10 @@ RAFT_KERNEL __launch_bounds__(1, 1)
                       dataset_norms);
 #else
   // When JIT LTO is enabled, Metric is not a template parameter
+  using query_t =
+    std::conditional_t<Metric == cuvs::distance::DistanceType::BitwiseHamming, DataT, float>;
   using desc_type =
-    standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
+    standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT, query_t>;
   using base_type = typename desc_type::base_type;
 
   // For JIT, we don't use the function pointers, so set them to nullptr
@@ -385,8 +393,11 @@ standard_descriptor_spec<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, Dista
   using base_type = typename desc_type::base_type;
 #else
   // When JIT LTO is enabled, Metric is not a template parameter
+  // QueryT depends on metric: uint8_t for BitwiseHamming, float for others
+  using query_t =
+    std::conditional_t<Metric == cuvs::distance::DistanceType::BitwiseHamming, DataT, float>;
   using desc_type =
-    standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
+    standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT, query_t>;
   using base_type = typename desc_type::base_type;
 #endif
 

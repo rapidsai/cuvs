@@ -85,9 +85,9 @@ using cuvs::neighbors::cagra::detail::device::compute_distance_to_child_nodes_ji
 using cuvs::neighbors::cagra::detail::device::compute_distance_to_random_nodes_jit;
 
 // JIT version of search_core - uses dataset_descriptor_base_t* pointer
-// Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT
-// For standard descriptors: PQ_BITS=0, PQ_LEN=0, CodebookT=void
-// For VPQ descriptors: PQ_BITS>0, PQ_LEN>0, CodebookT=half
+// Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, QueryT
+// For standard descriptors: PQ_BITS=0, PQ_LEN=0, CodebookT=void, QueryT=float (or uint8_t for
+// BitwiseHamming) For VPQ descriptors: PQ_BITS>0, PQ_LEN>0, CodebookT=half, QueryT=half
 template <bool TOPK_BY_BITONIC_SORT,
           bool BITONIC_SORT_AND_MERGE_MULTI_WARPS,
           uint32_t TeamSize,
@@ -98,6 +98,7 @@ template <bool TOPK_BY_BITONIC_SORT,
           typename DataT,
           typename IndexT,
           typename DistanceT,
+          typename QueryT,
           typename SourceIndexT>
 RAFT_DEVICE_INLINE_FUNCTION void search_core(
   uintptr_t result_indices_ptr,
@@ -174,7 +175,8 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
                     CodebookT,
                     DataT,
                     IndexT,
-                    DistanceT>(dataset_desc, smem, queries_ptr, query_id);
+                    DistanceT,
+                    QueryT>(dataset_desc, smem, queries_ptr, query_id);
 
   auto* __restrict__ result_indices_buffer =
     reinterpret_cast<IndexT*>(smem + smem_ws_size_in_bytes);
@@ -219,18 +221,19 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
                                        CodebookT,
                                        IndexT,
                                        DistanceT,
-                                       DataT>(result_indices_buffer,
-                                              result_distances_buffer,
-                                              smem_desc,
-                                              result_buffer_size,
-                                              num_distilation,
-                                              rand_xor_mask,
-                                              local_seed_ptr,
-                                              num_seeds,
-                                              local_visited_hashmap_ptr,
-                                              hash_bitlen,
-                                              (IndexT*)nullptr,
-                                              0);
+                                       DataT,
+                                       QueryT>(result_indices_buffer,
+                                               result_distances_buffer,
+                                               smem_desc,
+                                               result_buffer_size,
+                                               num_distilation,
+                                               rand_xor_mask,
+                                               local_seed_ptr,
+                                               num_seeds,
+                                               local_visited_hashmap_ptr,
+                                               hash_bitlen,
+                                               (IndexT*)nullptr,
+                                               0);
   __syncthreads();
   _CLK_REC(clk_compute_1st_distance);
 
@@ -345,18 +348,19 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
                                         CodebookT,
                                         IndexT,
                                         DistanceT,
-                                        DataT>(result_indices_buffer + internal_topk,
-                                               result_distances_buffer + internal_topk,
-                                               smem_desc,
-                                               knn_graph,
-                                               graph_degree,
-                                               local_visited_hashmap_ptr,
-                                               hash_bitlen,
-                                               (IndexT*)nullptr,
-                                               0,
-                                               parent_list_buffer,
-                                               result_indices_buffer,
-                                               search_width);
+                                        DataT,
+                                        QueryT>(result_indices_buffer + internal_topk,
+                                                result_distances_buffer + internal_topk,
+                                                smem_desc,
+                                                knn_graph,
+                                                graph_degree,
+                                                local_visited_hashmap_ptr,
+                                                hash_bitlen,
+                                                (IndexT*)nullptr,
+                                                0,
+                                                parent_list_buffer,
+                                                result_indices_buffer,
+                                                search_width);
     // Critical: __syncthreads() must be reached by ALL threads
     // If any thread is stuck in compute_distance_to_child_nodes_jit, this will hang
     __syncthreads();
@@ -525,7 +529,7 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
 }
 
 // JIT kernel wrapper - calls search_core
-// Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT
+// Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, QueryT
 template <bool TOPK_BY_BITONIC_SORT,
           bool BITONIC_SORT_AND_MERGE_MULTI_WARPS,
           uint32_t TeamSize,
@@ -536,6 +540,7 @@ template <bool TOPK_BY_BITONIC_SORT,
           typename DataT,
           typename IndexT,
           typename DistanceT,
+          typename QueryT,
           typename SourceIndexT>
 RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_jit(
   uintptr_t result_indices_ptr,
@@ -577,6 +582,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_jit(
               DataT,
               IndexT,
               DistanceT,
+              QueryT,
               SourceIndexT>(result_indices_ptr,
                             result_distances_ptr,
                             top_k,
@@ -617,7 +623,7 @@ struct job_desc_jit_helper_desc {
 };
 
 // JIT persistent kernel - uses extern functions and JIT search_core
-// Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT
+// Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, QueryT
 template <bool TOPK_BY_BITONIC_SORT,
           bool BITONIC_SORT_AND_MERGE_MULTI_WARPS,
           uint32_t TeamSize,
@@ -628,6 +634,7 @@ template <bool TOPK_BY_BITONIC_SORT,
           typename DataT,
           typename IndexT,
           typename DistanceT,
+          typename QueryT,
           typename SourceIndexT>
 RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_p_jit(
   worker_handle_t* worker_handles,
@@ -709,6 +716,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_p_jit(
                 DataT,
                 IndexT,
                 DistanceT,
+                QueryT,
                 SourceIndexT>(result_indices_ptr,
                               result_distances_ptr,
                               top_k,

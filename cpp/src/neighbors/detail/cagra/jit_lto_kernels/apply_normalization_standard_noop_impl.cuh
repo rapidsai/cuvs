@@ -11,11 +11,13 @@ namespace cuvs::neighbors::cagra::detail {
 
 // No-op normalization fragment implementation
 // This provides apply_normalization_standard that does nothing (for non-CosineExpanded metrics)
+// QueryT is needed to match the descriptor template signature, but not used in this function
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           typename DataT,
           typename IndexT,
-          typename DistanceT>
+          typename DistanceT,
+          typename QueryT>
 __device__ DistanceT
 apply_normalization_standard(DistanceT distance,
                              const typename cuvs::neighbors::cagra::detail::

@@ -10,8 +10,9 @@
 namespace cuvs::neighbors::cagra::detail {
 
 // dist_op fragment for CosineExpanded metric (same as InnerProduct)
-template <typename DATA_T, typename DISTANCE_T>
-__device__ DISTANCE_T dist_op(DATA_T a, DATA_T b)
+// QueryT can be float (for most metrics) or uint8_t (for BitwiseHamming)
+template <typename QUERY_T, typename DISTANCE_T>
+__device__ DISTANCE_T dist_op(QUERY_T a, QUERY_T b)
 {
   return -static_cast<DISTANCE_T>(a) * static_cast<DISTANCE_T>(b);
 }

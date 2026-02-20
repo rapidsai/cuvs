@@ -130,7 +130,14 @@ struct CagraSearchPlanner : AlgorithmPlanner {
       case cuvs::distance::DistanceType::BitwiseHamming: metric_tag = "hamming"; break;
       default: metric_tag = "unknown"; break;
     }
-    auto params     = make_fragment_key<DataTag, DistanceTag>();
+    // QueryT can be float (for most metrics) or uint8_t (for BitwiseHamming)
+    // DistanceT is always float
+    std::string params;
+    if (metric == cuvs::distance::DistanceType::BitwiseHamming) {
+      params = make_fragment_key<cuvs::neighbors::cagra::detail::tag_uc, DistanceTag>();
+    } else {
+      params = make_fragment_key<cuvs::neighbors::cagra::detail::tag_f, DistanceTag>();
+    }
     std::string key = "dist_op_" + metric_tag + "_" + params;
     this->device_functions.push_back(key);
   }
@@ -142,13 +149,17 @@ struct CagraSearchPlanner : AlgorithmPlanner {
     // Both cosine and noop fragments provide the same function name "apply_normalization_standard"
     // but register with different fragment names. The planner links the appropriate one based on
     // metric.
+    // QueryT is always float for normalization (only used for CosineExpanded which uses float
+    // queries)
     std::string normalization_type;
     if (metric == cuvs::distance::DistanceType::CosineExpanded) {
       normalization_type = "cosine";
     } else {
       normalization_type = "noop";
     }
-    auto params     = make_fragment_key<DataTag, IndexTag, DistanceTag>();
+    // For lookup, we need to manually append fragment key parameters
+    using QueryTag  = cuvs::neighbors::cagra::detail::tag_f;  // Always float for normalization
+    auto params     = make_fragment_key<DataTag, IndexTag, DistanceTag, QueryTag>();
     std::string key = "apply_normalization_standard_" + normalization_type;
     key += "_t" + std::to_string(team_size);
     key += "_dim" + std::to_string(dataset_block_dim);

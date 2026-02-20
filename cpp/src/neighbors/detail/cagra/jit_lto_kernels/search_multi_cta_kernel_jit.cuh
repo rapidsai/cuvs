@@ -43,7 +43,7 @@ using cuvs::neighbors::cagra::detail::device::compute_distance_to_child_nodes_ji
 using cuvs::neighbors::cagra::detail::device::compute_distance_to_random_nodes_jit;
 
 // JIT version of search_kernel - uses dataset_descriptor_base_t* pointer
-// Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT
+// Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, QueryT
 // Filter is linked separately via JIT LTO, so we use none_sample_filter directly
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
@@ -53,6 +53,7 @@ template <uint32_t TeamSize,
           typename DataT,
           typename IndexT,
           typename DistanceT,
+          typename QueryT,
           typename SourceIndexT>
 __global__ __launch_bounds__(1024, 1) void search_kernel_jit(
   IndexT* const result_indices_ptr,       // [num_queries, num_cta_per_query, itopk_size]
@@ -134,7 +135,8 @@ __global__ __launch_bounds__(1024, 1) void search_kernel_jit(
                     CodebookT,
                     DataT,
                     IndexT,
-                    DistanceT>(dataset_desc, smem, queries_ptr, query_id);
+                    DistanceT,
+                    QueryT>(dataset_desc, smem, queries_ptr, query_id);
 
   auto* __restrict__ result_indices_buffer =
     reinterpret_cast<INDEX_T*>(smem + smem_ws_size_in_bytes);
@@ -173,20 +175,21 @@ __global__ __launch_bounds__(1024, 1) void search_kernel_jit(
                                        CodebookT,
                                        IndexT,
                                        DistanceT,
-                                       DataT>(result_indices_buffer,
-                                              result_distances_buffer,
-                                              smem_desc,
-                                              graph_degree,
-                                              num_distilation,
-                                              rand_xor_mask,
-                                              local_seed_ptr,
-                                              num_seeds,
-                                              local_visited_hashmap_ptr,
-                                              visited_hash_bitlen,
-                                              local_traversed_hashmap_ptr,
-                                              traversed_hash_bitlen,
-                                              block_id,
-                                              num_blocks);
+                                       DataT,
+                                       QueryT>(result_indices_buffer,
+                                               result_distances_buffer,
+                                               smem_desc,
+                                               graph_degree,
+                                               num_distilation,
+                                               rand_xor_mask,
+                                               local_seed_ptr,
+                                               num_seeds,
+                                               local_visited_hashmap_ptr,
+                                               visited_hash_bitlen,
+                                               local_traversed_hashmap_ptr,
+                                               traversed_hash_bitlen,
+                                               block_id,
+                                               num_blocks);
   __syncthreads();
   _CLK_REC(clk_compute_1st_distance);
 
@@ -274,6 +277,7 @@ __global__ __launch_bounds__(1024, 1) void search_kernel_jit(
                                         IndexT,
                                         DistanceT,
                                         DataT,
+                                        QueryT,
                                         0>(result_indices_buffer,
                                            result_distances_buffer,
                                            smem_desc,

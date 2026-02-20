@@ -11,10 +11,11 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
-// Instantiate the compute_distance_standard function for standard descriptor
-// Note: Metric is no longer a template parameter - it's determined via JIT-linked dist_op fragments
+// Instantiate the unified compute_distance function for standard descriptor
+// PQ_BITS=0, PQ_LEN=0, CodebookT=void for standard descriptors
+// QueryT can be float (for most metrics) or uint8_t (for BitwiseHamming)
 using args_t = typename cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<@data_type@, @index_type@, @distance_type@>::args_t;
-template __device__ @distance_type@ compute_distance_standard<@team_size@, @dataset_block_dim@, @data_type@, @index_type@, @distance_type@>(
+template __device__ @distance_type@ compute_distance<@team_size@, @dataset_block_dim@, 0, 0, void, @data_type@, @index_type@, @distance_type@, @query_type@>(
     const args_t, @index_type@);
 
 }  // namespace cuvs::neighbors::cagra::detail
@@ -23,18 +24,20 @@ template __device__ @distance_type@ compute_distance_standard<@team_size@, @data
 
 #include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
 #include <cuvs/detail/jit_lto/cagra/search_single_cta_tags.hpp>
-#include "compute_distance_standard_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@.h"
+#include "compute_distance_standard_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@query_type_abbrev@.h"
 
 using namespace cuvs::neighbors::cagra::detail;
 
 __attribute__((__constructor__)) static void register_compute_distance_standard_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@()
 {
+  // This fragment provides compute_distance (standard version)
+  // The planner links the appropriate fragment (standard or VPQ) based on descriptor type
   registerAlgorithm<tag_@type_abbrev@,
     tag_idx_@idx_abbrev@,
     tag_dist_@dist_abbrev@>(
     "compute_distance_standard_t@team_size@_dim@dataset_block_dim@",
-    embedded_compute_distance_standard_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@,
-    sizeof(embedded_compute_distance_standard_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@));
+    embedded_compute_distance_standard_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@query_type_abbrev@,
+    sizeof(embedded_compute_distance_standard_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@query_type_abbrev@));
 }
 
 #endif

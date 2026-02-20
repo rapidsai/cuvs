@@ -6,17 +6,13 @@
 #pragma once
 
 #include "../compute_distance_vpq-impl.cuh"
-#include "../device_common.hpp"
-
-#include <raft/core/operators.hpp>
-#include <raft/util/integer_utils.hpp>
-#include <raft/util/pow2_utils.cuh>
+#include "../device_common.hpp"  // For dataset_descriptor_base_t
 
 namespace cuvs::neighbors::cagra::detail {
 
-// Extern function implementation for compute_distance_vpq (VPQ descriptor)
-// Returns per-thread distance (team_sum must be called by the caller)
-// Note: Metric is no longer a template parameter - VPQ only supports L2Expanded
+// Unified compute_distance implementation for VPQ descriptors
+// This is instantiated when PQ_BITS>0, PQ_LEN>0, CodebookT=half
+// QueryT is always half for VPQ
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           uint32_t PQ_BITS,
@@ -24,26 +20,29 @@ template <uint32_t TeamSize,
           typename CodebookT,
           typename DataT,
           typename IndexT,
-          typename DistanceT>
+          typename DistanceT,
+          typename QueryT>
 __device__ DistanceT
-compute_distance_vpq(const typename cuvs::neighbors::cagra::detail::
-                       dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t args,
-                     IndexT dataset_index)
+compute_distance(const typename dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t args,
+                 IndexT dataset_index)
 {
-  // Call the free function compute_distance_vpq directly with args (already loaded)
-  // Returns per-thread distance (caller must do team_sum)
-  // VPQ only supports L2Expanded, so Metric is hardcoded
-  using desc_t = cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<TeamSize,
-                                                                              DatasetBlockDim,
-                                                                              PQ_BITS,
-                                                                              PQ_LEN,
-                                                                              CodebookT,
-                                                                              DataT,
-                                                                              IndexT,
-                                                                              DistanceT>;
-  auto per_thread_distance =
-    cuvs::neighbors::cagra::detail::compute_distance_vpq<desc_t>(args, dataset_index);
-  return per_thread_distance;
+  // For VPQ descriptors, PQ_BITS>0, PQ_LEN>0, CodebookT=half, QueryT=half
+  static_assert(
+    PQ_BITS > 0 && PQ_LEN > 0 && std::is_same_v<CodebookT, half> && std::is_same_v<QueryT, half>,
+    "VPQ descriptor requires PQ_BITS>0, PQ_LEN>0, CodebookT=half, QueryT=half");
+
+  // Reconstruct the descriptor type and call compute_distance_vpq
+  // QueryT is always half for VPQ
+  using desc_t = cagra_q_dataset_descriptor_t<TeamSize,
+                                              DatasetBlockDim,
+                                              PQ_BITS,
+                                              PQ_LEN,
+                                              CodebookT,
+                                              DataT,
+                                              IndexT,
+                                              DistanceT,
+                                              QueryT>;
+  return compute_distance_vpq<desc_t>(args, dataset_index);
 }
 
 }  // namespace cuvs::neighbors::cagra::detail

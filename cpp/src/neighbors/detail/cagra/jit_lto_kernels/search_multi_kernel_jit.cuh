@@ -37,7 +37,7 @@ template <typename T>
 inline constexpr bool has_kpq_bits_v = has_kpq_bits<T>::value;
 
 // JIT version of random_pickup_kernel - uses dataset_descriptor_base_t* pointer
-// Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT
+// Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, QueryT
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           uint32_t PQ_BITS,
@@ -45,7 +45,8 @@ template <uint32_t TeamSize,
           typename CodebookT,
           typename DataT,
           typename IndexT,
-          typename DistanceT>
+          typename DistanceT,
+          typename QueryT>
 RAFT_KERNEL random_pickup_kernel_jit(
   dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
   const DataT* const queries_ptr,  // [num_queries, dataset_dim]
@@ -84,7 +85,8 @@ RAFT_KERNEL random_pickup_kernel_jit(
                     CodebookT,
                     DataT,
                     IndexT,
-                    DistanceT>(dataset_desc, smem, queries_ptr, query_id);
+                    DistanceT,
+                    QueryT>(dataset_desc, smem, queries_ptr, query_id);
   __syncthreads();
 
   // Load args once for better performance (avoid repeated loads in the loop)
@@ -116,7 +118,8 @@ RAFT_KERNEL random_pickup_kernel_jit(
                                         CodebookT,
                                         DataT,
                                         IndexT,
-                                        DistanceT>(args, seed_index);
+                                        DistanceT,
+                                        QueryT>(args, seed_index);
     // Now ALL threads in the team participate in team_sum
     const auto norm2 = device::team_sum(per_thread_norm2, team_size_bits);
 
@@ -140,7 +143,8 @@ RAFT_KERNEL random_pickup_kernel_jit(
 }
 
 // JIT version of compute_distance_to_child_nodes_kernel - uses extern functions with void*
-// descriptor Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT
+// descriptor Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT,
+// QueryT
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           uint32_t PQ_BITS,
@@ -149,6 +153,7 @@ template <uint32_t TeamSize,
           typename DataT,
           typename IndexT,
           typename DistanceT,
+          typename QueryT,
           typename SourceIndexT,
           typename SAMPLE_FILTER_T>
 RAFT_KERNEL compute_distance_to_child_nodes_kernel_jit(
@@ -193,7 +198,8 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel_jit(
                     CodebookT,
                     DataT,
                     IndexT,
-                    DistanceT>(dataset_desc, smem, query_ptr, query_id);
+                    DistanceT,
+                    QueryT>(dataset_desc, smem, query_ptr, query_id);
 
   __syncthreads();
   if (global_team_id >= search_width * graph_degree) { return; }
@@ -237,7 +243,8 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel_jit(
                                         CodebookT,
                                         DataT,
                                         IndexT,
-                                        DistanceT>(args, child_id);
+                                        DistanceT,
+                                        QueryT>(args, child_id);
   }
   // Now ALL threads in the team participate in team_sum
   DISTANCE_T norm2 = device::team_sum(per_thread_norm2, team_size_bits);

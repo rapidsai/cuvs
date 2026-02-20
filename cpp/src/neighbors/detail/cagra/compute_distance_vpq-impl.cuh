@@ -26,12 +26,19 @@ template <uint32_t TeamSize,
 #if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
           ,
           cuvs::distance::DistanceType Metric
+#else
+          ,
+          typename QueryT
 #endif
           >
 struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, IndexT, DistanceT> {
   using base_type   = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
   using CODE_BOOK_T = CodebookT;
-  using QUERY_T     = half;
+#if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
+  using QUERY_T = half;
+#else
+  using QUERY_T = QueryT;
+#endif
   using base_type::args;
   using base_type::extra_ptr3;
   using typename base_type::args_t;
@@ -388,6 +395,9 @@ RAFT_KERNEL __launch_bounds__(1, 1)
 #if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
                                                  ,
                                                  Metric
+#else
+                                                 ,
+                                                 half
 #endif
                                                  >;
   using base_type = typename desc_type::base_type;
@@ -458,6 +468,9 @@ vpq_descriptor_spec<Metric,
 #if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
                                                  ,
                                                  Metric
+#else
+                                                 ,
+                                                 half
 #endif
                                                  >;
   using base_type = typename desc_type::base_type;

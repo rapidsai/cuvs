@@ -32,7 +32,7 @@ inline constexpr bool has_kpq_bits_v = has_kpq_bits<T>::value;
 
 // JIT version of compute_distance_to_random_nodes - uses dataset_descriptor_base_t* pointer
 // Shared between single_cta and multi_cta JIT kernels
-// Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT
+// Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, QueryT
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           uint32_t PQ_BITS,
@@ -40,7 +40,8 @@ template <uint32_t TeamSize,
           typename CodebookT,
           typename IndexT,
           typename DistanceT,
-          typename DataT>
+          typename DataT,
+          typename QueryT>
 RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes_jit(
   IndexT* __restrict__ result_indices_ptr,       // [num_pickup]
   DistanceT* __restrict__ result_distances_ptr,  // [num_pickup]
@@ -100,7 +101,8 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes_jit(
                                             CodebookT,
                                             DataT,
                                             IndexT,
-                                            DistanceT>(args, seed_index);
+                                            DistanceT,
+                                            QueryT>(args, seed_index);
       }
       // Now ALL threads in the team participate in team_sum
       const auto norm2_sum = device::team_sum(per_thread_norm2, team_size_bits);
@@ -134,7 +136,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes_jit(
 
 // JIT version of compute_distance_to_child_nodes - uses dataset_descriptor_base_t* pointer
 // Shared between single_cta and multi_cta JIT kernels
-// Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT
+// Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, QueryT
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           uint32_t PQ_BITS,
@@ -143,6 +145,7 @@ template <uint32_t TeamSize,
           typename IndexT,
           typename DistanceT,
           typename DataT,
+          typename QueryT,
           int STATIC_RESULT_POSITION = 1>
 RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes_jit(
   IndexT* __restrict__ result_child_indices_ptr,
@@ -224,7 +227,8 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes_jit(
                                          CodebookT,
                                          DataT,
                                          IndexT,
-                                         DistanceT>(args, child_id);
+                                         DistanceT,
+                                         QueryT>(args, child_id);
     } else {
       // Invalid child_id: lead lane gets upper_bound, others get 0
       per_thread_dist = lead_lane ? raft::upper_bound<DistanceT>() : 0;

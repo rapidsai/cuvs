@@ -11,8 +11,9 @@
 namespace cuvs::neighbors::cagra::detail {
 
 // dist_op fragment for BitwiseHamming metric
-template <typename DATA_T, typename DISTANCE_T>
-__device__ DISTANCE_T dist_op(DATA_T a, DATA_T b)
+// QueryT is uint8_t for BitwiseHamming
+template <typename QUERY_T, typename DISTANCE_T>
+__device__ DISTANCE_T dist_op(QUERY_T a, QUERY_T b)
 {
   // mask the result of xor for the integer promotion
   const auto v = (a ^ b) & 0xffu;

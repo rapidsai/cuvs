@@ -8,41 +8,40 @@
 #include "../compute_distance_standard-impl.cuh"
 #include "../device_common.hpp"
 
-#include <raft/core/operators.hpp>
-#include <raft/util/integer_utils.hpp>
-#include <raft/util/pow2_utils.cuh>
-
 namespace cuvs::neighbors::cagra::detail {
 
-// Extern function implementation for setup_workspace_standard (standard descriptor)
-// Takes the concrete descriptor pointer and calls the free function directly (not through function
-// pointer) For JIT LTO, the descriptor's setup_workspace_impl is nullptr, so we must call the free
-// function directly
-// Note: Metric is no longer a template parameter - it's linked via dist_op and normalization
-// fragments
+// Unified setup_workspace implementation for standard descriptors
+// This is instantiated when PQ_BITS=0, PQ_LEN=0, CodebookT=void
+// Takes dataset_descriptor_base_t* and reconstructs the derived descriptor inside
+// QueryT can be float (for most metrics) or uint8_t (for BitwiseHamming)
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
+          uint32_t PQ_BITS,
+          uint32_t PQ_LEN,
+          typename CodebookT,
           typename DataT,
           typename IndexT,
-          typename DistanceT>
-__device__ const cuvs::neighbors::cagra::detail::
-  standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>*
-  setup_workspace_standard(
-    const cuvs::neighbors::cagra::detail::
-      standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>* desc,
-    void* smem,
-    const DataT* queries,
-    uint32_t query_id)
+          typename DistanceT,
+          typename QueryT>
+__device__ dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_workspace(
+  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* desc_ptr,
+  void* smem,
+  const DataT* queries,
+  uint32_t query_id)
 {
-  // CRITICAL: This function uses __syncthreads() and expects ALL threads to call it
-  // If only thread 0 calls it, __syncthreads() will hang forever
-  // Call the free function directly (not desc->setup_workspace() which uses a function pointer)
-  // The free function is in compute_distance_standard-impl.cuh
-  using desc_t = cuvs::neighbors::cagra::detail::
-    standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
-  const auto* result =
-    cuvs::neighbors::cagra::detail::setup_workspace_standard<desc_t>(desc, smem, queries, query_id);
-  return result;
+  // For standard descriptors, PQ_BITS=0, PQ_LEN=0, CodebookT=void
+  static_assert(PQ_BITS == 0 && PQ_LEN == 0 && std::is_same_v<CodebookT, void>,
+                "Standard descriptor requires PQ_BITS=0, PQ_LEN=0, CodebookT=void");
+
+  // Reconstruct the descriptor pointer from base pointer with QueryT
+  using desc_t =
+    standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT, QueryT>;
+  const desc_t* desc = static_cast<const desc_t*>(desc_ptr);
+
+  // Call the free function directly - it takes DescriptorT as template parameter
+  const desc_t* result = setup_workspace_standard<desc_t>(desc, smem, queries, query_id);
+  return const_cast<dataset_descriptor_base_t<DataT, IndexT, DistanceT>*>(
+    static_cast<const dataset_descriptor_base_t<DataT, IndexT, DistanceT>*>(result));
 }
 
 }  // namespace cuvs::neighbors::cagra::detail

@@ -13,8 +13,9 @@ namespace cuvs::neighbors::cagra::detail {
 
 // Instantiate the cosine normalization function
 // This fragment provides apply_normalization_standard that normalizes by dataset norm
+// QueryT is needed to match the descriptor template signature
 using args_t = typename cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<@data_type@, @index_type@, @distance_type@>::args_t;
-template __device__ @distance_type@ apply_normalization_standard<@team_size@, @dataset_block_dim@, @data_type@, @index_type@, @distance_type@>(
+template __device__ @distance_type@ apply_normalization_standard<@team_size@, @dataset_block_dim@, @data_type@, @index_type@, @distance_type@, float>(
     @distance_type@, const args_t, @index_type@);
 
 }  // namespace cuvs::neighbors::cagra::detail
@@ -31,9 +32,12 @@ __attribute__((__constructor__)) static void register_apply_normalization_standa
 {
   // This fragment provides apply_normalization_standard (cosine normalization version)
   // The planner links the appropriate fragment (noop or cosine) based on metric
+  // QueryT is always float for normalization (only used for CosineExpanded which uses float queries)
+  using QueryTag = cuvs::neighbors::cagra::detail::tag_f;
   registerAlgorithm<tag_@type_abbrev@,
     tag_idx_@idx_abbrev@,
-    tag_dist_@dist_abbrev@>(
+    tag_dist_@dist_abbrev@,
+    QueryTag>(
     "apply_normalization_standard_cosine_t@team_size@_dim@dataset_block_dim@",
     embedded_apply_normalization_standard_cosine_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@,
     sizeof(embedded_apply_normalization_standard_cosine_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@));
