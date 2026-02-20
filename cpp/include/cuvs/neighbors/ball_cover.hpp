@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -269,6 +269,8 @@ void eps_nn(raft::resources const& handle,
  *                     that it is not guarantueed to return the nearest neighbors.
  *                     Upon return max_k is overwritten with the actual max_k found during
  *                     computation.
+ * @param[out] dists   An optional vector (with same length as adj_ja). If provided, will be
+ *                     used to store the corresponding distances for the computed neighbors.
  */
 void eps_nn(raft::resources const& handle,
             const index<int64_t, float>& index,
@@ -277,7 +279,8 @@ void eps_nn(raft::resources const& handle,
             raft::device_vector_view<int64_t, int64_t> vd,
             raft::device_matrix_view<const float, int64_t, raft::row_major> query,
             float eps,
-            std::optional<raft::host_scalar_view<int64_t, int64_t>> max_k = std::nullopt);
+            std::optional<raft::host_scalar_view<int64_t, int64_t>> max_k = std::nullopt,
+            std::optional<raft::device_vector_view<float, int64_t>> dists = std::nullopt);
 
 /**
  * @ingroup random_ball_cover
