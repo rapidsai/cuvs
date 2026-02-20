@@ -375,10 +375,9 @@ void bench_search(::benchmark::State& state,
     // Avoid CPU oversubscription when parallelizing recall calculation loop
     int num_recall_calculation_worker_threads =
       std::thread::hardware_concurrency() / benchmark_n_threads - 1;  // -1 for the main thread
-    num_recall_calculation_worker_threads =
-      std::max(num_recall_calculation_worker_threads,
-               0);  // ensure non-negative number of workers (possible if hardware_concurrency()
-                    // does not return an expected value)
+    // ensure non-negative number of workers (possible if hardware_concurrency()
+    // does not return an expected value) by clamping to 0
+    if (num_recall_calculation_worker_threads < 0) { num_recall_calculation_worker_threads = 0; }
     while (out_offset < rows && out_offset <= max_queries_for_recall) {
       std::vector<std::thread> recall_calculation_workers;
       recall_calculation_workers.reserve(num_recall_calculation_worker_threads);
