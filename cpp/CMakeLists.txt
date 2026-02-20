@@ -67,6 +67,10 @@ option(DISABLE_OPENMP "Disable OpenMP" OFF)
 option(CUVS_COMPILE_DYNAMIC_ONLY "Only build the shared library and skip the static library." OFF)
 option(CUVS_NVTX "Enable nvtx markers" OFF)
 option(CUVS_RAFT_CLONE_ON_PIN "Explicitly clone RAFT branch when pinned to non-feature branch" ON)
+set(CUVS_JIT_LTO_COMPILATION
+    "AUTO"
+    CACHE STRING "Enable JIT LTO compilation (ON, OFF, or AUTO to enable for CUDA 13+)"
+)
 
 if(BUILD_CPU_ONLY)
   set(BUILD_SHARED_LIBS OFF)
@@ -346,9 +350,15 @@ if(NOT BUILD_CPU_ONLY)
   set(JIT_LTO_TARGET_ARCHITECTURE "")
   set(JIT_LTO_COMPILATION OFF)
   set(JIT_LTO_FILES "")
-  if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
-    set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
+  if(CUVS_JIT_LTO_COMPILATION STREQUAL "AUTO")
+    if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
+      set(JIT_LTO_COMPILATION ON)
+    endif()
+  elseif(CUVS_JIT_LTO_COMPILATION)
     set(JIT_LTO_COMPILATION ON)
+  endif()
+  if(JIT_LTO_COMPILATION)
+    set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
   endif()
 
   if(JIT_LTO_COMPILATION)
