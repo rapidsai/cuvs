@@ -187,13 +187,13 @@ void launch_kernel(const index<T, IdxT>& index,
     metric_udf += type_name<AccT>();
     metric_udf += ");\n";
     // Include hash of UDF source in key to differentiate different UDFs
-    auto udf_hash           = std::to_string(std::hash<std::string>{}(metric_udf));
-    std::string metric_name = "metric_udf_" + udf_hash;
-    NVRTCLTOFragmentCompiler nrtc_lto_compiler;
+    auto udf_hash            = std::to_string(std::hash<std::string>{}(metric_udf));
+    std::string metric_name  = "metric_udf_" + udf_hash;
+    auto& nvrtc_lto_compiler = nvrtc_compiler();
     std::string key =
       metric_name + "_" + std::to_string(Veclen) + "_" +
       make_fragment_key<decltype(get_data_type_tag<T>()), decltype(get_acc_type_tag<AccT>())>();
-    nrtc_lto_compiler.compile(key, metric_udf);
+    nvrtc_lto_compiler.compile(key, metric_udf);
     kernel_planner.template add_metric_device_function<decltype(get_data_type_tag<T>()),
                                                        decltype(get_acc_type_tag<AccT>())>(
       metric_name, Veclen);

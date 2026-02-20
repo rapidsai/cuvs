@@ -15,3 +15,5 @@ struct NVRTCLTOFragmentCompiler {
 
   std::vector<std::string> standard_compile_opts;
 };
+
+NVRTCLTOFragmentCompiler& nvrtc_compiler();

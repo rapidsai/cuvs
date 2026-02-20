@@ -13,16 +13,7 @@ AlgorithmLauncher::AlgorithmLauncher(cudaKernel_t k, cudaLibrary_t lib) : kernel
 
 AlgorithmLauncher::~AlgorithmLauncher()
 {
-  if (library != nullptr) {
-    cudaError_t err = cudaLibraryUnload(library);
-    if (err != cudaSuccess) {
-      // Log error but don't throw in destructor
-      std::cerr << "[JIT] WARNING: Failed to unload library in destructor: "
-                << cudaGetErrorString(err) << std::endl;
-      std::cerr.flush();
-    }
-    library = nullptr;
-  }
+  if (library != nullptr) { (void)cudaLibraryUnload(library); }
 }
 
 AlgorithmLauncher::AlgorithmLauncher(AlgorithmLauncher&& other) noexcept

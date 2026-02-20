@@ -1806,7 +1806,7 @@ struct alignas(kCacheLineBytes) launcher_t {
   {
     // Don't sleep this many times hoping for smoother run
     constexpr auto kSpinLimit = 3;
-    // It doesn't make much sense to slee less than this
+    // It doesn't make much sense to sleep less than this
     constexpr auto kPauseTimeMin = std::chrono::nanoseconds(1000);
     // Bound sleeping time
     constexpr auto kPauseTimeMax = std::chrono::nanoseconds(50000);
