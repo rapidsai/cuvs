@@ -442,6 +442,7 @@ if(NOT BUILD_CPU_ONLY)
       PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_SOURCE_DIR}/src"
               "${CMAKE_CURRENT_SOURCE_DIR}/../c/include"
     )
+    target_link_libraries(cuvs_jit_lto_kernels PRIVATE raft::raft)
     add_library(cuvs::cuvs_jit_lto_kernels ALIAS cuvs_jit_lto_kernels)
   endif()
 
