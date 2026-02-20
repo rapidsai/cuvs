@@ -1,47 +1,23 @@
 #!/bin/bash
 # SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
+#
+# Build script for the standalone C library. Expects to be run inside an
+# environment that already provides: dnf packages (patch, tar, unzip, wget),
+# ninja, cmake (e.g. ci/standalone_c/Dockerfile.standalone_c).
 
 set -euo pipefail
 
 TOOLSET_VERSION=14
-NINJA_VERSION=v1.13.1
 
 BUILD_C_LIB_TESTS="OFF"
 if [[ "${1:-}" == "--build-tests" ]]; then
   BUILD_C_LIB_TESTS="ON"
 fi
 
-dnf install -y \
-      patch \
-      tar \
-      unzip \
-      wget
-
-if ! command -V ninja >/dev/null 2>&1; then
-    case "$(uname -m)" in
-        x86_64)
-            wget --no-hsts -q -O /tmp/ninja-linux.zip "https://github.com/ninja-build/ninja/releases/download/${NINJA_VERSION}/ninja-linux.zip";
-            ;;
-        aarch64)
-            wget --no-hsts -q -O /tmp/ninja-linux.zip "https://github.com/ninja-build/ninja/releases/download/${NINJA_VERSION}/ninja-linux-aarch64.zip";
-            ;;
-        *)
-            echo "Unrecognized platform '$(uname -m)'" >&2
-            exit 1
-            ;;
-    esac
-    unzip -d /usr/bin /tmp/ninja-linux.zip
-    chmod +x /usr/bin/ninja
-    rm /tmp/ninja-linux.zip
-fi
-
 source rapids-install-sccache
 source rapids-configure-sccache
 source rapids-date-string
-
-rapids-pip-retry install cmake
-pyenv rehash
 
 rapids-print-env
 
