@@ -88,6 +88,18 @@ cdef class KMeansParams:
         "full_batch" : Standard Lloyd's algorithm - accumulate assignments over
             the entire dataset, then update centroids once per iteration.
         "mini_batch" : Mini-batch k-means - update centroids after each batch.
+    inertia_check : bool
+        If True, check inertia during iterations for early convergence.
+    final_inertia_check : bool
+        If True, compute the final inertia after fit_batched completes.
+        This requires an additional full pass over all the host data.
+        Only used by fit_batched(); regular fit() always computes final inertia.
+        Default: False (skip final inertia computation for performance).
+    max_no_improvement : int
+        Maximum number of consecutive mini-batch steps without improvement
+        in smoothed inertia before early stopping. Only used when update_mode
+        is "mini_batch". If 0, this convergence criterion is disabled.
+        Default: 10 (matches sklearn's default).
     hierarchical : bool
         Whether to use hierarchical (balanced) kmeans or not
     hierarchical_n_iters : int
@@ -113,6 +125,9 @@ cdef class KMeansParams:
                  batch_samples=None,
                  batch_centroids=None,
                  update_mode=None,
+                 inertia_check=None,
+                 final_inertia_check=None,
+                 max_no_improvement=None,
                  hierarchical=None,
                  hierarchical_n_iters=None):
         if metric is not None:
@@ -137,6 +152,12 @@ cdef class KMeansParams:
         if update_mode is not None:
             c_mode = UPDATE_MODE_TYPES[update_mode]
             self.params.update_mode = <cuvsKMeansCentroidUpdateMode>c_mode
+        if inertia_check is not None:
+            self.params.inertia_check = inertia_check
+        if final_inertia_check is not None:
+            self.params.final_inertia_check = final_inertia_check
+        if max_no_improvement is not None:
+            self.params.max_no_improvement = max_no_improvement
         if hierarchical is not None:
             self.params.hierarchical = hierarchical
         if hierarchical_n_iters is not None:
@@ -184,6 +205,18 @@ cdef class KMeansParams:
     @property
     def update_mode(self):
         return UPDATE_MODE_NAMES[self.params.update_mode]
+
+    @property
+    def inertia_check(self):
+        return self.params.inertia_check
+
+    @property
+    def final_inertia_check(self):
+        return self.params.final_inertia_check
+
+    @property
+    def max_no_improvement(self):
+        return self.params.max_no_improvement
 
     @property
     def hierarchical(self):
