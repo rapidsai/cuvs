@@ -345,7 +345,6 @@ if(NOT BUILD_CPU_ONLY)
 
   set(JIT_LTO_TARGET_ARCHITECTURE "")
   set(JIT_LTO_COMPILATION OFF)
-  set(JIT_LTO_FILES "")
   if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
     set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
     set(JIT_LTO_COMPILATION ON)
@@ -424,8 +423,16 @@ if(NOT BUILD_CPU_ONLY)
     endblock()
 
     add_library(
-      cuvs_jit_lto_kernels STATIC ${interleaved_scan_files} ${metric_files} ${filter_files}
-                                  ${post_lambda_files}
+      cuvs_jit_lto_kernels STATIC
+      ${interleaved_scan_files}
+      ${metric_files}
+      ${filter_files}
+      ${post_lambda_files}
+      src/detail/jit_lto/AlgorithmLauncher.cu
+      src/detail/jit_lto/AlgorithmPlanner.cu
+      src/detail/jit_lto/FragmentDatabase.cu
+      src/detail/jit_lto/FragmentEntry.cu
+      src/detail/jit_lto/nvjitlink_checker.cpp
     )
     set_target_properties(
       cuvs_jit_lto_kernels PROPERTIES POSITION_INDEPENDENT_CODE ON CXX_STANDARD 20
@@ -436,14 +443,6 @@ if(NOT BUILD_CPU_ONLY)
               "${CMAKE_CURRENT_SOURCE_DIR}/../c/include"
     )
     add_library(cuvs::cuvs_jit_lto_kernels ALIAS cuvs_jit_lto_kernels)
-
-    set(JIT_LTO_FILES
-        src/detail/jit_lto/AlgorithmLauncher.cu
-        src/detail/jit_lto/AlgorithmPlanner.cu
-        src/detail/jit_lto/FragmentDatabase.cu
-        src/detail/jit_lto/FragmentEntry.cu
-        src/detail/jit_lto/nvjitlink_checker.cpp
-    )
   endif()
 
   add_library(
@@ -659,7 +658,6 @@ if(NOT BUILD_CPU_ONLY)
     src/stats/silhouette_score.cu
     src/stats/trustworthiness_score.cu
     ${CUVS_MG_ALGOS}
-    $<$<BOOL:${JIT_LTO_COMPILATION}>:${JIT_LTO_FILES}>
   )
 
   set_target_properties(
