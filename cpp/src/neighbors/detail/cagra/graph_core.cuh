@@ -173,7 +173,7 @@ __global__ void kern_prune(const IdxT* const knn_graph,  // [graph_chunk_size, g
   uint64_t* const num_full   = stats + 1;
 
   const uint64_t iA       = blockIdx.x + (batch_size * batch_id);
-  const uint64_t iA_batch = iA % static_cast<uint64_t>(batch_size);
+  const uint64_t iA_batch = blockIdx.x;
 
   if (iA >= graph_size) { return; }
 
@@ -246,66 +246,69 @@ __global__ void kern_make_rev_graph(const IdxT* const dest_nodes,     // [graph_
   }
 }
 
-// Select output_graph_degree neighbors with smallest detour count per node (writes to device).
-template <class IdxT>
+// Based on the detour count, select the smallest detour count and its index
+// (Pruning Update Kernel)
+template <typename IdxT>
 __global__ void kern_select_smallest_detour_neighbors(
-  const IdxT* const knn_graph,
+  const IdxT* const knn_graph,  // [graph_chunk_size, graph_degree]
   uint64_t graph_size,
   uint64_t knn_graph_degree,
   uint64_t output_graph_degree,
-  const uint8_t* const d_detour_count,  // [batch_size, graph_degree]
-  IdxT* output_graph_ptr,               // [batch_size, output_graph_degree]
-  const uint32_t batch_size,
-  const uint32_t batch_id)
+  uint8_t* const d_detour_count,  // [batch_size, graph_degree]
+  IdxT* output_graph_ptr,
+  const uint32_t batch_size,  // [batch_size, output_graph_degree]
+  const uint32_t batch_id,
+  uint32_t* const d_invalid_neighbor_list)
 {
-  // FIXME: this does not really work for num_warps > 1
-  constexpr unsigned warp_mask = 0xffffffff;
-  const uint32_t num_warps     = blockDim.x / raft::WarpSize;
-  extern __shared__ unsigned char smem_buf[];
-  uint32_t* smem_indices = reinterpret_cast<uint32_t*>(smem_buf);
-  uint16_t* smem_detour_count =
-    reinterpret_cast<uint16_t*>(&smem_indices[knn_graph_degree * num_warps]);
+  assert(blockDim.x == 32);
 
-  const uint32_t wid     = threadIdx.x / raft::WarpSize;
-  const uint32_t lane_id = threadIdx.x % raft::WarpSize;
-  const uint64_t nid     = static_cast<uint64_t>(blockIdx.x) * num_warps +
-                       (static_cast<uint64_t>(batch_size) * batch_id * num_warps) + wid;
+  // Allocate shared memory for detour counts and their indices
+  extern __shared__ IdxT smem_indices[];
+  uint16_t* smem_detour_count = (uint16_t*)&smem_indices[knn_graph_degree];
 
-  const uint64_t nid_batch = nid % static_cast<uint64_t>(batch_size);
+  const uint64_t nid       = blockIdx.x + (batch_size * batch_id);
+  const uint64_t nid_batch = blockIdx.x;
 
-  if (nid >= graph_size) return;
+  if (nid >= graph_size) { return; }
 
-  for (uint32_t k = lane_id; k < knn_graph_degree; k += raft::WarpSize) {
-    smem_detour_count[(knn_graph_degree * wid) + k] =
-      d_detour_count[nid_batch * knn_graph_degree + k];
-    smem_indices[(knn_graph_degree * wid) + k] = k;
+  // Each uint64_t loads detour_count for its assigned k
+  for (uint32_t k = threadIdx.x; k < knn_graph_degree; k += blockDim.x) {
+    smem_detour_count[k] = d_detour_count[nid_batch * knn_graph_degree + k];
+    smem_indices[k]      = knn_graph[knn_graph_degree * nid + k];
   }
-  __syncwarp(warp_mask);
+  __syncwarp();
+
+  const unsigned warp_mask = 0xffffffff;
 
   for (uint32_t i = 0; i < output_graph_degree; i++) {
-    uint32_t local_min = 256;
+    uint32_t local_min = 255;
     uint32_t local_idx = 0xffffffff;
-    for (uint32_t k = lane_id; k < knn_graph_degree; k += raft::WarpSize) {
-      uint32_t c = smem_detour_count[(knn_graph_degree * wid) + k];
-      if (c < local_min) {
-        local_min = c;
-        local_idx = smem_indices[(knn_graph_degree * wid) + k];
+    for (uint32_t k = threadIdx.x; k < knn_graph_degree; k += blockDim.x) {
+      if (smem_detour_count[k] < local_min) {
+        local_min = smem_detour_count[k];
+        local_idx = k;
       }
     }
-    uint32_t local_min_with_tag = (local_min << 16) | local_idx;
-    for (int offset = raft::WarpSize / 2; offset > 0; offset /= 2) {
-      uint32_t other     = __shfl_down_sync(warp_mask, local_min_with_tag, offset);
-      local_min_with_tag = (local_min_with_tag <= other) ? local_min_with_tag : other;
-    }
-    uint32_t warp_min_tag   = __shfl_sync(warp_mask, local_min_with_tag, 0);
-    uint32_t warp_local_idx = warp_min_tag & 0xffff;
 
-    if (local_idx == warp_local_idx) {
-      output_graph_ptr[nid_batch * output_graph_degree + i] =
-        knn_graph[knn_graph_degree * nid + warp_local_idx];
-      smem_detour_count[knn_graph_degree * wid + warp_local_idx] = 255;
+    uint32_t local_min_with_tag = (local_min << 16) | ((uint32_t)local_idx);
+    uint32_t warp_min_with_tag  = __reduce_min_sync(warp_mask, local_min_with_tag);
+    uint32_t warp_min_count     = warp_min_with_tag >> 16;
+    uint32_t warp_local_idx     = warp_min_with_tag & 0xffff;
+
+    if (warp_min_count == 255) {
+      // No valid position left; set error flag and fill remaining slots with sentinel
+      if (threadIdx.x == 0) { atomicExch(d_invalid_neighbor_list, 1u); }
+      break;
+    }
+
+    IdxT selected_node = smem_indices[warp_local_idx];
+
+    for (uint32_t k = threadIdx.x; k < knn_graph_degree; k += blockDim.x) {
+      if (smem_indices[k] == selected_node) { smem_detour_count[k] = 255; }
     }
     __syncwarp(warp_mask);
+
+    if (threadIdx.x == 0) { output_graph_ptr[nid_batch * output_graph_degree + i] = selected_node; }
   }
 }
 
@@ -350,19 +353,18 @@ __global__ void kern_merge_graph(IdxT* output_graph,
   extern __shared__ unsigned char smem_buf[];
   IdxT* smem_sorted_output_graph = reinterpret_cast<IdxT*>(smem_buf);
 
-  const uint32_t wid       = threadIdx.x / 32;
-  const uint32_t lane_id   = threadIdx.x % 32;
-  const uint32_t num_warps = blockDim.x / 32;
-  const uint64_t nid       = blockIdx.x * num_warps + (batch_size * batch_id * num_warps) + wid;
+  assert(blockDim.x == 32);
+
+  const uint64_t nid = blockIdx.x + (batch_size * batch_id);
   if (nid >= graph_size) { return; }
 
-  if (lane_id == 0) check_num_protected_edges[0] = true;
+  if (threadIdx.x == 0) check_num_protected_edges[0] = true;
 
   const auto mst_graph_num_edges = mst_graph_num_edges_ptr[nid];
   // If guarantee_connectivity == true, use a temporal list to merge the
   // neighbor lists of the graphs.
   if (guarantee_connectivity) {
-    for (uint32_t i = lane_id; i < mst_graph_degree; i += 32) {
+    for (uint32_t i = threadIdx.x; i < mst_graph_degree; i += 32) {
       smem_sorted_output_graph[i] = mst_graph[nid * mst_graph_degree + i];
     }
     __syncwarp();
@@ -371,7 +373,7 @@ __global__ void kern_merge_graph(IdxT* output_graph,
          pruned_j++) {
       const auto v     = output_graph[output_graph_degree * nid + pruned_j];
       unsigned int dup = 0;
-      for (uint32_t m = lane_id; m < output_j; m += 32) {
+      for (uint32_t m = threadIdx.x; m < output_j; m += 32) {
         if (v == smem_sorted_output_graph[m]) {
           dup = 1;
           break;
@@ -380,7 +382,7 @@ __global__ void kern_merge_graph(IdxT* output_graph,
 
       unsigned int warp_dup = __ballot_sync(0xffffffff, dup);
       if (warp_dup == 0) {
-        if (lane_id == 0) smem_sorted_output_graph[output_j] = v;
+        if (threadIdx.x == 0) smem_sorted_output_graph[output_j] = v;
         output_j++;
       }
       __syncwarp();
@@ -388,7 +390,7 @@ __global__ void kern_merge_graph(IdxT* output_graph,
   }
 
   else {
-    for (uint32_t i = lane_id; i < output_graph_degree; i += 32) {
+    for (uint32_t i = threadIdx.x; i < output_graph_degree; i += 32) {
       smem_sorted_output_graph[i] = output_graph[output_graph_degree * nid + i];
     }
     __syncwarp();
@@ -409,7 +411,7 @@ __global__ void kern_merge_graph(IdxT* output_graph,
       if (pos < num_protected_edges) { continue; }
       uint64_t num_shift = pos - num_protected_edges;
       if (pos >= output_graph_degree) { num_shift = output_graph_degree - num_protected_edges - 1; }
-      if (lane_id == 0) {
+      if (threadIdx.x == 0) {
         thread_shift_array<IdxT>(smem_sorted_output_graph + num_protected_edges, num_shift);
         smem_sorted_output_graph[num_protected_edges] = rev_graph[kr + (output_graph_degree * nid)];
       }
@@ -417,7 +419,7 @@ __global__ void kern_merge_graph(IdxT* output_graph,
     }
   }
 
-  for (uint32_t i = lane_id; i < output_graph_degree; i += 32) {
+  for (uint32_t i = threadIdx.x; i < output_graph_degree; i += 32) {
     output_graph[(output_graph_degree * nid) + i] = smem_sorted_output_graph[i];
   }
 }
@@ -1477,6 +1479,7 @@ void optimize(
         res, large_tmp_mr, raft::make_extents<int64_t>(batch_size));
       auto d_output_graph = raft::make_device_mdarray<IdxT>(
         res, large_tmp_mr, raft::make_extents<int64_t>(batch_size, output_graph_degree));
+      auto d_invalid_neighbor_list = raft::make_device_scalar<uint32_t>(res, 0u);
 
       for (uint32_t i_batch = 0; i_batch < num_batch; i_batch++) {
         // initialize the detour_count and num_no_detour_edges for the current batch
@@ -1507,8 +1510,7 @@ void optimize(
             dev_stats.data_handle());
 
         // select smallest-detour neighbors for the current batch
-        const size_t select_smem_size =
-          (knn_graph_degree * knn_graph_degree) * (sizeof(uint16_t) + sizeof(uint32_t));
+        const size_t select_smem_size = (knn_graph_degree) * (sizeof(uint16_t) + sizeof(IdxT));
         const dim3 threads_select(32, 1, 1);
         const dim3 blocks_select(batch_size, 1, 1);
         kern_select_smallest_detour_neighbors<IdxT>
@@ -1522,10 +1524,11 @@ void optimize(
                                                      d_detour_count.data_handle(),
                                                      d_output_graph.data_handle(),
                                                      batch_size,
-                                                     i_batch);
+                                                     i_batch,
+                                                     d_invalid_neighbor_list.data_handle());
 
-        raft::copy(output_graph_ptr,
-                   d_output_graph.data_handle() + i_batch * batch_size * output_graph_degree,
+        raft::copy(output_graph_ptr + i_batch * batch_size * output_graph_degree,
+                   d_output_graph.data_handle(),
                    static_cast<size_t>(batch_size) * output_graph_degree,
                    raft::resource::get_cuda_stream(res));
 
@@ -1536,6 +1539,18 @@ void optimize(
       }
       raft::resource::sync_stream(res);
       RAFT_LOG_DEBUG("\n");
+
+      uint32_t invalid_neighbor_list = 0;
+      raft::copy(&invalid_neighbor_list,
+                 d_invalid_neighbor_list.data_handle(),
+                 1,
+                 raft::resource::get_cuda_stream(res));
+      raft::resource::sync_stream(res);
+      RAFT_EXPECTS(
+        invalid_neighbor_list == 0,
+        "Could not generate an intermediate CAGRA graph because the initial kNN graph contains too "
+        "many invalid or duplicated neighbor nodes. This error can occur, for example, if too many "
+        "overflows occur during the norm computation between the dataset vectors.");
 
       raft::copy(
         host_stats.data_handle(), dev_stats.data_handle(), 2, raft::resource::get_cuda_stream(res));
@@ -1641,6 +1656,8 @@ void optimize(
       auto d_dest_nodes =
         raft::make_device_mdarray<IdxT>(res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
       auto d_rev_graph = raft::make_device_mdarray<IdxT>(
+        res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, output_graph_degree));
+      auto d_output_graph = raft::make_device_mdarray<IdxT>(
         res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, output_graph_degree));
     } catch (std::bad_alloc& e) {
       RAFT_LOG_DEBUG("Insufficient memory for reverse graph on GPU");
@@ -1760,15 +1777,15 @@ void optimize(
                  d_check_num_protected_edges.data_handle(),
                  1,
                  raft::resource::get_cuda_stream(res));
-      raft::resource::sync_stream(res);
 
-      // TODO: is this required?
       if (d_output_graph.allocated_memory()) {
         raft::copy(output_graph_ptr,
                    d_output_graph.data_handle(),
                    graph_size * output_graph_degree,
                    raft::resource::get_cuda_stream(res));
       }
+
+      raft::resource::sync_stream(res);
 
       const auto merge_graph_end = cur_time();
       RAFT_EXPECTS(check_num_protected_edges,
