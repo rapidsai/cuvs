@@ -30,7 +30,7 @@ struct has_kpq_bits {
 template <typename T>
 inline constexpr bool has_kpq_bits_v = has_kpq_bits<T>::value;
 
-// JIT version of compute_distance_to_random_nodes - uses extern functions with void* descriptor
+// JIT version of compute_distance_to_random_nodes - uses dataset_descriptor_base_t* pointer
 // Shared between single_cta and multi_cta JIT kernels
 // Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT
 template <uint32_t TeamSize,
@@ -44,7 +44,7 @@ template <uint32_t TeamSize,
 RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes_jit(
   IndexT* __restrict__ result_indices_ptr,       // [num_pickup]
   DistanceT* __restrict__ result_distances_ptr,  // [num_pickup]
-  void* smem_desc,  // void* descriptor pointer (reconstructed in fragments)
+  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* smem_desc,
   const uint32_t num_pickup,
   const uint32_t num_distilation,
   const uint64_t rand_xor_mask,
@@ -59,26 +59,14 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes_jit(
 {
   constexpr unsigned warp_size = 32;
 
-  // Get team_size_bits and args using accessor fragments
-  // Planner links the right fragment (standard or VPQ) at runtime based on descriptor type
+  // Get team_size_bits and args directly from base descriptor
   using args_t = typename cuvs::neighbors::cagra::detail::
     dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t;
 
-  // Use get_team_size_bitshift_from_smem since smem_desc is in shared memory
-  uint32_t team_size_bits = get_team_size_bitshift_from_smem<TeamSize,
-                                                             DatasetBlockDim,
-                                                             PQ_BITS,
-                                                             PQ_LEN,
-                                                             CodebookT,
-                                                             DataT,
-                                                             IndexT,
-                                                             DistanceT>(smem_desc);
-  args_t args =
-    get_args<TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, DataT, IndexT, DistanceT>(
-      smem_desc);
-  IndexT dataset_size =
-    get_size<TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, DataT, IndexT, DistanceT>(
-      smem_desc);
+  // Use team_size_bitshift_from_smem since smem_desc is in shared memory
+  uint32_t team_size_bits = smem_desc->team_size_bitshift_from_smem();
+  args_t args             = smem_desc->args.load();
+  IndexT dataset_size     = smem_desc->size;
 
   const auto max_i = raft::round_up_safe<uint32_t>(num_pickup, warp_size >> team_size_bits);
 
@@ -144,7 +132,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes_jit(
   }
 }
 
-// JIT version of compute_distance_to_child_nodes - uses extern functions with void* descriptor
+// JIT version of compute_distance_to_child_nodes - uses dataset_descriptor_base_t* pointer
 // Shared between single_cta and multi_cta JIT kernels
 // Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT
 template <uint32_t TeamSize,
@@ -159,7 +147,7 @@ template <uint32_t TeamSize,
 RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes_jit(
   IndexT* __restrict__ result_child_indices_ptr,
   DistanceT* __restrict__ result_child_distances_ptr,
-  void* smem_desc,  // void* descriptor pointer (reconstructed in fragments)
+  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* smem_desc,
   const IndexT* __restrict__ knn_graph,
   const uint32_t knn_k,
   IndexT* __restrict__ visited_hashmap_ptr,
@@ -205,23 +193,13 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes_jit(
   // Compute the distance to child nodes using unified extern compute_distance
   constexpr unsigned warp_size = 32;
 
-  // Get team_size_bits and args using accessor fragments
-  // Planner links the right fragment (standard or VPQ) at runtime based on descriptor type
+  // Get team_size_bits and args directly from base descriptor
   using args_t = typename cuvs::neighbors::cagra::detail::
     dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t;
 
-  // Use get_team_size_bitshift_from_smem since smem_desc is in shared memory
-  uint32_t team_size_bits = get_team_size_bitshift_from_smem<TeamSize,
-                                                             DatasetBlockDim,
-                                                             PQ_BITS,
-                                                             PQ_LEN,
-                                                             CodebookT,
-                                                             DataT,
-                                                             IndexT,
-                                                             DistanceT>(smem_desc);
-  args_t args =
-    get_args<TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, DataT, IndexT, DistanceT>(
-      smem_desc);
+  // Use team_size_bitshift_from_smem since smem_desc is in shared memory
+  uint32_t team_size_bits = smem_desc->team_size_bitshift_from_smem();
+  args_t args             = smem_desc->args.load();
 
   const auto num_k     = knn_k * search_width;
   const auto max_i     = raft::round_up_safe(num_k, warp_size >> team_size_bits);

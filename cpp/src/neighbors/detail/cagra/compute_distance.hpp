@@ -192,6 +192,7 @@ struct alignas(device::LOAD_128BIT_T) dataset_descriptor_base_t {
     return smem_and_team_size.team_size();
   }
 
+#if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
   RAFT_DEVICE_INLINE_FUNCTION auto setup_workspace(void* smem_ptr,
                                                    const DATA_T* queries_ptr,
                                                    uint32_t query_id) const -> const base_type*
@@ -205,6 +206,7 @@ struct alignas(device::LOAD_128BIT_T) dataset_descriptor_base_t {
     auto per_thread_distances = valid ? compute_distance_impl(args.load(), dataset_index) : 0;
     return device::team_sum(per_thread_distances, team_size_bitshift_from_smem());
   }
+#endif
 };
 
 /**

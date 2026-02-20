@@ -383,22 +383,13 @@ struct alignas(kCacheLineBytes) persistent_runner_jit_t : public persistent_runn
       using InnerFilter = decltype(sample_filter.filter);
       // Always extract offset for wrapped filters
       query_id_offset = sample_filter.offset;
-      RAFT_LOG_INFO("Extracted query_id_offset: %u", query_id_offset);
       if constexpr (is_bitset_filter<InnerFilter>::value) {
         // Extract bitset data for bitset_filter (works for any bitset_filter instantiation)
         auto bitset_view = sample_filter.filter.view();
         bitset_ptr       = const_cast<uint32_t*>(bitset_view.data());
         bitset_len       = static_cast<SourceIndexT>(bitset_view.size());
         original_nbits   = static_cast<SourceIndexT>(bitset_view.get_original_nbits());
-        RAFT_LOG_INFO("Extracted bitset data: bitset_ptr=%p, bitset_len=%zu, original_nbits=%zu",
-                      bitset_ptr,
-                      static_cast<size_t>(bitset_len),
-                      static_cast<size_t>(original_nbits));
-      } else {
-        RAFT_LOG_INFO("InnerFilter is not bitset_filter, skipping bitset extraction");
       }
-    } else {
-      RAFT_LOG_INFO("Filter does not have wrapper members (.filter/.offset), skipping extraction");
     }
 
     // set kernel launch parameters
@@ -487,12 +478,6 @@ struct alignas(kCacheLineBytes) persistent_runner_jit_t : public persistent_runn
       bitset_len,
       original_nbits);
 
-    RAFT_LOG_INFO(
-      "Initialized the JIT persistent kernel in stream %zd; job_queue size = %u; worker_queue size "
-      "= %u",
-      int64_t((cudaStream_t)stream),
-      job_queue.capacity(),
-      worker_queue.capacity());
     last_touch.store(std::chrono::system_clock::now(), std::memory_order_relaxed);
   }
 
@@ -503,7 +488,6 @@ struct alignas(kCacheLineBytes) persistent_runner_jit_t : public persistent_runn
       whs[worker_queue.pop().wait()].data.store({kNoMoreWork}, cuda::memory_order_relaxed);
     }
     RAFT_CUDA_TRY_NO_THROW(cudaStreamSynchronize(stream));
-    RAFT_LOG_INFO("Destroyed the JIT persistent runner.");
   }
 
   void launch(uintptr_t result_indices_ptr,
@@ -590,11 +574,6 @@ void select_and_run_jit(
   SampleFilterT sample_filter,
   cudaStream_t stream)
 {
-  RAFT_LOG_INFO(
-    "[JIT LAUNCHER] Entering SINGLE_CTA launcher (persistent=%d, num_queries=%u, topk=%u)",
-    ps.persistent ? 1 : 0,
-    num_queries,
-    topk);
   const SourceIndexT* source_indices_ptr =
     source_indices.has_value() ? source_indices->data_handle() : nullptr;
 
@@ -613,26 +592,13 @@ void select_and_run_jit(
     using InnerFilter = decltype(sample_filter.filter);
     // Always extract offset for wrapped filters
     query_id_offset = sample_filter.offset;
-    RAFT_LOG_INFO("Extracted query_id_offset: %u", query_id_offset);
     if constexpr (is_bitset_filter<InnerFilter>::value) {
       // Extract bitset data for bitset_filter (works for any bitset_filter instantiation)
       auto bitset_view = sample_filter.filter.view();
       bitset_ptr       = const_cast<uint32_t*>(bitset_view.data());
       bitset_len       = static_cast<SourceIndexT>(bitset_view.size());
       original_nbits   = static_cast<SourceIndexT>(bitset_view.get_original_nbits());
-      RAFT_LOG_INFO("Extracted bitset data: bitset_ptr=%p, bitset_len=%zu, original_nbits=%zu",
-                    bitset_ptr,
-                    static_cast<size_t>(bitset_len),
-                    static_cast<size_t>(original_nbits));
-      RAFT_LOG_INFO("InnerFilter type: %s, bitset_view.size() type: %s, SourceIndexT: %s",
-                    typeid(InnerFilter).name(),
-                    typeid(decltype(bitset_view.size())).name(),
-                    typeid(SourceIndexT).name());
-    } else {
-      RAFT_LOG_INFO("InnerFilter is not bitset_filter, skipping bitset extraction");
     }
-  } else {
-    RAFT_LOG_INFO("Filter does not have wrapper members (.filter/.offset), skipping extraction");
   }
 
   // Use common logic to compute launch config
@@ -666,12 +632,6 @@ void select_and_run_jit(
       true /* persistent */);
 
     // Add device functions
-    // Register descriptor accessor fragments first (needed for void* descriptor access)
-    planner.add_descriptor_accessor_device_functions(dataset_desc.team_size,
-                                                     dataset_desc.dataset_block_dim,
-                                                     dataset_desc.is_vpq,
-                                                     dataset_desc.pq_bits,
-                                                     dataset_desc.pq_len);
     planner.add_setup_workspace_device_function(dataset_desc.metric,
                                                 dataset_desc.team_size,
                                                 dataset_desc.dataset_block_dim,
@@ -684,7 +644,7 @@ void select_and_run_jit(
                                                  dataset_desc.is_vpq,
                                                  dataset_desc.pq_bits,
                                                  dataset_desc.pq_len);
-    planner.add_sample_filter_device_function(get_sample_filter_name<SampleFilterT>(true));
+    planner.add_sample_filter_device_function(get_sample_filter_name<SampleFilterT>());
 
     // Get launcher for persistent kernel
     auto launcher = planner.get_launcher();
@@ -734,12 +694,6 @@ void select_and_run_jit(
       dataset_desc.pq_len);
 
     // Add device functions (tags are determined inside the planner methods)
-    // Register descriptor accessor fragments first (needed for void* descriptor access)
-    planner.add_descriptor_accessor_device_functions(dataset_desc.team_size,
-                                                     dataset_desc.dataset_block_dim,
-                                                     dataset_desc.is_vpq,
-                                                     dataset_desc.pq_bits,
-                                                     dataset_desc.pq_len);
     planner.add_setup_workspace_device_function(dataset_desc.metric,
                                                 dataset_desc.team_size,
                                                 dataset_desc.dataset_block_dim,
@@ -752,7 +706,7 @@ void select_and_run_jit(
                                                  dataset_desc.is_vpq,
                                                  dataset_desc.pq_bits,
                                                  dataset_desc.pq_len);
-    planner.add_sample_filter_device_function(get_sample_filter_name<SampleFilterT>(true));
+    planner.add_sample_filter_device_function(get_sample_filter_name<SampleFilterT>());
 
     // Get launcher
     auto launcher = planner.get_launcher();
@@ -815,48 +769,7 @@ void select_and_run_jit(
       bitset_len,
       original_nbits);
 
-    // Check for launch errors immediately
-    cudaError_t launch_err = cudaPeekAtLastError();
-    if (launch_err != cudaSuccess) {
-      RAFT_LOG_ERROR("[JIT LAUNCHER] SINGLE_CTA kernel launch error detected: %s (error code: %d)",
-                     cudaGetErrorString(launch_err),
-                     launch_err);
-      RAFT_LOG_ERROR(
-        "[JIT LAUNCHER] SINGLE_CTA parameters: graph_degree=%u, itopk_size=%u, num_queries=%u, "
-        "topk=%u",
-        graph_degree_u32,
-        itopk_size_u32,
-        num_queries,
-        topk);
-      RAFT_CUDA_TRY(launch_err);
-    }
-
-    // Synchronize to catch kernel execution errors before they propagate
-    // This ensures the kernel completes before we return, preventing parameter lifetime issues
-    cudaError_t sync_err = cudaStreamSynchronize(stream);
-    if (sync_err != cudaSuccess) {
-      RAFT_LOG_ERROR("[JIT LAUNCHER] SINGLE_CTA kernel execution failed: %s (error code: %d)",
-                     cudaGetErrorString(sync_err),
-                     sync_err);
-      RAFT_LOG_ERROR(
-        "[JIT LAUNCHER] SINGLE_CTA parameters: graph_degree=%u, itopk_size=%u, num_queries=%u, "
-        "topk=%u, search_width=%u",
-        graph_degree_u32,
-        itopk_size_u32,
-        num_queries,
-        topk,
-        search_width_u32);
-      RAFT_LOG_ERROR(
-        "[JIT LAUNCHER] SINGLE_CTA pointers: topk_indices=%p, topk_distances=%p, graph=%p, "
-        "dev_desc=%p",
-        reinterpret_cast<void*>(topk_indices_ptr),
-        topk_distances_ptr,
-        graph.data_handle(),
-        dev_desc);
-      RAFT_CUDA_TRY(sync_err);
-    }
-
-    RAFT_LOG_INFO("[JIT LAUNCHER] SINGLE_CTA kernel completed successfully");
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
 }
 

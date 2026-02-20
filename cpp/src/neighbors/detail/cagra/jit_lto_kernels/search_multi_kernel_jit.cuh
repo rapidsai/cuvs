@@ -36,7 +36,7 @@ struct has_kpq_bits {
 template <typename T>
 inline constexpr bool has_kpq_bits_v = has_kpq_bits<T>::value;
 
-// JIT version of random_pickup_kernel - uses extern functions with void* descriptor pointer
+// JIT version of random_pickup_kernel - uses dataset_descriptor_base_t* pointer
 // Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
@@ -47,7 +47,7 @@ template <uint32_t TeamSize,
           typename IndexT,
           typename DistanceT>
 RAFT_KERNEL random_pickup_kernel_jit(
-  void* dataset_desc,              // void* descriptor pointer (reconstructed in fragments)
+  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
   const DataT* const queries_ptr,  // [num_queries, dataset_dim]
   const std::size_t num_pickup,
   const unsigned num_distilation,
@@ -64,15 +64,8 @@ RAFT_KERNEL random_pickup_kernel_jit(
   using INDEX_T    = IndexT;
   using DISTANCE_T = DistanceT;
 
-  // Get team_size_bits using accessor fragment (planner links the right fragment at runtime)
-  uint32_t team_size_bits = get_team_size_bitshift<TeamSize,
-                                                   DatasetBlockDim,
-                                                   PQ_BITS,
-                                                   PQ_LEN,
-                                                   CodebookT,
-                                                   DataT,
-                                                   IndexT,
-                                                   DistanceT>(dataset_desc);
+  // Get team_size_bits directly from base descriptor
+  uint32_t team_size_bits = dataset_desc->team_size_bitshift();
 
   const auto ldb               = hashmap::get_size(hash_bitlen);
   const auto global_team_index = (blockIdx.x * blockDim.x + threadIdx.x) >> team_size_bits;
@@ -81,27 +74,24 @@ RAFT_KERNEL random_pickup_kernel_jit(
   extern __shared__ uint8_t smem[];
 
   // Set smem working buffer using unified setup_workspace
-  // setup_workspace copies the descriptor to shared memory and returns void* to smem descriptor
-  // NOTE: setup_workspace must be called by ALL threads (it uses __syncthreads())
-  void* smem_desc = setup_workspace<TeamSize,
-                                    DatasetBlockDim,
-                                    PQ_BITS,
-                                    PQ_LEN,
-                                    CodebookT,
-                                    DataT,
-                                    IndexT,
-                                    DistanceT>(dataset_desc, smem, queries_ptr, query_id);
+  // setup_workspace copies the descriptor to shared memory and returns base pointer to smem
+  // descriptor NOTE: setup_workspace must be called by ALL threads (it uses __syncthreads())
+  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* smem_desc =
+    setup_workspace<TeamSize,
+                    DatasetBlockDim,
+                    PQ_BITS,
+                    PQ_LEN,
+                    CodebookT,
+                    DataT,
+                    IndexT,
+                    DistanceT>(dataset_desc, smem, queries_ptr, query_id);
   __syncthreads();
 
   // Load args once for better performance (avoid repeated loads in the loop)
   using args_t = typename cuvs::neighbors::cagra::detail::
     dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t;
-  args_t args =
-    get_args<TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, DataT, IndexT, DistanceT>(
-      smem_desc);
-  IndexT dataset_size =
-    get_size<TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, DataT, IndexT, DistanceT>(
-      smem_desc);
+  args_t args         = smem_desc->args.load();
+  IndexT dataset_size = smem_desc->size;
 
   INDEX_T best_index_team_local;
   DISTANCE_T best_norm2_team_local = utils::get_max_value<DISTANCE_T>();
@@ -167,7 +157,7 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel_jit(
   DistanceT* const parent_distance_ptr,  // [num_queries, search_width]
   const std::size_t lds,
   const std::uint32_t search_width,
-  void* dataset_desc,                      // void* descriptor pointer (reconstructed in fragments)
+  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
   const IndexT* const neighbor_graph_ptr,  // [dataset_size, graph_degree]
   const std::uint32_t graph_degree,
   const SourceIndexT* source_indices_ptr,
@@ -182,15 +172,8 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel_jit(
   using INDEX_T    = IndexT;
   using DISTANCE_T = DistanceT;
 
-  // Get team_size_bits using accessor fragment (planner links the right fragment at runtime)
-  uint32_t team_size_bits = get_team_size_bitshift<TeamSize,
-                                                   DatasetBlockDim,
-                                                   PQ_BITS,
-                                                   PQ_LEN,
-                                                   CodebookT,
-                                                   DataT,
-                                                   IndexT,
-                                                   DistanceT>(dataset_desc);
+  // Get team_size_bits directly from base descriptor
+  uint32_t team_size_bits = dataset_desc->team_size_bitshift();
 
   const auto team_size      = 1u << team_size_bits;
   const uint32_t ldb        = hashmap::get_size(hash_bitlen);
@@ -200,16 +183,17 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel_jit(
 
   extern __shared__ uint8_t smem[];
   // Load a query using unified setup_workspace
-  // setup_workspace copies the descriptor to shared memory and returns void* to smem descriptor
-  // NOTE: setup_workspace must be called by ALL threads (it uses __syncthreads())
-  void* smem_desc = setup_workspace<TeamSize,
-                                    DatasetBlockDim,
-                                    PQ_BITS,
-                                    PQ_LEN,
-                                    CodebookT,
-                                    DataT,
-                                    IndexT,
-                                    DistanceT>(dataset_desc, smem, query_ptr, query_id);
+  // setup_workspace copies the descriptor to shared memory and returns base pointer to smem
+  // descriptor NOTE: setup_workspace must be called by ALL threads (it uses __syncthreads())
+  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* smem_desc =
+    setup_workspace<TeamSize,
+                    DatasetBlockDim,
+                    PQ_BITS,
+                    PQ_LEN,
+                    CodebookT,
+                    DataT,
+                    IndexT,
+                    DistanceT>(dataset_desc, smem, query_ptr, query_id);
 
   __syncthreads();
   if (global_team_id >= search_width * graph_degree) { return; }
@@ -238,9 +222,7 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel_jit(
   // Load args once for better performance (avoid repeated loads)
   using args_t = typename cuvs::neighbors::cagra::detail::
     dataset_descriptor_base_t<DataT, INDEX_T, DISTANCE_T>::args_t;
-  args_t args =
-    get_args<TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, DataT, IndexT, DistanceT>(
-      smem_desc);
+  args_t args = smem_desc->args.load();
 
   // CRITICAL: ALL threads in the team must participate in compute_distance and team_sum
   // Otherwise warp shuffles will hang. Each thread calls the unified extern function to get

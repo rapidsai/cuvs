@@ -42,7 +42,7 @@ using cuvs::neighbors::detail::sample_filter;
 using cuvs::neighbors::cagra::detail::device::compute_distance_to_child_nodes_jit;
 using cuvs::neighbors::cagra::detail::device::compute_distance_to_random_nodes_jit;
 
-// JIT version of search_kernel - uses extern functions with void* descriptor pointer
+// JIT version of search_kernel - uses dataset_descriptor_base_t* pointer
 // Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT
 // Filter is linked separately via JIT LTO, so we use none_sample_filter directly
 template <uint32_t TeamSize,
@@ -57,9 +57,9 @@ template <uint32_t TeamSize,
 __global__ __launch_bounds__(1024, 1) void search_kernel_jit(
   IndexT* const result_indices_ptr,       // [num_queries, num_cta_per_query, itopk_size]
   DistanceT* const result_distances_ptr,  // [num_queries, num_cta_per_query, itopk_size]
-  void* dataset_desc,                     // void* descriptor pointer (reconstructed in fragments)
-  const DataT* const queries_ptr,         // [num_queries, dataset_dim]
-  const IndexT* const knn_graph,          // [dataset_size, graph_degree]
+  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
+  const DataT* const queries_ptr,  // [num_queries, dataset_dim]
+  const IndexT* const knn_graph,   // [dataset_size, graph_degree]
   const uint32_t max_elements,
   const uint32_t graph_degree,
   const SourceIndexT* source_indices_ptr,  // [num_queries, search_width]
@@ -119,30 +119,22 @@ __global__ __launch_bounds__(1024, 1) void search_kernel_jit(
   const auto result_buffer_size_32 = raft::round_up_safe<uint32_t>(result_buffer_size, 32);
   assert(result_buffer_size_32 <= max_elements);
 
-  // Get dim and smem_ws_size_in_bytes using accessor fragments
-  // Planner links the right fragment (standard or VPQ) at runtime based on descriptor type
-  uint32_t dim =
-    get_dim<TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, DataT, IndexT, DistanceT>(
-      dataset_desc);
-  uint32_t smem_ws_size_in_bytes = get_smem_ws_size_in_bytes<TeamSize,
-                                                             DatasetBlockDim,
-                                                             PQ_BITS,
-                                                             PQ_LEN,
-                                                             CodebookT,
-                                                             DataT,
-                                                             IndexT,
-                                                             DistanceT>(dataset_desc, dim);
+  // Get dim and smem_ws_size_in_bytes directly from base descriptor
+  uint32_t dim                   = dataset_desc->args.dim;
+  uint32_t smem_ws_size_in_bytes = dataset_desc->smem_ws_size_in_bytes();
 
   // Set smem working buffer using unified setup_workspace
-  // Planner links the right fragment (standard or VPQ) at runtime based on descriptor type
-  void* smem_desc = setup_workspace<TeamSize,
-                                    DatasetBlockDim,
-                                    PQ_BITS,
-                                    PQ_LEN,
-                                    CodebookT,
-                                    DataT,
-                                    IndexT,
-                                    DistanceT>(dataset_desc, smem, queries_ptr, query_id);
+  // setup_workspace copies the descriptor to shared memory and returns base pointer to smem
+  // descriptor
+  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* smem_desc =
+    setup_workspace<TeamSize,
+                    DatasetBlockDim,
+                    PQ_BITS,
+                    PQ_LEN,
+                    CodebookT,
+                    DataT,
+                    IndexT,
+                    DistanceT>(dataset_desc, smem, queries_ptr, query_id);
 
   auto* __restrict__ result_indices_buffer =
     reinterpret_cast<INDEX_T*>(smem + smem_ws_size_in_bytes);

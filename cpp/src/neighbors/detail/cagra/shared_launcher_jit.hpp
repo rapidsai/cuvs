@@ -60,21 +60,13 @@ struct is_bitset_filter<cuvs::neighbors::filtering::bitset_filter<bitset_t, inde
   : std::true_type {};
 
 template <class SAMPLE_FILTER_T>
-std::string get_sample_filter_name(bool debug_output = false)
+std::string get_sample_filter_name()
 {
   using namespace cuvs::neighbors::filtering;
   using DecayedFilter = std::decay_t<SAMPLE_FILTER_T>;
 
-  if (debug_output) {
-    std::cerr << "[JIT] get_sample_filter_name called" << std::endl;
-    std::cerr << "[JIT] Type name: " << typeid(DecayedFilter).name() << std::endl;
-  }
-
   // First check for none_sample_filter (the only unwrapped case)
-  if constexpr (std::is_same_v<DecayedFilter, none_sample_filter>) {
-    if (debug_output) { std::cerr << "[JIT] Returning: filter_none_ui" << std::endl; }
-    return "filter_none_ui";
-  }
+  if constexpr (std::is_same_v<DecayedFilter, none_sample_filter>) { return "filter_none_ui"; }
 
   // All other filters are wrapped in CagraSampleFilterWithQueryIdOffset
   // Access the inner filter type via decltype
@@ -83,17 +75,11 @@ std::string get_sample_filter_name(bool debug_output = false)
     if constexpr (is_bitset_filter<InnerFilter>::value ||
                   std::is_same_v<InnerFilter, bitset_filter<uint32_t, int64_t>> ||
                   std::is_same_v<InnerFilter, bitset_filter<uint32_t, uint32_t>>) {
-      if (debug_output) {
-        std::cerr << "[JIT] Returning: filter_bitset_ui (via wrapped filter)" << std::endl;
-      }
       return "filter_bitset_ui";
     }
   }
 
   // Default to none filter for unknown types
-  if (debug_output) {
-    std::cerr << "[JIT] Returning: filter_none_ui (default/unknown)" << std::endl;
-  }
   return "filter_none_ui";
 }
 

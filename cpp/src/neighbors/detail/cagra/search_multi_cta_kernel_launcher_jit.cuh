@@ -60,14 +60,6 @@ void select_and_run_jit(
   SampleFilterT sample_filter,
   cudaStream_t stream)
 {
-  RAFT_LOG_INFO(
-    "[JIT LAUNCHER] Entering MULTI_CTA launcher (num_queries=%u, topk=%u, num_cta_per_query=%u, "
-    "result_buffer_size=%u, itopk_size=%zu)",
-    num_queries,
-    topk,
-    num_cta_per_query,
-    result_buffer_size,
-    ps.itopk_size);
   // Extract bitset data from filter object (if it's a bitset_filter)
   uint32_t* bitset_ptr        = nullptr;
   SourceIndexT bitset_len     = 0;
@@ -82,22 +74,13 @@ void select_and_run_jit(
     using InnerFilter = decltype(sample_filter.filter);
     // Always extract offset for wrapped filters
     query_id_offset = sample_filter.offset;
-    RAFT_LOG_INFO("Extracted query_id_offset: %u", query_id_offset);
     if constexpr (is_bitset_filter<InnerFilter>::value) {
       // Extract bitset data for bitset_filter (works for any bitset_filter instantiation)
       auto bitset_view = sample_filter.filter.view();
       bitset_ptr       = const_cast<uint32_t*>(bitset_view.data());
       bitset_len       = static_cast<SourceIndexT>(bitset_view.size());
       original_nbits   = static_cast<SourceIndexT>(bitset_view.get_original_nbits());
-      RAFT_LOG_INFO("Extracted bitset data: bitset_ptr=%p, bitset_len=%zu, original_nbits=%zu",
-                    bitset_ptr,
-                    static_cast<size_t>(bitset_len),
-                    static_cast<size_t>(original_nbits));
-    } else {
-      RAFT_LOG_INFO("InnerFilter is not bitset_filter, skipping bitset extraction");
     }
-  } else {
-    RAFT_LOG_INFO("Filter does not have wrapper members (.filter/.offset), skipping extraction");
   }
 
   // Create planner with tags
@@ -130,12 +113,6 @@ void select_and_run_jit(
     dataset_desc.pq_bits,
     dataset_desc.pq_len);
 
-  // Register descriptor accessor fragments first (needed for void* descriptor access)
-  planner.add_descriptor_accessor_device_functions(dataset_desc.team_size,
-                                                   dataset_desc.dataset_block_dim,
-                                                   dataset_desc.is_vpq,
-                                                   dataset_desc.pq_bits,
-                                                   dataset_desc.pq_len);
   planner.add_setup_workspace_device_function(dataset_desc.metric,
                                               dataset_desc.team_size,
                                               dataset_desc.dataset_block_dim,
@@ -150,20 +127,12 @@ void select_and_run_jit(
                                                dataset_desc.pq_len);
   std::string filter_name = get_sample_filter_name<SampleFilterT>();
   planner.add_sample_filter_device_function(filter_name);
-  RAFT_LOG_INFO("[JIT LAUNCHER] MULTI_CTA filter name: %s", filter_name.c_str());
 
   // Get launcher using the planner's entrypoint name and fragment key
   auto params   = make_fragment_key<DataTag, IndexTag, DistTag, SourceTag>();
   auto launcher = planner.get_launcher();
 
   if (!launcher) { RAFT_FAIL("Failed to get JIT launcher"); }
-
-  RAFT_LOG_INFO("[JIT LAUNCHER] MULTI_CTA launcher obtained (kernel handle: %p)",
-                launcher->get_kernel());
-
-  // Verify kernel handle is valid
-  cudaKernel_t kernel_handle = launcher->get_kernel();
-  if (kernel_handle == nullptr) { RAFT_FAIL("JIT launcher has null kernel handle"); }
 
   uint32_t max_elements{};
   if (result_buffer_size <= 64) {
@@ -190,17 +159,11 @@ void select_and_run_jit(
 
   dim3 block_dims(block_size, 1, 1);
   dim3 grid_dims(num_cta_per_query, num_queries, 1);
-  RAFT_LOG_DEBUG("Launching JIT multi_cta kernel with %u threads, (%u, %u) blocks %u smem",
-                 block_size,
-                 num_cta_per_query,
-                 num_queries,
-                 smem_size);
 
   // Get the device descriptor pointer
   const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dev_desc_base =
     dataset_desc.dev_ptr(stream);
   const auto* dev_desc = dev_desc_base;
-  if (dev_desc == nullptr) { RAFT_FAIL("Device descriptor pointer is NULL"); }
 
   // Note: dataset_desc is passed by const reference, so it stays alive for the duration of this
   // function The descriptor's state is managed by a shared_ptr internally, so no need to explicitly
@@ -220,41 +183,6 @@ void select_and_run_jit(
   const uint32_t max_iterations_u32        = static_cast<uint32_t>(ps.max_iterations);
   const unsigned num_random_samplings_u    = static_cast<unsigned>(ps.num_random_samplings);
 
-  RAFT_LOG_INFO(
-    "[JIT LAUNCHER] MULTI_CTA dispatch parameters: graph_degree=%u, traversed_hash_bitlen=%u, "
-    "itopk_size=%u, bitset_len=%u, original_nbits=%u, query_id_offset=%u",
-    graph_degree_u32,
-    traversed_hash_bitlen_u32,
-    itopk_size_u32,
-    static_cast<uint32_t>(bitset_len),
-    static_cast<uint32_t>(original_nbits),
-    query_id_offset);
-
-  // Validate critical pointers before dispatch
-  if (topk_indices_ptr == nullptr) { RAFT_FAIL("MULTI_CTA: topk_indices_ptr is NULL"); }
-  if (topk_distances_ptr == nullptr) { RAFT_FAIL("MULTI_CTA: topk_distances_ptr is NULL"); }
-  if (graph.data_handle() == nullptr) { RAFT_FAIL("MULTI_CTA: graph.data_handle() is NULL"); }
-  if (dev_desc == nullptr) { RAFT_FAIL("MULTI_CTA: dev_desc is NULL"); }
-  RAFT_LOG_INFO(
-    "[JIT LAUNCHER] MULTI_CTA pointer validation passed: topk_indices=%p, topk_distances=%p, "
-    "graph=%p, dev_desc=%p",
-    topk_indices_ptr,
-    topk_distances_ptr,
-    graph.data_handle(),
-    dev_desc);
-
-  // Log all critical parameters before dispatch to help diagnose issues
-  RAFT_LOG_INFO(
-    "[JIT LAUNCHER] MULTI_CTA pre-dispatch: num_queries=%u, topk=%u, num_cta_per_query=%u, "
-    "max_elements=%u, graph.extent(0)=%zu, graph.extent(1)=%zu",
-    num_queries,
-    topk,
-    num_cta_per_query,
-    max_elements,
-    graph.extent(0),
-    graph.extent(1));
-
-  RAFT_LOG_INFO("[JIT LAUNCHER] MULTI_CTA launching kernel on stream=%p", stream);
   launcher->dispatch(stream,
                      grid_dims,
                      block_dims,
@@ -283,42 +211,7 @@ void select_and_run_jit(
                      bitset_len,
                      original_nbits);
 
-  // Check for launch errors immediately
-  cudaError_t launch_err = cudaPeekAtLastError();
-  if (launch_err != cudaSuccess) {
-    RAFT_LOG_ERROR("[JIT LAUNCHER] MULTI_CTA kernel launch error detected: %s (error code: %d)",
-                   cudaGetErrorString(launch_err),
-                   launch_err);
-    RAFT_CUDA_TRY(launch_err);
-  }
-
-  // Synchronize to catch kernel execution errors before they propagate
-  // This ensures the kernel completes before we return, preventing parameter lifetime issues
-  cudaError_t sync_err = cudaStreamSynchronize(stream);
-  if (sync_err != cudaSuccess) {
-    RAFT_LOG_ERROR("[JIT LAUNCHER] MULTI_CTA kernel execution failed: %s (error code: %d)",
-                   cudaGetErrorString(sync_err),
-                   sync_err);
-    RAFT_LOG_ERROR(
-      "[JIT LAUNCHER] MULTI_CTA parameters: graph_degree=%u, itopk_size=%u, num_queries=%u, "
-      "topk=%u, num_cta_per_query=%u, max_elements=%u",
-      graph_degree_u32,
-      itopk_size_u32,
-      num_queries,
-      topk,
-      num_cta_per_query,
-      max_elements);
-    RAFT_LOG_ERROR(
-      "[JIT LAUNCHER] MULTI_CTA pointers: topk_indices=%p, topk_distances=%p, graph=%p, "
-      "dev_desc=%p",
-      topk_indices_ptr,
-      topk_distances_ptr,
-      graph.data_handle(),
-      dev_desc);
-    RAFT_CUDA_TRY(sync_err);
-  }
-
-  RAFT_LOG_INFO("[JIT LAUNCHER] MULTI_CTA kernel completed successfully");
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
 }  // namespace cuvs::neighbors::cagra::detail::multi_cta_search

@@ -84,7 +84,7 @@ using cuvs::neighbors::detail::sample_filter;
 using cuvs::neighbors::cagra::detail::device::compute_distance_to_child_nodes_jit;
 using cuvs::neighbors::cagra::detail::device::compute_distance_to_random_nodes_jit;
 
-// JIT version of search_core - uses extern functions with void* descriptor pointer
+// JIT version of search_core - uses dataset_descriptor_base_t* pointer
 // Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT
 // For standard descriptors: PQ_BITS=0, PQ_LEN=0, CodebookT=void
 // For VPQ descriptors: PQ_BITS>0, PQ_LEN>0, CodebookT=half
@@ -124,10 +124,10 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
   const std::uint32_t small_hash_reset_interval,
   const std::uint32_t query_id,
   const std::uint32_t query_id_offset,  // Offset to add to query_id when calling filter
-  void* dataset_desc,                   // void* descriptor pointer (reconstructed in fragments)
-  uint32_t* bitset_ptr,                 // Bitset data pointer (nullptr for none_filter)
-  SourceIndexT bitset_len,              // Bitset length
-  SourceIndexT original_nbits)          // Original number of bits
+  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
+  uint32_t* bitset_ptr,         // Bitset data pointer (nullptr for none_filter)
+  SourceIndexT bitset_len,      // Bitset length
+  SourceIndexT original_nbits)  // Original number of bits
 {
   using LOAD_T = device::LOAD_128BIT_T;
 
@@ -159,32 +159,22 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
   const auto result_buffer_size_32 = raft::round_up_safe<uint32_t>(result_buffer_size, 32);
   const auto small_hash_size       = hashmap::get_size(small_hash_bitlen);
 
-  // Get dim using accessor fragment (reconstructs descriptor from void*)
-  // Planner links the right fragment (standard or VPQ) at runtime based on descriptor type
-  uint32_t dim =
-    get_dim<TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, DataT, IndexT, DistanceT>(
-      dataset_desc);
-  uint32_t smem_ws_size_in_bytes = get_smem_ws_size_in_bytes<TeamSize,
-                                                             DatasetBlockDim,
-                                                             PQ_BITS,
-                                                             PQ_LEN,
-                                                             CodebookT,
-                                                             DataT,
-                                                             IndexT,
-                                                             DistanceT>(dataset_desc, dim);
+  // Get dim and smem_ws_size directly from base descriptor
+  uint32_t dim                   = dataset_desc->args.dim;
+  uint32_t smem_ws_size_in_bytes = dataset_desc->smem_ws_size_in_bytes();
 
   // Set smem working buffer using unified setup_workspace
-  // setup_workspace copies the descriptor to shared memory and returns void* to smem descriptor
-  // NOTE: setup_workspace must be called by ALL threads (it uses __syncthreads())
-  // Planner links the right fragment (standard or VPQ) at runtime based on descriptor type
-  void* smem_desc = setup_workspace<TeamSize,
-                                    DatasetBlockDim,
-                                    PQ_BITS,
-                                    PQ_LEN,
-                                    CodebookT,
-                                    DataT,
-                                    IndexT,
-                                    DistanceT>(dataset_desc, smem, queries_ptr, query_id);
+  // setup_workspace copies the descriptor to shared memory and returns base pointer to smem
+  // descriptor NOTE: setup_workspace must be called by ALL threads (it uses __syncthreads())
+  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* smem_desc =
+    setup_workspace<TeamSize,
+                    DatasetBlockDim,
+                    PQ_BITS,
+                    PQ_LEN,
+                    CodebookT,
+                    DataT,
+                    IndexT,
+                    DistanceT>(dataset_desc, smem, queries_ptr, query_id);
 
   auto* __restrict__ result_indices_buffer =
     reinterpret_cast<IndexT*>(smem + smem_ws_size_in_bytes);
@@ -220,10 +210,8 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
   // compute distance to randomly selecting nodes using JIT version
   _CLK_START();
   const IndexT* const local_seed_ptr = seed_ptr ? seed_ptr + (num_seeds * query_id) : nullptr;
-  // Get dataset_size using accessor fragment (planner links the right fragment at runtime)
-  IndexT dataset_size =
-    get_size<TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, DataT, IndexT, DistanceT>(
-      smem_desc);
+  // Get dataset_size directly from base descriptor
+  IndexT dataset_size = smem_desc->size;
   compute_distance_to_random_nodes_jit<TeamSize,
                                        DatasetBlockDim,
                                        PQ_BITS,
@@ -573,10 +561,10 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_jit(
   const std::uint32_t small_hash_bitlen,
   const std::uint32_t small_hash_reset_interval,
   const std::uint32_t query_id_offset,  // Offset to add to query_id when calling filter
-  void* dataset_desc,                   // void* descriptor pointer (reconstructed in fragments)
-  uint32_t* bitset_ptr,                 // Bitset data pointer (nullptr for none_filter)
-  SourceIndexT bitset_len,              // Bitset length
-  SourceIndexT original_nbits)          // Original number of bits
+  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
+  uint32_t* bitset_ptr,         // Bitset data pointer (nullptr for none_filter)
+  SourceIndexT bitset_len,      // Bitset length
+  SourceIndexT original_nbits)  // Original number of bits
 {
   const auto query_id = blockIdx.y;
   search_core<TOPK_BY_BITONIC_SORT,
@@ -664,10 +652,10 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_p_jit(
   const std::uint32_t small_hash_bitlen,
   const std::uint32_t small_hash_reset_interval,
   const std::uint32_t query_id_offset,  // Offset to add to query_id when calling filter
-  void* dataset_desc,                   // void* descriptor pointer (reconstructed in fragments)
-  uint32_t* bitset_ptr,                 // Bitset data pointer (nullptr for none_filter)
-  SourceIndexT bitset_len,              // Bitset length
-  SourceIndexT original_nbits)          // Original number of bits
+  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
+  uint32_t* bitset_ptr,         // Bitset data pointer (nullptr for none_filter)
+  SourceIndexT bitset_len,      // Bitset length
+  SourceIndexT original_nbits)  // Original number of bits
 {
   using job_desc_type = job_desc_t<job_desc_jit_helper_desc<DataT, IndexT, DistanceT>>;
   __shared__ typename job_desc_type::input_t job_descriptor;
