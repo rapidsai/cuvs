@@ -11,14 +11,12 @@
 #include <iostream>
 #include <string>
 
-inline std::string bool_to_string(bool b) { return b ? "true" : "false"; }
-
 template <typename... Args>
 struct InterleavedScanPlanner : AlgorithmPlanner {
   InterleavedScanPlanner(int Capacity, int Veclen, bool Ascending, bool ComputeNorm)
-    : AlgorithmPlanner("interleaved_scan_kernel_" + std::to_string(Capacity) + "_" +
-                         std::to_string(Veclen) + "_" + bool_to_string(Ascending) + "_" +
-                         bool_to_string(ComputeNorm),
+    : AlgorithmPlanner("interleaved_scan_kernel_capacity_" + std::to_string(Capacity) + "_veclen_" +
+                         std::to_string(Veclen) + "_" + (Ascending ? "ascending" : "descending") +
+                         "_" + (ComputeNorm ? "compute_norm" : "no_compute_norm"),
                        make_fragment_key<Args...>())
   {
   }
@@ -26,7 +24,7 @@ struct InterleavedScanPlanner : AlgorithmPlanner {
   template <typename... FuncTags>
   void add_metric_device_function(std::string metric_name, int Veclen)
   {
-    auto key    = metric_name + "_" + std::to_string(Veclen);
+    auto key    = metric_name + "_veclen_" + std::to_string(Veclen);
     auto params = make_fragment_key<FuncTags...>();
     this->device_functions.push_back(key + "_" + params);
   }
