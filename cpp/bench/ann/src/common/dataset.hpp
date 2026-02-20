@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -46,6 +46,7 @@ struct dataset {
   blob<DataT> query_set_;
   std::optional<blob<IdxT>> ground_truth_set_;
   std::optional<blob<bitset_carrier_type>> filter_bitset_;
+
   // Protects the lazy mutations of the blobs accessed by multiple threads
   mutable std::mutex mutex_;
   // The dim can be read either from the training set or from the query set.
