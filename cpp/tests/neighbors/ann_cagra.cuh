@@ -286,6 +286,7 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
       case cuvs::distance::DistanceType::L2Expanded: return "L2";
       case cuvs::distance::DistanceType::BitwiseHamming: return "BitwiseHamming";
       case cuvs::distance::DistanceType::CosineExpanded: return "Cosine";
+      case cuvs::distance::DistanceType::L1: return "L1";
       default: break;
     }
     return "Unknown";
@@ -341,6 +342,9 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
     // distance, making it impossible to make a top-k ground truth.
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
+      GTEST_SKIP();
+    if (ps.metric == cuvs::distance::DistanceType::L1 &&
+        ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)
       GTEST_SKIP();
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.compression.has_value()) { GTEST_SKIP(); }
@@ -532,6 +536,9 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
  protected:
   void testCagra()
   {
+    if (ps.metric == cuvs::distance::DistanceType::L1 &&
+        ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)
+      GTEST_SKIP();
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.compression.has_value()) { GTEST_SKIP(); }
       if (ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH || ps.dim == 1) {
@@ -745,6 +752,9 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
  protected:
   void testCagra()
   {
+    if (ps.metric == cuvs::distance::DistanceType::L1 &&
+        ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)
+      GTEST_SKIP();
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.compression.has_value()) { GTEST_SKIP(); }
       if (ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH || ps.dim == 1) {
@@ -964,6 +974,9 @@ class AnnCagraIndexFilteredMergeTest : public ::testing::TestWithParam<AnnCagraI
   template <typename SearchIdxT = IdxT>
   void testCagra()
   {
+    if (ps.metric == cuvs::distance::DistanceType::L1 &&
+        ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)
+      GTEST_SKIP();
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH || ps.dim == 1) {
         GTEST_SKIP();
@@ -1205,6 +1218,9 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
   template <typename SearchIdxT = IdxT>
   void testCagra()
   {
+    if (ps.metric == cuvs::distance::DistanceType::L1 &&
+        ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)
+      GTEST_SKIP();
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH || ps.dim == 1) {
         GTEST_SKIP();
@@ -1419,7 +1435,8 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {cuvs::distance::DistanceType::L2Expanded,
      cuvs::distance::DistanceType::InnerProduct,
      cuvs::distance::DistanceType::BitwiseHamming,
-     cuvs::distance::DistanceType::CosineExpanded},
+     cuvs::distance::DistanceType::CosineExpanded,
+     cuvs::distance::DistanceType::L1},
     {false},
     {true},
     {true, false},
@@ -1443,7 +1460,8 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {cuvs::distance::DistanceType::L2Expanded,
      cuvs::distance::DistanceType::InnerProduct,
      cuvs::distance::DistanceType::BitwiseHamming,
-     cuvs::distance::DistanceType::CosineExpanded},
+     cuvs::distance::DistanceType::CosineExpanded,
+     cuvs::distance::DistanceType::L1},
     {false},
     {true},
     {false},
@@ -1468,7 +1486,8 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1},
     {cuvs::distance::DistanceType::InnerProduct,
      cuvs::distance::DistanceType::BitwiseHamming,
-     cuvs::distance::DistanceType::CosineExpanded},
+     cuvs::distance::DistanceType::CosineExpanded,
+     cuvs::distance::DistanceType::L1},
     {false},
     {true},
     {false},
@@ -1519,7 +1538,8 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1},
     {cuvs::distance::DistanceType::L2Expanded,
      cuvs::distance::DistanceType::InnerProduct,
-     cuvs::distance::DistanceType::BitwiseHamming},
+     cuvs::distance::DistanceType::BitwiseHamming,
+     cuvs::distance::DistanceType::L1},
     {false},
     {true},
     {false},
@@ -1548,7 +1568,8 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {cuvs::distance::DistanceType::L2Expanded,
      cuvs::distance::DistanceType::InnerProduct,
      cuvs::distance::DistanceType::BitwiseHamming,
-     cuvs::distance::DistanceType::CosineExpanded},
+     cuvs::distance::DistanceType::CosineExpanded,
+     cuvs::distance::DistanceType::L1},
     {false},
     {false},
     {false},
@@ -1575,7 +1596,8 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {cuvs::distance::DistanceType::L2Expanded,
      cuvs::distance::DistanceType::InnerProduct,
      cuvs::distance::DistanceType::BitwiseHamming,
-     cuvs::distance::DistanceType::CosineExpanded},
+     cuvs::distance::DistanceType::CosineExpanded,
+     cuvs::distance::DistanceType::L1},
     {false},
     {false},
     {false},
@@ -1717,7 +1739,8 @@ inline std::vector<AnnCagraInputs> generate_addnode_inputs()
                                                    {1},
                                                    {cuvs::distance::DistanceType::L2Expanded,
                                                     cuvs::distance::DistanceType::InnerProduct,
-                                                    cuvs::distance::DistanceType::BitwiseHamming},
+                                                    cuvs::distance::DistanceType::BitwiseHamming,
+                                                    cuvs::distance::DistanceType::L1},
                                                    {false},
                                                    {true},
                                                    {true},
