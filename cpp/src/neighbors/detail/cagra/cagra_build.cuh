@@ -1990,7 +1990,6 @@ void search_and_optimize(raft::resources const& res,
 {
   // Search.
   // Since there are many queries, divide them into batches and search them.
-  RAFT_LOG_DEBUG("search_and_optimize: search_params.max_node_id=%u", search_params.max_node_id);
   cuvs::spatial::knn::detail::utils::batch_load_iterator<T> query_batch(
     dev_query_view.data_handle(),
     curr_query_size,
@@ -2024,7 +2023,7 @@ void search_and_optimize(raft::resources const& res,
   // Optimize graph
   auto next_graph_size = curr_query_size;
   cagra_graph          = raft::make_host_matrix<IdxT, int64_t>(0, 0);  // delete existing grahp
-  cagra_graph = raft::make_host_matrix<IdxT, int64_t>(next_graph_size, next_graph_degree);
+  cagra_graph          = raft::make_host_matrix<IdxT, int64_t>(next_graph_size, next_graph_degree);
   optimize<IdxT>(
     res, neighbors_view, cagra_graph.view(), flag_last ? params.guarantee_connectivity : 0);
 }
@@ -2125,15 +2124,15 @@ auto iterative_build_graph(
   if (params.compression.has_value()) {
     auto start = std::chrono::high_resolution_clock::now();
     RAFT_EXPECTS(params.metric == cuvs::distance::DistanceType::L2Expanded,
-      "VPQ compression is only supported with L2Expanded distance mertric");
+                 "VPQ compression is only supported with L2Expanded distance mertric");
     idx_opt.emplace(res, params.metric);
-    //idx_opt->update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
+    // idx_opt->update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
     idx_opt->update_dataset(
-    res,
-    // TODO: hardcoding codebook math to `half`, we can do runtime dispatching later
-    cuvs::neighbors::vpq_build<decltype(dev_dataset), half, int64_t>(
-    res, *params.compression, dev_dataset));
-    auto end = std::chrono::high_resolution_clock::now();
+      res,
+      // TODO: hardcoding codebook math to `half`, we can do runtime dispatching later
+      cuvs::neighbors::vpq_build<decltype(dev_dataset), half, int64_t>(
+        res, *params.compression, dev_dataset));
+    auto end        = std::chrono::high_resolution_clock::now();
     auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     RAFT_LOG_INFO("# VPQ compression time: %.3lf sec", (double)elapsed_ms / 1000);
   }
@@ -2148,25 +2147,28 @@ auto iterative_build_graph(
     // pruning is not used except in the last iteration.
     // (*) The appropriate setting for itopk_size requires careful consideration.
     auto curr_topk       = next_graph_degree + 1;
-    auto curr_itopk_size = next_graph_degree + 32;
+    auto curr_itopk_size = std::max(next_graph_degree + 32, (uint64_t)128);
     if (flag_last) {
       curr_topk       = topk;
       curr_itopk_size = curr_topk + 32;
     }
 
-    RAFT_LOG_INFO(
-      "# graph_size = %lu (%.3lf), graph_degree = %lu, query_size = %lu, itopk = %lu, topk = %lu",
-      (uint64_t)cagra_graph.extent(0),
-      (double)cagra_graph.extent(0) / final_graph_size,
-      (uint64_t)cagra_graph.extent(1),
-      (uint64_t)curr_query_size,
-      (uint64_t)curr_itopk_size,
-      (uint64_t)curr_topk);
+    // RAFT_LOG_INFO(
+    //   "# graph_size = %lu (%.3lf), graph_degree = %lu, query_size = %lu, itopk = %lu, topk =
+    //   %lu", (uint64_t)cagra_graph.extent(0), (double)cagra_graph.extent(0) / final_graph_size,
+    //   (uint64_t)cagra_graph.extent(1),
+    //   (uint64_t)curr_query_size,
+    //   (uint64_t)curr_itopk_size,
+    //   (uint64_t)curr_topk);
 
     cuvs::neighbors::cagra::search_params search_params;
-    search_params.algo        = cuvs::neighbors::cagra::search_algo::AUTO;
-    search_params.max_queries = max_chunk_size;
-    search_params.itopk_size  = curr_itopk_size;
+    search_params.algo           = cuvs::neighbors::cagra::search_algo::AUTO;
+    search_params.max_queries    = max_chunk_size;
+    search_params.itopk_size     = curr_itopk_size;
+    search_params.max_iterations = 8;
+    search_params.search_width   = 1;
+    // This fails. Why?
+    // search_params.persistent = true;
 
     // Create an index (idx), a query view (dev_query_view), and a mdarray for
     // search results (neighbors).
@@ -2174,7 +2176,8 @@ auto iterative_build_graph(
       dev_dataset.data_handle(), (int64_t)curr_graph_size, dev_dataset.extent(1));
     // No compression, create mdspan index
     if (!params.compression.has_value()) {
-      idx_opt.emplace(res, params.metric, dev_dataset_view, raft::make_const_mdspan(cagra_graph.view()));
+      idx_opt.emplace(
+        res, params.metric, dev_dataset_view, raft::make_const_mdspan(cagra_graph.view()));
     } else {
       idx_opt->update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
     }
@@ -2185,11 +2188,6 @@ auto iterative_build_graph(
 
     auto neighbors_view =
       raft::make_host_matrix_view<IdxT, int64_t>(neighbors_ptr, curr_query_size, curr_topk);
-
-    // Set max_node_id to constrain random seed selection to valid graph nodes
-    search_params.max_node_id = static_cast<uint32_t>(curr_graph_size);
-    RAFT_LOG_DEBUG("iterative_build: Setting search_params.max_node_id=%u (curr_graph_size=%lu)",
-                   search_params.max_node_id, curr_graph_size);
 
     search_and_optimize(res,
                         search_params,
@@ -2208,12 +2206,12 @@ auto iterative_build_graph(
 
     auto end        = std::chrono::high_resolution_clock::now();
     auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    RAFT_LOG_INFO("# elapsed time: %.3lf sec", (double)elapsed_ms / 1000);
+    RAFT_LOG_DEBUG("# elapsed time: %.3lf sec", (double)elapsed_ms / 1000);
 
     if (flag_last) { break; }
-    flag_last       = (curr_graph_size == final_graph_size);
+    flag_last            = (curr_graph_size == final_graph_size);
     auto next_graph_size = curr_query_size;
-    curr_graph_size = next_graph_size;
+    curr_graph_size      = next_graph_size;
   }
 
   return cagra_graph;
