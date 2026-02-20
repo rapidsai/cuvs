@@ -39,6 +39,7 @@ IDENTIFIER_RE: re.Pattern = re.compile(r"^(?P<underscores>_*)(?P<rest>.*)$")
 
 
 def iterate_matrix_product(
+    *,
     matrix: "Matrix",
     warn_unused=True,
     warn_used=True,
@@ -231,7 +232,7 @@ if __name__ == "__main__":
     json.dump(
         list(
             iterate_matrix_product(
-                matrix,
+                matrix=matrix,
                 warn_unused=namespace.warn_unused,
                 warn_used=namespace.warn_used,
             )

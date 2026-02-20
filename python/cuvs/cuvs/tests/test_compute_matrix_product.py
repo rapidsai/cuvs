@@ -14,28 +14,23 @@ if TYPE_CHECKING:
     MatrixValue = None | bool | int | float | str
     Matrix = MatrixValue | list["Matrix"] | dict[str, "Matrix"]
 
-try:
-    compute_matrix_product_script = runpy.run_path(
-        str(
-            pathlib.Path(__file__).parent
-            / "../../../../cpp/cmake/modules/compute_matrix_product.py"
-        )
+compute_matrix_product_script = runpy.run_path(
+    str(
+        pathlib.Path(__file__).parent
+        / "../../../../cpp/cmake/modules/compute_matrix_product.py"
     )
-except FileNotFoundError:
-    pytest.skip(
-        "Could not find compute_matrix_product.py", allow_module_level=True
-    )
-else:
-    iterate_matrix_product: "Callable[[Matrix], Generator[dict[str, MatrixValue]]]" = compute_matrix_product_script[
-        "iterate_matrix_product"
-    ]
-    NoKeyError: type[ValueError] = compute_matrix_product_script["NoKeyError"]
-    UnusedKeyWarning: type[UserWarning] = compute_matrix_product_script[
-        "UnusedKeyWarning"
-    ]
-    UsedKeyWarning: type[UserWarning] = compute_matrix_product_script[
-        "UsedKeyWarning"
-    ]
+)
+
+iterate_matrix_product: "Callable[[Matrix], Generator[dict[str, MatrixValue]]]" = compute_matrix_product_script[
+    "iterate_matrix_product"
+]
+NoKeyError: type[ValueError] = compute_matrix_product_script["NoKeyError"]
+UnusedKeyWarning: type[UserWarning] = compute_matrix_product_script[
+    "UnusedKeyWarning"
+]
+UsedKeyWarning: type[UserWarning] = compute_matrix_product_script[
+    "UsedKeyWarning"
+]
 
 
 @pytest.mark.parametrize(
@@ -251,7 +246,7 @@ def test_iterate_matrix_product(
         assert (
             list(
                 iterate_matrix_product(
-                    matrix, warn_unused=warn_unused, warn_used=warn_used
+                    matrix=matrix, warn_unused=warn_unused, warn_used=warn_used
                 )
             )
             == expected_product
