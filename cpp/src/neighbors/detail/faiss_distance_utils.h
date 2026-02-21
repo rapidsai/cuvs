@@ -1,6 +1,6 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) Facebook, Inc. and its affiliates.
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0 AND MIT
  */
 
@@ -12,6 +12,9 @@
  */
 
 #pragma once
+
+#include <algorithm>
+#include <rmm/cuda_device.hpp>
 
 namespace cuvs::neighbors::detail::faiss_select {
 // If the inner size (dim) of the vectors is small, we want a larger query tile
