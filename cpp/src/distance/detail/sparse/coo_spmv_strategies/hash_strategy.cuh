@@ -12,8 +12,8 @@
 #include <raft/util/cuda_dev_essentials.cuh>
 
 #include <cuco/static_map.cuh>
+#include <cuda/iterator>
 #include <thrust/copy.h>
-#include <thrust/iterator/counting_iterator.h>
 
 #include <cooperative_groups.h>
 #include <rmm/device_uvector.hpp>
@@ -68,16 +68,16 @@ class hash_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
     auto policy = raft::resource::get_thrust_policy(this->config.handle);
 
     auto less                   = thrust::copy_if(policy,
-                                thrust::make_counting_iterator(value_idx(0)),
-                                thrust::make_counting_iterator(n_rows),
+                                cuda::make_counting_iterator(value_idx(0)),
+                                cuda::make_counting_iterator(n_rows),
                                 mask_indptr.data(),
                                 fits_in_hash_table(indptr, 0, capacity_threshold * map_size));
     std::get<0>(n_rows_divided) = less - mask_indptr.data();
 
     auto more = thrust::copy_if(
       policy,
-      thrust::make_counting_iterator(value_idx(0)),
-      thrust::make_counting_iterator(n_rows),
+      cuda::make_counting_iterator(value_idx(0)),
+      cuda::make_counting_iterator(n_rows),
       less,
       fits_in_hash_table(
         indptr, capacity_threshold * map_size, std::numeric_limits<value_idx>::max()));

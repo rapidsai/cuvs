@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,7 +17,6 @@
 
 #include <thrust/copy.h>
 #include <thrust/device_ptr.h>
-#include <thrust/iterator/counting_iterator.h>
 
 #include <fstream>
 
