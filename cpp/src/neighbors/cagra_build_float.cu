@@ -17,6 +17,11 @@ namespace cuvs::neighbors::cagra {
     cuvs::neighbors::cagra::build_knn_graph<T, IdxT>(handle, dataset, knn_graph, params); \
   }                                                                                       \
                                                                                           \
+  template auto build(raft::resources const& handle,                                      \
+             const cuvs::neighbors::cagra::index_params& params,                          \
+             strided_dataset<T, int64_t> const& dataset)                                  \
+    -> cuvs::neighbors::cagra::index<T, IdxT>;                                            \
+                                                                                          \
   auto build(raft::resources const& handle,                                               \
              const cuvs::neighbors::cagra::index_params& params,                          \
              raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)         \
