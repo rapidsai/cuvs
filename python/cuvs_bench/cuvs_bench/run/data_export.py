@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 
@@ -213,9 +213,10 @@ def convert_json_to_csv_search(dataset, dataset_path):
                     write["build GPU"] = None
                 for col_idx in range(start_idx, len(build_df.columns)):
                     col_name = build_df.columns[col_idx]
-                    write[col_name] = None
                     if col_name == "num_threads":
                         write["build_num_threads"] = None
+                    else:
+                        write[col_name] = None
                 for s_index, search_row in write.iterrows():
                     for b_index, build_row in build_df.iterrows():
                         if search_row["index_name"] == build_row["index_name"]:
