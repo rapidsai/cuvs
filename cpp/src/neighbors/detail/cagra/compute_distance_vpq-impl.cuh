@@ -1,11 +1,12 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
 #include "compute_distance_vpq.hpp"
+#include "distance_op.cuh"
 
 #include <cuvs/distance/distance.hpp>
 #include <raft/util/integer_utils.hpp>
@@ -281,8 +282,8 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
                         pq_codebook_ptr +
                           sizeof(CODE_BOOK_T) * ((1 << PQ_BITS) * 2 * m + (2 * (pq_code & 0xff))));
             // L2 distance
-            auto dist = q2 - c2 - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[d1];
-            dist      = dist * dist;
+            half2 dist = dist_op<half2, DescriptorT::kMetric>(
+              q2, c2 + reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[d1]);
             norm += static_cast<DISTANCE_T>(dist.x + dist.y);
           }
           pq_code >>= 8;
@@ -315,12 +316,12 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
             const std::uint32_t d1 = m + (PQ_LEN * v);
             const std::uint32_t d  = d1 + (PQ_LEN * k);
             // if (d >= dataset_dim) break;
-            DISTANCE_T diff;
-            device::lds(diff, query_ptr + sizeof(QUERY_T) * d);
-            diff -= static_cast<DISTANCE_T>(pq_vals[m]);
-            diff -=
+            DISTANCE_T q;
+            device::lds(q, query_ptr + sizeof(QUERY_T) * d);
+            DISTANCE_T c = static_cast<DISTANCE_T>(pq_vals[m]);
+            c +=
               static_cast<DISTANCE_T>(reinterpret_cast<CODE_BOOK_T(&)[PQ_LEN * vlen]>(vq_vals)[d1]);
-            norm += diff * diff;
+            norm += dist_op<DISTANCE_T>(q, c);
           }
           pq_code >>= 8;
         }

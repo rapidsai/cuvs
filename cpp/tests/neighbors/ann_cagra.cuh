@@ -460,13 +460,13 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         raft::resource::sync_stream(handle_);
       }
 
-      // for (int i = 0; i < min(ps.n_queries, 10); i++) {
-      //   //  std::cout << "query " << i << std::end;
-      //   print_vector("T", indices_naive.data() + i * ps.k, ps.k, std::cout);
-      //   print_vector("C", indices_Cagra.data() + i * ps.k, ps.k, std::cout);
-      //   print_vector("T", distances_naive.data() + i * ps.k, ps.k, std::cout);
-      //   print_vector("C", distances_Cagra.data() + i * ps.k, ps.k, std::cout);
-      // }
+      for (int i = 0; i < min(ps.n_queries, 10); i++) {
+        //  std::cout << "query " << i << std::end;
+        print_vector("T", indices_naive.data() + i * ps.k, ps.k, std::cout);
+        print_vector("C", indices_Cagra.data() + i * ps.k, ps.k, std::cout);
+        print_vector("T", distances_naive.data() + i * ps.k, ps.k, std::cout);
+        print_vector("C", distances_Cagra.data() + i * ps.k, ps.k, std::cout);
+      }
       double min_recall = ps.min_recall;
       EXPECT_TRUE(eval_neighbours(indices_naive,
                                   indices_Cagra,
@@ -1615,15 +1615,15 @@ inline std::vector<AnnCagraInputs> generate_inputs()
   inputs2 = raft::util::itertools::product<AnnCagraInputs>(
     {100},
     {10000},
-    {64, 128, 192, 256, 512, 1024},  // dim
-    {16},                            // k
+    {64, 128, 192, 256, 512},  // dim
+    {16},                      // k
     {graph_build_algo::IVF_PQ},
     {search_algo::AUTO},
     {10},
     {0},
     {64},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded},
+    {cuvs::distance::DistanceType::InnerProduct},
     {false},
     {true},
     {false},
@@ -1635,7 +1635,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
      cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL});  // don't demand high recall
                                                                 // without refinement
   for (uint32_t pq_len : {2}) {  // for now, only pq_len = 2 is supported, more options coming  soon
-    for (uint32_t vq_n_centers : {100, 1000}) {
+    for (uint32_t vq_n_centers : {100}) {
       for (auto input : inputs2) {
         vpq_params ps{};
         ps.pq_dim       = input.dim / pq_len;

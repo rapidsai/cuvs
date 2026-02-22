@@ -184,7 +184,7 @@ auto train_vq(const raft::resources& res, const vpq_params& params, const Datase
   using kmeans_in_type = typename DatasetT::value_type;
   cuvs::cluster::kmeans::balanced_params kmeans_params;
   kmeans_params.n_iters = params.kmeans_n_iters;
-  kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
+  kmeans_params.metric  = params.metric;
   auto vq_centers_view =
     raft::make_device_matrix_view<MathT, ix_t>(vq_centers.data_handle(), vq_n_centers, dim);
   auto vq_trainset_view = raft::make_device_matrix_view<const kmeans_in_type, ix_t>(
@@ -198,7 +198,9 @@ template <typename LabelT, typename DatasetT, typename VqCentersT>
 auto predict_vq(const raft::resources& res,
                 const DatasetT& dataset,
                 const VqCentersT& vq_centers,
+                cuvs::distance::DistanceType metric,
                 raft::device_vector_view<LabelT, typename DatasetT::index_type> vq_labels)
+  -> raft::device_vector<LabelT, typename DatasetT::index_type>
 {
   using kmeans_data_type = typename DatasetT::value_type;
   using kmeans_math_type = typename VqCentersT::value_type;
@@ -206,7 +208,7 @@ auto predict_vq(const raft::resources& res,
   using label_type       = LabelT;
 
   cuvs::cluster::kmeans::balanced_params kmeans_params;
-  kmeans_params.metric = cuvs::distance::DistanceType::L2Expanded;
+  kmeans_params.metric = metric;
 
   auto vq_centers_view = raft::make_device_matrix_view<const kmeans_math_type, index_type>(
     vq_centers.data_handle(), vq_centers.extent(0), vq_centers.extent(1));
@@ -907,6 +909,8 @@ auto vpq_build(const raft::resources& res, const vpq_params& params, const Datas
   using label_t = uint32_t;
   // Use a heuristic to impute missing parameters.
   auto ps = fill_missing_params_heuristics(params, dataset);
+
+  RAFT_LOG_INFO("ps.metric %d", ps.metric);
 
   // Train codes
   auto vq_code_book = train_vq<MathT>(res, ps, dataset);

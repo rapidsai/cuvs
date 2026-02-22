@@ -5,6 +5,7 @@
 #pragma once
 
 #include "compute_distance_standard.hpp"
+#include "distance_op.cuh"
 
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/operators.hpp>
