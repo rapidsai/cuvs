@@ -8,6 +8,7 @@
 //
 
 // This file implements `SearcherGPU::SearchClusterQueryPairsQuantizeQuery`.
+#include "../../detail/smem_utils.cuh"
 #include "../../ivf_flat/ivf_flat_interleaved_scan.cuh"
 #include "../utils/searcher_gpu_utils.hpp"
 #include "searcher_gpu.cuh"
@@ -1853,48 +1854,40 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
 
   if (!use_4bit) {
     if (cur_ivf.get_ex_bits() != 0) {
-      auto kernel = use_block_sort ? computeInnerProductsWithBitwiseOpt8bitBlockSort
-                                   : computeInnerProductsWithBitwiseOpt;
-      auto status =
-        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size);
-      RAFT_EXPECTS(status == cudaSuccess,
-                   "Failed to set max dynamic shared memory size to %zu bytes. Increasing the "
-                   "`n_lists` parameter may reduce shared memory usage.",
-                   shared_mem_size);
-      kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
+      auto kernel                 = use_block_sort ? computeInnerProductsWithBitwiseOpt8bitBlockSort
+                                                   : computeInnerProductsWithBitwiseOpt;
+      auto const& kernel_launcher = [&](auto const& kernel) -> void {
+        kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
+      };
+      cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
+        kernel, shared_mem_size, kernel_launcher);
     } else {
       auto kernel = use_block_sort ? computeInnerProductsWithBitwiseOpt8bitNoEXBlockSort
                                    : computeInnerProductsWithBitwiseOptNoEX;
-      auto status =
-        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size);
-      RAFT_EXPECTS(status == cudaSuccess,
-                   "Failed to set max dynamic shared memory size to %zu bytes. Increasing the "
-                   "`n_lists` parameter may reduce shared memory usage.",
-                   shared_mem_size);
-      kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
+      auto const& kernel_launcher = [&](auto const& kernel) -> void {
+        kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
+      };
+      cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
+        kernel, shared_mem_size, kernel_launcher);
     }
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   } else {
     if (cur_ivf.get_ex_bits() != 0) {
-      auto kernel = use_block_sort ? computeInnerProductsWithBitwiseOpt4bitBlockSort
-                                   : computeInnerProductsWithBitwiseOpt;
-      auto status =
-        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size);
-      RAFT_EXPECTS(status == cudaSuccess,
-                   "Failed to set max dynamic shared memory size to %zu bytes. Increasing the "
-                   "`n_lists` parameter may reduce shared memory usage.",
-                   shared_mem_size);
-      kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
+      auto kernel                 = use_block_sort ? computeInnerProductsWithBitwiseOpt4bitBlockSort
+                                                   : computeInnerProductsWithBitwiseOpt;
+      auto const& kernel_launcher = [&](auto const& kernel) -> void {
+        kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
+      };
+      cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
+        kernel, shared_mem_size, kernel_launcher);
     } else {
       auto kernel = use_block_sort ? computeInnerProductsWithBitwiseOpt4bitNoEXBlockSort
                                    : computeInnerProductsWithBitwiseOptNoEX;
-      auto status =
-        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size);
-      RAFT_EXPECTS(status == cudaSuccess,
-                   "Failed to set max dynamic shared memory size to %zu bytes. Increasing the "
-                   "`n_lists` parameter may reduce shared memory usage.",
-                   shared_mem_size);
-      kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
+      auto const& kernel_launcher = [&](auto const& kernel) -> void {
+        kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
+      };
+      cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
+        kernel, shared_mem_size, kernel_launcher);
     }
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }

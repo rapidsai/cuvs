@@ -8,6 +8,7 @@
 //
 
 // This file implements `SearcherGPU::SearchClusterQueryPairs`.
+#include "../../detail/smem_utils.cuh"
 #include "../../ivf_flat/ivf_flat_interleaved_scan.cuh"
 #include "../utils/memory.hpp"
 #include "../utils/searcher_gpu_utils.hpp"
@@ -1060,13 +1061,11 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
       use_block_sort ? computeInnerProductsWithLUTBlockSort : computeInnerProductsWithLUT;
     size_t shared_mem_size =
       num_chunks * LUT_SIZE * sizeof(float) + candidate_storage + queue_buffer_smem_bytes;
-    auto status =
-      cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size);
-    RAFT_EXPECTS(status == cudaSuccess,
-                 "Failed to set max dynamic shared memory size to %zu bytes. Increasing the "
-                 "`n_lists` parameter may reduce shared memory usage.",
-                 shared_mem_size);
-    kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
+    auto const& kernel_launcher = [&](auto const& kernel) -> void {
+      kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
+    };
+    cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
+      kernel, shared_mem_size, kernel_launcher);
   } else {
     auto kernel =
       use_block_sort ? computeInnerProductsWithLUTNoEXBlockSort : computeInnerProductsWithLUTNoEX;
@@ -1074,13 +1073,11 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
       max(num_chunks * LUT_SIZE * sizeof(float) +
             (use_block_sort ? max_cluster_size * (sizeof(float) + sizeof(int)) : 0),
           (size_t)queue_buffer_smem_bytes);
-    auto status =
-      cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem_size);
-    RAFT_EXPECTS(status == cudaSuccess,
-                 "Failed to set max dynamic shared memory size to %zu bytes. Increasing the "
-                 "`n_lists` parameter may reduce shared memory usage.",
-                 shared_mem_size);
-    kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
+    auto const& kernel_launcher = [&](auto const& kernel) -> void {
+      kernel<<<gridDim, blockDim, shared_mem_size, stream_>>>(kernelParams);
+    };
+    cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
+      kernel, shared_mem_size, kernel_launcher);
   }
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
