@@ -17,6 +17,7 @@
 #include <raft/linalg/detail/cublaslt_wrappers.hpp>
 #include <raft/matrix/select_k.cuh>
 
+#include <cub/device/device_histogram.cuh>
 #include <thrust/sort.h>
 
 #include <cuda_runtime.h>

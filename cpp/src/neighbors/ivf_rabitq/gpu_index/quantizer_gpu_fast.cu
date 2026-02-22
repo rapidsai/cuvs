@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -18,6 +18,8 @@
 #include <raft/linalg/norm_types.hpp>
 #include <raft/linalg/normalize.cuh>
 #include <raft/random/rng.cuh>
+
+#include <cub/device/device_reduce.cuh>
 
 #include <queue>
 
