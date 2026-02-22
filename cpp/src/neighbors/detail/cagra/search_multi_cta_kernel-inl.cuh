@@ -26,6 +26,7 @@
 
 // TODO: This shouldn't be invoking anything from spatial/knn
 #include "../ann_utils.cuh"
+#include "../smem_utils.cuh"
 
 #include <raft/util/cuda_rt_essentials.hpp>
 #include <raft/util/cudart_utils.hpp>  // RAFT_CUDA_TRY_NOT_THROW is used TODO(tfeher): consider moving this to cuda_rt_essentials.hpp
@@ -589,8 +590,6 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
     THROW("Result buffer size %u larger than max buffer size %u", result_buffer_size, 256);
   }
 
-  RAFT_CUDA_TRY(
-    cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
   // Initialize hash table
   const uint32_t traversed_hash_size = hashmap::get_size(traversed_hash_bitlen);
   set_value_batch(traversed_hashmap_ptr,
@@ -608,26 +607,29 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
                  num_queries,
                  smem_size);
 
-  kernel<<<grid_dims, block_dims, smem_size, stream>>>(topk_indices_ptr,
-                                                       topk_distances_ptr,
-                                                       dataset_desc.dev_ptr(stream),
-                                                       queries_ptr,
-                                                       graph.data_handle(),
-                                                       max_elements,
-                                                       graph.extent(1),
-                                                       source_indices_ptr,
-                                                       ps.num_random_samplings,
-                                                       ps.rand_xor_mask,
-                                                       dev_seed_ptr,
-                                                       num_seeds,
-                                                       visited_hash_bitlen,
-                                                       traversed_hashmap_ptr,
-                                                       traversed_hash_bitlen,
-                                                       ps.itopk_size,
-                                                       ps.min_iterations,
-                                                       ps.max_iterations,
-                                                       num_executed_iterations,
-                                                       sample_filter);
+  auto const& kernel_launcher = [&](auto const& kernel) -> void {
+    kernel<<<grid_dims, block_dims, smem_size, stream>>>(topk_indices_ptr,
+                                                         topk_distances_ptr,
+                                                         dataset_desc.dev_ptr(stream),
+                                                         queries_ptr,
+                                                         graph.data_handle(),
+                                                         max_elements,
+                                                         graph.extent(1),
+                                                         source_indices_ptr,
+                                                         ps.num_random_samplings,
+                                                         ps.rand_xor_mask,
+                                                         dev_seed_ptr,
+                                                         num_seeds,
+                                                         visited_hash_bitlen,
+                                                         traversed_hashmap_ptr,
+                                                         traversed_hash_bitlen,
+                                                         ps.itopk_size,
+                                                         ps.min_iterations,
+                                                         ps.max_iterations,
+                                                         num_executed_iterations,
+                                                         sample_filter);
+  };
+  cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(kernel, smem_size, kernel_launcher);
 }
 
 }  // namespace multi_cta_search

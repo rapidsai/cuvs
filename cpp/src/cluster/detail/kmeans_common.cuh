@@ -31,7 +31,10 @@
 #include <rmm/device_scalar.hpp>
 #include <rmm/device_uvector.hpp>
 
-#include <cub/cub.cuh>
+#include <cub/device/device_histogram.cuh>
+#include <cub/device/device_reduce.cuh>
+#include <cub/device/device_select.cuh>
+#include <cub/iterator/arg_index_input_iterator.cuh>
 #include <cuda.h>
 #include <thrust/fill.h>
 #include <thrust/for_each.h>

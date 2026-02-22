@@ -8,7 +8,8 @@
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/pow2_utils.cuh>
 
-#include <cub/cub.cuh>
+#include <cub/block/block_scan.cuh>
+#include <cub/device/device_radix_sort.cuh>
 
 namespace cuvs::neighbors::ivf::detail {
 
@@ -70,6 +71,24 @@ void calc_chunk_indices::configured::operator()(const uint32_t* cluster_sizes,
   void* args[] =  // NOLINT
     {&n_probes, &cluster_sizes, &clusters_to_probe, &chunk_indices, &n_samples};
   RAFT_CUDA_TRY(cudaLaunchKernel(kernel, grid_dim, block_dim, args, 0, stream));
+}
+
+// Helper function to sort cluster sizes using CUB, extracted from template to avoid
+// including cub/device/* in the header file
+void sort_cluster_sizes_descending(uint32_t* input,
+                                   uint32_t* output,
+                                   uint32_t n_lists,
+                                   rmm::cuda_stream_view stream,
+                                   rmm::mr::device_memory_resource* tmp_res)
+{
+  int begin_bit             = 0;
+  int end_bit               = sizeof(uint32_t) * 8;
+  size_t cub_workspace_size = 0;
+  cub::DeviceRadixSort::SortKeysDescending(
+    nullptr, cub_workspace_size, input, output, n_lists, begin_bit, end_bit, stream);
+  rmm::device_buffer cub_workspace(cub_workspace_size, stream, tmp_res);
+  cub::DeviceRadixSort::SortKeysDescending(
+    cub_workspace.data(), cub_workspace_size, input, output, n_lists, begin_bit, end_bit, stream);
 }
 
 }  // namespace cuvs::neighbors::ivf::detail

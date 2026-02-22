@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -22,6 +22,7 @@
 
 #include <rmm/device_uvector.hpp>
 
+#include <cuda/std/tuple>
 #include <thrust/device_ptr.h>
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
@@ -238,7 +239,7 @@ void connect_knn_graph(
   auto cols_begin = thrust::device_pointer_cast(device_v_indices.data_handle());
   auto dist_begin = thrust::device_pointer_cast(pairwise_dist_vec.data_handle());
 
-  auto zipped_begin = thrust::make_zip_iterator(thrust::make_tuple(cols_begin, dist_begin));
+  auto zipped_begin = thrust::make_zip_iterator(cuda::std::make_tuple(cols_begin, dist_begin));
   thrust::sort_by_key(rows_begin, rows_begin + new_nnz, zipped_begin);
 
   rmm::device_uvector<value_idx> indptr2(m + 1, stream);
