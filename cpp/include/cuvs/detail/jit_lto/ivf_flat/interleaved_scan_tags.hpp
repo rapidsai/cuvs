@@ -37,6 +37,9 @@ struct tag_metric_euclidean {};
 template <int Veclen, typename TTag, typename AccTTag>
 struct tag_metric_inner_product {};
 
+template <int Veclen, typename TTag, typename AccTTag>
+struct tag_metric_custom_udf {};
+
 // Tag types for post-processing
 struct tag_post_identity {};
 struct tag_post_sqrt {};
