@@ -1,11 +1,9 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) @year@, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 // This file is auto-generated. Do not edit manually.
-
-#ifdef BUILD_KERNEL
 
 #include <@header_file@>
 
@@ -15,18 +13,3 @@ namespace cuvs::neighbors::ivf_flat::detail {
 template __device__ bool sample_filter<int64_t>(int64_t* const* const, const uint32_t, const uint32_t, const uint32_t, uint32_t*, int64_t, int64_t);
 
 }  // namespace cuvs::neighbors::ivf_flat::detail
-
-#else
-
-#include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
-#include "@filter_name@.h"
-
-__attribute__((__constructor__)) static void register_@filter_name@()
-{
-  registerAlgorithm(
-    "@filter_name@",
-    embedded_@filter_name@,
-    sizeof(embedded_@filter_name@));
-}
-
-#endif

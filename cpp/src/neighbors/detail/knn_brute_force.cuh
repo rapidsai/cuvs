@@ -37,10 +37,11 @@
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/popc.cuh>
 
+#include <cuda/iterator>
 #include <cuda_fp16.h>
 #include <rmm/cuda_device.hpp>
 #include <rmm/device_uvector.hpp>
-#include <thrust/iterator/transform_iterator.h>
+#include <thrust/for_each.h>
 
 #include <cstdint>
 #include <iostream>
@@ -226,7 +227,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
       }
 
       auto distances_ptr        = temp_distances.data();
-      auto count                = thrust::make_counting_iterator<IndexType>(0);
+      auto count                = cuda::make_counting_iterator<IndexType>(0);
       DistanceT masked_distance = select_min ? std::numeric_limits<DistanceT>::infinity()
                                              : std::numeric_limits<DistanceT>::lowest();
 
@@ -276,7 +277,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
         DistanceT* out_distances      = temp_out_distances.data();
         IndexType* out_indices        = temp_out_indices.data();
 
-        auto count = thrust::make_counting_iterator<IndexType>(0);
+        auto count = cuda::make_counting_iterator<IndexType>(0);
         thrust::for_each(raft::resource::get_thrust_policy(handle),
                          count,
                          count + current_query_size * current_k,

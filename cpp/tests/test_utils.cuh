@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2018-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -7,6 +7,7 @@
 
 #include "test_utils.h"
 
+#include <cuda/iterator>
 #include <gtest/gtest.h>
 #include <iostream>
 #include <memory>
@@ -259,7 +260,7 @@ void gen_uniform(const raft::resources& handle,
 
   const T1* d_keys   = keys.data();
   const T2* d_values = values.data();
-  auto counting      = thrust::make_counting_iterator<IdxT>(0);
+  auto counting      = cuda::make_counting_iterator<IdxT>(0);
   thrust::for_each(rmm::exec_policy(stream),
                    counting,
                    counting + len,
