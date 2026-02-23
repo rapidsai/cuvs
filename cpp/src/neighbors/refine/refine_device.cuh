@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,7 +17,9 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/linalg/map.cuh>
 #include <raft/matrix/detail/select_warpsort.cuh>
+#include <raft/matrix/init.cuh>
 
 #include <thrust/sequence.h>
 
@@ -66,9 +68,9 @@ void refine_device(
   // - We run IVF flat search with n_probes=1 to select the best k elements of the candidates.
   rmm::device_uvector<uint32_t> fake_coarse_idx(n_queries, raft::resource::get_cuda_stream(handle));
 
-  thrust::sequence(raft::resource::get_thrust_policy(handle),
-                   fake_coarse_idx.data(),
-                   fake_coarse_idx.data() + n_queries);
+  raft::linalg::map_offset(handle,
+                           raft::make_device_vector_view(fake_coarse_idx.data(), n_queries),
+                           raft::cast_op<uint32_t>{});
 
   cuvs::neighbors::ivf_flat::index<data_t, int64_t> refinement_index(
     handle, metric, n_queries, false, true, dim);
@@ -88,10 +90,8 @@ void refine_device(
   rmm::device_uvector<uint32_t> chunk_index(n_queries, raft::resource::get_cuda_stream(handle));
 
   // we know that each cluster has exactly n_candidates entries
-  thrust::fill(raft::resource::get_thrust_policy(handle),
-               chunk_index.data(),
-               chunk_index.data() + n_queries,
-               uint32_t(n_candidates));
+  raft::matrix::fill(
+    handle, raft::make_device_vector_view(chunk_index.data(), n_queries), uint32_t(n_candidates));
 
   uint32_t* neighbors_uint32 = nullptr;
   if constexpr (sizeof(idx_t) == sizeof(uint32_t)) {

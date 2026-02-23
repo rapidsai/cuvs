@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -237,7 +237,10 @@ struct index_state {
     auto stream                  = raft::resource::get_cuda_stream(res);
     int64_t host_translations[2] = {0, static_cast<int64_t>(ann_rows())};
     auto device_translations     = raft::make_device_vector<int64_t>(res, 2);
-    raft::copy(device_translations.data_handle(), host_translations, 2, stream);
+    raft::copy(
+      res,
+      device_translations.view(),
+      raft::make_host_vector_view<const int64_t>(host_translations, device_translations.extent(0)));
 
     knn_merge_parts(res,
                     temp_distances.view(),

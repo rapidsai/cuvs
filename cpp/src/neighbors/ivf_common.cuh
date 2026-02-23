@@ -6,6 +6,10 @@
 #pragma once
 
 #include <cuvs/distance/distance.hpp>
+#include <raft/core/copy.cuh>
+#include <raft/core/device_mdspan.hpp>
+#include <raft/core/host_mdarray.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/detail/select_warpsort.cuh>  // matrix::detail::select::warpsort::warp_sort_distributed
 
@@ -256,15 +260,17 @@ void recompute_internal_state(const raft::resources& res, Index& index)
   sort_cluster_sizes_descending(
     index.list_sizes().data_handle(), sorted_sizes.data(), index.n_lists(), stream, tmp_res);
   // copy the results to CPU
-  std::vector<uint32_t> sorted_sizes_host(index.n_lists());
-  raft::copy(sorted_sizes_host.data(), sorted_sizes.data(), index.n_lists(), stream);
+  auto sorted_sizes_host = raft::make_host_vector<uint32_t>(index.n_lists());
+  raft::copy(res,
+             sorted_sizes_host.view(),
+             raft::make_device_vector_view(sorted_sizes.data(), index.n_lists()));
   raft::resource::sync_stream(res);
 
   // accumulate the sorted cluster sizes
   auto accum_sorted_sizes = index.accum_sorted_sizes();
   accum_sorted_sizes(0)   = 0;
-  for (uint32_t label = 0; label < sorted_sizes_host.size(); label++) {
-    accum_sorted_sizes(label + 1) = accum_sorted_sizes(label) + sorted_sizes_host[label];
+  for (uint32_t label = 0; label < sorted_sizes_host.extent(0); label++) {
+    accum_sorted_sizes(label + 1) = accum_sorted_sizes(label) + sorted_sizes_host(label);
   }
 }
 

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2020-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -7,6 +7,9 @@
 #include "../../distance/sparse_distance.cuh"
 #include <cuvs/distance/distance.hpp>
 
+#include <raft/core/copy.cuh>
+#include <raft/core/device_mdspan.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/linalg/unary_op.cuh>
 
@@ -324,8 +327,9 @@ class sparse_knn_t {
     id_ranges.push_back(idx_batcher.batch_start());
 
     rmm::device_uvector<value_idx> trans(id_ranges.size(), raft::resource::get_cuda_stream(handle));
-    raft::update_device(
-      trans.data(), id_ranges.data(), id_ranges.size(), raft::resource::get_cuda_stream(handle));
+    raft::copy(handle,
+               raft::make_device_vector_view(trans.data(), id_ranges.size()),
+               raft::make_host_vector_view(id_ranges.data(), id_ranges.size()));
 
     // combine merge buffers only if there's more than 1 partition to combine
     auto rows = query_batcher.batch_rows();

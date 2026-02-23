@@ -30,6 +30,7 @@
 
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/linalg/norm.cuh>
+#include <raft/linalg/reduce.cuh>
 #include <raft/linalg/unary_op.cuh>
 
 namespace cuvs::neighbors::cagra::detail {
@@ -217,16 +218,16 @@ void search_main(raft::resources const& res,
     // first scale the queries and then compute norms
     auto scaled_sq_op = raft::compose_op(
       raft::sq_op{}, raft::div_const_op<DistanceT>{DistanceT(kScale)}, raft::cast_op<DistanceT>());
-    raft::linalg::reduce<true, true, T, DistanceT, int64_t>(query_norms.data_handle(),
-                                                            queries.data_handle(),
-                                                            queries.extent(1),
-                                                            queries.extent(0),
-                                                            (DistanceT)0,
-                                                            stream,
-                                                            false,
-                                                            scaled_sq_op,
-                                                            raft::add_op(),
-                                                            raft::sqrt_op{});
+    raft::linalg::reduce<raft::Apply::ALONG_ROWS>(
+      res,
+      raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
+        queries.data_handle(), queries.extent(0), queries.extent(1)),
+      query_norms.view(),
+      (DistanceT)0,
+      false,
+      scaled_sq_op,
+      raft::add_op(),
+      raft::sqrt_op{});
 
     const auto n_queries = distances.extent(0);
     const auto k         = distances.extent(1);

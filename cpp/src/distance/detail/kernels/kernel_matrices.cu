@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2019-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2019-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -466,18 +466,20 @@ void RBFKernel<math_t>::matrixRowNormL2(raft::resources const& handle,
   int minor         = is_row_major ? matrix.extent(1) : matrix.extent(0);
   int ld            = is_row_major ? matrix.stride(0) : matrix.stride(1);
   ASSERT(ld == minor, "RBF Kernel lazy rowNorm compute does not support ld parameter");
+  auto n_rows = matrix.extent(0);
+  auto n_cols = matrix.extent(1);
   if (is_row_major) {
-    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(target,
-                                                      matrix.data_handle(),
-                                                      matrix.extent(1),
-                                                      matrix.extent(0),
-                                                      raft::resource::get_cuda_stream(handle));
+    raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+      handle,
+      raft::make_device_matrix_view<const math_t, int, raft::row_major>(
+        matrix.data_handle(), n_rows, n_cols),
+      raft::make_device_vector_view(target, n_rows));
   } else {
-    raft::linalg::rowNorm<raft::linalg::L2Norm, false>(target,
-                                                       matrix.data_handle(),
-                                                       matrix.extent(1),
-                                                       matrix.extent(0),
-                                                       raft::resource::get_cuda_stream(handle));
+    raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+      handle,
+      raft::make_device_matrix_view<const math_t, int, raft::col_major>(
+        matrix.data_handle(), n_rows, n_cols),
+      raft::make_device_vector_view(target, n_rows));
   }
 }
 

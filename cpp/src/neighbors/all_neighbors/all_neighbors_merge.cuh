@@ -1,10 +1,11 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
 #include <optional>
+#include <raft/core/copy.cuh>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdarray.hpp>
@@ -268,15 +269,16 @@ void remap_and_merge_subgraphs(raft::resources const& res,
     }
   }
 
-  raft::copy(inverted_indices_d.data_handle(),
-             inverted_indices.data_handle(),
-             num_data_in_cluster,
-             raft::resource::get_cuda_stream(res));
+  raft::copy(
+    res,
+    raft::make_device_vector_view(inverted_indices_d.data_handle(), num_data_in_cluster),
+    raft::make_host_vector_view<const IdxT>(inverted_indices.data_handle(), num_data_in_cluster));
 
-  raft::copy(batch_neighbors_d.data_handle(),
-             batch_neighbors_h.data_handle(),
-             num_data_in_cluster * k,
-             raft::resource::get_cuda_stream(res));
+  raft::copy(
+    res,
+    raft::make_device_vector_view(batch_neighbors_d.data_handle(), num_data_in_cluster * k),
+    raft::make_host_vector_view<const IdxT>(batch_neighbors_h.data_handle(),
+                                            num_data_in_cluster * k));
 
   merge_subgraphs<T, IdxT, SweepAll>(res,
                                      k,

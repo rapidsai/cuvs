@@ -251,16 +251,11 @@ void compute_avq_centroid(raft::resources const& dev_resources,
     x_eta_1.view(),
     raft::mul_op());
 
-  raft::linalg::reduce<true, false>(avq_centroid.data_handle(),
-                                    raft::make_const_mdspan(x_eta_1.view()).data_handle(),
-                                    x_eta_1.extent(1),
-                                    x_eta_1.extent(0),
-                                    0.0f,
-                                    raft::resource::get_cuda_stream(dev_resources),
-                                    false,
-                                    raft::identity_op(),
-                                    raft::add_op(),
-                                    raft::identity_op());
+  raft::linalg::reduce<raft::Apply::ALONG_COLUMNS>(
+    dev_resources,
+    raft::make_const_mdspan(x_eta_1.view()),
+    raft::make_device_vector_view<float, int64_t>(avq_centroid.data_handle(), x_eta_1.extent(1)),
+    0.0f);
 
   // scale x
   // skipping zero elements in the vector should be ok, since they are norms
@@ -313,16 +308,8 @@ void compute_avq_centroid(raft::resources const& dev_resources,
 
   auto dots = raft::make_device_vector<float, int64_t>(dev_resources, x.extent(1));
 
-  raft::linalg::reduce<true, false>(dots.data_handle(),
-                                    raft::make_const_mdspan(x).data_handle(),
-                                    x.extent(1),
-                                    x.extent(0),
-                                    0.0f,
-                                    raft::resource::get_cuda_stream(dev_resources),
-                                    false,
-                                    raft::identity_op(),
-                                    raft::add_op(),
-                                    raft::identity_op());
+  raft::linalg::reduce<raft::Apply::ALONG_COLUMNS>(
+    dev_resources, raft::make_const_mdspan(x), dots.view(), 0.0f);
 
   raft::linalg::dot(dev_resources,
                     raft::make_const_mdspan(dots.view()),
@@ -526,8 +513,7 @@ class cluster_loader {
       auto h_cluster_ids =
         raft::make_pinned_vector_view<LabelT, int64_t>(cluster_ids_buf_.data_handle(), size);
 
-      raft::copy(
-        h_cluster_ids.data_handle(), cluster_ids.data_handle(), cluster_ids.size(), stream_);
+      raft::copy(res, h_cluster_ids, cluster_ids);
       raft::resource::sync_stream(res, stream_);
 
       auto pinned_cluster = raft::make_pinned_matrix_view<T, int64_t>(
@@ -541,10 +527,7 @@ class cluster_loader {
                sizeof(T) * dim_);
       }
 
-      raft::copy(cluster_vectors.data_handle(),
-                 pinned_cluster.data_handle(),
-                 pinned_cluster.size(),
-                 stream_);
+      raft::copy(res, cluster_vectors, raft::make_const_mdspan(pinned_cluster));
       raft::resource::sync_stream(res, stream_);
 
     } else {
@@ -600,8 +583,7 @@ void apply_avq(raft::resources const& res,
   compute_cluster_offsets(res, labels_view, cluster_offsets.view(), max_cluster_size);
   auto h_cluster_offsets = raft::make_host_vector<uint32_t, int64_t>(cluster_offsets.extent(0));
 
-  raft::copy(
-    h_cluster_offsets.data_handle(), cluster_offsets.data_handle(), cluster_offsets.size(), stream);
+  raft::copy(res, h_cluster_offsets.view(), raft::make_const_mdspan(cluster_offsets.view()));
 
   dim3 block(32, 1, 1);
   dim3 grid((dataset.extent(0) + block.x - 1) / block.x, 1, 1);

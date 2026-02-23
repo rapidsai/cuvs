@@ -237,7 +237,10 @@ void batched_insert_vamana(
     int num_blocks = min(maxBlocks, step_size);
 
     // Copy ids to be inserted for this batch
-    raft::copy(query_ids.data_handle(), &insert_order.data()[start], step_size, stream);
+    raft::copy(
+      res,
+      raft::make_device_vector_view(query_ids.data_handle(), int64_t(step_size)),
+      raft::make_host_vector_view<const IdxT>(insert_order.data() + start, int64_t(step_size)));
     set_query_ids<IdxT, accT><<<num_blocks, blockD, 0, stream>>>(
       query_list_ptr.data_handle(), query_ids.data_handle(), step_size);
 
@@ -542,7 +545,7 @@ void batched_insert_vamana(
          batch_prune);
 #endif
 
-  raft::copy(graph.data_handle(), d_graph.data_handle(), d_graph.size(), stream);
+  raft::copy(res, graph, d_graph.view());
 
   RAFT_CHECK_CUDA(stream);
 }
@@ -604,10 +607,10 @@ index<T, IdxT> build(
       res,
       codebook_params.pq_encoding_table.size());  // logically a 2D matrix with dimensions
                                                   // pq_codebook_size x dim_per_subspace * pq_dim
-    raft::copy(pq_encoding_table_device_vec.data_handle(),
-               codebook_params.pq_encoding_table.data(),
-               codebook_params.pq_encoding_table.size(),
-               raft::resource::get_cuda_stream(res));
+    raft::copy(res,
+               pq_encoding_table_device_vec.view(),
+               raft::make_host_vector_view<const float>(codebook_params.pq_encoding_table.data(),
+                                                        pq_encoding_table_device_vec.extent(0)));
     int dim_per_subspace = dim / pq_dim;
     auto pq_codebook =
       raft::make_device_matrix<float, uint32_t>(res, pq_codebook_size * pq_dim, dim_per_subspace);
@@ -631,10 +634,12 @@ index<T, IdxT> build(
 
     // prepare rotation matrix
     auto rotation_matrix_device = raft::make_device_matrix<float, int64_t>(res, dim, dim);
-    raft::copy(rotation_matrix_device.data_handle(),
-               codebook_params.rotation_matrix.data(),
-               codebook_params.rotation_matrix.size(),
-               raft::resource::get_cuda_stream(res));
+    raft::copy(
+      res,
+      raft::make_device_vector_view(rotation_matrix_device.data_handle(),
+                                    int64_t(codebook_params.rotation_matrix.size())),
+      raft::make_host_vector_view<const float>(codebook_params.rotation_matrix.data(),
+                                               int64_t(codebook_params.rotation_matrix.size())));
 
     // process in batches
     const uint32_t n_rows = dataset.extent(0);

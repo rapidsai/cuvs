@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -35,11 +35,10 @@ void minClusterAndDistanceCompute(
 
   if (is_fused) {
     L2NormBuf_OR_DistBuf.resize(n_clusters, stream);
-    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(L2NormBuf_OR_DistBuf.data(),
-                                                      centroids.data_handle(),
-                                                      centroids.extent(1),
-                                                      centroids.extent(0),
-                                                      stream);
+    raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+      handle,
+      centroids,
+      raft::make_device_vector_view<DataT, IndexT>(L2NormBuf_OR_DistBuf.data(), n_clusters));
   } else {
     // TODO: Unless pool allocator is used, passing in a workspace for this
     // isn't really increasing performance because this needs to do a re-allocation
@@ -189,11 +188,11 @@ void minClusterDistanceCompute(raft::resources const& handle,
 
   if (is_fused) {
     L2NormBuf_OR_DistBuf.resize(n_clusters, stream);
-    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(L2NormBuf_OR_DistBuf.data(),
-                                                      centroids.data_handle(),
-                                                      centroids.extent(1),
-                                                      centroids.extent(0),
-                                                      stream);
+    raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+      handle,
+      raft::make_device_matrix_view<const DataT, IndexT>(
+        centroids.data_handle(), centroids.extent(0), centroids.extent(1)),
+      raft::make_device_vector_view<DataT, IndexT>(L2NormBuf_OR_DistBuf.data(), n_clusters));
   } else {
     L2NormBuf_OR_DistBuf.resize(dataBatchSize * centroidsBatchSize, stream);
   }

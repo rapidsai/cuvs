@@ -10,8 +10,10 @@
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/distance/distance.hpp>
 
+#include <raft/core/copy.cuh>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/kvp.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/mdarray.hpp>
@@ -19,6 +21,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/linalg/map.cuh>
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/reduce_rows_by_key.cuh>
 #include <raft/linalg/unary_op.cuh>
@@ -147,7 +150,9 @@ void checkWeight(raft::resources const& handle,
                                        n_samples,
                                        stream));
   DataT wt_sum = 0;
-  raft::copy(&wt_sum, wt_aggr.data_handle(), 1, stream);
+  raft::copy(handle,
+             raft::make_host_scalar_view(&wt_sum),
+             raft::make_device_scalar_view(wt_aggr.data_handle()));
   raft::resource::sync_stream(handle, stream);
 
   if (wt_sum != n_samples) {
@@ -157,11 +162,8 @@ void checkWeight(raft::resources const& handle,
       n_samples);
 
     auto scale = static_cast<DataT>(n_samples) / wt_sum;
-    raft::linalg::unaryOp(weight.data_handle(),
-                          weight.data_handle(),
-                          n_samples,
-                          raft::mul_const_op<DataT>{scale},
-                          stream);
+    raft::linalg::map(
+      handle, raft::make_const_mdspan(weight), weight, raft::mul_const_op<DataT>{scale});
   }
 }
 
@@ -256,7 +258,9 @@ void sampleCentroids(raft::resources const& handle,
                                       stream));
 
   IndexT nPtsSampledInRank = 0;
-  raft::copy(&nPtsSampledInRank, nSelected.data_handle(), 1, stream);
+  raft::copy(handle,
+             raft::make_host_scalar_view(&nPtsSampledInRank),
+             raft::make_device_scalar_view(nSelected.data_handle()));
   raft::resource::sync_stream(handle, stream);
 
   uint8_t* rawPtr_isSampleCentroid = isSampleCentroid.data_handle();

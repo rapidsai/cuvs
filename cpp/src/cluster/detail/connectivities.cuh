@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,6 +9,9 @@
 #include "./kmeans_common.cuh"
 #include <cuvs/cluster/agglomerative.hpp>
 #include <cuvs/distance/distance.hpp>
+#include <raft/core/copy.cuh>
+#include <raft/core/device_mdspan.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
@@ -144,7 +147,7 @@ void pairwise_distances(const raft::resources& handle,
                            raft::make_device_vector_view<value_idx, value_idx>(indptr, m),
                            [=] __device__(value_idx idx) { return idx * m; });
 
-  raft::update_device(indptr + m, &nnz, 1, stream);
+  raft::copy(handle, raft::make_device_scalar_view(indptr + m), raft::make_host_scalar_view(&nnz));
 
   // TODO: It would ultimately be nice if the MST could accept
   // dense inputs directly so we don't need to double the memory

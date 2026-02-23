@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,6 +8,7 @@
 #include "vamana_structs.cuh"
 
 #include <cuvs/neighbors/vamana.hpp>
+#include <raft/core/copy.cuh>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/mdarray.hpp>
@@ -66,10 +67,11 @@ void serialize_dataset(raft::resources const& res,
     if (strided_dataset) {
       auto h_dataset =
         raft::make_host_matrix<T, int64_t>(strided_dataset->n_rows(), strided_dataset->dim());
-      raft::copy(h_dataset.data_handle(),
-                 strided_dataset->view().data_handle(),
-                 strided_dataset->n_rows() * strided_dataset->dim(),
-                 raft::resource::get_cuda_stream(res));
+      raft::copy(res,
+                 raft::make_host_vector_view(h_dataset.data_handle(),
+                                             strided_dataset->n_rows() * strided_dataset->dim()),
+                 raft::make_device_vector_view(strided_dataset->view().data_handle(),
+                                               strided_dataset->n_rows() * strided_dataset->dim()));
       to_file(dataset_base_file, h_dataset);
     } else {
       RAFT_LOG_DEBUG("dynamic_cast to strided_dataset failed");
@@ -88,10 +90,7 @@ void serialize_dataset(raft::resources const& res,
   // try allocating a buffer for the dataset on host
   try {
     auto h_dataset = raft::make_host_matrix<T, int64_t>(dataset.extent(0), dataset.extent(1));
-    raft::copy(h_dataset.data_handle(),
-               dataset.data_handle(),
-               dataset.extent(0) * dataset.extent(1),
-               raft::resource::get_cuda_stream(res));
+    raft::copy(res, h_dataset.view(), dataset);
     to_file(dataset_base_file, h_dataset);
   } catch (std::bad_alloc& e) {
     RAFT_LOG_INFO("Failed to serialize dataset");
@@ -313,10 +312,7 @@ void serialize(raft::resources const& res,
 {
   auto d_graph = index_.graph();
   auto h_graph = raft::make_host_matrix<IdxT, int64_t>(d_graph.extent(0), d_graph.extent(1));
-  raft::copy(h_graph.data_handle(),
-             d_graph.data_handle(),
-             d_graph.size(),
-             raft::resource::get_cuda_stream(res));
+  raft::copy(res, h_graph.view(), d_graph);
   raft::resource::sync_stream(res);
 
   // if requested, write sector-aligned file and return

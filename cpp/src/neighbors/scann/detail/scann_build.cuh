@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -10,10 +10,12 @@
 #include <cuvs/neighbors/scann.hpp>
 
 #include <cuda_bf16.h>
+#include <raft/core/copy.cuh>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/error.hpp>
 #include <raft/core/host_device_accessor.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/linalg/map.cuh>
 #include <raft/matrix/copy.cuh>
@@ -185,10 +187,12 @@ index<T, IdxT> build(
     auto sub_pq_codebook =
       create_pq_codebook<T>(res, raft::make_const_mdspan(sub_trainset.view()), pq_params);
 
-    raft::copy(full_codebook.data_handle() + (subspace * sub_pq_codebook.size()),
-               sub_pq_codebook.data_handle(),
-               sub_pq_codebook.size(),
-               stream);
+    raft::copy(
+      res,
+      raft::make_device_vector_view(
+        full_codebook.data_handle() + (subspace * sub_pq_codebook.size()), sub_pq_codebook.size()),
+      raft::make_device_vector_view<const float>(sub_pq_codebook.data_handle(),
+                                                 sub_pq_codebook.size()));
   }
   raft::resource::sync_stream(res);
 
@@ -272,21 +276,26 @@ index<T, IdxT> build(
 
     // Copy unpacked codes to host
     // TODO (rmaschal): these copies are blocking and not overlapped
-    raft::copy(idx.quantized_residuals().data_handle() + batch.offset() * num_subspaces,
-               quantized_residuals.data_handle(),
-               quantized_residuals.size(),
-               stream);
+    raft::copy(res,
+               raft::make_host_vector_view(
+                 idx.quantized_residuals().data_handle() + batch.offset() * num_subspaces,
+                 quantized_residuals.size()),
+               raft::make_device_vector_view<const uint8_t>(quantized_residuals.data_handle(),
+                                                            quantized_residuals.size()));
 
-    raft::copy(idx.quantized_soar_residuals().data_handle() + batch.offset() * num_subspaces,
-               quantized_soar_residuals.data_handle(),
-               quantized_soar_residuals.size(),
-               stream);
+    raft::copy(res,
+               raft::make_host_vector_view(
+                 idx.quantized_soar_residuals().data_handle() + batch.offset() * num_subspaces,
+                 quantized_soar_residuals.size()),
+               raft::make_device_vector_view<const uint8_t>(quantized_soar_residuals.data_handle(),
+                                                            quantized_soar_residuals.size()));
 
     if (params.reordering_bf16) {
-      raft::copy(idx.bf16_dataset().data_handle() + batch.offset() * dim,
-                 bf16_dataset.data_handle(),
-                 bf16_dataset.size(),
-                 stream);
+      raft::copy(res,
+                 raft::make_host_vector_view(
+                   idx.bf16_dataset().data_handle() + batch.offset() * dim, bf16_dataset.size()),
+                 raft::make_device_vector_view<const int16_t>(bf16_dataset.data_handle(),
+                                                              bf16_dataset.size()));
     }
 
     // Make sure work on device is finished before swapping buffers

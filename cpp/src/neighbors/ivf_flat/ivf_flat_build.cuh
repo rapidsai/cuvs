@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,6 +17,9 @@
 #include "../detail/ann_utils.cuh"
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/distance/distance.hpp>
+#include <raft/core/copy.cuh>
+#include <raft/core/device_mdspan.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/operators.hpp>
@@ -27,6 +30,7 @@
 #include <raft/linalg/add.cuh>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/norm.cuh>
+#include <raft/matrix/init.cuh>
 #include <raft/stats/histogram.cuh>
 #include <raft/util/pow2_utils.cuh>
 
@@ -53,20 +57,11 @@ auto clone(const raft::resources& res, const index<T, IdxT>& source) -> index<T,
                         source.dim());
 
   // Copy the independent parts
-  raft::copy(target.list_sizes().data_handle(),
-             source.list_sizes().data_handle(),
-             source.list_sizes().size(),
-             stream);
-  raft::copy(target.centers().data_handle(),
-             source.centers().data_handle(),
-             source.centers().size(),
-             stream);
+  raft::copy(res, target.list_sizes(), source.list_sizes());
+  raft::copy(res, target.centers(), source.centers());
   if (source.center_norms().has_value()) {
     target.allocate_center_norms(res);
-    raft::copy(target.center_norms()->data_handle(),
-               source.center_norms()->data_handle(),
-               source.center_norms()->size(),
-               stream);
+    raft::copy(res, target.center_norms().value(), source.center_norms().value());
   }
   // Copy shared pointers
   target.lists() = source.lists();
@@ -230,7 +225,9 @@ void extend(raft::resources const& handle,
   auto* list_sizes_ptr    = index->list_sizes().data_handle();
   auto old_list_sizes_dev = raft::make_device_mdarray<uint32_t>(
     handle, raft::resource::get_workspace_resource(handle), raft::make_extents<IdxT>(n_lists));
-  raft::copy(old_list_sizes_dev.data_handle(), list_sizes_ptr, n_lists, stream);
+  raft::copy(handle,
+             old_list_sizes_dev.view(),
+             raft::make_device_vector_view<const uint32_t, IdxT>(list_sizes_ptr, n_lists));
 
   // Calculate the centers and sizes on the new data, starting from the original values
   if (index->adaptive_centers()) {
@@ -260,16 +257,23 @@ void extend(raft::resources const& handle,
                                            n_rows,
                                            1,
                                            stream);
-    raft::linalg::add(
-      list_sizes_ptr, list_sizes_ptr, old_list_sizes_dev.data_handle(), n_lists, stream);
+    raft::linalg::add(handle,
+                      raft::make_device_vector_view<const uint32_t, IdxT>(list_sizes_ptr, n_lists),
+                      raft::make_device_vector_view<const uint32_t, IdxT>(
+                        old_list_sizes_dev.data_handle(), n_lists),
+                      raft::make_device_vector_view<uint32_t, IdxT>(list_sizes_ptr, n_lists));
   }
 
   // Calculate and allocate new list data
   std::vector<uint32_t> new_list_sizes(n_lists);
   std::vector<uint32_t> old_list_sizes(n_lists);
   {
-    raft::copy(old_list_sizes.data(), old_list_sizes_dev.data_handle(), n_lists, stream);
-    raft::copy(new_list_sizes.data(), list_sizes_ptr, n_lists, stream);
+    raft::copy(handle,
+               raft::make_host_vector_view(old_list_sizes.data(), n_lists),
+               raft::make_device_vector_view(old_list_sizes_dev.data_handle(), n_lists));
+    raft::copy(handle,
+               raft::make_host_vector_view(new_list_sizes.data(), n_lists),
+               raft::make_device_vector_view(list_sizes_ptr, n_lists));
     raft::resource::sync_stream(handle);
     auto& lists = index->lists();
     for (uint32_t label = 0; label < n_lists; label++) {
@@ -284,7 +288,10 @@ void extend(raft::resources const& handle,
   ivf::detail::recompute_internal_state(handle, *index);
   // Copy the old sizes, so we can start from the current state of the index;
   // we'll rebuild the `list_sizes_ptr` in the following kernel, using it as an atomic counter.
-  raft::copy(list_sizes_ptr, old_list_sizes_dev.data_handle(), n_lists, stream);
+  raft::copy(
+    handle,
+    raft::make_device_vector_view(list_sizes_ptr, n_lists),
+    raft::make_device_vector_view<const uint32_t>(old_list_sizes_dev.data_handle(), n_lists));
 
   utils::batch_load_iterator<IdxT> vec_indices(
     new_indices, n_rows, 1, max_batch_size, stream, raft::resource::get_workspace_resource(handle));
@@ -329,33 +336,30 @@ void extend(raft::resources const& handle,
   if (!index->center_norms().has_value()) {
     index->allocate_center_norms(handle);
     if (index->center_norms().has_value()) {
+      auto centers_view = raft::make_device_matrix_view<const float, uint32_t, raft::row_major>(
+        index->centers().data_handle(), n_lists, dim);
+      auto norms_view = raft::make_device_vector_view<float, uint32_t>(
+        index->center_norms()->data_handle(), n_lists);
       if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
-        raft::linalg::rowNorm<raft::linalg::L2Norm, true>(index->center_norms()->data_handle(),
-                                                          index->centers().data_handle(),
-                                                          dim,
-                                                          n_lists,
-                                                          stream,
-                                                          raft::sqrt_op{});
+        raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+          handle, centers_view, norms_view, raft::sqrt_op{});
       } else {
-        raft::linalg::rowNorm<raft::linalg::L2Norm, true>(index->center_norms()->data_handle(),
-                                                          index->centers().data_handle(),
-                                                          dim,
-                                                          n_lists,
-                                                          stream);
+        raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+          handle, centers_view, norms_view);
       }
       RAFT_LOG_TRACE_VEC(index->center_norms()->data_handle(), std::min<uint32_t>(dim, 20));
     }
   } else if (index->center_norms().has_value() && index->adaptive_centers()) {
+    auto centers_view = raft::make_device_matrix_view<const float, uint32_t, raft::row_major>(
+      index->centers().data_handle(), n_lists, dim);
+    auto norms_view =
+      raft::make_device_vector_view<float, uint32_t>(index->center_norms()->data_handle(), n_lists);
     if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      raft::linalg::rowNorm<raft::linalg::L2Norm, true>(index->center_norms()->data_handle(),
-                                                        index->centers().data_handle(),
-                                                        dim,
-                                                        n_lists,
-                                                        stream,
-                                                        raft::sqrt_op{});
+      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+        handle, centers_view, norms_view, raft::sqrt_op{});
     } else {
-      raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
-        index->center_norms()->data_handle(), index->centers().data_handle(), dim, n_lists, stream);
+      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+        handle, centers_view, norms_view);
     }
     RAFT_LOG_TRACE_VEC(index->center_norms()->data_handle(), std::min<uint32_t>(dim, 20));
   }
@@ -485,7 +489,7 @@ inline void fill_refinement_index(raft::resources const& handle,
   // Update the pointers and the sizes
   ivf::detail::recompute_internal_state(handle, *refinement_index);
 
-  RAFT_CUDA_TRY(cudaMemsetAsync(list_sizes_ptr, 0, n_lists * sizeof(uint32_t), stream));
+  raft::matrix::fill(handle, raft::make_device_vector_view(list_sizes_ptr, n_lists), uint32_t(0));
 
   const dim3 block_dim(256);
   const dim3 grid_dim(raft::ceildiv<IdxT>(n_queries * n_candidates, block_dim.x));
