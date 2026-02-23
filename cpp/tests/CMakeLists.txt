@@ -156,6 +156,7 @@ ConfigureTest(
 ConfigureTest(
   NAME NEIGHBORS_ANN_CAGRA_TEST_BUGS
   PATH neighbors/ann_cagra/bug_extreme_inputs_oob.cu neighbors/ann_cagra/bug_multi_cta_crash.cu
+       neighbors/ann_cagra/bug_issue_93_reproducer.cu
   GPUS 1
   PERCENT 100
 )
@@ -335,7 +336,7 @@ ConfigureTest(
 ConfigureTest(
   NAME PREPROCESSING_TEST
   PATH preprocessing/scalar_quantization.cu preprocessing/binary_quantization.cu
-       preprocessing/spectral_embedding.cu
+       preprocessing/spectral_embedding.cu preprocessing/product_quantization.cu
   GPUS 1
   PERCENT 100
 )

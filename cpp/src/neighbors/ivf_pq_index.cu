@@ -25,9 +25,11 @@ index_impl<IdxT>::index_impl(raft::resources const& handle,
                              uint32_t dim,
                              uint32_t pq_bits,
                              uint32_t pq_dim,
-                             bool conservative_memory_allocation)
+                             bool conservative_memory_allocation,
+                             list_layout codes_layout)
   : metric_(metric),
     codebook_kind_(codebook_kind),
+    codes_layout_(codes_layout),
     dim_(dim),
     pq_bits_(pq_bits),
     pq_dim_(pq_dim == 0 ? index<IdxT>::calculate_pq_dim(dim) : pq_dim),
@@ -52,6 +54,12 @@ template <typename IdxT>
 codebook_gen index_impl<IdxT>::codebook_kind() const noexcept
 {
   return codebook_kind_;
+}
+
+template <typename IdxT>
+list_layout index_impl<IdxT>::codes_layout() const noexcept
+{
+  return codes_layout_;
 }
 
 template <typename IdxT>
@@ -115,13 +123,13 @@ bool index_impl<IdxT>::conservative_memory_allocation() const noexcept
 }
 
 template <typename IdxT>
-std::vector<std::shared_ptr<list_data<IdxT>>>& index_impl<IdxT>::lists() noexcept
+std::vector<std::shared_ptr<list_data_base<IdxT>>>& index_impl<IdxT>::lists() noexcept
 {
   return lists_;
 }
 
 template <typename IdxT>
-const std::vector<std::shared_ptr<list_data<IdxT>>>& index_impl<IdxT>::lists() const noexcept
+const std::vector<std::shared_ptr<list_data_base<IdxT>>>& index_impl<IdxT>::lists() const noexcept
 {
   return lists_;
 }
@@ -189,9 +197,17 @@ owning_impl<IdxT>::owning_impl(raft::resources const& handle,
                                uint32_t dim,
                                uint32_t pq_bits,
                                uint32_t pq_dim,
-                               bool conservative_memory_allocation)
-  : index_impl<IdxT>(
-      handle, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, conservative_memory_allocation),
+                               bool conservative_memory_allocation,
+                               list_layout codes_layout)
+  : index_impl<IdxT>(handle,
+                     metric,
+                     codebook_kind,
+                     n_lists,
+                     dim,
+                     pq_bits,
+                     pq_dim,
+                     conservative_memory_allocation,
+                     codes_layout),
     pq_centers_{raft::make_device_mdarray<float>(
       handle, index<IdxT>::make_pq_centers_extents(dim, pq_dim, pq_bits, codebook_kind, n_lists))},
     centers_{
@@ -231,9 +247,17 @@ view_impl<IdxT>::view_impl(
   raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers_view,
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_view,
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot_view,
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix_view)
-  : index_impl<IdxT>(
-      handle, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, conservative_memory_allocation),
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix_view,
+  list_layout codes_layout)
+  : index_impl<IdxT>(handle,
+                     metric,
+                     codebook_kind,
+                     n_lists,
+                     dim,
+                     pq_bits,
+                     pq_dim,
+                     conservative_memory_allocation,
+                     codes_layout),
     pq_centers_view_(pq_centers_view),
     centers_view_(centers_view),
     centers_rot_view_(centers_rot_view),
@@ -454,6 +478,12 @@ codebook_gen index<IdxT>::codebook_kind() const noexcept
 }
 
 template <typename IdxT>
+list_layout index<IdxT>::codes_layout() const noexcept
+{
+  return impl_->codes_layout();
+}
+
+template <typename IdxT>
 uint32_t index<IdxT>::n_lists() const noexcept
 {
   return impl_->n_lists();
@@ -494,13 +524,13 @@ raft::device_matrix_view<const float, uint32_t, raft::row_major> index<IdxT>::ro
 }
 
 template <typename IdxT>
-std::vector<std::shared_ptr<list_data<IdxT>>>& index<IdxT>::lists() noexcept
+std::vector<std::shared_ptr<list_data_base<IdxT>>>& index<IdxT>::lists() noexcept
 {
   return impl_->lists();
 }
 
 template <typename IdxT>
-const std::vector<std::shared_ptr<list_data<IdxT>>>& index<IdxT>::lists() const noexcept
+const std::vector<std::shared_ptr<list_data_base<IdxT>>>& index<IdxT>::lists() const noexcept
 {
   return impl_->lists();
 }
@@ -596,8 +626,7 @@ uint32_t index_impl<IdxT>::get_list_size_in_bytes(uint32_t label) const
 {
   RAFT_EXPECTS(label < lists_.size(),
                "Expected label to be less than number of lists in the index");
-  auto& list_data = lists_[label]->data;
-  return list_data.size();
+  return lists_[label]->data_byte_size();
 }
 
 template <typename IdxT>

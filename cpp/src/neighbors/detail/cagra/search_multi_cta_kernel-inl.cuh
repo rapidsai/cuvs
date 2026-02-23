@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -26,6 +26,7 @@
 
 // TODO: This shouldn't be invoking anything from spatial/knn
 #include "../ann_utils.cuh"
+#include "../smem_utils.cuh"
 
 #include <raft/util/cuda_rt_essentials.hpp>
 #include <raft/util/cudart_utils.hpp>  // RAFT_CUDA_TRY_NOT_THROW is used TODO(tfeher): consider moving this to cuda_rt_essentials.hpp
@@ -114,14 +115,14 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort(float* distances,  // [num
                                                       INDEX_T* indices,  // [num_elements]
                                                       const uint32_t num_elements)
 {
-  const unsigned warp_id = threadIdx.x / 32;
+  const unsigned warp_id = threadIdx.x / raft::warp_size();
   if (warp_id > 0) { return; }
-  const unsigned lane_id = threadIdx.x % 32;
-  constexpr unsigned N   = (MAX_ELEMENTS + 31) / 32;
+  const unsigned lane_id = threadIdx.x % raft::warp_size();
+  constexpr unsigned N   = (MAX_ELEMENTS + (raft::warp_size() - 1)) / raft::warp_size();
   float key[N];
   INDEX_T val[N];
   for (unsigned i = 0; i < N; i++) {
-    unsigned j = lane_id + (32 * i);
+    unsigned j = lane_id + (raft::warp_size() * i);
     if (j < num_elements) {
       key[i] = distances[j];
       val[i] = indices[j];
@@ -142,13 +143,34 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort(float* distances,  // [num
   }
 }
 
+RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort_wrapper_64(
+  float* distances,   // [num_elements]
+  uint32_t* indices,  // [num_elements]
+  const uint32_t num_elements)
+{
+  topk_by_bitonic_sort<64, uint32_t>(distances, indices, num_elements);
+}
+
+RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort_wrapper_128(
+  float* distances,   // [num_elements]
+  uint32_t* indices,  // [num_elements]
+  const uint32_t num_elements)
+{
+  topk_by_bitonic_sort<128, uint32_t>(distances, indices, num_elements);
+}
+
+RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort_wrapper_256(
+  float* distances,   // [num_elements]
+  uint32_t* indices,  // [num_elements]
+  const uint32_t num_elements)
+{
+  topk_by_bitonic_sort<256, uint32_t>(distances, indices, num_elements);
+}
+
 //
 // multiple CTAs per single query
 //
-template <std::uint32_t MAX_ELEMENTS,
-          class DATASET_DESCRIPTOR_T,
-          class SourceIndexT,
-          class SAMPLE_FILTER_T>
+template <class DATASET_DESCRIPTOR_T, class SourceIndexT, class SAMPLE_FILTER_T>
 RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
   typename DATASET_DESCRIPTOR_T::INDEX_T* const
     result_indices_ptr,  // [num_queries, num_cta_per_query, itopk_size]
@@ -157,6 +179,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
   const DATASET_DESCRIPTOR_T* dataset_desc,
   const typename DATASET_DESCRIPTOR_T::DATA_T* const queries_ptr,  // [num_queries, dataset_dim]
   const typename DATASET_DESCRIPTOR_T::INDEX_T* const knn_graph,   // [dataset_size, graph_degree]
+  const uint32_t max_elements,
   const uint32_t graph_degree,
   const SourceIndexT* source_indices_ptr,  // [num_queries, search_width]
   const unsigned num_distilation,
@@ -211,7 +234,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
   // |<---        result_buffer_size_32                 --->|
   const auto result_buffer_size    = itopk_size + graph_degree;
   const auto result_buffer_size_32 = raft::round_up_safe<uint32_t>(result_buffer_size, 32);
-  assert(result_buffer_size_32 <= MAX_ELEMENTS);
+  assert(result_buffer_size_32 <= max_elements);
 
   // Set smem working buffer for the distance calculation
   dataset_desc = dataset_desc->setup_workspace(smem, queries_ptr, query_id);
@@ -268,8 +291,33 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
     _CLK_START();
     if (threadIdx.x < 32) {
       // [1st warp] Topk with bitonic sort
-      topk_by_bitonic_sort<MAX_ELEMENTS, INDEX_T>(
-        result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+      if constexpr (std::is_same_v<INDEX_T, uint32_t>) {
+        // use a non-template wrapper function to avoid pre-inlining the topk_by_bitonic_sort
+        // function (vs post-inlining, this impacts register pressure)
+        if (max_elements <= 64) {
+          topk_by_bitonic_sort_wrapper_64(
+            result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+        } else if (max_elements <= 128) {
+          topk_by_bitonic_sort_wrapper_128(
+            result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+        } else {
+          assert(max_elements <= 256);
+          topk_by_bitonic_sort_wrapper_256(
+            result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+        }
+      } else {
+        if (max_elements <= 64) {
+          topk_by_bitonic_sort<64, INDEX_T>(
+            result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+        } else if (max_elements <= 128) {
+          topk_by_bitonic_sort<128, INDEX_T>(
+            result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+        } else {
+          assert(max_elements <= 256);
+          topk_by_bitonic_sort<256, INDEX_T>(
+            result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+        }
+      }
     }
     __syncthreads();
     _CLK_REC(clk_topk);
@@ -487,17 +535,12 @@ struct search_kernel_config {
   // Search kernel function type. Note that the actual values for the template value
   // parameters do not matter, because they are not part of the function signature. The
   // second to fourth value parameters will be selected by the choose_* functions below.
-  using kernel_t =
-    decltype(&search_kernel<128, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>);
+  using kernel_t = decltype(&search_kernel<DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>);
 
   static auto choose_buffer_size(unsigned result_buffer_size, unsigned block_size) -> kernel_t
   {
-    if (result_buffer_size <= 64) {
-      return search_kernel<64, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
-    } else if (result_buffer_size <= 128) {
-      return search_kernel<128, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
-    } else if (result_buffer_size <= 256) {
-      return search_kernel<256, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
+    if (result_buffer_size <= 256) {
+      return search_kernel<DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
     }
     THROW("Result buffer size %u larger than max buffer size %u", result_buffer_size, 256);
   }
@@ -536,8 +579,17 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
                          SourceIndexT,
                          SampleFilterT>::choose_buffer_size(result_buffer_size, block_size);
 
-  RAFT_CUDA_TRY(
-    cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
+  uint32_t max_elements{};
+  if (result_buffer_size <= 64) {
+    max_elements = 64;
+  } else if (result_buffer_size <= 128) {
+    max_elements = 128;
+  } else if (result_buffer_size <= 256) {
+    max_elements = 256;
+  } else {
+    THROW("Result buffer size %u larger than max buffer size %u", result_buffer_size, 256);
+  }
+
   // Initialize hash table
   const uint32_t traversed_hash_size = hashmap::get_size(traversed_hash_bitlen);
   set_value_batch(traversed_hashmap_ptr,
@@ -555,25 +607,29 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
                  num_queries,
                  smem_size);
 
-  kernel<<<grid_dims, block_dims, smem_size, stream>>>(topk_indices_ptr,
-                                                       topk_distances_ptr,
-                                                       dataset_desc.dev_ptr(stream),
-                                                       queries_ptr,
-                                                       graph.data_handle(),
-                                                       graph.extent(1),
-                                                       source_indices_ptr,
-                                                       ps.num_random_samplings,
-                                                       ps.rand_xor_mask,
-                                                       dev_seed_ptr,
-                                                       num_seeds,
-                                                       visited_hash_bitlen,
-                                                       traversed_hashmap_ptr,
-                                                       traversed_hash_bitlen,
-                                                       ps.itopk_size,
-                                                       ps.min_iterations,
-                                                       ps.max_iterations,
-                                                       num_executed_iterations,
-                                                       sample_filter);
+  auto const& kernel_launcher = [&](auto const& kernel) -> void {
+    kernel<<<grid_dims, block_dims, smem_size, stream>>>(topk_indices_ptr,
+                                                         topk_distances_ptr,
+                                                         dataset_desc.dev_ptr(stream),
+                                                         queries_ptr,
+                                                         graph.data_handle(),
+                                                         max_elements,
+                                                         graph.extent(1),
+                                                         source_indices_ptr,
+                                                         ps.num_random_samplings,
+                                                         ps.rand_xor_mask,
+                                                         dev_seed_ptr,
+                                                         num_seeds,
+                                                         visited_hash_bitlen,
+                                                         traversed_hashmap_ptr,
+                                                         traversed_hash_bitlen,
+                                                         ps.itopk_size,
+                                                         ps.min_iterations,
+                                                         ps.max_iterations,
+                                                         num_executed_iterations,
+                                                         sample_filter);
+  };
+  cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(kernel, smem_size, kernel_launcher);
 }
 
 }  // namespace multi_cta_search

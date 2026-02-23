@@ -300,38 +300,6 @@ struct extend_params {
  * @}
  */
 
-/**
- * @defgroup cagra_cpp_merge_params CAGRA index merge parameters
- * @{
- */
-
-/**
- * @brief Parameters for merging CAGRA indexes.
- */
-struct merge_params : cuvs::neighbors::merge_params {
-  merge_params() = default;
-
-  /**
-   * @brief Constructs merge parameters with given index parameters.
-   * @param params Parameters for creating the output index.
-   */
-  explicit merge_params(const cagra::index_params& params) : output_index_params(params) {}
-
-  /// Parameters for creating the output index.
-  cagra::index_params output_index_params;
-
-  /// Strategy for merging. Defaults to `MergeStrategy::MERGE_STRATEGY_PHYSICAL`.
-  cuvs::neighbors::MergeStrategy merge_strategy =
-    cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL;
-
-  /// Implementation of the polymorphic strategy() method
-  cuvs::neighbors::MergeStrategy strategy() const { return merge_strategy; }
-};
-
-/**
- * @}
- */
-
 static_assert(std::is_aggregate_v<index_params>);
 static_assert(std::is_aggregate_v<search_params>);
 
@@ -1235,6 +1203,82 @@ void extend(
   raft::host_matrix_view<const float, int64_t, raft::row_major> additional_dataset,
   cuvs::neighbors::cagra::index<float, uint32_t>& idx,
   std::optional<raft::device_matrix_view<float, int64_t, raft::layout_stride>>
+    new_dataset_buffer_view                                                        = std::nullopt,
+  std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
+
+/** @brief Add new vectors to a CAGRA index
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   auto additional_dataset = raft::make_device_matrix<half, int64_t>(handle,add_size,dim);
+ *   // set_additional_dataset(additional_dataset.view());
+ *
+ *   cagra::extend_params params;
+ *   cagra::extend(res, params, raft::make_const_mdspan(additional_dataset.view()), index);
+ * @endcode
+ *
+ * @param[in] handle raft resources
+ * @param[in] params extend params
+ * @param[in] additional_dataset additional dataset on device memory
+ * @param[in,out] idx CAGRA index
+ * @param[out] new_dataset_buffer_view memory buffer view for the dataset including the additional
+ * part. The data will be copied from the current index in this function. The num rows must be the
+ * sum of the original and additional datasets, cols must be the dimension of the dataset, and the
+ * stride must be the same as the original index dataset. This view will be stored in the output
+ * index. It is the caller's responsibility to ensure that dataset stays alive as long as the index.
+ * This option is useful when users want to manage the memory space for the dataset themselves.
+ * @param[out] new_graph_buffer_view memory buffer view for the graph including the additional part.
+ * The data will be copied from the current index in this function. The num rows must be the sum of
+ * the original and additional datasets and cols must be the graph degree. This view will be stored
+ * in the output index. It is the caller's responsibility to ensure that dataset stays alive as long
+ * as the index. This option is useful when users want to manage the memory space for the graph
+ * themselves.
+ */
+void extend(
+  raft::resources const& handle,
+  const cagra::extend_params& params,
+  raft::device_matrix_view<const half, int64_t, raft::row_major> additional_dataset,
+  cuvs::neighbors::cagra::index<half, uint32_t>& idx,
+  std::optional<raft::device_matrix_view<half, int64_t, raft::layout_stride>>
+    new_dataset_buffer_view                                                        = std::nullopt,
+  std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
+
+/** @brief Add new vectors to a CAGRA index
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   auto additional_dataset = raft::make_host_matrix<half, int64_t>(handle,add_size,dim);
+ *   // set_additional_dataset(additional_dataset.view());
+ *
+ *   cagra::extend_params params;
+ *   cagra::extend(res, params, raft::make_const_mdspan(additional_dataset.view()), index);
+ * @endcode
+ *
+ * @param[in] handle raft resources
+ * @param[in] params extend params
+ * @param[in] additional_dataset additional dataset on host memory
+ * @param[in,out] idx CAGRA index
+ * @param[out] new_dataset_buffer_view memory buffer view for the dataset including the additional
+ * part. The data will be copied from the current index in this function. The num rows must be the
+ * sum of the original and additional datasets, cols must be the dimension of the dataset, and the
+ * stride must be the same as the original index dataset. This view will be stored in the output
+ * index. It is the caller's responsibility to ensure that dataset stays alive as long as the index.
+ * This option is useful when users want to manage the memory space for the dataset themselves.
+ * @param[out] new_graph_buffer_view memory buffer view for the graph including the additional part.
+ * The data will be copied from the current index in this function. The num rows must be the sum of
+ * the original and additional datasets and cols must be the graph degree. This view will be stored
+ * in the output index. It is the caller's responsibility to ensure that dataset stays alive as long
+ * as the index. This option is useful when users want to manage the memory space for the graph
+ * themselves.
+ */
+void extend(
+  raft::resources const& handle,
+  const cagra::extend_params& params,
+  raft::host_matrix_view<const half, int64_t, raft::row_major> additional_dataset,
+  cuvs::neighbors::cagra::index<half, uint32_t>& idx,
+  std::optional<raft::device_matrix_view<half, int64_t, raft::layout_stride>>
     new_dataset_buffer_view                                                        = std::nullopt,
   std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
 
@@ -2325,126 +2369,47 @@ void serialize_to_hnswlib(
  *   auto index1 = cagra::build(res, index_params, dataset1);
  *
  *   std::vector<cagra::index<float, uint32_t>*> indices{&index0, &index1};
- *   cagra::merge_params params{index_params};
  *
- *   auto merged_index = cagra::merge(res, params, indices);
+ *   auto merged_index = cagra::merge(res, index_params, indices);
  * @endcode
  *
  * @param[in] res RAFT resources used for the merge operation.
  * @param[in] params Parameters that control the merging process.
  * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
  *                    - Have attached datasets with the same dimension.
- *
+ * @param[in] row_filter an optional device filter function object that greenlights rows
+ *    to include in the merged index  (none_sample_filter for no filtering)
  * @return A new CAGRA index containing the merged indices, graph, and dataset.
  */
 auto merge(raft::resources const& res,
-           const cuvs::neighbors::cagra::merge_params& params,
-           std::vector<cuvs::neighbors::cagra::index<float, uint32_t>*>& indices)
+           const cuvs::neighbors::cagra::index_params& params,
+           std::vector<cuvs::neighbors::cagra::index<float, uint32_t>*>& indices,
+           const cuvs::neighbors::filtering::base_filter& row_filter =
+             cuvs::neighbors::filtering::none_sample_filter{})
   -> cuvs::neighbors::cagra::index<float, uint32_t>;
 
-/** @brief Merge multiple CAGRA indices into a single index.
- *
- * This function merges multiple CAGRA indices into one, combining both the datasets and graph
- * structures.
- *
- * @note: When device memory is sufficient, the dataset attached to the returned index is allocated
- * in device memory by default; otherwise, host memory is used automatically.
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   auto dataset0 = raft::make_host_matrix<half, int64_t>(handle, size0, dim);
- *   auto dataset1 = raft::make_host_matrix<half, int64_t>(handle, size1, dim);
- *
- *   auto index0 = cagra::build(res, index_params, dataset0);
- *   auto index1 = cagra::build(res, index_params, dataset1);
- *
- *   std::vector<cagra::index<half, uint32_t>*> indices{&index0, &index1};
- *   cagra::merge_params params{index_params};
- *
- *   auto merged_index = cagra::merge(res, params, indices);
- * @endcode
- *
- * @param[in] res RAFT resources used for the merge operation.
- * @param[in] params Parameters that control the merging process.
- * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
- *                    - Have attached datasets with the same dimension.
- *
- * @return A new CAGRA index containing the merged indices, graph, and dataset.
- */
+/** @copydoc merge */
 auto merge(raft::resources const& res,
-           const cuvs::neighbors::cagra::merge_params& params,
-           std::vector<cuvs::neighbors::cagra::index<half, uint32_t>*>& indices)
+           const cuvs::neighbors::cagra::index_params& params,
+           std::vector<cuvs::neighbors::cagra::index<half, uint32_t>*>& indices,
+           const cuvs::neighbors::filtering::base_filter& row_filter =
+             cuvs::neighbors::filtering::none_sample_filter{})
   -> cuvs::neighbors::cagra::index<half, uint32_t>;
 
-/** @brief Merge multiple CAGRA indices into a single index.
- *
- * This function merges multiple CAGRA indices into one, combining both the datasets and graph
- * structures.
- *
- * @note: When device memory is sufficient, the dataset attached to the returned index is allocated
- * in device memory by default; otherwise, host memory is used automatically.
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   auto dataset0 = raft::make_host_matrix<int8_t, int64_t>(handle, size0, dim);
- *   auto dataset1 = raft::make_host_matrix<int8_t, int64_t>(handle, size1, dim);
- *
- *   auto index0 = cagra::build(res, index_params, dataset0);
- *   auto index1 = cagra::build(res, index_params, dataset1);
- *
- *   std::vector<cagra::index<int8_t, uint32_t>*> indices{&index0, &index1};
- *   cagra::merge_params params{index_params};
- *
- *   auto merged_index = cagra::merge(res, params, indices);
- * @endcode
- *
- * @param[in] res RAFT resources used for the merge operation.
- * @param[in] params Parameters that control the merging process.
- * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
- *                    - Have attached datasets with the same dimension.
- *
- * @return A new CAGRA index containing the merged indices, graph, and dataset.
- */
+/** @copydoc merge */
 auto merge(raft::resources const& res,
-           const cuvs::neighbors::cagra::merge_params& params,
-           std::vector<cuvs::neighbors::cagra::index<int8_t, uint32_t>*>& indices)
+           const cuvs::neighbors::cagra::index_params& params,
+           std::vector<cuvs::neighbors::cagra::index<int8_t, uint32_t>*>& indices,
+           const cuvs::neighbors::filtering::base_filter& row_filter =
+             cuvs::neighbors::filtering::none_sample_filter{})
   -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
 
-/** @brief Merge multiple CAGRA indices into a single index.
- *
- * This function merges multiple CAGRA indices into one, combining both the datasets and graph
- * structures.
- *
- * @note: When device memory is sufficient, the dataset attached to the returned index is allocated
- * in device memory by default; otherwise, host memory is used automatically.
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   auto dataset0 = raft::make_host_matrix<uint8_t, int64_t>(handle, size0, dim);
- *   auto dataset1 = raft::make_host_matrix<uint8_t, int64_t>(handle, size1, dim);
- *
- *   auto index0 = cagra::build(res, index_params, dataset0);
- *   auto index1 = cagra::build(res, index_params, dataset1);
- *
- *   std::vector<cagra::index<uint8_t, uint32_t>*> indices{&index0, &index1};
- *   cagra::merge_params params{index_params};
- *
- *   auto merged_index = cagra::merge(res, params, indices);
- * @endcode
- *
- * @param[in] res RAFT resources used for the merge operation.
- * @param[in] params Parameters that control the merging process.
- * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
- *                    - Have attached datasets with the same dimension.
- *
- * @return A new CAGRA index containing the merged indices, graph, and dataset.
- */
+/** @copydoc merge */
 auto merge(raft::resources const& res,
-           const cuvs::neighbors::cagra::merge_params& params,
-           std::vector<cuvs::neighbors::cagra::index<uint8_t, uint32_t>*>& indices)
+           const cuvs::neighbors::cagra::index_params& params,
+           std::vector<cuvs::neighbors::cagra::index<uint8_t, uint32_t>*>& indices,
+           const cuvs::neighbors::filtering::base_filter& row_filter =
+             cuvs::neighbors::filtering::none_sample_filter{})
   -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
 /**
  * @}
@@ -3212,5 +3177,31 @@ std::pair<size_t, size_t> cagra_build_mem_usage(raft::resources const& res,
 }  // namespace helpers
 }  // namespace cuvs::neighbors::cagra
 
+namespace cuvs::neighbors::cagra::helpers {
+
+/**
+ * @brief Optimize a KNN graph into a CAGRA graph.
+ *
+ * This function optimizes a k-NN graph to create a CAGRA graph.
+ * The input/output graphs must be on host memory.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   raft::resources res;
+ *   auto h_knn = raft::make_host_matrix<uint32_t, int64_t>(N, K_in);
+ *   // Fill h_knn with KNN graph
+ *   auto h_out = raft::make_host_matrix<uint32_t, int64_t>(N, K_out);
+ *   cuvs::neighbors::cagra::helpers::optimize(res, h_knn.view(), h_out.view());
+ * @endcode
+ *
+ * @param[in] handle RAFT resources
+ * @param[in] knn_graph Input KNN graph on host [n_rows, k_in]
+ * @param[out] new_graph Output CAGRA graph on host [n_rows, k_out]
+ */
+void optimize(raft::resources const& handle,
+              raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
+              raft::host_matrix_view<uint32_t, int64_t, raft::row_major> new_graph);
+
+}  // namespace cuvs::neighbors::cagra::helpers
+
 #include <cuvs/neighbors/cagra_index_wrapper.hpp>
-#include <cuvs/neighbors/cagra_optimize.hpp>
