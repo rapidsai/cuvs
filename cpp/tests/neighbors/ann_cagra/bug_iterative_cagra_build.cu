@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -28,13 +28,12 @@ class CagraIterativeBuildBugTest : public ::testing::Test {
     cagra::index_params index_params;
     index_params.graph_degree              = 16;
     index_params.intermediate_graph_degree = 16;
-    
+
     // Use iterative CAGRA search for graph building
     index_params.graph_build_params = graph_build_params::iterative_search_params();
 
     // Build the index
-    auto cagra_index =
-      cagra::build(res, index_params, raft::make_const_mdspan(dataset->view()));
+    auto cagra_index = cagra::build(res, index_params, raft::make_const_mdspan(dataset->view()));
     raft::resource::sync_stream(res);
 
     // Verify the index was built successfully
@@ -46,7 +45,7 @@ class CagraIterativeBuildBugTest : public ::testing::Test {
   {
     dataset.emplace(raft::make_device_matrix<data_type, int64_t>(res, n_samples, n_dim));
     raft::random::RngState r(1234ULL);
-    
+
     // Generate random data based on type
     if constexpr (std::is_same_v<data_type, float>) {
       raft::random::normal(

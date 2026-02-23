@@ -2021,7 +2021,7 @@ auto iterative_build_graph(
 
   // Allocate memory for search results.
   constexpr uint64_t max_chunk_size = 8192;
-  auto topk                         = intermediate_degree;
+  auto topk                         = intermediate_degree + 1;
   auto dev_neighbors = raft::make_device_matrix<IdxT, int64_t>(res, max_chunk_size, topk);
   auto dev_distances = raft::make_device_matrix<float, int64_t>(res, max_chunk_size, topk);
 
