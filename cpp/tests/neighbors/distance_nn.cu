@@ -85,8 +85,15 @@ class NNTest : public ::testing::TestWithParam<NNInputs<IdxT>> {
       workspace_size = m * n * sizeof(AccT);
     }
 
-    // Reset buffers
-    RAFT_CUDA_TRY(cudaMemsetAsync(out.data_handle(), 0, m * sizeof(OutT)));
+    // Reset buffer
+    if constexpr (std::is_same_v<OutT, raft::KeyValuePair<IdxT, AccT>>) {
+      // OutT is a RAFT KeyValuePair
+      raft::matrix::fill(
+        handle, raft::make_device_matrix_view(out.data_handle(), m, 1), OutT{0, 0});
+    } else {
+      // OutT is a scalar type
+      raft::matrix::fill(handle, raft::make_device_matrix_view(out.data_handle(), m, 1), OutT{0});
+    }
     raft::resource::sync_stream(handle, stream);
   }
 

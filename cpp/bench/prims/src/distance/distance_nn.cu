@@ -14,6 +14,7 @@
 #include <raft/core/device_resources.hpp>
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/norm_types.hpp>
+#include <raft/matrix/init.cuh>
 #include <raft/random/rng.cuh>
 
 using cuvs::distance::DistanceType;
@@ -81,8 +82,8 @@ void benchmark_distance_nn(benchmark::State& state)
 
   size_t workspace_size = (algo == AlgorithmType::fused) ? m * sizeof(IdxT) : m * n * sizeof(AccT);
 
-  raft::device_vector<char, IdxT> workspace =
-    raft::make_device_vector<char, IdxT>(handle, workspace_size);
+  raft::device_vector<char, size_t> workspace =
+    raft::make_device_vector<char, size_t>(handle, workspace_size);
 
   // Warm up
   if constexpr (algo != AlgorithmType::fused) {
@@ -104,9 +105,18 @@ void benchmark_distance_nn(benchmark::State& state)
                                                         stream);
   }
 
-  RAFT_CUDA_TRY(cudaMemsetAsync(workspace.data_handle(), 0, workspace_size, stream));
-  RAFT_CUDA_TRY(cudaMemsetAsync(out.data_handle(), 0, m * sizeof(OutT), stream));
-  RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
+  raft::matrix::fill(
+    handle,
+    raft::make_device_matrix_view(workspace.data_handle(), workspace_size, size_t(1)),
+    char(0));
+  if constexpr (std::is_same_v<OutT, raft::KeyValuePair<IdxT, AccT>>) {
+    // OutT is a RAFT KeyValuePair
+    raft::matrix::fill(handle, raft::make_device_matrix_view(out.data_handle(), m, 1), OutT{0, 0});
+  } else {
+    // OutT is a scalar type
+    raft::matrix::fill(handle, raft::make_device_matrix_view(out.data_handle(), m, 1), OutT{0});
+  }
+  raft::resource::sync_stream(handle, stream);
 
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
