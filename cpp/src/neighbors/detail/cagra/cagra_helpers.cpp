@@ -80,7 +80,7 @@ inline std::pair<size_t, size_t> ivf_pq_build_mem_usage(
   size_t total_host =
     graph_host_mem + host_workspace_size + 2e9;  // added 2 GB extra workspace (IVF-PQ search)
   size_t total_dev =
-    std::max(dataset_gpu_mem, gpu_workspace_size) + 1e9;  // addet 1 GB extra workspace size
+    std::max(dataset_gpu_mem, gpu_workspace_size) + 1e9;  // added 1 GB extra workspace size
 
   std::cout << "IVF-PQ build memory requirements\ndataset_gpu " << dataset_gpu_mem / 1e9 << " GB"
             << std::endl;
