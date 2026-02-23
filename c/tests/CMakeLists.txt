@@ -56,6 +56,18 @@ function(ConfigureTest)
                INSTALL_RPATH "\$ORIGIN/../../../${lib_dir}"
   )
 
+  # Apply same CUDA/CXX flags as main cuvs (e.g. LIBCUDACXX_ENABLE_EXPERIMENTAL_MEMORY_RESOURCE for RMM)
+  if(DEFINED CUVS_CUDA_FLAGS)
+    target_compile_options(
+      ${TEST_NAME} PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+    )
+  endif()
+  if(DEFINED CUVS_CXX_FLAGS)
+    target_compile_options(
+      ${TEST_NAME} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
+    )
+  endif()
+
   target_include_directories(
     ${TEST_NAME} PRIVATE "$<BUILD_INTERFACE:${CUVS_C_SOURCE_DIR}/tests>"
                          "$<BUILD_INTERFACE:${CUVS_C_SOURCE_DIR}/../cpp/tests>"
