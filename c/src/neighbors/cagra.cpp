@@ -615,7 +615,6 @@ extern "C" cuvsError_t cuvsCagraUpdateDataset(cuvsResources_t res,
                                               cuvsCagraIndex_t index)
 {
   return cuvs::core::translate_exceptions([=] {
-    auto dataset = dataset_tensor->dl_tensor;
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
       _update_dataset<float>(res, *index, dataset_tensor);
     } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
