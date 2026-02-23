@@ -77,10 +77,10 @@ class NNTest : public ::testing::TestWithParam<NNInputs<IdxT>> {
     raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
       x_norm.data_handle(), x.data_handle(), k, m, stream);
     raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
-      y_norm.data_handle(), y.data_handle(), k, m, stream);
+      y_norm.data_handle(), y.data_handle(), k, n, stream);
 
     if constexpr (impl == ImplType::fused) {
-      workspace_size = n * sizeof(IdxT);
+      workspace_size = m * sizeof(IdxT);
     } else if constexpr (impl == ImplType::unfused) {
       workspace_size = m * n * sizeof(AccT);
     }
