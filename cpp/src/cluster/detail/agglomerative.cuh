@@ -13,8 +13,8 @@
 
 #include <rmm/device_uvector.hpp>
 
-#include <cuda/std/functional>
 #include <cuda/iterator>
+#include <cuda/std/functional>
 #include <cuda/std/tuple>
 #include <thrust/device_ptr.h>
 #include <thrust/execution_policy.h>
