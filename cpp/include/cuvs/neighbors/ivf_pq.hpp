@@ -3295,7 +3295,7 @@ void make_rotation_matrix(
  *
  * @param[in] res raft resource
  * @param[in] dataset shape of the dataset
- * @param[in] param ivf-pq compression pramas
+ * @param[in] param ivf-pq compression params
  *
  * @return compressed dataset size in bytes
  */
