@@ -116,8 +116,7 @@ struct search_plan_impl_base : public search_params {
       // This causes recall degradation when AUTO switches to SINGLE_CTA at
       // large batch sizes. Only select SINGLE_CTA when search_width <= 1 to
       // ensure consistent recall across batch sizes. (See #1187)
-      if (itopk_size <= 512 && search_width <= 1 &&
-          search_params::max_queries >= num_sm * 2lu) {
+      if (itopk_size <= 512 && search_width <= 1 && search_params::max_queries >= num_sm * 2lu) {
         algo = search_algo::SINGLE_CTA;
         RAFT_LOG_DEBUG("Auto strategy: selecting single-cta");
       } else {

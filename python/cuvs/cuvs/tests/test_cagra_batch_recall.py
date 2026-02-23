@@ -67,7 +67,9 @@ def test_cagra_batch_recall_consistency(search_width):
         q = queries_device[i : i + 1]
         n_out = device_ndarray(np.zeros((1, k), dtype=np.uint32))
         d_out = device_ndarray(np.zeros((1, k), dtype=np.float32))
-        cagra.search(search_params, index, q, k, neighbors=n_out, distances=d_out)
+        cagra.search(
+            search_params, index, q, k, neighbors=n_out, distances=d_out
+        )
         gt_neighbors[i] = cp.asnumpy(cp.asarray(n_out))
 
     # Test different batch sizes including ones that trigger SINGLE_CTA
@@ -102,14 +104,10 @@ def test_cagra_batch_recall_consistency(search_width):
     assert recall_std < 0.02, (
         f"Recall varies too much with batch size (std={recall_std:.4f}). "
         f"Recalls by batch size: "
-        + ", ".join(
-            f"{bs}={r:.4f}" for bs, r in zip(batch_sizes, recalls)
-        )
+        + ", ".join(f"{bs}={r:.4f}" for bs, r in zip(batch_sizes, recalls))
     )
     assert (max_recall - min_recall) < 0.05, (
         f"Recall range too wide ({max_recall - min_recall:.4f}). "
         f"Recalls by batch size: "
-        + ", ".join(
-            f"{bs}={r:.4f}" for bs, r in zip(batch_sizes, recalls)
-        )
+        + ", ".join(f"{bs}={r:.4f}" for bs, r in zip(batch_sizes, recalls))
     )
