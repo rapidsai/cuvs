@@ -3294,6 +3294,18 @@ void make_rotation_matrix(
   raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix,
   bool force_random_rotation);
 
+/** Calculate the size of the compressed dataset.
+ *
+ * @param[in] res raft resource
+ * @param[in] dataset shape of the dataset
+ * @param[in] param ivf-pq compression params
+ *
+ * @return compressed dataset size in bytes
+ */
+size_t compressed_dataset_size(raft::resources const& res,
+                               raft::matrix_extent<int64_t> dataset,
+                               cuvs::neighbors::ivf_pq::index_params params);
+
 /**
  * @brief Resize an IVF-PQ list with flat layout.
  *
@@ -3356,17 +3368,6 @@ void resize_list(raft::resources const& res,
                  uint32_t new_used_size,
                  uint32_t old_used_size);
 
-/** Calculate the size of the compressed dataset.
- *
- * @param[in] res raft resource
- * @param[in] dataset shape of the dataset
- * @param[in] param ivf-pq compression pramas
- *
- * @return compressed dataset size in bytes
- */
-size_t compressed_dataset_size(raft::resources const& res,
-                               raft::matrix_extent<int64_t> dataset,
-                               cuvs::neighbors::ivf_pq::index_params params);
 /**
  * @}
  */
