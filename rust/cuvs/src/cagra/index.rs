@@ -59,7 +59,7 @@ impl Index {
     /// * `neighbors` - Matrix in device memory that receives the indices of the nearest neighbors
     /// * `distances` - Matrix in device memory that receives the distances of the nearest neighbors
     pub fn search(
-        self,
+        &self,
         res: &Resources,
         params: &SearchParams,
         queries: &ManagedTensor,
