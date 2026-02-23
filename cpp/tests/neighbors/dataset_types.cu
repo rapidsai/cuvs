@@ -13,11 +13,31 @@
 #include <cuvs/neighbors/common.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_resources.hpp>
+#include <raft/core/host_mdarray.hpp>
+#include <raft/util/cudart_utils.hpp>
+#include <exception>
 #include <gtest/gtest.h>
 
 namespace cuvs::neighbors::test {
 
 using namespace cuvs::neighbors;
+
+// Helper: assert that ptr is device memory (for device_* dataset views).
+inline void expect_device_pointer(const void* ptr)
+{
+  cudaPointerAttributes attr;
+  RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, ptr));
+  EXPECT_EQ(attr.type, cudaMemoryTypeDevice) << "Expected device memory";
+}
+
+// Helper: assert that ptr is host memory (for host_* dataset views).
+inline void expect_host_pointer(const void* ptr)
+{
+  cudaPointerAttributes attr;
+  RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, ptr));
+  EXPECT_TRUE(attr.type == cudaMemoryTypeHost || attr.type == cudaMemoryTypeUnregistered)
+    << "Expected host memory";
+}
 
 // Type aliases to avoid commas in GTest macro arguments (preprocessor splits on comma).
 using strided_float_i64    = strided_dataset<float, int64_t>;
@@ -59,6 +79,14 @@ TEST(DatasetTypes, TypeTraits)
   // EXPECT_TRUE((is_pq_dataset_v<pq_dataset<float, int64_t>>));
   // EXPECT_FALSE((is_pq_dataset_v<vpq_float_i64>));
   // EXPECT_FALSE((is_pq_dataset_v<strided_float_i64>));
+
+  // Padded dataset type traits
+  EXPECT_TRUE((is_padded_dataset_v<device_padded_dataset<float, int64_t>>));
+  EXPECT_TRUE((is_padded_dataset_v<device_padded_dataset_view<float, int64_t>>));
+  EXPECT_TRUE((is_padded_dataset_v<host_padded_dataset<float, int64_t>>));
+  EXPECT_TRUE((is_padded_dataset_v<host_padded_dataset_view<float, int64_t>>));
+  EXPECT_FALSE((is_padded_dataset_v<strided_float_i64>));
+  EXPECT_FALSE((is_padded_dataset_v<empty_dataset<int64_t>>));
 }
 
 // ---------------------------------------------------------------------------
@@ -137,6 +165,111 @@ TEST(DatasetTypes, MakeAlignedDatasetOwningWhenPadded)
   EXPECT_EQ(ds->dim(), dim);
   EXPECT_GE(ds->stride(), dim);   // stride will be 32 (rounded up from 30)
   EXPECT_TRUE(ds->is_owning());   // stride mismatch -> copy with padding
+}
+
+// ---------------------------------------------------------------------------
+// Padded datasets (device_padded_dataset, device_padded_dataset_view, host_*)
+// ---------------------------------------------------------------------------
+// Owning vs view is determined by which factory is used, not by dim/stride:
+//   make_*_padded_dataset(...)  -> always allocates -> is_owning() == true
+//   make_*_padded_dataset_view(...) -> wraps existing memory -> is_owning() == false
+// Stride only affects layout (stride >= dim); it does not change owning vs view.
+//
+TEST(DatasetTypes, DevicePaddedDataset)
+{
+  raft::resources res;
+  const int64_t n_rows = 40;
+  const uint32_t dim   = 16;
+
+  auto ds = make_device_padded_dataset<float>(res, n_rows, dim);
+  ASSERT_NE(ds, nullptr);
+  EXPECT_EQ(ds->n_rows(), n_rows);
+  EXPECT_EQ(ds->dim(), dim);
+  EXPECT_EQ(ds->stride(), dim);  // no stride_hint -> stride == dim
+  EXPECT_TRUE(ds->is_owning());  // make_*_padded_dataset always owning
+  expect_device_pointer(ds->view().data_handle());
+  auto v = ds->view();
+  EXPECT_EQ(v.extent(0), n_rows);
+  EXPECT_EQ(v.extent(1), dim);
+
+  // With explicit stride (padding): still owning; stride does not change that
+  const uint32_t padded_stride = dim + 8;
+  auto ds_padded               = make_device_padded_dataset<float>(res, n_rows, dim, padded_stride);
+  ASSERT_NE(ds_padded, nullptr);
+  EXPECT_EQ(ds_padded->n_rows(), n_rows);
+  EXPECT_EQ(ds_padded->dim(), dim);
+  EXPECT_EQ(ds_padded->stride(), padded_stride);
+  EXPECT_TRUE(ds_padded->is_owning());
+  expect_device_pointer(ds_padded->view().data_handle());
+}
+
+TEST(DatasetTypes, DevicePaddedDatasetView)
+{
+  raft::resources res;
+  const int64_t n_rows = 20;
+  const uint32_t dim   = 8;
+  // For float, dim=8: required_stride = 8, so stride=8 is allowed.
+  auto dev_matrix = raft::make_device_matrix<float, int64_t>(res, n_rows, dim);
+  auto ds         = make_device_padded_dataset_view(dev_matrix.data_handle(), n_rows, dim);
+  ASSERT_NE(ds, nullptr);
+  EXPECT_EQ(ds->n_rows(), n_rows);
+  EXPECT_EQ(ds->dim(), dim);
+  EXPECT_EQ(ds->stride(), dim);
+  EXPECT_FALSE(ds->is_owning());  // make_*_padded_dataset_view always non-owning
+  expect_device_pointer(ds->view().data_handle());
+  auto v = ds->view();
+  EXPECT_EQ(v.extent(0), n_rows);
+  EXPECT_EQ(v.extent(1), dim);
+}
+
+TEST(DatasetTypes, HostPaddedDataset)
+{
+  raft::resources res;
+  const int64_t n_rows = 30;
+  const uint32_t dim  = 12;
+
+  auto ds = make_host_padded_dataset<float>(res, n_rows, dim);
+  ASSERT_NE(ds, nullptr);
+  EXPECT_EQ(ds->n_rows(), n_rows);
+  EXPECT_EQ(ds->dim(), dim);
+  EXPECT_EQ(ds->stride(), dim);
+  EXPECT_TRUE(ds->is_owning());  // make_*_padded_dataset always owning
+  expect_host_pointer(ds->view().data_handle());
+  auto v = ds->view();
+  EXPECT_EQ(v.extent(0), n_rows);
+  EXPECT_EQ(v.extent(1), dim);
+}
+
+TEST(DatasetTypes, HostPaddedDatasetView)
+{
+  raft::resources res;
+  const int64_t n_rows = 10;
+  const uint32_t dim   = 4;
+  // For float, dim=4: required_stride = 4, so stride=4 is allowed.
+  auto host_matrix = raft::make_host_matrix<float, int64_t>(res, n_rows, dim);
+  auto ds          = make_host_padded_dataset_view(host_matrix.data_handle(), n_rows, dim);
+  ASSERT_NE(ds, nullptr);
+  EXPECT_EQ(ds->n_rows(), n_rows);
+  EXPECT_EQ(ds->dim(), dim);
+  EXPECT_EQ(ds->stride(), dim);
+  EXPECT_FALSE(ds->is_owning());  // make_*_padded_dataset_view always non-owning
+  expect_host_pointer(ds->view().data_handle());
+  auto v = ds->view();
+  EXPECT_EQ(v.extent(0), n_rows);
+  EXPECT_EQ(v.extent(1), dim);
+}
+
+// 3-arg view throws when stride != required_stride. For stride=30, float, align=16: required_stride=32.
+TEST(DatasetTypes, PaddedDatasetViewFailsWhenStrideNotRequiredStride)
+{
+  raft::resources res;
+  const int64_t n_rows = 10;
+  auto host_matrix = raft::make_host_matrix<float, int64_t>(res, n_rows, 32u);
+  EXPECT_THROW(
+    {
+      (void)make_host_padded_dataset_view(host_matrix.data_handle(), n_rows, 30u);
+    },
+    std::exception);
 }
 
 // ---------------------------------------------------------------------------
@@ -223,6 +356,13 @@ TEST(DatasetTypes, PolymorphicBaseAccess)
   base = ds_strided.get();
   EXPECT_EQ(base->n_rows(), 5);
   EXPECT_EQ(base->dim(), 8u);
+  EXPECT_TRUE(base->is_owning());
+
+  // device padded (owning); use int64_t so base (dataset<int64_t>*) is compatible
+  auto ds_padded = make_device_padded_dataset<float, int64_t>(res, 6, 4);
+  base = ds_padded.get();
+  EXPECT_EQ(base->n_rows(), 6);
+  EXPECT_EQ(base->dim(), 4u);
   EXPECT_TRUE(base->is_owning());
 
   // vpq
