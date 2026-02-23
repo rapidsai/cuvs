@@ -15,7 +15,7 @@ namespace cuvs {
 namespace distance {
 
 template <typename T>
-__host__ __device__ T max_val()
+_RAFT_HOST_DEVICE T max_val()
 {
   if constexpr (std::is_same<T, half>::value) {
     return CUDART_MAX_NORMAL_FP16;
