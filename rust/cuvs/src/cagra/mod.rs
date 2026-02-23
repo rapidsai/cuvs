@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -62,6 +62,29 @@
 //!     // dataset
 //!     println!("Neighbors {:?}", neighbors_host);
 //!     println!("Distances {:?}", distances_host);
+//!     Ok(())
+//! }
+//! ```
+//!
+//! Serialization example:
+//! ```no_run
+//! use cuvs::cagra::{Index, IndexParams};
+//! use cuvs::{Resources, Result};
+//!
+//! fn serialize_example() -> Result<()> {
+//!     let res = Resources::new()?;
+//!
+//!     // Build an index (using some dataset)
+//!     let build_params = IndexParams::new()?;
+//!     // let index = Index::build(&res, &build_params, &dataset)?;
+//!
+//!     // Save the index to disk (including the dataset)
+//!     // index.serialize(&res, "/path/to/index.bin", true)?;
+//!
+//!     // Later, load the index from disk
+//!     let loaded_index = Index::deserialize(&res, "/path/to/index.bin")?;
+//!
+//!     // The loaded index can be used for search just like the original
 //!     Ok(())
 //! }
 //! ```
