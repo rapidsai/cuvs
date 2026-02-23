@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -94,9 +94,9 @@ enum KernelType { LINEAR, POLYNOMIAL, RBF, TANH };
 struct KernelParams {
   // Kernel function parameters
   KernelType kernel = KernelType::LINEAR;  //!< Type of the kernel function
-  int degree = 3;         //!< Degree of polynomial kernel (ignored by others)
-  double gamma = 1.0;     //!< multiplier in the
-  double coef0 = 0.0;     //!< additive constant in poly and tanh kernels
+  int degree        = 3;                   //!< Degree of polynomial kernel (ignored by others)
+  double gamma      = 1.0;                 //!< multiplier in the
+  double coef0      = 0.0;                 //!< additive constant in poly and tanh kernels
 };
 }  // end namespace kernels
 
