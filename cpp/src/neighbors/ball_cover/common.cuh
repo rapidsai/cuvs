@@ -6,7 +6,6 @@
 #pragma once
 
 #include <cuda/std/tuple>
-#include <thrust/functional.h>
 
 #include <cstdint>
 
