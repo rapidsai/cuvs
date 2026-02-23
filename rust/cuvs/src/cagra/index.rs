@@ -264,8 +264,8 @@ mod tests {
         );
 
         // Deserialize the index
-        let loaded_index = Index::deserialize(&res, filepath_str)
-            .expect("failed to deserialize cagra index");
+        let loaded_index =
+            Index::deserialize(&res, filepath_str).expect("failed to deserialize cagra index");
 
         // Search the deserialized index with the first 4 points from the dataset
         let n_queries = 4;
@@ -357,7 +357,10 @@ mod tests {
             .expect("failed to serialize cagra index to hnswlib format");
 
         // Verify the file was created
-        assert!(filepath.exists(), "serialized hnswlib index file should exist");
+        assert!(
+            filepath.exists(),
+            "serialized hnswlib index file should exist"
+        );
         assert!(
             std::fs::metadata(&filepath).unwrap().len() > 0,
             "serialized hnswlib index file should not be empty"
