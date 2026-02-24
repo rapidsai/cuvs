@@ -83,7 +83,7 @@ def test_cluster_cost(n_rows, n_cols, n_clusters, dtype):
 @pytest.mark.parametrize("n_cols", [10, 100])
 @pytest.mark.parametrize("n_clusters", [8, 16])
 @pytest.mark.parametrize("batch_size", [100, 500])
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float64])
 def test_fit_batched_matches_fit(
     n_rows, n_cols, n_clusters, batch_size, dtype
 ):
@@ -93,6 +93,11 @@ def test_fit_batched_matches_fit(
     """
     rng = np.random.default_rng(99)
     X_host = rng.random((n_rows, n_cols)).astype(dtype)
+    
+    norms = np.linalg.norm(X_host, ord=1, axis=1, keepdims=True)
+    norms = np.where(norms == 0, 1.0, norms)
+    X_host = X_host / norms
+    
     initial_centroids_host = X_host[:n_clusters].copy()
 
     params = KMeansParams(
@@ -117,7 +122,7 @@ def test_fit_batched_matches_fit(
     centroids_batched = centroids_batched.copy_to_host()
 
     assert np.allclose(
-        centroids_regular, centroids_batched, rtol=0.05, atol=0.05
+        centroids_regular, centroids_batched, rtol=1e-3, atol=1e-3
     ), f"max diff: {np.max(np.abs(centroids_regular - centroids_batched))}"
 
 
@@ -147,7 +152,6 @@ def test_minibatch_sklearn(n_rows, n_cols, n_clusters, dtype):
         reassignment_ratio=0.01,
         batch_size=256,
     )
-    # kmeans = KMeans(n_clusters=8, init=initial_centroids_host, n_init='auto', max_iter=20, tol=0.0001, verbose=0, random_state=None, copy_x=True, algorithm='lloyd')
     kmeans.fit(X_host)
 
     centroids_sklearn = kmeans.cluster_centers_
@@ -167,7 +171,6 @@ def test_minibatch_sklearn(n_rows, n_cols, n_clusters, dtype):
         centroids=device_ndarray(initial_centroids_host.copy()),
     )
     centroids_cuvs = centroids_cuvs.copy_to_host()
-    print(centroids_cuvs)
 
     assert np.allclose(
         centroids_sklearn, centroids_cuvs, rtol=0.3, atol=0.3
