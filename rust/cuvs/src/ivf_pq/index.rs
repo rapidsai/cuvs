@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -201,7 +201,8 @@ mod tests {
 
             // Verify results are consistent
             assert_eq!(
-                neighbors_host[[0, 0]], 0,
+                neighbors_host[[0, 0]],
+                0,
                 "iteration {}: first query should find itself",
                 search_iter
             );
