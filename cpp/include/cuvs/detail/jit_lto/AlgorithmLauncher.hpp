@@ -15,9 +15,17 @@
 #include <memory>
 
 struct AlgorithmLauncher {
-  AlgorithmLauncher() = default;
+  AlgorithmLauncher() : kernel{nullptr}, library{nullptr} {}
 
-  AlgorithmLauncher(cudaKernel_t k);
+  AlgorithmLauncher(cudaKernel_t k, cudaLibrary_t lib);
+
+  ~AlgorithmLauncher();
+
+  AlgorithmLauncher(const AlgorithmLauncher&)            = delete;
+  AlgorithmLauncher& operator=(const AlgorithmLauncher&) = delete;
+
+  AlgorithmLauncher(AlgorithmLauncher&& other) noexcept;
+  AlgorithmLauncher& operator=(AlgorithmLauncher&& other) noexcept;
 
   template <typename... Args>
   void dispatch(cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, Args&&... args)
@@ -31,6 +39,7 @@ struct AlgorithmLauncher {
  private:
   void call(cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, void** args);
   cudaKernel_t kernel;
+  cudaLibrary_t library;
 };
 
 std::unordered_map<std::string, std::shared_ptr<AlgorithmLauncher>>& get_cached_launchers();
