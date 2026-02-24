@@ -155,7 +155,8 @@ ConfigureTest(
 
 ConfigureTest(
   NAME NEIGHBORS_ANN_CAGRA_TEST_BUGS
-  PATH neighbors/ann_cagra/bug_extreme_inputs_oob.cu neighbors/ann_cagra/bug_multi_cta_crash.cu
+  PATH neighbors/ann_cagra/bug_extreme_inputs_oob.cu
+       neighbors/ann_cagra/bug_multi_cta_crash.cu
        neighbors/ann_cagra/bug_graph_smaller_than_dataset.cu
        neighbors/ann_cagra/bug_issue_93_reproducer.cu
   GPUS 1
