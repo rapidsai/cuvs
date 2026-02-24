@@ -23,8 +23,8 @@
 #endif
 
 // Include extern function declarations before namespace so they're available to kernel definitions
+#include "../../jit_lto_kernels/filter_data.h"
 #include "extern_device_functions.cuh"
-#include "filter_data.h"
 // Include shared JIT device functions before namespace so they're available to kernel definitions
 #include "device_common_jit.cuh"
 

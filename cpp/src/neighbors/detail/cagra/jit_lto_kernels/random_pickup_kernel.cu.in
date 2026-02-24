@@ -11,11 +11,6 @@
 
 namespace cuvs::neighbors::cagra::detail::multi_kernel_search {
 
-// Instantiate the random_pickup_kernel_jit function with unified template parameters
-// For standard descriptors: PQ_BITS=0, PQ_LEN=0, CodebookT=void, QueryT=float (or uint8_t for BitwiseHamming)
-// For VPQ descriptors: PQ_BITS>0, PQ_LEN>0, CodebookT=half, QueryT=half
-// Note: Metric is no longer a template parameter - it's linked via dist_op and normalization fragments
-// Note: Kernels use dataset_descriptor_base_t* pointer directly
 template __global__ void random_pickup_kernel_jit<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@, @query_type@>(
     cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<@data_type@, @index_type@, @distance_type@>*, const @data_type@* const, const std::size_t, const unsigned, const uint64_t, const @index_type@*, const std::uint32_t, @index_type@* const, @distance_type@* const, const std::uint32_t, @index_type@* const, const std::uint32_t);
 
@@ -34,7 +29,7 @@ __attribute__((__constructor__)) static void register_random_pickup_kernel@pq_pr
   registerAlgorithm<tag_@type_abbrev@,
     tag_idx_@idx_abbrev@,
     tag_dist_@dist_abbrev@,
-    tag_idx_@idx_abbrev@@codebook_tag@>(
+    tag_idx_@idx_abbrev@@codebook_tag_comma@ @codebook_tag@>(
     "random_pickup_kernel@pq_prefix@_t@team_size@_dim@dataset_block_dim@@pq_suffix@",
     embedded_random_pickup_kernel@pq_prefix@_t@team_size@_dim@dataset_block_dim@@pq_suffix@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@query_type_abbrev@,
     sizeof(embedded_random_pickup_kernel@pq_prefix@_t@team_size@_dim@dataset_block_dim@@pq_suffix@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@query_type_abbrev@));

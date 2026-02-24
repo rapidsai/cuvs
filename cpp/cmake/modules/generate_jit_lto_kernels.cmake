@@ -240,9 +240,9 @@ function(generate_jit_lto_kernels target)
   set(cagra_source_index_types "uint32_t")
   set(cagra_source_index_abbrevs "ui")
 
-  # Generate setup_workspace_standard fragments (one per team_size, dataset_block_dim, data_type,
-  # index_type, distance_type, query_type) QueryT can be float (for most metrics) or uint8_t (for
-  # BitwiseHamming when DataT=uint8_t)
+  # Generate setup_workspace fragments (one per team_size, dataset_block_dim, data_type, index_type,
+  # distance_type, query_type) QueryT can be float (for most metrics) or uint8_t (for BitwiseHamming
+  # when DataT=uint8_t)
   foreach(data_idx IN ITEMS 0 1 2 3)
     list(GET cagra_data_types ${data_idx} data_type)
     list(GET cagra_data_type_abbrevs ${data_idx} type_abbrev)
@@ -258,10 +258,20 @@ function(generate_jit_lto_kernels target)
         set(distance_type "${cagra_distance_type}")
         set(query_type "float")
         set(query_type_abbrev "f")
+        set(query_type_suffix "_f")
+        set(query_type_suffix_reg "_f")
+        set(pq_bits "0")
+        set(pq_len "0")
+        set(codebook_type "void")
+        set(pq_prefix "_standard")
+        set(pq_suffix "")
+        set(codebook_tag "")
+        set(codebook_tag_comma "")
+        set(impl_file "setup_workspace_standard_impl.cuh")
         set(idx_abbrev "${cagra_index_abbrev}")
         set(dist_abbrev "${cagra_distance_abbrev}")
         configure_file(
-          "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/setup_workspace_standard.cu.in"
+          "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/setup_workspace.cu.in"
           "${filename}"
           @ONLY
         )
@@ -283,10 +293,20 @@ function(generate_jit_lto_kernels target)
           set(distance_type "${cagra_distance_type}")
           set(query_type "uint8_t")
           set(query_type_abbrev "uc")
+          set(query_type_suffix "_uc")
+          set(query_type_suffix_reg "_uc")
+          set(pq_bits "0")
+          set(pq_len "0")
+          set(codebook_type "void")
+          set(pq_prefix "_standard")
+          set(pq_suffix "")
+          set(codebook_tag "")
+          set(codebook_tag_comma "")
+          set(impl_file "setup_workspace_standard_impl.cuh")
           set(idx_abbrev "${cagra_index_abbrev}")
           set(dist_abbrev "${cagra_distance_abbrev}")
           configure_file(
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/setup_workspace_standard.cu.in"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/setup_workspace.cu.in"
             "${filename}"
             @ONLY
           )
@@ -302,9 +322,8 @@ function(generate_jit_lto_kernels target)
     endforeach()
   endforeach()
 
-  # Generate compute_distance_standard fragments (without metric - metric is handled via dist_op
-  # fragments) QueryT can be float (for most metrics) or uint8_t (for BitwiseHamming when
-  # DataT=uint8_t)
+  # Generate compute_distance fragments (without metric - metric is handled via dist_op fragments)
+  # QueryT can be float (for most metrics) or uint8_t (for BitwiseHamming when DataT=uint8_t)
   foreach(data_idx IN ITEMS 0 1 2 3)
     list(GET cagra_data_types ${data_idx} data_type)
     list(GET cagra_data_type_abbrevs ${data_idx} type_abbrev)
@@ -320,10 +339,20 @@ function(generate_jit_lto_kernels target)
         set(distance_type "${cagra_distance_type}")
         set(query_type "float")
         set(query_type_abbrev "f")
+        set(query_type_suffix "_f")
+        set(query_type_suffix_reg "_f")
+        set(pq_bits "0")
+        set(pq_len "0")
+        set(codebook_type "void")
+        set(pq_prefix "_standard")
+        set(pq_suffix "")
+        set(codebook_tag "")
+        set(codebook_tag_comma "")
+        set(impl_file "compute_distance_standard_impl.cuh")
         set(idx_abbrev "${cagra_index_abbrev}")
         set(dist_abbrev "${cagra_distance_abbrev}")
         configure_file(
-          "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_standard.cu.in"
+          "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance.cu.in"
           "${filename}"
           @ONLY
         )
@@ -345,10 +374,20 @@ function(generate_jit_lto_kernels target)
           set(distance_type "${cagra_distance_type}")
           set(query_type "uint8_t")
           set(query_type_abbrev "uc")
+          set(query_type_suffix "_uc")
+          set(query_type_suffix_reg "_uc")
+          set(pq_bits "0")
+          set(pq_len "0")
+          set(codebook_type "void")
+          set(pq_prefix "_standard")
+          set(pq_suffix "")
+          set(codebook_tag "")
+          set(codebook_tag_comma "")
+          set(impl_file "compute_distance_standard_impl.cuh")
           set(idx_abbrev "${cagra_index_abbrev}")
           set(dist_abbrev "${cagra_distance_abbrev}")
           configure_file(
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_standard.cu.in"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance.cu.in"
             "${filename}"
             @ONLY
           )
@@ -370,16 +409,12 @@ function(generate_jit_lto_kernels target)
   set(dist_op_tags "l2" "inner_product" "hamming")
   foreach(metric_tag IN LISTS dist_op_tags)
     if(metric_tag STREQUAL "hamming")
-      # BitwiseHamming uses QueryT=uint8_t
       set(query_type "uint8_t")
       set(query_type_abbrev "uc")
     else()
-      # L2 and InnerProduct use QueryT=float
       set(query_type "float")
       set(query_type_abbrev "f")
     endif()
-    # Generate dist_op fragment for this metric tag Note: dist_op uses QueryT and DistanceT, not
-    # DataT
     set(kernel_name "dist_op_${metric_tag}_${query_type_abbrev}_${cagra_distance_abbrev}")
     set(filename "${generated_kernels_dir}/cagra_device_functions/fatbin_${kernel_name}.cu")
     set(metric_tag "${metric_tag}")
@@ -417,8 +452,9 @@ function(generate_jit_lto_kernels target)
         set(distance_type "${cagra_distance_type}")
         set(idx_abbrev "${cagra_index_abbrev}")
         set(dist_abbrev "${cagra_distance_abbrev}")
+        set(normalization_suffix "_noop")
         configure_file(
-          "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_normalization_standard_noop.cu.in"
+          "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_normalization.cu.in"
           "${filename}"
           @ONLY
         )
@@ -435,8 +471,9 @@ function(generate_jit_lto_kernels target)
             "apply_normalization_standard_cosine_t${team_size}_dim${dataset_block_dim}_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}"
         )
         set(filename "${generated_kernels_dir}/cagra_device_functions/fatbin_${kernel_name}.cu")
+        set(normalization_suffix "_cosine")
         configure_file(
-          "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_normalization_standard_cosine.cu.in"
+          "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_normalization.cu.in"
           "${filename}"
           @ONLY
         )
@@ -459,24 +496,30 @@ function(generate_jit_lto_kernels target)
     foreach(team_size IN LISTS cagra_team_sizes)
       foreach(dataset_block_dim IN LISTS cagra_dataset_block_dims)
         foreach(pq_len IN LISTS cagra_pq_lens)
-          # setup_workspace_vpq Note: Metric is no longer in the kernel name - VPQ only supports
           # L2Expanded
           set(kernel_name
               "setup_workspace_vpq_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}"
           )
           set(filename "${generated_kernels_dir}/cagra_device_functions/fatbin_${kernel_name}.cu")
-          # VPQ only supports L2Expanded, but we don't need to pass metric to the template anymore
           set(pq_bits "${cagra_pq_bits}")
+          set(pq_len "${pq_len}")
           set(codebook_type "${cagra_codebook_type}")
           set(query_type "half")
           set(query_type_abbrev "h")
+          set(query_type_suffix "")
+          set(query_type_suffix_reg "")
+          set(pq_prefix "_vpq")
+          set(pq_suffix "_${cagra_pq_bits}pq_${pq_len}subd")
+          set(codebook_tag "tag_codebook_half")
+          set(codebook_tag_comma ", ")
+          set(impl_file "setup_workspace_vpq_impl.cuh")
           set(data_type "${data_type}")
           set(index_type "${cagra_index_type}")
           set(distance_type "${cagra_distance_type}")
           set(idx_abbrev "${cagra_index_abbrev}")
           set(dist_abbrev "${cagra_distance_abbrev}")
           configure_file(
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/setup_workspace_vpq.cu.in"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/setup_workspace.cu.in"
             "${filename}"
             @ONLY
           )
@@ -488,24 +531,30 @@ function(generate_jit_lto_kernels target)
             EMBEDDED_ARRAY "embedded_${kernel_name}"
           )
 
-          # compute_distance_vpq Note: Metric is no longer in the kernel name - VPQ only supports
           # L2Expanded
           set(kernel_name
               "compute_distance_vpq_t${team_size}_dim${dataset_block_dim}_${cagra_pq_bits}pq_${pq_len}subd_${type_abbrev}_${cagra_index_abbrev}_${cagra_distance_abbrev}"
           )
           set(filename "${generated_kernels_dir}/cagra_device_functions/fatbin_${kernel_name}.cu")
-          # VPQ only supports L2Expanded, but we don't need to pass metric to the template anymore
           set(pq_bits "${cagra_pq_bits}")
+          set(pq_len "${pq_len}")
           set(codebook_type "${cagra_codebook_type}")
           set(query_type "half")
           set(query_type_abbrev "h")
+          set(query_type_suffix "")
+          set(query_type_suffix_reg "")
+          set(pq_prefix "_vpq")
+          set(pq_suffix "_${cagra_pq_bits}pq_${pq_len}subd")
+          set(codebook_tag "tag_codebook_half")
+          set(codebook_tag_comma ", ")
+          set(impl_file "compute_distance_vpq_impl.cuh")
           set(idx_abbrev "${cagra_index_abbrev}")
           set(dist_abbrev "${cagra_distance_abbrev}")
           set(data_type "${data_type}")
           set(index_type "${cagra_index_type}")
           set(distance_type "${cagra_distance_type}")
           configure_file(
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_vpq.cu.in"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance.cu.in"
             "${filename}"
             @ONLY
           )
@@ -579,6 +628,7 @@ function(generate_jit_lto_kernels target)
               set(pq_suffix "")
               set(pq_prefix "")
               set(codebook_tag "")
+              set(codebook_tag_comma "")
               set(query_type "${query_type}")
               set(query_type_abbrev "${query_type_abbrev}")
               set(index_type "${cagra_index_type}")
@@ -613,6 +663,7 @@ function(generate_jit_lto_kernels target)
               set(pq_suffix "")
               set(pq_prefix "")
               set(codebook_tag "")
+              set(codebook_tag_comma "")
               set(query_type "${query_type}")
               set(query_type_abbrev "${query_type_abbrev}")
               set(index_type "${cagra_index_type}")
@@ -677,7 +728,8 @@ function(generate_jit_lto_kernels target)
               set(codebook_type "${cagra_codebook_type}")
               set(pq_suffix "_${cagra_pq_bits}pq_${pq_len}subd")
               set(pq_prefix "")
-              set(codebook_tag ", tag_codebook_half")
+              set(codebook_tag "tag_codebook_half")
+              set(codebook_tag_comma ", ")
               set(query_type "half")
               set(query_type_abbrev "h")
               set(index_type "${cagra_index_type}")
@@ -715,7 +767,8 @@ function(generate_jit_lto_kernels target)
               set(codebook_type "${cagra_codebook_type}")
               set(pq_suffix "_${cagra_pq_bits}pq_${pq_len}subd")
               set(pq_prefix "")
-              set(codebook_tag ", tag_codebook_half")
+              set(codebook_tag "tag_codebook_half")
+              set(codebook_tag_comma ", ")
               set(query_type "half")
               set(query_type_abbrev "h")
               set(index_type "${cagra_index_type}")
@@ -783,6 +836,7 @@ function(generate_jit_lto_kernels target)
           set(pq_suffix "")
           set(pq_prefix "")
           set(codebook_tag "")
+          set(codebook_tag_comma "")
           set(query_type "${query_type}")
           set(query_type_abbrev "${query_type_abbrev}")
           set(index_type "${cagra_index_type}")
@@ -833,7 +887,8 @@ function(generate_jit_lto_kernels target)
           set(codebook_type "${cagra_codebook_type}")
           set(pq_suffix "_${cagra_pq_bits}pq_${pq_len}subd")
           set(pq_prefix "_vpq")
-          set(codebook_tag ", tag_codebook_half")
+          set(codebook_tag "tag_codebook_half")
+          set(codebook_tag_comma ", ")
           set(query_type "half")
           set(query_type_abbrev "h")
           set(index_type "${cagra_index_type}")
@@ -892,6 +947,7 @@ function(generate_jit_lto_kernels target)
           set(pq_suffix "")
           set(pq_prefix "")
           set(codebook_tag "")
+          set(codebook_tag_comma "")
           set(query_type "${query_type}")
           set(query_type_abbrev "${query_type_abbrev}")
           set(index_type "${cagra_index_type}")
@@ -927,6 +983,7 @@ function(generate_jit_lto_kernels target)
           set(pq_suffix "")
           set(pq_prefix "")
           set(codebook_tag "")
+          set(codebook_tag_comma "")
           set(query_type "${query_type}")
           set(query_type_abbrev "${query_type_abbrev}")
           set(index_type "${cagra_index_type}")
@@ -973,7 +1030,8 @@ function(generate_jit_lto_kernels target)
           set(codebook_type "${cagra_codebook_type}")
           set(pq_suffix "_${cagra_pq_bits}pq_${pq_len}subd")
           set(pq_prefix "_vpq")
-          set(codebook_tag ", tag_codebook_half")
+          set(codebook_tag "tag_codebook_half")
+          set(codebook_tag_comma ", ")
           set(query_type "half")
           set(query_type_abbrev "h")
           set(index_type "${cagra_index_type}")
@@ -1010,7 +1068,8 @@ function(generate_jit_lto_kernels target)
           set(codebook_type "${cagra_codebook_type}")
           set(pq_suffix "_${cagra_pq_bits}pq_${pq_len}subd")
           set(pq_prefix "_vpq")
-          set(codebook_tag ", tag_codebook_half")
+          set(codebook_tag "tag_codebook_half")
+          set(codebook_tag_comma ", ")
           set(query_type "half")
           set(query_type_abbrev "h")
           set(index_type "${cagra_index_type}")

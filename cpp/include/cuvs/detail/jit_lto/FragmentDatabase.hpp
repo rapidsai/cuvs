@@ -6,6 +6,7 @@
 #pragma once
 
 #include <memory>
+#include <mutex>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -39,6 +40,7 @@ class FragmentDatabase {
                                     std::unique_ptr<char[]>&& program,
                                     std::size_t size);
 
+  mutable std::mutex cache_mutex_;
   std::unordered_map<std::string, std::unique_ptr<FragmentEntry>> cache;
 };
 

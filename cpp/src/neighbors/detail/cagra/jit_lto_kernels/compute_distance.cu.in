@@ -1,0 +1,40 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) @year@, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+// This file is auto-generated. Do not edit manually.
+
+#ifdef BUILD_KERNEL
+
+#include <neighbors/detail/cagra/jit_lto_kernels/@impl_file@>
+
+namespace cuvs::neighbors::cagra::detail {
+
+using args_t = typename cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<@data_type@, @index_type@, @distance_type@>::args_t;
+template __device__ @distance_type@ compute_distance<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@, @query_type@>(
+    const args_t, @index_type@);
+
+}  // namespace cuvs::neighbors::cagra::detail
+
+#else
+
+#include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
+#include <cuvs/detail/jit_lto/registration_tags.hpp>
+#include "compute_distance@pq_prefix@_t@team_size@_dim@dataset_block_dim@@pq_suffix@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@@query_type_suffix@.h"
+
+using namespace cuvs::neighbors::cagra::detail;
+
+__attribute__((__constructor__)) static void register_compute_distance@pq_prefix@_t@team_size@_dim@dataset_block_dim@@pq_suffix@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@@query_type_suffix_reg@()
+{
+  using QueryTag = cuvs::neighbors::cagra::detail::tag_@query_type_abbrev@;
+  registerAlgorithm<tag_@type_abbrev@,
+    tag_idx_@idx_abbrev@,
+    tag_dist_@dist_abbrev@,
+    QueryTag@codebook_tag_comma@ @codebook_tag@>(
+    "compute_distance@pq_prefix@_t@team_size@_dim@dataset_block_dim@@pq_suffix@",
+    embedded_compute_distance@pq_prefix@_t@team_size@_dim@dataset_block_dim@@pq_suffix@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@@query_type_suffix@,
+    sizeof(embedded_compute_distance@pq_prefix@_t@team_size@_dim@dataset_block_dim@@pq_suffix@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@@query_type_suffix@));
+}
+
+#endif

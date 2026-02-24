@@ -7,7 +7,7 @@
 
 #ifdef BUILD_KERNEL
 
-#include <neighbors/detail/cagra/jit_lto_kernels/apply_normalization_standard_cosine_impl.cuh>
+#include <neighbors/detail/cagra/jit_lto_kernels/apply_normalization_standard@normalization_suffix@_impl.cuh>
 
 namespace cuvs::neighbors::cagra::detail {
 
@@ -21,20 +21,20 @@ template __device__ @distance_type@ apply_normalization_standard<@team_size@, @d
 
 #include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
 #include <cuvs/detail/jit_lto/registration_tags.hpp>
-#include "apply_normalization_standard_cosine_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@.h"
+#include "apply_normalization_standard@normalization_suffix@_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@.h"
 
 using namespace cuvs::neighbors::cagra::detail;
 
-__attribute__((__constructor__)) static void register_apply_normalization_standard_cosine_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@()
+__attribute__((__constructor__)) static void register_apply_normalization_standard@normalization_suffix@_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@()
 {
   using QueryTag = cuvs::neighbors::cagra::detail::tag_f;
   registerAlgorithm<tag_@type_abbrev@,
     tag_idx_@idx_abbrev@,
     tag_dist_@dist_abbrev@,
     QueryTag>(
-    "apply_normalization_standard_cosine_t@team_size@_dim@dataset_block_dim@",
-    embedded_apply_normalization_standard_cosine_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@,
-    sizeof(embedded_apply_normalization_standard_cosine_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@));
+    "apply_normalization_standard@normalization_suffix@_t@team_size@_dim@dataset_block_dim@",
+    embedded_apply_normalization_standard@normalization_suffix@_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@,
+    sizeof(embedded_apply_normalization_standard@normalization_suffix@_t@team_size@_dim@dataset_block_dim@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@));
 }
 
 #endif

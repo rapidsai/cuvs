@@ -18,8 +18,8 @@
 #include <type_traits>  // For std::is_same_v, std::true_type, std::false_type
 
 // Include extern function declarations before namespace so they're available to kernel definitions
+#include "../../jit_lto_kernels/filter_data.h"
 #include "extern_device_functions.cuh"
-#include "filter_data.h"
 
 namespace cuvs::neighbors::cagra::detail::multi_kernel_search {
 
