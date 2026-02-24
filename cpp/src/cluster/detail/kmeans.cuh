@@ -40,7 +40,6 @@
 #include <rmm/device_uvector.hpp>
 
 #include <cuda.h>
-#include <thrust/iterator/transform_iterator.h>
 
 #include <algorithm>
 #include <cmath>
@@ -426,23 +425,17 @@ void kmeans_fit_main(raft::resources const& handle,
       params.batch_centroids,
       workspace);
 
-    // Using TransformInputIteratorT to dereference an array of
-    // raft::KeyValuePair and converting them to just return the Key to be used
-    // in reduce_rows_by_key prims
-    cuvs::cluster::kmeans::detail::KeyValueIndexOp<IndexT, DataT> conversion_op;
-    thrust::transform_iterator<cuvs::cluster::kmeans::detail::KeyValueIndexOp<IndexT, DataT>,
-                               raft::KeyValuePair<IndexT, DataT>*>
-      itr(minClusterAndDistance.data_handle(), conversion_op);
-
-    update_centroids(handle,
-                     X,
-                     weight,
-                     raft::make_device_matrix_view<const DataT, IndexT>(
-                       centroidsRawData.data_handle(), n_clusters, n_features),
-                     itr,
-                     wtInCluster.view(),
-                     newCentroids.view(),
-                     workspace);
+    update_centroids(
+      handle,
+      X,
+      weight,
+      raft::make_device_matrix_view<const DataT, IndexT>(
+        centroidsRawData.data_handle(), n_clusters, n_features),
+      cuda::transform_iterator(minClusterAndDistance.data_handle(),
+                               cuvs::cluster::kmeans::detail::KeyValueIndexOp<IndexT, DataT>{}),
+      wtInCluster.view(),
+      newCentroids.view(),
+      workspace);
 
     // compute the squared norm between the newCentroids and the original
     // centroids, destructor releases the resource

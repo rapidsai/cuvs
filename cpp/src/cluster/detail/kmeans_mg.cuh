@@ -17,7 +17,6 @@
 #include <raft/core/kvp.hpp>
 #include <raft/core/resource/comms.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/core/resource/thrust_policy.hpp>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/map_then_reduce.cuh>
 #include <raft/linalg/matrix_vector_op.cuh>
@@ -32,13 +31,10 @@
 #include <rmm/device_uvector.hpp>
 
 #include <cuda/functional>
-#include <thrust/execution_policy.h>
-#include <thrust/iterator/transform_iterator.h>
-#include <thrust/reduce.h>
-#include <thrust/scan.h>
-#include <thrust/transform.h>
 
+#include <algorithm>
 #include <cstdint>
+#include <numeric>
 #include <random>
 
 namespace cuvs::cluster::kmeans::mg::detail {
@@ -53,15 +49,6 @@ namespace cuvs::cluster::kmeans::mg::detail {
     }                                                        \
     if (isRoot) { RAFT_LOG_DEBUG(fmt, ##__VA_ARGS__); }      \
   } while (0)
-
-template <typename IndexT, typename DataT>
-struct KeyValueIndexOp {
-  __host__ __device__ __forceinline__ IndexT
-  operator()(const raft::KeyValuePair<IndexT, DataT>& a) const
-  {
-    return a.key;
-  }
-};
 
 #define KMEANS_COMM_ROOT 0
 
@@ -113,10 +100,10 @@ void initRandom(const raft::resources& handle,
     handle, X, centroidsSampledInRank.view(), nCentroidsSampledInRank, params.rng_state.seed);
 
   std::vector<size_t> displs(n_ranks);
-  thrust::exclusive_scan(thrust::host,
-                         nCentroidsElementsToReceiveFromRank.begin(),
-                         nCentroidsElementsToReceiveFromRank.end(),
-                         displs.begin());
+  std::exclusive_scan(nCentroidsElementsToReceiveFromRank.begin(),
+                      nCentroidsElementsToReceiveFromRank.end(),
+                      displs.begin(),
+                      size_t(0));
 
   // gather centroids from all ranks
   comm.allgatherv<DataT>(centroidsSampledInRank.data_handle(),        // sendbuff
@@ -361,20 +348,19 @@ void initKMeansPlusPlus(const raft::resources& handle,
            "An error occurred in the distributed operation. This can result "
            "from a failed rank");
 
-    auto nPtsSampled =
-      thrust::reduce(thrust::host, nPtsSampledByRank, nPtsSampledByRank + n_rank, 0);
+    auto nPtsSampled = std::reduce(nPtsSampledByRank, nPtsSampledByRank + n_rank, 0);
 
     // gather centroids from all ranks
     std::vector<size_t> sizes(n_rank);
-    thrust::transform(
-      thrust::host, nPtsSampledByRank, nPtsSampledByRank + n_rank, sizes.begin(), [&](int val) {
-        return val * n_features;
+    std::transform(
+      nPtsSampledByRank, nPtsSampledByRank + n_rank, sizes.begin(), [n_features](int val) {
+        return static_cast<size_t>(val) * n_features;
       });
 
     RAFT_CUDA_TRY_NO_THROW(cudaFreeHost(nPtsSampledByRank));
 
     std::vector<size_t> displs(n_rank);
-    thrust::exclusive_scan(thrust::host, sizes.begin(), sizes.end(), displs.begin());
+    std::exclusive_scan(sizes.begin(), sizes.end(), displs.begin(), size_t(0));
 
     centroidsBuf.resize(centroidsBuf.size() + nPtsSampled * n_features, stream);
     comm.allgatherv<DataT>(inRankCp.data(),
@@ -611,20 +597,14 @@ void fit(const raft::resources& handle,
                                                     params.batch_centroids,
                                                     workspace);
 
-    // Using TransformInputIteratorT to dereference an array of
-    // cub::KeyValuePair and converting them to just return the Key to be used
-    // in reduce_rows_by_key prims
-    KeyValueIndexOp<IndexT, DataT> conversion_op;
-    thrust::transform_iterator<KeyValueIndexOp<IndexT, DataT>, raft::KeyValuePair<IndexT, DataT>*>
-      itr(minClusterAndDistance.data_handle(), conversion_op);
-
     workspace.resize(n_samples, stream);
 
-    // Calculates weighted sum of all the samples assigned to cluster-i and
-    // store the result in newCentroids[i]
+    cuda::transform_iterator keys_itr(
+      minClusterAndDistance.data_handle(),
+      cuvs::cluster::kmeans::detail::KeyValueIndexOp<IndexT, DataT>{});
     raft::linalg::reduce_rows_by_key((DataT*)X.data_handle(),
                                      X.extent(1),
-                                     itr,
+                                     keys_itr,
                                      weight.data_handle(),
                                      workspace.data(),
                                      X.extent(0),
@@ -635,7 +615,7 @@ void fit(const raft::resources& handle,
 
     // Reduce weights by key to compute weight in each cluster
     raft::linalg::reduce_cols_by_key(weight.data_handle(),
-                                     itr,
+                                     keys_itr,
                                      wtInCluster.data_handle(),
                                      (IndexT)1,
                                      (IndexT)weight.extent(0),
