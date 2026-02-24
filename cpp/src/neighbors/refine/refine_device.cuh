@@ -15,13 +15,10 @@
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/map.cuh>
 #include <raft/matrix/detail/select_warpsort.cuh>
 #include <raft/matrix/init.cuh>
-
-#include <thrust/sequence.h>
 
 namespace cuvs::neighbors {
 

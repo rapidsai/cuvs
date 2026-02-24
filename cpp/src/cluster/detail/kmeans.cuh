@@ -40,9 +40,7 @@
 #include <rmm/device_uvector.hpp>
 
 #include <cuda.h>
-#include <thrust/fill.h>
 #include <thrust/iterator/transform_iterator.h>
-#include <thrust/transform.h>
 
 #include <algorithm>
 #include <cmath>

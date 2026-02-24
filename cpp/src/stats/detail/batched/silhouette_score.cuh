@@ -7,21 +7,17 @@
 
 #include "../silhouette_score.cuh"
 
+#include <raft/core/device_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/cuda_stream_pool.hpp>
-#include <raft/core/resource/thrust_policy.hpp>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/reduce.cuh>
 #include <raft/matrix/init.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/device_atomics.cuh>
 
+#include <raft/core/device_mdarray.hpp>
 #include <rmm/device_uvector.hpp>
-#include <rmm/exec_policy.hpp>
-
-#include <thrust/device_vector.h>
-#include <thrust/fill.h>
-#include <thrust/reduce.h>
 
 namespace cuvs {
 namespace stats {
@@ -187,7 +183,6 @@ value_t silhouette_score(
   rmm::device_uvector<value_idx> cluster_counts = get_cluster_counts(handle, y, n_rows, n_labels);
 
   auto stream = raft::resource::get_cuda_stream(handle);
-  auto policy = raft::resource::get_thrust_policy(handle);
 
   auto b_size = n_rows * n_labels;
 
@@ -270,7 +265,14 @@ value_t silhouette_score(
     raft::make_const_mdspan(
       raft::make_device_vector_view<const value_t, value_idx>(b_ptr, n_rows)));
 
-  return thrust::reduce(policy, a_ptr, a_ptr + n_rows, value_t(0)) / n_rows;
+  auto sum = raft::make_device_vector<value_t, value_idx>(handle, 1);
+  raft::linalg::reduce<raft::Apply::ALONG_COLUMNS>(
+    handle,
+    raft::make_device_matrix_view<const value_t, value_idx, raft::row_major>(a_ptr, n_rows, 1),
+    sum.view(),
+    value_t(0));
+  raft::resource::sync_stream(handle);
+  return sum(0) / n_rows;
 }
 
 }  // namespace detail

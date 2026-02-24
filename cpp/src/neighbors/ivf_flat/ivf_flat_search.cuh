@@ -18,11 +18,10 @@
 #include <raft/core/error.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/core/resources.hpp>   // raft::resources
-#include <raft/linalg/gemm.cuh>      // raft::linalg::gemm
-#include <raft/linalg/map.cuh>       // raft::linalg::map
-#include <raft/linalg/norm.cuh>      // raft::linalg::norm
-#include <raft/linalg/unary_op.cuh>  // raft::linalg::unary_op
+#include <raft/core/resources.hpp>  // raft::resources
+#include <raft/linalg/gemm.cuh>     // raft::linalg::gemm
+#include <raft/linalg/map.cuh>      // raft::linalg::map
+#include <raft/linalg/norm.cuh>     // raft::linalg::norm
 #include <raft/matrix/detail/select_warpsort.cuh>
 
 #include <rmm/resource_ref.hpp>

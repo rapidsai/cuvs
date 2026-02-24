@@ -15,13 +15,11 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/linalg/map.cuh>
-#include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/init.cuh>
 #include <raft/util/cuda_utils.cuh>
 
 #include <cuda/functional>
-#include <thrust/count.h>
-#include <thrust/fill.h>
+#include <thrust/reduce.h>
 #include <thrust/scan.h>
 
 #include <limits.h>

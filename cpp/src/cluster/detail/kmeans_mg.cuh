@@ -33,7 +33,6 @@
 
 #include <cuda/functional>
 #include <thrust/execution_policy.h>
-#include <thrust/fill.h>
 #include <thrust/iterator/transform_iterator.h>
 #include <thrust/reduce.h>
 #include <thrust/scan.h>
@@ -508,10 +507,7 @@ void checkWeights(const raft::resources& handle,
 
     DataT scale = n_samples / wt_sum;
     raft::linalg::map(
-      handle,
-      weight,
-      cuda::proclaim_return_type<DataT>([=] __device__(const DataT& wt) { return wt * scale; }),
-      raft::make_const_mdspan(weight));
+      handle, weight, raft::mul_const_op<DataT>(scale), raft::make_const_mdspan(weight));
   }
 }
 
