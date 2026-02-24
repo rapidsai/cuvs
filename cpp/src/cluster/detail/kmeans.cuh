@@ -513,7 +513,7 @@ void kmeans_fit_main(raft::resources const& handle,
 
   raft::linalg::map(handle,
                     raft::make_const_mdspan(minClusterAndDistance.view()),
-                    weight,
+                    raft::make_const_mdspan(weight.view()),
                     minClusterAndDistance.view(),
                     [=] __device__(const raft::KeyValuePair<IndexT, DataT> kvp, DataT wt) {
                       raft::KeyValuePair<IndexT, DataT> res;
