@@ -10,7 +10,7 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
-#include <raft/linalg/unary_op.cuh>
+#include <raft/linalg/map.cuh>
 #include <raft/matrix/detail/select_warpsort.cuh>  // matrix::detail::select::warpsort::warp_sort_distributed
 
 namespace cuvs::neighbors::ivf::detail {
@@ -173,62 +173,65 @@ void postprocess_neighbors(IdxT* neighbors_out,                // [n_queries, to
  * translate the element type if necessary.
  */
 template <typename ScoreInT, typename ScoreOutT = float>
-void postprocess_distances(ScoreOutT* out,      // [n_queries, topk]
+void postprocess_distances(const raft::resources& res,
+                           ScoreOutT* out,      // [n_queries, topk]
                            const ScoreInT* in,  // [n_queries, topk]
                            distance::DistanceType metric,
                            uint32_t n_queries,
                            uint32_t topk,
                            float scaling_factor,
-                           bool account_for_max_close,
-                           rmm::cuda_stream_view stream)
+                           bool account_for_max_close)
 {
   constexpr bool needs_cast = !std::is_same<ScoreInT, ScoreOutT>::value;
   const bool needs_copy     = ((void*)in) != ((void*)out);
   size_t len                = size_t(n_queries) * size_t(topk);
+  auto out_view             = raft::make_device_vector_view<ScoreOutT, size_t>(out, len);
+  auto in_view              = raft::make_device_vector_view<const ScoreInT, size_t>(in, len);
   switch (metric) {
     case distance::DistanceType::L2Unexpanded:
     case distance::DistanceType::L2Expanded: {
       if (scaling_factor != 1.0) {
-        raft::linalg::unaryOp(
-          out,
-          in,
-          len,
+        raft::linalg::map(
+          res,
+          out_view,
           raft::compose_op(raft::mul_const_op<ScoreOutT>{scaling_factor * scaling_factor},
                            raft::cast_op<ScoreOutT>{}),
-          stream);
+          raft::make_const_mdspan(in_view));
       } else if (needs_cast || needs_copy) {
-        raft::linalg::unaryOp(out, in, len, raft::cast_op<ScoreOutT>{}, stream);
+        raft::linalg::map(
+          res, out_view, raft::cast_op<ScoreOutT>{}, raft::make_const_mdspan(in_view));
       }
     } break;
     case distance::DistanceType::L2SqrtUnexpanded:
     case distance::DistanceType::L2SqrtExpanded: {
       if (scaling_factor != 1.0) {
-        raft::linalg::unaryOp(out,
-                              in,
-                              len,
-                              raft::compose_op{raft::mul_const_op<ScoreOutT>{scaling_factor},
-                                               raft::sqrt_op{},
-                                               raft::cast_op<ScoreOutT>{}},
-                              stream);
+        raft::linalg::map(res,
+                          out_view,
+                          raft::compose_op{raft::mul_const_op<ScoreOutT>{scaling_factor},
+                                           raft::sqrt_op{},
+                                           raft::cast_op<ScoreOutT>{}},
+                          raft::make_const_mdspan(in_view));
       } else if (needs_cast) {
-        raft::linalg::unaryOp(
-          out, in, len, raft::compose_op{raft::sqrt_op{}, raft::cast_op<ScoreOutT>{}}, stream);
+        raft::linalg::map(res,
+                          out_view,
+                          raft::compose_op{raft::sqrt_op{}, raft::cast_op<ScoreOutT>{}},
+                          raft::make_const_mdspan(in_view));
       } else {
-        raft::linalg::unaryOp(out, in, len, raft::sqrt_op{}, stream);
+        raft::linalg::map(res, out_view, raft::sqrt_op{}, raft::make_const_mdspan(in_view));
       }
     } break;
     case distance::DistanceType::CosineExpanded:
     case distance::DistanceType::InnerProduct: {
       float factor = (account_for_max_close ? -1.0 : 1.0) * scaling_factor * scaling_factor;
       if (factor != 1.0) {
-        raft::linalg::unaryOp(
-          out,
-          in,
-          len,
+        raft::linalg::map(
+          res,
+          out_view,
           raft::compose_op(raft::mul_const_op<ScoreOutT>{factor}, raft::cast_op<ScoreOutT>{}),
-          stream);
+          raft::make_const_mdspan(in_view));
       } else if (needs_cast || needs_copy) {
-        raft::linalg::unaryOp(out, in, len, raft::cast_op<ScoreOutT>{}, stream);
+        raft::linalg::map(
+          res, out_view, raft::cast_op<ScoreOutT>{}, raft::make_const_mdspan(in_view));
       }
     } break;
     case distance::DistanceType::BitwiseHamming: break;

@@ -470,12 +470,12 @@ void brute_force_knn_impl(
           metric == cuvs::distance::DistanceType::LpUnexpanded) {
         DistType p = 0.5;  // standard l2
         if (metric == cuvs::distance::DistanceType::LpUnexpanded) p = 1.0 / metricArg;
-        raft::linalg::unaryOp<DistType>(
-          res_D,
-          res_D,
-          n * k,
+        raft::linalg::map(
+          handle,
+          raft::make_device_vector_view<DistType, int64_t>(res_D, n * k),
           [p] __device__(DistType input) { return powf(fabsf(input), p); },
-          stream);
+          raft::make_const_mdspan(
+            raft::make_device_vector_view<const DistType, int64_t>(res_D, n * k)));
       }
     } else {
       switch (metric) {

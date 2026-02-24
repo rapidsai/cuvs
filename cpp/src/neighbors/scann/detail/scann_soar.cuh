@@ -111,12 +111,12 @@ void compute_soar_labels(raft::resources const& dev_resources,
     raft::sub_op());
 
   raft::linalg::map(
-    dev_resources, raft::make_const_mdspan(soar_scores.view()), soar_scores.view(), raft::sq_op());
+    dev_resources, soar_scores.view(), raft::sq_op{}, raft::make_const_mdspan(soar_scores.view()));
 
   raft::linalg::map(dev_resources,
-                    raft::make_const_mdspan(soar_scores.view()),
                     soar_scores.view(),
-                    raft::mul_const_op<float>(lambda));
+                    raft::mul_const_op<float>(lambda),
+                    raft::make_const_mdspan(soar_scores.view()));
 
   auto nc_dataset = raft::make_device_matrix_view<float, int64_t>(
     const_cast<float*>(dataset.data_handle()), dataset.extent(0), dataset.extent(1));

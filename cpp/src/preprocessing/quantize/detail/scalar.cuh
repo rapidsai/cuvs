@@ -148,7 +148,10 @@ void transform(raft::resources const& res,
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(res);
 
-  raft::linalg::map(res, out, quantize_op<T, QuantI>(quantizer.min_, quantizer.max_), dataset);
+  raft::linalg::map(res,
+                    out,
+                    quantize_op<T, QuantI>(quantizer.min_, quantizer.max_),
+                    raft::make_const_mdspan(dataset));
 }
 
 template <typename T, typename QuantI = int8_t>
@@ -174,7 +177,10 @@ void inverse_transform(raft::resources const& res,
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(res);
 
-  raft::linalg::map(res, out, quantize_op<T, QuantI>(quantizer.min_, quantizer.max_), dataset);
+  raft::linalg::map(res,
+                    out,
+                    quantize_op<T, QuantI>(quantizer.min_, quantizer.max_),
+                    raft::make_const_mdspan(dataset));
 }
 
 template <typename T, typename QuantI = int8_t>

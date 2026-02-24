@@ -304,11 +304,12 @@ DataT silhouette_score(
     raft::min_op{});
 
   // calculating the silhouette score per sample using the d_aArray and d_bArray
-  raft::linalg::map(handle,
-                    raft::make_device_vector_view<const DataT>(d_aArray.data(), nRows),
-                    raft::make_device_vector_view<const DataT>(d_bArray.data(), nRows),
-                    raft::make_device_vector_view<DataT>(perSampleSilScore, nRows),
-                    SilOp<DataT>());
+  raft::linalg::map(
+    handle,
+    raft::make_device_vector_view<DataT>(perSampleSilScore, nRows),
+    SilOp<DataT>(),
+    raft::make_const_mdspan(raft::make_device_vector_view<const DataT>(d_aArray.data(), nRows)),
+    raft::make_const_mdspan(raft::make_device_vector_view<const DataT>(d_bArray.data(), nRows)));
 
   // calculating the sum of all the silhouette score
   rmm::device_scalar<DataT> d_avgSilhouetteScore(stream);

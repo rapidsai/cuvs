@@ -511,16 +511,17 @@ void kmeans_fit_main(raft::resources const& handle,
     params.batch_centroids,
     workspace);
 
-  raft::linalg::map(handle,
-                    raft::make_const_mdspan(minClusterAndDistance.view()),
-                    raft::make_const_mdspan(weight.view()),
-                    minClusterAndDistance.view(),
-                    [=] __device__(const raft::KeyValuePair<IndexT, DataT> kvp, DataT wt) {
-                      raft::KeyValuePair<IndexT, DataT> res;
-                      res.value = kvp.value * wt;
-                      res.key   = kvp.key;
-                      return res;
-                    });
+  raft::linalg::map(
+    handle,
+    minClusterAndDistance.view(),
+    [=] __device__(const raft::KeyValuePair<IndexT, DataT> kvp, DataT wt) {
+      raft::KeyValuePair<IndexT, DataT> res;
+      res.value = kvp.value * wt;
+      res.key   = kvp.key;
+      return res;
+    },
+    raft::make_const_mdspan(minClusterAndDistance.view()),
+    raft::make_const_mdspan(weight));
 
   // calculate cluster cost phi_x(C)
   cuvs::cluster::kmeans::detail::computeClusterCost(
@@ -1051,16 +1052,17 @@ void kmeans_predict(raft::resources const& handle,
 
   // calculate cluster cost phi_x(C)
   rmm::device_scalar<DataT> clusterCostD(stream);
-  raft::linalg::map(handle,
-                    raft::make_const_mdspan(minClusterAndDistance.view()),
-                    raft::make_const_mdspan(weight.view()),
-                    minClusterAndDistance.view(),
-                    [=] __device__(const raft::KeyValuePair<IndexT, DataT> kvp, DataT wt) {
-                      raft::KeyValuePair<IndexT, DataT> res;
-                      res.value = kvp.value * wt;
-                      res.key   = kvp.key;
-                      return res;
-                    });
+  raft::linalg::map(
+    handle,
+    minClusterAndDistance.view(),
+    [=] __device__(const raft::KeyValuePair<IndexT, DataT> kvp, DataT wt) {
+      raft::KeyValuePair<IndexT, DataT> res;
+      res.value = kvp.value * wt;
+      res.key   = kvp.key;
+      return res;
+    },
+    raft::make_const_mdspan(minClusterAndDistance.view()),
+    raft::make_const_mdspan(weight.view()));
 
   cuvs::cluster::kmeans::detail::computeClusterCost(
     handle,
@@ -1071,7 +1073,7 @@ void kmeans_predict(raft::resources const& handle,
     raft::add_op{});
 
   raft::linalg::map(
-    handle, raft::make_const_mdspan(minClusterAndDistance.view()), labels, raft::key_op{});
+    handle, labels, raft::key_op{}, raft::make_const_mdspan(minClusterAndDistance.view()));
 
   inertia[0] = clusterCostD.value(stream);
 }

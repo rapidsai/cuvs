@@ -385,15 +385,17 @@ void perform_1nn(raft::resources const& handle,
   }
 
   // Transform the keys so that they correctly point to the unpermuted indices.
-  raft::linalg::map(handle,
-                    raft::make_device_vector_view<const OutT, value_idx>(kvp, (value_idx)n_rows),
-                    raft::make_device_vector_view<OutT, value_idx>(kvp, (value_idx)n_rows),
-                    [sort_plan = sort_plan.data_handle()] __device__(OutT KVP) {
-                      OutT res;
-                      res.value = KVP.value;
-                      res.key   = sort_plan[KVP.key];
-                      return res;
-                    });
+  raft::linalg::map(
+    handle,
+    raft::make_device_vector_view<OutT, value_idx>(kvp, (value_idx)n_rows),
+    [sort_plan = sort_plan.data_handle()] __device__(OutT KVP) {
+      OutT res;
+      res.value = KVP.value;
+      res.key   = sort_plan[KVP.key];
+      return res;
+    },
+    raft::make_const_mdspan(
+      raft::make_device_vector_view<const OutT, value_idx>(kvp, (value_idx)n_rows)));
 
   // Undo permutation of the rows of X by scattering in place.
   raft::matrix::scatter(handle, X_mutable_view, sort_plan_const_view, (value_idx)col_batch_size);
@@ -414,9 +416,10 @@ void perform_1nn(raft::resources const& handle,
   LookupColorOp<value_idx, value_t> extract_colors_op(colors);
   raft::linalg::map(
     handle,
-    raft::make_device_vector_view<const OutT, value_idx>(kvp, (value_idx)n_rows),
     raft::make_device_vector_view<value_idx, value_idx>(nn_colors, (value_idx)n_rows),
-    extract_colors_op);
+    extract_colors_op,
+    raft::make_const_mdspan(
+      raft::make_device_vector_view<const OutT, value_idx>(kvp, (value_idx)n_rows)));
 }
 
 /**

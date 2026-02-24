@@ -93,9 +93,10 @@ void search_impl(raft::resources const& handle,
   } else {
     raft::linalg::map(
       handle,
-      raft::make_device_vector_view<const T>(queries, n_queries * index.dim()),
       raft::make_device_vector_view<float>(converted_queries_ptr, n_queries * index.dim()),
-      utils::mapping<float>{});
+      utils::mapping<float>{},
+      raft::make_const_mdspan(
+        raft::make_device_vector_view<const T>(queries, n_queries * index.dim())));
   }
 
   float alpha = 1.0f;
@@ -289,7 +290,7 @@ void search_impl(raft::resources const& handle,
   if (!manage_local_topk) {
     // post process distances && neighbor IDs
     ivf::detail::postprocess_distances(
-      distances, distances, index.metric(), n_queries, k, 1.0, false, stream);
+      handle, distances, distances, index.metric(), n_queries, k, 1.0, false);
   }
   ivf::detail::postprocess_neighbors(neighbors,
                                      neighbors_uint32,

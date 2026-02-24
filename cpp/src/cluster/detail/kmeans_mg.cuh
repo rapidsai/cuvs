@@ -509,9 +509,9 @@ void checkWeights(const raft::resources& handle,
     DataT scale = n_samples / wt_sum;
     raft::linalg::map(
       handle,
-      raft::make_const_mdspan(weight),
       weight,
-      cuda::proclaim_return_type<DataT>([=] __device__(const DataT& wt) { return wt * scale; }));
+      cuda::proclaim_return_type<DataT>([=] __device__(const DataT& wt) { return wt * scale; }),
+      raft::make_const_mdspan(weight));
   }
 }
 

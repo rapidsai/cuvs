@@ -494,12 +494,13 @@ void quantize_bfloat16(raft::resources const& res,
   if (!std::isnan(noise_shaping_threshold)) {
     quantize_bfloat16_noise_shaped(res, dataset, bf16_dataset, noise_shaping_threshold);
   } else {
-    raft::linalg::map(res,
-                      raft::make_device_vector_view<const float, int64_t>(dataset.data_handle(),
-                                                                          (int64_t)dataset.size()),
-                      raft::make_device_vector_view<int16_t, int64_t>(bf16_dataset.data_handle(),
-                                                                      (int64_t)bf16_dataset.size()),
-                      [] __device__(float x) { return float_to_bfloat16(x); });
+    raft::linalg::map(
+      res,
+      raft::make_device_vector_view<int16_t, int64_t>(bf16_dataset.data_handle(),
+                                                      (int64_t)bf16_dataset.size()),
+      [] __device__(float x) { return float_to_bfloat16(x); },
+      raft::make_const_mdspan(raft::make_device_vector_view<const float, int64_t>(
+        dataset.data_handle(), (int64_t)dataset.size())));
   }
 }
 

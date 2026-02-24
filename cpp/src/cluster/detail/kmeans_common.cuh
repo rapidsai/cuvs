@@ -163,7 +163,7 @@ void checkWeight(raft::resources const& handle,
 
     auto scale = static_cast<DataT>(n_samples) / wt_sum;
     raft::linalg::map(
-      handle, raft::make_const_mdspan(weight), weight, raft::mul_const_op<DataT>{scale});
+      handle, weight, raft::mul_const_op<DataT>{scale}, raft::make_const_mdspan(weight));
   }
 }
 

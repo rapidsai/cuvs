@@ -13,9 +13,9 @@
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/linalg/gemm.cuh>
+#include <raft/linalg/map.cuh>
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/reduce.cuh>
-#include <raft/linalg/unary_op.cuh>
 #include <raft/util/cuda_dev_essentials.cuh>  // to_float
 
 #include <type_traits>
@@ -349,29 +349,37 @@ void distance_impl(raft::resources const& handle,
                    bool is_row_major,
                    DataT)  // metric_arg unused
 {
-  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
-
   // Check if arrays overlap
   const DataT* x_end  = x + m * k;
   const DataT* y_end  = y + n * k;
   bool arrays_overlap = (x < y_end) && (y < x_end);
 
-  const auto raft_sqrt = raft::linalg::unaryOp<DataT, raft::sqrt_op, IdxT>;
-  const auto raft_sq   = raft::linalg::unaryOp<DataT, raft::sq_op, IdxT>;
-
   if (!arrays_overlap) {
     // Arrays don't overlap: sqrt each array independently
-    raft_sqrt((DataT*)x, x, m * k, raft::sqrt_op{}, stream);
-    raft_sqrt((DataT*)y, y, n * k, raft::sqrt_op{}, stream);
+    raft::linalg::map(
+      handle,
+      raft::make_device_vector_view<DataT, IdxT>((DataT*)x, m * k),
+      raft::sqrt_op{},
+      raft::make_const_mdspan(raft::make_device_vector_view<const DataT, IdxT>(x, m * k)));
+    raft::linalg::map(
+      handle,
+      raft::make_device_vector_view<DataT, IdxT>((DataT*)y, n * k),
+      raft::sqrt_op{},
+      raft::make_const_mdspan(raft::make_device_vector_view<const DataT, IdxT>(y, n * k)));
   } else {
     // Arrays overlap: sqrt the union of both arrays exactly once
     const DataT* start = (x < y) ? x : y;
     const DataT* end   = (x_end > y_end) ? x_end : y_end;
     IdxT union_size    = end - start;
 
-    raft_sqrt((DataT*)start, start, union_size, raft::sqrt_op{}, stream);
+    raft::linalg::map(
+      handle,
+      raft::make_device_vector_view<DataT, IdxT>((DataT*)start, union_size),
+      raft::sqrt_op{},
+      raft::make_const_mdspan(raft::make_device_vector_view<const DataT, IdxT>(start, union_size)));
   }
 
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   // Calculate Hellinger distance
   ops::hellinger_distance_op<DataT, AccT, IdxT> distance_op{};
 
@@ -384,15 +392,27 @@ void distance_impl(raft::resources const& handle,
   // Restore arrays by squaring back
   if (!arrays_overlap) {
     // Arrays don't overlap: square each array independently
-    raft_sq((DataT*)x, x, m * k, raft::sq_op{}, stream);
-    raft_sq((DataT*)y, y, n * k, raft::sq_op{}, stream);
+    raft::linalg::map(
+      handle,
+      raft::make_device_vector_view<DataT, IdxT>((DataT*)x, m * k),
+      raft::sq_op{},
+      raft::make_const_mdspan(raft::make_device_vector_view<const DataT, IdxT>(x, m * k)));
+    raft::linalg::map(
+      handle,
+      raft::make_device_vector_view<DataT, IdxT>((DataT*)y, n * k),
+      raft::sq_op{},
+      raft::make_const_mdspan(raft::make_device_vector_view<const DataT, IdxT>(y, n * k)));
   } else {
     // Arrays overlap: square the union back
     const DataT* start = (x < y) ? x : y;
     const DataT* end   = (x_end > y_end) ? x_end : y_end;
     IdxT union_size    = end - start;
 
-    raft_sq((DataT*)start, start, union_size, raft::sq_op{}, stream);
+    raft::linalg::map(
+      handle,
+      raft::make_device_vector_view<DataT, IdxT>((DataT*)start, union_size),
+      raft::sq_op{},
+      raft::make_const_mdspan(raft::make_device_vector_view<const DataT, IdxT>(start, union_size)));
   }
 
   RAFT_CUDA_TRY(cudaGetLastError());
@@ -463,8 +483,11 @@ void distance_impl(raft::resources const& handle,
   };
 
   if (x != y) {
-    raft::linalg::unaryOp<DataT, decltype(unaryOp_lambda), IdxT>(
-      (DataT*)y, y, n * k, unaryOp_lambda, stream);
+    raft::linalg::map(
+      handle,
+      raft::make_device_vector_view<DataT, IdxT>((DataT*)y, n * k),
+      unaryOp_lambda,
+      raft::make_const_mdspan(raft::make_device_vector_view<const DataT, IdxT>(y, n * k)));
   }
 
   const OutT* x_norm = nullptr;
@@ -479,8 +502,11 @@ void distance_impl(raft::resources const& handle,
 
   if (x != y) {
     // Now reverse previous log (x) back to x using (e ^ log(x))
-    raft::linalg::unaryOp<DataT, decltype(unaryOp_lambda_reverse), IdxT>(
-      (DataT*)y, y, n * k, unaryOp_lambda_reverse, stream);
+    raft::linalg::map(
+      handle,
+      raft::make_device_vector_view<DataT, IdxT>((DataT*)y, n * k),
+      unaryOp_lambda_reverse,
+      raft::make_const_mdspan(raft::make_device_vector_view<const DataT, IdxT>(y, n * k)));
   }
 }
 

@@ -240,14 +240,14 @@ void search_main(raft::resources const& res,
       distances,
       raft::compose_op(raft::add_const_op<DistanceT>{DistanceT(1)}, raft::div_checkzero_op{}));
   } else {
-    cuvs::neighbors::ivf::detail::postprocess_distances(dist_out,
+    cuvs::neighbors::ivf::detail::postprocess_distances(res,
+                                                        dist_out,
                                                         dist_in,
                                                         index.metric(),
                                                         distances.extent(0),
                                                         distances.extent(1),
                                                         kScale,
-                                                        true,
-                                                        raft::resource::get_cuda_stream(res));
+                                                        true);
   }
 }
 /** @} */  // end group cagra

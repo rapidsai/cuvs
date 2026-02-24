@@ -88,9 +88,9 @@ struct distance_graph_impl<Linkage::KNN_GRAPH, value_idx, value_t> {
         bool self_loop = row == col;
         return (self_loop * std::numeric_limits<value_t>::max()) + (!self_loop * val);
       },
-      rows_view,
-      cols_view,
-      vals_in_view);
+      raft::make_const_mdspan(rows_view),
+      raft::make_const_mdspan(cols_view),
+      raft::make_const_mdspan(vals_in_view));
 
     raft::sparse::convert::sorted_coo_to_csr(
       knn_graph_coo.rows(), knn_graph_coo.nnz, indptr.data(), m + 1, stream);
@@ -160,11 +160,14 @@ void pairwise_distances(const raft::resources& handle,
   // self-loops get max distance
   auto data_view = raft::make_device_vector_view<value_t, value_idx>(data, nnz);
 
-  raft::linalg::map_offset(handle, data_view, [=] __device__(value_idx idx) {
-    value_t val    = data[idx];
-    bool self_loop = idx % m == idx / m;
-    return (self_loop * std::numeric_limits<value_t>::max()) + (!self_loop * val);
-  });
+  raft::linalg::map_offset(
+    handle,
+    data_view,
+    [=] __device__(value_idx idx, value_t val) {
+      bool self_loop = idx % m == idx / m;
+      return (self_loop * std::numeric_limits<value_t>::max()) + (!self_loop * val);
+    },
+    raft::make_const_mdspan(data_view));
 }
 
 /**

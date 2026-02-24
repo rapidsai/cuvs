@@ -262,11 +262,13 @@ value_t silhouette_score(
     raft::min_op());
 
   // calculating the silhouette score per sample
-  raft::linalg::map(handle,
-                    raft::make_device_vector_view<const value_t, value_idx>(a_ptr, n_rows),
-                    raft::make_device_vector_view<const value_t, value_idx>(b_ptr, n_rows),
-                    raft::make_device_vector_view<value_t, value_idx>(a_ptr, n_rows),
-                    cuvs::stats::detail::SilOp<value_t>());
+  raft::linalg::map(
+    handle,
+    raft::make_device_vector_view<value_t, value_idx>(a_ptr, n_rows),
+    cuvs::stats::detail::SilOp<value_t>(),
+    raft::make_const_mdspan(raft::make_device_vector_view<const value_t, value_idx>(a_ptr, n_rows)),
+    raft::make_const_mdspan(
+      raft::make_device_vector_view<const value_t, value_idx>(b_ptr, n_rows)));
 
   return thrust::reduce(policy, a_ptr, a_ptr + n_rows, value_t(0)) / n_rows;
 }

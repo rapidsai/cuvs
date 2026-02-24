@@ -161,10 +161,11 @@ void create_connectivity_graph(
   auto knn_rows = raft::make_device_vector<int, NNZType>(handle, nnz);
   auto knn_cols = raft::make_device_vector<int, NNZType>(handle, nnz);
 
-  raft::linalg::unary_op(
-    handle, make_const_mdspan(d_indices.view()), knn_cols.view(), [] __device__(int64_t x) {
-      return static_cast<int>(x);
-    });
+  raft::linalg::map(
+    handle,
+    knn_cols.view(),
+    [] __device__(int64_t x) { return static_cast<int>(x); },
+    raft::make_const_mdspan(d_indices.view()));
 
   raft::linalg::map_offset(handle, knn_rows.view(), [k_search] __device__(NNZType idx) -> int {
     return static_cast<int>(idx / k_search);
