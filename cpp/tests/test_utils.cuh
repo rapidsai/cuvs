@@ -7,6 +7,7 @@
 
 #include "test_utils.h"
 
+#include <cuda/iterator>
 #include <gtest/gtest.h>
 #include <iostream>
 #include <memory>
@@ -15,7 +16,6 @@
 #include <raft/util/cudart_utils.hpp>
 #include <rmm/exec_policy.hpp>
 #include <thrust/for_each.h>
-#include <thrust/iterator/counting_iterator.h>
 
 #include <fstream>
 #include <sstream>
@@ -260,7 +260,7 @@ void gen_uniform(const raft::resources& handle,
 
   const T1* d_keys   = keys.data();
   const T2* d_values = values.data();
-  auto counting      = thrust::make_counting_iterator<IdxT>(0);
+  auto counting      = cuda::make_counting_iterator<IdxT>(0);
   thrust::for_each(rmm::exec_policy(stream),
                    counting,
                    counting + len,
