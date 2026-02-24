@@ -172,4 +172,62 @@ mod tests {
     fn test_l2() {
         test_bfknn(DistanceType::L2Expanded);
     }
+
+    /// Test that an index can be searched multiple times without rebuilding.
+    /// This validates that search() takes &self instead of self.
+    #[test]
+    fn test_brute_force_multiple_searches() {
+        let res = Resources::new().unwrap();
+
+        // Create a random dataset
+        let n_datapoints = 64;
+        let n_features = 8;
+        let dataset_host =
+            ndarray::Array::<f32, _>::random((n_datapoints, n_features), Uniform::new(0., 1.0));
+
+        // Pass host data directly so the C++ index copies it to device and owns
+        // the copy. Passing a device ManagedTensor would create a non-owning view
+        // that becomes a dangling pointer once the ManagedTensor is dropped after
+        // build, causing use-after-free during search.
+        let index = Index::build(&res, DistanceType::L2Expanded, None, &dataset_host)
+            .expect("failed to create brute force index");
+
+        res.sync_stream().unwrap();
+
+        let k = 4;
+
+        // Perform multiple searches on the same index
+        for search_iter in 0..3 {
+            let n_queries = 4;
+            let queries = dataset_host.slice(s![0..n_queries, ..]);
+            let queries = ManagedTensor::from(&queries).to_device(&res).unwrap();
+
+            let mut neighbors_host = ndarray::Array::<i64, _>::zeros((n_queries, k));
+            let neighbors = ManagedTensor::from(&neighbors_host)
+                .to_device(&res)
+                .unwrap();
+
+            let mut distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
+            let distances = ManagedTensor::from(&distances_host)
+                .to_device(&res)
+                .unwrap();
+
+            // This should work on every iteration because search() takes &self
+            index
+                .search(&res, &queries, &neighbors, &distances)
+                .expect(&format!("search iteration {} failed", search_iter));
+
+            // Copy back to host memory
+            distances.to_host(&res, &mut distances_host).unwrap();
+            neighbors.to_host(&res, &mut neighbors_host).unwrap();
+            res.sync_stream().unwrap();
+
+            // Verify results are consistent
+            assert_eq!(
+                neighbors_host[[0, 0]], 0,
+                "iteration {}: first query should find itself",
+                search_iter
+            );
+        }
+    }
 }
