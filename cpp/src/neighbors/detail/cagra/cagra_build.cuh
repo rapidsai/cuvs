@@ -822,6 +822,8 @@ inline std::pair<size_t, size_t> optimize_workspace_size(size_t n_rows,
                                                          size_t index_size,
                                                          bool mst_optimize = false)
 {
+  // TODO: MODIFY!!
+
   // MST optimization memory (host only)
   size_t mst_host = n_rows * index_size;  // mst_graph_num_edges
   if (mst_optimize) {
