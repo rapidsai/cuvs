@@ -476,6 +476,7 @@ void sharded_search_with_tree_merge(
         radix *= 2;
 
         if (received_something) {
+
           auto neighbors_merge_res = raft::make_device_matrix<searchIdxT, int64_t, row_major>(
             dev_res, n_rows_of_current_batch, n_neighbors);
           auto distances_merge_res = raft::make_device_matrix<float, int64_t, row_major>(
