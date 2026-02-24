@@ -213,14 +213,6 @@ endif()
 # ##################################################################################################
 # * cuvs ---------------------------------------------------------------------
 if(NOT BUILD_CPU_ONLY)
-  set(JIT_LTO_TARGET_ARCHITECTURE "")
-  set(JIT_LTO_COMPILATION OFF)
-  set(JIT_LTO_FILES "")
-  if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
-    set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
-    set(JIT_LTO_COMPILATION ON)
-  endif()
-
   add_library(cuvs_cpp_headers INTERFACE)
   add_library(cuvs::cuvs_cpp_headers ALIAS cuvs_cpp_headers)
   target_include_directories(
@@ -357,20 +349,108 @@ if(NOT BUILD_CPU_ONLY)
     )
   endif()
 
+  set(JIT_LTO_TARGET_ARCHITECTURE "")
+  set(JIT_LTO_COMPILATION OFF)
+  if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
+    set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
+    set(JIT_LTO_COMPILATION ON)
+  endif()
+
   if(JIT_LTO_COMPILATION)
     # Generate interleaved scan kernel files at build time
     include(cmake/modules/generate_jit_lto_kernels.cmake)
-    generate_jit_lto_kernels(cuvs_jit_lto_kernels)
-    add_library(cuvs::cuvs_jit_lto_kernels ALIAS cuvs_jit_lto_kernels)
 
-    set(JIT_LTO_FILES
-        src/detail/jit_lto/AlgorithmLauncher.cu
-        src/detail/jit_lto/AlgorithmPlanner.cu
-        src/detail/jit_lto/FragmentDatabase.cu
-        src/detail/jit_lto/FragmentEntry.cu
-        src/detail/jit_lto/nvjitlink_checker.cpp
-        src/detail/jit_lto/NVRTCLTOFragmentCompiler.cu
+    add_library(jit_lto_kernel_usage_requirements INTERFACE)
+    target_include_directories(
+      jit_lto_kernel_usage_requirements
+      INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_SOURCE_DIR}/src"
+                "${CMAKE_CURRENT_SOURCE_DIR}/../c/include"
     )
+    target_compile_options(
+      jit_lto_kernel_usage_requirements INTERFACE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
+                                                  "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+    )
+    target_compile_features(jit_lto_kernel_usage_requirements INTERFACE cuda_std_20)
+    target_link_libraries(
+      jit_lto_kernel_usage_requirements INTERFACE rmm::rmm raft::raft CCCL::CCCL
+    )
+
+    block(PROPAGATE interleaved_scan_files metric_files filter_files post_lambda_files)
+    set(CMAKE_CUDA_ARCHITECTURES ${JIT_LTO_TARGET_ARCHITECTURE})
+    generate_jit_lto_kernels(
+      interleaved_scan_files
+      NAME_FORMAT
+        "interleaved_scan_capacity_@capacity@_veclen_@veclen@_@ascending_descending@_@compute_norm_name@_data_@type_abbrev@_acc_@acc_abbrev@_idx_@idx_abbrev@"
+      MATRIX_JSON_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_matrix.json"
+      KERNEL_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_kernel.cu.in"
+      EMBEDDED_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_embedded.cpp.in"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/interleaved_scan"
+      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    )
+    generate_jit_lto_kernels(
+      metric_files
+      NAME_FORMAT "metric_@metric_name@_veclen_@veclen@_data_@type_abbrev@_acc_@acc_abbrev@"
+      MATRIX_JSON_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/metric_matrix.json"
+      KERNEL_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/metric_kernel.cu.in"
+      EMBEDDED_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/metric_embedded.cpp.in"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/metric"
+      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    )
+    generate_jit_lto_kernels(
+      filter_files
+      NAME_FORMAT "@filter_name@"
+      MATRIX_JSON_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/filter_matrix.json"
+      KERNEL_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/filter_kernel.cu.in"
+      EMBEDDED_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/filter_embedded.cpp.in"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/filter"
+      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    )
+    generate_jit_lto_kernels(
+      post_lambda_files
+      NAME_FORMAT "@post_lambda_name@"
+      MATRIX_JSON_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/post_lambda_matrix.json"
+      KERNEL_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/post_lambda_kernel.cu.in"
+      EMBEDDED_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/post_lambda_embedded.cpp.in"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/post_lambda"
+      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    )
+    endblock()
+
+    add_library(
+      cuvs_jit_lto_kernels STATIC
+      ${interleaved_scan_files}
+      ${metric_files}
+      ${filter_files}
+      ${post_lambda_files}
+      src/detail/jit_lto/AlgorithmLauncher.cu
+      src/detail/jit_lto/AlgorithmPlanner.cu
+      src/detail/jit_lto/FragmentDatabase.cu
+      src/detail/jit_lto/FragmentEntry.cu
+      src/detail/jit_lto/nvjitlink_checker.cpp
+      src/detail/jit_lto/NVRTCLTOFragmentCompiler.cu
+    )
+    set_target_properties(
+      cuvs_jit_lto_kernels PROPERTIES POSITION_INDEPENDENT_CODE ON CXX_STANDARD 20
+    )
+    target_include_directories(
+      cuvs_jit_lto_kernels
+      PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_SOURCE_DIR}/src"
+              "${CMAKE_CURRENT_SOURCE_DIR}/../c/include"
+    )
+    target_link_libraries(cuvs_jit_lto_kernels PRIVATE raft::raft)
+    add_library(cuvs::cuvs_jit_lto_kernels ALIAS cuvs_jit_lto_kernels)
   endif()
 
   add_library(
@@ -586,7 +666,6 @@ if(NOT BUILD_CPU_ONLY)
     src/stats/silhouette_score.cu
     src/stats/trustworthiness_score.cu
     ${CUVS_MG_ALGOS}
-    $<$<BOOL:${JIT_LTO_COMPILATION}>:${JIT_LTO_FILES}>
   )
 
   set_target_properties(

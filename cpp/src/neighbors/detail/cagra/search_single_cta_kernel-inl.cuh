@@ -28,6 +28,7 @@
 
 // TODO: This shouldn't be invoking anything from spatial/knn
 #include "../ann_utils.cuh"
+#include "../smem_utils.cuh"
 
 #include <raft/util/cuda_rt_essentials.hpp>
 #include <raft/util/integer_utils.hpp>
