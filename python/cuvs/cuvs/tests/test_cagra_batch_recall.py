@@ -72,9 +72,9 @@ def cagra_test_data():
         dists = np.sum(
             (q_chunk[:, None, :] - dataset[None, :, :]) ** 2, axis=2
         )
-        gt_neighbors[start:end] = np.argsort(dists, axis=1)[
-            :, :k
-        ].astype(np.uint32)
+        gt_neighbors[start:end] = np.argsort(dists, axis=1)[:, :k].astype(
+            np.uint32
+        )
         del dists
 
     return {
@@ -195,8 +195,8 @@ def test_cagra_search_width_monotonicity(cagra_test_data):
     tolerance = 0.02
     for i in range(1, len(search_widths)):
         assert recalls[i] >= recalls[i - 1] - tolerance, (
-            f"Recall decreased from sw={search_widths[i-1]} "
-            f"({recalls[i-1]:.4f}) to sw={search_widths[i]} "
+            f"Recall decreased from sw={search_widths[i - 1]} "
+            f"({recalls[i - 1]:.4f}) to sw={search_widths[i]} "
             f"({recalls[i]:.4f}) at batch_size=512. "
             f"Higher search_width should not reduce recall."
         )

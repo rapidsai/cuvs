@@ -46,7 +46,9 @@ def compute_reachability_iters(dataset_size, graph_degree):
     return iters
 
 
-def compute_max_iterations(algo, itopk_size, search_width, dataset_size, graph_degree):
+def compute_max_iterations(
+    algo, itopk_size, search_width, dataset_size, graph_degree
+):
     """Replicate the C++ max_iterations calculation for each algorithm."""
     reach = compute_reachability_iters(dataset_size, graph_degree)
     if algo == "multi_cta":
@@ -86,7 +88,9 @@ def run_benchmark():
     # Build brute-force ground truth
     print("Computing brute-force ground truth...")
     bf_index = brute_force.build(dataset_device)
-    gt_distances, gt_neighbors = brute_force.search(bf_index, queries_device, k=K)
+    gt_distances, gt_neighbors = brute_force.search(
+        bf_index, queries_device, k=K
+    )
     gt_neighbors_host = gt_neighbors.copy_to_host()
 
     # Build CAGRA index
@@ -96,7 +100,9 @@ def run_benchmark():
         graph_degree=GRAPH_DEGREE,
     )
     cagra_index = cagra.build(index_params, dataset_device)
-    print(f"  Index built: {N_SAMPLES} vectors, dim={DIM}, graph_degree={GRAPH_DEGREE}")
+    print(
+        f"  Index built: {N_SAMPLES} vectors, dim={DIM}, graph_degree={GRAPH_DEGREE}"
+    )
 
     reach_iters = compute_reachability_iters(N_SAMPLES, GRAPH_DEGREE)
     print(f"  Reachability iterations: {reach_iters}")
@@ -111,8 +117,10 @@ def run_benchmark():
     ]
 
     # Header
-    print(f"{'Config':<25} {'sw':>3} {'batch':>6} {'max_iter':>9} "
-          f"{'recall@10':>10} {'QPS':>10}")
+    print(
+        f"{'Config':<25} {'sw':>3} {'batch':>6} {'max_iter':>9} "
+        f"{'recall@10':>10} {'QPS':>10}"
+    )
     print("-" * 75)
 
     results_table = []
@@ -124,7 +132,11 @@ def run_benchmark():
 
             for config_name, config_key in configs:
                 max_iter = compute_max_iterations(
-                    config_key, ITOPK_SIZE, search_width, N_SAMPLES, GRAPH_DEGREE
+                    config_key,
+                    ITOPK_SIZE,
+                    search_width,
+                    N_SAMPLES,
+                    GRAPH_DEGREE,
                 )
 
                 # Build SearchParams — algo must be set in constructor
@@ -174,17 +186,21 @@ def run_benchmark():
                 qps = batch_size / avg_time if avg_time > 0 else 0
 
                 iter_str = str(max_iter) if max_iter > 0 else "auto"
-                print(f"{config_name:<25} {search_width:>3} {batch_size:>6} "
-                      f"{iter_str:>9} {recall_val:>10.4f} {qps:>10.0f}")
+                print(
+                    f"{config_name:<25} {search_width:>3} {batch_size:>6} "
+                    f"{iter_str:>9} {recall_val:>10.4f} {qps:>10.0f}"
+                )
 
-                results_table.append({
-                    "config": config_name,
-                    "search_width": search_width,
-                    "batch_size": batch_size,
-                    "max_iterations": max_iter,
-                    "recall": recall_val,
-                    "qps": qps,
-                })
+                results_table.append(
+                    {
+                        "config": config_name,
+                        "search_width": search_width,
+                        "batch_size": batch_size,
+                        "max_iterations": max_iter,
+                        "recall": recall_val,
+                        "qps": qps,
+                    }
+                )
 
         print()  # Blank line between search_width groups
 
@@ -193,22 +209,34 @@ def run_benchmark():
     print("ANALYSIS: Recall delta at algorithm switch point (batch_size=512)")
     print("=" * 75)
     for sw in SEARCH_WIDTHS:
-        multi = [r for r in results_table
-                 if r["config"] == "MULTI_CTA"
-                 and r["search_width"] == sw
-                 and r["batch_size"] == 512]
-        single_def = [r for r in results_table
-                      if r["config"] == "SINGLE_CTA (default)"
-                      and r["search_width"] == sw
-                      and r["batch_size"] == 512]
-        single_fix = [r for r in results_table
-                      if r["config"] == "SINGLE_CTA (floor@32)"
-                      and r["search_width"] == sw
-                      and r["batch_size"] == 512]
-        auto = [r for r in results_table
-                if r["config"] == "AUTO"
-                and r["search_width"] == sw
-                and r["batch_size"] == 512]
+        multi = [
+            r
+            for r in results_table
+            if r["config"] == "MULTI_CTA"
+            and r["search_width"] == sw
+            and r["batch_size"] == 512
+        ]
+        single_def = [
+            r
+            for r in results_table
+            if r["config"] == "SINGLE_CTA (default)"
+            and r["search_width"] == sw
+            and r["batch_size"] == 512
+        ]
+        single_fix = [
+            r
+            for r in results_table
+            if r["config"] == "SINGLE_CTA (floor@32)"
+            and r["search_width"] == sw
+            and r["batch_size"] == 512
+        ]
+        auto = [
+            r
+            for r in results_table
+            if r["config"] == "AUTO"
+            and r["search_width"] == sw
+            and r["batch_size"] == 512
+        ]
 
         if multi and single_def and single_fix and auto:
             m = multi[0]
@@ -216,20 +244,32 @@ def run_benchmark():
             sf = single_fix[0]
             a = auto[0]
             print(f"\n  search_width={sw}:")
-            print(f"    MULTI_CTA:              recall={m['recall']:.4f}  QPS={m['qps']:.0f}")
-            print(f"    SINGLE_CTA (default):   recall={sd['recall']:.4f}  QPS={sd['qps']:.0f}  "
-                  f"(recall delta: {sd['recall'] - m['recall']:+.4f})")
-            print(f"    SINGLE_CTA (floor@32):  recall={sf['recall']:.4f}  QPS={sf['qps']:.0f}  "
-                  f"(recall delta: {sf['recall'] - m['recall']:+.4f})")
-            print(f"    AUTO (current code):    recall={a['recall']:.4f}  QPS={a['qps']:.0f}  "
-                  f"(recall delta: {a['recall'] - m['recall']:+.4f})")
+            print(
+                f"    MULTI_CTA:              recall={m['recall']:.4f}  QPS={m['qps']:.0f}"
+            )
+            print(
+                f"    SINGLE_CTA (default):   recall={sd['recall']:.4f}  QPS={sd['qps']:.0f}  "
+                f"(recall delta: {sd['recall'] - m['recall']:+.4f})"
+            )
+            print(
+                f"    SINGLE_CTA (floor@32):  recall={sf['recall']:.4f}  QPS={sf['qps']:.0f}  "
+                f"(recall delta: {sf['recall'] - m['recall']:+.4f})"
+            )
+            print(
+                f"    AUTO (current code):    recall={a['recall']:.4f}  QPS={a['qps']:.0f}  "
+                f"(recall delta: {a['recall'] - m['recall']:+.4f})"
+            )
 
-            if sd['qps'] > 0 and m['qps'] > 0:
-                print(f"    Throughput gain (SINGLE_CTA default vs MULTI_CTA): "
-                      f"{sd['qps'] / m['qps']:.2f}x")
-            if sf['qps'] > 0 and m['qps'] > 0:
-                print(f"    Throughput gain (SINGLE_CTA floor@32 vs MULTI_CTA): "
-                      f"{sf['qps'] / m['qps']:.2f}x")
+            if sd["qps"] > 0 and m["qps"] > 0:
+                print(
+                    f"    Throughput gain (SINGLE_CTA default vs MULTI_CTA): "
+                    f"{sd['qps'] / m['qps']:.2f}x"
+                )
+            if sf["qps"] > 0 and m["qps"] > 0:
+                print(
+                    f"    Throughput gain (SINGLE_CTA floor@32 vs MULTI_CTA): "
+                    f"{sf['qps'] / m['qps']:.2f}x"
+                )
 
     print("\n\nKey question: Does SINGLE_CTA (floor@32) recover recall while")
     print("preserving throughput advantage over MULTI_CTA?")
