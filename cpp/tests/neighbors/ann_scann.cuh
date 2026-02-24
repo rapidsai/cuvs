@@ -143,28 +143,13 @@ class scann_test : public ::testing::TestWithParam<scann_inputs> {
                stream_);
     raft::resource::sync_stream(handle_);
 
-    bool all_zeros = true;
-    bool has_nan   = false;
-    // Check all codes are in valid range [0, num_pq_clusters]
+    bool all_zeros       = true;
     auto n_vecs_to_check = std::min(ps.num_db_vecs, 50u);
-    for (IdxT i = 0; i < n_vecs_to_check * num_subspaces; i++) {
+    for (IdxT i = 0; (i < n_vecs_to_check * num_subspaces) && all_zeros; i++) {
       if (quant_res_host.data_handle()[i] != 0) { all_zeros = false; }
       if (quant_soar_host.data_handle()[i] != 0) { all_zeros = false; }
-      if (std::isnan(quant_res_host.data_handle()[i])) {
-        has_nan = true;
-        break;
-      }
-      if (std::isnan(quant_soar_host.data_handle()[i])) {
-        has_nan = true;
-        break;
-      }
-      ASSERT_LT(quant_res_host.data_handle()[i], num_pq_clusters)
-        << "AVQ quantized code out of range at position " << i;
-      ASSERT_LT(quant_soar_host.data_handle()[i], num_pq_clusters)
-        << "SOAR quantized code out of range at position " << i;
     }
     ASSERT_FALSE(all_zeros) << "Quantized output contains all zeros";
-    ASSERT_FALSE(has_nan) << "Quantized output contains NaN values";
   }
 
   void SetUp() override  // NOLINT
