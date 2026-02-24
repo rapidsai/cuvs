@@ -1,0 +1,11 @@
+diff --git a/faiss/gpu/utils/CuvsUtils.cu b/faiss/gpu/utils/CuvsUtils.cu
+index 0000000..1111111 100644
+--- a/faiss/gpu/utils/CuvsUtils.cu
++++ b/faiss/gpu/utils/CuvsUtils.cu
+@@ -36,6 +36,7 @@
+ #include <raft/matrix/gather.cuh>
+
+ #include <thrust/copy.h>
++#include <thrust/iterator/counting_iterator.h>
+ #include <thrust/gather.h>
+ #include <thrust/reduce.h>
