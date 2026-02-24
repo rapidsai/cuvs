@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -19,8 +19,8 @@
 
 #include <rmm/device_uvector.hpp>
 
+#include <cuda/iterator>
 #include <thrust/for_each.h>
-#include <thrust/iterator/counting_iterator.h>
 
 #include <algorithm>
 #include <nvfunctional>
@@ -470,7 +470,7 @@ class russelrao_expanded_distances_t : public distances_t<value_t> {
       raft::resource::get_cuda_stream(config_->handle));
 
     auto exec_policy  = rmm::exec_policy(raft::resource::get_cuda_stream(config_->handle));
-    auto diags        = thrust::counting_iterator<value_idx>(0);
+    auto diags        = cuda::make_counting_iterator<value_idx>(0);
     value_idx b_nrows = config_->b_nrows;
     thrust::for_each(exec_policy, diags, diags + config_->a_nrows, [=] __device__(value_idx input) {
       out_dists[input * b_nrows + input] = 0.0;
