@@ -28,11 +28,11 @@
 
 #include <rmm/device_uvector.hpp>
 
+#include <cuda/iterator>
 #include <cuda/std/tuple>
 #include <thrust/copy.h>
 #include <thrust/device_ptr.h>
 #include <thrust/gather.h>
-#include <thrust/iterator/counting_iterator.h>
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/scan.h>
 #include <thrust/scatter.h>
@@ -439,8 +439,8 @@ void sort_by_color(raft::resources const& handle,
                    value_idx* src_indices,
                    size_t n_rows)
 {
-  auto exec_policy = raft::resource::get_thrust_policy(handle);
-  thrust::counting_iterator<value_idx> arg_sort_iter(0);
+  auto exec_policy   = raft::resource::get_thrust_policy(handle);
+  auto arg_sort_iter = cuda::make_counting_iterator<value_idx>(0);
   thrust::copy(exec_policy, arg_sort_iter, arg_sort_iter + n_rows, src_indices);
 
   auto keys = thrust::make_zip_iterator(

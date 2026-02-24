@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 compute_matrix_product_script = runpy.run_path(
     str(
         pathlib.Path(__file__).parent
-        / "../../../../cpp/cmake/modules/compute_matrix_product.py"
+        / "../../cmake/modules/compute_matrix_product.py"
     )
 )
 
