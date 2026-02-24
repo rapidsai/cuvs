@@ -252,6 +252,17 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/neighbors/dataset_compression.cu)
   )
 endif()
 
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/neighbors/cagra_padded_dataset.cu)
+  ConfigureTest(
+    NAME NEIGHBORS_CAGRA_PADDED_DATASET_TEST
+    PATH neighbors/cagra_padded_dataset.cu
+    GPUS 1
+    PERCENT 100
+  )
+  target_include_directories(NEIGHBORS_CAGRA_PADDED_DATASET_TEST
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+endif()
+
 ConfigureTest(
   NAME NEIGHBORS_ALL_NEIGHBORS_TEST
   PATH neighbors/all_neighbors/test_float.cu

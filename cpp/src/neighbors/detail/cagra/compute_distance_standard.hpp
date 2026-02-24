@@ -28,7 +28,7 @@ struct standard_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT>
   template <typename DatasetT>
   constexpr static inline bool accepts_dataset()
   {
-    return is_strided_dataset_v<DatasetT>;
+    return is_strided_dataset_v<DatasetT> || is_padded_dataset_v<DatasetT>;
   }
 
   template <typename DatasetT>

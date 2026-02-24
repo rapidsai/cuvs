@@ -257,6 +257,12 @@ struct device_padded_dataset : public dataset<IdxT> {
   }
   [[nodiscard]] auto is_owning() const noexcept -> bool final { return true; }
   [[nodiscard]] auto view() const noexcept -> view_type { return data_.view(); }
+  /** Mutable pointer to the underlying buffer (for filling after construction). */
+  [[nodiscard]] auto data_handle() noexcept -> value_type* { return data_.data_handle(); }
+  [[nodiscard]] auto data_handle() const noexcept -> const value_type*
+  {
+    return data_.data_handle();
+  }
 };
 
 /** Device padded dataset view (non-owning). */
@@ -269,6 +275,8 @@ struct device_padded_dataset_view : public dataset<IdxT> {
   view_type data_;
 
   explicit device_padded_dataset_view(view_type v) noexcept : data_{v} {}
+
+  device_padded_dataset_view(device_padded_dataset_view const& other) noexcept : data_{other.data_} {}
 
   [[nodiscard]] auto n_rows() const noexcept -> index_type final { return data_.extent(0); }
   [[nodiscard]] auto dim() const noexcept -> uint32_t final
@@ -319,6 +327,8 @@ struct host_padded_dataset_view : public dataset<IdxT> {
   view_type data_;
 
   explicit host_padded_dataset_view(view_type v) noexcept : data_{v} {}
+
+  host_padded_dataset_view(host_padded_dataset_view const& other) noexcept : data_{other.data_} {}
 
   [[nodiscard]] auto n_rows() const noexcept -> index_type final { return data_.extent(0); }
   [[nodiscard]] auto dim() const noexcept -> uint32_t final
