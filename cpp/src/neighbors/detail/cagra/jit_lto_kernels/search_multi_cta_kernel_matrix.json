@@ -1,0 +1,166 @@
+[
+  {
+    "_data": [
+      {
+        "data_type": "float",
+        "data_abbrev": "f",
+        "_query": [
+          {
+            "query_type": "float",
+            "query_abbrev": "f"
+          }
+        ]
+      },
+      {
+        "data_type": "__half",
+        "data_abbrev": "h",
+        "_query": [
+          {
+            "query_type": "float",
+            "query_abbrev": "f"
+          }
+        ]
+      },
+      {
+        "data_type": "uint8_t",
+        "data_abbrev": "uc",
+        "_query": [
+          {
+            "query_type": "float",
+            "query_abbrev": "f"
+          },
+          {
+            "query_type": "uint8_t",
+            "query_abbrev": "uc"
+          }
+        ]
+      },
+      {
+        "data_type": "int8_t",
+        "data_abbrev": "sc",
+        "_query": [
+          {
+            "query_type": "float",
+            "query_abbrev": "f"
+          }
+        ]
+      }
+    ],
+    "_source_index": [
+      {
+        "source_index_type": "uint32_t",
+        "source_index_abbrev": "ui"
+      }
+    ],
+    "_index": [
+      {
+        "index_type": "uint32_t",
+        "index_abbrev": "ui"
+      }
+    ],
+    "_distance": [
+      {
+        "distance_type": "float",
+        "distance_abbrev": "f"
+      }
+    ],
+    "team_size": [
+      "8",
+      "16",
+      "32"
+    ],
+    "dataset_block_dim": [
+      "128",
+      "256",
+      "512"
+    ],
+    "_pq": [
+      {
+        "pq_bits": "0",
+        "pq_len": "0",
+        "pq_prefix": "",
+        "pq_suffix": ""
+      }
+    ],
+    "_codebook": [
+      {
+        "codebook_type": "void",
+        "codebook_tag": ""
+      }
+    ]
+  },
+  {
+    "_data": [
+      {
+        "data_type": "float",
+        "data_abbrev": "f"
+      },
+      {
+        "data_type": "__half",
+        "data_abbrev": "h"
+      },
+      {
+        "data_type": "uint8_t",
+        "data_abbrev": "uc"
+      },
+      {
+        "data_type": "int8_t",
+        "data_abbrev": "sc"
+      }
+    ],
+    "_query": [
+      {
+        "query_type": "float",
+        "query_abbrev": "f"
+      }
+    ],
+    "_source_index": [
+      {
+        "source_index_type": "uint32_t",
+        "source_index_abbrev": "ui"
+      }
+    ],
+    "_index": [
+      {
+        "index_type": "uint32_t",
+        "index_abbrev": "ui"
+      }
+    ],
+    "_distance": [
+      {
+        "distance_type": "float",
+        "distance_abbrev": "f"
+      }
+    ],
+    "team_size": [
+      "8",
+      "16",
+      "32"
+    ],
+    "dataset_block_dim": [
+      "128",
+      "256",
+      "512"
+    ],
+    "_pq": [
+      {
+        "pq_bits": "8",
+        "pq_len": "2",
+        "pq_prefix": "_vpq",
+        "pq_suffix": "_8pq_2subd"
+      },
+      {
+        "pq_bits": "8",
+        "pq_len": "4",
+        "pq_prefix": "_vpq",
+        "pq_suffix": "_8pq_4subd"
+      }
+    ],
+    "_codebook": [
+      {
+        "codebook_type": "half",
+        "codebook_tag": ", tag_codebook_half"
+      }
+    ]
+  }
+]

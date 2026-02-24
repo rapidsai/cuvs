@@ -1,0 +1,58 @@
+{
+  "_data": [
+    {
+      "data_type": "float",
+      "data_abbrev": "f"
+    },
+    {
+      "data_type": "__half",
+      "data_abbrev": "h"
+    },
+    {
+      "data_type": "uint8_t",
+      "data_abbrev": "uc"
+    },
+    {
+      "data_type": "int8_t",
+      "data_abbrev": "sc"
+    }
+  ],
+  "_index": [
+    {
+      "index_type": "uint32_t",
+      "index_abbrev": "ui"
+    }
+  ],
+  "_distance": [
+    {
+      "distance_type": "float",
+      "distance_abbrev": "f"
+    }
+  ],
+  "team_size": [
+    "8",
+    "16",
+    "32"
+  ],
+  "dataset_block_dim": [
+    "128",
+    "256",
+    "512"
+  ],
+  "pq_len": [
+    "2",
+    "4"
+  ],
+  "pq_bits": [
+    "8"
+  ],
+  "codebook_type": [
+    "half"
+  ],
+  "_query": [
+    {
+      "query_type": "half",
+      "query_abbrev": "h"
+    }
+  ]
+}

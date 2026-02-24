@@ -1,0 +1,25 @@
+{
+  "_metric": [
+    {
+      "metric_tag": "l2",
+      "query_type": "float",
+      "query_type_abbrev": "f"
+    },
+    {
+      "metric_tag": "inner_product",
+      "query_type": "float",
+      "query_type_abbrev": "f"
+    },
+    {
+      "metric_tag": "hamming",
+      "query_type": "uint8_t",
+      "query_type_abbrev": "uc"
+    }
+  ],
+  "_distance": [
+    {
+      "distance_type": "float",
+      "distance_abbrev": "f"
+    }
+  ]
+}
