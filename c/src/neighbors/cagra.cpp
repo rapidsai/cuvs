@@ -146,6 +146,8 @@ void _update_dataset(cuvsResources_t res,
     using mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
     index_ptr->update_dataset(*res_ptr, mds);
+  } else {
+    RAFT_FAIL("Unsupported dataset DLtensor device type: %d", dataset.device.device_type);
   }
 }
 
