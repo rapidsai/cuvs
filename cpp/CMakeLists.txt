@@ -213,6 +213,13 @@ endif()
 # ##################################################################################################
 # * cuvs ---------------------------------------------------------------------
 if(NOT BUILD_CPU_ONLY)
+  set(JIT_LTO_TARGET_ARCHITECTURE "")
+  set(JIT_LTO_COMPILATION OFF)
+  if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
+    set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
+    set(JIT_LTO_COMPILATION ON)
+  endif()
+
   add_library(cuvs_cpp_headers INTERFACE)
   add_library(cuvs::cuvs_cpp_headers ALIAS cuvs_cpp_headers)
   target_include_directories(
@@ -347,13 +354,6 @@ if(NOT BUILD_CPU_ONLY)
         src/neighbors/mg/mg_cagra_int8_t_uint32_t.cu
         src/neighbors/mg/mg_cagra_uint8_t_uint32_t.cu
     )
-  endif()
-
-  set(JIT_LTO_TARGET_ARCHITECTURE "")
-  set(JIT_LTO_COMPILATION OFF)
-  if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
-    set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
-    set(JIT_LTO_COMPILATION ON)
   endif()
 
   if(JIT_LTO_COMPILATION)
