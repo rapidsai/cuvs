@@ -49,7 +49,6 @@ def test_cagra_batch_recall_consistency(search_width):
     queries = np.random.randn(n_queries, dim).astype(np.float32)
 
     dataset_device = device_ndarray(dataset)
-    queries_device = device_ndarray(queries)
 
     # Build CAGRA index
     build_params = cagra.IndexParams(
@@ -64,7 +63,7 @@ def test_cagra_batch_recall_consistency(search_width):
     # Compute ground truth with batch_size=1 (always uses MULTI_CTA)
     gt_neighbors = np.zeros((n_queries, k), dtype=np.uint32)
     for i in range(n_queries):
-        q = queries_device[i : i + 1]
+        q = device_ndarray(queries[i : i + 1])
         n_out = device_ndarray(np.zeros((1, k), dtype=np.uint32))
         d_out = device_ndarray(np.zeros((1, k), dtype=np.float32))
         cagra.search(
@@ -80,7 +79,7 @@ def test_cagra_batch_recall_consistency(search_width):
         all_neighbors = np.zeros((n_queries, k), dtype=np.uint32)
         for start in range(0, n_queries, batch_size):
             end = min(start + batch_size, n_queries)
-            q = queries_device[start:end]
+            q = device_ndarray(queries[start:end])
             actual_batch = end - start
             n_out = device_ndarray(
                 np.zeros((actual_batch, k), dtype=np.uint32)
