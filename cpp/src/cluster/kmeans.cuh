@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2020-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -7,11 +7,15 @@
 #include "detail/kmeans.cuh"
 #include "kmeans_mg.hpp"
 #include <cuvs/cluster/kmeans.hpp>
+#include <raft/core/copy.cuh>
+#include <raft/core/device_mdspan.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/kvp.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/comms.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/linalg/norm.cuh>
 
 #include <optional>
 
@@ -416,8 +420,7 @@ void cluster_cost(raft::resources const& handle,
 
   auto x_norms = raft::make_device_vector<DataT>(handle, n_samples);
 
-  raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
-    x_norms.data_handle(), X.data_handle(), n_features, n_samples, stream);
+  raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(handle, X, x_norms.view());
 
   auto min_cluster_distance = raft::make_device_vector<DataT>(handle, n_samples);
   rmm::device_uvector<DataT> l2_norm_or_distance_buffer(0, stream);
@@ -437,14 +440,11 @@ void cluster_cost(raft::resources const& handle,
     n_clusters,
     workspace);
 
-  rmm::device_scalar<DataT> device_cost(0, stream);
+  auto device_cost = raft::make_device_scalar<DataT>(handle, DataT(0));
 
-  cuvs::cluster::kmeans::cluster_cost(handle,
-                                      min_cluster_distance.view(),
-                                      workspace,
-                                      raft::make_device_scalar_view<DataT>(device_cost.data()),
-                                      raft::add_op{});
-  raft::update_host(cost.data_handle(), device_cost.data(), 1, stream);
+  cuvs::cluster::kmeans::cluster_cost(
+    handle, min_cluster_distance.view(), workspace, device_cost.view(), raft::add_op{});
+  raft::copy(handle, cost, raft::make_const_mdspan(device_cost.view()));
 
   raft::resource::sync_stream(handle);
 }

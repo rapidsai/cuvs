@@ -7,8 +7,10 @@
 #include "../../../distance/masked_nn.cuh"
 #include <cuvs/distance/distance.hpp>
 
+#include <raft/core/copy.cuh>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/kvp.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
@@ -324,8 +326,10 @@ void perform_1nn(raft::resources const& handle,
     colors_group_idxs.data_handle() + 1, n_components);
 
   auto x_norm = raft::make_device_vector<value_t, value_idx>(handle, (value_idx)n_rows);
-  raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
-    x_norm.data_handle(), X, n_cols, n_rows, stream);
+  raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+    handle,
+    raft::make_device_matrix_view<const value_t, value_idx, raft::row_major>(X, n_rows, n_cols),
+    x_norm.view());
 
   auto adj     = raft::make_device_matrix<bool, value_idx>(handle, row_batch_size, n_components);
   using OutT   = raft::KeyValuePair<value_idx, value_t>;
@@ -381,16 +385,17 @@ void perform_1nn(raft::resources const& handle,
   }
 
   // Transform the keys so that they correctly point to the unpermuted indices.
-  thrust::transform(exec_policy,
-                    kvp,
-                    kvp + n_rows,
-                    kvp,
-                    [sort_plan = sort_plan.data_handle()] __device__(OutT KVP) {
-                      OutT res;
-                      res.value = KVP.value;
-                      res.key   = sort_plan[KVP.key];
-                      return res;
-                    });
+  raft::linalg::map(
+    handle,
+    raft::make_device_vector_view<OutT, value_idx>(kvp, (value_idx)n_rows),
+    [sort_plan = sort_plan.data_handle()] __device__(OutT KVP) {
+      OutT res;
+      res.value = KVP.value;
+      res.key   = sort_plan[KVP.key];
+      return res;
+    },
+    raft::make_const_mdspan(
+      raft::make_device_vector_view<const OutT, value_idx>(kvp, (value_idx)n_rows)));
 
   // Undo permutation of the rows of X by scattering in place.
   raft::matrix::scatter(handle, X_mutable_view, sort_plan_const_view, (value_idx)col_batch_size);
@@ -409,7 +414,12 @@ void perform_1nn(raft::resources const& handle,
   raft::copy_async(kvp, tmp_kvp.data_handle(), n_rows, stream);
 
   LookupColorOp<value_idx, value_t> extract_colors_op(colors);
-  thrust::transform(exec_policy, kvp, kvp + n_rows, nn_colors, extract_colors_op);
+  raft::linalg::map(
+    handle,
+    raft::make_device_vector_view<value_idx, value_idx>(nn_colors, (value_idx)n_rows),
+    extract_colors_op,
+    raft::make_const_mdspan(
+      raft::make_device_vector_view<const OutT, value_idx>(kvp, (value_idx)n_rows)));
 }
 
 /**
@@ -596,7 +606,9 @@ void cross_component_nn(
 
   // compute final size
   value_idx size_int = 0;
-  raft::update_host(&size_int, out_index.data() + (out_index.size() - 1), 1, stream);
+  raft::copy(handle,
+             raft::make_host_scalar_view(&size_int),
+             raft::make_device_scalar_view(out_index.data() + (out_index.size() - 1)));
   raft::resource::sync_stream(handle, stream);
   nnz_t size = static_cast<nnz_t>(size_int);
 
