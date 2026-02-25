@@ -13,7 +13,7 @@
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/linalg/detail/qr.cuh>
-#include <raft/linalg/gemm.hpp>
+#include <raft/linalg/gemm.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/util/cuda_rt_essentials.hpp>
 
