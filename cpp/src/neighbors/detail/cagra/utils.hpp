@@ -283,8 +283,6 @@ void copy_with_padding(
   }
   if (dst.extent(1) == src.extent(1)) {
     auto stream = raft::resource::get_cuda_stream(res);
-    RAFT_LOG_INFO("[STREAM DEBUG] copy_with_padding using stream: %p",
-                  static_cast<const void*>(stream));
     raft::copy(dst.data_handle(), src.data_handle(), src.size(), stream);
   } else {
     // copy with padding

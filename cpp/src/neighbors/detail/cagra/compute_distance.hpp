@@ -246,32 +246,15 @@ struct dataset_descriptor_host {
     std::atomic<bool> ready;  // Not sure if std::holds_alternative is thread-safe
     std::variant<ready_t, init_f> value;
 
-    state() : ready{false}
-    {
-      RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] state::state() constructor - this=%p",
-                    static_cast<const void*>(this));
-    }
-
     template <typename InitF>
     state(InitF init, size_t size) : ready{false}, value{std::make_tuple(init, size)}
     {
-      RAFT_LOG_INFO(
-        "[JIT FRAGMENT DEBUG] state::state(InitF, size_t) constructor - this=%p, size=%zu",
-        static_cast<const void*>(this),
-        size);
     }
 
     ~state() noexcept
     {
       if (std::holds_alternative<ready_t>(value)) {
         auto& [ptr, stream] = std::get<ready_t>(value);
-        RAFT_LOG_INFO("[STREAM DEBUG] state::~state() - freeing ptr=%p on stream=%p",
-                      static_cast<const void*>(ptr),
-                      static_cast<const void*>(stream));
-        // Synchronize the stream before freeing to ensure all kernels using this descriptor have
-        // completed This prevents use-after-free if kernels are still running when the destructor
-        // is called
-        RAFT_CUDA_TRY_NO_THROW(cudaStreamSynchronize(stream));
         RAFT_CUDA_TRY_NO_THROW(cudaFreeAsync(ptr, stream));
       }
     }
@@ -282,45 +265,17 @@ struct dataset_descriptor_host {
       if (std::holds_alternative<init_f>(value)) {
         auto& [fun, size]     = std::get<init_f>(value);
         dev_descriptor_t* ptr = nullptr;
-        RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] state::eval() - allocating %zu bytes", size);
         RAFT_CUDA_TRY(cudaMallocAsync(&ptr, size, stream));
-        RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] state::eval() - allocated ptr=%p",
-                      static_cast<const void*>(ptr));
-        try {
-          fun(ptr, stream);
-          value = std::make_tuple(ptr, stream);
-          ready.store(true, std::memory_order_release);
-          RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] state::eval() - initialization complete, ready=true");
-        } catch (...) {
-          RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] state::eval() - exception caught, freeing ptr=%p",
-                        static_cast<const void*>(ptr));
-          // If fun() throws, free the allocated memory before rethrowing
-          RAFT_CUDA_TRY_NO_THROW(cudaFreeAsync(ptr, stream));
-          throw;
-        }
-      } else {
-        RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] state::eval() - already initialized, skipping");
+        fun(ptr, stream);
+        value = std::make_tuple(ptr, stream);
+        ready.store(true, std::memory_order_release);
       }
     }
 
     auto get(rmm::cuda_stream_view stream) -> dev_descriptor_t*
     {
-      bool was_ready = ready.load(std::memory_order_acquire);
-      if (!was_ready) {
-        eval(stream);
-        // After eval(), value must be in ready_t state (either from this call or a concurrent one)
-        // If eval() threw, we won't reach here
-        was_ready = ready.load(std::memory_order_acquire);
-      }
-      // Only access value if we're sure it's in ready_t state
-      if (!was_ready || !std::holds_alternative<ready_t>(value)) {
-        RAFT_FAIL("Descriptor state is invalid - eval() must have failed");
-      }
-      auto* ptr = std::get<0>(std::get<ready_t>(value));
-      RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] state::get() - was_ready=%d, ptr=%p",
-                    was_ready,
-                    static_cast<const void*>(ptr));
-      return ptr;
+      if (!ready.load(std::memory_order_acquire)) { eval(stream); }
+      return std::get<0>(std::get<ready_t>(value));
     }
   };
 

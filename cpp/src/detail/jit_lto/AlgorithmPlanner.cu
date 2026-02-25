@@ -63,7 +63,7 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::get_launcher()
       log_message += device_function + ",";
     }
     log_message.pop_back();
-    RAFT_LOG_INFO("%s", log_message.c_str());
+    RAFT_LOG_DEBUG("%s", log_message.c_str());
     launchers[launch_key] = this->build();
   }
   return launchers[launch_key];

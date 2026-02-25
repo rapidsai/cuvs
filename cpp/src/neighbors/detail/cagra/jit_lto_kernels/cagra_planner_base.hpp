@@ -41,17 +41,11 @@ struct CagraPlannerBase : AlgorithmPlanner {
       key += "_dim" + std::to_string(dataset_block_dim);
       key += "_" + std::to_string(pq_bits) + "pq_" + std::to_string(pq_len) + "subd";
       if (!params.empty()) { key += "_" + params; }
-      RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] setup_workspace VPQ key: %s (params: %s)",
-                    key.c_str(),
-                    params.c_str());
     } else {
       key += "standard_t" + std::to_string(team_size);
       key += "_dim" + std::to_string(dataset_block_dim);
       auto params = make_fragment_key<DataTag, IndexTag, DistanceTag, QueryTag>();
       if (!params.empty()) { key += "_" + params; }
-      RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] setup_workspace standard key: %s (params: %s)",
-                    key.c_str(),
-                    params.c_str());
     }
     this->device_functions.push_back(key);
   }
@@ -70,18 +64,12 @@ struct CagraPlannerBase : AlgorithmPlanner {
       key += "_dim" + std::to_string(dataset_block_dim);
       key += "_" + std::to_string(pq_bits) + "pq_" + std::to_string(pq_len) + "subd";
       if (!params.empty()) { key += "_" + params; }
-      RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] compute_distance VPQ key: %s (params: %s)",
-                    key.c_str(),
-                    params.c_str());
       this->device_functions.push_back(key);
     } else {
       std::string key = "compute_distance_standard_t" + std::to_string(team_size);
       key += "_dim" + std::to_string(dataset_block_dim);
       auto params = make_fragment_key<DataTag, IndexTag, DistanceTag, QueryTag>();
       if (!params.empty()) { key += "_" + params; }
-      RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] compute_distance standard key: %s (params: %s)",
-                    key.c_str(),
-                    params.c_str());
       this->device_functions.push_back(key);
       add_dist_op_device_function(metric);
       add_normalization_device_function(metric, team_size, dataset_block_dim);
@@ -102,7 +90,6 @@ struct CagraPlannerBase : AlgorithmPlanner {
     auto params     = make_fragment_key<QueryTag, DistanceTag>();
     std::string key = "dist_op_" + metric_tag;
     if (!params.empty()) { key += "_" + params; }
-    RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] dist_op key: %s (params: %s)", key.c_str(), params.c_str());
     this->device_functions.push_back(key);
   }
 
@@ -121,8 +108,6 @@ struct CagraPlannerBase : AlgorithmPlanner {
     key += "_t" + std::to_string(team_size);
     key += "_dim" + std::to_string(dataset_block_dim);
     if (!params.empty()) { key += "_" + params; }
-    RAFT_LOG_INFO(
-      "[JIT FRAGMENT DEBUG] apply_normalization key: %s (params: %s)", key.c_str(), params.c_str());
     this->device_functions.push_back(key);
   }
 
