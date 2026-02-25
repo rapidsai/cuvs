@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -15,9 +15,11 @@
 #include <cuvs/neighbors/nn_descent.hpp>
 #include <cuvs/neighbors/refine.hpp>
 
+#include <raft/core/copy.cuh>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdarray.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/managed_mdspan.hpp>
 #include <raft/core/mdspan.hpp>
 #include <raft/core/mdspan_types.hpp>
@@ -190,10 +192,11 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
                                     candidate_distances_view);
 
     // copy candidate neighbors to host
-    raft::copy(candidate_neighbors_h.value().data_handle(),
-               candidate_neighbors_view.data_handle(),
-               num_data_in_cluster * candidate_k,
-               raft::resource::get_cuda_stream(this->res));
+    raft::copy(this->res,
+               raft::make_host_vector_view(candidate_neighbors_h.value().data_handle(),
+                                           num_data_in_cluster * candidate_k),
+               raft::make_device_vector_view<const IdxT>(candidate_neighbors_view.data_handle(),
+                                                         num_data_in_cluster * candidate_k));
     auto candidate_neighbors_h_view = raft::make_host_matrix_view<IdxT, IdxT>(
       candidate_neighbors_h.value().data_handle(), num_data_in_cluster, candidate_k);
     auto refined_distances_h_view = raft::make_host_matrix_view<T, IdxT>(
@@ -210,10 +213,11 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
            all_ivf_pq_params.build_params.metric);
 
     if (this->n_clusters > 1) {  // do batching
-      raft::copy(this->batch_distances_d.value().data_handle(),
-                 refined_distances_h_view.data_handle(),
-                 num_data_in_cluster * this->k,
-                 raft::resource::get_cuda_stream(this->res));
+      raft::copy(this->res,
+                 raft::make_device_vector_view(this->batch_distances_d.value().data_handle(),
+                                               num_data_in_cluster * this->k),
+                 raft::make_host_vector_view<const T>(refined_distances_h_view.data_handle(),
+                                                      num_data_in_cluster * this->k));
 
       remap_and_merge_subgraphs<T, IdxT, IdxT>(
         this->res,
@@ -231,15 +235,17 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
     } else {
       size_t num_rows = num_data_in_cluster;
       // copy resulting indices and distances to device output
-      raft::copy(this->indices_.value().data_handle(),
-                 refined_neighbors_h_view.data_handle(),
-                 num_rows * this->k,
-                 raft::resource::get_cuda_stream(this->res));
+      raft::copy(
+        this->res,
+        raft::make_device_vector_view(this->indices_.value().data_handle(), num_rows * this->k),
+        raft::make_host_vector_view<const IdxT>(refined_neighbors_h_view.data_handle(),
+                                                num_rows * this->k));
       if (this->distances_.has_value()) {
-        raft::copy(this->distances_.value().data_handle(),
-                   refined_distances_h_view.data_handle(),
-                   num_rows * this->k,
-                   raft::resource::get_cuda_stream(this->res));
+        raft::copy(
+          this->res,
+          raft::make_device_vector_view(this->distances_.value().data_handle(), num_rows * this->k),
+          raft::make_host_vector_view<const T>(refined_distances_h_view.data_handle(),
+                                               num_rows * this->k));
       }
     }
   }
@@ -251,10 +257,9 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
     std::optional<raft::managed_matrix_view<T, IdxT>> global_distances    = std::nullopt) override
   {
     // we need data on device for ivfpq build and search.
-    raft::copy(data_d.value().data_handle(),
-               dataset.data_handle(),
-               dataset.size(),
-               raft::resource::get_cuda_stream(this->res));
+    raft::copy(this->res,
+               raft::make_device_vector_view(data_d.value().data_handle(), dataset.size()),
+               raft::make_host_vector_view<const T>(dataset.data_handle(), dataset.size()));
 
     build_knn_common(raft::make_device_matrix_view<const T, IdxT, row_major>(
                        data_d.value().data_handle(), dataset.extent(0), dataset.extent(1)),
@@ -275,10 +280,9 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
     auto dataset_h = raft::make_host_matrix<T, IdxT>(dataset.extent(0), dataset.extent(1));
 
     // we need data on host for refining
-    raft::copy(dataset_h.data_handle(),
-               dataset.data_handle(),
-               dataset.size(),
-               raft::resource::get_cuda_stream(this->res));
+    raft::copy(this->res,
+               raft::make_host_vector_view(dataset_h.data_handle(), dataset.size()),
+               raft::make_device_vector_view<const T>(dataset.data_handle(), dataset.size()));
 
     build_knn_common(dataset,
                      raft::make_host_matrix_view<const T, IdxT, row_major>(
@@ -381,10 +385,11 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
       size_t num_data_in_cluster = dataset.extent(0);
       if constexpr (std::is_same_v<DistEpilogueT, ReachabilityPP>) {
         // gather core dists
-        raft::copy(this->inverted_indices_d.value().data_handle(),
-                   inverted_indices.value().data_handle(),
-                   num_data_in_cluster,
-                   raft::resource::get_cuda_stream(this->res));
+        raft::copy(this->res,
+                   raft::make_device_vector_view(this->inverted_indices_d.value().data_handle(),
+                                                 num_data_in_cluster),
+                   raft::make_host_vector_view<const IdxT>(inverted_indices.value().data_handle(),
+                                                           num_data_in_cluster));
 
         raft::matrix::gather(this->res,
                              raft::make_device_matrix_view<const T, IdxT>(
@@ -458,10 +463,11 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
       }
 
       // copy to final device output
-      raft::copy(this->indices_.value().data_handle(),
-                 tmp_indices.data_handle(),
-                 tmp_indices.extent(0) * this->k,
-                 raft::resource::get_cuda_stream(this->res));
+      raft::copy(this->res,
+                 raft::make_device_vector_view(this->indices_.value().data_handle(),
+                                               tmp_indices.extent(0) * this->k),
+                 raft::make_host_vector_view<const IdxT>(tmp_indices.data_handle(),
+                                                         tmp_indices.extent(0) * this->k));
     }
   }
 
@@ -546,10 +552,11 @@ struct all_neighbors_builder_brute_force : public all_neighbors_builder<T, IdxT>
 
       if constexpr (std::is_same_v<DistEpilogueT, ReachabilityPP>) {
         // gather core dists
-        raft::copy(this->inverted_indices_d.value().data_handle(),
-                   inverted_indices.value().data_handle(),
-                   num_data_in_cluster,
-                   raft::resource::get_cuda_stream(this->res));
+        raft::copy(this->res,
+                   raft::make_device_vector_view(this->inverted_indices_d.value().data_handle(),
+                                                 num_data_in_cluster),
+                   raft::make_host_vector_view<const IdxT>(inverted_indices.value().data_handle(),
+                                                           num_data_in_cluster));
 
         raft::matrix::gather(this->res,
                              raft::make_device_matrix_view<const T, IdxT>(
@@ -591,10 +598,11 @@ struct all_neighbors_builder_brute_force : public all_neighbors_builder<T, IdxT>
           raft::make_device_matrix_view<T, IdxT>(
             this->batch_distances_d.value().data_handle(), num_data_in_cluster, this->k));
       }
-      raft::copy(this->batch_neighbors_h.value().data_handle(),
-                 this->batch_neighbors_d.value().data_handle(),
-                 num_data_in_cluster * this->k,
-                 raft::resource::get_cuda_stream(this->res));
+      raft::copy(this->res,
+                 raft::make_host_vector_view(this->batch_neighbors_h.value().data_handle(),
+                                             num_data_in_cluster * this->k),
+                 raft::make_device_vector_view<const IdxT>(
+                   this->batch_neighbors_d.value().data_handle(), num_data_in_cluster * this->k));
 
       remap_and_merge_subgraphs<T, IdxT, IdxT, std::is_same_v<DistEpilogueT, ReachabilityPP>>(
         this->res,
@@ -654,10 +662,9 @@ struct all_neighbors_builder_brute_force : public all_neighbors_builder<T, IdxT>
     std::optional<raft::managed_matrix_view<IdxT, IdxT>> global_neighbors = std::nullopt,
     std::optional<raft::managed_matrix_view<T, IdxT>> global_distances    = std::nullopt) override
   {
-    raft::copy(data_d.value().data_handle(),
-               dataset.data_handle(),
-               dataset.size(),
-               raft::resource::get_cuda_stream(this->res));
+    raft::copy(this->res,
+               raft::make_device_vector_view(data_d.value().data_handle(), dataset.size()),
+               raft::make_host_vector_view<const T>(dataset.data_handle(), dataset.size()));
 
     build_knn_common(raft::make_device_matrix_view<const T, IdxT, row_major>(
                        data_d.value().data_handle(), dataset.extent(0), dataset.extent(1)),
