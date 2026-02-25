@@ -18,10 +18,6 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
         Random
         Array
 
-    ctypedef enum cuvsKMeansCentroidUpdateMode:
-        CUVS_KMEANS_UPDATE_FULL_BATCH
-        CUVS_KMEANS_UPDATE_MINI_BATCH
-
     ctypedef enum cuvsKMeansType:
         CUVS_KMEANS_TYPE_KMEANS
         CUVS_KMEANS_TYPE_KMEANS_BALANCED
@@ -36,8 +32,8 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
         double oversampling_factor,
         int batch_samples,
         int batch_centroids,
-        cuvsKMeansCentroidUpdateMode update_mode,
         bool inertia_check,
+        int batch_size,
         bool final_inertia_check,
         int max_no_improvement,
         double reassignment_ratio,
@@ -72,11 +68,10 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
                                       DLManagedTensor* centroids,
                                       double* cost)
 
-    cuvsError_t cuvsKMeansFitBatched(cuvsResources_t res,
-                                     cuvsKMeansParams_t params,
-                                     DLManagedTensor* X,
-                                     int64_t batch_size,
-                                     DLManagedTensor* sample_weight,
-                                     DLManagedTensor* centroids,
-                                     double* inertia,
-                                     int64_t* n_iter) except +
+    cuvsError_t cuvsMiniBatchKMeansFit(cuvsResources_t res,
+                                       cuvsKMeansParams_t params,
+                                       DLManagedTensor* X,
+                                       DLManagedTensor* sample_weight,
+                                       DLManagedTensor* centroids,
+                                       double* inertia,
+                                       int64_t* n_iter) except +

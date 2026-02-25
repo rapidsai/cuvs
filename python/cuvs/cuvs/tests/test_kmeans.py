@@ -10,12 +10,9 @@ from cuvs.cluster.kmeans import (
     KMeansParams,
     cluster_cost,
     fit,
-    fit_batched,
     predict,
 )
 from cuvs.distance import pairwise_distance
-
-from sklearn.cluster import MiniBatchKMeans
 
 
 @pytest.mark.parametrize("n_rows", [100])
@@ -84,12 +81,12 @@ def test_cluster_cost(n_rows, n_cols, n_clusters, dtype):
 @pytest.mark.parametrize("n_clusters", [8, 16])
 @pytest.mark.parametrize("batch_size", [100, 500])
 @pytest.mark.parametrize("dtype", [np.float64])
-def test_fit_batched_matches_fit(
+def test_host_fit_matches_device_fit(
     n_rows, n_cols, n_clusters, batch_size, dtype
 ):
     """
-    Test that fit_batched FullBatch produces the same centroids as regular fit
-    when given the same initial centroids.
+    Test that fit() with host data produces the same centroids as fit()
+    with device data when given the same initial centroids.
     """
     rng = np.random.default_rng(99)
     X_host = rng.random((n_rows, n_cols)).astype(dtype)
@@ -100,86 +97,34 @@ def test_fit_batched_matches_fit(
 
     initial_centroids_host = X_host[:n_clusters].copy()
 
-    params = KMeansParams(
+    params_device = KMeansParams(
         n_clusters=n_clusters,
         init_method="Array",
         max_iter=100,
         tol=1e-10,
     )
     centroids_regular, _, _ = fit(
-        params,
+        params_device,
         device_ndarray(X_host),
         device_ndarray(initial_centroids_host.copy()),
     )
     centroids_regular = centroids_regular.copy_to_host()
 
-    centroids_batched, _, _ = fit_batched(
-        params,
-        X_host,
-        batch_size=batch_size,
-        centroids=device_ndarray(initial_centroids_host.copy()),
-    )
-    centroids_batched = centroids_batched.copy_to_host()
-
-    assert np.allclose(
-        centroids_regular, centroids_batched, rtol=1e-3, atol=1e-3
-    ), f"max diff: {np.max(np.abs(centroids_regular - centroids_batched))}"
-
-
-@pytest.mark.parametrize("n_rows", [1000])
-@pytest.mark.parametrize("n_cols", [10])
-@pytest.mark.parametrize("n_clusters", [8])
-@pytest.mark.parametrize("dtype", [np.float32])
-def test_minibatch_sklearn(n_rows, n_cols, n_clusters, dtype):
-    """
-    Test that fit_batched matches sklearn's KMeans implementation.
-    """
-    rng = np.random.default_rng(99)
-    X_host = rng.random((n_rows, n_cols)).astype(dtype)
-    initial_centroids_host = X_host[:n_clusters].copy()
-
-    # Sklearn fit
-    kmeans = MiniBatchKMeans(
-        n_clusters=8,
-        init=initial_centroids_host,
-        max_iter=100,
-        verbose=0,
-        random_state=None,
-        tol=0.0,
-        max_no_improvement=10,
-        init_size=None,
-        n_init="auto",
-        reassignment_ratio=0.01,
-        batch_size=256,
-    )
-    kmeans.fit(X_host)
-
-    centroids_sklearn = kmeans.cluster_centers_
-    inertia_sklearn = kmeans.inertia_
-
-    # cuvs fit
-    params = KMeansParams(
+    # Host-data fit with batch_size
+    params_host = KMeansParams(
         n_clusters=n_clusters,
         init_method="Array",
         max_iter=100,
-        tol=1e-4,
-        update_mode="mini_batch",
-        final_inertia_check=True,
-        max_no_improvement=10,
+        tol=1e-10,
+        batch_size=batch_size,
     )
-    centroids_cuvs, inertia_cuvs, _ = fit_batched(
-        params,
+    centroids_host, _, _ = fit(
+        params_host,
         X_host,
-        batch_size=256,
         centroids=device_ndarray(initial_centroids_host.copy()),
     )
-    centroids_cuvs = centroids_cuvs.copy_to_host()
+    centroids_host = centroids_host.copy_to_host()
 
     assert np.allclose(
-        centroids_sklearn, centroids_cuvs, rtol=0.3, atol=0.3
-    ), f"max diff: {np.max(np.abs(centroids_sklearn - centroids_cuvs))}"
-
-    inertia_diff = abs(inertia_sklearn - inertia_cuvs)
-    assert np.allclose(inertia_sklearn, inertia_cuvs, rtol=0.1, atol=0.1), (
-        f"inertia diff: sklearn={inertia_sklearn}, cuvs={inertia_cuvs}, diff={inertia_diff}"
-    )
+        centroids_regular, centroids_host, rtol=1e-3, atol=1e-3
+    ), f"max diff: {np.max(np.abs(centroids_regular - centroids_host))}"

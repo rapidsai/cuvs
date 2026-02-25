@@ -37,22 +37,6 @@ typedef enum {
 } cuvsKMeansInitMethod;
 
 /**
- * @brief Centroid update mode for k-means algorithm
- */
-typedef enum {
-  /**
-   * Standard k-means (Lloyd's algorithm): accumulate assignments over the
-   * entire dataset, then update centroids once per iteration.
-   */
-  CUVS_KMEANS_UPDATE_FULL_BATCH = 0,
-
-  /**
-   * Mini-batch k-means: update centroids after each randomly sampled batch.
-   */
-  CUVS_KMEANS_UPDATE_MINI_BATCH = 1
-} cuvsKMeansCentroidUpdateMode;
-
-/**
  * @brief Hyper-parameters for the kmeans algorithm
  */
 struct cuvsKMeansParams {
@@ -106,25 +90,28 @@ struct cuvsKMeansParams {
    */
   int batch_centroids;
 
-  /**
-   * Centroid update mode:
-   *  - CUVS_KMEANS_UPDATE_FULL_BATCH: Standard Lloyd's algorithm, update after full dataset pass
-   *  - CUVS_KMEANS_UPDATE_MINI_BATCH: Mini-batch k-means, update after each batch
-   */
-  cuvsKMeansCentroidUpdateMode update_mode;
-
   /** Check inertia during iterations for early convergence. */
   bool inertia_check;
 
   /**
-   * Compute final inertia after fit_batched completes (requires extra data pass).
-   * Only used by fit_batched; regular fit always computes final inertia.
+   * Number of samples to process per batch. Controls memory usage when the
+   * dataset is large or resides on the host. If 0 (default), the entire dataset
+   * is used as a single batch.
+   *
+   * For cuvsKMeansFit with host data, this controls the streaming batch size.
+   * For cuvsMiniBatchKMeansFit, this is the mini-batch size.
+   */
+  int batch_size;
+
+  /**
+   * Compute final inertia after fit completes (requires extra data pass).
+   * Only relevant when data is on host; regular device-data fit always computes final inertia.
    */
   bool final_inertia_check;
 
   /**
    * Maximum number of consecutive mini-batch steps without improvement in smoothed inertia
-   * before early stopping. Only used when update_mode is CUVS_KMEANS_UPDATE_MINI_BATCH.
+   * before early stopping. Only used by cuvsMiniBatchKMeansFit.
    * If 0, this convergence criterion is disabled.
    */
   int max_no_improvement;
@@ -132,7 +119,7 @@ struct cuvsKMeansParams {
   /**
    * Control the fraction of the maximum number of counts for a center to be reassigned.
    * Centers with count < reassignment_ratio * max(counts) are randomly reassigned to
-   * observations from the current batch. Only used when update_mode is CUVS_KMEANS_UPDATE_MINI_BATCH.
+   * observations from the current batch. Only used by cuvsMiniBatchKMeansFit.
    * If 0.0, reassignment is disabled. Default: 0.01
    */
   double reassignment_ratio;
@@ -187,18 +174,23 @@ typedef enum { CUVS_KMEANS_TYPE_KMEANS = 0, CUVS_KMEANS_TYPE_KMEANS_BALANCED = 1
  *   clusters are reinitialized by choosing new centroids with
  *   k-means++ algorithm.
  *
+ *   If X is on device (GPU) memory, a standard device-data fit is performed.
+ *   If X is on host (CPU) memory, data is automatically streamed to the GPU
+ *   in batches controlled by params->batch_size.
+ *
  * @param[in]     res           opaque C handle
  * @param[in]     params        Parameters for KMeans model.
- * @param[in]     X             Training instances to cluster. The data must
- *                              be in row-major format.
+ * @param[in]     X             Training instances to cluster (host or device memory).
+ *                              The data must be in row-major format.
  *                              [dim = n_samples x n_features]
  * @param[in]     sample_weight Optional weights for each observation in X.
+ *                              Must be on the same memory space as X.
  *                              [len = n_samples]
  * @param[inout]  centroids     [in] When init is InitMethod::Array, use
  *                              centroids as the initial cluster centers.
  *                              [out] The generated centroids from the
  *                              kmeans algorithm are stored at the address
- *                              pointed by 'centroids'.
+ *                              pointed by 'centroids'. Must be on device memory.
  *                              [dim = n_clusters x n_features]
  * @param[out]    inertia       Sum of squared distances of samples to their
  *                              closest cluster center.
@@ -259,37 +251,40 @@ cuvsError_t cuvsKMeansClusterCost(cuvsResources_t res,
                                   double* cost);
 
 /**
- * @brief Find clusters with k-means algorithm using batched processing.
+ * @brief Fit mini-batch k-means using host-resident data.
  *
- *   This function processes data from HOST memory in batches, streaming
- *   to the GPU. Useful when the dataset is too large to fit in GPU memory.
+ *   Mini-batches are randomly sampled from the host data each step. Centroids
+ *   are updated using an online learning rule. The mini-batch size is
+ *   controlled by params->batch_size.
+ *
+ *   When sample weights are provided, they are used as sampling probabilities
+ *   (matching scikit-learn). Unit weights are passed to the centroid update
+ *   to avoid double weighting.
  *
  * @param[in]     res           opaque C handle
- * @param[in]     params        Parameters for KMeans model.
+ * @param[in]     params        Parameters for KMeans model. The fields
+ *                              batch_size, max_no_improvement, and
+ *                              reassignment_ratio are used by this function.
  * @param[in]     X             Training instances on HOST memory. The data must
  *                              be in row-major format.
  *                              [dim = n_samples x n_features]
- * @param[in]     batch_size    Number of samples to process per batch.
  * @param[in]     sample_weight Optional weights for each observation in X (on host).
  *                              [len = n_samples]
- * @param[inout]  centroids     [in] When init is InitMethod::Array, use
- *                              centroids as the initial cluster centers.
- *                              [out] The generated centroids from the
- *                              kmeans algorithm are stored at the address
- *                              pointed by 'centroids'. Must be on DEVICE memory.
+ * @param[inout]  centroids     [in] Initial centroids / [out] Fitted centroids.
+ *                              Must be on DEVICE memory.
  *                              [dim = n_clusters x n_features]
  * @param[out]    inertia       Sum of squared distances of samples to their
  *                              closest cluster center.
- * @param[out]    n_iter        Number of iterations run.
+ * @param[out]    n_iter        Number of mini-batch steps run.
  */
-cuvsError_t cuvsKMeansFitBatched(cuvsResources_t res,
-                                 cuvsKMeansParams_t params,
-                                 DLManagedTensor* X,
-                                 int64_t batch_size,
-                                 DLManagedTensor* sample_weight,
-                                 DLManagedTensor* centroids,
-                                 double* inertia,
-                                 int64_t* n_iter);
+cuvsError_t cuvsMiniBatchKMeansFit(cuvsResources_t res,
+                                   cuvsKMeansParams_t params,
+                                   DLManagedTensor* X,
+                                   DLManagedTensor* sample_weight,
+                                   DLManagedTensor* centroids,
+                                   double* inertia,
+                                   int64_t* n_iter);
+
 /**
  * @}
  */
