@@ -126,13 +126,6 @@ enum class MergeStrategy {
   MERGE_STRATEGY_LOGICAL = 1
 };
 
-/** Base merge parameters with polymorphic interface. */
-struct merge_params {
-  virtual ~merge_params() = default;
-
-  virtual MergeStrategy strategy() const = 0;
-};
-
 /** @} */  // end group neighbors_index
 
 /** Two-dimensional dataset; maybe owning, maybe compressed, maybe strided. */

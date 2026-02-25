@@ -13,7 +13,7 @@
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/common.hpp>
-#include <cuvs/neighbors/composite/merge.hpp>
+#include <cuvs/neighbors/composite/index.hpp>
 #include <cuvs/neighbors/dynamic_batching.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
@@ -453,33 +453,21 @@ void cuvs_cagra<T, IdxT>::search_base(
     } else {
       if (index_params_.merge_type == CagraMergeType::kLogical) {
         // TODO: index merge must happen outside of search, otherwise what are we benchmarking?
-        cuvs::neighbors::cagra::merge_params merge_params{cuvs::neighbors::cagra::index_params{}};
-        merge_params.merge_strategy = cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL;
-
-        // Create wrapped indices for composite merge
-        std::vector<std::shared_ptr<cuvs::neighbors::IndexBase<T, IdxT, algo_base::index_type>>>
-          wrapped_indices;
-        wrapped_indices.reserve(sub_indices_.size());
+        std::vector<cuvs::neighbors::cagra::index<T, IdxT>*> cagra_indices;
+        cagra_indices.reserve(sub_indices_.size());
         for (auto& ptr : sub_indices_) {
-          auto index_wrapper =
-            cuvs::neighbors::cagra::make_index_wrapper<T, IdxT, algo_base::index_type>(ptr.get());
-          wrapped_indices.push_back(index_wrapper);
+          cagra_indices.push_back(ptr.get());
         }
 
         raft::resources composite_handle(handle_);
-        size_t n_streams = wrapped_indices.size();
+        size_t n_streams = cagra_indices.size();
         raft::resource::set_cuda_stream_pool(composite_handle,
                                              std::make_shared<rmm::cuda_stream_pool>(n_streams));
 
-        auto merged_index =
-          cuvs::neighbors::composite::merge(composite_handle, merge_params, wrapped_indices);
-        cuvs::neighbors::filtering::none_sample_filter empty_filter;
-        merged_index->search(composite_handle,
-                             search_params_,
-                             queries_view,
-                             neighbors_view,
-                             distances_view,
-                             empty_filter);
+        cuvs::neighbors::composite::CompositeIndex<T, IdxT, algo_base::index_type> composite(
+          cagra_indices);
+        composite.search(
+          composite_handle, search_params_, queries_view, neighbors_view, distances_view);
       }
     }
   }

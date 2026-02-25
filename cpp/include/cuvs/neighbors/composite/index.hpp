@@ -1,61 +1,63 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
 #include <cuvs/distance/distance.hpp>
-#include <cuvs/neighbors/index_base.hpp>
+#include <cuvs/neighbors/cagra.hpp>
 #include <raft/core/device_mdspan.hpp>
 
-#include <memory>
 #include <vector>
 
 namespace cuvs::neighbors::composite {
 
 /**
- * @brief Composite index made of other IndexBase implementations.
+ * @brief Composite index that searches multiple CAGRA sub-indices and merges results.
+ *
+ * When the composite index contains multiple sub-indices, the user can set a
+ * stream pool in the input raft::resource to enable parallel search across
+ * sub-indices for improved performance.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *
+ *   auto index0 = cagra::build(res, params, dataset0);
+ *   auto index1 = cagra::build(res, params, dataset1);
+ *
+ *   composite::CompositeIndex<float, uint32_t> composite({&index0, &index1});
+ *
+ *   // optional: create a stream pool to enable parallel search across sub-indices
+ *   size_t n_streams = 2;
+ *   raft::resource::set_cuda_stream_pool(handle,
+ *                                        std::make_shared<rmm::cuda_stream_pool>(n_streams));
+ *
+ *   composite.search(handle, search_params, queries, neighbors, distances);
+ * @endcode
  */
 template <typename T, typename IdxT, typename OutputIdxT = IdxT>
-class CompositeIndex : public IndexBase<T, IdxT, OutputIdxT> {
+class CompositeIndex {
  public:
-  using value_type        = typename IndexBase<T, IdxT, OutputIdxT>::value_type;
-  using index_type        = typename IndexBase<T, IdxT, OutputIdxT>::index_type;
-  using out_index_type    = typename IndexBase<T, IdxT, OutputIdxT>::out_index_type;
-  using matrix_index_type = typename IndexBase<T, IdxT, OutputIdxT>::matrix_index_type;
+  using value_type        = T;
+  using index_type        = IdxT;
+  using out_index_type    = OutputIdxT;
+  using matrix_index_type = int64_t;
 
-  using index_ptr = std::shared_ptr<IndexBase<value_type, index_type, out_index_type>>;
-
-  explicit CompositeIndex(std::vector<index_ptr> children) : children_(std::move(children)) {}
+  explicit CompositeIndex(std::vector<cuvs::neighbors::cagra::index<T, IdxT>*> children)
+    : children_(std::move(children))
+  {
+  }
 
   /**
    * @brief Search the composite index for the k nearest neighbors.
    *
-   * When the composite index contains multiple sub-indices, the user can set a
-   * stream pool in the input raft::resource to enable parallel search across
-   * sub-indices for improved performance.
-   *
-   * Usage example:
-   * @code{.cpp}
-   *   using namespace cuvs::neighbors;
-   *   // create a composite index with multiple sub-indices
-   *   std::vector<CompositeIndex<T, IdxT>::index_ptr> sub_indices;
-   *   // ... populate sub_indices ...
-   *   auto composite_index = CompositeIndex<T, IdxT>(std::move(sub_indices));
-   *
-   *   // optional: create a stream pool to enable parallel search across sub-indices
-   *   // recommended stream count: min(number_of_sub_indices, 8)
-   *   size_t n_streams = std::min(sub_indices.size(), size_t(8));
-   *   raft::resource::set_cuda_stream_pool(handle,
-   *                                        std::make_shared<rmm::cuda_stream_pool>(n_streams));
-   *
-   *   // perform search with parallel sub-index execution
-   *   composite_index.search(handle, search_params, queries, neighbors, distances);
-   * @endcode
+   * Searches each sub-index independently (optionally in parallel via stream pool),
+   * then selects the top-k results across all sub-indices.
    *
    * @param[in] handle raft resource handle
-   * @param[in] params search parameters
+   * @param[in] params CAGRA search parameters
    * @param[in] queries device matrix view of query vectors [n_queries, dim]
    * @param[out] neighbors device matrix view for neighbor indices [n_queries, k]
    * @param[out] distances device matrix view for distances [n_queries, k]
@@ -63,14 +65,14 @@ class CompositeIndex : public IndexBase<T, IdxT, OutputIdxT> {
    */
   void search(
     const raft::resources& handle,
-    const cuvs::neighbors::search_params& params,
+    const cuvs::neighbors::cagra::search_params& params,
     raft::device_matrix_view<const value_type, matrix_index_type, raft::row_major> queries,
     raft::device_matrix_view<out_index_type, matrix_index_type, raft::row_major> neighbors,
     raft::device_matrix_view<float, matrix_index_type, raft::row_major> distances,
     const cuvs::neighbors::filtering::base_filter& filter =
-      cuvs::neighbors::filtering::none_sample_filter{}) const override;
+      cuvs::neighbors::filtering::none_sample_filter{}) const;
 
-  index_type size() const noexcept override
+  index_type size() const noexcept
   {
     index_type total = 0;
     for (const auto& c : children_) {
@@ -79,14 +81,14 @@ class CompositeIndex : public IndexBase<T, IdxT, OutputIdxT> {
     return total;
   }
 
-  cuvs::distance::DistanceType metric() const noexcept override
+  cuvs::distance::DistanceType metric() const noexcept
   {
     return children_.empty() ? cuvs::distance::DistanceType::L2Expanded
                              : children_.front()->metric();
   }
 
  private:
-  std::vector<index_ptr> children_;
+  std::vector<cuvs::neighbors::cagra::index<T, IdxT>*> children_;
 };
 
 }  // namespace cuvs::neighbors::composite

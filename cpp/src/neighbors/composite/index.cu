@@ -1,9 +1,10 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <cuvs/distance/distance.hpp>
+#include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/composite/index.hpp>
 #include <cuvs/selection/select_k.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -16,7 +17,7 @@ namespace cuvs::neighbors::composite {
 template <typename T, typename IdxT, typename OutputIdxT>
 void CompositeIndex<T, IdxT, OutputIdxT>::search(
   const raft::resources& handle,
-  const cuvs::neighbors::search_params& params,
+  const cuvs::neighbors::cagra::search_params& params,
   raft::device_matrix_view<const value_type, matrix_index_type, raft::row_major> queries,
   raft::device_matrix_view<out_index_type, matrix_index_type, raft::row_major> neighbors,
   raft::device_matrix_view<float, matrix_index_type, raft::row_major> distances,
@@ -28,7 +29,8 @@ void CompositeIndex<T, IdxT, OutputIdxT>::search(
   }
 
   if (children_.size() == 1) {
-    children_.front()->search(handle, params, queries, neighbors, distances, filter);
+    cuvs::neighbors::cagra::search(
+      handle, params, *children_.front(), queries, neighbors, distances, filter);
     return;
   }
 
@@ -57,8 +59,6 @@ void CompositeIndex<T, IdxT, OutputIdxT>::search(
   out_index_type stride = K * num_indices;
 
   for (size_t i = 0; i < num_indices; i++) {
-    const auto& sub_index = children_[i];
-
     auto stream = raft::resource::get_next_usable_stream(handle, i);
 
     raft::resources stream_pool_handle(handle);
@@ -71,8 +71,13 @@ void CompositeIndex<T, IdxT, OutputIdxT>::search(
       raft::make_device_matrix_view<float, matrix_index_type, raft::row_major>(
         temp_distances[i].data(), num_queries, K);
 
-    sub_index->search(
-      stream_pool_handle, params, queries, temp_neighbors_view, temp_distances_view, filter);
+    cuvs::neighbors::cagra::search(stream_pool_handle,
+                                   params,
+                                   *children_[i],
+                                   queries,
+                                   temp_neighbors_view,
+                                   temp_distances_view,
+                                   filter);
 
     if (offset != 0) {
       raft::linalg::addScalar(temp_neighbors[i].data(),
@@ -87,7 +92,7 @@ void CompositeIndex<T, IdxT, OutputIdxT>::search(
     raft::copy_matrix(
       distances_buffer.data() + i * K, stride, temp_distances[i].data(), K, K, num_queries, stream);
 
-    offset += sub_index->size();
+    offset += children_[i]->size();
   }
   raft::resource::sync_stream_pool(handle);
 
@@ -102,11 +107,10 @@ void CompositeIndex<T, IdxT, OutputIdxT>::search(
                             distances,
                             neighbors,
                             cuvs::distance::is_min_close(metric()),
-                            true,  // stable_sort
+                            true,
                             cuvs::selection::SelectAlgo::kAuto);
 }
 
-// Explicit instantiations
 template class CompositeIndex<float, uint32_t, uint32_t>;
 template class CompositeIndex<float, uint32_t, int64_t>;
 template class CompositeIndex<half, uint32_t, uint32_t>;

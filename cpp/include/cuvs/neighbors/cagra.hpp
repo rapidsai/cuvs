@@ -3173,5 +3173,3 @@ void optimize(raft::resources const& handle,
               raft::host_matrix_view<uint32_t, int64_t, raft::row_major> new_graph);
 
 }  // namespace cuvs::neighbors::cagra::helpers
-
-#include <cuvs/neighbors/cagra_index_wrapper.hpp>
