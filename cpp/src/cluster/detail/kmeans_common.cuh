@@ -21,12 +21,14 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/linalg/add.cuh>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/reduce_cols_by_key.cuh>
 #include <raft/linalg/reduce_rows_by_key.cuh>
 #include <raft/matrix/gather.cuh>
+#include <raft/matrix/init.cuh>
 #include <raft/random/permute.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/util/cuda_utils.cuh>
@@ -46,9 +48,12 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <ctime>
 #include <optional>
 #include <random>
+#include <unordered_set>
+#include <vector>
 
 namespace cuvs::cluster::kmeans::detail {
 
@@ -574,6 +579,154 @@ void finalize_centroids(raft::resources const& handle,
     [=] __device__(raft::KeyValuePair<ptrdiff_t, DataT> map) { return map.value == DataT{0}; },
     raft::key_op{},
     stream);
+}
+
+/**
+ * @brief Sample data from host to device for initialization, with optional type conversion
+ *
+ * @tparam T      Input data type
+ * @tparam IdxT   Index type
+ */
+template <typename T, typename IdxT>
+void prepare_init_sample(raft::resources const& handle,
+                         raft::host_matrix_view<const T, IdxT> X,
+                         raft::device_matrix_view<T, IdxT> X_sample,
+                         uint64_t seed)
+{
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
+  auto n_samples      = X.extent(0);
+  auto n_features     = X.extent(1);
+  auto n_samples_out  = X_sample.extent(0);
+
+  std::mt19937 gen(seed);
+  std::uniform_int_distribution<IdxT> dist(0, n_samples - 1);
+
+  // Generate n_samples_out unique random indices using rejection sampling
+  // Since n_samples_out << n_samples, collisions are rare and this is O(n_samples_out)
+  std::unordered_set<IdxT> selected_indices;
+  selected_indices.reserve(n_samples_out);
+
+  while (static_cast<IdxT>(selected_indices.size()) < n_samples_out) {
+    IdxT idx = dist(gen);
+    selected_indices.insert(idx);
+  }
+
+  std::vector<IdxT> indices(selected_indices.begin(), selected_indices.end());
+
+  std::vector<T> host_sample(n_samples_out * n_features);
+#pragma omp parallel for
+  for (IdxT i = 0; i < static_cast<IdxT>(n_samples_out); i++) {
+    IdxT src_idx = indices[i];
+    std::memcpy(host_sample.data() + i * n_features,
+                X.data_handle() + src_idx * n_features,
+                n_features * sizeof(T));
+  }
+
+  raft::copy(X_sample.data_handle(), host_sample.data(), host_sample.size(), stream);
+}
+
+/**
+ * @brief Initialize centroids using k-means++ on a sample of the host data
+ *
+ * @tparam T      Input data type
+ * @tparam IdxT   Index type
+ */
+template <typename T, typename IdxT>
+void init_centroids_from_host_sample(raft::resources const& handle,
+                                     const cuvs::cluster::kmeans::params& params,
+                                     raft::host_matrix_view<const T, IdxT> X,
+                                     raft::device_matrix_view<T, IdxT> centroids,
+                                     rmm::device_uvector<char>& workspace)
+{
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
+  auto n_samples      = X.extent(0);
+  auto n_features     = X.extent(1);
+  auto n_clusters     = params.n_clusters;
+
+  size_t init_sample_size =
+    std::min(static_cast<size_t>(n_samples),
+             std::max(static_cast<size_t>(3 * n_clusters), static_cast<size_t>(10000)));
+  RAFT_LOG_DEBUG("KMeans: sampling %zu points for initialization from host data", init_sample_size);
+
+  auto init_sample = raft::make_device_matrix<T, IdxT>(handle, init_sample_size, n_features);
+  prepare_init_sample(handle, X, init_sample.view(), params.rng_state.seed);
+
+  if (params.init == cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus) {
+    auto init_sample_view = raft::make_device_matrix_view<const T, IdxT>(
+      init_sample.data_handle(), init_sample_size, n_features);
+
+    if (params.oversampling_factor == 0) {
+      cuvs::cluster::kmeans::detail::kmeansPlusPlus<T, IdxT>(
+        handle, params, init_sample_view, centroids, workspace);
+    } else {
+      cuvs::cluster::kmeans::detail::initScalableKMeansPlusPlus<T, IdxT>(
+        handle, params, init_sample_view, centroids, workspace);
+    }
+  } else if (params.init == cuvs::cluster::kmeans::params::InitMethod::Random) {
+    raft::copy(centroids.data_handle(), init_sample.data_handle(), n_clusters * n_features, stream);
+  } else if (params.init == cuvs::cluster::kmeans::params::InitMethod::Array) {
+    // already provided
+  } else {
+    RAFT_FAIL("Unknown initialization method");
+  }
+}
+
+/**
+ * @brief Accumulate partial centroid sums and counts from a batch.
+ *
+ * Adds the partial sums from a single batch to running accumulators.
+ * Does NOT divide — the caller is responsible for finalizing centroids.
+ *
+ * @tparam MathT  Data/math type
+ * @tparam IdxT   Index type
+ */
+template <typename MathT, typename IdxT>
+void accumulate_batch_centroids(
+  raft::resources const& handle,
+  raft::device_matrix_view<const MathT, IdxT> batch_data,
+  raft::device_vector_view<const raft::KeyValuePair<IdxT, MathT>, IdxT> minClusterAndDistance,
+  raft::device_vector_view<const MathT, IdxT> sample_weights,
+  raft::device_matrix_view<MathT, IdxT> centroid_sums,
+  raft::device_vector_view<MathT, IdxT> cluster_counts)
+{
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
+  auto n_features     = batch_data.extent(1);
+  auto n_clusters     = centroid_sums.extent(0);
+
+  auto workspace = rmm::device_uvector<char>(
+    batch_data.extent(0), stream, raft::resource::get_workspace_resource(handle));
+
+  auto batch_sums   = raft::make_device_matrix<MathT, IdxT>(handle, n_clusters, n_features);
+  auto batch_counts = raft::make_device_vector<MathT, IdxT>(handle, n_clusters);
+
+  raft::matrix::fill(handle, batch_sums.view(), MathT{0});
+  raft::matrix::fill(handle, batch_counts.view(), MathT{0});
+
+  cuvs::cluster::kmeans::detail::KeyValueIndexOp<IdxT, MathT> conversion_op;
+  thrust::transform_iterator<cuvs::cluster::kmeans::detail::KeyValueIndexOp<IdxT, MathT>,
+                             const raft::KeyValuePair<IdxT, MathT>*>
+    labels_itr(minClusterAndDistance.data_handle(), conversion_op);
+
+  cuvs::cluster::kmeans::detail::compute_centroid_adjustments(handle,
+                                                              batch_data,
+                                                              sample_weights,
+                                                              labels_itr,
+                                                              static_cast<IdxT>(n_clusters),
+                                                              batch_sums.view(),
+                                                              batch_counts.view(),
+                                                              workspace);
+
+  raft::linalg::add(centroid_sums.data_handle(),
+                    centroid_sums.data_handle(),
+                    batch_sums.data_handle(),
+                    centroid_sums.size(),
+                    stream);
+
+  raft::linalg::add(cluster_counts.data_handle(),
+                    cluster_counts.data_handle(),
+                    batch_counts.data_handle(),
+                    cluster_counts.size(),
+                    stream);
 }
 
 }  // namespace cuvs::cluster::kmeans::detail

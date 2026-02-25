@@ -5,6 +5,7 @@
 #pragma once
 
 #include "detail/kmeans.cuh"
+#include "detail/kmeans_minibatch.cuh"
 #include "kmeans_mg.hpp"
 #include <cuvs/cluster/kmeans.hpp>
 #include <raft/core/copy.cuh>
@@ -585,6 +586,133 @@ void init_plus_plus(raft::resources const& handle,
 {
   cuvs::cluster::kmeans::detail::kmeansPlusPlus<DataT, IndexT>(
     handle, params, X, centroids, workspace);
+}
+
+// =========================================================
+// Host-data overloads (automatically batch data to device)
+// =========================================================
+
+/**
+ * @brief Fit k-means using host-resident data.
+ *
+ * Data is streamed to the GPU in `batch_size`-sized chunks via batch_load_iterator.
+ * When batch_size >= n_samples the behaviour is identical to the device-data path.
+ *
+ * @tparam DataT  the type of data used for weights, distances.
+ * @tparam IndexT the type of data used for indexing.
+ *
+ * @param[in]  handle        The raft handle.
+ * @param[in]  params        Parameters for KMeans model.
+ * @param[in]  X             Training data in row-major format [n_samples x n_features].
+ * @param[in]  batch_size    Number of samples per device batch.
+ * @param[in]  sample_weight Optional per-sample weights [n_samples].
+ * @param[inout] centroids   [in] Initial centroids / [out] Fitted centroids.
+ * @param[out] inertia       Sum of squared distances.
+ * @param[out] n_iter        Number of iterations run.
+ */
+template <typename DataT, typename IndexT>
+void fit(raft::resources const& handle,
+         const kmeans::params& params,
+         raft::host_matrix_view<const DataT, IndexT> X,
+         IndexT batch_size,
+         std::optional<raft::host_vector_view<const DataT, IndexT>> sample_weight,
+         raft::device_matrix_view<DataT, IndexT> centroids,
+         raft::host_scalar_view<DataT> inertia,
+         raft::host_scalar_view<IndexT> n_iter)
+{
+  cuvs::cluster::kmeans::detail::kmeans_fit_host<DataT, IndexT>(
+    handle, params, X, batch_size, sample_weight, centroids, inertia, n_iter);
+}
+
+/**
+ * @brief Predict cluster labels using host-resident data.
+ *
+ * Data is streamed to the GPU in `batch_size`-sized chunks.
+ *
+ * @tparam DataT  the type of data used for weights, distances.
+ * @tparam IndexT the type of data used for indexing.
+ *
+ * @param[in]  handle           The raft handle.
+ * @param[in]  params           Parameters for KMeans model.
+ * @param[in]  X                Data to predict [n_samples x n_features].
+ * @param[in]  batch_size       Number of samples per device batch.
+ * @param[in]  sample_weight    Optional per-sample weights.
+ * @param[in]  centroids        Cluster centroids [n_clusters x n_features].
+ * @param[out] labels           Predicted labels [n_samples].
+ * @param[in]  normalize_weight Whether to normalize weights.
+ * @param[out] inertia          Sum of squared distances.
+ */
+template <typename DataT, typename IndexT>
+void predict(raft::resources const& handle,
+             const kmeans::params& params,
+             raft::host_matrix_view<const DataT, IndexT> X,
+             IndexT batch_size,
+             std::optional<raft::host_vector_view<const DataT, IndexT>> sample_weight,
+             raft::device_matrix_view<const DataT, IndexT> centroids,
+             raft::host_vector_view<IndexT, IndexT> labels,
+             bool normalize_weight,
+             raft::host_scalar_view<DataT> inertia)
+{
+  cuvs::cluster::kmeans::detail::kmeans_predict_host<DataT, IndexT>(
+    handle, params, X, batch_size, sample_weight, centroids, labels, normalize_weight, inertia);
+}
+
+/**
+ * @brief Fit k-means and predict labels using host-resident data.
+ *
+ * @tparam DataT  the type of data used for weights, distances.
+ * @tparam IndexT the type of data used for indexing.
+ */
+template <typename DataT, typename IndexT>
+void fit_predict(raft::resources const& handle,
+                 const kmeans::params& params,
+                 raft::host_matrix_view<const DataT, IndexT> X,
+                 IndexT batch_size,
+                 std::optional<raft::host_vector_view<const DataT, IndexT>> sample_weight,
+                 raft::device_matrix_view<DataT, IndexT> centroids,
+                 raft::host_vector_view<IndexT, IndexT> labels,
+                 raft::host_scalar_view<DataT> inertia,
+                 raft::host_scalar_view<IndexT> n_iter)
+{
+  cuvs::cluster::kmeans::detail::kmeans_fit_predict_host<DataT, IndexT>(
+    handle, params, X, batch_size, sample_weight, centroids, labels, inertia, n_iter);
+}
+
+/**
+ * @brief Fit mini-batch k-means using host-resident data.
+ *
+ * Mini-batches are randomly sampled from the host data each step. Centroids
+ * are updated using an online learning rule. Converges based on smoothed
+ * inertia and center shift.
+ *
+ * @note When sample weights are provided they are used as sampling
+ *       probabilities. Unit weights are passed to the centroid update
+ *       to avoid double weighting (matching scikit-learn).
+ *
+ * @tparam DataT  the type of data used for weights, distances.
+ * @tparam IndexT the type of data used for indexing.
+ *
+ * @param[in]  handle        The raft handle.
+ * @param[in]  params        Parameters for KMeans model.
+ * @param[in]  X             Training data in row-major format [n_samples x n_features].
+ * @param[in]  batch_size    Mini-batch size.
+ * @param[in]  sample_weight Optional per-sample weights [n_samples].
+ * @param[inout] centroids   [in] Initial centroids / [out] Fitted centroids.
+ * @param[out] inertia       Sum of squared distances.
+ * @param[out] n_iter        Number of steps run.
+ */
+template <typename DataT, typename IndexT>
+void minibatch_fit(raft::resources const& handle,
+                   const kmeans::params& params,
+                   raft::host_matrix_view<const DataT, IndexT> X,
+                   IndexT batch_size,
+                   std::optional<raft::host_vector_view<const DataT, IndexT>> sample_weight,
+                   raft::device_matrix_view<DataT, IndexT> centroids,
+                   raft::host_scalar_view<DataT> inertia,
+                   raft::host_scalar_view<IndexT> n_iter)
+{
+  cuvs::cluster::kmeans::detail::minibatch_fit<DataT, IndexT>(
+    handle, params, X, batch_size, sample_weight, centroids, inertia, n_iter);
 }
 
 };  // end namespace  cuvs::cluster::kmeans
