@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -391,7 +391,6 @@ __global__ void create_reverse_edge_list(void* query_list_ptr,
 
   for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < num_queries;
        i += blockDim.x * gridDim.x) {
-    int read_idx   = i * query_list[i].maxSize;
     int cand_count = query_list[i + 1].size - query_list[i].size;
 
     for (int j = 0; j < cand_count; j++) {

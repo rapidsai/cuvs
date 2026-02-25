@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 
@@ -623,6 +623,13 @@ def run_benchmark(
     -------
     None
     """
+    warnings.warn(
+        "run_benchmark() is deprecated and will be removed in a future release. "
+        "Use BenchmarkOrchestrator.run_benchmark() from cuvs_bench.orchestrator instead.",
+        FutureWarning,
+        stacklevel=2,
+    )
+
     scripts_path = os.path.dirname(os.path.realpath(__file__))
     gpu_present = rmm_present()
 

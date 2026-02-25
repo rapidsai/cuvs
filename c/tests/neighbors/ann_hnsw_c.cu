@@ -102,6 +102,8 @@ TEST(CagraHnswC, BuildSearch)
   hnsw_index->dtype = index->dtype;
   cuvsHnswIndexParams_t hnsw_params;
   cuvsHnswIndexParamsCreate(&hnsw_params);
+  // Use NONE hierarchy since cuvsCagraSerializeToHnswlib creates a base-layer-only index
+  hnsw_params->hierarchy = NONE;
   cuvsHnswDeserialize(res, hnsw_params, "/tmp/cagra_hnswlib.index", 2, L2Expanded, hnsw_index);
 
   // search index

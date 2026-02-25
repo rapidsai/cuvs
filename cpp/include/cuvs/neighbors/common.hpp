@@ -539,7 +539,8 @@ struct ivf_to_sample_filter : public base_filter {
   const index_t* const* inds_ptrs_;
   const filter_t next_filter_;
 
-  ivf_to_sample_filter(const index_t* const* inds_ptrs, const filter_t next_filter);
+  _RAFT_HOST_DEVICE ivf_to_sample_filter(const index_t* const* inds_ptrs,
+                                         const filter_t next_filter);
 
   /** \cond */
   /** If the original filter takes three arguments, then don't modify the arguments.

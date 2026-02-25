@@ -1401,6 +1401,9 @@ void extend(raft::resources const& handle,
 
 /**
  * @brief Search ANN using the constructed index.
+ * This function JIT compiles the kernel for the very first usage, after which it maintains an
+ * in-memory and disk-based cache of the compiled kernels. We recommend running a warmup search
+ * before the actual searches to avoid the first-time JIT compilation overhead.
  *
  * See the [ivf_flat::build](#ivf_flat::build) documentation for a usage example.
  *
@@ -1442,6 +1445,9 @@ void search(raft::resources const& handle,
 
 /**
  * @brief Search ANN using the constructed index.
+ * This function JIT compiles the kernel for the very first usage, after which it maintains an
+ * in-memory and disk-based cache of the compiled kernels. We recommend running a warmup search
+ * before the actual searches to avoid the first-time JIT compilation overhead.
  *
  * See the [ivf_flat::build](#ivf_flat::build) documentation for a usage example.
  *
@@ -1482,6 +1488,9 @@ void search(raft::resources const& handle,
               cuvs::neighbors::filtering::none_sample_filter{});
 /**
  * @brief Search ANN using the constructed index.
+ * This function JIT compiles the kernel for the very first usage, after which it maintains an
+ * in-memory and disk-based cache of the compiled kernels. We recommend running a warmup search
+ * before the actual searches to avoid the first-time JIT compilation overhead.
  *
  * See the [ivf_flat::build](#ivf_flat::build) documentation for a usage example.
  *
@@ -1523,6 +1532,9 @@ void search(raft::resources const& handle,
 
 /**
  * @brief Search ANN using the constructed index.
+ * This function JIT compiles the kernel for the very first usage, after which it maintains an
+ * in-memory and disk-based cache of the compiled kernels. We recommend running a warmup search
+ * before the actual searches to avoid the first-time JIT compilation overhead.
  *
  * See the [ivf_flat::build](#ivf_flat::build) documentation for a usage example.
  *

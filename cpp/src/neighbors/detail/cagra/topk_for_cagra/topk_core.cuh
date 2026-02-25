@@ -7,7 +7,7 @@
 #include "../utils.hpp"
 #include "topk.h"
 
-#include <cub/cub.cuh>
+#include <cub/block/block_scan.cuh>
 
 #include <raft/core/detail/macros.hpp>
 #include <raft/core/error.hpp>

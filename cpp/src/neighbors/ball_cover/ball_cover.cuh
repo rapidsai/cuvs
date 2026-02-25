@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -23,12 +23,11 @@
 #include <rmm/device_uvector.hpp>
 #include <rmm/exec_policy.hpp>
 
+#include <cuda/std/tuple>
 #include <thrust/fill.h>
-#include <thrust/functional.h>
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/reduce.h>
 #include <thrust/sort.h>
-#include <thrust/tuple.h>
 
 #include <limits.h>
 
@@ -124,7 +123,7 @@ void construct_landmark_1nn(raft::resources const& handle,
     });
 
   auto keys = thrust::make_zip_iterator(
-    thrust::make_tuple(R_1nn_inds.data_handle(), index.get_R_1nn_dists().data_handle()));
+    cuda::std::make_tuple(R_1nn_inds.data_handle(), index.get_R_1nn_dists().data_handle()));
 
   // group neighborhoods for each reference landmark and sort each group by distance
   thrust::sort_by_key(raft::resource::get_thrust_policy(handle),

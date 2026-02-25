@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 
@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import uuid
+import warnings
 from typing import Dict, List, Optional, Tuple
 
 
@@ -65,6 +66,13 @@ def cuvs_bench_cpp(
     -------
     None
     """
+    warnings.warn(
+        "cuvs_bench_cpp() is deprecated and will be removed in a future release. "
+        "Use CppGoogleBenchmarkBackend from cuvs_bench.backends instead.",
+        FutureWarning,
+        stacklevel=2,
+    )
+
     for (
         executable,
         ann_executable_path,
@@ -137,7 +145,7 @@ def cuvs_bench_cpp(
                 "--benchmark_counters_tabular=true",
                 f"--override_kv=k:{k}",
                 f"--override_kv=n_queries:{batch_size}",
-                "--benchmark_min_warmup_time=1",
+                "--benchmark_min_warmup_time=4",
                 "--benchmark_out_format=json",
                 f"--mode={mode}",
                 f"--benchmark_out={os.path.join(search_folder, search_file)}",
