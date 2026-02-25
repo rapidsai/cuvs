@@ -5,10 +5,14 @@
 
 #pragma once
 
+#include <raft/core/copy.cuh>
+#include <raft/core/device_mdspan.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/resource/multi_gpu.hpp>
 #include <raft/core/resource/nccl_comm.hpp>
 #include <raft/core/serialize.hpp>
 #include <raft/linalg/add.cuh>
+#include <raft/matrix/init.cuh>
 #include <raft/util/cuda_dev_essentials.cuh>
 
 #include "../../core/omp_wrapper.hpp"
@@ -346,10 +350,9 @@ void sharded_search_with_direct_merge(
     }
     auto d_trans = raft::make_device_vector<searchIdxT>(root_handle_, index.num_ranks_);
 
-    raft::copy(d_trans.data_handle(),
-               h_trans.data(),
-               index.num_ranks_,
-               raft::resource::get_cuda_stream(root_handle_));
+    raft::copy(root_handle_,
+               d_trans.view(),
+               raft::make_host_vector_view<const searchIdxT>(h_trans.data(), index.num_ranks_));
 
     knn_merge_parts(root_handle_,
                     in_distances.view(),
@@ -358,14 +361,13 @@ void sharded_search_with_direct_merge(
                     out_neighbors.view(),
                     d_trans.view());
 
-    raft::copy(neighbors.data_handle() + output_offset,
-               out_neighbors.data_handle(),
-               part_size,
-               raft::resource::get_cuda_stream(root_handle_));
-    raft::copy(distances.data_handle() + output_offset,
-               out_distances.data_handle(),
-               part_size,
-               raft::resource::get_cuda_stream(root_handle_));
+    raft::copy(
+      root_handle_,
+      raft::make_host_vector_view(neighbors.data_handle() + output_offset, part_size),
+      raft::make_device_vector_view<const searchIdxT>(out_neighbors.data_handle(), part_size));
+    raft::copy(root_handle_,
+               raft::make_host_vector_view(distances.data_handle() + output_offset, part_size),
+               raft::make_device_vector_view<const float>(out_distances.data_handle(), part_size));
 
     resource::sync_stream(root_handle_);
   }
@@ -425,8 +427,7 @@ void sharded_search_with_tree_merge(
                               raft::resource::get_cuda_stream(dev_res));
 
       auto d_trans = raft::make_device_vector<searchIdxT>(dev_res, 2);
-      cudaMemsetAsync(
-        d_trans.data_handle(), 0, 2 * sizeof(searchIdxT), raft::resource::get_cuda_stream(dev_res));
+      raft::matrix::fill(dev_res, d_trans.view(), searchIdxT(0));
 
       int64_t remaining = index.num_ranks_;
       int64_t radix     = 2;
@@ -486,25 +487,26 @@ void sharded_search_with_tree_merge(
                           distances_merge_res.view(),
                           neighbors_merge_res.view(),
                           d_trans.view());
-          raft::copy(tmp_neighbors.data_handle(),
-                     neighbors_merge_res.data_handle(),
-                     part_size,
-                     raft::resource::get_cuda_stream(dev_res));
-          raft::copy(tmp_distances.data_handle(),
-                     distances_merge_res.data_handle(),
-                     part_size,
-                     raft::resource::get_cuda_stream(dev_res));
+          raft::copy(dev_res,
+                     raft::make_device_vector_view(tmp_neighbors.data_handle(), part_size),
+                     raft::make_device_vector_view<const searchIdxT>(
+                       neighbors_merge_res.data_handle(), part_size));
+          raft::copy(dev_res,
+                     raft::make_device_vector_view(tmp_distances.data_handle(), part_size),
+                     raft::make_device_vector_view<const float>(distances_merge_res.data_handle(),
+                                                                part_size));
 
           // If done, copy the final result
           if (remaining <= 1) {
-            raft::copy(neighbors.data_handle() + output_offset,
-                       tmp_neighbors.data_handle(),
-                       part_size,
-                       raft::resource::get_cuda_stream(dev_res));
-            raft::copy(distances.data_handle() + output_offset,
-                       tmp_distances.data_handle(),
-                       part_size,
-                       raft::resource::get_cuda_stream(dev_res));
+            raft::copy(
+              dev_res,
+              raft::make_host_vector_view(neighbors.data_handle() + output_offset, part_size),
+              raft::make_device_vector_view<const searchIdxT>(tmp_neighbors.data_handle(),
+                                                              part_size));
+            raft::copy(
+              dev_res,
+              raft::make_host_vector_view(distances.data_handle() + output_offset, part_size),
+              raft::make_device_vector_view<const float>(tmp_distances.data_handle(), part_size));
             resource::sync_stream(dev_res);
           }
         }
@@ -540,14 +542,16 @@ void run_search_batch(const raft::resources& clique,
   cuvs::neighbors::search(
     dev_res, ann_if, search_params, query_partition, d_neighbors.view(), d_distances.view());
 
-  raft::copy(neighbors.data_handle() + output_offset,
-             d_neighbors.data_handle(),
-             n_rows_of_current_batch * n_neighbors,
-             raft::resource::get_cuda_stream(dev_res));
-  raft::copy(distances.data_handle() + output_offset,
-             d_distances.data_handle(),
-             n_rows_of_current_batch * n_neighbors,
-             raft::resource::get_cuda_stream(dev_res));
+  raft::copy(dev_res,
+             raft::make_host_vector_view(neighbors.data_handle() + output_offset,
+                                         n_rows_of_current_batch * n_neighbors),
+             raft::make_device_vector_view<const searchIdxT>(
+               d_neighbors.data_handle(), n_rows_of_current_batch * n_neighbors));
+  raft::copy(dev_res,
+             raft::make_host_vector_view(distances.data_handle() + output_offset,
+                                         n_rows_of_current_batch * n_neighbors),
+             raft::make_device_vector_view<const float>(d_distances.data_handle(),
+                                                        n_rows_of_current_batch * n_neighbors));
 
   resource::sync_stream(dev_res);
 }

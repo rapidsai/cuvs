@@ -1,18 +1,20 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
 #include <cuvs/preprocessing/quantize/scalar.hpp>
+#include <raft/core/copy.cuh>
+#include <raft/core/device_mdspan.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/operators.hpp>
-#include <raft/linalg/unary_op.cuh>
+#include <raft/linalg/map.cuh>
 #include <raft/matrix/sample_rows.cuh>
 #include <raft/random/rng.cuh>
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
-#include <thrust/system/omp/execution_policy.h>
 
 namespace cuvs::preprocessing::quantize::detail {
 
@@ -93,8 +95,12 @@ std::tuple<T, T> quantile_min_max(
   int pos_min              = subset_size - pos_max - 1;
 
   T minmax_h[2];
-  raft::update_host(&(minmax_h[0]), subset.data_handle() + pos_min, 1, stream);
-  raft::update_host(&(minmax_h[1]), subset.data_handle() + pos_max, 1, stream);
+  raft::copy(res,
+             raft::make_host_scalar_view(&minmax_h[0]),
+             raft::make_device_scalar_view(subset.data_handle() + pos_min));
+  raft::copy(res,
+             raft::make_host_scalar_view(&minmax_h[1]),
+             raft::make_device_scalar_view(subset.data_handle() + pos_max));
   raft::resource::sync_stream(res);
   return {minmax_h[0], minmax_h[1]};
 }
@@ -141,7 +147,10 @@ void transform(raft::resources const& res,
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(res);
 
-  raft::linalg::map(res, out, quantize_op<T, QuantI>(quantizer.min_, quantizer.max_), dataset);
+  raft::linalg::map(res,
+                    out,
+                    quantize_op<T, QuantI>(quantizer.min_, quantizer.max_),
+                    raft::make_const_mdspan(dataset));
 }
 
 template <typename T, typename QuantI = int8_t>
@@ -167,7 +176,10 @@ void inverse_transform(raft::resources const& res,
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(res);
 
-  raft::linalg::map(res, out, quantize_op<T, QuantI>(quantizer.min_, quantizer.max_), dataset);
+  raft::linalg::map(res,
+                    out,
+                    quantize_op<T, QuantI>(quantizer.min_, quantizer.max_),
+                    raft::make_const_mdspan(dataset));
 }
 
 template <typename T, typename QuantI = int8_t>

@@ -13,6 +13,7 @@
 #include <raft/core/handle.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/linalg/map.cuh>
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/matrix/gather.cuh>
 #include <raft/matrix/init.cuh>
@@ -24,9 +25,6 @@
 #include <raft/sparse/solver/lanczos_types.hpp>
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/integer_utils.hpp>
-
-#include <thrust/sequence.h>
-#include <thrust/tabulate.h>
 
 namespace cuvs::preprocessing::spectral_embedding::detail {
 
@@ -44,10 +42,11 @@ OutSparseMatrixType create_laplacian(raft::resources const& handle,
   auto laplacian_elements_view = raft::make_device_vector_view<DataT>(
     laplacian.get_elements().data(), laplacian.structure_view().get_nnz());
 
-  raft::linalg::unary_op(handle,
-                         raft::make_const_mdspan(laplacian_elements_view),
-                         laplacian_elements_view,
-                         [] __device__(DataT x) { return -x; });
+  raft::linalg::map(
+    handle,
+    laplacian_elements_view,
+    [] __device__(DataT x) { return -x; },
+    raft::make_const_mdspan(laplacian_elements_view));
 
   return laplacian;
 }
@@ -92,13 +91,9 @@ void compute_eigenpairs(raft::resources const& handle,
     spectral_embedding_config.drop_first ? config.n_components - 1 : config.n_components;
   auto col_indices = raft::make_device_vector<int>(handle, config.n_components);
 
-  // TODO: https://github.com/rapidsai/raft/issues/2661
-  thrust::sequence(thrust::device,
-                   col_indices.data_handle(),
-                   col_indices.data_handle() + config.n_components,
-                   config.n_components - 1,  // Start from the last column index
-                   -1                        // Decrement (move backward)
-  );
+  raft::linalg::map_offset(handle,
+                           col_indices.view(),
+                           [n = config.n_components] __device__(int idx) { return n - 1 - idx; });
 
   // Create row-major views of the column-major matrices
   // This is just a view re-interpretation, no data movement
@@ -166,15 +161,15 @@ void create_connectivity_graph(
   auto knn_rows = raft::make_device_vector<int, NNZType>(handle, nnz);
   auto knn_cols = raft::make_device_vector<int, NNZType>(handle, nnz);
 
-  raft::linalg::unary_op(
-    handle, make_const_mdspan(d_indices.view()), knn_cols.view(), [] __device__(int64_t x) {
-      return static_cast<int>(x);
-    });
+  raft::linalg::map(
+    handle,
+    knn_cols.view(),
+    [] __device__(int64_t x) { return static_cast<int>(x); },
+    raft::make_const_mdspan(d_indices.view()));
 
-  thrust::tabulate(raft::resource::get_thrust_policy(handle),
-                   knn_rows.data_handle(),
-                   knn_rows.data_handle() + nnz,
-                   [k_search] __device__(NNZType idx) { return idx / k_search; });
+  raft::linalg::map_offset(handle, knn_rows.view(), [k_search] __device__(NNZType idx) -> int {
+    return static_cast<int>(idx / k_search);
+  });
 
   // set all distances to 1.0f (connectivity KNN graph)
   raft::matrix::fill(

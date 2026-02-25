@@ -18,10 +18,10 @@
 #include <raft/core/error.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/core/resources.hpp>   // raft::resources
-#include <raft/linalg/gemm.cuh>      // raft::linalg::gemm
-#include <raft/linalg/norm.cuh>      // raft::linalg::norm
-#include <raft/linalg/unary_op.cuh>  // raft::linalg::unary_op
+#include <raft/core/resources.hpp>  // raft::resources
+#include <raft/linalg/gemm.cuh>     // raft::linalg::gemm
+#include <raft/linalg/map.cuh>      // raft::linalg::map
+#include <raft/linalg/norm.cuh>     // raft::linalg::norm
 #include <raft/matrix/detail/select_warpsort.cuh>
 
 #include <rmm/resource_ref.hpp>
@@ -93,8 +93,12 @@ void search_impl(raft::resources const& handle,
   if constexpr (std::is_same_v<T, float>) {
     converted_queries_ptr = const_cast<float*>(queries);
   } else {
-    raft::linalg::unaryOp(
-      converted_queries_ptr, queries, n_queries * index.dim(), utils::mapping<float>{}, stream);
+    raft::linalg::map(
+      handle,
+      raft::make_device_vector_view<float>(converted_queries_ptr, n_queries * index.dim()),
+      utils::mapping<float>{},
+      raft::make_const_mdspan(
+        raft::make_device_vector_view<const T>(queries, n_queries * index.dim())));
   }
 
   float alpha = 1.0f;
@@ -106,11 +110,12 @@ void search_impl(raft::resources const& handle,
     case cuvs::distance::DistanceType::L2SqrtExpanded: {
       alpha = -2.0f;
       beta  = 1.0f;
-      raft::linalg::rowNorm<raft::linalg::L2Norm, true>(query_norm_dev.data(),
-                                                        converted_queries_ptr,
-                                                        static_cast<IdxT>(index.dim()),
-                                                        static_cast<IdxT>(n_queries),
-                                                        stream);
+      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+        handle,
+        raft::make_device_matrix_view<const float, IdxT, raft::row_major>(
+          converted_queries_ptr, static_cast<IdxT>(n_queries), static_cast<IdxT>(index.dim())),
+        raft::make_device_vector_view<float, IdxT>(query_norm_dev.data(),
+                                                   static_cast<IdxT>(n_queries)));
       utils::outer_add(query_norm_dev.data(),
                        (IdxT)n_queries,
                        index.center_norms()->data_handle(),
@@ -122,12 +127,13 @@ void search_impl(raft::resources const& handle,
       break;
     }
     case cuvs::distance::DistanceType::CosineExpanded: {
-      raft::linalg::rowNorm<raft::linalg::L2Norm, true>(query_norm_dev.data(),
-                                                        converted_queries_ptr,
-                                                        static_cast<IdxT>(index.dim()),
-                                                        static_cast<IdxT>(n_queries),
-                                                        stream,
-                                                        raft::sqrt_op{});
+      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+        handle,
+        raft::make_device_matrix_view<const float, IdxT, raft::row_major>(
+          converted_queries_ptr, static_cast<IdxT>(n_queries), static_cast<IdxT>(index.dim())),
+        raft::make_device_vector_view<float, IdxT>(query_norm_dev.data(),
+                                                   static_cast<IdxT>(n_queries)),
+        raft::sqrt_op{});
       alpha = -1.0f;
       beta  = 0.0f;
       break;
@@ -288,7 +294,7 @@ void search_impl(raft::resources const& handle,
   if (!manage_local_topk) {
     // post process distances && neighbor IDs
     ivf::detail::postprocess_distances(
-      distances, distances, index.metric(), n_queries, k, 1.0, false, stream);
+      handle, distances, distances, index.metric(), n_queries, k, 1.0, false);
   }
   ivf::detail::postprocess_neighbors(neighbors,
                                      neighbors_uint32,
