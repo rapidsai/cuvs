@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -11,6 +11,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/linalg/contractions.cuh>
+#include <raft/matrix/init.cuh>
 #include <raft/util/cuda_utils.cuh>
 
 #include <rmm/device_uvector.hpp>
@@ -255,8 +256,10 @@ void masked_l2_nn_impl(raft::resources const& handle,
   size_t m_div_64 = raft::ceildiv(m, IdxT(64));
   rmm::device_uvector<uint64_t> ws_adj64{m_div_64 * num_groups, stream, ws_mr};
   rmm::device_uvector<int> ws_fused_nn{size_t(m), stream, ws_mr};
-  RAFT_CUDA_TRY(cudaMemsetAsync(ws_adj64.data(), 0, ws_adj64.size() * sizeof(uint64_t), stream));
-  RAFT_CUDA_TRY(cudaMemsetAsync(ws_fused_nn.data(), 0, ws_fused_nn.size() * sizeof(int), stream));
+  raft::matrix::fill(
+    handle, raft::make_device_vector_view(ws_adj64.data(), ws_adj64.size()), uint64_t(0));
+  raft::matrix::fill(
+    handle, raft::make_device_vector_view(ws_fused_nn.data(), ws_fused_nn.size()), int(0));
 
   // Compress boolean adjacency matrix to bitfield.
   auto adj_view = raft::make_device_matrix_view<const bool, int>(adj, m, num_groups);
