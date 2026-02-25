@@ -268,21 +268,23 @@ __global__ void kern_select_smallest_detour_neighbors(
 
   const uint64_t nid       = blockIdx.x + (batch_size * batch_id);
   const uint64_t nid_batch = blockIdx.x;
+  const uint32_t maxval16  = 0x0000ffff;
 
   if (nid >= graph_size) { return; }
 
-  // Each uint64_t loads detour_count for its assigned k
+  // Load indices and detour counts for each neighbor; invalidate out-of-bounds entries
   for (uint32_t k = threadIdx.x; k < knn_graph_degree; k += blockDim.x) {
-    smem_detour_count[k] = d_detour_count[nid_batch * knn_graph_degree + k];
     smem_indices[k]      = knn_graph[knn_graph_degree * nid + k];
+    smem_detour_count[k] = (smem_indices[k] >= graph_size)
+                             ? maxval16
+                             : (uint16_t)d_detour_count[nid_batch * knn_graph_degree + k];
   }
   __syncwarp();
 
   const unsigned warp_mask = 0xffffffff;
-
   for (uint32_t i = 0; i < output_graph_degree; i++) {
-    uint32_t local_min = 255;
-    uint32_t local_idx = 0xffffffff;
+    uint32_t local_min = maxval16;
+    uint32_t local_idx = maxval16;
     for (uint32_t k = threadIdx.x; k < knn_graph_degree; k += blockDim.x) {
       if (smem_detour_count[k] < local_min) {
         local_min = smem_detour_count[k];
@@ -295,8 +297,7 @@ __global__ void kern_select_smallest_detour_neighbors(
     uint32_t warp_min_count     = warp_min_with_tag >> 16;
     uint32_t warp_local_idx     = warp_min_with_tag & 0xffff;
 
-    if (warp_min_count == 255) {
-      // No valid position left; set error flag and fill remaining slots with sentinel
+    if (warp_min_count == maxval16 || warp_local_idx == maxval16) {
       if (threadIdx.x == 0) { atomicExch(d_invalid_neighbor_list, 1u); }
       break;
     }
@@ -304,7 +305,7 @@ __global__ void kern_select_smallest_detour_neighbors(
     IdxT selected_node = smem_indices[warp_local_idx];
 
     for (uint32_t k = threadIdx.x; k < knn_graph_degree; k += blockDim.x) {
-      if (smem_indices[k] == selected_node) { smem_detour_count[k] = 255; }
+      if (smem_indices[k] == selected_node) { smem_detour_count[k] = maxval16; }
     }
     __syncwarp(warp_mask);
 
@@ -1355,7 +1356,11 @@ void optimize(
 {
   RAFT_LOG_DEBUG(
     "# Pruning kNN graph (size=%lu, degree=%lu)\n", knn_graph.extent(0), knn_graph.extent(1));
+
+  // large temporary memory for large arrays, e.g. everything >= O(graph_size)
   auto large_tmp_mr = raft::resource::get_large_workspace_resource(res);
+  // temporary memory for small arrays, e.g. everything <= O(batchsize * graph_degree)
+  // auto tmp_mr = raft::resource::get_tmp_workspace_resource(res);
 
   RAFT_EXPECTS(knn_graph.extent(0) == new_graph.extent(0),
                "Each input array is expected to have the same number of rows");
@@ -1527,9 +1532,12 @@ void optimize(
                                                      i_batch,
                                                      d_invalid_neighbor_list.data_handle());
 
+        size_t copy_size =
+          std::min(static_cast<size_t>(batch_size), graph_size - i_batch * batch_size) *
+          output_graph_degree;
         raft::copy(output_graph_ptr + i_batch * batch_size * output_graph_degree,
                    d_output_graph.data_handle(),
-                   static_cast<size_t>(batch_size) * output_graph_degree,
+                   copy_size,
                    raft::resource::get_cuda_stream(res));
 
         raft::resource::sync_stream(res);
