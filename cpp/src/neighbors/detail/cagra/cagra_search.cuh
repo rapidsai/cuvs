@@ -31,7 +31,6 @@
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/reduce.cuh>
-#include <raft/linalg/unary_op.cuh>
 
 namespace cuvs::neighbors::cagra::detail {
 

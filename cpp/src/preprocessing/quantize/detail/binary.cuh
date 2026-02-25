@@ -10,8 +10,8 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/operators.hpp>
+#include <raft/linalg/map.cuh>
 #include <raft/linalg/transpose.cuh>
-#include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/init.cuh>
 #include <raft/matrix/sample_rows.cuh>
 #include <raft/random/rng.cuh>

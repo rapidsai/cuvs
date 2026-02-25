@@ -42,10 +42,11 @@ OutSparseMatrixType create_laplacian(raft::resources const& handle,
   auto laplacian_elements_view = raft::make_device_vector_view<DataT>(
     laplacian.get_elements().data(), laplacian.structure_view().get_nnz());
 
-  raft::linalg::unary_op(handle,
-                         raft::make_const_mdspan(laplacian_elements_view),
-                         laplacian_elements_view,
-                         [] __device__(DataT x) { return -x; });
+  raft::linalg::map(
+    handle,
+    laplacian_elements_view,
+    [] __device__(DataT x) { return -x; },
+    raft::make_const_mdspan(laplacian_elements_view));
 
   return laplacian;
 }
