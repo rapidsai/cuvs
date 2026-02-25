@@ -1,0 +1,39 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+// This file is auto-generated. Do not edit manually.
+
+#ifdef BUILD_KERNEL
+
+#include <neighbors/detail/cagra/jit_lto_kernels/@impl_file@>
+
+namespace cuvs::neighbors::cagra::detail {
+
+template __device__ cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<@data_type@, @index_type@, @distance_type@>* setup_workspace<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@, @query_type@>(
+    cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<@data_type@, @index_type@, @distance_type@>*, void*, const @data_type@*, uint32_t);
+
+}  // namespace cuvs::neighbors::cagra::detail
+
+#else
+
+#include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
+#include <cuvs/detail/jit_lto/registration_tags.hpp>
+#include "setup_workspace@pq_prefix@_t@team_size@_dim@dataset_block_dim@@pq_suffix@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@@query_type_suffix@.h"
+
+using namespace cuvs::neighbors::cagra::detail;
+
+__attribute__((__constructor__)) static void register_setup_workspace@pq_prefix@_t@team_size@_dim@dataset_block_dim@@pq_suffix@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@@query_type_suffix_reg@()
+{
+  using QueryTag = cuvs::neighbors::cagra::detail::tag_@query_type_abbrev@;
+  registerAlgorithm<tag_@type_abbrev@,
+    tag_idx_@idx_abbrev@,
+    tag_dist_@dist_abbrev@,
+    QueryTag@codebook_tag_comma@ @codebook_tag@>(
+    "setup_workspace@pq_prefix@_t@team_size@_dim@dataset_block_dim@@pq_suffix@",
+    embedded_setup_workspace@pq_prefix@_t@team_size@_dim@dataset_block_dim@@pq_suffix@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@@query_type_suffix@,
+    sizeof(embedded_setup_workspace@pq_prefix@_t@team_size@_dim@dataset_block_dim@@pq_suffix@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@@query_type_suffix@));
+}
+
+#endif

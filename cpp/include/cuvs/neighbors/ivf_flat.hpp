@@ -3147,12 +3147,8 @@ __device__ __forceinline__ AccT abs_diff(point<T, AccT, V> x, point<T, AccT, V> 
 {
   if constexpr (std::is_same_v<T, uint8_t> && V > 1) {
     auto diff = __vabsdiffu4(x.raw(), y.raw());
-    return ((diff >> 0) & 0xFF) + ((diff >> 8) & 0xFF) + ((diff >> 16) & 0xFF) +
-           ((diff >> 24) & 0xFF);
   } else if constexpr (std::is_same_v<T, int8_t> && V > 1) {
     auto diff = __vabsdiffs4(x.raw(), y.raw());
-    return ((diff >> 0) & 0xFF) + ((diff >> 8) & 0xFF) + ((diff >> 16) & 0xFF) +
-           ((diff >> 24) & 0xFF);
   } else {
     auto a = x.raw();
     auto b = y.raw();
@@ -3293,12 +3289,8 @@ __device__ __forceinline__ AccT abs_diff(point<T, AccT, V> x, point<T, AccT, V> 
 {
   if constexpr (std::is_same_v<T, uint8_t> && V > 1) {
     auto diff = __vabsdiffu4(x.raw(), y.raw());
-    return ((diff >> 0) & 0xFF) + ((diff >> 8) & 0xFF) + ((diff >> 16) & 0xFF) +
-           ((diff >> 24) & 0xFF);
   } else if constexpr (std::is_same_v<T, int8_t> && V > 1) {
     auto diff = __vabsdiffs4(x.raw(), y.raw());
-    return ((diff >> 0) & 0xFF) + ((diff >> 8) & 0xFF) + ((diff >> 16) & 0xFF) +
-           ((diff >> 24) & 0xFF);
   } else {
     auto a = x.raw();
     auto b = y.raw();

@@ -16,7 +16,7 @@
     nvrtcResult result = _call;                                                \
     std::string error_string =                                                 \
       std::string("nvrtc error: ") + std::string(nvrtcGetErrorString(result)); \
-    RAFT_EXPECTS(result == NVRTC_SUCCESS, error_string.c_str());               \
+    RAFT_EXPECTS(result == NVRTC_SUCCESS, "%s", error_string.c_str());         \
   }
 
 NVRTCLTOFragmentCompiler::NVRTCLTOFragmentCompiler()

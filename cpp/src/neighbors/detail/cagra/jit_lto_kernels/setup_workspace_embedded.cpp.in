@@ -15,12 +15,12 @@ namespace {
 
 __attribute__((__constructor__)) void register_kernel()
 {
-  using QueryTag = cuvs::neighbors::cagra::detail::tag_f;
+  using QueryTag = cuvs::neighbors::cagra::detail::tag_@query_abbrev@;
   registerAlgorithm<tag_@data_abbrev@,
     tag_idx_@index_abbrev@,
     tag_dist_@distance_abbrev@,
-    QueryTag>(
-    "apply_normalization_standard_cosine_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@",
+    QueryTag@codebook_tag_comma@ @codebook_tag@>(
+    "setup_workspace@pq_prefix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@",
     embedded_fatbin,
     sizeof(embedded_fatbin));
 }

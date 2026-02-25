@@ -5,18 +5,11 @@
 
 // This file is auto-generated. Do not edit manually.
 
-// Include helpers first so they're available when the JIT kernel is instantiated
-#include <neighbors/detail/cagra/jit_lto_kernels/search_multi_cta_helpers.cuh>  // For pickup_next_parent and topk_by_bitonic_sort_wrapper_*
-
+#include <neighbors/detail/cagra/jit_lto_kernels/search_multi_cta_helpers.cuh>
 #include <neighbors/detail/cagra/jit_lto_kernels/search_multi_cta_kernel_jit.cuh>
 
 namespace cuvs::neighbors::cagra::detail::multi_cta_search {
 
-// Instantiate the search_kernel_jit function with unified template parameters
-// For standard descriptors: PQ_BITS=0, PQ_LEN=0, CodebookT=void, QueryT=float (or uint8_t for BitwiseHamming)
-// For VPQ descriptors: PQ_BITS>0, PQ_LEN>0, CodebookT=half, QueryT=half
-// Note: Metric is no longer a template parameter - it's linked via dist_op and normalization fragments
-// Note: Kernels use dataset_descriptor_base_t* pointer directly
 template __global__ void search_kernel_jit<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@, @query_type@, @source_index_type@>(
     @index_type@* const, @distance_type@* const, cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<@data_type@, @index_type@, @distance_type@>*, const @data_type@* const, const @index_type@* const, const std::uint32_t, const std::uint32_t, const @source_index_type@*, const unsigned, const uint64_t, const @index_type@*, const std::uint32_t, const std::uint32_t, @index_type@* const, const std::uint32_t, const std::uint32_t, const std::uint32_t, const std::uint32_t, std::uint32_t* const, const std::uint32_t, uint32_t*, @source_index_type@, @source_index_type@);
 

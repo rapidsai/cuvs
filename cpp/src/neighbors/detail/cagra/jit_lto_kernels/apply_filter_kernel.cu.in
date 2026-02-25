@@ -9,7 +9,6 @@
 
 namespace cuvs::neighbors::cagra::detail::multi_kernel_search {
 
-// Instantiate the apply_filter_kernel_jit function with concrete types
 template __global__ void apply_filter_kernel_jit<@index_type@, @distance_type@, @source_index_type@>(
     const @source_index_type@* const, @index_type@* const, @distance_type@* const, const std::size_t, const std::uint32_t, const std::uint32_t, const @index_type@, uint32_t*, @source_index_type@, @source_index_type@);
 

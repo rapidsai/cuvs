@@ -574,6 +574,20 @@ void select_and_run_jit(
   SampleFilterT sample_filter,
   cudaStream_t stream)
 {
+  RAFT_LOG_INFO(
+    "[JIT FRAGMENT DEBUG] select_and_run_jit - is_vpq=%d, metric=%d, team_size=%u, "
+    "dataset_block_dim=%u, pq_bits=%u, pq_len=%u, queries_ptr=%p, topk_indices_ptr=%p, "
+    "topk_distances_ptr=%p",
+    dataset_desc.is_vpq,
+    static_cast<int>(dataset_desc.metric),
+    dataset_desc.team_size,
+    dataset_desc.dataset_block_dim,
+    dataset_desc.pq_bits,
+    dataset_desc.pq_len,
+    static_cast<const void*>(queries_ptr),
+    reinterpret_cast<const void*>(topk_indices_ptr),
+    static_cast<const void*>(topk_distances_ptr));
+
   const SourceIndexT* source_indices_ptr =
     source_indices.has_value() ? source_indices->data_handle() : nullptr;
 
@@ -620,37 +634,117 @@ void select_and_run_jit(
     using DistTag   = decltype(get_distance_type_tag<DistanceT>());
     using SourceTag = decltype(get_source_index_type_tag<SourceIndexT>());
 
-    CagraSearchPlanner<DataTag, IndexTag, DistTag, SourceTag> planner(
-      dataset_desc.metric,
-      topk_by_bitonic_sort,
-      bitonic_sort_and_merge_multi_warps,
-      dataset_desc.team_size,
-      dataset_desc.dataset_block_dim,
-      dataset_desc.is_vpq,
-      dataset_desc.pq_bits,
-      dataset_desc.pq_len,
-      true /* persistent */);
+    RAFT_LOG_INFO(
+      "[JIT FRAGMENT DEBUG] Persistent kernel - DataTag=%s, IndexTag=%s, DistTag=%s, SourceTag=%s",
+      typeid(DataTag).name(),
+      typeid(IndexTag).name(),
+      typeid(DistTag).name(),
+      typeid(SourceTag).name());
 
-    // Add device functions
-    planner.add_setup_workspace_device_function(dataset_desc.metric,
-                                                dataset_desc.team_size,
-                                                dataset_desc.dataset_block_dim,
-                                                dataset_desc.is_vpq,
-                                                dataset_desc.pq_bits,
-                                                dataset_desc.pq_len);
-    planner.add_compute_distance_device_function(dataset_desc.metric,
-                                                 dataset_desc.team_size,
-                                                 dataset_desc.dataset_block_dim,
-                                                 dataset_desc.is_vpq,
-                                                 dataset_desc.pq_bits,
-                                                 dataset_desc.pq_len);
-    planner.add_sample_filter_device_function(get_sample_filter_name<SampleFilterT>());
+    std::shared_ptr<AlgorithmLauncher> launcher;
+    if (dataset_desc.is_vpq) {
+      using QueryTag    = query_type_tag_vpq_t<DataTag>;
+      using CodebookTag = codebook_tag_vpq_t;
+      RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] VPQ path - QueryTag=%s, CodebookTag=%s",
+                    typeid(QueryTag).name(),
+                    typeid(CodebookTag).name());
+      CagraSingleCtaSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
+        planner(dataset_desc.metric,
+                topk_by_bitonic_sort,
+                bitonic_sort_and_merge_multi_warps,
+                dataset_desc.team_size,
+                dataset_desc.dataset_block_dim,
+                dataset_desc.is_vpq,
+                dataset_desc.pq_bits,
+                dataset_desc.pq_len,
+                true /* persistent */);
 
-    // Get launcher for persistent kernel
-    auto launcher = planner.get_launcher();
+      planner.add_setup_workspace_device_function(dataset_desc.metric,
+                                                  dataset_desc.team_size,
+                                                  dataset_desc.dataset_block_dim,
+                                                  dataset_desc.is_vpq,
+                                                  dataset_desc.pq_bits,
+                                                  dataset_desc.pq_len);
+      planner.add_compute_distance_device_function(dataset_desc.metric,
+                                                   dataset_desc.team_size,
+                                                   dataset_desc.dataset_block_dim,
+                                                   dataset_desc.is_vpq,
+                                                   dataset_desc.pq_bits,
+                                                   dataset_desc.pq_len);
+      planner.add_sample_filter_device_function(get_sample_filter_name<SampleFilterT>());
+      launcher = planner.get_launcher();
+    } else {
+      using CodebookTag = codebook_tag_standard_t;
+      if (dataset_desc.metric == cuvs::distance::DistanceType::BitwiseHamming) {
+        using QueryTag =
+          query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::BitwiseHamming>;
+        RAFT_LOG_INFO(
+          "[JIT FRAGMENT DEBUG] Standard path (BitwiseHamming) - QueryTag=%s, CodebookTag=%s",
+          typeid(QueryTag).name(),
+          typeid(CodebookTag).name());
+        CagraSingleCtaSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
+          planner(dataset_desc.metric,
+                  topk_by_bitonic_sort,
+                  bitonic_sort_and_merge_multi_warps,
+                  dataset_desc.team_size,
+                  dataset_desc.dataset_block_dim,
+                  dataset_desc.is_vpq,
+                  dataset_desc.pq_bits,
+                  dataset_desc.pq_len,
+                  true /* persistent */);
+
+        planner.add_setup_workspace_device_function(dataset_desc.metric,
+                                                    dataset_desc.team_size,
+                                                    dataset_desc.dataset_block_dim,
+                                                    dataset_desc.is_vpq,
+                                                    dataset_desc.pq_bits,
+                                                    dataset_desc.pq_len);
+        planner.add_compute_distance_device_function(dataset_desc.metric,
+                                                     dataset_desc.team_size,
+                                                     dataset_desc.dataset_block_dim,
+                                                     dataset_desc.is_vpq,
+                                                     dataset_desc.pq_bits,
+                                                     dataset_desc.pq_len);
+        planner.add_sample_filter_device_function(get_sample_filter_name<SampleFilterT>());
+        launcher = planner.get_launcher();
+      } else {
+        using QueryTag =
+          query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::L2Expanded>;
+        CagraSingleCtaSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
+          planner(dataset_desc.metric,
+                  topk_by_bitonic_sort,
+                  bitonic_sort_and_merge_multi_warps,
+                  dataset_desc.team_size,
+                  dataset_desc.dataset_block_dim,
+                  dataset_desc.is_vpq,
+                  dataset_desc.pq_bits,
+                  dataset_desc.pq_len,
+                  true /* persistent */);
+
+        planner.add_setup_workspace_device_function(dataset_desc.metric,
+                                                    dataset_desc.team_size,
+                                                    dataset_desc.dataset_block_dim,
+                                                    dataset_desc.is_vpq,
+                                                    dataset_desc.pq_bits,
+                                                    dataset_desc.pq_len);
+        planner.add_compute_distance_device_function(dataset_desc.metric,
+                                                     dataset_desc.team_size,
+                                                     dataset_desc.dataset_block_dim,
+                                                     dataset_desc.is_vpq,
+                                                     dataset_desc.pq_bits,
+                                                     dataset_desc.pq_len);
+        planner.add_sample_filter_device_function(get_sample_filter_name<SampleFilterT>());
+        launcher = planner.get_launcher();
+      }
+    }
     if (!launcher) { RAFT_FAIL("Failed to get JIT launcher for CAGRA persistent search kernel"); }
 
     // Use get_runner pattern similar to non-JIT version
+    RAFT_LOG_INFO(
+      "[JIT FRAGMENT DEBUG] About to call get_runner_jit and dev_ptr() for persistent kernel");
+    const auto* dev_desc_persistent = dataset_desc.dev_ptr(stream);
+    RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] dev_ptr() for persistent kernel returned: %p",
+                  static_cast<const void*>(dev_desc_persistent));
     get_runner_jit<runner_type>(std::cref(dataset_desc),
                                 graph,
                                 source_indices_ptr,
@@ -673,7 +767,7 @@ void select_and_run_jit(
                                 ps.persistent_lifetime,
                                 ps.persistent_device_usage,
                                 launcher,
-                                dataset_desc.dev_ptr(stream))  // Pass descriptor pointer
+                                dev_desc_persistent)  // Pass descriptor pointer
       ->launch(topk_indices_ptr, topk_distances_ptr, queries_ptr, num_queries, topk);
     return;
   } else {
@@ -683,37 +777,117 @@ void select_and_run_jit(
     using DistTag   = decltype(get_distance_type_tag<DistanceT>());
     using SourceTag = decltype(get_source_index_type_tag<SourceIndexT>());
 
-    CagraSearchPlanner<DataTag, IndexTag, DistTag, SourceTag> planner(
-      dataset_desc.metric,
-      topk_by_bitonic_sort,
-      bitonic_sort_and_merge_multi_warps,
-      dataset_desc.team_size,
-      dataset_desc.dataset_block_dim,
-      dataset_desc.is_vpq,
-      dataset_desc.pq_bits,
-      dataset_desc.pq_len);
+    RAFT_LOG_INFO(
+      "[JIT FRAGMENT DEBUG] Regular kernel - DataTag=%s, IndexTag=%s, DistTag=%s, SourceTag=%s",
+      typeid(DataTag).name(),
+      typeid(IndexTag).name(),
+      typeid(DistTag).name(),
+      typeid(SourceTag).name());
 
-    // Add device functions (tags are determined inside the planner methods)
-    planner.add_setup_workspace_device_function(dataset_desc.metric,
-                                                dataset_desc.team_size,
-                                                dataset_desc.dataset_block_dim,
-                                                dataset_desc.is_vpq,
-                                                dataset_desc.pq_bits,
-                                                dataset_desc.pq_len);
-    planner.add_compute_distance_device_function(dataset_desc.metric,
-                                                 dataset_desc.team_size,
-                                                 dataset_desc.dataset_block_dim,
-                                                 dataset_desc.is_vpq,
-                                                 dataset_desc.pq_bits,
-                                                 dataset_desc.pq_len);
-    planner.add_sample_filter_device_function(get_sample_filter_name<SampleFilterT>());
+    std::shared_ptr<AlgorithmLauncher> launcher;
+    if (dataset_desc.is_vpq) {
+      using QueryTag    = query_type_tag_vpq_t<DataTag>;
+      using CodebookTag = codebook_tag_vpq_t;
+      RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] VPQ path - QueryTag=%s, CodebookTag=%s",
+                    typeid(QueryTag).name(),
+                    typeid(CodebookTag).name());
+      CagraSingleCtaSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
+        planner(dataset_desc.metric,
+                topk_by_bitonic_sort,
+                bitonic_sort_and_merge_multi_warps,
+                dataset_desc.team_size,
+                dataset_desc.dataset_block_dim,
+                dataset_desc.is_vpq,
+                dataset_desc.pq_bits,
+                dataset_desc.pq_len);
 
-    // Get launcher
-    auto launcher = planner.get_launcher();
+      planner.add_setup_workspace_device_function(dataset_desc.metric,
+                                                  dataset_desc.team_size,
+                                                  dataset_desc.dataset_block_dim,
+                                                  dataset_desc.is_vpq,
+                                                  dataset_desc.pq_bits,
+                                                  dataset_desc.pq_len);
+      planner.add_compute_distance_device_function(dataset_desc.metric,
+                                                   dataset_desc.team_size,
+                                                   dataset_desc.dataset_block_dim,
+                                                   dataset_desc.is_vpq,
+                                                   dataset_desc.pq_bits,
+                                                   dataset_desc.pq_len);
+      planner.add_sample_filter_device_function(get_sample_filter_name<SampleFilterT>());
+      launcher = planner.get_launcher();
+    } else {
+      using CodebookTag = codebook_tag_standard_t;
+      if (dataset_desc.metric == cuvs::distance::DistanceType::BitwiseHamming) {
+        using QueryTag =
+          query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::BitwiseHamming>;
+        RAFT_LOG_INFO(
+          "[JIT FRAGMENT DEBUG] Standard path (BitwiseHamming) - QueryTag=%s, CodebookTag=%s",
+          typeid(QueryTag).name(),
+          typeid(CodebookTag).name());
+        CagraSingleCtaSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
+          planner(dataset_desc.metric,
+                  topk_by_bitonic_sort,
+                  bitonic_sort_and_merge_multi_warps,
+                  dataset_desc.team_size,
+                  dataset_desc.dataset_block_dim,
+                  dataset_desc.is_vpq,
+                  dataset_desc.pq_bits,
+                  dataset_desc.pq_len);
+
+        planner.add_setup_workspace_device_function(dataset_desc.metric,
+                                                    dataset_desc.team_size,
+                                                    dataset_desc.dataset_block_dim,
+                                                    dataset_desc.is_vpq,
+                                                    dataset_desc.pq_bits,
+                                                    dataset_desc.pq_len);
+        planner.add_compute_distance_device_function(dataset_desc.metric,
+                                                     dataset_desc.team_size,
+                                                     dataset_desc.dataset_block_dim,
+                                                     dataset_desc.is_vpq,
+                                                     dataset_desc.pq_bits,
+                                                     dataset_desc.pq_len);
+        planner.add_sample_filter_device_function(get_sample_filter_name<SampleFilterT>());
+        launcher = planner.get_launcher();
+      } else {
+        using QueryTag =
+          query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::L2Expanded>;
+        RAFT_LOG_INFO(
+          "[JIT FRAGMENT DEBUG] Standard path (non-BitwiseHamming) - QueryTag=%s, CodebookTag=%s",
+          typeid(QueryTag).name(),
+          typeid(CodebookTag).name());
+        CagraSingleCtaSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
+          planner(dataset_desc.metric,
+                  topk_by_bitonic_sort,
+                  bitonic_sort_and_merge_multi_warps,
+                  dataset_desc.team_size,
+                  dataset_desc.dataset_block_dim,
+                  dataset_desc.is_vpq,
+                  dataset_desc.pq_bits,
+                  dataset_desc.pq_len);
+
+        planner.add_setup_workspace_device_function(dataset_desc.metric,
+                                                    dataset_desc.team_size,
+                                                    dataset_desc.dataset_block_dim,
+                                                    dataset_desc.is_vpq,
+                                                    dataset_desc.pq_bits,
+                                                    dataset_desc.pq_len);
+        planner.add_compute_distance_device_function(dataset_desc.metric,
+                                                     dataset_desc.team_size,
+                                                     dataset_desc.dataset_block_dim,
+                                                     dataset_desc.is_vpq,
+                                                     dataset_desc.pq_bits,
+                                                     dataset_desc.pq_len);
+        planner.add_sample_filter_device_function(get_sample_filter_name<SampleFilterT>());
+        launcher = planner.get_launcher();
+      }
+    }
     if (!launcher) { RAFT_FAIL("Failed to get JIT launcher for CAGRA search kernel"); }
 
     // Get the device descriptor pointer - dev_ptr() initializes it if needed
+    RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] About to call dev_ptr()");
     const auto* dev_desc = dataset_desc.dev_ptr(stream);
+    RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] dev_ptr() returned: %p",
+                  static_cast<const void*>(dev_desc));
 
     // Cast size_t/int64_t parameters to match kernel signature exactly
     // The dispatch mechanism uses void* pointers, so parameter sizes must match exactly
@@ -736,6 +910,7 @@ void select_and_run_jit(
                    smem_size);
 
     // Dispatch kernel via launcher
+    RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] About to dispatch kernel via launcher");
     launcher->dispatch(
       stream,
       grid,

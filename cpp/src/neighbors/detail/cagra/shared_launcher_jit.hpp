@@ -51,6 +51,36 @@ constexpr auto get_source_index_type_tag()
   if constexpr (std::is_same_v<T, int64_t>) { return tag_idx_l{}; }
 }
 
+template <typename DataTag, cuvs::distance::DistanceType metric>
+struct query_type_tag_standard {
+  using type = std::conditional_t<metric == cuvs::distance::DistanceType::BitwiseHamming &&
+                                    std::is_same_v<DataTag, tag_uc>,
+                                  tag_uc,
+                                  tag_f>;
+};
+
+template <typename DataTag, cuvs::distance::DistanceType metric>
+using query_type_tag_standard_t = typename query_type_tag_standard<DataTag, metric>::type;
+
+template <typename DataTag>
+using query_type_tag_vpq_t = tag_h;
+
+template <typename DataTag>
+using query_type_tag_standard_l2_t =
+  query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::L2Expanded>;
+template <typename DataTag>
+using query_type_tag_standard_inner_product_t =
+  query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::InnerProduct>;
+template <typename DataTag>
+using query_type_tag_standard_cosine_t =
+  query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::CosineExpanded>;
+template <typename DataTag>
+using query_type_tag_standard_hamming_t =
+  query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::BitwiseHamming>;
+
+using codebook_tag_vpq_t      = tag_codebook_half;
+using codebook_tag_standard_t = void;
+
 // Helper trait to detect if a type is a bitset_filter (regardless of template parameters)
 template <typename T>
 struct is_bitset_filter : std::false_type {};

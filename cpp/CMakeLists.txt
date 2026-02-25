@@ -431,29 +431,27 @@ if(NOT BUILD_CPU_ONLY)
     generate_jit_lto_kernels(
       jit_lto_kernel_files
       NAME_FORMAT
-        "cagra_setup_workspace_standard_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@_data_@data_abbrev@_query_@query_abbrev@"
+        "cagra_setup_workspace@pq_prefix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_data_@data_abbrev@_query_@query_abbrev@"
       MATRIX_JSON_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/setup_workspace_standard_matrix.json"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/setup_workspace_matrix.json"
       KERNEL_INPUT_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/setup_workspace_standard_kernel.cu.in"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/setup_workspace_kernel.cu.in"
       EMBEDDED_INPUT_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/setup_workspace_standard_embedded.cpp.in"
-      OUTPUT_DIRECTORY
-        "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/setup_workspace_standard"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/setup_workspace_embedded.cpp.in"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/setup_workspace"
       KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
     )
     generate_jit_lto_kernels(
       jit_lto_kernel_files
       NAME_FORMAT
-        "cagra_compute_distance_standard_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@_data_@data_abbrev@_query_@query_abbrev@"
+        "cagra_compute_distance@pq_prefix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_data_@data_abbrev@_query_@query_abbrev@"
       MATRIX_JSON_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_standard_matrix.json"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_matrix.json"
       KERNEL_INPUT_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_standard_kernel.cu.in"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_kernel.cu.in"
       EMBEDDED_INPUT_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_standard_embedded.cpp.in"
-      OUTPUT_DIRECTORY
-        "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/compute_distance_standard"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_embedded.cpp.in"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/compute_distance"
       KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
     )
     generate_jit_lto_kernels(
@@ -471,55 +469,15 @@ if(NOT BUILD_CPU_ONLY)
     generate_jit_lto_kernels(
       jit_lto_kernel_files
       NAME_FORMAT
-        "cagra_apply_normalization_standard_noop_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@_data_@data_abbrev@"
+        "cagra_apply_normalization_standard@normalization_suffix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@_data_@data_abbrev@"
       MATRIX_JSON_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_normalization_standard_noop_matrix.json"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_normalization_standard_matrix.json"
       KERNEL_INPUT_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_normalization_standard_noop_kernel.cu.in"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_normalization_standard_kernel.cu.in"
       EMBEDDED_INPUT_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_normalization_standard_noop_embedded.cpp.in"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_normalization_standard_embedded.cpp.in"
       OUTPUT_DIRECTORY
-        "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/apply_normalization_standard_noop"
-      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
-    )
-    generate_jit_lto_kernels(
-      jit_lto_kernel_files
-      NAME_FORMAT
-        "cagra_apply_normalization_standard_cosine_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@_data_@data_abbrev@"
-      MATRIX_JSON_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_normalization_standard_cosine_matrix.json"
-      KERNEL_INPUT_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_normalization_standard_cosine_kernel.cu.in"
-      EMBEDDED_INPUT_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_normalization_standard_cosine_embedded.cpp.in"
-      OUTPUT_DIRECTORY
-        "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/apply_normalization_standard_cosine"
-      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
-    )
-    generate_jit_lto_kernels(
-      jit_lto_kernel_files
-      NAME_FORMAT
-        "cagra_setup_workspace_vpq_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_data_@data_abbrev@"
-      MATRIX_JSON_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/setup_workspace_vpq_matrix.json"
-      KERNEL_INPUT_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/setup_workspace_vpq_kernel.cu.in"
-      EMBEDDED_INPUT_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/setup_workspace_vpq_embedded.cpp.in"
-      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/setup_workspace_vpq"
-      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
-    )
-    generate_jit_lto_kernels(
-      jit_lto_kernel_files
-      NAME_FORMAT
-        "cagra_compute_distance_vpq_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_data_@data_abbrev@"
-      MATRIX_JSON_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_vpq_matrix.json"
-      KERNEL_INPUT_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_vpq_kernel.cu.in"
-      EMBEDDED_INPUT_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_vpq_embedded.cpp.in"
-      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/compute_distance_vpq"
+        "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/apply_normalization_standard"
       KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
     )
     generate_jit_lto_kernels(

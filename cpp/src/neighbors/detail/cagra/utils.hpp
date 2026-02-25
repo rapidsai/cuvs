@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -282,8 +282,10 @@ void copy_with_padding(
       raft::make_device_mdarray<T>(res, mr, raft::make_extents<int64_t>(src.extent(0), padded_dim));
   }
   if (dst.extent(1) == src.extent(1)) {
-    raft::copy(
-      dst.data_handle(), src.data_handle(), src.size(), raft::resource::get_cuda_stream(res));
+    auto stream = raft::resource::get_cuda_stream(res);
+    RAFT_LOG_INFO("[STREAM DEBUG] copy_with_padding using stream: %p",
+                  static_cast<const void*>(stream));
+    raft::copy(dst.data_handle(), src.data_handle(), src.size(), stream);
   } else {
     // copy with padding
     RAFT_CUDA_TRY(cudaMemsetAsync(

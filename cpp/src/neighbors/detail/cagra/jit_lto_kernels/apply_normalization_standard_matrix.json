@@ -39,20 +39,8 @@
     "256",
     "512"
   ],
-  "pq_len": [
-    "2",
-    "4"
-  ],
-  "pq_bits": [
-    "8"
-  ],
-  "codebook_type": [
-    "half"
-  ],
-  "_query": [
-    {
-      "query_type": "half",
-      "query_abbrev": "h"
-    }
+  "normalization_suffix": [
+    "_noop",
+    "_cosine"
   ]
 }

@@ -60,6 +60,20 @@ void select_and_run_jit(
   SampleFilterT sample_filter,
   cudaStream_t stream)
 {
+  RAFT_LOG_INFO(
+    "[JIT FRAGMENT DEBUG] select_and_run_jit (multi_cta) - is_vpq=%d, metric=%d, team_size=%u, "
+    "dataset_block_dim=%u, pq_bits=%u, pq_len=%u, queries_ptr=%p, topk_indices_ptr=%p, "
+    "topk_distances_ptr=%p",
+    dataset_desc.is_vpq,
+    static_cast<int>(dataset_desc.metric),
+    dataset_desc.team_size,
+    dataset_desc.dataset_block_dim,
+    dataset_desc.pq_bits,
+    dataset_desc.pq_len,
+    static_cast<const void*>(queries_ptr),
+    static_cast<const void*>(topk_indices_ptr),
+    static_cast<const void*>(topk_distances_ptr));
+
   // Extract bitset data from filter object (if it's a bitset_filter)
   uint32_t* bitset_ptr        = nullptr;
   SourceIndexT bitset_len     = 0;
@@ -89,48 +103,110 @@ void select_and_run_jit(
   using DistTag   = decltype(get_distance_type_tag<DistanceT>());
   using SourceTag = decltype(get_source_index_type_tag<SourceIndexT>());
 
-  // For multi_cta, we don't use topk_by_bitonic_sort or bitonic_sort_and_merge_multi_warps
-  // These are handled inside the kernel based on max_elements
-  // We need to construct the entrypoint name manually since it's different from single_cta
-  std::string metric_name_full;
-  if (dataset_desc.metric == cuvs::distance::DistanceType::L2Expanded) {
-    metric_name_full = "L2Expanded";
-  } else if (dataset_desc.metric == cuvs::distance::DistanceType::InnerProduct) {
-    metric_name_full = "InnerProduct";
-  } else if (dataset_desc.metric == cuvs::distance::DistanceType::CosineExpanded) {
-    metric_name_full = "CosineExpanded";
-  } else {
-    RAFT_FAIL("Unsupported metric for multi_cta JIT kernel");
-  }
+  RAFT_LOG_INFO(
+    "[JIT FRAGMENT DEBUG] multi_cta - DataTag=%s, IndexTag=%s, DistTag=%s, SourceTag=%s",
+    typeid(DataTag).name(),
+    typeid(IndexTag).name(),
+    typeid(DistTag).name(),
+    typeid(SourceTag).name());
 
   // Create planner and register device functions
   // Pass team_size, dataset_block_dim, and VPQ parameters to match the kernel entrypoint name
-  CagraMultiCtaSearchPlanner<DataTag, IndexTag, DistTag, SourceTag> planner(
-    dataset_desc.metric,
-    dataset_desc.team_size,
-    dataset_desc.dataset_block_dim,
-    dataset_desc.is_vpq,
-    dataset_desc.pq_bits,
-    dataset_desc.pq_len);
+  std::shared_ptr<AlgorithmLauncher> launcher;
+  if (dataset_desc.is_vpq) {
+    using QueryTag    = query_type_tag_vpq_t<DataTag>;
+    using CodebookTag = codebook_tag_vpq_t;
+    RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] multi_cta VPQ path - QueryTag=%s, CodebookTag=%s",
+                  typeid(QueryTag).name(),
+                  typeid(CodebookTag).name());
+    CagraMultiCtaSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
+      planner(dataset_desc.metric,
+              dataset_desc.team_size,
+              dataset_desc.dataset_block_dim,
+              dataset_desc.is_vpq,
+              dataset_desc.pq_bits,
+              dataset_desc.pq_len);
 
-  planner.add_setup_workspace_device_function(dataset_desc.metric,
-                                              dataset_desc.team_size,
-                                              dataset_desc.dataset_block_dim,
-                                              dataset_desc.is_vpq,
-                                              dataset_desc.pq_bits,
-                                              dataset_desc.pq_len);
-  planner.add_compute_distance_device_function(dataset_desc.metric,
-                                               dataset_desc.team_size,
-                                               dataset_desc.dataset_block_dim,
-                                               dataset_desc.is_vpq,
-                                               dataset_desc.pq_bits,
-                                               dataset_desc.pq_len);
-  std::string filter_name = get_sample_filter_name<SampleFilterT>();
-  planner.add_sample_filter_device_function(filter_name);
+    planner.add_setup_workspace_device_function(dataset_desc.metric,
+                                                dataset_desc.team_size,
+                                                dataset_desc.dataset_block_dim,
+                                                dataset_desc.is_vpq,
+                                                dataset_desc.pq_bits,
+                                                dataset_desc.pq_len);
+    planner.add_compute_distance_device_function(dataset_desc.metric,
+                                                 dataset_desc.team_size,
+                                                 dataset_desc.dataset_block_dim,
+                                                 dataset_desc.is_vpq,
+                                                 dataset_desc.pq_bits,
+                                                 dataset_desc.pq_len);
+    std::string filter_name = get_sample_filter_name<SampleFilterT>();
+    planner.add_sample_filter_device_function(filter_name);
+    launcher = planner.get_launcher();
+  } else {
+    using CodebookTag = codebook_tag_standard_t;
+    if (dataset_desc.metric == cuvs::distance::DistanceType::BitwiseHamming) {
+      using QueryTag =
+        query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::BitwiseHamming>;
+      RAFT_LOG_INFO(
+        "[JIT FRAGMENT DEBUG] multi_cta Standard path (BitwiseHamming) - QueryTag=%s, "
+        "CodebookTag=%s",
+        typeid(QueryTag).name(),
+        typeid(CodebookTag).name());
+      CagraMultiCtaSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
+        planner(dataset_desc.metric,
+                dataset_desc.team_size,
+                dataset_desc.dataset_block_dim,
+                dataset_desc.is_vpq,
+                dataset_desc.pq_bits,
+                dataset_desc.pq_len);
 
-  // Get launcher using the planner's entrypoint name and fragment key
-  auto params   = make_fragment_key<DataTag, IndexTag, DistTag, SourceTag>();
-  auto launcher = planner.get_launcher();
+      planner.add_setup_workspace_device_function(dataset_desc.metric,
+                                                  dataset_desc.team_size,
+                                                  dataset_desc.dataset_block_dim,
+                                                  dataset_desc.is_vpq,
+                                                  dataset_desc.pq_bits,
+                                                  dataset_desc.pq_len);
+      planner.add_compute_distance_device_function(dataset_desc.metric,
+                                                   dataset_desc.team_size,
+                                                   dataset_desc.dataset_block_dim,
+                                                   dataset_desc.is_vpq,
+                                                   dataset_desc.pq_bits,
+                                                   dataset_desc.pq_len);
+      std::string filter_name = get_sample_filter_name<SampleFilterT>();
+      planner.add_sample_filter_device_function(filter_name);
+      launcher = planner.get_launcher();
+    } else {
+      using QueryTag = query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::L2Expanded>;
+      RAFT_LOG_INFO(
+        "[JIT FRAGMENT DEBUG] multi_cta Standard path (non-BitwiseHamming) - QueryTag=%s, "
+        "CodebookTag=%s",
+        typeid(QueryTag).name(),
+        typeid(CodebookTag).name());
+      CagraMultiCtaSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
+        planner(dataset_desc.metric,
+                dataset_desc.team_size,
+                dataset_desc.dataset_block_dim,
+                dataset_desc.is_vpq,
+                dataset_desc.pq_bits,
+                dataset_desc.pq_len);
+
+      planner.add_setup_workspace_device_function(dataset_desc.metric,
+                                                  dataset_desc.team_size,
+                                                  dataset_desc.dataset_block_dim,
+                                                  dataset_desc.is_vpq,
+                                                  dataset_desc.pq_bits,
+                                                  dataset_desc.pq_len);
+      planner.add_compute_distance_device_function(dataset_desc.metric,
+                                                   dataset_desc.team_size,
+                                                   dataset_desc.dataset_block_dim,
+                                                   dataset_desc.is_vpq,
+                                                   dataset_desc.pq_bits,
+                                                   dataset_desc.pq_len);
+      std::string filter_name = get_sample_filter_name<SampleFilterT>();
+      planner.add_sample_filter_device_function(filter_name);
+      launcher = planner.get_launcher();
+    }
+  }
 
   if (!launcher) { RAFT_FAIL("Failed to get JIT launcher"); }
 
@@ -161,9 +237,12 @@ void select_and_run_jit(
   dim3 grid_dims(num_cta_per_query, num_queries, 1);
 
   // Get the device descriptor pointer
+  RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] multi_cta About to call dev_ptr()");
   const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dev_desc_base =
     dataset_desc.dev_ptr(stream);
   const auto* dev_desc = dev_desc_base;
+  RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] multi_cta dev_ptr() returned: %p",
+                static_cast<const void*>(dev_desc));
 
   // Note: dataset_desc is passed by const reference, so it stays alive for the duration of this
   // function The descriptor's state is managed by a shared_ptr internally, so no need to explicitly

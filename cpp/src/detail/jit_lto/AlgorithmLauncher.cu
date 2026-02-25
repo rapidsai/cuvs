@@ -36,21 +36,12 @@ AlgorithmLauncher& AlgorithmLauncher::operator=(AlgorithmLauncher&& other) noexc
 void AlgorithmLauncher::call(
   cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, void** kernel_args)
 {
-  if (kernel == nullptr) { RAFT_FAIL("AlgorithmLauncher::call - kernel is NULL!"); }
-  if (library == nullptr) { RAFT_FAIL("AlgorithmLauncher::call - library is NULL!"); }
-  if (kernel_args == nullptr) { RAFT_FAIL("AlgorithmLauncher::call - kernel_args is NULL!"); }
-
-  cudaLaunchAttribute attribute[1];
-  attribute[0].id = cudaLaunchAttributeProgrammaticStreamSerialization;
-  attribute[0].val.programmaticStreamSerializationAllowed = 1;
-
   cudaLaunchConfig_t config;
   config.gridDim          = grid;
   config.blockDim         = block;
   config.stream           = stream;
-  config.attrs            = attribute;
-  config.numAttrs         = 1;
   config.dynamicSmemBytes = shared_mem;
+  config.numAttrs         = 0;
 
   RAFT_CUDA_TRY(cudaLaunchKernelExC(&config, kernel, kernel_args));
 }
@@ -58,19 +49,17 @@ void AlgorithmLauncher::call(
 void AlgorithmLauncher::call_cooperative(
   cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, void** kernel_args)
 {
-  cudaLaunchAttribute attributes[2];
-  attributes[0].id = cudaLaunchAttributeProgrammaticStreamSerialization;
-  attributes[0].val.programmaticStreamSerializationAllowed = 1;
-  attributes[1].id                                         = cudaLaunchAttributeCooperative;
-  attributes[1].val.cooperative                            = 1;
+  cudaLaunchAttribute attribute[1];
+  attribute[0].id              = cudaLaunchAttributeCooperative;
+  attribute[0].val.cooperative = 1;
 
   cudaLaunchConfig_t config;
   config.gridDim          = grid;
   config.blockDim         = block;
   config.stream           = stream;
-  config.attrs            = attributes;
-  config.numAttrs         = 2;
   config.dynamicSmemBytes = shared_mem;
+  config.numAttrs         = 1;
+  config.attrs            = attribute;
 
   RAFT_CUDA_TRY(cudaLaunchKernelExC(&config, kernel, kernel_args));
 }

@@ -9,11 +9,6 @@
 
 namespace cuvs::neighbors::cagra::detail::single_cta_search {
 
-// Instantiate the search_kernel_p_jit function with unified template parameters
-// For standard descriptors: PQ_BITS=0, PQ_LEN=0, CodebookT=void, QueryT=float (or uint8_t for BitwiseHamming)
-// For VPQ descriptors: PQ_BITS>0, PQ_LEN>0, CodebookT=half, QueryT=half
-// Note: Metric is no longer a template parameter - it's linked via dist_op and normalization fragments
-// Note: Kernels use dataset_descriptor_base_t* pointer directly
 template __global__ void search_kernel_p_jit<@topk_by_bitonic_sort@, @bitonic_sort_and_merge_multi_warps@, @team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@, @query_type@, @source_index_type@>(
     worker_handle_t*, job_desc_t<job_desc_jit_helper_desc<@data_type@, @index_type@, @distance_type@>>*, uint32_t*, const @index_type@* const, const std::uint32_t, const @source_index_type@*, const unsigned, const uint64_t, const @index_type@*, const uint32_t, @index_type@* const, const std::uint32_t, const std::uint32_t, const std::uint32_t, const std::uint32_t, const std::uint32_t, const std::uint32_t, std::uint32_t* const, const std::uint32_t, const std::uint32_t, const std::uint32_t, const std::uint32_t, cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<@data_type@, @index_type@, @distance_type@>*, uint32_t*, @source_index_type@, @source_index_type@);
 
