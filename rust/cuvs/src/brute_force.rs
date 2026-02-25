@@ -182,14 +182,12 @@ mod tests {
         // Create a random dataset
         let n_datapoints = 64;
         let n_features = 8;
-        let dataset_host =
+        let dataset =
             ndarray::Array::<f32, _>::random((n_datapoints, n_features), Uniform::new(0., 1.0));
 
-        // Pass host data directly so the C++ index copies it to device and owns
-        // the copy. Passing a device ManagedTensor would create a non-owning view
-        // that becomes a dangling pointer once the ManagedTensor is dropped after
-        // build, causing use-after-free during search.
-        let index = Index::build(&res, DistanceType::L2Expanded, None, &dataset_host)
+        // Build the brute force index from device memory
+        let dataset_device = ManagedTensor::from(&dataset).to_device(&res).unwrap();
+        let index = Index::build(&res, DistanceType::L2Expanded, None, dataset_device)
             .expect("failed to create brute force index");
 
         res.sync_stream().unwrap();
@@ -199,7 +197,7 @@ mod tests {
         // Perform multiple searches on the same index
         for search_iter in 0..3 {
             let n_queries = 4;
-            let queries = dataset_host.slice(s![0..n_queries, ..]);
+            let queries = dataset.slice(s![0..n_queries, ..]);
             let queries = ManagedTensor::from(&queries).to_device(&res).unwrap();
 
             let mut neighbors_host = ndarray::Array::<i64, _>::zeros((n_queries, k));
