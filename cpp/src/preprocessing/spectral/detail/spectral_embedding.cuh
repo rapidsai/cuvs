@@ -63,10 +63,12 @@ void compute_eigenpairs(raft::resources const& handle,
   auto config           = raft::sparse::solver::lanczos_solver_config<DataT>();
   config.n_components   = spectral_embedding_config.n_components;
   config.max_iterations = 10 * n_samples;
-  config.ncv            = std::min(n_samples, std::max(2 * config.n_components + 1, 20));
-  config.tolerance      = spectral_embedding_config.tolerance;
-  config.which          = raft::sparse::solver::LANCZOS_WHICH::LA;
-  config.seed           = spectral_embedding_config.seed;
+  RAFT_EXPECTS(n_samples - config.n_components > 0,
+               "Please set `ncv` to a value in (0, n_samples)");
+  config.ncv = std::min(n_samples - config.n_components, std::max(2 * config.n_components + 1, 20));
+  config.tolerance = spectral_embedding_config.tolerance;
+  config.which     = raft::sparse::solver::LANCZOS_WHICH::LA;
+  config.seed      = spectral_embedding_config.seed;
 
   auto eigenvalues =
     raft::make_device_vector<DataT, int, raft::col_major>(handle, config.n_components);
