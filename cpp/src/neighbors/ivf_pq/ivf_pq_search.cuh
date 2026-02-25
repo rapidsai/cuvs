@@ -42,7 +42,7 @@
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/mr/per_device_resource.hpp>
 
-#include <cub/cub.cuh>
+#include <cub/device/device_radix_sort.cuh>
 #include <cuda_fp16.h>
 
 #include <optional>

@@ -106,15 +106,44 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
   RAFT_EXPECTS(result == NVJITLINK_SUCCESS, "nvJitLinkDestroy failed");
 
   // cubin is linked, so now load it
-  // NOTE: cudaLibrary_t does not need to be freed explicitly
   cudaLibrary_t library;
   RAFT_CUDA_TRY(
     cudaLibraryLoadData(&library, cubin.get(), nullptr, nullptr, 0, nullptr, nullptr, 0));
 
-  constexpr unsigned int count = 1;
-  // NOTE: cudaKernel_t does not need to be freed explicitly
-  std::unique_ptr<cudaKernel_t[]> kernels{new cudaKernel_t[count]};
-  RAFT_CUDA_TRY(cudaLibraryEnumerateKernels(kernels.get(), count, library));
+  unsigned int kernel_count = 0;
+  RAFT_CUDA_TRY(cudaLibraryGetKernelCount(&kernel_count, library));
 
-  return std::make_shared<AlgorithmLauncher>(kernels.release()[0]);
+  // NOTE: cudaKernel_t does not need to be freed explicitly
+  std::unique_ptr<cudaKernel_t[]> kernels{new cudaKernel_t[kernel_count]};
+  RAFT_CUDA_TRY(cudaLibraryEnumerateKernels(kernels.get(), kernel_count, library));
+
+  // Filter out EmptyKernel by checking kernel names using cudaFuncGetName
+  const char* empty_kernel_name = "_ZN3cub6detail11EmptyKernelIvEEvv";
+  std::vector<cudaKernel_t> valid_kernels;
+  valid_kernels.reserve(kernel_count);
+
+  for (unsigned int i = 0; i < kernel_count; ++i) {
+    // cudaFuncGetName can be used with cudaKernel_t by casting to void*
+    const void* func_ptr  = reinterpret_cast<const void*>(kernels[i]);
+    const char* func_name = nullptr;
+    RAFT_CUDA_TRY(cudaFuncGetName(&func_name, func_ptr));
+
+    bool is_empty_kernel = false;
+    if (func_name != nullptr) {
+      std::string kernel_name(func_name);
+      // Check if this is EmptyKernel
+      if (kernel_name.find(empty_kernel_name) != std::string::npos ||
+          kernel_name == empty_kernel_name) {
+        is_empty_kernel = true;
+      }
+    }
+
+    // Only keep the kernel if it's not EmptyKernel
+    if (!is_empty_kernel) { valid_kernels.push_back(kernels[i]); }
+  }
+
+  RAFT_EXPECTS(
+    valid_kernels.size() == 1, "Expected 1 valid JIT kernel, got %zu", valid_kernels.size());
+
+  return std::make_shared<AlgorithmLauncher>(valid_kernels[0], library);
 }
