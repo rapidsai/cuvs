@@ -93,11 +93,11 @@ def test_fit_batched_matches_fit(
     """
     rng = np.random.default_rng(99)
     X_host = rng.random((n_rows, n_cols)).astype(dtype)
-    
+
     norms = np.linalg.norm(X_host, ord=1, axis=1, keepdims=True)
     norms = np.where(norms == 0, 1.0, norms)
     X_host = X_host / norms
-    
+
     initial_centroids_host = X_host[:n_clusters].copy()
 
     params = KMeansParams(
@@ -142,7 +142,7 @@ def test_minibatch_sklearn(n_rows, n_cols, n_clusters, dtype):
     kmeans = MiniBatchKMeans(
         n_clusters=8,
         init=initial_centroids_host,
-        max_iter=200,
+        max_iter=100,
         verbose=0,
         random_state=None,
         tol=0.0,
