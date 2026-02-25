@@ -126,36 +126,60 @@ struct params : base_params {
   int batch_centroids = 0;
 
   /**
-   * Centroid update mode for fit_batched():
-   *  - FullBatch (default): Standard Lloyd's algorithm. Accumulate partial sums
-   *    across all batches, update centroids once per iteration. Deterministic and
-   *    mathematically equivalent to standard k-means.
-   *  - MiniBatch: Online mini-batch k-means. Update centroids incrementally after
-   *    each randomly sampled batch. Faster convergence but non-deterministic.
-   */
-  CentroidUpdateMode update_mode = FullBatch;
-
-  /**
    * If true, check inertia during iterations for early convergence (used by both fit and
    * fit_batched).
    */
   bool inertia_check = false;
 
   /**
-   * If true, compute the final inertia after fit_batched completes. This requires an additional
-   * full pass over all the host data, which can be expensive for large datasets.
-   * Only used by fit_batched(); regular fit() always computes final inertia.
-   * Default: false (skip final inertia computation for performance).
+   * Parameters specific to batched k-means (fit_batched).
+   * These parameters are only used when calling fit_batched() and are ignored by regular fit().
    */
-  bool final_inertia_check = false;
+  struct batched_params {
+    /**
+     * Centroid update mode for fit_batched():
+     *  - FullBatch (default): Standard Lloyd's algorithm. Accumulate partial sums
+     *    across all batches, update centroids once per iteration. Deterministic and
+     *    mathematically equivalent to standard k-means.
+     *  - MiniBatch: Online mini-batch k-means. Update centroids incrementally after
+     *    each randomly sampled batch. Faster convergence but non-deterministic.
+     */
+    CentroidUpdateMode update_mode = FullBatch;
 
-  /**
-   * Maximum number of consecutive mini-batch steps without improvement in smoothed inertia
-   * before early stopping. Only used when update_mode is MiniBatch.
-   * If None/0, this convergence criterion is disabled.
-   * Default: 10
-   */
-  int max_no_improvement = 10;
+    /**
+     * If true, compute the final inertia after fit_batched completes. This requires an additional
+     * full pass over all the host data, which can be expensive for large datasets.
+     * Only used by fit_batched(); regular fit() always computes final inertia.
+     * Default: false (skip final inertia computation for performance).
+     */
+    bool final_inertia_check = false;
+
+    /**
+     * Parameters specific to mini-batch k-means mode.
+     * These parameters are only used when update_mode is MiniBatch.
+     */
+    struct minibatch_params {
+      /**
+       * Maximum number of consecutive mini-batch steps without improvement in smoothed inertia
+       * before early stopping. Only used when update_mode is MiniBatch.
+       * If 0, this convergence criterion is disabled.
+       * Default: 10
+       */
+      int max_no_improvement = 10;
+
+      /**
+       * Control the fraction of the maximum number of counts for a center to be reassigned.
+       * Centers with count < reassignment_ratio * max(counts) are randomly reassigned to
+       * observations from the current batch. A higher value means that low count centers are
+       * more likely to be reassigned, which means that the model will take longer to converge,
+       * but should converge in a better clustering.
+       * Only used when update_mode is MiniBatch.
+       * If 0.0, reassignment is disabled.
+       * Default: 0.01 (matching scikit-learn)
+       */
+      double reassignment_ratio = 0.01;
+    } minibatch;
+  } batched;
 };
 
 /**
@@ -207,7 +231,7 @@ enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
  *   raft::resources handle;
  *   cuvs::cluster::kmeans::params params;
  *   params.n_clusters = 100;
- *   // params.update_mode = kmeans::params::MiniBatch;  // for mini-batch mode
+ *   // params.batched.update_mode = kmeans::params::MiniBatch;  // for mini-batch mode
  *   int n_features = 15;
  *   float inertia;
  *   int n_iter;
@@ -230,7 +254,7 @@ enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
  * @endcode
  *
  * @param[in]     handle        The raft handle.
- * @param[in]     params        Parameters for KMeans model. Use params.update_mode
+ * @param[in]     params        Parameters for KMeans model. Use params.batched.update_mode
  *                              to select FullBatch or MiniBatch mode.
  * @param[in]     X             Training instances on HOST memory. The data must
  *                              be in row-major format.

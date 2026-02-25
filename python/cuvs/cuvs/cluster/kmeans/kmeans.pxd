@@ -40,6 +40,7 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
         bool inertia_check,
         bool final_inertia_check,
         int max_no_improvement,
+        double reassignment_ratio,
         bool hierarchical,
         int hierarchical_n_iters
 

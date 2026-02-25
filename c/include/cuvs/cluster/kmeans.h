@@ -130,6 +130,14 @@ struct cuvsKMeansParams {
   int max_no_improvement;
 
   /**
+   * Control the fraction of the maximum number of counts for a center to be reassigned.
+   * Centers with count < reassignment_ratio * max(counts) are randomly reassigned to
+   * observations from the current batch. Only used when update_mode is CUVS_KMEANS_UPDATE_MINI_BATCH.
+   * If 0.0, reassignment is disabled. Default: 0.01
+   */
+  double reassignment_ratio;
+
+  /**
    * Whether to use hierarchical (balanced) kmeans or not
    */
   bool hierarchical;

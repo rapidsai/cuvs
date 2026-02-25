@@ -100,6 +100,11 @@ cdef class KMeansParams:
         in smoothed inertia before early stopping. Only used when update_mode
         is "mini_batch". If 0, this convergence criterion is disabled.
         Default: 10 (matches sklearn's default).
+    reassignment_ratio : float
+        Control the fraction of the maximum number of counts for a center to be reassigned.
+        Centers with count < reassignment_ratio * max(counts) are randomly reassigned to
+        observations from the current batch. Only used when update_mode is "mini_batch".
+        If 0.0, reassignment is disabled. Default: 0.01 (matches sklearn's default).
     hierarchical : bool
         Whether to use hierarchical (balanced) kmeans or not
     hierarchical_n_iters : int
@@ -128,6 +133,7 @@ cdef class KMeansParams:
                  inertia_check=None,
                  final_inertia_check=None,
                  max_no_improvement=None,
+                 reassignment_ratio=None,
                  hierarchical=None,
                  hierarchical_n_iters=None):
         if metric is not None:
@@ -158,6 +164,8 @@ cdef class KMeansParams:
             self.params.final_inertia_check = final_inertia_check
         if max_no_improvement is not None:
             self.params.max_no_improvement = max_no_improvement
+        if reassignment_ratio is not None:
+            self.params.reassignment_ratio = reassignment_ratio
         if hierarchical is not None:
             self.params.hierarchical = hierarchical
         if hierarchical_n_iters is not None:
@@ -217,6 +225,10 @@ cdef class KMeansParams:
     @property
     def max_no_improvement(self):
         return self.params.max_no_improvement
+
+    @property
+    def reassignment_ratio(self):
+        return self.params.reassignment_ratio
 
     @property
     def hierarchical(self):
