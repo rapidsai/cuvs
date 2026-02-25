@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -27,6 +27,10 @@ struct EpsUnexpL2SqNeighborhood : public BaseClass {
 
   DataT acc[P::AccRowsPerTh][P::AccColsPerTh];
 
+  size_t n_blocks_y;
+  size_t block_x;
+  size_t block_y;
+
  public:
   DI EpsUnexpL2SqNeighborhood(bool* _adj,
                               IdxT* _vd,
@@ -39,6 +43,9 @@ struct EpsUnexpL2SqNeighborhood : public BaseClass {
                               char* _smem)
     : BaseClass(_x, _y, _m, _n, _k, _smem), adj(_adj), eps(_eps), vd(_vd), smem(_smem)
   {
+    n_blocks_y = raft::ceildiv<size_t>(static_cast<size_t>(_n), static_cast<size_t>(P::Nblk));
+    block_x    = static_cast<size_t>(blockIdx.x) / n_blocks_y;
+    block_y    = static_cast<size_t>(blockIdx.x) % n_blocks_y;
   }
 
   DI void run()
@@ -51,7 +58,7 @@ struct EpsUnexpL2SqNeighborhood : public BaseClass {
  private:
   DI void prolog()
   {
-    this->ldgXY(IdxT(blockIdx.x) * P::Mblk, IdxT(blockIdx.y) * P::Nblk, 0);
+    this->ldgXY(block_x * P::Mblk, block_y * P::Nblk, 0);
 #pragma unroll
     for (int i = 0; i < P::AccRowsPerTh; ++i) {
 #pragma unroll
@@ -67,7 +74,7 @@ struct EpsUnexpL2SqNeighborhood : public BaseClass {
   DI void loop()
   {
     for (int kidx = P::Kblk; kidx < this->k; kidx += P::Kblk) {
-      this->ldgXY(IdxT(blockIdx.x) * P::Mblk, IdxT(blockIdx.y) * P::Nblk, kidx);
+      this->ldgXY(block_x * P::Mblk, block_y * P::Nblk, kidx);
       accumulate();  // on the previous k-block
       this->stsXY();
       __syncthreads();
@@ -79,8 +86,8 @@ struct EpsUnexpL2SqNeighborhood : public BaseClass {
 
   DI void epilog()
   {
-    IdxT startx = blockIdx.x * P::Mblk + this->accrowid;
-    IdxT starty = blockIdx.y * P::Nblk + this->acccolid;
+    IdxT startx = block_x * P::Mblk + this->accrowid;
+    IdxT starty = block_y * P::Nblk + this->acccolid;
     auto lid    = raft::laneId();
     IdxT sums[P::AccRowsPerTh];
 #pragma unroll
@@ -126,7 +133,7 @@ struct EpsUnexpL2SqNeighborhood : public BaseClass {
     __syncthreads();  // so that we can safely reuse smem
     int gid       = this->accrowid;
     int lid       = this->acccolid;
-    auto cidx     = IdxT(blockIdx.x) * P::Mblk + gid;
+    auto cidx     = block_x * P::Mblk + gid;
     IdxT totalSum = 0;
     // update the individual vertex degrees
 #pragma unroll
@@ -177,7 +184,9 @@ void epsUnexpL2SqNeighImpl(bool* adj,
                            cudaStream_t stream)
 {
   typedef typename raft::linalg::Policy4x4<DataT, VecLen>::Policy Policy;
-  dim3 grid(raft::ceildiv<int>(m, Policy::Mblk), raft::ceildiv<int>(n, Policy::Nblk));
+  IdxT n_blocks_x = raft::ceildiv<IdxT>(m, Policy::Mblk);
+  IdxT n_blocks_y = raft::ceildiv<IdxT>(n, Policy::Nblk);
+  dim3 grid(n_blocks_x * n_blocks_y);
   dim3 blk(Policy::Nthreads);
   epsUnexpL2SqNeighKernel<DataT, IdxT, Policy>
     <<<grid, blk, Policy::SmemSize, stream>>>(adj, vd, x, y, m, n, k, eps);
