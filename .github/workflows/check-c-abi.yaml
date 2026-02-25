@@ -48,18 +48,8 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
+          pip install dlpack
           pip install -e ci/check_c_abi
-
-      - name: Build C++ project to get dependencies (dlpack)
-        run: |
-          mkdir -p cpp/build
-          cd cpp/build
-          cmake .. \
-            -GNinja \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DBUILD_TESTS=OFF \
-            -DBUILD_EXAMPLES=OFF
-          echo "Build directory created and dependencies fetched"
 
       - name: Extract ABI from main branch
         run: |
@@ -113,18 +103,8 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
+          pip install dlpack
           pip install ci/check_c_abi
-
-      - name: Build C++ project to get dependencies (dlpack)
-        run: |
-          mkdir -p cpp/build
-          cd cpp/build
-          cmake .. \
-            -GNinja \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DBUILD_TESTS=OFF \
-            -DBUILD_EXAMPLES=OFF
-          echo "Build directory created and dependencies fetched"
 
       - name: Find merge base commit
         id: merge-base

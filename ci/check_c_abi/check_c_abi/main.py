@@ -9,6 +9,8 @@ import gzip
 import msgspec
 import pathlib
 import sys
+import sysconfig
+
 
 from check_c_abi.abi import analyze_c_abi, Abi
 
@@ -103,7 +105,11 @@ def main_cli():
         / "include"
     )
     if not dlpack_header_path.is_dir():
-        raise ValueError(f"dlpack header {dlpack_header_path} not found")
+        # check if dlpack is installed w/ 'pip install dlpack' before giving up
+        python_include_path = pathlib.Path(sysconfig.get_paths()["include"])
+        dlpack_header_path = python_include_path.parent
+        if not (dlpack_header_path / "dlpack" / "dlpack.h").is_file():
+            raise ValueError(f"dlpack header {dlpack_header_path} not found")
 
     extra_clang_args = [f"-I{str(dlpack_header_path)}"]
 
