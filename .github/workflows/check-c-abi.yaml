@@ -6,14 +6,14 @@ on:
   pull_request:
     paths:
       - 'c/include/**'
-      - 'ci/check_c_abi.py'
+      - 'ci/check_c_abi/**'
       - '.github/workflows/check-c-abi.yaml'
   push:
     branches:
       - main
     paths:
       - 'c/include/**'
-      - 'ci/check_c_abi.py'
+      - 'ci/check_c_abi/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -48,7 +48,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
-          pip install msgspec libclang termcolor
+          pip install -e ci/check_c_abi
 
       - name: Build C++ project to get dependencies (dlpack)
         run: |
@@ -64,7 +64,7 @@ jobs:
       - name: Extract ABI from main branch
         run: |
           mkdir -p baseline
-          python ci/check_c_abi.py extract \
+          check-c-abi extract \
             --header-path c/include \
             --include-file cuvs/core/all.h \
             --output-file baseline/c_abi.json.gz
@@ -111,7 +111,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
-          pip install msgspec libclang termcolor
+          pip install ci/check_c_abi
 
       - name: Build C++ project to get dependencies (dlpack)
         run: |
@@ -168,7 +168,7 @@ jobs:
             -DBUILD_EXAMPLES=OFF
           cd ../../..
           mkdir -p baseline
-          python ci/check_c_abi.py extract \
+          check-c-abi extract \
             --header-path ../cuvs-main/c/include \
             --include-file cuvs/core/all.h \
             --output-file baseline/c_abi.json.gz
@@ -186,7 +186,7 @@ jobs:
 
       - name: Analyze current branch for ABI breaking changes
         run: |
-          python ci/check_c_abi.py analyze \
+          check-c-abi analyze \
             --abi-file baseline/c_abi.json.gz \
             --header-path c/include \
             --include-file cuvs/core/all.h
