@@ -196,11 +196,13 @@ void accumulate_batch_centroids(
 /**
  * @brief Update centroids using mini-batch online learning
  *
- * Uses the online update formula:
- *   learning_rate[k] = batch_count[k] / (total_count[k] + batch_count[k])
- *   centroid[k] = centroid[k] + learning_rate[k] * (batch_mean[k] - centroid[k])
+ * Updates centroids using the following formula (matching scikit-learn's implementation):
  *
- * This is equivalent to a weighted average where total_count tracks cumulative weight.
+ *   centroid_new[k] = (centroid_old[k] * old_total_counts[k] + batch_sums[k]) / total_counts[k]
+ *
+ * This is equivalent to the learning rate formula:
+ *   learning_rate[k] = batch_counts[k] / total_counts[k]
+ *   centroid[k] = centroid[k] * (1 - learning_rate[k]) + batch_means[k] * learning_rate[k]
  *
  * Optionally reassigns low-count clusters to random samples from the current batch.
  */
@@ -219,39 +221,22 @@ void minibatch_update_centroids(raft::resources const& handle,
   auto n_features     = centroids.extent(1);
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
-  auto batch_means = raft::make_device_matrix<MathT, IdxT>(handle, n_clusters, n_features);
-  raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(
-    handle, batch_sums, batch_counts, batch_means.view(), raft::div_checkzero_op{});
+  raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(handle,
+                                                             raft::make_const_mdspan(centroids),
+                                                             raft::make_const_mdspan(total_counts),
+                                                             centroids,
+                                                             raft::mul_op{});
+
+  raft::linalg::add(
+    handle, raft::make_const_mdspan(centroids), raft::make_const_mdspan(batch_sums), centroids);
 
   raft::linalg::add(handle, raft::make_const_mdspan(total_counts), batch_counts, total_counts);
 
-  // lr[k] = batch_count[k] / total_count[k] (after update)
-  auto learning_rates = raft::make_device_vector<MathT, IdxT>(handle, n_clusters);
-  raft::linalg::map(handle,
-                    learning_rates.view(),
-                    raft::div_checkzero_op{},
-                    batch_counts,
-                    raft::make_const_mdspan(total_counts));
-
-  // centroid = (1 - lr) * centroid + lr * batch_mean
-  raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(
-    handle,
-    raft::make_const_mdspan(centroids),
-    raft::make_const_mdspan(learning_rates.view()),
-    centroids,
-    [] __device__(MathT centroid_val, MathT lr) { return (MathT{1} - lr) * centroid_val; });
-
-  raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(
-    handle,
-    raft::make_const_mdspan(batch_means.view()),
-    raft::make_const_mdspan(learning_rates.view()),
-    batch_means.view(),
-    [] __device__(MathT mean_val, MathT lr) { return lr * mean_val; });
-
-  raft::linalg::add(handle,
-                    raft::make_const_mdspan(centroids),
-                    raft::make_const_mdspan(batch_means.view()),
-                    centroids);
+  raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(handle,
+                                                             raft::make_const_mdspan(centroids),
+                                                             raft::make_const_mdspan(total_counts),
+                                                             centroids,
+                                                             raft::div_checkzero_op{});
 
   // Reassignment logic: reassign low-count clusters to random samples from current batch
   if (reassignment_ratio > 0.0) {
@@ -275,8 +260,6 @@ void minibatch_update_centroids(raft::resources const& handle,
     raft::resource::sync_stream(handle, stream);
     MathT max_count = max_count_host.data_handle()[0];
 
-    // Identify clusters to reassign on device: total_count < reassignment_ratio * max_count or
-    // total_count == 0
     MathT threshold     = static_cast<MathT>(reassignment_ratio) * max_count;
     auto reassign_flags = raft::make_device_vector<uint8_t, IdxT>(handle, n_clusters);
 
@@ -289,7 +272,6 @@ void minibatch_update_centroids(raft::resources const& handle,
       },
       stream);
 
-    // Count how many clusters need reassignment using RAFT mapThenSumReduce
     auto num_reassign_scalar = raft::make_device_scalar<IdxT>(handle, IdxT{0});
     raft::linalg::mapThenSumReduce(num_reassign_scalar.data_handle(),
                                    n_clusters,
@@ -317,7 +299,6 @@ void minibatch_update_centroids(raft::resources const& handle,
                       thrust::device_pointer_cast(all_reassign_indices.data_handle()),
                       [] __device__(uint8_t flag) { return flag == 1; });
 
-      // Get counts for these clusters using RAFT matrix::gather
       auto reassign_counts = raft::make_device_vector<MathT, IdxT>(handle, num_to_reassign);
       auto total_counts_matrix_view =
         raft::make_device_matrix_view<const MathT, IdxT>(total_counts.data_handle(), n_clusters, 1);
@@ -333,7 +314,6 @@ void minibatch_update_centroids(raft::resources const& handle,
                           reassign_counts.data_handle() + num_to_reassign,
                           all_reassign_indices.data_handle());
 
-      // Reset all flags
       raft::matrix::fill(handle, reassign_flags.view(), uint8_t{0});
 
       // Set flags only for worst max_reassign clusters
@@ -341,7 +321,6 @@ void minibatch_update_centroids(raft::resources const& handle,
       raft::copy(
         worst_indices.data_handle(), all_reassign_indices.data_handle(), max_reassign, stream);
 
-      // Scatter flags: set reassign_flags[worst_indices[i]] = 1
       auto flags_scatter = raft::make_device_vector<uint8_t, IdxT>(handle, max_reassign);
       raft::matrix::fill(handle, flags_scatter.view(), uint8_t{1});
       thrust::scatter(raft::resource::get_thrust_policy(handle),
@@ -354,7 +333,7 @@ void minibatch_update_centroids(raft::resources const& handle,
     }
 
     if (num_to_reassign > 0) {
-      // Get list of cluster indices to reassign using thrust::copy_if
+      // Get list of cluster indices to reassign
       auto reassign_indices = raft::make_device_vector<IdxT, IdxT>(handle, num_to_reassign);
       auto counting_iter    = thrust::counting_iterator<IdxT>(0);
       thrust::device_ptr<uint8_t> flags_ptr(reassign_flags.data_handle());
@@ -366,7 +345,6 @@ void minibatch_update_centroids(raft::resources const& handle,
                       thrust::device_pointer_cast(reassign_indices.data_handle()),
                       [] __device__(uint8_t flag) { return flag == 1; });
 
-      // Verify actual count using RAFT (in case flags were modified)
       auto actual_count_scalar = raft::make_device_scalar<IdxT>(handle, IdxT{0});
       raft::linalg::mapThenSumReduce(actual_count_scalar.data_handle(),
                                      n_clusters,
@@ -397,7 +375,6 @@ void minibatch_update_centroids(raft::resources const& handle,
 
       std::vector<IdxT> new_center_indices(selected_indices.begin(), selected_indices.end());
 
-      // Update centroids for reassigned clusters (device-to-device copy from batch_data)
       for (IdxT i = 0; i < num_to_reassign; ++i) {
         IdxT cluster_idx = reassign_indices_host.data_handle()[i];
         IdxT sample_idx  = new_center_indices[i];
@@ -407,8 +384,8 @@ void minibatch_update_centroids(raft::resources const& handle,
                    stream);
       }
 
-      // Reset total_counts for reassigned clusters to min of non-reassigned clusters on device
-      // Find min of non-reassigned clusters on device
+      // Reset total_counts for reassigned clusters to min of non-reassigned clusters. Note that
+      // this will affect the learning rate directly.
       auto masked_counts      = raft::make_device_vector<MathT, IdxT>(handle, n_clusters);
       auto total_counts_ptr   = total_counts.data_handle();
       auto reassign_flags_ptr = reassign_flags.data_handle();
@@ -470,6 +447,10 @@ void minibatch_update_centroids(raft::resources const& handle,
  * @param[inout]  centroids     Initial/output cluster centers [n_clusters x n_features]
  * @param[out]    inertia       Sum of squared distances to nearest centroid
  * @param[out]    n_iter        Number of iterations run
+ *
+ * @note For mini-batch mode: When sample weights are provided, they are used as sampling
+ *       probabilities (normalized) to select minibatch samples. Unit weights are then passed
+ *       to the centroid update to avoid double weighting (matching scikit-learn's approach).
  */
 template <typename T, typename IdxT>
 void fit(raft::resources const& handle,
@@ -533,6 +514,9 @@ void fit(raft::resources const& handle,
                                          : raft::make_host_vector<IdxT, IdxT>(0);
   std::mt19937 rng(params.rng_state.seed);
   std::uniform_int_distribution<IdxT> uniform_dist(0, n_samples - 1);
+  // Weighted sampling: if sample weights are provided, use them as sampling probabilities.
+  // Since the sampling is weight-aware, we pass unit weights to the centroid update
+  // to avoid accounting for the weights twice (matching scikit-learn's approach).
   std::discrete_distribution<IdxT> weighted_dist;
   bool use_weighted_sampling = false;
   if (use_minibatch && sample_weight) {
@@ -552,6 +536,8 @@ void fit(raft::resources const& handle,
 
   if (use_minibatch) {
     raft::matrix::fill(handle, total_counts.view(), T{0});
+    // Fill once before the loop since batch_size is constant.
+    raft::matrix::fill(handle, batch_weights.view(), T{1});
     n_steps = (params.max_iter * n_samples) / batch_size;
   }
 
@@ -582,10 +568,6 @@ void fit(raft::resources const& handle,
                  host_batch_buffer.data_handle(),
                  current_batch_size * n_features,
                  stream);
-
-      auto batch_weights_view =
-        raft::make_device_vector_view<T, IdxT>(batch_weights.data_handle(), current_batch_size);
-      raft::matrix::fill(handle, batch_weights_view, T{1});
 
       auto batch_data_view = raft::make_device_matrix_view<const T, IdxT>(
         batch_data.data_handle(), current_batch_size, n_features);
@@ -734,7 +716,6 @@ void fit(raft::resources const& handle,
       raft::matrix::fill(handle, centroid_sums.view(), T{0});
       raft::matrix::fill(handle, cluster_counts.view(), T{0});
 
-      // Use centroids from start of iteration for all batches (must remain constant)
       auto centroids_const = raft::make_device_matrix_view<const T, IdxT>(
         centroids.data_handle(), n_clusters, n_features);
 
@@ -948,29 +929,24 @@ void predict(raft::resources const& handle,
                current_batch_size * n_features,
                stream);
 
-    std::optional<raft::device_vector_view<const T, IdxT>> batch_weight_view;
     if (sample_weight) {
       raft::copy(batch_weights.data_handle(),
                  sample_weight->data_handle() + batch_idx,
                  current_batch_size,
                  stream);
-      batch_weight_view = raft::make_device_vector_view<const T, IdxT>(batch_weights.data_handle(),
-                                                                       current_batch_size);
     }
 
     auto batch_data_view = raft::make_device_matrix_view<const T, IdxT>(
       batch_data.data_handle(), current_batch_size, n_features);
-    auto batch_labels_view =
-      raft::make_device_vector_view<IdxT, IdxT>(batch_labels.data_handle(), current_batch_size);
 
     T batch_inertia = 0;
     cuvs::cluster::kmeans::detail::kmeans_predict<T, IdxT>(
       handle,
       params,
       batch_data_view,
-      batch_weight_view,
+      batch_weights.view(),
       centroids,
-      batch_labels_view,
+      batch_labels.view(),
       normalize_weight,
       raft::make_host_scalar_view(&batch_inertia));
 
