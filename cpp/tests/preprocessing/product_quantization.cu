@@ -206,7 +206,7 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
                 d_vq_labels_view);
     }
 
-    // 1. Verify that the quantized output is not all zeros or NaNs
+    // 1. Verify that the quantized output is not all zeros
     {
       auto h_quantized_output =
         raft::make_host_matrix<uint8_t, int, raft::col_major>(n_samples_, n_encoded_cols);
@@ -216,18 +216,13 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
                         stream);
       raft::resource::sync_stream(handle, stream);
 
-      bool all_zeros = true;
-      bool has_nan   = false;
+      bool all_zeros       = true;
+      auto n_vecs_to_check = std::min(n_samples_, 50);
 
-      for (int i = 0; i < h_quantized_output.extent(0) * h_quantized_output.extent(1); i++) {
+      for (int i = 0; (i < n_vecs_to_check * h_quantized_output.extent(1)) && all_zeros; i++) {
         if (h_quantized_output.data_handle()[i] != 0) { all_zeros = false; }
-        if (std::isnan(h_quantized_output.data_handle()[i])) {
-          has_nan = true;
-          break;
-        }
       }
       ASSERT_FALSE(all_zeros) << "Quantized output contains all zeros";
-      ASSERT_FALSE(has_nan) << "Quantized output contains NaN values";
     }
 
     // 2. Verify that the quantized output is consistent with the input

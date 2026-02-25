@@ -5,7 +5,7 @@
 #pragma once
 
 #include "../../../core/nvtx.hpp"
-#include "../../vpq_dataset.cuh"
+#include "../../../preprocessing/quantize/vpq_build-ext.cuh"
 #include "graph_core.cuh"
 
 #include <raft/core/device_mdarray.hpp>
@@ -2283,8 +2283,7 @@ index<T, IdxT> build(
     idx.update_dataset(
       res,
       // TODO: hardcoding codebook math to `half`, we can do runtime dispatching later
-      cuvs::neighbors::vpq_build<decltype(dataset), half, int64_t>(
-        res, *params.compression, dataset));
+      cuvs::preprocessing::quantize::pq::vpq_build(res, *params.compression, dataset));
 
     return idx;
   }
