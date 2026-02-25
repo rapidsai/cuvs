@@ -16,7 +16,7 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-          
+
       - name: Download main baseline artifact
         uses: dawidd6/action-download-artifact@v3
         with:
@@ -24,51 +24,49 @@ jobs:
           workflow: check-c-abi.yaml
           branch: main
           path: baseline/
-          
+
       - name: Archive baseline with release version
         uses: actions/upload-artifact@v4
         with:
           name: c-abi-baseline-${{ github.event.release.tag_name || inputs.version }}
           path: baseline/c_abi.json.gz
           retention-days: 400  # ~13 months
-          
+
       - name: Commit baseline to repository (for long-term storage)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
+
           # Create a baselines branch if it doesn't exist
           git fetch origin baselines:baselines 2>/dev/null || git checkout --orphan baselines
           git checkout baselines 2>/dev/null || true
-          
+
           # Copy the baseline file with version name
           mkdir -p c-abi-baselines
           cp baseline/c_abi.json.gz c-abi-baselines/c_abi_${{ github.event.release.tag_name || inputs.version }}.json.gz
-          
+
           # Commit and push
           git add c-abi-baselines/
           git commit -m "Archive C ABI baseline for ${{ github.event.release.tag_name || inputs.version }}"
           git push origin baselines
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
+
       - name: Create release comment
         if: github.event_name == 'release'
         uses: actions/github-script@v7
         with:
           script: |
             const tagName = context.payload.release.tag_name;
-            
+
             github.rest.repos.createCommitComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               commit_sha: context.payload.release.target_commitish,
-              body: `✅ C ABI baseline archived for release ${tagName}
-
-This baseline has been archived from the main branch and will be available for historical reference.
-
-The baseline is stored in:
-- Artifact: \`c-abi-baseline-${tagName}\` (available for ~13 months)
-- Branch: \`baselines\` (permanent storage)
-`
+              body: |
+                `✅ C ABI baseline archived for release ${tagName}
+                 This baseline has been archived from the main branch and will be available for historical reference.
+                The baseline is stored in:
+                - Artifact: \`c-abi-baseline-${tagName}\` (available for ~13 months)
+                - Branch: \`baselines\` (permanent storage)`
             });
