@@ -68,8 +68,11 @@ option(CUVS_COMPILE_DYNAMIC_ONLY "Only build the shared library and skip the sta
 option(CUVS_NVTX "Enable nvtx markers" OFF)
 option(CUVS_RAFT_CLONE_ON_PIN "Explicitly clone RAFT branch when pinned to non-feature branch" ON)
 # Disabled by default: requires RAFT with lanczos_compute_eigenpairs. Set to ON if your RAFT has it.
-option(CUVS_BUILD_SPECTRAL_EMBEDDING
-       "Build spectral embedding and cluster spectral (requires RAFT with lanczos_compute_eigenpairs)" OFF)
+option(
+  CUVS_BUILD_SPECTRAL_EMBEDDING
+  "Build spectral embedding and cluster spectral (requires RAFT with lanczos_compute_eigenpairs)"
+  OFF
+)
 
 if(BUILD_CPU_ONLY)
   set(BUILD_SHARED_LIBS OFF)

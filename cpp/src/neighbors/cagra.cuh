@@ -289,8 +289,8 @@ index<T, IdxT> build(
  */
 template <typename T, typename IdxT>
 index<T, IdxT> build(raft::resources const& res,
-                    const index_params& params,
-                    cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& dataset)
+                     const index_params& params,
+                     cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& dataset)
 {
   auto idx = build<T, IdxT>(res, params, dataset.view());
   idx.update_dataset(res, cuvs::neighbors::device_padded_dataset_view<T, int64_t>(dataset));
@@ -302,8 +302,8 @@ index<T, IdxT> build(raft::resources const& res,
  */
 template <typename T, typename IdxT>
 index<T, IdxT> build(raft::resources const& res,
-                    const index_params& params,
-                    cuvs::neighbors::device_padded_dataset<T, int64_t>&& dataset)
+                     const index_params& params,
+                     cuvs::neighbors::device_padded_dataset<T, int64_t>&& dataset)
 {
   auto idx = build<T, IdxT>(res, params, dataset.view());
   idx.update_dataset(res, std::move(dataset));

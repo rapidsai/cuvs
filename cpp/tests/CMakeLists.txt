@@ -115,9 +115,8 @@ ConfigureTest(
   PERCENT 100
 )
 
-set(CLUSTER_TEST_SOURCES
-  cluster/kmeans.cu cluster/kmeans_balanced.cu cluster/kmeans_find_k.cu cluster/linkage.cu
-  cluster/connect_knn.cu
+set(CLUSTER_TEST_SOURCES cluster/kmeans.cu cluster/kmeans_balanced.cu cluster/kmeans_find_k.cu
+                         cluster/linkage.cu cluster/connect_knn.cu
 )
 if(CUVS_BUILD_SPECTRAL_EMBEDDING)
   list(APPEND CLUSTER_TEST_SOURCES cluster/spectral.cu)
@@ -262,8 +261,9 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/neighbors/cagra_padded_dataset.cu)
     GPUS 1
     PERCENT 100
   )
-  target_include_directories(NEIGHBORS_CAGRA_PADDED_DATASET_TEST
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+  target_include_directories(
+    NEIGHBORS_CAGRA_PADDED_DATASET_TEST PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src
+  )
 endif()
 
 ConfigureTest(
@@ -371,8 +371,8 @@ ConfigureTest(
   PERCENT 100
 )
 
-set(PREPROCESSING_TEST_SOURCES
-  preprocessing/scalar_quantization.cu preprocessing/binary_quantization.cu
+set(PREPROCESSING_TEST_SOURCES preprocessing/scalar_quantization.cu
+                               preprocessing/binary_quantization.cu
 )
 if(CUVS_BUILD_SPECTRAL_EMBEDDING)
   list(APPEND PREPROCESSING_TEST_SOURCES preprocessing/spectral_embedding.cu)

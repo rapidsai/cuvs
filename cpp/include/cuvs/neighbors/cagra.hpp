@@ -372,10 +372,7 @@ struct index : cuvs::neighbors::index {
     auto p_padded = dynamic_cast<device_padded_dataset<T, int64_t>*>(dataset_.get());
     if (p_padded != nullptr) {
       return raft::make_device_strided_matrix_view<const T, int64_t>(
-        p_padded->view().data_handle(),
-        p_padded->n_rows(),
-        p_padded->dim(),
-        p_padded->stride());
+        p_padded->view().data_handle(), p_padded->n_rows(), p_padded->dim(), p_padded->stride());
     }
     auto d = dataset_->dim();
     return raft::make_device_strided_matrix_view<const T, int64_t>(nullptr, 0, d, d);
@@ -587,7 +584,7 @@ struct index : cuvs::neighbors::index {
 
   /** Replace the dataset with a non-owning padded view (stores a copy of the view). */
   void update_dataset(raft::resources const& res,
-                     device_padded_dataset_view<T, int64_t> const& dataset)
+                      device_padded_dataset_view<T, int64_t> const& dataset)
   {
     dataset_ = std::make_unique<device_padded_dataset_view<T, int64_t>>(dataset);
     dataset_norms_.reset();

@@ -18,10 +18,10 @@
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/common.hpp>
+#include <gtest/gtest.h>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_resources.hpp>
 #include <raft/random/rng.cuh>
-#include <gtest/gtest.h>
 #include <rmm/device_uvector.hpp>
 
 namespace cuvs::neighbors::test {
@@ -71,16 +71,16 @@ TEST(DatasetCompression, VpqBuildSearchRecall)
 
   // 3. Build CAGRA with VPQ compression (trains codebooks, encodes data, index holds vpq_dataset)
   cagra::index_params build_params;
-  build_params.metric = cuvs::distance::DistanceType::L2Expanded;
-  build_params.graph_build_params =
-    cagra::graph_build_params::ivf_pq_params(raft::matrix_extent<int64_t>(n_rows, dim), build_params.metric);
-  build_params.compression = cuvs::neighbors::vpq_params{};
-  build_params.compression->pq_bits   = 8;
-  build_params.compression->pq_dim    = dim / 2;  // 16 subspaces of length 2
+  build_params.metric             = cuvs::distance::DistanceType::L2Expanded;
+  build_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
+    raft::matrix_extent<int64_t>(n_rows, dim), build_params.metric);
+  build_params.compression               = cuvs::neighbors::vpq_params{};
+  build_params.compression->pq_bits      = 8;
+  build_params.compression->pq_dim       = dim / 2;  // 16 subspaces of length 2
   build_params.compression->vq_n_centers = 64;
 
-  auto database_view = raft::make_device_matrix_view<const float, int64_t>(
-    database.data(), n_rows, dim);
+  auto database_view =
+    raft::make_device_matrix_view<const float, int64_t>(database.data(), n_rows, dim);
   cagra::index<float, uint32_t> index = cagra::build(res, build_params, database_view);
 
   // 4. Search on the compressed index (uses vpq_dataset for distance computation)
@@ -89,7 +89,8 @@ TEST(DatasetCompression, VpqBuildSearchRecall)
   cagra::search_params sp;
   sp.algo = cagra::search_algo::AUTO;
 
-  auto queries_view = raft::make_device_matrix_view<const float, int64_t>(queries.data(), n_queries, dim);
+  auto queries_view =
+    raft::make_device_matrix_view<const float, int64_t>(queries.data(), n_queries, dim);
   auto indices_out_view =
     raft::make_device_matrix_view<int64_t, int64_t>(indices_cagra_dev.data(), n_queries, k);
   auto dists_out_view =

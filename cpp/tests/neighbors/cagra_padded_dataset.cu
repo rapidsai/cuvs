@@ -1,4 +1,9 @@
 /*
+ * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/*
  * Tests that CAGRA build and search work with device_padded_dataset and
  * device_padded_dataset_view. Includes the CAGRA implementation so the test
  * binary provides the padded build overload symbols regardless of which
@@ -7,14 +12,13 @@
 
 #include "ann_utils.cuh"
 #include "naive_knn.cuh"
-#include "neighbors/cagra.cuh"
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/common.hpp>
+#include <gtest/gtest.h>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_resources.hpp>
 #include <raft/random/rng.cuh>
-#include <gtest/gtest.h>
 #include <rmm/device_uvector.hpp>
 
 namespace cuvs::neighbors::test {
@@ -61,13 +65,13 @@ TEST(CagraPaddedDataset, PaddedDatasetViewBuildSearchRecall)
   raft::resource::sync_stream(res);
 
   cagra::index_params build_params;
-  build_params.metric = cuvs::distance::DistanceType::L2Expanded;
-  build_params.graph_build_params =
-    cagra::graph_build_params::ivf_pq_params(raft::matrix_extent<int64_t>(n_rows, dim), build_params.metric);
+  build_params.metric             = cuvs::distance::DistanceType::L2Expanded;
+  build_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
+    raft::matrix_extent<int64_t>(n_rows, dim), build_params.metric);
 
   // Build from device_padded_dataset_view (dim=32 -> stride=32 is valid for alignment)
-  auto padded_view = cuvs::neighbors::make_device_padded_dataset_view<float>(
-    database.data(), n_rows, dim);
+  auto padded_view =
+    cuvs::neighbors::make_device_padded_dataset_view<float>(database.data(), n_rows, dim);
   ASSERT_NE(padded_view, nullptr);
   cagra::index<float, uint32_t> index = cagra::build(res, build_params, *padded_view);
 
@@ -141,14 +145,13 @@ TEST(CagraPaddedDataset, PaddedDatasetBuildSearchRecall)
 
   auto ds_ptr = cuvs::neighbors::make_device_padded_dataset<float>(res, n_rows, dim);
   ASSERT_NE(ds_ptr, nullptr);
-  raft::copy(
-    ds_ptr->data_handle(), database.data(), static_cast<size_t>(n_rows * dim), stream);
+  raft::copy(ds_ptr->data_handle(), database.data(), static_cast<size_t>(n_rows * dim), stream);
   raft::resource::sync_stream(res);
 
   cagra::index_params build_params;
-  build_params.metric = cuvs::distance::DistanceType::L2Expanded;
-  build_params.graph_build_params =
-    cagra::graph_build_params::ivf_pq_params(raft::matrix_extent<int64_t>(n_rows, dim), build_params.metric);
+  build_params.metric             = cuvs::distance::DistanceType::L2Expanded;
+  build_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
+    raft::matrix_extent<int64_t>(n_rows, dim), build_params.metric);
 
   cagra::index<float, uint32_t> index = cagra::build(res, build_params, std::move(*ds_ptr));
 

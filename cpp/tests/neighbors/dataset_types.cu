@@ -11,12 +11,12 @@
  */
 
 #include <cuvs/neighbors/common.hpp>
+#include <exception>
+#include <gtest/gtest.h>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_resources.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/util/cudart_utils.hpp>
-#include <exception>
-#include <gtest/gtest.h>
 
 namespace cuvs::neighbors::test {
 
@@ -69,10 +69,12 @@ TEST(DatasetTypes, TypeTraits)
   EXPECT_TRUE((is_strided_dataset_v<non_owning_float_i64>));
   EXPECT_FALSE((is_strided_dataset_v<empty_dataset<int64_t>>));
   EXPECT_FALSE((is_strided_dataset_v<vpq_float_i64>));
-  // EXPECT_FALSE((is_strided_dataset_v<pq_dataset<float, int64_t>>));  // TODO: enable when pq_dataset is in common.hpp
+  // EXPECT_FALSE((is_strided_dataset_v<pq_dataset<float, int64_t>>));  // TODO: enable when
+  // pq_dataset is in common.hpp
 
   EXPECT_TRUE((is_vpq_dataset_v<vpq_float_i64>));
-  // EXPECT_FALSE((is_vpq_dataset_v<pq_dataset<float, int64_t>>));  // TODO: enable when pq_dataset is in common.hpp
+  // EXPECT_FALSE((is_vpq_dataset_v<pq_dataset<float, int64_t>>));  // TODO: enable when pq_dataset
+  // is in common.hpp
   EXPECT_FALSE((is_vpq_dataset_v<strided_float_i64>));
 
   // TODO: enable when pq_dataset is in common.hpp
@@ -163,8 +165,8 @@ TEST(DatasetTypes, MakeAlignedDatasetOwningWhenPadded)
   ASSERT_NE(ds, nullptr);
   EXPECT_EQ(ds->n_rows(), n_rows);
   EXPECT_EQ(ds->dim(), dim);
-  EXPECT_GE(ds->stride(), dim);   // stride will be 32 (rounded up from 30)
-  EXPECT_TRUE(ds->is_owning());   // stride mismatch -> copy with padding
+  EXPECT_GE(ds->stride(), dim);  // stride will be 32 (rounded up from 30)
+  EXPECT_TRUE(ds->is_owning());  // stride mismatch -> copy with padding
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +228,7 @@ TEST(DatasetTypes, HostPaddedDataset)
 {
   raft::resources res;
   const int64_t n_rows = 30;
-  const uint32_t dim  = 12;
+  const uint32_t dim   = 12;
 
   auto ds = make_host_padded_dataset<float>(res, n_rows, dim);
   ASSERT_NE(ds, nullptr);
@@ -259,16 +261,15 @@ TEST(DatasetTypes, HostPaddedDatasetView)
   EXPECT_EQ(v.extent(1), dim);
 }
 
-// 3-arg view throws when stride != required_stride. For stride=30, float, align=16: required_stride=32.
+// 3-arg view throws when stride != required_stride. For stride=30, float, align=16:
+// required_stride=32.
 TEST(DatasetTypes, PaddedDatasetViewFailsWhenStrideNotRequiredStride)
 {
   raft::resources res;
   const int64_t n_rows = 10;
-  auto host_matrix = raft::make_host_matrix<float, int64_t>(res, n_rows, 32u);
+  auto host_matrix     = raft::make_host_matrix<float, int64_t>(res, n_rows, 32u);
   EXPECT_THROW(
-    {
-      (void)make_host_padded_dataset_view(host_matrix.data_handle(), n_rows, 30u);
-    },
+    { (void)make_host_padded_dataset_view(host_matrix.data_handle(), n_rows, 30u); },
     std::exception);
 }
 
@@ -286,15 +287,12 @@ TEST(DatasetTypes, VpqDataset)
   const int64_t n_rows        = 10;
   const uint32_t pq_dim       = dim / pq_len;  // 4
 
-  auto vq_code_book =
-    raft::make_device_matrix<float, uint32_t>(res, vq_n_centers, dim);
-  auto pq_code_book =
-    raft::make_device_matrix<float, uint32_t>(res, pq_n_centers, pq_len);
-  auto data = raft::make_device_matrix<uint8_t, int64_t>(res, n_rows, pq_dim);
+  auto vq_code_book = raft::make_device_matrix<float, uint32_t>(res, vq_n_centers, dim);
+  auto pq_code_book = raft::make_device_matrix<float, uint32_t>(res, pq_n_centers, pq_len);
+  auto data         = raft::make_device_matrix<uint8_t, int64_t>(res, n_rows, pq_dim);
 
-  vpq_dataset<float, int64_t> vpq(std::move(vq_code_book),
-                                  std::move(pq_code_book),
-                                  std::move(data));
+  vpq_dataset<float, int64_t> vpq(
+    std::move(vq_code_book), std::move(pq_code_book), std::move(data));
 
   EXPECT_EQ(vpq.n_rows(), n_rows);
   EXPECT_EQ(vpq.dim(), dim);
@@ -353,21 +351,21 @@ TEST(DatasetTypes, PolymorphicBaseAccess)
   // strided (owning)
   auto dev_matrix = raft::make_device_matrix<float, int64_t>(res, 5, 8);
   auto ds_strided = make_strided_dataset(res, dev_matrix.view(), 16u);
-  base = ds_strided.get();
+  base            = ds_strided.get();
   EXPECT_EQ(base->n_rows(), 5);
   EXPECT_EQ(base->dim(), 8u);
   EXPECT_TRUE(base->is_owning());
 
   // device padded (owning); use int64_t so base (dataset<int64_t>*) is compatible
   auto ds_padded = make_device_padded_dataset<float, int64_t>(res, 6, 4);
-  base = ds_padded.get();
+  base           = ds_padded.get();
   EXPECT_EQ(base->n_rows(), 6);
   EXPECT_EQ(base->dim(), 4u);
   EXPECT_TRUE(base->is_owning());
 
   // vpq
-  auto vq   = raft::make_device_matrix<float, uint32_t>(res, 2, 4);
-  auto pq   = raft::make_device_matrix<float, uint32_t>(res, 256, 2);
+  auto vq       = raft::make_device_matrix<float, uint32_t>(res, 2, 4);
+  auto pq       = raft::make_device_matrix<float, uint32_t>(res, 256, 2);
   auto vpq_data = raft::make_device_matrix<uint8_t, int64_t>(res, 3, 2);
   vpq_dataset<float, int64_t> vpq(std::move(vq), std::move(pq), std::move(vpq_data));
   base = &vpq;

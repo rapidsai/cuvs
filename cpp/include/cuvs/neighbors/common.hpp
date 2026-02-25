@@ -236,10 +236,10 @@ inline constexpr bool is_strided_dataset_v = is_strided_dataset<DatasetT>::value
 /** Device padded dataset (owning): row-major matrix with optional row padding. */
 template <typename DataT, typename IdxT>
 struct device_padded_dataset : public dataset<IdxT> {
-  using index_type = IdxT;
-  using value_type = DataT;
+  using index_type   = IdxT;
+  using value_type   = DataT;
   using storage_type = raft::device_matrix<value_type, index_type, raft::row_major>;
-  using view_type   = raft::device_matrix_view<const value_type, index_type, raft::row_major>;
+  using view_type    = raft::device_matrix_view<const value_type, index_type, raft::row_major>;
 
   storage_type data_;
   uint32_t dim_;  // logical dimension (number of columns); data_.extent(1) is stride
@@ -276,7 +276,9 @@ struct device_padded_dataset_view : public dataset<IdxT> {
 
   explicit device_padded_dataset_view(view_type v) noexcept : data_{v} {}
 
-  device_padded_dataset_view(device_padded_dataset_view const& other) noexcept : data_{other.data_} {}
+  device_padded_dataset_view(device_padded_dataset_view const& other) noexcept : data_{other.data_}
+  {
+  }
 
   [[nodiscard]] auto n_rows() const noexcept -> index_type final { return data_.extent(0); }
   [[nodiscard]] auto dim() const noexcept -> uint32_t final
@@ -294,10 +296,10 @@ struct device_padded_dataset_view : public dataset<IdxT> {
 /** Host padded dataset (owning). */
 template <typename DataT, typename IdxT>
 struct host_padded_dataset : public dataset<IdxT> {
-  using index_type = IdxT;
-  using value_type = DataT;
+  using index_type   = IdxT;
+  using value_type   = DataT;
   using storage_type = raft::host_matrix<value_type, index_type, raft::row_major>;
-  using view_type   = raft::host_matrix_view<const value_type, index_type, raft::row_major>;
+  using view_type    = raft::host_matrix_view<const value_type, index_type, raft::row_major>;
 
   storage_type data_;
   uint32_t dim_;
@@ -391,9 +393,8 @@ auto make_device_padded_dataset_view(const DataT* ptr, IdxT n_rows, uint32_t str
 {
   constexpr uint32_t kAlignBytes = 16u;
   constexpr size_t kSize         = sizeof(DataT);
-  uint32_t required_stride =
-    static_cast<uint32_t>(raft::round_up_safe<size_t>(stride * kSize, std::lcm(kAlignBytes, kSize)) /
-                          kSize);
+  uint32_t required_stride       = static_cast<uint32_t>(
+    raft::round_up_safe<size_t>(stride * kSize, std::lcm(kAlignBytes, kSize)) / kSize);
   RAFT_EXPECTS(stride == required_stride,
                "stride must equal required stride for alignment (e.g. dim=30 needs stride=32); "
                "use make_device_padded_dataset for an owning aligned copy.");
@@ -426,9 +427,8 @@ auto make_host_padded_dataset_view(const DataT* ptr, IdxT n_rows, uint32_t strid
 {
   constexpr uint32_t kAlignBytes = 16u;
   constexpr size_t kSize         = sizeof(DataT);
-  uint32_t required_stride =
-    static_cast<uint32_t>(raft::round_up_safe<size_t>(stride * kSize, std::lcm(kAlignBytes, kSize)) /
-                          kSize);
+  uint32_t required_stride       = static_cast<uint32_t>(
+    raft::round_up_safe<size_t>(stride * kSize, std::lcm(kAlignBytes, kSize)) / kSize);
   RAFT_EXPECTS(stride == required_stride,
                "stride must equal required stride for alignment (e.g. dim=30 needs stride=32); "
                "use make_host_padded_dataset for an owning aligned copy.");
