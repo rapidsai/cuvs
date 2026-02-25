@@ -14,13 +14,13 @@
 #include <rmm/device_uvector.hpp>
 
 #include <cuda/iterator>
+#include <cuda/std/functional>
 #include <cuda/std/tuple>
 #include <thrust/device_ptr.h>
 #include <thrust/execution_policy.h>
 #include <thrust/extrema.h>
 #include <thrust/fill.h>
 #include <thrust/for_each.h>
-#include <thrust/functional.h>
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/sort.h>
 
@@ -282,7 +282,7 @@ void extract_flattened_clusters(raft::resources const& handle,
     thrust::sort(thrust_policy,
                  label_roots.data(),
                  label_roots.data() + (child_size),
-                 thrust::greater<value_idx>());
+                 cuda::std::greater<value_idx>());
 
     rmm::device_uvector<value_idx> tmp_labels(n_vertices, stream);
 
