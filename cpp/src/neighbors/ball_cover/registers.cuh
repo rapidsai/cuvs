@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,6 +17,7 @@
 #include <raft/linalg/unary_op.cuh>
 #include <raft/util/cuda_utils.cuh>
 
+#include <cuda/functional>
 #include <thrust/count.h>
 #include <thrust/fill.h>
 #include <thrust/scan.h>
@@ -1444,7 +1445,7 @@ void rbc_eps_pass(raft::resources const& handle,
                                         vd_ptr,
                                         vd_ptr + n_query_rows,
                                         (value_idx)0,
-                                        thrust::maximum<value_idx>());
+                                        cuda::maximum<value_idx>());
 
     if (actual_max > max_k_in) {
       // ceil vd to max_k
