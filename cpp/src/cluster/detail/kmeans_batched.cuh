@@ -7,9 +7,9 @@
 #include "kmeans.cuh"
 #include "kmeans_common.cuh"
 
+#include "../../neighbors/detail/ann_utils.cuh"
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/distance/distance.hpp>
-#include <cuvs/neighbors/detail/ann_utils.cuh>
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/host_mdarray.hpp>

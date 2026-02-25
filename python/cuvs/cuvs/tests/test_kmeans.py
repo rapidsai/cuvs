@@ -155,16 +155,19 @@ def test_minibatch_sklearn(n_rows, n_cols, n_clusters, dtype):
     kmeans.fit(X_host)
 
     centroids_sklearn = kmeans.cluster_centers_
+    inertia_sklearn = kmeans.inertia_
 
     # cuvs fit
     params = KMeansParams(
         n_clusters=n_clusters,
         init_method="Array",
-        max_iter=200,
+        max_iter=100,
         tol=1e-4,
         update_mode="mini_batch",
+        final_inertia_check=True,
+        max_no_improvement=10,
     )
-    centroids_cuvs, _, _ = fit_batched(
+    centroids_cuvs, inertia_cuvs, _ = fit_batched(
         params,
         X_host,
         batch_size=256,
@@ -172,6 +175,12 @@ def test_minibatch_sklearn(n_rows, n_cols, n_clusters, dtype):
     )
     centroids_cuvs = centroids_cuvs.copy_to_host()
 
+    # Compare centroids
     assert np.allclose(
         centroids_sklearn, centroids_cuvs, rtol=0.3, atol=0.3
     ), f"max diff: {np.max(np.abs(centroids_sklearn - centroids_cuvs))}"
+
+    inertia_diff = abs(inertia_sklearn - inertia_cuvs)
+    assert np.allclose(
+        inertia_sklearn, inertia_cuvs, rtol=0.1, atol=0.1
+    ), f"inertia diff: sklearn={inertia_sklearn}, cuvs={inertia_cuvs}, diff={inertia_diff}"
