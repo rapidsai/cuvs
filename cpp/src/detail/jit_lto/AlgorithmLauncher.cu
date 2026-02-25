@@ -41,6 +41,7 @@ void AlgorithmLauncher::call(
   config.blockDim         = block;
   config.stream           = stream;
   config.dynamicSmemBytes = shared_mem;
+  config.numAttrs         = 0;
 
   RAFT_CUDA_TRY(cudaLaunchKernelExC(&config, kernel, kernel_args));
 }
@@ -48,11 +49,17 @@ void AlgorithmLauncher::call(
 void AlgorithmLauncher::call_cooperative(
   cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, void** kernel_args)
 {
+  cudaLaunchAttribute attribute[1];
+  attribute[0].id              = cudaLaunchAttributeCooperative;
+  attribute[0].val.cooperative = 1;
+
   cudaLaunchConfig_t config;
   config.gridDim          = grid;
   config.blockDim         = block;
   config.stream           = stream;
   config.dynamicSmemBytes = shared_mem;
+  config.numAttrs         = 1;
+  config.attrs            = attribute;
 
   RAFT_CUDA_TRY(cudaLaunchKernelExC(&config, kernel, kernel_args));
 }
