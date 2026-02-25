@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -13,7 +13,7 @@ namespace {
 __attribute__((__constructor__)) void register_kernel()
 {
   registerAlgorithm(
-    "@filter_name@",
+    "sample_filter_@filter_name@_source_index_@source_index_abbrev@",
     embedded_fatbin,
     sizeof(embedded_fatbin));
 }

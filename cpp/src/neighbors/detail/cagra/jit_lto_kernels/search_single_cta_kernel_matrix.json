@@ -67,21 +67,21 @@
     "_topk_by_bitonic": [
       {
         "topk_by_bitonic_sort": "true",
-        "topk_by_bitonic_sort_str": "true"
+        "topk_by_bitonic_sort_str": "topk_by_bitonic_sort"
       },
       {
         "topk_by_bitonic_sort": "false",
-        "topk_by_bitonic_sort_str": "false"
+        "topk_by_bitonic_sort_str": "no_topk_by_bitonic_sort"
       }
     ],
     "_bitonic_sort_and_merge_multi_warps": [
       {
         "bitonic_sort_and_merge_multi_warps": "true",
-        "bitonic_sort_and_merge_multi_warps_str": "true"
+        "bitonic_sort_and_merge_multi_warps_str": "topk_by_bitonic_sort"
       },
       {
         "bitonic_sort_and_merge_multi_warps": "false",
-        "bitonic_sort_and_merge_multi_warps_str": "false"
+        "bitonic_sort_and_merge_multi_warps_str": "no_topk_by_bitonic_sort"
       }
     ],
     "team_size": [
@@ -155,21 +155,21 @@
     "_topk_by_bitonic": [
       {
         "topk_by_bitonic_sort": "true",
-        "topk_by_bitonic_sort_str": "true"
+        "topk_by_bitonic_sort_str": "topk_by_bitonic_sort"
       },
       {
         "topk_by_bitonic_sort": "false",
-        "topk_by_bitonic_sort_str": "false"
+        "topk_by_bitonic_sort_str": "no_topk_by_bitonic_sort"
       }
     ],
     "_bitonic_sort_and_merge_multi_warps": [
       {
         "bitonic_sort_and_merge_multi_warps": "true",
-        "bitonic_sort_and_merge_multi_warps_str": "true"
+        "bitonic_sort_and_merge_multi_warps_str": "bitonic_sort_and_merge_multi_warps"
       },
       {
         "bitonic_sort_and_merge_multi_warps": "false",
-        "bitonic_sort_and_merge_multi_warps_str": "false"
+        "bitonic_sort_and_merge_multi_warps_str": "no_bitonic_sort_and_merge_multi_warps"
       }
     ],
     "team_size": [

@@ -1,11 +1,9 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) @year@, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 // This file is auto-generated. Do not edit manually.
-
-#ifdef BUILD_KERNEL
 
 #include <neighbors/detail/cagra/jit_lto_kernels/search_multi_kernel_jit.cuh>
 
@@ -20,24 +18,3 @@ template __global__ void random_pickup_kernel_jit<@team_size@, @dataset_block_di
     cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<@data_type@, @index_type@, @distance_type@>*, const @data_type@* const, const std::size_t, const unsigned, const uint64_t, const @index_type@*, const std::uint32_t, @index_type@* const, @distance_type@* const, const std::uint32_t, @index_type@* const, const std::uint32_t);
 
 }  // namespace cuvs::neighbors::cagra::detail::multi_kernel_search
-
-#else
-
-#include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
-#include <cuvs/detail/jit_lto/registration_tags.hpp>
-#include "random_pickup_kernel@pq_prefix@_t@team_size@_dim@dataset_block_dim@@pq_suffix@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@query_type_abbrev@.h"
-
-using namespace cuvs::neighbors::cagra::detail;
-
-__attribute__((__constructor__)) static void register_random_pickup_kernel@pq_prefix@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@()
-{
-  registerAlgorithm<tag_@type_abbrev@,
-    tag_idx_@idx_abbrev@,
-    tag_dist_@dist_abbrev@,
-    tag_idx_@idx_abbrev@@codebook_tag@>(
-    "random_pickup_kernel@pq_prefix@_t@team_size@_dim@dataset_block_dim@@pq_suffix@",
-    embedded_random_pickup_kernel@pq_prefix@_t@team_size@_dim@dataset_block_dim@@pq_suffix@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@query_type_abbrev@,
-    sizeof(embedded_random_pickup_kernel@pq_prefix@_t@team_size@_dim@dataset_block_dim@@pq_suffix@_@type_abbrev@_@idx_abbrev@_@dist_abbrev@_@query_type_abbrev@));
-}
-
-#endif

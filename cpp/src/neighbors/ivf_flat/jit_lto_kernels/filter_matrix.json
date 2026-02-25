@@ -2,11 +2,20 @@
   "_filter": [
     {
       "filter_name": "filter_none",
-      "header_file": "neighbors/ivf_flat/jit_lto_kernels/filter_none.cuh"
+      "header_file": "neighbors/detail/jit_lto_kernels/filter_none.cuh"
     },
     {
       "filter_name": "filter_bitset",
-      "header_file": "neighbors/ivf_flat/jit_lto_kernels/filter_bitset.cuh"
+      "header_file": "neighbors/detail/jit_lto_kernels/filter_bitset.cuh"
     }
+  ],
+  "_source_index": [
+    {
+      "source_index_type": "int64_t",
+      "source_index_abbrev": "l"
+    }
+  ],
+  "namespace": [
+    "cuvs::neighbors::detail"
   ]
 }

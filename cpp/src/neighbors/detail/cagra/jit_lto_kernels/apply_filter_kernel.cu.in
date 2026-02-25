@@ -1,11 +1,9 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) @year@, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 // This file is auto-generated. Do not edit manually.
-
-#ifdef BUILD_KERNEL
 
 #include <neighbors/detail/cagra/jit_lto_kernels/search_multi_kernel_jit.cuh>
 
@@ -16,23 +14,3 @@ template __global__ void apply_filter_kernel_jit<@index_type@, @distance_type@, 
     const @source_index_type@* const, @index_type@* const, @distance_type@* const, const std::size_t, const std::uint32_t, const std::uint32_t, const @index_type@, uint32_t*, @source_index_type@, @source_index_type@);
 
 }  // namespace cuvs::neighbors::cagra::detail::multi_kernel_search
-
-#else
-
-#include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
-#include <cuvs/detail/jit_lto/registration_tags.hpp>
-#include "apply_filter_kernel_@idx_abbrev@_@dist_abbrev@_@src_idx_abbrev@.h"
-
-using namespace cuvs::neighbors::cagra::detail;
-
-__attribute__((__constructor__)) static void register_apply_filter_kernel_@idx_abbrev@_@dist_abbrev@_@src_idx_abbrev@()
-{
-  registerAlgorithm<tag_idx_@idx_abbrev@,
-    tag_dist_@dist_abbrev@,
-    tag_idx_@src_idx_abbrev@>(
-    "apply_filter_kernel",
-    embedded_apply_filter_kernel_@idx_abbrev@_@dist_abbrev@_@src_idx_abbrev@,
-    sizeof(embedded_apply_filter_kernel_@idx_abbrev@_@dist_abbrev@_@src_idx_abbrev@));
-}
-
-#endif
