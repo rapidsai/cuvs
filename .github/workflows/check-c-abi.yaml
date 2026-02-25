@@ -201,31 +201,29 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: `## ⚠️ C ABI Breaking Changes Detected
+                This PR introduces breaking changes to the C ABI. Please review the changes carefully.
 
-This PR introduces breaking changes to the C ABI. Please review the changes carefully.
+                Breaking ABI changes are only allowed in major releases. If this is intentional for a major release,
+                the baseline ABI will need to be updated after merge.
 
-Breaking ABI changes are only allowed in major releases. If this is intentional for a major release,
-the baseline ABI will need to be updated after merge.
+                See the job logs for details on what specific changes were detected.
 
-See the job logs for details on what specific changes were detected.
+                ### What are breaking ABI changes?
 
-### What are breaking ABI changes?
+                Breaking ABI changes include:
+                - Removing functions from the public API
+                - Changing function signatures (parameters or return types)
+                - Removing struct members or changing their types
+                - Removing or changing enum values
 
-Breaking ABI changes include:
-- Removing functions from the public API
-- Changing function signatures (parameters or return types)
-- Removing struct members or changing their types
-- Removing or changing enum values
+                ### Next steps
 
-### Next steps
+                1. Review the changes flagged in the CI logs
+                2. If these changes are unintentional, update your PR to maintain ABI compatibility
+                3. If these changes are required, ensure:
+                   - This is part of a major version release
+                   - The changes are documented in the changelog
+                   - Migration guide is provided for users
 
-1. Review the changes flagged in the CI logs
-2. If these changes are unintentional, update your PR to maintain ABI compatibility
-3. If these changes are required, ensure:
-   - This is part of a major version release
-   - The changes are documented in the changelog
-   - Migration guide is provided for users
-
-For more information, see the [C ABI documentation](../docs/source/c_developer_guide.md).
-`
+                For more information, see the [C ABI documentation](../docs/source/c_developer_guide.md).`
             });
