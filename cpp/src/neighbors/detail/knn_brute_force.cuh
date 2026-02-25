@@ -37,10 +37,11 @@
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/popc.cuh>
 
+#include <cuda/iterator>
 #include <cuda_fp16.h>
 #include <rmm/cuda_device.hpp>
 #include <rmm/device_uvector.hpp>
-#include <thrust/iterator/transform_iterator.h>
+#include <thrust/for_each.h>
 
 #include <cstdint>
 #include <iostream>
@@ -110,20 +111,33 @@ void tiled_brute_force_knn(const raft::resources& handle,
     // cosine needs the l2norm, where as l2 distances needs the squared norm
     if (metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (!precomputed_search_norms) {
-        raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
-          search_norms.data(), search, d, m, stream, raft::sqrt_op{});
+        raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+          handle,
+          raft::make_device_matrix_view<const ElementType, IndexType, raft::row_major>(
+            search, m, d),
+          raft::make_device_vector_view<DistanceT, IndexType>(search_norms.data(), m),
+          raft::sqrt_op{});
       }
       if (!precomputed_index_norms) {
-        raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
-          index_norms.data(), index, d, n, stream, raft::sqrt_op{});
+        raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+          handle,
+          raft::make_device_matrix_view<const ElementType, IndexType, raft::row_major>(index, n, d),
+          raft::make_device_vector_view<DistanceT, IndexType>(index_norms.data(), n),
+          raft::sqrt_op{});
       }
     } else {
       if (!precomputed_search_norms) {
-        raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
-          search_norms.data(), search, d, m, stream);
+        raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+          handle,
+          raft::make_device_matrix_view<const ElementType, IndexType, raft::row_major>(
+            search, m, d),
+          raft::make_device_vector_view<DistanceT, IndexType>(search_norms.data(), m));
       }
       if (!precomputed_index_norms) {
-        raft::linalg::rowNorm<raft::linalg::L2Norm, true>(index_norms.data(), index, d, n, stream);
+        raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+          handle,
+          raft::make_device_matrix_view<const ElementType, IndexType, raft::row_major>(index, n, d),
+          raft::make_device_vector_view<DistanceT, IndexType>(index_norms.data(), n));
       }
     }
     pairwise_metric = cuvs::distance::DistanceType::InnerProduct;
@@ -226,7 +240,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
       }
 
       auto distances_ptr        = temp_distances.data();
-      auto count                = thrust::make_counting_iterator<IndexType>(0);
+      auto count                = cuda::make_counting_iterator<IndexType>(0);
       DistanceT masked_distance = select_min ? std::numeric_limits<DistanceT>::infinity()
                                              : std::numeric_limits<DistanceT>::lowest();
 
@@ -276,7 +290,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
         DistanceT* out_distances      = temp_out_distances.data();
         IndexType* out_indices        = temp_out_indices.data();
 
-        auto count = thrust::make_counting_iterator<IndexType>(0);
+        auto count = cuda::make_counting_iterator<IndexType>(0);
         thrust::for_each(raft::resource::get_thrust_policy(handle),
                          count,
                          count + current_query_size * current_k,
@@ -376,7 +390,9 @@ void brute_force_knn_impl(
   rmm::device_uvector<IdxType> trans(0, userStream);
   if (id_ranges.size() > 0) {
     trans.resize(id_ranges.size(), userStream);
-    raft::update_device(trans.data(), id_ranges.data(), id_ranges.size(), userStream);
+    raft::copy(handle,
+               raft::make_device_vector_view(trans.data(), id_ranges.size()),
+               raft::make_host_vector_view(id_ranges.data(), id_ranges.size()));
   }
 
   rmm::device_uvector<DistType> all_D(0, userStream);
@@ -454,12 +470,12 @@ void brute_force_knn_impl(
           metric == cuvs::distance::DistanceType::LpUnexpanded) {
         DistType p = 0.5;  // standard l2
         if (metric == cuvs::distance::DistanceType::LpUnexpanded) p = 1.0 / metricArg;
-        raft::linalg::unaryOp<DistType>(
-          res_D,
-          res_D,
-          n * k,
+        raft::linalg::map(
+          handle,
+          raft::make_device_vector_view<DistType, int64_t>(res_D, n * k),
           [p] __device__(DistType input) { return powf(fabsf(input), p); },
-          stream);
+          raft::make_const_mdspan(
+            raft::make_device_vector_view<const DistType, int64_t>(res_D, n * k)));
       }
     } else {
       switch (metric) {
@@ -681,24 +697,21 @@ void brute_force_search_filtered(
       if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         if (!query_norms) {
           query_norms_ = raft::make_device_vector<DistanceT, IdxT>(res, n_queries);
-          raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
-            (DistanceT*)(query_norms_->data_handle()),
-            queries.data_handle(),
-            dim,
-            n_queries,
-            stream,
+          raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+            res,
+            raft::make_device_matrix_view<const T, IdxT, raft::row_major>(
+              queries.data_handle(), n_queries, dim),
+            query_norms_->view(),
             raft::sqrt_op{});
         }
       } else {
         if (!query_norms) {
           query_norms_ = raft::make_device_vector<DistanceT, IdxT>(res, n_queries);
-          raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
-            (DistanceT*)(query_norms_->data_handle()),
-            queries.data_handle(),
-            dim,
-            n_queries,
-            stream,
-            raft::identity_op{});
+          raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+            res,
+            raft::make_device_matrix_view<const T, IdxT, raft::row_major>(
+              queries.data_handle(), n_queries, dim),
+            query_norms_->view());
         }
       }
       cuvs::neighbors::detail::epilogue_on_csr(

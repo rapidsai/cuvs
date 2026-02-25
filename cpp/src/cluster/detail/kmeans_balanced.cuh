@@ -25,9 +25,9 @@
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/normalize.cuh>
-#include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/argmin.cuh>
 #include <raft/matrix/gather.cuh>
+#include <raft/matrix/init.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/device_atomics.cuh>
@@ -95,15 +95,14 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
       auto minClusterAndDistance = raft::make_device_mdarray<raft::KeyValuePair<IdxT, MathT>, IdxT>(
         handle, mr, raft::make_extents<IdxT>(n_rows));
       raft::KeyValuePair<IdxT, MathT> initial_value(0, std::numeric_limits<MathT>::max());
-      thrust::fill(raft::resource::get_thrust_policy(handle),
-                   minClusterAndDistance.data_handle(),
-                   minClusterAndDistance.data_handle() + minClusterAndDistance.size(),
-                   initial_value);
+      raft::matrix::fill(handle, minClusterAndDistance.view(), initial_value);
 
       auto centroidsNorm =
         raft::make_device_mdarray<MathT, IdxT>(handle, mr, raft::make_extents<IdxT>(n_clusters));
-      raft::linalg::rowNorm<raft::linalg::L2Norm, true, MathT, IdxT>(
-        centroidsNorm.data_handle(), centers, dim, n_clusters, stream);
+      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+        handle,
+        raft::make_device_matrix_view<const MathT, IdxT, raft::row_major>(centers, n_clusters, dim),
+        centroidsNorm.view());
 
       cuvs::distance::fusedDistanceNNMinReduce<MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
         minClusterAndDistance.data_handle(),
@@ -124,10 +123,9 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
 
       // todo(lsugy): use KVP + iterator in caller.
       // Copy keys to output labels
-      thrust::transform(raft::resource::get_thrust_policy(handle),
-                        minClusterAndDistance.data_handle(),
-                        minClusterAndDistance.data_handle() + n_rows,
-                        labels,
+      raft::linalg::map(handle,
+                        raft::make_const_mdspan(minClusterAndDistance.view()),
+                        raft::make_device_vector_view<LabelT, IdxT>(labels, n_rows),
                         raft::compose_op<raft::cast_op<LabelT>, raft::key_op>());
       break;
     }
@@ -138,15 +136,15 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
       auto minClusterAndDistance = raft::make_device_mdarray<raft::KeyValuePair<IdxT, MathT>, IdxT>(
         handle, mr, raft::make_extents<IdxT>(n_rows));
       raft::KeyValuePair<IdxT, MathT> initial_value(0, std::numeric_limits<MathT>::max());
-      thrust::fill(raft::resource::get_thrust_policy(handle),
-                   minClusterAndDistance.data_handle(),
-                   minClusterAndDistance.data_handle() + minClusterAndDistance.size(),
-                   initial_value);
+      raft::matrix::fill(handle, minClusterAndDistance.view(), initial_value);
 
       auto centroidsNorm =
         raft::make_device_mdarray<MathT, IdxT>(handle, mr, raft::make_extents<IdxT>(n_clusters));
-      raft::linalg::rowNorm<raft::linalg::L2Norm, true, MathT, IdxT>(
-        centroidsNorm.data_handle(), centers, dim, n_clusters, stream, raft::sqrt_op{});
+      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+        handle,
+        raft::make_device_matrix_view<const MathT, IdxT, raft::row_major>(centers, n_clusters, dim),
+        centroidsNorm.view(),
+        raft::sqrt_op{});
 
       cuvs::distance::fusedDistanceNNMinReduce<MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
         minClusterAndDistance.data_handle(),
@@ -165,10 +163,9 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
         0.0f,
         stream);
       // Copy keys to output labels
-      thrust::transform(raft::resource::get_thrust_policy(handle),
-                        minClusterAndDistance.data_handle(),
-                        minClusterAndDistance.data_handle() + n_rows,
-                        labels,
+      raft::linalg::map(handle,
+                        raft::make_const_mdspan(minClusterAndDistance.view()),
+                        raft::make_device_vector_view<LabelT, IdxT>(labels, n_rows),
                         raft::compose_op<raft::cast_op<LabelT>, raft::key_op>());
       break;
     }
@@ -339,7 +336,11 @@ void calc_centers_and_sizes(const raft::resources& handle,
 
   // Add previous sizes if necessary
   if (!reset_counters) {
-    raft::linalg::add(cluster_sizes, cluster_sizes, temp_sizes, n_clusters, stream);
+    raft::linalg::add(
+      handle,
+      raft::make_device_vector_view<const CounterT, IdxT>(cluster_sizes, n_clusters),
+      raft::make_device_vector_view<const CounterT, IdxT>(temp_sizes, n_clusters),
+      raft::make_device_vector_view<CounterT, IdxT>(cluster_sizes, n_clusters));
   }
 
   raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(handle,
@@ -372,13 +373,20 @@ void compute_norm(const raft::resources& handle,
   } else {
     mapped_dataset.resize(n_rows * dim, stream);
 
-    raft::linalg::unaryOp(mapped_dataset.data(), dataset, n_rows * dim, mapping_op, stream);
+    raft::linalg::map(
+      handle,
+      raft::make_device_vector_view<const T, IdxT>(dataset, n_rows * dim),
+      raft::make_device_vector_view<MathT, IdxT>(mapped_dataset.data(), n_rows * dim),
+      mapping_op);
 
     dataset_ptr = static_cast<const MathT*>(mapped_dataset.data());
   }
 
-  raft::linalg::rowNorm<raft::linalg::L2Norm, true, MathT, IdxT>(
-    dataset_norm, dataset_ptr, dim, n_rows, stream, norm_fin_op);
+  raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+    handle,
+    raft::make_device_matrix_view<const MathT, IdxT, raft::row_major>(dataset_ptr, n_rows, dim),
+    raft::make_device_vector_view<MathT, IdxT>(dataset_norm, n_rows),
+    norm_fin_op);
 }
 
 /**
@@ -437,8 +445,11 @@ void predict(const raft::resources& handle,
     if constexpr (std::is_same_v<T, MathT>) {
       cur_dataset_ptr = const_cast<MathT*>(dataset + offset * dim);
     } else {
-      raft::linalg::unaryOp(
-        cur_dataset_ptr, dataset + offset * dim, minibatch_size * dim, mapping_op, stream);
+      raft::linalg::map(
+        handle,
+        raft::make_device_vector_view<const T, IdxT>(dataset + offset * dim, minibatch_size * dim),
+        raft::make_device_vector_view<MathT, IdxT>(cur_dataset_ptr, minibatch_size * dim),
+        mapping_op);
     }
 
     // Compute the norm now if it hasn't been pre-computed.
@@ -500,7 +511,7 @@ __launch_bounds__((raft::WarpSize * BlockDimY)) RAFT_KERNEL
                         IdxT* count,
                         MappingOpT mapping_op)
 {
-  IdxT l = threadIdx.y + BlockDimY * static_cast<IdxT>(blockIdx.y);
+  IdxT l = threadIdx.y + BlockDimY * static_cast<IdxT>(blockIdx.x);
   if (l >= n_clusters) return;
   auto csize = static_cast<IdxT>(cluster_sizes[l]);
   // skip big clusters
@@ -605,7 +616,7 @@ auto adjust_centers(MathT* centers,
 
   constexpr uint32_t kBlockDimY = 4;
   const dim3 block_dim(raft::WarpSize, kBlockDimY, 1);
-  const dim3 grid_dim(1, raft::ceildiv(n_clusters, static_cast<IdxT>(kBlockDimY)), 1);
+  const dim3 grid_dim(raft::ceildiv(n_clusters, static_cast<IdxT>(kBlockDimY)), 1, 1);
   rmm::device_scalar<IdxT> update_count(0, stream, device_memory);
   adjust_centers_kernel<kBlockDimY><<<grid_dim, block_dim, 0, stream>>>(centers,
                                                                         n_clusters,
@@ -974,10 +985,11 @@ auto build_fine_clusters(const raft::resources& handle,
                    device_memory,
                    mc_trainset_norm);
 
-    raft::copy(cluster_centers + (dim * fine_clusters_csum[i]),
-               mc_trainset_ccenters.data(),
-               fine_clusters_nums[i] * dim,
-               stream);
+    raft::copy(handle,
+               raft::make_device_vector_view(cluster_centers + (dim * fine_clusters_csum[i]),
+                                             fine_clusters_nums[i] * dim),
+               raft::make_device_vector_view<const MathT>(mc_trainset_ccenters.data(),
+                                                          fine_clusters_nums[i] * dim));
     raft::resource::sync_stream(handle, stream);
     n_clusters_done += fine_clusters_nums[i];
   }

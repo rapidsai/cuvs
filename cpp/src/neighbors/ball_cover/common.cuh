@@ -1,12 +1,11 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
-#include <thrust/functional.h>
-#include <thrust/tuple.h>
+#include <cuda/std/tuple>
 
 #include <cstdint>
 
@@ -17,11 +16,11 @@ struct NNComp {
   __host__ __device__ bool operator()(const one& t1, const two& t2)
   {
     // sort first by each sample's reference landmark,
-    if (thrust::get<0>(t1) < thrust::get<0>(t2)) return true;
-    if (thrust::get<0>(t1) > thrust::get<0>(t2)) return false;
+    if (cuda::std::get<0>(t1) < cuda::std::get<0>(t2)) return true;
+    if (cuda::std::get<0>(t1) > cuda::std::get<0>(t2)) return false;
 
     // then by closest neighbor,
-    return thrust::get<1>(t1) < thrust::get<1>(t2);
+    return cuda::std::get<1>(t1) < cuda::std::get<1>(t2);
   }
 };
 

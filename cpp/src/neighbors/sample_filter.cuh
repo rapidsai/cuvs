@@ -57,8 +57,8 @@ struct takes_three_args<
  * @tparam filter_t
  */
 template <typename index_t, typename filter_t>
-ivf_to_sample_filter<index_t, filter_t>::ivf_to_sample_filter(const index_t* const* inds_ptrs,
-                                                              const filter_t next_filter)
+_RAFT_HOST_DEVICE ivf_to_sample_filter<index_t, filter_t>::ivf_to_sample_filter(
+  const index_t* const* inds_ptrs, const filter_t next_filter)
   : inds_ptrs_{inds_ptrs}, next_filter_{next_filter}
 {
 }

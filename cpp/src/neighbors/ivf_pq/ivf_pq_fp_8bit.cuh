@@ -19,7 +19,6 @@
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/mr/per_device_resource.hpp>
 
-#include <cub/cub.cuh>
 #include <cuda_fp16.h>
 
 namespace cuvs::neighbors::ivf_pq::detail {

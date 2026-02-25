@@ -6,12 +6,21 @@
 #pragma once
 
 #include <cuvs/distance/distance.hpp>
-#include <raft/linalg/unary_op.cuh>
+#include <raft/core/copy.cuh>
+#include <raft/core/device_mdspan.hpp>
+#include <raft/core/host_mdarray.hpp>
+#include <raft/core/host_mdspan.hpp>
+#include <raft/linalg/map.cuh>
 #include <raft/matrix/detail/select_warpsort.cuh>  // matrix::detail::select::warpsort::warp_sort_distributed
 
-#include <cub/cub.cuh>
-
 namespace cuvs::neighbors::ivf::detail {
+
+// Forward declaration of helper function to avoid including cub/device/* in header
+void sort_cluster_sizes_descending(uint32_t* input,
+                                   uint32_t* output,
+                                   uint32_t n_lists,
+                                   rmm::cuda_stream_view stream,
+                                   rmm::mr::device_memory_resource* tmp_res);
 
 /**
  * Default value returned by `search` when the `n_probes` is too small and top-k is too large.
@@ -164,62 +173,65 @@ void postprocess_neighbors(IdxT* neighbors_out,                // [n_queries, to
  * translate the element type if necessary.
  */
 template <typename ScoreInT, typename ScoreOutT = float>
-void postprocess_distances(ScoreOutT* out,      // [n_queries, topk]
+void postprocess_distances(const raft::resources& res,
+                           ScoreOutT* out,      // [n_queries, topk]
                            const ScoreInT* in,  // [n_queries, topk]
                            distance::DistanceType metric,
                            uint32_t n_queries,
                            uint32_t topk,
                            float scaling_factor,
-                           bool account_for_max_close,
-                           rmm::cuda_stream_view stream)
+                           bool account_for_max_close)
 {
   constexpr bool needs_cast = !std::is_same<ScoreInT, ScoreOutT>::value;
   const bool needs_copy     = ((void*)in) != ((void*)out);
   size_t len                = size_t(n_queries) * size_t(topk);
+  auto out_view             = raft::make_device_vector_view<ScoreOutT, size_t>(out, len);
+  auto in_view              = raft::make_device_vector_view<const ScoreInT, size_t>(in, len);
   switch (metric) {
     case distance::DistanceType::L2Unexpanded:
     case distance::DistanceType::L2Expanded: {
       if (scaling_factor != 1.0) {
-        raft::linalg::unaryOp(
-          out,
-          in,
-          len,
+        raft::linalg::map(
+          res,
+          out_view,
           raft::compose_op(raft::mul_const_op<ScoreOutT>{scaling_factor * scaling_factor},
                            raft::cast_op<ScoreOutT>{}),
-          stream);
+          raft::make_const_mdspan(in_view));
       } else if (needs_cast || needs_copy) {
-        raft::linalg::unaryOp(out, in, len, raft::cast_op<ScoreOutT>{}, stream);
+        raft::linalg::map(
+          res, out_view, raft::cast_op<ScoreOutT>{}, raft::make_const_mdspan(in_view));
       }
     } break;
     case distance::DistanceType::L2SqrtUnexpanded:
     case distance::DistanceType::L2SqrtExpanded: {
       if (scaling_factor != 1.0) {
-        raft::linalg::unaryOp(out,
-                              in,
-                              len,
-                              raft::compose_op{raft::mul_const_op<ScoreOutT>{scaling_factor},
-                                               raft::sqrt_op{},
-                                               raft::cast_op<ScoreOutT>{}},
-                              stream);
+        raft::linalg::map(res,
+                          out_view,
+                          raft::compose_op{raft::mul_const_op<ScoreOutT>{scaling_factor},
+                                           raft::sqrt_op{},
+                                           raft::cast_op<ScoreOutT>{}},
+                          raft::make_const_mdspan(in_view));
       } else if (needs_cast) {
-        raft::linalg::unaryOp(
-          out, in, len, raft::compose_op{raft::sqrt_op{}, raft::cast_op<ScoreOutT>{}}, stream);
+        raft::linalg::map(res,
+                          out_view,
+                          raft::compose_op{raft::sqrt_op{}, raft::cast_op<ScoreOutT>{}},
+                          raft::make_const_mdspan(in_view));
       } else {
-        raft::linalg::unaryOp(out, in, len, raft::sqrt_op{}, stream);
+        raft::linalg::map(res, out_view, raft::sqrt_op{}, raft::make_const_mdspan(in_view));
       }
     } break;
     case distance::DistanceType::CosineExpanded:
     case distance::DistanceType::InnerProduct: {
       float factor = (account_for_max_close ? -1.0 : 1.0) * scaling_factor * scaling_factor;
       if (factor != 1.0) {
-        raft::linalg::unaryOp(
-          out,
-          in,
-          len,
+        raft::linalg::map(
+          res,
+          out_view,
           raft::compose_op(raft::mul_const_op<ScoreOutT>{factor}, raft::cast_op<ScoreOutT>{}),
-          stream);
+          raft::make_const_mdspan(in_view));
       } else if (needs_cast || needs_copy) {
-        raft::linalg::unaryOp(out, in, len, raft::cast_op<ScoreOutT>{}, stream);
+        raft::linalg::map(
+          res, out_view, raft::cast_op<ScoreOutT>{}, raft::make_const_mdspan(in_view));
       }
     } break;
     case distance::DistanceType::BitwiseHamming: break;
@@ -247,36 +259,21 @@ void recompute_internal_state(const raft::resources& res, Index& index)
   }
 
   // Sort the cluster sizes in the descending order.
-  int begin_bit             = 0;
-  int end_bit               = sizeof(uint32_t) * 8;
-  size_t cub_workspace_size = 0;
-  cub::DeviceRadixSort::SortKeysDescending(nullptr,
-                                           cub_workspace_size,
-                                           index.list_sizes().data_handle(),
-                                           sorted_sizes.data(),
-                                           index.n_lists(),
-                                           begin_bit,
-                                           end_bit,
-                                           stream);
-  rmm::device_buffer cub_workspace(cub_workspace_size, stream, tmp_res);
-  cub::DeviceRadixSort::SortKeysDescending(cub_workspace.data(),
-                                           cub_workspace_size,
-                                           index.list_sizes().data_handle(),
-                                           sorted_sizes.data(),
-                                           index.n_lists(),
-                                           begin_bit,
-                                           end_bit,
-                                           stream);
+  // Use helper function to avoid including cub/device/* in this header
+  sort_cluster_sizes_descending(
+    index.list_sizes().data_handle(), sorted_sizes.data(), index.n_lists(), stream, tmp_res);
   // copy the results to CPU
-  std::vector<uint32_t> sorted_sizes_host(index.n_lists());
-  raft::copy(sorted_sizes_host.data(), sorted_sizes.data(), index.n_lists(), stream);
+  auto sorted_sizes_host = raft::make_host_vector<uint32_t>(index.n_lists());
+  raft::copy(res,
+             sorted_sizes_host.view(),
+             raft::make_device_vector_view(sorted_sizes.data(), index.n_lists()));
   raft::resource::sync_stream(res);
 
   // accumulate the sorted cluster sizes
   auto accum_sorted_sizes = index.accum_sorted_sizes();
   accum_sorted_sizes(0)   = 0;
-  for (uint32_t label = 0; label < sorted_sizes_host.size(); label++) {
-    accum_sorted_sizes(label + 1) = accum_sorted_sizes(label) + sorted_sizes_host[label];
+  for (uint32_t label = 0; label < sorted_sizes_host.extent(0); label++) {
+    accum_sorted_sizes(label + 1) = accum_sorted_sizes(label) + sorted_sizes_host(label);
   }
 }
 

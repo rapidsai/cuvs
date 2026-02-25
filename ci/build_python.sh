@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
 set -euo pipefail
@@ -58,3 +58,6 @@ if [[ ${RAPIDS_CUDA_MAJOR} == "13" ]]; then
   sccache --show-adv-stats
   sccache --stop-server >/dev/null 2>&1 || true
 fi
+
+RAPIDS_PACKAGE_NAME="$(rapids-package-name conda_python cuvs --stable --cuda "$RAPIDS_CUDA_VERSION")"
+export RAPIDS_PACKAGE_NAME

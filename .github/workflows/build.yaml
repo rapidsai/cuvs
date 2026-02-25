@@ -142,6 +142,8 @@ jobs:
       date: ${{ inputs.date }}
       script: ci/build_python.sh
       sha: ${{ inputs.sha }}
+      # Build a conda package for each CUDA x ARCH x minimum supported Python version
+      matrix_filter: group_by({CUDA_VER, ARCH}) | map(min_by(.PY_VER | split(".") | map(tonumber)))
   upload-conda:
     needs: [cpp-build, python-build]
     secrets: inherit
@@ -208,6 +210,8 @@ jobs:
       script: ci/build_wheel_cuvs.sh
       package-name: cuvs
       package-type: python
+      # Build a wheel for each CUDA x ARCH x minimum supported Python version
+      matrix_filter: group_by({CUDA_VER, ARCH}) | map(min_by(.PY_VER | split(".") | map(tonumber)))
   wheel-publish-cuvs:
     needs: wheel-build-cuvs
     secrets: inherit
@@ -219,3 +223,4 @@ jobs:
       date: ${{ inputs.date }}
       package-name: cuvs
       package-type: python
+      publish-wheel-search-key: cuvs_wheel_python_abi3

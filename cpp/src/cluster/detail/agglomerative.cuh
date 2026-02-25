@@ -1,28 +1,32 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
+#include <raft/core/copy.cuh>
+#include <raft/core/device_mdspan.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/matrix/init.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
 
 #include <rmm/device_uvector.hpp>
 
+#include <cuda/iterator>
+#include <cuda/std/functional>
+#include <cuda/std/tuple>
 #include <thrust/device_ptr.h>
 #include <thrust/execution_policy.h>
 #include <thrust/extrema.h>
 #include <thrust/fill.h>
 #include <thrust/for_each.h>
-#include <thrust/functional.h>
-#include <thrust/iterator/counting_iterator.h>
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/sort.h>
-#include <thrust/tuple.h>
 
 #include <cstddef>
 
@@ -108,9 +112,15 @@ void build_dendrogram_host(raft::resources const& handle,
   std::vector<value_idx> mst_dst_h(n_edges);
   std::vector<value_t> mst_weights_h(n_edges);
 
-  raft::update_host(mst_src_h.data(), rows, n_edges, stream);
-  raft::update_host(mst_dst_h.data(), cols, n_edges, stream);
-  raft::update_host(mst_weights_h.data(), data, n_edges, stream);
+  raft::copy(handle,
+             raft::make_host_vector_view(mst_src_h.data(), n_edges),
+             raft::make_device_vector_view(rows, n_edges));
+  raft::copy(handle,
+             raft::make_host_vector_view(mst_dst_h.data(), n_edges),
+             raft::make_device_vector_view(cols, n_edges));
+  raft::copy(handle,
+             raft::make_host_vector_view(mst_weights_h.data(), n_edges),
+             raft::make_device_vector_view(data, n_edges));
 
   raft::resource::sync_stream(handle, stream);
 
@@ -138,9 +148,15 @@ void build_dendrogram_host(raft::resources const& handle,
     U.perform_union(aa, bb);
   }
 
-  raft::update_device(children, children_h.data(), n_edges * 2, stream);
-  raft::update_device(out_size, out_size_h.data(), n_edges, stream);
-  raft::update_device(out_delta, out_delta_h.data(), n_edges, stream);
+  raft::copy(handle,
+             raft::make_device_vector_view(children, n_edges * 2),
+             raft::make_host_vector_view(children_h.data(), n_edges * 2));
+  raft::copy(handle,
+             raft::make_device_vector_view(out_size, n_edges),
+             raft::make_host_vector_view(out_size_h.data(), n_edges));
+  raft::copy(handle,
+             raft::make_device_vector_view(out_delta, n_edges),
+             raft::make_host_vector_view(out_delta_h.data(), n_edges));
 }
 
 template <typename value_idx>
@@ -205,7 +221,7 @@ struct init_label_roots {
   template <typename Tuple>
   __host__ __device__ void operator()(Tuple t)
   {
-    labels[thrust::get<1>(t)] = thrust::get<0>(t);
+    labels[cuda::std::get<1>(t)] = cuda::std::get<0>(t);
   }
 
  private:
@@ -236,7 +252,8 @@ void extract_flattened_clusters(raft::resources const& handle,
 
   // Handle special case where n_clusters == 1
   if (n_clusters == 1) {
-    thrust::fill(thrust_policy, labels, labels + n_leaves, 0);
+    raft::matrix::fill(
+      handle, raft::make_device_vector_view<value_idx>(labels, n_leaves), value_idx(0));
   } else {
     /**
      * Compute levels for each node
@@ -282,7 +299,7 @@ void extract_flattened_clusters(raft::resources const& handle,
     thrust::sort(thrust_policy,
                  label_roots.data(),
                  label_roots.data() + (child_size),
-                 thrust::greater<value_idx>());
+                 cuda::std::greater<value_idx>());
 
     rmm::device_uvector<value_idx> tmp_labels(n_vertices, stream);
 
@@ -290,10 +307,10 @@ void extract_flattened_clusters(raft::resources const& handle,
     thrust::fill(thrust_policy, tmp_labels.data(), tmp_labels.data() + n_vertices, -1);
 
     // Write labels for cluster roots to "labels"
-    thrust::counting_iterator<uint> first(0);
+    auto first = cuda::make_counting_iterator<uint>(0);
 
     auto z_iter = thrust::make_zip_iterator(
-      thrust::make_tuple(first, label_roots.data() + (label_roots.size() - n_clusters)));
+      cuda::std::make_tuple(first, label_roots.data() + (label_roots.size() - n_clusters)));
 
     thrust::for_each(
       thrust_policy, z_iter, z_iter + n_clusters, init_label_roots<value_idx>(tmp_labels.data()));
