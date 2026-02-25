@@ -26,18 +26,18 @@
 #include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/gather.cuh>
 #include <raft/matrix/init.cuh>
-#include <raft/matrix/scatter.cuh>
 #include <raft/util/cudart_utils.hpp>
 
 #include <rmm/device_scalar.hpp>
 #include <rmm/device_uvector.hpp>
 
-#include <thrust/iterator/transform_iterator.h>
-#include <thrust/iterator/counting_iterator.h>
+#include <cub/device/device_reduce.cuh>
 #include <thrust/device_ptr.h>
 #include <thrust/execution_policy.h>
+#include <thrust/iterator/counting_iterator.h>
+#include <thrust/iterator/transform_iterator.h>
+#include <thrust/scatter.h>
 #include <thrust/sort.h>
-#include <cub/device/device_reduce.cuh>
 
 #include <algorithm>
 #include <cstring>
@@ -215,8 +215,8 @@ void minibatch_update_centroids(raft::resources const& handle,
                                 IdxT current_batch_size,
                                 std::mt19937& rng)
 {
-  auto n_clusters = centroids.extent(0);
-  auto n_features = centroids.extent(1);
+  auto n_clusters     = centroids.extent(0);
+  auto n_features     = centroids.extent(1);
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
   auto batch_means = raft::make_device_matrix<MathT, IdxT>(handle, n_clusters, n_features);
@@ -255,7 +255,7 @@ void minibatch_update_centroids(raft::resources const& handle,
 
   // Reassignment logic: reassign low-count clusters to random samples from current batch
   if (reassignment_ratio > 0.0) {
-    auto max_count_scalar = raft::make_device_scalar<MathT>(handle, MathT{0});
+    auto max_count_scalar     = raft::make_device_scalar<MathT>(handle, MathT{0});
     size_t temp_storage_bytes = 0;
     cub::DeviceReduce::Max(nullptr,
                            temp_storage_bytes,
@@ -270,20 +270,24 @@ void minibatch_update_centroids(raft::resources const& handle,
                            max_count_scalar.data_handle(),
                            n_clusters,
                            stream);
-    MathT max_count = max_count_scalar.value(stream);
+    auto max_count_host = raft::make_host_scalar<MathT>(0);
+    raft::copy(max_count_host.data_handle(), max_count_scalar.data_handle(), 1, stream);
     raft::resource::sync_stream(handle, stream);
+    MathT max_count = max_count_host.data_handle()[0];
 
-    // Identify clusters to reassign on device: total_count < reassignment_ratio * max_count or total_count == 0
-    MathT threshold = static_cast<MathT>(reassignment_ratio) * max_count;
+    // Identify clusters to reassign on device: total_count < reassignment_ratio * max_count or
+    // total_count == 0
+    MathT threshold     = static_cast<MathT>(reassignment_ratio) * max_count;
     auto reassign_flags = raft::make_device_vector<uint8_t, IdxT>(handle, n_clusters);
-    
-    raft::linalg::unaryOp(total_counts.data_handle(),
-                          reassign_flags.data_handle(),
-                          n_clusters,
-                          [=] __device__(MathT count) {
-                            return (count < threshold || count == MathT{0}) ? uint8_t{1} : uint8_t{0};
-                          },
-                          stream);
+
+    raft::linalg::unaryOp(
+      total_counts.data_handle(),
+      reassign_flags.data_handle(),
+      n_clusters,
+      [=] __device__(MathT count) {
+        return (count < threshold || count == MathT{0}) ? uint8_t{1} : uint8_t{0};
+      },
+      stream);
 
     // Count how many clusters need reassignment using RAFT mapThenSumReduce
     auto num_reassign_scalar = raft::make_device_scalar<IdxT>(handle, IdxT{0});
@@ -292,8 +296,10 @@ void minibatch_update_centroids(raft::resources const& handle,
                                    raft::identity_op{},
                                    stream,
                                    reassign_flags.data_handle());
-    IdxT num_to_reassign = num_reassign_scalar.value(stream);
+    auto num_reassign_host = raft::make_host_scalar<IdxT>(0);
+    raft::copy(num_reassign_host.data_handle(), num_reassign_scalar.data_handle(), 1, stream);
     raft::resource::sync_stream(handle, stream);
+    IdxT num_to_reassign = num_reassign_host.data_handle()[0];
 
     // Limit to 50% of batch size
     IdxT max_reassign = static_cast<IdxT>(0.5 * current_batch_size);
@@ -301,68 +307,65 @@ void minibatch_update_centroids(raft::resources const& handle,
       // Need to select only the worst ones - do sorting on device
       // First, get all cluster indices that need reassignment
       auto all_reassign_indices = raft::make_device_vector<IdxT, IdxT>(handle, num_to_reassign);
-      auto counting_iter = thrust::counting_iterator<IdxT>(0);
+      auto counting_iter        = thrust::counting_iterator<IdxT>(0);
       thrust::device_ptr<uint8_t> flags_ptr(reassign_flags.data_handle());
-      
-      auto end_iter = thrust::copy_if(raft::resource::get_thrust_policy(handle),
-                                       counting_iter,
-                                       counting_iter + n_clusters,
-                                       flags_ptr,
-                                       thrust::device_pointer_cast(all_reassign_indices.data_handle()),
-                                       [] __device__(uint8_t flag) { return flag == 1; });
-      
+
+      thrust::copy_if(raft::resource::get_thrust_policy(handle),
+                      counting_iter,
+                      counting_iter + n_clusters,
+                      flags_ptr,
+                      thrust::device_pointer_cast(all_reassign_indices.data_handle()),
+                      [] __device__(uint8_t flag) { return flag == 1; });
+
       // Get counts for these clusters using RAFT matrix::gather
       auto reassign_counts = raft::make_device_vector<MathT, IdxT>(handle, num_to_reassign);
-      auto total_counts_matrix_view = raft::make_device_matrix_view<const MathT, IdxT>(
-        total_counts.data_handle(), n_clusters, 1);
+      auto total_counts_matrix_view =
+        raft::make_device_matrix_view<const MathT, IdxT>(total_counts.data_handle(), n_clusters, 1);
       auto reassign_indices_view = raft::make_device_vector_view<const IdxT, IdxT>(
         all_reassign_indices.data_handle(), num_to_reassign);
       auto reassign_counts_matrix_view = raft::make_device_matrix_view<MathT, IdxT>(
         reassign_counts.data_handle(), num_to_reassign, 1);
-      raft::matrix::gather(handle, total_counts_matrix_view, reassign_indices_view, reassign_counts_matrix_view);
-      
+      raft::matrix::gather(
+        handle, total_counts_matrix_view, reassign_indices_view, reassign_counts_matrix_view);
+
       thrust::sort_by_key(raft::resource::get_thrust_policy(handle),
                           reassign_counts.data_handle(),
                           reassign_counts.data_handle() + num_to_reassign,
                           all_reassign_indices.data_handle());
-      
+
       // Reset all flags
       raft::matrix::fill(handle, reassign_flags.view(), uint8_t{0});
-      
+
       // Set flags only for worst max_reassign clusters
       auto worst_indices = raft::make_device_vector<IdxT, IdxT>(handle, max_reassign);
-      raft::copy(worst_indices.data_handle(),
-                 all_reassign_indices.data_handle(),
-                 max_reassign,
-                 stream);
-      
-      // Use RAFT matrix::scatter to set flags
+      raft::copy(
+        worst_indices.data_handle(), all_reassign_indices.data_handle(), max_reassign, stream);
+
+      // Scatter flags: set reassign_flags[worst_indices[i]] = 1
       auto flags_scatter = raft::make_device_vector<uint8_t, IdxT>(handle, max_reassign);
       raft::matrix::fill(handle, flags_scatter.view(), uint8_t{1});
-      auto flags_scatter_matrix_view = raft::make_device_matrix_view<const uint8_t, IdxT>(
-        flags_scatter.data_handle(), max_reassign, 1);
-      auto worst_indices_view = raft::make_device_vector_view<const IdxT, IdxT>(
-        worst_indices.data_handle(), max_reassign);
-      auto reassign_flags_matrix_view = raft::make_device_matrix_view<uint8_t, IdxT>(
-        reassign_flags.data_handle(), n_clusters, 1);
-      raft::matrix::scatter(handle, flags_scatter_matrix_view, worst_indices_view, reassign_flags_matrix_view);
-      
+      thrust::scatter(raft::resource::get_thrust_policy(handle),
+                      flags_scatter.data_handle(),
+                      flags_scatter.data_handle() + max_reassign,
+                      worst_indices.data_handle(),
+                      reassign_flags.data_handle());
+
       num_to_reassign = max_reassign;
     }
 
     if (num_to_reassign > 0) {
       // Get list of cluster indices to reassign using thrust::copy_if
       auto reassign_indices = raft::make_device_vector<IdxT, IdxT>(handle, num_to_reassign);
-      auto counting_iter = thrust::counting_iterator<IdxT>(0);
+      auto counting_iter    = thrust::counting_iterator<IdxT>(0);
       thrust::device_ptr<uint8_t> flags_ptr(reassign_flags.data_handle());
-      
-      auto end_iter = thrust::copy_if(raft::resource::get_thrust_policy(handle),
-                                       counting_iter,
-                                       counting_iter + n_clusters,
-                                       flags_ptr,
-                                       thrust::device_pointer_cast(reassign_indices.data_handle()),
-                                       [] __device__(uint8_t flag) { return flag == 1; });
-      
+
+      thrust::copy_if(raft::resource::get_thrust_policy(handle),
+                      counting_iter,
+                      counting_iter + n_clusters,
+                      flags_ptr,
+                      thrust::device_pointer_cast(reassign_indices.data_handle()),
+                      [] __device__(uint8_t flag) { return flag == 1; });
+
       // Verify actual count using RAFT (in case flags were modified)
       auto actual_count_scalar = raft::make_device_scalar<IdxT>(handle, IdxT{0});
       raft::linalg::mapThenSumReduce(actual_count_scalar.data_handle(),
@@ -370,11 +373,16 @@ void minibatch_update_centroids(raft::resources const& handle,
                                      raft::identity_op{},
                                      stream,
                                      reassign_flags.data_handle());
-      num_to_reassign = actual_count_scalar.value(stream);
+      auto actual_count_host = raft::make_host_scalar<IdxT>(0);
+      raft::copy(actual_count_host.data_handle(), actual_count_scalar.data_handle(), 1, stream);
       raft::resource::sync_stream(handle, stream);
-      
-      auto reassign_indices_host = raft::make_host_vector<IdxT, IdxT>(handle, num_to_reassign);
-      raft::copy(reassign_indices_host.data_handle(), reassign_indices.data_handle(), num_to_reassign, stream);
+      num_to_reassign = actual_count_host.data_handle()[0];
+
+      auto reassign_indices_host = raft::make_host_vector<IdxT, IdxT>(num_to_reassign);
+      raft::copy(reassign_indices_host.data_handle(),
+                 reassign_indices.data_handle(),
+                 num_to_reassign,
+                 stream);
       raft::resource::sync_stream(handle, stream);
 
       // Pick random samples from current batch (without replacement) on host
@@ -401,35 +409,36 @@ void minibatch_update_centroids(raft::resources const& handle,
 
       // Reset total_counts for reassigned clusters to min of non-reassigned clusters on device
       // Find min of non-reassigned clusters on device
-      auto masked_counts = raft::make_device_vector<MathT, IdxT>(handle, n_clusters);
-      auto total_counts_ptr = total_counts.data_handle();
+      auto masked_counts      = raft::make_device_vector<MathT, IdxT>(handle, n_clusters);
+      auto total_counts_ptr   = total_counts.data_handle();
       auto reassign_flags_ptr = reassign_flags.data_handle();
-      // Use RAFT map_offset to create masked array (replaces thrust::make_counting_iterator)
-      raft::linalg::map_offset(handle,
-                                masked_counts.view(),
-                                [=] __device__(IdxT k) {
-                                  if (reassign_flags_ptr[k] == 0 && total_counts_ptr[k] > MathT{0}) {
-                                    return total_counts_ptr[k];
-                                  }
-                                  return max_count;
-                                });
+      raft::linalg::map_offset(handle, masked_counts.view(), [=] __device__(IdxT k) {
+        if (reassign_flags_ptr[k] == 0 && total_counts_ptr[k] > MathT{0}) {
+          return total_counts_ptr[k];
+        }
+        return max_count;
+      });
 
       auto min_non_reassigned_scalar = raft::make_device_scalar<MathT>(handle, max_count);
-      size_t min_temp_storage_bytes = 0;
+      size_t min_temp_storage_bytes  = 0;
       cub::DeviceReduce::Min(nullptr,
-                              min_temp_storage_bytes,
-                              masked_counts.data_handle(),
-                              min_non_reassigned_scalar.data_handle(),
-                              n_clusters,
-                              stream);
+                             min_temp_storage_bytes,
+                             masked_counts.data_handle(),
+                             min_non_reassigned_scalar.data_handle(),
+                             n_clusters,
+                             stream);
       rmm::device_uvector<char> min_temp_storage(min_temp_storage_bytes, stream);
       cub::DeviceReduce::Min(min_temp_storage.data(),
-                              min_temp_storage_bytes,
-                              masked_counts.data_handle(),
-                              min_non_reassigned_scalar.data_handle(),
-                              n_clusters,
-                              stream);
-      MathT min_non_reassigned = min_non_reassigned_scalar.value(stream);
+                             min_temp_storage_bytes,
+                             masked_counts.data_handle(),
+                             min_non_reassigned_scalar.data_handle(),
+                             n_clusters,
+                             stream);
+      auto min_non_reassigned_host = raft::make_host_scalar<MathT>(0);
+      raft::copy(
+        min_non_reassigned_host.data_handle(), min_non_reassigned_scalar.data_handle(), 1, stream);
+      raft::resource::sync_stream(handle, stream);
+      MathT min_non_reassigned = min_non_reassigned_host.data_handle()[0];
       if (min_non_reassigned == max_count) {
         min_non_reassigned = MathT{1};  // Fallback if all clusters were reassigned
       }
@@ -438,13 +447,11 @@ void minibatch_update_centroids(raft::resources const& handle,
       // reassign_indices_host is already available from earlier
       for (IdxT i = 0; i < num_to_reassign; ++i) {
         IdxT cluster_idx = reassign_indices_host.data_handle()[i];
-        raft::copy(total_counts.data_handle() + cluster_idx,
-                   &min_non_reassigned,
-                   1,
-                   stream);
+        raft::copy(total_counts.data_handle() + cluster_idx, &min_non_reassigned, 1, stream);
       }
 
-      RAFT_LOG_DEBUG("KMeans minibatch: Reassigned %zu cluster centers", static_cast<size_t>(num_to_reassign));
+      RAFT_LOG_DEBUG("KMeans minibatch: Reassigned %zu cluster centers",
+                     static_cast<size_t>(num_to_reassign));
     }
   }
 }
@@ -626,7 +633,10 @@ void fit(raft::resources const& handle,
         raft::make_device_scalar_view(clusterCostD.data()),
         raft::value_op{},
         raft::add_op{});
-      batch_inertia = clusterCostD.value(stream) / static_cast<T>(current_batch_size);
+      auto clusterCost_host = raft::make_host_scalar<T>(0);
+      raft::copy(clusterCost_host.data_handle(), clusterCostD.data(), 1, stream);
+      raft::resource::sync_stream(handle, stream);
+      batch_inertia = clusterCost_host.data_handle()[0] / static_cast<T>(current_batch_size);
 
       raft::matrix::fill(handle, centroid_sums.view(), T{0});
       raft::matrix::fill(handle, cluster_counts.view(), T{0});
@@ -790,7 +800,10 @@ void fit(raft::resources const& handle,
             raft::make_device_scalar_view(clusterCostD.data()),
             raft::value_op{},
             raft::add_op{});
-          total_cost += clusterCostD.value(stream);
+          auto clusterCost_host = raft::make_host_scalar<T>(0);
+          raft::copy(clusterCost_host.data_handle(), clusterCostD.data(), 1, stream);
+          raft::resource::sync_stream(handle, stream);
+          total_cost += clusterCost_host.data_handle()[0];
         }
       }
 
@@ -880,7 +893,10 @@ void fit(raft::resources const& handle,
         raft::value_op{},
         raft::add_op{});
 
-      inertia[0] += clusterCostD.value(stream);
+      auto clusterCost_host = raft::make_host_scalar<T>(0);
+      raft::copy(clusterCost_host.data_handle(), clusterCostD.data(), 1, stream);
+      raft::resource::sync_stream(handle, stream);
+      inertia[0] += clusterCost_host.data_handle()[0];
     }
     RAFT_LOG_DEBUG("KMeans batched: Completed with inertia=%f", static_cast<double>(inertia[0]));
   } else {
