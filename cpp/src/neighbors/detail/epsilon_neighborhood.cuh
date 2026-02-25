@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -51,7 +51,8 @@ struct EpsUnexpL2SqNeighborhood : public BaseClass {
  private:
   DI void prolog()
   {
-    this->ldgXY(IdxT(blockIdx.x) * P::Mblk, IdxT(blockIdx.y) * P::Nblk, 0);
+    // grid.x = n/Nblk (large), grid.y = m/Mblk (small) to stay within gridDim.y<=65535
+    this->ldgXY(IdxT(blockIdx.y) * P::Mblk, IdxT(blockIdx.x) * P::Nblk, 0);
 #pragma unroll
     for (int i = 0; i < P::AccRowsPerTh; ++i) {
 #pragma unroll
@@ -67,7 +68,7 @@ struct EpsUnexpL2SqNeighborhood : public BaseClass {
   DI void loop()
   {
     for (int kidx = P::Kblk; kidx < this->k; kidx += P::Kblk) {
-      this->ldgXY(IdxT(blockIdx.x) * P::Mblk, IdxT(blockIdx.y) * P::Nblk, kidx);
+      this->ldgXY(IdxT(blockIdx.y) * P::Mblk, IdxT(blockIdx.x) * P::Nblk, kidx);
       accumulate();  // on the previous k-block
       this->stsXY();
       __syncthreads();
@@ -79,8 +80,8 @@ struct EpsUnexpL2SqNeighborhood : public BaseClass {
 
   DI void epilog()
   {
-    IdxT startx = blockIdx.x * P::Mblk + this->accrowid;
-    IdxT starty = blockIdx.y * P::Nblk + this->acccolid;
+    IdxT startx = blockIdx.y * P::Mblk + this->accrowid;
+    IdxT starty = blockIdx.x * P::Nblk + this->acccolid;
     auto lid    = raft::laneId();
     IdxT sums[P::AccRowsPerTh];
 #pragma unroll
@@ -126,7 +127,7 @@ struct EpsUnexpL2SqNeighborhood : public BaseClass {
     __syncthreads();  // so that we can safely reuse smem
     int gid       = this->accrowid;
     int lid       = this->acccolid;
-    auto cidx     = IdxT(blockIdx.x) * P::Mblk + gid;
+    auto cidx     = IdxT(blockIdx.y) * P::Mblk + gid;
     IdxT totalSum = 0;
     // update the individual vertex degrees
 #pragma unroll
@@ -177,7 +178,8 @@ void epsUnexpL2SqNeighImpl(bool* adj,
                            cudaStream_t stream)
 {
   typedef typename raft::linalg::Policy4x4<DataT, VecLen>::Policy Policy;
-  dim3 grid(raft::ceildiv<int>(m, Policy::Mblk), raft::ceildiv<int>(n, Policy::Nblk));
+  // grid.x = n/Nblk (large dim, limit 2^31-1), grid.y = m/Mblk (small batched dim, limit 65535)
+  dim3 grid(raft::ceildiv<int>(n, Policy::Nblk), raft::ceildiv<int>(m, Policy::Mblk));
   dim3 blk(Policy::Nthreads);
   epsUnexpL2SqNeighKernel<DataT, IdxT, Policy>
     <<<grid, blk, Policy::SmemSize, stream>>>(adj, vd, x, y, m, n, k, eps);
