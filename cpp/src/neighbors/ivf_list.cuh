@@ -24,8 +24,6 @@
 
 #include "ivf_common.cuh"
 
-#include <thrust/fill.h>
-
 #include <atomic>
 #include <fstream>
 #include <limits>

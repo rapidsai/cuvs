@@ -26,9 +26,6 @@
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/integer_utils.hpp>
 
-#include <thrust/sequence.h>
-#include <thrust/tabulate.h>
-
 namespace cuvs::preprocessing::spectral_embedding::detail {
 
 template <typename DataT, typename OutSparseMatrixType, typename InSparseMatrixViewType>

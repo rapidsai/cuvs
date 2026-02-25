@@ -24,7 +24,6 @@
 
 #include <cuda/std/tuple>
 #include <thrust/device_ptr.h>
-#include <thrust/execution_policy.h>
 #include <thrust/sort.h>
 
 namespace cuvs::cluster::agglomerative::detail {

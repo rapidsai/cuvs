@@ -39,7 +39,6 @@
 #include <cub/iterator/arg_index_input_iterator.cuh>
 #include <cuda.h>
 #include <cuda/iterator>
-#include <thrust/fill.h>
 #include <thrust/for_each.h>
 
 #include <algorithm>

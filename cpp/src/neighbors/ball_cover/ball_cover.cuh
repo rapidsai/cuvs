@@ -25,9 +25,7 @@
 #include <rmm/exec_policy.hpp>
 
 #include <cuda/std/tuple>
-#include <thrust/fill.h>
 #include <thrust/iterator/zip_iterator.h>
-#include <thrust/reduce.h>
 #include <thrust/sort.h>
 
 #include <limits.h>

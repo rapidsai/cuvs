@@ -5,6 +5,8 @@
 
 #include "kmeans_common.cuh"
 
+#include <raft/matrix/init.cuh>
+
 namespace cuvs::cluster::kmeans::detail {
 
 // Calculates a <key, value> pair for every sample in input 'X' where key is an
@@ -56,10 +58,7 @@ void minClusterAndDistanceCompute(
 
   raft::KeyValuePair<IndexT, DataT> initial_value(0, std::numeric_limits<DataT>::max());
 
-  thrust::fill(raft::resource::get_thrust_policy(handle),
-               minClusterAndDistance.data_handle(),
-               minClusterAndDistance.data_handle() + minClusterAndDistance.size(),
-               initial_value);
+  raft::matrix::fill(handle, minClusterAndDistance, initial_value);
 
   // tile over the input dataset
   for (IndexT dIdx = 0; dIdx < n_samples; dIdx += dataBatchSize) {
@@ -205,10 +204,7 @@ void minClusterDistanceCompute(raft::resources const& handle,
   auto pairwiseDistance = raft::make_device_matrix_view<DataT, IndexT>(
     L2NormBuf_OR_DistBuf.data(), dataBatchSize, centroidsBatchSize);
 
-  thrust::fill(raft::resource::get_thrust_policy(handle),
-               minClusterDistance.data_handle(),
-               minClusterDistance.data_handle() + minClusterDistance.size(),
-               std::numeric_limits<DataT>::max());
+  raft::matrix::fill(handle, minClusterDistance, std::numeric_limits<DataT>::max());
 
   // tile over the input data and calculate distance matrix [n_samples x
   // n_clusters]

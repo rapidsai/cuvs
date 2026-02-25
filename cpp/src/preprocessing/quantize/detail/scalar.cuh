@@ -15,7 +15,6 @@
 #include <raft/random/rng.cuh>
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
-#include <thrust/system/omp/execution_policy.h>
 
 namespace cuvs::preprocessing::quantize::detail {
 
