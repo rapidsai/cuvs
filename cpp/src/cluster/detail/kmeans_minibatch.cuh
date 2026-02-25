@@ -408,8 +408,8 @@ void minibatch_fit(raft::resources const& handle,
 
     auto batch_data_view = raft::make_device_matrix_view<const T, IdxT>(
       batch_data.data_handle(), current_batch_size, n_features);
-    auto batch_weights_view_const = raft::make_device_vector_view<const T, IdxT>(
-      batch_weights.data_handle(), current_batch_size);
+    auto batch_weights_view_const =
+      raft::make_device_vector_view<const T, IdxT>(batch_weights.data_handle(), current_batch_size);
     auto minClusterAndDistance_view =
       raft::make_device_vector_view<raft::KeyValuePair<IdxT, T>, IdxT>(
         minClusterAndDistance.data_handle(), current_batch_size);
@@ -426,22 +426,21 @@ void minibatch_fit(raft::resources const& handle,
     // Save centroids before update for convergence check
     raft::copy(prev_centroids.data_handle(), centroids.data_handle(), centroids.size(), stream);
 
-    auto centroids_const = raft::make_device_matrix_view<const T, IdxT>(
-      centroids.data_handle(), n_clusters, n_features);
+    auto centroids_const =
+      raft::make_device_matrix_view<const T, IdxT>(centroids.data_handle(), n_clusters, n_features);
     auto L2NormBatch_const =
       raft::make_device_vector_view<const T, IdxT>(L2NormBatch.data_handle(), current_batch_size);
 
-    cuvs::cluster::kmeans::detail::minClusterAndDistanceCompute<T, IdxT>(
-      handle,
-      batch_data_view,
-      centroids_const,
-      minClusterAndDistance_view,
-      L2NormBatch_const,
-      L2NormBuf_OR_DistBuf,
-      metric,
-      params.batch_samples,
-      params.batch_centroids,
-      workspace);
+    cuvs::cluster::kmeans::detail::minClusterAndDistanceCompute<T, IdxT>(handle,
+                                                                         batch_data_view,
+                                                                         centroids_const,
+                                                                         minClusterAndDistance_view,
+                                                                         L2NormBatch_const,
+                                                                         L2NormBuf_OR_DistBuf,
+                                                                         metric,
+                                                                         params.batch_samples,
+                                                                         params.batch_centroids,
+                                                                         workspace);
 
     // Compute batch inertia (normalized by batch_size for comparison)
     T batch_inertia = 0;
@@ -534,9 +533,8 @@ void minibatch_fit(raft::resources const& handle,
         }
 
         if (no_improvement >= params.minibatch.max_no_improvement) {
-          RAFT_LOG_DEBUG("KMeans minibatch: Converged (lack of improvement) at step %d/%d",
-                         n_iter[0],
-                         n_steps);
+          RAFT_LOG_DEBUG(
+            "KMeans minibatch: Converged (lack of improvement) at step %d/%d", n_iter[0], n_steps);
           break;
         }
       }
@@ -571,8 +569,8 @@ void minibatch_fit(raft::resources const& handle,
 
       auto centroids_const = raft::make_device_matrix_view<const T, IdxT>(
         centroids.data_handle(), n_clusters, n_features);
-      auto L2NormBatch_const = raft::make_device_vector_view<const T, IdxT>(
-        L2NormBatch.data_handle(), current_batch_size);
+      auto L2NormBatch_const =
+        raft::make_device_vector_view<const T, IdxT>(L2NormBatch.data_handle(), current_batch_size);
 
       cuvs::cluster::kmeans::detail::minClusterAndDistanceCompute<T, IdxT>(
         handle,
