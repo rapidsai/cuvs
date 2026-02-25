@@ -14,3 +14,4 @@ ndarray = "0.15"
 
 [dev-dependencies]
 ndarray-rand = "0.14"
+mark-flaky-tests = "1"
