@@ -49,38 +49,17 @@ void random_pickup_jit(const dataset_descriptor_host<DataT, IndexT, DistanceT>& 
                        std::uint32_t hash_bitlen,
                        cudaStream_t cuda_stream)
 {
-  RAFT_LOG_INFO(
-    "[JIT FRAGMENT DEBUG] random_pickup_jit - is_vpq=%d, metric=%d, team_size=%u, "
-    "dataset_block_dim=%u, pq_bits=%u, pq_len=%u, queries_ptr=%p",
-    dataset_desc.is_vpq,
-    static_cast<int>(dataset_desc.metric),
-    dataset_desc.team_size,
-    dataset_desc.dataset_block_dim,
-    dataset_desc.pq_bits,
-    dataset_desc.pq_len,
-    static_cast<const void*>(queries_ptr));
-
   // Create planner with tags
   using DataTag   = decltype(get_data_type_tag<DataT>());
   using IndexTag  = decltype(get_index_type_tag<IndexT>());
   using DistTag   = decltype(get_distance_type_tag<DistanceT>());
   using SourceTag = decltype(get_source_index_type_tag<IndexT>());  // Use IndexT for source
 
-  RAFT_LOG_INFO(
-    "[JIT FRAGMENT DEBUG] random_pickup - DataTag=%s, IndexTag=%s, DistTag=%s, SourceTag=%s",
-    typeid(DataTag).name(),
-    typeid(IndexTag).name(),
-    typeid(DistTag).name(),
-    typeid(SourceTag).name());
-
   // Create planner and register device functions
   std::shared_ptr<AlgorithmLauncher> launcher;
   if (dataset_desc.is_vpq) {
     using QueryTag    = query_type_tag_vpq_t<DataTag>;
     using CodebookTag = codebook_tag_vpq_t;
-    RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] random_pickup VPQ path - QueryTag=%s, CodebookTag=%s",
-                  typeid(QueryTag).name(),
-                  typeid(CodebookTag).name());
     CagraMultiKernelSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
       planner(dataset_desc.metric,
               "random_pickup_kernel",
@@ -130,11 +109,6 @@ void random_pickup_jit(const dataset_descriptor_host<DataT, IndexT, DistanceT>& 
       launcher = planner.get_launcher();
     } else {
       using QueryTag = query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::L2Expanded>;
-      RAFT_LOG_INFO(
-        "[JIT FRAGMENT DEBUG] random_pickup Standard path (non-BitwiseHamming) - QueryTag=%s, "
-        "CodebookTag=%s",
-        typeid(QueryTag).name(),
-        typeid(CodebookTag).name());
       CagraMultiKernelSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
         planner(dataset_desc.metric,
                 "random_pickup_kernel",
@@ -165,10 +139,7 @@ void random_pickup_jit(const dataset_descriptor_host<DataT, IndexT, DistanceT>& 
                        num_queries);
 
   // Get the device descriptor pointer
-  RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] random_pickup About to call dev_ptr()");
   const auto* dev_desc = dataset_desc.dev_ptr(cuda_stream);
-  RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] random_pickup dev_ptr() returned: %p",
-                static_cast<const void*>(dev_desc));
 
   // Cast size_t parameters to match kernel signature exactly
   // The dispatch mechanism uses void* pointers, so parameter sizes must match exactly
@@ -221,41 +192,17 @@ void compute_distance_to_child_nodes_jit(
   SAMPLE_FILTER_T sample_filter,
   cudaStream_t cuda_stream)
 {
-  RAFT_LOG_INFO(
-    "[JIT FRAGMENT DEBUG] compute_distance_to_child_nodes_jit - is_vpq=%d, metric=%d, "
-    "team_size=%u, "
-    "dataset_block_dim=%u, pq_bits=%u, pq_len=%u, query_ptr=%p",
-    dataset_desc.is_vpq,
-    static_cast<int>(dataset_desc.metric),
-    dataset_desc.team_size,
-    dataset_desc.dataset_block_dim,
-    dataset_desc.pq_bits,
-    dataset_desc.pq_len,
-    static_cast<const void*>(query_ptr));
-
   // Create planner with tags
   using DataTag   = decltype(get_data_type_tag<DataT>());
   using IndexTag  = decltype(get_index_type_tag<IndexT>());
   using DistTag   = decltype(get_distance_type_tag<DistanceT>());
   using SourceTag = decltype(get_source_index_type_tag<SourceIndexT>());
 
-  RAFT_LOG_INFO(
-    "[JIT FRAGMENT DEBUG] compute_distance_to_child_nodes - DataTag=%s, IndexTag=%s, DistTag=%s, "
-    "SourceTag=%s",
-    typeid(DataTag).name(),
-    typeid(IndexTag).name(),
-    typeid(DistTag).name(),
-    typeid(SourceTag).name());
-
   // Create planner and register device functions
   std::shared_ptr<AlgorithmLauncher> launcher;
   if (dataset_desc.is_vpq) {
     using QueryTag    = query_type_tag_vpq_t<DataTag>;
     using CodebookTag = codebook_tag_vpq_t;
-    RAFT_LOG_INFO(
-      "[JIT FRAGMENT DEBUG] compute_distance_to_child_nodes VPQ path - QueryTag=%s, CodebookTag=%s",
-      typeid(QueryTag).name(),
-      typeid(CodebookTag).name());
     CagraMultiKernelSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
       planner(dataset_desc.metric,
               "compute_distance_to_child_nodes_kernel",
@@ -282,11 +229,6 @@ void compute_distance_to_child_nodes_jit(
     if (dataset_desc.metric == cuvs::distance::DistanceType::BitwiseHamming) {
       using QueryTag =
         query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::BitwiseHamming>;
-      RAFT_LOG_INFO(
-        "[JIT FRAGMENT DEBUG] compute_distance_to_child_nodes Standard path (BitwiseHamming) - "
-        "QueryTag=%s, CodebookTag=%s",
-        typeid(QueryTag).name(),
-        typeid(CodebookTag).name());
       CagraMultiKernelSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
         planner(dataset_desc.metric,
                 "compute_distance_to_child_nodes_kernel",
@@ -340,10 +282,7 @@ void compute_distance_to_child_nodes_jit(
                        num_queries);
 
   // Get the device descriptor pointer
-  RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] compute_distance_to_child_nodes About to call dev_ptr()");
   const auto* dev_desc = dataset_desc.dev_ptr(cuda_stream);
-  RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] compute_distance_to_child_nodes dev_ptr() returned: %p",
-                static_cast<const void*>(dev_desc));
 
   // Dispatch kernel via launcher
   launcher->dispatch(cuda_stream,

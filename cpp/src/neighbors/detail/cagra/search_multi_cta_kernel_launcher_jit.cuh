@@ -60,20 +60,6 @@ void select_and_run_jit(
   SampleFilterT sample_filter,
   cudaStream_t stream)
 {
-  RAFT_LOG_INFO(
-    "[JIT FRAGMENT DEBUG] select_and_run_jit (multi_cta) - is_vpq=%d, metric=%d, team_size=%u, "
-    "dataset_block_dim=%u, pq_bits=%u, pq_len=%u, queries_ptr=%p, topk_indices_ptr=%p, "
-    "topk_distances_ptr=%p",
-    dataset_desc.is_vpq,
-    static_cast<int>(dataset_desc.metric),
-    dataset_desc.team_size,
-    dataset_desc.dataset_block_dim,
-    dataset_desc.pq_bits,
-    dataset_desc.pq_len,
-    static_cast<const void*>(queries_ptr),
-    static_cast<const void*>(topk_indices_ptr),
-    static_cast<const void*>(topk_distances_ptr));
-
   // Extract bitset data from filter object (if it's a bitset_filter)
   uint32_t* bitset_ptr        = nullptr;
   SourceIndexT bitset_len     = 0;
@@ -103,22 +89,12 @@ void select_and_run_jit(
   using DistTag   = decltype(get_distance_type_tag<DistanceT>());
   using SourceTag = decltype(get_source_index_type_tag<SourceIndexT>());
 
-  RAFT_LOG_INFO(
-    "[JIT FRAGMENT DEBUG] multi_cta - DataTag=%s, IndexTag=%s, DistTag=%s, SourceTag=%s",
-    typeid(DataTag).name(),
-    typeid(IndexTag).name(),
-    typeid(DistTag).name(),
-    typeid(SourceTag).name());
-
   // Create planner and register device functions
   // Pass team_size, dataset_block_dim, and VPQ parameters to match the kernel entrypoint name
   std::shared_ptr<AlgorithmLauncher> launcher;
   if (dataset_desc.is_vpq) {
     using QueryTag    = query_type_tag_vpq_t<DataTag>;
     using CodebookTag = codebook_tag_vpq_t;
-    RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] multi_cta VPQ path - QueryTag=%s, CodebookTag=%s",
-                  typeid(QueryTag).name(),
-                  typeid(CodebookTag).name());
     CagraMultiCtaSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
       planner(dataset_desc.metric,
               dataset_desc.team_size,
@@ -147,11 +123,6 @@ void select_and_run_jit(
     if (dataset_desc.metric == cuvs::distance::DistanceType::BitwiseHamming) {
       using QueryTag =
         query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::BitwiseHamming>;
-      RAFT_LOG_INFO(
-        "[JIT FRAGMENT DEBUG] multi_cta Standard path (BitwiseHamming) - QueryTag=%s, "
-        "CodebookTag=%s",
-        typeid(QueryTag).name(),
-        typeid(CodebookTag).name());
       CagraMultiCtaSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
         planner(dataset_desc.metric,
                 dataset_desc.team_size,
@@ -177,11 +148,6 @@ void select_and_run_jit(
       launcher = planner.get_launcher();
     } else {
       using QueryTag = query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::L2Expanded>;
-      RAFT_LOG_INFO(
-        "[JIT FRAGMENT DEBUG] multi_cta Standard path (non-BitwiseHamming) - QueryTag=%s, "
-        "CodebookTag=%s",
-        typeid(QueryTag).name(),
-        typeid(CodebookTag).name());
       CagraMultiCtaSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
         planner(dataset_desc.metric,
                 dataset_desc.team_size,
@@ -237,12 +203,9 @@ void select_and_run_jit(
   dim3 grid_dims(num_cta_per_query, num_queries, 1);
 
   // Get the device descriptor pointer
-  RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] multi_cta About to call dev_ptr()");
   const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dev_desc_base =
     dataset_desc.dev_ptr(stream);
   const auto* dev_desc = dev_desc_base;
-  RAFT_LOG_INFO("[JIT FRAGMENT DEBUG] multi_cta dev_ptr() returned: %p",
-                static_cast<const void*>(dev_desc));
 
   // Note: dataset_desc is passed by const reference, so it stays alive for the duration of this
   // function The descriptor's state is managed by a shared_ptr internally, so no need to explicitly
