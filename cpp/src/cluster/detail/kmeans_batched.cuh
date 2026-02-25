@@ -33,6 +33,7 @@
 #include <cstring>
 #include <numeric>
 #include <random>
+#include <unordered_set>
 #include <vector>
 
 namespace cuvs::cluster::kmeans::detail {
@@ -55,9 +56,19 @@ void prepare_init_sample(raft::resources const& handle,
   auto n_samples_out  = X_sample.extent(0);
 
   std::mt19937 gen(seed);
-  std::vector<IdxT> indices(n_samples);
-  std::iota(indices.begin(), indices.end(), 0);
-  std::shuffle(indices.begin(), indices.end(), gen);
+  std::uniform_int_distribution<IdxT> dist(0, n_samples - 1);
+  
+  // Generate n_samples_out unique random indices using rejection sampling
+  // Since n_samples_out << n_samples, collisions are rare and this is O(n_samples_out)
+  std::unordered_set<IdxT> selected_indices;
+  selected_indices.reserve(n_samples_out);
+  
+  while (static_cast<IdxT>(selected_indices.size()) < n_samples_out) {
+    IdxT idx = dist(gen);
+    selected_indices.insert(idx);
+  }
+  
+  std::vector<IdxT> indices(selected_indices.begin(), selected_indices.end());
 
   std::vector<T> host_sample(n_samples_out * n_features);
 #pragma omp parallel for
