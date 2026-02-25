@@ -14,10 +14,11 @@ namespace cuvs::neighbors::detail {
 /**
  * @brief (Thread-)Safely invoke a kernel with a maximum dynamic shared memory size.
  *
- * Maintains a monotonically growing high-water mark for `cudaFuncAttributeMaxDynamicSharedMemorySize`.
- * When the kernel function pointer changes, the new kernel is brought up to the current high-water
- * mark; when smem_size exceeds the high-water mark, it is grown for the current kernel.
- * This guarantees every kernel's attribute is always >= smem_size at the time of launch.
+ * Maintains a monotonically growing high-water mark for
+ * `cudaFuncAttributeMaxDynamicSharedMemorySize`. When the kernel function pointer changes, the new
+ * kernel is brought up to the current high-water mark; when smem_size exceeds the high-water mark,
+ * it is grown for the current kernel. This guarantees every kernel's attribute is always >=
+ * smem_size at the time of launch.
  *
  * NB: cudaFuncSetAttribute is per kernel function pointer value, not per type. Multiple kernel
  * template instantiations may share the same KernelT type (e.g. function pointers with the same
@@ -50,7 +51,7 @@ void safely_launch_kernel_with_smem_size(KernelT const& kernel,
     // mark. This is necessary because cudaFuncSetAttribute applies to a specific function pointer,
     // not to the pointer type — different template instantiations may share the same KernelT.
     if (kernel != last_kernel) {
-      current_kernel     = kernel;
+      current_kernel = kernel;
       auto launch_status =
         cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, last_smem_size);
       RAFT_EXPECTS(launch_status == cudaSuccess,
@@ -60,7 +61,7 @@ void safely_launch_kernel_with_smem_size(KernelT const& kernel,
     // When smem_size exceeds the high-water mark, grow it for the current kernel.
     // If the kernel also changed above, this handles the case where smem_size > last_smem_size.
     if (smem_size > last_smem_size) {
-      current_smem_size  = smem_size;
+      current_smem_size = smem_size;
       auto launch_status =
         cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
       RAFT_EXPECTS(launch_status == cudaSuccess,
