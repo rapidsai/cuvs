@@ -652,6 +652,7 @@ if(NOT BUILD_CPU_ONLY)
     src/preprocessing/quantize/binary.cu
     src/preprocessing/quantize/pq.cu
     src/preprocessing/spectral/spectral_embedding.cu
+    src/preprocessing/pca/pca.cu
     src/selection/select_k_float_int64_t.cu
     src/selection/select_k_float_int32_t.cu
     src/selection/select_k_float_uint32_t.cu
