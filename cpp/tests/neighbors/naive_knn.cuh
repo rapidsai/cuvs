@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -58,6 +58,10 @@ RAFT_KERNEL naive_distance_kernel(EvalT* dist,
           if constexpr (std::is_same_v<uint8_t, DataT> || std::is_same_v<int8_t, DataT>) {
             acc += __popc(static_cast<uint32_t>(xv ^ yv) & 0xff);
           }
+        } break;
+        case cuvs::distance::DistanceType::L1: {
+          auto diff = static_cast<EvalT>(xv) - static_cast<EvalT>(yv);
+          acc += raft::abs(diff);
         } break;
         default: break;
       }

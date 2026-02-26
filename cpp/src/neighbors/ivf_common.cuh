@@ -235,6 +235,18 @@ void postprocess_distances(const raft::resources& res,
       }
     } break;
     case distance::DistanceType::BitwiseHamming: break;
+    case distance::DistanceType::L1: {
+      if (scaling_factor != 1.0) {
+        raft::linalg::unaryOp(out,
+                              in,
+                              len,
+                              raft::compose_op(raft::mul_const_op<ScoreOutT>{scaling_factor},
+                                               raft::cast_op<ScoreOutT>{}),
+                              stream);
+      } else if (needs_cast || needs_copy) {
+        raft::linalg::unaryOp(out, in, len, raft::cast_op<ScoreOutT>{}, stream);
+      }
+    } break;
     default: RAFT_FAIL("Unexpected metric.");
   }
 }
