@@ -141,14 +141,6 @@ jobs:
           echo "⚠️ No baseline artifacts found, extracting from main branch..."
           echo "This is slower but ensures we always have a baseline for comparison."
           git worktree add ../cuvs-main main
-          mkdir -p ../cuvs-main/cpp/build
-          cd ../cuvs-main/cpp/build
-          cmake .. \
-            -GNinja \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DBUILD_TESTS=OFF \
-            -DBUILD_EXAMPLES=OFF
-          cd ../../..
           mkdir -p baseline
           check-c-abi extract \
             --header-path ../cuvs-main/c/include \
