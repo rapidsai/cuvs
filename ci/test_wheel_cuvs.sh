@@ -11,7 +11,7 @@ rm -rf /usr/lib64/libnccl*
 
 # TODO(jameslamb): revert before merging
 git clone --branch generate-pip-constraints \
-    git@github.com:rapidsai/gha-tools.git \
+    https://github.com/rapidsai/gha-tools.git \
     /tmp/gha-tools
 
 export PATH="/tmp/gha-tools/tools:${PATH}"
