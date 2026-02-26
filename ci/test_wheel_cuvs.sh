@@ -11,7 +11,7 @@ rm -rf /usr/lib64/libnccl*
 
 # TODO(jameslamb): revert before merging
 git clone --branch generate-pip-constraints \
-    git@github.com:rapidsai/gha-tools.git \
+    https://github.com/rapidsai/gha-tools.git \
     /tmp/gha-tools
 
 export PATH="/tmp/gha-tools/tools:${PATH}"
@@ -24,7 +24,7 @@ LIBCUVS_WHEELHOUSE=$(RAPIDS_PY_WHEEL_NAME="libcuvs_${RAPIDS_PY_CUDA_SUFFIX}" rap
 CUVS_WHEELHOUSE=$(rapids-download-from-github "$(rapids-package-name "wheel_python" cuvs --stable --cuda "$RAPIDS_CUDA_VERSION")")
 
 # generate constraints (possibly pinning to oldest support versions of dependencies)
-rapids-generate-pip-constraints py_test_cuvs ./constraints.txt
+rapids-generate-pip-constraints test_python ./constraints.txt
 
 # notes:
 #
