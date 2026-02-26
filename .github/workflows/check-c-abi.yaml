@@ -88,6 +88,8 @@ jobs:
   check-pr:
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_call'
     runs-on: ubuntu-latest
+    container:
+      image: rapidsai/ci-conda:26.04-cuda13.1.1-rockylinux8-py3.11
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v4
