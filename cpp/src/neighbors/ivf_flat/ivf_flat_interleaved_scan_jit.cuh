@@ -93,8 +93,12 @@ constexpr auto get_metric_name()
 template <typename IvfSampleFilterTag>
 constexpr auto get_filter_name()
 {
-  if constexpr (std::is_same_v<IvfSampleFilterTag, tag_filter_none>) { return "filter_none_l"; }
-  if constexpr (std::is_same_v<IvfSampleFilterTag, tag_filter_bitset>) { return "filter_bitset_l"; }
+  if constexpr (std::is_same_v<IvfSampleFilterTag, tag_filter_none>) {
+    return "filter_none_source_index_l";
+  }
+  if constexpr (std::is_same_v<IvfSampleFilterTag, tag_filter_bitset>) {
+    return "filter_bitset_source_index_l";
+  }
 }
 
 template <typename PostLambdaTag>
