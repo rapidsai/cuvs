@@ -12,6 +12,7 @@
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/hnsw.hpp>
 #include <cuvs/util/file_io.hpp>
+#include <cuvs/util/host_memory.hpp>
 
 #include <raft/core/copy.cuh>
 #include <raft/core/detail/mdspan_numpy_serializer.hpp>
@@ -1265,6 +1266,23 @@ void deserialize(raft::resources const& res,
   }
 }
 
+inline std::pair<size_t, size_t> get_available_memory(
+  std::optional<double> max_host_memory_gb = std::nullopt,
+  std::optional<double> max_gpu_memory_gb  = std::nullopt)
+{
+  size_t available_host_memory = cuvs::util::get_free_host_memory();
+  if (max_host_memory_gb.has_value() && max_host_memory_gb.value() > 0) {
+    available_host_memory = static_cast<size_t>(max_host_memory_gb.value() * (1ULL << 30));
+    RAFT_LOG_INFO("ACE: Using overridden host memory limit: %.2f GiB", max_host_memory_gb.value());
+  }
+  size_t available_device_memory = rmm::available_device_memory().second;
+  if (max_gpu_memory_gb.has_value() && max_gpu_memory_gb.value() > 0) {
+    available_device_memory = static_cast<size_t>(max_gpu_memory_gb.value() * (1ULL << 30));
+    RAFT_LOG_INFO("ACE: Using overridden GPU memory limit: %.2f GiB", max_gpu_memory_gb.value());
+  }
+  return std::make_pair(available_host_memory, available_device_memory);
+}
+
 /**
  * @brief Build an HNSW index on the GPU using CAGRA graph building algorithm
  *
@@ -1280,33 +1298,61 @@ std::unique_ptr<index<T>> build(raft::resources const& res,
 {
   common::nvtx::range<common::nvtx::domain::cuvs> fun_scope("hnsw::build<ACE>");
 
-  // Use provided ACE parameters or default ones if not specified
-  auto ace_params =
-    std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params)
-      ? std::get<graph_build_params::ace_params>(params.graph_build_params)
-      : graph_build_params::ace_params{};
-
-  // Create CAGRA index parameters from HNSW parameters
   cuvs::neighbors::cagra::index_params cagra_params;
-  cagra_params.metric                    = params.metric;
-  cagra_params.intermediate_graph_degree = params.M * 3;
-  cagra_params.graph_degree              = params.M * 2;
+  bool use_ace = false;
 
-  // Configure ACE parameters for CAGRA
-  cuvs::neighbors::cagra::graph_build_params::ace_params cagra_ace_params;
-  cagra_ace_params.npartitions        = ace_params.npartitions;
-  cagra_ace_params.ef_construction    = params.ef_construction;
-  cagra_ace_params.build_dir          = ace_params.build_dir;
-  cagra_ace_params.use_disk           = ace_params.use_disk;
-  cagra_ace_params.max_host_memory_gb = ace_params.max_host_memory_gb;
-  cagra_ace_params.max_gpu_memory_gb  = ace_params.max_gpu_memory_gb;
-  cagra_params.graph_build_params     = cagra_ace_params;
+  if (std::holds_alternative<std::monostate>(params.graph_build_params)) {
+    cagra_params = cagra::index_params::from_hnsw_params(
+      dataset.extents(),
+      params.M,
+      params.ef_construction,
+      cagra::hnsw_heuristic_type::SAME_GRAPH_FOOTPRINT,  // SIMILAR_SEARCH_PERFORMANCE,
+      params.metric);
 
-  RAFT_LOG_INFO(
-    "hnsw::build - Building HNSW index using ACE with %zu partitions, ef_construction=%zu",
-    ace_params.npartitions,
-    ace_params.ef_construction);
+    auto [required_host, required_dev] = cuvs::neighbors::cagra::helpers::cagra_build_mem_usage(
+      res, dataset.extents(), sizeof(T), cagra_params);
+    auto [available_host, available_dev] = get_available_memory();
 
+    RAFT_LOG_INFO("CAGRA in memory build, required host mem %4.1f GB, GPU mem %4.1f GB",
+                  required_host / 1e9,
+                  required_dev / 1e9);
+    RAFT_LOG_INFO("Available                       host mem %4.1f GB, GPU mem %4.1f GB",
+                  available_host / 1e9,
+                  available_dev / 1e9);
+    if (required_host < available_host && required_dev < available_dev) {
+      RAFT_LOG_INFO("We have sufficient memory to proceed with in memory build");
+    } else {
+      use_ace = true;
+      RAFT_LOG_INFO(
+        "Not enough host or device memory. Falling back to ACE build with disk spilling");
+    }
+  }
+  if (use_ace) {
+    auto ace_params =
+      std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params)
+        ? std::get<graph_build_params::ace_params>(params.graph_build_params)
+        : graph_build_params::ace_params{};
+
+    // Create CAGRA index parameters from HNSW parameters
+    cagra_params.metric                    = params.metric;
+    cagra_params.intermediate_graph_degree = params.M * 3;
+    cagra_params.graph_degree              = params.M * 2;
+
+    // Configure ACE parameters for CAGRA
+    cuvs::neighbors::cagra::graph_build_params::ace_params cagra_ace_params;
+    cagra_ace_params.npartitions        = ace_params.npartitions;
+    cagra_ace_params.ef_construction    = params.ef_construction;
+    cagra_ace_params.build_dir          = ace_params.build_dir;
+    cagra_ace_params.use_disk           = ace_params.use_disk;
+    cagra_ace_params.max_host_memory_gb = ace_params.max_host_memory_gb;
+    cagra_ace_params.max_gpu_memory_gb  = ace_params.max_gpu_memory_gb;
+    cagra_params.graph_build_params     = cagra_ace_params;
+
+    RAFT_LOG_INFO(
+      "hnsw::build - Building HNSW index using ACE with %zu partitions, ef_construction=%zu",
+      ace_params.npartitions,
+      ace_params.ef_construction);
+  }
   // Build CAGRA index using ACE
   auto cagra_index = cuvs::neighbors::cagra::build(res, cagra_params, dataset);
 

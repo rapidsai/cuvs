@@ -3145,6 +3145,36 @@ void build_knn_graph(raft::resources const& res,
                      raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
                      cuvs::neighbors::cagra::graph_build_params::ivf_pq_params build_params);
 
+namespace helpers {
+/** Calculates the workspace for graph optimization
+ *
+ * @param[in] n_rows number of rows in the dataset (or number of points in the grapt)
+ * @param[in] graph_degree degree of the output graph
+ * @param[in] intermediate_graph_degree degree of the input graph for the optimization process
+ * @param[in] index_size
+ * @return pair of [host_size, device_size] memory sizes in bytes
+ */
+std::pair<size_t, size_t> optimize_workspace_size(size_t n_rows,
+                                                  size_t graph_degree,
+                                                  size_t intermediate_degree,
+                                                  size_t index_size,
+                                                  bool mst_optimize = false);
+
+/**
+ * Calculate memory usage of CAGRA build.
+ *
+ * @param[in] res raft resource
+ * @param[in] dataset shape of the dataset
+ * @param[in] dtype_size size of dataset datatype in bytes
+ * @param[in] cparams CAGRA index building parameters
+ *
+ * @return pair of [host_size, device_size] memory sizes in bytes
+ */
+std::pair<size_t, size_t> cagra_build_mem_usage(raft::resources const& res,
+                                                raft::matrix_extent<int64_t> dataset,
+                                                size_t dtype_size,
+                                                cuvs::neighbors::cagra::index_params cparams);
+}  // namespace helpers
 }  // namespace cuvs::neighbors::cagra
 
 namespace cuvs::neighbors::cagra::helpers {
