@@ -128,24 +128,27 @@ def test_fit_batched_matches_fit(
 
 @pytest.mark.parametrize("n_rows", [1000])
 @pytest.mark.parametrize("n_cols", [10])
-@pytest.mark.parametrize("n_clusters", [8])
-@pytest.mark.parametrize("dtype", [np.float32])
+@pytest.mark.parametrize("n_clusters", [8, 16, 32])
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
 def test_minibatch_sklearn(n_rows, n_cols, n_clusters, dtype):
     """
     Test that fit_batched matches sklearn's KMeans implementation.
     """
     rng = np.random.default_rng(99)
     X_host = rng.random((n_rows, n_cols)).astype(dtype)
+    norms = np.linalg.norm(X_host, ord=1, axis=1, keepdims=True)
+    norms = np.where(norms == 0, 1.0, norms)
+    X_host = X_host / norms
     initial_centroids_host = X_host[:n_clusters].copy()
 
     # Sklearn fit
     kmeans = MiniBatchKMeans(
-        n_clusters=8,
+        n_clusters=n_clusters,
         init=initial_centroids_host,
         max_iter=100,
         verbose=0,
         random_state=None,
-        tol=0.0,
+        tol=1e-4,
         max_no_improvement=10,
         init_size=None,
         n_init="auto",
@@ -176,7 +179,7 @@ def test_minibatch_sklearn(n_rows, n_cols, n_clusters, dtype):
     centroids_cuvs = centroids_cuvs.copy_to_host()
 
     assert np.allclose(
-        centroids_sklearn, centroids_cuvs, rtol=0.3, atol=0.3
+        centroids_sklearn, centroids_cuvs, rtol=0.1, atol=0.1
     ), f"max diff: {np.max(np.abs(centroids_sklearn - centroids_cuvs))}"
 
     inertia_diff = abs(inertia_sklearn - inertia_cuvs)
