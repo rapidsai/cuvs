@@ -9,6 +9,16 @@ source rapids-init-pip
 # Delete system libnccl.so to ensure the wheel is used
 rm -rf /usr/lib64/libnccl*
 
+# TODO(jameslamb): revert before merging
+git clone --branch generate-pip-constraints \
+    git@github.com:rapidsai/gha-tools.git \
+    /tmp/gha-tools
+
+export PATH="/tmp/gha-tools/tools:${PATH}"
+echo "--- rapids-generate-pip-constraints ---"
+cat $(which rapids-generate-pip-constraints)
+echo ""
+
 RAPIDS_PY_CUDA_SUFFIX="$(rapids-wheel-ctk-name-gen "${RAPIDS_CUDA_VERSION}")"
 LIBCUVS_WHEELHOUSE=$(RAPIDS_PY_WHEEL_NAME="libcuvs_${RAPIDS_PY_CUDA_SUFFIX}" rapids-download-wheels-from-github cpp)
 CUVS_WHEELHOUSE=$(rapids-download-from-github "$(rapids-package-name "wheel_python" cuvs --stable --cuda "$RAPIDS_CUDA_VERSION")")
