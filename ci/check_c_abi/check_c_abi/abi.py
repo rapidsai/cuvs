@@ -213,7 +213,9 @@ class AbiError(msgspec.Struct):
     location: Optional[SymbolLocation] = None
 
 
-def _analyze_function_abi(old_abi: Abi, new_abi: Abi) -> Generator[AbiError]:
+def _analyze_function_abi(
+    old_abi: Abi, new_abi: Abi
+) -> Generator[AbiError, None, None]:
     """This iterates over every function in the existing abi, and make sure that no functions
     have been removed or had function parameters removed, parameters added or the type of any
     parameter changed. Note: adding new functions to the new abi is allowed
@@ -266,7 +268,9 @@ def _analyze_function_abi(old_abi: Abi, new_abi: Abi) -> Generator[AbiError]:
                 )
 
 
-def _analyze_struct_abi(old_abi: Abi, new_abi: Abi) -> Generator[AbiError]:
+def _analyze_struct_abi(
+    old_abi: Abi, new_abi: Abi
+) -> Generator[AbiError, None, None]:
     """Checks to see if any existing structures have had items removed, reordered, renamed, or types
     changed (adding new members is considered to be ok, as long as functions are initialized via
     a create factory function)
@@ -307,7 +311,9 @@ def _analyze_struct_abi(old_abi: Abi, new_abi: Abi) -> Generator[AbiError]:
                 )
 
 
-def _analyze_enum_abi(old_abi: Abi, new_abi: Abi) -> Generator[AbiError]:
+def _analyze_enum_abi(
+    old_abi: Abi, new_abi: Abi
+) -> Generator[AbiError, None, None]:
     # flatten enum values: since values inside an enum in C are in the global scope
     old_enum_values = {
         k: (v, enum) for enum in old_abi.enums for k, v in enum.values
