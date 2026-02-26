@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "nvjitlink_helper.hpp"
+#include <cuvs/detail/jit_lto/nvjitlink_helper.hpp>
 
 #include <cstring>
 
