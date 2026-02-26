@@ -264,8 +264,8 @@ void minibatch_update_centroids(raft::resources const& handle,
     auto reassign_flags = raft::make_device_vector<uint8_t, IdxT>(handle, n_clusters);
 
     raft::linalg::unaryOp(
-      total_counts.data_handle(),
       reassign_flags.data_handle(),
+      total_counts.data_handle(),
       n_clusters,
       [=] __device__(MathT count) {
         return (count < threshold || count == MathT{0}) ? uint8_t{1} : uint8_t{0};
