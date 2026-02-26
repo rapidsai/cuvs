@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -525,3 +525,7 @@ bool has_enough_device_memory(raft::resources const& res,
                               size_t idx_size = 4);
 
 }  // namespace cuvs::neighbors::nn_descent
+
+namespace cuvs::neighbors::graph_build_params {
+using nn_descent_params = cuvs::neighbors::nn_descent::index_params;
+}
