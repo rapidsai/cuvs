@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -10,7 +10,6 @@
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/linalg/map.cuh>
-#include <raft/linalg/unary_op.cuh>
 #include <raft/sparse/coo.hpp>
 #include <raft/sparse/linalg/symmetrize.cuh>
 #include <raft/util/cuda_dev_essentials.cuh>
@@ -88,10 +87,10 @@ void knn_graph(raft::resources const& res,
     indices_64_view,
     distances_view);
 
-  raft::linalg::unary_op(res,
-                         raft::make_const_mdspan(indices_64_view),
-                         raft::make_device_vector_view<value_idx, nnz_t>(indices.data(), nnz),
-                         raft::cast_op<value_idx>{});
+  raft::linalg::map(res,
+                    raft::make_device_vector_view<value_idx, nnz_t>(indices.data(), nnz),
+                    raft::cast_op<value_idx>{},
+                    raft::make_const_mdspan(indices_64_view));
 
   raft::sparse::linalg::symmetrize(res,
                                    rows.data(),

@@ -38,7 +38,6 @@
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/norm_types.hpp>
 #include <raft/linalg/normalize.cuh>
-#include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/gather.cuh>
 #include <raft/matrix/linewise_op.cuh>
 #include <raft/matrix/sample_rows.cuh>
@@ -149,28 +148,34 @@ void flat_compute_residuals(
   auto tmp_view = raft::make_device_vector_view<float, size_t>(tmp.data(), tmp.size());
 
   if (metric == cuvs::distance::DistanceType::CosineExpanded) {
-    raft::linalg::map(handle,
-                      tmp_view,
-                      raft::cast_op<float>{},
-                      raft::make_device_vector_view<const T, IdxT>(dataset, n_rows * dim));
+    raft::linalg::map(
+      handle,
+      tmp_view,
+      raft::cast_op<float>{},
+      raft::make_const_mdspan(raft::make_device_vector_view<const T, IdxT>(dataset, n_rows * dim)));
     auto tmp_matrix_view = raft::make_device_matrix_view<float, size_t>(tmp.data(), n_rows, dim);
     raft::linalg::row_normalize<raft::linalg::L2Norm>(
       handle, raft::make_const_mdspan(tmp_matrix_view), tmp_matrix_view);
   } else {
-    raft::linalg::map_offset(handle, tmp_view, [dataset, dim] __device__(size_t i) {
-      return utils::mapping<float>{}(dataset[i]);
-    });
+    raft::linalg::map_offset(
+      handle,
+      tmp_view,
+      [dim] __device__(size_t i, T val) { return utils::mapping<float>{}(val); },
+      raft::make_const_mdspan(raft::make_device_vector_view<const T, IdxT>(dataset, n_rows * dim)));
   }
 
   raft::linalg::map_offset(
-    handle, tmp_view, [centers, tmp = tmp.data(), labels, dim] __device__(size_t i) {
+    handle,
+    tmp_view,
+    [centers, labels, dim] __device__(size_t i, float val) {
       auto row_ix = i / dim;
       auto el_ix  = i % dim;
       auto label  = std::holds_alternative<uint32_t>(labels)
                       ? std::get<uint32_t>(labels)
                       : std::get<const uint32_t*>(labels)[row_ix];
-      return tmp[i] - centers(label, el_ix);
-    });
+      return val - centers(label, el_ix);
+    },
+    raft::make_const_mdspan(tmp_view));
 
   float alpha = 1.0f;
   float beta  = 0.0f;
@@ -268,8 +273,10 @@ inline void pad_centers_with_norms(raft::resources const& res,
                                   stream));
 
   rmm::device_uvector<float> center_norms(n_lists, stream);
-  raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
-    center_norms.data(), centers, dim, n_lists, stream);
+  raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+    res,
+    raft::make_device_matrix_view<const float, uint32_t, raft::row_major>(centers, n_lists, dim),
+    raft::make_device_vector_view<float, uint32_t>(center_norms.data(), n_lists));
   RAFT_CUDA_TRY(cudaMemcpy2DAsync(padded_centers + dim,
                                   sizeof(float) * dim_ext,
                                   center_norms.data(),
@@ -837,12 +844,14 @@ auto extend_list_prepare(
   uint32_t n_rows = new_indices.extent(0);
   uint32_t offset;
   // Allocate the lists to fit the new data
-  raft::copy(
-    &offset, index->list_sizes().data_handle() + label, 1, raft::resource::get_cuda_stream(res));
+  raft::copy(res,
+             raft::make_host_scalar_view(&offset),
+             raft::make_device_scalar_view(index->list_sizes().data_handle() + label));
   raft::resource::sync_stream(res);
   uint32_t new_size = offset + n_rows;
-  raft::copy(
-    index->list_sizes().data_handle() + label, &new_size, 1, raft::resource::get_cuda_stream(res));
+  raft::copy(res,
+             raft::make_device_scalar_view(index->list_sizes().data_handle() + label),
+             raft::make_host_scalar_view(&new_size));
   auto& list_data_base_ptr = index->lists()[label];
   if (index->codes_layout() == list_layout::FLAT) {
     auto spec = list_spec_flat<uint32_t, IdxT>{
@@ -853,10 +862,10 @@ auto extend_list_prepare(
       index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
     cuvs::neighbors::ivf_pq::helpers::resize_list(res, list_data_base_ptr, spec, new_size, offset);
   }
-  raft::copy(list_data_base_ptr->indices_ptr() + offset,
-             new_indices.data_handle(),
-             n_rows,
-             raft::resource::get_cuda_stream(res));
+  raft::copy(res,
+             raft::make_device_vector_view<IdxT, uint32_t>(
+               list_data_base_ptr->indices_ptr() + offset, n_rows),
+             new_indices);
   return offset;
 }
 
@@ -927,8 +936,9 @@ template <typename IdxT>
 void erase_list(raft::resources const& res, index<IdxT>* index, uint32_t label)
 {
   uint32_t zero = 0;
-  raft::copy(
-    index->list_sizes().data_handle() + label, &zero, 1, raft::resource::get_cuda_stream(res));
+  raft::copy(res,
+             raft::make_device_scalar_view(index->list_sizes().data_handle() + label),
+             raft::make_host_scalar_view(&zero));
   index->lists()[label].reset();
   ivf::detail::recompute_internal_state(res, *index);
 }
@@ -950,25 +960,12 @@ auto clone(const raft::resources& res, const index<IdxT>& source) -> index<IdxT>
                                                   source.conservative_memory_allocation(),
                                                   source.codes_layout());
 
-  // raft::copy the independent parts using mutable accessors
-  raft::copy(impl->list_sizes().data_handle(),
-             source.list_sizes().data_handle(),
-             source.list_sizes().size(),
-             stream);
-  raft::copy(impl->rotation_matrix().data_handle(),
-             source.rotation_matrix().data_handle(),
-             source.rotation_matrix().size(),
-             stream);
-  raft::copy(impl->pq_centers().data_handle(),
-             source.pq_centers().data_handle(),
-             source.pq_centers().size(),
-             stream);
-  raft::copy(
-    impl->centers().data_handle(), source.centers().data_handle(), source.centers().size(), stream);
-  raft::copy(impl->centers_rot().data_handle(),
-             source.centers_rot().data_handle(),
-             source.centers_rot().size(),
-             stream);
+  // Copy the independent parts using mutable accessors
+  raft::copy(res, impl->list_sizes(), source.list_sizes());
+  raft::copy(res, impl->rotation_matrix(), source.rotation_matrix());
+  raft::copy(res, impl->pq_centers(), source.pq_centers());
+  raft::copy(res, impl->centers(), source.centers());
+  raft::copy(res, impl->centers_rot(), source.centers_rot());
 
   // raft::copy shared pointers
   impl->lists() = source.lists();
@@ -1135,7 +1132,9 @@ void extend(raft::resources const& handle,
   auto list_sizes = index->list_sizes().data_handle();
   // store the current cluster sizes, because we'll need them later
   rmm::device_uvector<uint32_t> orig_list_sizes(n_clusters, stream, device_memory);
-  raft::copy(orig_list_sizes.data(), list_sizes, n_clusters, stream);
+  raft::copy(handle,
+             raft::make_device_vector_view(orig_list_sizes.data(), n_clusters),
+             raft::make_device_vector_view<const uint32_t>(list_sizes, n_clusters));
 
   // Get the combined cluster sizes
   raft::stats::histogram<uint32_t, IdxT>(raft::stats::HistTypeAuto,
@@ -1145,14 +1144,22 @@ void extend(raft::resources const& handle,
                                          n_rows,
                                          1,
                                          stream);
-  raft::linalg::add(list_sizes, list_sizes, orig_list_sizes.data(), n_clusters, stream);
+  raft::linalg::add(
+    handle,
+    raft::make_device_vector_view<const uint32_t>(list_sizes, n_clusters),
+    raft::make_device_vector_view<const uint32_t>(orig_list_sizes.data(), n_clusters),
+    raft::make_device_vector_view<uint32_t>(list_sizes, n_clusters));
 
   // Allocate the lists to fit the new data
   {
     std::vector<uint32_t> new_cluster_sizes(n_clusters);
     std::vector<uint32_t> old_cluster_sizes(n_clusters);
-    raft::copy(new_cluster_sizes.data(), list_sizes, n_clusters, stream);
-    raft::copy(old_cluster_sizes.data(), orig_list_sizes.data(), n_clusters, stream);
+    raft::copy(handle,
+               raft::make_host_vector_view(new_cluster_sizes.data(), n_clusters),
+               raft::make_device_vector_view<const uint32_t>(list_sizes, n_clusters));
+    raft::copy(handle,
+               raft::make_host_vector_view(old_cluster_sizes.data(), n_clusters),
+               raft::make_device_vector_view<const uint32_t>(orig_list_sizes.data(), n_clusters));
     raft::resource::sync_stream(handle);
     if (index->codes_layout() == list_layout::FLAT) {
       auto spec = list_spec_flat<uint32_t, IdxT>{
@@ -1175,7 +1182,9 @@ void extend(raft::resources const& handle,
   ivf::detail::recompute_internal_state(handle, *index);
 
   // Recover old cluster sizes: they are used as counters in the fill-codes kernel
-  raft::copy(list_sizes, orig_list_sizes.data(), n_clusters, stream);
+  raft::copy(handle,
+             raft::make_device_vector_view(list_sizes, n_clusters),
+             raft::make_device_vector_view<const uint32_t>(orig_list_sizes.data(), n_clusters));
 
   // By this point, the index state is updated and valid except it doesn't contain the new data
   // Fill the extended index with the new data (possibly, in batches)
@@ -1300,11 +1309,12 @@ auto build(raft::resources const& handle,
 
       raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset_tmp.view());
 
-      raft::linalg::unaryOp(trainset.data_handle(),
-                            trainset_tmp.data_handle(),
-                            trainset.size(),
-                            utils::mapping<float>{},
-                            raft::resource::get_cuda_stream(handle));
+      raft::linalg::map(handle,
+                        raft::make_device_vector_view<float, int64_t>(trainset.data_handle(),
+                                                                      (int64_t)trainset.size()),
+                        utils::mapping<float>{},
+                        raft::make_const_mdspan(raft::make_device_vector_view<const T, int64_t>(
+                          trainset_tmp.data_handle(), (int64_t)trainset.size())));
     }
 
     // NB: here cluster_centers is used as if it is [n_clusters, data_dim] not [n_clusters,
@@ -1571,10 +1581,7 @@ auto build(
     impl->n_lists());
 
   if (centers.extent(1) == impl->dim_ext()) {
-    raft::copy(impl->centers().data_handle(),
-               centers.data_handle(),
-               impl->centers().extent(0) * impl->centers().extent(1),
-               stream);
+    raft::copy(handle, impl->centers(), centers);
   } else {
     cuvs::neighbors::ivf_pq::helpers::pad_centers_with_norms(handle, centers, impl->centers());
   }
@@ -1587,10 +1594,7 @@ auto build(
                  dim,
                  rotation_matrix.value().extent(0),
                  rotation_matrix.value().extent(1));
-    raft::copy(impl->rotation_matrix().data_handle(),
-               rotation_matrix.value().data_handle(),
-               rotation_matrix.value().size(),
-               stream);
+    raft::copy(handle, impl->rotation_matrix(), rotation_matrix.value());
   } else {
     helpers::make_rotation_matrix(
       handle, impl->rotation_matrix(), index_params.force_random_rotation);
@@ -1604,10 +1608,7 @@ auto build(
                  impl->rot_dim(),
                  centers_rot.value().extent(0),
                  centers_rot.value().extent(1));
-    raft::copy(impl->centers_rot().data_handle(),
-               centers_rot.value().data_handle(),
-               centers_rot.value().size(),
-               stream);
+    raft::copy(handle, impl->centers_rot(), centers_rot.value());
   } else {
     cuvs::neighbors::ivf_pq::helpers::rotate_padded_centers(
       handle, impl->centers(), impl->rotation_matrix(), impl->centers_rot());
@@ -1623,7 +1624,7 @@ auto build(
                pq_centers.extent(0),
                pq_centers.extent(1),
                pq_centers.extent(2));
-  raft::copy(impl->pq_centers().data_handle(), pq_centers.data_handle(), pq_centers.size(), stream);
+  raft::copy(handle, impl->pq_centers(), pq_centers);
 
   // Wrap the impl in an index and return
   return index<IdxT>(std::move(impl));
