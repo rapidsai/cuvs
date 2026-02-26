@@ -31,6 +31,7 @@
 #include <climits>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <random>
 
 namespace cuvs::neighbors::cagra::detail::graph {
@@ -1143,7 +1144,8 @@ void optimize(
   raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph,
   const bool guarantee_connectivity = true,
-  const bool use_gpu                = true)
+  const bool use_gpu                = true,
+  const IdxT* d_knn_graph_ptr       = nullptr)
 {
   RAFT_LOG_DEBUG(
     "# Pruning kNN graph (size=%lu, degree=%lu)\n", knn_graph.extent(0), knn_graph.extent(1));
@@ -1248,11 +1250,18 @@ void optimize(
 
       RAFT_LOG_DEBUG("# Pruning kNN Graph on GPUs\r");
 
-      // Copy knn_graph over to device if necessary
-      device_matrix_view_from_host d_input_graph(
-        res,
-        raft::make_host_matrix_view<IdxT, int64_t>(
-          knn_graph.data_handle(), graph_size, knn_graph_degree));
+      // Use device knn_graph directly if provided; otherwise copy from host.
+      std::optional<device_matrix_view_from_host<IdxT, int64_t>> d_input_graph_copy;
+      const IdxT* d_input_graph_handle;
+      if (d_knn_graph_ptr != nullptr) {
+        d_input_graph_handle = d_knn_graph_ptr;
+      } else {
+        d_input_graph_copy.emplace(
+          res,
+          raft::make_host_matrix_view<IdxT, int64_t>(
+            knn_graph.data_handle(), graph_size, knn_graph_degree));
+        d_input_graph_handle = d_input_graph_copy->data_handle();
+      }
 
       constexpr int MAX_DEGREE = 1024;
       if (knn_graph_degree > MAX_DEGREE) {
@@ -1273,7 +1282,7 @@ void optimize(
       for (uint32_t i_batch = 0; i_batch < num_batch; i_batch++) {
         kern_prune<MAX_DEGREE, IdxT>
           <<<blocks_prune, threads_prune, 0, raft::resource::get_cuda_stream(res)>>>(
-            d_input_graph.data_handle(),
+            d_input_graph_handle,
             graph_size,
             knn_graph_degree,
             output_graph_degree,

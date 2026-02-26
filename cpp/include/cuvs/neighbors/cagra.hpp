@@ -120,6 +120,14 @@ struct index_params : cuvs::neighbors::index_params {
   bool guarantee_connectivity = false;
 
   /**
+   * Whether to skip graph optimization (pruning, reverse edges, MST) during non-final iterations
+   * of iterative graph building. When true, search results are copied directly into the device
+   * graph without host round-trips. Only applies to iterative_search_params graph builds; the
+   * final iteration always runs full optimization.
+   */
+  bool skip_graph_optimization = false;
+
+  /**
    * Whether to add the dataset content to the index, i.e.:
    *
    *  - `true` means the index is filled with the dataset vectors and ready to search after calling

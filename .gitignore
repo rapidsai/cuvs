@@ -72,7 +72,9 @@ docs/source/_static/rust
 
 # clang tooling
 compile_commands.json
-.clangd/
+
+
+
 
 # serialized ann indexes
 brute_force_index

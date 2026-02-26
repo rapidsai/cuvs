@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -104,7 +104,8 @@ RAFT_KERNEL random_pickup_kernel(
   typename DATASET_DESCRIPTOR_T::DISTANCE_T* const result_distances_ptr,  // [num_queries, ldr]
   const std::uint32_t ldr,                                                // (*) ldr >= num_pickup
   typename DATASET_DESCRIPTOR_T::INDEX_T* const visited_hashmap_ptr,  // [num_queries, 1 << bitlen]
-  const std::uint32_t hash_bitlen)
+  const std::uint32_t hash_bitlen,
+  const typename DATASET_DESCRIPTOR_T::INDEX_T graph_size = 0)
 {
   using DATA_T     = typename DATASET_DESCRIPTOR_T::DATA_T;
   using INDEX_T    = typename DATASET_DESCRIPTOR_T::INDEX_T;
@@ -119,6 +120,8 @@ RAFT_KERNEL random_pickup_kernel(
   dataset_desc = dataset_desc->setup_workspace(smem, queries_ptr, query_id);
   __syncthreads();
 
+  // Set the resulting random index limit to the modulo wrap value if it is set
+  const INDEX_T seed_index_limit = graph_size > 0 ? graph_size : dataset_desc->size;
   INDEX_T best_index_team_local;
   DISTANCE_T best_norm2_team_local = utils::get_max_value<DISTANCE_T>();
   for (unsigned i = 0; i < num_distilation; i++) {
@@ -128,7 +131,7 @@ RAFT_KERNEL random_pickup_kernel(
     } else {
       // Chose a seed node randomly
       seed_index =
-        device::xorshift64((global_team_index ^ rand_xor_mask) * (i + 1)) % dataset_desc->size;
+        device::xorshift64((global_team_index ^ rand_xor_mask) * (i + 1)) % seed_index_limit;
     }
 
     DISTANCE_T norm2 = dataset_desc->compute_distance(seed_index, true);
@@ -166,12 +169,14 @@ void random_pickup(const dataset_descriptor_host<DataT, IndexT, DistanceT>& data
                    std::size_t ldr,                  // (*) ldr >= num_pickup
                    IndexT* visited_hashmap_ptr,      // [num_queries, 1 << bitlen]
                    std::uint32_t hash_bitlen,
-                   cudaStream_t cuda_stream)
+                   cudaStream_t cuda_stream,
+                   IndexT graph_size = 0)
 {
   const auto block_size                = 256u;
   const auto num_teams_per_threadblock = block_size / dataset_desc.team_size;
   const dim3 grid_size((num_pickup + num_teams_per_threadblock - 1) / num_teams_per_threadblock,
                        num_queries);
+  RAFT_LOG_DEBUG("max_node_id: %d", mod_wrap);
 
   random_pickup_kernel<<<grid_size, block_size, dataset_desc.smem_ws_size_in_bytes, cuda_stream>>>(
     dataset_desc.dev_ptr(cuda_stream),
@@ -185,7 +190,8 @@ void random_pickup(const dataset_descriptor_host<DataT, IndexT, DistanceT>& data
     result_distances_ptr,
     ldr,
     visited_hashmap_ptr,
-    hash_bitlen);
+    hash_bitlen,
+    graph_size);
 }
 
 template <class INDEX_T>
