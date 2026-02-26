@@ -432,7 +432,7 @@ if(NOT BUILD_CPU_ONLY)
       src/detail/jit_lto/AlgorithmPlanner.cu
       src/detail/jit_lto/FragmentDatabase.cu
       src/detail/jit_lto/FragmentEntry.cu
-      src/detail/jit_lto/nvjitlink_checker.cpp
+      src/detail/jit_lto/nvjitlink_helper.cpp
     )
     set_target_properties(
       cuvs_jit_lto_kernels PROPERTIES POSITION_INDEPENDENT_CODE ON CXX_STANDARD 20
