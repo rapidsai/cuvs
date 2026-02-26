@@ -105,8 +105,8 @@
     ],
     "_query": [
       {
-        "query_type": "float",
-        "query_abbrev": "f"
+        "query_type": "half",
+        "query_abbrev": "h"
       }
     ],
     "_index": [
