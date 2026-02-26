@@ -46,7 +46,7 @@ struct CagraMultiCtaSearchPlanner
                                            uint32_t pq_bits,
                                            uint32_t pq_len)
   {
-    std::string name = "search_multi_cta_kernel";
+    std::string name = "search_multi_cta";
     if (is_vpq) { name += "_vpq"; }
     name += "_team_size_" + std::to_string(team_size);
     name += "_dataset_block_dim_" + std::to_string(dataset_block_dim);

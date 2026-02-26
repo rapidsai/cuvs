@@ -19,7 +19,7 @@ __attribute__((__constructor__)) void register_kernel()
     tag_idx_@index_abbrev@,
     tag_dist_@distance_abbrev@,
     tag_idx_@source_index_abbrev@@codebook_comma@ @codebook_tag@>(
-    "search_single_cta_kernel_p_@topk_by_bitonic_sort_str@_@bitonic_sort_and_merge_multi_warps_str@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@",
+    "search_multi_cta@pq_prefix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@",
     embedded_fatbin,
     sizeof(embedded_fatbin));
 }

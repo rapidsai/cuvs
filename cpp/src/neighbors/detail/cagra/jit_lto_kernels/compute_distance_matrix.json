@@ -70,20 +70,19 @@
     ],
     "_pq": [
       {
-        "pq_prefix": "_standard",
-        "pq_suffix": "",
+        "pq_len": "0",
         "pq_bits": "0",
-        "pq_len": "0"
+        "pq_prefix": "_standard",
+        "pq_suffix": ""
       }
     ],
     "_codebook": [
       {
         "codebook_type": "void",
         "codebook_tag": "",
-        "codebook_tag_comma": ""
+        "codebook_comma": ""
       }
-    ],
-    "impl_file": "compute_distance_standard_impl.cuh"
+    ]
   },
   {
     "_data": [
@@ -150,9 +149,8 @@
       {
         "codebook_type": "half",
         "codebook_tag": "tag_codebook_half",
-        "codebook_tag_comma": ", "
+        "codebook_comma": ", "
       }
-    ],
-    "impl_file": "compute_distance_vpq_impl.cuh"
+    ]
   }
 ]

@@ -5,7 +5,7 @@
 
 // This file is auto-generated. Do not edit manually.
 
-#include <neighbors/detail/cagra/jit_lto_kernels/search_single_cta_kernel_jit.cuh>
+#include <neighbors/detail/cagra/jit_lto_kernels/search_single_cta_jit.cuh>
 
 namespace cuvs::neighbors::cagra::detail::single_cta_search {
 
