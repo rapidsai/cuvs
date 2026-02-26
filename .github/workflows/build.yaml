@@ -42,11 +42,13 @@ jobs:
       date: ${{ inputs.date }}
       node_type: cpu16
       script: ci/build_cpp.sh
+      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
       sha: ${{ inputs.sha }}
 
   rocky8-clib-standalone-build:
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
+    runs-on: linux-${{ matrix.arch }}-cpu16
+    env:
+      RAPIDS_ARTIFACTS_DIR: ${{ github.workspace }}/artifacts
     strategy:
       fail-fast: false
       matrix:
@@ -56,18 +58,39 @@ jobs:
         arch:
           - amd64
           - arm64
-    with:
-      build_type: ${{ inputs.build_type || 'branch' }}
-      branch: ${{ inputs.branch }}
-      arch: "${{matrix.arch}}"
-      date: ${{ inputs.date }}
-      container_image: "rapidsai/ci-wheel:26.04-cuda${{ matrix.cuda_version }}-rockylinux8-py3.11"
-      node_type: "cpu16"
-      requires_license_builder: true
-      script: "ci/build_standalone_c.sh"
-      artifact-name: "libcuvs_c_${{ matrix.cuda_version }}_${{ matrix.arch }}.tar.gz"
-      file_to_upload: "libcuvs_c.tar.gz"
-      sha: ${{ inputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+          fetch-depth: 0
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-duration-seconds: 43200
+      - name: Setup sccache-dist
+        uses: rapidsai/shared-actions/setup-sccache-dist@main
+        with:
+          log-file: ${{ env.RAPIDS_ARTIFACTS_DIR }}/sccache.log
+          request-timeout: 7140
+      - name: Get RAPIDS License Builder
+        uses: actions/checkout@v4
+        with:
+          repository: rapidsai/spdx-license-builder
+          ref: refs/heads/main
+          path: ./tool/
+          fetch-depth: 0
+      - name: Build and run standalone C Docker image
+        env:
+          CUDA_VERSION: ${{ matrix.cuda_version }}
+          PYTHON_VERSION: "3.10"
+          RAPIDS_AUX_SECRET_1: ${{ secrets.GIST_REPO_READ_ORG_GITHUB_TOKEN }}
+        run: ci/run_standalone_c_docker.sh
+      - name: Upload file to GitHub Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libcuvs_c_${{ matrix.cuda_version }}_${{ matrix.arch }}.tar.gz
+          path: libcuvs_c.tar.gz
   rust-build:
     needs: cpp-build
     secrets: inherit
