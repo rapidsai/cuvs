@@ -242,6 +242,53 @@ __global__ void kern_make_rev_graph(const IdxT* const dest_nodes,     // [graph_
   }
 }
 
+template <class IdxT>
+__global__ void kern_select_edges(const uint8_t* const d_detour_count,
+                                  const IdxT* const d_knn_graph,
+                                  IdxT* const d_output_graph,
+                                  const uint32_t graph_size,
+                                  const uint32_t knn_graph_degree,
+                                  const uint32_t output_graph_degree,
+                                  uint32_t* const d_invalid_count)
+{
+  const uint64_t i = static_cast<uint64_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  if (i >= graph_size) return;
+
+  const uint8_t* my_detour = d_detour_count + i * knn_graph_degree;
+  const IdxT* my_knn       = d_knn_graph + i * knn_graph_degree;
+  IdxT* my_output          = d_output_graph + i * output_graph_degree;
+
+  uint32_t pk         = 0;
+  uint32_t num_detour = 0;
+  for (uint32_t l = 0; l < knn_graph_degree && pk < output_graph_degree; l++) {
+    uint32_t next_num_detour = 0xFFFFFFFFu;
+    for (uint32_t k = 0; k < knn_graph_degree; k++) {
+      const uint32_t d = my_detour[k];
+      if (d > num_detour) { next_num_detour = min(next_num_detour, d); }
+      if (d != num_detour) { continue; }
+
+      const IdxT candidate = my_knn[k];
+      bool dup              = false;
+      for (uint32_t dk = 0; dk < pk; dk++) {
+        if (candidate == my_output[dk]) {
+          dup = true;
+          break;
+        }
+      }
+      if (!dup && candidate < static_cast<IdxT>(graph_size)) {
+        my_output[pk] = candidate;
+        pk++;
+      }
+      if (pk >= output_graph_degree) break;
+    }
+    if (pk >= output_graph_degree) break;
+    if (next_num_detour == 0xFFFFFFFFu) break;
+    num_detour = next_num_detour;
+  }
+
+  if (pk != output_graph_degree) { atomicAdd(d_invalid_count, 1); }
+}
+
 template <class IdxT, class LabelT>
 __device__ __host__ LabelT get_root_label(IdxT i, const LabelT* label)
 {
@@ -1299,8 +1346,6 @@ void optimize(
       raft::resource::sync_stream(res);
       RAFT_LOG_DEBUG("\n");
 
-      raft::copy(res, detour_count.view(), raft::make_const_mdspan(d_detour_count.view()));
-
       raft::copy(res, host_stats.view(), raft::make_const_mdspan(dev_stats.view()));
       num_keep = host_stats.data_handle()[0];
       num_full = host_stats.data_handle()[1];
@@ -1314,6 +1359,45 @@ void optimize(
         (double)num_keep / graph_size,
         output_graph_degree,
         (double)num_full / graph_size * 100);
+
+      // GPU edge selection: pick output_graph_degree edges per node with lowest detour counts.
+      {
+        raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> select_scope(
+          "cagra::graph::optimize/prune/edge-selection-by-GPU");
+        auto d_output_graph = raft::make_device_mdarray<IdxT>(
+          res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, output_graph_degree));
+        auto d_invalid_count = raft::make_device_mdarray<uint32_t>(
+          res, large_tmp_mr, raft::make_extents<int64_t>(1));
+        raft::matrix::fill(res, d_invalid_count.view(), uint32_t(0));
+
+        const uint32_t select_threads = 256;
+        const uint32_t select_blocks  = (graph_size + select_threads - 1) / select_threads;
+        kern_select_edges<IdxT>
+          <<<select_blocks, select_threads, 0, raft::resource::get_cuda_stream(res)>>>(
+            d_detour_count.data_handle(),
+            d_input_graph_handle,
+            d_output_graph.data_handle(),
+            graph_size,
+            knn_graph_degree,
+            output_graph_degree,
+            d_invalid_count.data_handle());
+        raft::resource::sync_stream(res);
+
+        auto h_invalid_count = raft::make_host_vector<uint32_t, int64_t>(1);
+        raft::copy(res, h_invalid_count.view(), raft::make_const_mdspan(d_invalid_count.view()));
+        raft::resource::sync_stream(res);
+        RAFT_EXPECTS(
+          h_invalid_count.data_handle()[0] == 0,
+          "Could not generate an intermediate CAGRA graph because the initial kNN graph "
+          "contains too many invalid or duplicated neighbor nodes. (%u nodes failed)",
+          h_invalid_count.data_handle()[0]);
+
+        raft::copy(output_graph_ptr,
+                   d_output_graph.data_handle(),
+                   graph_size * output_graph_degree,
+                   raft::resource::get_cuda_stream(res));
+        raft::resource::sync_stream(res);
+      }
     } else {
       // Count 2-hop detours on CPU
       raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
@@ -1325,66 +1409,66 @@ void optimize(
       const double time_2hop_count_end = cur_time();
       RAFT_LOG_DEBUG("# Time for 2-hop detour counting on CPU: %.1lf sec",
                      time_2hop_count_end - time_2hop_count_start);
-    }
 
-    // Create pruned kNN graph
-    bool invalid_neighbor_list = false;
+      // Create pruned kNN graph
+      bool invalid_neighbor_list = false;
 #pragma omp parallel for
-    for (uint64_t i = 0; i < graph_size; i++) {
-      // Find the `output_graph_degree` smallest detourable count nodes by checking the detourable
-      // count of the neighbors while increasing the target detourable count from zero.
-      uint64_t pk         = 0;
-      uint32_t num_detour = 0;
-      for (uint32_t l = 0; l < knn_graph_degree && pk < output_graph_degree; l++) {
-        uint32_t next_num_detour = std::numeric_limits<uint32_t>::max();
-        for (uint64_t k = 0; k < knn_graph_degree; k++) {
-          const auto num_detour_k = detour_count(i, k);
-          // Find the detourable count to check in the next iteration
-          if (num_detour_k > num_detour) {
-            next_num_detour = std::min(static_cast<uint32_t>(num_detour_k), next_num_detour);
-          }
-
-          // Store the neighbor index if its detourable count is equal to `num_detour`.
-          if (num_detour_k != num_detour) { continue; }
-
-          // Check duplication and append
-          const auto candidate_node = knn_graph(i, k);
-          bool dup                  = false;
-          for (uint32_t dk = 0; dk < pk; dk++) {
-            if (candidate_node == output_graph_ptr[i * output_graph_degree + dk]) {
-              dup = true;
-              break;
+      for (uint64_t i = 0; i < graph_size; i++) {
+        // Find the `output_graph_degree` smallest detourable count nodes by checking the detourable
+        // count of the neighbors while increasing the target detourable count from zero.
+        uint64_t pk         = 0;
+        uint32_t num_detour = 0;
+        for (uint32_t l = 0; l < knn_graph_degree && pk < output_graph_degree; l++) {
+          uint32_t next_num_detour = std::numeric_limits<uint32_t>::max();
+          for (uint64_t k = 0; k < knn_graph_degree; k++) {
+            const auto num_detour_k = detour_count(i, k);
+            // Find the detourable count to check in the next iteration
+            if (num_detour_k > num_detour) {
+              next_num_detour = std::min(static_cast<uint32_t>(num_detour_k), next_num_detour);
             }
-          }
-          if (!dup && candidate_node < graph_size) {
-            output_graph_ptr[i * output_graph_degree + pk] = candidate_node;
-            pk += 1;
+
+            // Store the neighbor index if its detourable count is equal to `num_detour`.
+            if (num_detour_k != num_detour) { continue; }
+
+            // Check duplication and append
+            const auto candidate_node = knn_graph(i, k);
+            bool dup                  = false;
+            for (uint32_t dk = 0; dk < pk; dk++) {
+              if (candidate_node == output_graph_ptr[i * output_graph_degree + dk]) {
+                dup = true;
+                break;
+              }
+            }
+            if (!dup && candidate_node < graph_size) {
+              output_graph_ptr[i * output_graph_degree + pk] = candidate_node;
+              pk += 1;
+            }
+            if (pk >= output_graph_degree) break;
           }
           if (pk >= output_graph_degree) break;
-        }
-        if (pk >= output_graph_degree) break;
 
-        if (next_num_detour == std::numeric_limits<uint32_t>::max()) {
-          // There are no valid edges enough in the initial kNN graph. Break the loop here and catch
-          // the error at the next validation (pk != output_graph_degree).
-          break;
+          if (next_num_detour == std::numeric_limits<uint32_t>::max()) {
+            // There are no valid edges enough in the initial kNN graph. Break the loop here and
+            // catch the error at the next validation (pk != output_graph_degree).
+            break;
+          }
+          num_detour = next_num_detour;
         }
-        num_detour = next_num_detour;
+        if (pk != output_graph_degree) {
+          RAFT_LOG_DEBUG(
+            "Couldn't find the output_graph_degree (%lu) smallest detourable count nodes for "
+            "node %lu in the rank-based node reranking process",
+            output_graph_degree,
+            i);
+          invalid_neighbor_list = true;
+        }
       }
-      if (pk != output_graph_degree) {
-        RAFT_LOG_DEBUG(
-          "Couldn't find the output_graph_degree (%lu) smallest detourable count nodes for "
-          "node %lu in the rank-based node reranking process",
-          output_graph_degree,
-          i);
-        invalid_neighbor_list = true;
-      }
+      RAFT_EXPECTS(
+        !invalid_neighbor_list,
+        "Could not generate an intermediate CAGRA graph because the initial kNN graph contains too "
+        "many invalid or duplicated neighbor nodes. This error can occur, for example, if too many "
+        "overflows occur during the norm computation between the dataset vectors.");
     }
-    RAFT_EXPECTS(
-      !invalid_neighbor_list,
-      "Could not generate an intermediate CAGRA graph because the initial kNN graph contains too "
-      "many invalid or duplicated neighbor nodes. This error can occur, for example, if too many "
-      "overflows occur during the norm computation between the dataset vectors.");
 
     const double time_prune_end = cur_time();
     RAFT_LOG_DEBUG("# Pruning time: %.1lf ms", (time_prune_end - time_prune_start) * 1000.0);
