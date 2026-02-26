@@ -12,8 +12,18 @@ use crate::error::{check_cuvs, Result};
 use crate::resources::Resources;
 
 /// Brute Force KNN Index
+///
+/// Unlike CAGRA or IVF indexes which build self-contained data structures,
+/// the brute force index holds a non-owning view into the original dataset.
+/// The `_dataset` field keeps the device memory alive for the lifetime of
+/// the index.
 #[derive(Debug)]
-pub struct Index(ffi::cuvsBruteForceIndex_t);
+pub struct Index {
+    inner: ffi::cuvsBruteForceIndex_t,
+    // The C library stores a view into the dataset (not a copy).
+    // We must keep the ManagedTensor alive so the device memory is not freed.
+    _dataset: Option<ManagedTensor>,
+}
 
 impl Index {
     /// Builds a new Brute Force KNN Index from the dataset for efficient search.
@@ -31,16 +41,18 @@ impl Index {
         dataset: T,
     ) -> Result<Index> {
         let dataset: ManagedTensor = dataset.into();
-        let index = Index::new()?;
+        let mut index = Index::new()?;
         unsafe {
             check_cuvs(ffi::cuvsBruteForceBuild(
                 res.0,
                 dataset.as_ptr(),
                 metric,
                 metric_arg.unwrap_or(2.0),
-                index.0,
+                index.inner,
             ))?;
         }
+        // Store the dataset so the device memory remains valid for searches.
+        index._dataset = Some(dataset);
         Ok(index)
     }
 
@@ -49,7 +61,10 @@ impl Index {
         unsafe {
             let mut index = std::mem::MaybeUninit::<ffi::cuvsBruteForceIndex_t>::uninit();
             check_cuvs(ffi::cuvsBruteForceIndexCreate(index.as_mut_ptr()))?;
-            Ok(Index(index.assume_init()))
+            Ok(Index {
+                inner: index.assume_init(),
+                _dataset: None,
+            })
         }
     }
 
@@ -76,7 +91,7 @@ impl Index {
 
             check_cuvs(ffi::cuvsBruteForceSearch(
                 res.0,
-                self.0,
+                self.inner,
                 queries.as_ptr(),
                 neighbors.as_ptr(),
                 distances.as_ptr(),
@@ -88,8 +103,8 @@ impl Index {
 
 impl Drop for Index {
     fn drop(&mut self) {
-        if let Err(e) = check_cuvs(unsafe { ffi::cuvsBruteForceIndexDestroy(self.0) }) {
-            write!(stderr(), "failed to call cagraIndexDestroy {:?}", e)
+        if let Err(e) = check_cuvs(unsafe { ffi::cuvsBruteForceIndexDestroy(self.inner) }) {
+            write!(stderr(), "failed to call bruteForceIndexDestroy {:?}", e)
                 .expect("failed to write to stderr");
         }
     }
