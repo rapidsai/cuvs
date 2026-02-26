@@ -483,69 +483,67 @@ if(NOT BUILD_CPU_ONLY)
     generate_jit_lto_kernels(
       jit_lto_kernel_files
       NAME_FORMAT
-        "cagra_search_single_cta_kernel_@topk_by_bitonic_sort_str@_@bitonic_sort_and_merge_multi_warps_str@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@_data_@data_abbrev@_query_@query_abbrev@"
+        "cagra_search_single_cta_@topk_by_bitonic_sort_str@_@bitonic_sort_and_merge_multi_warps_str@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@_data_@data_abbrev@_query_@query_abbrev@"
       MATRIX_JSON_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_kernel_matrix.json"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_matrix.json"
       KERNEL_INPUT_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_kernel_kernel.cu.in"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_kernel.cu.in"
       EMBEDDED_INPUT_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_kernel_embedded.cpp.in"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_embedded.cpp.in"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/search_single_cta"
+      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    )
+    generate_jit_lto_kernels(
+      jit_lto_kernel_files
+      NAME_FORMAT
+        "cagra_search_single_cta_p_@topk_by_bitonic_sort_str@_@bitonic_sort_and_merge_multi_warps_str@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@_data_@data_abbrev@_query_@query_abbrev@"
+      MATRIX_JSON_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_p_matrix.json"
+      KERNEL_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_p_kernel.cu.in"
+      EMBEDDED_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_p_embedded.cpp.in"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/search_single_cta_p"
+      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    )
+    generate_jit_lto_kernels(
+      jit_lto_kernel_files
+      NAME_FORMAT
+        "cagra_search_multi_cta@pq_prefix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@_data_@data_abbrev@_query_@query_abbrev@"
+      MATRIX_JSON_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_multi_cta_matrix.json"
+      KERNEL_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_multi_cta_kernel.cu.in"
+      EMBEDDED_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_multi_cta_embedded.cpp.in"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/search_multi_cta"
+      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    )
+    generate_jit_lto_kernels(
+      jit_lto_kernel_files
+      NAME_FORMAT
+        "cagra_random_pickup@pq_prefix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@_data_@data_abbrev@_query_@query_abbrev@"
+      MATRIX_JSON_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/random_pickup_matrix.json"
+      KERNEL_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/random_pickup_kernel.cu.in"
+      EMBEDDED_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/random_pickup_embedded.cpp.in"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/random_pickup"
+      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    )
+    generate_jit_lto_kernels(
+      jit_lto_kernel_files
+      NAME_FORMAT
+        "cagra_compute_distance_to_child_nodes@pq_prefix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@_data_@data_abbrev@_query_@query_abbrev@"
+      MATRIX_JSON_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_to_child_nodes_matrix.json"
+      KERNEL_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_to_child_nodes_kernel.cu.in"
+      EMBEDDED_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_to_child_nodes_embedded.cpp.in"
       OUTPUT_DIRECTORY
-        "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/search_single_cta_kernel"
-      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
-    )
-    generate_jit_lto_kernels(
-      jit_lto_kernel_files
-      NAME_FORMAT
-        "cagra_search_single_cta_kernel_p_@topk_by_bitonic_sort_str@_@bitonic_sort_and_merge_multi_warps_str@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@_data_@data_abbrev@_query_@query_abbrev@"
-      MATRIX_JSON_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_kernel_p_matrix.json"
-      KERNEL_INPUT_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_kernel_p_kernel.cu.in"
-      EMBEDDED_INPUT_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_kernel_p_embedded.cpp.in"
-      OUTPUT_DIRECTORY
-        "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/search_single_cta_kernel_p"
-      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
-    )
-    generate_jit_lto_kernels(
-      jit_lto_kernel_files
-      NAME_FORMAT
-        "cagra_search_multi_cta_kernel@pq_prefix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@_data_@data_abbrev@_query_@query_abbrev@"
-      MATRIX_JSON_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_multi_cta_kernel_matrix.json"
-      KERNEL_INPUT_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_multi_cta_kernel_kernel.cu.in"
-      EMBEDDED_INPUT_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_multi_cta_kernel_embedded.cpp.in"
-      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/search_multi_cta_kernel"
-      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
-    )
-    generate_jit_lto_kernels(
-      jit_lto_kernel_files
-      NAME_FORMAT
-        "cagra_random_pickup_kernel@pq_prefix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@_data_@data_abbrev@_query_@query_abbrev@"
-      MATRIX_JSON_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/random_pickup_kernel_matrix.json"
-      KERNEL_INPUT_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/random_pickup_kernel_kernel.cu.in"
-      EMBEDDED_INPUT_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/random_pickup_kernel_embedded.cpp.in"
-      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/random_pickup_kernel"
-      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
-    )
-    generate_jit_lto_kernels(
-      jit_lto_kernel_files
-      NAME_FORMAT
-        "cagra_compute_distance_to_child_nodes_kernel@pq_prefix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@_data_@data_abbrev@_query_@query_abbrev@"
-      MATRIX_JSON_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_to_child_nodes_kernel_matrix.json"
-      KERNEL_INPUT_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_to_child_nodes_kernel_kernel.cu.in"
-      EMBEDDED_INPUT_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_to_child_nodes_kernel_embedded.cpp.in"
-      OUTPUT_DIRECTORY
-        "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/compute_distance_to_child_nodes_kernel"
+        "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/compute_distance_to_child_nodes"
       KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
     )
     generate_jit_lto_kernels(

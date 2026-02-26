@@ -62,7 +62,7 @@ void random_pickup_jit(const dataset_descriptor_host<DataT, IndexT, DistanceT>& 
     using CodebookTag = codebook_tag_vpq_t;
     CagraMultiKernelSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
       planner(dataset_desc.metric,
-              "random_pickup_kernel",
+              "random_pickup",
               dataset_desc.team_size,
               dataset_desc.dataset_block_dim,
               dataset_desc.is_vpq,
@@ -88,7 +88,7 @@ void random_pickup_jit(const dataset_descriptor_host<DataT, IndexT, DistanceT>& 
         query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::BitwiseHamming>;
       CagraMultiKernelSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
         planner(dataset_desc.metric,
-                "random_pickup_kernel",
+                "random_pickup",
                 dataset_desc.team_size,
                 dataset_desc.dataset_block_dim,
                 dataset_desc.is_vpq,
@@ -111,7 +111,7 @@ void random_pickup_jit(const dataset_descriptor_host<DataT, IndexT, DistanceT>& 
       using QueryTag = query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::L2Expanded>;
       CagraMultiKernelSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
         planner(dataset_desc.metric,
-                "random_pickup_kernel",
+                "random_pickup",
                 dataset_desc.team_size,
                 dataset_desc.dataset_block_dim,
                 dataset_desc.is_vpq,
@@ -205,7 +205,7 @@ void compute_distance_to_child_nodes_jit(
     using CodebookTag = codebook_tag_vpq_t;
     CagraMultiKernelSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
       planner(dataset_desc.metric,
-              "compute_distance_to_child_nodes_kernel",
+              "compute_distance_to_child_nodes",
               dataset_desc.team_size,
               dataset_desc.dataset_block_dim,
               dataset_desc.is_vpq,
@@ -231,7 +231,7 @@ void compute_distance_to_child_nodes_jit(
         query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::BitwiseHamming>;
       CagraMultiKernelSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
         planner(dataset_desc.metric,
-                "compute_distance_to_child_nodes_kernel",
+                "compute_distance_to_child_nodes",
                 dataset_desc.team_size,
                 dataset_desc.dataset_block_dim,
                 dataset_desc.is_vpq,
@@ -254,7 +254,7 @@ void compute_distance_to_child_nodes_jit(
       using QueryTag = query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::L2Expanded>;
       CagraMultiKernelSearchPlanner<DataTag, IndexTag, DistTag, SourceTag, QueryTag, CodebookTag>
         planner(dataset_desc.metric,
-                "compute_distance_to_child_nodes_kernel",
+                "compute_distance_to_child_nodes",
                 dataset_desc.team_size,
                 dataset_desc.dataset_block_dim,
                 dataset_desc.is_vpq,

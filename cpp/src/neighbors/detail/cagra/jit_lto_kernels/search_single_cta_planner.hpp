@@ -60,7 +60,7 @@ struct CagraSingleCtaSearchPlanner
                                            uint32_t pq_len,
                                            bool persistent)
   {
-    std::string name = (persistent ? "search_single_cta_kernel_p" : "search_single_cta_kernel");
+    std::string name = (persistent ? "search_single_cta_p" : "search_single_cta");
     name += std::string(topk_by_bitonic_sort ? "_" : "_no_") + "topk_by_bitonic_sort";
     name += std::string(bitonic_sort_and_merge_multi_warps ? "_" : "_no_") +
             "bitonic_sort_and_merge_multi_warps";

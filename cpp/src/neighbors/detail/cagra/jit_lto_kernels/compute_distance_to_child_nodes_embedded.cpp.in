@@ -18,8 +18,8 @@ __attribute__((__constructor__)) void register_kernel()
   registerAlgorithm<tag_@data_abbrev@,
     tag_idx_@index_abbrev@,
     tag_dist_@distance_abbrev@,
-    tag_idx_@index_abbrev@@codebook_comma@ @codebook_tag@>(
-    "random_pickup_kernel@pq_prefix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@",
+    tag_idx_@source_index_abbrev@@codebook_comma@ @codebook_tag@>(
+    "compute_distance_to_child_nodes@pq_prefix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@",
     embedded_fatbin,
     sizeof(embedded_fatbin));
 }

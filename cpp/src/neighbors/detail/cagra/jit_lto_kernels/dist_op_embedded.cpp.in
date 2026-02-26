@@ -15,7 +15,7 @@ namespace {
 
 __attribute__((__constructor__)) static void register_kernel()
 {
-  registerAlgorithm<tag_@query_type_abbrev@,
+  registerAlgorithm<tag_@query_abbrev@,
     tag_dist_@distance_abbrev@>(
     "dist_op_@metric_tag@",
     embedded_fatbin,

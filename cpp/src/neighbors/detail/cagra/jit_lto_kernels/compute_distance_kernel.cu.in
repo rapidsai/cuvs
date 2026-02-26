@@ -5,7 +5,7 @@
 
 // This file is auto-generated. Do not edit manually.
 
-#include <neighbors/detail/cagra/jit_lto_kernels/@impl_file@>
+#include <neighbors/detail/cagra/jit_lto_kernels/compute_distance@pq_prefix@_impl.cuh>
 
 namespace cuvs::neighbors::cagra::detail {
 
