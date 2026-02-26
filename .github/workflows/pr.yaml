@@ -14,13 +14,13 @@ jobs:
       - wheel-tests-cuvs
       - devcontainer
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/pr-builder.yaml@main
+    uses: rapidsai/shared-workflows/.github/workflows/pr-builder.yaml@oldest-deps
     if: always()
     with:
       needs: ${{ toJSON(needs) }}
   wheel-build-libcuvs:
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@main
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@oldest-deps
     with:
       build_type: pull-request
       node_type: cpu16
@@ -32,7 +32,7 @@ jobs:
   wheel-build-cuvs:
     needs: wheel-build-libcuvs
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@main
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@oldest-deps
     with:
       build_type: pull-request
       node_type: cpu8
@@ -44,13 +44,13 @@ jobs:
   wheel-tests-cuvs:
     needs: [wheel-build-cuvs]
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-test.yaml@main
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-test.yaml@oldest-deps
     with:
       build_type: pull-request
       script: ci/test_wheel_cuvs.sh
   devcontainer:
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/build-in-devcontainer.yaml@main
+    uses: rapidsai/shared-workflows/.github/workflows/build-in-devcontainer.yaml@oldest-deps
     with:
       arch: '["amd64", "arm64"]'
       cuda: '["13.1"]'
