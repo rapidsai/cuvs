@@ -1977,6 +1977,58 @@ struct mmap_owner {
   size_t size_;
 };
 
+template <typename T, typename MathT>
+__global__ void kern_reconstruct_vpq_queries(const uint8_t* encoded_data,
+                                             uint32_t encoded_row_len,
+                                             const MathT* vq_codebook,
+                                             const MathT* pq_codebook,
+                                             uint32_t dim,
+                                             uint32_t pq_len,
+                                             uint64_t offset,
+                                             uint32_t batch_size,
+                                             T* output)
+{
+  const uint64_t batch_idx = blockIdx.x;
+  if (batch_idx >= batch_size) return;
+  const uint64_t vec_idx       = offset + batch_idx;
+  const uint8_t* vec_data      = encoded_data + vec_idx * encoded_row_len;
+  const uint32_t vq_code       = *reinterpret_cast<const uint32_t*>(vec_data);
+  const uint8_t* pq_codes      = vec_data + sizeof(uint32_t);
+  const MathT* vq_centroid_ptr = vq_codebook + static_cast<uint64_t>(vq_code) * dim;
+
+  for (uint32_t d = threadIdx.x; d < dim; d += blockDim.x) {
+    uint32_t j   = d / pq_len;
+    uint32_t k   = d % pq_len;
+    float val    = static_cast<float>(vq_centroid_ptr[d]) +
+                static_cast<float>(pq_codebook[static_cast<uint32_t>(pq_codes[j]) * pq_len + k]);
+    output[batch_idx * dim + d] = static_cast<T>(val);
+  }
+}
+
+template <typename T, typename MathT, typename IdxT>
+void reconstruct_vpq_queries(raft::resources const& res,
+                             const vpq_dataset<MathT, IdxT>& vpq_dset,
+                             uint64_t offset,
+                             uint32_t batch_size,
+                             raft::device_matrix_view<T, int64_t> output)
+{
+  const uint32_t dim     = vpq_dset.dim();
+  const uint32_t pq_len  = vpq_dset.pq_len();
+  const uint32_t threads = std::min(dim, 256u);
+
+  kern_reconstruct_vpq_queries<T, MathT>
+    <<<batch_size, threads, 0, raft::resource::get_cuda_stream(res)>>>(
+      vpq_dset.data.data_handle(),
+      vpq_dset.encoded_row_length(),
+      vpq_dset.vq_code_book.data_handle(),
+      vpq_dset.pq_code_book.data_handle(),
+      dim,
+      pq_len,
+      offset,
+      batch_size,
+      output.data_handle());
+}
+
 template <typename T, typename IdxT>
 void search_to_device_graph(raft::resources const& res,
                             const cuvs::neighbors::cagra::search_params& search_params,
@@ -2192,13 +2244,13 @@ auto iterative_build_graph(
   bool use_device_graph = false;
 
   // Generate the compressed index once if compression is enabled
+  const uint64_t dataset_dim = dev_dataset.extent(1);
   std::optional<index<T, IdxT>> idx_opt;
   if (params.compression.has_value()) {
     auto start = std::chrono::high_resolution_clock::now();
     RAFT_EXPECTS(params.metric == cuvs::distance::DistanceType::L2Expanded,
                  "VPQ compression is only supported with L2Expanded distance mertric");
     idx_opt.emplace(res, params.metric);
-    // idx_opt->update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
     idx_opt->update_dataset(
       res,
       // TODO: hardcoding codebook math to `half`, we can do runtime dispatching later
@@ -2207,6 +2259,12 @@ auto iterative_build_graph(
     auto end        = std::chrono::high_resolution_clock::now();
     auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     RAFT_LOG_INFO("# VPQ compression time: %.3lf sec", (double)elapsed_ms / 1000);
+
+    // Free the original dataset -- queries will be reconstructed from VPQ codes.
+    dev_aligned_dataset.reset();
+    RAFT_LOG_INFO(
+      "# Freed original dataset from device (%.1f MiB); queries will use VPQ reconstruction",
+      to_mib(final_graph_size * dataset_dim * sizeof(T)));
   }
   bool do_skip = true;
   while (true) {
@@ -2236,12 +2294,10 @@ auto iterative_build_graph(
     search_params.max_iterations = 8;
     search_params.search_width   = 1;
 
-    // Create an index (idx), a query view (dev_query_view), and a mdarray for
-    // search results (neighbors).
-    auto dev_dataset_view = raft::make_device_matrix_view<const T, int64_t>(
-      dev_dataset.data_handle(), (int64_t)curr_graph_size, dev_dataset.extent(1));
-
+    // Create index and query views.
     if (!params.compression.has_value()) {
+      auto dev_dataset_view = raft::make_device_matrix_view<const T, int64_t>(
+        dev_dataset.data_handle(), (int64_t)curr_graph_size, dev_dataset.extent(1));
       if (use_device_graph) {
         idx_opt.emplace(
           res, params.metric, dev_dataset_view, raft::make_const_mdspan(dev_graph.view()));
@@ -2258,8 +2314,24 @@ auto iterative_build_graph(
     }
     const auto& idx = *idx_opt;
 
-    auto dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
-      dev_dataset.data_handle(), (int64_t)curr_query_size, dev_dataset.extent(1));
+    // When compression is enabled, reconstruct queries from VPQ codes instead of
+    // reading from the (freed) original dataset.
+    auto dev_reconstructed_queries =
+      params.compression.has_value()
+        ? raft::make_device_matrix<T, int64_t>(res, curr_query_size, dataset_dim)
+        : raft::make_device_matrix<T, int64_t>(res, 0, 0);
+    if (params.compression.has_value()) {
+      auto* vpq_dset =
+        dynamic_cast<const vpq_dataset<half, int64_t>*>(&idx.data());
+      RAFT_EXPECTS(vpq_dset != nullptr, "Expected VPQ dataset in compressed index");
+      reconstruct_vpq_queries<T, half, int64_t>(
+        res, *vpq_dset, 0, curr_query_size, dev_reconstructed_queries.view());
+    }
+    auto dev_query_view = params.compression.has_value()
+      ? raft::make_device_matrix_view<const T, int64_t>(
+          dev_reconstructed_queries.data_handle(), (int64_t)curr_query_size, dataset_dim)
+      : raft::make_device_matrix_view<const T, int64_t>(
+          dev_dataset.data_handle(), (int64_t)curr_query_size, dev_dataset.extent(1));
 
     if (do_skip) {
       auto dev_graph_next =
