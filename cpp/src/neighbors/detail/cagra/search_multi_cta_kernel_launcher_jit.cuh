@@ -9,6 +9,8 @@
 #error "search_multi_cta_kernel_launcher_jit.cuh included but CUVS_ENABLE_JIT_LTO not defined!"
 #endif
 
+#include "../smem_utils.cuh"
+
 // Include tags header before any other includes that might open namespaces
 #include <cuvs/detail/jit_lto/registration_tags.hpp>
 
@@ -187,9 +189,6 @@ void select_and_run_jit(
     THROW("Result buffer size %u larger than max buffer size %u", result_buffer_size, 256);
   }
 
-  RAFT_CUDA_TRY(cudaFuncSetAttribute(
-    launcher->get_kernel(), cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
-
   // Initialize hash table
   const uint32_t traversed_hash_size = hashmap::get_size(traversed_hash_bitlen);
   set_value_batch(traversed_hashmap_ptr,
@@ -225,33 +224,37 @@ void select_and_run_jit(
   const uint32_t max_iterations_u32        = static_cast<uint32_t>(ps.max_iterations);
   const unsigned num_random_samplings_u    = static_cast<unsigned>(ps.num_random_samplings);
 
-  launcher->dispatch(stream,
-                     grid_dims,
-                     block_dims,
-                     smem_size,
-                     topk_indices_ptr,
-                     topk_distances_ptr,
-                     dev_desc,
-                     queries_ptr,
-                     graph.data_handle(),
-                     max_elements,
-                     graph_degree_u32,  // Cast int64_t to uint32_t
-                     source_indices_ptr,
-                     num_random_samplings_u,  // Cast uint32_t to unsigned for consistency
-                     ps.rand_xor_mask,        // uint64_t matches kernel (8 bytes)
-                     dev_seed_ptr,
-                     num_seeds,
-                     visited_hash_bitlen,
-                     traversed_hashmap_ptr,
-                     traversed_hash_bitlen_u32,  // Cast int64_t to uint32_t
-                     itopk_size_u32,             // Cast size_t to uint32_t
-                     min_iterations_u32,         // Cast size_t to uint32_t
-                     max_iterations_u32,         // Cast size_t to uint32_t
-                     num_executed_iterations,
-                     query_id_offset,  // Offset to add to query_id when calling filter
-                     bitset_ptr,
-                     bitset_len,
-                     original_nbits);
+  auto kernel_launcher = [&](auto const& kernel) -> void {
+    launcher->dispatch(stream,
+                       grid_dims,
+                       block_dims,
+                       smem_size,
+                       topk_indices_ptr,
+                       topk_distances_ptr,
+                       dev_desc,
+                       queries_ptr,
+                       graph.data_handle(),
+                       max_elements,
+                       graph_degree_u32,  // Cast int64_t to uint32_t
+                       source_indices_ptr,
+                       num_random_samplings_u,  // Cast uint32_t to unsigned for consistency
+                       ps.rand_xor_mask,        // uint64_t matches kernel (8 bytes)
+                       dev_seed_ptr,
+                       num_seeds,
+                       visited_hash_bitlen,
+                       traversed_hashmap_ptr,
+                       traversed_hash_bitlen_u32,  // Cast int64_t to uint32_t
+                       itopk_size_u32,             // Cast size_t to uint32_t
+                       min_iterations_u32,         // Cast size_t to uint32_t
+                       max_iterations_u32,         // Cast size_t to uint32_t
+                       num_executed_iterations,
+                       query_id_offset,  // Offset to add to query_id when calling filter
+                       bitset_ptr,
+                       bitset_len,
+                       original_nbits);
+  };
+  cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
+    launcher->get_kernel(), smem_size, kernel_launcher);
 
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }

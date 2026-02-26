@@ -9,6 +9,8 @@
 #error "search_single_cta_kernel_launcher_jit.cuh included but CUVS_ENABLE_JIT_LTO not defined!"
 #endif
 
+#include "../smem_utils.cuh"
+
 #include <iostream>
 #include <typeinfo>
 
@@ -857,38 +859,43 @@ void select_and_run_jit(
                    smem_size);
 
     // Dispatch kernel via launcher
-    launcher->dispatch(
-      stream,
-      grid,
-      block,
-      smem_size,
-      topk_indices_ptr,
-      topk_distances_ptr,
-      topk,
-      queries_ptr,
-      graph.data_handle(),
-      graph_degree_u32,  // Cast int64_t to uint32_t
-      source_indices_ptr,
-      num_random_samplings_u,  // Cast uint32_t to unsigned for consistency
-      ps.rand_xor_mask,        // uint64_t matches kernel (8 bytes)
-      dev_seed_ptr,
-      num_seeds,
-      hashmap_ptr,
-      max_candidates,
-      max_itopk,
-      itopk_size_u32,      // Cast size_t to uint32_t
-      search_width_u32,    // Cast size_t to uint32_t
-      min_iterations_u32,  // Cast size_t to uint32_t
-      max_iterations_u32,  // Cast size_t to uint32_t
-      num_executed_iterations,
-      hash_bitlen_u32,                // Cast int64_t to uint32_t
-      small_hash_bitlen_u32,          // Cast size_t to uint32_t
-      small_hash_reset_interval_u32,  // Cast size_t to uint32_t
-      query_id_offset,                // Offset to add to query_id when calling filter
-      dev_desc,  // Pass base pointer - kernel expects concrete type but pointer value is same
-      bitset_ptr,
-      bitset_len,
-      original_nbits);
+    auto kernel_launcher = [&](auto const& kernel) -> void {
+      launcher->dispatch(
+        stream,
+        grid,
+        block,
+        smem_size,
+        topk_indices_ptr,
+        topk_distances_ptr,
+        topk,
+        queries_ptr,
+        graph.data_handle(),
+        graph_degree_u32,  // Cast int64_t to uint32_t
+        source_indices_ptr,
+        num_random_samplings_u,  // Cast uint32_t to unsigned for consistency
+        ps.rand_xor_mask,        // uint64_t matches kernel (8 bytes)
+        dev_seed_ptr,
+        num_seeds,
+        hashmap_ptr,
+        max_candidates,
+        max_itopk,
+        itopk_size_u32,      // Cast size_t to uint32_t
+        search_width_u32,    // Cast size_t to uint32_t
+        min_iterations_u32,  // Cast size_t to uint32_t
+        max_iterations_u32,  // Cast size_t to uint32_t
+        num_executed_iterations,
+        hash_bitlen_u32,                // Cast int64_t to uint32_t
+        small_hash_bitlen_u32,          // Cast size_t to uint32_t
+        small_hash_reset_interval_u32,  // Cast size_t to uint32_t
+        query_id_offset,                // Offset to add to query_id when calling filter
+        dev_desc,  // Pass base pointer - kernel expects concrete type but pointer value is same
+        bitset_ptr,
+        bitset_len,
+        original_nbits);
+    };
+
+    cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
+      launcher->get_kernel(), smem_size, kernel_launcher);
 
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
