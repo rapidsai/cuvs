@@ -243,6 +243,20 @@ __global__ void kern_make_rev_graph(const IdxT* const dest_nodes,     // [graph_
 }
 
 template <class IdxT>
+__global__ void kern_extract_column(const IdxT* const d_matrix,
+                                    IdxT* const d_column,
+                                    const uint32_t n_rows,
+                                    const uint32_t n_cols,
+                                    const uint32_t col_idx)
+{
+  const uint32_t tid  = threadIdx.x + (blockDim.x * blockIdx.x);
+  const uint32_t tnum = blockDim.x * gridDim.x;
+  for (uint32_t i = tid; i < n_rows; i += tnum) {
+    d_column[i] = d_matrix[col_idx + (static_cast<uint64_t>(n_cols) * i)];
+  }
+}
+
+template <class IdxT>
 __global__ void kern_select_edges(const uint8_t* const d_detour_count,
                                   const IdxT* const d_knn_graph,
                                   IdxT* const d_output_graph,
@@ -1234,6 +1248,10 @@ void optimize(
     }
   }
 
+  // Device pruned graph: populated by GPU edge selection, reused by GPU reverse graph.
+  auto d_pruned_graph = raft::make_device_mdarray<IdxT>(
+    res, large_tmp_mr, raft::make_extents<int64_t>(0, 0));
+
   {
     raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
       "cagra::graph::optimize/prune");
@@ -1361,11 +1379,11 @@ void optimize(
         (double)num_full / graph_size * 100);
 
       // GPU edge selection: pick output_graph_degree edges per node with lowest detour counts.
+      d_pruned_graph = raft::make_device_mdarray<IdxT>(
+        res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, output_graph_degree));
       {
         raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> select_scope(
           "cagra::graph::optimize/prune/edge-selection-by-GPU");
-        auto d_output_graph = raft::make_device_mdarray<IdxT>(
-          res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, output_graph_degree));
         auto d_invalid_count = raft::make_device_mdarray<uint32_t>(
           res, large_tmp_mr, raft::make_extents<int64_t>(1));
         raft::matrix::fill(res, d_invalid_count.view(), uint32_t(0));
@@ -1376,7 +1394,7 @@ void optimize(
           <<<select_blocks, select_threads, 0, raft::resource::get_cuda_stream(res)>>>(
             d_detour_count.data_handle(),
             d_input_graph_handle,
-            d_output_graph.data_handle(),
+            d_pruned_graph.data_handle(),
             graph_size,
             knn_graph_degree,
             output_graph_degree,
@@ -1393,7 +1411,7 @@ void optimize(
           h_invalid_count.data_handle()[0]);
 
         raft::copy(output_graph_ptr,
-                   d_output_graph.data_handle(),
+                   d_pruned_graph.data_handle(),
                    graph_size * output_graph_degree,
                    raft::resource::get_cuda_stream(res));
         raft::resource::sync_stream(res);
@@ -1485,48 +1503,94 @@ void optimize(
     //
     const double time_make_start = cur_time();
 
-    device_matrix_view_from_host<IdxT, int64_t> d_rev_graph(res, rev_graph.view());
-    raft::matrix::fill(res,
-                       raft::make_device_vector_view<IdxT, int64_t>(
-                         d_rev_graph.data_handle(), graph_size * output_graph_degree),
-                       IdxT(-1));
+    if (d_pruned_graph.extent(0) > 0) {
+      // GPU path: d_pruned_graph is on device; extract columns on device to preserve
+      // column-priority ordering (earlier columns get priority in the reverse graph).
+      auto d_rev_graph = raft::make_device_mdarray<IdxT>(
+        res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, output_graph_degree));
+      raft::matrix::fill(res,
+                         raft::make_device_vector_view<IdxT, int64_t>(
+                           d_rev_graph.data_handle(), graph_size * output_graph_degree),
+                         IdxT(-1));
 
-    auto d_rev_graph_count = raft::make_device_mdarray<uint32_t>(
-      res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
-    raft::matrix::fill(res, d_rev_graph_count.view(), uint32_t(0));
+      auto d_rev_graph_count = raft::make_device_mdarray<uint32_t>(
+        res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
+      raft::matrix::fill(res, d_rev_graph_count.view(), uint32_t(0));
 
-    auto dest_nodes = raft::make_host_vector<IdxT, int64_t>(graph_size);
-    auto d_dest_nodes =
-      raft::make_device_mdarray<IdxT>(res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
+      auto d_dest_nodes =
+        raft::make_device_mdarray<IdxT>(res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
 
-    for (uint64_t k = 0; k < output_graph_degree; k++) {
-#pragma omp parallel for
-      for (uint64_t i = 0; i < graph_size; i++) {
-        // dest_nodes.data_handle()[i] = output_graph_ptr[k + (output_graph_degree * i)];
-        dest_nodes(i) = output_graph_ptr[k + (output_graph_degree * i)];
+      for (uint64_t k = 0; k < output_graph_degree; k++) {
+        dim3 ext_threads(256, 1, 1);
+        dim3 ext_blocks(std::min(static_cast<uint32_t>((graph_size + 255) / 256), 65535u), 1, 1);
+        kern_extract_column<IdxT>
+          <<<ext_blocks, ext_threads, 0, raft::resource::get_cuda_stream(res)>>>(
+            d_pruned_graph.data_handle(),
+            d_dest_nodes.data_handle(),
+            graph_size,
+            output_graph_degree,
+            k);
+
+        dim3 threads(256, 1, 1);
+        dim3 blocks(1024, 1, 1);
+        kern_make_rev_graph<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
+          d_dest_nodes.data_handle(),
+          d_rev_graph.data_handle(),
+          d_rev_graph_count.data_handle(),
+          graph_size,
+          output_graph_degree);
       }
       raft::resource::sync_stream(res);
 
-      raft::copy(res, d_dest_nodes.view(), raft::make_const_mdspan(dest_nodes.view()));
+      d_pruned_graph = raft::make_device_mdarray<IdxT>(
+        res, large_tmp_mr, raft::make_extents<int64_t>(0, 0));
 
-      dim3 threads(256, 1, 1);
-      dim3 blocks(1024, 1, 1);
-      kern_make_rev_graph<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
-        d_dest_nodes.data_handle(),
-        d_rev_graph.data_handle(),
-        d_rev_graph_count.data_handle(),
-        graph_size,
-        output_graph_degree);
-      RAFT_LOG_DEBUG("# Making reverse graph on GPUs: %lu / %u    \r", k, output_graph_degree);
-    }
-
-    raft::resource::sync_stream(res);
-    RAFT_LOG_DEBUG("\n");
-
-    if (d_rev_graph.allocated_memory()) {
       raft::copy(res, rev_graph.view(), raft::make_const_mdspan(d_rev_graph.view()));
+      raft::copy(res, rev_graph_count.view(), raft::make_const_mdspan(d_rev_graph_count.view()));
+    } else {
+      // CPU fallback: per-column H-to-D copy approach.
+      device_matrix_view_from_host<IdxT, int64_t> d_rev_graph(res, rev_graph.view());
+      raft::matrix::fill(res,
+                         raft::make_device_vector_view<IdxT, int64_t>(
+                           d_rev_graph.data_handle(), graph_size * output_graph_degree),
+                         IdxT(-1));
+
+      auto d_rev_graph_count = raft::make_device_mdarray<uint32_t>(
+        res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
+      raft::matrix::fill(res, d_rev_graph_count.view(), uint32_t(0));
+
+      auto dest_nodes = raft::make_host_vector<IdxT, int64_t>(graph_size);
+      auto d_dest_nodes =
+        raft::make_device_mdarray<IdxT>(res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
+
+      for (uint64_t k = 0; k < output_graph_degree; k++) {
+#pragma omp parallel for
+        for (uint64_t i = 0; i < graph_size; i++) {
+          dest_nodes(i) = output_graph_ptr[k + (output_graph_degree * i)];
+        }
+        raft::resource::sync_stream(res);
+
+        raft::copy(res, d_dest_nodes.view(), raft::make_const_mdspan(dest_nodes.view()));
+
+        dim3 threads(256, 1, 1);
+        dim3 blocks(1024, 1, 1);
+        kern_make_rev_graph<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
+          d_dest_nodes.data_handle(),
+          d_rev_graph.data_handle(),
+          d_rev_graph_count.data_handle(),
+          graph_size,
+          output_graph_degree);
+        RAFT_LOG_DEBUG("# Making reverse graph on GPUs: %lu / %u    \r", k, output_graph_degree);
+      }
+
+      raft::resource::sync_stream(res);
+      RAFT_LOG_DEBUG("\n");
+
+      if (d_rev_graph.allocated_memory()) {
+        raft::copy(res, rev_graph.view(), raft::make_const_mdspan(d_rev_graph.view()));
+      }
+      raft::copy(res, rev_graph_count.view(), raft::make_const_mdspan(d_rev_graph_count.view()));
     }
-    raft::copy(res, rev_graph_count.view(), raft::make_const_mdspan(d_rev_graph_count.view()));
 
     const double time_make_end = cur_time();
     RAFT_LOG_DEBUG("# Making reverse graph time: %.1lf ms",
