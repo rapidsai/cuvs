@@ -6,7 +6,6 @@
 #include "nvjitlink_helper.hpp"
 
 #include <memory>
-#include <nvJitLink.h>
 #include <string>
 
 #include <raft/core/error.hpp>
