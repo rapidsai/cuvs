@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 //! Brute Force KNN
@@ -12,8 +12,18 @@ use crate::error::{check_cuvs, Result};
 use crate::resources::Resources;
 
 /// Brute Force KNN Index
+///
+/// Unlike CAGRA or IVF indexes which build self-contained data structures,
+/// the brute force index holds a non-owning view into the original dataset.
+/// The `_dataset` field keeps the device memory alive for the lifetime of
+/// the index.
 #[derive(Debug)]
-pub struct Index(ffi::cuvsBruteForceIndex_t);
+pub struct Index {
+    inner: ffi::cuvsBruteForceIndex_t,
+    // The C library stores a view into the dataset (not a copy).
+    // We must keep the ManagedTensor alive so the device memory is not freed.
+    _dataset: Option<ManagedTensor>,
+}
 
 impl Index {
     /// Builds a new Brute Force KNN Index from the dataset for efficient search.
@@ -31,16 +41,18 @@ impl Index {
         dataset: T,
     ) -> Result<Index> {
         let dataset: ManagedTensor = dataset.into();
-        let index = Index::new()?;
+        let mut index = Index::new()?;
         unsafe {
             check_cuvs(ffi::cuvsBruteForceBuild(
                 res.0,
                 dataset.as_ptr(),
                 metric,
                 metric_arg.unwrap_or(2.0),
-                index.0,
+                index.inner,
             ))?;
         }
+        // Store the dataset so the device memory remains valid for searches.
+        index._dataset = Some(dataset);
         Ok(index)
     }
 
@@ -49,7 +61,10 @@ impl Index {
         unsafe {
             let mut index = std::mem::MaybeUninit::<ffi::cuvsBruteForceIndex_t>::uninit();
             check_cuvs(ffi::cuvsBruteForceIndexCreate(index.as_mut_ptr()))?;
-            Ok(Index(index.assume_init()))
+            Ok(Index {
+                inner: index.assume_init(),
+                _dataset: None,
+            })
         }
     }
 
@@ -62,7 +77,7 @@ impl Index {
     /// * `neighbors` - Matrix in device memory that receives the indices of the nearest neighbors
     /// * `distances` - Matrix in device memory that receives the distances of the nearest neighbors
     pub fn search(
-        self,
+        &self,
         res: &Resources,
         queries: &ManagedTensor,
         neighbors: &ManagedTensor,
@@ -76,7 +91,7 @@ impl Index {
 
             check_cuvs(ffi::cuvsBruteForceSearch(
                 res.0,
-                self.0,
+                self.inner,
                 queries.as_ptr(),
                 neighbors.as_ptr(),
                 distances.as_ptr(),
@@ -88,8 +103,8 @@ impl Index {
 
 impl Drop for Index {
     fn drop(&mut self) {
-        if let Err(e) = check_cuvs(unsafe { ffi::cuvsBruteForceIndexDestroy(self.0) }) {
-            write!(stderr(), "failed to call cagraIndexDestroy {:?}", e)
+        if let Err(e) = check_cuvs(unsafe { ffi::cuvsBruteForceIndexDestroy(self.inner) }) {
+            write!(stderr(), "failed to call bruteForceIndexDestroy {:?}", e)
                 .expect("failed to write to stderr");
         }
     }
@@ -171,5 +186,62 @@ mod tests {
     #[flaky]
     fn test_l2() {
         test_bfknn(DistanceType::L2Expanded);
+    }
+
+    /// Test that an index can be searched multiple times without rebuilding.
+    /// This validates that search() takes &self instead of self.
+    #[test]
+    fn test_brute_force_multiple_searches() {
+        let res = Resources::new().unwrap();
+
+        // Create a random dataset
+        let n_datapoints = 64;
+        let n_features = 8;
+        let dataset =
+            ndarray::Array::<f32, _>::random((n_datapoints, n_features), Uniform::new(0., 1.0));
+
+        // Build the brute force index from device memory
+        let dataset_device = ManagedTensor::from(&dataset).to_device(&res).unwrap();
+        let index = Index::build(&res, DistanceType::L2Expanded, None, dataset_device)
+            .expect("failed to create brute force index");
+
+        res.sync_stream().unwrap();
+
+        let k = 4;
+
+        // Perform multiple searches on the same index
+        for search_iter in 0..3 {
+            let n_queries = 4;
+            let queries = dataset.slice(s![0..n_queries, ..]);
+            let queries = ManagedTensor::from(&queries).to_device(&res).unwrap();
+
+            let mut neighbors_host = ndarray::Array::<i64, _>::zeros((n_queries, k));
+            let neighbors = ManagedTensor::from(&neighbors_host)
+                .to_device(&res)
+                .unwrap();
+
+            let mut distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
+            let distances = ManagedTensor::from(&distances_host)
+                .to_device(&res)
+                .unwrap();
+
+            // This should work on every iteration because search() takes &self
+            index
+                .search(&res, &queries, &neighbors, &distances)
+                .expect(&format!("search iteration {} failed", search_iter));
+
+            // Copy back to host memory
+            distances.to_host(&res, &mut distances_host).unwrap();
+            neighbors.to_host(&res, &mut neighbors_host).unwrap();
+            res.sync_stream().unwrap();
+
+            // Verify results are consistent
+            assert_eq!(
+                neighbors_host[[0, 0]],
+                0,
+                "iteration {}: first query should find itself",
+                search_iter
+            );
+        }
     }
 }
