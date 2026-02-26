@@ -8,7 +8,9 @@
 
 #include <atomic>
 #include <cstdint>
+#include <cuda_runtime.h>
 #include <mutex>
+#include <unordered_map>
 
 namespace cuvs::neighbors::detail {
 
@@ -26,6 +28,42 @@ namespace cuvs::neighbors::detail {
  * @param smem_size The size of the dynamic shared memory to be set.
  * @param launch The kernel launch function/lambda.
  */
+// Specialization for cudaKernel_t (JIT LTO kernels) - track by kernel pointer
+template <typename KernelLauncherT>
+void safely_launch_kernel_with_smem_size(cudaKernel_t kernel,
+                                         uint32_t smem_size,
+                                         KernelLauncherT const& launch)
+{
+  // For JIT kernels, track by kernel pointer since all cudaKernel_t have the same type
+  static std::unordered_map<cudaKernel_t, std::atomic<uint32_t>> jit_smem_sizes;
+
+  auto& current_smem_size = jit_smem_sizes[kernel];
+  auto last_smem_size     = current_smem_size.load(std::memory_order_relaxed);
+
+  if (smem_size > last_smem_size) {
+    static std::mutex jit_mutex;
+    std::lock_guard<std::mutex> guard(jit_mutex);
+    if (!current_smem_size.compare_exchange_strong(
+          last_smem_size, smem_size, std::memory_order_relaxed, std::memory_order_relaxed)) {
+      // The value has been updated by another thread between the load and the mutex acquisition.
+      if (smem_size > last_smem_size) {
+        current_smem_size.store(smem_size, std::memory_order_relaxed);
+      }
+    }
+    // Only update if the last seen value is smaller than the new one.
+    if (smem_size > last_smem_size) {
+      auto launch_status =
+        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
+      RAFT_EXPECTS(launch_status == cudaSuccess,
+                   "Failed to set max dynamic shared memory size to %u bytes",
+                   smem_size);
+    }
+  }
+
+  return launch(kernel);
+}
+
+// General template for regular function pointers
 template <typename KernelT, typename KernelLauncherT>
 void safely_launch_kernel_with_smem_size(KernelT const& kernel,
                                          uint32_t smem_size,

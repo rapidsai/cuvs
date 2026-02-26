@@ -35,16 +35,9 @@ struct CagraMultiCtaSearchPlanner
     : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag>(
         build_entrypoint_name(metric, team_size, dataset_block_dim, is_vpq, pq_bits, pq_len),
         is_vpq ? make_fragment_key<DataTag, IndexTag, DistanceTag, SourceIndexTag, CodebookTag>()
-               : make_fragment_key<DataTag, IndexTag, DistanceTag, SourceIndexTag>()),
-      entrypoint_name_(
-        build_entrypoint_name(metric, team_size, dataset_block_dim, is_vpq, pq_bits, pq_len))
+               : make_fragment_key<DataTag, IndexTag, DistanceTag, SourceIndexTag>())
   {
   }
-
-  const std::string& get_entrypoint_name() const { return entrypoint_name_; }
-
- private:
-  std::string entrypoint_name_;
 
   static std::string build_entrypoint_name(cuvs::distance::DistanceType metric,
                                            uint32_t team_size,
