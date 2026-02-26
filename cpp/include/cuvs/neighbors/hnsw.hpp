@@ -738,9 +738,9 @@ void extend(raft::resources const& res,
  */
 
 struct search_params : cuvs::neighbors::search_params {
-  int ef;               // size of the candidate list
-  int num_threads = 0;  // number of host threads to use for concurrent searches. Value of 0
-                        // automatically maximizes parallelism
+  int ef          = 200;  // size of the candidate list
+  int num_threads = 0;    // number of host threads to use for concurrent searches. Value of 0
+                          // automatically maximizes parallelism
 };
 
 /**

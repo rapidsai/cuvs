@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -135,7 +135,7 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix<float, int64_t, raft::row_major> X_reordered;
 
  protected:
-  bool index_trained;
+  bool index_trained = false;
 };
 
 /** @} */
