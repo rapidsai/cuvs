@@ -40,12 +40,17 @@ struct EpsUnexpL2SqNeighborhood : public BaseClass {
                               IdxT _n,
                               IdxT _k,
                               DataT _eps,
-                              char* _smem)
-    : BaseClass(_x, _y, _m, _n, _k, _smem), adj(_adj), eps(_eps), vd(_vd), smem(_smem)
+                              char* _smem,
+                              size_t _n_blocks_y)
+    : BaseClass(_x, _y, _m, _n, _k, _smem),
+      adj(_adj),
+      eps(_eps),
+      vd(_vd),
+      smem(_smem),
+      n_blocks_y(_n_blocks_y)
   {
-    n_blocks_y = raft::ceildiv<size_t>(static_cast<size_t>(_n), static_cast<size_t>(P::Nblk));
-    block_x    = static_cast<size_t>(blockIdx.x) / n_blocks_y;
-    block_y    = static_cast<size_t>(blockIdx.x) % n_blocks_y;
+    block_x = static_cast<size_t>(blockIdx.x) / n_blocks_y;
+    block_y = static_cast<size_t>(blockIdx.x) % n_blocks_y;
   }
 
   DI void run()
@@ -164,11 +169,18 @@ struct EpsUnexpL2SqNeighborhood : public BaseClass {
 };  // struct EpsUnexpL2SqNeighborhood
 
 template <typename DataT, typename IdxT, typename Policy>
-__launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL epsUnexpL2SqNeighKernel(
-  bool* adj, IdxT* vd, const DataT* x, const DataT* y, IdxT m, IdxT n, IdxT k, DataT eps)
+__launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL epsUnexpL2SqNeighKernel(bool* adj,
+                                                                           IdxT* vd,
+                                                                           const DataT* x,
+                                                                           const DataT* y,
+                                                                           IdxT m,
+                                                                           IdxT n,
+                                                                           IdxT k,
+                                                                           DataT eps,
+                                                                           size_t n_blocks_y)
 {
   extern __shared__ char smem[];
-  EpsUnexpL2SqNeighborhood<DataT, IdxT, Policy> obj(adj, vd, x, y, m, n, k, eps, smem);
+  EpsUnexpL2SqNeighborhood<DataT, IdxT, Policy> obj(adj, vd, x, y, m, n, k, eps, smem, n_blocks_y);
   obj.run();
 }
 
@@ -184,12 +196,12 @@ void epsUnexpL2SqNeighImpl(bool* adj,
                            cudaStream_t stream)
 {
   typedef typename raft::linalg::Policy4x4<DataT, VecLen>::Policy Policy;
-  IdxT n_blocks_x = raft::ceildiv<IdxT>(m, Policy::Mblk);
-  IdxT n_blocks_y = raft::ceildiv<IdxT>(n, Policy::Nblk);
+  size_t n_blocks_x = raft::ceildiv<size_t>(m, Policy::Mblk);
+  size_t n_blocks_y = raft::ceildiv<size_t>(n, Policy::Nblk);
   dim3 grid(n_blocks_x * n_blocks_y);
   dim3 blk(Policy::Nthreads);
   epsUnexpL2SqNeighKernel<DataT, IdxT, Policy>
-    <<<grid, blk, Policy::SmemSize, stream>>>(adj, vd, x, y, m, n, k, eps);
+    <<<grid, blk, Policy::SmemSize, stream>>>(adj, vd, x, y, m, n, k, eps, n_blocks_y);
   RAFT_CUDA_TRY(cudaGetLastError());
 }
 
