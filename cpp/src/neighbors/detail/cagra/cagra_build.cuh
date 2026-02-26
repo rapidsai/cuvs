@@ -1904,7 +1904,8 @@ void optimize(
   raft::resources const& res,
   raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph,
-  const bool guarantee_connectivity = false)
+  const bool guarantee_connectivity = false,
+  const IdxT* d_knn_graph_ptr       = nullptr)
 {
   using internal_IdxT = typename std::make_unsigned<IdxT>::type;
 
@@ -1922,7 +1923,12 @@ void optimize(
       knn_graph.extent(1));
 
   cagra::detail::graph::optimize(
-    res, knn_graph_internal, new_graph_internal, guarantee_connectivity);
+    res,
+    knn_graph_internal,
+    new_graph_internal,
+    guarantee_connectivity,
+    true,
+    reinterpret_cast<const internal_IdxT*>(d_knn_graph_ptr));
 }
 
 // RAII wrapper for allocating memory with Transparent HugePage
@@ -2034,14 +2040,20 @@ void search_and_optimize(raft::resources const& res,
                          bool flag_last,
                          const index_params& params)
 {
-  // Search.
-  // Since there are many queries, divide them into batches and search them.
+  auto stream = raft::resource::get_cuda_stream(res);
+
+  // Accumulate search results on device to avoid D-to-H + H-to-D round-trip.
+  auto dev_knn_graph =
+    raft::make_device_matrix<IdxT, int64_t>(res, curr_query_size, curr_topk);
+
+  // Search in batches, accumulate results on both device and host.
+  // Host copy is needed by optimize Phase 3 (edge selection) which currently runs on CPU.
   cuvs::spatial::knn::detail::utils::batch_load_iterator<T> query_batch(
     dev_query_view.data_handle(),
     curr_query_size,
     dev_query_view.extent(1),
     max_chunk_size,
-    raft::resource::get_cuda_stream(res),
+    stream,
     raft::resource::get_workspace_resource(res));
   for (const auto& batch : query_batch) {
     auto batch_dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
@@ -2058,20 +2070,28 @@ void search_and_optimize(raft::resources const& res,
                                    batch_dev_neighbors_view,
                                    batch_dev_distances_view);
 
-    auto batch_neighbors_view = raft::make_host_matrix_view<IdxT, int64_t>(
-      neighbors_view.data_handle() + batch.offset() * curr_topk, batch.size(), curr_topk);
-    raft::copy(batch_neighbors_view.data_handle(),
+    // D-to-D: accumulate into device knn_graph
+    raft::copy(dev_knn_graph.data_handle() + batch.offset() * curr_topk,
                batch_dev_neighbors_view.data_handle(),
-               batch_neighbors_view.size(),
-               raft::resource::get_cuda_stream(res));
+               batch.size() * curr_topk,
+               stream);
+
+    // D-to-H: still needed for optimize Phase 3 (host edge selection)
+    raft::copy(neighbors_view.data_handle() + batch.offset() * curr_topk,
+               batch_dev_neighbors_view.data_handle(),
+               batch.size() * curr_topk,
+               stream);
   }
 
-  // Optimize graph
+  // Optimize graph, passing device knn_graph to skip H-to-D copy inside optimize Phase 2.
   auto next_graph_size = curr_query_size;
-  cagra_graph          = raft::make_host_matrix<IdxT, int64_t>(0, 0);  // delete existing grahp
+  cagra_graph          = raft::make_host_matrix<IdxT, int64_t>(0, 0);
   cagra_graph          = raft::make_host_matrix<IdxT, int64_t>(next_graph_size, next_graph_degree);
-  optimize<IdxT>(
-    res, neighbors_view, cagra_graph.view(), flag_last ? params.guarantee_connectivity : 0);
+  optimize<IdxT>(res,
+                 neighbors_view,
+                 cagra_graph.view(),
+                 flag_last ? params.guarantee_connectivity : 0,
+                 dev_knn_graph.data_handle());
 }
 
 template <typename T,
@@ -2188,6 +2208,7 @@ auto iterative_build_graph(
     auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     RAFT_LOG_INFO("# VPQ compression time: %.3lf sec", (double)elapsed_ms / 1000);
   }
+  bool do_skip = true;
   while (true) {
     auto start           = std::chrono::high_resolution_clock::now();
     auto curr_query_size = std::min(2 * curr_graph_size, final_graph_size);
@@ -2205,7 +2226,8 @@ auto iterative_build_graph(
       curr_itopk_size = curr_topk + 32;
     }
 
-    bool do_skip = false;//params.skip_graph_optimization && !flag_last;
+    do_skip = false;//params.skip_graph_optimization && !flag_last;
+    RAFT_LOG_INFO("# do_skip = %s", do_skip ? "true" : "false");
 
     cuvs::neighbors::cagra::search_params search_params;
     search_params.algo           = cuvs::neighbors::cagra::search_algo::AUTO;
