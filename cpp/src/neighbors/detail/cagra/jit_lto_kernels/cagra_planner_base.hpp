@@ -33,17 +33,17 @@ struct CagraPlannerBase : AlgorithmPlanner {
                                            uint32_t pq_bits = 0,
                                            uint32_t pq_len  = 0)
   {
-    std::string key = "setup_workspace_";
+    std::string key = "setup_workspace";
     if (is_vpq) {
-      key += "vpq_";
+      key += "_vpq";
       auto params = make_fragment_key<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag>();
-      key += "t" + std::to_string(team_size);
-      key += "_dim" + std::to_string(dataset_block_dim);
+      key += "_team_size_" + std::to_string(team_size);
+      key += "_dataset_block_dim_" + std::to_string(dataset_block_dim);
       key += "_" + std::to_string(pq_bits) + "pq_" + std::to_string(pq_len) + "subd";
       if (!params.empty()) { key += "_" + params; }
     } else {
-      key += "standard_t" + std::to_string(team_size);
-      key += "_dim" + std::to_string(dataset_block_dim);
+      key += "_standard_team_size_" + std::to_string(team_size);
+      key += "_dataset_block_dim_" + std::to_string(dataset_block_dim);
       auto params = make_fragment_key<DataTag, IndexTag, DistanceTag, QueryTag>();
       if (!params.empty()) { key += "_" + params; }
     }
@@ -58,16 +58,16 @@ struct CagraPlannerBase : AlgorithmPlanner {
                                             uint32_t pq_len  = 0)
   {
     if (is_vpq) {
-      std::string key = "compute_distance_vpq_";
+      std::string key = "compute_distance_vpq";
       auto params     = make_fragment_key<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag>();
-      key += "t" + std::to_string(team_size);
-      key += "_dim" + std::to_string(dataset_block_dim);
+      key += "_team_size_" + std::to_string(team_size);
+      key += "_dataset_block_dim_" + std::to_string(dataset_block_dim);
       key += "_" + std::to_string(pq_bits) + "pq_" + std::to_string(pq_len) + "subd";
       if (!params.empty()) { key += "_" + params; }
       this->device_functions.push_back(key);
     } else {
-      std::string key = "compute_distance_standard_t" + std::to_string(team_size);
-      key += "_dim" + std::to_string(dataset_block_dim);
+      std::string key = "compute_distance_standard_team_size_" + std::to_string(team_size);
+      key += "_dataset_block_dim_" + std::to_string(dataset_block_dim);
       auto params = make_fragment_key<DataTag, IndexTag, DistanceTag, QueryTag>();
       if (!params.empty()) { key += "_" + params; }
       this->device_functions.push_back(key);
@@ -105,8 +105,8 @@ struct CagraPlannerBase : AlgorithmPlanner {
     }
     auto params     = make_fragment_key<DataTag, IndexTag, DistanceTag, QueryTag>();
     std::string key = "apply_normalization_standard_" + normalization_type;
-    key += "_t" + std::to_string(team_size);
-    key += "_dim" + std::to_string(dataset_block_dim);
+    key += "_team_size_" + std::to_string(team_size);
+    key += "_dataset_block_dim_" + std::to_string(dataset_block_dim);
     if (!params.empty()) { key += "_" + params; }
     this->device_functions.push_back(key);
   }

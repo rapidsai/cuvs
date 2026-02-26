@@ -96,7 +96,9 @@ std::string get_sample_filter_name()
   using DecayedFilter = std::decay_t<SAMPLE_FILTER_T>;
 
   // First check for none_sample_filter (the only unwrapped case)
-  if constexpr (std::is_same_v<DecayedFilter, none_sample_filter>) { return "filter_none_ui"; }
+  if constexpr (std::is_same_v<DecayedFilter, none_sample_filter>) {
+    return "filter_none_source_index_ui";
+  }
 
   // All other filters are wrapped in CagraSampleFilterWithQueryIdOffset
   // Access the inner filter type via decltype
@@ -105,12 +107,12 @@ std::string get_sample_filter_name()
     if constexpr (is_bitset_filter<InnerFilter>::value ||
                   std::is_same_v<InnerFilter, bitset_filter<uint32_t, int64_t>> ||
                   std::is_same_v<InnerFilter, bitset_filter<uint32_t, uint32_t>>) {
-      return "filter_bitset_ui";
+      return "filter_bitset_source_index_ui";
     }
   }
 
   // Default to none filter for unknown types
-  return "filter_none_ui";
+  return "filter_none_source_index_ui";
 }
 
 }  // namespace cuvs::neighbors::cagra::detail

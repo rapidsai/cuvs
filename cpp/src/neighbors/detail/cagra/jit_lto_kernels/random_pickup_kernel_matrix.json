@@ -79,7 +79,8 @@
     "_codebook": [
       {
         "codebook_type": "void",
-        "codebook_tag": ""
+        "codebook_tag": "",
+        "codebook_comma": ""
       }
     ]
   },
@@ -147,7 +148,8 @@
     "_codebook": [
       {
         "codebook_type": "half",
-        "codebook_tag": ", tag_codebook_half"
+        "codebook_tag": "tag_codebook_half",
+        "codebook_comma": ", "
       }
     ]
   }

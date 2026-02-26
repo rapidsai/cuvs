@@ -64,8 +64,8 @@ struct CagraMultiKernelSearchPlanner
 
     std::string name = kernel_name;
     if (is_vpq) { name += "_vpq"; }
-    name += "_t" + std::to_string(team_size);
-    name += "_dim" + std::to_string(dataset_block_dim);
+    name += "_team_size_" + std::to_string(team_size);
+    name += "_dataset_block_dim_" + std::to_string(dataset_block_dim);
     if (is_vpq) { name += "_" + std::to_string(pq_bits) + "pq_" + std::to_string(pq_len) + "subd"; }
     return name;
   }

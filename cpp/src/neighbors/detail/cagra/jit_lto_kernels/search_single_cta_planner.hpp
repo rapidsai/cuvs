@@ -60,16 +60,15 @@ struct CagraSingleCtaSearchPlanner
                                            uint32_t pq_len,
                                            bool persistent)
   {
-    std::string name = (persistent ? "search_single_cta_kernel_p_" : "search_single_cta_kernel_");
-    name += bool_to_string(topk_by_bitonic_sort) + "_";
-    name += bool_to_string(bitonic_sort_and_merge_multi_warps) + "_";
-    name += "t" + std::to_string(team_size);
-    name += "_dim" + std::to_string(dataset_block_dim);
+    std::string name = (persistent ? "search_single_cta_kernel_p" : "search_single_cta_kernel");
+    name += std::string(topk_by_bitonic_sort ? "_" : "_no_") + "topk_by_bitonic_sort";
+    name += std::string(bitonic_sort_and_merge_multi_warps ? "_" : "_no_") +
+            "bitonic_sort_and_merge_multi_warps";
+    name += "_team_size_" + std::to_string(team_size);
+    name += "_dataset_block_dim_" + std::to_string(dataset_block_dim);
     if (is_vpq) { name += "_" + std::to_string(pq_bits) + "pq_" + std::to_string(pq_len) + "subd"; }
     return name;
   }
-
-  static std::string bool_to_string(bool b) { return b ? "true" : "false"; }
 };
 
 }  // namespace single_cta_search
