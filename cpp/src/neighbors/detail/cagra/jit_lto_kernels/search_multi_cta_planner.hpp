@@ -34,8 +34,13 @@ struct CagraMultiCtaSearchPlanner
                              uint32_t pq_len  = 0)
     : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag>(
         build_entrypoint_name(metric, team_size, dataset_block_dim, is_vpq, pq_bits, pq_len),
-        is_vpq ? make_fragment_key<DataTag, IndexTag, DistanceTag, SourceIndexTag, CodebookTag>()
-               : make_fragment_key<DataTag, IndexTag, DistanceTag, SourceIndexTag>())
+        is_vpq ? make_fragment_key<DataTag,
+                                   IndexTag,
+                                   DistanceTag,
+                                   QueryTag,
+                                   SourceIndexTag,
+                                   CodebookTag>()
+               : make_fragment_key<DataTag, IndexTag, DistanceTag, QueryTag, SourceIndexTag>())
   {
   }
 

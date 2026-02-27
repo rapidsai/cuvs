@@ -44,8 +44,13 @@ struct CagraSingleCtaSearchPlanner
                               pq_bits,
                               pq_len,
                               persistent),
-        is_vpq ? make_fragment_key<DataTag, IndexTag, DistanceTag, SourceIndexTag, CodebookTag>()
-               : make_fragment_key<DataTag, IndexTag, DistanceTag, SourceIndexTag>())
+        is_vpq ? make_fragment_key<DataTag,
+                                   IndexTag,
+                                   DistanceTag,
+                                   QueryTag,
+                                   SourceIndexTag,
+                                   CodebookTag>()
+               : make_fragment_key<DataTag, IndexTag, DistanceTag, QueryTag, SourceIndexTag>())
   {
   }
 

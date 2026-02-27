@@ -38,8 +38,13 @@ struct CagraMultiKernelSearchPlanner
         (kernel_name == "apply_filter_kernel")
           ? make_fragment_key<IndexTag, DistanceTag, SourceIndexTag>()
           : (is_vpq
-               ? make_fragment_key<DataTag, IndexTag, DistanceTag, SourceIndexTag, CodebookTag>()
-               : make_fragment_key<DataTag, IndexTag, DistanceTag, SourceIndexTag>()))
+               ? make_fragment_key<DataTag,
+                                   IndexTag,
+                                   DistanceTag,
+                                   QueryTag,
+                                   SourceIndexTag,
+                                   CodebookTag>()
+               : make_fragment_key<DataTag, IndexTag, DistanceTag, QueryTag, SourceIndexTag>()))
   {
   }
 
