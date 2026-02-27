@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -10,6 +10,7 @@
 #include "coo_spmv_strategies/hash_strategy.cuh"
 
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/matrix/init.cuh>
 #include <raft/sparse/csr.hpp>
 #include <raft/sparse/detail/cusparse_wrappers.h>
 #include <raft/sparse/detail/utils.h>
@@ -43,8 +44,10 @@ inline void balanced_coo_pairwise_generalized_spmv(
   strategy_t strategy,
   int chunk_size = 500000)
 {
-  uint64_t n = (uint64_t)sizeof(value_t) * (uint64_t)config_.a_nrows * (uint64_t)config_.b_nrows;
-  RAFT_CUDA_TRY(cudaMemsetAsync(out_dists, 0, n, raft::resource::get_cuda_stream(config_.handle)));
+  raft::matrix::fill(
+    config_.handle,
+    raft::make_device_vector_view(out_dists, (int64_t)config_.a_nrows * config_.b_nrows),
+    value_t(0));
 
   strategy.dispatch(out_dists, coo_rows_b, product_func, accum_func, write_func, chunk_size);
 };
@@ -97,8 +100,10 @@ inline void balanced_coo_pairwise_generalized_spmv(
   write_f write_func,
   int chunk_size = 500000)
 {
-  uint64_t n = (uint64_t)sizeof(value_t) * (uint64_t)config_.a_nrows * (uint64_t)config_.b_nrows;
-  RAFT_CUDA_TRY(cudaMemsetAsync(out_dists, 0, n, raft::resource::get_cuda_stream(config_.handle)));
+  raft::matrix::fill(
+    config_.handle,
+    raft::make_device_vector_view(out_dists, (int64_t)config_.a_nrows * config_.b_nrows),
+    value_t(0));
 
   int max_cols = max_cols_per_block<value_idx, value_t>();
 
