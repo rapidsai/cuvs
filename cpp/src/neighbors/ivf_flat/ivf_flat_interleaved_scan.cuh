@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -1293,6 +1293,7 @@ struct select_interleaved_scan_kernel {
  */
 template <typename T, typename AccT, typename IdxT, typename IvfSampleFilterT>
 void ivfflat_interleaved_scan(const index<T, IdxT>& index,
+                              const search_params& params,
                               const T* queries,
                               const uint32_t* coarse_query_results,
                               const uint32_t n_queries,

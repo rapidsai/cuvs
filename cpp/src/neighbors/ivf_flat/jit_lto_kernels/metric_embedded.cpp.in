@@ -3,10 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// This file is auto-generated. Do not edit manually.
-
 #include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
-#include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>
+#include <cuvs/detail/jit_lto/registration_tags.hpp>
 #include "@embedded_header_file@"
 
 using namespace cuvs::neighbors::ivf_flat::detail;

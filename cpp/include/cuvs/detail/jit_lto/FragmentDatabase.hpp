@@ -6,6 +6,7 @@
 #pragma once
 
 #include <memory>
+#include <mutex>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -21,6 +22,7 @@ class FragmentDatabase {
   FragmentDatabase& operator=(FragmentDatabase const&) = delete;
 
   FragmentEntry* get_fragment(std::string const& key);
+  bool has_fragment(std::string const& key) const;
 
  private:
   FragmentDatabase();
@@ -34,6 +36,11 @@ class FragmentDatabase {
                                      unsigned char const* blob,
                                      std::size_t size);
 
+  friend void registerNVRTCFragment(std::string const& key,
+                                    std::unique_ptr<char[]>&& program,
+                                    std::size_t size);
+
+  mutable std::mutex cache_mutex_;
   std::unordered_map<std::string, std::unique_ptr<FragmentEntry>> cache;
 };
 
@@ -43,3 +50,7 @@ void registerFatbinFragment(std::string const& algo,
                             std::string const& params,
                             unsigned char const* blob,
                             std::size_t size);
+
+void registerNVRTCFragment(std::string const& key,
+                           std::unique_ptr<char[]>&& program,
+                           std::size_t size);

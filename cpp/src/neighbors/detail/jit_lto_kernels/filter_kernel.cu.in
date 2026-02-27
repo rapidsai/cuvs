@@ -1,0 +1,14 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <neighbors/detail/jit_lto_kernels/@filter_name@.cuh>
+
+namespace @namespace@ {
+
+// Instantiate the sample_filter device function template
+// CAGRA style: sample_filter(query_id, node_id, filter_data)
+template __device__ bool sample_filter<@source_index_type@>(uint32_t, @source_index_type@, void*);
+
+}  // namespace @namespace@

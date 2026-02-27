@@ -3,13 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// This file is auto-generated. Do not edit manually.
-
 #include <neighbors/ivf_flat/jit_lto_kernels/ivf_flat_interleaved_scan_kernel.cuh>
 
 namespace cuvs::neighbors::ivf_flat::detail {
 
 // Instantiate the kernel template
+// Pass individual filter parameters like CAGRA does
 template __global__ void interleaved_scan_kernel<@capacity@, @veclen@, @ascending_value@, @compute_norm_value@, @data_type@, @acc_type@, @idx_type@>(
     const uint32_t, const @data_type@*, const uint32_t*, const @data_type@* const*, const uint32_t*,
     const uint32_t, const uint32_t, const uint32_t, const uint32_t, const uint32_t*, const uint32_t,

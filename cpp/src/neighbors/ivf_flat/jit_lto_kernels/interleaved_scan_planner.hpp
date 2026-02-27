@@ -31,7 +31,7 @@ struct InterleavedScanPlanner : AlgorithmPlanner {
 
   void add_filter_device_function(std::string filter_name)
   {
-    auto key = filter_name;
+    auto key = "sample_filter_" + filter_name;
     this->device_functions.push_back(key);
   }
 

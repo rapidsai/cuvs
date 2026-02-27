@@ -213,6 +213,12 @@ endif()
 # ##################################################################################################
 # * cuvs ---------------------------------------------------------------------
 if(NOT BUILD_CPU_ONLY)
+  set(JIT_LTO_TARGET_ARCHITECTURE "")
+  set(JIT_LTO_COMPILATION OFF)
+  if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
+    set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
+    set(JIT_LTO_COMPILATION ON)
+  endif()
 
   add_library(cuvs_cpp_headers INTERFACE)
   add_library(cuvs::cuvs_cpp_headers ALIAS cuvs_cpp_headers)
@@ -221,6 +227,9 @@ if(NOT BUILD_CPU_ONLY)
     INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
               "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
               "$<INSTALL_INTERFACE:include>"
+  )
+  target_compile_definitions(
+    cuvs_cpp_headers INTERFACE $<$<BOOL:${JIT_LTO_COMPILATION}>:CUVS_ENABLE_JIT_LTO>
   )
   target_link_libraries(cuvs_cpp_headers INTERFACE raft::raft rmm::rmm)
 
@@ -317,6 +326,10 @@ if(NOT BUILD_CPU_ONLY)
                CUDA_SEPARABLE_COMPILATION ON
                POSITION_INDEPENDENT_CODE ON
   )
+  target_compile_definitions(
+    cuvs-cagra-search PRIVATE $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
+                              $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
+  )
   target_link_libraries(
     cuvs-cagra-search PRIVATE cuvs::cuvs_cpp_headers
                               $<TARGET_NAME_IF_EXISTS:nvidia::cutlass::cutlass>
@@ -343,13 +356,6 @@ if(NOT BUILD_CPU_ONLY)
     )
   endif()
 
-  set(JIT_LTO_TARGET_ARCHITECTURE "")
-  set(JIT_LTO_COMPILATION OFF)
-  if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
-    set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
-    set(JIT_LTO_COMPILATION ON)
-  endif()
-
   if(JIT_LTO_COMPILATION)
     # Generate interleaved scan kernel files at build time
     include(cmake/modules/generate_jit_lto_kernels.cmake)
@@ -365,74 +371,216 @@ if(NOT BUILD_CPU_ONLY)
                                                   "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
     )
     target_compile_features(jit_lto_kernel_usage_requirements INTERFACE cuda_std_20)
+    target_compile_definitions(jit_lto_kernel_usage_requirements INTERFACE BUILD_KERNEL)
     target_link_libraries(
       jit_lto_kernel_usage_requirements INTERFACE rmm::rmm raft::raft CCCL::CCCL
     )
 
-    block(PROPAGATE interleaved_scan_files metric_files filter_files post_lambda_files)
+    block(PROPAGATE jit_lto_kernel_files)
     set(CMAKE_CUDA_ARCHITECTURES ${JIT_LTO_TARGET_ARCHITECTURE})
     generate_jit_lto_kernels(
-      interleaved_scan_files
+      jit_lto_kernel_files
       NAME_FORMAT
-        "interleaved_scan_capacity_@capacity@_veclen_@veclen@_@ascending_descending@_@compute_norm_name@_data_@type_abbrev@_acc_@acc_abbrev@_idx_@idx_abbrev@"
+        "ivf_flat_interleaved_scan_capacity_@capacity@_veclen_@veclen@_@ascending_descending@_@compute_norm_name@_data_@type_abbrev@_acc_@acc_abbrev@_idx_@idx_abbrev@"
       MATRIX_JSON_FILE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_matrix.json"
       KERNEL_INPUT_FILE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_kernel.cu.in"
       EMBEDDED_INPUT_FILE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_embedded.cpp.in"
-      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/interleaved_scan"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_flat/interleaved_scan"
       KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
     )
     generate_jit_lto_kernels(
-      metric_files
-      NAME_FORMAT "metric_@metric_name@_veclen_@veclen@_data_@type_abbrev@_acc_@acc_abbrev@"
+      jit_lto_kernel_files
+      NAME_FORMAT
+        "ivf_flat_metric_@metric_name@_veclen_@veclen@_data_@type_abbrev@_acc_@acc_abbrev@"
       MATRIX_JSON_FILE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/metric_matrix.json"
       KERNEL_INPUT_FILE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/metric_kernel.cu.in"
       EMBEDDED_INPUT_FILE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/metric_embedded.cpp.in"
-      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/metric"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_flat/metric"
       KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
     )
     generate_jit_lto_kernels(
-      filter_files
-      NAME_FORMAT "@filter_name@"
+      jit_lto_kernel_files
+      NAME_FORMAT "ivf_flat_@filter_name@"
       MATRIX_JSON_FILE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/filter_matrix.json"
       KERNEL_INPUT_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/filter_kernel.cu.in"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/jit_lto_kernels/filter_kernel.cu.in"
       EMBEDDED_INPUT_FILE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/filter_embedded.cpp.in"
-      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/filter"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/jit_lto_kernels/filter_embedded.cpp.in"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_flat/filter"
       KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
     )
     generate_jit_lto_kernels(
-      post_lambda_files
-      NAME_FORMAT "@post_lambda_name@"
+      jit_lto_kernel_files
+      NAME_FORMAT "ivf_flat_@post_lambda_name@"
       MATRIX_JSON_FILE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/post_lambda_matrix.json"
       KERNEL_INPUT_FILE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/post_lambda_kernel.cu.in"
       EMBEDDED_INPUT_FILE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/post_lambda_embedded.cpp.in"
-      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/post_lambda"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_flat/post_lambda"
+      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    )
+    generate_jit_lto_kernels(
+      jit_lto_kernel_files
+      NAME_FORMAT
+        "cagra_setup_workspace@pq_prefix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_data_@data_abbrev@_query_@query_abbrev@"
+      MATRIX_JSON_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/setup_workspace_matrix.json"
+      KERNEL_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/setup_workspace_kernel.cu.in"
+      EMBEDDED_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/setup_workspace_embedded.cpp.in"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/setup_workspace"
+      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    )
+    generate_jit_lto_kernels(
+      jit_lto_kernel_files
+      NAME_FORMAT
+        "cagra_compute_distance@pq_prefix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@_@pq_bits@pq_@pq_len@subd_data_@data_abbrev@_query_@query_abbrev@"
+      MATRIX_JSON_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_matrix.json"
+      KERNEL_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_kernel.cu.in"
+      EMBEDDED_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_embedded.cpp.in"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/compute_distance"
+      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    )
+    generate_jit_lto_kernels(
+      jit_lto_kernel_files
+      NAME_FORMAT "cagra_dist_op_@metric_tag@"
+      MATRIX_JSON_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/dist_op_matrix.json"
+      KERNEL_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/dist_op_kernel.cu.in"
+      EMBEDDED_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/dist_op_embedded.cpp.in"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/dist_op"
+      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    )
+    generate_jit_lto_kernels(
+      jit_lto_kernel_files
+      NAME_FORMAT
+        "cagra_apply_normalization_standard@normalization_suffix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@_data_@data_abbrev@_query_@query_abbrev@"
+      MATRIX_JSON_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_normalization_standard_matrix.json"
+      KERNEL_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_normalization_standard_kernel.cu.in"
+      EMBEDDED_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_normalization_standard_embedded.cpp.in"
+      OUTPUT_DIRECTORY
+        "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/apply_normalization_standard"
+      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    )
+    generate_jit_lto_kernels(
+      jit_lto_kernel_files
+      NAME_FORMAT
+        "cagra_search_single_cta_@topk_by_bitonic_sort_str@_@bitonic_sort_and_merge_multi_warps_str@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@_data_@data_abbrev@_query_@query_abbrev@"
+      MATRIX_JSON_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_matrix.json"
+      KERNEL_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_kernel.cu.in"
+      EMBEDDED_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_embedded.cpp.in"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/search_single_cta"
+      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    )
+    generate_jit_lto_kernels(
+      jit_lto_kernel_files
+      NAME_FORMAT
+        "cagra_search_single_cta_p_@topk_by_bitonic_sort_str@_@bitonic_sort_and_merge_multi_warps_str@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@_data_@data_abbrev@_query_@query_abbrev@"
+      MATRIX_JSON_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_p_matrix.json"
+      KERNEL_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_p_kernel.cu.in"
+      EMBEDDED_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_p_embedded.cpp.in"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/search_single_cta_p"
+      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    )
+    generate_jit_lto_kernels(
+      jit_lto_kernel_files
+      NAME_FORMAT
+        "cagra_search_multi_cta@pq_prefix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@_data_@data_abbrev@_query_@query_abbrev@"
+      MATRIX_JSON_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_multi_cta_matrix.json"
+      KERNEL_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_multi_cta_kernel.cu.in"
+      EMBEDDED_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_multi_cta_embedded.cpp.in"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/search_multi_cta"
+      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    )
+    generate_jit_lto_kernels(
+      jit_lto_kernel_files
+      NAME_FORMAT
+        "cagra_random_pickup@pq_prefix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@_data_@data_abbrev@_query_@query_abbrev@"
+      MATRIX_JSON_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/random_pickup_matrix.json"
+      KERNEL_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/random_pickup_kernel.cu.in"
+      EMBEDDED_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/random_pickup_embedded.cpp.in"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/random_pickup"
+      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    )
+    generate_jit_lto_kernels(
+      jit_lto_kernel_files
+      NAME_FORMAT
+        "cagra_compute_distance_to_child_nodes@pq_prefix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@_data_@data_abbrev@_query_@query_abbrev@"
+      MATRIX_JSON_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_to_child_nodes_matrix.json"
+      KERNEL_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_to_child_nodes_kernel.cu.in"
+      EMBEDDED_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_to_child_nodes_embedded.cpp.in"
+      OUTPUT_DIRECTORY
+        "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/compute_distance_to_child_nodes"
+      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    )
+    generate_jit_lto_kernels(
+      jit_lto_kernel_files
+      NAME_FORMAT "cagra_appy_filter"
+      MATRIX_JSON_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_filter_matrix.json"
+      KERNEL_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_filter_kernel.cu.in"
+      EMBEDDED_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_filter_embedded.cpp.in"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/apply_filter"
+      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    )
+    generate_jit_lto_kernels(
+      jit_lto_kernel_files
+      NAME_FORMAT "cagra_@filter_name@"
+      MATRIX_JSON_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/filter_matrix.json"
+      KERNEL_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/jit_lto_kernels/filter_kernel.cu.in"
+      EMBEDDED_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/jit_lto_kernels/filter_embedded.cpp.in"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/cagra/filter"
       KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
     )
     endblock()
 
     add_library(
       cuvs_jit_lto_kernels STATIC
-      ${interleaved_scan_files}
-      ${metric_files}
-      ${filter_files}
-      ${post_lambda_files}
+      ${jit_lto_kernel_files}
       src/detail/jit_lto/AlgorithmLauncher.cu
       src/detail/jit_lto/AlgorithmPlanner.cu
       src/detail/jit_lto/FragmentDatabase.cu
       src/detail/jit_lto/FragmentEntry.cu
       src/detail/jit_lto/nvjitlink_checker.cpp
+      src/detail/jit_lto/NVRTCLTOFragmentCompiler.cu
     )
     set_target_properties(
       cuvs_jit_lto_kernels PROPERTIES POSITION_INDEPENDENT_CODE ON CXX_STANDARD 20
@@ -442,7 +590,7 @@ if(NOT BUILD_CPU_ONLY)
       PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_SOURCE_DIR}/src"
               "${CMAKE_CURRENT_SOURCE_DIR}/../c/include"
     )
-    target_link_libraries(cuvs_jit_lto_kernels PRIVATE raft::raft)
+    target_link_libraries(cuvs_jit_lto_kernels PRIVATE raft::raft CUDA::nvJitLink CUDA::nvrtc)
     add_library(cuvs::cuvs_jit_lto_kernels ALIAS cuvs_jit_lto_kernels)
   endif()
 
@@ -689,6 +837,7 @@ if(NOT BUILD_CPU_ONLY)
             ${CUVS_CTK_MATH_DEPENDENCIES}
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
             $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
+            $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvrtc>
   )
 
   target_include_directories(
@@ -772,6 +921,7 @@ if(NOT BUILD_CPU_ONLY)
         $<COMPILE_ONLY:nvidia::cutlass::cutlass>
         $<COMPILE_ONLY:cuco::cuco>
         $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
+        $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvrtc>
         $<$<BOOL:${JIT_LTO_COMPILATION}>:$<LINK_LIBRARY:WHOLE_ARCHIVE,cuvs::cuvs_jit_lto_kernels>>
     )
 
@@ -832,6 +982,7 @@ SECTIONS
       PRIVATE
         $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
         $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
+        $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvrtc>
         $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
         $<COMPILE_ONLY:nvidia::cutlass::cutlass>
         $<COMPILE_ONLY:cuco::cuco>

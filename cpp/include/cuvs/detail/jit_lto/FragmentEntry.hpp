@@ -30,3 +30,12 @@ struct FatbinFragmentEntry final : FragmentEntry {
   std::size_t data_size          = 0;
   unsigned char const* data_view = nullptr;
 };
+
+struct NVRTCFragmentEntry final : FragmentEntry {
+  NVRTCFragmentEntry(std::string const& key, std::unique_ptr<char[]>&& program, std::size_t size);
+
+  virtual bool add_to(nvJitLinkHandle& handle) const;
+
+  std::size_t data_size = 0;
+  std::unique_ptr<char[]> program{};
+};

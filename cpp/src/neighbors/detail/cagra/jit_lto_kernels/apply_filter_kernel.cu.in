@@ -1,0 +1,13 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <neighbors/detail/cagra/jit_lto_kernels/search_multi_jit.cuh>
+
+namespace cuvs::neighbors::cagra::detail::multi_kernel_search {
+
+template __global__ void apply_filter_kernel_jit<@index_type@, @distance_type@, @source_index_type@>(
+    const @source_index_type@* const, @index_type@* const, @distance_type@* const, const std::size_t, const std::uint32_t, const std::uint32_t, const @index_type@, uint32_t*, @source_index_type@, @source_index_type@);
+
+}  // namespace cuvs::neighbors::cagra::detail::multi_kernel_search

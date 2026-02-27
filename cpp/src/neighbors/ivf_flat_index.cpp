@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -58,6 +58,12 @@ template <typename T, typename IdxT>
 cuvs::distance::DistanceType index<T, IdxT>::metric() const noexcept
 {
   return metric_;
+}
+
+template <typename T, typename IdxT>
+void index<T, IdxT>::set_metric(cuvs::distance::DistanceType metric)
+{
+  metric_ = metric;
 }
 
 template <typename T, typename IdxT>

@@ -1,0 +1,14 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <neighbors/detail/cagra/jit_lto_kernels/compute_distance@pq_prefix@_impl.cuh>
+
+namespace cuvs::neighbors::cagra::detail {
+
+using args_t = typename cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<@data_type@, @index_type@, @distance_type@>::args_t;
+template __device__ @distance_type@ compute_distance<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@, @query_type@>(
+    const args_t, @index_type@);
+
+}  // namespace cuvs::neighbors::cagra::detail

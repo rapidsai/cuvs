@@ -14,6 +14,12 @@
 #include "topk_for_cagra/topk.h"  // TODO replace with raft topk if possible
 #include "utils.hpp"
 
+#ifdef CUVS_ENABLE_JIT_LTO
+#include "search_multi_cta_kernel_launcher_jit.cuh"
+#else
+#include "set_value_batch.cuh"
+#endif
+
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -453,7 +459,18 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
           uint32_t k            = j + (itopk_size * (cta_id + (num_cta_per_query * query_id)));
           result_indices_ptr[k] = index & ~index_msb_1_mask;
           if (result_distances_ptr != nullptr) {
-            result_distances_ptr[k] = result_distances_buffer[i];
+            DISTANCE_T dist         = result_distances_buffer[i];
+            result_distances_ptr[k] = dist;
+            // Debug: print first query, first CTA, first few results
+            if (query_id == 0 && cta_id == 0 && j < 5) {
+              printf("NON-JIT: query=%u cta=%u j=%u i=%u idx=%u dist=%.6f\n",
+                     query_id,
+                     cta_id,
+                     j,
+                     i,
+                     index & ~index_msb_1_mask,
+                     (float)dist);
+            }
           }
         } else {
           // If it is valid and registered in the traversed hash table but is
@@ -502,34 +519,6 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
 #endif
 }
 
-template <class T>
-RAFT_KERNEL set_value_batch_kernel(T* const dev_ptr,
-                                   const std::size_t ld,
-                                   const T val,
-                                   const std::size_t count,
-                                   const std::size_t batch_size)
-{
-  const auto tid = threadIdx.x + blockIdx.x * blockDim.x;
-  if (tid >= count * batch_size) { return; }
-  const auto batch_id              = tid / count;
-  const auto elem_id               = tid % count;
-  dev_ptr[elem_id + ld * batch_id] = val;
-}
-
-template <class T>
-void set_value_batch(T* const dev_ptr,
-                     const std::size_t ld,
-                     const T val,
-                     const std::size_t count,
-                     const std::size_t batch_size,
-                     cudaStream_t cuda_stream)
-{
-  constexpr std::uint32_t block_size = 256;
-  const auto grid_size               = (count * batch_size + block_size - 1) / block_size;
-  set_value_batch_kernel<T>
-    <<<grid_size, block_size, 0, cuda_stream>>>(dev_ptr, ld, val, count, batch_size);
-}
-
 template <typename DATASET_DESCRIPTOR_T, typename SourceIndexT, typename SAMPLE_FILTER_T>
 struct search_kernel_config {
   // Search kernel function type. Note that the actual values for the template value
@@ -574,6 +563,31 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
                     SampleFilterT sample_filter,
                     cudaStream_t stream)
 {
+#ifdef CUVS_ENABLE_JIT_LTO
+  // Use JIT version when JIT is enabled
+  select_and_run_jit(dataset_desc,
+                     graph,
+                     source_indices_ptr,
+                     topk_indices_ptr,
+                     topk_distances_ptr,
+                     queries_ptr,
+                     num_queries,
+                     dev_seed_ptr,
+                     num_executed_iterations,
+                     ps,
+                     topk,
+                     block_size,
+                     result_buffer_size,
+                     smem_size,
+                     visited_hash_bitlen,
+                     traversed_hash_bitlen,
+                     traversed_hashmap_ptr,
+                     num_cta_per_query,
+                     num_seeds,
+                     sample_filter,
+                     stream);
+#else
+  // Non-JIT path
   auto kernel =
     search_kernel_config<dataset_descriptor_base_t<DataT, IndexT, DistanceT>,
                          SourceIndexT,
@@ -630,6 +644,7 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
                                                          sample_filter);
   };
   cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(kernel, smem_size, kernel_launcher);
+#endif
 }
 
 }  // namespace multi_cta_search

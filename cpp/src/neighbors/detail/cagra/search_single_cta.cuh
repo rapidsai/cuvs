@@ -34,6 +34,7 @@
 #include <numeric>
 #include <vector>
 
+// All includes are done before opening namespace to avoid nested namespace issues
 namespace cuvs::neighbors::cagra::detail {
 namespace single_cta_search {
 

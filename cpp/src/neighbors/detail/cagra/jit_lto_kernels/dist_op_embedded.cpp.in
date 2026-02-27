@@ -1,0 +1,23 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
+#include <cuvs/detail/jit_lto/registration_tags.hpp>
+#include "@embedded_header_file@"
+
+using namespace cuvs::neighbors::cagra::detail;
+
+namespace {
+
+__attribute__((__constructor__)) static void register_kernel()
+{
+  registerAlgorithm<tag_@query_abbrev@,
+    tag_dist_@distance_abbrev@>(
+    "dist_op_@metric_tag@",
+    embedded_fatbin,
+    sizeof(embedded_fatbin));
+}
+
+}
