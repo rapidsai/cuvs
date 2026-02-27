@@ -337,7 +337,7 @@ TEST(CagraC, BuildExtendSearch)
   cuvsResourcesDestroy(res);
 }
 
-TEST(CagraC, BuildSearchFiltered)
+TEST(CagraC, BuildSearchBitsetFiltered)
 {
   // create cuvsResources_t
   cuvsResources_t res;
@@ -439,6 +439,142 @@ TEST(CagraC, BuildSearchFiltered)
     neighbors_exp_filtered, neighbors_d.data(), 4, cuvs::Compare<uint32_t>()));
   ASSERT_TRUE(cuvs::devArrMatchHost(
     distances_exp_filtered, distances_d.data(), 4, cuvs::CompareApprox<float>(0.001f)));
+
+  // de-allocate index and res
+  cuvsCagraSearchParamsDestroy(search_params);
+  cuvsCagraIndexParamsDestroy(build_params);
+  cuvsCagraIndexDestroy(index);
+  cuvsResourcesDestroy(res);
+}
+
+TEST(CagraC, BuildSearchBitmapFiltered)
+{
+  int64_t n_rows       = 100;
+  int64_t n_queries    = 10;
+  int64_t n_dim        = 16;
+  uint32_t n_neighbors = 4;
+
+  raft::handle_t handle;
+  auto stream = raft::resource::get_cuda_stream(handle);
+
+  // Generate data
+  rmm::device_uvector<float> index_data(n_rows * n_dim, stream);
+  rmm::device_uvector<float> query_data(n_queries * n_dim, stream);
+  raft::random::RngState r(1234ULL);
+  raft::random::uniform(
+    handle, r, index_data.data(), n_rows * n_dim, float(0.1), float(2.0));
+  raft::random::uniform(
+    handle, r, query_data.data(), n_queries * n_dim, float(0.1), float(2.0));
+
+  // create cuvsResources_t
+  cuvsResources_t res;
+  cuvsResourcesCreate(&res);
+
+  // create dataset DLTensor
+  DLManagedTensor dataset_tensor;
+  dataset_tensor.dl_tensor.data               = index_data.data();
+  dataset_tensor.dl_tensor.device.device_type = kDLCUDA;
+  dataset_tensor.dl_tensor.ndim               = 2;
+  dataset_tensor.dl_tensor.dtype.code         = kDLFloat;
+  dataset_tensor.dl_tensor.dtype.bits         = 32;
+  dataset_tensor.dl_tensor.dtype.lanes        = 1;
+  int64_t dataset_shape[2]                    = {n_rows, n_dim};
+  dataset_tensor.dl_tensor.shape              = dataset_shape;
+  dataset_tensor.dl_tensor.strides            = nullptr;
+
+  // create index
+  cuvsCagraIndex_t index;
+  cuvsCagraIndexCreate(&index);
+
+  // build index
+  cuvsCagraIndexParams_t build_params;
+  cuvsCagraIndexParamsCreate(&build_params);
+  cuvsCagraBuild(res, build_params, &dataset_tensor, index);
+
+  // create queries DLTensor
+  DLManagedTensor queries_tensor;
+  queries_tensor.dl_tensor.data               = query_data.data();
+  queries_tensor.dl_tensor.device.device_type = kDLCUDA;
+  queries_tensor.dl_tensor.ndim               = 2;
+  queries_tensor.dl_tensor.dtype.code         = kDLFloat;
+  queries_tensor.dl_tensor.dtype.bits         = 32;
+  queries_tensor.dl_tensor.dtype.lanes        = 1;
+  int64_t queries_shape[2]                    = {n_queries, n_dim};
+  queries_tensor.dl_tensor.shape              = queries_shape;
+  queries_tensor.dl_tensor.strides            = nullptr;
+
+  // create neighbors DLTensor
+  rmm::device_uvector<uint32_t> neighbors_data(n_queries * n_neighbors, stream);
+  DLManagedTensor neighbors_tensor;
+  neighbors_tensor.dl_tensor.data               = neighbors_data.data();
+  neighbors_tensor.dl_tensor.device.device_type = kDLCUDA;
+  neighbors_tensor.dl_tensor.ndim               = 2;
+  neighbors_tensor.dl_tensor.dtype.code         = kDLUInt;
+  neighbors_tensor.dl_tensor.dtype.bits         = 32;
+  neighbors_tensor.dl_tensor.dtype.lanes        = 1;
+  int64_t neighbors_shape[2]                    = {n_queries, n_neighbors};
+  neighbors_tensor.dl_tensor.shape              = neighbors_shape;
+  neighbors_tensor.dl_tensor.strides            = nullptr;
+
+  // create distances DLTensor
+  rmm::device_uvector<float> distances_data(n_queries * n_neighbors, stream);
+  DLManagedTensor distances_tensor;
+  distances_tensor.dl_tensor.data               = distances_data.data();
+  distances_tensor.dl_tensor.device.device_type = kDLCUDA;
+  distances_tensor.dl_tensor.ndim               = 2;
+  distances_tensor.dl_tensor.dtype.code         = kDLFloat;
+  distances_tensor.dl_tensor.dtype.bits         = 32;
+  distances_tensor.dl_tensor.dtype.lanes        = 1;
+  int64_t distances_shape[2]                    = {n_queries, n_neighbors};
+  distances_tensor.dl_tensor.shape              = distances_shape;
+  distances_tensor.dl_tensor.strides            = nullptr;
+
+  // Create bitmap filter - per query filter
+  // For each query, remove even indices
+  auto bitmap_size = n_queries * ((n_rows + 31) / 32);  // n_queries x (bits for n_rows)
+  rmm::device_uvector<uint32_t> filter_bitmap(bitmap_size, stream);
+  std::vector<uint32_t> filter_bitmap_h(bitmap_size);
+  for (size_t q = 0; q < n_queries; ++q) {
+    for (size_t i = 0; i < (n_rows + 31) / 32; ++i) {
+      filter_bitmap_h[q * ((n_rows + 31) / 32) + i] =
+        0xAAAAAAAA;  // 10101010... pattern - removes even indices
+    }
+  }
+  raft::copy(filter_bitmap.data(), filter_bitmap_h.data(), bitmap_size, stream);
+
+  DLManagedTensor filter_tensor;
+  filter_tensor.dl_tensor.data               = filter_bitmap.data();
+  filter_tensor.dl_tensor.device.device_type = kDLCUDA;
+  filter_tensor.dl_tensor.ndim               = 1;
+  filter_tensor.dl_tensor.dtype.code         = kDLUInt;
+  filter_tensor.dl_tensor.dtype.bits         = 32;
+  filter_tensor.dl_tensor.dtype.lanes        = 1;
+  int64_t filter_shape[1]                    = {bitmap_size};
+  filter_tensor.dl_tensor.shape              = filter_shape;
+  filter_tensor.dl_tensor.strides            = nullptr;
+
+  cuvsFilter filter;
+  filter.type = BITMAP;
+  filter.addr = (uintptr_t)&filter_tensor;
+
+  // search index with bitmap filter
+  cuvsCagraSearchParams_t search_params;
+  cuvsCagraSearchParamsCreate(&search_params);
+  cuvsCagraSearch(
+    res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor, filter);
+
+  // Verify all returned neighbors are odd indices (not filtered out)
+  std::vector<uint32_t> neighbors_h(n_queries * n_neighbors);
+  raft::copy(neighbors_h.data(), neighbors_data.data(), n_queries * n_neighbors, stream);
+  raft::resource::sync_stream(handle);
+
+  for (size_t i = 0; i < n_queries * n_neighbors; ++i) {
+    // All neighbors should be odd indices (since even indices are filtered)
+    // Note: uint32_t max value indicates no valid neighbor found
+    ASSERT_TRUE(neighbors_h[i] % 2 == 1 || neighbors_h[i] == std::numeric_limits<uint32_t>::max())
+      << "Neighbor at position " << i << " has value " << neighbors_h[i]
+      << " which is an even index (should be filtered)";
+  }
 
   // de-allocate index and res
   cuvsCagraSearchParamsDestroy(search_params);

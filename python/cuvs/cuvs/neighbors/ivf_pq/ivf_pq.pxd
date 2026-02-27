@@ -10,6 +10,7 @@ from libcpp cimport bool
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
 from cuvs.distance_type cimport cuvsDistanceType
+from cuvs.neighbors.filters.filters cimport cuvsFilter
 
 
 cdef extern from "library_types.h":
@@ -141,7 +142,8 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
                                 cuvsIvfPqIndex_t index,
                                 DLManagedTensor* queries,
                                 DLManagedTensor* neighbors,
-                                DLManagedTensor* distances)
+                                DLManagedTensor* distances,
+                                cuvsFilter filter)
 
     cuvsError_t cuvsIvfPqSerialize(cuvsResources_t res,
                                    const char * filename,

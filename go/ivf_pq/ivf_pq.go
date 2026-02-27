@@ -68,6 +68,10 @@ func SearchIndex[T any](Resources cuvs.Resource, params *SearchParams, index *Iv
 	if !index.trained {
 		return errors.New("index needs to be built before calling search")
 	}
+	prefilter := C.cuvsFilter{
+		addr:  0,
+		_type: C.NO_FILTER,
+	}
 
-	return cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfPqSearch(C.cuvsResources_t(Resources.Resource), params.params, index.index, (*C.DLManagedTensor)(unsafe.Pointer(queries.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(neighbors.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(distances.C_tensor)))))
+	return cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfPqSearch(C.cuvsResources_t(Resources.Resource), params.params, index.index, (*C.DLManagedTensor)(unsafe.Pointer(queries.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(neighbors.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(distances.C_tensor)), prefilter)))
 }

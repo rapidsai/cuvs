@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -80,11 +80,15 @@ void run_ivf_pq(int64_t n_rows,
   distances_tensor.dl_tensor.shape              = distances_shape;
   distances_tensor.dl_tensor.strides            = NULL;
 
+  cuvsFilter filter;
+  filter.type = NO_FILTER;
+  filter.addr = (uintptr_t)NULL;
+
   // search index
   cuvsIvfPqSearchParams_t search_params;
   cuvsIvfPqSearchParamsCreate(&search_params);
   search_params->n_probes = n_probes;
-  cuvsIvfPqSearch(res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor);
+  cuvsIvfPqSearch(res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor, filter);
 
   // de-allocate index and res
   cuvsIvfPqSearchParamsDestroy(search_params);

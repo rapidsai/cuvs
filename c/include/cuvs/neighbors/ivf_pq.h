@@ -7,6 +7,7 @@
 
 #include <cuvs/core/c_api.h>
 #include <cuvs/distance/distance.h>
+#include <cuvs/neighbors/common.h>
 #include <dlpack/dlpack.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -516,8 +517,9 @@ cuvsError_t cuvsIvfPqBuildPrecomputed(cuvsResources_t res,
  * cuvsError_t params_create_status = cuvsIvfPqSearchParamsCreate(&search_params);
  *
  * // Search the `index` built using `cuvsIvfPqBuild`
+ * cuvsFilter filter = {.addr = 0, .type = NO_FILTER};
  * cuvsError_t search_status = cuvsIvfPqSearch(res, search_params, index, &queries, &neighbors,
- * &distances);
+ * &distances, filter);
  *
  * // de-allocate `search_params` and `res`
  * cuvsError_t params_destroy_status = cuvsIvfPqSearchParamsDestroy(search_params);
@@ -530,13 +532,15 @@ cuvsError_t cuvsIvfPqBuildPrecomputed(cuvsResources_t res,
  * @param[in] queries DLManagedTensor* queries dataset to search
  * @param[out] neighbors DLManagedTensor* output `k` neighbors for queries
  * @param[out] distances DLManagedTensor* output `k` distances for queries
+ * @param[in] filter cuvsFilter filter to apply to the search
  */
 cuvsError_t cuvsIvfPqSearch(cuvsResources_t res,
                             cuvsIvfPqSearchParams_t search_params,
                             cuvsIvfPqIndex_t index,
                             DLManagedTensor* queries,
                             DLManagedTensor* neighbors,
-                            DLManagedTensor* distances);
+                            DLManagedTensor* distances,
+                            cuvsFilter filter);
 /**
  * @}
  */
