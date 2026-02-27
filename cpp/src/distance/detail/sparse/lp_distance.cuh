@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -10,6 +10,7 @@
 #include <raft/core/operators.cuh>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/linalg/map.cuh>
 #include <raft/sparse/convert/coo.cuh>
 #include <raft/sparse/csr.hpp>
 #include <raft/sparse/detail/utils.h>
@@ -116,15 +117,14 @@ class l2_sqrt_unexpanded_distances_t : public l2_unexpanded_distances_t<value_id
 
     uint64_t n = (uint64_t)this->config_->a_nrows * (uint64_t)this->config_->b_nrows;
     // Sqrt Post-processing
-    raft::linalg::unaryOp<value_t>(
-      out_dists,
-      out_dists,
-      n,
+    raft::linalg::map(
+      this->config_->handle,
+      raft::make_device_vector_view<value_t, int64_t>(out_dists, n),
       [] __device__(value_t input) {
         int neg = input < 0 ? -1 : 1;
         return raft::sqrt(abs(input) * neg);
       },
-      raft::resource::get_cuda_stream(this->config_->handle));
+      raft::make_const_mdspan(raft::make_device_vector_view<const value_t, int64_t>(out_dists, n)));
   }
 };
 
@@ -194,11 +194,11 @@ class lp_unexpanded_distances_t : public distances_t<value_t> {
 
     uint64_t n         = (uint64_t)this->config_->a_nrows * (uint64_t)this->config_->b_nrows;
     value_t one_over_p = value_t{1} / p;
-    raft::linalg::unaryOp<value_t>(out_dists,
-                                   out_dists,
-                                   n,
-                                   raft::pow_const_op<value_t>(one_over_p),
-                                   raft::resource::get_cuda_stream(config_->handle));
+    raft::linalg::map(
+      config_->handle,
+      raft::make_device_vector_view<value_t, int64_t>(out_dists, n),
+      raft::pow_const_op<value_t>(one_over_p),
+      raft::make_const_mdspan(raft::make_device_vector_view<const value_t, int64_t>(out_dists, n)));
   }
 
  private:
@@ -221,11 +221,11 @@ class hamming_unexpanded_distances_t : public distances_t<value_t> {
 
     uint64_t n     = (uint64_t)config_->a_nrows * (uint64_t)config_->b_nrows;
     value_t n_cols = 1.0 / config_->a_ncols;
-    raft::linalg::unaryOp<value_t>(out_dists,
-                                   out_dists,
-                                   n,
-                                   raft::mul_const_op<value_t>(n_cols),
-                                   raft::resource::get_cuda_stream(config_->handle));
+    raft::linalg::map(
+      config_->handle,
+      raft::make_device_vector_view<value_t, int64_t>(out_dists, n),
+      raft::mul_const_op<value_t>(n_cols),
+      raft::make_const_mdspan(raft::make_device_vector_view<const value_t, int64_t>(out_dists, n)));
   }
 
  private:
@@ -263,12 +263,11 @@ class jensen_shannon_unexpanded_distances_t : public distances_t<value_t> {
       raft::atomic_add_op());
 
     uint64_t n = (uint64_t)this->config_->a_nrows * (uint64_t)this->config_->b_nrows;
-    raft::linalg::unaryOp<value_t>(
-      out_dists,
-      out_dists,
-      n,
+    raft::linalg::map(
+      config_->handle,
+      raft::make_device_vector_view<value_t, int64_t>(out_dists, n),
       [=] __device__(value_t input) { return raft::sqrt(0.5 * input); },
-      raft::resource::get_cuda_stream(config_->handle));
+      raft::make_const_mdspan(raft::make_device_vector_view<const value_t, int64_t>(out_dists, n)));
   }
 
  private:
@@ -304,11 +303,11 @@ class kl_divergence_unexpanded_distances_t : public distances_t<value_t> {
       raft::atomic_add_op());
 
     uint64_t n = (uint64_t)this->config_->a_nrows * (uint64_t)this->config_->b_nrows;
-    raft::linalg::unaryOp<value_t>(out_dists,
-                                   out_dists,
-                                   n,
-                                   raft::mul_const_op<value_t>(0.5),
-                                   raft::resource::get_cuda_stream(config_->handle));
+    raft::linalg::map(
+      config_->handle,
+      raft::make_device_vector_view<value_t, int64_t>(out_dists, n),
+      raft::mul_const_op<value_t>(0.5),
+      raft::make_const_mdspan(raft::make_device_vector_view<const value_t, int64_t>(out_dists, n)));
   }
 
  private:
