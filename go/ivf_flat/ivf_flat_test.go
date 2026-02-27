@@ -1,11 +1,31 @@
 package ivf_flat
 
 import (
+	"github.com/stretchr/testify/require"
 	"math/rand/v2"
+	"runtime"
 	"testing"
 
 	cuvs "github.com/rapidsai/cuvs/go"
 )
+
+func TestGetCenters(t *testing.T) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	dimension := uint(128)
+	dsize := 100000
+	nlist := 128
+	vecs := make([][]float32, dsize)
+	for i := range vecs {
+		vecs[i] = make([]float32, dimension)
+		for j := range vecs[i] {
+			vecs[i][j] = rand.Float32()
+		}
+	}
+	_, err := getCenters(vecs, int(dimension), nlist, cuvs.DistanceL2, 10)
+	require.NoError(t, err)
+}
 
 func TestIvfFlat(t *testing.T) {
 	const (
@@ -17,7 +37,16 @@ func TestIvfFlat(t *testing.T) {
 		nList       = 512
 	)
 
-	resource, _ := cuvs.NewResource(nil)
+	cudaStream, err := cuvs.NewCudaStream()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cudaStream.Close()
+
+	resource, err := cuvs.NewResource(cudaStream)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer resource.Close()
 
 	testDataset := make([][]float32, nDataPoints)
@@ -42,7 +71,7 @@ func TestIvfFlat(t *testing.T) {
 
 	indexParams.SetNLists(nList)
 
-	index, _ := CreateIndex(indexParams, &dataset)
+	index, _ := CreateIndex[float32](indexParams)
 	defer index.Close()
 
 	// use the first 4 points from the dataset as queries : will test that we get them back
@@ -167,4 +196,81 @@ func TestIvfFlat(t *testing.T) {
 			t.Error("distance should be close to 0, got", distancesSlice[i][0])
 		}
 	}
+}
+
+func getCenters(vecs [][]float32, dim int, clusterCnt int, distanceType cuvs.Distance, maxIterations int) ([][]float32, error) {
+	stream, err := cuvs.NewCudaStream()
+	if err != nil {
+		return nil, err
+	}
+	defer stream.Close()
+	resource, err := cuvs.NewResource(stream)
+	if err != nil {
+		return nil, err
+	}
+	defer resource.Close()
+
+	indexParams, err := CreateIndexParams()
+	if err != nil {
+		return nil, err
+	}
+	defer indexParams.Close()
+
+	indexParams.SetNLists(uint32(clusterCnt))
+	indexParams.SetMetric(distanceType)
+	indexParams.SetKMeansNIters(uint32(maxIterations))
+	indexParams.SetKMeansTrainsetFraction(1) // train all sample
+
+	dataset, err := cuvs.NewTensor(vecs)
+	if err != nil {
+		return nil, err
+	}
+	defer dataset.Close()
+
+	index, err := CreateIndex[float32](indexParams)
+	if err != nil {
+		return nil, err
+	}
+	defer index.Close()
+
+	if _, err := dataset.ToDevice(&resource); err != nil {
+		return nil, err
+	}
+
+	if err := BuildIndex(resource, indexParams, &dataset, index); err != nil {
+		return nil, err
+	}
+
+	if err := resource.Sync(); err != nil {
+		return nil, err
+	}
+
+	centers, err := cuvs.NewTensorNoDataOnDevice[float32](&resource, []int64{int64(clusterCnt), int64(dim)})
+	if err != nil {
+		return nil, err
+	}
+	defer centers.Close()
+
+	if err := GetCenters(index, &centers); err != nil {
+		return nil, err
+	}
+
+	if err := resource.Sync(); err != nil {
+		return nil, err
+	}
+
+	if _, err := centers.ToHost(&resource); err != nil {
+		return nil, err
+	}
+
+	if err := resource.Sync(); err != nil {
+		return nil, err
+	}
+
+	result, err := centers.Slice()
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
