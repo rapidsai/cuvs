@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
@@ -34,6 +34,7 @@ from libc.stdint cimport (
     uint64_t,
     uintptr_t,
 )
+from libc.stdlib cimport free, malloc
 
 from cuvs.common.exceptions import check_cuvs
 
@@ -43,6 +44,12 @@ INIT_METHOD_TYPES = {
     "Array" : cuvsKMeansInitMethod.Array}
 
 INIT_METHOD_NAMES = {v: k for k, v in INIT_METHOD_TYPES.items()}
+
+UPDATE_MODE_TYPES = {
+    "full_batch": cuvsKMeansCentroidUpdateMode.CUVS_KMEANS_UPDATE_FULL_BATCH,
+    "mini_batch": cuvsKMeansCentroidUpdateMode.CUVS_KMEANS_UPDATE_MINI_BATCH}
+
+UPDATE_MODE_NAMES = {v: k for k, v in UPDATE_MODE_TYPES.items()}
 
 cdef class KMeansParams:
     """
@@ -70,6 +77,34 @@ cdef class KMeansParams:
         Number of instance k-means algorithm will be run with different seeds
     oversampling_factor : double
         Oversampling factor for use in the k-means|| algorithm
+    batch_samples : int
+        Number of samples to process in each batch for tiled 1NN computation.
+        Useful to optimize/control memory footprint. Default tile is
+        [batch_samples x n_clusters].
+    batch_centroids : int
+        Number of centroids to process in each batch. If 0, uses n_clusters.
+    update_mode : str
+        Centroid update strategy. One of:
+        "full_batch" : Standard Lloyd's algorithm - accumulate assignments over
+            the entire dataset, then update centroids once per iteration.
+        "mini_batch" : Mini-batch k-means - update centroids after each batch.
+    inertia_check : bool
+        If True, check inertia during iterations for early convergence.
+    final_inertia_check : bool
+        If True, compute the final inertia after fit_batched completes.
+        This requires an additional full pass over all the host data.
+        Only used by fit_batched(); regular fit() always computes final inertia.
+        Default: False (skip final inertia computation for performance).
+    max_no_improvement : int
+        Maximum number of consecutive mini-batch steps without improvement
+        in smoothed inertia before early stopping. Only used when update_mode
+        is "mini_batch". If 0, this convergence criterion is disabled.
+        Default: 10 (matches sklearn's default).
+    reassignment_ratio : float
+        Control the fraction of the maximum number of counts for a center to be reassigned.
+        Centers with count < reassignment_ratio * max(counts) are randomly reassigned to
+        observations from the current batch. Only used when update_mode is "mini_batch".
+        If 0.0, reassignment is disabled. Default: 0.01 (matches sklearn's default).
     hierarchical : bool
         Whether to use hierarchical (balanced) kmeans or not
     hierarchical_n_iters : int
@@ -92,6 +127,13 @@ cdef class KMeansParams:
                  tol=None,
                  n_init=None,
                  oversampling_factor=None,
+                 batch_samples=None,
+                 batch_centroids=None,
+                 update_mode=None,
+                 inertia_check=None,
+                 final_inertia_check=None,
+                 max_no_improvement=None,
+                 reassignment_ratio=None,
                  hierarchical=None,
                  hierarchical_n_iters=None):
         if metric is not None:
@@ -109,6 +151,21 @@ cdef class KMeansParams:
             self.params.n_init = n_init
         if oversampling_factor is not None:
             self.params.oversampling_factor = oversampling_factor
+        if batch_samples is not None:
+            self.params.batch_samples = batch_samples
+        if batch_centroids is not None:
+            self.params.batch_centroids = batch_centroids
+        if update_mode is not None:
+            c_mode = UPDATE_MODE_TYPES[update_mode]
+            self.params.update_mode = <cuvsKMeansCentroidUpdateMode>c_mode
+        if inertia_check is not None:
+            self.params.inertia_check = inertia_check
+        if final_inertia_check is not None:
+            self.params.final_inertia_check = final_inertia_check
+        if max_no_improvement is not None:
+            self.params.max_no_improvement = max_no_improvement
+        if reassignment_ratio is not None:
+            self.params.reassignment_ratio = reassignment_ratio
         if hierarchical is not None:
             self.params.hierarchical = hierarchical
         if hierarchical_n_iters is not None:
@@ -144,6 +201,34 @@ cdef class KMeansParams:
     @property
     def oversampling_factor(self):
         return self.params.oversampling_factor
+
+    @property
+    def batch_samples(self):
+        return self.params.batch_samples
+
+    @property
+    def batch_centroids(self):
+        return self.params.batch_centroids
+
+    @property
+    def update_mode(self):
+        return UPDATE_MODE_NAMES[self.params.update_mode]
+
+    @property
+    def inertia_check(self):
+        return self.params.inertia_check
+
+    @property
+    def final_inertia_check(self):
+        return self.params.final_inertia_check
+
+    @property
+    def max_no_improvement(self):
+        return self.params.max_no_improvement
+
+    @property
+    def reassignment_ratio(self):
+        return self.params.reassignment_ratio
 
     @property
     def hierarchical(self):
@@ -392,3 +477,110 @@ def cluster_cost(X, centroids, resources=None):
             &inertia))
 
     return inertia
+
+
+@auto_sync_resources
+@auto_convert_output
+def fit_batched(
+    KMeansParams params, X, batch_size, centroids=None, sample_weights=None,
+    resources=None
+):
+    """
+    Find clusters with the k-means algorithm using batched processing.
+
+    This function processes data from HOST memory in batches, streaming
+    to the GPU. Useful when the dataset is too large to fit in GPU memory.
+
+    Parameters
+    ----------
+
+    params : KMeansParams
+        Parameters to use to fit KMeans model
+    X : numpy array or array with __array_interface__
+        Input HOST memory array shape (n_samples, n_features).
+        Must be C-contiguous. Supported dtypes: float32, float64.
+    batch_size : int
+        Number of samples to process per batch. Recommended: 500K-2M
+        depending on GPU memory.
+    centroids : Optional writable CUDA array interface compliant matrix
+                shape (n_clusters, n_features)
+    sample_weights : Optional input HOST memory array shape (n_samples,)
+                     default: None
+    {resources_docstring}
+
+    Returns
+    -------
+    centroids : raft.device_ndarray
+        The computed centroids for each cluster (on device)
+    inertia : float
+       Sum of squared distances of samples to their closest cluster center
+    n_iter : int
+        The number of iterations used to fit the model
+
+    Examples
+    --------
+
+    >>> import numpy as np
+    >>> import cupy as cp
+    >>>
+    >>> from cuvs.cluster.kmeans import fit_batched, KMeansParams
+    >>>
+    >>> n_samples = 10_000_000
+    >>> n_features = 128
+    >>> n_clusters = 1000
+    >>>
+    >>> # Data on host (numpy array)
+    >>> X = np.random.random((n_samples, n_features)).astype(np.float32)
+    >>>
+    >>> params = KMeansParams(n_clusters=n_clusters, max_iter=20)
+    >>> centroids, inertia, n_iter = fit_batched(params, X, batch_size=1_000_000)
+    """
+    # Ensure X is a numpy array (host memory)
+    if not isinstance(X, np.ndarray):
+        X = np.asarray(X)
+
+    if not X.flags['C_CONTIGUOUS']:
+        X = np.ascontiguousarray(X)
+
+    _check_input_array(wrap_array(X), [np.dtype('float32'), np.dtype('float64')])
+
+    cdef int64_t n_samples = X.shape[0]
+    cdef int64_t n_features = X.shape[1]
+
+    # Create DLPack tensor for host data
+    cdef cydlpack.DLManagedTensor* x_dlpack = cydlpack.dlpack_c(wrap_array(X))
+    cdef cydlpack.DLManagedTensor* sample_weight_dlpack = NULL
+
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
+    cdef double inertia = 0
+    cdef int64_t n_iter = 0
+    cdef int64_t c_batch_size = batch_size
+
+    if centroids is None:
+        centroids = device_ndarray.empty((params.n_clusters, n_features),
+                                         dtype=X.dtype)
+
+    centroids_ai = wrap_array(centroids)
+    cdef cydlpack.DLManagedTensor* centroids_dlpack = \
+        cydlpack.dlpack_c(centroids_ai)
+
+    if sample_weights is not None:
+        if not isinstance(sample_weights, np.ndarray):
+            sample_weights = np.asarray(sample_weights)
+        if not sample_weights.flags['C_CONTIGUOUS']:
+            sample_weights = np.ascontiguousarray(sample_weights)
+        sample_weight_dlpack = cydlpack.dlpack_c(wrap_array(sample_weights))
+
+    with cuda_interruptible():
+        check_cuvs(cuvsKMeansFitBatched(
+            res,
+            params.params,
+            x_dlpack,
+            c_batch_size,
+            sample_weight_dlpack,
+            centroids_dlpack,
+            &inertia,
+            &n_iter))
+
+    return FitOutput(centroids, inertia, n_iter)

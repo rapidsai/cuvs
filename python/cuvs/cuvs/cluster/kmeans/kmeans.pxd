@@ -4,7 +4,7 @@
 #
 # cython: language_level=3
 
-from libc.stdint cimport uintptr_t
+from libc.stdint cimport int64_t, uintptr_t
 from libcpp cimport bool
 
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
@@ -17,6 +17,10 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
         KMeansPlusPlus
         Random
         Array
+
+    ctypedef enum cuvsKMeansCentroidUpdateMode:
+        CUVS_KMEANS_UPDATE_FULL_BATCH
+        CUVS_KMEANS_UPDATE_MINI_BATCH
 
     ctypedef enum cuvsKMeansType:
         CUVS_KMEANS_TYPE_KMEANS
@@ -32,7 +36,11 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
         double oversampling_factor,
         int batch_samples,
         int batch_centroids,
+        cuvsKMeansCentroidUpdateMode update_mode,
         bool inertia_check,
+        bool final_inertia_check,
+        int max_no_improvement,
+        double reassignment_ratio,
         bool hierarchical,
         int hierarchical_n_iters
 
@@ -63,3 +71,12 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
                                       DLManagedTensor* X,
                                       DLManagedTensor* centroids,
                                       double* cost)
+
+    cuvsError_t cuvsKMeansFitBatched(cuvsResources_t res,
+                                     cuvsKMeansParams_t params,
+                                     DLManagedTensor* X,
+                                     int64_t batch_size,
+                                     DLManagedTensor* sample_weight,
+                                     DLManagedTensor* centroids,
+                                     double* inertia,
+                                     int64_t* n_iter) except +

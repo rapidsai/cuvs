@@ -287,61 +287,23 @@ void update_centroids(raft::resources const& handle,
                       rmm::device_uvector<char>& workspace)
 {
   auto n_clusters = centroids.extent(0);
-  auto n_samples  = X.extent(0);
 
-  workspace.resize(n_samples, raft::resource::get_cuda_stream(handle));
+  // Compute weighted sums and counts per cluster
+  cuvs::cluster::kmeans::detail::compute_centroid_adjustments(handle,
+                                                              X,
+                                                              sample_weights,
+                                                              cluster_labels,
+                                                              static_cast<IndexT>(n_clusters),
+                                                              new_centroids,
+                                                              weight_per_cluster,
+                                                              workspace);
 
-  // Calculates weighted sum of all the samples assigned to cluster-i and stores the
-  // result in new_centroids[i]
-  raft::linalg::reduce_rows_by_key((DataT*)X.data_handle(),
-                                   X.extent(1),
-                                   cluster_labels,
-                                   sample_weights.data_handle(),
-                                   workspace.data(),
-                                   X.extent(0),
-                                   X.extent(1),
-                                   n_clusters,
-                                   new_centroids.data_handle(),
-                                   raft::resource::get_cuda_stream(handle));
-
-  // Reduce weights by key to compute weight in each cluster
-  raft::linalg::reduce_cols_by_key(sample_weights.data_handle(),
-                                   cluster_labels,
-                                   weight_per_cluster.data_handle(),
-                                   (IndexT)1,
-                                   (IndexT)sample_weights.extent(0),
-                                   (IndexT)n_clusters,
-                                   raft::resource::get_cuda_stream(handle));
-
-  // Computes new_centroids[i] = new_centroids[i]/weight_per_cluster[i] where
-  //   new_centroids[n_clusters x n_features] - 2D array, new_centroids[i] has sum of all the
-  //   samples assigned to cluster-i
-  //   weight_per_cluster[n_clusters] - 1D array, weight_per_cluster[i] contains sum of weights in
-  //   cluster-i.
-  // Note - when weight_per_cluster[i] is 0, new_centroids[i] is reset to 0
-  raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(
-    handle,
-    raft::make_const_mdspan(new_centroids),
-    raft::make_const_mdspan(weight_per_cluster),
-    new_centroids,
-    raft::div_checkzero_op{});
-
-  // copy centroids[i] to new_centroids[i] when weight_per_cluster[i] is 0
-  cub::ArgIndexInputIterator<DataT*> itr_wt(weight_per_cluster.data_handle());
-  raft::matrix::gather_if(
-    const_cast<DataT*>(centroids.data_handle()),
-    static_cast<int>(centroids.extent(1)),
-    static_cast<int>(centroids.extent(0)),
-    itr_wt,
-    itr_wt,
-    static_cast<int>(weight_per_cluster.size()),
-    new_centroids.data_handle(),
-    [=] __device__(raft::KeyValuePair<ptrdiff_t, DataT> map) {  // predicate
-      // copy when the sum of weights in the cluster is 0
-      return map.value == 0;
-    },
-    raft::key_op{},
-    raft::resource::get_cuda_stream(handle));
+  // Divide sums by counts to get new centroids; preserve old centroids for empty clusters
+  cuvs::cluster::kmeans::detail::finalize_centroids(handle,
+                                                    raft::make_const_mdspan(new_centroids),
+                                                    raft::make_const_mdspan(weight_per_cluster),
+                                                    centroids,
+                                                    new_centroids);
 }
 
 // TODO: Resizing is needed to use mdarray instead of rmm::device_uvector
