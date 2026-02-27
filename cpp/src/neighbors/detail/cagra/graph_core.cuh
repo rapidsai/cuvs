@@ -1343,6 +1343,246 @@ void count_2hop_detours(raft::host_matrix_view<IdxT, int64_t, raft::row_major> k
   }
 }
 
+//
+// Prune unimportant edges based on 2-hop detour counts.
+//
+// The edge to be retained is determined without explicitly considering distance or angle.
+// Suppose the edge is the k-th edge of some node-A to node-B (A->B). Among the edges
+// originating at node-A, there are k-1 edges shorter than the edge A->B. Each of these
+// k-1 edges are connected to a different k-1 nodes. Among these k-1 nodes, count the
+// number of nodes with edges to node-B, which is the number of 2-hop detours for the
+// edge A->B. Once the number of 2-hop detours has been counted for all edges, the
+// specified number of edges are picked up for each node, starting with the edge with
+// the lowest number of 2-hop detours.
+//
+template <typename IdxT, typename InputMatrixView, typename OutputMatrixView>
+void prune_graph(raft::resources const& res,
+                 InputMatrixView knn_graph,
+                 OutputMatrixView output_graph,
+                 bool use_gpu)
+{
+  const uint64_t graph_size          = output_graph.extent(0);
+  const uint64_t knn_graph_degree    = knn_graph.extent(1);
+  const uint64_t output_graph_degree = output_graph.extent(1);
+  auto output_graph_ptr              = output_graph.data_handle();
+
+  auto large_tmp_mr = raft::resource::get_large_workspace_resource(res);
+
+  uint32_t batch_size =
+    std::min(static_cast<uint32_t>(graph_size), static_cast<uint32_t>(256 * 1024));
+  const uint32_t num_batch = (graph_size + batch_size - 1) / batch_size;
+
+  bool use_gpu_prune = use_gpu;
+  if (use_gpu_prune) {
+    try {
+      auto d_detour_count = raft::make_device_mdarray<uint8_t>(
+        res, large_tmp_mr, raft::make_extents<int64_t>(batch_size, knn_graph_degree));
+      auto d_num_no_detour_edges = raft::make_device_mdarray<uint32_t>(
+        res, large_tmp_mr, raft::make_extents<int64_t>(batch_size));
+      auto d_output_graph = raft::make_device_mdarray<IdxT>(
+        res, large_tmp_mr, raft::make_extents<int64_t>(batch_size, output_graph_degree));
+      auto d_input_graph = raft::make_device_mdarray<IdxT>(
+        res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, knn_graph_degree));
+    } catch (std::bad_alloc& e) {
+      RAFT_LOG_DEBUG("Insufficient memory for pruning on GPU");
+      use_gpu_prune = false;
+    } catch (raft::logic_error& e) {
+      RAFT_LOG_DEBUG("Insufficient memory for pruning on GPU (logic error)");
+      use_gpu_prune = false;
+    }
+  }
+
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
+    "cagra::graph::optimize/prune");
+  const double time_prune_start = cur_time();
+
+  if (use_gpu_prune) {
+    RAFT_LOG_DEBUG("# Pruning kNN Graph on GPUs\r");
+
+    constexpr int MAX_DEGREE = 1024;
+    if (knn_graph_degree > MAX_DEGREE) {
+      RAFT_FAIL(
+        "The degree of input knn graph is too large (%zu). "
+        "It must be equal to or smaller than %d.",
+        knn_graph_degree,
+        MAX_DEGREE);
+    }
+
+    const double prune_start = cur_time();
+
+    uint64_t num_keep __attribute__((unused)) = 0;
+    uint64_t num_full __attribute__((unused)) = 0;
+    auto dev_stats                            = raft::make_device_vector<uint64_t>(res, 2);
+    auto host_stats                           = raft::make_host_vector<uint64_t>(2);
+    RAFT_CUDA_TRY(cudaMemsetAsync(
+      dev_stats.data_handle(), 0, sizeof(uint64_t) * 2, raft::resource::get_cuda_stream(res)));
+
+    device_matrix_view_from_host d_input_graph(
+      res,
+      raft::make_host_matrix_view<IdxT, int64_t>(
+        knn_graph.data_handle(), graph_size, knn_graph_degree));
+
+    auto d_detour_count = raft::make_device_mdarray<uint8_t>(
+      res, large_tmp_mr, raft::make_extents<int64_t>(batch_size, knn_graph_degree));
+    auto d_num_no_detour_edges = raft::make_device_mdarray<uint32_t>(
+      res, large_tmp_mr, raft::make_extents<int64_t>(batch_size));
+    auto d_output_graph = raft::make_device_mdarray<IdxT>(
+      res, large_tmp_mr, raft::make_extents<int64_t>(batch_size, output_graph_degree));
+    auto d_invalid_neighbor_list = raft::make_device_scalar<uint32_t>(res, 0u);
+
+    for (uint32_t i_batch = 0; i_batch < num_batch; i_batch++) {
+      RAFT_CUDA_TRY(cudaMemsetAsync(d_detour_count.data_handle(),
+                                    0xff,
+                                    batch_size * knn_graph_degree * sizeof(uint8_t),
+                                    raft::resource::get_cuda_stream(res)));
+
+      RAFT_CUDA_TRY(cudaMemsetAsync(d_num_no_detour_edges.data_handle(),
+                                    0x00,
+                                    batch_size * sizeof(uint32_t),
+                                    raft::resource::get_cuda_stream(res)));
+
+      const dim3 threads_prune(32, 1, 1);
+      const dim3 blocks_prune(batch_size, 1, 1);
+      const size_t prune_smem_size = knn_graph_degree * sizeof(IdxT);
+      kern_prune<MAX_DEGREE, IdxT>
+        <<<blocks_prune, threads_prune, prune_smem_size, raft::resource::get_cuda_stream(res)>>>(
+          d_input_graph.data_handle(),
+          graph_size,
+          knn_graph_degree,
+          output_graph_degree,
+          batch_size,
+          i_batch,
+          d_detour_count.data_handle(),
+          d_num_no_detour_edges.data_handle(),
+          dev_stats.data_handle());
+
+      const size_t select_smem_size = (knn_graph_degree) * (sizeof(uint16_t) + sizeof(IdxT));
+      const dim3 threads_select(32, 1, 1);
+      const dim3 blocks_select(batch_size, 1, 1);
+      kern_select_smallest_detour_neighbors<IdxT>
+        <<<blocks_select, threads_select, select_smem_size, raft::resource::get_cuda_stream(res)>>>(
+          d_input_graph.data_handle(),
+          graph_size,
+          knn_graph_degree,
+          output_graph_degree,
+          d_detour_count.data_handle(),
+          d_output_graph.data_handle(),
+          batch_size,
+          i_batch,
+          d_invalid_neighbor_list.data_handle());
+
+      size_t copy_size =
+        std::min(static_cast<size_t>(batch_size), graph_size - i_batch * batch_size) *
+        output_graph_degree;
+      raft::copy(output_graph_ptr + i_batch * batch_size * output_graph_degree,
+                 d_output_graph.data_handle(),
+                 copy_size,
+                 raft::resource::get_cuda_stream(res));
+
+      raft::resource::sync_stream(res);
+      RAFT_LOG_DEBUG(
+        "# Pruning kNN Graph on GPUs (%.1lf %%)\r",
+        (double)std::min<IdxT>((i_batch + 1) * batch_size, graph_size) / graph_size * 100);
+    }
+    raft::resource::sync_stream(res);
+    RAFT_LOG_DEBUG("\n");
+
+    uint32_t invalid_neighbor_list = 0;
+    raft::copy(&invalid_neighbor_list,
+               d_invalid_neighbor_list.data_handle(),
+               1,
+               raft::resource::get_cuda_stream(res));
+    raft::resource::sync_stream(res);
+    RAFT_EXPECTS(
+      invalid_neighbor_list == 0,
+      "Could not generate an intermediate CAGRA graph because the initial kNN graph contains too "
+      "many invalid or duplicated neighbor nodes. This error can occur, for example, if too many "
+      "overflows occur during the norm computation between the dataset vectors.");
+
+    raft::copy(
+      host_stats.data_handle(), dev_stats.data_handle(), 2, raft::resource::get_cuda_stream(res));
+    num_keep = host_stats.data_handle()[0];
+    num_full = host_stats.data_handle()[1];
+
+    const double prune_end = cur_time();
+    RAFT_LOG_DEBUG(
+      "# Time for pruning on GPU: %.1lf sec, "
+      "avg_no_detour_edges_per_node: %.2lf/%u, "
+      "nodes_with_no_detour_at_all_edges: %.1lf%%",
+      prune_end - prune_start,
+      (double)num_keep / graph_size,
+      output_graph_degree,
+      (double)num_full / graph_size * 100);
+  } else {
+    auto detour_count = raft::make_host_matrix<uint8_t, int64_t>(graph_size, knn_graph_degree);
+
+    {
+      raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
+        "cagra::graph::optimize/prune/2-hop-counting-by-CPU");
+      const double time_2hop_count_start = cur_time();
+
+      auto knn_graph_view = raft::make_host_matrix_view<IdxT, int64_t>(
+        knn_graph.data_handle(), knn_graph.extent(0), knn_graph.extent(1));
+      count_2hop_detours(knn_graph_view, detour_count.view());
+
+      const double time_2hop_count_end = cur_time();
+      RAFT_LOG_DEBUG("# Time for 2-hop detour counting on CPU: %.1lf sec",
+                     time_2hop_count_end - time_2hop_count_start);
+    }
+    bool invalid_neighbor_list = false;
+#pragma omp parallel for
+    for (uint64_t i = 0; i < graph_size; i++) {
+      uint64_t pk         = 0;
+      uint32_t num_detour = 0;
+      for (uint32_t l = 0; l < knn_graph_degree && pk < output_graph_degree; l++) {
+        uint32_t next_num_detour = std::numeric_limits<uint32_t>::max();
+        for (uint64_t k = 0; k < knn_graph_degree; k++) {
+          const auto num_detour_k = detour_count(i, k);
+          if (num_detour_k > num_detour) {
+            next_num_detour = std::min(static_cast<uint32_t>(num_detour_k), next_num_detour);
+          }
+
+          if (num_detour_k != num_detour) { continue; }
+
+          const auto candidate_node = knn_graph(i, k);
+          bool dup                  = false;
+          for (uint32_t dk = 0; dk < pk; dk++) {
+            if (candidate_node == output_graph_ptr[i * output_graph_degree + dk]) {
+              dup = true;
+              break;
+            }
+          }
+          if (!dup && candidate_node < graph_size) {
+            output_graph_ptr[i * output_graph_degree + pk] = candidate_node;
+            pk += 1;
+          }
+          if (pk >= output_graph_degree) break;
+        }
+        if (pk >= output_graph_degree) break;
+
+        if (next_num_detour == std::numeric_limits<uint32_t>::max()) { break; }
+        num_detour = next_num_detour;
+      }
+      if (pk != output_graph_degree) {
+        RAFT_LOG_DEBUG(
+          "Couldn't find the output_graph_degree (%lu) smallest detourable count nodes for "
+          "node %lu in the rank-based node reranking process",
+          output_graph_degree,
+          i);
+        invalid_neighbor_list = true;
+      }
+    }
+    RAFT_EXPECTS(
+      !invalid_neighbor_list,
+      "Could not generate an intermediate CAGRA graph because the initial kNN graph contains too "
+      "many invalid or duplicated neighbor nodes. This error can occur, for example, if too many "
+      "overflows occur during the norm computation between the dataset vectors.");
+  }
+
+  const double time_prune_end = cur_time();
+  RAFT_LOG_DEBUG("# Pruning time: %.1lf ms", (time_prune_end - time_prune_start) * 1000.0);
+}
+
 // TODO allow pinned input for both knn_graph and new_graph
 template <typename IdxT = uint32_t,
           typename g_accessor =
@@ -1399,258 +1639,7 @@ void optimize(
     }
   }
 
-  uint32_t batch_size =
-    std::min(static_cast<uint32_t>(graph_size), static_cast<uint32_t>(256 * 1024));
-  const uint32_t num_batch = (graph_size + batch_size - 1) / batch_size;
-
-  //
-  // If the available device memory is insufficient, do not use the GPU to count
-  // the number of 2-hop detours, but use the CPU.
-  //
-  // TODO: we should decide on a global strategy for this in a single place
-  // it comes down to input memory type and available memory which data should be copied to GPU
-  bool _use_gpu_prune = use_gpu;
-  if (_use_gpu_prune) {
-    try {
-      auto d_detour_count = raft::make_device_mdarray<uint8_t>(
-        res, large_tmp_mr, raft::make_extents<int64_t>(batch_size, knn_graph_degree));
-      auto d_num_no_detour_edges = raft::make_device_mdarray<uint32_t>(
-        res, large_tmp_mr, raft::make_extents<int64_t>(batch_size));
-      auto d_output_graph = raft::make_device_mdarray<IdxT>(
-        res, large_tmp_mr, raft::make_extents<int64_t>(batch_size, output_graph_degree));
-      // TODO we also want to consider pinned memory in case we are short on memory
-      auto d_input_graph = raft::make_device_mdarray<IdxT>(
-        res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, knn_graph_degree));
-    } catch (std::bad_alloc& e) {
-      RAFT_LOG_DEBUG("Insufficient memory for pruning on GPU");
-      _use_gpu_prune = false;
-    } catch (raft::logic_error& e) {
-      RAFT_LOG_DEBUG("Insufficient memory for pruning on GPU (logic error)");
-      _use_gpu_prune = false;
-    }
-  }
-
-  {
-    raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
-      "cagra::graph::optimize/prune");
-    const double time_prune_start = cur_time();
-
-    //
-    // Prune unimportant edges.
-    //
-    // The edge to be retained is determined without explicitly considering
-    // distance or angle. Suppose the edge is the k-th edge of some node-A to
-    // node-B (A->B). Among the edges originating at node-A, there are k-1 edges
-    // shorter than the edge A->B. Each of these k-1 edges are connected to a
-    // different k-1 nodes. Among these k-1 nodes, count the number of nodes with
-    // edges to node-B, which is the number of 2-hop detours for the edge A->B.
-    // Once the number of 2-hop detours has been counted for all edges, the
-    // specified number of edges are picked up for each node, starting with the
-    // edge with the lowest number of 2-hop detours.
-    //
-    if (_use_gpu_prune) {
-      // Pruning on GPU
-      RAFT_LOG_DEBUG("# Pruning kNN Graph on GPUs\r");
-
-      constexpr int MAX_DEGREE = 1024;
-      if (knn_graph_degree > MAX_DEGREE) {
-        RAFT_FAIL(
-          "The degree of input knn graph is too large (%zu). "
-          "It must be equal to or smaller than %d.",
-          knn_graph_degree,
-          MAX_DEGREE);
-      }
-
-      const double prune_start = cur_time();
-
-      uint64_t num_keep __attribute__((unused)) = 0;
-      uint64_t num_full __attribute__((unused)) = 0;
-      auto dev_stats                            = raft::make_device_vector<uint64_t>(res, 2);
-      auto host_stats                           = raft::make_host_vector<uint64_t>(2);
-      RAFT_CUDA_TRY(cudaMemsetAsync(
-        dev_stats.data_handle(), 0, sizeof(uint64_t) * 2, raft::resource::get_cuda_stream(res)));
-
-      // Copy knn_graph over to device if necessary
-      // TODO: should we use pinned memory if we have issues fitting on GPU?
-      device_matrix_view_from_host d_input_graph(
-        res,
-        raft::make_host_matrix_view<IdxT, int64_t>(
-          knn_graph.data_handle(), graph_size, knn_graph_degree));
-
-      // data structures per batch
-      auto d_detour_count = raft::make_device_mdarray<uint8_t>(
-        res, large_tmp_mr, raft::make_extents<int64_t>(batch_size, knn_graph_degree));
-      auto d_num_no_detour_edges = raft::make_device_mdarray<uint32_t>(
-        res, large_tmp_mr, raft::make_extents<int64_t>(batch_size));
-      auto d_output_graph = raft::make_device_mdarray<IdxT>(
-        res, large_tmp_mr, raft::make_extents<int64_t>(batch_size, output_graph_degree));
-      auto d_invalid_neighbor_list = raft::make_device_scalar<uint32_t>(res, 0u);
-
-      for (uint32_t i_batch = 0; i_batch < num_batch; i_batch++) {
-        // initialize the detour_count and num_no_detour_edges for the current batch
-        RAFT_CUDA_TRY(cudaMemsetAsync(d_detour_count.data_handle(),
-                                      0xff,
-                                      batch_size * knn_graph_degree * sizeof(uint8_t),
-                                      raft::resource::get_cuda_stream(res)));
-
-        RAFT_CUDA_TRY(cudaMemsetAsync(d_num_no_detour_edges.data_handle(),
-                                      0x00,
-                                      batch_size * sizeof(uint32_t),
-                                      raft::resource::get_cuda_stream(res)));
-
-        // count 2-hop detours for the current batch
-        const dim3 threads_prune(32, 1, 1);
-        const dim3 blocks_prune(batch_size, 1, 1);
-        const size_t prune_smem_size = knn_graph_degree * sizeof(IdxT);
-        kern_prune<MAX_DEGREE, IdxT>
-          <<<blocks_prune, threads_prune, prune_smem_size, raft::resource::get_cuda_stream(res)>>>(
-            d_input_graph.data_handle(),
-            graph_size,
-            knn_graph_degree,
-            output_graph_degree,
-            batch_size,
-            i_batch,
-            d_detour_count.data_handle(),
-            d_num_no_detour_edges.data_handle(),
-            dev_stats.data_handle());
-
-        // select smallest-detour neighbors for the current batch
-        const size_t select_smem_size = (knn_graph_degree) * (sizeof(uint16_t) + sizeof(IdxT));
-        const dim3 threads_select(32, 1, 1);
-        const dim3 blocks_select(batch_size, 1, 1);
-        kern_select_smallest_detour_neighbors<IdxT>
-          <<<blocks_select,
-             threads_select,
-             select_smem_size,
-             raft::resource::get_cuda_stream(res)>>>(d_input_graph.data_handle(),
-                                                     graph_size,
-                                                     knn_graph_degree,
-                                                     output_graph_degree,
-                                                     d_detour_count.data_handle(),
-                                                     d_output_graph.data_handle(),
-                                                     batch_size,
-                                                     i_batch,
-                                                     d_invalid_neighbor_list.data_handle());
-
-        size_t copy_size =
-          std::min(static_cast<size_t>(batch_size), graph_size - i_batch * batch_size) *
-          output_graph_degree;
-        raft::copy(output_graph_ptr + i_batch * batch_size * output_graph_degree,
-                   d_output_graph.data_handle(),
-                   copy_size,
-                   raft::resource::get_cuda_stream(res));
-
-        raft::resource::sync_stream(res);
-        RAFT_LOG_DEBUG(
-          "# Pruning kNN Graph on GPUs (%.1lf %%)\r",
-          (double)std::min<IdxT>((i_batch + 1) * batch_size, graph_size) / graph_size * 100);
-      }
-      raft::resource::sync_stream(res);
-      RAFT_LOG_DEBUG("\n");
-
-      uint32_t invalid_neighbor_list = 0;
-      raft::copy(&invalid_neighbor_list,
-                 d_invalid_neighbor_list.data_handle(),
-                 1,
-                 raft::resource::get_cuda_stream(res));
-      raft::resource::sync_stream(res);
-      RAFT_EXPECTS(
-        invalid_neighbor_list == 0,
-        "Could not generate an intermediate CAGRA graph because the initial kNN graph contains too "
-        "many invalid or duplicated neighbor nodes. This error can occur, for example, if too many "
-        "overflows occur during the norm computation between the dataset vectors.");
-
-      raft::copy(
-        host_stats.data_handle(), dev_stats.data_handle(), 2, raft::resource::get_cuda_stream(res));
-      num_keep = host_stats.data_handle()[0];
-      num_full = host_stats.data_handle()[1];
-
-      const double prune_end = cur_time();
-      RAFT_LOG_DEBUG(
-        "# Time for pruning on GPU: %.1lf sec, "
-        "avg_no_detour_edges_per_node: %.2lf/%u, "
-        "nodes_with_no_detour_at_all_edges: %.1lf%%",
-        prune_end - prune_start,
-        (double)num_keep / graph_size,
-        output_graph_degree,
-        (double)num_full / graph_size * 100);
-    } else {
-      // Pruning on CPU
-      auto detour_count = raft::make_host_matrix<uint8_t, int64_t>(graph_size, knn_graph_degree);
-
-      {
-        raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
-          "cagra::graph::optimize/prune/2-hop-counting-by-CPU");
-        const double time_2hop_count_start = cur_time();
-
-        count_2hop_detours(knn_graph, detour_count.view());
-
-        const double time_2hop_count_end = cur_time();
-        RAFT_LOG_DEBUG("# Time for 2-hop detour counting on CPU: %.1lf sec",
-                       time_2hop_count_end - time_2hop_count_start);
-      }
-      bool invalid_neighbor_list = false;
-#pragma omp parallel for
-      for (uint64_t i = 0; i < graph_size; i++) {
-        // Find the `output_graph_degree` smallest detourable count nodes by checking the detourable
-        // count of the neighbors while increasing the target detourable count from zero.
-        uint64_t pk         = 0;
-        uint32_t num_detour = 0;
-        for (uint32_t l = 0; l < knn_graph_degree && pk < output_graph_degree; l++) {
-          uint32_t next_num_detour = std::numeric_limits<uint32_t>::max();
-          for (uint64_t k = 0; k < knn_graph_degree; k++) {
-            const auto num_detour_k = detour_count(i, k);
-            // Find the detourable count to check in the next iteration
-            if (num_detour_k > num_detour) {
-              next_num_detour = std::min(static_cast<uint32_t>(num_detour_k), next_num_detour);
-            }
-
-            // Store the neighbor index if its detourable count is equal to `num_detour`.
-            if (num_detour_k != num_detour) { continue; }
-
-            // Check duplication and append
-            const auto candidate_node = knn_graph(i, k);
-            bool dup                  = false;
-            for (uint32_t dk = 0; dk < pk; dk++) {
-              if (candidate_node == output_graph_ptr[i * output_graph_degree + dk]) {
-                dup = true;
-                break;
-              }
-            }
-            if (!dup && candidate_node < graph_size) {
-              output_graph_ptr[i * output_graph_degree + pk] = candidate_node;
-              pk += 1;
-            }
-            if (pk >= output_graph_degree) break;
-          }
-          if (pk >= output_graph_degree) break;
-
-          if (next_num_detour == std::numeric_limits<uint32_t>::max()) {
-            // There are no valid edges enough in the initial kNN graph. Break the loop here and
-            // catch the error at the next validation (pk != output_graph_degree).
-            break;
-          }
-          num_detour = next_num_detour;
-        }
-        if (pk != output_graph_degree) {
-          RAFT_LOG_DEBUG(
-            "Couldn't find the output_graph_degree (%lu) smallest detourable count nodes for "
-            "node %lu in the rank-based node reranking process",
-            output_graph_degree,
-            i);
-          invalid_neighbor_list = true;
-        }
-      }
-      RAFT_EXPECTS(
-        !invalid_neighbor_list,
-        "Could not generate an intermediate CAGRA graph because the initial kNN graph contains too "
-        "many invalid or duplicated neighbor nodes. This error can occur, for example, if too many "
-        "overflows occur during the norm computation between the dataset vectors.");
-    }
-
-    const double time_prune_end = cur_time();
-    RAFT_LOG_DEBUG("# Pruning time: %.1lf ms", (time_prune_end - time_prune_start) * 1000.0);
-  }
+  prune_graph<IdxT>(res, knn_graph, new_graph, use_gpu);
 
   auto rev_graph       = raft::make_host_matrix<IdxT, int64_t>(graph_size, output_graph_degree);
   auto rev_graph_count = raft::make_host_vector<uint32_t, int64_t>(graph_size);
@@ -1759,6 +1748,10 @@ void optimize(
 
       // Create a boolean variable on the GPU using RAFT device allocator
       auto d_check_num_protected_edges = raft::make_device_scalar<bool>(res, true);
+
+      uint32_t batch_size =
+        std::min(static_cast<uint32_t>(graph_size), static_cast<uint32_t>(256 * 1024));
+      const uint32_t num_batch = (graph_size + batch_size - 1) / batch_size;
 
       const dim3 threads_merge(32, 1, 1);
       const dim3 blocks_merge(batch_size, 1, 1);
