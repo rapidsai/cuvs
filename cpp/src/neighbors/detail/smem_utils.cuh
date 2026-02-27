@@ -14,6 +14,38 @@
 
 namespace cuvs::neighbors::detail {
 
+template <typename KernelT, typename KernelLauncherT>
+void safely_launch_kernel_with_smem_size_impl(KernelT const& kernel,
+                                              uint32_t smem_size,
+                                              KernelLauncherT const& launch,
+                                              std::mutex& mutex,
+                                              std::atomic<uint32_t>& current_smem_size)
+{
+  auto last_smem_size = current_smem_size.load(std::memory_order_relaxed);
+  if (smem_size > last_smem_size) {
+    // We still need a mutex for the critical section: actualize last_smem_size and set the
+    // attribute.
+    auto guard = std::lock_guard<std::mutex>{mutex};
+    if (!current_smem_size.compare_exchange_strong(
+          last_smem_size, smem_size, std::memory_order_relaxed, std::memory_order_relaxed)) {
+      // The value has been updated by another thread between the load and the mutex acquisition.
+      if (smem_size > last_smem_size) {
+        current_smem_size.store(smem_size, std::memory_order_relaxed);
+      }
+    }
+    // Only update if the last seen value is smaller than the new one.
+    if (smem_size > last_smem_size) {
+      auto launch_status =
+        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
+      RAFT_EXPECTS(launch_status == cudaSuccess,
+                   "Failed to set max dynamic shared memory size to %u bytes",
+                   smem_size);
+    }
+  }
+  // We don't need to guard the kernel launch because the smem_size can only grow.
+  return launch(kernel);
+}
+
 /**
  * @brief (Thread-)Safely invoke a kernel with a maximum dynamic shared memory size.
  * This is required because the sequence `cudaFuncSetAttribute` + kernel launch is not executed
@@ -35,32 +67,17 @@ void safely_launch_kernel_with_smem_size(cudaKernel_t kernel,
                                          KernelLauncherT const& launch)
 {
   // For JIT kernels, track by kernel pointer since all cudaKernel_t have the same type
-  static std::unordered_map<cudaKernel_t, std::atomic<uint32_t>> jit_smem_sizes;
+  static std::unordered_map<cudaKernel_t, std::pair<std::mutex, std::atomic<uint32_t>>>
+    jit_smem_sizes;
+  std::mutex map_mutex;
 
-  auto& current_smem_size = jit_smem_sizes[kernel];
-  auto last_smem_size     = current_smem_size.load(std::memory_order_relaxed);
-
-  if (smem_size > last_smem_size) {
-    static std::mutex jit_mutex;
-    std::lock_guard<std::mutex> guard(jit_mutex);
-    if (!current_smem_size.compare_exchange_strong(
-          last_smem_size, smem_size, std::memory_order_relaxed, std::memory_order_relaxed)) {
-      // The value has been updated by another thread between the load and the mutex acquisition.
-      if (smem_size > last_smem_size) {
-        current_smem_size.store(smem_size, std::memory_order_relaxed);
-      }
-    }
-    // Only update if the last seen value is smaller than the new one.
-    if (smem_size > last_smem_size) {
-      auto launch_status =
-        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
-      RAFT_EXPECTS(launch_status == cudaSuccess,
-                   "Failed to set max dynamic shared memory size to %u bytes",
-                   smem_size);
-    }
+  std::pair<std::mutex, std::atomic<uint32_t>>* current_smem_size;
+  {
+    std::lock_guard<std::mutex> map_lock{map_mutex};
+    current_smem_size = &jit_smem_sizes[kernel];
   }
-
-  return launch(kernel);
+  safely_launch_kernel_with_smem_size_impl<cudaKernel_t, KernelLauncherT>(
+    kernel, smem_size, launch, current_smem_size->first, current_smem_size->second);
 }
 
 // General template for regular function pointers
@@ -71,30 +88,10 @@ void safely_launch_kernel_with_smem_size(KernelT const& kernel,
 {
   // the last smem size is parameterized by the kernel thanks to the template parameter.
   static std::atomic<uint32_t> current_smem_size{0};
-  auto last_smem_size = current_smem_size.load(std::memory_order_relaxed);
-  if (smem_size > last_smem_size) {
-    // We still need a mutex for the critical section: actualize last_smem_size and set the
-    // attribute.
-    static auto mutex = std::mutex{};
-    auto guard        = std::lock_guard<std::mutex>{mutex};
-    if (!current_smem_size.compare_exchange_strong(
-          last_smem_size, smem_size, std::memory_order_relaxed, std::memory_order_relaxed)) {
-      // The value has been updated by another thread between the load and the mutex acquisition.
-      if (smem_size > last_smem_size) {
-        current_smem_size.store(smem_size, std::memory_order_relaxed);
-      }
-    }
-    // Only update if the last seen value is smaller than the new one.
-    if (smem_size > last_smem_size) {
-      auto launch_status =
-        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
-      RAFT_EXPECTS(launch_status == cudaSuccess,
-                   "Failed to set max dynamic shared memory size to %u bytes",
-                   smem_size);
-    }
-  }
-  // We don't need to guard the kernel launch because the smem_size can only grow.
-  return launch(kernel);
+  static std::mutex mutex;
+
+  safely_launch_kernel_with_smem_size_impl<KernelT, KernelLauncherT>(
+    kernel, smem_size, launch, mutex, current_smem_size);
 }
 
 }  // namespace cuvs::neighbors::detail
