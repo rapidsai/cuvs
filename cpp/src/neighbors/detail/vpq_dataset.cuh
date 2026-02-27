@@ -4,6 +4,7 @@
  */
 #pragma once
 
+#include "../../neighbors/vpq_dataset_impl.hpp"
 #include <cuvs/neighbors/common.hpp>
 
 #include "../../cluster/kmeans_balanced.cuh"
@@ -507,19 +508,29 @@ template <typename NewMathT, typename OldMathT, typename IdxT>
 auto vpq_convert_math_type(const raft::resources& res, vpq_dataset<OldMathT, IdxT>&& src)
   -> vpq_dataset<NewMathT, IdxT>
 {
-  auto vq_code_book = raft::make_device_mdarray<NewMathT>(res, src.vq_code_book.extents());
-  auto pq_code_book = raft::make_device_mdarray<NewMathT>(res, src.pq_code_book.extents());
+  auto vq_code_book = raft::make_device_mdarray<NewMathT>(res, src.vq_code_book().extents());
+  auto pq_code_book = raft::make_device_mdarray<NewMathT>(res, src.pq_code_book().extents());
 
   raft::linalg::map(res,
                     vq_code_book.view(),
                     cuvs::spatial::knn::detail::utils::mapping<NewMathT>{},
-                    raft::make_const_mdspan(src.vq_code_book.view()));
+                    src.vq_code_book());
   raft::linalg::map(res,
                     pq_code_book.view(),
                     cuvs::spatial::knn::detail::utils::mapping<NewMathT>{},
-                    raft::make_const_mdspan(src.pq_code_book.view()));
-  return vpq_dataset<NewMathT, IdxT>{
-    std::move(vq_code_book), std::move(pq_code_book), std::move(src.data)};
+                    src.pq_code_book());
+
+  // Copy the data from the source (data type is uint8_t, independent of MathT)
+  auto data_view = src.data();
+  auto data      = raft::make_device_matrix<uint8_t, IdxT, raft::row_major>(
+    res, data_view.extent(0), data_view.extent(1));
+  raft::copy(data.data_handle(),
+             data_view.data_handle(),
+             data_view.size(),
+             raft::resource::get_cuda_stream(res));
+
+  return vpq_dataset<NewMathT, IdxT>{std::make_unique<vpq_dataset_owning<NewMathT, IdxT>>(
+    std::move(vq_code_book), std::move(pq_code_book), std::move(data))};
 }
 
 // Helper for operations using vectorized loads of raft::TxN_t
@@ -928,8 +939,8 @@ auto vpq_build(const raft::resources& res, const vpq_params& params, const Datas
                                       codes.view(),
                                       true);
 
-  return vpq_dataset<MathT, IdxT>{
-    std::move(vq_code_book), std::move(pq_code_book), std::move(codes)};
+  return vpq_dataset<MathT, IdxT>{std::make_unique<vpq_dataset_owning<MathT, IdxT>>(
+    std::move(vq_code_book), std::move(pq_code_book), std::move(codes))};
 }
 
 }  // namespace cuvs::neighbors::detail

@@ -50,10 +50,10 @@ struct vpq_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
                    const DistanceT* dataset_norms = nullptr) -> host_type
   {
     return init_(params,
-                 dataset.data.data_handle(),
+                 dataset.data().data_handle(),
                  dataset.encoded_row_length(),
-                 dataset.vq_code_book.data_handle(),
-                 dataset.pq_code_book.data_handle(),
+                 dataset.vq_code_book().data_handle(),
+                 dataset.pq_code_book().data_handle(),
                  IndexT(dataset.n_rows()),
                  dataset.dim());
   }

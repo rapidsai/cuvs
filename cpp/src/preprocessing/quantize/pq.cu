@@ -22,6 +22,14 @@ namespace cuvs::preprocessing::quantize::pq {
   {                                                                                    \
     return detail::build<T, T>(res, params, dataset);                                  \
   }                                                                                    \
+  auto build(raft::resources const& res,                                               \
+             const params params,                                                      \
+             raft::device_matrix_view<const T, uint32_t, raft::row_major> pq_centers,  \
+             raft::device_matrix_view<const T, uint32_t, raft::row_major> vq_centers)  \
+    -> quantizer<T>                                                                    \
+  {                                                                                    \
+    return detail::build_view<T>(res, params, pq_centers, vq_centers);                 \
+  }                                                                                    \
   void transform(raft::resources const& res,                                           \
                  const quantizer<T>& quantizer,                                        \
                  raft::device_matrix_view<const T, int64_t> dataset,                   \
