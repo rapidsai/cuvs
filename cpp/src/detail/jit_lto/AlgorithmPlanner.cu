@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "nvjitlink_checker.hpp"
+#include <cuvs/detail/jit_lto/nvjitlink_helper.hpp>
 
 #include <chrono>
 #include <iterator>
@@ -17,7 +17,6 @@
 #include <cuvs/detail/jit_lto/FragmentDatabase.hpp>
 
 #include "cuda_runtime.h"
-#include "nvJitLink.h"
 
 #include <raft/core/logger.hpp>
 #include <raft/util/cuda_rt_essentials.hpp>
