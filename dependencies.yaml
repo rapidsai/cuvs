@@ -321,31 +321,31 @@ dependencies:
               cuda: "12.2"
             packages:
               # nvidia-cublas-cu12 didn't get aarch64 wheels until CTK 12.3
-              - cuda-toolkit[cublas,curand,cusolver,cusparse]>=12.2,<12.4
+              - cuda-toolkit>=12.2,<12.4
           - matrix:
               cuda: "12.2"
             packages:
-              - cuda-toolkit[cublas,curand,cusolver,cusparse]==12.2.*
+              - cuda-toolkit==12.2.*
           - matrix:
               cuda: "12.5"
             packages:
-              - cuda-toolkit[cublas,curand,cusolver,cusparse]==12.5.*
+              - cuda-toolkit==12.5.*
           - matrix:
               cuda: "12.8"
             packages:
-              - cuda-toolkit[cublas,curand,cusolver,cusparse]==12.8.*
+              - cuda-toolkit==12.8.*
           - matrix:
               cuda: "12.9"
             packages:
-              - cuda-toolkit[cublas,curand,cusolver,cusparse]==12.9.*
+              - cuda-toolkit==12.9.*
           - matrix:
               cuda: "13.0"
             packages:
-              - cuda-toolkit[cublas,curand,cusolver,cusparse]==13.0.*
+              - cuda-toolkit==13.0.*
           - matrix:
               cuda: "13.1"
             packages:
-              - cuda-toolkit[cublas,curand,cusolver,cusparse]==13.1.*
+              - cuda-toolkit==13.1.*
   cuda:
     common:
       - output_types: [conda]
