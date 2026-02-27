@@ -113,7 +113,6 @@ auto deserialize(raft::resources const& handle, std::istream& is) -> index<T, Id
   if (ver != serialization_version) {
     RAFT_FAIL("serialization version mismatch, expected %d, got %d ", serialization_version, ver);
   }
-  auto n_rows           = raft::deserialize_scalar<IdxT>(handle, is);
   auto dim              = raft::deserialize_scalar<std::uint32_t>(handle, is);
   auto n_lists          = raft::deserialize_scalar<std::uint32_t>(handle, is);
   auto metric           = raft::deserialize_scalar<cuvs::distance::DistanceType>(handle, is);
