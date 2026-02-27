@@ -42,7 +42,6 @@ void AlgorithmLauncher::call(
   config.stream           = stream;
   config.dynamicSmemBytes = shared_mem;
   config.numAttrs         = 0;
-  std::cout << "Launching kernel with shared_mem: " << shared_mem << std::endl;
 
   RAFT_CUDA_TRY(cudaLaunchKernelExC(&config, kernel, kernel_args));
 }
