@@ -28,5 +28,4 @@ nvJitLinkResult nvJitLinkGetInfoLogSize(nvJitLinkHandle, size_t*);
 nvJitLinkResult nvJitLinkGetInfoLog(nvJitLinkHandle, char*);
 }
 
-// We can make a better RAII wrapper around nvjitlinkhandle
 void check_nvjitlink_result(nvJitLinkHandle handle, nvJitLinkResult result);
