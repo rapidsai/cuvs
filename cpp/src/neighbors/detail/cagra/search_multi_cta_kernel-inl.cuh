@@ -461,16 +461,6 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
           if (result_distances_ptr != nullptr) {
             DISTANCE_T dist         = result_distances_buffer[i];
             result_distances_ptr[k] = dist;
-            // Debug: print first query, first CTA, first few results
-            if (query_id == 0 && cta_id == 0 && j < 5) {
-              printf("NON-JIT: query=%u cta=%u j=%u i=%u idx=%u dist=%.6f\n",
-                     query_id,
-                     cta_id,
-                     j,
-                     i,
-                     index & ~index_msb_1_mask,
-                     (float)dist);
-            }
           }
         } else {
           // If it is valid and registered in the traversed hash table but is
