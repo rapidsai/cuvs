@@ -469,7 +469,7 @@ if(NOT BUILD_CPU_ONLY)
     generate_jit_lto_kernels(
       jit_lto_kernel_files
       NAME_FORMAT
-        "cagra_apply_normalization_standard@normalization_suffix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@_data_@data_abbrev@"
+        "cagra_apply_normalization_standard@normalization_suffix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@_data_@data_abbrev@_query_@query_abbrev@"
       MATRIX_JSON_FILE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/apply_normalization_standard_matrix.json"
       KERNEL_INPUT_FILE
