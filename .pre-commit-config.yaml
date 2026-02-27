@@ -102,7 +102,7 @@ repos:
                     ^CHANGELOG[.]md$|
                     ^cpp/cmake/patches/cutlass/build-export[.]patch$
       - repo: https://github.com/rapidsai/pre-commit-hooks
-        rev: v1.3.3
+        rev: v1.4.3
         hooks:
           - id: verify-copyright
             name: verify-copyright-cuvs
@@ -172,6 +172,7 @@ repos:
             exclude: |
               (?x)
                 ^pyproject[.]toml$
+          - id: verify-hardcoded-version
       - repo: https://github.com/rapidsai/dependency-file-generator
         rev: v1.20.0
         hooks:
