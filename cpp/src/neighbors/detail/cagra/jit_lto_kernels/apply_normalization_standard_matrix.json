@@ -39,8 +39,28 @@
     "256",
     "512"
   ],
-  "normalization_suffix": [
-    "_noop",
-    "_cosine"
+  "_normalization": [
+    {
+      "normalization_suffix": "_noop",
+      "_query": [
+        {
+          "query_type": "float",
+          "query_abbrev": "f"
+        },
+        {
+          "query_type": "uint8_t",
+          "query_abbrev": "uc"
+        }
+      ]
+    },
+    {
+      "normalization_suffix": "_cosine",
+      "_query": [
+        {
+          "query_type": "float",
+          "query_abbrev": "f"
+        }
+      ]
+    }
   ]
 }
