@@ -381,6 +381,16 @@ void search(raft::resources const& res,
     return search_with_filtering<T, IdxT, decltype(sample_filter_copy), OutputIdxT>(
       res, params_copy, idx, queries, neighbors, distances, sample_filter_copy);
   } catch (const std::bad_cast&) {
+  }
+  try {
+    using label_filter_type   = cuvs::neighbors::filtering::label_filter<int32_t, int64_t>;
+    auto& label_filter        = dynamic_cast<const label_filter_type&>(sample_filter_ref);
+    search_params params_copy = params;
+    if (params.filtering_rate < 0.0) { params_copy.filtering_rate = 0.0; }
+    auto label_filter_copy = label_filter;
+    return search_with_filtering<T, IdxT, label_filter_type, OutputIdxT>(
+      res, params_copy, idx, queries, neighbors, distances, label_filter_copy);
+  } catch (const std::bad_cast&) {
     RAFT_FAIL("Unsupported sample filter type");
   }
 }
