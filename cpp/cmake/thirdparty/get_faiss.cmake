@@ -83,7 +83,7 @@ function(find_and_configure_faiss)
                   NAMESPACE faiss::)
   endif()
 
-  # Need to tell CMake to rescan the link group of faiss::faiss_gpu_objs and faiss
+  # Need to tell CMake to rescan the link group of faiss and include faiss_gpu_objs
   # so that we get proper link order when they are static
   #
   # We don't look at the existence of `faiss_avx2` as it will always exist
@@ -92,9 +92,9 @@ function(find_and_configure_faiss)
   # a dependency to it. Adding a dependency will cause it to compile,
   # and fail due to invalid compiler flags.
   if(PKG_ENABLE_GPU AND PKG_BUILD_STATIC_LIBS AND CXX_AVX2_FOUND)
-    set(CUVS_FAISS_TARGETS "$<LINK_GROUP:RESCAN,$<LINK_LIBRARY:WHOLE_ARCHIVE,faiss_gpu_objs>,faiss::faiss_avx2>" PARENT_SCOPE)
+    set(CUVS_FAISS_TARGETS "$<TARGET_OBJECTS:faiss_gpu_objs>;$<LINK_GROUP:RESCAN,$<LINK_LIBRARY:WHOLE_ARCHIVE,faiss::faiss_avx2>>" PARENT_SCOPE)
   elseif(PKG_ENABLE_GPU AND  PKG_BUILD_STATIC_LIBS)
-    set(CUVS_FAISS_TARGETS "$<LINK_GROUP:RESCAN,$<LINK_LIBRARY:WHOLE_ARCHIVE,faiss_gpu_objs>,faiss::faiss>" PARENT_SCOPE)
+    set(CUVS_FAISS_TARGETS "$<TARGET_OBJECTS:faiss_gpu_objs>;$<LINK_GROUP:RESCAN,$<LINK_LIBRARY:WHOLE_ARCHIVE,faiss::faiss>>" PARENT_SCOPE)
   elseif(CXX_AVX2_FOUND)
     set(CUVS_FAISS_TARGETS faiss::faiss_avx2 PARENT_SCOPE)
   else()
