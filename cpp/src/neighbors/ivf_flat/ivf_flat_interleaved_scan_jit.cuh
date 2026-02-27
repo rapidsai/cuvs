@@ -188,7 +188,7 @@ void launch_kernel(const index<T, IdxT>& index,
     std::string metric_name  = "metric_udf_" + udf_hash;
     auto& nvrtc_lto_compiler = nvrtc_compiler();
     std::string key =
-      metric_name + "_" + std::to_string(Veclen) + "_" +
+      metric_name + "_veclen_" + std::to_string(Veclen) + "_" +
       make_fragment_key<decltype(get_data_type_tag<T>()), decltype(get_acc_type_tag<AccT>())>();
     nvrtc_lto_compiler.compile(key, metric_udf);
     kernel_planner.template add_metric_device_function<decltype(get_data_type_tag<T>()),
