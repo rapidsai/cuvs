@@ -5,60 +5,30 @@
 
 #pragma once
 
+// Device-only helpers - extracted from search_single_cta_kernel-inl.cuh to avoid host-side includes
+#include "search_single_cta_device_helpers.cuh"
+
+// Additional device-side includes needed
 #include "../compute_distance-ext.cuh"
-#include "../compute_distance_standard-impl.cuh"
-#include "../compute_distance_vpq-impl.cuh"
 #include "../device_common.hpp"
 #include "../hashmap.hpp"
-#include "../search_single_cta_kernel-inl.cuh"
+#include "../topk_by_radix.cuh"
 #include "../utils.hpp"
 
-#include <cuvs/distance/distance.hpp>
-#include <cuvs/neighbors/cagra.hpp>
-#include <cuvs/neighbors/common.hpp>
-#include <raft/core/logger.hpp>
-#include <raft/core/operators.hpp>
-
-#include <cfloat>
-#include <cstdint>
-#include <cuda_fp16.h>
-
-#include "../bitonic.hpp"
-#include "../search_plan.cuh"
-#include "../topk_by_radix.cuh"
-#include "../topk_for_cagra/topk.h"
-
-#include <cub/warp/warp_scan.cuh>
-
-#include <raft/core/device_mdspan.hpp>
-#include <raft/core/resource/cuda_stream.hpp>
-#include <raft/core/resource/device_properties.hpp>
-#include <raft/core/resources.hpp>
-
-#include <raft/util/cuda_rt_essentials.hpp>
-#include <raft/util/integer_utils.hpp>
+#include <raft/core/operators.hpp>      // For raft::shfl_xor
+#include <raft/util/integer_utils.hpp>  // For raft::round_up_safe
 #include <raft/util/pow2_utils.cuh>
 
-#include <rmm/cuda_stream.hpp>
-#include <rmm/device_uvector.hpp>
-#include <rmm/mr/cuda_memory_resource.hpp>
-#include <rmm/mr/pinned_host_memory_resource.hpp>
+#include <cub/warp/warp_scan.cuh>
 
 #include <cuda/atomic>
 #include <cuda/std/atomic>
 
-#include <algorithm>
-#include <array>
-#include <cassert>
-#include <chrono>
-#include <cstdio>
-#include <iostream>
-#include <limits>
-#include <memory>
-#include <numeric>
-#include <optional>
-#include <type_traits>  // For std::is_same_v
-#include <vector>
+#include <cassert>  // For assert()
+
+#ifdef _CLK_BREAKDOWN
+#include <cstdio>  // For printf() in debug mode
+#endif
 
 // Include extern function declarations before namespace so they're available to kernel definitions
 #include "../../jit_lto_kernels/filter_data.h"

@@ -5,25 +5,18 @@
 
 #pragma once
 
-#include "../compute_distance-ext.cuh"
-#include "../device_common.hpp"
 #include "../hashmap.hpp"
 #include "../utils.hpp"
 
-#include <cuvs/distance/distance.hpp>  // For DistanceType enum
-#include <raft/core/operators.hpp>     // For raft::upper_bound
-
 #include <cstdint>
 #include <cuda_fp16.h>
-#include <type_traits>  // For std::is_same_v, std::true_type, std::false_type
+#include <type_traits>
 
-// Include extern function declarations before namespace so they're available to kernel definitions
 #include "../../jit_lto_kernels/filter_data.h"
 #include "extern_device_functions.cuh"
 
 namespace cuvs::neighbors::cagra::detail::multi_kernel_search {
 
-// Helper to check if DescriptorT has kPqBits (VPQ descriptor)
 template <typename T>
 struct has_kpq_bits {
   template <typename U>
@@ -36,8 +29,6 @@ struct has_kpq_bits {
 template <typename T>
 inline constexpr bool has_kpq_bits_v = has_kpq_bits<T>::value;
 
-// JIT version of random_pickup_kernel - uses dataset_descriptor_base_t* pointer
-// Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, QueryT
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           uint32_t PQ_BITS,
@@ -142,9 +133,6 @@ RAFT_KERNEL random_pickup_kernel_jit(
   }
 }
 
-// JIT version of compute_distance_to_child_nodes_kernel - uses extern functions with void*
-// descriptor Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT,
-// QueryT
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           uint32_t PQ_BITS,
@@ -272,9 +260,6 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel_jit(
   }
 }
 
-// JIT version of apply_filter_kernel - uses extern sample_filter function
-// Bitset data is passed as kernel parameters (matching non-JIT where filter object contains
-// bitset_view) The bitset data is in global memory (not shared memory), just like non-JIT
 using cuvs::neighbors::detail::sample_filter;
 template <typename IndexT,
           typename DistanceT,

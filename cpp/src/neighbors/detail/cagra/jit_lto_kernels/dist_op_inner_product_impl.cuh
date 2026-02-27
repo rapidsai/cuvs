@@ -5,12 +5,8 @@
 
 #pragma once
 
-#include <cuvs/distance/distance.hpp>
-
 namespace cuvs::neighbors::cagra::detail {
 
-// dist_op fragment for InnerProduct metric
-// QueryT can be float (for most metrics) or uint8_t (for BitwiseHamming)
 template <typename QUERY_T, typename DISTANCE_T>
 __device__ DISTANCE_T dist_op(QUERY_T a, QUERY_T b)
 {

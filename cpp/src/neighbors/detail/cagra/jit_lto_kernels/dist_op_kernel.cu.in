@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <cstdint>
+
 #include <neighbors/detail/cagra/jit_lto_kernels/dist_op_@metric_tag@_impl.cuh>
 
 namespace cuvs::neighbors::cagra::detail {

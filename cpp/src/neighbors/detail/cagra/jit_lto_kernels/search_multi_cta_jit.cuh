@@ -5,14 +5,10 @@
 
 #pragma once
 
-#include "../compute_distance-ext.cuh"
-#include "../device_common.hpp"
 #include "../hashmap.hpp"
 #include "../utils.hpp"
 
-#include <cuvs/distance/distance.hpp>   // For DistanceType enum
-#include <raft/core/operators.hpp>      // For raft::upper_bound
-#include <raft/util/integer_utils.hpp>  // For raft::round_up_safe
+#include <raft/util/integer_utils.hpp>
 
 #include <cstdint>
 #include <cuda_fp16.h>
@@ -22,29 +18,16 @@
 #include <cstdio>
 #endif
 
-// Include extern function declarations before namespace so they're available to kernel definitions
 #include "../../jit_lto_kernels/filter_data.h"
-#include "extern_device_functions.cuh"
-// Include shared JIT device functions before namespace so they're available to kernel definitions
 #include "device_common_jit.cuh"
+#include "extern_device_functions.cuh"
 
 namespace cuvs::neighbors::cagra::detail::multi_cta_search {
 
-// Helper to check if DescriptorT has kPqBits (VPQ descriptor) - use shared version
-// Use fully qualified name since it's a template variable
-using cuvs::neighbors::cagra::detail::device::has_kpq_bits_v;
-
-// sample_filter is declared in extern_device_functions.cuh
-using cuvs::neighbors::detail::sample_filter;
-
-// JIT versions of compute_distance_to_random_nodes and compute_distance_to_child_nodes
-// are now shared in device_common_jit.cuh - use fully qualified names
 using cuvs::neighbors::cagra::detail::device::compute_distance_to_child_nodes_jit;
 using cuvs::neighbors::cagra::detail::device::compute_distance_to_random_nodes_jit;
-
-// JIT version of search_kernel - uses dataset_descriptor_base_t* pointer
-// Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, QueryT
-// Filter is linked separately via JIT LTO, so we use none_sample_filter directly
+using cuvs::neighbors::cagra::detail::device::has_kpq_bits_v;
+using cuvs::neighbors::detail::sample_filter;
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           uint32_t PQ_BITS,

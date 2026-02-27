@@ -12,25 +12,6 @@ namespace cuvs::neighbors::cagra::detail {
 
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
-          typename DataT,
-          typename IndexT,
-          typename DistanceT,
-          typename QueryT>
-struct standard_dataset_descriptor_t;
-
-template <uint32_t TeamSize,
-          uint32_t DatasetBlockDim,
-          uint32_t PQ_BITS,
-          uint32_t PQ_LEN,
-          typename CodebookT,
-          typename DataT,
-          typename IndexT,
-          typename DistanceT,
-          typename QueryT>
-struct cagra_q_dataset_descriptor_t;
-
-template <uint32_t TeamSize,
-          uint32_t DatasetBlockDim,
           uint32_t PQ_BITS,
           uint32_t PQ_LEN,
           typename CodebookT,
