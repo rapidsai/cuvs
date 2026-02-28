@@ -1,6 +1,6 @@
 # =============================================================================
 # cmake-format: off
-# SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 # =============================================================================
@@ -55,6 +55,15 @@ function(ConfigureTest)
     PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<BUILD_INTERFACE:${CUVS_C_BINARY_DIR}/gtests>"
                INSTALL_RPATH "\$ORIGIN/../../../${lib_dir}"
   )
+
+  # Apply same CUDA/CXX flags as main cuvs (e.g. LIBCUDACXX_ENABLE_EXPERIMENTAL_MEMORY_RESOURCE for
+  # RMM)
+  if(DEFINED CUVS_CUDA_FLAGS)
+    target_compile_options(${TEST_NAME} PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>")
+  endif()
+  if(DEFINED CUVS_CXX_FLAGS)
+    target_compile_options(${TEST_NAME} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>")
+  endif()
 
   target_include_directories(
     ${TEST_NAME} PRIVATE "$<BUILD_INTERFACE:${CUVS_C_SOURCE_DIR}/tests>"

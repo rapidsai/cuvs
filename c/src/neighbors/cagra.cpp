@@ -144,27 +144,31 @@ void* _from_args(cuvsResources_t res,
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
     using mdspan_type = raft::device_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
+    cuvs::neighbors::device_padded_dataset_view<T, int64_t> dataset_view(mds);
     if (cuvs::core::is_dlpack_device_compatible(graph)) {
       using graph_mdspan_type = raft::device_matrix_view<uint32_t const, int64_t, raft::row_major>;
       auto graph_mds          = cuvs::core::from_dlpack<graph_mdspan_type>(graph_tensor);
-      index = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr, metric, mds, graph_mds);
+      index = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr, metric, dataset_view, graph_mds);
     } else {
       using graph_mdspan_type = raft::host_matrix_view<uint32_t const, int64_t, raft::row_major>;
       auto graph_mds          = cuvs::core::from_dlpack<graph_mdspan_type>(graph_tensor);
-      index = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr, metric, mds, graph_mds);
+      index = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr, metric, dataset_view, graph_mds);
     }
   } else if (cuvs::core::is_dlpack_host_compatible(dataset)) {
     using mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
+    auto idx          = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr, metric);
+    idx->update_dataset(*res_ptr, mds);
     if (cuvs::core::is_dlpack_device_compatible(graph)) {
       using graph_mdspan_type = raft::device_matrix_view<uint32_t const, int64_t, raft::row_major>;
       auto graph_mds          = cuvs::core::from_dlpack<graph_mdspan_type>(graph_tensor);
-      index = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr, metric, mds, graph_mds);
+      idx->update_graph(*res_ptr, graph_mds);
     } else {
       using graph_mdspan_type = raft::host_matrix_view<uint32_t const, int64_t, raft::row_major>;
       auto graph_mds          = cuvs::core::from_dlpack<graph_mdspan_type>(graph_tensor);
-      index = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr, metric, mds, graph_mds);
+      idx->update_graph(*res_ptr, graph_mds);
     }
+    index = idx;
   }
   return index;
 }

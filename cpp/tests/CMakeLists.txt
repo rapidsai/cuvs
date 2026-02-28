@@ -37,10 +37,18 @@ function(ConfigureTest)
   endif()
 
   add_executable(${TEST_NAME} ${_CUVS_TEST_PATH})
+  # Link to static lib when available so tests use build-tree cuvs (no libcuvs.so load, avoids conda RPATH).
+  if(TARGET cuvs_static)
+    set(_cuvs_lib cuvs_static)
+    set(_cuvs_alias cuvs::cuvs_static)
+  else()
+    set(_cuvs_lib cuvs)
+    set(_cuvs_alias cuvs::cuvs)
+  endif()
   target_link_libraries(
     ${TEST_NAME}
-    PRIVATE cuvs
-            cuvs::cuvs
+    PRIVATE ${_cuvs_lib}
+            ${_cuvs_alias}
             raft::raft
             GTest::gtest
             GTest::gtest_main
@@ -115,10 +123,15 @@ ConfigureTest(
   PERCENT 100
 )
 
+set(CLUSTER_TEST_SOURCES cluster/kmeans.cu cluster/kmeans_balanced.cu cluster/kmeans_find_k.cu
+                         cluster/linkage.cu cluster/connect_knn.cu
+)
+if(CUVS_BUILD_SPECTRAL_EMBEDDING)
+  list(APPEND CLUSTER_TEST_SOURCES cluster/spectral.cu)
+endif()
 ConfigureTest(
   NAME CLUSTER_TEST
-  PATH cluster/kmeans.cu cluster/kmeans_balanced.cu cluster/kmeans_find_k.cu cluster/linkage.cu
-       cluster/connect_knn.cu cluster/spectral.cu
+  PATH ${CLUSTER_TEST_SOURCES}
   GPUS 1
   PERCENT 100
 )
@@ -230,6 +243,46 @@ ConfigureTest(
   PERCENT 100
 )
 
+# Optional: only build if source files exist (e.g. not yet synced on all machines)
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/neighbors/dataset_types.cu)
+  ConfigureTest(
+    NAME NEIGHBORS_DATASET_TYPES_TEST
+    PATH neighbors/dataset_types.cu
+    GPUS 1
+    PERCENT 100
+  )
+endif()
+
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/neighbors/dataset_compression.cu)
+  ConfigureTest(
+    NAME NEIGHBORS_DATASET_COMPRESSION_TEST
+    PATH neighbors/dataset_compression.cu
+    GPUS 1
+    PERCENT 100
+  )
+endif()
+
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/neighbors/cagra_padded_dataset.cu)
+  ConfigureTest(
+    NAME NEIGHBORS_CAGRA_PADDED_DATASET_TEST
+    PATH neighbors/cagra_padded_dataset.cu
+    GPUS 1
+    PERCENT 100
+  )
+  target_include_directories(
+    NEIGHBORS_CAGRA_PADDED_DATASET_TEST PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src
+  )
+endif()
+
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/neighbors/cagra_build_view_only.cu)
+  ConfigureTest(
+    NAME NEIGHBORS_CAGRA_BUILD_VIEW_ONLY_TEST
+    PATH neighbors/cagra_build_view_only.cu
+    GPUS 1
+    PERCENT 100
+  )
+endif()
+
 ConfigureTest(
   NAME NEIGHBORS_ALL_NEIGHBORS_TEST
   PATH neighbors/all_neighbors/test_float.cu
@@ -335,10 +388,16 @@ ConfigureTest(
   PERCENT 100
 )
 
+set(PREPROCESSING_TEST_SOURCES preprocessing/scalar_quantization.cu
+                               preprocessing/binary_quantization.cu
+)
+if(CUVS_BUILD_SPECTRAL_EMBEDDING)
+  list(APPEND PREPROCESSING_TEST_SOURCES preprocessing/spectral_embedding.cu)
+endif()
+list(APPEND PREPROCESSING_TEST_SOURCES preprocessing/product_quantization.cu)
 ConfigureTest(
   NAME PREPROCESSING_TEST
-  PATH preprocessing/scalar_quantization.cu preprocessing/binary_quantization.cu
-       preprocessing/spectral_embedding.cu preprocessing/product_quantization.cu
+  PATH ${PREPROCESSING_TEST_SOURCES}
   GPUS 1
   PERCENT 100
 )

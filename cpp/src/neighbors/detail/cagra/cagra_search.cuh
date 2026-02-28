@@ -191,6 +191,54 @@ void search_main(raft::resources const& res,
       neighbors,
       distances,
       sample_filter);
+  } else if (auto* padded_view_dset =
+               dynamic_cast<const device_padded_dataset_view<T, ds_idx_type>*>(&index.data());
+             padded_view_dset != nullptr) {
+    // Search using a padded dataset view (same descriptor as strided)
+    RAFT_EXPECTS(index.metric() != cuvs::distance::DistanceType::CosineExpanded ||
+                   index.dataset_norms().has_value(),
+                 "Dataset norms must be provided for CosineExpanded metric");
+
+    const float* dataset_norms_ptr = nullptr;
+    if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) {
+      dataset_norms_ptr = index.dataset_norms().value().data_handle();
+    }
+    auto desc = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
+      res, params, *padded_view_dset, index.metric(), dataset_norms_ptr);
+    search_main_core<T, graph_idx_type, DistanceT, CagraSampleFilterT, IdxT, OutputIdxT>(
+      res,
+      params,
+      desc,
+      index.graph(),
+      index.source_indices(),
+      queries,
+      neighbors,
+      distances,
+      sample_filter);
+  } else if (auto* padded_dset =
+               dynamic_cast<const device_padded_dataset<T, ds_idx_type>*>(&index.data());
+             padded_dset != nullptr) {
+    // Search using a padded dataset (same descriptor as strided)
+    RAFT_EXPECTS(index.metric() != cuvs::distance::DistanceType::CosineExpanded ||
+                   index.dataset_norms().has_value(),
+                 "Dataset norms must be provided for CosineExpanded metric");
+
+    const float* dataset_norms_ptr = nullptr;
+    if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) {
+      dataset_norms_ptr = index.dataset_norms().value().data_handle();
+    }
+    auto desc = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
+      res, params, *padded_dset, index.metric(), dataset_norms_ptr);
+    search_main_core<T, graph_idx_type, DistanceT, CagraSampleFilterT, IdxT, OutputIdxT>(
+      res,
+      params,
+      desc,
+      index.graph(),
+      index.source_indices(),
+      queries,
+      neighbors,
+      distances,
+      sample_filter);
   } else if (auto* empty_dset = dynamic_cast<const empty_dataset<ds_idx_type>*>(&index.data());
              empty_dset != nullptr) {
     // Forgot to add a dataset.

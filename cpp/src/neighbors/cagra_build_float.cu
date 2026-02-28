@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -34,6 +34,15 @@ namespace cuvs::neighbors::cagra {
   }
 
 RAFT_INST_CAGRA_BUILD(float, uint32_t);
+
+template auto build(raft::resources const& res,
+                    const cuvs::neighbors::cagra::index_params& params,
+                    cuvs::neighbors::device_padded_dataset_view<float, int64_t> const& dataset)
+  -> cuvs::neighbors::cagra::index<float, uint32_t>;
+template auto build(raft::resources const& res,
+                    const cuvs::neighbors::cagra::index_params& params,
+                    cuvs::neighbors::device_padded_dataset<float, int64_t>&& dataset)
+  -> cuvs::neighbors::cagra::index<float, uint32_t>;
 
 #undef RAFT_INST_CAGRA_BUILD
 

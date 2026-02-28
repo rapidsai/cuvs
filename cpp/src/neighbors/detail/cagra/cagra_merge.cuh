@@ -30,10 +30,11 @@
 namespace cuvs::neighbors::cagra::detail {
 
 template <class T, class IdxT>
-index<T, IdxT> merge(raft::resources const& handle,
-                     const cagra::index_params& params,
-                     std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,
-                     const cuvs::neighbors::filtering::base_filter& row_filter)
+index<T, IdxT> merge(
+  raft::resources const& handle,
+  const cagra::index_params& params,
+  std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,
+  const cuvs::neighbors::filtering::base_filter& row_filter)
 {
   using cagra_index_t = cuvs::neighbors::cagra::index<T, IdxT>;
   using ds_idx_type   = typename cagra_index_t::dataset_index_type;
@@ -120,14 +121,9 @@ index<T, IdxT> merge(raft::resources const& handle,
       auto merged_index =
         cagra::build(handle, params, raft::make_const_mdspan(filtered_dataset.view()));
       if (!merged_index.data().is_owning() && params.attach_dataset_on_build) {
-        using matrix_t           = decltype(updated_dataset);
-        using layout_t           = typename matrix_t::layout_type;
-        using container_policy_t = typename matrix_t::container_policy_type;
-        using owning_t           = owning_dataset<T, int64_t, layout_t, container_policy_t>;
-        auto out_layout          = raft::make_strided_layout(filtered_dataset.view().extents(),
-                                                    cuda::std::array<int64_t, 2>{stride, 1});
-
-        merged_index.update_dataset(handle, owning_t{std::move(filtered_dataset), out_layout});
+        auto ds = std::make_unique<cuvs::neighbors::device_padded_dataset<T, int64_t>>(
+          std::move(filtered_dataset), static_cast<uint32_t>(dim));
+        merged_index.update_dataset(handle, std::move(ds));
       }
       RAFT_LOG_DEBUG("cagra merge: using device memory for merged dataset");
       return merged_index;
@@ -135,14 +131,9 @@ index<T, IdxT> merge(raft::resources const& handle,
       auto merged_index =
         cagra::build(handle, params, raft::make_const_mdspan(updated_dataset.view()));
       if (!merged_index.data().is_owning() && params.attach_dataset_on_build) {
-        using matrix_t           = decltype(updated_dataset);
-        using layout_t           = typename matrix_t::layout_type;
-        using container_policy_t = typename matrix_t::container_policy_type;
-        using owning_t           = owning_dataset<T, int64_t, layout_t, container_policy_t>;
-        auto out_layout          = raft::make_strided_layout(updated_dataset.view().extents(),
-                                                    cuda::std::array<int64_t, 2>{stride, 1});
-
-        merged_index.update_dataset(handle, owning_t{std::move(updated_dataset), out_layout});
+        auto ds = std::make_unique<cuvs::neighbors::device_padded_dataset<T, int64_t>>(
+          std::move(updated_dataset), static_cast<uint32_t>(dim));
+        merged_index.update_dataset(handle, std::move(ds));
       }
       RAFT_LOG_DEBUG("cagra merge: using device memory for merged dataset");
       return merged_index;
@@ -163,13 +154,15 @@ index<T, IdxT> merge(raft::resources const& handle,
     auto merged_index =
       cagra::build(handle, params, raft::make_const_mdspan(updated_dataset.view()));
     if (!merged_index.data().is_owning() && params.attach_dataset_on_build) {
-      using matrix_t           = decltype(updated_dataset);
-      using layout_t           = typename matrix_t::layout_type;
-      using container_policy_t = typename matrix_t::container_policy_type;
-      using owning_t           = owning_dataset<T, int64_t, layout_t, container_policy_t>;
-      auto out_layout          = raft::make_strided_layout(updated_dataset.view().extents(),
-                                                  cuda::std::array<int64_t, 2>{stride, 1});
-      merged_index.update_dataset(handle, owning_t{std::move(updated_dataset), out_layout});
+      auto dev_dataset =
+        raft::make_device_matrix<T, int64_t>(handle, updated_dataset.extent(0), updated_dataset.extent(1));
+      raft::copy(dev_dataset.data_handle(),
+                 updated_dataset.data_handle(),
+                 updated_dataset.size(),
+                 raft::resource::get_cuda_stream(handle));
+      auto ds = std::make_unique<cuvs::neighbors::device_padded_dataset<T, int64_t>>(
+        std::move(dev_dataset), static_cast<uint32_t>(dim));
+      merged_index.update_dataset(handle, std::move(ds));
     }
     return merged_index;
   }

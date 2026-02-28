@@ -300,11 +300,14 @@ void add_graph_nodes(
              raft::make_device_vector_view(updated_graph_view.data_handle(), index.graph().size()),
              raft::make_device_vector_view(index.graph().data_handle(), index.graph().size()));
 
+  auto empty_data_view =
+    raft::make_device_matrix_view<const T, int64_t>(nullptr, 0, dim);
+  cuvs::neighbors::device_padded_dataset_view<T, int64_t> empty_dataset_view(
+    empty_data_view);
+  auto empty_graph_view =
+    raft::make_device_matrix_view<const IdxT, int64_t>(nullptr, 0, degree);
   neighbors::cagra::index<T, IdxT> internal_index(
-    handle,
-    index.metric(),
-    raft::make_device_matrix_view<const T, int64_t>(nullptr, 0, dim),
-    raft::make_device_matrix_view<const IdxT, int64_t>(nullptr, 0, degree));
+    handle, index.metric(), empty_dataset_view, empty_graph_view);
 
   for (std::size_t additional_dataset_offset = 0; additional_dataset_offset < num_new_nodes;
        additional_dataset_offset += max_chunk_size_) {
@@ -429,8 +432,10 @@ void extend_core(
       updated_dataset_view = new_dataset_buffer_view.value();
     } else {
       // Deallocate the current dataset memory space if the dataset is `owning'.
-      index.update_dataset(
-        handle, raft::make_device_strided_matrix_view<const T, int64_t>(nullptr, 0, dim, stride));
+      cuvs::neighbors::device_padded_dataset_view<T, int64_t> empty_dv(
+        raft::make_device_matrix_view<const T, int64_t>(static_cast<T const*>(nullptr), 0, stride),
+        dim);
+      index.update_dataset(handle, empty_dv);
 
       // Allocate the new dataset
       updated_dataset = raft::make_device_matrix<T, std::int64_t>(handle, new_dataset_size, stride);
@@ -448,19 +453,18 @@ void extend_core(
     cuvs::neighbors::cagra::add_graph_nodes<T, IdxT>(
       handle, raft::make_const_mdspan(updated_dataset_view), index, updated_graph.view(), params);
 
-    // Update index dataset
+    // Update index dataset: view when caller provided buffer, else take ownership
     if (new_dataset_buffer_view.has_value()) {
-      index.update_dataset(handle, raft::make_const_mdspan(updated_dataset_view));
+      cuvs::neighbors::device_padded_dataset_view<T, int64_t> dv(
+        raft::make_device_matrix_view(updated_dataset_view.data_handle(),
+                                     updated_dataset_view.extent(0),
+                                     updated_dataset_view.stride(0)),
+        dim);
+      index.update_dataset(handle, dv);
     } else {
-      using out_mdarray_type          = decltype(updated_dataset);
-      using out_layout_type           = typename out_mdarray_type::layout_type;
-      using out_container_policy_type = typename out_mdarray_type::container_policy_type;
-      using out_owning_type =
-        owning_dataset<T, int64_t, out_layout_type, out_container_policy_type>;
-      auto out_layout = raft::make_strided_layout(updated_dataset_view.extents(),
-                                                  cuda::std::array<int64_t, 2>{stride, 1});
-
-      index.update_dataset(handle, out_owning_type{std::move(updated_dataset), out_layout});
+      auto ds = std::make_unique<cuvs::neighbors::device_padded_dataset<T, int64_t>>(
+        std::move(updated_dataset), static_cast<uint32_t>(dim));
+      index.update_dataset(handle, std::move(ds));
     }
 
     // Update index graph
