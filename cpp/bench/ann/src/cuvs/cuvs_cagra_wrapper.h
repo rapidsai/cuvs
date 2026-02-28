@@ -228,7 +228,7 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
       }
 
       index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(
-        std::move(cuvs::neighbors::cagra::merge(handle_, params, indices)));
+        cuvs::neighbors::cagra::merge(handle_, params, indices));
     }
   }
 }
@@ -288,7 +288,9 @@ void cuvs_cagra<T, IdxT>::set_search_param(const search_param_base& param,
 
     // First free up existing memory
     *dataset_ = raft::make_device_matrix<T, int64_t>(handle_, 0, 0);
-    index_->update_dataset(handle_, make_const_mdspan(dataset_->view()));
+    cuvs::neighbors::device_padded_dataset_view<T, int64_t> empty_dv(
+      raft::make_device_matrix_view(static_cast<T const*>(nullptr), 0, this->dim_), this->dim_);
+    index_->update_dataset(handle_, empty_dv);
 
     // Allocate space using the correct memory resource.
     RAFT_LOG_DEBUG("moving dataset to new memory space: %s",
@@ -297,9 +299,12 @@ void cuvs_cagra<T, IdxT>::set_search_param(const search_param_base& param,
     auto mr = get_mr(dataset_mem_);
     cuvs::neighbors::cagra::detail::copy_with_padding(handle_, *dataset_, *input_dataset_v_, mr);
 
-    auto dataset_view = raft::make_device_strided_matrix_view<const T, int64_t>(
-      dataset_->data_handle(), dataset_->extent(0), this->dim_, dataset_->extent(1));
-    index_->update_dataset(handle_, dataset_view);
+    cuvs::neighbors::device_padded_dataset_view<T, int64_t> dv(
+      raft::make_device_matrix_view(dataset_->data_handle(),
+                                    dataset_->extent(0),
+                                    dataset_->extent(1)),
+      this->dim_);
+    index_->update_dataset(handle_, dv);
 
     need_dataset_update_         = false;
     needs_dynamic_batcher_update = true;

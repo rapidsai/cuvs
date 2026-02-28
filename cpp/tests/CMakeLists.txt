@@ -37,10 +37,18 @@ function(ConfigureTest)
   endif()
 
   add_executable(${TEST_NAME} ${_CUVS_TEST_PATH})
+  # Link to static lib when available so tests use build-tree cuvs (no libcuvs.so load, avoids conda RPATH).
+  if(TARGET cuvs_static)
+    set(_cuvs_lib cuvs_static)
+    set(_cuvs_alias cuvs::cuvs_static)
+  else()
+    set(_cuvs_lib cuvs)
+    set(_cuvs_alias cuvs::cuvs)
+  endif()
   target_link_libraries(
     ${TEST_NAME}
-    PRIVATE cuvs
-            cuvs::cuvs
+    PRIVATE ${_cuvs_lib}
+            ${_cuvs_alias}
             raft::raft
             GTest::gtest
             GTest::gtest_main
@@ -263,6 +271,15 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/neighbors/cagra_padded_dataset.cu)
   )
   target_include_directories(
     NEIGHBORS_CAGRA_PADDED_DATASET_TEST PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src
+  )
+endif()
+
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/neighbors/cagra_build_view_only.cu)
+  ConfigureTest(
+    NAME NEIGHBORS_CAGRA_BUILD_VIEW_ONLY_TEST
+    PATH neighbors/cagra_build_view_only.cu
+    GPUS 1
+    PERCENT 100
   )
 endif()
 

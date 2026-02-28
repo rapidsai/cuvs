@@ -279,34 +279,37 @@ index<T, IdxT> build(
       dataset.data_handle(), dataset.extent(0), dataset.extent(1));
     return cuvs::neighbors::cagra::detail::build_ace<T, IdxT>(res, params, dataset_view);
   }
-  return cuvs::neighbors::cagra::detail::build<T, IdxT, Accessor>(res, params, dataset);
+  throw raft::logic_error(
+    "Use make_padded_dataset_view() or make_padded_dataset() to obtain a view, "
+    "then call build(res, params, view). ACE build is the only path that accepts a raw mdspan.");
 }
 
 /**
  * @brief Build the index from a device padded dataset view.
  *
- * The index stores a non-owning copy of the view; the caller must keep the dataset alive.
+ * The index stores a non-owning copy of the view; the caller must keep the underlying data alive.
+ * Obtain the view via make_padded_dataset_view() (when stride is correct) or
+ * make_padded_dataset()->as_dataset_view() (when stride is incorrect).
  */
 template <typename T, typename IdxT>
 index<T, IdxT> build(raft::resources const& res,
                      const index_params& params,
                      cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& dataset)
 {
-  auto idx = build<T, IdxT>(res, params, dataset.view());
-  idx.update_dataset(res, cuvs::neighbors::device_padded_dataset_view<T, int64_t>(dataset));
-  return idx;
+  return cuvs::neighbors::cagra::detail::build<T, IdxT>(res, params, dataset);
 }
 
 /**
- * @brief Build the index from a device padded dataset (taking ownership).
+ * @brief Build the index from a device padded dataset (owning; takes ownership).
  */
 template <typename T, typename IdxT>
 index<T, IdxT> build(raft::resources const& res,
                      const index_params& params,
                      cuvs::neighbors::device_padded_dataset<T, int64_t>&& dataset)
 {
-  auto idx = build<T, IdxT>(res, params, dataset.view());
-  idx.update_dataset(res, std::move(dataset));
+  auto idx = build(res, params, dataset.as_dataset_view());
+  idx.update_dataset(res, std::make_unique<cuvs::neighbors::device_padded_dataset<T, int64_t>>(
+                            std::move(dataset)));
   return idx;
 }
 

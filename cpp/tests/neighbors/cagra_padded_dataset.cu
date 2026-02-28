@@ -70,10 +70,9 @@ TEST(CagraPaddedDataset, PaddedDatasetViewBuildSearchRecall)
     raft::matrix_extent<int64_t>(n_rows, dim), build_params.metric);
 
   // Build from device_padded_dataset_view (dim=32 -> stride=32 is valid for alignment)
-  auto padded_view =
-    cuvs::neighbors::make_device_padded_dataset_view<float>(database.data(), n_rows, dim);
-  ASSERT_NE(padded_view, nullptr);
-  cagra::index<float, uint32_t> index = cagra::build(res, build_params, *padded_view);
+  auto db_view = raft::make_device_matrix_view<const float, int64_t>(database.data(), n_rows, dim);
+  auto padded_view = cuvs::neighbors::make_padded_dataset_view(res, db_view);
+  cagra::index<float, uint32_t> index = cagra::build(res, build_params, padded_view);
 
   rmm::device_uvector<float> distances_cagra_dev(queries_size, stream);
   rmm::device_uvector<int64_t> indices_cagra_dev(queries_size, stream);
@@ -143,17 +142,20 @@ TEST(CagraPaddedDataset, PaddedDatasetBuildSearchRecall)
   raft::update_host(indices_naive.data(), indices_naive_dev.data(), queries_size, stream);
   raft::resource::sync_stream(res);
 
-  auto ds_ptr = cuvs::neighbors::make_device_padded_dataset<float>(res, n_rows, dim);
-  ASSERT_NE(ds_ptr, nullptr);
-  raft::copy(ds_ptr->data_handle(), database.data(), static_cast<size_t>(n_rows * dim), stream);
+  // Owning device padded dataset: allocate with correct stride, copy, then build from view.
+  // (First test uses make_padded_dataset_view for non-owning; here we own the buffer.)
+  auto dev_matrix = raft::make_device_matrix<float, int64_t>(res, n_rows, dim);
+  raft::copy(dev_matrix.data_handle(), database.data(), static_cast<size_t>(n_rows * dim), stream);
   raft::resource::sync_stream(res);
+  auto ds = std::make_unique<cuvs::neighbors::device_padded_dataset<float, int64_t>>(
+    std::move(dev_matrix), dim);
 
   cagra::index_params build_params;
   build_params.metric             = cuvs::distance::DistanceType::L2Expanded;
   build_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
     raft::matrix_extent<int64_t>(n_rows, dim), build_params.metric);
 
-  cagra::index<float, uint32_t> index = cagra::build(res, build_params, std::move(*ds_ptr));
+  cagra::index<float, uint32_t> index = cagra::build(res, build_params, ds->as_dataset_view());
 
   rmm::device_uvector<float> distances_cagra_dev(queries_size, stream);
   rmm::device_uvector<int64_t> indices_cagra_dev(queries_size, stream);
