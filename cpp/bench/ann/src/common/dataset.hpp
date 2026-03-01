@@ -45,12 +45,12 @@ struct dataset {
   std::string distance_;
   blob<DataT> base_set_;
   blob<DataT> query_set_;
-  std::optional<blob<IdxT>> ground_truth_set_;
   std::optional<blob<bitset_carrier_type>> filter_bitset_;
   // Hash maps of {id, neighbor_rank} for up to kMaxQueriesForRecall queries in the ground truth set
   // e.g. gt_maps_[i][j] = k means that the i-th query in the ground truth set has k-th nearest
   // neighbor with id j. Note that the nearest neighbor rank starts from 0.
   std::vector<std::unordered_map<IdxT, IdxT>> gt_maps_;
+  uint32_t max_k_ = 0;  // number of nearest neighbors in the ground truth
   std::vector<uint32_t> filter_pass_counts_;
 
   // Protects the lazy mutations of the blobs accessed by multiple threads
@@ -79,10 +79,7 @@ struct dataset {
     : name_{std::move(name)},
       distance_{std::move(distance)},
       base_set_{base_file, subset_first_row, subset_size},
-      query_set_{query_file},
-      ground_truth_set_{groundtruth_neighbors_file.has_value()
-                          ? std::make_optional<blob<IdxT>>(groundtruth_neighbors_file.value())
-                          : std::nullopt}
+      query_set_{query_file}
   {
     if (filtering_rate.has_value()) {
       // Generate a random bitset for filtering
@@ -106,18 +103,19 @@ struct dataset {
 
     We generate the filtered ground truth values and build unordered_maps with them to
     enable O(1) lookup. We need enough ground truth values to compute recall correctly
-    though. But the ground truth file only contains `max_k` values per row; if there are
+    though. But the ground truth file only contains `max_k_` values per row; if there are
     less valid values than k among them, we overestimate the recall. Essentially, we compare
     the first `filter_pass_count` values of the algorithm output, and this counter can be
     less than `k`. In the extreme case of very high filtering rate, we may be bypassing
     entire rows of results. However, this is still better than no recall estimate at all.
 
     */
-    if (ground_truth_set_.has_value()) {
-      auto n_queries = std::min(query_set_.n_rows(), kMaxQueriesForRecall);
+    if (groundtruth_neighbors_file.has_value()) {
+      auto ground_truth_set = blob<IdxT>(groundtruth_neighbors_file.value());
+      auto n_queries        = std::min(query_set_.n_rows(), kMaxQueriesForRecall);
       gt_maps_.resize(n_queries);
-      const std::uint32_t max_k = ground_truth_set_->n_cols();
-      auto filter               = [this](IdxT i) -> bool {
+      max_k_      = ground_truth_set.n_cols();
+      auto filter = [this](IdxT i) -> bool {
         if (!this->filter_bitset_.has_value()) { return true; }
         auto word = this->filter_bitset_->data()[i >> 5];
         return word & (1 << (i & 31));
@@ -135,8 +133,8 @@ struct dataset {
       int remainder     = n_queries % (num_map_building_worker_threads + 1);
       auto build_gt_map = [&](int start, int end, int tid) -> void {
         for (int query_idx = start; query_idx < end; ++query_idx) {
-          for (std::uint32_t neighbor_rank = 0; neighbor_rank < max_k; ++neighbor_rank) {
-            auto id = ground_truth_set_->data()[query_idx * max_k + neighbor_rank];
+          for (std::uint32_t neighbor_rank = 0; neighbor_rank < max_k_; ++neighbor_rank) {
+            auto id = ground_truth_set.data()[query_idx * max_k_ + neighbor_rank];
             if (!filter(id)) { continue; }
             if (gt_maps_[query_idx].count(id)) {
               throw std::invalid_argument(
@@ -185,12 +183,7 @@ struct dataset {
     dim_.store(d, std::memory_order_relaxed);
     return d;
   }
-  [[nodiscard]] auto max_k() const -> uint32_t
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (ground_truth_set_.has_value()) { return ground_truth_set_->n_cols(); }
-    return 0;
-  }
+  [[nodiscard]] auto max_k() const -> uint32_t { return max_k_; }
   [[nodiscard]] auto base_set_size() const -> size_t
   {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -204,13 +197,6 @@ struct dataset {
     auto r = query_set_.n_rows();
     cache_dim(query_set_);
     return r;
-  }
-
-  [[nodiscard]] auto gt_set() const -> const IdxT*
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (ground_truth_set_.has_value()) { return ground_truth_set_->data(); }
-    return nullptr;
   }
 
   [[nodiscard]] auto gt_maps() const -> const std::vector<std::unordered_map<IdxT, IdxT>>&
