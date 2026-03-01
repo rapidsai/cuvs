@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -38,6 +38,7 @@ struct dataset {
  public:
   using bitset_carrier_type                           = uint32_t;
   static inline constexpr size_t kBitsPerCarrierValue = sizeof(bitset_carrier_type) * 8;
+  static constexpr uint32_t kMaxQueriesForRecall      = 10'000;
 
  private:
   std::string name_;
@@ -46,6 +47,12 @@ struct dataset {
   blob<DataT> query_set_;
   std::optional<blob<IdxT>> ground_truth_set_;
   std::optional<blob<bitset_carrier_type>> filter_bitset_;
+  // Hash maps of {id, neighbor_rank} for up to kMaxQueriesForRecall queries in the ground truth set
+  // e.g. gt_maps_[i][j] = k means that the i-th query in the ground truth set has k-th nearest
+  // neighbor with id j. Note that the nearest neighbor rank starts from 1, i.e. there is no 0-th
+  // nearest neighbor.
+  std::vector<std::unordered_map<IdxT, IdxT>> gt_maps_;
+  std::vector<uint32_t> filter_pass_counts_;
 
   // Protects the lazy mutations of the blobs accessed by multiple threads
   mutable std::mutex mutex_;
@@ -93,6 +100,69 @@ struct dataset {
                          bitset_size,
                          1.0 - filtering_rate.value());
       filter_bitset_.emplace(std::move(bitset_blob));
+    }
+    // Eagerly iterate over and optionally filter the ground truth set to build gt_maps_ for up to
+    // kMaxQueriesForRecall queries
+    /* NOTE: recall correctness & filtering
+
+    We generate the filtered ground truth values and build unordered_maps with them to
+    enable O(1) lookup. We need enough ground truth values to compute recall correctly
+    though. But the ground truth file only contains `max_k` values per row; if there are
+    less valid values than k among them, we overestimate the recall. Essentially, we compare
+    the first `filter_pass_count` values of the algorithm output, and this counter can be
+    less than `k`. In the extreme case of very high filtering rate, we may be bypassing
+    entire rows of results. However, this is still better than no recall estimate at all.
+
+    */
+    if (ground_truth_set_.has_value()) {
+      auto n_queries = std::min(query_set_.n_rows(), kMaxQueriesForRecall);
+      gt_maps_.resize(n_queries);
+      const std::uint32_t max_k = ground_truth_set_->n_cols();
+      auto filter               = [this](IdxT i) -> bool {
+        if (!this->filter_bitset_.has_value()) { return true; }
+        auto word = this->filter_bitset_->data()[i >> 5];
+        return word & (1 << (i & 31));
+      };
+      filter_pass_counts_.resize(n_queries);
+      // Avoid CPU oversubscription when parallelizing recall calculation loop
+      int num_map_building_worker_threads =
+        std::thread::hardware_concurrency() - 1;  // -1 for the main thread
+      // ensure non-negative number of workers (possible if hardware_concurrency()
+      // does not return an expected value) by clamping to 0
+      if (num_map_building_worker_threads < 0) { num_map_building_worker_threads = 0; }
+      std::vector<std::thread> gt_map_building_workers;
+      gt_map_building_workers.reserve(num_map_building_worker_threads);
+      int chunk_size    = n_queries / (num_map_building_worker_threads + 1);
+      int remainder     = n_queries % (num_map_building_worker_threads + 1);
+      auto build_gt_map = [&](int start, int end, int tid) -> void {
+        for (int query_idx = start; query_idx < end; ++query_idx) {
+          for (std::uint32_t neighbor_rank = 0; neighbor_rank < max_k; ++neighbor_rank) {
+            auto id = ground_truth_set_->data()[query_idx * max_k + neighbor_rank];
+            if (!filter(id)) { continue; }
+            if (gt_maps_[query_idx].count(id)) {
+              throw std::invalid_argument(
+                "Duplicate neighbor id found in ground truth set for query " +
+                std::to_string(query_idx));
+            }
+            gt_maps_[query_idx][id] = neighbor_rank + 1;  // +1 for 1-indexed rank
+            ++filter_pass_counts_[query_idx];
+          }
+        }
+      };
+      // launch worker threads
+      int start = 0;
+      for (int tid = 0; tid < num_map_building_worker_threads; tid++) {
+        int end = start + chunk_size;
+        if (tid < remainder) { ++end; }
+        gt_map_building_workers.emplace_back(build_gt_map, start, end, tid);
+        start = end;
+      }
+      // main thread works on last chunk
+      build_gt_map(start, n_queries, num_map_building_worker_threads);
+      // join all worker threads
+      for (auto& worker : gt_map_building_workers) {
+        worker.join();
+      }
     }
   }
 
@@ -142,6 +212,11 @@ struct dataset {
     std::lock_guard<std::mutex> lock(mutex_);
     if (ground_truth_set_.has_value()) { return ground_truth_set_->data(); }
     return nullptr;
+  }
+
+  [[nodiscard]] auto gt_maps() const -> const std::vector<std::unordered_map<IdxT, IdxT>>&
+  {
+    return gt_maps_;
   }
 
   [[nodiscard]] auto query_set() const -> const DataT*
@@ -194,6 +269,11 @@ struct dataset {
       return filter_bitset_->data(memory_type, request_hugepages_2mb);
     }
     return nullptr;
+  }
+
+  [[nodiscard]] auto filter_pass_counts() const -> const std::vector<uint32_t>&
+  {
+    return filter_pass_counts_;
   }
 };
 

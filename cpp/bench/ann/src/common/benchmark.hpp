@@ -355,14 +355,9 @@ void bench_search(::benchmark::State& state,
   // Each thread calculates recall on their partition of queries.
   // evaluate recall
   if (dataset->max_k() >= k) {
-    const std::int32_t* gt             = dataset->gt_set();
-    const std::uint32_t* filter_bitset = dataset->filter_bitset(MemoryType::kHostMmap);
-    auto filter                        = [filter_bitset](std::int32_t i) -> bool {
-      if (filter_bitset == nullptr) { return true; }
-      auto word = filter_bitset[i >> 5];
-      return word & (1 << (i & 31));
-    };
-    const std::uint32_t max_k = dataset->max_k();
+    // gt_maps[i] is a hash map of {id, neighbor_rank} for query i
+    const auto& gt_maps            = dataset->gt_maps();
+    const auto& filter_pass_counts = dataset->filter_pass_counts();
     result_buf.transfer_data(MemoryType::kHost, current_algo_props->query_memory_type);
     auto* neighbors_host    = reinterpret_cast<index_type*>(result_buf.data(MemoryType::kHost));
     std::size_t rows        = std::min(queries_processed, query_set_size);
@@ -386,37 +381,18 @@ void bench_search(::benchmark::State& state,
       int chunk_size =
         n_queries / (num_recall_calculation_worker_threads + 1);  // +1 for the main thread
       int remainder           = n_queries % (num_recall_calculation_worker_threads + 1);
-      auto recall_calculation = [&](int start, int end, int tid) {
+      auto recall_calculation = [&](int start, int end, int tid) -> void {
         for (int i = start; i < end; ++i) {
           size_t i_orig_idx = batch_offset + i;
           size_t i_out_idx  = out_offset + i;
           if (i_out_idx < rows) {
-            /* NOTE: recall correctness & filtering
-
-            We generate the filtered ground truth values and build an unordered_set with them to
-            enable O(1) lookup. We need enough ground truth values to compute recall correctly
-            though. But the ground truth file only contains `max_k` values per row; if there are
-            less valid values than k among them, we overestimate the recall. Essentially, we compare
-            the first `filter_pass_count` values of the algorithm output, and this counter can be
-            less than `k`. In the extreme case of very high filtering rate, we may be bypassing
-            entire rows of results. However, this is still better than no recall estimate at all.
-
-            */
-            std::unordered_set<std::int32_t> gt_set;
-            if (!filter_bitset) { gt_set.reserve(max_k); }
-            uint32_t filter_pass_count{};
-            for (std::uint32_t l = 0; l < max_k && filter_pass_count < k; l++) {
-              auto exp_idx = gt[i_orig_idx * max_k + l];
-              if (!filter(exp_idx)) { continue; }
-              gt_set.insert(exp_idx);
-              filter_pass_count++;
-            }
-
-            local_total_count[tid] += filter_pass_count;
+            local_total_count[tid] += filter_pass_counts[i_orig_idx];
 
             for (std::uint32_t j = 0; j < k; j++) {
               auto act_idx = static_cast<std::int32_t>(neighbors_host[i_out_idx * k + j]);
-              if (gt_set.count(act_idx)) local_match_count[tid]++;
+              if (gt_maps[i_orig_idx].count(act_idx) &&
+                  static_cast<uint32_t>(gt_maps[i_orig_idx].at(act_idx)) <= k)
+                local_match_count[tid]++;
             }
           }
         }
