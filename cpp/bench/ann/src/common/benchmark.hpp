@@ -391,7 +391,7 @@ void bench_search(::benchmark::State& state,
             for (std::uint32_t j = 0; j < k; j++) {
               auto act_idx = static_cast<std::int32_t>(neighbors_host[i_out_idx * k + j]);
               if (gt_maps[i_orig_idx].count(act_idx) &&
-                  static_cast<uint32_t>(gt_maps[i_orig_idx].at(act_idx)) <= k)
+                  static_cast<uint32_t>(gt_maps[i_orig_idx].at(act_idx)) < k)
                 local_match_count[tid]++;
             }
           }

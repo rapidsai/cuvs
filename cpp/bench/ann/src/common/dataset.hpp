@@ -49,8 +49,7 @@ struct dataset {
   std::optional<blob<bitset_carrier_type>> filter_bitset_;
   // Hash maps of {id, neighbor_rank} for up to kMaxQueriesForRecall queries in the ground truth set
   // e.g. gt_maps_[i][j] = k means that the i-th query in the ground truth set has k-th nearest
-  // neighbor with id j. Note that the nearest neighbor rank starts from 1, i.e. there is no 0-th
-  // nearest neighbor.
+  // neighbor with id j. Note that the nearest neighbor rank starts from 0.
   std::vector<std::unordered_map<IdxT, IdxT>> gt_maps_;
   std::vector<uint32_t> filter_pass_counts_;
 
@@ -144,7 +143,7 @@ struct dataset {
                 "Duplicate neighbor id found in ground truth set for query " +
                 std::to_string(query_idx));
             }
-            gt_maps_[query_idx][id] = neighbor_rank + 1;  // +1 for 1-indexed rank
+            gt_maps_[query_idx][id] = neighbor_rank;
             ++filter_pass_counts_[query_idx];
           }
         }
