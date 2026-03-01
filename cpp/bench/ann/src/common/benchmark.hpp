@@ -185,9 +185,6 @@ void bench_search(::benchmark::State& state,
   cuvs::bench::benchmark_thread_id = state.thread_index();
   cuvs::bench::benchmark_n_threads = state.threads();
   std::size_t queries_processed    = 0;
-  // Maximum number of queries to process for recall calculation (the actual number of recall
-  // calculations may exceed this value by up to n_queries)
-  constexpr size_t max_queries_for_recall = 10'000;
 
   const auto& sp_json = index.search_params[search_param_ix];
 
@@ -373,7 +370,7 @@ void bench_search(::benchmark::State& state,
     // ensure non-negative number of workers (possible if hardware_concurrency()
     // does not return an expected value) by clamping to 0
     if (num_recall_calculation_worker_threads < 0) { num_recall_calculation_worker_threads = 0; }
-    while (out_offset < rows && out_offset <= max_queries_for_recall) {
+    while (out_offset < rows && out_offset <= gt_maps.size()) {
       std::vector<std::thread> recall_calculation_workers;
       recall_calculation_workers.reserve(num_recall_calculation_worker_threads);
       std::vector<std::size_t> local_match_count(num_recall_calculation_worker_threads + 1);
