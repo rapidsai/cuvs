@@ -5,7 +5,7 @@
 #pragma once
 
 #include <raft/core/error.hpp>
-
+#include <atomic>
 #include <cstdint>
 #include <mutex>
 
@@ -37,25 +37,36 @@ void safely_launch_kernel_with_smem_size(KernelT const& kernel,
 {
   // last_smem_size is a monotonically growing high-water mark across all kernel pointers.
   // last_kernel tracks which kernel pointer was last used.
-  static uint32_t last_smem_size{0};
-  static KernelT last_kernel{KernelT{}};
+  static std::atomic<uint32_t> last_smem_size{0};
+  static std::atomic<KernelT> last_kernel{KernelT{}};
   static std::mutex mutex;
-
+  bool updated_needed = false;
+  // When the kernel function pointer changes, bring the new kernel up to the global high-water
+  // mark. This is necessary because cudaFuncSetAttribute applies to a specific function pointer,
+  // not to the pointer type — different template instantiations may share the same KernelT.
+  if (kernel != last_kernel.load(std::memory_order_relaxed))
+  {
+    last_kernel.store(kernel, std::memory_order_relaxed);
+    updated_needed = true;
+  }
+  // Since we first read the kernel pointer, and the shem_size can only grow,
+  // reading an inconsistent state is safe. At worst we will use a larger smem_size
+  uint32_t cur_smem_size = last_smem_size.load(std::memory_order_relaxed);
+  if (smem_size > cur_smem_size)
+  {
+    last_smem_size.store(smem_size, std::memory_order_relaxed);
+    cur_smem_size = smem_size;
+    updated_needed = true;
+  }
+  // Mutex-protected cudaFuncSetAttribute
+  if (updated_needed)
   {
     std::lock_guard<std::mutex> guard(mutex);
-
-    // When the kernel function pointer changes, bring the new kernel up to the global high-water
-    // mark. This is necessary because cudaFuncSetAttribute applies to a specific function pointer,
-    // not to the pointer type — different template instantiations may share the same KernelT.
-    last_kernel = kernel != last_kernel ? kernel : last_kernel;
-    // When smem_size exceeds the high-water mark, grow it for the current kernel.
-    // If the kernel also changed above, this handles the case where smem_size > last_smem_size.
-    last_smem_size = smem_size > last_smem_size ? smem_size : last_smem_size;
     auto launch_status =
-      cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, last_smem_size);
+      cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, cur_smem_size);
     RAFT_EXPECTS(launch_status == cudaSuccess,
                  "Failed to set max dynamic shared memory size to %u bytes",
-                 last_smem_size);
+                 cur_smem_size);
   }
   // The kernel launch is outside the lock: any concurrent cudaFuncSetAttribute can only increase
   // the limit, so the launch is always safe.
