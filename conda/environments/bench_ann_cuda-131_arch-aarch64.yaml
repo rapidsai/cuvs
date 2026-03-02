@@ -19,7 +19,7 @@ dependencies:
 - cupy>=13.6.0
 - cuvs==26.4.*,>=0.0.0a0
 - cxx-compiler
-- cython>=3.0.0,<3.2.0
+- cython>=3.2.2
 - dlpack>=0.8,<1.0
 - gcc_linux-aarch64=14.*
 - glog>=0.6.0

@@ -10,6 +10,7 @@
 #include "../ivf_pq_impl.hpp"
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
+#include <raft/core/copy.cuh>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -63,10 +64,7 @@ void serialize(raft::resources const& handle_, std::ostream& os, const index<Idx
 
   auto sizes_host =
     raft::make_host_mdarray<uint32_t, uint32_t, raft::row_major>(index.list_sizes().extents());
-  raft::copy(sizes_host.data_handle(),
-             index.list_sizes().data_handle(),
-             sizes_host.size(),
-             raft::resource::get_cuda_stream(handle_));
+  raft::copy(handle_, sizes_host.view(), index.list_sizes());
   raft::resource::sync_stream(handle_);
   raft::serialize_mdspan(handle_, os, sizes_host.view());
   // NOTE: We use static_cast here because serialize_list requires the concrete list type

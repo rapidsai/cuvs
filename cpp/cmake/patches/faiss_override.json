@@ -14,6 +14,11 @@
           "file" : "${current_json_dir}/faiss-1.13-cuvs-26.02.diff",
           "issue" : "Multiple fixes for cuVS and RMM compatibility",
           "fixed_in" : ""
+        },
+        {
+          "file" : "${current_json_dir}/faiss-1.13-cuvs-26.04.diff",
+          "issue" : "Multiple fixes for cuVS compatibility",
+          "fixed_in" : ""
         }
       ]
     }
