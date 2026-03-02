@@ -35,6 +35,23 @@ def main_cli():
             break
         current_path = current_path.parent
 
+    parent_parser = argparse.ArgumentParser(
+        add_help=False, description="Common arguments for all subcommands"
+    )
+    parent_parser.add_argument(
+        "--header-path",
+        help="Path of C headers to analyze (default: %(default)s)",
+        default=str(default_c_header_path),
+    )
+    parent_parser.add_argument(
+        "--include-file",
+        help="root header file to examine (default: %(default)s)",
+        default="cuvs/core/all.h",
+    )
+    parent_parser.add_argument(
+        "--dlpack-include-path", help="path of dlpack header include"
+    )
+
     parser = argparse.ArgumentParser(
         description="Analyze C headers for breaking ABI changes"
     )
@@ -43,7 +60,9 @@ def main_cli():
     )
 
     parser_extract = subparsers.add_parser(
-        "extract", help="Extract the ABI from a set of header files"
+        "extract",
+        parents=[parent_parser],
+        help="Extract the ABI from a set of header files",
     )
     parser_extract.add_argument(
         "--output-file",
@@ -51,35 +70,17 @@ def main_cli():
         help="The file to output the ABI into (default: %(default)s)",
         default="c_abi.json.gz",
     )
-    parser_extract.add_argument(
-        "--header-path",
-        help="Path of C headers to extract the ABI from (default: %(default)s)",
-        default=str(default_c_header_path),
-    )
-    parser_extract.add_argument(
-        "--include-file",
-        help="root header file to examine (default: %(default)s)",
-        default="cuvs/core/all.h",
-    )
 
     parser_analyze = subparsers.add_parser(
-        "analyze", help="Analyze a set of header files for breaking changes"
+        "analyze",
+        parents=[parent_parser],
+        help="Analyze a set of header files for breaking changes",
     )
     parser_analyze.add_argument(
         "--abi-file",
         type=str,
         help="The extracted ABI file to compare against (default: %(default)s)",
         default="c_abi.json.gz",
-    )
-    parser_analyze.add_argument(
-        "--header-path",
-        help="Path of C headers to analyze (default: %(default)s)",
-        default=str(default_c_header_path),
-    )
-    parser_analyze.add_argument(
-        "--include-file",
-        help="root header file to examine (default: %(default)s)",
-        default="cuvs/core/all.h",
     )
 
     args = parser.parse_args()
@@ -89,23 +90,34 @@ def main_cli():
 
     header_path = pathlib.Path(args.header_path)
 
-    # TODO: better way of specifying the dlpack header source, since missing the dlpack.h
-    # header means that we all dlpack types get treated as 'int' which could be misleading
-    # when looking for differences in the ABI (like if we change a field from `DLDataType` to
-    # `int` without specifying the dlpack include directory, we won't know that the type has
-    # changed)
-    dlpack_header_path = (
-        header_path.parent.parent
-        / "cpp"
-        / "build"
-        / "_deps"
-        / "dlpack-src"
-        / "include"
-    )
-    if not dlpack_header_path.is_dir():
-        raise ValueError(f"dlpack header {dlpack_header_path} not found")
+    if args.dlpack_include_path:
+        dlpack_include_path = pathlib.Path(args.dlpack_include_path).resolve()
 
-    extra_clang_args = [f"-I{str(dlpack_header_path)}"]
+    else:
+        # try getting from the cmake build directory dependencies if we
+        # haven't specified the include directory
+        dlpack_include_path = (
+            header_path.parent.parent
+            / "cpp"
+            / "build"
+            / "_deps"
+            / "dlpack-src"
+            / "include"
+        )
+
+    if not dlpack_include_path.is_dir():
+        raise ValueError(
+            f"dlpack header path '{dlpack_include_path}' not found"
+        )
+
+    if not (dlpack_include_path / "dlpack" / "dlpack.h").is_file():
+        raise ValueError(
+            f"dlpack header 'dlpack/dlpack.h' not found in '{dlpack_include_path}'"
+        )
+
+    print(f"using dlpack from {dlpack_include_path}")
+
+    extra_clang_args = [f"-I{str(dlpack_include_path)}"]
 
     if args.command == "extract":
         abi = Abi.from_include_path(
