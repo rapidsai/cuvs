@@ -103,7 +103,9 @@ struct params : base_params {
   raft::random::RngState rng_state{0};
 
   /**
-   * Number of instance k-means algorithm will be run with different seeds.
+   * Number of instance k-means algorithm will be run with different seeds. For MiniBatch mode,
+   * this is the number of different initializations to try, but the algorithm is only run once with
+   * the best initialization.
    */
   int n_init = 1;
 
