@@ -292,25 +292,11 @@ index<T, IdxT> build(
  * make_padded_dataset()->as_dataset_view() (when stride is incorrect).
  */
 template <typename T, typename IdxT>
-index<T, IdxT> build(raft::resources const& res,
-                     const index_params& params,
-                     cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& dataset)
+build_result<T, IdxT> build(raft::resources const& res,
+                           const index_params& params,
+                           cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& dataset)
 {
   return cuvs::neighbors::cagra::detail::build<T, IdxT>(res, params, dataset);
-}
-
-/**
- * @brief Build the index from a device padded dataset (owning; takes ownership).
- */
-template <typename T, typename IdxT>
-index<T, IdxT> build(raft::resources const& res,
-                     const index_params& params,
-                     cuvs::neighbors::device_padded_dataset<T, int64_t>&& dataset)
-{
-  auto idx = build(res, params, dataset.as_dataset_view());
-  idx.update_dataset(res, std::make_unique<cuvs::neighbors::device_padded_dataset<T, int64_t>>(
-                            std::move(dataset)));
-  return idx;
 }
 
 /**

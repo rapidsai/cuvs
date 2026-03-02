@@ -159,6 +159,18 @@ struct empty_dataset : public dataset<IdxT> {
   [[nodiscard]] auto is_owning() const noexcept -> bool final { return true; }
 };
 
+/** Non-owning view over an external dataset. Caller must keep the referenced dataset alive. */
+template <typename IdxT>
+struct dataset_view : public dataset<IdxT> {
+  using index_type = IdxT;
+  const dataset<IdxT>* ptr_;
+  explicit dataset_view(const dataset<IdxT>* p) noexcept : ptr_(p) {}
+  dataset_view(const dataset_view& other) noexcept : ptr_(other.ptr_) {}
+  [[nodiscard]] auto n_rows() const noexcept -> index_type final { return ptr_->n_rows(); }
+  [[nodiscard]] auto dim() const noexcept -> uint32_t final { return ptr_->dim(); }
+  [[nodiscard]] auto is_owning() const noexcept -> bool final { return false; }
+};
+
 template <typename DataT, typename IdxT>
 struct strided_dataset : public dataset<IdxT> {
   using index_type = IdxT;

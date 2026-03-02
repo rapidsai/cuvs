@@ -1374,8 +1374,9 @@ index<T, IdxT> build_ace(raft::resources const& res,
       // Copy host partition to device with padding; build accepts device_padded_dataset_view only
       auto sub_dataset_dev =
         cuvs::neighbors::make_padded_dataset(res, raft::make_const_mdspan(sub_dataset.view()));
-      auto sub_index = cuvs::neighbors::cagra::build(
+      auto sub_build_res = cuvs::neighbors::cagra::build(
         res, sub_index_params, sub_dataset_dev->as_dataset_view());
+      auto sub_index = std::move(sub_build_res.idx);
 
       auto optimize_end = std::chrono::high_resolution_clock::now();
       auto optimize_elapsed =
@@ -2148,7 +2149,7 @@ auto iterative_build_graph(
 
 // Build from padded dataset view (user calls make_padded_dataset_view or make_padded_dataset()->as_dataset_view() first).
 template <typename T, typename IdxT = uint32_t>
-index<T, IdxT> build(
+cagra::build_result<T, IdxT> build(
   raft::resources const& res,
   const index_params& params,
   cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& dataset)
@@ -2260,21 +2261,18 @@ index<T, IdxT> build(
                  "VPQ compression is only supported with L2Expanded distance mertric");
     index<T, IdxT> idx(res, params.metric);
     idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
-    // Pass dataset.view() so VPQ code sees mdspan-like extent()/data_handle(); store result as
-    // owning dataset.
     // TODO: hardcoding codebook math to `half`, we can do runtime dispatching later
     auto vpq_ds = cuvs::neighbors::vpq_build<decltype(dataset.view()), half, int64_t>(
       res, *params.compression, dataset.view());
-    idx.update_dataset(
-      res,
-      std::make_unique<cuvs::neighbors::vpq_dataset<half, int64_t>>(std::move(vpq_ds)));
-
-    return idx;
+    cuvs::neighbors::dataset_view<int64_t> vw(&vpq_ds);
+    idx.update_dataset(res, vw);
+    return cagra::build_result<T, IdxT>{std::move(idx), std::move(vpq_ds)};
   }
   if (params.attach_dataset_on_build) {
     try {
-      return index<T, IdxT>(
-        res, params.metric, dataset, raft::make_const_mdspan(cagra_graph.view()));
+      return cagra::build_result<T, IdxT>{
+        index<T, IdxT>(res, params.metric, dataset, raft::make_const_mdspan(cagra_graph.view())),
+        std::nullopt};
     } catch (std::bad_alloc& e) {
       RAFT_LOG_WARN(
         "Insufficient GPU memory to construct CAGRA index with dataset on GPU. Only the graph will "
@@ -2290,6 +2288,6 @@ index<T, IdxT> build(
   }
   index<T, IdxT> idx(res, params.metric);
   idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
-  return idx;
+  return cagra::build_result<T, IdxT>{std::move(idx), std::nullopt};
 }
 }  // namespace cuvs::neighbors::cagra::detail

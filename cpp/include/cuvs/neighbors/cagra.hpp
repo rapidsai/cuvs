@@ -12,6 +12,7 @@
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 #include <cuvs/util/file_io.hpp>
+#include <cuda_fp16.h>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_device_accessor.hpp>
 #include <raft/core/host_mdspan.hpp>
@@ -524,6 +525,20 @@ struct index : cuvs::neighbors::index {
   }
 
   /**
+   * Replace the dataset with a non-owning view over an external dataset (e.g. VPQ).
+   * The caller must keep the referenced dataset alive for the lifetime of the index.
+   */
+  void update_dataset(raft::resources const& res,
+                      const cuvs::neighbors::dataset_view<int64_t>& view)
+  {
+    dataset_ = std::make_unique<cuvs::neighbors::dataset_view<int64_t>>(view);
+    dataset_norms_.reset();
+    if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
+      if (dataset_->n_rows() > 0) { compute_dataset_norms_(res); }
+    }
+  }
+
+  /**
    * Replace the dataset by copying from a host matrix view.
    *
    * The index allocates device memory and copies the data; it owns the copy.
@@ -776,6 +791,25 @@ struct index : cuvs::neighbors::index {
 /**
  * @}
  */
+
+/**
+ * Result of building when VPQ compression is used. Caller must keep \p vpq alive for the
+ * lifetime of \p idx (the index holds a dataset_view over it).
+ */
+template <typename T, typename IdxT>
+struct build_result {
+  cuvs::neighbors::cagra::index<T, IdxT> idx;
+  std::optional<cuvs::neighbors::vpq_dataset<half, int64_t>> vpq;
+
+  /** Implicit conversion to index when VPQ is not used (e.g. index idx = build(...)). */
+  operator cuvs::neighbors::cagra::index<T, IdxT>() &&
+  {
+    RAFT_EXPECTS(!vpq.has_value(),
+                 "When using VPQ compression, use build_result.idx and keep build_result.vpq "
+                 "alive.");
+    return std::move(idx);
+  }
+};
 
 /**
  * @defgroup cagra_cpp_index_build CAGRA index build functions
@@ -1088,24 +1122,14 @@ auto build(raft::resources const& res,
  * @brief Build the index from a device padded dataset view (non-owning).
  *
  * The index stores a copy of the view; the caller must keep the dataset memory alive.
+ * When VPQ compression is used, returns build_result with .vpq that caller must keep alive.
  * See build(res, params, device_matrix_view) for full documentation.
  */
 template <typename T, typename IdxT = uint32_t>
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& dataset)
-  -> cuvs::neighbors::cagra::index<T, IdxT>;
-
-/**
- * @brief Build the index from a device padded dataset (owning; takes ownership).
- *
- * See build(res, params, device_matrix_view) for full documentation.
- */
-template <typename T, typename IdxT = uint32_t>
-auto build(raft::resources const& res,
-           const cuvs::neighbors::cagra::index_params& params,
-           cuvs::neighbors::device_padded_dataset<T, int64_t>&& dataset)
-  -> cuvs::neighbors::cagra::index<T, IdxT>;
+  -> cuvs::neighbors::cagra::build_result<T, IdxT>;
 
 /**
  * @}

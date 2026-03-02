@@ -283,6 +283,18 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/neighbors/cagra_build_view_only.cu)
   )
 endif()
 
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/neighbors/cagra_vpq_build_result.cu)
+  ConfigureTest(
+    NAME NEIGHBORS_CAGRA_VPQ_BUILD_RESULT_TEST
+    PATH neighbors/cagra_vpq_build_result.cu
+    GPUS 1
+    PERCENT 100
+  )
+  target_include_directories(
+    NEIGHBORS_CAGRA_VPQ_BUILD_RESULT_TEST PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src
+  )
+endif()
+
 ConfigureTest(
   NAME NEIGHBORS_ALL_NEIGHBORS_TEST
   PATH neighbors/all_neighbors/test_float.cu

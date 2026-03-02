@@ -118,6 +118,7 @@ index<T, IdxT> merge(
                               filtered_dataset.view(),
                               indices_view);
 
+      // device_matrix_view overload returns index, not build_result.
       auto merged_index =
         cagra::build(handle, params, raft::make_const_mdspan(filtered_dataset.view()));
       if (!merged_index.data().is_owning() && params.attach_dataset_on_build) {
@@ -128,6 +129,7 @@ index<T, IdxT> merge(
       RAFT_LOG_DEBUG("cagra merge: using device memory for merged dataset");
       return merged_index;
     } else {
+      // device_matrix_view overload returns index, not build_result.
       auto merged_index =
         cagra::build(handle, params, raft::make_const_mdspan(updated_dataset.view()));
       if (!merged_index.data().is_owning() && params.attach_dataset_on_build) {
@@ -151,6 +153,7 @@ index<T, IdxT> merge(
 
     merge_dataset(updated_dataset.data_handle());
 
+    // Host-path build uses overload that returns index (not build_result).
     auto merged_index =
       cagra::build(handle, params, raft::make_const_mdspan(updated_dataset.view()));
     if (!merged_index.data().is_owning() && params.attach_dataset_on_build) {

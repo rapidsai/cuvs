@@ -36,10 +36,6 @@ cuvs::neighbors::cagra::index<half, uint32_t> build(
 template auto build(raft::resources const& res,
                     const cuvs::neighbors::cagra::index_params& params,
                     cuvs::neighbors::device_padded_dataset_view<half, int64_t> const& dataset)
-  -> cuvs::neighbors::cagra::index<half, uint32_t>;
-template auto build(raft::resources const& res,
-                    const cuvs::neighbors::cagra::index_params& params,
-                    cuvs::neighbors::device_padded_dataset<half, int64_t>&& dataset)
-  -> cuvs::neighbors::cagra::index<half, uint32_t>;
+  -> cuvs::neighbors::cagra::build_result<half, uint32_t>;
 
 }  // namespace cuvs::neighbors::cagra
