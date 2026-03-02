@@ -51,10 +51,11 @@ void safely_launch_kernel_with_smem_size(KernelT const& kernel,
     // When smem_size exceeds the high-water mark, grow it for the current kernel.
     // If the kernel also changed above, this handles the case where smem_size > last_smem_size.
     last_smem_size = smem_size > last_smem_size ? smem_size : last_smem_size;
-    auto launch_status = cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, last_smem_size);
+    auto launch_status =
+      cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, last_smem_size);
     RAFT_EXPECTS(launch_status == cudaSuccess,
-                  "Failed to set max dynamic shared memory size to %u bytes",
-                  last_smem_size);
+                 "Failed to set max dynamic shared memory size to %u bytes",
+                 last_smem_size);
   }
   // The kernel launch is outside the lock: any concurrent cudaFuncSetAttribute can only increase
   // the limit, so the launch is always safe.
