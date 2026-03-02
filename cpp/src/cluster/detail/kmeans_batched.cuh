@@ -115,6 +115,7 @@ void prepare_init_sample(
 template <typename T, typename IdxT>
 void init_centroids_from_host_sample(raft::resources const& handle,
                                      const cuvs::cluster::kmeans::params& params,
+                                     IdxT batch_size,
                                      raft::host_matrix_view<const T, IdxT> X,
                                      raft::device_matrix_view<T, IdxT> centroids,
                                      rmm::device_uvector<char>& workspace)
@@ -124,10 +125,9 @@ void init_centroids_from_host_sample(raft::resources const& handle,
   auto n_features     = X.extent(1);
   auto n_clusters     = params.n_clusters;
 
-  size_t init_sample_size = 3 * params.batch_size;
+  IdxT init_sample_size = 3 * batch_size;
   if (init_sample_size < n_clusters) { init_sample_size = 3 * n_clusters; }
   init_sample_size = std::min(init_sample_size, n_samples);
-  RAFT_LOG_DEBUG("KMeans batched: sampling %zu points for initialization", init_sample_size);
 
   auto init_sample = raft::make_device_matrix<T, IdxT>(handle, init_sample_size, n_features);
   prepare_init_sample(handle, X, init_sample.view(), params.rng_state.seed);
@@ -668,7 +668,12 @@ void fit(raft::resources const& handle,
     std::optional<raft::device_vector_view<const T, IdxT>> valid_weight_view;
 
     if (sample_weight) {
-      prepare_init_sample(handle, X, X_valid.view(), gen(), *sample_weight, valid_weights.view());
+      prepare_init_sample(handle,
+                          X,
+                          X_valid.view(),
+                          gen(),
+                          std::optional<raft::host_vector_view<const T, IdxT>>{*sample_weight},
+                          std::optional<raft::device_vector_view<T, IdxT>>{valid_weights.view()});
       valid_weight_view = raft::make_device_vector_view<const T, IdxT>(
         valid_weights.data_handle(), static_cast<IdxT>(valid_size));
     } else {
@@ -686,7 +691,7 @@ void fit(raft::resources const& handle,
                      n_init,
                      (unsigned long long)iter_params.rng_state.seed);
 
-      init_centroids_from_host_sample(handle, iter_params, X, centroids, workspace);
+      init_centroids_from_host_sample(handle, iter_params, batch_size, X, centroids, workspace);
 
       auto centroids_const = raft::make_device_matrix_view<const T, IdxT>(
         centroids.data_handle(), n_clusters, n_features);
@@ -728,7 +733,7 @@ void fit(raft::resources const& handle,
 
     if (!minibatch_init_done &&
         iter_params.init != cuvs::cluster::kmeans::params::InitMethod::Array) {
-      init_centroids_from_host_sample(handle, iter_params, X, centroids, workspace);
+      init_centroids_from_host_sample(handle, iter_params, batch_size, X, centroids, workspace);
     }
 
     // Reset per-iteration state
