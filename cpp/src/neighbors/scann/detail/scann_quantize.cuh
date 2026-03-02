@@ -6,8 +6,10 @@
 #include <chrono>
 #include <cmath>
 #include <cuvs/neighbors/common.hpp>
+#include <raft/linalg/map.cuh>
 #include <raft/linalg/transpose.cuh>
 #include <raft/matrix/gather.cuh>
+#include <raft/matrix/init.cuh>
 
 #include "scann_common.cuh"
 using namespace cuvs::neighbors;
@@ -325,12 +327,13 @@ void quantize_bfloat16(raft::resources const& res,
   if (!std::isnan(noise_shaping_threshold)) {
     quantize_bfloat16_noise_shaped(res, dataset, bf16_dataset, noise_shaping_threshold);
   } else {
-    raft::linalg::unaryOp(
-      bf16_dataset.data_handle(),
-      dataset.data_handle(),
-      dataset.size(),
+    raft::linalg::map(
+      res,
+      raft::make_device_vector_view<int16_t, int64_t>(bf16_dataset.data_handle(),
+                                                      (int64_t)bf16_dataset.size()),
       [] __device__(float x) { return float_to_bfloat16(x); },
-      resource::get_cuda_stream(res));
+      raft::make_const_mdspan(raft::make_device_vector_view<const float, int64_t>(
+        dataset.data_handle(), (int64_t)dataset.size())));
   }
 }
 

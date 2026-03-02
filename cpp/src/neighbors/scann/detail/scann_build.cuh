@@ -11,10 +11,12 @@
 #include <cuvs/preprocessing/quantize/pq.hpp>
 
 #include <cuda_bf16.h>
+#include <raft/core/copy.cuh>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/error.hpp>
 #include <raft/core/host_device_accessor.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/linalg/map.cuh>
 #include <raft/matrix/copy.cuh>
@@ -247,15 +249,19 @@ index<T, IdxT> build(
                    raft::make_const_mdspan(soar_quant.view()),
                    params.pq_bits,
                    num_subspaces);
-      raft::copy(idx.quantized_residuals().data_handle() + batch.offset() * num_subspaces,
-                 quantized_residuals.data_handle(),
-                 quantized_residuals.size(),
-                 stream);
+      raft::copy(res,
+                 raft::make_host_vector_view(
+                   idx.quantized_residuals().data_handle() + batch.offset() * num_subspaces,
+                   quantized_residuals.size()),
+                 raft::make_device_vector_view<const uint8_t>(quantized_residuals.data_handle(),
+                                                              quantized_residuals.size()));
 
-      raft::copy(idx.quantized_soar_residuals().data_handle() + batch.offset() * num_subspaces,
-                 quantized_soar_residuals.data_handle(),
-                 quantized_soar_residuals.size(),
-                 stream);
+      raft::copy(res,
+                 raft::make_host_vector_view(
+                   idx.quantized_soar_residuals().data_handle() + batch.offset() * num_subspaces,
+                   quantized_soar_residuals.size()),
+                 raft::make_device_vector_view<const uint8_t>(
+                   quantized_soar_residuals.data_handle(), quantized_soar_residuals.size()));
     }
 
     // quantize dataset to bfloat16, if enabled. Similar to SOAR, quantization
@@ -266,10 +272,11 @@ index<T, IdxT> build(
         raft::make_device_matrix<int16_t, int64_t>(res, batch_view.extent(0), dim);
       quantize_bfloat16(
         res, batch_view, bf16_dataset.view(), params.reordering_noise_shaping_threshold);
-      raft::copy(idx.bf16_dataset().data_handle() + batch.offset() * dim,
-                 bf16_dataset.data_handle(),
-                 bf16_dataset.size(),
-                 stream);
+      raft::copy(res,
+                 raft::make_host_vector_view(
+                   idx.bf16_dataset().data_handle() + batch.offset() * dim, bf16_dataset.size()),
+                 raft::make_device_vector_view<const int16_t>(bf16_dataset.data_handle(),
+                                                              bf16_dataset.size()));
     }
 
     // Make sure work on device is finished before swapping buffers

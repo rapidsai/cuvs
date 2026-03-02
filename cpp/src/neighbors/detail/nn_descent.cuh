@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -13,6 +13,7 @@
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 
+#include <raft/core/copy.cuh>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/error.hpp>
@@ -1368,7 +1369,9 @@ void GNND<Data_t, Index_t>::add_reverse_edges(Index_t* graph_ptr,
     std::numeric_limits<Index_t>::max());
   add_rev_edges_kernel<<<nrow_, raft::warp_size(), 0, stream>>>(
     graph_ptr, d_rev_graph_ptr, NUM_SAMPLES, list_sizes);
-  raft::copy(h_rev_graph_ptr, d_rev_graph_ptr, nrow_ * NUM_SAMPLES, stream);
+  raft::copy(res,
+             raft::make_host_vector_view(h_rev_graph_ptr, nrow_ * NUM_SAMPLES),
+             raft::make_device_vector_view(d_rev_graph_ptr, nrow_ * NUM_SAMPLES));
 }
 
 template <typename Data_t, typename Index_t>
@@ -1499,18 +1502,9 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
   };
 
   for (size_t it = 0; it < build_config_.max_iterations; it++) {
-    raft::copy(d_list_sizes_new_.data_handle(),
-               graph_.h_list_sizes_new.data_handle(),
-               nrow_,
-               raft::resource::get_cuda_stream(res));
-    raft::copy(h_graph_old_.data_handle(),
-               graph_.h_graph_old.data_handle(),
-               nrow_ * NUM_SAMPLES,
-               raft::resource::get_cuda_stream(res));
-    raft::copy(d_list_sizes_old_.data_handle(),
-               graph_.h_list_sizes_old.data_handle(),
-               nrow_,
-               raft::resource::get_cuda_stream(res));
+    raft::copy(res, d_list_sizes_new_.view(), graph_.h_list_sizes_new.view());
+    raft::copy(res, h_graph_old_.view(), graph_.h_graph_old.view());
+    raft::copy(res, d_list_sizes_old_.view(), graph_.h_list_sizes_old.view());
     raft::resource::sync_stream(res);
 
     std::thread update_and_sample_thread(update_and_sample, it);
@@ -1551,14 +1545,8 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
     update_and_sample_thread.join();
 
     if (update_counter_ == -1) { break; }
-    raft::copy(graph_host_buffer_.data_handle(),
-               graph_buffer_.data_handle(),
-               nrow_ * DEGREE_ON_DEVICE,
-               raft::resource::get_cuda_stream(res));
-    raft::copy(dists_host_buffer_.data_handle(),
-               dists_buffer_.data_handle(),
-               nrow_ * DEGREE_ON_DEVICE,
-               raft::resource::get_cuda_stream(res));
+    raft::copy(res, graph_host_buffer_.view(), graph_buffer_.view());
+    raft::copy(res, dists_host_buffer_.view(), dists_buffer_.view());
     raft::resource::sync_stream(res);
 
     graph_.sample_graph_new(graph_host_buffer_.data_handle(), DEGREE_ON_DEVICE);
@@ -1585,10 +1573,11 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
         graph_h_dists(i, j) = graph_.h_dists(i, j);
       }
     }
-    raft::copy(output_distances,
-               graph_h_dists.data_handle(),
-               nrow_ * build_config_.output_graph_degree,
-               raft::resource::get_cuda_stream(res));
+    raft::copy(
+      res,
+      raft::make_device_vector_view(output_distances, nrow_ * build_config_.output_graph_degree),
+      raft::make_host_vector_view(graph_h_dists.data_handle(),
+                                  nrow_ * build_config_.output_graph_degree));
 
     auto output_dist_view = raft::make_device_matrix_view<DistData_t, int64_t, raft::row_major>(
       output_distances, nrow_, build_config_.output_graph_degree);
