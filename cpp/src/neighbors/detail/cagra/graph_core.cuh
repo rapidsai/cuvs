@@ -801,8 +801,8 @@ void check_duplicates_and_out_of_range(const IdxT* output_graph_ptr,
 template <typename IdxT>
 void merge_graph_gpu(raft::resources const& res,
                      IdxT* output_graph_ptr,
-                     const IdxT* d_rev_graph,
-                     uint32_t* d_rev_graph_count,
+                     const IdxT* d_rev_graph_ptr,
+                     uint32_t* d_rev_graph_count_ptr,
                      const IdxT* mst_graph_ptr,
                      const uint32_t* mst_graph_num_edges_ptr,
                      uint64_t graph_size,
@@ -831,8 +831,8 @@ void merge_graph_gpu(raft::resources const& res,
     kern_merge_graph<IdxT>
       <<<blocks_merge, threads_merge, merge_smem_size, raft::resource::get_cuda_stream(res)>>>(
         d_output_graph.data_handle(),
-        d_rev_graph,
-        d_rev_graph_count,
+        d_rev_graph_ptr,
+        d_rev_graph_count_ptr,
         static_cast<uint32_t>(graph_size),
         static_cast<uint32_t>(output_graph_degree),
         mst_graph_ptr,
@@ -955,8 +955,8 @@ void merge_graph_cpu(IdxT* output_graph_ptr,
 
 template <typename IdxT, typename InOutMatrixView>
 void make_reverse_graph_gpu(raft::resources const& res,
-                            IdxT* d_rev_graph,
-                            uint32_t* d_rev_graph_count,
+                            IdxT* d_rev_graph_ptr,
+                            uint32_t* d_rev_graph_count_ptr,
                             InOutMatrixView new_graph)
 {
   const uint64_t graph_size          = new_graph.extent(0);
@@ -966,18 +966,19 @@ void make_reverse_graph_gpu(raft::resources const& res,
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
     "cagra::graph::optimize/reverse");
 
-  auto large_tmp_mr = raft::resource::get_large_workspace_resource(res);
   auto dest_nodes   = raft::make_host_vector<IdxT, int64_t>(graph_size);
-  auto d_dest_nodes =
-    raft::make_device_mdarray<IdxT>(res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
+  auto d_dest_nodes = raft::make_device_mdarray<IdxT>(
+    res, raft::resource::get_workspace_resource(res), raft::make_extents<int64_t>(graph_size));
 
   raft::matrix::fill(
     res,
-    raft::make_device_vector_view<IdxT, int64_t>(d_rev_graph, graph_size * output_graph_degree),
+    raft::make_device_vector_view<IdxT, int64_t>(d_rev_graph_ptr, graph_size * output_graph_degree),
     IdxT(-1));
 
   raft::matrix::fill(
-    res, raft::make_device_vector_view<IdxT, int64_t>(d_rev_graph_count, graph_size), uint32_t(0));
+    res,
+    raft::make_device_vector_view<IdxT, int64_t>(d_rev_graph_count_ptr, graph_size),
+    uint32_t(0));
 
   bool output_graph_device_accessible = is_ptr_device_accessible(output_graph_ptr);
   dim3 threads(256, 1, 1);
@@ -987,8 +988,8 @@ void make_reverse_graph_gpu(raft::resources const& res,
     if (output_graph_device_accessible) {
       kern_make_rev_graph_k<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
         output_graph_ptr,
-        d_rev_graph,
-        d_rev_graph_count,
+        d_rev_graph_ptr,
+        d_rev_graph_count_ptr,
         static_cast<uint32_t>(graph_size),
         static_cast<uint32_t>(output_graph_degree),
         k);
@@ -1003,8 +1004,8 @@ void make_reverse_graph_gpu(raft::resources const& res,
 
       kern_make_rev_graph<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
         d_dest_nodes.data_handle(),
-        d_rev_graph,
-        d_rev_graph_count,
+        d_rev_graph_ptr,
+        d_rev_graph_count_ptr,
         static_cast<uint32_t>(graph_size),
         static_cast<uint32_t>(output_graph_degree));
     }
@@ -1679,6 +1680,8 @@ void prune_graph_gpu(raft::resources const& res,
                      IdxT* output_graph_ptr,
                      uint64_t output_graph_degree)
 {
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
+    "cagra::graph::optimize/prune");
   auto default_ws_mr = raft::resource::get_workspace_resource(res);
 
   uint32_t batch_size =
@@ -1715,6 +1718,8 @@ void prune_graph_gpu(raft::resources const& res,
     res, default_ws_mr, raft::make_extents<int64_t>(batch_size, output_graph_degree));
   auto d_invalid_neighbor_list = raft::make_device_scalar<uint32_t>(res, 0u);
 
+  bool output_device_accessible = is_ptr_device_accessible(output_graph_ptr);
+
   for (uint32_t i_batch = 0; i_batch < num_batch; i_batch++) {
     raft::matrix::fill(res, d_detour_count.view(), uint8_t(0xff));
     raft::matrix::fill(res, d_num_no_detour_edges.view(), uint32_t(0));
@@ -1744,18 +1749,21 @@ void prune_graph_gpu(raft::resources const& res,
         knn_graph_degree,
         output_graph_degree,
         d_detour_count.data_handle(),
-        d_output_graph.data_handle(),
+        output_device_accessible ? d_output_graph.data_handle()
+                                 : output_graph_ptr + i_batch * batch_size * output_graph_degree,
         batch_size,
         i_batch,
         d_invalid_neighbor_list.data_handle());
 
-    size_t copy_size =
-      std::min(static_cast<size_t>(batch_size), graph_size - i_batch * batch_size) *
-      output_graph_degree;
-    raft::copy(output_graph_ptr + i_batch * batch_size * output_graph_degree,
-               d_output_graph.data_handle(),
-               copy_size,
-               raft::resource::get_cuda_stream(res));
+    if (!output_device_accessible) {
+      size_t copy_size =
+        std::min(static_cast<size_t>(batch_size), graph_size - i_batch * batch_size) *
+        output_graph_degree;
+      raft::copy(output_graph_ptr + i_batch * batch_size * output_graph_degree,
+                 d_output_graph.data_handle(),
+                 copy_size,
+                 raft::resource::get_cuda_stream(res));
+    }
 
     raft::resource::sync_stream(res);
     RAFT_LOG_DEBUG(
@@ -1799,14 +1807,14 @@ void prune_graph_cpu(IdxT* knn_graph_ptr,
                      IdxT* output_graph_ptr,
                      uint64_t output_graph_degree)
 {
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
+    "cagra::graph::optimize/prune");
   auto detour_count = raft::make_host_matrix<uint8_t, int64_t>(graph_size, knn_graph_degree);
 
   auto knn_graph_view =
     raft::make_host_matrix_view<IdxT, int64_t>(knn_graph_ptr, graph_size, knn_graph_degree);
 
   {
-    raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
-      "cagra::graph::optimize/prune/2-hop-counting-by-CPU");
     const double time_2hop_count_start = cur_time();
 
     count_2hop_detours(knn_graph_view, detour_count.view());
@@ -2022,7 +2030,6 @@ void optimize(raft::resources const& res,
   } else {
     auto rev_graph       = raft::make_host_matrix<IdxT, int64_t>(graph_size, output_graph_degree);
     auto rev_graph_count = raft::make_host_vector<uint32_t, int64_t>(graph_size);
-    auto mst_graph       = raft::make_host_matrix<IdxT, int64_t>(0, 0);
     raft::copy(res, rev_graph.view(), d_rev_graph.view());
     raft::copy(res, rev_graph_count.view(), d_rev_graph_count.view());
 
@@ -2035,6 +2042,8 @@ void optimize(raft::resources const& res,
                           output_graph_degree,
                           guarantee_connectivity);
   }
+
+  raft::resource::sync_stream(res);
 
   if (is_ptr_host_accessible(new_graph.data_handle())) {
     // following checks require host access
