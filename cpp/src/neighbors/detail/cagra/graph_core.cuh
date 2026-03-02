@@ -246,6 +246,26 @@ __global__ void kern_make_rev_graph(const IdxT* const dest_nodes,     // [graph_
   }
 }
 
+template <typename IdxT>
+__global__ void kern_make_rev_graph_k(const IdxT* const dest_nodes,     // [graph_size]
+                                      IdxT* const rev_graph,            // [size, degree]
+                                      uint32_t* const rev_graph_count,  // [graph_size]
+                                      const uint32_t graph_size,
+                                      const uint32_t degree,
+                                      uint64_t k)
+{
+  const uint64_t tid  = threadIdx.x + (blockDim.x * blockIdx.x);
+  const uint64_t tnum = blockDim.x * gridDim.x;
+
+  for (uint64_t src_id = tid; src_id < graph_size; src_id += tnum) {
+    IdxT dest_id = dest_nodes[k + (degree * src_id)];
+    if (dest_id >= graph_size) continue;
+
+    const uint32_t pos = atomicAdd(rev_graph_count + dest_id, 1);
+    if (pos < degree) { rev_graph[(degree * dest_id) + pos] = static_cast<IdxT>(src_id); }
+  }
+}
+
 // Based on the detour count, select the smallest detour count and its index
 // (Pruning Update Kernel)
 template <typename IdxT>
@@ -932,11 +952,11 @@ void merge_graph_cpu(IdxT* output_graph_ptr,
                  (time_replace_end - time_replace_start) * 1000.0);
 }
 
-template <typename IdxT>
+template <typename IdxT, typename InOutMatrixView>
 void make_reverse_graph_gpu(raft::resources const& res,
                             IdxT* d_rev_graph,
                             uint32_t* d_rev_graph_count,
-                            raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph)
+                            InOutMatrixView new_graph)
 {
   const uint64_t graph_size          = new_graph.extent(0);
   const uint64_t output_graph_degree = new_graph.extent(1);
@@ -958,26 +978,38 @@ void make_reverse_graph_gpu(raft::resources const& res,
   RAFT_CUDA_TRY(cudaMemsetAsync(
     d_rev_graph_count, 0x00, graph_size * sizeof(uint32_t), raft::resource::get_cuda_stream(res)));
 
+  bool output_graph_device_accessible = is_ptr_device_accessible(output_graph_ptr);
+  dim3 threads(256, 1, 1);
+  dim3 blocks(1024, 1, 1);
+
   for (uint64_t k = 0; k < output_graph_degree; k++) {
+    if (output_graph_device_accessible) {
+      kern_make_rev_graph_k<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
+        output_graph_ptr,
+        d_rev_graph,
+        d_rev_graph_count,
+        static_cast<uint32_t>(graph_size),
+        static_cast<uint32_t>(output_graph_degree),
+        k);
+    } else {
 #pragma omp parallel for
-    for (uint64_t i = 0; i < graph_size; i++) {
-      dest_nodes(i) = output_graph_ptr[k + (output_graph_degree * i)];
+      for (uint64_t i = 0; i < graph_size; i++) {
+        dest_nodes(i) = output_graph_ptr[k + (output_graph_degree * i)];
+      }
+      raft::resource::sync_stream(res);
+
+      raft::copy(d_dest_nodes.data_handle(),
+                 dest_nodes.data_handle(),
+                 graph_size,
+                 raft::resource::get_cuda_stream(res));
+
+      kern_make_rev_graph<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
+        d_dest_nodes.data_handle(),
+        d_rev_graph,
+        d_rev_graph_count,
+        static_cast<uint32_t>(graph_size),
+        static_cast<uint32_t>(output_graph_degree));
     }
-    raft::resource::sync_stream(res);
-
-    raft::copy(d_dest_nodes.data_handle(),
-               dest_nodes.data_handle(),
-               graph_size,
-               raft::resource::get_cuda_stream(res));
-
-    dim3 threads(256, 1, 1);
-    dim3 blocks(1024, 1, 1);
-    kern_make_rev_graph<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
-      d_dest_nodes.data_handle(),
-      d_rev_graph,
-      d_rev_graph_count,
-      static_cast<uint32_t>(graph_size),
-      static_cast<uint32_t>(output_graph_degree));
     RAFT_LOG_DEBUG("# Making reverse graph on GPUs: %lu / %lu    \r", k, output_graph_degree);
   }
 
@@ -1868,24 +1900,13 @@ void prune_graph_cpu(IdxT* knn_graph_ptr,
     "overflows occur during the norm computation between the dataset vectors.");
 }
 
-template <typename T>
-bool is_gpu_accessible(T* ptr)
-{
-  cudaPointerAttributes attr;
-  RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, ptr));
-  return attr.devicePointer != nullptr;
-}
-
 // TODO allow pinned input for both knn_graph and new_graph
-template <typename IdxT = uint32_t,
-          typename g_accessor =
-            raft::host_device_accessor<cuda::std::default_accessor<IdxT>, raft::memory_type::host>>
-void optimize(
-  raft::resources const& res,
-  raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph,
-  raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph,
-  const bool guarantee_connectivity = true,
-  const bool use_gpu                = true)
+template <typename IdxT = uint32_t, typename InOutMatrixView>
+void optimize(raft::resources const& res,
+              InOutMatrixView knn_graph,
+              InOutMatrixView new_graph,
+              const bool guarantee_connectivity = true,
+              const bool use_gpu                = true)
 {
   RAFT_LOG_DEBUG(
     "# Pruning kNN graph (size=%lu, degree=%lu)\n", knn_graph.extent(0), knn_graph.extent(1));
@@ -1913,8 +1934,8 @@ void optimize(
   // and all small allocations to go to the default workspace resource
   bool inout_device_accessible = false;
   {
-    bool input_device_accessible  = is_gpu_accessible(knn_graph.data_handle());
-    bool output_device_accessible = is_gpu_accessible(new_graph.data_handle());
+    bool input_device_accessible  = is_ptr_device_accessible(knn_graph.data_handle());
+    bool output_device_accessible = is_ptr_device_accessible(new_graph.data_handle());
     RAFT_EXPECTS(input_device_accessible == output_device_accessible,
                  "Input and output must be either both device accessible or both host accessible");
     inout_device_accessible = input_device_accessible && output_device_accessible;
@@ -2062,7 +2083,7 @@ void optimize(
                           guarantee_connectivity);
   }
 
-  if (!inout_device_accessible) {
+  if (is_ptr_host_accessible(new_graph.data_handle())) {
     // following checks require host access
     log_replaced_edges_stats<IdxT>(new_graph.data_handle(), graph_size, output_graph_degree);
 

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -151,6 +151,22 @@ struct gen_index_msb_1_mask {
   static constexpr IdxT value = static_cast<IdxT>(1) << (utils::size_of<IdxT>() * 8 - 1);
 };
 }  // namespace utils
+
+template <typename T>
+bool is_ptr_device_accessible(T* ptr)
+{
+  cudaPointerAttributes attr;
+  RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, ptr));
+  return attr.devicePointer != nullptr;
+}
+
+template <typename T>
+bool is_ptr_host_accessible(T* ptr)
+{
+  cudaPointerAttributes attr;
+  RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, ptr));
+  return attr.hostPointer != nullptr;
+}
 
 /**
  * Utility to sync memory from a host_matrix_view to a device_matrix_view
