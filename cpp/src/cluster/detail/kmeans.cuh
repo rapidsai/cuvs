@@ -399,18 +399,13 @@ void kmeans_fit_main(raft::resources const& handle,
       newCentroids.view(),
       workspace);
 
-    // compute the squared norm between the newCentroids and the original
-    // centroids, destructor releases the resource
-    auto sqrdNorm = raft::make_device_scalar(handle, DataT(0));
-    raft::linalg::mapThenSumReduce(sqrdNorm.data_handle(),
-                                   newCentroids.size(),
-                                   raft::sqdiff_op{},
-                                   stream,
-                                   centroids.data_handle(),
-                                   newCentroids.data_handle());
-
-    DataT sqrdNormError = 0;
-    raft::copy(handle, raft::make_host_scalar_view(&sqrdNormError), sqrdNorm.view());
+    // Compute how much centroids shifted
+    DataT sqrdNormError =
+      compute_centroid_shift<DataT, IndexT>(handle,
+                                            raft::make_device_matrix_view<const DataT, IndexT>(
+                                              centroids.data_handle(), n_clusters, n_features),
+                                            raft::make_device_matrix_view<const DataT, IndexT>(
+                                              newCentroids.data_handle(), n_clusters, n_features));
 
     raft::copy(handle,
                raft::make_device_vector_view(centroidsRawData.data_handle(), newCentroids.size()),
@@ -440,7 +435,6 @@ void kmeans_fit_main(raft::resources const& handle,
       priorClusteringCost = curClusteringCost;
     }
 
-    raft::resource::sync_stream(handle, stream);
     if (sqrdNormError < params.tol) done = true;
 
     if (done) {
@@ -449,43 +443,14 @@ void kmeans_fit_main(raft::resources const& handle,
     }
   }
 
-  auto centroids = raft::make_device_matrix_view<DataT, IndexT>(
-    centroidsRawData.data_handle(), n_clusters, n_features);
-
-  cuvs::cluster::kmeans::detail::minClusterAndDistanceCompute<DataT, IndexT>(
-    handle,
-    X,
-    centroids,
-    minClusterAndDistance.view(),
-    l2normx_view,
-    L2NormBuf_OR_DistBuf,
-    params.metric,
-    params.batch_samples,
-    params.batch_centroids,
-    workspace);
-
-  raft::linalg::map(
-    handle,
-    minClusterAndDistance.view(),
-    [=] __device__(const raft::KeyValuePair<IndexT, DataT> kvp, DataT wt) {
-      raft::KeyValuePair<IndexT, DataT> res;
-      res.value = kvp.value * wt;
-      res.key   = kvp.key;
-      return res;
-    },
-    raft::make_const_mdspan(minClusterAndDistance.view()),
-    raft::make_const_mdspan(weight));
-
-  // calculate cluster cost phi_x(C)
-  cuvs::cluster::kmeans::detail::computeClusterCost(
-    handle,
-    minClusterAndDistance.view(),
-    workspace,
-    raft::make_device_scalar_view(clusterCostD.data()),
-    raft::value_op{},
-    raft::add_op{});
-
-  inertia[0] = clusterCostD.value(stream);
+  inertia[0] =
+    compute_inertia<DataT, IndexT>(handle,
+                                   params,
+                                   X,
+                                   raft::make_device_matrix_view<const DataT, IndexT>(
+                                     centroidsRawData.data_handle(), n_clusters, n_features),
+                                   workspace,
+                                   weight);
 
   RAFT_LOG_DEBUG("KMeans.fit: completed after %d iterations with %f inertia[0] ",
                  n_iter[0] > params.max_iter ? n_iter[0] - 1 : n_iter[0],

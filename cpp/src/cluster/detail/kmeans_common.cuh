@@ -22,6 +22,7 @@
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/map.cuh>
+#include <raft/linalg/map_then_reduce.cuh>
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/reduce_cols_by_key.cuh>
@@ -574,6 +575,105 @@ void finalize_centroids(raft::resources const& handle,
     [=] __device__(raft::KeyValuePair<ptrdiff_t, DataT> map) { return map.value == DataT{0}; },
     raft::key_op{},
     stream);
+}
+
+/**
+ * @brief Compute the squared norm difference between two centroid sets.
+ *
+ * Returns sum((old_centroids - new_centroids)^2).
+ * Used for convergence checking in both full-batch and mini-batch modes.
+ */
+template <typename DataT, typename IndexT>
+DataT compute_centroid_shift(raft::resources const& handle,
+                             raft::device_matrix_view<const DataT, IndexT> old_centroids,
+                             raft::device_matrix_view<const DataT, IndexT> new_centroids)
+{
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
+  auto sqrdNorm       = raft::make_device_scalar<DataT>(handle, DataT{0});
+  raft::linalg::mapThenSumReduce(sqrdNorm.data_handle(),
+                                 old_centroids.size(),
+                                 raft::sqdiff_op{},
+                                 stream,
+                                 old_centroids.data_handle(),
+                                 new_centroids.data_handle());
+  DataT result = 0;
+  raft::copy(&result, sqrdNorm.data_handle(), 1, stream);
+  raft::resource::sync_stream(handle, stream);
+  return result;
+}
+
+/**
+ * @brief Compute (optionally weighted) inertia for device-resident data.
+ *
+ * Computes the sum of (optionally weighted) squared distances from each sample
+ * to its nearest centroid.  Used for final inertia reporting after training and
+ * for scoring validation sets during n_init selection.
+ */
+template <typename DataT, typename IndexT>
+DataT compute_inertia(
+  raft::resources const& handle,
+  const cuvs::cluster::kmeans::params& params,
+  raft::device_matrix_view<const DataT, IndexT> X,
+  raft::device_matrix_view<const DataT, IndexT> centroids,
+  rmm::device_uvector<char>& workspace,
+  std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight = std::nullopt)
+{
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
+  auto n_samples      = X.extent(0);
+  auto n_features     = X.extent(1);
+  auto metric         = params.metric;
+
+  auto minClusterAndDistance =
+    raft::make_device_vector<raft::KeyValuePair<IndexT, DataT>, IndexT>(handle, n_samples);
+  auto L2NormX = raft::make_device_vector<DataT, IndexT>(handle, n_samples);
+  rmm::device_uvector<DataT> L2NormBuf(0, stream);
+  rmm::device_scalar<DataT> cost(stream);
+
+  if (metric == cuvs::distance::DistanceType::L2Expanded ||
+      metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+      L2NormX.data_handle(), X.data_handle(), n_features, n_samples, stream);
+  }
+
+  auto mcd_view = minClusterAndDistance.view();
+
+  cuvs::cluster::kmeans::detail::minClusterAndDistanceCompute<DataT, IndexT>(
+    handle,
+    X,
+    centroids,
+    mcd_view,
+    raft::make_device_vector_view<const DataT, IndexT>(L2NormX.data_handle(), n_samples),
+    L2NormBuf,
+    metric,
+    params.batch_samples,
+    params.batch_centroids,
+    workspace);
+
+  if (sample_weight) {
+    raft::linalg::map(
+      handle,
+      mcd_view,
+      [=] __device__(const raft::KeyValuePair<IndexT, DataT> kvp, DataT wt) {
+        raft::KeyValuePair<IndexT, DataT> res;
+        res.value = kvp.value * wt;
+        res.key   = kvp.key;
+        return res;
+      },
+      raft::make_const_mdspan(mcd_view),
+      *sample_weight);
+  }
+
+  cuvs::cluster::kmeans::detail::computeClusterCost(handle,
+                                                    mcd_view,
+                                                    workspace,
+                                                    raft::make_device_scalar_view(cost.data()),
+                                                    raft::value_op{},
+                                                    raft::add_op{});
+
+  DataT result = 0;
+  raft::copy(&result, cost.data(), 1, stream);
+  raft::resource::sync_stream(handle, stream);
+  return result;
 }
 
 }  // namespace cuvs::cluster::kmeans::detail
