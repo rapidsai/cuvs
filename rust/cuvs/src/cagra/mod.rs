@@ -27,7 +27,8 @@
 //!
 //!     // build the cagra index
 //!     let build_params = IndexParams::new()?;
-//!     let index = Index::build(&res, &build_params, &dataset)?;
+//!     let tensor = ManagedTensor::from(&dataset);
+//!     let index = Index::build(&res, &build_params, &tensor)?;
 //!     println!(
 //!         "Indexed {}x{} datapoints into cagra index",
 //!         n_datapoints, n_features
