@@ -868,10 +868,8 @@ void fit(raft::resources const& handle,
         // Skip first step (inertia from initialization)
         if (n_iter[0] > 1) {
           // Update Exponentially Weighted Average of inertia.
-          //   alpha = 2 * batch_size / (n_samples_seen + batch_size)
-          int64_t n_samples_seen = static_cast<int64_t>(n_iter[0]) * current_batch_size;
           T alpha = static_cast<T>(current_batch_size * 2.0) /
-                    static_cast<T>(n_samples_seen + current_batch_size);
+                    static_cast<T>(n_samples + 1);
           alpha = std::min(alpha, T{1});
 
           if (!ewa_initialized) {
