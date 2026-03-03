@@ -449,8 +449,7 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
                                raft::make_host_scalar_view<T>(&ref_inertia),
                                raft::make_host_scalar_view<int>(&ref_n_iter));
 
-    raft::copy(
-      d_centroids.data(), d_centroids_ref.data(), params.n_clusters * n_features, stream);
+    raft::copy(d_centroids.data(), d_centroids_ref.data(), params.n_clusters * n_features, stream);
 
     cuvs::cluster::kmeans::params batched_params = params;
     batched_params.init                          = cuvs::cluster::kmeans::params::Array;
@@ -496,7 +495,8 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
       params,
       raft::make_const_mdspan(X.view()),
       std::optional<raft::device_vector_view<const T, int>>(std::nullopt),
-      raft::make_device_matrix_view<const T, int>(d_centroids.data(), params.n_clusters, n_features),
+      raft::make_device_matrix_view<const T, int>(
+        d_centroids.data(), params.n_clusters, n_features),
       raft::make_device_vector_view<int, int>(d_labels.data(), n_samples),
       true,
       raft::make_host_scalar_view<T>(&pred_inertia));
@@ -608,7 +608,8 @@ class KmeansPredictBatchedTest : public ::testing::TestWithParam<KmeansInputs<T>
       params,
       raft::make_const_mdspan(X.view()),
       std::optional<raft::device_vector_view<const T, int>>(std::nullopt),
-      raft::make_device_matrix_view<const T, int>(d_centroids.data(), params.n_clusters, n_features),
+      raft::make_device_matrix_view<const T, int>(
+        d_centroids.data(), params.n_clusters, n_features),
       raft::make_device_vector_view<int, int>(d_labels_ref.data(), n_samples),
       true,
       raft::make_host_scalar_view<T>(&ref_inertia));
@@ -650,8 +651,8 @@ class KmeansPredictBatchedTest : public ::testing::TestWithParam<KmeansInputs<T>
 
     // Compare labels directly: predict_batched should produce exact same labels
     // as device predict given the same centroids
-    labels_match = devArrMatch(
-      d_labels_ref.data(), d_labels.data(), n_samples, Compare<int>(), stream);
+    labels_match =
+      devArrMatch(d_labels_ref.data(), d_labels.data(), n_samples, Compare<int>(), stream);
   }
 
   void SetUp() override { predictBatchedTest(); }
