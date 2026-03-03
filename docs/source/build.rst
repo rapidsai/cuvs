@@ -88,7 +88,7 @@ Prerequisites
 - `NCCL <https://docs.nvidia.com/deeplearning/nccl/install-guide/index.html>` _
 - `libopenmp`
 - CUDA Toolkit Runtime 12.2+
-- Ampere Architecture of better (compute compatibility
+- Ampere Architecture or better (compute capability >= 8.0)
 
 Download the pre-built tarball for your CPU architecture and CUDA version from https://developer.nvidia.com/cuvs-downloads
 
