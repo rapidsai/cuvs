@@ -867,9 +867,12 @@ void fit(raft::resources const& handle,
 
         // Skip first step (inertia from initialization)
         if (n_iter[0] > 1) {
-          // Update Exponentially Weighted Average of inertia
-          T alpha = static_cast<T>(current_batch_size * 2.0) / static_cast<T>(n_samples + 1);
-          alpha   = std::min(alpha, T{1});
+          // Update Exponentially Weighted Average of inertia.
+          //   alpha = 2 * batch_size / (n_samples_seen + batch_size)
+          int64_t n_samples_seen = static_cast<int64_t>(n_iter[0]) * current_batch_size;
+          T alpha = static_cast<T>(current_batch_size * 2.0) /
+                    static_cast<T>(n_samples_seen + current_batch_size);
+          alpha = std::min(alpha, T{1});
 
           if (!ewa_initialized) {
             ewa_inertia     = batch_inertia;
@@ -881,12 +884,13 @@ void fit(raft::resources const& handle,
 
           RAFT_LOG_DEBUG(
             "KMeans minibatch step %d/%d: batch_inertia=%f, ewa_inertia=%f, "
-            "centers_squared_diff=%f",
+            "centers_squared_diff=%f, alpha=%f",
             n_iter[0],
             n_steps,
             static_cast<double>(batch_inertia),
             static_cast<double>(ewa_inertia),
-            static_cast<double>(centers_squared_diff));
+            static_cast<double>(centers_squared_diff),
+            static_cast<double>(alpha));
 
           // Early stopping: absolute tolerance on squared change of centers
           // Disabled if tol == 0.0
