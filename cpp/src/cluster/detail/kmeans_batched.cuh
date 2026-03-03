@@ -33,7 +33,6 @@
 
 #include <cub/device/device_reduce.cuh>
 #include <thrust/device_ptr.h>
-#include <thrust/execution_policy.h>
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/iterator/transform_iterator.h>
 #include <thrust/scatter.h>
@@ -42,7 +41,6 @@
 #include <algorithm>
 #include <cstring>
 #include <limits>
-#include <numeric>
 #include <random>
 #include <unordered_set>
 #include <vector>
