@@ -10,7 +10,7 @@
 #include <cuvs/distance/distance.hpp>
 
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/linalg/unary_op.cuh>
+#include <raft/linalg/map.cuh>
 #include <raft/sparse/csr.hpp>
 #include <raft/sparse/detail/cusparse_wrappers.h>
 #include <raft/sparse/detail/utils.h>
@@ -276,15 +276,15 @@ class l2_sqrt_expanded_distances_t : public l2_expanded_distances_t<value_idx, v
   {
     l2_expanded_distances_t<value_idx, value_t>::compute(out_dists);
     // Sqrt Post-processing
-    raft::linalg::unaryOp<value_t>(
-      out_dists,
-      out_dists,
-      this->config_->a_nrows * this->config_->b_nrows,
+    uint64_t n = (uint64_t)this->config_->a_nrows * this->config_->b_nrows;
+    raft::linalg::map(
+      this->config_->handle,
+      raft::make_device_vector_view<value_t, int64_t>(out_dists, n),
       [] __device__(value_t input) {
         int neg = input < 0 ? -1 : 1;
         return raft::sqrt(abs(input) * neg);
       },
-      raft::resource::get_cuda_stream(this->config_->handle));
+      raft::make_const_mdspan(raft::make_device_vector_view<const value_t, int64_t>(out_dists, n)));
   }
 
   ~l2_sqrt_expanded_distances_t() = default;
@@ -427,16 +427,16 @@ class hellinger_expanded_distances_t : public distances_t<value_t> {
       raft::add_op(),
       raft::atomic_add_op());
 
-    raft::linalg::unaryOp<value_t>(
-      out_dists,
-      out_dists,
-      config_->a_nrows * config_->b_nrows,
+    uint64_t n = (uint64_t)config_->a_nrows * config_->b_nrows;
+    raft::linalg::map(
+      config_->handle,
+      raft::make_device_vector_view<value_t, int64_t>(out_dists, n),
       [=] __device__(value_t input) {
         // Adjust to replace NaN in sqrt with 0 if input to sqrt is negative
         bool rectifier = (1 - input) > 0;
         return raft::sqrt(rectifier * (1 - input));
       },
-      raft::resource::get_cuda_stream(config_->handle));
+      raft::make_const_mdspan(raft::make_device_vector_view<const value_t, int64_t>(out_dists, n)));
   }
 
   ~hellinger_expanded_distances_t() = default;
@@ -462,12 +462,12 @@ class russelrao_expanded_distances_t : public distances_t<value_t> {
 
     value_t n_cols     = config_->a_ncols;
     value_t n_cols_inv = 1.0 / n_cols;
-    raft::linalg::unaryOp<value_t>(
-      out_dists,
-      out_dists,
-      config_->a_nrows * config_->b_nrows,
+    uint64_t n         = (uint64_t)config_->a_nrows * config_->b_nrows;
+    raft::linalg::map(
+      config_->handle,
+      raft::make_device_vector_view<value_t, int64_t>(out_dists, n),
       [=] __device__(value_t input) { return (n_cols - input) * n_cols_inv; },
-      raft::resource::get_cuda_stream(config_->handle));
+      raft::make_const_mdspan(raft::make_device_vector_view<const value_t, int64_t>(out_dists, n)));
 
     auto exec_policy  = rmm::exec_policy(raft::resource::get_cuda_stream(config_->handle));
     auto diags        = cuda::make_counting_iterator<value_idx>(0);
