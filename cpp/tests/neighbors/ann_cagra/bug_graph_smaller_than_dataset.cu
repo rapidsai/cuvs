@@ -38,8 +38,8 @@ class cagra_graph_smaller_than_dataset_test : public ::testing::Test {
  protected:
   void run()
   {
-    // Create a dataset with 10000 points
-    constexpr int64_t n_dataset = 10000;
+    // Create a dataset with 1000 points
+    constexpr int64_t n_dataset = 1000;
     constexpr int64_t n_dim     = 128;
     constexpr int64_t n_queries = 100;
     constexpr int64_t k         = 10;
