@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
 set -euo pipefail
@@ -43,9 +43,15 @@ EXITCODE=0
 trap "EXITCODE=1" ERR
 set +e
 
+# Run Python build utilities tests
+rapids-logger "Run libcuvs Python build utilities tests"
+pytest cpp/tests/python
+
 # Run libcuvs gtests from libcuvs-tests package
-cd "$CONDA_PREFIX"/bin/gtests/libcuvs
+rapids-logger "Run libcuvs tests"
+pushd "$CONDA_PREFIX"/bin/gtests/libcuvs
 ctest -j8 --output-on-failure
+popd
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}
