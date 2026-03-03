@@ -1126,14 +1126,24 @@ void predict(raft::resources const& handle,
     auto batch_data_view = raft::make_device_matrix_view<const T, IdxT>(
       batch_data.data_handle(), current_batch_size, n_features);
 
+    std::optional<raft::device_vector_view<const T, IdxT>> batch_weights_view = std::nullopt;
+    if (sample_weight) {
+      batch_weights_view = std::make_optional(
+        raft::make_device_vector_view<const T, IdxT>(batch_weights.data_handle(),
+                                                     current_batch_size));
+    }
+
+    auto batch_labels_view = raft::make_device_vector_view<IdxT, IdxT>(
+      batch_labels.data_handle(), current_batch_size);
+
     T batch_inertia = 0;
     cuvs::cluster::kmeans::detail::kmeans_predict<T, IdxT>(
       handle,
       params,
       batch_data_view,
-      batch_weights.view(),
+      batch_weights_view,
       centroids,
-      batch_labels.view(),
+      batch_labels_view,
       normalize_weight,
       raft::make_host_scalar_view(&batch_inertia));
 
