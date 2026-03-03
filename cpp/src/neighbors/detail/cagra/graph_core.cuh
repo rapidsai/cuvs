@@ -1749,8 +1749,8 @@ void prune_graph_gpu(raft::resources const& res,
         knn_graph_degree,
         output_graph_degree,
         d_detour_count.data_handle(),
-        output_device_accessible ? d_output_graph.data_handle()
-                                 : output_graph_ptr + i_batch * batch_size * output_graph_degree,
+        output_device_accessible ? output_graph_ptr + i_batch * batch_size * output_graph_degree
+                                 : d_output_graph.data_handle(),
         batch_size,
         i_batch,
         d_invalid_neighbor_list.data_handle());
