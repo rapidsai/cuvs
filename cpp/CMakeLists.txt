@@ -215,7 +215,6 @@ endif()
 if(NOT BUILD_CPU_ONLY)
   set(JIT_LTO_TARGET_ARCHITECTURE "")
   set(JIT_LTO_COMPILATION OFF)
-  set(JIT_LTO_FILES "")
   if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
     set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
     set(JIT_LTO_COMPILATION ON)
@@ -436,6 +435,7 @@ if(NOT BUILD_CPU_ONLY)
       src/detail/jit_lto/FragmentDatabase.cu
       src/detail/jit_lto/FragmentEntry.cu
       src/detail/jit_lto/nvjitlink_checker.cpp
+      src/detail/jit_lto/NVRTCLTOFragmentCompiler.cu
     )
     set_target_properties(
       cuvs_jit_lto_kernels PROPERTIES POSITION_INDEPENDENT_CODE ON CXX_STANDARD 20
