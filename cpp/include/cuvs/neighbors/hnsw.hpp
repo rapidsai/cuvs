@@ -161,7 +161,7 @@ struct index : cuvs::neighbors::index {
   /**
   @brief Set ef for search
   */
-  virtual void set_ef(int ef) const;
+  virtual void set_ef(int ef) const = 0;
 
   /**
   @brief Get file path for disk-backed index
