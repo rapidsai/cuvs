@@ -383,7 +383,7 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
     params.oversampling_factor = 0;
 
     if (testparams.minibatch) {
-      params.batched.update_mode      = cuvs::cluster::kmeans::params::MiniBatch;
+      params.batched.update_mode         = cuvs::cluster::kmeans::params::MiniBatch;
       params.batched.final_inertia_check = true;
     } else {
       params.batched.update_mode = cuvs::cluster::kmeans::params::FullBatch;
@@ -449,7 +449,8 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
       params,
       raft::make_const_mdspan(X.view()),
       std::optional<raft::device_vector_view<const T, int>>(std::nullopt),
-      raft::make_device_matrix_view<const T, int>(d_centroids.data(), params.n_clusters, n_features),
+      raft::make_device_matrix_view<const T, int>(
+        d_centroids.data(), params.n_clusters, n_features),
       raft::make_device_vector_view<int, int>(d_labels.data(), n_samples),
       true,
       raft::make_host_scalar_view<T>(&pred_inertia));
@@ -566,8 +567,8 @@ class KmeansPredictBatchedTest : public ::testing::TestWithParam<KmeansInputs<T>
     auto h_labels_view =
       raft::make_host_vector_view<int64_t, int64_t>(h_labels.data(), (int64_t)n_samples);
 
-    T pred_inertia       = 0;
-    int64_t batch_size   = std::min((int64_t)n_samples, (int64_t)256);
+    T pred_inertia     = 0;
+    int64_t batch_size = std::min((int64_t)n_samples, (int64_t)256);
 
     cuvs::cluster::kmeans::predict_batched(
       handle,
@@ -678,11 +679,11 @@ TEST_P(KmeansFitBatchedTestD, Result)
 }
 
 INSTANTIATE_TEST_CASE_P(KmeansFitBatchedTests,
-                         KmeansFitBatchedTestF,
-                         ::testing::ValuesIn(batched_inputsf2));
+                        KmeansFitBatchedTestF,
+                        ::testing::ValuesIn(batched_inputsf2));
 INSTANTIATE_TEST_CASE_P(KmeansFitBatchedTests,
-                         KmeansFitBatchedTestD,
-                         ::testing::ValuesIn(batched_inputsd2));
+                        KmeansFitBatchedTestD,
+                        ::testing::ValuesIn(batched_inputsd2));
 
 // ============================================================================
 // predict_batched tests
@@ -694,10 +695,10 @@ TEST_P(KmeansPredictBatchedTestF, Result) { ASSERT_TRUE(score == 1.0); }
 TEST_P(KmeansPredictBatchedTestD, Result) { ASSERT_TRUE(score == 1.0); }
 
 INSTANTIATE_TEST_CASE_P(KmeansPredictBatchedTests,
-                         KmeansPredictBatchedTestF,
-                         ::testing::ValuesIn(inputsf2));
+                        KmeansPredictBatchedTestF,
+                        ::testing::ValuesIn(inputsf2));
 INSTANTIATE_TEST_CASE_P(KmeansPredictBatchedTests,
-                         KmeansPredictBatchedTestD,
-                         ::testing::ValuesIn(inputsd2));
+                        KmeansPredictBatchedTestD,
+                        ::testing::ValuesIn(inputsd2));
 
 }  // namespace cuvs
