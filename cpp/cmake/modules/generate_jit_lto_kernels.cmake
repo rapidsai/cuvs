@@ -7,10 +7,116 @@
 
 include_guard(GLOBAL)
 
-function(embed_jit_lto_fatbin)
+function(compute_matrix_product output_var)
   set(options)
-  set(one_value FATBIN_TARGET FATBIN_SOURCE EMBEDDED_TARGET EMBEDDED_HEADER EMBEDDED_ARRAY)
+  set(one_value MATRIX_JSON_FILE MATRIX_JSON_STRING)
   set(multi_value)
+
+  cmake_parse_arguments(_JIT_LTO "${options}" "${one_value}" "${multi_value}" ${ARGN})
+
+  if(_JIT_LTO_MATRIX_JSON_FILE)
+    execute_process(
+      COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/compute_matrix_product.py"
+              "${_JIT_LTO_MATRIX_JSON_FILE}" #
+      OUTPUT_VARIABLE output COMMAND_ERROR_IS_FATAL ANY
+    )
+  else()
+    execute_process(
+      COMMAND "${CMAKE_COMMAND}" -E echo "${_JIT_LTO_MATRIX_JSON_STRING}"
+      COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/compute_matrix_product.py"
+              -
+      OUTPUT_VARIABLE output COMMAND_ERROR_IS_FATAL ANY
+    )
+  endif()
+
+  set(${output_var}
+      "${output}"
+      PARENT_SCOPE
+  )
+endfunction()
+
+function(populate_matrix_variables matrix_json_entry)
+  string(JSON len LENGTH "${matrix_json_entry}")
+  math(EXPR last "${len} - 1")
+
+  # cmake-lint: disable=C0103,E1120
+  foreach(i RANGE "${last}")
+    string(JSON key MEMBER "${matrix_json_entry}" "${i}")
+    string(JSON value GET "${matrix_json_entry}" "${key}")
+    set(${key}
+        "${value}"
+        PARENT_SCOPE
+    )
+  endforeach()
+endfunction()
+
+function(add_jit_lto_kernel kernel_target)
+  set(options)
+  set(one_value KERNEL_FILE EMBEDDED_HEADER_FILE)
+  set(multi_value LINK_LIBRARIES)
+
+  cmake_parse_arguments(_JIT_LTO "${options}" "${one_value}" "${multi_value}" ${ARGN})
+
+  add_library(${kernel_target} OBJECT EXCLUDE_FROM_ALL "${_JIT_LTO_KERNEL_FILE}")
+  # Do not modify these properties, options, and libraries. Usage requirements (including CUDA
+  # version, etc.) should be propagated to the kernel targets via INTERFACE libraries passed in
+  # through the LINK_LIBRARIES argument.
+  target_link_libraries(${kernel_target} PRIVATE ${_JIT_LTO_LINK_LIBRARIES})
+  target_compile_options(${kernel_target} PRIVATE -Xfatbin=--compress-all --compress-mode=size)
+  set_target_properties(
+    ${kernel_target}
+    PROPERTIES CUDA_SEPARABLE_COMPILATION ON
+               CUDA_FATBIN_COMPILATION ON
+               POSITION_INDEPENDENT_CODE ON
+               INTERPROCEDURAL_OPTIMIZATION ON
+  )
+
+  add_custom_command(
+    OUTPUT "${_JIT_LTO_EMBEDDED_HEADER_FILE}"
+    COMMAND "${bin_to_c}" --const --name embedded_fatbin --static $<TARGET_OBJECTS:${kernel_target}>
+            > "${_JIT_LTO_EMBEDDED_HEADER_FILE}"
+    DEPENDS $<TARGET_OBJECTS:${kernel_target}>
+  )
+endfunction()
+
+function(process_matrix_entry source_list_var)
+  set(options)
+  set(one_value NAME_FORMAT KERNEL_INPUT_FILE EMBEDDED_INPUT_FILE OUTPUT_DIRECTORY
+                MATRIX_JSON_ENTRY
+  )
+  set(multi_value KERNEL_LINK_LIBRARIES)
+
+  cmake_parse_arguments(_JIT_LTO "${options}" "${one_value}" "${multi_value}" ${ARGN})
+
+  populate_matrix_variables("${_JIT_LTO_MATRIX_JSON_ENTRY}")
+  string(CONFIGURE "${_JIT_LTO_NAME_FORMAT}" kernel_name @ONLY)
+
+  set(kernel_file "${_JIT_LTO_OUTPUT_DIRECTORY}/${kernel_name}_kernel.cu")
+  set(kernel_target "${kernel_name}_kernel")
+  set(embedded_header_file "${_JIT_LTO_OUTPUT_DIRECTORY}/${kernel_name}_embedded.h")
+  set(embedded_file "${_JIT_LTO_OUTPUT_DIRECTORY}/${kernel_name}_embedded.cpp")
+  configure_file("${_JIT_LTO_KERNEL_INPUT_FILE}" "${kernel_file}" @ONLY)
+  configure_file("${_JIT_LTO_EMBEDDED_INPUT_FILE}" "${embedded_file}" @ONLY)
+
+  add_jit_lto_kernel(
+    ${kernel_target}
+    KERNEL_FILE "${kernel_file}"
+    EMBEDDED_HEADER_FILE "${embedded_header_file}"
+    LINK_LIBRARIES ${_JIT_LTO_KERNEL_LINK_LIBRARIES}
+  )
+  list(APPEND ${source_list_var} "${embedded_header_file}" "${embedded_file}")
+  set(${source_list_var}
+      "${${source_list_var}}"
+      PARENT_SCOPE
+  )
+endfunction()
+
+function(generate_jit_lto_kernels source_list_var)
+  set(options)
+  set(one_value NAME_FORMAT MATRIX_JSON_FILE MATRIX_JSON_STRING KERNEL_INPUT_FILE
+                EMBEDDED_INPUT_FILE OUTPUT_DIRECTORY
+  )
+  set(multi_value KERNEL_LINK_LIBRARIES)
 
   cmake_parse_arguments(_JIT_LTO "${options}" "${one_value}" "${multi_value}" ${ARGN})
 
@@ -20,201 +126,33 @@ function(embed_jit_lto_fatbin)
     NAMES bin2c
     PATHS ${CUDAToolkit_BIN_DIR}
   )
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
-  add_library(${_JIT_LTO_FATBIN_TARGET} OBJECT "${_JIT_LTO_FATBIN_SOURCE}")
-  target_compile_definitions(${_JIT_LTO_FATBIN_TARGET} PRIVATE BUILD_KERNEL)
-  target_include_directories(
-    ${_JIT_LTO_FATBIN_TARGET}
-    PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
-  )
-  target_compile_options(
-    ${_JIT_LTO_FATBIN_TARGET}
-    PRIVATE -Xfatbin=--compress-all
-            --compress-mode=size
-            "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
-            "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
-  )
-  set_target_properties(
-    ${_JIT_LTO_FATBIN_TARGET}
-    PROPERTIES CUDA_ARCHITECTURES ${JIT_LTO_TARGET_ARCHITECTURE}
-               CUDA_STANDARD 17
-               CUDA_STANDARD_REQUIRED ON
-               CUDA_SEPARABLE_COMPILATION ON
-               CUDA_FATBIN_COMPILATION ON
-               POSITION_INDEPENDENT_CODE ON
-               INTERPROCEDURAL_OPTIMIZATION ON
-  )
-  target_link_libraries(${_JIT_LTO_FATBIN_TARGET} PRIVATE rmm::rmm raft::raft CCCL::CCCL)
-
-  add_custom_command(
-    OUTPUT "${_JIT_LTO_EMBEDDED_HEADER}"
-    COMMAND "${bin_to_c}" -c -p 0x0 --name "${_JIT_LTO_EMBEDDED_ARRAY}" --static
-            $<TARGET_OBJECTS:${_JIT_LTO_FATBIN_TARGET}> > "${_JIT_LTO_EMBEDDED_HEADER}"
-    DEPENDS $<TARGET_OBJECTS:${_JIT_LTO_FATBIN_TARGET}>
-  )
-  target_sources(
-    ${_JIT_LTO_EMBEDDED_TARGET} PRIVATE "${_JIT_LTO_FATBIN_SOURCE}" "${_JIT_LTO_EMBEDDED_HEADER}"
-  )
-  cmake_path(GET _JIT_LTO_EMBEDDED_HEADER PARENT_PATH header_dir)
-  target_include_directories(${_JIT_LTO_EMBEDDED_TARGET} PRIVATE "${header_dir}")
-endfunction()
-
-function(parse_jit_lto_data_type_configs config)
-  set(options)
-  set(one_value DATA_TYPE ACC_TYPE VECLENS TYPE_ABBREV ACC_ABBREV)
-  set(multi_value)
-
-  cmake_parse_arguments(_JIT_LTO "${options}" "${one_value}" "${multi_value}" ${ARGN})
-
-  if(config MATCHES [==[^([^,]+),([^,]+),\[([0-9]+(,[0-9]+)*)?\],([^,]+),([^,]+)$]==])
-    if(_JIT_LTO_DATA_TYPE)
-      set(${_JIT_LTO_DATA_TYPE}
-          "${CMAKE_MATCH_1}"
-          PARENT_SCOPE
-      )
-    endif()
-    if(_JIT_LTO_ACC_TYPE)
-      set(${_JIT_LTO_ACC_TYPE}
-          "${CMAKE_MATCH_2}"
-          PARENT_SCOPE
-      )
-    endif()
-    if(_JIT_LTO_VECLENS)
-      string(REPLACE "," ";" veclens_value "${CMAKE_MATCH_3}")
-      set(${_JIT_LTO_VECLENS}
-          "${veclens_value}"
-          PARENT_SCOPE
-      )
-    endif()
-    if(_JIT_LTO_TYPE_ABBREV)
-      set(${_JIT_LTO_TYPE_ABBREV}
-          "${CMAKE_MATCH_5}"
-          PARENT_SCOPE
-      )
-    endif()
-    if(_JIT_LTO_ACC_ABBREV)
-      set(${_JIT_LTO_ACC_ABBREV}
-          "${CMAKE_MATCH_6}"
-          PARENT_SCOPE
-      )
-    endif()
+  if(_JIT_LTO_MATRIX_JSON_FILE)
+    compute_matrix_product(matrix_product MATRIX_JSON_FILE "${_JIT_LTO_MATRIX_JSON_FILE}")
   else()
-    message(FATAL_ERROR "Invalid data type config: ${config}")
+    compute_matrix_product(matrix_product MATRIX_JSON_STRING "${_JIT_LTO_MATRIX_JSON_STRING}")
   endif()
-endfunction()
 
-# cmake-lint: disable=R0915
-function(generate_jit_lto_kernels target)
-  add_library(${target} STATIC)
-  target_include_directories(
-    ${target}
-    PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
+  string(JSON len LENGTH "${matrix_product}")
+  math(EXPR last "${len} - 1")
+
+  # cmake-lint: disable=C0103,E1120
+  foreach(i RANGE "${last}")
+    string(JSON matrix_json_entry GET "${matrix_product}" "${i}")
+    process_matrix_entry(
+      "${source_list_var}"
+      NAME_FORMAT "${_JIT_LTO_NAME_FORMAT}"
+      KERNEL_INPUT_FILE "${_JIT_LTO_KERNEL_INPUT_FILE}"
+      EMBEDDED_INPUT_FILE "${_JIT_LTO_EMBEDDED_INPUT_FILE}"
+      OUTPUT_DIRECTORY "${_JIT_LTO_OUTPUT_DIRECTORY}"
+      MATRIX_JSON_ENTRY "${matrix_json_entry}"
+      KERNEL_LINK_LIBRARIES ${_JIT_LTO_KERNEL_LINK_LIBRARIES}
+    )
+  endforeach()
+
+  set(${source_list_var}
+      "${${source_list_var}}"
+      PARENT_SCOPE
   )
-  set_target_properties(${target} PROPERTIES POSITION_INDEPENDENT_CODE ON)
-
-  set(generated_kernels_dir "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels")
-  string(TIMESTAMP year "%Y")
-
-  set(capacities 0 1 2 4 8 16 32 64 128 256)
-  set(ascending_values true false)
-  set(compute_norm_values true false)
-  set(data_type_configs "float,float,[1,4],f,f" "__half,__half,[1,8],h,h"
-                        "uint8_t,uint32_t,[1,16],uc,ui" "int8_t,int32_t,[1,16],sc,i"
-  )
-  set(idx_type int64_t)
-  set(idx_abbrev l)
-  set(metric_configs euclidean inner_prod)
-  set(filter_configs filter_none filter_bitset)
-  set(post_lambda_configs post_identity post_sqrt post_compose)
-
-  foreach(config IN LISTS data_type_configs)
-    parse_jit_lto_data_type_configs(
-      "${config}" DATA_TYPE data_type ACC_TYPE acc_type VECLENS veclens TYPE_ABBREV type_abbrev
-      ACC_ABBREV acc_abbrev
-    )
-    foreach(veclen IN LISTS veclens)
-      foreach(capacity IN LISTS capacities)
-        foreach(ascending IN LISTS ascending_values)
-          foreach(compute_norm IN LISTS compute_norm_values)
-            set(kernel_name
-                "interleaved_scan_kernel_${capacity}_${veclen}_${ascending}_${compute_norm}_${type_abbrev}_${acc_abbrev}_${idx_abbrev}"
-            )
-            set(filename
-                "${generated_kernels_dir}/interleaved_scan_kernels/fatbin_${kernel_name}.cu"
-            )
-            configure_file(
-              "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_kernel.cu.in"
-              "${filename}"
-              @ONLY
-            )
-            embed_jit_lto_fatbin(
-              FATBIN_TARGET "fatbin_${kernel_name}"
-              FATBIN_SOURCE "${filename}"
-              EMBEDDED_TARGET "${target}"
-              EMBEDDED_HEADER "${generated_kernels_dir}/interleaved_scan_kernels/${kernel_name}.h"
-              EMBEDDED_ARRAY "embedded_${kernel_name}"
-            )
-          endforeach()
-        endforeach()
-      endforeach()
-
-      foreach(metric_name IN LISTS metric_configs)
-        set(header_file "neighbors/ivf_flat/jit_lto_kernels/metric_${metric_name}.cuh")
-
-        set(kernel_name "metric_${metric_name}_${veclen}_${type_abbrev}_${acc_abbrev}")
-        set(filename "${generated_kernels_dir}/metric_device_functions/fatbin_${kernel_name}.cu")
-        configure_file(
-          "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/metric.cu.in"
-          "${filename}" @ONLY
-        )
-        embed_jit_lto_fatbin(
-          FATBIN_TARGET "fatbin_${kernel_name}"
-          FATBIN_SOURCE "${filename}"
-          EMBEDDED_TARGET "${target}"
-          EMBEDDED_HEADER "${generated_kernels_dir}/metric_device_functions/${kernel_name}.h"
-          EMBEDDED_ARRAY "embedded_${kernel_name}"
-        )
-      endforeach()
-    endforeach()
-  endforeach()
-
-  foreach(filter_name IN LISTS filter_configs)
-    set(header_file "neighbors/ivf_flat/jit_lto_kernels/${filter_name}.cuh")
-
-    set(kernel_name "${filter_name}")
-    set(filename "${generated_kernels_dir}/filter_device_functions/fatbin_${kernel_name}.cu")
-    configure_file(
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/filter.cu.in"
-      "${filename}" @ONLY
-    )
-    embed_jit_lto_fatbin(
-      FATBIN_TARGET "fatbin_${kernel_name}"
-      FATBIN_SOURCE "${filename}"
-      EMBEDDED_TARGET "${target}"
-      EMBEDDED_HEADER "${generated_kernels_dir}/filter_device_functions/${kernel_name}.h"
-      EMBEDDED_ARRAY "embedded_${kernel_name}"
-    )
-  endforeach()
-
-  foreach(post_lambda_name IN LISTS post_lambda_configs)
-    set(header_file "neighbors/ivf_flat/jit_lto_kernels/${post_lambda_name}.cuh")
-
-    set(kernel_name "${post_lambda_name}")
-    set(filename "${generated_kernels_dir}/post_lambda_device_functions/${post_lambda_name}.cu")
-    configure_file(
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/post_lambda.cu.in"
-      "${filename}" @ONLY
-    )
-    embed_jit_lto_fatbin(
-      FATBIN_TARGET "fatbin_${kernel_name}"
-      FATBIN_SOURCE "${filename}"
-      EMBEDDED_TARGET "${target}"
-      EMBEDDED_HEADER "${generated_kernels_dir}/post_lambda_device_functions/${kernel_name}.h"
-      EMBEDDED_ARRAY "embedded_${kernel_name}"
-    )
-  endforeach()
 endfunction()
