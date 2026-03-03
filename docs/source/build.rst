@@ -82,6 +82,14 @@ Note: these packages statically link the C and C++ libraries so the `libcuvs` an
 Tarball
 ^^^^^^^
 
+Prerequisites
+^^^^^^^^^^^^^
+
+- `NCCL <https://docs.nvidia.com/deeplearning/nccl/install-guide/index.html>` _
+- `libopenmp`
+- CUDA Toolkit Runtime 12.2+
+- Ampere Architecture of better (compute compatibility
+
 Download the pre-built tarball for your CPU architecture and CUDA version from https://developer.nvidia.com/cuvs-downloads
 
 Untar the tarball into a directory
@@ -99,7 +107,6 @@ Build from source
 -----------------
 
 The core cuVS source code is written in C++ and wrapped through a C API. The C API is wrapped around the C++ APIs and the other supported languages are built around the C API.
-
 
 Prerequisites
 ^^^^^^^^^^^^^
