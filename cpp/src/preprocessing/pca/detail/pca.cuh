@@ -16,7 +16,7 @@ namespace cuvs::preprocessing::pca::detail {
 /**
  * @brief Convert cuvs::preprocessing::pca::params to raft::linalg::paramsPCA.
  */
-inline auto to_raft_params(params config, std::size_t n_rows, std::size_t n_cols)
+inline auto to_raft_params(const params& config, std::size_t n_rows, std::size_t n_cols)
   -> raft::linalg::paramsPCA
 {
   raft::linalg::paramsPCA prms;
@@ -33,7 +33,7 @@ inline auto to_raft_params(params config, std::size_t n_rows, std::size_t n_cols
 
 template <typename DataT, typename IndexT>
 void fit(raft::resources const& handle,
-         params config,
+         const params& config,
          raft::device_matrix_view<DataT, IndexT, raft::col_major> input,
          raft::device_matrix_view<DataT, IndexT, raft::col_major> components,
          raft::device_vector_view<DataT, IndexT> explained_var,
@@ -58,7 +58,7 @@ void fit(raft::resources const& handle,
 
 template <typename DataT, typename IndexT>
 void fit_transform(raft::resources const& handle,
-                   params config,
+                   const params& config,
                    raft::device_matrix_view<DataT, IndexT, raft::col_major> input,
                    raft::device_matrix_view<DataT, IndexT, raft::col_major> trans_input,
                    raft::device_matrix_view<DataT, IndexT, raft::col_major> components,
@@ -85,7 +85,7 @@ void fit_transform(raft::resources const& handle,
 
 template <typename DataT, typename IndexT>
 void transform(raft::resources const& handle,
-               params config,
+               const params& config,
                raft::device_matrix_view<DataT, IndexT, raft::col_major> input,
                raft::device_matrix_view<DataT, IndexT, raft::col_major> components,
                raft::device_vector_view<DataT, IndexT> singular_vals,
@@ -98,7 +98,7 @@ void transform(raft::resources const& handle,
 
 template <typename DataT, typename IndexT>
 void inverse_transform(raft::resources const& handle,
-                       params config,
+                       const params& config,
                        raft::device_matrix_view<DataT, IndexT, raft::col_major> trans_input,
                        raft::device_matrix_view<DataT, IndexT, raft::col_major> components,
                        raft::device_vector_view<DataT, IndexT> singular_vals,

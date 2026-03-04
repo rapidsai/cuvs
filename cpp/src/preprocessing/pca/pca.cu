@@ -11,7 +11,7 @@ namespace cuvs::preprocessing::pca {
 
 #define CUVS_INST_PCA_FIT(DataT, IndexT)                                        \
   void fit(raft::resources const& handle,                                       \
-           params config,                                                       \
+           const params& config,                                                \
            raft::device_matrix_view<DataT, IndexT, raft::col_major> input,      \
            raft::device_matrix_view<DataT, IndexT, raft::col_major> components, \
            raft::device_vector_view<DataT, IndexT> explained_var,               \
@@ -39,7 +39,7 @@ CUVS_INST_PCA_FIT(double, int64_t);
 
 #define CUVS_INST_PCA_FIT_TRANSFORM(DataT, IndexT)                                         \
   void fit_transform(raft::resources const& handle,                                        \
-                     params config,                                                        \
+                     const params& config,                                                 \
                      raft::device_matrix_view<DataT, IndexT, raft::col_major> input,       \
                      raft::device_matrix_view<DataT, IndexT, raft::col_major> trans_input, \
                      raft::device_matrix_view<DataT, IndexT, raft::col_major> components,  \
@@ -69,7 +69,7 @@ CUVS_INST_PCA_FIT_TRANSFORM(double, int64_t);
 
 #define CUVS_INST_PCA_TRANSFORM(DataT, IndexT)                                            \
   void transform(raft::resources const& handle,                                           \
-                 params config,                                                           \
+                 const params& config,                                                    \
                  raft::device_matrix_view<DataT, IndexT, raft::col_major> input,          \
                  raft::device_matrix_view<DataT, IndexT, raft::col_major> components,     \
                  raft::device_vector_view<DataT, IndexT> singular_vals,                   \
@@ -85,7 +85,7 @@ CUVS_INST_PCA_TRANSFORM(double, int64_t);
 
 #define CUVS_INST_PCA_INVERSE_TRANSFORM(DataT, IndexT)                                             \
   void inverse_transform(raft::resources const& handle,                                            \
-                         params config,                                                            \
+                         const params& config,                                                     \
                          raft::device_matrix_view<DataT, IndexT, raft::col_major> trans_input,     \
                          raft::device_matrix_view<DataT, IndexT, raft::col_major> components,      \
                          raft::device_vector_view<DataT, IndexT> singular_vals,                    \

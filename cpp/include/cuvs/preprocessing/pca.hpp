@@ -97,7 +97,7 @@ struct params {
  * @param[in] flip_signs_based_on_U whether to determine signs by U (true) or V.T (false)
  */
 void fit(raft::resources const& handle,
-         params config,
+         const params& config,
          raft::device_matrix_view<float, int64_t, raft::col_major> input,
          raft::device_matrix_view<float, int64_t, raft::col_major> components,
          raft::device_vector_view<float, int64_t> explained_var,
@@ -108,7 +108,7 @@ void fit(raft::resources const& handle,
          bool flip_signs_based_on_U = false);
 
 void fit(raft::resources const& handle,
-         params config,
+         const params& config,
          raft::device_matrix_view<double, int64_t, raft::col_major> input,
          raft::device_matrix_view<double, int64_t, raft::col_major> components,
          raft::device_vector_view<double, int64_t> explained_var,
@@ -137,7 +137,7 @@ void fit(raft::resources const& handle,
  * @param[in] flip_signs_based_on_U whether to determine signs by U (true) or V.T (false)
  */
 void fit_transform(raft::resources const& handle,
-                   params config,
+                   const params& config,
                    raft::device_matrix_view<float, int64_t, raft::col_major> input,
                    raft::device_matrix_view<float, int64_t, raft::col_major> trans_input,
                    raft::device_matrix_view<float, int64_t, raft::col_major> components,
@@ -149,7 +149,7 @@ void fit_transform(raft::resources const& handle,
                    bool flip_signs_based_on_U = false);
 
 void fit_transform(raft::resources const& handle,
-                   params config,
+                   const params& config,
                    raft::device_matrix_view<double, int64_t, raft::col_major> input,
                    raft::device_matrix_view<double, int64_t, raft::col_major> trans_input,
                    raft::device_matrix_view<double, int64_t, raft::col_major> components,
@@ -175,7 +175,7 @@ void fit_transform(raft::resources const& handle,
  * @param[out] trans_input transformed data [n_rows x n_components] (col-major)
  */
 void transform(raft::resources const& handle,
-               params config,
+               const params& config,
                raft::device_matrix_view<float, int64_t, raft::col_major> input,
                raft::device_matrix_view<float, int64_t, raft::col_major> components,
                raft::device_vector_view<float, int64_t> singular_vals,
@@ -183,7 +183,7 @@ void transform(raft::resources const& handle,
                raft::device_matrix_view<float, int64_t, raft::col_major> trans_input);
 
 void transform(raft::resources const& handle,
-               params config,
+               const params& config,
                raft::device_matrix_view<double, int64_t, raft::col_major> input,
                raft::device_matrix_view<double, int64_t, raft::col_major> components,
                raft::device_vector_view<double, int64_t> singular_vals,
@@ -204,7 +204,7 @@ void transform(raft::resources const& handle,
  * @param[out] output reconstructed data [n_rows x n_cols] (col-major)
  */
 void inverse_transform(raft::resources const& handle,
-                       params config,
+                       const params& config,
                        raft::device_matrix_view<float, int64_t, raft::col_major> trans_input,
                        raft::device_matrix_view<float, int64_t, raft::col_major> components,
                        raft::device_vector_view<float, int64_t> singular_vals,
@@ -212,7 +212,7 @@ void inverse_transform(raft::resources const& handle,
                        raft::device_matrix_view<float, int64_t, raft::col_major> output);
 
 void inverse_transform(raft::resources const& handle,
-                       params config,
+                       const params& config,
                        raft::device_matrix_view<double, int64_t, raft::col_major> trans_input,
                        raft::device_matrix_view<double, int64_t, raft::col_major> components,
                        raft::device_vector_view<double, int64_t> singular_vals,
