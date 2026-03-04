@@ -445,7 +445,10 @@ if(NOT BUILD_CPU_ONLY)
       PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_SOURCE_DIR}/src"
               "${CMAKE_CURRENT_SOURCE_DIR}/../c/include"
     )
-    target_link_libraries(cuvs_jit_lto_kernels PRIVATE raft::raft)
+    target_link_libraries(
+      cuvs_jit_lto_kernels PRIVATE raft::raft $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvjitlink>
+                                   $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvrtc>
+    )
     add_library(cuvs::cuvs_jit_lto_kernels ALIAS cuvs_jit_lto_kernels)
   endif()
 
@@ -692,7 +695,6 @@ if(NOT BUILD_CPU_ONLY)
             ${CUVS_CTK_MATH_DEPENDENCIES}
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
             $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
-            $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvrtc>
   )
 
   target_include_directories(
