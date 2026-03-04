@@ -1102,9 +1102,9 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
 // In disk mode, the graph is stored in build_dir and dataset is reordered on disk.
 // The returned index is not usable for search. Use the created files for search instead.
 template <typename T, typename IdxT>
-index<T, IdxT> build_ace(raft::resources const& res,
-                         const index_params& params,
-                         raft::host_matrix_view<const T, int64_t, row_major> dataset)
+cagra::ace_build_result<T, IdxT> build_ace(raft::resources const& res,
+                                          const index_params& params,
+                                          raft::host_matrix_view<const T, int64_t, row_major> dataset)
 {
   // Extract ACE parameters from graph_build_params
   RAFT_EXPECTS(
@@ -1482,9 +1482,18 @@ index<T, IdxT> build_ace(raft::resources const& res,
     if (!use_disk_mode) {
       idx.update_graph(res, raft::make_const_mdspan(search_graph.view()));
 
+      std::optional<raft::device_matrix<T, int64_t, raft::row_major>> device_dataset;
       if (params.attach_dataset_on_build) {
         try {
-          idx.update_dataset(res, dataset);
+          auto dev_data = raft::make_device_matrix<T, int64_t>(res, dataset.extent(0), dataset.extent(1));
+          raft::copy(dev_data.data_handle(),
+                    dataset.data_handle(),
+                    dev_data.size(),
+                    raft::resource::get_cuda_stream(res));
+          cuvs::neighbors::device_padded_dataset_view<T, int64_t> dv(
+            raft::make_const_mdspan(dev_data.view()), static_cast<uint32_t>(dataset.extent(1)));
+          idx.update_dataset(res, dv);
+          device_dataset = std::move(dev_data);
         } catch (std::bad_alloc& e) {
           RAFT_LOG_WARN(
             "Insufficient GPU memory to attach dataset to ACE index. Only the graph will be "
@@ -1495,6 +1504,18 @@ index<T, IdxT> build_ace(raft::resources const& res,
             "stored.");
         }
       }
+      auto index_creation_end     = std::chrono::high_resolution_clock::now();
+      auto index_creation_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                      index_creation_end - index_creation_start)
+                                      .count();
+      RAFT_LOG_INFO("ACE: Final index creation completed in %ld ms", index_creation_elapsed);
+
+      auto total_end = std::chrono::high_resolution_clock::now();
+      auto total_elapsed =
+        std::chrono::duration_cast<std::chrono::milliseconds>(total_end - total_start).count();
+      RAFT_LOG_INFO("ACE: Partitioned CAGRA build completed in %ld ms total", total_elapsed);
+
+      return cagra::ace_build_result<T, IdxT>{std::move(idx), std::move(device_dataset)};
     } else {
       idx.update_dataset(res, std::move(reordered_fd));
       idx.update_graph(res, std::move(graph_fd));
@@ -1520,7 +1541,7 @@ index<T, IdxT> build_ace(raft::resources const& res,
       std::chrono::duration_cast<std::chrono::milliseconds>(total_end - total_start).count();
     RAFT_LOG_INFO("ACE: Partitioned CAGRA build completed in %ld ms total", total_elapsed);
 
-    return idx;
+    return cagra::ace_build_result<T, IdxT>{std::move(idx), std::nullopt};
   } catch (const std::exception& e) {
     // Clean up build directory on failure if we created it
     RAFT_LOG_ERROR("ACE: Build failed with exception: %s", e.what());

@@ -30,7 +30,7 @@
 namespace cuvs::neighbors::cagra::detail {
 
 template <class T, class IdxT>
-index<T, IdxT> merge(
+merge_result<T, IdxT> merge(
   raft::resources const& handle,
   const cagra::index_params& params,
   std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,
@@ -118,27 +118,17 @@ index<T, IdxT> merge(
                               filtered_dataset.view(),
                               indices_view);
 
-      // device_matrix_view overload returns index, not build_result.
-      auto merged_index =
-        cagra::build(handle, params, raft::make_const_mdspan(filtered_dataset.view()));
-      if (!merged_index.data().is_owning() && params.attach_dataset_on_build) {
-        auto ds = std::make_unique<cuvs::neighbors::device_padded_dataset<T, int64_t>>(
-          std::move(filtered_dataset), static_cast<uint32_t>(dim));
-        merged_index.update_dataset(handle, std::move(ds));
-      }
+      cuvs::neighbors::device_padded_dataset_view<T, int64_t> dv(
+        raft::make_const_mdspan(filtered_dataset.view()), static_cast<uint32_t>(dim));
+      auto build_res = cagra::detail::build<T, IdxT>(handle, params, dv);
       RAFT_LOG_DEBUG("cagra merge: using device memory for merged dataset");
-      return merged_index;
+      return cagra::merge_result<T, IdxT>{std::move(build_res.idx), std::move(filtered_dataset)};
     } else {
-      // device_matrix_view overload returns index, not build_result.
-      auto merged_index =
-        cagra::build(handle, params, raft::make_const_mdspan(updated_dataset.view()));
-      if (!merged_index.data().is_owning() && params.attach_dataset_on_build) {
-        auto ds = std::make_unique<cuvs::neighbors::device_padded_dataset<T, int64_t>>(
-          std::move(updated_dataset), static_cast<uint32_t>(dim));
-        merged_index.update_dataset(handle, std::move(ds));
-      }
+      cuvs::neighbors::device_padded_dataset_view<T, int64_t> dv(
+        raft::make_const_mdspan(updated_dataset.view()), static_cast<uint32_t>(dim));
+      auto build_res = cagra::detail::build<T, IdxT>(handle, params, dv);
       RAFT_LOG_DEBUG("cagra merge: using device memory for merged dataset");
-      return merged_index;
+      return cagra::merge_result<T, IdxT>{std::move(build_res.idx), std::move(updated_dataset)};
     }
   } catch (std::bad_alloc& e) {
     // We don't currently support the cpu memory fallback with filtered merge, since the
@@ -153,21 +143,15 @@ index<T, IdxT> merge(
 
     merge_dataset(updated_dataset.data_handle());
 
-    // Host-path build uses overload that returns index (not build_result).
-    auto merged_index =
-      cagra::build(handle, params, raft::make_const_mdspan(updated_dataset.view()));
-    if (!merged_index.data().is_owning() && params.attach_dataset_on_build) {
-      auto dev_dataset =
-        raft::make_device_matrix<T, int64_t>(handle, updated_dataset.extent(0), updated_dataset.extent(1));
-      raft::copy(dev_dataset.data_handle(),
-                 updated_dataset.data_handle(),
-                 updated_dataset.size(),
-                 raft::resource::get_cuda_stream(handle));
-      auto ds = std::make_unique<cuvs::neighbors::device_padded_dataset<T, int64_t>>(
-        std::move(dev_dataset), static_cast<uint32_t>(dim));
-      merged_index.update_dataset(handle, std::move(ds));
+    auto host_view = raft::make_host_matrix_view<const T, int64_t, raft::row_major>(
+      updated_dataset.data_handle(), updated_dataset.extent(0), updated_dataset.extent(1));
+    auto ace_res = cagra::detail::build_ace<T, IdxT>(handle, params, host_view);
+    if (ace_res.dataset.has_value()) {
+      return cagra::merge_result<T, IdxT>{std::move(ace_res.idx), std::move(*ace_res.dataset)};
     }
-    return merged_index;
+    return cagra::merge_result<T, IdxT>{
+      std::move(ace_res.idx),
+      raft::make_device_matrix<T, int64_t>(handle, 0, dim)};
   }
 }
 

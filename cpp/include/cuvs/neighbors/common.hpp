@@ -1120,6 +1120,8 @@ struct iface {
   const IdxT size() const { return index_.value().size(); }
 
   std::optional<AnnIndexType> index_;
+  /** Used by CAGRA when built from host: holds device copy so index dataset view stays valid. */
+  std::optional<raft::device_matrix<T, int64_t, raft::row_major>> cagra_build_dataset_;
   std::shared_ptr<std::mutex> mutex_;
 };
 

@@ -13,6 +13,7 @@
 #include <cuvs/neighbors/nn_descent.hpp>
 #include <cuvs/util/file_io.hpp>
 #include <cuda_fp16.h>
+#include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_device_accessor.hpp>
 #include <raft/core/host_mdspan.hpp>
@@ -539,47 +540,6 @@ struct index : cuvs::neighbors::index {
   }
 
   /**
-   * Replace the dataset by copying from a host matrix view.
-   *
-   * The index allocates device memory and copies the data; it owns the copy.
-   * Used by ACE build and other paths that have dataset on host.
-   */
-  void update_dataset(
-    raft::resources const& res,
-    raft::host_matrix_view<const T, int64_t, raft::row_major> dataset_view)
-  {
-    auto device_data = raft::make_device_matrix<T, int64_t>(
-      res, dataset_view.extent(0), dataset_view.extent(1));
-    raft::copy(device_data.data_handle(),
-               dataset_view.data_handle(),
-               device_data.size(),
-               raft::resource::get_cuda_stream(res));
-    dataset_ = std::make_unique<device_padded_dataset<T, int64_t>>(
-      std::move(device_data), static_cast<uint32_t>(dataset_view.extent(1)));
-    dataset_norms_.reset();
-    if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      if (dataset_->n_rows() > 0) { compute_dataset_norms_(res); }
-    }
-  }
-
-  /**
-   * Replace the dataset by taking ownership of an owning dataset.
-   *
-   * The index stores the dataset and is responsible for its lifetime.
-   *
-   * Note: This will clear any precomputed dataset norms.
-   */
-  void update_dataset(raft::resources const& res,
-                      std::unique_ptr<cuvs::neighbors::dataset<int64_t>>&& dataset)
-  {
-    dataset_ = std::move(dataset);
-    dataset_norms_.reset();
-    if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      if (dataset_->n_rows() > 0) { compute_dataset_norms_(res); }
-    }
-  }
-
-  /**
    * Replace the graph with a new graph.
    *
    * Since the new graph is a device array, we store a reference to that, and it is
@@ -812,6 +772,26 @@ struct build_result {
 };
 
 /**
+ * Result of merging CAGRA indices. The index holds a view over \p dataset; caller must keep
+ * \p dataset alive for the lifetime of \p idx.
+ */
+template <typename T, typename IdxT>
+struct merge_result {
+  cuvs::neighbors::cagra::index<T, IdxT> idx;
+  raft::device_matrix<T, int64_t, raft::row_major> dataset;
+};
+
+/**
+ * Result of ACE build from host dataset. When \p dataset has value, the index holds a view
+ * over it; caller must keep \p dataset alive for the lifetime of \p idx.
+ */
+template <typename T, typename IdxT>
+struct ace_build_result {
+  cuvs::neighbors::cagra::index<T, IdxT> idx;
+  std::optional<raft::device_matrix<T, int64_t, raft::row_major>> dataset;
+};
+
+/**
  * @defgroup cagra_cpp_index_build CAGRA index build functions
  * @{
  */
@@ -890,7 +870,7 @@ auto build(raft::resources const& res,
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::index<float, uint32_t>;
+  -> cuvs::neighbors::cagra::ace_build_result<float, uint32_t>;
 
 /**
  * @brief Build the index from the dataset for efficient search.
@@ -965,7 +945,7 @@ auto build(raft::resources const& res,
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::index<half, uint32_t>;
+  -> cuvs::neighbors::cagra::ace_build_result<half, uint32_t>;
 
 /**
  * @brief Build the index from the dataset for efficient search.
@@ -1040,7 +1020,7 @@ auto build(raft::resources const& res,
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
+  -> cuvs::neighbors::cagra::ace_build_result<int8_t, uint32_t>;
 
 /**
  * @brief Build the index from the dataset for efficient search.
@@ -1116,7 +1096,7 @@ auto build(raft::resources const& res,
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
+  -> cuvs::neighbors::cagra::ace_build_result<uint8_t, uint32_t>;
 
 /**
  * @brief Build the index from a device padded dataset view (non-owning).
@@ -1712,7 +1692,8 @@ void serialize(raft::resources const& handle,
  */
 void deserialize(raft::resources const& handle,
                  const std::string& filename,
-                 cuvs::neighbors::cagra::index<float, uint32_t>* index);
+                 cuvs::neighbors::cagra::index<float, uint32_t>* index,
+                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the index to an output stream
@@ -1764,7 +1745,8 @@ void serialize(raft::resources const& handle,
  */
 void deserialize(raft::resources const& handle,
                  std::istream& is,
-                 cuvs::neighbors::cagra::index<float, uint32_t>* index);
+                 cuvs::neighbors::cagra::index<float, uint32_t>* index,
+                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr);
 /**
  * Save the index to file.
  *
@@ -1817,7 +1799,8 @@ void serialize(raft::resources const& handle,
  */
 void deserialize(raft::resources const& handle,
                  const std::string& filename,
-                 cuvs::neighbors::cagra::index<half, uint32_t>* index);
+                 cuvs::neighbors::cagra::index<half, uint32_t>* index,
+                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the index to an output stream
@@ -1869,7 +1852,8 @@ void serialize(raft::resources const& handle,
  */
 void deserialize(raft::resources const& handle,
                  std::istream& is,
-                 cuvs::neighbors::cagra::index<half, uint32_t>* index);
+                 cuvs::neighbors::cagra::index<half, uint32_t>* index,
+                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Save the index to file.
@@ -1922,7 +1906,8 @@ void serialize(raft::resources const& handle,
  */
 void deserialize(raft::resources const& handle,
                  const std::string& filename,
-                 cuvs::neighbors::cagra::index<int8_t, uint32_t>* index);
+                 cuvs::neighbors::cagra::index<int8_t, uint32_t>* index,
+                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the index to an output stream
@@ -1974,7 +1959,8 @@ void serialize(raft::resources const& handle,
  */
 void deserialize(raft::resources const& handle,
                  std::istream& is,
-                 cuvs::neighbors::cagra::index<int8_t, uint32_t>* index);
+                 cuvs::neighbors::cagra::index<int8_t, uint32_t>* index,
+                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Save the index to file.
@@ -2027,7 +2013,8 @@ void serialize(raft::resources const& handle,
  */
 void deserialize(raft::resources const& handle,
                  const std::string& filename,
-                 cuvs::neighbors::cagra::index<uint8_t, uint32_t>* index);
+                 cuvs::neighbors::cagra::index<uint8_t, uint32_t>* index,
+                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the index to an output stream
@@ -2079,7 +2066,8 @@ void serialize(raft::resources const& handle,
  */
 void deserialize(raft::resources const& handle,
                  std::istream& is,
-                 cuvs::neighbors::cagra::index<uint8_t, uint32_t>* index);
+                 cuvs::neighbors::cagra::index<uint8_t, uint32_t>* index,
+                 std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset = nullptr);
 
 /**
  * Write the CAGRA built index as a base layer HNSW index to an output stream
@@ -2389,14 +2377,15 @@ void serialize_to_hnswlib(
  *                    - Have attached datasets with the same dimension.
  * @param[in] row_filter an optional device filter function object that greenlights rows
  *    to include in the merged index  (none_sample_filter for no filtering)
- * @return A new CAGRA index containing the merged indices, graph, and dataset.
+ * @return merge_result with .idx (merged index holding a view over .dataset) and .dataset;
+ *         caller must keep .dataset alive for the lifetime of .idx.
  */
 auto merge(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            std::vector<cuvs::neighbors::cagra::index<float, uint32_t>*>& indices,
            const cuvs::neighbors::filtering::base_filter& row_filter =
              cuvs::neighbors::filtering::none_sample_filter{})
-  -> cuvs::neighbors::cagra::index<float, uint32_t>;
+  -> cuvs::neighbors::cagra::merge_result<float, uint32_t>;
 
 /** @copydoc merge */
 auto merge(raft::resources const& res,
@@ -2404,7 +2393,7 @@ auto merge(raft::resources const& res,
            std::vector<cuvs::neighbors::cagra::index<half, uint32_t>*>& indices,
            const cuvs::neighbors::filtering::base_filter& row_filter =
              cuvs::neighbors::filtering::none_sample_filter{})
-  -> cuvs::neighbors::cagra::index<half, uint32_t>;
+  -> cuvs::neighbors::cagra::merge_result<half, uint32_t>;
 
 /** @copydoc merge */
 auto merge(raft::resources const& res,
@@ -2412,7 +2401,7 @@ auto merge(raft::resources const& res,
            std::vector<cuvs::neighbors::cagra::index<int8_t, uint32_t>*>& indices,
            const cuvs::neighbors::filtering::base_filter& row_filter =
              cuvs::neighbors::filtering::none_sample_filter{})
-  -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
+  -> cuvs::neighbors::cagra::merge_result<int8_t, uint32_t>;
 
 /** @copydoc merge */
 auto merge(raft::resources const& res,
@@ -2420,7 +2409,7 @@ auto merge(raft::resources const& res,
            std::vector<cuvs::neighbors::cagra::index<uint8_t, uint32_t>*>& indices,
            const cuvs::neighbors::filtering::base_filter& row_filter =
              cuvs::neighbors::filtering::none_sample_filter{})
-  -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
+  -> cuvs::neighbors::cagra::merge_result<uint8_t, uint32_t>;
 /**
  * @}
  */

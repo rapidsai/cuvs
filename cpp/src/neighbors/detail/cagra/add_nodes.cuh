@@ -364,12 +364,9 @@ void extend_core(
                "cuvs::neighbors::hnsw::from_cagra() and load it into memory via "
                "cuvs::neighbors::hnsw::deserialize() before calling extend().");
 
-  if (dynamic_cast<const non_owning_dataset<T, IdxT>*>(&index.data()) != nullptr &&
-      !new_dataset_buffer_view.has_value()) {
-    RAFT_LOG_WARN(
-      "New memory space for extended dataset will be allocated while the memory space for the old "
-      "dataset is allocated by user.");
-  }
+  RAFT_EXPECTS(new_dataset_buffer_view.has_value(),
+              "cagra::extend requires new_dataset_buffer_view. "
+              "Provide a buffer view for the extended dataset (initial + additional vectors).");
   const std::size_t num_new_nodes        = additional_dataset.extent(0);
   const std::size_t initial_dataset_size = index.size();
   const std::size_t new_dataset_size     = initial_dataset_size + num_new_nodes;
@@ -404,15 +401,13 @@ void extend_core(
     // Allocate memory space for updated graph on host
     auto updated_graph = raft::make_host_matrix<IdxT, std::int64_t>(new_dataset_size, degree);
 
-    const auto stride    = strided_dset->stride();
-    auto updated_dataset = raft::make_device_matrix<T, std::int64_t>(handle, 0, stride);
-    auto updated_dataset_view =
-      raft::make_device_strided_matrix_view<T, std::int64_t>(nullptr, 0, dim, stride);
+    const auto stride = strided_dset->stride();
+    auto updated_dataset_view = new_dataset_buffer_view.value();
 
-    // Update dataset
+    // Update dataset on host, then copy to device buffer provided by caller
     auto host_updated_dataset = raft::make_host_matrix<T, std::int64_t>(new_dataset_size, stride);
 
-    // The padding area must be filled with zeros.!!!!!!!!!!!!!!!!!!!
+    // The padding area must be filled with zeros.
     memset(host_updated_dataset.data_handle(), 0, sizeof(T) * host_updated_dataset.size());
 
     RAFT_CUDA_TRY(cudaMemcpy2DAsync(host_updated_dataset.data_handle(),
@@ -433,22 +428,7 @@ void extend_core(
                         cudaMemcpyDefault,
                         raft::resource::get_cuda_stream(handle)));
 
-    if (new_dataset_buffer_view.has_value()) {
-      updated_dataset_view = new_dataset_buffer_view.value();
-    } else {
-      // Deallocate the current dataset memory space if the dataset is `owning'.
-      cuvs::neighbors::device_padded_dataset_view<T, int64_t> empty_dv(
-        raft::make_device_matrix_view<const T, int64_t>(static_cast<T const*>(nullptr), 0, stride),
-        dim);
-      index.update_dataset(handle, empty_dv);
-
-      // Allocate the new dataset
-      updated_dataset = raft::make_device_matrix<T, std::int64_t>(handle, new_dataset_size, stride);
-      updated_dataset_view = raft::make_device_strided_matrix_view<T, std::int64_t>(
-        updated_dataset.data_handle(), new_dataset_size, dim, stride);
-    }
-
-    // Copy updated dataset on host memory to device memory
+    // Copy updated dataset on host memory to device memory (caller's buffer)
     raft::copy(updated_dataset_view.data_handle(),
                host_updated_dataset.data_handle(),
                new_dataset_size * stride,
@@ -458,19 +438,13 @@ void extend_core(
     cuvs::neighbors::cagra::add_graph_nodes<T, IdxT>(
       handle, raft::make_const_mdspan(updated_dataset_view), index, updated_graph.view(), params);
 
-    // Update index dataset: view when caller provided buffer, else take ownership
-    if (new_dataset_buffer_view.has_value()) {
-      cuvs::neighbors::device_padded_dataset_view<T, int64_t> dv(
-        raft::make_device_matrix_view(updated_dataset_view.data_handle(),
-                                     updated_dataset_view.extent(0),
-                                     updated_dataset_view.stride(0)),
-        dim);
-      index.update_dataset(handle, dv);
-    } else {
-      auto ds = std::make_unique<cuvs::neighbors::device_padded_dataset<T, int64_t>>(
-        std::move(updated_dataset), static_cast<uint32_t>(dim));
-      index.update_dataset(handle, std::move(ds));
-    }
+    // Attach view over caller's buffer; index does not take ownership
+    cuvs::neighbors::device_padded_dataset_view<T, int64_t> dv(
+      raft::make_device_matrix_view(updated_dataset_view.data_handle(),
+                                    updated_dataset_view.extent(0),
+                                    updated_dataset_view.stride(0)),
+      dim);
+    index.update_dataset(handle, dv);
 
     // Update index graph
     if (new_graph_buffer_view.has_value()) {

@@ -22,15 +22,17 @@ namespace cuvs::neighbors::cagra {
              raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)         \
     -> cuvs::neighbors::cagra::index<T, IdxT>                                             \
   {                                                                                       \
-    return cuvs::neighbors::cagra::build<T, IdxT>(handle, params, dataset);               \
+    cuvs::neighbors::device_padded_dataset_view<T, int64_t> dv(                           \
+      dataset, static_cast<uint32_t>(dataset.extent(1)));                                 \
+    return cuvs::neighbors::cagra::detail::build<T, IdxT>(handle, params, dv).idx;        \
   }                                                                                       \
                                                                                           \
   auto build(raft::resources const& handle,                                               \
              const cuvs::neighbors::cagra::index_params& params,                          \
              raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)           \
-    -> cuvs::neighbors::cagra::index<T, IdxT>                                             \
+    -> cuvs::neighbors::cagra::ace_build_result<T, IdxT>                                  \
   {                                                                                       \
-    return cuvs::neighbors::cagra::build<T, IdxT>(handle, params, dataset);               \
+    return cuvs::neighbors::cagra::detail::build_ace<T, IdxT>(handle, params, dataset);   \
   }
 
 RAFT_INST_CAGRA_BUILD(float, uint32_t);

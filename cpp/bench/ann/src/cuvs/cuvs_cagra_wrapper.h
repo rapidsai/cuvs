@@ -162,6 +162,9 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
 
   std::shared_ptr<cuvs::neighbors::filtering::base_filter> filter_;
   std::vector<std::shared_ptr<cuvs::neighbors::cagra::index<T, IdxT>>> sub_indices_;
+  std::vector<raft::device_matrix<T, int64_t, raft::row_major>> sub_dataset_buffers_;
+  std::unique_ptr<cuvs::neighbors::dataset<int64_t>> deserialized_dataset_;
+  std::vector<std::unique_ptr<cuvs::neighbors::dataset<int64_t>>> sub_deserialized_datasets_;
 
   inline rmm::device_async_resource_ref get_mr(AllocatorType mem_type)
   {
@@ -185,9 +188,14 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
     raft::make_mdspan<const T, IdxT, raft::row_major, false, true>(dataset, dataset_extents);
   bool dataset_is_on_host = raft::get_device_for_address(dataset) == -1;
   if (index_params_.num_dataset_splits <= 1) {
-    index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(
-      dataset_is_on_host ? cuvs::neighbors::cagra::build(handle_, params, dataset_view_host)
-                         : cuvs::neighbors::cagra::build(handle_, params, dataset_view_device)));
+    if (dataset_is_on_host) {
+      auto ace_res = cuvs::neighbors::cagra::build(handle_, params, dataset_view_host);
+      index_       = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(ace_res.idx));
+      if (ace_res.dataset.has_value()) { *dataset_ = std::move(*ace_res.dataset); }
+    } else {
+      index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(
+        std::move(cuvs::neighbors::cagra::build(handle_, params, dataset_view_device)));
+    }
   } else {
     IdxT rows_per_split =
       raft::ceildiv<IdxT>(nrow, static_cast<IdxT>(index_params_.num_dataset_splits));
@@ -204,14 +212,26 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
       auto sub_index = cuvs::neighbors::cagra::index<T, IdxT>(handle_, params.metric);
       if (index_params_.merge_type == CagraMergeType::kPhysical) {
         if (dataset_is_on_host) {
-          sub_index.update_dataset(handle_, sub_host);
+          sub_dataset_buffers_.emplace_back(
+            raft::make_device_matrix<T, int64_t>(handle_, rows, dim_));
+          raft::copy(sub_dataset_buffers_.back().data_handle(),
+                     sub_ptr,
+                     static_cast<size_t>(rows) * dim_,
+                     raft::resource::get_cuda_stream(handle_));
+          cuvs::neighbors::device_padded_dataset_view<T, int64_t> dv(
+            raft::make_const_mdspan(sub_dataset_buffers_.back().view()), dim_);
+          sub_index.update_dataset(handle_, dv);
         } else {
           sub_index.update_dataset(handle_, sub_dev);
         }
       }
       if (index_params_.merge_type == CagraMergeType::kLogical) {
         if (dataset_is_on_host) {
-          sub_index = cuvs::neighbors::cagra::build(handle_, params, sub_host);
+          auto ace_res = cuvs::neighbors::cagra::build(handle_, params, sub_host);
+          sub_index    = std::move(ace_res.idx);
+          if (ace_res.dataset.has_value()) {
+            sub_dataset_buffers_.push_back(std::move(*ace_res.dataset));
+          }
         } else {
           sub_index = cuvs::neighbors::cagra::build(handle_, params, sub_dev);
         }
@@ -227,8 +247,9 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
         indices.push_back(ptr.get());
       }
 
-      index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(
-        cuvs::neighbors::cagra::merge(handle_, params, indices));
+      auto merge_res = cuvs::neighbors::cagra::merge(handle_, params, indices);
+      index_         = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(merge_res.idx));
+      *dataset_      = std::move(merge_res.dataset);
     }
   }
 }
@@ -338,6 +359,7 @@ void cuvs_cagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
   if (index_params_.num_dataset_splits > 1 &&
       index_params_.merge_type == CagraMergeType::kLogical) {
     bool dataset_is_on_host = raft::get_device_for_address(dataset) == -1;
+    if (dataset_is_on_host) { sub_dataset_buffers_.clear(); }
     IdxT rows_per_split =
       raft::ceildiv<IdxT>(nrow, static_cast<IdxT>(index_params_.num_dataset_splits));
     for (size_t i = 0; i < sub_indices_.size(); ++i) {
@@ -352,7 +374,15 @@ void cuvs_cagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
       auto sub_index = sub_indices_[i].get();
       if (index_params_.merge_type == CagraMergeType::kLogical) {
         if (dataset_is_on_host) {
-          sub_index->update_dataset(handle_, sub_host);
+          sub_dataset_buffers_.emplace_back(
+            raft::make_device_matrix<T, int64_t>(handle_, rows, dim_));
+          raft::copy(sub_dataset_buffers_.back().data_handle(),
+                     sub_ptr,
+                     static_cast<size_t>(rows) * dim_,
+                     raft::resource::get_cuda_stream(handle_));
+          cuvs::neighbors::device_padded_dataset_view<T, int64_t> dv(
+            raft::make_const_mdspan(sub_dataset_buffers_.back().view()), dim_);
+          sub_index->update_dataset(handle_, dv);
         } else {
           sub_index->update_dataset(handle_, sub_dev);
         }
@@ -413,15 +443,17 @@ void cuvs_cagra<T, IdxT>::load(const std::string& file)
     meta >> count;
     meta.close();
     sub_indices_.clear();
+    sub_deserialized_datasets_.resize(count);
     for (size_t i = 0; i < count; ++i) {
       std::string subfile = file + (i == 0 ? "" : ".subidx." + std::to_string(i));
       auto sub_index      = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(handle_);
-      cuvs::neighbors::cagra::deserialize(handle_, subfile, sub_index.get());
+      cuvs::neighbors::cagra::deserialize(handle_, subfile, sub_index.get(), &sub_deserialized_datasets_[i]);
       sub_indices_.push_back(std::move(sub_index));
     }
   } else {
     index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(handle_);
-    cuvs::neighbors::cagra::deserialize(handle_, file, index_.get());
+    deserialized_dataset_.reset();
+    cuvs::neighbors::cagra::deserialize(handle_, file, index_.get(), &deserialized_dataset_);
   }
 }
 

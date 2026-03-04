@@ -6,7 +6,9 @@
 #pragma once
 
 #include <cuvs/neighbors/index_wrappers.hpp>
+#include <raft/core/device_mdarray.hpp>
 #include <memory>
+#include <optional>
 
 // Forward declarations to avoid circular dependencies
 namespace cuvs::neighbors::cagra {
@@ -91,6 +93,11 @@ class IndexWrapper : public cuvs::neighbors::IndexWrapper<T, IdxT, OutputIdxT> {
   cuvs::distance::DistanceType metric() const noexcept override;
 
   /**
+   * @brief Store merged dataset so the index's view remains valid (used after physical merge).
+   */
+  void set_merged_dataset(raft::device_matrix<T, int64_t, raft::row_major>&& dataset);
+
+  /**
    * @brief Merge this CAGRA index with other CAGRA indices.
    *
    * This method provides merge capability for CAGRA indices. It supports both
@@ -120,6 +127,7 @@ class IndexWrapper : public cuvs::neighbors::IndexWrapper<T, IdxT, OutputIdxT> {
 
  private:
   cuvs::neighbors::cagra::index<T, IdxT>* index_;
+  std::optional<raft::device_matrix<T, int64_t, raft::row_major>> merged_dataset_;
 };
 
 /**

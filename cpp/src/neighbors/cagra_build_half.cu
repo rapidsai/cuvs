@@ -22,15 +22,17 @@ cuvs::neighbors::cagra::index<half, uint32_t> build(
   const cuvs::neighbors::cagra::index_params& params,
   raft::device_matrix_view<const half, int64_t, raft::row_major> dataset)
 {
-  return cuvs::neighbors::cagra::build<half, uint32_t>(handle, params, dataset);
+  cuvs::neighbors::device_padded_dataset_view<half, int64_t> dv(
+    dataset, static_cast<uint32_t>(dataset.extent(1)));
+  return cuvs::neighbors::cagra::detail::build<half, uint32_t>(handle, params, dv).idx;
 }
 
-cuvs::neighbors::cagra::index<half, uint32_t> build(
+cuvs::neighbors::cagra::ace_build_result<half, uint32_t> build(
   raft::resources const& handle,
   const cuvs::neighbors::cagra::index_params& params,
   raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
 {
-  return cuvs::neighbors::cagra::build<half, uint32_t>(handle, params, dataset);
+  return cuvs::neighbors::cagra::detail::build_ace<half, uint32_t>(handle, params, dataset);
 }
 
 template auto build(raft::resources const& res,

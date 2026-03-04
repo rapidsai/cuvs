@@ -7,8 +7,10 @@
 #include <cstring>
 #include <dlpack/dlpack.h>
 
+#include <raft/core/copy.hpp>
 #include <raft/core/error.hpp>
 #include <raft/core/mdspan_types.hpp>
+#include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/core/serialize.hpp>
 
@@ -27,6 +29,13 @@
 #include <fstream>
 
 namespace {
+
+/** Wrapper that owns both index and dataset for C API lifetime (merge, build-from-host, from_args-with-host). */
+template <typename T>
+struct merged_cagra_holder {
+  cuvs::neighbors::cagra::index<T, uint32_t> idx;
+  raft::device_matrix<T, int64_t, raft::row_major> dataset;
+};
 
 static void _set_graph_build_params(
   std::variant<std::monostate,
@@ -107,12 +116,13 @@ static void _set_graph_build_params(
 }
 
 template <typename T>
-void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* dataset_tensor)
+void _build(cuvsResources_t res,
+            cuvsCagraIndexParams params,
+            DLManagedTensor* dataset_tensor,
+            cuvsCagraIndex_t output_index)
 {
   auto dataset = dataset_tensor->dl_tensor;
-
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
-  auto index   = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr);
 
   auto index_params = cuvs::neighbors::cagra::index_params();
   convert_c_index_params(params, dataset.shape[0], dataset.shape[1], &index_params);
@@ -120,45 +130,61 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
     using mdspan_type = raft::device_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
-    *index            = cuvs::neighbors::cagra::build(*res_ptr, index_params, mds);
+    auto idx          = cuvs::neighbors::cagra::build(*res_ptr, index_params, mds);
+    auto* raw         = new cuvs::neighbors::cagra::index<T, uint32_t>(std::move(idx));
+    output_index->addr         = reinterpret_cast<uintptr_t>(raw);
+    output_index->merged_owner = 0;
   } else if (cuvs::core::is_dlpack_host_compatible(dataset)) {
     using mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
-    *index            = cuvs::neighbors::cagra::build(*res_ptr, index_params, mds);
+    auto result       = cuvs::neighbors::cagra::build(*res_ptr, index_params, mds);
+    auto* holder =
+      new merged_cagra_holder<T>{std::move(result.idx), std::move(*result.dataset)};
+    output_index->addr         = reinterpret_cast<uintptr_t>(&holder->idx);
+    output_index->merged_owner = reinterpret_cast<uintptr_t>(holder);
   }
-  return index;
 }
 
 template <typename T>
-void* _from_args(cuvsResources_t res,
-                 cuvsDistanceType _metric,
-                 DLManagedTensor* graph_tensor,
-                 DLManagedTensor* dataset_tensor)
+void _from_args(cuvsResources_t res,
+                cuvsDistanceType _metric,
+                DLManagedTensor* graph_tensor,
+                DLManagedTensor* dataset_tensor,
+                cuvsCagraIndex_t output_index)
 {
   auto metric  = static_cast<cuvs::distance::DistanceType>((int)_metric);
   auto dataset = dataset_tensor->dl_tensor;
   auto graph   = graph_tensor->dl_tensor;
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
 
-  void* index = NULL;
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
     using mdspan_type = raft::device_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
     cuvs::neighbors::device_padded_dataset_view<T, int64_t> dataset_view(mds);
+    void* raw = nullptr;
     if (cuvs::core::is_dlpack_device_compatible(graph)) {
       using graph_mdspan_type = raft::device_matrix_view<uint32_t const, int64_t, raft::row_major>;
       auto graph_mds          = cuvs::core::from_dlpack<graph_mdspan_type>(graph_tensor);
-      index = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr, metric, dataset_view, graph_mds);
+      raw = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr, metric, dataset_view, graph_mds);
     } else {
       using graph_mdspan_type = raft::host_matrix_view<uint32_t const, int64_t, raft::row_major>;
       auto graph_mds          = cuvs::core::from_dlpack<graph_mdspan_type>(graph_tensor);
-      index = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr, metric, dataset_view, graph_mds);
+      raw = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr, metric, dataset_view, graph_mds);
     }
+    output_index->addr         = reinterpret_cast<uintptr_t>(raw);
+    output_index->merged_owner = 0;
   } else if (cuvs::core::is_dlpack_host_compatible(dataset)) {
     using mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
-    auto idx          = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr, metric);
-    idx->update_dataset(*res_ptr, mds);
+    auto d_matrix    = raft::make_device_matrix<T, int64_t, raft::row_major>(
+      *res_ptr, mds.extent(0), mds.extent(1));
+    raft::copy(d_matrix.data_handle(),
+               mds.data_handle(),
+               mds.size(),
+               raft::resource::get_cuda_stream(*res_ptr));
+    cuvs::neighbors::device_padded_dataset_view<T, int64_t> dataset_view(d_matrix.view());
+    auto idx = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr, metric);
+    idx->update_dataset(*res_ptr, dataset_view);
     if (cuvs::core::is_dlpack_device_compatible(graph)) {
       using graph_mdspan_type = raft::device_matrix_view<uint32_t const, int64_t, raft::row_major>;
       auto graph_mds          = cuvs::core::from_dlpack<graph_mdspan_type>(graph_tensor);
@@ -168,9 +194,11 @@ void* _from_args(cuvsResources_t res,
       auto graph_mds          = cuvs::core::from_dlpack<graph_mdspan_type>(graph_tensor);
       idx->update_graph(*res_ptr, graph_mds);
     }
-    index = idx;
+    auto* holder = new merged_cagra_holder<T>{std::move(*idx), std::move(d_matrix)};
+    delete idx;
+    output_index->addr         = reinterpret_cast<uintptr_t>(&holder->idx);
+    output_index->merged_owner = reinterpret_cast<uintptr_t>(holder);
   }
-  return index;
 }
 
 template <typename T>
@@ -296,11 +324,12 @@ void* _deserialize(cuvsResources_t res, const char* filename)
 }
 
 template <typename T>
-void* _merge(cuvsResources_t res,
-             cuvsCagraIndexParams params,
-             cuvsCagraIndex_t* indices,
-             size_t num_indices,
-             cuvsFilter filter)
+void _merge(cuvsResources_t res,
+            cuvsCagraIndexParams params,
+            cuvsCagraIndex_t* indices,
+            size_t num_indices,
+            cuvsFilter filter,
+            cuvsCagraIndex_t output_index)
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   cuvs::neighbors::cagra::index_params params_cpp;
@@ -337,21 +366,25 @@ void* _merge(cuvsResources_t res,
     index_ptrs.push_back(idx_ptr);
   }
 
-  if (filter.type == NO_FILTER) {
-    return new cuvs::neighbors::cagra::index<T, uint32_t>(
-      cuvs::neighbors::cagra::merge(*res_ptr, params_cpp, index_ptrs));
-  } else if (filter.type == BITSET) {
-    using filter_mdspan_type    = raft::device_vector_view<std::uint32_t, int64_t, raft::row_major>;
-    auto removed_indices_tensor = reinterpret_cast<DLManagedTensor*>(filter.addr);
-    auto removed_indices = cuvs::core::from_dlpack<filter_mdspan_type>(removed_indices_tensor);
-    cuvs::core::bitset_view<std::uint32_t, int64_t> removed_indices_bitset(
-      removed_indices, total_size);
-    auto bitset_filter_obj = cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset);
-    return new cuvs::neighbors::cagra::index<T, uint32_t>(
-      cuvs::neighbors::cagra::merge(*res_ptr, params_cpp, index_ptrs, bitset_filter_obj));
-  } else {
-    RAFT_FAIL("Unsupported filter type: BITMAP");
-  }
+  cuvs::neighbors::cagra::merge_result<T, uint32_t> merge_res = [&]() {
+    if (filter.type == NO_FILTER) {
+      return cuvs::neighbors::cagra::merge(*res_ptr, params_cpp, index_ptrs);
+    } else if (filter.type == BITSET) {
+      using filter_mdspan_type    = raft::device_vector_view<std::uint32_t, int64_t, raft::row_major>;
+      auto removed_indices_tensor = reinterpret_cast<DLManagedTensor*>(filter.addr);
+      auto removed_indices = cuvs::core::from_dlpack<filter_mdspan_type>(removed_indices_tensor);
+      cuvs::core::bitset_view<std::uint32_t, int64_t> removed_indices_bitset(
+        removed_indices, total_size);
+      auto bitset_filter_obj = cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset);
+      return cuvs::neighbors::cagra::merge(*res_ptr, params_cpp, index_ptrs, bitset_filter_obj);
+    } else {
+      RAFT_FAIL("Unsupported filter type: BITMAP");
+    }
+  }();
+
+  auto* holder = new merged_cagra_holder<T>{std::move(merge_res.idx), std::move(merge_res.dataset)};
+  output_index->addr         = reinterpret_cast<uintptr_t>(&holder->idx);
+  output_index->merged_owner = reinterpret_cast<uintptr_t>(holder);
 }
 
 template <typename T, typename IdxT>
@@ -483,7 +516,9 @@ void convert_c_search_params(cuvsCagraSearchParams params,
 }  // namespace cuvs::neighbors::cagra
 extern "C" cuvsError_t cuvsCagraIndexCreate(cuvsCagraIndex_t* index)
 {
-  return cuvs::core::translate_exceptions([=] { *index = new cuvsCagraIndex{}; });
+  return cuvs::core::translate_exceptions([=] {
+    *index = new cuvsCagraIndex{0, {}, 0};
+  });
 }
 
 extern "C" cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index_c_ptr)
@@ -491,21 +526,35 @@ extern "C" cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index_c_ptr)
   return cuvs::core::translate_exceptions([=] {
     auto index = *index_c_ptr;
 
-    if (index.dtype.code == kDLFloat && index.dtype.bits == 32) {
-      auto index_ptr =
-        reinterpret_cast<cuvs::neighbors::cagra::index<float, uint32_t>*>(index.addr);
-      delete index_ptr;
-    } else if (index.dtype.code == kDLFloat && index.dtype.bits == 16) {
-      auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<half, uint32_t>*>(index.addr);
-      delete index_ptr;
-    } else if (index.dtype.code == kDLInt && index.dtype.bits == 8) {
-      auto index_ptr =
-        reinterpret_cast<cuvs::neighbors::cagra::index<int8_t, uint32_t>*>(index.addr);
-      delete index_ptr;
-    } else if (index.dtype.code == kDLUInt && index.dtype.bits == 8) {
-      auto index_ptr =
-        reinterpret_cast<cuvs::neighbors::cagra::index<uint8_t, uint32_t>*>(index.addr);
-      delete index_ptr;
+    if (index.merged_owner != 0) {
+      // Merged index: addr points inside the holder; delete the holder.
+      if (index.dtype.code == kDLFloat && index.dtype.bits == 32) {
+        delete reinterpret_cast<merged_cagra_holder<float>*>(index.merged_owner);
+      } else if (index.dtype.code == kDLFloat && index.dtype.bits == 16) {
+        delete reinterpret_cast<merged_cagra_holder<half>*>(index.merged_owner);
+      } else if (index.dtype.code == kDLInt && index.dtype.bits == 8) {
+        delete reinterpret_cast<merged_cagra_holder<int8_t>*>(index.merged_owner);
+      } else if (index.dtype.code == kDLUInt && index.dtype.bits == 8) {
+        delete reinterpret_cast<merged_cagra_holder<uint8_t>*>(index.merged_owner);
+      }
+    } else {
+      if (index.dtype.code == kDLFloat && index.dtype.bits == 32) {
+        auto index_ptr =
+          reinterpret_cast<cuvs::neighbors::cagra::index<float, uint32_t>*>(index.addr);
+        delete index_ptr;
+      } else if (index.dtype.code == kDLFloat && index.dtype.bits == 16) {
+        auto index_ptr =
+          reinterpret_cast<cuvs::neighbors::cagra::index<half, uint32_t>*>(index.addr);
+        delete index_ptr;
+      } else if (index.dtype.code == kDLInt && index.dtype.bits == 8) {
+        auto index_ptr =
+          reinterpret_cast<cuvs::neighbors::cagra::index<int8_t, uint32_t>*>(index.addr);
+        delete index_ptr;
+      } else if (index.dtype.code == kDLUInt && index.dtype.bits == 8) {
+        auto index_ptr =
+          reinterpret_cast<cuvs::neighbors::cagra::index<uint8_t, uint32_t>*>(index.addr);
+        delete index_ptr;
+      }
     }
     delete index_c_ptr;
   });
@@ -576,15 +625,16 @@ extern "C" cuvsError_t cuvsCagraBuild(cuvsResources_t res,
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
-    index->dtype = dataset.dtype;
+    index->dtype        = dataset.dtype;
+    index->merged_owner = 0;
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
-      index->addr = reinterpret_cast<uintptr_t>(_build<float>(res, *params, dataset_tensor));
+      _build<float>(res, *params, dataset_tensor, index);
     } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 16) {
-      index->addr = reinterpret_cast<uintptr_t>(_build<half>(res, *params, dataset_tensor));
+      _build<half>(res, *params, dataset_tensor, index);
     } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
-      index->addr = reinterpret_cast<uintptr_t>(_build<int8_t>(res, *params, dataset_tensor));
+      _build<int8_t>(res, *params, dataset_tensor, index);
     } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
-      index->addr = reinterpret_cast<uintptr_t>(_build<uint8_t>(res, *params, dataset_tensor));
+      _build<uint8_t>(res, *params, dataset_tensor, index);
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
                 dataset.dtype.code,
@@ -601,19 +651,16 @@ extern "C" cuvsError_t cuvsCagraIndexFromArgs(cuvsResources_t res,
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
-    index->dtype = dataset.dtype;
+    index->dtype        = dataset.dtype;
+    index->merged_owner = 0;
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
-      index->addr =
-        reinterpret_cast<uintptr_t>(_from_args<float>(res, metric, graph_tensor, dataset_tensor));
+      _from_args<float>(res, metric, graph_tensor, dataset_tensor, index);
     } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 16) {
-      index->addr =
-        reinterpret_cast<uintptr_t>(_from_args<half>(res, metric, graph_tensor, dataset_tensor));
+      _from_args<half>(res, metric, graph_tensor, dataset_tensor, index);
     } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
-      index->addr =
-        reinterpret_cast<uintptr_t>(_from_args<int8_t>(res, metric, graph_tensor, dataset_tensor));
+      _from_args<int8_t>(res, metric, graph_tensor, dataset_tensor, index);
     } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
-      index->addr =
-        reinterpret_cast<uintptr_t>(_from_args<uint8_t>(res, metric, graph_tensor, dataset_tensor));
+      _from_args<uint8_t>(res, metric, graph_tensor, dataset_tensor, index);
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
                 dataset.dtype.code,
@@ -715,19 +762,16 @@ extern "C" cuvsError_t cuvsCagraMerge(cuvsResources_t res,
     }
     RAFT_EXPECTS(output_index != nullptr, "Output index pointer must not be null");
     output_index->dtype = dtype;  // output index type matches inputs
+    output_index->merged_owner = 0;  // set by _merge when it allocates the holder
     // Dispatch based on data type
     if (dtype.code == kDLFloat && dtype.bits == 32) {
-      output_index->addr =
-        reinterpret_cast<uintptr_t>(_merge<float>(res, *params, indices, num_indices, filter));
+      _merge<float>(res, *params, indices, num_indices, filter, output_index);
     } else if (dtype.code == kDLFloat && dtype.bits == 16) {
-      output_index->addr =
-        reinterpret_cast<uintptr_t>(_merge<half>(res, *params, indices, num_indices, filter));
+      _merge<half>(res, *params, indices, num_indices, filter, output_index);
     } else if (dtype.code == kDLInt && dtype.bits == 8) {
-      output_index->addr =
-        reinterpret_cast<uintptr_t>(_merge<int8_t>(res, *params, indices, num_indices, filter));
+      _merge<int8_t>(res, *params, indices, num_indices, filter, output_index);
     } else if (dtype.code == kDLUInt && dtype.bits == 8) {
-      output_index->addr =
-        reinterpret_cast<uintptr_t>(_merge<uint8_t>(res, *params, indices, num_indices, filter));
+      _merge<uint8_t>(res, *params, indices, num_indices, filter, output_index);
     } else {
       RAFT_FAIL("Unsupported index data type: code=%d, bits=%d", dtype.code, dtype.bits);
     }
@@ -882,7 +926,8 @@ extern "C" cuvsError_t cuvsCagraDeserialize(cuvsResources_t res,
     is.read(dtype_string, 4);
     auto dtype = raft::detail::numpy_serializer::parse_descr(std::string(dtype_string, 4));
 
-    index->dtype.bits = dtype.itemsize * 8;
+    index->dtype.bits    = dtype.itemsize * 8;
+    index->merged_owner  = 0;
     if (dtype.kind == 'f' && dtype.itemsize == 4) {
       index->addr       = reinterpret_cast<uintptr_t>(_deserialize<float>(res, filename));
       index->dtype.code = kDLFloat;
