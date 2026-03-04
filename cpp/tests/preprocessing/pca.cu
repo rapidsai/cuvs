@@ -289,7 +289,7 @@ TEST_P(PcaTestDataVecSmallD, Result)
 {
   ASSERT_TRUE(devArrMatch(data.data(),
                           data_back.data(),
-                          (params.n_col * params.n_col),
+                          (params.n_row * params.n_col),
                           cuvs::CompareApprox<double>(params.tolerance),
                           raft::resource::get_cuda_stream(handle)));
 }
