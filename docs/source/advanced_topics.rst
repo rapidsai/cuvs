@@ -9,6 +9,7 @@ cuVS uses the Just-in-Time (JIT) compilation technology to compile certain kerne
 
 1. In-memory cache is valid for the lifetime of the process.
 2. On-disk cache is valid until a CUDA driver upgrade is performed.
+
 Thus, the JIT compilation is a one-time cost and you can expect no loss in real performance after the first compilation. We recommend that you run a "warmup" to trigger the JIT compilation before the actual usage.
 
 Currently, the following algorithms will trigger a JIT compilation:
