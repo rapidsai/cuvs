@@ -82,30 +82,32 @@ Note: these packages statically link the C and C++ libraries so the `libcuvs` an
 Tarball
 ^^^^^^^
 
-* Install prerequisites
+Prerequisites
+~~~~~~~~~~~~~
 
-  * `NCCL <https://docs.nvidia.com/deeplearning/nccl/install-guide/index.html>` _
+1.`NCCL <https://docs.nvidia.com/deeplearning/nccl/install-guide/index.html>` _
+2. `libopenmp`
+3. CUDA Toolkit Runtime 12.2+
+4. Ampere architecture or better (compute capability >= 8.0)
 
-  * `libopenmp`
+Download & Extract
+~~~~~~~~~~~~~~~~~~
 
-  * CUDA Toolkit Runtime 12.2+
-
-  * Ampere architecture or better (compute capability >= 8.0)
-
-* Download the pre-built tarball for your CPU architecture and CUDA version from
+Download the pre-built tarball for your CPU architecture and CUDA version from
 `https://developer.nvidia.com/cuvs-downloads <https://developer.nvidia.com/cuvs-downloads>`_
 
-* Untar the tarball into a directory
+Untar the tarball into a directory.
 
-    .. code-block:: bash
+.. code-block:: bash
 
-        tar -xzvf libcuvs-linux-sbsa-26.02.00.189485_cuda12-archive.tar.xz -C /path/to/folder
+    tar -xzvf libcuvs-linux-sbsa-26.02.00.189485_cuda12-archive.tar.xz -C /path/to/folder
 
-* Add cuVS to your system library load path. This should be done in the appropriate profile configuration (for e.g. `.bashrc`, `.bash_profile`) to maintain the setting across sessions.
 
-    .. code-block:: bash
+Add cuVS to your system library load path. This should be done in the appropriate profile configuration (for e.g. `.bashrc`, `.bash_profile`) to maintain the setting across sessions.
 
-        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path/to/folder
+.. code-block:: bash
+
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path/to/folder
 
 
 Build from source
