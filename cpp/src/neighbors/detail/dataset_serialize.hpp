@@ -56,6 +56,32 @@ void serialize(const raft::resources& res,
   raft::serialize_mdspan(res, os, dst.view());
 }
 
+template <typename DataT, typename IdxT>
+void serialize(const raft::resources& res,
+               std::ostream& os,
+               const device_padded_dataset_view<DataT, IdxT>& dataset)
+{
+  // Same on-disk format as strided_dataset so deserialize_strided can read it.
+  auto n_rows = dataset.n_rows();
+  auto dim    = dataset.dim();
+  auto stride = dataset.stride();
+  raft::serialize_scalar(res, os, n_rows);
+  raft::serialize_scalar(res, os, dim);
+  raft::serialize_scalar(res, os, stride);
+  auto src = dataset.view();
+  auto dst = raft::make_host_matrix<DataT, IdxT>(n_rows, dim);
+  RAFT_CUDA_TRY(cudaMemcpy2DAsync(dst.data_handle(),
+                                  sizeof(DataT) * dim,
+                                  src.data_handle(),
+                                  sizeof(DataT) * stride,
+                                  sizeof(DataT) * dim,
+                                  n_rows,
+                                  cudaMemcpyDefault,
+                                  raft::resource::get_cuda_stream(res)));
+  raft::resource::sync_stream(res);
+  raft::serialize_mdspan(res, os, dst.view());
+}
+
 template <typename MathT, typename IdxT>
 void serialize(const raft::resources& res,
                std::ostream& os,
@@ -95,6 +121,30 @@ void serialize(const raft::resources& res, std::ostream& os, const dataset<IdxT>
     return serialize(res, os, *x);
   }
   if (auto x = dynamic_cast<const strided_dataset<uint8_t, IdxT>*>(&dataset); x != nullptr) {
+    raft::serialize_scalar(res, os, kSerializeStridedDataset);
+    raft::serialize_scalar(res, os, CUDA_R_8U);
+    return serialize(res, os, *x);
+  }
+  if (auto x = dynamic_cast<const device_padded_dataset_view<float, IdxT>*>(&dataset);
+      x != nullptr) {
+    raft::serialize_scalar(res, os, kSerializeStridedDataset);
+    raft::serialize_scalar(res, os, CUDA_R_32F);
+    return serialize(res, os, *x);
+  }
+  if (auto x = dynamic_cast<const device_padded_dataset_view<half, IdxT>*>(&dataset);
+      x != nullptr) {
+    raft::serialize_scalar(res, os, kSerializeStridedDataset);
+    raft::serialize_scalar(res, os, CUDA_R_16F);
+    return serialize(res, os, *x);
+  }
+  if (auto x = dynamic_cast<const device_padded_dataset_view<int8_t, IdxT>*>(&dataset);
+      x != nullptr) {
+    raft::serialize_scalar(res, os, kSerializeStridedDataset);
+    raft::serialize_scalar(res, os, CUDA_R_8I);
+    return serialize(res, os, *x);
+  }
+  if (auto x = dynamic_cast<const device_padded_dataset_view<uint8_t, IdxT>*>(&dataset);
+      x != nullptr) {
     raft::serialize_scalar(res, os, kSerializeStridedDataset);
     raft::serialize_scalar(res, os, CUDA_R_8U);
     return serialize(res, os, *x);

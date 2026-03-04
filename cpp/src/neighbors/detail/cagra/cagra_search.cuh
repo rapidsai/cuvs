@@ -149,8 +149,15 @@ void search_main(raft::resources const& res,
   // n_rows has the same type as the dataset index (the array extents type)
   using ds_idx_type    = decltype(index.data().n_rows());
   using graph_idx_type = uint32_t;
-  // Dispatch search parameters based on the dataset kind.
-  if (auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index.data());
+
+  // Dispatch on dataset type. If index holds dataset_view (e.g. after deserialize), unwrap once.
+  auto const* data_ptr = &index.data();
+  if (auto* view_dset = dynamic_cast<const dataset_view<ds_idx_type>*>(data_ptr);
+      view_dset != nullptr) {
+    data_ptr = view_dset->ptr_;
+  }
+
+  if (auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(data_ptr);
       strided_dset != nullptr) {
     // Search using a plain (strided) row-major dataset
     RAFT_EXPECTS(index.metric() != cuvs::distance::DistanceType::CosineExpanded ||
@@ -173,11 +180,11 @@ void search_main(raft::resources const& res,
       neighbors,
       distances,
       sample_filter);
-  } else if (auto* vpq_dset = dynamic_cast<const vpq_dataset<float, ds_idx_type>*>(&index.data());
+  } else if (auto* vpq_dset = dynamic_cast<const vpq_dataset<float, ds_idx_type>*>(data_ptr);
              vpq_dset != nullptr) {
     // Search using a compressed dataset
     RAFT_FAIL("FP32 VPQ dataset support is coming soon");
-  } else if (auto* vpq_dset = dynamic_cast<const vpq_dataset<half, ds_idx_type>*>(&index.data());
+  } else if (auto* vpq_dset = dynamic_cast<const vpq_dataset<half, ds_idx_type>*>(data_ptr);
              vpq_dset != nullptr) {
     auto desc = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
       res, params, *vpq_dset, index.metric(), nullptr);
@@ -192,7 +199,7 @@ void search_main(raft::resources const& res,
       distances,
       sample_filter);
   } else if (auto* padded_view_dset =
-               dynamic_cast<const device_padded_dataset_view<T, ds_idx_type>*>(&index.data());
+               dynamic_cast<const device_padded_dataset_view<T, ds_idx_type>*>(data_ptr);
              padded_view_dset != nullptr) {
     // Search using a padded dataset view (same descriptor as strided)
     RAFT_EXPECTS(index.metric() != cuvs::distance::DistanceType::CosineExpanded ||
@@ -216,7 +223,7 @@ void search_main(raft::resources const& res,
       distances,
       sample_filter);
   } else if (auto* padded_dset =
-               dynamic_cast<const device_padded_dataset<T, ds_idx_type>*>(&index.data());
+               dynamic_cast<const device_padded_dataset<T, ds_idx_type>*>(data_ptr);
              padded_dset != nullptr) {
     // Search using a padded dataset (same descriptor as strided)
     RAFT_EXPECTS(index.metric() != cuvs::distance::DistanceType::CosineExpanded ||
@@ -239,7 +246,7 @@ void search_main(raft::resources const& res,
       neighbors,
       distances,
       sample_filter);
-  } else if (auto* empty_dset = dynamic_cast<const empty_dataset<ds_idx_type>*>(&index.data());
+  } else if (auto* empty_dset = dynamic_cast<const empty_dataset<ds_idx_type>*>(data_ptr);
              empty_dset != nullptr) {
     // Forgot to add a dataset.
     RAFT_FAIL(
