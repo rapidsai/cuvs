@@ -34,7 +34,6 @@ namespace cuvs::preprocessing::pca {
   }
 
 CUVS_INST_PCA_FIT(float, int64_t);
-CUVS_INST_PCA_FIT(double, int64_t);
 #undef CUVS_INST_PCA_FIT
 
 #define CUVS_INST_PCA_FIT_TRANSFORM(DataT, IndexT)                                         \
@@ -64,7 +63,6 @@ CUVS_INST_PCA_FIT(double, int64_t);
   }
 
 CUVS_INST_PCA_FIT_TRANSFORM(float, int64_t);
-CUVS_INST_PCA_FIT_TRANSFORM(double, int64_t);
 #undef CUVS_INST_PCA_FIT_TRANSFORM
 
 #define CUVS_INST_PCA_TRANSFORM(DataT, IndexT)                                            \
@@ -80,7 +78,6 @@ CUVS_INST_PCA_FIT_TRANSFORM(double, int64_t);
   }
 
 CUVS_INST_PCA_TRANSFORM(float, int64_t);
-CUVS_INST_PCA_TRANSFORM(double, int64_t);
 #undef CUVS_INST_PCA_TRANSFORM
 
 #define CUVS_INST_PCA_INVERSE_TRANSFORM(DataT, IndexT)                                             \
@@ -96,7 +93,6 @@ CUVS_INST_PCA_TRANSFORM(double, int64_t);
   }
 
 CUVS_INST_PCA_INVERSE_TRANSFORM(float, int64_t);
-CUVS_INST_PCA_INVERSE_TRANSFORM(double, int64_t);
 #undef CUVS_INST_PCA_INVERSE_TRANSFORM
 
 }  // namespace cuvs::preprocessing::pca

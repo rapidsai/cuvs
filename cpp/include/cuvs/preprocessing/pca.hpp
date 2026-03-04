@@ -107,17 +107,6 @@ void fit(raft::resources const& handle,
          raft::device_scalar_view<float, int64_t> noise_vars,
          bool flip_signs_based_on_U = false);
 
-void fit(raft::resources const& handle,
-         const params& config,
-         raft::device_matrix_view<double, int64_t, raft::col_major> input,
-         raft::device_matrix_view<double, int64_t, raft::col_major> components,
-         raft::device_vector_view<double, int64_t> explained_var,
-         raft::device_vector_view<double, int64_t> explained_var_ratio,
-         raft::device_vector_view<double, int64_t> singular_vals,
-         raft::device_vector_view<double, int64_t> mu,
-         raft::device_scalar_view<double, int64_t> noise_vars,
-         bool flip_signs_based_on_U = false);
-
 /**
  * @brief Perform PCA fit and transform operations.
  *
@@ -148,18 +137,6 @@ void fit_transform(raft::resources const& handle,
                    raft::device_scalar_view<float, int64_t> noise_vars,
                    bool flip_signs_based_on_U = false);
 
-void fit_transform(raft::resources const& handle,
-                   const params& config,
-                   raft::device_matrix_view<double, int64_t, raft::col_major> input,
-                   raft::device_matrix_view<double, int64_t, raft::col_major> trans_input,
-                   raft::device_matrix_view<double, int64_t, raft::col_major> components,
-                   raft::device_vector_view<double, int64_t> explained_var,
-                   raft::device_vector_view<double, int64_t> explained_var_ratio,
-                   raft::device_vector_view<double, int64_t> singular_vals,
-                   raft::device_vector_view<double, int64_t> mu,
-                   raft::device_scalar_view<double, int64_t> noise_vars,
-                   bool flip_signs_based_on_U = false);
-
 /**
  * @brief Perform PCA transform operation.
  *
@@ -182,14 +159,6 @@ void transform(raft::resources const& handle,
                raft::device_vector_view<float, int64_t> mu,
                raft::device_matrix_view<float, int64_t, raft::col_major> trans_input);
 
-void transform(raft::resources const& handle,
-               const params& config,
-               raft::device_matrix_view<double, int64_t, raft::col_major> input,
-               raft::device_matrix_view<double, int64_t, raft::col_major> components,
-               raft::device_vector_view<double, int64_t> singular_vals,
-               raft::device_vector_view<double, int64_t> mu,
-               raft::device_matrix_view<double, int64_t, raft::col_major> trans_input);
-
 /**
  * @brief Perform PCA inverse transform operation.
  *
@@ -210,14 +179,6 @@ void inverse_transform(raft::resources const& handle,
                        raft::device_vector_view<float, int64_t> singular_vals,
                        raft::device_vector_view<float, int64_t> mu,
                        raft::device_matrix_view<float, int64_t, raft::col_major> output);
-
-void inverse_transform(raft::resources const& handle,
-                       const params& config,
-                       raft::device_matrix_view<double, int64_t, raft::col_major> trans_input,
-                       raft::device_matrix_view<double, int64_t, raft::col_major> components,
-                       raft::device_vector_view<double, int64_t> singular_vals,
-                       raft::device_vector_view<double, int64_t> mu,
-                       raft::device_matrix_view<double, int64_t, raft::col_major> output);
 
 /** @} */  // end group pca
 

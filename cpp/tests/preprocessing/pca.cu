@@ -206,10 +206,6 @@ const std::vector<PcaInputs<float>> inputsf2 = {
   {0.01f, 3 * 2, 3, 2, 1024 * 128, 1024, 128, 1234ULL, 0},
   {0.01f, 3 * 2, 3, 2, 256 * 32, 256, 32, 1234ULL, 1}};
 
-const std::vector<PcaInputs<double>> inputsd2 = {
-  {0.01, 3 * 2, 3, 2, 1024 * 128, 1024, 128, 1234ULL, 0},
-  {0.01, 3 * 2, 3, 2, 256 * 32, 256, 32, 1234ULL, 1}};
-
 typedef PcaTest<float> PcaTestValF;
 TEST_P(PcaTestValF, Result)
 {
@@ -217,16 +213,6 @@ TEST_P(PcaTestValF, Result)
                           explained_vars_ref.data(),
                           params.n_col,
                           cuvs::CompareApprox<float>(params.tolerance),
-                          raft::resource::get_cuda_stream(handle)));
-}
-
-typedef PcaTest<double> PcaTestValD;
-TEST_P(PcaTestValD, Result)
-{
-  ASSERT_TRUE(devArrMatch(explained_vars.data(),
-                          explained_vars_ref.data(),
-                          params.n_col,
-                          cuvs::CompareApprox<double>(params.tolerance),
                           raft::resource::get_cuda_stream(handle)));
 }
 
@@ -240,16 +226,6 @@ TEST_P(PcaTestLeftVecF, Result)
                           raft::resource::get_cuda_stream(handle)));
 }
 
-typedef PcaTest<double> PcaTestLeftVecD;
-TEST_P(PcaTestLeftVecD, Result)
-{
-  ASSERT_TRUE(devArrMatch(components.data(),
-                          components_ref.data(),
-                          (params.n_col * params.n_col),
-                          cuvs::CompareApprox<double>(params.tolerance),
-                          raft::resource::get_cuda_stream(handle)));
-}
-
 typedef PcaTest<float> PcaTestTransDataF;
 TEST_P(PcaTestTransDataF, Result)
 {
@@ -257,16 +233,6 @@ TEST_P(PcaTestTransDataF, Result)
                           trans_data_ref.data(),
                           (params.n_row * params.n_col),
                           cuvs::CompareApprox<float>(params.tolerance),
-                          raft::resource::get_cuda_stream(handle)));
-}
-
-typedef PcaTest<double> PcaTestTransDataD;
-TEST_P(PcaTestTransDataD, Result)
-{
-  ASSERT_TRUE(devArrMatch(trans_data.data(),
-                          trans_data_ref.data(),
-                          (params.n_row * params.n_col),
-                          cuvs::CompareApprox<double>(params.tolerance),
                           raft::resource::get_cuda_stream(handle)));
 }
 
@@ -280,16 +246,6 @@ TEST_P(PcaTestDataVecSmallF, Result)
                           raft::resource::get_cuda_stream(handle)));
 }
 
-typedef PcaTest<double> PcaTestDataVecSmallD;
-TEST_P(PcaTestDataVecSmallD, Result)
-{
-  ASSERT_TRUE(devArrMatch(data.data(),
-                          data_back.data(),
-                          (params.n_row * params.n_col),
-                          cuvs::CompareApprox<double>(params.tolerance),
-                          raft::resource::get_cuda_stream(handle)));
-}
-
 typedef PcaTest<float> PcaTestDataVecF;
 TEST_P(PcaTestDataVecF, Result)
 {
@@ -300,34 +256,14 @@ TEST_P(PcaTestDataVecF, Result)
                           raft::resource::get_cuda_stream(handle)));
 }
 
-typedef PcaTest<double> PcaTestDataVecD;
-TEST_P(PcaTestDataVecD, Result)
-{
-  ASSERT_TRUE(devArrMatch(data2.data(),
-                          data2_back.data(),
-                          (params.n_row2 * params.n_col2),
-                          cuvs::CompareApprox<double>(params.tolerance),
-                          raft::resource::get_cuda_stream(handle)));
-}
-
 INSTANTIATE_TEST_CASE_P(PcaTests, PcaTestValF, ::testing::ValuesIn(inputsf2));
-
-INSTANTIATE_TEST_CASE_P(PcaTests, PcaTestValD, ::testing::ValuesIn(inputsd2));
 
 INSTANTIATE_TEST_CASE_P(PcaTests, PcaTestLeftVecF, ::testing::ValuesIn(inputsf2));
 
-INSTANTIATE_TEST_CASE_P(PcaTests, PcaTestLeftVecD, ::testing::ValuesIn(inputsd2));
-
 INSTANTIATE_TEST_CASE_P(PcaTests, PcaTestDataVecSmallF, ::testing::ValuesIn(inputsf2));
-
-INSTANTIATE_TEST_CASE_P(PcaTests, PcaTestDataVecSmallD, ::testing::ValuesIn(inputsd2));
 
 INSTANTIATE_TEST_CASE_P(PcaTests, PcaTestTransDataF, ::testing::ValuesIn(inputsf2));
 
-INSTANTIATE_TEST_CASE_P(PcaTests, PcaTestTransDataD, ::testing::ValuesIn(inputsd2));
-
 INSTANTIATE_TEST_CASE_P(PcaTests, PcaTestDataVecF, ::testing::ValuesIn(inputsf2));
-
-INSTANTIATE_TEST_CASE_P(PcaTests, PcaTestDataVecD, ::testing::ValuesIn(inputsd2));
 
 }  // end namespace cuvs::preprocessing::pca
