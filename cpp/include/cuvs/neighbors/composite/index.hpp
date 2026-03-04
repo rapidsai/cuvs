@@ -27,7 +27,7 @@ namespace cuvs::neighbors::composite {
  *   auto index0 = cagra::build(res, params, dataset0);
  *   auto index1 = cagra::build(res, params, dataset1);
  *
- *   composite::CompositeIndex<float, uint32_t> composite({&index0, &index1});
+ *   composite::composite_index<float, uint32_t> composite({&index0, &index1});
  *
  *   // optional: create a stream pool to enable parallel search across sub-indices
  *   size_t n_streams = 2;
@@ -38,14 +38,14 @@ namespace cuvs::neighbors::composite {
  * @endcode
  */
 template <typename T, typename IdxT, typename OutputIdxT = IdxT>
-class CompositeIndex {
+class composite_index {
  public:
   using value_type        = T;
   using index_type        = IdxT;
   using out_index_type    = OutputIdxT;
   using matrix_index_type = int64_t;
 
-  explicit CompositeIndex(std::vector<cuvs::neighbors::cagra::index<T, IdxT>*> children)
+  explicit composite_index(std::vector<cuvs::neighbors::cagra::index<T, IdxT>*> children)
     : children_(std::move(children))
   {
   }

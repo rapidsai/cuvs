@@ -15,7 +15,7 @@
 namespace cuvs::neighbors::composite {
 
 template <typename T, typename IdxT, typename OutputIdxT>
-void CompositeIndex<T, IdxT, OutputIdxT>::search(
+void composite_index<T, IdxT, OutputIdxT>::search(
   const raft::resources& handle,
   const cuvs::neighbors::cagra::search_params& params,
   raft::device_matrix_view<const value_type, matrix_index_type, raft::row_major> queries,
@@ -111,13 +111,13 @@ void CompositeIndex<T, IdxT, OutputIdxT>::search(
                             cuvs::selection::SelectAlgo::kAuto);
 }
 
-template class CompositeIndex<float, uint32_t, uint32_t>;
-template class CompositeIndex<float, uint32_t, int64_t>;
-template class CompositeIndex<half, uint32_t, uint32_t>;
-template class CompositeIndex<half, uint32_t, int64_t>;
-template class CompositeIndex<int8_t, uint32_t, uint32_t>;
-template class CompositeIndex<int8_t, uint32_t, int64_t>;
-template class CompositeIndex<uint8_t, uint32_t, uint32_t>;
-template class CompositeIndex<uint8_t, uint32_t, int64_t>;
+template class composite_index<float, uint32_t, uint32_t>;
+template class composite_index<float, uint32_t, int64_t>;
+template class composite_index<half, uint32_t, uint32_t>;
+template class composite_index<half, uint32_t, int64_t>;
+template class composite_index<int8_t, uint32_t, uint32_t>;
+template class composite_index<int8_t, uint32_t, int64_t>;
+template class composite_index<uint8_t, uint32_t, uint32_t>;
+template class composite_index<uint8_t, uint32_t, int64_t>;
 
 }  // namespace cuvs::neighbors::composite

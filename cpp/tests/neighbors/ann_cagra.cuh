@@ -1338,7 +1338,7 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
           cagra::search(
             handle_, search_params, merged, search_queries_view, indices_out_view, dists_out_view);
         } else {
-          cuvs::neighbors::composite::CompositeIndex<DataT, IdxT, SearchIdxT> composite(
+          cuvs::neighbors::composite::composite_index<DataT, IdxT, SearchIdxT> composite(
             indices_to_merge);
           composite.search(
             handle_, search_params, search_queries_view, indices_out_view, dists_out_view);
