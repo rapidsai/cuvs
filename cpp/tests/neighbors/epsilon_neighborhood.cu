@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -10,6 +10,7 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/matrix/init.cuh>
 #include <raft/random/make_blobs.cuh>
 #include <raft/sparse/convert/csr.cuh>
 #include <raft/util/cudart_utils.hpp>
@@ -418,5 +419,42 @@ TEST_P(EpsNeighRbcTestFI, SparseRbcMaxK)
 }
 
 INSTANTIATE_TEST_CASE_P(EpsNeighTests, EpsNeighRbcTestFI, ::testing::ValuesIn(inputsfi_rbc));
+
+TEST(EpsNeighborhood, LargeNDimension)
+{
+  // n just past the grid.y=65535 limit for Nblk=16
+  int64_t m = 1, n = 65536 * 16 + 1, k = 4;
+  float eps = 1e10f;  // large enough that everything is a neighbor
+
+  raft::resources handle;
+  auto x   = raft::make_device_matrix<float, int64_t>(handle, m, k);
+  auto y   = raft::make_device_matrix<float, int64_t>(handle, n, k);
+  auto adj = raft::make_device_matrix<bool, int64_t>(handle, m, n);
+  auto vd  = raft::make_device_vector<int64_t, int64_t>(handle, m + 1);
+
+  // fill x, y with zeros (every pair has distance 0 < eps)
+  raft::matrix::fill(handle, x.view(), 0.0f);
+  raft::matrix::fill(handle, y.view(), 0.0f);
+
+  cuvs::neighbors::epsilon_neighborhood::compute(handle,
+                                                 raft::make_const_mdspan(x.view()),
+                                                 raft::make_const_mdspan(y.view()),
+                                                 adj.view(),
+                                                 vd.view(),
+                                                 eps,
+                                                 cuvs::distance::DistanceType::L2Unexpanded);
+
+  // Verify: with distance=0 and huge eps, every entry in adj should be true
+  // and vd[0] should equal n
+  auto adj_expected = raft::make_device_matrix<bool, int64_t>(handle, m, n);
+  raft::matrix::fill(handle, adj_expected.view(), true);
+  auto stream = raft::resource::get_cuda_stream(handle);
+  ASSERT_TRUE(cuvs::devArrMatch(
+    adj_expected.data_handle(), adj.data_handle(), m * n, cuvs::Compare<bool>(), stream));
+
+  int64_t expected_vd0 = n;
+  ASSERT_TRUE(
+    cuvs::devArrMatch(&expected_vd0, vd.data_handle(), 1, cuvs::Compare<int64_t>(), stream));
+}
 
 };  // namespace cuvs::neighbors::epsilon_neighborhood
