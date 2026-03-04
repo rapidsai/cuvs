@@ -357,7 +357,7 @@ void bench_search(::benchmark::State& state,
     const auto& filter_pass_counts = dataset->filter_pass_counts();
     result_buf.transfer_data(MemoryType::kHost, current_algo_props->query_memory_type);
     auto* neighbors_host    = reinterpret_cast<index_type*>(result_buf.data(MemoryType::kHost));
-    std::size_t rows        = std::min(queries_processed, query_set_size);
+    std::size_t rows        = std::min({queries_processed, query_set_size, gt_maps.size()});
     std::size_t match_count = 0;
     std::size_t total_count = 0;
 
@@ -370,7 +370,7 @@ void bench_search(::benchmark::State& state,
     // ensure non-negative number of workers (possible if hardware_concurrency()
     // does not return an expected value) by clamping to 0
     if (num_recall_calculation_worker_threads < 0) { num_recall_calculation_worker_threads = 0; }
-    while (out_offset < rows && out_offset <= gt_maps.size()) {
+    while (out_offset < rows) {
       std::vector<std::thread> recall_calculation_workers;
       recall_calculation_workers.reserve(num_recall_calculation_worker_threads);
       std::vector<std::size_t> local_match_count(num_recall_calculation_worker_threads + 1);
