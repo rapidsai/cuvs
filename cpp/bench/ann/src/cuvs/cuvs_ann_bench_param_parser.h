@@ -282,6 +282,11 @@ void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::cagra::index
             params.graph_build_params)) {
         params.graph_build_params = cuvs::neighbors::graph_build_params::ace_params{};
       }
+    } else if (conf.at("graph_build_algo") == "ITERATIVE_SEARCH") {
+      if (!std::holds_alternative<cuvs::neighbors::graph_build_params::iterative_search_params>(
+            params.graph_build_params)) {
+        params.graph_build_params = cuvs::neighbors::graph_build_params::iterative_search_params{};
+      }
     }
   }
 
@@ -291,6 +296,9 @@ void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::cagra::index
   nlohmann::json nn_descent_conf    = collect_conf_with_prefix(conf, "nn_descent_");
   nlohmann::json ace_conf           = collect_conf_with_prefix(conf, "ace_");
 
+  // When graph_build_algo is not specified, leave graph_build_params as monostate so the
+  // CAGRA build uses AUTO selection (NN_DESCENT or IVF_PQ based on dataset/heuristics).
+  // Only infer from algo-specific config keys when present.
   if (std::holds_alternative<std::monostate>(params.graph_build_params)) {
     if (!ivf_pq_build_conf.empty() || !ivf_pq_search_conf.empty()) {
       params.graph_build_params = cuvs::neighbors::graph_build_params::ivf_pq_params{};
@@ -298,9 +306,8 @@ void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::cagra::index
       params.graph_build_params = cuvs::neighbors::graph_build_params::nn_descent_params{};
     } else if (!ace_conf.empty()) {
       params.graph_build_params = cuvs::neighbors::graph_build_params::ace_params{};
-    } else {
-      params.graph_build_params = cuvs::neighbors::graph_build_params::iterative_search_params{};
     }
+    // else: leave as monostate → AUTO in cagra_build.cuh
   }
 
   // Apply build-algo-specific parameters
