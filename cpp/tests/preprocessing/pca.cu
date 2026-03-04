@@ -279,7 +279,7 @@ TEST_P(PcaTestDataVecSmallF, Result)
 {
   ASSERT_TRUE(devArrMatch(data.data(),
                           data_back.data(),
-                          (params.n_col * params.n_col),
+                          (params.n_row * params.n_col),
                           cuvs::CompareApprox<float>(params.tolerance),
                           raft::resource::get_cuda_stream(handle)));
 }
@@ -299,7 +299,7 @@ TEST_P(PcaTestDataVecF, Result)
 {
   ASSERT_TRUE(devArrMatch(data2.data(),
                           data2_back.data(),
-                          (params.n_col2 * params.n_col2),
+                          (params.n_row2 * params.n_col2),
                           cuvs::CompareApprox<float>(params.tolerance),
                           raft::resource::get_cuda_stream(handle)));
 }
@@ -309,7 +309,7 @@ TEST_P(PcaTestDataVecD, Result)
 {
   ASSERT_TRUE(devArrMatch(data2.data(),
                           data2_back.data(),
-                          (params.n_col2 * params.n_col2),
+                          (params.n_row2 * params.n_col2),
                           cuvs::CompareApprox<double>(params.tolerance),
                           raft::resource::get_cuda_stream(handle)));
 }
