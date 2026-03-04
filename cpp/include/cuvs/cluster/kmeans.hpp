@@ -1380,7 +1380,7 @@ void transform(raft::resources const& handle,
                raft::device_matrix_view<double, int> X_new);
 
 /**
- * @brief Compute cluster cost
+ * @brief Compute (optionally weighted) cluster cost
  *
  * @param[in]  handle         The raft handle
  * @param[in]  X              Training instances to cluster. The data must
@@ -1390,12 +1390,16 @@ void transform(raft::resources const& handle,
  *                            row-major format.
  *                            [dim = n_clusters x n_features]
  * @param[out] cost           Resulting cluster cost
+ * @param[in]  sample_weight  Optional per-sample weights.
+ *                            [len = n_samples]
  *
  */
-void cluster_cost(const raft::resources& handle,
-                  raft::device_matrix_view<const float, int> X,
-                  raft::device_matrix_view<const float, int> centroids,
-                  raft::host_scalar_view<float> cost);
+void cluster_cost(
+  const raft::resources& handle,
+  raft::device_matrix_view<const float, int> X,
+  raft::device_matrix_view<const float, int> centroids,
+  raft::host_scalar_view<float> cost,
+  std::optional<raft::device_vector_view<const float, int>> sample_weight = std::nullopt);
 
 /**
  * @brief Compute cluster cost
@@ -1408,12 +1412,15 @@ void cluster_cost(const raft::resources& handle,
  *                            row-major format.
  *                            [dim = n_clusters x n_features]
  * @param[out] cost           Resulting cluster cost
- *
+ * @param[in]  sample_weight  Optional per-sample weights.
+ *                            [len = n_samples]
  */
-void cluster_cost(const raft::resources& handle,
-                  raft::device_matrix_view<const double, int> X,
-                  raft::device_matrix_view<const double, int> centroids,
-                  raft::host_scalar_view<double> cost);
+void cluster_cost(
+  const raft::resources& handle,
+  raft::device_matrix_view<const double, int> X,
+  raft::device_matrix_view<const double, int> centroids,
+  raft::host_scalar_view<double> cost,
+  std::optional<raft::device_vector_view<const double, int>> sample_weight = std::nullopt);
 
 /**
  * @}

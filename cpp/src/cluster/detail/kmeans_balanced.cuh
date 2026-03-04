@@ -1164,6 +1164,15 @@ void build_hierarchical(const raft::resources& handle,
                      MathT{0.2},
                      mapping_op,
                      device_memory);
+
+  // Compute inertia if requested
+  if (inertia != nullptr) {
+    auto X_view = raft::make_device_matrix_view<const T, IdxT>(dataset, n_rows, dim);
+    auto centroids_view =
+      raft::make_device_matrix_view<const MathT, IdxT>(cluster_centers, n_clusters, dim);
+    cuvs::cluster::kmeans::detail::cluster_cost(
+      handle, X_view, centroids_view, *inertia, std::nullopt, mapping_op);
+  }
 }
 
 }  // namespace  cuvs::cluster::kmeans::detail

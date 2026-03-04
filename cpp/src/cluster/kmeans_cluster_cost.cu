@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -11,16 +11,18 @@ namespace cuvs::cluster::kmeans {
 void cluster_cost(const raft::resources& handle,
                   raft::device_matrix_view<const float, int> X,
                   raft::device_matrix_view<const float, int> centroids,
-                  raft::host_scalar_view<float> cost)
+                  raft::host_scalar_view<float> cost,
+                  std::optional<raft::device_vector_view<const float, int>> sample_weight)
 {
-  cuvs::cluster::kmeans::cluster_cost<float, int>(handle, X, centroids, cost);
+  cuvs::cluster::kmeans::cluster_cost<float, int>(handle, X, centroids, cost, sample_weight);
 }
 
 void cluster_cost(const raft::resources& handle,
                   raft::device_matrix_view<const double, int> X,
                   raft::device_matrix_view<const double, int> centroids,
-                  raft::host_scalar_view<double> cost)
+                  raft::host_scalar_view<double> cost,
+                  std::optional<raft::device_vector_view<const double, int>> sample_weight)
 {
-  cuvs::cluster::kmeans::cluster_cost<double, int>(handle, X, centroids, cost);
+  cuvs::cluster::kmeans::cluster_cost<double, int>(handle, X, centroids, cost, sample_weight);
 }
 }  // namespace cuvs::cluster::kmeans
