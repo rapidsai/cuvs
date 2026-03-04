@@ -142,8 +142,6 @@ class PcaTest : public ::testing::TestWithParam<PcaInputs<T>> {
     int len = params.len2;
 
     cuvs::preprocessing::pca::params prms;
-    // prms.n_cols       = params.n_col2;
-    // prms.n_rows       = params.n_row2;
     prms.n_components = params.n_col2;
     prms.whiten       = false;
     if (params.algo == 0) {
