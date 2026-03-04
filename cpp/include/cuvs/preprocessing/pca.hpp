@@ -47,9 +47,6 @@ struct params {
    * @brief Number of iterations for the power method computed by the Jacobi solver.
    */
   int n_iterations = 15;
-
-  /** @brief 0: no error message printing, 1: print error messages. */
-  int verbose = 0;
 };
 
 /**
