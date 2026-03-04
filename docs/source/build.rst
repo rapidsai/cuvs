@@ -85,8 +85,11 @@ Tarball
 * Install prerequisites
 
   * `NCCL <https://docs.nvidia.com/deeplearning/nccl/install-guide/index.html>` _
+
   * `libopenmp`
+
   * CUDA Toolkit Runtime 12.2+
+
   * Ampere architecture or better (compute capability >= 8.0)
 
 * Download the pre-built tarball for your CPU architecture and CUDA version from
@@ -94,15 +97,15 @@ Tarball
 
 * Untar the tarball into a directory
 
-.. code-block:: bash
+    .. code-block:: bash
 
-    tar -xzvf libcuvs-linux-sbsa-26.02.00.189485_cuda12-archive.tar.xz -C /path/to/folder
+        tar -xzvf libcuvs-linux-sbsa-26.02.00.189485_cuda12-archive.tar.xz -C /path/to/folder
 
 * Add cuVS to your system library load path. This should be done in the appropriate profile configuration (for e.g. `.bashrc`, `.bash_profile`) to maintain the setting across sessions.
 
-.. code-block:: bash
+    .. code-block:: bash
 
-    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path/to/folder
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path/to/folder
 
 
 Build from source
