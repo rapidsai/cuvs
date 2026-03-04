@@ -17,6 +17,7 @@
 #include <raft/core/mdspan.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/norm.cuh>
+#include <raft/linalg/reduce.cuh>
 
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
@@ -46,16 +47,16 @@ void index<T, IdxT>::compute_dataset_norms_(raft::resources const& res)
   // first scale the dataset and then compute norms
   auto scaled_sq_op = raft::compose_op(
     raft::sq_op{}, raft::div_const_op<float>{float(kScale)}, raft::cast_op<float>());
-  raft::linalg::reduce<true, true, T, float, int64_t>(dataset_norms_->data_handle(),
-                                                      dataset_view.data_handle(),
-                                                      dataset_view.stride(0),
-                                                      dataset_view.extent(0),
-                                                      (float)0,
-                                                      raft::resource::get_cuda_stream(res),
-                                                      false,
-                                                      scaled_sq_op,
-                                                      raft::add_op(),
-                                                      raft::sqrt_op{});
+  raft::linalg::reduce<raft::Apply::ALONG_ROWS>(
+    res,
+    raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
+      dataset_view.data_handle(), dataset_view.extent(0), dataset_view.stride(0)),
+    dataset_norms_->view(),
+    (float)0,
+    false,
+    scaled_sq_op,
+    raft::add_op(),
+    raft::sqrt_op{});
 }
 
 /**

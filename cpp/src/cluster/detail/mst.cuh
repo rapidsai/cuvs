@@ -24,7 +24,6 @@
 
 #include <cuda/std/tuple>
 #include <thrust/device_ptr.h>
-#include <thrust/execution_policy.h>
 #include <thrust/sort.h>
 
 namespace cuvs::cluster::agglomerative::detail {
@@ -154,7 +153,9 @@ void connect_knn_graph(
   raft::label::make_monotonic(d_color_remapped.data(), color, m, stream, true);
 
   std::vector<value_idx> h_color(m);
-  raft::copy(h_color.data(), d_color_remapped.data(), m, stream);
+  raft::copy(handle,
+             raft::make_host_vector_view(h_color.data(), m),
+             raft::make_device_vector_view<const value_idx>(d_color_remapped.data(), m));
   raft::resource::sync_stream(handle, stream);
 
   // make key (color) : value (vector of ids that have that color)
@@ -196,8 +197,14 @@ void connect_knn_graph(
   auto device_u_indices = raft::make_device_vector<value_idx, value_idx>(handle, new_nnz);
   auto device_v_indices = raft::make_device_vector<value_idx, value_idx>(handle, new_nnz);
 
-  raft::copy(device_u_indices.data_handle(), host_u_indices.data(), new_nnz, stream);
-  raft::copy(device_v_indices.data_handle(), host_v_indices.data(), new_nnz, stream);
+  raft::copy(
+    handle,
+    device_u_indices.view(),
+    raft::make_host_vector_view<const value_idx>(host_u_indices.data(), value_idx(new_nnz)));
+  raft::copy(
+    handle,
+    device_v_indices.view(),
+    raft::make_host_vector_view<const value_idx>(host_v_indices.data(), value_idx(new_nnz)));
 
   auto data_u = raft::make_device_matrix<value_t, value_idx>(handle, new_nnz, n);
   auto data_v = raft::make_device_matrix<value_t, value_idx>(handle, new_nnz, n);
