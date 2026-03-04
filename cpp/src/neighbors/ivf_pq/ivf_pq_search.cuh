@@ -28,7 +28,6 @@
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/linalg/norm_types.hpp>
 #include <raft/linalg/normalize.cuh>
-#include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/detail/select_warpsort.cuh>
 #include <raft/matrix/select_k.cuh>
 #include <raft/util/cache.hpp>
@@ -628,14 +627,14 @@ void ivfpq_search_worker(raft::resources const& handle,
     num_samples_vector);
 
   // Postprocessing
-  ivf::detail::postprocess_distances(distances,
+  ivf::detail::postprocess_distances(handle,
+                                     distances,
                                      topk_dists.data(),
                                      index.metric(),
                                      n_queries,
                                      topK,
                                      scaling_factor,
-                                     index.metric() != distance::DistanceType::CosineExpanded,
-                                     stream);
+                                     index.metric() != distance::DistanceType::CosineExpanded);
   ivf::detail::postprocess_neighbors(neighbors,
                                      neighbors_uint32,
                                      index.inds_ptrs().data_handle(),
