@@ -90,8 +90,6 @@ class PcaTest : public ::testing::TestWithParam<PcaInputs<T>> {
       explained_vars_ref.data(), explained_vars_ref_h.data(), params.n_col, stream);
 
     cuvs::preprocessing::pca::params prms;
-    // prms.n_cols       = params.n_col;
-    // prms.n_rows       = params.n_row;
     prms.n_components = params.n_col;
     prms.whiten       = false;
     if (params.algo == 0) {
