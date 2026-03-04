@@ -82,8 +82,8 @@ Note: these packages statically link the C and C++ libraries so the `libcuvs` an
 Tarball
 ^^^^^^^
 
-Prerequisites
-~~~~~~~~~~~~~
+Install Dependencies
+~~~~~~~~~~~~~~~~~~~~
 
 1. `NCCL <https://docs.nvidia.com/deeplearning/nccl/install-guide/index.html>` _
 2. `libopenmp`
