@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -67,7 +67,8 @@ void fit(const raft::resources& handle,
          cuvs::cluster::kmeans::balanced_params const& params,
          raft::device_matrix_view<const DataT, IndexT> X,
          raft::device_matrix_view<MathT, IndexT> centroids,
-         MappingOpT mapping_op = raft::identity_op())
+         MappingOpT mapping_op                                    = raft::identity_op(),
+         std::optional<raft::host_scalar_view<MathT>> inertia_out = std::nullopt)
 {
   RAFT_EXPECTS(X.extent(1) == centroids.extent(1),
                "Number of features in dataset and centroids are different");
@@ -78,6 +79,8 @@ void fit(const raft::resources& handle,
                "The number of centroids must be strictly positive and cannot exceed the number of "
                "points in the training dataset.");
 
+  MathT* inertia_ptr = inertia_out.has_value() ? inertia_out.value().data_handle() : nullptr;
+
   cuvs::cluster::kmeans::detail::build_hierarchical(handle,
                                                     params,
                                                     X.extent(1),
@@ -85,7 +88,9 @@ void fit(const raft::resources& handle,
                                                     X.extent(0),
                                                     centroids.data_handle(),
                                                     centroids.extent(0),
-                                                    mapping_op);
+                                                    mapping_op,
+                                                    static_cast<const MathT*>(nullptr),
+                                                    inertia_ptr);
 }
 
 /**

@@ -11,6 +11,8 @@
 #include <raft/random/rng_state.hpp>
 #include <rapids_logger/logger.hpp>
 
+#include <optional>
+
 namespace cuvs::cluster::kmeans {
 
 /** Base structure for parameters that are common to all k-means algorithms */
@@ -424,7 +426,8 @@ void fit(raft::resources const& handle,
 void fit(const raft::resources& handle,
          cuvs::cluster::kmeans::balanced_params const& params,
          raft::device_matrix_view<const float, int64_t> X,
-         raft::device_matrix_view<float, int64_t> centroids);
+         raft::device_matrix_view<float, int64_t> centroids,
+         std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 
 /**
  * @brief Find balanced clusters with k-means algorithm.
@@ -458,7 +461,8 @@ void fit(const raft::resources& handle,
 void fit(const raft::resources& handle,
          cuvs::cluster::kmeans::balanced_params const& params,
          raft::device_matrix_view<const int8_t, int64_t> X,
-         raft::device_matrix_view<float, int64_t> centroids);
+         raft::device_matrix_view<float, int64_t> centroids,
+         std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 
 /**
  * @brief Find balanced clusters with k-means algorithm.
@@ -492,7 +496,8 @@ void fit(const raft::resources& handle,
 void fit(const raft::resources& handle,
          cuvs::cluster::kmeans::balanced_params const& params,
          raft::device_matrix_view<const half, int64_t> X,
-         raft::device_matrix_view<float, int64_t> centroids);
+         raft::device_matrix_view<float, int64_t> centroids,
+         std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 
 /**
  * @brief Find balanced clusters with k-means algorithm.
@@ -526,7 +531,8 @@ void fit(const raft::resources& handle,
 void fit(const raft::resources& handle,
          cuvs::cluster::kmeans::balanced_params const& params,
          raft::device_matrix_view<const uint8_t, int64_t> X,
-         raft::device_matrix_view<float, int64_t> centroids);
+         raft::device_matrix_view<float, int64_t> centroids,
+         std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 
 /**
  * @brief Predict the closest cluster each sample in X belongs to.
@@ -1422,6 +1428,47 @@ void cluster_cost(
   raft::host_scalar_view<double> cost,
   std::optional<raft::device_vector_view<const double, int>> sample_weight = std::nullopt);
 
+/**
+ * @brief Compute (optionally weighted) cluster cost
+ *
+ * @param[in]  handle         The raft handle
+ * @param[in]  X              Training instances to cluster. The data must
+ *                            be in row-major format.
+ *                            [dim = n_samples x n_features]
+ * @param[in]  centroids      Cluster centroids. The data must be in
+ *                            row-major format.
+ *                            [dim = n_clusters x n_features]
+ * @param[out] cost           Resulting cluster cost
+ * @param[in]  sample_weight  Optional per-sample weights.
+ *                            [len = n_samples]
+ */
+void cluster_cost(
+  const raft::resources& handle,
+  raft::device_matrix_view<const float, int64_t> X,
+  raft::device_matrix_view<const float, int64_t> centroids,
+  raft::host_scalar_view<float> cost,
+  std::optional<raft::device_vector_view<const float, int64_t>> sample_weight = std::nullopt);
+
+/**
+ * @brief Compute (optionally weighted) cluster cost
+ *
+ * @param[in]  handle         The raft handle
+ * @param[in]  X              Training instances to cluster. The data must
+ *                            be in row-major format.
+ *                            [dim = n_samples x n_features]
+ * @param[in]  centroids      Cluster centroids. The data must be in
+ *                            row-major format.
+ *                            [dim = n_clusters x n_features]
+ * @param[out] cost           Resulting cluster cost
+ * @param[in]  sample_weight  Optional per-sample weights.
+ *                            [len = n_samples]
+ */
+void cluster_cost(
+  const raft::resources& handle,
+  raft::device_matrix_view<const double, int64_t> X,
+  raft::device_matrix_view<const double, int64_t> centroids,
+  raft::host_scalar_view<double> cost,
+  std::optional<raft::device_vector_view<const double, int64_t>> sample_weight = std::nullopt);
 /**
  * @}
  */

@@ -1025,7 +1025,8 @@ void build_hierarchical(const raft::resources& handle,
                         MathT* cluster_centers,
                         IdxT n_clusters,
                         MappingOpT mapping_op,
-                        const MathT* dataset_norm = nullptr)
+                        const MathT* dataset_norm = nullptr,
+                        MathT* inertia            = nullptr)
 {
   auto stream  = raft::resource::get_cuda_stream(handle);
   using LabelT = uint32_t;
@@ -1172,7 +1173,8 @@ void build_hierarchical(const raft::resources& handle,
         reinterpret_cast<const MathT*>(dataset), n_rows, dim);
       auto centroids_view =
         raft::make_device_matrix_view<const MathT, IdxT>(cluster_centers, n_clusters, dim);
-      cuvs::cluster::kmeans::detail::cluster_cost(handle, X_view, centroids_view, *inertia);
+      cuvs::cluster::kmeans::cluster_cost(
+        handle, X_view, centroids_view, raft::make_host_scalar_view<MathT>(inertia));
     }
   }
 }
