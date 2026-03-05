@@ -693,8 +693,13 @@ void fit(raft::resources const& handle,
 
       auto centroids_const = raft::make_device_matrix_view<const T, IdxT>(
         centroids.data_handle(), n_clusters, n_features);
-      T valid_inertia = compute_inertia<T, IdxT>(
-        handle, iter_params, X_valid_const, centroids_const, workspace, valid_weight_view);
+      T valid_inertia;
+      cuvs::cluster::kmeans::cluster_cost(
+        handle,
+        X_valid_const,
+        centroids_const,
+        raft::make_host_scalar_view<T>(&valid_inertia),
+        valid_weight_view);
 
       RAFT_LOG_DEBUG("KMeans minibatch: n_init %d/%d validation inertia=%f",
                      seed_iter + 1,
