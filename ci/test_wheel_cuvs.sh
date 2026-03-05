@@ -6,6 +6,9 @@ set -euo pipefail
 
 source rapids-init-pip
 
+# TODO(jameslamb): revert before merging
+source ci/use_wheels_from_prs.sh
+
 # Delete system libnccl.so to ensure the wheel is used
 rm -rf /usr/lib64/libnccl*
 
@@ -21,16 +24,16 @@ LIBCUVS_WHEELHOUSE=$(RAPIDS_PY_WHEEL_NAME="libcuvs_${RAPIDS_PY_CUDA_SUFFIX}" rap
 CUVS_WHEELHOUSE=$(rapids-download-from-github "$(rapids-package-name "wheel_python" cuvs --stable --cuda "$RAPIDS_CUDA_VERSION")")
 
 # generate constraints (possibly pinning to oldest support versions of dependencies)
-rapids-generate-pip-constraints test_python ./constraints.txt
+rapids-generate-pip-constraints test_python "${PIP_CONSTRAINT}"
 
 # notes:
 #
 #   * echo to expand wildcard before adding `[test]` requires for pip
-#   * need to provide --constraint="${PIP_CONSTRAINT}" because that environment variable is
-#     ignored if any other --constraint are passed via the CLI
+#   * just providing --constraint="${PIP_CONSTRAINT}" to be explicit, and because
+#     that environment variable is ignored if any other --constraint are passed via the CLI
 #
 rapids-pip-retry install \
-    --constraint ./constraints.txt \
+    --prefer-binary \
     --constraint "${PIP_CONSTRAINT}" \
     "${LIBCUVS_WHEELHOUSE}"/libcuvs*.whl \
     "$(echo "${CUVS_WHEELHOUSE}"/cuvs*.whl)[test]"
