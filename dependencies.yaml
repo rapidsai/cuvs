@@ -369,6 +369,12 @@ dependencies:
             packages:
   cuda_wheels:
     specific:
+      # cuVS needs 'nvJitLink>={whatever-cuvs-was-built-against}' at runtime, and mixing
+      # old-CTK with new-nvJitLink is supported, so maintain 1 entry here per CUDA major.minor
+      # cuVS is built against.
+      #
+      # nvJitLink has historically roughly followed the CTK's minor versioning scheme,
+      # but check at https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html
       - output_types: [requirements, pyproject]
         matrices:
           # skip this whole group if explicitly opting out of CUDA wheels
@@ -376,55 +382,29 @@ dependencies:
               use_cuda_wheels: "false"
             packages:
           - matrix:
-              cuda: "12.*"
+              cuda: "12.9"
               use_cuda_wheels: "true"
             packages:
               # cuVS doesn't place a direct requirement on nvJitLink at runtime for CUDA 12,
               # but does need to ensure cusparse and nvJitLink installed together are compatible
               - cuda-toolkit[cublas,curand,cusolver,cusparse,nvjitlink]==12.*
           - matrix:
-              cuda: "13.*"
-              use_cuda_wheels: "true"
-            packages:
-              # cuVS needs 'nvJitLink>={whatever-cuvs-was-built-against}' at runtime, so
-              # omits it here and constrains it separately from cuda-toolkit
-              - cuda-toolkit[cublas,curand,cusolver,cusparse]==13.*
-          # if no matching matrix selectors passed, list a range
-          # (just as a source of documentation, as this populates pyproject.toml in source control)
-          - matrix:
-            packages:
-              - cuda-toolkit[cublas,curand,cusolver,cusparse]>=12,<14
-      - output_types: [requirements, pyproject]
-        matrices:
-          # skip this whole group if explicitly opting out of CUDA wheels
-          - matrix:
-              use_cuda_wheels: "false"
-            packages:
-          # for CUDA 12, using cuda-toolkit[nvjitlink] above
-          - matrix:
-              cuda: "12.*"
-            packages:
-          # We always want nvJitLink >= whatever version cuVS was built against.
-          # nvJitLink tends to follow the CTK's minor versions, but check at https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html
-          - matrix:
               cuda: "13.0"
               use_cuda_wheels: "true"
             packages:
+              - &cuda_toolkit_any_cu13 cuda-toolkit[cublas,curand,cusolver,cusparse]==13.*
               - nvidia-nvjitlink>=13.0,<14
           - matrix:
               cuda: "13.1"
               use_cuda_wheels: "true"
             packages:
-              - &nvjitlink_cu13 nvidia-nvjitlink>=13.1,<14
-          - matrix:
-              cuda: "13.*"
-              use_cuda_wheels: "true"
-            packages:
-              - *nvjitlink_cu13
+              - *cuda_toolkit_any_cu13
+              - nvidia-nvjitlink>=13.1,<14
           # if no matching matrix selectors passed, list a range
           # (just as a source of documentation, as this populates pyproject.toml in source control)
           - matrix:
             packages:
+              - cuda-toolkit[cublas,curand,cusolver,cusparse]>=12,<14
               - nvidia-nvjitlink>=12,<14
   depends_on_cupy:
     common:
