@@ -24,7 +24,7 @@ PYLIBRAFT_WHEELHOUSE=$(
   rapids-get-pr-artifact raft 2971 python wheel --pkg_name pylibraft --stable "${RAFT_COMMIT}"
 )
 RAFT_DASK_WHEELHOUSE=$(
-  rapids-get-pr-artifact raft 2971 python wheel --pkg_name raft-dask --stable "${RAFT_COMMIT}"
+  rapids-get-pr-artifact raft 2971 python wheel --pkg_name raft_dask --stable "${RAFT_COMMIT}"
 )
 
 UCXX_COMMIT=b1e5230d5b1ac47a11cc2d421b3af91be50b39e4
