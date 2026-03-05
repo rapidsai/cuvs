@@ -422,6 +422,8 @@ void fit(raft::resources const& handle,
  *                              kmeans algorithm are stored at the address
  *                              pointed by 'centroids'.
  *                              [dim = n_clusters x n_features]
+ * @param[out]    inertia       Sum of squared distances of samples to their
+ *                              closest cluster center.
  */
 void fit(const raft::resources& handle,
          cuvs::cluster::kmeans::balanced_params const& params,
@@ -457,6 +459,8 @@ void fit(const raft::resources& handle,
  *                              kmeans algorithm are stored at the address
  *                              pointed by 'centroids'.
  *                              [dim = n_clusters x n_features]
+ * @param[out]    inertia       Sum of squared distances of samples to their
+ *                              closest cluster center.
  */
 void fit(const raft::resources& handle,
          cuvs::cluster::kmeans::balanced_params const& params,
@@ -492,6 +496,8 @@ void fit(const raft::resources& handle,
  *                              kmeans algorithm are stored at the address
  *                              pointed by 'centroids'.
  *                              [dim = n_clusters x n_features]
+ * @param[out]    inertia       Sum of squared distances of samples to their
+ *                              closest cluster center.
  */
 void fit(const raft::resources& handle,
          cuvs::cluster::kmeans::balanced_params const& params,
@@ -527,6 +533,8 @@ void fit(const raft::resources& handle,
  *                              kmeans algorithm are stored at the address
  *                              pointed by 'centroids'.
  *                              [dim = n_clusters x n_features]
+ * @param[out]    inertia       Sum of squared distances of samples to their
+ *                              closest cluster center.
  */
 void fit(const raft::resources& handle,
          cuvs::cluster::kmeans::balanced_params const& params,

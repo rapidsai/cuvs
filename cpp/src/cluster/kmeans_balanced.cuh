@@ -61,6 +61,8 @@ namespace cuvs::cluster::kmeans_balanced {
  * @param[out] centroids  The generated centroids [dim = n_clusters x n_features]
  * @param[in]  mapping_op (optional) Functor to convert from the input datatype to the arithmetic
  *                        datatype. If DataT == MathT, this must be the identity.
+ * @param[out] inertia    (optional) Sum of squared distances of samples to their
+ *                        closest cluster center.
  */
 template <typename DataT, typename MathT, typename IndexT, typename MappingOpT = raft::identity_op>
 void fit(const raft::resources& handle,
@@ -68,7 +70,7 @@ void fit(const raft::resources& handle,
          raft::device_matrix_view<const DataT, IndexT> X,
          raft::device_matrix_view<MathT, IndexT> centroids,
          MappingOpT mapping_op                                    = raft::identity_op(),
-         std::optional<raft::host_scalar_view<MathT>> inertia_out = std::nullopt)
+         std::optional<raft::host_scalar_view<MathT>> inertia = std::nullopt)
 {
   RAFT_EXPECTS(X.extent(1) == centroids.extent(1),
                "Number of features in dataset and centroids are different");
@@ -79,7 +81,7 @@ void fit(const raft::resources& handle,
                "The number of centroids must be strictly positive and cannot exceed the number of "
                "points in the training dataset.");
 
-  MathT* inertia_ptr = inertia_out.has_value() ? inertia_out.value().data_handle() : nullptr;
+  MathT* inertia_ptr = inertia.has_value() ? inertia.value().data_handle() : nullptr;
 
   cuvs::cluster::kmeans::detail::build_hierarchical(handle,
                                                     params,
