@@ -90,3 +90,4 @@ Contents
    advanced_topics.rst
    contributing.md
    developer_guide.md
+   jit_lto_guide.md
