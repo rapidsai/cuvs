@@ -457,9 +457,9 @@ void cluster_cost(
   if (sample_weight.has_value()) {
     raft::linalg::map(
       handle,
-      min_dist.view(),
+      min_cluster_distance.view(),
       [] __device__(DataT d, DataT w) { return d * w; },
-      raft::make_const_mdspan(min_dist.view()),
+      raft::make_const_mdspan(min_cluster_distance.view()),
       sample_weight.value());
   }
 
