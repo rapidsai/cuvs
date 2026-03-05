@@ -69,7 +69,7 @@ void fit(const raft::resources& handle,
          cuvs::cluster::kmeans::balanced_params const& params,
          raft::device_matrix_view<const DataT, IndexT> X,
          raft::device_matrix_view<MathT, IndexT> centroids,
-         MappingOpT mapping_op                                    = raft::identity_op(),
+         MappingOpT mapping_op                                = raft::identity_op(),
          std::optional<raft::host_scalar_view<MathT>> inertia = std::nullopt)
 {
   RAFT_EXPECTS(X.extent(1) == centroids.extent(1),
