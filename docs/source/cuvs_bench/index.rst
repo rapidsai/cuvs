@@ -92,7 +92,7 @@ The following command pulls the nightly container for Python version 3.13, CUDA 
 
 The CUDA and python versions can be changed for the supported values:
 - Supported CUDA versions: 12, 13
-- Supported Python versions: 3.11, 3.12, and 3.13
+- Supported Python versions: 3.11, 3.11, 3.13, and 3.14
 
 You can see the exact versions as well in the dockerhub site:
 - `cuVS bench images <https://hub.docker.com/r/rapidsai/cuvs-bench/tags>`_

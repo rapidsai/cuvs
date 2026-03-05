@@ -7,7 +7,6 @@
 #include "../detail/reachability.cuh"
 #include "all_neighbors_batched.cuh"
 #include <cuvs/neighbors/all_neighbors.hpp>
-#include <cuvs/neighbors/graph_build_types.hpp>
 #include <raft/matrix/shift.cuh>
 #include <raft/util/cudart_utils.hpp>
 
