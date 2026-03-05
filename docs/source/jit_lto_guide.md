@@ -338,13 +338,13 @@ The `.cu.in` files are templates that get instantiated for each combination in t
 
 #### `compute_distance_kernel.cu.in`
 
-```cpp
+```text
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <@header_file@>
+#include "@header_file@"
 
 namespace example::detail {
 
@@ -357,13 +357,13 @@ template __device__ float compute_distance<@data_type@>(@data_type@, @data_type@
 
 #### `filter_kernel.cu.in`
 
-```cpp
+```text
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <example/jit_lto_kernels/@filter_name@.cuh>
+#include "example/jit_lto_kernels/@filter_name@.cuh"
 
 namespace example::detail {
 
@@ -445,13 +445,13 @@ __global__ void search_kernel(
 
 The `.cu.in` file only contains the explicit template instantiation:
 
-```cpp
+```text
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <example/jit_lto_kernels/search_kernel.cuh>
+#include "example/jit_lto_kernels/search_kernel.cuh"
 
 namespace example::detail {
 
@@ -473,7 +473,7 @@ The `.cpp.in` files register the compiled fatbins so they can be loaded at runti
 
 #### `compute_distance_embedded.cpp.in`
 
-```cpp
+```text
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
@@ -501,7 +501,7 @@ __attribute__((__constructor__)) void register_kernel()
 
 #### `filter_embedded.cpp.in`
 
-```cpp
+```text
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
@@ -528,7 +528,7 @@ __attribute__((__constructor__)) void register_kernel()
 
 #### `search_kernel_embedded.cpp.in`
 
-```cpp
+```text
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
