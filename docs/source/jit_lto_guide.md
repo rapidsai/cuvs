@@ -68,7 +68,7 @@ __device__ bool apply_filter_bitset(uint32_t query_id, IdxT node_id, void* filte
 }
 
 // Main kernel - will use generic extern device functions
-template <typename T, typename OutT, typename IdxT, bool UseOptimizedPath>
+template <typename T, typename OutT, typename IdxT, bool UseOptimizedPath, int Veclen>
 __global__ void search_kernel(
     const T* dataset,
     const T* queries,
@@ -305,24 +305,32 @@ This example demonstrates conditional combinations: `OutT` can be `float` or `do
   "_optimized": [
     {
       "optimized_name": "optimized",
-      "optimized_value": "true"
+      "optimized_value": "true",
+      "veclen": ["1", "4"]
     },
     {
       "optimized_name": "standard",
-      "optimized_value": "false"
+      "optimized_value": "false",
+      "veclen": ["8", "16"]
     }
   ]
 }
 ```
 
-This generates 6 combinations:
-- `float` + `float` + `uint32_t` + `optimized`
-- `float` + `float` + `uint32_t` + `standard`
-- `float` + `double` + `uint32_t` + `optimized`
-- `float` + `double` + `uint32_t` + `standard`
-- `__half` + `float` + `uint32_t` + `optimized`
-- `__half` + `float` + `uint32_t` + `standard`
-- ... and the same with `int64_t` (total: 12 combinations)
+This generates 24 combinations (3 data/output type combinations × 2 index types × 4 optimized/veclen combinations):
+- `float` + `float` + `uint32_t` + `optimized` + `veclen=1`
+- `float` + `float` + `uint32_t` + `optimized` + `veclen=4`
+- `float` + `float` + `uint32_t` + `standard` + `veclen=8`
+- `float` + `float` + `uint32_t` + `standard` + `veclen=16`
+- `float` + `double` + `uint32_t` + `optimized` + `veclen=1`
+- `float` + `double` + `uint32_t` + `optimized` + `veclen=4`
+- `float` + `double` + `uint32_t` + `standard` + `veclen=8`
+- `float` + `double` + `uint32_t` + `standard` + `veclen=16`
+- `__half` + `float` + `uint32_t` + `optimized` + `veclen=1`
+- `__half` + `float` + `uint32_t` + `optimized` + `veclen=4`
+- `__half` + `float` + `uint32_t` + `standard` + `veclen=8`
+- `__half` + `float` + `uint32_t` + `standard` + `veclen=16`
+- ... and the same with `int64_t` (total: 24 combinations)
 
 ### Step 4: Create `.cu.in` Template Files
 
@@ -370,7 +378,7 @@ template __device__ bool apply_filter<@idx_type@>(uint32_t, @idx_type@, void*);
 
 The kernel header needs to declare generic extern device functions so the kernel code can call them. The specific implementations will be linked from fragments at runtime:
 
-**`search_kernel.cuh` (updated)**:
+**`search_kernel.cuh`**:
 
 ```cpp
 #pragma once
@@ -388,7 +396,7 @@ template <typename IdxT>
 extern __device__ bool apply_filter(uint32_t, IdxT, void*);
 
 // Main kernel - uses generic extern device functions
-template <typename T, typename OutT, typename IdxT, bool UseOptimizedPath>
+template <typename T, typename OutT, typename IdxT, bool UseOptimizedPath, int Veclen>
 __global__ void search_kernel(
     const T* dataset,
     const T* queries,
@@ -448,7 +456,7 @@ The `.cu.in` file only contains the explicit template instantiation:
 namespace example::detail {
 
 // Instantiate the kernel template
-template __global__ void search_kernel<@data_type@, @out_type@, @idx_type@, @optimized_value@>(
+template __global__ void search_kernel<@data_type@, @out_type@, @idx_type@, @optimized_value@, @veclen@>(
     const @data_type@*, const @data_type@*, @idx_type@*, @out_type@*,
     uint32_t, uint32_t, void*);
 
@@ -459,7 +467,7 @@ template __global__ void search_kernel<@data_type@, @out_type@, @idx_type@, @opt
 
 ### Step 5: Create `.cpp.in` Template Files for Embedding
 
-The `.cpp.in` files register the compiled fatbins so they can be loaded at runtime.
+The `.cpp.in` files register the compiled fatbins so they can be loaded at runtime. The fragment key used for registration is constructed as: `registerAlgorithm` constructor string + `"_"` + `make_fragment_key<Ts...>()`, where `Ts...` are the template parameters passed to `registerAlgorithm`.
 
 **Important**: In the `.cpp.in` files (which become `.cpp` files), we use **tags** (like `tag_f`, `tag_h`) instead of real types (like `float`, `__half`) in the `registerAlgorithm` template parameters. This avoids including heavy headers that define the actual types, significantly improving compilation times. The tags are lightweight empty structs that serve only as compile-time identifiers.
 
@@ -481,12 +489,9 @@ namespace {
 
 __attribute__((__constructor__)) void register_kernel()
 {
-  // IMPORTANT: The key must match exactly with the key constructed in the planner.
-  // For device functions, the key is: function_name + "_" + make_fragment_key<Tag>()
-  // The full fragment key used for matching is: entrypoint_name + "_" + make_fragment_key<Ts...>
-  // where entrypoint_name comes from the AlgorithmPlanner constructor and Ts are the template tags.
+  // Note: Fragment keys should include parameter names along with their values for better readability.
   registerAlgorithm<tag_@type_abbrev@>(
-    "@distance_name@_@data_type@",
+    "@distance_name@_data_@data_type@",
     embedded_fatbin,
     sizeof(embedded_fatbin));
 }
@@ -513,7 +518,7 @@ namespace {
 __attribute__((__constructor__)) void register_kernel()
 {
   registerAlgorithm<tag_@idx_abbrev@>(
-    "@filter_name@_@idx_type@",
+    "@filter_name@_index_@idx_type@",
     embedded_fatbin,
     sizeof(embedded_fatbin));
 }
@@ -543,7 +548,7 @@ __attribute__((__constructor__)) void register_kernel()
   // so they must be included in the key string. Type information in template parameters
   // doesn't need to be repeated in the key.
   registerAlgorithm<tag_@type_abbrev@, tag_@out_abbrev@, tag_@idx_abbrev@>(
-    "search_kernel_@optimized_name@",
+    "@optimized_name@_veclen_@veclen@",
     embedded_fatbin,
     sizeof(embedded_fatbin));
 }
@@ -559,6 +564,8 @@ The planner is responsible for:
 3. Requesting the fragments from the fragment database
 4. Linking them together to create a launchable kernel
 
+**CRITICAL**: The fragment keys constructed in the planner methods must match **EXACTLY** with the keys used in the corresponding `.cpp.in` registration files. Any mismatch will result in runtime linking failures.
+
 **`search_planner.hpp`**:
 
 ```cpp
@@ -571,35 +578,28 @@ The planner is responsible for:
 
 template <typename DataTag, typename OutTag, typename IndexTag>
 struct SearchPlanner : AlgorithmPlanner {
-  SearchPlanner(bool use_optimized = false)
+  SearchPlanner(bool use_optimized = false, int veclen = 1)
     : AlgorithmPlanner("search_kernel",
-                      make_fragment_key<DataTag, OutTag, IndexTag>() +
-                      (use_optimized ? "_optimized" : "_standard"))
+                      (use_optimized ? "_optimized" : "_standard") + "_veclen_" + std::to_string(veclen) +
+                      make_fragment_key<DataTag, OutTag, IndexTag>())
   {
-    // The fragment key is constructed as: "search_kernel" + "_" + make_fragment_key<DataTag, OutTag, IndexTag>() + "_optimized"/"_standard"
-    // This matches the key used in registerAlgorithm: entrypoint_name + "_" + make_fragment_key<Ts...>
   }
 
   void add_compute_distance_device_function(std::string distance_name)
   {
-    // Build fragment key: distance_name + "_" + make_fragment_key<DataTag>()
-    // CRITICAL: This key must match EXACTLY with the key in compute_distance_embedded.cpp.in
-    auto key = distance_name;
+    // Build fragment key: distance_name + "_data_" + make_fragment_key<DataTag>()
+    auto key = distance_name + "_data_";
     auto params = make_fragment_key<DataTag>();
-    if (!params.empty()) {
-      key += "_" + params;
-    }
+    key += params;
     this->device_functions.push_back(key);
   }
 
   void add_filter_device_function(std::string filter_name)
   {
-    // Build fragment key: filter_name + "_" + make_fragment_key<IndexTag>()
-    auto key = filter_name;
+    // Build fragment key: filter_name + "_index_" + make_fragment_key<IndexTag>()
+    auto key = filter_name + "_index_";
     auto params = make_fragment_key<IndexTag>();
-    if (!params.empty()) {
-      key += "_" + params;
-    }
+    key += params;
     this->device_functions.push_back(key);
   }
 };
@@ -645,6 +645,7 @@ void search_jit(
     std::string distance_type,  // "euclidean" or "inner_product"
     std::string filter_type,     // "filter_none" or "filter_bitset"
     bool use_optimized = false,  // Use optimized kernel path
+    int veclen = 1,              // Vectorization length
     void* filter_data = nullptr) {
 
   // Type tag helpers for output type
@@ -714,19 +715,21 @@ Where:
 - `make_fragment_key<Ts...>` converts the template tag types to a string representation
 - The `"_"` separator connects them
 
-For device function fragments, the key is constructed as: `function_name + "_" + make_fragment_key<Tag>()` where `Tag` is the template parameter. Device functions are looked up separately from entrypoint kernels.
+For device function fragments, the key is constructed as: `function_name + "_" + param_name + "_" + make_fragment_key<Tag>()` where `Tag` is the template parameter and `param_name` is a descriptive name for the parameter (e.g., `"data"`, `"index"`). Device functions are looked up separately from entrypoint kernels.
+
+**Naming Convention**: Fragment keys should include parameter names along with their values for better readability. For example, use `"euclidean_data_float"` instead of `"euclidean_float"`, or `"filter_none_index_uint32_t"` instead of `"filter_none_uint32_t"`. This makes it clear what each value represents when debugging or inspecting fragment keys.
 
 If the keys don't match exactly (including case, underscores, and order), the fragment will not be found at runtime and linking will fail.
 
 **Important**: The fragment database matches fragments by both the template tags and the key string together. For device functions, the key string must include the type information (via `make_fragment_key`) to match what the planner constructs.
 
 For example:
-- In `compute_distance_embedded.cpp.in`: `registerAlgorithm<tag_f>("euclidean", ...)` - the key includes both function name and type
-- In `SearchPlanner::add_compute_distance_device_function()`: must produce `key = distance_name + "_" + make_fragment_key<DataTag>()` for lookup
+- In `compute_distance_embedded.cpp.in`: `registerAlgorithm<tag_f>("euclidean_data_float", ...)` - the key includes function name, parameter name, and type
+- In `SearchPlanner::add_compute_distance_device_function()`: must produce `key = distance_name + "_data_" + make_fragment_key<DataTag>()` for lookup (e.g., `"euclidean_data_float"`)
 
-**Non-Type Template Parameters**: For non-type template parameters (like `bool`, `int`, etc.), `make_fragment_key` cannot be used since it only works with types. Instead, append the value as a string directly to the key:
-- In the planner constructor: `make_fragment_key<DataTag, OutTag, IndexTag>() + (use_optimized ? "_optimized" : "_standard")`
-- In the registration: `"search_kernel_@optimized_name@"` - types are in the template, only the boolean value is in the key
+**Non-Type Template Parameters**: For non-type template parameters (like `bool`, `int`, etc.), `make_fragment_key` cannot be used since it only works with types. Instead, prepend the value as a string directly to the key:
+- In the planner constructor: `(use_optimized ? "_optimized" : "_standard") + "_veclen_" + std::to_string(veclen) + make_fragment_key<DataTag, OutTag, IndexTag>()` - this produces something like `"_optimized_veclen_1_f_f_ui"`
+- In the registration: `"@optimized_name@_veclen_@veclen@"` - type information is in the template parameters, only the non-type parameter values (optimized/standard and veclen) are in the key
 
 Any mismatch will result in a runtime error when trying to link the fragments.
 
