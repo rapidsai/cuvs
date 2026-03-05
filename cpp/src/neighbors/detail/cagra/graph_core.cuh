@@ -157,79 +157,6 @@ __global__ void kern_sort(const DATA_T* const dataset,  // [dataset_chunk_size, 
   }
 }
 
-template <int MAX_DEGREE, class IdxT>
-__global__ void kern_prune(const IdxT* const knn_graph,  // [graph_chunk_size, graph_degree]
-                           const uint32_t graph_size,
-                           const uint32_t graph_degree,
-                           const uint32_t degree,
-                           const uint32_t batch_size,
-                           const uint32_t batch_id,
-                           uint8_t* const detour_count,          // [batch_size, graph_degree]
-                           uint32_t* const num_no_detour_edges,  // [batch_size]
-                           uint64_t* const stats)
-{
-  __shared__ uint32_t smem_num_detour[MAX_DEGREE];
-  extern __shared__ unsigned char smem_buf[];
-  IdxT* const smem_knn_iA_neighbors = reinterpret_cast<IdxT*>(smem_buf);
-
-  uint64_t* const num_retain = stats;
-  uint64_t* const num_full   = stats + 1;
-
-  const uint64_t iA       = blockIdx.x + (batch_size * batch_id);
-  const uint64_t iA_batch = blockIdx.x;
-
-  if (iA >= graph_size) { return; }
-
-  // Load this node's neighbor row into shared memory to reduce global reads
-  for (uint32_t k = threadIdx.x; k < graph_degree; k += blockDim.x) {
-    smem_num_detour[k]       = 0;
-    smem_knn_iA_neighbors[k] = knn_graph[k + ((uint64_t)graph_degree * iA)];
-    if (smem_knn_iA_neighbors[k] == iA) {
-      // Lower the priority of self-edge
-      smem_num_detour[k] = graph_degree;
-    }
-  }
-  __syncthreads();
-
-  // count number of detours (A->D->B)
-  for (uint32_t kAD = 0; kAD < graph_degree - 1; kAD++) {
-    const uint64_t iD = smem_knn_iA_neighbors[kAD];
-    if (iD >= graph_size) { continue; }
-    for (uint32_t kDB = threadIdx.x; kDB < graph_degree; kDB += blockDim.x) {
-      const uint64_t iB_candidate = knn_graph[kDB + ((uint64_t)graph_degree * iD)];
-      for (uint32_t kAB = kAD + 1; kAB < graph_degree; kAB++) {
-        // if ( kDB < kAB )
-        {
-          const uint64_t iB = smem_knn_iA_neighbors[kAB];
-          if (iB == iB_candidate) {
-            atomicAdd(smem_num_detour + kAB, 1);
-            break;
-          }
-        }
-      }
-    }
-    __syncthreads();
-  }
-
-  uint32_t num_edges_no_detour = 0;
-  for (uint32_t k = threadIdx.x; k < graph_degree; k += blockDim.x) {
-    detour_count[k + (graph_degree * iA_batch)] = min(smem_num_detour[k], (uint32_t)255);
-    if (smem_num_detour[k] == 0) { num_edges_no_detour++; }
-  }
-  num_edges_no_detour += __shfl_xor_sync(0xffffffff, num_edges_no_detour, 1);
-  num_edges_no_detour += __shfl_xor_sync(0xffffffff, num_edges_no_detour, 2);
-  num_edges_no_detour += __shfl_xor_sync(0xffffffff, num_edges_no_detour, 4);
-  num_edges_no_detour += __shfl_xor_sync(0xffffffff, num_edges_no_detour, 8);
-  num_edges_no_detour += __shfl_xor_sync(0xffffffff, num_edges_no_detour, 16);
-  num_edges_no_detour = min(num_edges_no_detour, degree);
-
-  if (threadIdx.x == 0) {
-    num_no_detour_edges[iA_batch] = num_edges_no_detour;
-    atomicAdd((unsigned long long int*)num_retain, (unsigned long long int)num_edges_no_detour);
-    if (num_edges_no_detour >= degree) { atomicAdd((unsigned long long int*)num_full, 1); }
-  }
-}
-
 template <class IdxT>
 __global__ void kern_make_rev_graph(const IdxT* const dest_nodes,     // [graph_size]
                                     IdxT* const rev_graph,            // [size, degree]
@@ -269,48 +196,98 @@ __global__ void kern_make_rev_graph_k(const IdxT* const dest_nodes,     // [grap
   }
 }
 
-// Based on the detour count, select the smallest detour count and its index
-// (Pruning Update Kernel)
-template <typename IdxT>
-__global__ void kern_select_smallest_detour_neighbors(
-  const IdxT* const knn_graph,  // [graph_chunk_size, graph_degree]
-  uint64_t graph_size,
-  uint64_t knn_graph_degree,
-  uint64_t output_graph_degree,
-  uint8_t* const d_detour_count,  // [batch_size, graph_degree]
-  IdxT* output_graph_ptr,
-  const uint32_t batch_size,  // [batch_size, output_graph_degree]
-  const uint32_t batch_id,
-  uint32_t* const d_invalid_neighbor_list)
+template <class IdxT, uint32_t num_warps>
+__global__ void kern_fused_prune(const IdxT* const knn_graph,  // [graph_chunk_size, graph_degree]
+                                 IdxT* const output_graph_ptr,
+                                 const uint32_t graph_size,
+                                 const uint32_t knn_graph_degree,
+                                 const uint32_t output_graph_degree,
+                                 const uint32_t batch_size,
+                                 const uint32_t batch_id,
+                                 uint32_t* const d_invalid_neighbor_list,
+                                 uint64_t* const stats)
 {
-  assert(blockDim.x == 32);
+  extern __shared__ unsigned char smem_buf[];
 
-  // Allocate shared memory for detour counts and their indices
-  extern __shared__ IdxT smem_indices[];
-  uint16_t* smem_detour_count = (uint16_t*)&smem_indices[knn_graph_degree];
+  const uint32_t wid     = threadIdx.x / raft::WarpSize;
+  const uint32_t lane_id = threadIdx.x % raft::WarpSize;
 
-  const uint64_t nid       = blockIdx.x + (batch_size * batch_id);
-  const uint64_t nid_batch = blockIdx.x;
+  IdxT* const smem_indices =
+    reinterpret_cast<IdxT*>(smem_buf + wid * knn_graph_degree * sizeof(IdxT));
+  uint32_t* const smem_num_detour = reinterpret_cast<uint32_t*>(
+    smem_buf + wid * knn_graph_degree * sizeof(IdxT) + num_warps * knn_graph_degree * sizeof(IdxT));
+
+  uint64_t* const num_retain = stats;
+  uint64_t* const num_full   = stats + 1;
+
+  const unsigned warp_mask = 0xffffffff;
   const uint32_t maxval16  = 0x0000ffff;
+
+  const uint64_t nid_batch = blockIdx.x * num_warps + wid;
+  const uint64_t nid       = nid_batch + (batch_size * batch_id);
 
   if (nid >= graph_size) { return; }
 
-  // Load indices and detour counts for each neighbor; invalidate out-of-bounds entries
-  for (uint32_t k = threadIdx.x; k < knn_graph_degree; k += blockDim.x) {
-    smem_indices[k]      = knn_graph[knn_graph_degree * nid + k];
-    smem_detour_count[k] = (smem_indices[k] >= graph_size)
-                             ? maxval16
-                             : (uint16_t)d_detour_count[nid_batch * knn_graph_degree + k];
+  // Load this node's neighbor row into shared memory to reduce global reads
+  for (uint32_t k = lane_id; k < knn_graph_degree; k += raft::WarpSize) {
+    smem_num_detour[k] = 0;
+    smem_indices[k]    = knn_graph[k + ((uint64_t)knn_graph_degree * nid)];
+    if (smem_indices[k] == nid) {
+      // Lower the priority of self-edge
+      smem_num_detour[k] = knn_graph_degree;
+    }
   }
   __syncwarp();
 
-  const unsigned warp_mask = 0xffffffff;
+  // count number of detours (A->D->B)
+  for (uint32_t kAD = 0; kAD < knn_graph_degree - 1; kAD++) {
+    const uint64_t iD = smem_indices[kAD];
+    if (iD >= graph_size) { continue; }
+    for (uint32_t kDB = lane_id; kDB < knn_graph_degree; kDB += raft::WarpSize) {
+      const uint64_t iB_candidate = knn_graph[kDB + ((uint64_t)knn_graph_degree * iD)];
+      for (uint32_t kAB = kAD + 1; kAB < knn_graph_degree; kAB++) {
+        // if ( kDB < kAB )
+        {
+          const uint64_t iB = smem_indices[kAB];
+          if (iB == iB_candidate) {
+            atomicAdd(smem_num_detour + kAB, 1);
+            break;
+          }
+        }
+      }
+    }
+    __syncwarp();
+  }
+
+  uint32_t num_edges_no_detour = 0;
+  for (uint32_t k = lane_id; k < knn_graph_degree; k += raft::WarpSize) {
+    smem_num_detour[k] = min(smem_num_detour[k], maxval16);
+    if (smem_num_detour[k] == 0) { num_edges_no_detour++; }
+    if (smem_indices[k] >= graph_size) { smem_num_detour[k] = maxval16; }
+  }
+
+  __syncwarp();
+
+  num_edges_no_detour += __shfl_xor_sync(0xffffffff, num_edges_no_detour, 1);
+  num_edges_no_detour += __shfl_xor_sync(0xffffffff, num_edges_no_detour, 2);
+  num_edges_no_detour += __shfl_xor_sync(0xffffffff, num_edges_no_detour, 4);
+  num_edges_no_detour += __shfl_xor_sync(0xffffffff, num_edges_no_detour, 8);
+  num_edges_no_detour += __shfl_xor_sync(0xffffffff, num_edges_no_detour, 16);
+  num_edges_no_detour = min(num_edges_no_detour, output_graph_degree);
+
+  if (lane_id == 0) {
+    atomicAdd((unsigned long long int*)num_retain, (unsigned long long int)num_edges_no_detour);
+    if (num_edges_no_detour >= output_graph_degree) {
+      atomicAdd((unsigned long long int*)num_full, 1);
+    }
+  }
+
   for (uint32_t i = 0; i < output_graph_degree; i++) {
     uint32_t local_min = maxval16;
     uint32_t local_idx = maxval16;
-    for (uint32_t k = threadIdx.x; k < knn_graph_degree; k += blockDim.x) {
-      if (smem_detour_count[k] < local_min) {
-        local_min = smem_detour_count[k];
+    for (uint32_t k = lane_id; k < knn_graph_degree; k += raft::WarpSize) {
+      if (smem_num_detour[k] < local_min) {
+        local_min = smem_num_detour[k];
         local_idx = k;
       }
     }
@@ -321,18 +298,18 @@ __global__ void kern_select_smallest_detour_neighbors(
     uint32_t warp_local_idx     = warp_min_with_tag & 0xffff;
 
     if (warp_min_count == maxval16 || warp_local_idx == maxval16) {
-      if (threadIdx.x == 0) { atomicExch(d_invalid_neighbor_list, 1u); }
+      if (lane_id == 0) { atomicExch(d_invalid_neighbor_list, 1u); }
       break;
     }
 
     IdxT selected_node = smem_indices[warp_local_idx];
 
-    for (uint32_t k = threadIdx.x; k < knn_graph_degree; k += blockDim.x) {
-      if (smem_indices[k] == selected_node) { smem_detour_count[k] = maxval16; }
+    for (uint32_t k = lane_id; k < knn_graph_degree; k += raft::WarpSize) {
+      if (smem_indices[k] == selected_node) { smem_num_detour[k] = maxval16; }
     }
     __syncwarp(warp_mask);
 
-    if (threadIdx.x == 0) { output_graph_ptr[nid_batch * output_graph_degree + i] = selected_node; }
+    if (lane_id == 0) { output_graph_ptr[nid_batch * output_graph_degree + i] = selected_node; }
   }
 }
 
@@ -1690,15 +1667,6 @@ void prune_graph_gpu(raft::resources const& res,
 
   RAFT_LOG_DEBUG("# Pruning kNN Graph on GPUs\r");
 
-  constexpr int MAX_DEGREE = 1024;
-  if (knn_graph_degree > MAX_DEGREE) {
-    RAFT_FAIL(
-      "The degree of input knn graph is too large (%zu). "
-      "It must be equal to or smaller than %d.",
-      knn_graph_degree,
-      MAX_DEGREE);
-  }
-
   const double prune_start = cur_time();
 
   uint64_t num_keep __attribute__((unused)) = 0;
@@ -1710,10 +1678,6 @@ void prune_graph_gpu(raft::resources const& res,
   device_matrix_view_from_host<IdxT, int64_t> d_input_graph(
     res, raft::make_host_matrix_view<IdxT, int64_t>(knn_graph_ptr, graph_size, knn_graph_degree));
 
-  auto d_detour_count = raft::make_device_mdarray<uint8_t>(
-    res, default_ws_mr, raft::make_extents<int64_t>(batch_size, knn_graph_degree));
-  auto d_num_no_detour_edges = raft::make_device_mdarray<uint32_t>(
-    res, default_ws_mr, raft::make_extents<int64_t>(batch_size));
   auto d_output_graph = raft::make_device_mdarray<IdxT>(
     res, default_ws_mr, raft::make_extents<int64_t>(batch_size, output_graph_degree));
   auto d_invalid_neighbor_list = raft::make_device_scalar<uint32_t>(res, 0u);
@@ -1721,39 +1685,22 @@ void prune_graph_gpu(raft::resources const& res,
   bool output_device_accessible = is_ptr_device_accessible(output_graph_ptr);
 
   for (uint32_t i_batch = 0; i_batch < num_batch; i_batch++) {
-    raft::matrix::fill(res, d_detour_count.view(), uint8_t(0xff));
-    raft::matrix::fill(res, d_num_no_detour_edges.view(), uint32_t(0));
-
-    const dim3 threads_prune(32, 1, 1);
+    const uint32_t num_warps = 4;
+    const dim3 threads_prune(raft::WarpSize * num_warps, 1, 1);
     const dim3 blocks_prune(batch_size, 1, 1);
-    const size_t prune_smem_size = knn_graph_degree * sizeof(IdxT);
-    kern_prune<MAX_DEGREE, IdxT>
+    const size_t prune_smem_size = num_warps * knn_graph_degree * (sizeof(IdxT) + sizeof(uint32_t));
+    kern_fused_prune<IdxT, num_warps>
       <<<blocks_prune, threads_prune, prune_smem_size, raft::resource::get_cuda_stream(res)>>>(
         d_input_graph.data_handle(),
-        graph_size,
-        knn_graph_degree,
-        output_graph_degree,
-        batch_size,
-        i_batch,
-        d_detour_count.data_handle(),
-        d_num_no_detour_edges.data_handle(),
-        dev_stats.data_handle());
-
-    const size_t select_smem_size = (knn_graph_degree) * (sizeof(uint16_t) + sizeof(IdxT));
-    const dim3 threads_select(32, 1, 1);
-    const dim3 blocks_select(batch_size, 1, 1);
-    kern_select_smallest_detour_neighbors<IdxT>
-      <<<blocks_select, threads_select, select_smem_size, raft::resource::get_cuda_stream(res)>>>(
-        d_input_graph.data_handle(),
-        graph_size,
-        knn_graph_degree,
-        output_graph_degree,
-        d_detour_count.data_handle(),
         output_device_accessible ? output_graph_ptr + i_batch * batch_size * output_graph_degree
                                  : d_output_graph.data_handle(),
+        graph_size,
+        knn_graph_degree,
+        output_graph_degree,
         batch_size,
         i_batch,
-        d_invalid_neighbor_list.data_handle());
+        d_invalid_neighbor_list.data_handle(),
+        dev_stats.data_handle());
 
     if (!output_device_accessible) {
       size_t copy_size =
@@ -1798,79 +1745,6 @@ void prune_graph_gpu(raft::resources const& res,
     (double)num_keep / graph_size,
     output_graph_degree,
     (double)num_full / graph_size * 100);
-}
-
-template <typename IdxT>
-void prune_graph_cpu(IdxT* knn_graph_ptr,
-                     uint64_t graph_size,
-                     uint64_t knn_graph_degree,
-                     IdxT* output_graph_ptr,
-                     uint64_t output_graph_degree)
-{
-  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
-    "cagra::graph::optimize/prune");
-  auto detour_count = raft::make_host_matrix<uint8_t, int64_t>(graph_size, knn_graph_degree);
-
-  auto knn_graph_view =
-    raft::make_host_matrix_view<IdxT, int64_t>(knn_graph_ptr, graph_size, knn_graph_degree);
-
-  {
-    const double time_2hop_count_start = cur_time();
-
-    count_2hop_detours(knn_graph_view, detour_count.view());
-
-    const double time_2hop_count_end = cur_time();
-    RAFT_LOG_DEBUG("# Time for 2-hop detour counting on CPU: %.1lf sec",
-                   time_2hop_count_end - time_2hop_count_start);
-  }
-  bool invalid_neighbor_list = false;
-#pragma omp parallel for
-  for (uint64_t i = 0; i < graph_size; i++) {
-    uint64_t pk         = 0;
-    uint32_t num_detour = 0;
-    for (uint32_t l = 0; l < knn_graph_degree && pk < output_graph_degree; l++) {
-      uint32_t next_num_detour = std::numeric_limits<uint32_t>::max();
-      for (uint64_t k = 0; k < knn_graph_degree; k++) {
-        const auto num_detour_k = detour_count(i, k);
-        if (num_detour_k > num_detour) {
-          next_num_detour = std::min(static_cast<uint32_t>(num_detour_k), next_num_detour);
-        }
-
-        if (num_detour_k != num_detour) { continue; }
-
-        const auto candidate_node = knn_graph_view(i, k);
-        bool dup                  = false;
-        for (uint32_t dk = 0; dk < pk; dk++) {
-          if (candidate_node == output_graph_ptr[i * output_graph_degree + dk]) {
-            dup = true;
-            break;
-          }
-        }
-        if (!dup && candidate_node < graph_size) {
-          output_graph_ptr[i * output_graph_degree + pk] = candidate_node;
-          pk += 1;
-        }
-        if (pk >= output_graph_degree) break;
-      }
-      if (pk >= output_graph_degree) break;
-
-      if (next_num_detour == std::numeric_limits<uint32_t>::max()) { break; }
-      num_detour = next_num_detour;
-    }
-    if (pk != output_graph_degree) {
-      RAFT_LOG_DEBUG(
-        "Couldn't find the output_graph_degree (%lu) smallest detourable count nodes for "
-        "node %lu in the rank-based node reranking process",
-        output_graph_degree,
-        i);
-      invalid_neighbor_list = true;
-    }
-  }
-  RAFT_EXPECTS(
-    !invalid_neighbor_list,
-    "Could not generate an intermediate CAGRA graph because the initial kNN graph contains too "
-    "many invalid or duplicated neighbor nodes. This error can occur, for example, if too many "
-    "overflows occur during the norm computation between the dataset vectors.");
 }
 
 // TODO allow pinned input for both knn_graph and new_graph
@@ -1939,22 +1813,8 @@ void optimize(raft::resources const& res,
     }
   }
 
-  // prune graph -- will use GPU path if possible, otherwise CPU path
-  // we only need to check in case input is not alreadydevice accessible
-  bool use_gpu_prune = use_gpu;
-  if (!inout_device_accessible) {
-    try {
-      auto d_input_graph = raft::make_device_mdarray<IdxT>(
-        res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, knn_graph_degree));
-    } catch (std::bad_alloc& e) {
-      RAFT_LOG_DEBUG("Insufficient memory for pruning on GPU");
-      use_gpu_prune = false;
-    } catch (raft::logic_error& e) {
-      RAFT_LOG_DEBUG("Insufficient memory for pruning on GPU (logic error)");
-      use_gpu_prune = false;
-    }
-  }
-  if (use_gpu_prune) {
+  // prune graph -- will always use GPU path
+  {
     // should be noop in case input is already device accessible
     device_matrix_view_from_host<IdxT, int64_t> d_input_graph(
       res,
@@ -1963,13 +1823,6 @@ void optimize(raft::resources const& res,
 
     prune_graph_gpu<IdxT>(res,
                           d_input_graph.data_handle(),
-                          graph_size,
-                          knn_graph_degree,
-                          new_graph.data_handle(),
-                          output_graph_degree);
-
-  } else {
-    prune_graph_cpu<IdxT>(knn_graph.data_handle(),
                           graph_size,
                           knn_graph_degree,
                           new_graph.data_handle(),
