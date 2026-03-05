@@ -404,14 +404,27 @@ void min_cluster_distance(raft::resources const& handle,
                                                                           workspace);
 }
 
+/**
+ * @brief Compute (optionally weighted) cluster cost (inertia).
+ *
+ * @tparam DataT  float or double
+ * @tparam IndexT Index type
+ *
+ * @param[in]  handle         The raft handle
+ * @param[in]  X              Input data [n_samples x n_features]
+ * @param[in]  centroids      Cluster centroids [n_clusters x n_features]
+ * @param[out] cost           Sum of squared distances to nearest centroid
+ * @param[in]  sample_weight  Optional per-sample weights [n_samples]
+ */
 template <typename DataT, typename IndexT>
-void cluster_cost(raft::resources const& handle,
-                  raft::device_matrix_view<const DataT, IndexT> X,
-                  raft::device_matrix_view<const DataT, IndexT> centroids,
-                  raft::host_scalar_view<DataT> cost)
+void cluster_cost(
+  raft::resources const& handle,
+  raft::device_matrix_view<const DataT, IndexT> X,
+  raft::device_matrix_view<const DataT, IndexT> centroids,
+  raft::host_scalar_view<DataT> cost,
+  std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight = std::nullopt)
 {
-  auto stream = raft::resource::get_cuda_stream(handle);
-
+  auto stream     = raft::resource::get_cuda_stream(handle);
   auto n_clusters = centroids.extent(0);
   auto n_samples  = X.extent(0);
   auto n_features = X.extent(1);
@@ -439,6 +452,16 @@ void cluster_cost(raft::resources const& handle,
     n_samples,
     n_clusters,
     workspace);
+
+  // Apply sample weights if provided
+  if (sample_weight.has_value()) {
+    raft::linalg::map(
+      handle,
+      min_dist.view(),
+      [] __device__(DataT d, DataT w) { return d * w; },
+      raft::make_const_mdspan(min_dist.view()),
+      sample_weight.value());
+  }
 
   auto device_cost = raft::make_device_scalar<DataT>(handle, DataT(0));
 
