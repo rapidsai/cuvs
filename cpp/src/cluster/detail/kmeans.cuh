@@ -443,13 +443,12 @@ void kmeans_fit_main(raft::resources const& handle,
     }
   }
 
-  cuvs::cluster::kmeans::cluster_cost(
-    handle,
-    X,
-    raft::make_device_matrix_view<const DataT, IndexT>(
-      centroidsRawData.data_handle(), n_clusters, n_features),
-    inertia,
-    std::make_optional(weight));
+  cuvs::cluster::kmeans::cluster_cost(handle,
+                                      X,
+                                      raft::make_device_matrix_view<const DataT, IndexT>(
+                                        centroidsRawData.data_handle(), n_clusters, n_features),
+                                      inertia,
+                                      std::make_optional(weight));
 
   RAFT_LOG_DEBUG("KMeans.fit: completed after %d iterations with %f inertia[0] ",
                  n_iter[0] > params.max_iter ? n_iter[0] - 1 : n_iter[0],

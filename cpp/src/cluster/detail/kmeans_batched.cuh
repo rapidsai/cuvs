@@ -490,17 +490,16 @@ T compute_batched_host_inertia(
                  sample_weight->data_handle() + weight_offset,
                  current_batch_size,
                  stream);
-      batch_weight_view = raft::make_device_vector_view<const T, IdxT>(
-        batch_weights.data_handle(), current_batch_size);
+      batch_weight_view = raft::make_device_vector_view<const T, IdxT>(batch_weights.data_handle(),
+                                                                       current_batch_size);
     }
 
     T batch_cost;
-    cuvs::cluster::kmeans::cluster_cost(
-      handle,
-      batch_view,
-      centroids,
-      raft::make_host_scalar_view<T>(&batch_cost),
-      batch_weight_view);
+    cuvs::cluster::kmeans::cluster_cost(handle,
+                                        batch_view,
+                                        centroids,
+                                        raft::make_host_scalar_view<T>(&batch_cost),
+                                        batch_weight_view);
 
     total_inertia += batch_cost;
   }
@@ -654,12 +653,11 @@ void fit(raft::resources const& handle,
       auto centroids_const = raft::make_device_matrix_view<const T, IdxT>(
         centroids.data_handle(), n_clusters, n_features);
       T valid_inertia;
-      cuvs::cluster::kmeans::cluster_cost(
-        handle,
-        X_valid_const,
-        centroids_const,
-        raft::make_host_scalar_view<T>(&valid_inertia),
-        valid_weight_view);
+      cuvs::cluster::kmeans::cluster_cost(handle,
+                                          X_valid_const,
+                                          centroids_const,
+                                          raft::make_host_scalar_view<T>(&valid_inertia),
+                                          valid_weight_view);
 
       RAFT_LOG_DEBUG("KMeans minibatch: n_init %d/%d validation inertia=%f",
                      seed_iter + 1,
@@ -833,9 +831,8 @@ void fit(raft::resources const& handle,
         // Skip first step (inertia from initialization)
         if (n_iter[0] > 1) {
           // Update Exponentially Weighted Average of inertia.
-          T alpha = static_cast<T>(current_batch_size * 2.0) /
-                    static_cast<T>(n_samples + 1);
-          alpha = std::min(alpha, T{1});
+          T alpha = static_cast<T>(current_batch_size * 2.0) / static_cast<T>(n_samples + 1);
+          alpha   = std::min(alpha, T{1});
 
           if (!ewa_initialized) {
             ewa_inertia     = batch_inertia;
