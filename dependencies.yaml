@@ -233,7 +233,7 @@ dependencies:
     common:
       - output_types: [conda, requirements, pyproject]
         packages:
-          - cython>=3.0.0,<3.2.0
+          - cython>=3.2.2
   rapids_build:
     common:
       - output_types: [conda, requirements, pyproject]
@@ -383,7 +383,7 @@ dependencies:
         packages:
           - *cmake_ver
           - openblas
-          - &pytest pytest<9.0.0
+          - &pytest pytest
   docs:
     common:
       - output_types: [conda]
@@ -435,8 +435,12 @@ dependencies:
             packages:
               - python=3.13
           - matrix:
+              py: "3.14"
             packages:
-              - python>=3.11,<3.14
+              - python=3.14
+          - matrix:
+            packages:
+              - python>=3.11
   run_py_cuvs:
     common:
       - output_types: [conda, requirements, pyproject]
