@@ -458,24 +458,16 @@ void minibatch_update_centroids(raft::resources const& handle,
 template <typename T, typename IdxT>
 T compute_batched_host_inertia(
   raft::resources const& handle,
-  const cuvs::cluster::kmeans::params& params,
   raft::host_matrix_view<const T, IdxT> X,
   IdxT batch_size,
   raft::device_matrix_view<const T, IdxT> centroids,
-  rmm::device_uvector<char>& workspace,
   std::optional<raft::host_vector_view<const T, IdxT>> sample_weight = std::nullopt)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   auto n_samples      = X.extent(0);
   auto n_features     = X.extent(1);
-  auto metric         = params.metric;
 
   IdxT effective_batch = std::min(batch_size, static_cast<IdxT>(n_samples));
-  auto minClusterAndDistance =
-    raft::make_device_vector<raft::KeyValuePair<IdxT, T>, IdxT>(handle, effective_batch);
-  auto L2NormBatch = raft::make_device_vector<T, IdxT>(handle, effective_batch);
-  rmm::device_uvector<T> L2NormBuf(0, stream);
-  rmm::device_scalar<T> cost(stream);
 
   // Device buffer for per-batch weights (only used when sample_weight is provided)
   auto batch_weights =
@@ -489,59 +481,27 @@ T compute_batched_host_inertia(
     IdxT current_batch_size = static_cast<IdxT>(data_batch.size());
     auto batch_view         = raft::make_device_matrix_view<const T, IdxT>(
       data_batch.data(), current_batch_size, n_features);
-    auto mcd_view = raft::make_device_vector_view<raft::KeyValuePair<IdxT, T>, IdxT>(
-      minClusterAndDistance.data_handle(), current_batch_size);
 
-    if (metric == cuvs::distance::DistanceType::L2Expanded ||
-        metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
-      raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
-        L2NormBatch.data_handle(), data_batch.data(), n_features, current_batch_size, stream);
-    }
-
-    cuvs::cluster::kmeans::detail::minClusterAndDistanceCompute<T, IdxT>(
-      handle,
-      batch_view,
-      centroids,
-      mcd_view,
-      raft::make_device_vector_view<const T, IdxT>(L2NormBatch.data_handle(), current_batch_size),
-      L2NormBuf,
-      metric,
-      params.batch_samples,
-      params.batch_centroids,
-      workspace);
-
-    // Apply sample weights to distances before summing (matching sklearn weighted inertia)
+    // Build optional device weight view for this batch
+    std::optional<raft::device_vector_view<const T, IdxT>> batch_weight_view;
     if (sample_weight) {
       auto weight_offset = static_cast<IdxT>(data_batch.offset());
       raft::copy(batch_weights.data_handle(),
                  sample_weight->data_handle() + weight_offset,
                  current_batch_size,
                  stream);
-
-      raft::linalg::map(
-        handle,
-        mcd_view,
-        [=] __device__(const raft::KeyValuePair<IdxT, T> kvp, T wt) {
-          raft::KeyValuePair<IdxT, T> res;
-          res.value = kvp.value * wt;
-          res.key   = kvp.key;
-          return res;
-        },
-        raft::make_const_mdspan(mcd_view),
-        raft::make_device_vector_view<const T, IdxT>(batch_weights.data_handle(),
-                                                     current_batch_size));
+      batch_weight_view = raft::make_device_vector_view<const T, IdxT>(
+        batch_weights.data_handle(), current_batch_size);
     }
 
-    cuvs::cluster::kmeans::detail::computeClusterCost(handle,
-                                                      mcd_view,
-                                                      workspace,
-                                                      raft::make_device_scalar_view(cost.data()),
-                                                      raft::value_op{},
-                                                      raft::add_op{});
+    T batch_cost;
+    cuvs::cluster::kmeans::cluster_cost(
+      handle,
+      batch_view,
+      centroids,
+      raft::make_host_scalar_view<T>(&batch_cost),
+      batch_weight_view);
 
-    T batch_cost = 0;
-    raft::copy(&batch_cost, cost.data(), 1, stream);
-    raft::resource::sync_stream(handle, stream);
     total_inertia += batch_cost;
   }
 
@@ -1045,7 +1005,7 @@ void fit(raft::resources const& handle,
       auto centroids_const = raft::make_device_matrix_view<const T, IdxT>(
         centroids.data_handle(), n_clusters, n_features);
       inertia[0] = compute_batched_host_inertia<T, IdxT>(
-        handle, iter_params, X, batch_size, centroids_const, workspace, sample_weight);
+        handle, X, batch_size, centroids_const, sample_weight);
 
       RAFT_LOG_DEBUG("KMeans batched: n_init %d/%d completed with inertia=%f",
                      seed_iter + 1,
