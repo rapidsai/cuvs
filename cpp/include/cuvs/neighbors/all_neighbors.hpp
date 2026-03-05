@@ -1,11 +1,14 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
-#include <cuvs/neighbors/graph_build_types.hpp>
+#include <cuvs/neighbors/brute_force.hpp>
+#include <cuvs/neighbors/ivf_pq.hpp>
+#include <cuvs/neighbors/nn_descent.hpp>
+
 #include <variant>
 
 namespace cuvs::neighbors::all_neighbors {
