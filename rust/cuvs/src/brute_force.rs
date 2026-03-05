@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 //! Brute Force KNN
@@ -62,7 +62,7 @@ impl Index {
     /// * `neighbors` - Matrix in device memory that receives the indices of the nearest neighbors
     /// * `distances` - Matrix in device memory that receives the distances of the nearest neighbors
     pub fn search(
-        self,
+        &self,
         res: &Resources,
         queries: &ManagedTensor,
         neighbors: &ManagedTensor,
@@ -89,7 +89,7 @@ impl Index {
 impl Drop for Index {
     fn drop(&mut self) {
         if let Err(e) = check_cuvs(unsafe { ffi::cuvsBruteForceIndexDestroy(self.0) }) {
-            write!(stderr(), "failed to call cagraIndexDestroy {:?}", e)
+            write!(stderr(), "failed to call bruteForceIndexDestroy {:?}", e)
                 .expect("failed to write to stderr");
         }
     }
@@ -172,4 +172,11 @@ mod tests {
     fn test_l2() {
         test_bfknn(DistanceType::L2Expanded);
     }
+
+    // NOTE: brute_force multiple-search test is omitted here because the C++
+    // brute_force::index stores a non-owning view into the dataset. Building
+    // from device data via `build()` drops the ManagedTensor after the call,
+    // leaving a dangling pointer. A follow-up PR will add dataset lifetime
+    // enforcement (DatasetOwnership<'a>) to make this safe.
+    // See: https://github.com/rapidsai/cuvs/issues/1838
 }
