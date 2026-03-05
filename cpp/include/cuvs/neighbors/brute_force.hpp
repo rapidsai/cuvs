@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -926,3 +926,11 @@ void deserialize(raft::resources const& handle,
  */
 
 }  // namespace cuvs::neighbors::brute_force
+
+/** Specialized parameters utilizing brute force to build knn graph */
+namespace cuvs::neighbors::graph_build_params {
+struct brute_force_params {
+  cuvs::neighbors::brute_force::index_params build_params;
+  cuvs::neighbors::brute_force::search_params search_params;
+};
+}  // namespace cuvs::neighbors::graph_build_params
