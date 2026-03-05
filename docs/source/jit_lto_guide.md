@@ -188,11 +188,12 @@ __device__ bool apply_filter(uint32_t query_id, IdxT node_id, void* filter_data)
 JSON matrix files define all the parameter combinations that need to be compiled. The build system uses these to generate `.cu` files from `.cu.in` templates.
 
 **How JSON Cross-Product Works**:
-- The build system computes the **Cartesian product** (cross-product) of all parameter combinations
-- **Leaf nodes** are the actual values (strings, numbers, or objects with named properties)
-- **Parameters with `_` prefix** (e.g., `_data_type`, `_index`) create **groups** that are expanded together
-- Parameters **without `_` prefix** are treated as simple arrays of values
-- Each group expands to create multiple combinations, and all groups are cross-multiplied
+- The build system computes a modified **Cartesian product** (cross-product) of all parameter combinations.
+- **Leaf nodes** are the actual values. These can be strings, numbers, booleans, or `null`, but only strings should be used, even for numbers, for example ``"1"``.
+- Related values can be grouped together in a dictionary consisting of single values. Any dictionary key in such a dictionary's ancestry will not be used in the final product, and should be prefixed with `_` to indicate that it is used only for grouping.
+- Keys containing only leaf nodes will be used in the final product, and should not be prefixed with `_`.
+- The matrix product algorithm will automatically warn if the proper naming convention (`_` prefix or not) is not followed.
+- Each group expands to create multiple combinations, and all groups are cross-multiplied.
 
 For example, if you have:
 ```json
