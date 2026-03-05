@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -78,8 +78,9 @@ IndexWrapper<T, IdxT, OutputIdxT>::merge(
     return std::make_shared<cuvs::neighbors::composite::CompositeIndex<T, IdxT, OutputIdxT>>(
       std::move(wrappers));
   } else if (cagra_params->strategy() == cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL) {
-    auto merged_index = cuvs::neighbors::cagra::merge(handle, *cagra_params, cagra_indices);
-    auto* idx         = new decltype(merged_index)(std::move(merged_index));
+    auto merged_index =
+      cuvs::neighbors::cagra::merge(handle, cagra_params->output_index_params, cagra_indices);
+    auto* idx = new decltype(merged_index)(std::move(merged_index));
     return std::make_shared<IndexWrapper<T, IdxT, OutputIdxT>>(idx);
   }
 

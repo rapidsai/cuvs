@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -207,6 +207,23 @@ inline void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::vpq_p
   if (conf.contains("pq_kmeans_trainset_fraction")) {
     param.pq_kmeans_trainset_fraction = conf.at("pq_kmeans_trainset_fraction");
   }
+  if (conf.contains("pq_kmeans_type")) {
+    std::string type = conf.at("pq_kmeans_type");
+    if (type == "KMeans") {
+      param.pq_kmeans_type = cuvs::cluster::kmeans::kmeans_type::KMeans;
+    } else if (type == "KMeansBalanced") {
+      param.pq_kmeans_type = cuvs::cluster::kmeans::kmeans_type::KMeansBalanced;
+    } else {
+      throw std::runtime_error("pq_kmeans_type: '" + type +
+                               "', should be either 'KMeans' or 'KMeansBalanced'");
+    }
+  }
+  if (conf.contains("max_train_points_per_pq_code")) {
+    param.max_train_points_per_pq_code = conf.at("max_train_points_per_pq_code");
+  }
+  if (conf.contains("max_train_points_per_vq_cluster")) {
+    param.max_train_points_per_vq_cluster = conf.at("max_train_points_per_vq_cluster");
+  }
 }
 
 nlohmann::json collect_conf_with_prefix(const nlohmann::json& conf,
@@ -265,6 +282,11 @@ void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::cagra::index
             params.graph_build_params)) {
         params.graph_build_params = cuvs::neighbors::graph_build_params::ace_params{};
       }
+    } else if (conf.at("graph_build_algo") == "ITERATIVE_SEARCH") {
+      if (!std::holds_alternative<cuvs::neighbors::graph_build_params::iterative_search_params>(
+            params.graph_build_params)) {
+        params.graph_build_params = cuvs::neighbors::graph_build_params::iterative_search_params{};
+      }
     }
   }
 
@@ -274,6 +296,9 @@ void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::cagra::index
   nlohmann::json nn_descent_conf    = collect_conf_with_prefix(conf, "nn_descent_");
   nlohmann::json ace_conf           = collect_conf_with_prefix(conf, "ace_");
 
+  // When graph_build_algo is not specified, leave graph_build_params as monostate so the
+  // CAGRA build uses AUTO selection (NN_DESCENT or IVF_PQ based on dataset/heuristics).
+  // Only infer from algo-specific config keys when present.
   if (std::holds_alternative<std::monostate>(params.graph_build_params)) {
     if (!ivf_pq_build_conf.empty() || !ivf_pq_search_conf.empty()) {
       params.graph_build_params = cuvs::neighbors::graph_build_params::ivf_pq_params{};
@@ -281,9 +306,8 @@ void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::cagra::index
       params.graph_build_params = cuvs::neighbors::graph_build_params::nn_descent_params{};
     } else if (!ace_conf.empty()) {
       params.graph_build_params = cuvs::neighbors::graph_build_params::ace_params{};
-    } else {
-      params.graph_build_params = cuvs::neighbors::graph_build_params::iterative_search_params{};
     }
+    // else: leave as monostate → AUTO in cagra_build.cuh
   }
 
   // Apply build-algo-specific parameters

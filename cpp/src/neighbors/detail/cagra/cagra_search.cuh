@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,7 +9,6 @@
 #include "factory.cuh"
 #include "sample_filter_utils.cuh"
 #include "search_plan.cuh"
-#include "search_single_cta_inst.cuh"
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>
@@ -31,7 +30,7 @@
 
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/linalg/norm.cuh>
-#include <raft/linalg/unary_op.cuh>
+#include <raft/linalg/reduce.cuh>
 
 namespace cuvs::neighbors::cagra::detail {
 
@@ -218,16 +217,16 @@ void search_main(raft::resources const& res,
     // first scale the queries and then compute norms
     auto scaled_sq_op = raft::compose_op(
       raft::sq_op{}, raft::div_const_op<DistanceT>{DistanceT(kScale)}, raft::cast_op<DistanceT>());
-    raft::linalg::reduce<true, true, T, DistanceT, int64_t>(query_norms.data_handle(),
-                                                            queries.data_handle(),
-                                                            queries.extent(1),
-                                                            queries.extent(0),
-                                                            (DistanceT)0,
-                                                            stream,
-                                                            false,
-                                                            scaled_sq_op,
-                                                            raft::add_op(),
-                                                            raft::sqrt_op{});
+    raft::linalg::reduce<raft::Apply::ALONG_ROWS>(
+      res,
+      raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
+        queries.data_handle(), queries.extent(0), queries.extent(1)),
+      query_norms.view(),
+      (DistanceT)0,
+      false,
+      scaled_sq_op,
+      raft::add_op(),
+      raft::sqrt_op{});
 
     const auto n_queries = distances.extent(0);
     const auto k         = distances.extent(1);
@@ -240,14 +239,14 @@ void search_main(raft::resources const& res,
       distances,
       raft::compose_op(raft::add_const_op<DistanceT>{DistanceT(1)}, raft::div_checkzero_op{}));
   } else {
-    cuvs::neighbors::ivf::detail::postprocess_distances(dist_out,
+    cuvs::neighbors::ivf::detail::postprocess_distances(res,
+                                                        dist_out,
                                                         dist_in,
                                                         index.metric(),
                                                         distances.extent(0),
                                                         distances.extent(1),
                                                         kScale,
-                                                        true,
-                                                        raft::resource::get_cuda_stream(res));
+                                                        true);
   }
 }
 /** @} */  // end group cagra

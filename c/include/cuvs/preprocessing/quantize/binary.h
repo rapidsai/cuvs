@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -13,6 +13,10 @@
 extern "C" {
 #endif
 
+/**
+ * @defgroup preprocessing_c_binary C API for Binary Quantizer
+ * @{
+ */
 /**
  * @brief In the cuvsBinaryQuantizerTransform function, a bit is set if the corresponding element in
  * the dataset vector is greater than the corresponding element in the threshold vector. The mean
@@ -131,6 +135,10 @@ cuvsError_t cuvsBinaryQuantizerTransformWithParams(cuvsResources_t res,
                                                    cuvsBinaryQuantizer_t quantizer,
                                                    DLManagedTensor* dataset,
                                                    DLManagedTensor* out);
+
+/**
+ * @}
+ */
 
 #ifdef __cplusplus
 }

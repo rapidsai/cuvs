@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -13,6 +13,10 @@
 extern "C" {
 #endif
 
+/**
+ * @defgroup preprocessing_c_scalar C API for Scalar Quantizer
+ * @{
+ */
 /**
  * @brief Scalar quantizer parameters.
  */
@@ -113,6 +117,10 @@ cuvsError_t cuvsScalarQuantizerInverseTransform(cuvsResources_t res,
                                                 cuvsScalarQuantizer_t quantizer,
                                                 DLManagedTensor* dataset,
                                                 DLManagedTensor* out);
+
+/**
+ * @}
+ */
 
 #ifdef __cplusplus
 }

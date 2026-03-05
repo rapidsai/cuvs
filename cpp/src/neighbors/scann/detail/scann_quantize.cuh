@@ -1,14 +1,17 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "../../detail/vpq_dataset.cuh"
+#include "../../ivf_pq/ivf_pq_codepacking.cuh"
 #include <chrono>
 #include <cmath>
 #include <cuvs/neighbors/common.hpp>
+#include <raft/linalg/map.cuh>
 #include <raft/linalg/transpose.cuh>
 #include <raft/matrix/gather.cuh>
+#include <raft/matrix/init.cuh>
 
 #include "scann_common.cuh"
 using namespace cuvs::neighbors;
@@ -52,8 +55,10 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_subspaces_kernel
     int subspace_offset   = j * pq_centers.extent(1) * (1 << PqBits);
     auto pq_subspace_view = raft::make_device_matrix_view(
       pq_centers.data_handle() + subspace_offset, (uint32_t)(1 << PqBits), pq_centers.extent(1));
-    uint8_t code = cuvs::neighbors::detail::compute_code<kSubWarpSize>(
-      dataset, vq_centers, pq_subspace_view, row_ix, j, vq_label);
+    auto pq_centers_smem =
+      raft::make_device_matrix_view<const MathT, uint32_t, raft::row_major>(nullptr, 0, 0);
+    uint8_t code = cuvs::neighbors::detail::compute_code<kSubWarpSize, uint8_t>(
+      dataset, vq_centers, pq_centers_smem, pq_subspace_view, row_ix, j, vq_label);
     // TODO: this writes in global memory one byte per warp, which is very slow.
     //  It's better to keep the codes in the shared memory or registers and dump them at once.
     if (lane_id == 0) { code_view[j] = code; }
@@ -101,7 +106,8 @@ auto process_and_fill_codes_subspaces(
     }
   }(pq_bits);
 
-  auto labels = cuvs::neighbors::detail::predict_vq<label_t>(res, dataset, vq_centers);
+  auto labels = raft::make_device_vector<label_t, IdxT>(res, dataset.extent(0));
+  cuvs::neighbors::detail::predict_vq<label_t>(res, dataset, vq_centers, labels.view());
 
   dim3 blocks(raft::div_rounding_up_safe<ix_t>(n_rows, kBlockSize / threads_per_vec), 1, 1);
 
@@ -198,10 +204,7 @@ auto quantize_residuals(raft::resources const& res,
   // vq centers and computed residuals w.r.t those centers
   auto vq_codebook = raft::make_device_matrix<T, uint32_t, raft::row_major>(res, 1, dim);
 
-  RAFT_CUDA_TRY(cudaMemsetAsync(vq_codebook.data_handle(),
-                                0,
-                                vq_codebook.size() * sizeof(T),
-                                raft::resource::get_cuda_stream(res)));
+  raft::matrix::fill(res, vq_codebook.view(), T(0));
 
   auto codes = process_and_fill_codes_subspaces<T, IdxT>(
     res, ps, residuals, raft::make_const_mdspan(vq_codebook.view()), pq_codebook);
@@ -491,12 +494,13 @@ void quantize_bfloat16(raft::resources const& res,
   if (!std::isnan(noise_shaping_threshold)) {
     quantize_bfloat16_noise_shaped(res, dataset, bf16_dataset, noise_shaping_threshold);
   } else {
-    raft::linalg::unaryOp(
-      bf16_dataset.data_handle(),
-      dataset.data_handle(),
-      dataset.size(),
+    raft::linalg::map(
+      res,
+      raft::make_device_vector_view<int16_t, int64_t>(bf16_dataset.data_handle(),
+                                                      (int64_t)bf16_dataset.size()),
       [] __device__(float x) { return float_to_bfloat16(x); },
-      resource::get_cuda_stream(res));
+      raft::make_const_mdspan(raft::make_device_vector_view<const float, int64_t>(
+        dataset.data_handle(), (int64_t)dataset.size())));
   }
 }
 

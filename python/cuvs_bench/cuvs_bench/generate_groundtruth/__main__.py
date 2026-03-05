@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 import argparse
@@ -190,7 +190,7 @@ def calc_truth(dataset, queries, k, metric="sqeuclidean"):
             D, Ind = search(index, queries, k, resources=resources)
             resources.sync()
         else:
-            D, Ind = cpu_search(X, queries, metric=metric)
+            D, Ind = cpu_search(X, queries, k, metric=metric)
 
         D, Ind = xp.asarray(D), xp.asarray(Ind)
         Ind += i  # shift neighbor index by offset i

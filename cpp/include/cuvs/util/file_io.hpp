@@ -1,10 +1,11 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
 #include <raft/core/error.hpp>
+#include <raft/core/serialize.hpp>
 
 #include <algorithm>
 #include <cstring>
@@ -12,6 +13,7 @@
 #include <limits.h>
 #include <memory>
 #include <ostream>
+#include <sstream>
 #include <streambuf>
 #include <string>
 #include <utility>
@@ -165,6 +167,58 @@ class file_descriptor {
   int fd_;
   std::string path_;
 };
+
+/**
+ * @brief Create a numpy file with pre-allocated space and write the header.
+ *
+ * Opens a file, writes a numpy header for the given shape/dtype, and pre-allocates
+ * space for the data. This is useful for memory-mapped or streaming writes.
+ *
+ * @tparam T Data type for the numpy array
+ * @param path File path to create
+ * @param shape Shape of the numpy array (e.g., {rows, cols} for 2D)
+ * @return Pair of (file_descriptor, header_size)
+ */
+template <typename T>
+std::pair<file_descriptor, size_t> create_numpy_file(const std::string& path,
+                                                     const std::vector<size_t>& shape)
+{
+  // Open file
+  file_descriptor fd(path, O_CREAT | O_RDWR | O_TRUNC, 0644);
+
+  // Build header
+  const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<T>();
+  const bool fortran_order = false;
+  const raft::detail::numpy_serializer::header_t header = {dtype, fortran_order, shape};
+
+  std::stringstream ss;
+  raft::detail::numpy_serializer::write_header(ss, header);
+  std::string header_str = ss.str();
+  size_t header_size     = header_str.size();
+
+  // Calculate data size from shape
+  size_t data_bytes = sizeof(T);
+  for (auto dim : shape) {
+    data_bytes *= dim;
+  }
+
+  // Pre-allocate file space
+  if (posix_fallocate(fd.get(), 0, header_size + data_bytes) != 0) {
+    RAFT_FAIL("Failed to pre-allocate space for file: %s", path.c_str());
+  }
+
+  // Seek to beginning and write header
+  if (lseek(fd.get(), 0, SEEK_SET) == -1) {
+    RAFT_FAIL("Failed to seek to beginning of file: %s", path.c_str());
+  }
+
+  ssize_t written = write(fd.get(), header_str.data(), header_str.size());
+  if (written < 0 || static_cast<size_t>(written) != header_str.size()) {
+    RAFT_FAIL("Failed to write numpy header to file: %s", path.c_str());
+  }
+
+  return {std::move(fd), header_size};
+}
 
 /**
  * @brief Read large file in chunks using pread

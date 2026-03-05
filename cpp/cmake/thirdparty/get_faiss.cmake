@@ -1,6 +1,6 @@
 #=============================================================================
 # cmake-format: off
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 #=============================================================================
@@ -16,6 +16,7 @@ function(find_and_configure_faiss)
     )
 
   set(patch_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../patches")
+  include("${rapids-cmake-dir}/cpm/package_override.cmake")
   rapids_cpm_package_override("${patch_dir}/faiss_override.json")
 
   include("${rapids-cmake-dir}/cpm/detail/package_info.cmake")
@@ -31,7 +32,7 @@ function(find_and_configure_faiss)
     set(CPM_DOWNLOAD_faiss ON)
   endif()
 
-  include(cmake/modules/FindAVX)
+  include(${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../modules/FindAVX.cmake)
   # Link against AVX CPU lib if it exists
   set(CUVS_FAISS_OPT_LEVEL "generic")
   if(CXX_AVX2_FOUND)
