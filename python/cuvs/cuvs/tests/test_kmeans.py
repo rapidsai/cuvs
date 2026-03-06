@@ -15,8 +15,6 @@ from cuvs.cluster.kmeans import (
 )
 from cuvs.distance import pairwise_distance
 
-from sklearn.cluster import MiniBatchKMeans
-
 
 @pytest.mark.parametrize("n_rows", [100])
 @pytest.mark.parametrize("n_cols", [5, 25])
@@ -126,63 +124,3 @@ def test_fit_batched_matches_fit(
     ), f"max diff: {np.max(np.abs(centroids_regular - centroids_batched))}"
 
 
-@pytest.mark.parametrize("n_rows", [1000])
-@pytest.mark.parametrize("n_cols", [10])
-@pytest.mark.parametrize("n_clusters", [8, 16, 32])
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
-def test_minibatch_sklearn(n_rows, n_cols, n_clusters, dtype):
-    """
-    Test that fit_batched matches sklearn's KMeans implementation.
-    """
-    rng = np.random.default_rng(99)
-    X_host = rng.random((n_rows, n_cols)).astype(dtype)
-    norms = np.linalg.norm(X_host, ord=1, axis=1, keepdims=True)
-    norms = np.where(norms == 0, 1.0, norms)
-    X_host = X_host / norms
-    initial_centroids_host = X_host[:n_clusters].copy()
-
-    # Sklearn fit
-    kmeans = MiniBatchKMeans(
-        n_clusters=n_clusters,
-        init=initial_centroids_host,
-        max_iter=100,
-        verbose=0,
-        random_state=None,
-        tol=1e-4,
-        max_no_improvement=10,
-        init_size=None,
-        n_init="auto",
-        reassignment_ratio=0.01,
-        batch_size=256,
-    )
-    kmeans.fit(X_host)
-
-    centroids_sklearn = kmeans.cluster_centers_
-    inertia_sklearn = kmeans.inertia_
-
-    # cuvs fit
-    params = KMeansParams(
-        n_clusters=n_clusters,
-        init_method="Array",
-        max_iter=100,
-        tol=1e-4,
-        update_mode="mini_batch",
-        final_inertia_check=True,
-        max_no_improvement=10,
-    )
-    centroids_cuvs, inertia_cuvs, _ = fit_batched(
-        params,
-        X_host,
-        batch_size=256,
-        centroids=device_ndarray(initial_centroids_host.copy()),
-    )
-    centroids_cuvs = centroids_cuvs.copy_to_host()
-
-    assert np.allclose(
-        centroids_sklearn, centroids_cuvs, rtol=0.1, atol=0.1
-    ), f"max diff: {np.max(np.abs(centroids_sklearn - centroids_cuvs))}"
-
-    inertia_diff = abs(inertia_sklearn - inertia_cuvs)
-    assert np.allclose(inertia_sklearn, inertia_cuvs, rtol=0.1, atol=0.1), (
-        f"inertia diff: sklearn={inertia_sklearn}, cuvs={inertia_cuvs}, diff={inertia_diff}"
-    )

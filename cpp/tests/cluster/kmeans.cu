@@ -357,7 +357,6 @@ struct KmeansBatchedInputs {
   int n_clusters;
   T tol;
   bool weighted;
-  bool minibatch;
 };
 
 template <typename T>
@@ -383,12 +382,7 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
     params.rng_state.seed      = 1;
     params.oversampling_factor = 0;
 
-    if (testparams.minibatch) {
-      params.batched.update_mode         = cuvs::cluster::kmeans::params::MiniBatch;
-      params.batched.final_inertia_check = true;
-    } else {
-      params.batched.update_mode = cuvs::cluster::kmeans::params::FullBatch;
-    }
+    params.batched.final_inertia_check = true;
 
     auto stream = raft::resource::get_cuda_stream(handle);
     auto X      = raft::make_device_matrix<T, int>(handle, n_samples, n_features);
@@ -478,15 +472,13 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
 
     raft::resource::sync_stream(handle, stream);
 
-    if (!testparams.minibatch) {
-      // FullBatch: centroids should match the device fit reference
-      centroids_match = devArrMatch(d_centroids_ref.data(),
-                                    d_centroids.data(),
-                                    params.n_clusters,
-                                    n_features,
-                                    CompareApprox<T>(T(1e-3)),
-                                    stream);
-    }
+    // FullBatch: centroids should match the device fit reference
+    centroids_match = devArrMatch(d_centroids_ref.data(),
+                                  d_centroids.data(),
+                                  params.n_clusters,
+                                  n_features,
+                                  CompareApprox<T>(T(1e-3)),
+                                  stream);
 
     // Also check label quality via ARI
     T pred_inertia = 0;
@@ -673,37 +665,21 @@ class KmeansPredictBatchedTest : public ::testing::TestWithParam<KmeansInputs<T>
 // ============================================================================
 
 const std::vector<KmeansBatchedInputs<float>> batched_inputsf2 = {
-  // FullBatch mode
-  {1000, 32, 5, 0.0001f, true, false},
-  {1000, 32, 5, 0.0001f, false, false},
-  {1000, 100, 20, 0.0001f, true, false},
-  {1000, 100, 20, 0.0001f, false, false},
-  {10000, 32, 10, 0.0001f, true, false},
-  {10000, 32, 10, 0.0001f, false, false},
-  // MiniBatch mode
-  {1000, 32, 5, 0.0001f, true, true},
-  {1000, 32, 5, 0.0001f, false, true},
-  {1000, 100, 20, 0.0001f, true, true},
-  {1000, 100, 20, 0.0001f, false, true},
-  {10000, 32, 10, 0.0001f, true, true},
-  {10000, 32, 10, 0.0001f, false, true},
+  {1000, 32, 5, 0.0001f, true},
+  {1000, 32, 5, 0.0001f, false},
+  {1000, 100, 20, 0.0001f, true},
+  {1000, 100, 20, 0.0001f, false},
+  {10000, 32, 10, 0.0001f, true},
+  {10000, 32, 10, 0.0001f, false},
 };
 
 const std::vector<KmeansBatchedInputs<double>> batched_inputsd2 = {
-  // FullBatch mode
-  {1000, 32, 5, 0.0001, true, false},
-  {1000, 32, 5, 0.0001, false, false},
-  {1000, 100, 20, 0.0001, true, false},
-  {1000, 100, 20, 0.0001, false, false},
-  {10000, 32, 10, 0.0001, true, false},
-  {10000, 32, 10, 0.0001, false, false},
-  // MiniBatch mode
-  {1000, 32, 5, 0.0001, true, true},
-  {1000, 32, 5, 0.0001, false, true},
-  {1000, 100, 20, 0.0001, true, true},
-  {1000, 100, 20, 0.0001, false, true},
-  {10000, 32, 10, 0.0001, true, true},
-  {10000, 32, 10, 0.0001, false, true},
+  {1000, 32, 5, 0.0001, true},
+  {1000, 32, 5, 0.0001, false},
+  {1000, 100, 20, 0.0001, true},
+  {1000, 100, 20, 0.0001, false},
+  {10000, 32, 10, 0.0001, true},
+  {10000, 32, 10, 0.0001, false},
 };
 
 // ============================================================================
@@ -714,22 +690,14 @@ typedef KmeansFitBatchedTest<double> KmeansFitBatchedTestD;
 
 TEST_P(KmeansFitBatchedTestF, Result)
 {
-  if (testparams.minibatch) {
-    ASSERT_TRUE(score >= 0.9);
-  } else {
-    ASSERT_TRUE(centroids_match);
-    ASSERT_TRUE(score == 1.0);
-  }
+  ASSERT_TRUE(centroids_match);
+  ASSERT_TRUE(score == 1.0);
 }
 
 TEST_P(KmeansFitBatchedTestD, Result)
 {
-  if (testparams.minibatch) {
-    ASSERT_TRUE(score >= 0.9);
-  } else {
-    ASSERT_TRUE(centroids_match);
-    ASSERT_TRUE(score == 1.0);
-  }
+  ASSERT_TRUE(centroids_match);
+  ASSERT_TRUE(score == 1.0);
 }
 
 INSTANTIATE_TEST_CASE_P(KmeansFitBatchedTests,

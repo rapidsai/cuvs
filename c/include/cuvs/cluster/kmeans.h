@@ -36,21 +36,6 @@ typedef enum {
   Array = 2
 } cuvsKMeansInitMethod;
 
-/**
- * @brief Centroid update mode for k-means algorithm
- */
-typedef enum {
-  /**
-   * Standard k-means (Lloyd's algorithm): accumulate assignments over the
-   * entire dataset, then update centroids once per iteration.
-   */
-  CUVS_KMEANS_UPDATE_FULL_BATCH = 0,
-
-  /**
-   * Mini-batch k-means: update centroids after each randomly sampled batch.
-   */
-  CUVS_KMEANS_UPDATE_MINI_BATCH = 1
-} cuvsKMeansCentroidUpdateMode;
 
 /**
  * @brief Hyper-parameters for the kmeans algorithm
@@ -106,13 +91,6 @@ struct cuvsKMeansParams {
    */
   int batch_centroids;
 
-  /**
-   * Centroid update mode:
-   *  - CUVS_KMEANS_UPDATE_FULL_BATCH: Standard Lloyd's algorithm, update after full dataset pass
-   *  - CUVS_KMEANS_UPDATE_MINI_BATCH: Mini-batch k-means, update after each batch
-   */
-  cuvsKMeansCentroidUpdateMode update_mode;
-
   /** Check inertia during iterations for early convergence. */
   bool inertia_check;
 
@@ -121,21 +99,6 @@ struct cuvsKMeansParams {
    * Only used by fit_batched; regular fit always computes final inertia.
    */
   bool final_inertia_check;
-
-  /**
-   * Maximum number of consecutive mini-batch steps without improvement in smoothed inertia
-   * before early stopping. Only used when update_mode is CUVS_KMEANS_UPDATE_MINI_BATCH.
-   * If 0, this convergence criterion is disabled.
-   */
-  int max_no_improvement;
-
-  /**
-   * Control the fraction of the maximum number of counts for a center to be reassigned.
-   * Centers with count < reassignment_ratio * max(counts) are randomly reassigned to
-   * observations from the current batch. Only used when update_mode is CUVS_KMEANS_UPDATE_MINI_BATCH.
-   * If 0.0, reassignment is disabled. Default: 0.01
-   */
-  double reassignment_ratio;
 
   /**
    * Whether to use hierarchical (balanced) kmeans or not

@@ -18,10 +18,6 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
         Random
         Array
 
-    ctypedef enum cuvsKMeansCentroidUpdateMode:
-        CUVS_KMEANS_UPDATE_FULL_BATCH
-        CUVS_KMEANS_UPDATE_MINI_BATCH
-
     ctypedef enum cuvsKMeansType:
         CUVS_KMEANS_TYPE_KMEANS
         CUVS_KMEANS_TYPE_KMEANS_BALANCED
@@ -36,11 +32,8 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
         double oversampling_factor,
         int batch_samples,
         int batch_centroids,
-        cuvsKMeansCentroidUpdateMode update_mode,
         bool inertia_check,
         bool final_inertia_check,
-        int max_no_improvement,
-        double reassignment_ratio,
         bool hierarchical,
         int hierarchical_n_iters
 

@@ -581,7 +581,7 @@ void finalize_centroids(raft::resources const& handle,
  * @brief Compute the squared norm difference between two centroid sets.
  *
  * Returns sum((old_centroids - new_centroids)^2).
- * Used for convergence checking in both full-batch and mini-batch modes.
+ * Used for convergence checking.
  */
 template <typename DataT, typename IndexT>
 DataT compute_centroid_shift(raft::resources const& handle,

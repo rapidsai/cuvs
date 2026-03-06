@@ -45,12 +45,6 @@ INIT_METHOD_TYPES = {
 
 INIT_METHOD_NAMES = {v: k for k, v in INIT_METHOD_TYPES.items()}
 
-UPDATE_MODE_TYPES = {
-    "full_batch": cuvsKMeansCentroidUpdateMode.CUVS_KMEANS_UPDATE_FULL_BATCH,
-    "mini_batch": cuvsKMeansCentroidUpdateMode.CUVS_KMEANS_UPDATE_MINI_BATCH}
-
-UPDATE_MODE_NAMES = {v: k for k, v in UPDATE_MODE_TYPES.items()}
-
 cdef class KMeansParams:
     """
     Hyper-parameters for the kmeans algorithm
@@ -83,11 +77,6 @@ cdef class KMeansParams:
         [batch_samples x n_clusters].
     batch_centroids : int
         Number of centroids to process in each batch. If 0, uses n_clusters.
-    update_mode : str
-        Centroid update strategy. One of:
-        "full_batch" : Standard Lloyd's algorithm - accumulate assignments over
-            the entire dataset, then update centroids once per iteration.
-        "mini_batch" : Mini-batch k-means - update centroids after each batch.
     inertia_check : bool
         If True, check inertia during iterations for early convergence.
     final_inertia_check : bool
@@ -95,16 +84,6 @@ cdef class KMeansParams:
         This requires an additional full pass over all the host data.
         Only used by fit_batched(); regular fit() always computes final inertia.
         Default: False (skip final inertia computation for performance).
-    max_no_improvement : int
-        Maximum number of consecutive mini-batch steps without improvement
-        in smoothed inertia before early stopping. Only used when update_mode
-        is "mini_batch". If 0, this convergence criterion is disabled.
-        Default: 10 (matches sklearn's default).
-    reassignment_ratio : float
-        Control the fraction of the maximum number of counts for a center to be reassigned.
-        Centers with count < reassignment_ratio * max(counts) are randomly reassigned to
-        observations from the current batch. Only used when update_mode is "mini_batch".
-        If 0.0, reassignment is disabled. Default: 0.01 (matches sklearn's default).
     hierarchical : bool
         Whether to use hierarchical (balanced) kmeans or not
     hierarchical_n_iters : int
@@ -129,11 +108,8 @@ cdef class KMeansParams:
                  oversampling_factor=None,
                  batch_samples=None,
                  batch_centroids=None,
-                 update_mode=None,
                  inertia_check=None,
                  final_inertia_check=None,
-                 max_no_improvement=None,
-                 reassignment_ratio=None,
                  hierarchical=None,
                  hierarchical_n_iters=None):
         if metric is not None:
@@ -155,17 +131,10 @@ cdef class KMeansParams:
             self.params.batch_samples = batch_samples
         if batch_centroids is not None:
             self.params.batch_centroids = batch_centroids
-        if update_mode is not None:
-            c_mode = UPDATE_MODE_TYPES[update_mode]
-            self.params.update_mode = <cuvsKMeansCentroidUpdateMode>c_mode
         if inertia_check is not None:
             self.params.inertia_check = inertia_check
         if final_inertia_check is not None:
             self.params.final_inertia_check = final_inertia_check
-        if max_no_improvement is not None:
-            self.params.max_no_improvement = max_no_improvement
-        if reassignment_ratio is not None:
-            self.params.reassignment_ratio = reassignment_ratio
         if hierarchical is not None:
             self.params.hierarchical = hierarchical
         if hierarchical_n_iters is not None:
@@ -211,24 +180,12 @@ cdef class KMeansParams:
         return self.params.batch_centroids
 
     @property
-    def update_mode(self):
-        return UPDATE_MODE_NAMES[self.params.update_mode]
-
-    @property
     def inertia_check(self):
         return self.params.inertia_check
 
     @property
     def final_inertia_check(self):
         return self.params.final_inertia_check
-
-    @property
-    def max_no_improvement(self):
-        return self.params.max_no_improvement
-
-    @property
-    def reassignment_ratio(self):
-        return self.params.reassignment_ratio
 
     @property
     def hierarchical(self):
