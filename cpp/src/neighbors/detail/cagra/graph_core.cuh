@@ -1543,8 +1543,19 @@ void prune_graph_gpu(raft::resources const& res,
   auto host_stats                           = raft::make_host_vector<uint64_t>(2);
   raft::matrix::fill(res, dev_stats.view(), uint64_t(0));
 
-  device_matrix_view_from_host<IdxT, int64_t> d_input_graph(
-    res, raft::make_host_matrix_view<IdxT, int64_t>(knn_graph_ptr, graph_size, knn_graph_degree));
+  // device_matrix_view_from_host<IdxT, int64_t> d_input_graph(
+  //   res, raft::make_host_matrix_view<IdxT, int64_t>(knn_graph_ptr, graph_size,
+  //   knn_graph_degree));
+
+  batched_device_view_from_host<IdxT, int64_t> d_input_graph(
+    res,
+    raft::make_host_matrix_view<IdxT, int64_t>(knn_graph_ptr, graph_size, knn_graph_degree),
+    /*batch_size*/ graph_size,
+    /*read_only*/ true,
+    /*host_writeback*/ false,
+    /*initialize*/ true,
+    /*evict*/ true);
+  auto input_view = d_input_graph.next_view();
 
   auto d_invalid_neighbor_list = raft::make_device_scalar<uint32_t>(res, 0u);
 
@@ -1561,7 +1572,7 @@ void prune_graph_gpu(raft::resources const& res,
     const size_t prune_smem_size = num_warps * knn_graph_degree * (sizeof(IdxT) + sizeof(uint32_t));
     kern_fused_prune<IdxT, num_warps>
       <<<blocks_prune, threads_prune, prune_smem_size, raft::resource::get_cuda_stream(res)>>>(
-        d_input_graph.data_handle(),
+        input_view.data_handle(),
         output_device_accessible ? output_graph_ptr + i_batch * batch_size * output_graph_degree
                                  : d_output_graph.data_handle(),
         graph_size,
