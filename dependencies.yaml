@@ -381,6 +381,7 @@ dependencies:
       - output_types: [conda]
         packages:
           - *cmake_ver
+          - cuda-sanitizer-api
           - openblas
           - &pytest pytest
   docs:
