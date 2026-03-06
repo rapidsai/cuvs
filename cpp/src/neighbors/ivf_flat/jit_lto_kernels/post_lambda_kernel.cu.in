@@ -3,8 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// This file is auto-generated. Do not edit manually.
-
 #include <@header_file@>
 
 namespace cuvs::neighbors::ivf_flat::detail {

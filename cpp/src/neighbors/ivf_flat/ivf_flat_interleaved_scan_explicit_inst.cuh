@@ -23,6 +23,7 @@
                            typename cuvs::spatial::knn::detail::utils::config<T>::value_t, \
                            IdxT,                                                           \
                            SampleFilterT>(const index<T, IdxT>& index,                     \
+                                          const search_params& params,                     \
                                           const T* queries,                                \
                                           const uint32_t* coarse_query_results,            \
                                           const uint32_t n_queries,                        \

@@ -109,7 +109,7 @@ repos:
             args: [--fix, --spdx]
             files: |
               (?x)
-                [.](cmake|c|cpp|cu|cuh|h|hpp|sh|pxd|py|pyx|rs|java)$|
+                [.](cmake|c|cpp([.]in)?|cu([.]in)?|cuh|h|hpp|sh|pxd|py|pyx|rs|java)$|
                 CMakeLists[.]txt$|
                 CMakeLists_standalone[.]txt$|
                 meta[.]yaml$|

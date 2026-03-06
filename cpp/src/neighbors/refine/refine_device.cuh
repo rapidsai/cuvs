@@ -103,6 +103,7 @@ void refine_device(
 
   cuvs::neighbors::ivf_flat::detail::ivfflat_interleaved_scan<data_t, acc_t, int64_t>(
     refinement_index,
+    cuvs::neighbors::ivf_flat::search_params(),
     queries.data_handle(),
     fake_coarse_idx.data(),
     static_cast<uint32_t>(n_queries),
