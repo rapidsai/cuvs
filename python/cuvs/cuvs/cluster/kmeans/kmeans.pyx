@@ -472,5 +472,3 @@ def cluster_cost(X, centroids, resources=None):
             &inertia))
 
     return inertia
-
-

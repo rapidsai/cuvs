@@ -10,7 +10,6 @@ from cuvs.cluster.kmeans import (
     KMeansParams,
     cluster_cost,
     fit,
-    fit_batched,
     predict,
 )
 from cuvs.distance import pairwise_distance
@@ -82,12 +81,12 @@ def test_cluster_cost(n_rows, n_cols, n_clusters, dtype):
 @pytest.mark.parametrize("n_clusters", [8, 16])
 @pytest.mark.parametrize("batch_size", [100, 500])
 @pytest.mark.parametrize("dtype", [np.float64])
-def test_fit_batched_matches_fit(
+def test_fit_host_matches_fit_device(
     n_rows, n_cols, n_clusters, batch_size, dtype
 ):
     """
-    Test that fit_batched FullBatch produces the same centroids as regular fit
-    when given the same initial centroids.
+    Test that fit() with host (numpy) data produces the same centroids as
+    fit() with device data, when given the same initial centroids.
     """
     rng = np.random.default_rng(99)
     X_host = rng.random((n_rows, n_cols)).astype(dtype)
@@ -98,23 +97,29 @@ def test_fit_batched_matches_fit(
 
     initial_centroids_host = X_host[:n_clusters].copy()
 
-    params = KMeansParams(
+    params_device = KMeansParams(
         n_clusters=n_clusters,
         init_method="Array",
         max_iter=100,
         tol=1e-10,
     )
     centroids_regular, _, _ = fit(
-        params,
+        params_device,
         device_ndarray(X_host),
         device_ndarray(initial_centroids_host.copy()),
     )
     centroids_regular = centroids_regular.copy_to_host()
 
-    centroids_batched, _, _ = fit_batched(
-        params,
-        X_host,
+    params_host = KMeansParams(
+        n_clusters=n_clusters,
+        init_method="Array",
+        max_iter=100,
+        tol=1e-10,
         batch_size=batch_size,
+    )
+    centroids_batched, _, _ = fit(
+        params_host,
+        X_host,
         centroids=device_ndarray(initial_centroids_host.copy()),
     )
     centroids_batched = centroids_batched.copy_to_host()
@@ -122,5 +127,3 @@ def test_fit_batched_matches_fit(
     assert np.allclose(
         centroids_regular, centroids_batched, rtol=1e-3, atol=1e-3
     ), f"max diff: {np.max(np.abs(centroids_regular - centroids_batched))}"
-
-

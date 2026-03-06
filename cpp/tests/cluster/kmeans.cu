@@ -616,7 +616,7 @@ class KmeansPredictBatchedTest : public ::testing::TestWithParam<KmeansInputs<T>
     auto h_labels_view =
       raft::make_host_vector_view<int64_t, int64_t>(h_labels.data(), (int64_t)n_samples);
 
-    T pred_inertia = 0;
+    T pred_inertia            = 0;
     params.batched.batch_size = std::min((int64_t)n_samples, (int64_t)256);
 
     cuvs::cluster::kmeans::predict(
