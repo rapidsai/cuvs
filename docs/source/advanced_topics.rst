@@ -1,6 +1,11 @@
 Advanced Topics
 ===============
 
+.. toctree::
+   :maxdepth: 2
+
+   jit_lto_guide
+
 - `Just-in-Time Compilation`_
 
 Just-in-Time Compilation
