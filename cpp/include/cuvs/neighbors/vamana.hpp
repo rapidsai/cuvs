@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -33,8 +33,8 @@ namespace cuvs::neighbors::vamana {
  */
 template <typename T = float>
 struct codebook_params {
-  int pq_codebook_size;
-  int pq_dim;
+  int pq_codebook_size = 0;
+  int pq_dim           = 0;
   std::vector<T> pq_encoding_table;
   std::vector<T> rotation_matrix;
 };
