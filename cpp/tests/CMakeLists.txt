@@ -131,6 +131,15 @@ ConfigureTest(
   PERCENT 100
 )
 
+if(JIT_LTO_COMPILATION)
+  ConfigureTest(
+    NAME NEIGHBORS_ANN_IVF_FLAT_UDF_TEST
+    PATH neighbors/ann_ivf_flat/test_udf.cu
+    GPUS 1
+    PERCENT 100
+  )
+endif()
+
 ConfigureTest(
   NAME NEIGHBORS_ANN_IVF_PQ_TEST
   PATH neighbors/ann_ivf_pq/test_float_int64_t.cu neighbors/ann_ivf_pq/test_int8_t_int64_t.cu
