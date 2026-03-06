@@ -28,7 +28,8 @@
 //!
 //!     // build the ivf-flat index
 //!     let build_params = IndexParams::new()?;
-//!     let index = Index::build(&res, &build_params, &dataset)?;
+//!     let tensor = ManagedTensor::from(&dataset);
+//!     let index = Index::build(&res, &build_params, &tensor)?;
 //!     println!(
 //!         "Indexed {}x{} datapoints into ivf-flat index",
 //!         n_datapoints, n_features
