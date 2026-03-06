@@ -637,4 +637,5 @@ Add a new entry to `algos.yaml` to map the name of the algorithm to its binary e
    build.rst
    datasets.rst
    param_tuning.rst
+   pluggable_backend.rst
    wiki_all_dataset.rst
