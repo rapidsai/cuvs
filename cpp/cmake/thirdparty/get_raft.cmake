@@ -6,8 +6,8 @@
 
 # Use RAPIDS_VERSION_MAJOR_MINOR from rapids_config.cmake
 set(RAFT_VERSION "${RAPIDS_VERSION_MAJOR_MINOR}")
-set(RAFT_FORK "rapidsai")
-set(RAFT_PINNED_TAG "${rapids-cmake-checkout-tag}")
+set(RAFT_FORK "yan-zaretskiy")
+set(RAFT_PINNED_TAG "yzaretkiy/fix-selectk-overflow")
 
 function(find_and_configure_raft)
     set(oneValueArgs VERSION FORK PINNED_TAG BUILD_STATIC_DEPS ENABLE_NVTX ENABLE_MNMG_DEPENDENCIES CLONE_ON_PIN)
