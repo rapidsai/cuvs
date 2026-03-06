@@ -347,7 +347,7 @@ TEST_P(KmeansTestF, Result) { ASSERT_TRUE(score == 1.0); }
 INSTANTIATE_TEST_CASE_P(KmeansTests, KmeansTestF, ::testing::ValuesIn(inputsf2));
 
 // ============================================================================
-// Batched KMeans Tests (fit_batched + predict_batched)
+// Batched KMeans Tests (fit + predict with host data)
 // ============================================================================
 
 template <typename T>
@@ -381,8 +381,6 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
     params.n_init              = 5;
     params.rng_state.seed      = 1;
     params.oversampling_factor = 0;
-
-    params.batched.final_inertia_check = true;
 
     auto stream = raft::resource::get_cuda_stream(handle);
     auto X      = raft::make_device_matrix<T, int>(handle, n_samples, n_features);
@@ -448,6 +446,7 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
     cuvs::cluster::kmeans::params batched_params = params;
     batched_params.init                          = cuvs::cluster::kmeans::params::Array;
     batched_params.n_init                        = 1;
+    batched_params.batched.batch_size            = std::min(n_samples, 256);
 
     std::optional<raft::host_vector_view<const T, int>> h_sw = std::nullopt;
     std::vector<T> h_sample_weight;
@@ -457,18 +456,16 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
         raft::make_host_vector_view<const T, int>(h_sample_weight.data(), n_samples));
     }
 
-    T inertia      = 0;
-    int n_iter     = 0;
-    int batch_size = std::min(n_samples, 256);
+    T inertia  = 0;
+    int n_iter = 0;
 
-    cuvs::cluster::kmeans::fit_batched(handle,
-                                       batched_params,
-                                       h_X_view,
-                                       batch_size,
-                                       h_sw,
-                                       d_centroids_view,
-                                       raft::make_host_scalar_view<T>(&inertia),
-                                       raft::make_host_scalar_view<int>(&n_iter));
+    cuvs::cluster::kmeans::fit(handle,
+                               batched_params,
+                               h_X_view,
+                               h_sw,
+                               d_centroids_view,
+                               raft::make_host_scalar_view<T>(&inertia),
+                               raft::make_host_scalar_view<int>(&n_iter));
 
     raft::resource::sync_stream(handle, stream);
 
@@ -619,14 +616,13 @@ class KmeansPredictBatchedTest : public ::testing::TestWithParam<KmeansInputs<T>
     auto h_labels_view =
       raft::make_host_vector_view<int64_t, int64_t>(h_labels.data(), (int64_t)n_samples);
 
-    T pred_inertia     = 0;
-    int64_t batch_size = std::min((int64_t)n_samples, (int64_t)256);
+    T pred_inertia = 0;
+    params.batched.batch_size = std::min((int64_t)n_samples, (int64_t)256);
 
-    cuvs::cluster::kmeans::predict_batched(
+    cuvs::cluster::kmeans::predict(
       handle,
       params,
       h_X_view,
-      batch_size,
       std::optional<raft::host_vector_view<const T, int64_t>>(std::nullopt),
       centroids_const_view,
       h_labels_view,
@@ -641,7 +637,7 @@ class KmeansPredictBatchedTest : public ::testing::TestWithParam<KmeansInputs<T>
     }
     raft::update_device(d_labels.data(), h_labels_int.data(), n_samples, stream);
 
-    // Compare labels directly: predict_batched should produce exact same labels
+    // Compare labels directly: batched predict should produce exact same labels
     // as device predict given the same centroids
     labels_match =
       devArrMatch(d_labels_ref.data(), d_labels.data(), n_samples, Compare<int>(), stream);
@@ -683,7 +679,7 @@ const std::vector<KmeansBatchedInputs<double>> batched_inputsd2 = {
 };
 
 // ============================================================================
-// fit_batched tests
+// fit (host/batched) tests
 // ============================================================================
 typedef KmeansFitBatchedTest<float> KmeansFitBatchedTestF;
 typedef KmeansFitBatchedTest<double> KmeansFitBatchedTestD;
@@ -708,7 +704,7 @@ INSTANTIATE_TEST_CASE_P(KmeansFitBatchedTests,
                         ::testing::ValuesIn(batched_inputsd2));
 
 // ============================================================================
-// predict_batched tests
+// predict (host/batched) tests
 // ============================================================================
 typedef KmeansPredictBatchedTest<float> KmeansPredictBatchedTestF;
 typedef KmeansPredictBatchedTest<double> KmeansPredictBatchedTestD;

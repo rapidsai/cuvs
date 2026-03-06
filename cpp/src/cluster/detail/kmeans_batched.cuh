@@ -267,9 +267,8 @@ T compute_batched_host_inertia(
  * @tparam IdxT      Index type (int, int64_t)
  *
  * @param[in]     handle        RAFT resources handle
- * @param[in]     params        K-means parameters
+ * @param[in]     params        K-means parameters (batch size read from params.batched.batch_size)
  * @param[in]     X             Input data on HOST [n_samples x n_features]
- * @param[in]     batch_size    Number of samples to process per GPU batch
  * @param[in]     sample_weight Optional weights per sample (on host)
  * @param[inout]  centroids     Initial/output cluster centers [n_clusters x n_features]
  * @param[out]    inertia       Sum of squared distances to nearest centroid
@@ -279,7 +278,6 @@ template <typename T, typename IdxT>
 void fit(raft::resources const& handle,
          const cuvs::cluster::kmeans::params& params,
          raft::host_matrix_view<const T, IdxT> X,
-         IdxT batch_size,
          std::optional<raft::host_vector_view<const T, IdxT>> sample_weight,
          raft::device_matrix_view<T, IdxT> centroids,
          raft::host_scalar_view<T> inertia,
@@ -290,6 +288,10 @@ void fit(raft::resources const& handle,
   auto n_features     = X.extent(1);
   auto n_clusters     = params.n_clusters;
   auto metric         = params.metric;
+
+  // Read batch_size from params; default to n_samples if 0 (auto)
+  IdxT batch_size = static_cast<IdxT>(params.batched.batch_size);
+  if (batch_size <= 0) { batch_size = static_cast<IdxT>(n_samples); }
 
   RAFT_EXPECTS(batch_size > 0, "batch_size must be positive");
   RAFT_EXPECTS(n_clusters > 0, "n_clusters must be positive");
@@ -321,7 +323,6 @@ void fit(raft::resources const& handle,
   IdxT best_n_iter    = 0;
 
   std::mt19937 gen(params.rng_state.seed);
-  bool compute_final_inertia = (n_init > 1) || params.batched.final_inertia_check;
 
   // ----- Allocate reusable work buffers (shared across n_init iterations) -----
   auto batch_data    = raft::make_device_matrix<T, IdxT>(handle, batch_size, n_features);
@@ -471,7 +472,8 @@ void fit(raft::resources const& handle,
       }
     }
 
-    if (compute_final_inertia) {
+    // Always compute final inertia (like regular kmeans)
+    {
       auto centroids_const = raft::make_device_matrix_view<const T, IdxT>(
         centroids.data_handle(), n_clusters, n_features);
       inertia[0] = compute_batched_host_inertia<T, IdxT>(
@@ -488,11 +490,6 @@ void fit(raft::resources const& handle,
         raft::copy(best_centroids.data_handle(), centroids.data_handle(), centroids.size(), stream);
         raft::resource::sync_stream(handle, stream);
       }
-    } else {
-      inertia[0] = 0;
-      RAFT_LOG_DEBUG("KMeans batched: n_init %d/%d completed (inertia computation skipped)",
-                     seed_iter + 1,
-                     n_init);
     }
 
     if (n_init > 1) {
@@ -518,7 +515,6 @@ template <typename T, typename IdxT>
 void predict(raft::resources const& handle,
              const cuvs::cluster::kmeans::params& params,
              raft::host_matrix_view<const T, IdxT> X,
-             IdxT batch_size,
              std::optional<raft::host_vector_view<const T, IdxT>> sample_weight,
              raft::device_matrix_view<const T, IdxT> centroids,
              raft::host_vector_view<IdxT, IdxT> labels,
@@ -529,6 +525,10 @@ void predict(raft::resources const& handle,
   auto n_samples      = X.extent(0);
   auto n_features     = X.extent(1);
   auto n_clusters     = params.n_clusters;
+
+  // Read batch_size from params; default to n_samples if 0 (auto)
+  IdxT batch_size = static_cast<IdxT>(params.batched.batch_size);
+  if (batch_size <= 0) { batch_size = static_cast<IdxT>(n_samples); }
 
   RAFT_EXPECTS(batch_size > 0, "batch_size must be positive");
   RAFT_EXPECTS(n_clusters > 0, "n_clusters must be positive");
@@ -597,7 +597,6 @@ template <typename T, typename IdxT>
 void fit_predict(raft::resources const& handle,
                  const cuvs::cluster::kmeans::params& params,
                  raft::host_matrix_view<const T, IdxT> X,
-                 IdxT batch_size,
                  std::optional<raft::host_vector_view<const T, IdxT>> sample_weight,
                  raft::device_matrix_view<T, IdxT> centroids,
                  raft::host_vector_view<IdxT, IdxT> labels,
@@ -608,7 +607,6 @@ void fit_predict(raft::resources const& handle,
   fit<T, IdxT>(handle,
                params,
                X,
-               batch_size,
                sample_weight,
                centroids,
                raft::make_host_scalar_view(&fit_inertia),
@@ -618,7 +616,7 @@ void fit_predict(raft::resources const& handle,
     centroids.data_handle(), centroids.extent(0), centroids.extent(1));
 
   predict<T, IdxT>(
-    handle, params, X, batch_size, sample_weight, centroids_const, labels, false, inertia);
+    handle, params, X, sample_weight, centroids_const, labels, false, inertia);
 }
 
 }  // namespace cuvs::cluster::kmeans::detail

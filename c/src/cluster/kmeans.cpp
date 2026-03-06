@@ -28,7 +28,7 @@ cuvs::cluster::kmeans::params convert_params(const cuvsKMeansParams& params)
   kmeans_params.batch_samples       = params.batch_samples;
   kmeans_params.batch_centroids     = params.batch_centroids;
   kmeans_params.inertia_check       = params.inertia_check;
-  kmeans_params.batched.final_inertia_check = params.final_inertia_check;
+  kmeans_params.batched.batch_size  = params.batch_size;
   return kmeans_params;
 }
 
@@ -41,59 +41,54 @@ cuvs::cluster::kmeans::balanced_params convert_balanced_params(const cuvsKMeansP
 }
 
 template <typename T, typename IdxT = int32_t>
-void _fit(cuvsResources_t res,
-          const cuvsKMeansParams& params,
-          DLManagedTensor* X_tensor,
-          DLManagedTensor* sample_weight_tensor,
-          DLManagedTensor* centroids_tensor,
-          double* inertia,
-          int* n_iter)
+void _fit_device(cuvsResources_t res,
+                 const cuvsKMeansParams& params,
+                 DLManagedTensor* X_tensor,
+                 DLManagedTensor* sample_weight_tensor,
+                 DLManagedTensor* centroids_tensor,
+                 double* inertia,
+                 int64_t* n_iter)
 {
-  auto X       = X_tensor->dl_tensor;
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
 
-  if (cuvs::core::is_dlpack_device_compatible(X)) {
-    using const_mdspan_type = raft::device_matrix_view<T const, IdxT, raft::row_major>;
-    using mdspan_type       = raft::device_matrix_view<T, IdxT, raft::row_major>;
+  using const_mdspan_type = raft::device_matrix_view<T const, IdxT, raft::row_major>;
+  using mdspan_type       = raft::device_matrix_view<T, IdxT, raft::row_major>;
 
-    if (params.hierarchical) {
-      if (sample_weight_tensor != NULL) {
-        RAFT_FAIL("sample_weight cannot be used with hierarchical kmeans");
-      }
+  if (params.hierarchical) {
+    if (sample_weight_tensor != NULL) {
+      RAFT_FAIL("sample_weight cannot be used with hierarchical kmeans");
+    }
 
-      if constexpr (std::is_same_v<T, double>) {
-        RAFT_FAIL("float64 is an unsupported dtype for hierarchical kmeans");
-      } else {
-        auto kmeans_params = convert_balanced_params(params);
-        T inertia_temp;
-        auto inertia_view = raft::make_host_scalar_view<T>(&inertia_temp);
-        cuvs::cluster::kmeans::fit(*res_ptr, kmeans_params, cuvs::core::from_dlpack<const_mdspan_type>(X_tensor), cuvs::core::from_dlpack<mdspan_type>(centroids_tensor), std::make_optional(inertia_view));
-        *inertia = inertia_temp;
-        *n_iter  = params.hierarchical_n_iters;
-      }
+    if constexpr (std::is_same_v<T, double>) {
+      RAFT_FAIL("float64 is an unsupported dtype for hierarchical kmeans");
     } else {
+      auto kmeans_params = convert_balanced_params(params);
       T inertia_temp;
-      IdxT n_iter_temp;
-
-      std::optional<raft::device_vector_view<T const, IdxT>> sample_weight;
-      if (sample_weight_tensor != NULL) {
-        sample_weight =
-          cuvs::core::from_dlpack<raft::device_vector_view<T const, IdxT>>(sample_weight_tensor);
-      }
-
-      auto kmeans_params = convert_params(params);
-      cuvs::cluster::kmeans::fit(*res_ptr,
-                                 kmeans_params,
-                                 cuvs::core::from_dlpack<const_mdspan_type>(X_tensor),
-                                 sample_weight,
-                                 cuvs::core::from_dlpack<mdspan_type>(centroids_tensor),
-                                 raft::make_host_scalar_view<T, IdxT>(&inertia_temp),
-                                 raft::make_host_scalar_view<IdxT, IdxT>(&n_iter_temp));
+      auto inertia_view = raft::make_host_scalar_view<T>(&inertia_temp);
+      cuvs::cluster::kmeans::fit(*res_ptr, kmeans_params, cuvs::core::from_dlpack<const_mdspan_type>(X_tensor), cuvs::core::from_dlpack<mdspan_type>(centroids_tensor), std::make_optional(inertia_view));
       *inertia = inertia_temp;
-      *n_iter  = n_iter_temp;
+      *n_iter  = params.hierarchical_n_iters;
     }
   } else {
-    RAFT_FAIL("X dataset must be accessible on device memory");
+    T inertia_temp;
+    IdxT n_iter_temp;
+
+    std::optional<raft::device_vector_view<T const, IdxT>> sample_weight;
+    if (sample_weight_tensor != NULL) {
+      sample_weight =
+        cuvs::core::from_dlpack<raft::device_vector_view<T const, IdxT>>(sample_weight_tensor);
+    }
+
+    auto kmeans_params = convert_params(params);
+    cuvs::cluster::kmeans::fit(*res_ptr,
+                               kmeans_params,
+                               cuvs::core::from_dlpack<const_mdspan_type>(X_tensor),
+                               sample_weight,
+                               cuvs::core::from_dlpack<mdspan_type>(centroids_tensor),
+                               raft::make_host_scalar_view<T, IdxT>(&inertia_temp),
+                               raft::make_host_scalar_view<IdxT, IdxT>(&n_iter_temp));
+    *inertia = inertia_temp;
+    *n_iter  = static_cast<int64_t>(n_iter_temp);
   }
 }
 
@@ -179,10 +174,9 @@ void _cluster_cost(cuvsResources_t res,
 }
 
 template <typename T, typename IdxT = int64_t>
-void _fit_batched(cuvsResources_t res,
+void _fit_host(cuvsResources_t res,
                   const cuvsKMeansParams& params,
                   DLManagedTensor* X_tensor,
-                  IdxT batch_size,
                   DLManagedTensor* sample_weight_tensor,
                   DLManagedTensor* centroids_tensor,
                   double* inertia,
@@ -196,7 +190,7 @@ void _fit_batched(cuvsResources_t res,
 
   // X must be on host (CPU) memory
   if (X.device.device_type != kDLCPU) {
-    RAFT_FAIL("X dataset must be on host (CPU) memory for fit_batched");
+    RAFT_FAIL("X dataset must be on host (CPU) memory for batched fit");
   }
 
   // centroids must be on device memory
@@ -214,7 +208,7 @@ void _fit_batched(cuvsResources_t res,
   if (sample_weight_tensor != NULL) {
     auto sw = sample_weight_tensor->dl_tensor;
     if (sw.device.device_type != kDLCPU) {
-      RAFT_FAIL("sample_weight must be on host (CPU) memory for fit_batched");
+      RAFT_FAIL("sample_weight must be on host (CPU) memory for batched fit");
     }
     sample_weight = raft::make_host_vector_view<T const, IdxT>(
       reinterpret_cast<T const*>(sw.data), n_samples);
@@ -224,14 +218,13 @@ void _fit_batched(cuvsResources_t res,
   IdxT n_iter_temp;
 
   auto kmeans_params = convert_params(params);
-  cuvs::cluster::kmeans::fit_batched(*res_ptr,
-                                     kmeans_params,
-                                     X_view,
-                                     batch_size,
-                                     sample_weight,
-                                     centroids_view,
-                                     raft::make_host_scalar_view<T>(&inertia_temp),
-                                     raft::make_host_scalar_view<IdxT>(&n_iter_temp));
+  cuvs::cluster::kmeans::fit(*res_ptr,
+                             kmeans_params,
+                             X_view,
+                             sample_weight,
+                             centroids_view,
+                             raft::make_host_scalar_view<T>(&inertia_temp),
+                             raft::make_host_scalar_view<IdxT>(&n_iter_temp));
 
   *inertia = inertia_temp;
   *n_iter  = n_iter_temp;
@@ -254,7 +247,7 @@ extern "C" cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params)
       .batch_samples        = cpp_params.batch_samples,
       .batch_centroids      = cpp_params.batch_centroids,
       .inertia_check        = cpp_params.inertia_check,
-      .final_inertia_check  = cpp_params.batched.final_inertia_check,
+      .batch_size           = cpp_params.batched.batch_size,
       .hierarchical         = false,
       .hierarchical_n_iters = static_cast<int>(cpp_balanced_params.n_iters)};
   });
@@ -271,14 +264,22 @@ extern "C" cuvsError_t cuvsKMeansFit(cuvsResources_t res,
                                      DLManagedTensor* sample_weight,
                                      DLManagedTensor* centroids,
                                      double* inertia,
-                                     int* n_iter)
+                                     int64_t* n_iter)
 {
   return cuvs::core::translate_exceptions([=] {
-    auto dataset = X->dl_tensor;
+    auto dataset  = X->dl_tensor;
+    bool is_host  = (dataset.device.device_type == kDLCPU);
+
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
-      _fit<float>(res, *params, X, sample_weight, centroids, inertia, n_iter);
+      if (is_host)
+        _fit_host<float>(res, *params, X, sample_weight, centroids, inertia, n_iter);
+      else
+        _fit_device<float>(res, *params, X, sample_weight, centroids, inertia, n_iter);
     } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 64) {
-      _fit<double>(res, *params, X, sample_weight, centroids, inertia, n_iter);
+      if (is_host)
+        _fit_host<double>(res, *params, X, sample_weight, centroids, inertia, n_iter);
+      else
+        _fit_device<double>(res, *params, X, sample_weight, centroids, inertia, n_iter);
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
                 dataset.dtype.code,
@@ -330,25 +331,3 @@ extern "C" cuvsError_t cuvsKMeansClusterCost(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsKMeansFitBatched(cuvsResources_t res,
-                                            cuvsKMeansParams_t params,
-                                            DLManagedTensor* X,
-                                            int64_t batch_size,
-                                            DLManagedTensor* sample_weight,
-                                            DLManagedTensor* centroids,
-                                            double* inertia,
-                                            int64_t* n_iter)
-{
-  return cuvs::core::translate_exceptions([=] {
-    auto dataset = X->dl_tensor;
-    if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
-      _fit_batched<float>(res, *params, X, batch_size, sample_weight, centroids, inertia, n_iter);
-    } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 64) {
-      _fit_batched<double>(res, *params, X, batch_size, sample_weight, centroids, inertia, n_iter);
-    } else {
-      RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
-                dataset.dtype.code,
-                dataset.dtype.bits);
-    }
-  });
-}

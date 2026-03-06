@@ -95,10 +95,10 @@ struct cuvsKMeansParams {
   bool inertia_check;
 
   /**
-   * Compute final inertia after fit_batched completes (requires extra data pass).
-   * Only used by fit_batched; regular fit always computes final inertia.
+   * Number of samples to process per GPU batch for the batched (host-data) API.
+   * When set to 0, defaults to n_samples (process all at once).
    */
-  bool final_inertia_check;
+  int64_t batch_size;
 
   /**
    * Whether to use hierarchical (balanced) kmeans or not
@@ -150,18 +150,24 @@ typedef enum { CUVS_KMEANS_TYPE_KMEANS = 0, CUVS_KMEANS_TYPE_KMEANS_BALANCED = 1
  *   clusters are reinitialized by choosing new centroids with
  *   k-means++ algorithm.
  *
+ *   X may reside on either host (CPU) or device (GPU) memory.
+ *   When X is on the host the data is streamed to the GPU in
+ *   batches controlled by params->batch_size.
+ *
  * @param[in]     res           opaque C handle
  * @param[in]     params        Parameters for KMeans model.
  * @param[in]     X             Training instances to cluster. The data must
- *                              be in row-major format.
+ *                              be in row-major format. May be on host or
+ *                              device memory.
  *                              [dim = n_samples x n_features]
  * @param[in]     sample_weight Optional weights for each observation in X.
+ *                              Must be on the same memory space as X.
  *                              [len = n_samples]
  * @param[inout]  centroids     [in] When init is InitMethod::Array, use
  *                              centroids as the initial cluster centers.
  *                              [out] The generated centroids from the
  *                              kmeans algorithm are stored at the address
- *                              pointed by 'centroids'.
+ *                              pointed by 'centroids'. Must be on device.
  *                              [dim = n_clusters x n_features]
  * @param[out]    inertia       Sum of squared distances of samples to their
  *                              closest cluster center.
@@ -173,7 +179,7 @@ cuvsError_t cuvsKMeansFit(cuvsResources_t res,
                           DLManagedTensor* sample_weight,
                           DLManagedTensor* centroids,
                           double* inertia,
-                          int* n_iter);
+                          int64_t* n_iter);
 
 /**
  * @brief Predict the closest cluster each sample in X belongs to.
@@ -221,38 +227,6 @@ cuvsError_t cuvsKMeansClusterCost(cuvsResources_t res,
                                   DLManagedTensor* centroids,
                                   double* cost);
 
-/**
- * @brief Find clusters with k-means algorithm using batched processing.
- *
- *   This function processes data from HOST memory in batches, streaming
- *   to the GPU. Useful when the dataset is too large to fit in GPU memory.
- *
- * @param[in]     res           opaque C handle
- * @param[in]     params        Parameters for KMeans model.
- * @param[in]     X             Training instances on HOST memory. The data must
- *                              be in row-major format.
- *                              [dim = n_samples x n_features]
- * @param[in]     batch_size    Number of samples to process per batch.
- * @param[in]     sample_weight Optional weights for each observation in X (on host).
- *                              [len = n_samples]
- * @param[inout]  centroids     [in] When init is InitMethod::Array, use
- *                              centroids as the initial cluster centers.
- *                              [out] The generated centroids from the
- *                              kmeans algorithm are stored at the address
- *                              pointed by 'centroids'. Must be on DEVICE memory.
- *                              [dim = n_clusters x n_features]
- * @param[out]    inertia       Sum of squared distances of samples to their
- *                              closest cluster center.
- * @param[out]    n_iter        Number of iterations run.
- */
-cuvsError_t cuvsKMeansFitBatched(cuvsResources_t res,
-                                 cuvsKMeansParams_t params,
-                                 DLManagedTensor* X,
-                                 int64_t batch_size,
-                                 DLManagedTensor* sample_weight,
-                                 DLManagedTensor* centroids,
-                                 double* inertia,
-                                 int64_t* n_iter);
 /**
  * @}
  */

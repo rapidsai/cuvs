@@ -33,7 +33,7 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
         int batch_samples,
         int batch_centroids,
         bool inertia_check,
-        bool final_inertia_check,
+        int64_t batch_size,
         bool hierarchical,
         int hierarchical_n_iters
 
@@ -49,7 +49,7 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
                               DLManagedTensor* sample_weight,
                               DLManagedTensor * centroids,
                               double * inertia,
-                              int * n_iter) except +
+                              int64_t * n_iter) except +
 
     cuvsError_t cuvsKMeansPredict(cuvsResources_t res,
                                   cuvsKMeansParams_t params,
@@ -64,12 +64,3 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
                                       DLManagedTensor* X,
                                       DLManagedTensor* centroids,
                                       double* cost)
-
-    cuvsError_t cuvsKMeansFitBatched(cuvsResources_t res,
-                                     cuvsKMeansParams_t params,
-                                     DLManagedTensor* X,
-                                     int64_t batch_size,
-                                     DLManagedTensor* sample_weight,
-                                     DLManagedTensor* centroids,
-                                     double* inertia,
-                                     int64_t* n_iter) except +

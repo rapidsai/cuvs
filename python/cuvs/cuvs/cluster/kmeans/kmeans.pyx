@@ -79,11 +79,11 @@ cdef class KMeansParams:
         Number of centroids to process in each batch. If 0, uses n_clusters.
     inertia_check : bool
         If True, check inertia during iterations for early convergence.
-    final_inertia_check : bool
-        If True, compute the final inertia after fit_batched completes.
-        This requires an additional full pass over all the host data.
-        Only used by fit_batched(); regular fit() always computes final inertia.
-        Default: False (skip final inertia computation for performance).
+    batch_size : int
+        Number of samples to process per GPU batch when fitting with host
+        (numpy) data. When set to 0, defaults to n_samples (process all
+        at once). Only used by the batched (host-data) code path.
+        Default: 0 (auto).
     hierarchical : bool
         Whether to use hierarchical (balanced) kmeans or not
     hierarchical_n_iters : int
@@ -109,7 +109,7 @@ cdef class KMeansParams:
                  batch_samples=None,
                  batch_centroids=None,
                  inertia_check=None,
-                 final_inertia_check=None,
+                 batch_size=None,
                  hierarchical=None,
                  hierarchical_n_iters=None):
         if metric is not None:
@@ -133,8 +133,8 @@ cdef class KMeansParams:
             self.params.batch_centroids = batch_centroids
         if inertia_check is not None:
             self.params.inertia_check = inertia_check
-        if final_inertia_check is not None:
-            self.params.final_inertia_check = final_inertia_check
+        if batch_size is not None:
+            self.params.batch_size = batch_size
         if hierarchical is not None:
             self.params.hierarchical = hierarchical
         if hierarchical_n_iters is not None:
@@ -184,8 +184,8 @@ cdef class KMeansParams:
         return self.params.inertia_check
 
     @property
-    def final_inertia_check(self):
-        return self.params.final_inertia_check
+    def batch_size(self):
+        return self.params.batch_size
 
     @property
     def hierarchical(self):
@@ -207,16 +207,26 @@ def fit(
     """
     Find clusters with the k-means algorithm
 
+    When X is a device array (CUDA array interface), standard on-device
+    k-means is used.  When X is a host array (numpy ndarray or
+    ``__array_interface__``), data is streamed to the GPU in batches
+    controlled by ``params.batch_size``.
+
     Parameters
     ----------
 
     params : KMeansParams
-        Parameters to use to fit KMeans model
-    X : Input CUDA array interface compliant matrix shape (m, k)
+        Parameters to use to fit KMeans model.  For host data,
+        ``params.batch_size`` controls how many samples are sent to the
+        GPU per batch.
+    X : array-like
+        Training instances, shape (m, k).  Accepts both device arrays
+        (cupy / CUDA array interface) and host arrays (numpy).
     centroids : Optional writable CUDA array interface compliant matrix
                 shape (n_clusters, k)
-    sample_weights : Optional input CUDA array interface compliant matrix shape
-                     (n_clusters, 1) default: None
+    sample_weights : Optional weights per observation.  Must reside on
+                     the same memory space as X (device or host).
+                     default: None
     {resources_docstring}
 
     Returns
@@ -244,10 +254,36 @@ def fit(
 
     >>> params = KMeansParams(n_clusters=n_clusters)
     >>> centroids, inertia, n_iter = fit(params, X)
+
+    Host-data (batched) example:
+
+    >>> import numpy as np
+    >>> X_host = np.random.random((10_000_000, 128)).astype(np.float32)
+    >>> params = KMeansParams(n_clusters=1000, batch_size=1_000_000)
+    >>> centroids, inertia, n_iter = fit(params, X_host)
     """
 
+    # ---- detect host vs device data for data-preparation ----
+    is_host = isinstance(X, np.ndarray) or (
+        hasattr(X, '__array_interface__') and
+        not hasattr(X, '__cuda_array_interface__')
+    )
+
+    if is_host:
+        if not isinstance(X, np.ndarray):
+            X = np.asarray(X)
+        if not X.flags['C_CONTIGUOUS']:
+            X = np.ascontiguousarray(X)
+        if sample_weights is not None:
+            if not isinstance(sample_weights, np.ndarray):
+                sample_weights = np.asarray(sample_weights)
+            if not sample_weights.flags['C_CONTIGUOUS']:
+                sample_weights = np.ascontiguousarray(sample_weights)
+
     x_ai = wrap_array(X)
-    _check_input_array(x_ai, [np.dtype('float32'), np.dtype('float64')])
+    _check_input_array(
+        x_ai, [np.dtype('float32'), np.dtype('float64')]
+    )
 
     cdef cydlpack.DLManagedTensor* x_dlpack = cydlpack.dlpack_c(x_ai)
     cdef cydlpack.DLManagedTensor* sample_weight_dlpack = NULL
@@ -255,18 +291,20 @@ def fit(
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
     cdef double inertia = 0
-    cdef int n_iter = 0
+    cdef int64_t n_iter = 0
 
     if centroids is None:
-        centroids = device_ndarray.empty((params.n_clusters, x_ai.shape[1]),
-                                         dtype=x_ai.dtype)
+        centroids = device_ndarray.empty(
+            (params.n_clusters, x_ai.shape[1]), dtype=x_ai.dtype
+        )
 
     centroids_ai = wrap_array(centroids)
-    cdef cydlpack.DLManagedTensor * centroids_dlpack = \
+    cdef cydlpack.DLManagedTensor* centroids_dlpack = \
         cydlpack.dlpack_c(centroids_ai)
 
     if sample_weights is not None:
-        sample_weight_dlpack = cydlpack.dlpack_c(wrap_array(sample_weights))
+        sample_weight_dlpack = \
+            cydlpack.dlpack_c(wrap_array(sample_weights))
 
     with cuda_interruptible():
         check_cuvs(cuvsKMeansFit(
@@ -436,108 +474,3 @@ def cluster_cost(X, centroids, resources=None):
     return inertia
 
 
-@auto_sync_resources
-@auto_convert_output
-def fit_batched(
-    KMeansParams params, X, batch_size, centroids=None, sample_weights=None,
-    resources=None
-):
-    """
-    Find clusters with the k-means algorithm using batched processing.
-
-    This function processes data from HOST memory in batches, streaming
-    to the GPU. Useful when the dataset is too large to fit in GPU memory.
-
-    Parameters
-    ----------
-
-    params : KMeansParams
-        Parameters to use to fit KMeans model
-    X : numpy array or array with __array_interface__
-        Input HOST memory array shape (n_samples, n_features).
-        Must be C-contiguous. Supported dtypes: float32, float64.
-    batch_size : int
-        Number of samples to process per batch. Recommended: 500K-2M
-        depending on GPU memory.
-    centroids : Optional writable CUDA array interface compliant matrix
-                shape (n_clusters, n_features)
-    sample_weights : Optional input HOST memory array shape (n_samples,)
-                     default: None
-    {resources_docstring}
-
-    Returns
-    -------
-    centroids : raft.device_ndarray
-        The computed centroids for each cluster (on device)
-    inertia : float
-       Sum of squared distances of samples to their closest cluster center
-    n_iter : int
-        The number of iterations used to fit the model
-
-    Examples
-    --------
-
-    >>> import numpy as np
-    >>> import cupy as cp
-    >>>
-    >>> from cuvs.cluster.kmeans import fit_batched, KMeansParams
-    >>>
-    >>> n_samples = 10_000_000
-    >>> n_features = 128
-    >>> n_clusters = 1000
-    >>>
-    >>> # Data on host (numpy array)
-    >>> X = np.random.random((n_samples, n_features)).astype(np.float32)
-    >>>
-    >>> params = KMeansParams(n_clusters=n_clusters, max_iter=20)
-    >>> centroids, inertia, n_iter = fit_batched(params, X, batch_size=1_000_000)
-    """
-    # Ensure X is a numpy array (host memory)
-    if not isinstance(X, np.ndarray):
-        X = np.asarray(X)
-
-    if not X.flags['C_CONTIGUOUS']:
-        X = np.ascontiguousarray(X)
-
-    _check_input_array(wrap_array(X), [np.dtype('float32'), np.dtype('float64')])
-
-    cdef int64_t n_samples = X.shape[0]
-    cdef int64_t n_features = X.shape[1]
-
-    # Create DLPack tensor for host data
-    cdef cydlpack.DLManagedTensor* x_dlpack = cydlpack.dlpack_c(wrap_array(X))
-    cdef cydlpack.DLManagedTensor* sample_weight_dlpack = NULL
-
-    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
-
-    cdef double inertia = 0
-    cdef int64_t n_iter = 0
-    cdef int64_t c_batch_size = batch_size
-
-    if centroids is None:
-        centroids = device_ndarray.empty((params.n_clusters, n_features),
-                                         dtype=X.dtype)
-
-    centroids_ai = wrap_array(centroids)
-    cdef cydlpack.DLManagedTensor* centroids_dlpack = \
-        cydlpack.dlpack_c(centroids_ai)
-
-    if sample_weights is not None:
-        if not isinstance(sample_weights, np.ndarray):
-            sample_weights = np.asarray(sample_weights)
-        if not sample_weights.flags['C_CONTIGUOUS']:
-            sample_weights = np.ascontiguousarray(sample_weights)
-        sample_weight_dlpack = cydlpack.dlpack_c(wrap_array(sample_weights))
-
-    with cuda_interruptible():
-        check_cuvs(cuvsKMeansFitBatched(
-            res,
-            params.params,
-            x_dlpack,
-            c_batch_size,
-            sample_weight_dlpack,
-            centroids_dlpack,
-            &inertia,
-            &n_iter))
-
-    return FitOutput(centroids, inertia, n_iter)
