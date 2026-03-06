@@ -12,21 +12,25 @@ jobs:
       - check-nightly-ci
       - changed-files
       - checks
-      - conda-cpp-build
-      - conda-cpp-tests
-      - conda-cpp-checks
-      - conda-python-build
-      - conda-python-tests
-      - rocky8-clib-standalone-build
-      - rocky8-clib-tests
-      - conda-java-build-and-tests
-      - rust-build
-      - go-build
-      - docs-build
-      - wheel-build-libcuvs
-      - wheel-build-cuvs
-      - wheel-tests-cuvs
-      - devcontainer
+      # - conda-cpp-build
+      # - conda-cpp-tests
+      # - conda-cpp-checks
+      # - conda-python-build
+      # - conda-python-tests
+      # - rocky8-clib-standalone-build
+      # - rocky8-clib-tests
+      # - conda-java-build-and-tests
+      # - rust-build
+      # - go-build
+      # - docs-build
+      # - wheel-build-libcuvs
+      # - wheel-build-cuvs
+      # - wheel-tests-cuvs
+      # - devcontainer
+      - discover-sanitizer-tests
+      - compute-sanitizer-memcheck
+      - compute-sanitizer-racecheck
+      - compute-sanitizer-synccheck
       - telemetry-setup
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/pr-builder.yaml@python-3.14
@@ -315,209 +319,241 @@ jobs:
     with:
       enable_check_generated_files: false
       ignored_pr_jobs: "telemetry-summarize"
-  conda-cpp-build:
-    needs: checks
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-build.yaml@python-3.14
+  discover-sanitizer-tests:
+    runs-on: linux-amd64-cpu4
+    container:
+      image: rapidsai/ci-conda:26.04-latest
+    outputs:
+      tests: ${{ steps.find-tests.outputs.tests }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+      - name: Discover test executables
+        id: find-tests
+        shell: bash
+        run: |
+          ./ci/discover_libcuvs_tests.sh
+  compute-sanitizer-memcheck:
+    needs: discover-sanitizer-tests
+    uses: ./.github/workflows/compute-sanitizer-run.yaml
     with:
-      build_type: pull-request
-      node_type: cpu16
-      script: ci/build_cpp.sh
-  conda-cpp-tests:
-    needs: [conda-cpp-build, changed-files]
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-tests.yaml@python-3.14
-    if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
+      tool_name: "memcheck"
+      test_names: ${{ needs.discover-sanitizer-tests.outputs.tests }}
+  compute-sanitizer-racecheck:
+    needs: discover-sanitizer-tests
+    uses: ./.github/workflows/compute-sanitizer-run.yaml
     with:
-      build_type: pull-request
-      script: ci/test_cpp.sh
-  conda-cpp-checks:
-    needs: conda-cpp-build
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-post-build-checks.yaml@python-3.14
+      tool_name: "racecheck"
+      test_names: ${{ needs.discover-sanitizer-tests.outputs.tests }}
+  compute-sanitizer-synccheck:
+    needs: discover-sanitizer-tests
+    uses: ./.github/workflows/compute-sanitizer-run.yaml
     with:
-      build_type: pull-request
-      symbol_exclusions: (void (thrust::|cub::))
-  conda-python-build:
-    needs: conda-cpp-build
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-python-build.yaml@python-3.14
-    with:
-      build_type: pull-request
-      script: ci/build_python.sh
-      # Build a conda package for each CUDA x ARCH x minimum supported Python version
-      matrix_filter: group_by({CUDA_VER, ARCH}) | map(min_by(.PY_VER | split(".") | map(tonumber)))
-  conda-python-tests:
-    needs: [conda-python-build, changed-files]
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-python-tests.yaml@python-3.14
-    if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_python_conda
-    with:
-      build_type: pull-request
-      script: ci/test_python.sh
-  rocky8-clib-standalone-build:
-    needs: [checks]
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@python-3.14
-    strategy:
-      fail-fast: false
-      matrix:
-        cuda_version:
-          - &latest_cuda12 '12.9.1'
-          - &latest_cuda13 '13.1.1'
-        arch:
-          - amd64
-          - arm64
-    with:
-      build_type: pull-request
-      arch: "${{matrix.arch}}"
-      date: ${{ inputs.date }}_c
-      container_image: "rapidsai/ci-wheel:26.04-cuda${{ matrix.cuda_version }}-rockylinux8-py3.11"
-      node_type: "cpu16"
-      requires_license_builder: true
-      script: "ci/build_standalone_c.sh --build-tests"
-      artifact-name: "libcuvs_c_${{ matrix.cuda_version }}_${{ matrix.arch }}.tar.gz"
-      file_to_upload: "libcuvs_c.tar.gz"
-      sha: ${{ inputs.sha }}
-  rocky8-clib-tests:
-    needs: [rocky8-clib-standalone-build, changed-files]
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@python-3.14
-    if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
-    strategy:
-      fail-fast: false
-      matrix:
-        cuda_version:
-          - *latest_cuda12
-          - *latest_cuda13
-        arch:
-          - amd64
-          - arm64
-    with:
-      build_type: pull-request
-      node_type: "gpu-l4-latest-1"
-      arch: "${{matrix.arch}}"
-      date: ${{ inputs.date }}_c
-      container_image: "rapidsai/ci-wheel:26.04-cuda${{ matrix.cuda_version }}-rockylinux8-py3.11"
-      script: "ci/test_standalone_c.sh libcuvs_c_${{ matrix.cuda_version }}_${{ matrix.arch }}.tar.gz"
-      sha: ${{ inputs.sha }}
-  conda-java-build-and-tests:
-    needs: [conda-cpp-build, changed-files]
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@python-3.14
-    if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_java || fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
-    # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
-    # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
-    strategy:
-      fail-fast: false
-      matrix:
-        cuda_version:
-          - *latest_cuda12
-          - *latest_cuda13
-    with:
-      build_type: pull-request
-      node_type: "gpu-l4-latest-1"
-      arch: "amd64"
-      container_image: "rapidsai/ci-conda:26.04-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
-      script: "ci/test_java.sh"
-      artifact-name: "cuvs-java-cuda${{ matrix.cuda_version }}"
-      file_to_upload: "java/cuvs-java/target/"
-  rust-build:
-    needs: [conda-cpp-build, changed-files]
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@python-3.14
-    if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_rust || fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
-    # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
-    # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
-    strategy:
-      fail-fast: false
-      matrix:
-        cuda_version:
-          - *latest_cuda12
-          - *latest_cuda13
-    with:
-      build_type: pull-request
-      node_type: "gpu-l4-latest-1"
-      arch: "amd64"
-      container_image: "rapidsai/ci-conda:26.04-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
-      script: "ci/build_rust.sh"
-  go-build:
-    needs: [conda-cpp-build, changed-files]
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@python-3.14
-    if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_go || fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
-    # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
-    # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
-    strategy:
-      fail-fast: false
-      matrix:
-        cuda_version:
-          - *latest_cuda12
-          - *latest_cuda13
-    with:
-      build_type: pull-request
-      node_type: "gpu-l4-latest-1"
-      arch: "amd64"
-      container_image: "rapidsai/ci-conda:26.04-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
-      script: "ci/build_go.sh"
-  docs-build:
-    needs: conda-python-build
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@python-3.14
-    with:
-      build_type: pull-request
-      node_type: "gpu-l4-latest-1"
-      arch: "amd64"
-      container_image: "rapidsai/ci-conda:26.04-latest"
-      script: "ci/build_docs.sh"
-  wheel-build-libcuvs:
-    needs: checks
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@python-3.14
-    with:
-      build_type: pull-request
-      node_type: cpu16
-      script: ci/build_wheel_libcuvs.sh
-      # build for every combination of arch and CUDA version, but only for the latest Python
-      matrix_filter: group_by([.ARCH, (.CUDA_VER|split(".")|map(tonumber)|.[0])]) | map(max_by(.PY_VER|split(".")|map(tonumber)))
-      package-name: libcuvs
-      package-type: cpp
-  wheel-build-cuvs:
-    needs: wheel-build-libcuvs
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@python-3.14
-    with:
-      build_type: pull-request
-      node_type: cpu8
-      script: ci/build_wheel_cuvs.sh
-      package-name: cuvs
-      package-type: python
-      # Build a wheel for each CUDA x ARCH x minimum supported Python version
-      matrix_filter: group_by({CUDA_VER, ARCH}) | map(min_by(.PY_VER | split(".") | map(tonumber)))
-  wheel-tests-cuvs:
-    needs: [wheel-build-cuvs, changed-files]
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-test.yaml@python-3.14
-    if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_python_wheels
-    with:
-      build_type: pull-request
-      script: ci/test_wheel_cuvs.sh
-  devcontainer:
-    secrets: inherit
-    needs: telemetry-setup
-    uses: rapidsai/shared-workflows/.github/workflows/build-in-devcontainer.yaml@python-3.14
-    with:
-      arch: '["amd64", "arm64"]'
-      cuda: '["13.1"]'
-      node_type: "cpu8"
-      env: |
-        SCCACHE_DIST_MAX_RETRIES=inf
-        SCCACHE_SERVER_LOG=sccache=debug
-        SCCACHE_DIST_FALLBACK_TO_LOCAL_COMPILE=false
-      build_command: |
-        sccache --zero-stats;
-        build-all -j0 --verbose 2>&1 | tee telemetry-artifacts/build.log;
-        sccache --show-adv-stats | tee telemetry-artifacts/sccache-stats.txt;
+      tool_name: "synccheck"
+      test_names: ${{ needs.discover-sanitizer-tests.outputs.tests }}
+  # conda-cpp-build:
+  #   needs: checks
+  #   secrets: inherit
+  #   uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-build.yaml@python-3.14
+  #   with:
+  #     build_type: pull-request
+  #     node_type: cpu16
+  #     script: ci/build_cpp.sh
+  # conda-cpp-tests:
+  #   needs: [conda-cpp-build, changed-files]
+  #   secrets: inherit
+  #   uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-tests.yaml@python-3.14
+  #   if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
+  #   with:
+  #     build_type: pull-request
+  #     script: ci/test_cpp.sh
+  # conda-cpp-checks:
+  #   needs: conda-cpp-build
+  #   secrets: inherit
+  #   uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-post-build-checks.yaml@python-3.14
+  #   with:
+  #     build_type: pull-request
+  #     symbol_exclusions: (void (thrust::|cub::))
+  # conda-python-build:
+  #   needs: conda-cpp-build
+  #   secrets: inherit
+  #   uses: rapidsai/shared-workflows/.github/workflows/conda-python-build.yaml@python-3.14
+  #   with:
+  #     build_type: pull-request
+  #     script: ci/build_python.sh
+  #     # Build a conda package for each CUDA x ARCH x minimum supported Python version
+  #     matrix_filter: group_by({CUDA_VER, ARCH}) | map(min_by(.PY_VER | split(".") | map(tonumber)))
+  # conda-python-tests:
+  #   needs: [conda-python-build, changed-files]
+  #   secrets: inherit
+  #   uses: rapidsai/shared-workflows/.github/workflows/conda-python-tests.yaml@python-3.14
+  #   if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_python_conda
+  #   with:
+  #     build_type: pull-request
+  #     script: ci/test_python.sh
+  # rocky8-clib-standalone-build:
+  #   needs: [checks]
+  #   secrets: inherit
+  #   uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@python-3.14
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       cuda_version:
+  #         - &latest_cuda12 '12.9.1'
+  #         - &latest_cuda13 '13.1.1'
+  #       arch:
+  #         - amd64
+  #         - arm64
+  #   with:
+  #     build_type: pull-request
+  #     arch: "${{matrix.arch}}"
+  #     date: ${{ inputs.date }}_c
+  #     container_image: "rapidsai/ci-wheel:26.04-cuda${{ matrix.cuda_version }}-rockylinux8-py3.11"
+  #     node_type: "cpu16"
+  #     requires_license_builder: true
+  #     script: "ci/build_standalone_c.sh --build-tests"
+  #     artifact-name: "libcuvs_c_${{ matrix.cuda_version }}_${{ matrix.arch }}.tar.gz"
+  #     file_to_upload: "libcuvs_c.tar.gz"
+  #     sha: ${{ inputs.sha }}
+  # rocky8-clib-tests:
+  #   needs: [rocky8-clib-standalone-build, changed-files]
+  #   secrets: inherit
+  #   uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@python-3.14
+  #   if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       cuda_version:
+  #         - *latest_cuda12
+  #         - *latest_cuda13
+  #       arch:
+  #         - amd64
+  #         - arm64
+  #   with:
+  #     build_type: pull-request
+  #     node_type: "gpu-l4-latest-1"
+  #     arch: "${{matrix.arch}}"
+  #     date: ${{ inputs.date }}_c
+  #     container_image: "rapidsai/ci-wheel:26.04-cuda${{ matrix.cuda_version }}-rockylinux8-py3.11"
+  #     script: "ci/test_standalone_c.sh libcuvs_c_${{ matrix.cuda_version }}_${{ matrix.arch }}.tar.gz"
+  #     sha: ${{ inputs.sha }}
+  # conda-java-build-and-tests:
+  #   needs: [conda-cpp-build, changed-files]
+  #   secrets: inherit
+  #   uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@python-3.14
+  #   if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_java || fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
+  #   # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
+  #   # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       cuda_version:
+  #         - *latest_cuda12
+  #         - *latest_cuda13
+  #   with:
+  #     build_type: pull-request
+  #     node_type: "gpu-l4-latest-1"
+  #     arch: "amd64"
+  #     container_image: "rapidsai/ci-conda:26.04-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
+  #     script: "ci/test_java.sh"
+  #     artifact-name: "cuvs-java-cuda${{ matrix.cuda_version }}"
+  #     file_to_upload: "java/cuvs-java/target/"
+  # rust-build:
+  #   needs: [conda-cpp-build, changed-files]
+  #   secrets: inherit
+  #   uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@python-3.14
+  #   if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_rust || fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
+  #   # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
+  #   # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       cuda_version:
+  #         - *latest_cuda12
+  #         - *latest_cuda13
+  #   with:
+  #     build_type: pull-request
+  #     node_type: "gpu-l4-latest-1"
+  #     arch: "amd64"
+  #     container_image: "rapidsai/ci-conda:26.04-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
+  #     script: "ci/build_rust.sh"
+  # go-build:
+  #   needs: [conda-cpp-build, changed-files]
+  #   secrets: inherit
+  #   uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@python-3.14
+  #   if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_go || fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
+  #   # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
+  #   # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       cuda_version:
+  #         - *latest_cuda12
+  #         - *latest_cuda13
+  #   with:
+  #     build_type: pull-request
+  #     node_type: "gpu-l4-latest-1"
+  #     arch: "amd64"
+  #     container_image: "rapidsai/ci-conda:26.04-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
+  #     script: "ci/build_go.sh"
+  # docs-build:
+  #   needs: conda-python-build
+  #   secrets: inherit
+  #   uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@python-3.14
+  #   with:
+  #     build_type: pull-request
+  #     node_type: "gpu-l4-latest-1"
+  #     arch: "amd64"
+  #     container_image: "rapidsai/ci-conda:26.04-latest"
+  #     script: "ci/build_docs.sh"
+  # wheel-build-libcuvs:
+  #   needs: checks
+  #   secrets: inherit
+  #   uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@python-3.14
+  #   with:
+  #     build_type: pull-request
+  #     node_type: cpu16
+  #     script: ci/build_wheel_libcuvs.sh
+  #     # build for every combination of arch and CUDA version, but only for the latest Python
+  #     matrix_filter: group_by([.ARCH, (.CUDA_VER|split(".")|map(tonumber)|.[0])]) | map(max_by(.PY_VER|split(".")|map(tonumber)))
+  #     package-name: libcuvs
+  #     package-type: cpp
+  # wheel-build-cuvs:
+  #   needs: wheel-build-libcuvs
+  #   secrets: inherit
+  #   uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@python-3.14
+  #   with:
+  #     build_type: pull-request
+  #     node_type: cpu8
+  #     script: ci/build_wheel_cuvs.sh
+  #     package-name: cuvs
+  #     package-type: python
+  #     # Build a wheel for each CUDA x ARCH x minimum supported Python version
+  #     matrix_filter: group_by({CUDA_VER, ARCH}) | map(min_by(.PY_VER | split(".") | map(tonumber)))
+  # wheel-tests-cuvs:
+  #   needs: [wheel-build-cuvs, changed-files]
+  #   secrets: inherit
+  #   uses: rapidsai/shared-workflows/.github/workflows/wheels-test.yaml@python-3.14
+  #   if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_python_wheels
+  #   with:
+  #     build_type: pull-request
+  #     script: ci/test_wheel_cuvs.sh
+  # devcontainer:
+  #   secrets: inherit
+  #   needs: telemetry-setup
+  #   uses: rapidsai/shared-workflows/.github/workflows/build-in-devcontainer.yaml@python-3.14
+  #   with:
+  #     arch: '["amd64", "arm64"]'
+  #     cuda: '["13.1"]'
+  #     node_type: "cpu8"
+  #     env: |
+  #       SCCACHE_DIST_MAX_RETRIES=inf
+  #       SCCACHE_SERVER_LOG=sccache=debug
+  #       SCCACHE_DIST_FALLBACK_TO_LOCAL_COMPILE=false
+  #     build_command: |
+  #       sccache --zero-stats;
+  #       build-all -j0 --verbose 2>&1 | tee telemetry-artifacts/build.log;
+  #       sccache --show-adv-stats | tee telemetry-artifacts/sccache-stats.txt;
   telemetry-summarize:
     # This job must use a self-hosted runner to record telemetry traces.
     runs-on: linux-amd64-cpu4
