@@ -36,6 +36,7 @@ typedef enum {
   Array = 2
 } cuvsKMeansInitMethod;
 
+
 /**
  * @brief Hyper-parameters for the kmeans algorithm
  */
@@ -90,7 +91,14 @@ struct cuvsKMeansParams {
    */
   int batch_centroids;
 
+  /** Check inertia during iterations for early convergence. */
   bool inertia_check;
+
+  /**
+   * Number of samples to process per GPU batch for the batched (host-data) API.
+   * When set to 0, defaults to n_samples (process all at once).
+   */
+  int64_t batch_size;
 
   /**
    * Whether to use hierarchical (balanced) kmeans or not
@@ -142,18 +150,24 @@ typedef enum { CUVS_KMEANS_TYPE_KMEANS = 0, CUVS_KMEANS_TYPE_KMEANS_BALANCED = 1
  *   clusters are reinitialized by choosing new centroids with
  *   k-means++ algorithm.
  *
+ *   X may reside on either host (CPU) or device (GPU) memory.
+ *   When X is on the host the data is streamed to the GPU in
+ *   batches controlled by params->batch_size.
+ *
  * @param[in]     res           opaque C handle
  * @param[in]     params        Parameters for KMeans model.
  * @param[in]     X             Training instances to cluster. The data must
- *                              be in row-major format.
+ *                              be in row-major format. May be on host or
+ *                              device memory.
  *                              [dim = n_samples x n_features]
  * @param[in]     sample_weight Optional weights for each observation in X.
+ *                              Must be on the same memory space as X.
  *                              [len = n_samples]
  * @param[inout]  centroids     [in] When init is InitMethod::Array, use
  *                              centroids as the initial cluster centers.
  *                              [out] The generated centroids from the
  *                              kmeans algorithm are stored at the address
- *                              pointed by 'centroids'.
+ *                              pointed by 'centroids'. Must be on device.
  *                              [dim = n_clusters x n_features]
  * @param[out]    inertia       Sum of squared distances of samples to their
  *                              closest cluster center.
@@ -165,7 +179,7 @@ cuvsError_t cuvsKMeansFit(cuvsResources_t res,
                           DLManagedTensor* sample_weight,
                           DLManagedTensor* centroids,
                           double* inertia,
-                          int* n_iter);
+                          int64_t* n_iter);
 
 /**
  * @brief Predict the closest cluster each sample in X belongs to.
@@ -212,6 +226,7 @@ cuvsError_t cuvsKMeansClusterCost(cuvsResources_t res,
                                   DLManagedTensor* X,
                                   DLManagedTensor* centroids,
                                   double* cost);
+
 /**
  * @}
  */
