@@ -10,7 +10,11 @@ use ndarray::s;
 use ndarray_rand::rand_distr::Uniform;
 use ndarray_rand::RandomExt;
 
-/// Example showing how to index and search data with CAGRA
+/// Example showing how to index and search data with CAGRA using the validated builder API.
+///
+/// `IndexParams::builder()` validates parameters before any GPU allocation, surfacing
+/// misconfiguration immediately with a clear error message instead of an opaque CUDA
+/// assertion 1-2 seconds into `Index::build()`.
 fn cagra_example() -> Result<()> {
     let res = Resources::new()?;
 
@@ -20,8 +24,14 @@ fn cagra_example() -> Result<()> {
     let dataset =
         ndarray::Array::<f32, _>::random((n_datapoints, n_features), Uniform::new(0., 1.0));
 
-    // build the cagra index
-    let build_params = IndexParams::new()?;
+    // Build the CAGRA index using the validated builder.
+    // Parameters are checked in Rust before any FFI call — invalid values (e.g.
+    // graph_degree=0) produce an error here, not inside Index::build().
+    let build_params = IndexParams::builder()
+        .graph_degree(32)
+        .intermediate_graph_degree(64)
+        .nn_descent_niter(20)
+        .build()?;
     let index = Index::build(&res, &build_params, &dataset)?;
     println!(
         "Indexed {}x{} datapoints into cagra index",

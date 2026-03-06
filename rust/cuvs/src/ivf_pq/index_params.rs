@@ -149,6 +149,15 @@ impl IndexParams {
     }
 }
 
+impl IndexParams {
+    /// Returns a builder for constructing [`IndexParams`] with validated parameters.
+    ///
+    /// See [`IndexParamsBuilder`] for details.
+    pub fn builder() -> IndexParamsBuilder {
+        IndexParamsBuilder::default()
+    }
+}
+
 impl fmt::Debug for IndexParams {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // custom debug trait here, default value will show the pointer address
@@ -170,6 +179,159 @@ impl Drop for IndexParams {
     }
 }
 
+/// Builder for IVF-PQ [`IndexParams`] with pre-validated parameters.
+///
+/// Construct via [`IndexParams::builder()`]. Defaults match the cuVS C API defaults.
+pub struct IndexParamsBuilder {
+    n_lists: u32,
+    metric: Option<crate::distance_type::DistanceType>,
+    metric_arg: f32,
+    kmeans_n_iters: u32,
+    kmeans_trainset_fraction: f64,
+    pq_bits: u32,
+    pq_dim: u32,
+    codebook_kind: Option<cuvsIvfPqCodebookGen>,
+    codes_layout: Option<cuvsIvfPqListLayout>,
+    force_random_rotation: bool,
+    max_train_points_per_pq_code: u32,
+    add_data_on_build: bool,
+}
+
+impl Default for IndexParamsBuilder {
+    fn default() -> Self {
+        Self {
+            n_lists: 1024,
+            metric: None,
+            metric_arg: 2.0,
+            kmeans_n_iters: 20,
+            kmeans_trainset_fraction: 0.5,
+            pq_bits: 8,
+            pq_dim: 0,
+            codebook_kind: None,
+            codes_layout: None,
+            force_random_rotation: false,
+            max_train_points_per_pq_code: 256,
+            add_data_on_build: true,
+        }
+    }
+}
+
+impl IndexParamsBuilder {
+    /// The number of clusters used in the coarse quantizer.
+    ///
+    /// Must be > 0.
+    pub fn n_lists(mut self, v: u32) -> Self {
+        self.n_lists = v;
+        self
+    }
+
+    /// DistanceType to use for building the index.
+    pub fn metric(mut self, v: crate::distance_type::DistanceType) -> Self {
+        self.metric = Some(v);
+        self
+    }
+
+    /// Metric argument (e.g. p for Minkowski distance).
+    pub fn metric_arg(mut self, v: f32) -> Self {
+        self.metric_arg = v;
+        self
+    }
+
+    /// Number of iterations searching for kmeans centers during index building.
+    pub fn kmeans_n_iters(mut self, v: u32) -> Self {
+        self.kmeans_n_iters = v;
+        self
+    }
+
+    /// Fraction of dataset used for kmeans training. Must be in (0, 1].
+    pub fn kmeans_trainset_fraction(mut self, v: f64) -> Self {
+        self.kmeans_trainset_fraction = v;
+        self
+    }
+
+    /// Bit length of the vector element after quantization. Typically 4 or 8.
+    pub fn pq_bits(mut self, v: u32) -> Self {
+        self.pq_bits = v;
+        self
+    }
+
+    /// Dimensionality of the vector after product quantization. 0 = auto.
+    pub fn pq_dim(mut self, v: u32) -> Self {
+        self.pq_dim = v;
+        self
+    }
+
+    /// Codebook generation method.
+    pub fn codebook_kind(mut self, v: cuvsIvfPqCodebookGen) -> Self {
+        self.codebook_kind = Some(v);
+        self
+    }
+
+    /// Memory layout of IVF-PQ list data.
+    pub fn codes_layout(mut self, v: cuvsIvfPqListLayout) -> Self {
+        self.codes_layout = Some(v);
+        self
+    }
+
+    /// Apply a random rotation matrix on input data and queries.
+    pub fn force_random_rotation(mut self, v: bool) -> Self {
+        self.force_random_rotation = v;
+        self
+    }
+
+    /// Max number of data points per PQ code during codebook training.
+    pub fn max_train_points_per_pq_code(mut self, v: u32) -> Self {
+        self.max_train_points_per_pq_code = v;
+        self
+    }
+
+    /// Populate the index with the dataset during build. When false, use `extend`.
+    pub fn add_data_on_build(mut self, v: bool) -> Self {
+        self.add_data_on_build = v;
+        self
+    }
+
+    /// Validate all parameters without allocating any GPU resources.
+    pub fn validate(&self) -> crate::error::Result<()> {
+        if self.n_lists == 0 {
+            return Err(format!("n_lists must be > 0; got {}", self.n_lists).into());
+        }
+        if self.kmeans_trainset_fraction <= 0.0 || self.kmeans_trainset_fraction > 1.0 {
+            return Err(format!(
+                "kmeans_trainset_fraction must be in (0, 1]; got {}",
+                self.kmeans_trainset_fraction
+            )
+            .into());
+        }
+        Ok(())
+    }
+
+    /// Validate all parameters and allocate the FFI struct.
+    pub fn build(self) -> crate::error::Result<IndexParams> {
+        self.validate()?;
+        let mut params = IndexParams::new()?
+            .set_n_lists(self.n_lists)
+            .set_metric_arg(self.metric_arg)
+            .set_kmeans_n_iters(self.kmeans_n_iters)
+            .set_kmeans_trainset_fraction(self.kmeans_trainset_fraction)
+            .set_pq_bits(self.pq_bits)
+            .set_pq_dim(self.pq_dim)
+            .set_force_random_rotation(self.force_random_rotation)
+            .set_max_train_points_per_pq_code(self.max_train_points_per_pq_code)
+            .set_add_data_on_build(self.add_data_on_build);
+        if let Some(metric) = self.metric {
+            params = params.set_metric(metric);
+        }
+        if let Some(kind) = self.codebook_kind {
+            params = params.set_codebook_kind(kind);
+        }
+        if let Some(layout) = self.codes_layout {
+            params = params.set_codes_layout(layout);
+        }
+        Ok(params)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -181,6 +343,36 @@ mod tests {
             .set_n_lists(128)
             .set_add_data_on_build(false);
 
+        unsafe {
+            assert_eq!((*params.0).n_lists, 128);
+            assert_eq!((*params.0).add_data_on_build, false);
+        }
+    }
+
+    #[test]
+    fn builder_rejects_zero_n_lists() {
+        let err = IndexParams::builder().n_lists(0).validate().unwrap_err();
+        assert!(
+            err.to_string().contains("n_lists"),
+            "error message should name the field: {err}"
+        );
+    }
+
+    #[test]
+    fn builder_accepts_valid_params() {
+        assert!(IndexParams::builder()
+            .n_lists(256)
+            .kmeans_trainset_fraction(0.5)
+            .validate()
+            .is_ok());
+    }
+
+    #[test]
+    fn existing_setter_api_unchanged() {
+        let params = IndexParams::new()
+            .unwrap()
+            .set_n_lists(128)
+            .set_add_data_on_build(false);
         unsafe {
             assert_eq!((*params.0).n_lists, 128);
             assert_eq!((*params.0).add_data_on_build, false);
