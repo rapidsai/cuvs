@@ -322,4 +322,3 @@ extern "C" cuvsError_t cuvsKMeansClusterCost(cuvsResources_t res,
     }
   });
 }
-
