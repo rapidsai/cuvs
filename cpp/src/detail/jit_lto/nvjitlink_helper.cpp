@@ -3,10 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "nvjitlink_checker.hpp"
+#include <cuvs/detail/jit_lto/nvjitlink_helper.hpp>
 
 #include <memory>
-#include <nvJitLink.h>
 #include <string>
 
 #include <raft/core/error.hpp>
