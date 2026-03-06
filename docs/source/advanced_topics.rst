@@ -17,5 +17,5 @@ cuVS uses the Just-in-Time (JIT) compilation technology to compile certain kerne
 
 Thus, the JIT compilation is a one-time cost and you can expect no loss in real performance after the first compilation. We recommend that you run a "warmup" to trigger the JIT compilation before the actual usage.
 
-Currently, the following algorithms will trigger a JIT compilation:
+Currently, the following capabilities will trigger a JIT compilation:
 - IVF Flat search APIs: :doc:`cuvs::neighbors::ivf_flat::search() <cpp_api/neighbors_ivf_flat>`
