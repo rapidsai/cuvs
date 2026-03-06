@@ -225,6 +225,33 @@ if(NOT BUILD_CPU_ONLY)
   target_link_libraries(cuvs_cpp_headers INTERFACE raft::raft rmm::rmm)
 
   add_library(
+    ivf_rabitq STATIC
+    src/neighbors/ivf_rabitq/gpu_index/ivf_gpu.cu
+    src/neighbors/ivf_rabitq/gpu_index/initializer_gpu.cu
+    src/neighbors/ivf_rabitq/gpu_index/quantizer_gpu.cu
+    src/neighbors/ivf_rabitq/gpu_index/rotator_gpu.cu
+    src/neighbors/ivf_rabitq/gpu_index/searcher_gpu.cu
+    src/neighbors/ivf_rabitq/gpu_index/searcher_gpu_shared_mem_opt.cu
+    src/neighbors/ivf_rabitq/gpu_index/searcher_gpu_quantize_query.cu
+    src/neighbors/ivf_rabitq/gpu_index/quantizer_gpu_fast.cu
+    src/neighbors/ivf_rabitq/utils/searcher_gpu_utils.cu
+  )
+
+  target_link_libraries(ivf_rabitq PRIVATE OpenMP::OpenMP_CXX CUDA::cudart raft::raft rmm)
+
+  target_include_directories(
+    ivf_rabitq PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  )
+
+  target_compile_options(
+    ivf_rabitq
+    PRIVATE $<$<COMPILE_LANGUAGE:CUDA>: $<$<CONFIG:Debug>:-G;-g> --extended-lambda
+            --expt-relaxed-constexpr -Xcompiler=-fopenmp > $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>
+  )
+
+  target_compile_definitions(ivf_rabitq PRIVATE HIGH_ACC_FAST_SCAN)
+
+  add_library(
     cuvs-cagra-search OBJECT
     src/neighbors/cagra_search_float.cu
     src/neighbors/cagra_search_half.cu
@@ -619,6 +646,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ivf_pq/detail/ivf_pq_transform_half_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_transform_int8_t_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_transform_uint8_t_int64_t.cu
+    src/neighbors/ivf_rabitq.cu
     src/neighbors/knn_merge_parts.cu
     src/neighbors/nn_descent.cu
     src/neighbors/nn_descent_float.cu
@@ -771,6 +799,7 @@ if(NOT BUILD_CPU_ONLY)
         $<COMPILE_ONLY:cuco::cuco>
         $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
         $<$<BOOL:${JIT_LTO_COMPILATION}>:$<LINK_LIBRARY:WHOLE_ARCHIVE,cuvs::cuvs_jit_lto_kernels>>
+        ivf_rabitq
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
