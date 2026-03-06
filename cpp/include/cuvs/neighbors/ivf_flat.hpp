@@ -3134,7 +3134,7 @@ __device__ __forceinline__ AccT squared_diff(point<T, AccT, V> x, point<T, AccT,
     return __dp4a(diff, diff, AccT{0});
   } else if constexpr (std::is_same_v<T, int8_t> && V > 1) {
     auto diff = __vabsdiffs4(x.raw(), y.raw());
-    return __dp4a(diff, diff, AccT{0});
+    return __dp4a(diff, diff, uint32_t{0});
   } else {
     auto diff = x.raw() - y.raw();
     return diff * diff;
@@ -3277,7 +3277,7 @@ __device__ __forceinline__ AccT squared_diff(point<T, AccT, V> x, point<T, AccT,
     return __dp4a(diff, diff, AccT{0});
   } else if constexpr (std::is_same_v<T, int8_t> && V > 1) {
     auto diff = __vabsdiffs4(x.raw(), y.raw());
-    return __dp4a(diff, diff, AccT{0});
+    return __dp4a(diff, diff, uint32_t{0});
   } else {
     auto diff = x.raw() - y.raw();
     return diff * diff;
