@@ -814,50 +814,6 @@ constexpr double usable_cpu_memory_fraction = 0.8;
 constexpr double usable_gpu_memory_fraction = 0.8;
 constexpr double imbalance_factor           = 3.0;
 
-// Calculate CAGRA optimize workspace memory requirements.
-// This is the working memory on top of the input/output memory usage.
-inline std::pair<size_t, size_t> optimize_workspace_size(size_t n_rows,
-                                                         size_t graph_degree,
-                                                         size_t intermediate_degree,
-                                                         size_t index_size,
-                                                         bool mst_optimize = false)
-{
-  // MST optimization memory (host only)
-  size_t mst_host = n_rows * index_size;  // mst_graph_num_edges
-  if (mst_optimize) {
-    mst_host += n_rows * graph_degree * index_size;  // mst_graph allocated in optimize
-    mst_host += n_rows * graph_degree * index_size;  // mst_graph allocated in mst_optimize
-    mst_host += n_rows * index_size * 7;             // vectors with _max_edges suffix
-    mst_host += (graph_degree - 1) * (graph_degree - 1) * index_size;  // iB_candidates
-  }
-
-  // Prune stage memory
-  // We neglect 8 bytes (both on host and device) for stats
-  size_t prune_host = n_rows * intermediate_degree * sizeof(uint8_t);  // detour count
-
-  size_t prune_dev = n_rows * intermediate_degree * 1;     // detour count (uint8_t)
-  prune_dev += n_rows * sizeof(uint32_t);                  // d_num_detour_edges
-  prune_dev += n_rows * intermediate_degree * index_size;  // d_input_graph
-
-  // Reverse graph stage memory
-  size_t rev_host = n_rows * graph_degree * index_size;  // rev_graph
-  rev_host += n_rows * sizeof(uint32_t);                 // rev_graph_count
-  rev_host += n_rows * index_size;                       // dest_nodes
-
-  size_t rev_dev = n_rows * graph_degree * index_size;  // d_rev_graph
-  rev_dev += n_rows * sizeof(uint32_t);                 // d_rev_graph_count
-  rev_dev += n_rows * sizeof(uint32_t);                 // d_dest_nodes
-
-  // Memory for merging graphs (host only)
-  size_t combine_host =
-    n_rows * sizeof(uint32_t) + graph_degree * sizeof(uint32_t);  // in_edge_count + hist
-
-  size_t total_host = mst_host + std::max({prune_host, rev_host, combine_host});
-  size_t total_dev  = std::max(prune_dev, rev_dev);
-
-  return std::make_pair(total_host, total_dev);
-}
-
 // Check if disk mode should be used for ACE based on memory constraints
 template <typename T, typename IdxT>
 bool ace_check_use_disk_mode(bool use_disk,
@@ -989,7 +945,7 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
   // Compute optimize workspace requirements
   size_t sub_partition_size =
     static_cast<size_t>(imbalance_factor * 2 * (dataset_size / n_partitions));
-  auto [host_workspace_size, gpu_workspace_size] = optimize_workspace_size(
+  auto [host_workspace_size, gpu_workspace_size] = helpers::optimize_workspace_size(
     sub_partition_size, graph_degree, intermediate_degree, sizeof(IdxT), guarantee_connectivity);
 
   // Check host memory requirements
@@ -1076,7 +1032,8 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
 
     size_t new_sub_partition_size =
       static_cast<size_t>(imbalance_factor * 2 * (dataset_size / n_partitions));
-    auto [new_opt_host_ws, new_opt_dev_ws] = optimize_workspace_size(new_sub_partition_size,
+    auto [new_opt_host_ws, new_opt_dev_ws] =
+      helpers::optimize_workspace_size(new_sub_partition_size,
                                                                      graph_degree,
                                                                      intermediate_degree,
                                                                      sizeof(IdxT),
@@ -1640,7 +1597,7 @@ void build_knn_graph(
     return std::string(model_name);
   }();
 
-  RAFT_LOG_DEBUG("# Building IVF-PQ index %s", model_name.c_str());
+  RAFT_LOG_INFO("# Building IVF-PQ index %s", model_name.c_str());
   auto index = cuvs::neighbors::ivf_pq::build(res, pq.build_params, dataset);
 
   //
@@ -1699,7 +1656,7 @@ void build_knn_graph(
     use_large_workspace ? raft::resource::get_large_workspace_resource(res)
                         : raft::resource::get_workspace_resource(res);
 
-  RAFT_LOG_DEBUG(
+  RAFT_LOG_INFO(
     "IVF-PQ search node_degree: %d, top_k: %d,  gpu_top_k: %d,  max_batch_size:: %d, n_probes: %u",
     node_degree,
     top_k,
@@ -1724,6 +1681,7 @@ void build_knn_graph(
   std::size_t num_self_included = 0;
   bool first                    = true;
   const auto start_clock        = std::chrono::system_clock::now();
+  auto last_tick                = start_clock;
 
   cuvs::spatial::knn::detail::utils::batch_load_iterator<DataT> vec_batches(
     dataset.data_handle(),
@@ -1835,14 +1793,17 @@ void build_knn_graph(
 
     size_t num_queries_done = batch.offset() + batch.size();
     const auto end_clock    = std::chrono::system_clock::now();
-    if (batch.offset() > next_report_offset) {
+    if (batch.offset() > next_report_offset &&
+        std::chrono::duration_cast<std::chrono::seconds>(end_clock - last_tick) >
+          std::chrono::seconds(10)) {
       next_report_offset += d_report_offset;
       const auto time =
         std::chrono::duration_cast<std::chrono::microseconds>(end_clock - start_clock).count() *
         1e-6;
       const auto throughput = num_queries_done / time;
+      last_tick             = end_clock;
 
-      RAFT_LOG_DEBUG(
+      RAFT_LOG_INFO(
         "# Search %12lu / %12lu (%3.2f %%), %e queries/sec, %.2f minutes ETA, self included = "
         "%3.2f %%    \r",
         num_queries_done,
