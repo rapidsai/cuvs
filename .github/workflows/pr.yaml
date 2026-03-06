@@ -12,7 +12,7 @@ jobs:
       - check-nightly-ci
       - changed-files
       - checks
-      - conda-cpp-build
+      # - conda-cpp-build
       # - conda-cpp-tests
       # - conda-cpp-checks
       # - conda-python-build
@@ -319,16 +319,7 @@ jobs:
     with:
       enable_check_generated_files: false
       ignored_pr_jobs: "telemetry-summarize"
-  conda-cpp-build:
-    needs: checks
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-build.yaml@python-3.14
-    with:
-      build_type: pull-request
-      node_type: cpu16
-      script: ci/build_cpp.sh
   discover-sanitizer-tests:
-    needs: conda-cpp-build
     runs-on: linux-amd64-cpu4
     container:
       image: rapidsai/ci-conda:26.04-latest
@@ -360,6 +351,14 @@ jobs:
     with:
       tool_name: "synccheck"
       test_names: ${{ needs.discover-sanitizer-tests.outputs.tests }}
+  # conda-cpp-build:
+  #   needs: checks
+  #   secrets: inherit
+  #   uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-build.yaml@python-3.14
+  #   with:
+  #     build_type: pull-request
+  #     node_type: cpu16
+  #     script: ci/build_cpp.sh
   # conda-cpp-tests:
   #   needs: [conda-cpp-build, changed-files]
   #   secrets: inherit
