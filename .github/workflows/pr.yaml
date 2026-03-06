@@ -27,6 +27,7 @@ jobs:
       # - wheel-build-cuvs
       # - wheel-tests-cuvs
       # - devcontainer
+      - discover-sanitizer-tests
       - compute-sanitizer-memcheck
       - compute-sanitizer-racecheck
       - compute-sanitizer-synccheck
