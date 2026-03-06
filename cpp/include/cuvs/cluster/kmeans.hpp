@@ -50,7 +50,6 @@ struct params : base_params {
     Array
   };
 
-
   /**
    * The number of clusters to form as well as the number of centroids to generate (default:8).
    */

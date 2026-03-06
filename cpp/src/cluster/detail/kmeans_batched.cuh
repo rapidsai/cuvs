@@ -604,19 +604,13 @@ void fit_predict(raft::resources const& handle,
                  raft::host_scalar_view<IdxT> n_iter)
 {
   T fit_inertia = 0;
-  fit<T, IdxT>(handle,
-               params,
-               X,
-               sample_weight,
-               centroids,
-               raft::make_host_scalar_view(&fit_inertia),
-               n_iter);
+  fit<T, IdxT>(
+    handle, params, X, sample_weight, centroids, raft::make_host_scalar_view(&fit_inertia), n_iter);
 
   auto centroids_const = raft::make_device_matrix_view<const T, IdxT>(
     centroids.data_handle(), centroids.extent(0), centroids.extent(1));
 
-  predict<T, IdxT>(
-    handle, params, X, sample_weight, centroids_const, labels, false, inertia);
+  predict<T, IdxT>(handle, params, X, sample_weight, centroids_const, labels, false, inertia);
 }
 
 }  // namespace cuvs::cluster::kmeans::detail
