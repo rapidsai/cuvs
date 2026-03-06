@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -352,56 +352,66 @@ void bench_search(::benchmark::State& state,
   // Each thread calculates recall on their partition of queries.
   // evaluate recall
   if (dataset->max_k() >= k) {
-    const std::int32_t* gt             = dataset->gt_set();
-    const std::uint32_t* filter_bitset = dataset->filter_bitset(MemoryType::kHostMmap);
-    auto filter                        = [filter_bitset](std::int32_t i) -> bool {
-      if (filter_bitset == nullptr) { return true; }
-      auto word = filter_bitset[i >> 5];
-      return word & (1 << (i & 31));
-    };
-    const std::uint32_t max_k = dataset->max_k();
+    // gt_maps[i] is a hash map of {id, neighbor_rank} for query i
+    const auto& gt_maps            = dataset->gt_maps();
+    const auto& filter_pass_counts = dataset->filter_pass_counts();
     result_buf.transfer_data(MemoryType::kHost, current_algo_props->query_memory_type);
     auto* neighbors_host    = reinterpret_cast<index_type*>(result_buf.data(MemoryType::kHost));
-    std::size_t rows        = std::min(queries_processed, query_set_size);
+    std::size_t rows        = std::min({queries_processed, query_set_size, gt_maps.size()});
     std::size_t match_count = 0;
     std::size_t total_count = 0;
 
     // We go through the groundtruth with same stride as the benchmark loop.
     size_t out_offset   = 0;
     size_t batch_offset = (state.thread_index() * n_queries) % query_set_size;
+    // Avoid CPU oversubscription when parallelizing recall calculation loop
+    int num_recall_calculation_worker_threads =
+      std::thread::hardware_concurrency() / benchmark_n_threads - 1;  // -1 for the main thread
+    // ensure non-negative number of workers (possible if hardware_concurrency()
+    // does not return an expected value) by clamping to 0
+    if (num_recall_calculation_worker_threads < 0) { num_recall_calculation_worker_threads = 0; }
     while (out_offset < rows) {
-      for (std::size_t i = 0; i < n_queries; i++) {
-        size_t i_orig_idx = batch_offset + i;
-        size_t i_out_idx  = out_offset + i;
-        if (i_out_idx < rows) {
-          /* NOTE: recall correctness & filtering
+      std::vector<std::thread> recall_calculation_workers;
+      recall_calculation_workers.reserve(num_recall_calculation_worker_threads);
+      std::vector<std::size_t> local_match_count(num_recall_calculation_worker_threads + 1);
+      std::vector<std::size_t> local_total_count(num_recall_calculation_worker_threads + 1);
+      int chunk_size =
+        n_queries / (num_recall_calculation_worker_threads + 1);  // +1 for the main thread
+      int remainder           = n_queries % (num_recall_calculation_worker_threads + 1);
+      auto recall_calculation = [&](int start, int end, int tid) -> void {
+        for (int i = start; i < end; ++i) {
+          size_t i_orig_idx = batch_offset + i;
+          if (i_orig_idx >= gt_maps.size()) { break; }
+          size_t i_out_idx = out_offset + i;
+          if (i_out_idx < rows) {
+            local_total_count[tid] += filter_pass_counts[i_orig_idx];
 
-          In the loop below, we filter the ground truth values on-the-fly.
-          We need enough ground truth values to compute recall correctly though.
-          But the ground truth file only contains `max_k` values per row; if there are less valid
-          values than k among them, we overestimate the recall. Essentially, we compare the first
-          `filter_pass_count` values of the algorithm output, and this counter can be less than `k`.
-          In the extreme case of very high filtering rate, we may be bypassing entire rows of
-          results. However, this is still better than no recall estimate at all.
-
-          TODO: consider generating the filtered ground truth on-the-fly
-          */
-          uint32_t filter_pass_count = 0;
-          for (std::uint32_t l = 0; l < max_k && filter_pass_count < k; l++) {
-            auto exp_idx = gt[i_orig_idx * max_k + l];
-            if (!filter(exp_idx)) { continue; }
-            filter_pass_count++;
             for (std::uint32_t j = 0; j < k; j++) {
               auto act_idx = static_cast<std::int32_t>(neighbors_host[i_out_idx * k + j]);
-              if (act_idx == exp_idx) {
-                match_count++;
-                break;
-              }
+              if (gt_maps[i_orig_idx].count(act_idx) &&
+                  static_cast<uint32_t>(gt_maps[i_orig_idx].at(act_idx)) < k)
+                local_match_count[tid]++;
             }
           }
-          total_count += filter_pass_count;
         }
+      };
+      // launch worker threads
+      int start = 0;
+      for (int tid = 0; tid < num_recall_calculation_worker_threads; tid++) {
+        int end = start + chunk_size;
+        if (tid < remainder) { ++end; }
+        recall_calculation_workers.emplace_back(recall_calculation, start, end, tid);
+        start = end;
       }
+      // main thread works on last chunk
+      recall_calculation(start, n_queries, num_recall_calculation_worker_threads);
+      // join all worker threads
+      for (auto& worker : recall_calculation_workers) {
+        worker.join();
+      }
+      match_count += std::accumulate(local_match_count.begin(), local_match_count.end(), 0);
+      total_count += std::accumulate(local_total_count.begin(), local_total_count.end(), 0);
+
       out_offset += n_queries;
       batch_offset = (batch_offset + queries_stride) % query_set_size;
     }
