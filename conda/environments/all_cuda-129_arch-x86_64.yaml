@@ -53,4 +53,4 @@ dependencies:
 - sysroot_linux-64==2.28
 - pip:
   - nvidia-sphinx-theme
-name: bench_cuvs
+name: all_cuda-129_arch-x86_64
