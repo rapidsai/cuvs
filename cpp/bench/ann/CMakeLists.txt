@@ -1,6 +1,6 @@
 # =============================================================================
 # cmake-format: off
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 # =============================================================================
@@ -24,6 +24,7 @@ option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_FLAT "Include faiss' cpu ivf flat algori
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_PQ "Include faiss' cpu ivf pq algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_HNSW_FLAT "Include faiss' hnsw algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT "Include cuVS ivf flat algorithm in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_CUVS_IVF_SQ "Include cuVS ivf sq algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ "Include cuVS ivf pq algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_CAGRA "Include cuVS CAGRA in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE "Include cuVS brute force knn in benchmark" ON)
@@ -80,6 +81,7 @@ set(CUVS_USE_FAISS_STATIC ON)
 if(BUILD_CPU_ONLY)
   set(CUVS_FAISS_ENABLE_GPU OFF)
   set(CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT OFF)
+  set(CUVS_ANN_BENCH_USE_CUVS_IVF_SQ OFF)
   set(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ OFF)
   set(CUVS_ANN_BENCH_USE_CUVS_CAGRA OFF)
   set(CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE OFF)
@@ -97,6 +99,7 @@ set(CUVS_ANN_BENCH_USE_CUVS OFF)
 if(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ
    OR CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE
    OR CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT
+   OR CUVS_ANN_BENCH_USE_CUVS_IVF_SQ
    OR CUVS_ANN_BENCH_USE_CUVS_CAGRA
    OR CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB
    OR CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE
@@ -239,6 +242,12 @@ endif()
 if(CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT)
   ConfigureAnnBench(
     NAME CUVS_IVF_FLAT PATH src/cuvs/cuvs_benchmark.cu src/cuvs/cuvs_ivf_flat.cu LINKS cuvs
+  )
+endif()
+
+if(CUVS_ANN_BENCH_USE_CUVS_IVF_SQ)
+  ConfigureAnnBench(
+    NAME CUVS_IVF_SQ PATH src/cuvs/cuvs_benchmark.cu src/cuvs/cuvs_ivf_sq.cu LINKS cuvs
   )
 endif()
 
