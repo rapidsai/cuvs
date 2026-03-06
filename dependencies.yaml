@@ -397,7 +397,7 @@ dependencies:
               use_cuda_wheels: "false"
             packages:
           - matrix:
-              cuda: "12.9"
+              cuda: "12.*"
               use_cuda_wheels: "true"
             packages:
               # cuVS doesn't place a direct requirement on nvJitLink at runtime for CUDA 12,
