@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -59,7 +59,7 @@ impl Index {
     /// * `neighbors` - Matrix in device memory that receives the indices of the nearest neighbors
     /// * `distances` - Matrix in device memory that receives the distances of the nearest neighbors
     pub fn search(
-        self,
+        &self,
         res: &Resources,
         params: &SearchParams,
         queries: &ManagedTensor,
@@ -166,5 +166,60 @@ mod tests {
             .unwrap()
             .set_compression(CompressionParams::new().unwrap());
         test_cagra(build_params);
+    }
+
+    /// Test that an index can be searched multiple times without rebuilding.
+    /// This validates that search() takes &self instead of self.
+    #[test]
+    fn test_cagra_multiple_searches() {
+        let res = Resources::new().unwrap();
+        let build_params = IndexParams::new().unwrap();
+
+        // Create a random dataset
+        let n_datapoints = 256;
+        let n_features = 16;
+        let dataset =
+            ndarray::Array::<f32, _>::random((n_datapoints, n_features), Uniform::new(0., 1.0));
+
+        // Build the index once
+        let index =
+            Index::build(&res, &build_params, &dataset).expect("failed to create cagra index");
+
+        let search_params = SearchParams::new().unwrap();
+        let k = 5;
+
+        // Perform multiple searches on the same index
+        for search_iter in 0..3 {
+            let n_queries = 4;
+            let queries = dataset.slice(s![0..n_queries, ..]);
+            let queries = ManagedTensor::from(&queries).to_device(&res).unwrap();
+
+            let mut neighbors_host = ndarray::Array::<u32, _>::zeros((n_queries, k));
+            let neighbors = ManagedTensor::from(&neighbors_host)
+                .to_device(&res)
+                .unwrap();
+
+            let mut distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
+            let distances = ManagedTensor::from(&distances_host)
+                .to_device(&res)
+                .unwrap();
+
+            // This should work on every iteration because search() takes &self
+            index
+                .search(&res, &search_params, &queries, &neighbors, &distances)
+                .expect(&format!("search iteration {} failed", search_iter));
+
+            // Copy back to host memory
+            distances.to_host(&res, &mut distances_host).unwrap();
+            neighbors.to_host(&res, &mut neighbors_host).unwrap();
+
+            // Verify results are consistent across searches
+            assert_eq!(
+                neighbors_host[[0, 0]],
+                0,
+                "iteration {}: first query should find itself",
+                search_iter
+            );
+        }
     }
 }
