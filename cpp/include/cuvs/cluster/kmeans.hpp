@@ -114,6 +114,7 @@ struct params : base_params {
   bool inertia_check = false;
 
   /**
+   * @struct batched_params
    * Parameters specific to batched k-means (host-data overloads of fit/predict).
    * These parameters are only used when calling fit() or predict() with host_matrix_view data
    * and are ignored by the device_matrix_view overloads.
