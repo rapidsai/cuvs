@@ -67,6 +67,12 @@ option(DISABLE_OPENMP "Disable OpenMP" OFF)
 option(CUVS_COMPILE_DYNAMIC_ONLY "Only build the shared library and skip the static library." OFF)
 option(CUVS_NVTX "Enable nvtx markers" OFF)
 option(CUVS_RAFT_CLONE_ON_PIN "Explicitly clone RAFT branch when pinned to non-feature branch" ON)
+# Disabled by default: requires RAFT with lanczos_compute_eigenpairs. Set to ON if your RAFT has it.
+option(
+  CUVS_BUILD_SPECTRAL_EMBEDDING
+  "Build spectral embedding and cluster spectral (requires RAFT with lanczos_compute_eigenpairs)"
+  OFF
+)
 
 if(BUILD_CPU_ONLY)
   set(BUILD_SHARED_LIBS OFF)
@@ -473,7 +479,7 @@ if(NOT BUILD_CPU_ONLY)
     src/cluster/kmeans_transform_double.cu
     src/cluster/kmeans_transform_float.cu
     src/cluster/single_linkage_float.cu
-    src/cluster/spectral.cu
+    $<$<BOOL:${CUVS_BUILD_SPECTRAL_EMBEDDING}>:src/cluster/spectral.cu>
     src/core/bitset.cu
     src/core/omp_wrapper.cpp
     src/util/file_io.cpp
@@ -651,7 +657,7 @@ if(NOT BUILD_CPU_ONLY)
     src/preprocessing/quantize/scalar.cu
     src/preprocessing/quantize/binary.cu
     src/preprocessing/quantize/pq.cu
-    src/preprocessing/spectral/spectral_embedding.cu
+    $<$<BOOL:${CUVS_BUILD_SPECTRAL_EMBEDDING}>:src/preprocessing/spectral/spectral_embedding.cu>
     src/selection/select_k_float_int64_t.cu
     src/selection/select_k_float_int32_t.cu
     src/selection/select_k_float_uint32_t.cu

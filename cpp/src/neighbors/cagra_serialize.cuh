@@ -21,9 +21,11 @@ namespace cuvs::neighbors::cagra {
                                                                                            \
   void deserialize(raft::resources const& handle,                                          \
                    const std::string& filename,                                            \
-                   cuvs::neighbors::cagra::index<DTYPE, uint32_t>* index)                  \
+                   cuvs::neighbors::cagra::index<DTYPE, uint32_t>* index,                  \
+                   std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset)        \
   {                                                                                        \
-    cuvs::neighbors::cagra::detail::deserialize<DTYPE, uint32_t>(handle, filename, index); \
+    cuvs::neighbors::cagra::detail::deserialize<DTYPE, uint32_t>(                          \
+      handle, filename, index, out_dataset);                                               \
   };                                                                                       \
   void serialize(raft::resources const& handle,                                            \
                  std::ostream& os,                                                         \
@@ -36,9 +38,11 @@ namespace cuvs::neighbors::cagra {
                                                                                            \
   void deserialize(raft::resources const& handle,                                          \
                    std::istream& is,                                                       \
-                   cuvs::neighbors::cagra::index<DTYPE, uint32_t>* index)                  \
+                   cuvs::neighbors::cagra::index<DTYPE, uint32_t>* index,                  \
+                   std::unique_ptr<cuvs::neighbors::dataset<int64_t>>* out_dataset)        \
   {                                                                                        \
-    cuvs::neighbors::cagra::detail::deserialize<DTYPE, uint32_t>(handle, is, index);       \
+    cuvs::neighbors::cagra::detail::deserialize<DTYPE, uint32_t>(                          \
+      handle, is, index, out_dataset);                                                     \
   }                                                                                        \
                                                                                            \
   void serialize_to_hnswlib(                                                               \

@@ -266,7 +266,7 @@ template <typename T,
           typename IdxT = uint32_t,
           typename Accessor =
             raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
-index<T, IdxT> build(
+ace_build_result<T, IdxT> build(
   raft::resources const& res,
   const index_params& params,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
@@ -280,7 +280,24 @@ index<T, IdxT> build(
       dataset.data_handle(), dataset.extent(0), dataset.extent(1));
     return cuvs::neighbors::cagra::detail::build_ace<T, IdxT>(res, params, dataset_view);
   }
-  return cuvs::neighbors::cagra::detail::build<T, IdxT, Accessor>(res, params, dataset);
+  throw raft::logic_error(
+    "Use make_padded_dataset_view() or make_padded_dataset() to obtain a view, "
+    "then call build(res, params, view). ACE build is the only path that accepts a raw mdspan.");
+}
+
+/**
+ * @brief Build the index from a device padded dataset view.
+ *
+ * The index stores a non-owning copy of the view; the caller must keep the underlying data alive.
+ * Obtain the view via make_padded_dataset_view() (when stride is correct) or
+ * make_padded_dataset()->as_dataset_view() (when stride is incorrect).
+ */
+template <typename T, typename IdxT>
+build_result<T, IdxT> build(raft::resources const& res,
+                           const index_params& params,
+                           cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& dataset)
+{
+  return cuvs::neighbors::cagra::detail::build<T, IdxT>(res, params, dataset);
 }
 
 /**
@@ -398,10 +415,10 @@ void extend(
 }
 
 template <class T, class IdxT>
-index<T, IdxT> merge(raft::resources const& handle,
-                     const cagra::index_params& params,
-                     std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,
-                     const cuvs::neighbors::filtering::base_filter& row_filter)
+merge_result<T, IdxT> merge(raft::resources const& handle,
+                           const cagra::index_params& params,
+                           std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,
+                           const cuvs::neighbors::filtering::base_filter& row_filter)
 {
   return cagra::detail::merge<T, IdxT>(handle, params, indices, row_filter);
 }
@@ -415,7 +432,7 @@ index<T, IdxT> merge(raft::resources const& handle,
              const cuvs::neighbors::cagra::index_params& params,                        \
              std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,             \
              const cuvs::neighbors::filtering::base_filter& row_filter)                 \
-    -> cuvs::neighbors::cagra::index<T, IdxT>                                           \
+    -> cuvs::neighbors::cagra::merge_result<T, IdxT>                                    \
   {                                                                                     \
     return cuvs::neighbors::cagra::merge<T, IdxT>(handle, params, indices, row_filter); \
   }

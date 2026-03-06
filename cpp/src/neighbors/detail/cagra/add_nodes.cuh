@@ -296,15 +296,19 @@ void add_graph_nodes(
   const std::size_t max_chunk_size_ =
     params.max_chunk_size == 0 ? new_dataset_size : params.max_chunk_size;
 
-  raft::copy(handle,
-             raft::make_device_vector_view(updated_graph_view.data_handle(), index.graph().size()),
-             raft::make_device_vector_view(index.graph().data_handle(), index.graph().size()));
+  raft::copy(updated_graph_view.data_handle(),
+             index.graph().data_handle(),
+             index.graph().size(),
+             raft::resource::get_cuda_stream(handle));
 
+  auto empty_data_view =
+    raft::make_device_matrix_view<const T, int64_t>(nullptr, 0, dim);
+  cuvs::neighbors::device_padded_dataset_view<T, int64_t> empty_dataset_view(
+    empty_data_view);
+  auto empty_graph_view =
+    raft::make_device_matrix_view<const IdxT, int64_t>(nullptr, 0, degree);
   neighbors::cagra::index<T, IdxT> internal_index(
-    handle,
-    index.metric(),
-    raft::make_device_matrix_view<const T, int64_t>(nullptr, 0, dim),
-    raft::make_device_matrix_view<const IdxT, int64_t>(nullptr, 0, degree));
+    handle, index.metric(), empty_dataset_view, empty_graph_view);
 
   for (std::size_t additional_dataset_offset = 0; additional_dataset_offset < num_new_nodes;
        additional_dataset_offset += max_chunk_size_) {
@@ -356,12 +360,9 @@ void extend_core(
                "cuvs::neighbors::hnsw::from_cagra() and load it into memory via "
                "cuvs::neighbors::hnsw::deserialize() before calling extend().");
 
-  if (dynamic_cast<const non_owning_dataset<T, IdxT>*>(&index.data()) != nullptr &&
-      !new_dataset_buffer_view.has_value()) {
-    RAFT_LOG_WARN(
-      "New memory space for extended dataset will be allocated while the memory space for the old "
-      "dataset is allocated by user.");
-  }
+  RAFT_EXPECTS(new_dataset_buffer_view.has_value(),
+              "cagra::extend requires new_dataset_buffer_view. "
+              "Provide a buffer view for the extended dataset (initial + additional vectors).");
   const std::size_t num_new_nodes        = additional_dataset.extent(0);
   const std::size_t initial_dataset_size = index.size();
   const std::size_t new_dataset_size     = initial_dataset_size + num_new_nodes;
@@ -396,15 +397,13 @@ void extend_core(
     // Allocate memory space for updated graph on host
     auto updated_graph = raft::make_host_matrix<IdxT, std::int64_t>(new_dataset_size, degree);
 
-    const auto stride    = strided_dset->stride();
-    auto updated_dataset = raft::make_device_matrix<T, std::int64_t>(handle, 0, stride);
-    auto updated_dataset_view =
-      raft::make_device_strided_matrix_view<T, std::int64_t>(nullptr, 0, dim, stride);
+    const auto stride = strided_dset->stride();
+    auto updated_dataset_view = new_dataset_buffer_view.value();
 
-    // Update dataset
+    // Update dataset on host, then copy to device buffer provided by caller
     auto host_updated_dataset = raft::make_host_matrix<T, std::int64_t>(new_dataset_size, stride);
 
-    // The padding area must be filled with zeros.!!!!!!!!!!!!!!!!!!!
+    // The padding area must be filled with zeros.
     memset(host_updated_dataset.data_handle(), 0, sizeof(T) * host_updated_dataset.size());
 
     RAFT_CUDA_TRY(cudaMemcpy2DAsync(host_updated_dataset.data_handle(),
@@ -425,43 +424,23 @@ void extend_core(
                         cudaMemcpyDefault,
                         raft::resource::get_cuda_stream(handle)));
 
-    if (new_dataset_buffer_view.has_value()) {
-      updated_dataset_view = new_dataset_buffer_view.value();
-    } else {
-      // Deallocate the current dataset memory space if the dataset is `owning'.
-      index.update_dataset(
-        handle, raft::make_device_strided_matrix_view<const T, int64_t>(nullptr, 0, dim, stride));
-
-      // Allocate the new dataset
-      updated_dataset = raft::make_device_matrix<T, std::int64_t>(handle, new_dataset_size, stride);
-      updated_dataset_view = raft::make_device_strided_matrix_view<T, std::int64_t>(
-        updated_dataset.data_handle(), new_dataset_size, dim, stride);
-    }
-
-    // Copy updated dataset on host memory to device memory
-    raft::copy(
-      handle,
-      raft::make_device_vector_view(updated_dataset_view.data_handle(), new_dataset_size * stride),
-      raft::make_host_vector_view(host_updated_dataset.data_handle(), new_dataset_size * stride));
+    // Copy updated dataset on host memory to device memory (caller's buffer)
+    raft::copy(updated_dataset_view.data_handle(),
+               host_updated_dataset.data_handle(),
+               new_dataset_size * stride,
+               raft::resource::get_cuda_stream(handle));
 
     // Add graph nodes
     cuvs::neighbors::cagra::add_graph_nodes<T, IdxT>(
       handle, raft::make_const_mdspan(updated_dataset_view), index, updated_graph.view(), params);
 
-    // Update index dataset
-    if (new_dataset_buffer_view.has_value()) {
-      index.update_dataset(handle, raft::make_const_mdspan(updated_dataset_view));
-    } else {
-      using out_mdarray_type          = decltype(updated_dataset);
-      using out_layout_type           = typename out_mdarray_type::layout_type;
-      using out_container_policy_type = typename out_mdarray_type::container_policy_type;
-      using out_owning_type =
-        owning_dataset<T, int64_t, out_layout_type, out_container_policy_type>;
-      auto out_layout = raft::make_strided_layout(updated_dataset_view.extents(),
-                                                  cuda::std::array<int64_t, 2>{stride, 1});
-
-      index.update_dataset(handle, out_owning_type{std::move(updated_dataset), out_layout});
-    }
+    // Attach view over caller's buffer; index does not take ownership
+    cuvs::neighbors::device_padded_dataset_view<T, int64_t> dv(
+      raft::make_device_matrix_view(updated_dataset_view.data_handle(),
+                                    updated_dataset_view.extent(0),
+                                    updated_dataset_view.stride(0)),
+      dim);
+    index.update_dataset(handle, dv);
 
     // Update index graph
     if (new_graph_buffer_view.has_value()) {

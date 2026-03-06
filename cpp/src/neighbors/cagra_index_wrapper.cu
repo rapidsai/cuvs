@@ -44,6 +44,13 @@ cuvs::distance::DistanceType IndexWrapper<T, IdxT, OutputIdxT>::metric() const n
 }
 
 template <typename T, typename IdxT, typename OutputIdxT>
+void IndexWrapper<T, IdxT, OutputIdxT>::set_merged_dataset(
+  raft::device_matrix<T, int64_t, raft::row_major>&& dataset)
+{
+  merged_dataset_.emplace(std::move(dataset));
+}
+
+template <typename T, typename IdxT, typename OutputIdxT>
 std::shared_ptr<
   cuvs::neighbors::IndexBase<typename IndexWrapper<T, IdxT, OutputIdxT>::value_type,
                              typename IndexWrapper<T, IdxT, OutputIdxT>::index_type,
@@ -78,10 +85,12 @@ IndexWrapper<T, IdxT, OutputIdxT>::merge(
     return std::make_shared<cuvs::neighbors::composite::CompositeIndex<T, IdxT, OutputIdxT>>(
       std::move(wrappers));
   } else if (cagra_params->strategy() == cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL) {
-    auto merged_index =
+    auto merge_res =
       cuvs::neighbors::cagra::merge(handle, cagra_params->output_index_params, cagra_indices);
-    auto* idx = new decltype(merged_index)(std::move(merged_index));
-    return std::make_shared<IndexWrapper<T, IdxT, OutputIdxT>>(idx);
+    auto* idx = new cuvs::neighbors::cagra::index<T, IdxT>(std::move(merge_res.idx));
+    auto wrapper = std::make_shared<IndexWrapper<T, IdxT, OutputIdxT>>(idx);
+    wrapper->set_merged_dataset(std::move(merge_res.dataset));
+    return wrapper;
   }
 
   RAFT_FAIL("Invalid merge strategy");

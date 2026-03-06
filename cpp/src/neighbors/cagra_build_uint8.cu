@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -22,18 +22,25 @@ namespace cuvs::neighbors::cagra {
              raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)         \
     -> cuvs::neighbors::cagra::index<T, IdxT>                                             \
   {                                                                                       \
-    return cuvs::neighbors::cagra::build<T, IdxT>(handle, params, dataset);               \
+    cuvs::neighbors::device_padded_dataset_view<T, int64_t> dv(                           \
+      dataset, static_cast<uint32_t>(dataset.extent(1)));                                 \
+    return cuvs::neighbors::cagra::detail::build<T, IdxT>(handle, params, dv).idx;        \
   }                                                                                       \
                                                                                           \
   auto build(raft::resources const& handle,                                               \
              const cuvs::neighbors::cagra::index_params& params,                          \
              raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)           \
-    -> cuvs::neighbors::cagra::index<T, IdxT>                                             \
+    -> cuvs::neighbors::cagra::ace_build_result<T, IdxT>                                  \
   {                                                                                       \
-    return cuvs::neighbors::cagra::build<T, IdxT>(handle, params, dataset);               \
+    return cuvs::neighbors::cagra::detail::build_ace<T, IdxT>(handle, params, dataset);   \
   }
 
 RAFT_INST_CAGRA_BUILD(uint8_t, uint32_t);
+
+template auto build(raft::resources const& res,
+                    const cuvs::neighbors::cagra::index_params& params,
+                    cuvs::neighbors::device_padded_dataset_view<uint8_t, int64_t> const& dataset)
+  -> cuvs::neighbors::cagra::build_result<uint8_t, uint32_t>;
 
 #undef RAFT_INST_CAGRA_BUILD
 

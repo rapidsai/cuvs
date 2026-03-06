@@ -425,7 +425,8 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
             auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
               (const DataT*)database_host->data_handle(), ps.n_rows, ps.dim);
 
-            index = cagra::build(handle_, index_params, database_host_view);
+            auto ace_res = cagra::build(handle_, index_params, database_host_view);
+            index       = std::move(ace_res.idx);
           } else {
             index = cagra::build(handle_, index_params, database_view);
           };
@@ -441,7 +442,8 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         }
 
         cagra::index<DataT, IdxT> index(handle_);
-        cagra::deserialize(handle_, index_file.filename, &index);
+        std::unique_ptr<cuvs::neighbors::dataset<int64_t>> loaded_dataset;
+        cagra::deserialize(handle_, index_file.filename, &index, &loaded_dataset);
 
         if (!ps.include_serialized_dataset) { index.update_dataset(handle_, database_view); }
 
@@ -628,9 +630,9 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
             database_host->data_handle(), database.data(), initial_database_view.size(), stream_);
           auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
             (const DataT*)database_host->data_handle(), initial_database_size, ps.dim);
-          // NB: database_host must live no less than the index, because the index _may_be_
-          //     non-onwning
-          index = cagra::build(handle_, index_params, database_host_view);
+          // NB: database_host and ace_build_result.dataset must live no less than the index
+          auto ace_res = cagra::build(handle_, index_params, database_host_view);
+          index       = std::move(ace_res.idx);
         } else {
           index = cagra::build(handle_, index_params, initial_database_view);
         };
@@ -843,7 +845,8 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
           raft::copy(database_host->data_handle(), database.data(), database.size(), stream_);
           auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
             (const DataT*)database_host->data_handle(), ps.n_rows, ps.dim);
-          index = cagra::build(handle_, index_params, database_host_view);
+          auto ace_res = cagra::build(handle_, index_params, database_host_view);
+          index       = std::move(ace_res.idx);
         } else {
           index = cagra::build(handle_, index_params, database_view);
         }
@@ -1095,14 +1098,16 @@ class AnnCagraIndexFilteredMergeTest : public ::testing::TestWithParam<AnnCagraI
           {
             auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
               (const DataT*)database_host->data_handle(), database0_size, ps.dim);
-            index0 = cagra::build(handle_, index_params, database_host_view);
+            auto ace_res0 = cagra::build(handle_, index_params, database_host_view);
+            index0       = std::move(ace_res0.idx);
           }
           {
             auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
               (const DataT*)database_host->data_handle() + database0_size * ps.dim,
               database1_size,
               ps.dim);
-            index1 = cagra::build(handle_, index_params, database_host_view);
+            auto ace_res1 = cagra::build(handle_, index_params, database_host_view);
+            index1       = std::move(ace_res1.idx);
           }
         } else {
           index0 = cagra::build(handle_, index_params, database0_view);
@@ -1113,7 +1118,7 @@ class AnnCagraIndexFilteredMergeTest : public ::testing::TestWithParam<AnnCagraI
         indices.push_back(&index0);
         indices.push_back(&index1);
 
-        auto index =
+        auto merge_res =
           cuvs::neighbors::cagra::merge(handle_, index_params, indices, bitset_filter_obj);
 
         auto search_queries_view = raft::make_device_matrix_view<const DataT, int64_t>(
@@ -1129,8 +1134,12 @@ class AnnCagraIndexFilteredMergeTest : public ::testing::TestWithParam<AnnCagraI
         search_params.team_size   = ps.team_size;
         search_params.itopk_size  = ps.itopk_size;
 
-        cuvs::neighbors::cagra::search(
-          handle_, search_params, index, search_queries_view, indices_out_view, dists_out_view);
+        cuvs::neighbors::cagra::search(handle_,
+                                        search_params,
+                                        merge_res.idx,
+                                        search_queries_view,
+                                        indices_out_view,
+                                        dists_out_view);
 
         raft::update_host(distances_Cagra.data(), distances_dev.data(), queries_size, stream_);
         raft::update_host(indices_Cagra.data(), indices_dev.data(), queries_size, stream_);
@@ -1305,14 +1314,16 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
           {
             auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
               (const DataT*)database_host->data_handle(), database0_size, ps.dim);
-            index0 = cagra::build(handle_, index_params, database_host_view);
+            auto ace_res0 = cagra::build(handle_, index_params, database_host_view);
+            index0       = std::move(ace_res0.idx);
           }
           {
             auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
               (const DataT*)database_host->data_handle() + database0_size * ps.dim,
               database1_size,
               ps.dim);
-            index1 = cagra::build(handle_, index_params, database_host_view);
+            auto ace_res1 = cagra::build(handle_, index_params, database_host_view);
+            index1       = std::move(ace_res1.idx);
           }
         } else {
           index0 = cagra::build(handle_, index_params, database0_view);

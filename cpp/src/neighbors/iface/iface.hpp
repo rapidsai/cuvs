@@ -37,9 +37,20 @@ void build(const raft::resources& handle,
       handle, *static_cast<const ivf_pq::index_params*>(index_params), index_dataset);
     interface.index_.emplace(std::move(idx));
   } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
-    auto idx = cuvs::neighbors::cagra::build(
-      handle, *static_cast<const cagra::index_params*>(index_params), index_dataset);
-    interface.index_.emplace(std::move(idx));
+    using build_return_t = decltype(cuvs::neighbors::cagra::build(
+      std::declval<raft::resources const&>(),
+      std::declval<cagra::index_params const&>(),
+      std::declval<raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor>>()));
+    if constexpr (std::is_same_v<build_return_t, cagra::ace_build_result<T, IdxT>>) {
+      auto result = cuvs::neighbors::cagra::build(
+        handle, *static_cast<const cagra::index_params*>(index_params), index_dataset);
+      interface.cagra_build_dataset_ = std::move(result.dataset);
+      interface.index_.emplace(std::move(result.idx));
+    } else {
+      auto idx = cuvs::neighbors::cagra::build(
+        handle, *static_cast<const cagra::index_params*>(index_params), index_dataset);
+      interface.index_.emplace(std::move(idx));
+    }
   }
   resource::sync_stream(handle);
 }
@@ -160,7 +171,9 @@ void deserialize(const raft::resources& handle,
     interface.index_.emplace(std::move(idx));
   } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
     cagra::index<T, IdxT> idx(handle);
-    cagra::deserialize(handle, is, &idx);
+    std::unique_ptr<cuvs::neighbors::dataset<int64_t>> out_dataset;
+    cagra::deserialize(handle, is, &idx, &out_dataset);
+    if (out_dataset) { interface.cagra_owned_dataset_ = std::move(out_dataset); }
     resource::sync_stream(handle);
     interface.index_.emplace(std::move(idx));
   }
@@ -188,7 +201,9 @@ void deserialize(const raft::resources& handle,
     interface.index_.emplace(std::move(idx));
   } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
     cagra::index<T, IdxT> idx(handle);
-    cagra::deserialize(handle, is, &idx);
+    std::unique_ptr<cuvs::neighbors::dataset<int64_t>> out_dataset;
+    cagra::deserialize(handle, is, &idx, &out_dataset);
+    if (out_dataset) { interface.cagra_owned_dataset_ = std::move(out_dataset); }
     resource::sync_stream(handle);
     interface.index_.emplace(std::move(idx));
   }

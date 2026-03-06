@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -91,6 +91,20 @@ auto make_key(const cagra::search_params& params,
               const DatasetT& dataset,
               cuvs::distance::DistanceType metric)
   -> std::enable_if_t<is_strided_dataset_v<DatasetT>, key>
+{
+  return key{reinterpret_cast<uint64_t>(dataset.view().data_handle()),
+             uint64_t(dataset.n_rows()),
+             dataset.dim(),
+             dataset.stride(),
+             uint32_t(params.team_size),
+             uint32_t(metric)};
+}
+
+template <typename DatasetT>
+auto make_key(const cagra::search_params& params,
+              const DatasetT& dataset,
+              cuvs::distance::DistanceType metric)
+  -> std::enable_if_t<is_padded_dataset_v<DatasetT>, key>
 {
   return key{reinterpret_cast<uint64_t>(dataset.view().data_handle()),
              uint64_t(dataset.n_rows()),

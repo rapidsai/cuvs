@@ -207,9 +207,11 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
         handle_, index.graph().extent(0), index.graph().extent(1));
       raft::linalg::map(handle_, graph_valid.view(), edge_op{}, index.graph());
 
+      cuvs::neighbors::device_padded_dataset_view<DataT, int64_t> cagra_dataset_view(
+        database_view);
       auto cagra_index = cagra::index<DataT, IdxT>(handle_,
                                                    ps.metric,
-                                                   raft::make_const_mdspan(database_view),
+                                                   cagra_dataset_view,
                                                    raft::make_const_mdspan(graph_valid.view()));
 
       cagra::search_params search_params;
