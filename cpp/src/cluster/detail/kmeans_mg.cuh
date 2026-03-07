@@ -38,6 +38,8 @@
 #include <cstdint>
 #include <random>
 
+#include "/home/vinayd/nwork/git-repos/snippets/ketu.cuh"
+
 namespace cuvs::cluster::kmeans::mg::detail {
 
 #define CUVS_LOG_KMEANS(handle, fmt, ...)                    \
