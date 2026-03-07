@@ -4,7 +4,7 @@
 
 ### What is JIT LTO?
 
-JIT LTO (Just-In-Time Link-Time Optimization) is a CUDA compilation strategy that enables dynamic kernel compilation and linking at runtime. Instead of pre-compiling all possible kernel variants (which would result in an explosion of binary size), JIT LTO compiles kernel **fragments** separately and links them together on-demand when a specific kernel configuration is needed.
+[JIT LTO (Just-In-Time Link-Time Optimization)](https://developer.nvidia.com/blog/cuda-12-0-compiler-support-for-runtime-lto-using-nvjitlink-library/) is a CUDA compilation strategy that enables dynamic kernel compilation and linking at runtime. Instead of pre-compiling all possible kernel variants (which would result in an explosion of binary size), JIT LTO compiles kernel **fragments** separately and links them together on-demand when a specific kernel configuration is needed.
 
 ### Fragment Terminology
 
