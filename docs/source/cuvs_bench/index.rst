@@ -106,10 +106,45 @@ Running the benchmarks
 End-to-end: smaller-scale benchmarks (<1M to 10M)
 -------------------------------------------------
 
-The steps below demonstrate how to download, install, and run benchmarks on a subset of 10M vectors from the Yandex Deep-1B dataset By default the datasets will be stored and used from the folder indicated by the `RAPIDS_DATASET_ROOT_DIR` environment variable if defined, otherwise a datasets sub-folder from where the script is being called:
+The steps below demonstrate how to download, install, and run benchmarks on a subset of 10M vectors from the Yandex Deep-1B dataset. By default the datasets will be stored and used from the folder indicated by the `RAPIDS_DATASET_ROOT_DIR` environment variable if defined, otherwise a datasets sub-folder from where the script is being called.
+
+**Recommended: Orchestrator API**
+
+Use the `BenchmarkOrchestrator` from `cuvs_bench.orchestrator` for the full workflow:
 
 .. code-block:: bash
 
+    # (1) Prepare dataset.
+    python -m cuvs_bench.get_dataset --dataset deep-image-96-angular --normalize
+
+.. code-block:: python
+
+    # (2) Build and search index.
+    from cuvs_bench.orchestrator import BenchmarkOrchestrator
+
+    orchestrator = BenchmarkOrchestrator(backend_type="cpp_gbench")
+    results = orchestrator.run_benchmark(
+        dataset="deep-image-96-inner",
+        algorithms="cuvs_cagra",
+        count=10,
+        batch_size=10,
+        build=True,
+        search=True,
+    )
+
+.. code-block:: bash
+
+    # (3) Export data.
+    python -m cuvs_bench.run --data-export --dataset deep-image-96-inner
+
+    # (4) Plot results.
+    python -m cuvs_bench.plot --dataset deep-image-96-inner
+
+**Legacy CLI**
+
+You can still run build and search from the command line (deprecated in favor of the orchestrator API):
+
+.. code-block:: bash
 
     # (1) prepare dataset.
     python -m cuvs_bench.get_dataset --dataset deep-image-96-angular --normalize
@@ -122,7 +157,6 @@ The steps below demonstrate how to download, install, and run benchmarks on a su
 
     # (4) plot results
     python -m cuvs_bench.plot --dataset deep-image-96-inner
-
 
 .. list-table::
 
@@ -386,7 +420,7 @@ Creating and customizing dataset configurations
 
 A single configuration will often define a set of algorithms, with associated index and search parameters, that can be generalize across datasets. We use YAML to define dataset specific and algorithm specific configurations.
 
-A default `datasets.yaml` is provided by CUVS in `${CUVS_HOME}/python/cuvs_bench/src/cuvs_bench/run/conf` with configurations available for several datasets. Here's a simple example entry for the `sift-128-euclidean` dataset:
+A default `datasets.yaml` is provided by CUVS in `${CUVS_HOME}/python/cuvs_bench/cuvs_bench/config/datasets/datasets.yaml` with configurations available for several datasets. Here's a simple example entry for the `sift-128-euclidean` dataset:
 
 .. code-block:: yaml
 
@@ -402,6 +436,9 @@ Configuration files for ANN algorithms supported by `cuvs-bench` are provided in
 .. code-block:: yaml
 
     name: cuvs_cagra
+    constraints:
+      build: cuvs_bench.config.algos.constraints.cuvs_cagra_build
+      search: cuvs_bench.config.algos.constraints.cuvs_cagra_search
     groups:
       base:
         build:
@@ -419,9 +456,11 @@ Configuration files for ANN algorithms supported by `cuvs-bench` are provided in
 
 The default parameters for which the benchmarks are run can be overridden by creating a custom YAML file for algorithms with a `base` group.
 
-There config above has 2 fields:
-1. `name` - define the name of the algorithm for which the parameters are being specified.
-2. `groups` - define a run group which has a particular set of parameters. Each group helps create a cross-product of all hyper-parameter fields for `build` and `search`.
+The config above has 3 fields:
+
+1. `name` - The name of the algorithm for which the parameters are being specified.
+2. `constraints` - Optional. Python import paths to functions that validate build and search parameter combinations (e.g. ``cuvs_bench.config.algos.constraints.cuvs_cagra_build``). Each function returns ``True`` if the parameters are valid, ``False`` otherwise; invalid combinations are skipped and not benchmarked.
+3. `groups` - Run groups, each with a set of parameters. Each group defines a cross-product of all hyper-parameter fields for `build` and `search`.
 
 The table below contains all algorithms supported by cuVS. Each unique algorithm will have its own set of `build` and `search` settings. The :doc:`ANN Algorithm Parameter Tuning Guide <param_tuning>` contains detailed instructions on choosing build and search parameters for each supported algorithm.
 
@@ -598,4 +637,5 @@ Add a new entry to `algos.yaml` to map the name of the algorithm to its binary e
    build.rst
    datasets.rst
    param_tuning.rst
+   pluggable_backend.rst
    wiki_all_dataset.rst
