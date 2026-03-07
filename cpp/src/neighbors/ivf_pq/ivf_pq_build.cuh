@@ -126,7 +126,8 @@ void select_residuals(raft::resources const& handle,
  * The residual has the form
  *  `rotation_matrix %* (dataset[:, :] - centers[labels[:], 0:dim])`
  *
- * For cosine metric, normalizes the data after type conversion before computing residuals.
+ * For cosine and inner-product metrics, normalizes the data after type conversion before
+ * computing residuals so that stored vectors and queries use the same (normalized) space.
  */
 template <typename T, typename IdxT>
 void flat_compute_residuals(
@@ -147,7 +148,8 @@ void flat_compute_residuals(
   rmm::device_uvector<float> tmp(n_rows * dim, stream, device_memory);
   auto tmp_view = raft::make_device_vector_view<float, size_t>(tmp.data(), tmp.size());
 
-  if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+  if (metric == cuvs::distance::DistanceType::CosineExpanded ||
+      metric == cuvs::distance::DistanceType::InnerProduct) {
     raft::linalg::map(
       handle,
       tmp_view,
@@ -1110,18 +1112,40 @@ void extend(raft::resources const& handle,
                                     n_clusters,
                                     cudaMemcpyDefault,
                                     stream));
+    const bool normalize_for_predict =
+      (index->metric() == cuvs::distance::DistanceType::CosineExpanded ||
+       index->metric() == cuvs::distance::DistanceType::InnerProduct);
+    rmm::device_uvector<float> batch_float_normalized(
+      normalize_for_predict ? size_t(max_batch_size) * size_t(index->dim()) : 0, stream, device_memory);
+
     vec_batches.prefetch_next_batch();
     for (const auto& batch : vec_batches) {
-      auto batch_data_view = raft::make_device_matrix_view<const T, internal_extents_t>(
-        batch.data(), batch.size(), index->dim());
       auto batch_labels_view = raft::make_device_vector_view<uint32_t, internal_extents_t>(
         new_data_labels.data() + batch.offset(), batch.size());
       auto centers_view = raft::make_device_matrix_view<const float, internal_extents_t>(
         cluster_centers.data(), n_clusters, index->dim());
       cuvs::cluster::kmeans::balanced_params kmeans_params;
       kmeans_params.metric = index->metric();
-      cuvs::cluster::kmeans::predict(
-        handle, kmeans_params, batch_data_view, centers_view, batch_labels_view);
+
+      if (normalize_for_predict) {
+        auto batch_float_view = raft::make_device_matrix_view<float, internal_extents_t>(
+          batch_float_normalized.data(), batch.size(), index->dim());
+        raft::linalg::map(handle,
+                          raft::make_device_vector_view<float, size_t>(batch_float_view.data_handle(),
+                                                                      size_t(batch.size()) * size_t(index->dim())),
+                          raft::cast_op<float>{},
+                          raft::make_const_mdspan(raft::make_device_vector_view<const T, size_t>(
+                            batch.data(), size_t(batch.size()) * size_t(index->dim()))));
+        raft::linalg::row_normalize<raft::linalg::L2Norm>(
+          handle, raft::make_const_mdspan(batch_float_view), batch_float_view);
+        cuvs::cluster::kmeans::predict(
+          handle, kmeans_params, batch_float_view, centers_view, batch_labels_view);
+      } else {
+        auto batch_data_view = raft::make_device_matrix_view<const T, internal_extents_t>(
+          batch.data(), batch.size(), index->dim());
+        cuvs::cluster::kmeans::predict(
+          handle, kmeans_params, batch_data_view, centers_view, batch_labels_view);
+      }
       vec_batches.prefetch_next_batch();
       // User needs to make sure kernel finishes its work before we overwrite batch in the next
       // iteration if different streams are used for kernel and copy.
@@ -1331,7 +1355,8 @@ auto build(raft::resources const& handle,
     kmeans_params.n_iters = params.kmeans_n_iters;
     kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>((int)impl->metric());
 
-    if (impl->metric() == distance::DistanceType::CosineExpanded) {
+    if (impl->metric() == distance::DistanceType::CosineExpanded ||
+        impl->metric() == distance::DistanceType::InnerProduct) {
       raft::linalg::row_normalize<raft::linalg::L2Norm>(
         handle, trainset_const_view, trainset.view());
     }
@@ -1341,7 +1366,8 @@ auto build(raft::resources const& handle,
     rmm::device_uvector<uint32_t> labels(n_rows_train, stream, big_memory_resource);
     auto centers_const_view = raft::make_device_matrix_view<const float, internal_extents_t>(
       cluster_centers, impl->n_lists(), impl->dim());
-    if (impl->metric() == distance::DistanceType::CosineExpanded) {
+    if (impl->metric() == distance::DistanceType::CosineExpanded ||
+        impl->metric() == distance::DistanceType::InnerProduct) {
       raft::linalg::row_normalize<raft::linalg::L2Norm>(handle, centers_const_view, centers_view);
     }
     auto labels_view =
