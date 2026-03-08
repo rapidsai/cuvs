@@ -249,6 +249,18 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_uint8_uint32_dim128_t8.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_uint8_uint32_dim256_t16.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_uint8_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_float_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_float_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_float_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_half_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_half_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_half_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_int8_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_int8_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_int8_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_uint8_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_uint8_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_uint8_uint32_dim512_t32.cu
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_float_uint32_dim128_t8.cu
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_float_uint32_dim256_t16.cu
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_float_uint32_dim512_t32.cu
