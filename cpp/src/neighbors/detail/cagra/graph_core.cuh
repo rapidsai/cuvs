@@ -108,6 +108,14 @@ __global__ void kern_sort(const DATA_T* const dataset,  // [dataset_chunk_size, 
                        dataset[d + static_cast<uint64_t>(dataset_dim) * dstNode]);
         dist += diff * diff;
       }
+    } else if (metric == cuvs::distance::DistanceType::L1) {
+      for (int d = lane_id; d < dataset_dim; d += raft::WarpSize) {
+        float diff = cuvs::spatial::knn::detail::utils::mapping<float>{}(
+                       dataset[d + static_cast<uint64_t>(dataset_dim) * srcNode]) -
+                     cuvs::spatial::knn::detail::utils::mapping<float>{}(
+                       dataset[d + static_cast<uint64_t>(dataset_dim) * dstNode]);
+        dist += raft::abs(diff);
+      }
     } else if (metric == cuvs::distance::DistanceType::BitwiseHamming) {
       if constexpr (std::is_integral_v<DATA_T>) {
         for (int d = lane_id; d < dataset_dim; d += raft::WarpSize) {
@@ -510,8 +518,9 @@ void sort_knn_graph(
     metric == cuvs::distance::DistanceType::InnerProduct ||
       metric == cuvs::distance::DistanceType::CosineExpanded ||
       metric == cuvs::distance::DistanceType::L2Expanded ||
-      metric == cuvs::distance::DistanceType::BitwiseHamming,
-    "Unsupported metric. Only InnerProduct, CosineExpanded, L2Expanded and BitwiseHamming are "
+      metric == cuvs::distance::DistanceType::BitwiseHamming ||
+      metric == cuvs::distance::DistanceType::L1,
+    "Unsupported metric. Only InnerProduct, CosineExpanded, L2Expanded, BitwiseHamming and L1 are "
     "supported");
   const uint64_t dataset_size = dataset.extent(0);
   const uint64_t dataset_dim  = dataset.extent(1);
