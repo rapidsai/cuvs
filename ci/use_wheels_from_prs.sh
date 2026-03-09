@@ -16,7 +16,7 @@ RMM_WHEELHOUSE=$(
   rapids-get-pr-artifact rmm 2270 python wheel --pkg_name rmm --stable "${RMM_COMMIT}"
 )
 
-RAFT_COMMIT=20f7213826e7550e92d635d5b3c07eff169afe54
+RAFT_COMMIT=5258ae71a6e0e0b10308329957b13358d3585b84
 LIBRAFT_WHEELHOUSE=$(
   RAPIDS_PY_WHEEL_NAME="libraft_${RAPIDS_PY_CUDA_SUFFIX}" rapids-get-pr-artifact raft 2971 cpp wheel "${RAFT_COMMIT}"
 )
