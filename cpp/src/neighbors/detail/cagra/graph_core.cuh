@@ -794,8 +794,7 @@ void merge_graph_gpu(raft::resources const& res,
     raft::make_host_matrix_view<IdxT, int64_t>(output_graph_ptr, graph_size, output_graph_degree),
     /*batch_size*/ batch_size,
     /*host_writeback*/ true,
-    /*initialize*/ true,
-    /*hmm_as_managed*/ false);
+    /*initialize*/ true);
 
   batched_device_view_from_host<IdxT, int64_t> d_mst_graph(
     res,
@@ -803,8 +802,7 @@ void merge_graph_gpu(raft::resources const& res,
       mst_graph_ptr, guarantee_connectivity ? graph_size : 0, output_graph_degree),
     /*batch_size*/ batch_size,
     /*host_writeback*/ false,
-    /*initialize*/ true,
-    /*hmm_as_managed*/ false);
+    /*initialize*/ true);
 
   batched_device_view_from_host<IdxT, int64_t> d_mst_graph_num_edges(
     res,
@@ -812,8 +810,7 @@ void merge_graph_gpu(raft::resources const& res,
       mst_graph_ptr, guarantee_connectivity ? graph_size : 0, output_graph_degree),
     /*batch_size*/ batch_size,
     /*host_writeback*/ false,
-    /*initialize*/ true,
-    /*hmm_as_managed*/ false);
+    /*initialize*/ true);
 
   const uint32_t num_warps = 4;
   const dim3 threads_merge(raft::WarpSize * num_warps, 1, 1);
@@ -887,8 +884,7 @@ void make_reverse_graph_gpu(raft::resources const& res,
     raft::make_host_matrix_view<IdxT, int64_t>(output_graph_ptr, graph_size, output_graph_degree),
     /*batch_size*/ batch_size,
     /*host_writeback*/ false,
-    /*initialize*/ true,
-    /*hmm_as_managed*/ false);
+    /*initialize*/ true);
 
   for (uint32_t i_batch = 0; i_batch < num_batch; i_batch++) {
     dim3 threads(256, 1, 1);
@@ -1544,8 +1540,7 @@ void prune_graph_gpu(raft::resources const& res,
     raft::make_host_matrix_view<IdxT, int64_t>(knn_graph_ptr, graph_size, knn_graph_degree),
     /*batch_size*/ graph_size,
     /*host_writeback*/ false,
-    /*initialize*/ true,
-    /*hmm_as_managed*/ true);
+    /*initialize*/ true);
   auto input_view = d_input_graph.next_view();
 
   batched_device_view_from_host<IdxT, int64_t> d_output_graph(
@@ -1553,8 +1548,7 @@ void prune_graph_gpu(raft::resources const& res,
     raft::make_host_matrix_view<IdxT, int64_t>(output_graph_ptr, graph_size, output_graph_degree),
     /*batch_size*/ batch_size,
     /*host_writeback*/ true,
-    /*initialize*/ false,
-    /*hmm_as_managed*/ false);
+    /*initialize*/ false);
 
   auto d_invalid_neighbor_list = raft::make_device_scalar<uint32_t>(res, 0u);
 

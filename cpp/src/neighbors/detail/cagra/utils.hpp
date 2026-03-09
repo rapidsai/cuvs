@@ -327,22 +327,25 @@ void copy_with_padding(
  * @param res The resources
  * @param host_view The host view to create the batched device view from
  * @param batch_size The batch size
- * @param read_only Whether the data is read only (only for managed memory)
  * @param host_writeback Whether to write back the data to the host (only for host memory)
  * @param initialize Whether to initialize the data (only for managed memory)
- * @param discard Whether to discard the data (only for managed memory)
  *
  * @return The batched device view
  */
 template <typename T, typename IdxT>
 class batched_device_view_from_host {
  public:
+  enum class memory_strategy {
+    device_only,   // data is on device only (no copy needed)
+    copy_device,   // data is explicitly moved to/from device buffers
+    managed_only,  // data is on managed memory (system managed)
+  };
+
   batched_device_view_from_host(raft::resources const& res,
                                 raft::host_matrix_view<T, IdxT> host_view,
                                 uint64_t batch_size,
                                 bool host_writeback = false,
-                                bool initialize     = true,
-                                bool hmm_as_managed = false)
+                                bool initialize     = true)
     : res_(res),
       host_view_(host_view),
       batch_size_(batch_size),
@@ -350,29 +353,23 @@ class batched_device_view_from_host {
       batch_id_(-2),
       num_buffers_(2),
       host_writeback_(host_writeback),
-      initialize_(initialize),
-      hmm_as_managed_(hmm_as_managed)
+      initialize_(initialize)
   {
     if (host_view.extent(0) == 0) {
-      mem_type_ = cudaMemoryTypeDevice;
+      mem_strategy_ = memory_strategy::device_only;
       return;
     }
 
     cudaPointerAttributes attr;
     RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, host_view.data_handle()));
-    mem_type_ = attr.type;
-    // cudaMemoryTypeUnregistered = 0
-    // cudaMemoryTypeHost = 1
-    // cudaMemoryTypeDevice = 2
-    // cudaMemoryTypeManaged = 3
-    //
-    // On HMM systems, unregistered (malloc) memory can have devicePointer != nullptr,
-    // meaning it's directly accessible from the GPU. Treat it like managed memory:
-    if (mem_type_ == cudaMemoryTypeUnregistered && attr.devicePointer != nullptr &&
-        hmm_as_managed) {
-      mem_type_ = cudaMemoryTypeManaged;
+    switch (attr.type) {
+      case cudaMemoryTypeUnregistered:
+      case cudaMemoryTypeHost:
+      case cudaMemoryTypeManaged: mem_strategy_ = memory_strategy::copy_device; break;
+      case cudaMemoryTypeDevice: mem_strategy_ = memory_strategy::device_only; break;
     }
 
+    // setup streams
     if (res.has_resource_factory(raft::resource::resource_type::CUDA_STREAM_POOL) &&
         raft::resource::get_stream_pool_size(res) >= 1) {
       prefetch_stream_  = raft::resource::get_stream_from_stream_pool(res);
@@ -383,32 +380,48 @@ class batched_device_view_from_host {
       writeback_stream_  = local_stream_pool_.value()->get_stream();
     }
 
-    // allocations
-    if (mem_type_ == cudaMemoryTypeHost || mem_type_ == cudaMemoryTypeUnregistered) {
-      device_mem_[0].emplace(raft::make_device_mdarray<T, IdxT>(
-        res,
-        raft::resource::get_workspace_resource(res),
-        raft::make_extents<int64_t>(batch_size, host_view.extent(1))));
-      device_ptr[0] = device_mem_[0]->data_handle();
-      if (batch_size < static_cast<uint64_t>(host_view.extent(0))) {
-        device_mem_[1].emplace(raft::make_device_mdarray<T, IdxT>(
+    // buffer allocations
+    if (mem_strategy_ == memory_strategy::copy_device) {
+      try {
+        device_mem_[0].emplace(raft::make_device_mdarray<T, IdxT>(
           res,
           raft::resource::get_workspace_resource(res),
           raft::make_extents<int64_t>(batch_size, host_view.extent(1))));
-        device_ptr[1] = device_mem_[1]->data_handle();
-      }
-      if (host_writeback_ && batch_size * 2 < static_cast<uint64_t>(host_view.extent(0))) {
-        num_buffers_ = 3;
-        device_mem_[2].emplace(raft::make_device_mdarray<T, IdxT>(
-          res,
-          raft::resource::get_workspace_resource(res),
-          raft::make_extents<int64_t>(batch_size, host_view.extent(1))));
-        device_ptr[2] = device_mem_[2]->data_handle();
+        device_ptr[0] = device_mem_[0]->data_handle();
+        if (batch_size < static_cast<uint64_t>(host_view.extent(0))) {
+          device_mem_[1].emplace(raft::make_device_mdarray<T, IdxT>(
+            res,
+            raft::resource::get_workspace_resource(res),
+            raft::make_extents<int64_t>(batch_size, host_view.extent(1))));
+          device_ptr[1] = device_mem_[1]->data_handle();
+        }
+        if (host_writeback_ && batch_size * 2 < static_cast<uint64_t>(host_view.extent(0))) {
+          num_buffers_ = 3;
+          device_mem_[2].emplace(raft::make_device_mdarray<T, IdxT>(
+            res,
+            raft::resource::get_workspace_resource(res),
+            raft::make_extents<int64_t>(batch_size, host_view.extent(1))));
+          device_ptr[2] = device_mem_[2]->data_handle();
+        }
+      } catch (std::bad_alloc& e) {
+        RAFT_LOG_DEBUG("Insufficient memory for device buffers");
+        if (attr.devicePointer != nullptr) {
+          mem_strategy_ = memory_strategy::managed_only;
+        } else {
+          throw std::bad_alloc();
+        }
+      } catch (raft::logic_error& e) {
+        RAFT_LOG_DEBUG("Insufficient memory for device buffers (logic error)");
+        if (attr.devicePointer != nullptr) {
+          mem_strategy_ = memory_strategy::managed_only;
+        } else {
+          throw raft::logic_error("Insufficient memory for device buffers (logic error)");
+        }
       }
     }
 
     // if data is managed and not for_write_ we can set the attribute on the device ptr
-    if (mem_type_ == cudaMemoryTypeManaged) {
+    if (mem_strategy_ == memory_strategy::managed_only) {
       // location_.type = CU_MEM_LOCATION_TYPE_DEVICE;
       location_.type = cudaMemLocationTypeDevice;
       location_.id   = static_cast<CUdevice>(raft::resource::get_device_id(res_));
@@ -428,7 +441,7 @@ class batched_device_view_from_host {
     batch_id_++;
 
     // ensure previous batch at position batch_id_ is ready
-    prefetch_stream_.synchronize();
+    if (initialize_) { prefetch_stream_.synchronize(); }
     if (host_writeback_) { writeback_stream_.synchronize(); }
 
     // this step will
@@ -456,8 +469,8 @@ class batched_device_view_from_host {
       int32_t prefetch_pos             = (batch_id_ + 1) % num_buffers_;
       actual_batch_size_[prefetch_pos] = min(batch_size_, host_view_.extent(0) - offset_);
 
-      switch (mem_type_) {
-        case cudaMemoryTypeManaged:
+      switch (mem_strategy_) {
+        case memory_strategy::managed_only:
           if (!host_writeback_ && batch_id_ > 1) {
             uint32_t discard_pos = (batch_id_ - 1) % num_buffers_;
             size_t discard_size  = batch_size_ * host_view_.extent(1) * sizeof(T);
@@ -469,8 +482,7 @@ class batched_device_view_from_host {
             device_ptr[prefetch_pos],
             actual_batch_size_[prefetch_pos] * host_view_.extent(1) * sizeof(T));
           break;
-        case cudaMemoryTypeHost:
-        case cudaMemoryTypeUnregistered:
+        case memory_strategy::copy_device:
           if (host_writeback_ && batch_id_ > 0) {
             // copy back last active
             uint32_t writeback_pos    = (batch_id_ - 1) % num_buffers_;
@@ -484,7 +496,7 @@ class batched_device_view_from_host {
           }
 
           break;
-        case cudaMemoryTypeDevice:
+        case memory_strategy::device_only:
           // just move pointer to next position
           device_ptr[prefetch_pos] = host_view_.data_handle() + offset_ * host_view_.extent(1);
           break;
@@ -506,8 +518,8 @@ class batched_device_view_from_host {
     // if data is managed and evict --> evict last active
 
     // make sure to sync on prefetch stream & res
-    switch (mem_type_) {
-      case cudaMemoryTypeManaged:
+    switch (mem_strategy_) {
+      case memory_strategy::managed_only:
         if (!host_writeback_) {
           uint32_t discard_pos     = batch_id_ % num_buffers_;
           size_t discard_size_rows = actual_batch_size_[discard_pos];
@@ -520,8 +532,7 @@ class batched_device_view_from_host {
         }
         writeback_stream_.synchronize();
         break;
-      case cudaMemoryTypeHost:
-      case cudaMemoryTypeUnregistered:
+      case memory_strategy::copy_device:
         if (host_writeback_) {
           uint32_t writeback_pos_last = batch_id_ % num_buffers_;
           if (batch_id_ > 0) {
@@ -538,7 +549,7 @@ class batched_device_view_from_host {
         }
         writeback_stream_.synchronize();
         break;
-      case cudaMemoryTypeDevice: break;
+      case memory_strategy::device_only: break;
     }
   }
 
@@ -630,10 +641,10 @@ class batched_device_view_from_host {
   rmm::cuda_stream_view writeback_stream_;
 
   // configuration
+  memory_strategy mem_strategy_;
   const raft::resources& res_;
   bool initialize_;      // initialize the data on the device
   bool host_writeback_;  // write back the data to the host
-  bool hmm_as_managed_;  // treat unregistered memory as managed memory
 
   // batch position information
   uint64_t batch_size_;
@@ -643,7 +654,6 @@ class batched_device_view_from_host {
   cudaMemLocation location_;
 
   // input pointer information
-  cudaMemoryType mem_type_;
   raft::host_matrix_view<T, IdxT> host_view_;
 
   // internal device buffers
