@@ -179,7 +179,7 @@ cuvsError_t cuvsKMeansFit(cuvsResources_t res,
                           DLManagedTensor* sample_weight,
                           DLManagedTensor* centroids,
                           double* inertia,
-                          int64_t* n_iter);
+                          int* n_iter);
 
 /**
  * @brief Predict the closest cluster each sample in X belongs to.

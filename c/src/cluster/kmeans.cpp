@@ -40,14 +40,14 @@ cuvs::cluster::kmeans::balanced_params convert_balanced_params(const cuvsKMeansP
   return kmeans_params;
 }
 
-template <typename T>
+template <typename T, typename IdxT = int32_t>
 void _fit(cuvsResources_t res,
           const cuvsKMeansParams& params,
           DLManagedTensor* X_tensor,
           DLManagedTensor* sample_weight_tensor,
           DLManagedTensor* centroids_tensor,
           double* inertia,
-          int64_t* n_iter)
+          int* n_iter)
 {
   auto X       = X_tensor->dl_tensor;
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
@@ -100,8 +100,6 @@ void _fit(cuvsResources_t res,
     *n_iter  = n_iter_temp;
 
   } else {
-    // ---- device path (IdxT = int32_t) ----
-    using IdxT              = int32_t;
     using const_mdspan_type = raft::device_matrix_view<T const, IdxT, raft::row_major>;
     using mdspan_type       = raft::device_matrix_view<T, IdxT, raft::row_major>;
 
@@ -144,7 +142,7 @@ void _fit(cuvsResources_t res,
                                  raft::make_host_scalar_view<T, IdxT>(&inertia_temp),
                                  raft::make_host_scalar_view<IdxT, IdxT>(&n_iter_temp));
       *inertia = inertia_temp;
-      *n_iter  = static_cast<int64_t>(n_iter_temp);
+      *n_iter  = n_iter_temp;
     }
   }
 }
@@ -264,7 +262,7 @@ extern "C" cuvsError_t cuvsKMeansFit(cuvsResources_t res,
                                      DLManagedTensor* sample_weight,
                                      DLManagedTensor* centroids,
                                      double* inertia,
-                                     int64_t* n_iter)
+                                     int* n_iter)
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = X->dl_tensor;
