@@ -107,7 +107,6 @@ struct dataset {
                          1.0 - filtering_rate.value());
       filter_bitset_.emplace(std::move(bitset_blob));
     }
-    max_k_ = ground_truth_set_.has_value() ? ground_truth_set_->n_cols() : 0;
   }
 
   [[nodiscard]] auto name() const -> std::string { return name_; }
