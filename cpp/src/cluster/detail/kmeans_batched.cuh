@@ -21,6 +21,8 @@
 #include <raft/linalg/add.cuh>
 #include <raft/linalg/norm.cuh>
 #include <raft/matrix/init.cuh>
+#include <raft/matrix/sample_rows.cuh>
+#include <raft/random/rng.cuh>
 #include <raft/util/cudart_utils.hpp>
 
 #include <rmm/device_scalar.hpp>
@@ -38,64 +40,7 @@
 namespace cuvs::cluster::kmeans::detail {
 
 /**
- * @brief Sample data from host to device for initialization/validation.
- *
- * When sample weights are provided, the corresponding weights are gathered
- * alongside the sampled rows and copied to device
- *
- * @tparam T      Input data type
- * @tparam IdxT   Index type
- */
-template <typename T, typename IdxT>
-void prepare_init_sample(
-  raft::resources const& handle,
-  raft::host_matrix_view<const T, IdxT> X,
-  raft::device_matrix_view<T, IdxT> X_sample,
-  uint64_t seed,
-  std::optional<raft::host_vector_view<const T, IdxT>> weight_in = std::nullopt,
-  std::optional<raft::device_vector_view<T, IdxT>> weight_out    = std::nullopt)
-{
-  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
-  auto n_samples      = X.extent(0);
-  auto n_features     = X.extent(1);
-  auto n_samples_out  = X_sample.extent(0);
-
-  std::mt19937 gen(seed);
-  std::uniform_int_distribution<IdxT> dist(0, n_samples - 1);
-
-  // Generate n_samples_out unique random indices using rejection sampling
-  // Since n_samples_out << n_samples, collisions are rare and this is O(n_samples_out)
-  std::unordered_set<IdxT> selected_indices;
-  selected_indices.reserve(n_samples_out);
-
-  while (static_cast<IdxT>(selected_indices.size()) < n_samples_out) {
-    selected_indices.insert(dist(gen));
-  }
-
-  std::vector<IdxT> indices(selected_indices.begin(), selected_indices.end());
-
-  bool copy_weights = weight_in.has_value() && weight_out.has_value();
-  std::vector<T> host_weights;
-  if (copy_weights) { host_weights.resize(n_samples_out); }
-
-  std::vector<T> host_sample(n_samples_out * n_features);
-#pragma omp parallel for
-  for (IdxT i = 0; i < static_cast<IdxT>(n_samples_out); i++) {
-    IdxT src_idx = indices[i];
-    std::memcpy(host_sample.data() + i * n_features,
-                X.data_handle() + src_idx * n_features,
-                n_features * sizeof(T));
-    if (copy_weights) { host_weights[i] = weight_in->data_handle()[src_idx]; }
-  }
-
-  raft::copy(X_sample.data_handle(), host_sample.data(), host_sample.size(), stream);
-  if (copy_weights) {
-    raft::copy(weight_out->data_handle(), host_weights.data(), n_samples_out, stream);
-  }
-}
-
-/**
- * @brief Initialize centroids using k-means++ on a sample of the host data
+ * @brief Initialize centroids from host data
  *
  * @tparam T      Input data type
  * @tparam IdxT   Index type
@@ -113,14 +58,15 @@ void init_centroids_from_host_sample(raft::resources const& handle,
   auto n_features     = X.extent(1);
   auto n_clusters     = params.n_clusters;
 
-  IdxT init_sample_size = 3 * batch_size;
-  if (init_sample_size < n_clusters) { init_sample_size = 3 * n_clusters; }
-  init_sample_size = std::min(init_sample_size, n_samples);
-
-  auto init_sample = raft::make_device_matrix<T, IdxT>(handle, init_sample_size, n_features);
-  prepare_init_sample(handle, X, init_sample.view(), params.rng_state.seed);
-
   if (params.init == cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus) {
+    IdxT init_sample_size = 3 * batch_size;
+    if (init_sample_size < n_clusters) { init_sample_size = 3 * n_clusters; }
+    init_sample_size = std::min(init_sample_size, n_samples);
+
+    auto init_sample = raft::make_device_matrix<T, IdxT>(handle, init_sample_size, n_features);
+    raft::random::RngState random_state(params.rng_state.seed);
+    raft::matrix::sample_rows(handle, random_state, X, init_sample.view());
+
     auto init_sample_view = raft::make_device_matrix_view<const T, IdxT>(
       init_sample.data_handle(), init_sample_size, n_features);
 
@@ -132,7 +78,8 @@ void init_centroids_from_host_sample(raft::resources const& handle,
         handle, params, init_sample_view, centroids, workspace);
     }
   } else if (params.init == cuvs::cluster::kmeans::params::InitMethod::Random) {
-    raft::copy(centroids.data_handle(), init_sample.data_handle(), n_clusters * n_features, stream);
+    raft::random::RngState random_state(params.rng_state.seed);
+    raft::matrix::sample_rows(handle, random_state, X, centroids);
   } else if (params.init == cuvs::cluster::kmeans::params::InitMethod::Array) {
     // already provided
   } else {
@@ -365,8 +312,7 @@ void fit(raft::resources const& handle,
       raft::matrix::fill(handle, centroid_sums.view(), T{0});
       raft::matrix::fill(handle, cluster_counts.view(), T{0});
 
-      auto centroids_const = raft::make_device_matrix_view<const T, IdxT>(
-        centroids.data_handle(), n_clusters, n_features);
+      auto centroids_const = raft::make_const_mdspan(centroids);
 
       using namespace cuvs::spatial::knn::detail::utils;
       batch_load_iterator<T> data_batches(
@@ -423,6 +369,7 @@ void fit(raft::resources const& handle,
                                             cluster_counts.view());
 
         if (params.inertia_check) {
+          // Compute cluster cost for this batch and accumulate
           cuvs::cluster::kmeans::detail::computeClusterCost(
             handle,
             minClusterAndDistance.view(),
@@ -472,12 +419,15 @@ void fit(raft::resources const& handle,
       }
     }
 
-    // Always compute final inertia (like regular kmeans)
     {
-      auto centroids_const = raft::make_device_matrix_view<const T, IdxT>(
-        centroids.data_handle(), n_clusters, n_features);
-      inertia[0] = compute_batched_host_inertia<T, IdxT>(
-        handle, X, batch_size, centroids_const, sample_weight);
+      // If inertia_check was enabled, we already computed inertia during iterations
+      if (params.inertia_check) {
+        inertia[0] = priorClusteringCost;
+      } else {
+        auto centroids_const = raft::make_const_mdspan(centroids);
+        inertia[0]           = compute_batched_host_inertia<T, IdxT>(
+          handle, X, batch_size, centroids_const, sample_weight);
+      }
 
       RAFT_LOG_DEBUG("KMeans batched: n_init %d/%d completed with inertia=%f",
                      seed_iter + 1,
@@ -607,8 +557,7 @@ void fit_predict(raft::resources const& handle,
   fit<T, IdxT>(
     handle, params, X, sample_weight, centroids, raft::make_host_scalar_view(&fit_inertia), n_iter);
 
-  auto centroids_const = raft::make_device_matrix_view<const T, IdxT>(
-    centroids.data_handle(), centroids.extent(0), centroids.extent(1));
+  auto centroids_const = raft::make_const_mdspan(centroids);
 
   predict<T, IdxT>(handle, params, X, sample_weight, centroids_const, labels, false, inertia);
 }
