@@ -129,6 +129,11 @@ function(generate_jit_lto_kernels source_list_var)
   find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
   if(_JIT_LTO_MATRIX_JSON_FILE)
+    set_property(
+      DIRECTORY
+      PROPERTY CMAKE_CONFIGURE_DEPENDS "${_JIT_LTO_MATRIX_JSON_FILE}"
+      APPEND
+    )
     compute_matrix_product(matrix_product MATRIX_JSON_FILE "${_JIT_LTO_MATRIX_JSON_FILE}")
   else()
     compute_matrix_product(matrix_product MATRIX_JSON_STRING "${_JIT_LTO_MATRIX_JSON_STRING}")
