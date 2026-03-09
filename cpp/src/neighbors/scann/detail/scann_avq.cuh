@@ -511,6 +511,11 @@ class cluster_loader {
       raft::make_device_matrix_view<float, int64_t>(d_cluster_copy_buf_.data_handle(), size, dim_);
 
     if (needs_copy_) {
+      // For prefetching to overlap with other gpu work
+      // we need to schedule copies on the provided copy stream stream_
+      auto stream = raft::resource::get_cuda_stream(res);
+      raft::resource::set_cuda_stream(res, stream_);
+
       // htod
       auto h_cluster_ids =
         raft::make_pinned_vector_view<LabelT, int64_t>(cluster_ids_buf_.data_handle(), size);
@@ -532,6 +537,8 @@ class cluster_loader {
       raft::copy(res, cluster_vectors, raft::make_const_mdspan(pinned_cluster));
       raft::resource::sync_stream(res, stream_);
 
+      // reset stream back to previous value
+      raft::resource::set_cuda_stream(res, stream);
     } else {
       // dtod
       auto dataset_view =
