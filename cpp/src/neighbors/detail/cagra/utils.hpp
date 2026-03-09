@@ -16,6 +16,7 @@
 #include <raft/core/resources.hpp>
 #include <raft/matrix/init.cuh>
 #include <raft/util/integer_utils.hpp>
+#include <rmm/cuda_stream_pool.hpp>
 #include <rmm/resource_ref.hpp>
 
 #include <cuda.h>
@@ -23,6 +24,7 @@
 
 #include <cfloat>
 #include <cstdint>
+#include <iostream>
 #include <type_traits>
 
 namespace cuvs::neighbors::cagra::detail {
@@ -328,7 +330,7 @@ void copy_with_padding(
  * @param read_only Whether the data is read only (only for managed memory)
  * @param host_writeback Whether to write back the data to the host (only for host memory)
  * @param initialize Whether to initialize the data (only for managed memory)
- * @param evict Whether to evict the data (only for managed memory)
+ * @param discard Whether to discard the data (only for managed memory)
  *
  * @return The batched device view
  */
@@ -338,22 +340,24 @@ class batched_device_view_from_host {
   batched_device_view_from_host(raft::resources const& res,
                                 raft::host_matrix_view<T, IdxT> host_view,
                                 uint64_t batch_size,
-                                bool read_only      = false,
                                 bool host_writeback = false,
                                 bool initialize     = true,
-                                bool evict          = false)
+                                bool hmm_as_managed = false)
     : res_(res),
       host_view_(host_view),
       batch_size_(batch_size),
       offset_(0),
-      batch_id_(0),
+      batch_id_(-2),
       num_buffers_(2),
-      read_only_(read_only),
       host_writeback_(host_writeback),
-      next_buffer_pos_(0),
-      evict_(evict),
-      initialize_(initialize)
+      initialize_(initialize),
+      hmm_as_managed_(hmm_as_managed)
   {
+    if (host_view.extent(0) == 0) {
+      mem_type_ = cudaMemoryTypeDevice;
+      return;
+    }
+
     cudaPointerAttributes attr;
     RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, host_view.data_handle()));
     mem_type_ = attr.type;
@@ -361,27 +365,35 @@ class batched_device_view_from_host {
     // cudaMemoryTypeHost = 1
     // cudaMemoryTypeDevice = 2
     // cudaMemoryTypeManaged = 3
+    //
+    // On HMM systems, unregistered (malloc) memory can have devicePointer != nullptr,
+    // meaning it's directly accessible from the GPU. Treat it like managed memory:
+    if (mem_type_ == cudaMemoryTypeUnregistered && attr.devicePointer != nullptr &&
+        hmm_as_managed) {
+      mem_type_ = cudaMemoryTypeManaged;
+    }
 
-    prefetch_stream_  = raft::resource::get_cuda_stream(res);
-    writeback_stream_ = raft::resource::get_cuda_stream(res);
-    if (res.has_resource_factory(raft::resource::resource_type::CUDA_STREAM_POOL)) {
-      if (raft::resource::get_stream_pool_size(res) >= 1) {
-        prefetch_stream_  = raft::resource::get_stream_from_stream_pool(res);
-        writeback_stream_ = raft::resource::get_stream_from_stream_pool(res);
-      }
+    if (res.has_resource_factory(raft::resource::resource_type::CUDA_STREAM_POOL) &&
+        raft::resource::get_stream_pool_size(res) >= 1) {
+      prefetch_stream_  = raft::resource::get_stream_from_stream_pool(res);
+      writeback_stream_ = raft::resource::get_stream_from_stream_pool(res);
+    } else {
+      local_stream_pool_ = std::make_shared<rmm::cuda_stream_pool>(2);
+      prefetch_stream_   = local_stream_pool_.value()->get_stream();
+      writeback_stream_  = local_stream_pool_.value()->get_stream();
     }
 
     // allocations
     if (mem_type_ == cudaMemoryTypeHost || mem_type_ == cudaMemoryTypeUnregistered) {
       device_mem_[0].emplace(raft::make_device_mdarray<T, IdxT>(
         res,
-        raft::resource::get_large_workspace_resource(res),
+        raft::resource::get_workspace_resource(res),
         raft::make_extents<int64_t>(batch_size, host_view.extent(1))));
       device_ptr[0] = device_mem_[0]->data_handle();
       if (batch_size < static_cast<uint64_t>(host_view.extent(0))) {
         device_mem_[1].emplace(raft::make_device_mdarray<T, IdxT>(
           res,
-          raft::resource::get_large_workspace_resource(res),
+          raft::resource::get_workspace_resource(res),
           raft::make_extents<int64_t>(batch_size, host_view.extent(1))));
         device_ptr[1] = device_mem_[1]->data_handle();
       }
@@ -389,7 +401,7 @@ class batched_device_view_from_host {
         num_buffers_ = 3;
         device_mem_[2].emplace(raft::make_device_mdarray<T, IdxT>(
           res,
-          raft::resource::get_large_workspace_resource(res),
+          raft::resource::get_workspace_resource(res),
           raft::make_extents<int64_t>(batch_size, host_view.extent(1))));
         device_ptr[2] = device_mem_[2]->data_handle();
       }
@@ -400,18 +412,9 @@ class batched_device_view_from_host {
       // location_.type = CU_MEM_LOCATION_TYPE_DEVICE;
       location_.type = cudaMemLocationTypeDevice;
       location_.id   = static_cast<CUdevice>(raft::resource::get_device_id(res_));
-      if (read_only_) {
-#if CUDA_VERSION >= 13000
-        RAFT_CUDA_TRY(cudaMemAdvise(host_view_.data_handle(),
-                                    host_view_.extent(0) * host_view_.extent(1) * sizeof(T),
-                                    cudaMemAdviseSetReadMostly,
-                                    location_));
-#else
-        RAFT_CUDA_TRY(cudaMemAdvise_v2(host_view_.data_handle(),
-                                       host_view_.extent(0) * host_view_.extent(1) * sizeof(T),
-                                       cudaMemAdviseSetReadMostly,
-                                       location_));
-#endif
+      if (!host_writeback_) {
+        advise_read_mostly(host_view_.data_handle(),
+                           host_view_.extent(0) * host_view_.extent(1) * sizeof(T));
         // TODO maybe also reset upon destruction
       }
     }
@@ -422,95 +425,72 @@ class batched_device_view_from_host {
 
   bool prefetch_next_batch()
   {
-    // this function will ensure the device_ptr [next_buffer_pos_] is pointing to the correct memory
-    // after the next synchronization with the prefetch stream
+    batch_id_++;
 
-    // if data is on host and we are writing to it we will have to copy it back
-    // if data is on host we will have to copy it to the device_ptr
+    // ensure previous batch at position batch_id_ is ready
+    prefetch_stream_.synchronize();
+    if (host_writeback_) { writeback_stream_.synchronize(); }
 
-    // if data is managed and evict_ is true we can evict the data from device memory
-    // if data is managed we have to prefetch it
+    // this step will
+    // * write back data from batch_id_ - 1
+    // * prefetch data for batch_id_ + 1
+
+    // if data is on host and host_writeback_ is true we will have to copy it back
+    // if data is on host and initialize_ is true we will have to copy it to the device_ptr
+
+    // if data is managed and !host_writeback_ we can discard the data from device memory
+    // if data is managed and initialize_ is true we can prefetch it to the device
+    // if data is managed and !initialize_ we can discard and prefetch the data location
+
+    // if data is on device only this is almost a noop, just prepping the pointers
+
+    RAFT_EXPECTS(offset_ <= host_view_.extent(0), "Offset out of bounds");
 
     bool next_batch_exists = offset_ < static_cast<uint64_t>(host_view_.extent(0));
 
     if (next_batch_exists) {
-      actual_batch_size_[next_buffer_pos_] =
-        next_batch_exists ? min(batch_size_, host_view_.extent(0) - offset_) : 0;
+      // synchronize to ensure all previous operations are completed
+      // in particular all work on batch_id_ - 1
+      raft::resource::sync_stream(res_);
+
+      int32_t prefetch_pos             = (batch_id_ + 1) % num_buffers_;
+      actual_batch_size_[prefetch_pos] = min(batch_size_, host_view_.extent(0) - offset_);
 
       switch (mem_type_) {
         case cudaMemoryTypeManaged:
-#if CUDA_VERSION >= 13000
-          if (evict_ && batch_id_ > 1) {
-            // evict last active
-            CUdeviceptr dptrs[]      = {device_ptr[next_buffer_pos_]};
-            size_t sizes[]           = {batch_size_ * host_view_.extent(1) * sizeof(T)};
-            size_t prefetchLocIdxs[] = {0};
-            RAFT_CUDA_TRY(cuMemDiscardBatchAsync(
-              dptrs, sizes, 1, &location_, prefetchLocIdxs, 1, 0, prefetch_stream_));
+          if (!host_writeback_ && batch_id_ > 1) {
+            uint32_t discard_pos = (batch_id_ - 1) % num_buffers_;
+            size_t discard_size  = batch_size_ * host_view_.extent(1) * sizeof(T);
+            discard_managed_region(device_ptr[discard_pos], discard_size);
           }
-#endif
-          // prefetch
-          device_ptr[next_buffer_pos_] = host_view_.data_handle() + offset_ * host_view_.extent(1);
-          if (initialize_) {
-            // managed API call to prefetch async
-#if CUDA_VERSION >= 13000
-            RAFT_CUDA_TRY(cudaMemPrefetchAsync(
-              device_ptr[next_buffer_pos_],
-              actual_batch_size_[next_buffer_pos_] * host_view_.extent(1) * sizeof(T),
-              location_,
-              0,
-              prefetch_stream_));
-#else
-            RAFT_CUDA_TRY(cudaMemPrefetchAsync_v2(
-              device_ptr[next_buffer_pos_],
-              actual_batch_size_[next_buffer_pos_] * host_view_.extent(1) * sizeof(T),
-              location_,
-              0,
-              prefetch_stream_));
-#endif
-          } else {
-            // managed API call to cuMemDiscardAndPrefetchBatchAsync (discard and prefetch batch)
-#if CUDA_VERSION >= 13000
-            CUdeviceptr dptrs[] = {device_ptr[next_buffer_pos_]};
-            size_t sizes[]      = {actual_batch_size_[next_buffer_pos_] * host_view_.extent(1) *
-                                   sizeof(T)};
-            size_t prefetchLocIdxs[] = {0};
-            RAFT_CUDA_TRY(cuMemDiscardAndPrefetchBatchAsync(
-              dptrs, sizes, 1, &location_, prefetchLocIdxs, 1, 0, prefetch_stream_));
-#endif
-          }
-
+          // prefetch next position
+          device_ptr[prefetch_pos] = host_view_.data_handle() + offset_ * host_view_.extent(1);
+          prefetch_managed_region(
+            device_ptr[prefetch_pos],
+            actual_batch_size_[prefetch_pos] * host_view_.extent(1) * sizeof(T));
           break;
         case cudaMemoryTypeHost:
         case cudaMemoryTypeUnregistered:
-          if (host_writeback_ && batch_id_ > 1) {
-            writeback_stream_.synchronize();
+          if (host_writeback_ && batch_id_ > 0) {
             // copy back last active
-            uint32_t writeback_pos    = (next_buffer_pos_ + num_buffers_ - 2) % num_buffers_;
-            uint64_t writeback_offset = (offset_ - 2 * batch_size_) * host_view_.extent(1);
-            raft::copy(host_view_.data_handle() + writeback_offset,
-                       device_ptr[writeback_pos],
-                       actual_batch_size_[writeback_pos] * host_view_.extent(1),
-                       writeback_stream_);
+            uint32_t writeback_pos    = (batch_id_ - 1) % num_buffers_;
+            uint64_t writeback_offset = (batch_id_ - 1) * batch_size_;
+            writeback_from_device_to_host(device_ptr[writeback_pos], writeback_offset, batch_size_);
           }
           if (initialize_) {
             // prefetch next position
-            raft::copy(device_ptr[next_buffer_pos_],
-                       host_view_.data_handle() + offset_ * host_view_.extent(1),
-                       actual_batch_size_[next_buffer_pos_] * host_view_.extent(1),
-                       prefetch_stream_);
+            prefetch_from_host_to_device(
+              device_ptr[prefetch_pos], offset_, actual_batch_size_[prefetch_pos]);
           }
 
           break;
         case cudaMemoryTypeDevice:
           // just move pointer to next position
-          device_ptr[next_buffer_pos_] = host_view_.data_handle() + offset_ * host_view_.extent(1);
+          device_ptr[prefetch_pos] = host_view_.data_handle() + offset_ * host_view_.extent(1);
           break;
       }
 
-      offset_ += actual_batch_size_[next_buffer_pos_];
-      // swap next_buffer_pos_
-      next_buffer_pos_ = (next_buffer_pos_ + 1) % num_buffers_;
+      offset_ += actual_batch_size_[prefetch_pos];
     }
 
     return next_batch_exists;
@@ -525,33 +505,36 @@ class batched_device_view_from_host {
     // if data is on host and for_write --> make sure to copy back last active
     // if data is managed and evict --> evict last active
 
-    // make sure to sync on prefetch & writeback stream & res
+    // make sure to sync on prefetch stream & res
     switch (mem_type_) {
       case cudaMemoryTypeManaged:
-#if CUDA_VERSION >= 13000
-        if (evict_ && batch_id_ > 0) {
-          // managed API call to evict 2
-          uint32_t evict_pos       = (next_buffer_pos_ + num_buffers_ - 1) % num_buffers_;
-          CUdeviceptr dptrs[]      = {device_ptr[evict_pos]};
-          size_t sizes[]           = {batch_size_ * host_view_.extent(1) * sizeof(T)};
-          size_t prefetchLocIdxs[] = {0};
-          RAFT_CUDA_TRY(cuMemDiscardBatchAsync(
-            dptrs, sizes, 1, &location_, prefetchLocIdxs, 1, 0, prefetch_stream_));
+        if (!host_writeback_) {
+          uint32_t discard_pos     = batch_id_ % num_buffers_;
+          size_t discard_size_rows = actual_batch_size_[discard_pos];
+          if (batch_id_ > 0) {
+            discard_pos = (batch_id_ - 1) % num_buffers_;
+            discard_size_rows += batch_size_;
+          }
+          discard_managed_region(device_ptr[discard_pos],
+                                 discard_size_rows * host_view_.extent(1) * sizeof(T));
         }
-        prefetch_stream_.synchronize();
-#endif
+        writeback_stream_.synchronize();
         break;
       case cudaMemoryTypeHost:
       case cudaMemoryTypeUnregistered:
-        if (host_writeback_ && batch_id_ > 0) {
-          // TODO managed API call to copy back last active
-          uint32_t writeback_pos = (next_buffer_pos_ + num_buffers_ - 1) % num_buffers_;
-          uint64_t writeback_offset =
-            (offset_ - actual_batch_size_[writeback_pos]) * host_view_.extent(1);
-          raft::copy(host_view_.data_handle() + writeback_offset,
-                     device_ptr[writeback_pos],
-                     actual_batch_size_[writeback_pos] * host_view_.extent(1),
-                     writeback_stream_);
+        if (host_writeback_) {
+          uint32_t writeback_pos_last = batch_id_ % num_buffers_;
+          if (batch_id_ > 0) {
+            uint32_t writeback_pos    = (batch_id_ - 1) % num_buffers_;
+            uint64_t writeback_offset = (batch_id_ - 1) * batch_size_;
+            writeback_from_device_to_host(device_ptr[writeback_pos], writeback_offset, batch_size_);
+          }
+          {
+            uint64_t writeback_offset_last = batch_id_ * batch_size_;
+            writeback_from_device_to_host(device_ptr[writeback_pos_last],
+                                          writeback_offset_last,
+                                          actual_batch_size_[writeback_pos_last]);
+          }
         }
         writeback_stream_.synchronize();
         break;
@@ -569,39 +552,103 @@ class batched_device_view_from_host {
    */
   raft::device_matrix_view<T, IdxT> next_view()
   {
-    RAFT_EXPECTS(batch_id_ * batch_size_ < host_view_.extent(0), "Batch index out of bounds");
-
-    // ensure current batch is ready
-    prefetch_stream_.synchronize();
+    // special case for empty host view
+    if (host_view_.extent(0) == 0) {
+      return raft::make_device_matrix_view<T, IdxT>(nullptr, 0, host_view_.extent(1));
+    }
 
     // trigger prefetch of next batch
     bool next_batch_exists = prefetch_next_batch();
 
-    batch_id_++;
+    RAFT_EXPECTS(batch_id_ * batch_size_ < host_view_.extent(0), "Batch index out of bounds");
 
-    uint32_t current_pos =
-      (next_buffer_pos_ + num_buffers_ - (next_batch_exists ? 2 : 1)) % num_buffers_;
+    uint32_t current_pos = batch_id_ % num_buffers_;
     return raft::make_device_matrix_view<T, IdxT>(
       device_ptr[current_pos], actual_batch_size_[current_pos], host_view_.extent(1));
   }
 
  private:
-  cudaMemoryType mem_type_;
-  const raft::resources& res_;
-  uint64_t batch_size_;
-  uint64_t offset_;
-  uint64_t num_buffers_;
-  bool initialize_;
+  void advise_read_mostly(T* ptr, size_t size)
+  {
+#if CUDA_VERSION >= 13000
+    RAFT_CUDA_TRY(cudaMemAdvise(ptr, size, cudaMemAdviseSetReadMostly, location_));
+#else
+    RAFT_CUDA_TRY(cudaMemAdvise_v2(ptr, size, cudaMemAdviseSetReadMostly, location_));
+#endif
+  }
+
+  void discard_managed_region(T* dev_ptr, size_t size)
+  {
+#if CUDA_VERSION >= 13000
+    void* dptrs[1]  = {dev_ptr};
+    size_t sizes[1] = {size};
+    RAFT_CUDA_TRY(cudaMemDiscardBatchAsync(dptrs, sizes, 1, 0, writeback_stream_));
+#endif
+    // FIXME: CUDA12 does not support discard
+  }
+
+  void prefetch_managed_region(T* dev_ptr, size_t size)
+  {
+#if CUDA_VERSION >= 13000
+    if (initialize_) {
+      RAFT_CUDA_TRY(cudaMemPrefetchAsync(dev_ptr, size, location_, 0, prefetch_stream_));
+    } else {
+      void* dptrs[1]  = {dev_ptr};
+      size_t sizes[1] = {size};
+      RAFT_CUDA_TRY(
+        cudaMemDiscardAndPrefetchBatchAsync(dptrs, sizes, 1, location_, 0, prefetch_stream_));
+    }
+#else
+    // FIXME: CUDA12 does not support discard - so we just prefetch
+    if (initialize_) {
+      RAFT_CUDA_TRY(cudaMemPrefetchAsync_v2(dev_ptr, size, location_, 0, prefetch_stream_));
+    } else {
+      RAFT_CUDA_TRY(cudaMemPrefetchAsync_v2(dev_ptr, size, location_, 0, prefetch_stream_));
+    }
+#endif
+  }
+
+  void prefetch_from_host_to_device(T* dev_ptr, size_t src_row_offset, size_t num_rows)
+  {
+    raft::copy(dev_ptr,
+               host_view_.data_handle() + src_row_offset * host_view_.extent(1),
+               num_rows * host_view_.extent(1),
+               prefetch_stream_);
+  }
+
+  void writeback_from_device_to_host(T* dev_ptr, size_t dst_row_offset, size_t num_rows)
+  {
+    raft::copy(host_view_.data_handle() + dst_row_offset * host_view_.extent(1),
+               dev_ptr,
+               num_rows * host_view_.extent(1),
+               writeback_stream_);
+  }
+
+  // stream pool for local streams
+  std::optional<std::shared_ptr<rmm::cuda_stream_pool>> local_stream_pool_;
   rmm::cuda_stream_view prefetch_stream_;
   rmm::cuda_stream_view writeback_stream_;
-  bool read_only_;
-  bool host_writeback_;
-  bool evict_;
-  int32_t next_buffer_pos_;
+
+  // configuration
+  const raft::resources& res_;
+  bool initialize_;      // initialize the data on the device
+  bool host_writeback_;  // write back the data to the host
+  bool hmm_as_managed_;  // treat unregistered memory as managed memory
+
+  // batch position information
+  uint64_t batch_size_;
   int32_t batch_id_;
+  uint64_t offset_;
+
   cudaMemLocation location_;
-  std::optional<raft::device_matrix<T, IdxT>> device_mem_[3];
+
+  // input pointer information
+  cudaMemoryType mem_type_;
   raft::host_matrix_view<T, IdxT> host_view_;
+
+  // internal device buffers
+  uint64_t num_buffers_;
+  std::optional<raft::device_matrix<T, IdxT>> device_mem_[3];
   T* device_ptr[3];
   uint32_t actual_batch_size_[3];
 };
