@@ -91,7 +91,6 @@ void fit(const raft::resources& handle,
                                                     centroids.data_handle(),
                                                     centroids.extent(0),
                                                     mapping_op,
-                                                    static_cast<const MathT*>(nullptr),
                                                     inertia_ptr);
 }
 
