@@ -95,12 +95,6 @@ struct cuvsKMeansParams {
   bool inertia_check;
 
   /**
-   * Number of samples to process per GPU batch for the batched (host-data) API.
-   * When set to 0, defaults to n_samples (process all at once).
-   */
-  int64_t batch_size;
-
-  /**
    * Whether to use hierarchical (balanced) kmeans or not
    */
   bool hierarchical;
@@ -109,6 +103,12 @@ struct cuvsKMeansParams {
    * For hierarchical k-means , defines the number of training iterations
    */
   int hierarchical_n_iters;
+
+  /**
+   * Number of samples to process per GPU batch for the batched (host-data) API.
+   * When set to 0, defaults to n_samples (process all at once).
+   */
+   int64_t batch_size;
 };
 
 typedef struct cuvsKMeansParams* cuvsKMeansParams_t;
