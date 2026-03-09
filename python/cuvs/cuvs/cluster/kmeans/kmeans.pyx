@@ -291,7 +291,7 @@ def fit(
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
     cdef double inertia = 0
-    cdef int64_t n_iter = 0
+    cdef int n_iter = 0
 
     if centroids is None:
         centroids = device_ndarray.empty(

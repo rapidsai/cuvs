@@ -54,8 +54,6 @@ void _fit(cuvsResources_t res,
   bool is_host = (X.device.device_type == kDLCPU);
 
   if (is_host) {
-    // ---- host / batched path (IdxT = int64_t) ----
-    using IdxT = int64_t;
     auto n_samples  = static_cast<IdxT>(X.shape[0]);
     auto n_features = static_cast<IdxT>(X.shape[1]);
 
@@ -245,9 +243,9 @@ extern "C" cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params)
       .batch_samples        = cpp_params.batch_samples,
       .batch_centroids      = cpp_params.batch_centroids,
       .inertia_check        = cpp_params.inertia_check,
-      .batch_size           = cpp_params.batched.batch_size,
       .hierarchical         = false,
-      .hierarchical_n_iters = static_cast<int>(cpp_balanced_params.n_iters)};
+      .hierarchical_n_iters = static_cast<int>(cpp_balanced_params.n_iters),
+      .batch_size           = cpp_params.batched.batch_size};
   });
 }
 

@@ -49,7 +49,7 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
                               DLManagedTensor* sample_weight,
                               DLManagedTensor * centroids,
                               double * inertia,
-                              int64_t * n_iter) except +
+                              int * n_iter) except +
 
     cuvsError_t cuvsKMeansPredict(cuvsResources_t res,
                                   cuvsKMeansParams_t params,
