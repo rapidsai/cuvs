@@ -354,8 +354,9 @@ void bench_search(::benchmark::State& state,
   if (dataset->max_k() >= k) {
     result_buf.transfer_data(MemoryType::kHost, current_algo_props->query_memory_type);
     auto* neighbors_host = reinterpret_cast<index_type*>(result_buf.data(MemoryType::kHost));
-    std::size_t rows     = std::min(
-      {queries_processed, query_set_size, static_cast<size_t>(dataset->kMaxQueriesForRecall)});
+    std::size_t rows     = std::min(queries_processed, query_set_size);
+    std::size_t n_queries_with_gt =
+      std::min(dataset->query_set_size(), static_cast<size_t>(dataset->kMaxQueriesForRecall));
     std::size_t match_count = 0;
     std::size_t total_count = 0;
 
@@ -379,7 +380,7 @@ void bench_search(::benchmark::State& state,
       auto recall_calculation = [&](int start, int end, int tid) -> void {
         for (int i = start; i < end; ++i) {
           size_t i_orig_idx = batch_offset + i;
-          if (i_orig_idx >= rows) { break; }
+          if (i_orig_idx >= n_queries_with_gt) { break; }
           size_t i_out_idx = out_offset + i;
           if (i_out_idx < rows) {
             const auto& gt = dataset->ground_truth_entry(i_orig_idx);
