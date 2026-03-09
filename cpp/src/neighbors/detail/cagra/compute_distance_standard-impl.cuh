@@ -48,31 +48,36 @@ namespace {
 
 // When JIT LTO is disabled, dist_op is a template function with Metric as a template parameter
 template <typename DATA_T, typename DISTANCE_T, cuvs::distance::DistanceType Metric>
+  requires(Metric == cuvs::distance::DistanceType::L2Expanded)
 RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(DATA_T a, DATA_T b)
-  -> std::enable_if_t<Metric == cuvs::distance::DistanceType::L2Expanded, DISTANCE_T>
 {
   DISTANCE_T diff = a - b;
   return diff * diff;
 }
 
 template <typename DATA_T, typename DISTANCE_T, cuvs::distance::DistanceType Metric>
+  requires(Metric == cuvs::distance::DistanceType::InnerProduct ||
+           Metric == cuvs::distance::DistanceType::CosineExpanded)
 RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(DATA_T a, DATA_T b)
-  -> std::enable_if_t<Metric == cuvs::distance::DistanceType::InnerProduct ||
-                        Metric == cuvs::distance::DistanceType::CosineExpanded,
-                      DISTANCE_T>
 {
   return -static_cast<DISTANCE_T>(a) * static_cast<DISTANCE_T>(b);
 }
 
 template <typename DATA_T, typename DISTANCE_T, cuvs::distance::DistanceType Metric>
+  requires(Metric == cuvs::distance::DistanceType::BitwiseHamming && std::is_integral_v<DATA_T>)
 RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(DATA_T a, DATA_T b)
-  -> std::enable_if_t<Metric == cuvs::distance::DistanceType::BitwiseHamming &&
-                        std::is_integral_v<DATA_T>,
-                      DISTANCE_T>
 {
   // mask the result of xor for the integer promotion
   const auto v = (a ^ b) & 0xffu;
   return __popc(v);
+}
+
+template <typename DATA_T, typename DISTANCE_T, cuvs::distance::DistanceType Metric>
+  requires(Metric == cuvs::distance::DistanceType::L1)
+RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(DATA_T a, DATA_T b)
+{
+  DISTANCE_T diff = a - b;
+  return raft::abs(diff);
 }
 
 #endif  // #if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)

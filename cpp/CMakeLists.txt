@@ -258,6 +258,18 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_uint8_uint32_dim128_t8.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_uint8_uint32_dim256_t16.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_uint8_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_float_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_float_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_float_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_half_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_half_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_half_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_int8_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_int8_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_int8_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_uint8_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_uint8_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_uint8_uint32_dim512_t32.cu
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_float_uint32_dim128_t8.cu
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_float_uint32_dim256_t16.cu
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_float_uint32_dim512_t32.cu
@@ -716,9 +728,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/iface/iface_pq_uint8_t_int64_t.cu
     src/neighbors/detail/cagra/topk_for_cagra/topk.cu
     src/neighbors/dynamic_batching.cu
-    src/neighbors/cagra_index_wrapper.cu
     src/neighbors/composite/index.cu
-    src/neighbors/composite/merge.cpp
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/cagra.cpp>
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw.cpp>
     src/neighbors/ivf_common.cu
