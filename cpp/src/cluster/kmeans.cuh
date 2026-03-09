@@ -455,12 +455,11 @@ void cluster_cost(
 
   // Apply sample weights if provided
   if (sample_weight.has_value()) {
-    raft::linalg::map(
-      handle,
-      min_cluster_distance.view(),
-      [] __device__(DataT d, DataT w) { return d * w; },
-      raft::make_const_mdspan(min_cluster_distance.view()),
-      sample_weight.value());
+    raft::linalg::map(handle,
+                      min_cluster_distance.view(),
+                      raft::mul_op{},
+                      raft::make_const_mdspan(min_cluster_distance.view()),
+                      sample_weight.value());
   }
 
   auto device_cost = raft::make_device_scalar<DataT>(handle, DataT(0));
