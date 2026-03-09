@@ -85,6 +85,7 @@ struct CagraPlannerBase : AlgorithmPlanner {
       case cuvs::distance::DistanceType::InnerProduct: metric_tag = "inner_product"; break;
       case cuvs::distance::DistanceType::CosineExpanded: metric_tag = "inner_product"; break;
       case cuvs::distance::DistanceType::BitwiseHamming: metric_tag = "hamming"; break;
+      case cuvs::distance::DistanceType::L1: metric_tag = "l1"; break;
       default: metric_tag = "unknown"; break;
     }
     auto params     = make_fragment_key<QueryTag, DistanceTag>();

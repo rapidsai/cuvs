@@ -14,6 +14,11 @@
       "metric_tag": "hamming",
       "query_type": "uint8_t",
       "query_abbrev": "uc"
+    },
+    {
+      "metric_tag": "l1",
+      "query_type": "float",
+      "query_abbrev": "f"
     }
   ],
   "_distance": [
