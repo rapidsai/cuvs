@@ -6,6 +6,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
+# rapids-pre-commit-hooks: disable-next-line[verify-hardcoded-version]
 version = "26.4.0"
 edition = "2021"
 repository = "https://github.com/rapidsai/cuvs"

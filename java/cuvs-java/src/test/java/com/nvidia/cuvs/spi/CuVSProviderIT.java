@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.spi;
@@ -105,6 +105,7 @@ public class CuVSProviderIT extends CuVSTestCase {
               ProviderInitializationException.class,
               () -> checkCuVSVersionMatching("25.12.0", 26, 4, 0));
 
+      // rapids-pre-commit-hooks: disable[verify-hardcoded-version]
       assertEquals(
           """
           Version mismatch: unsupported libcuvs_c (libcuvs_c [26.04.0], cuvs-java version [25.12.0]). \
@@ -112,6 +113,7 @@ public class CuVSProviderIT extends CuVSTestCase {
           """,
           ex.getMessage());
       System.setProperty("cuvs.max_version", "26.12.0");
+      // rapids-pre-commit-hooks: enable[verify-hardcoded-version]
       checkCuVSVersionMatching("25.12.0", 26, 12, 0);
     } catch (ProviderInitializationException e) {
       throw new AssertionError(e);
