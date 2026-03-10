@@ -15,7 +15,9 @@ jobs:
     container:
       image: rapidsai/ci-conda:26.04-latest
     outputs:
-      tests: ${{ steps.find-tests.outputs.tests }}
+      memcheck_tests: ${{ steps.find-tests.outputs.memcheck_tests }}
+      racecheck_tests: ${{ steps.find-tests.outputs.racecheck_tests }}
+      synccheck_tests: ${{ steps.find-tests.outputs.synccheck_tests }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -30,18 +32,18 @@ jobs:
     uses: ./.github/workflows/compute-sanitizer-run.yaml
     with:
       tool_name: "memcheck"
-      test_names: ${{ needs.discover-sanitizer-tests.outputs.tests }}
+      test_names: ${{ needs.discover-sanitizer-tests.outputs.memcheck_tests }}
   run-sanitizer-tests-racecheck:
     name: compute-sanitizer racecheck tests
     needs: discover-sanitizer-tests
     uses: ./.github/workflows/compute-sanitizer-run.yaml
     with:
       tool_name: "racecheck"
-      test_names: ${{ needs.discover-sanitizer-tests.outputs.tests }}
+      test_names: ${{ needs.discover-sanitizer-tests.outputs.racecheck_tests }}
   run-sanitizer-tests-synccheck:
     name: compute-sanitizer synccheck tests
     needs: discover-sanitizer-tests
     uses: ./.github/workflows/compute-sanitizer-run.yaml
     with:
       tool_name: "synccheck"
-      test_names: ${{ needs.discover-sanitizer-tests.outputs.tests }}
+      test_names: ${{ needs.discover-sanitizer-tests.outputs.synccheck_tests }}

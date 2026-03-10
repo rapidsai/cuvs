@@ -46,19 +46,75 @@ if ! ls ./*_TEST 1> /dev/null 2>&1; then
   exit 1
 fi
 
-# Create JSON array of test names (excluding multi-GPU tests)
-test_array=()
+# Tests that exceed the 360-minute GitHub Actions job time limit, per tool.
+# These are excluded from the matrix to avoid wasting CI resources.
+MEMCHECK_SKIP="
+  NEIGHBORS_ANN_CAGRA_FLOAT_UINT32_TEST
+  NEIGHBORS_ANN_IVF_FLAT_TEST
+  NEIGHBORS_ANN_IVF_PQ_TEST
+  NEIGHBORS_ANN_VAMANA_TEST
+  NEIGHBORS_DYNAMIC_BATCHING_TEST
+"
+RACECHECK_SKIP="
+  CLUSTER_TEST
+  DISTANCE_TEST
+  NEIGHBORS_ALL_NEIGHBORS_TEST
+  NEIGHBORS_ANN_CAGRA_FLOAT_UINT32_TEST
+  NEIGHBORS_ANN_CAGRA_HALF_UINT32_TEST
+  NEIGHBORS_ANN_CAGRA_INT8_UINT32_TEST
+  NEIGHBORS_ANN_CAGRA_UINT8_UINT32_TEST
+  NEIGHBORS_ANN_IVF_FLAT_TEST
+  NEIGHBORS_ANN_IVF_PQ_TEST
+  NEIGHBORS_ANN_NN_DESCENT_TEST
+  NEIGHBORS_ANN_SCANN_TEST
+  NEIGHBORS_ANN_VAMANA_TEST
+  NEIGHBORS_DYNAMIC_BATCHING_TEST
+  NEIGHBORS_EPSILON_NEIGHBORHOOD_TEST
+  NEIGHBORS_HNSW_TEST
+"
+SYNCCHECK_SKIP="
+  NEIGHBORS_ANN_CAGRA_UINT8_UINT32_TEST
+  NEIGHBORS_ANN_NN_DESCENT_TEST
+  NEIGHBORS_DYNAMIC_BATCHING_TEST
+"
+
+# Build a per-tool filtered JSON array of test names.
+# Excludes multi-GPU tests (NEIGHBORS_MG_*) and per-tool timeout skips.
+filter_tests() {
+  local skip_list="$1"
+  local filtered=()
+  for test in "${all_tests[@]}"; do
+    if [[ "${skip_list}" == *"${test}"* ]]; then
+      continue
+    fi
+    filtered+=("$test")
+  done
+  printf '%s\n' "${filtered[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))'
+}
+
+all_tests=()
 for test in *_TEST; do
   if [[ ! "$test" =~ ^NEIGHBORS_MG_ ]]; then
-    test_array+=("$test")
+    all_tests+=("$test")
   fi
 done
-tests=$(printf '%s\n' "${test_array[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
 
-rapids-logger "Found tests:"
-echo "${tests}" | jq .[]
+memcheck_tests=$(filter_tests "${MEMCHECK_SKIP}")
+racecheck_tests=$(filter_tests "${RACECHECK_SKIP}")
+synccheck_tests=$(filter_tests "${SYNCCHECK_SKIP}")
+
+rapids-logger "memcheck tests:"
+echo "${memcheck_tests}" | jq .[]
+rapids-logger "racecheck tests:"
+echo "${racecheck_tests}" | jq .[]
+rapids-logger "synccheck tests:"
+echo "${synccheck_tests}" | jq .[]
 
 # Output to GITHUB_OUTPUT for GitHub Actions
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
-  echo "tests=${tests}" >> "${GITHUB_OUTPUT}"
+  {
+    echo "memcheck_tests=${memcheck_tests}"
+    echo "racecheck_tests=${racecheck_tests}"
+    echo "synccheck_tests=${synccheck_tests}"
+  } >> "${GITHUB_OUTPUT}"
 fi
