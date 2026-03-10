@@ -13,7 +13,7 @@ template <typename QUERY_T, typename DISTANCE_T>
 __device__ DISTANCE_T dist_op(QUERY_T a, QUERY_T b)
 {
   DISTANCE_T diff = a - b;
-  return raft::abs(diff * diff);
+  return raft::abs(diff);
 }
 
 }  // namespace cuvs::neighbors::cagra::detail
