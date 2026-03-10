@@ -352,10 +352,12 @@ void bench_search(::benchmark::State& state,
   // Each thread calculates recall on their partition of queries.
   // evaluate recall
   if (dataset->max_k() >= k) {
+    // gt_maps[i] is a hash map of {id, neighbor_rank} for query i
+    const auto& gt_maps            = dataset->gt_maps();
+    const auto& filter_pass_counts = dataset->filter_pass_counts();
     result_buf.transfer_data(MemoryType::kHost, current_algo_props->query_memory_type);
-    auto* neighbors_host = reinterpret_cast<index_type*>(result_buf.data(MemoryType::kHost));
-    std::size_t rows     = std::min(
-      {queries_processed, query_set_size, static_cast<size_t>(dataset->kMaxQueriesForRecall)});
+    auto* neighbors_host    = reinterpret_cast<index_type*>(result_buf.data(MemoryType::kHost));
+    std::size_t rows        = std::min({queries_processed, query_set_size, gt_maps.size()});
     std::size_t match_count = 0;
     std::size_t total_count = 0;
 
@@ -379,15 +381,15 @@ void bench_search(::benchmark::State& state,
       auto recall_calculation = [&](int start, int end, int tid) -> void {
         for (int i = start; i < end; ++i) {
           size_t i_orig_idx = batch_offset + i;
-          if (i_orig_idx >= rows) { break; }
+          if (i_orig_idx >= gt_maps.size()) { break; }
           size_t i_out_idx = out_offset + i;
           if (i_out_idx < rows) {
-            const auto& gt = dataset->ground_truth_entry(i_orig_idx);
-            local_total_count[tid] += gt.filter_pass_count;
+            local_total_count[tid] += filter_pass_counts[i_orig_idx];
 
             for (std::uint32_t j = 0; j < k; j++) {
               auto act_idx = static_cast<std::int32_t>(neighbors_host[i_out_idx * k + j]);
-              if (gt.gt_map.count(act_idx) && static_cast<uint32_t>(gt.gt_map.at(act_idx)) < k)
+              if (gt_maps[i_orig_idx].count(act_idx) &&
+                  static_cast<uint32_t>(gt_maps[i_orig_idx].at(act_idx)) < k)
                 local_match_count[tid]++;
             }
           }
