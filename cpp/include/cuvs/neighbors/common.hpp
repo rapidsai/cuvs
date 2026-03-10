@@ -35,6 +35,9 @@ namespace cuvs::neighbors {
  * @{
  */
 
+/* Graph build algo used in cagra and all_neighbors */
+enum GRAPH_BUILD_ALGO { BRUTE_FORCE = 0, IVF_PQ = 1, NN_DESCENT = 2, ACE = 3 };
+
 /** Parameters for VPQ compression. */
 struct vpq_params {
   /**
@@ -124,13 +127,6 @@ enum class MergeStrategy {
   MERGE_STRATEGY_PHYSICAL = 0,
   /** Merge indices logically by creating a composite wrapper */
   MERGE_STRATEGY_LOGICAL = 1
-};
-
-/** Base merge parameters with polymorphic interface. */
-struct merge_params {
-  virtual ~merge_params() = default;
-
-  virtual MergeStrategy strategy() const = 0;
 };
 
 /** @} */  // end group neighbors_index

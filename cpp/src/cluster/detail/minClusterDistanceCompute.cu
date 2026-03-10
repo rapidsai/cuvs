@@ -1,9 +1,11 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "kmeans_common.cuh"
+
+#include <raft/matrix/init.cuh>
 
 namespace cuvs::cluster::kmeans::detail {
 
@@ -35,11 +37,10 @@ void minClusterAndDistanceCompute(
 
   if (is_fused) {
     L2NormBuf_OR_DistBuf.resize(n_clusters, stream);
-    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(L2NormBuf_OR_DistBuf.data(),
-                                                      centroids.data_handle(),
-                                                      centroids.extent(1),
-                                                      centroids.extent(0),
-                                                      stream);
+    raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+      handle,
+      centroids,
+      raft::make_device_vector_view<DataT, IndexT>(L2NormBuf_OR_DistBuf.data(), n_clusters));
   } else {
     // TODO: Unless pool allocator is used, passing in a workspace for this
     // isn't really increasing performance because this needs to do a re-allocation
@@ -57,10 +58,7 @@ void minClusterAndDistanceCompute(
 
   raft::KeyValuePair<IndexT, DataT> initial_value(0, std::numeric_limits<DataT>::max());
 
-  thrust::fill(raft::resource::get_thrust_policy(handle),
-               minClusterAndDistance.data_handle(),
-               minClusterAndDistance.data_handle() + minClusterAndDistance.size(),
-               initial_value);
+  raft::matrix::fill(handle, minClusterAndDistance, initial_value);
 
   // tile over the input dataset
   for (IndexT dIdx = 0; dIdx < n_samples; dIdx += dataBatchSize) {
@@ -189,11 +187,11 @@ void minClusterDistanceCompute(raft::resources const& handle,
 
   if (is_fused) {
     L2NormBuf_OR_DistBuf.resize(n_clusters, stream);
-    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(L2NormBuf_OR_DistBuf.data(),
-                                                      centroids.data_handle(),
-                                                      centroids.extent(1),
-                                                      centroids.extent(0),
-                                                      stream);
+    raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+      handle,
+      raft::make_device_matrix_view<const DataT, IndexT>(
+        centroids.data_handle(), centroids.extent(0), centroids.extent(1)),
+      raft::make_device_vector_view<DataT, IndexT>(L2NormBuf_OR_DistBuf.data(), n_clusters));
   } else {
     L2NormBuf_OR_DistBuf.resize(dataBatchSize * centroidsBatchSize, stream);
   }
@@ -206,10 +204,7 @@ void minClusterDistanceCompute(raft::resources const& handle,
   auto pairwiseDistance = raft::make_device_matrix_view<DataT, IndexT>(
     L2NormBuf_OR_DistBuf.data(), dataBatchSize, centroidsBatchSize);
 
-  thrust::fill(raft::resource::get_thrust_policy(handle),
-               minClusterDistance.data_handle(),
-               minClusterDistance.data_handle() + minClusterDistance.size(),
-               std::numeric_limits<DataT>::max());
+  raft::matrix::fill(handle, minClusterDistance, std::numeric_limits<DataT>::max());
 
   // tile over the input data and calculate distance matrix [n_samples x
   // n_clusters]
