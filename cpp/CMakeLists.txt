@@ -249,6 +249,18 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_uint8_uint32_dim128_t8.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_uint8_uint32_dim256_t16.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_uint8_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_float_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_float_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_float_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_half_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_half_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_half_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_int8_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_int8_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_int8_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_uint8_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_uint8_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_uint8_uint32_dim512_t32.cu
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_float_uint32_dim128_t8.cu
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_float_uint32_dim256_t16.cu
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_float_uint32_dim512_t32.cu
@@ -322,8 +334,10 @@ if(NOT BUILD_CPU_ONLY)
                               $<TARGET_NAME_IF_EXISTS:nvidia::cutlass::cutlass>
   )
   target_compile_options(
-    cuvs-cagra-search PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
-                              "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+    cuvs-cagra-search
+    PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
+            "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+            "$<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>:${CUVS_DEBUG_CUDA_FLAGS}>"
   )
 
   if(BUILD_MG_ALGOS)
@@ -566,9 +580,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/iface/iface_pq_uint8_t_int64_t.cu
     src/neighbors/detail/cagra/topk_for_cagra/topk.cu
     src/neighbors/dynamic_batching.cu
-    src/neighbors/cagra_index_wrapper.cu
     src/neighbors/composite/index.cu
-    src/neighbors/composite/merge.cpp
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/cagra.cpp>
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw.cpp>
     src/neighbors/ivf_common.cu
@@ -671,8 +683,10 @@ if(NOT BUILD_CPU_ONLY)
                POSITION_INDEPENDENT_CODE ON
   )
   target_compile_options(
-    cuvs_objs PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
-                      "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+    cuvs_objs
+    PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
+            "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+            "$<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>:${CUVS_DEBUG_CUDA_FLAGS}>"
   )
 
   target_compile_definitions(
@@ -751,6 +765,7 @@ if(NOT BUILD_CPU_ONLY)
                 --expt-relaxed-constexpr>
       PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
               "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+              "$<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>:${CUVS_DEBUG_CUDA_FLAGS}>"
     )
     target_compile_definitions(
       cuvs
