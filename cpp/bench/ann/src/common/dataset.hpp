@@ -224,15 +224,15 @@ struct dataset {
     entire rows of results. However, this is still better than no recall estimate at all.
 
     */
-    if (auto gt_data = gt_set()) {
+    if (ground_truth_set_.has_value()) {
       auto filter = [this](IdxT i) -> bool {
         if (!this->filter_bitset_.has_value()) { return true; }
         auto word = this->filter_bitset_->data()[i >> 5];
         return word & (1 << (i & 31));
       };
-      std::call_once(gt_entries_[query_idx].once_flag, [this, query_idx, gt_data, &filter] {
+      std::call_once(gt_entries_[query_idx].once_flag, [this, query_idx, &filter] {
         for (std::uint32_t neighbor_rank = 0; neighbor_rank < max_k_; ++neighbor_rank) {
-          auto id = gt_data[query_idx * max_k_ + neighbor_rank];
+          auto id = ground_truth_set_->data()[query_idx * max_k_ + neighbor_rank];
           if (!filter(id)) { continue; }
           if (gt_entries_[query_idx].gt_map.count(id)) {
             throw std::invalid_argument(
