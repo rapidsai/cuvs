@@ -12,9 +12,14 @@ instantiating benchmark backends.
 from typing import Dict, Type, Optional
 from pathlib import Path
 import importlib
+import importlib.metadata
 import yaml
 
 from .base import BenchmarkBackend
+
+# Entry point group names for plugin discovery
+_BACKENDS_GROUP = "cuvs_bench.backends"
+_CONFIG_LOADERS_GROUP = "cuvs_bench.config_loaders"
 
 
 class BackendRegistry:
@@ -375,9 +380,42 @@ def get_backend(name: str, config: Dict) -> BenchmarkBackend:
     return registry.get_backend(name, config)
 
 
+def _try_load_plugin(name: str) -> None:
+    """
+    Try to load backend and config loader from entry points for the given name.
+
+    Plugins register themselves when their entry point is loaded.
+    Raises ImportError with install instructions if the plugin requires
+    an optional dependency that is not installed.
+    """
+    for group in (_BACKENDS_GROUP, _CONFIG_LOADERS_GROUP):
+        try:
+            eps = importlib.metadata.entry_points(group=group)
+        except TypeError:
+            eps = importlib.metadata.entry_points().get(group, [])
+        if hasattr(eps, "select"):  # Python 3.10+
+            eps = list(eps.select(name=name))
+        else:
+            eps = [e for e in eps if e.name == name]
+        for ep in eps:
+            try:
+                ep.load()()
+            except ImportError as e:
+                if "elasticsearch" in str(e).lower() or "elasticsearch" in str(e):
+                    raise ImportError(
+                        f"Elasticsearch backend requires the 'elastic' extra. "
+                        f"Install with: pip install cuvs-bench[elastic]"
+                    ) from e
+                raise
+            return  # Plugin loaded successfully
+
+
 def get_backend_class(name: str) -> Type[BenchmarkBackend]:
     """
     Get the backend class (not instance) from the global registry.
+
+    If the backend is not registered, attempts to load it from entry points
+    (e.g., optional plugins like elastic).
 
     Parameters
     ----------
@@ -391,9 +429,14 @@ def get_backend_class(name: str) -> Type[BenchmarkBackend]:
     """
     registry = get_registry()
     if name not in registry._backends:
+        _try_load_plugin(name)
+    if name not in registry._backends:
         available = ", ".join(registry._backends.keys())
+        hint = ""
+        if name == "elastic":
+            hint = " Install with: pip install cuvs-bench[elastic]"
         raise ValueError(
-            f"Backend '{name}' not found. Available backends: {available or '(none)'}"
+            f"Backend '{name}' not found. Available backends: {available or '(none)'}.{hint}"
         )
     return registry._backends[name]
 
@@ -440,6 +483,9 @@ def get_config_loader(name: str) -> Type:
     """
     Get a registered config loader class by name.
 
+    If the config loader is not registered, attempts to load it from entry points
+    (e.g., optional plugins like elastic).
+
     Parameters
     ----------
     name : str
@@ -455,11 +501,15 @@ def get_config_loader(name: str) -> Type:
     ValueError
         If config loader is not registered
     """
-    # _CONFIG_LOADER_REGISTRY is a dictionary that maps backend names to config loader classes
+    if name not in _CONFIG_LOADER_REGISTRY:
+        _try_load_plugin(name)
     if name not in _CONFIG_LOADER_REGISTRY:
         available = ", ".join(_CONFIG_LOADER_REGISTRY.keys()) or "none"
+        hint = ""
+        if name == "elastic":
+            hint = " Install with: pip install cuvs-bench[elastic]"
         raise ValueError(
-            f"Unknown config loader for backend: '{name}'. Available: {available}"
+            f"Unknown config loader for backend: '{name}'. Available: {available}.{hint}"
         )
     return _CONFIG_LOADER_REGISTRY[name]
 
@@ -467,3 +517,16 @@ def get_config_loader(name: str) -> Type:
 def list_config_loaders() -> Dict[str, Type]:
     """Return all registered config loaders."""
     return dict(_CONFIG_LOADER_REGISTRY)
+
+
+def unregister_config_loader(name: str) -> None:
+    """
+    Unregister a config loader by name (primarily for testing).
+
+    Parameters
+    ----------
+    name : str
+        Backend name to unregister
+    """
+    if name in _CONFIG_LOADER_REGISTRY:
+        del _CONFIG_LOADER_REGISTRY[name]

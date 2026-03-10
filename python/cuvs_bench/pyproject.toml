@@ -41,6 +41,10 @@ classifiers = [
 [project.urls]
 Homepage = "https://github.com/rapidsai/cuvs"
 
+[project.optional-dependencies]
+elastic = ["cuvs-bench-elastic>=26.4.0"]
+integration = ["cuvs-bench-elastic>=26.4.0", "testcontainers[elasticsearch]"]
+
 [tool.setuptools.package-data]
 "*" = ["*.*", "VERSION"]
 

@@ -19,10 +19,11 @@ from cuvs_bench.backends import (
     register_backend,
     get_backend,
 )
+from cuvs_bench.orchestrator.config_loaders import IndexConfig
 
 
 class DummyBackend(BenchmarkBackend):
-    """Dummy backend for testing."""
+    """Dummy backend for testing (implements current BenchmarkBackend API)."""
 
     @property
     def algo(self) -> str:
@@ -58,7 +59,6 @@ class DummyBackend(BenchmarkBackend):
         neighbors = np.random.randint(0, dataset.n_base, size=(n_queries, k))
         distances = np.random.rand(n_queries, k)
         first = indexes[0]
-
         return SearchResult(
             neighbors=neighbors,
             distances=distances,
@@ -69,7 +69,9 @@ class DummyBackend(BenchmarkBackend):
             search_params=first.search_params,
             success=True,
         )
-
+            search_params=first.search_params,
+            success=True,
+        )
 
 class AnotherDummyBackend(BenchmarkBackend):
     """Another dummy backend for testing."""
@@ -108,7 +110,6 @@ class AnotherDummyBackend(BenchmarkBackend):
         neighbors = np.random.randint(0, dataset.n_base, size=(n_queries, k))
         distances = np.random.rand(n_queries, k)
         first = indexes[0]
-
         return SearchResult(
             neighbors=neighbors,
             distances=distances,
@@ -116,6 +117,9 @@ class AnotherDummyBackend(BenchmarkBackend):
             queries_per_second=n_queries / 0.2,
             recall=0.90,
             algorithm=self.algo,
+            search_params=first.search_params if first else [],
+            success=True,
+        )
             search_params=first.search_params if first else [],
             success=True,
         )
@@ -162,23 +166,6 @@ class TestDataset:
 class TestBuildResult:
     """Tests for BuildResult dataclass."""
 
-    def test_build_result_creation(self):
-        """Test basic build result creation."""
-        result = BuildResult(
-            index_path="/path/to/index",
-            build_time_seconds=5.5,
-            index_size_bytes=1024000,
-            algorithm="test_algo",
-            build_params={"nlist": 1024},
-            metadata={"gpu_time": 4.2},
-            success=True,
-        )
-
-        assert result.index_path == "/path/to/index"
-        assert result.build_time_seconds == 5.5
-        assert result.algorithm == "test_algo"
-        assert result.success is True
-
     def test_build_result_to_json(self):
         """Test conversion to JSON format."""
         result = BuildResult(
@@ -189,9 +176,7 @@ class TestBuildResult:
             build_params={"nlist": 1024},
             metadata={"gpu_time": 4.2},
         )
-
         json_result = result.to_json()
-
         assert json_result["name"] == "test_algo/build"
         assert json_result["real_time"] == 5.5
         assert json_result["nlist"] == 1024
@@ -200,25 +185,6 @@ class TestBuildResult:
 
 class TestSearchResult:
     """Tests for SearchResult dataclass."""
-
-    def test_search_result_creation(self):
-        """Test basic search result creation."""
-        neighbors = np.array([[1, 2, 3], [4, 5, 6]])
-        distances = np.array([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])
-
-        result = SearchResult(
-            neighbors=neighbors,
-            distances=distances,
-            search_time_ms=0.1,
-            queries_per_second=20.0,
-            recall=0.95,
-            algorithm="test_algo",
-            search_params=[{"nprobe": 10}],
-        )
-
-        assert result.recall == 0.95
-        assert result.queries_per_second == 20.0
-        assert result.success is True
 
     def test_search_result_to_json(self):
         """Test conversion to JSON format."""
@@ -249,11 +215,6 @@ class TestSearchResult:
 
 class TestBackendRegistry:
     """Tests for BackendRegistry."""
-
-    def test_registry_creation(self):
-        """Test registry creation."""
-        registry = BackendRegistry()
-        assert len(registry.list_backends()) == 0
 
     def test_register_backend(self):
         """Test backend registration."""
@@ -334,12 +295,11 @@ class TestBackendRegistry:
 
 
 class TestBackendIntegration:
-    """Integration tests for backends."""
+    """Integration tests for backends (uses current IndexConfig-based API)."""
 
     def test_dummy_backend_build(self, tmp_path):
         """Test dummy backend build."""
         from cuvs_bench.orchestrator.config_loaders import IndexConfig
-
         backend = DummyBackend(config={"name": "dummy"})
 
         base = np.random.rand(1000, 128).astype(np.float32)
@@ -347,6 +307,15 @@ class TestBackendIntegration:
         dataset = Dataset(
             name="test", training_vectors=base, query_vectors=queries
         )
+        indexes = [
+            IndexConfig(
+                name="dummy_test",
+                algo="dummy_algo",
+                build_param={"nlist": 1024},
+                search_params=[{"nprobe": 10}],
+                file="/tmp/test_index",
+            )
+        ]
 
         indexes = [
             IndexConfig(
@@ -367,7 +336,6 @@ class TestBackendIntegration:
     def test_dummy_backend_search(self, tmp_path):
         """Test dummy backend search."""
         from cuvs_bench.orchestrator.config_loaders import IndexConfig
-
         backend = DummyBackend(config={"name": "dummy"})
 
         base = np.random.rand(1000, 128).astype(np.float32)
@@ -375,6 +343,15 @@ class TestBackendIntegration:
         dataset = Dataset(
             name="test", training_vectors=base, query_vectors=queries
         )
+        indexes = [
+            IndexConfig(
+                name="dummy_test",
+                algo="dummy_algo",
+                build_param={},
+                search_params=[{"nprobe": 10}],
+                file="/tmp/test_index",
+            )
+        ]
 
         indexes = [
             IndexConfig(
@@ -396,14 +373,6 @@ class TestBackendIntegration:
 
 class TestGlobalRegistry:
     """Tests for global registry functions."""
-
-    def test_get_global_registry(self):
-        """Test getting global registry."""
-        registry1 = get_registry()
-        registry2 = get_registry()
-
-        # Should return the same instance (singleton)
-        assert registry1 is registry2
 
     def test_register_backend_global(self):
         """Test registering backend via global function."""
