@@ -464,15 +464,21 @@ struct BatchBuildAux {
   }
 };
 
-template <typename T, typename IdxT, typename DistEpilogueT = raft::identity_op>
-void batch_build(
-  const raft::resources& handle,
-  const all_neighbors_params& params,
-  raft::host_matrix_view<const T, IdxT, row_major> dataset,
-  raft::device_matrix_view<IdxT, IdxT, row_major> indices,
-  std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances = std::nullopt,
-  BatchBuildAux<IdxT>* aux_vectors                                      = nullptr,
-  DistEpilogueT dist_epilogue                                           = DistEpilogueT{})
+template <typename T,
+          typename IdxT,
+          typename IndicesMdspan,
+          typename DistancesMdspan = mdspan<T,
+                                            matrix_extent<IdxT>,
+                                            row_major,
+                                            raft::device_accessor<cuda::std::default_accessor<T>>>,
+          typename DistEpilogueT   = raft::identity_op>
+void batch_build(const raft::resources& handle,
+                 const all_neighbors_params& params,
+                 raft::host_matrix_view<const T, IdxT, row_major> dataset,
+                 IndicesMdspan indices,
+                 std::optional<DistancesMdspan> distances = std::nullopt,
+                 BatchBuildAux<IdxT>* aux_vectors         = nullptr,
+                 DistEpilogueT dist_epilogue              = DistEpilogueT{})
 {
   if (raft::resource::is_multi_gpu(handle)) {
     // For efficient CPU-computation of omp parallel for regions per GPU
@@ -614,6 +620,8 @@ void batch_build(
                num_rows * k,
                raft::resource::get_cuda_stream(handle));
   }
+
+  raft::resource::sync_stream(handle);
 }
 
 }  // namespace cuvs::neighbors::all_neighbors::detail
