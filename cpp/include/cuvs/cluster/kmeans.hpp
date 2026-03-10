@@ -100,7 +100,7 @@ struct params : base_params {
    * useful to optimize/control the memory footprint
    * Default tile is [batch_samples x n_clusters] i.e. when batch_centroids is 0
    * then don't tile the centroids
-   * 
+   *
    * NB: These parameters are unrelated to batched_params.batch_size, which
    * controls how many samples to transfer from host to device per batch when
    * processing out-of-core data.
