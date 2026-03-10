@@ -1,0 +1,591 @@
+#
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+#
+"""
+Smoke tests for cuvs-bench modularization (optional deps, entry points, lazy loading).
+
+These tests verify the plugin infrastructure without requiring full backend implementations.
+"""
+
+from unittest.mock import MagicMock, patch
+
+import numpy as np
+import pytest
+
+from cuvs_bench.backends.base import BenchmarkBackend, BuildResult, Dataset, SearchResult
+from cuvs_bench.backends.registry import (
+    get_backend_class,
+    get_config_loader,
+    get_registry,
+    list_backends,
+    list_config_loaders,
+    register_backend,
+    register_config_loader,
+    unregister_config_loader,
+)
+from cuvs_bench.orchestrator.config_loaders import ConfigLoader, IndexConfig
+
+
+class TestModularizationSmoke:
+    """Smoke tests for optional backend loading and error handling."""
+
+    def test_cpp_gbench_available(self):
+        """cpp_gbench (built-in) should always be available."""
+        backends = list_backends()
+        assert "cpp_gbench" in backends
+        cls = get_backend_class("cpp_gbench")
+        assert cls is not None
+
+    def test_cpp_gbench_config_loader_available(self):
+        """cpp_gbench config loader should always be registered."""
+        loaders = list_config_loaders()
+        assert "cpp_gbench" in loaders
+        loader_cls = get_config_loader("cpp_gbench")
+        assert loader_cls is not None
+
+    def test_elastic_without_extra_raises_clear_error(self):
+        """Requesting elastic without [elastic] installed raises helpful error."""
+        try:
+            import elasticsearch  # noqa: F401
+            pytest.skip("elasticsearch is installed; cannot test missing-plugin path")
+        except ImportError:
+            pass
+        import importlib.metadata
+        all_eps = importlib.metadata.entry_points()
+        if hasattr(all_eps, "select"):
+            eps = list(all_eps.select(group="cuvs_bench.backends", name="elastic"))
+        else:
+            eps = [e for e in all_eps.get("cuvs_bench.backends", []) if e.name == "elastic"]
+        if eps:
+            pytest.skip("cuvs-bench-elastic is installed; cannot test missing-plugin path")
+
+        with pytest.raises((ImportError, ValueError)) as exc_info:
+            get_backend_class("elastic")
+
+        msg = str(exc_info.value)
+        assert "elastic" in msg.lower()
+
+    def test_elastic_config_loader_without_extra_raises_clear_error(self):
+        """Requesting elastic config loader without [elastic] raises helpful error."""
+        try:
+            import elasticsearch  # noqa: F401
+            pytest.skip("elasticsearch is installed; cannot test missing-plugin path")
+        except ImportError:
+            pass
+        import importlib.metadata
+        all_eps = importlib.metadata.entry_points()
+        if hasattr(all_eps, "select"):
+            eps = list(all_eps.select(group="cuvs_bench.config_loaders", name="elastic"))
+        else:
+            eps = [e for e in all_eps.get("cuvs_bench.config_loaders", []) if e.name == "elastic"]
+        if eps:
+            pytest.skip("cuvs-bench-elastic is installed; cannot test missing-plugin path")
+
+        with pytest.raises((ImportError, ValueError)) as exc_info:
+            get_config_loader("elastic")
+
+        msg = str(exc_info.value)
+        assert "elastic" in msg.lower()
+
+    def test_unknown_backend_raises_value_error(self):
+        """Requesting unknown backend raises ValueError with available backends."""
+        with pytest.raises(ValueError) as exc_info:
+            get_backend_class("nonexistent_backend_xyz")
+
+        msg = str(exc_info.value)
+        assert "nonexistent_backend_xyz" in msg
+        assert "cpp_gbench" in msg
+
+    def test_unknown_config_loader_raises_value_error(self):
+        """Requesting unknown config loader raises ValueError."""
+        with pytest.raises(ValueError) as exc_info:
+            get_config_loader("nonexistent_loader_xyz")
+
+        msg = str(exc_info.value)
+        assert "nonexistent_loader_xyz" in msg
+
+    def test_orchestrator_cpp_gbench_no_regression(self):
+        """BenchmarkOrchestrator with cpp_gbench should initialize (no regression)."""
+        from cuvs_bench.orchestrator import BenchmarkOrchestrator
+
+        assert "cpp_gbench" in BenchmarkOrchestrator.available_backends()
+        orch = BenchmarkOrchestrator(backend_type="cpp_gbench")
+        assert orch.backend_type == "cpp_gbench"
+        assert orch.backend_class is not None
+        assert orch.config_loader is not None
+
+
+class TestPluginLoaderMocked:
+    """
+    Tests using mocked entry points (NAT-style).
+
+    These tests do not require elasticsearch or real plugins.
+    """
+
+    _MOCK_PLUGIN_NAME = "mock_plugin_test"
+
+    @staticmethod
+    def _make_mock_register():
+        """Create a register function that registers a minimal stub backend and loader."""
+
+        class StubBackend(BenchmarkBackend):
+            def build(self, dataset, indexes, force=False, dry_run=False):
+                return BuildResult(
+                    index_path="",
+                    build_time_seconds=0,
+                    index_size_bytes=0,
+                    algorithm="stub",
+                    build_params={},
+                    success=True,
+                )
+
+            def search(
+                self, dataset, indexes, k=10, batch_size=10000,
+                mode="latency", force=False, search_threads=None, dry_run=False,
+            ):
+                import numpy as np
+                return SearchResult(
+                    neighbors=np.empty((0, k)),
+                    distances=np.empty((0, k)),
+                    search_time_ms=0,
+                    queries_per_second=0,
+                    recall=0,
+                    algorithm="stub",
+                    search_params=[],
+                    success=True,
+                )
+
+        class StubConfigLoader(ConfigLoader):
+            @property
+            def backend_type(self):
+                return TestPluginLoaderMocked._MOCK_PLUGIN_NAME
+
+            def load(self, **kwargs):
+                raise NotImplementedError("Stub loader")
+
+        def register():
+            register_backend(TestPluginLoaderMocked._MOCK_PLUGIN_NAME, StubBackend)
+            register_config_loader(
+                TestPluginLoaderMocked._MOCK_PLUGIN_NAME, StubConfigLoader
+            )
+
+        return register
+
+    def test_valid_plugin_loads_via_mock_entry_point(self):
+        """Mock entry point: valid plugin registers and is discoverable."""
+        mock_register = self._make_mock_register()
+        mock_ep = MagicMock()
+        mock_ep.name = self._MOCK_PLUGIN_NAME
+        mock_ep.load.return_value = mock_register
+
+        mock_eps = MagicMock()
+        mock_eps.select.return_value = [mock_ep]
+
+        with patch(
+            "cuvs_bench.backends.registry.importlib.metadata.entry_points",
+            return_value=mock_eps,
+        ):
+            cls = get_backend_class(self._MOCK_PLUGIN_NAME)
+            assert cls is not None
+
+        loader_cls = get_config_loader(self._MOCK_PLUGIN_NAME)
+        assert loader_cls is not None
+
+        # Cleanup
+        get_registry().unregister(self._MOCK_PLUGIN_NAME)
+        unregister_config_loader(self._MOCK_PLUGIN_NAME)
+
+    def test_import_error_with_elasticsearch_message_raises_helpful_error(self):
+        """Mock entry point raising ImportError(elasticsearch) -> our install message."""
+        # Ensure elastic is not in registry (e.g. from TestElasticWithExtraInstalled)
+        registry = get_registry()
+        if "elastic" in registry._backends:
+            registry.unregister("elastic")
+            unregister_config_loader("elastic")
+
+        mock_ep = MagicMock()
+        mock_ep.name = "elastic"
+        mock_ep.load.side_effect = ImportError("No module named 'elasticsearch'")
+
+        mock_eps = MagicMock()
+        mock_eps.select.return_value = [mock_ep]
+
+        with patch(
+            "cuvs_bench.backends.registry.importlib.metadata.entry_points",
+            return_value=mock_eps,
+        ):
+            with pytest.raises(ImportError) as exc_info:
+                get_backend_class("elastic")
+
+        msg = str(exc_info.value)
+        assert "pip install cuvs-bench[elastic]" in msg
+
+    def test_import_error_unrelated_propagates(self):
+        """Mock entry point: unrelated ImportError propagates unchanged."""
+        mock_ep = MagicMock()
+        mock_ep.name = "other_plugin"
+        mock_ep.load.side_effect = ImportError("No module named 'something_else'")
+
+        mock_eps = MagicMock()
+        mock_eps.select.return_value = [mock_ep]
+
+        with patch(
+            "cuvs_bench.backends.registry.importlib.metadata.entry_points",
+            return_value=mock_eps,
+        ):
+            with pytest.raises(ImportError) as exc_info:
+                get_backend_class("other_plugin")
+
+        assert "something_else" in str(exc_info.value)
+
+    def test_unexpected_error_propagates(self):
+        """Mock entry point: RuntimeError propagates."""
+        mock_ep = MagicMock()
+        mock_ep.name = "broken_plugin"
+        mock_ep.load.side_effect = RuntimeError("Plugin crashed")
+
+        mock_eps = MagicMock()
+        mock_eps.select.return_value = [mock_ep]
+
+        with patch(
+            "cuvs_bench.backends.registry.importlib.metadata.entry_points",
+            return_value=mock_eps,
+        ):
+            with pytest.raises(RuntimeError) as exc_info:
+                get_backend_class("broken_plugin")
+
+        assert "Plugin crashed" in str(exc_info.value)
+
+    def test_no_entry_point_for_name_raises_value_error(self):
+        """Mock entry point: no plugin for requested name -> ValueError."""
+        mock_eps = MagicMock()
+        mock_eps.select.return_value = []  # No matching entry points
+
+        with patch(
+            "cuvs_bench.backends.registry.importlib.metadata.entry_points",
+            return_value=mock_eps,
+        ):
+            with pytest.raises(ValueError) as exc_info:
+                get_backend_class("nonexistent_mock_xyz")
+
+        msg = str(exc_info.value)
+        assert "nonexistent_mock_xyz" in msg
+        assert "cpp_gbench" in msg
+
+
+def _elasticsearch_installed():
+    try:
+        import elasticsearch  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+@pytest.mark.skipif(
+    not _elasticsearch_installed(),
+    reason="Requires pip install cuvs-bench[elastic]",
+)
+class TestElasticWithExtraInstalled:
+    """Tests that run only when [elastic] extra is installed."""
+
+    @pytest.fixture(autouse=True)
+    def _ensure_elastic_registered(self):
+        """Re-register elastic (may have been unregistered by other tests)."""
+        registry = get_registry()
+        if "elastic" not in registry._backends:
+            try:
+                from cuvs_bench_elastic import register
+                register()
+            except ImportError:
+                pass
+        yield
+
+    def test_elastic_plugin_loads(self):
+        """Elastic backend and config loader load when elasticsearch is installed."""
+        assert get_backend_class("elastic") is not None
+        assert get_config_loader("elastic") is not None
+
+    def test_elastic_config_loader_tune_mode_returns_single_config(self):
+        """Tune mode produces one BenchmarkConfig with Optuna-suggested params."""
+        loader_cls = get_config_loader("elastic")
+        loader = loader_cls()
+        dataset_config, benchmark_configs = loader.load(
+            dataset="glove-50-angular",
+            algorithms="elastic_hnsw",
+            _tune_mode=True,
+            _tune_build_params={"m": 24, "ef_construction": 150},
+            _tune_search_params={"num_candidates": 120},
+        )
+        assert len(benchmark_configs) == 1
+        config = benchmark_configs[0]
+        assert config.indexes[0].algo == "elastic_hnsw"
+        assert config.indexes[0].build_param["m"] == 24
+        assert config.indexes[0].build_param["ef_construction"] == 150
+        assert config.indexes[0].build_param["type"] == "hnsw"
+        assert config.indexes[0].search_params[0]["num_candidates"] == 120
+        assert config.backend_config["name"] == "elastic_hnsw_tune"
+
+    def test_elastic_config_loader_sweep_mode_returns_multiple_configs(self):
+        """Sweep mode produces multiple BenchmarkConfigs from param cartesian product."""
+        loader_cls = get_config_loader("elastic")
+        loader = loader_cls()
+        dataset_config, benchmark_configs = loader.load(
+            dataset="glove-50-angular",
+            algorithms="test",
+        )
+        assert len(benchmark_configs) >= 1
+        config = benchmark_configs[0]
+        assert config.indexes[0].algo == "elastic_hnsw"
+        assert "m" in config.indexes[0].build_param
+        assert "num_candidates" in config.indexes[0].search_params[0]
+
+    def test_elastic_config_loader_dataset_not_found_raises(self):
+        """Config loader raises ValueError for unknown dataset."""
+        loader_cls = get_config_loader("elastic")
+        loader = loader_cls()
+        with pytest.raises(ValueError, match="not found"):
+            loader.load(dataset="nonexistent_dataset_xyz")
+
+    def test_elastic_config_loader_group_not_found_raises(self):
+        """Config loader raises ValueError for unknown algorithm group."""
+        loader_cls = get_config_loader("elastic")
+        loader = loader_cls()
+        with pytest.raises(ValueError, match="not found"):
+            loader.load(
+                dataset="glove-50-angular",
+                algorithms="nonexistent_group_xyz",
+            )
+
+    def test_elastic_dry_run_build(self):
+        """ElasticBackend.build(dry_run=True) returns synthetic result without ES."""
+        cls = get_backend_class("elastic")
+        backend = cls(config={"name": "test", "host": "localhost", "port": 9200})
+
+        base = np.random.rand(100, 32).astype(np.float32)
+        queries = np.random.rand(10, 32).astype(np.float32)
+        dataset = Dataset(
+            name="test",
+            base_vectors=base,
+            query_vectors=queries,
+            distance_metric="euclidean",
+        )
+        indexes = [
+            IndexConfig(
+                name="elastic_hnsw_test",
+                algo="elastic_hnsw",
+                build_param={"m": 16, "ef_construction": 100},
+                search_params=[{"num_candidates": 100}],
+                file="",
+            )
+        ]
+
+        result = backend.build(dataset=dataset, indexes=indexes, dry_run=True)
+
+        assert result.success
+        assert result.algorithm == "elastic_hnsw"
+        assert result.build_time_seconds == 0
+
+    def test_elastic_dry_run_search(self):
+        """ElasticBackend.search(dry_run=True) returns synthetic result without ES."""
+        cls = get_backend_class("elastic")
+        backend = cls(config={"name": "test", "host": "localhost", "port": 9200})
+
+        base = np.random.rand(100, 32).astype(np.float32)
+        queries = np.random.rand(10, 32).astype(np.float32)
+        dataset = Dataset(
+            name="test",
+            base_vectors=base,
+            query_vectors=queries,
+            distance_metric="euclidean",
+        )
+        indexes = [
+            IndexConfig(
+                name="elastic_hnsw_test",
+                algo="elastic_hnsw",
+                build_param={},
+                search_params=[{"num_candidates": 100}],
+                file="",
+            )
+        ]
+
+        result = backend.search(
+            dataset=dataset, indexes=indexes, k=10, dry_run=True
+        )
+
+        assert result.success
+        assert result.algorithm == "elastic_hnsw"
+        assert result.search_time_ms == 0
+
+    def test_elastic_build_requires_base_file(self):
+        """ElasticBackend.build returns error when dataset has no base_file."""
+        cls = get_backend_class("elastic")
+        backend = cls(config={"name": "test", "host": "localhost", "port": 9200})
+
+        base = np.random.rand(100, 32).astype(np.float32)
+        queries = np.random.rand(10, 32).astype(np.float32)
+        dataset = Dataset(
+            name="test",
+            base_vectors=base,
+            query_vectors=queries,
+            base_file=None,
+            query_file=None,
+        )
+        indexes = [
+            IndexConfig(
+                name="elastic_hnsw_test",
+                algo="elastic_hnsw",
+                build_param={},
+                search_params=[{}],
+                file="",
+            )
+        ]
+
+        with patch.object(
+            backend, "_check_network_available", return_value=True
+        ):
+            result = backend.build(dataset=dataset, indexes=indexes, dry_run=False)
+
+        assert not result.success
+        assert "base_file" in (result.error_message or "").lower()
+
+    def test_elastic_preflight_skip_when_no_network(self):
+        """ElasticBackend skips build when network check fails."""
+        cls = get_backend_class("elastic")
+        backend = cls(config={"name": "test", "host": "localhost", "port": 9200})
+
+        base = np.random.rand(100, 32).astype(np.float32)
+        queries = np.random.rand(10, 32).astype(np.float32)
+        dataset = Dataset(
+            name="test",
+            base_vectors=base,
+            query_vectors=queries,
+            base_file="dummy/base.fbin",
+            query_file="dummy/query.fbin",
+        )
+        indexes = [
+            IndexConfig(
+                name="elastic_hnsw_test",
+                algo="elastic_hnsw",
+                build_param={},
+                search_params=[{}],
+                file="",
+            )
+        ]
+
+        with patch.object(
+            backend, "_check_network_available", return_value=False
+        ):
+            result = backend.build(dataset=dataset, indexes=indexes)
+
+        assert result.success
+        assert result.metadata.get("skipped") is True
+        assert result.metadata.get("reason") == "no_network"
+
+    def test_elastic_algo_from_config(self):
+        """ElasticBackend.algo derives from config type (elastic_hnsw, elastic_int8_hnsw)."""
+        cls = get_backend_class("elastic")
+        backend_hnsw = cls(config={"name": "test", "type": "hnsw"})
+        assert backend_hnsw.algo == "elastic_hnsw"
+
+        backend_int8 = cls(config={"name": "test", "type": "int8_hnsw"})
+        assert backend_int8.algo == "elastic_int8_hnsw"
+
+    def test_elastic_cleanup_closes_client(self):
+        """ElasticBackend.cleanup() closes client and sets _client to None."""
+        cls = get_backend_class("elastic")
+        backend = cls(config={"name": "test", "host": "localhost", "port": 9200})
+        mock_client = MagicMock()
+        backend._client = mock_client
+
+        backend.cleanup()
+
+        mock_client.close.assert_called_once()
+        assert backend._client is None
+
+    def test_orchestrator_elastic_dry_run(self):
+        """BenchmarkOrchestrator with elastic backend runs dry_run without ES."""
+        from cuvs_bench.orchestrator import BenchmarkOrchestrator
+
+        orch = BenchmarkOrchestrator(backend_type="elastic")
+        results = orch.run_benchmark(
+            dataset="glove-50-angular",
+            dataset_path="/nonexistent",
+            host="localhost",
+            port=9200,
+            algorithms="test",
+            build=True,
+            search=True,
+            dry_run=True,
+            count=10,
+            batch_size=100,
+        )
+        assert results is not None
+        assert len(results) >= 1
+
+
+@pytest.mark.skipif(
+    not _elasticsearch_installed(),
+    reason="Requires pip install cuvs-bench[elastic]",
+)
+class TestElasticHelpers:
+    """Tests for cuvs_bench_elastic helper functions."""
+
+    @pytest.fixture(autouse=True)
+    def _ensure_elastic_registered(self):
+        """Re-register elastic (may have been unregistered by other tests)."""
+        registry = get_registry()
+        if "elastic" not in registry._backends:
+            try:
+                from cuvs_bench_elastic import register
+                register()
+            except ImportError:
+                pass
+        yield
+
+    def test_distance_to_similarity(self):
+        """_distance_to_similarity maps cuvs distance to ES similarity."""
+        from cuvs_bench_elastic.backend import _distance_to_similarity
+
+        assert _distance_to_similarity("euclidean") == "l2_norm"
+        assert _distance_to_similarity("inner_product") == "max_inner_product"
+        assert _distance_to_similarity("cosine") == "cosine"
+        assert _distance_to_similarity("unknown") == "l2_norm"
+
+    def test_load_fbin(self):
+        """_load_fbin loads big-ann-bench fbin format."""
+        import tempfile
+        from pathlib import Path
+
+        from cuvs_bench_elastic.backend import _load_fbin
+
+        data = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+        with tempfile.NamedTemporaryFile(suffix=".fbin", delete=False) as f:
+            path = Path(f.name)
+        try:
+            with open(path, "wb") as f:
+                np.array([2, 2], dtype=np.uint32).tofile(f)
+                data.tofile(f)
+            loaded = _load_fbin(path)
+            np.testing.assert_array_equal(loaded, data)
+        finally:
+            path.unlink(missing_ok=True)
+
+    def test_load_ibin(self):
+        """_load_ibin loads big-ann-bench ibin format."""
+        import tempfile
+        from pathlib import Path
+
+        from cuvs_bench_elastic.backend import _load_ibin
+
+        data = np.array([[1, 2], [3, 4]], dtype=np.int32)
+        with tempfile.NamedTemporaryFile(suffix=".ibin", delete=False) as f:
+            path = Path(f.name)
+        try:
+            with open(path, "wb") as f:
+                np.array([2, 2], dtype=np.uint32).tofile(f)
+                data.tofile(f)
+            loaded = _load_ibin(path)
+            np.testing.assert_array_equal(loaded, data)
+        finally:
+            path.unlink(missing_ok=True)
