@@ -14,6 +14,7 @@
 #include <optional>
 #include <random>
 #include <string>
+#include <thread>
 
 namespace cuvs::bench {
 
