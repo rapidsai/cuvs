@@ -110,6 +110,12 @@ struct index_params : cuvs::neighbors::index_params {
    */
   bool conservative_memory_allocation = false;
   /**
+   * For InnerProduct metric only: when true (default), data and queries are L2-normalized so that
+   * the index effectively performs cosine similarity search. When false, no normalization is
+   * applied (raw inner product, legacy behavior). Used for testing and comparison.
+   */
+  bool normalize_for_inner_product = true;
+  /**
    * Whether to add the dataset content to the index, i.e.:
    *
    *  - `true` means the index is filled with the dataset vectors and ready to search after calling
@@ -207,6 +213,21 @@ struct search_params : cuvs::neighbors::search_params {
    * Set the internal batch size to improve GPU utilization at the cost of larger memory footprint.
    */
   uint32_t max_internal_batch_size = 4096;
+  /**
+   * Optional diagnostic output: when non-null, search writes the total number of vectors scanned
+   * (sum of list sizes of probed clusters over all queries) to *total_vectors_scanned.
+   * For testing and profiling only; adds host sync and copy overhead when set.
+   */
+  uint64_t* total_vectors_scanned = nullptr;
+  /**
+   * Optional diagnostic: when non-null, search writes coarse phase time (cluster selection) in ms.
+   */
+  float* coarse_search_ms = nullptr;
+  /**
+   * Optional diagnostic: when non-null, search writes fine phase time (query transform + list scan)
+   * in ms.
+   */
+  float* fine_search_ms = nullptr;
 };
 /**
  * @}
@@ -377,6 +398,8 @@ class index_iface {
   virtual uint32_t pq_book_size() const noexcept                = 0;
   virtual uint32_t n_lists() const noexcept                     = 0;
   virtual bool conservative_memory_allocation() const noexcept  = 0;
+  /** For InnerProduct: whether the index was built with normalized data (cosine-like search). */
+  virtual bool normalize_for_inner_product() const noexcept = 0;
   virtual uint32_t get_list_size_in_bytes(uint32_t label) const = 0;
 
   virtual std::vector<std::shared_ptr<list_data_base<IdxT>>>& lists() noexcept             = 0;
@@ -571,6 +594,9 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
    * (see index_params.conservative_memory_allocation).
    */
   bool conservative_memory_allocation() const noexcept override;
+
+  /** For InnerProduct: whether the index was built with normalized data (cosine-like search). */
+  bool normalize_for_inner_product() const noexcept override;
 
   /**
    * PQ cluster centers

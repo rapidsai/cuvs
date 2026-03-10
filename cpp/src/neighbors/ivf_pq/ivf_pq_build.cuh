@@ -140,7 +140,8 @@ void flat_compute_residuals(
   const T* dataset,                                                          // [n_rows, dim]
   std::variant<uint32_t, const uint32_t*> labels,                            // [n_rows]
   rmm::device_async_resource_ref device_memory,
-  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
+  cuvs::distance::DistanceType metric                  = cuvs::distance::DistanceType::L2Expanded,
+  bool normalize_for_inner_product = true)
 {
   auto stream  = raft::resource::get_cuda_stream(handle);
   auto dim     = rotation_matrix.extent(1);
@@ -148,8 +149,10 @@ void flat_compute_residuals(
   rmm::device_uvector<float> tmp(n_rows * dim, stream, device_memory);
   auto tmp_view = raft::make_device_vector_view<float, size_t>(tmp.data(), tmp.size());
 
-  if (metric == cuvs::distance::DistanceType::CosineExpanded ||
-      metric == cuvs::distance::DistanceType::InnerProduct) {
+  const bool use_normalization =
+    (metric == cuvs::distance::DistanceType::CosineExpanded ||
+     (metric == cuvs::distance::DistanceType::InnerProduct && normalize_for_inner_product));
+  if (use_normalization) {
     raft::linalg::map(
       handle,
       tmp_view,
@@ -725,7 +728,8 @@ void encode_list_data(raft::resources const& res,
                                       new_vectors.data_handle(),
                                       label,
                                       mr,
-                                      index->metric());
+                                      index->metric(),
+                                      index->normalize_for_inner_product());
 
   constexpr uint32_t kBlockSize  = 256;
   const uint32_t threads_per_vec = std::min<uint32_t>(raft::WarpSize, index->pq_book_size());
@@ -824,7 +828,8 @@ void process_and_fill_codes(raft::resources const& handle,
                                   new_vectors,
                                   new_labels,
                                   mr,
-                                  index.metric());
+                                  index.metric(),
+                                  index.normalize_for_inner_product());
 
   launch_process_and_fill_codes_kernel(
     handle, index, new_vectors_residual.view(), src_offset_or_indices, new_labels, n_rows);
@@ -960,7 +965,8 @@ auto clone(const raft::resources& res, const index<IdxT>& source) -> index<IdxT>
                                                   source.pq_bits(),
                                                   source.pq_dim(),
                                                   source.conservative_memory_allocation(),
-                                                  source.codes_layout());
+                                                  source.codes_layout(),
+                                                  source.normalize_for_inner_product());
 
   // Copy the independent parts using mutable accessors
   raft::copy(res, impl->list_sizes(), source.list_sizes());
@@ -1114,7 +1120,8 @@ void extend(raft::resources const& handle,
                                     stream));
     const bool normalize_for_predict =
       (index->metric() == cuvs::distance::DistanceType::CosineExpanded ||
-       index->metric() == cuvs::distance::DistanceType::InnerProduct);
+       (index->metric() == cuvs::distance::DistanceType::InnerProduct &&
+        index->normalize_for_inner_product()));
     rmm::device_uvector<float> batch_float_normalized(
       normalize_for_predict ? size_t(max_batch_size) * size_t(index->dim()) : 0, stream, device_memory);
 
@@ -1267,6 +1274,9 @@ auto build(raft::resources const& handle,
   RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
 
+  const bool normalize_ip =
+    (params.metric != cuvs::distance::DistanceType::InnerProduct) ||
+    params.normalize_for_inner_product;
   auto impl = std::make_unique<cuvs::neighbors::ivf_pq::owning_impl<IdxT>>(
     handle,
     params.metric,
@@ -1276,7 +1286,8 @@ auto build(raft::resources const& handle,
     params.pq_bits,
     params.pq_dim == 0 ? index<IdxT>::calculate_pq_dim(dim) : params.pq_dim,
     params.conservative_memory_allocation,
-    params.codes_layout);
+    params.codes_layout,
+    normalize_ip);
 
   auto stream = raft::resource::get_cuda_stream(handle);
   utils::memzero(
@@ -1355,8 +1366,10 @@ auto build(raft::resources const& handle,
     kmeans_params.n_iters = params.kmeans_n_iters;
     kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>((int)impl->metric());
 
-    if (impl->metric() == distance::DistanceType::CosineExpanded ||
-        impl->metric() == distance::DistanceType::InnerProduct) {
+    const bool use_normalization =
+      (impl->metric() == distance::DistanceType::CosineExpanded ||
+       (impl->metric() == distance::DistanceType::InnerProduct && impl->normalize_for_inner_product()));
+    if (use_normalization) {
       raft::linalg::row_normalize<raft::linalg::L2Norm>(
         handle, trainset_const_view, trainset.view());
     }
@@ -1366,8 +1379,7 @@ auto build(raft::resources const& handle,
     rmm::device_uvector<uint32_t> labels(n_rows_train, stream, big_memory_resource);
     auto centers_const_view = raft::make_device_matrix_view<const float, internal_extents_t>(
       cluster_centers, impl->n_lists(), impl->dim());
-    if (impl->metric() == distance::DistanceType::CosineExpanded ||
-        impl->metric() == distance::DistanceType::InnerProduct) {
+    if (use_normalization) {
       raft::linalg::row_normalize<raft::linalg::L2Norm>(handle, centers_const_view, centers_view);
     }
     auto labels_view =
@@ -1473,6 +1485,9 @@ auto build(raft::resources const& handle,
     centers_rot.extent(0),
     centers_rot.extent(1));
 
+  const bool normalize_ip =
+    (index_params.metric != cuvs::distance::DistanceType::InnerProduct) ||
+    index_params.normalize_for_inner_product;
   auto impl = std::make_unique<view_impl<IdxT>>(handle,
                                                 index_params.metric,
                                                 index_params.codebook_kind,
@@ -1485,7 +1500,8 @@ auto build(raft::resources const& handle,
                                                 centers,
                                                 centers_rot,
                                                 rotation_matrix,
-                                                index_params.codes_layout);
+                                                index_params.codes_layout,
+                                                normalize_ip);
 
   index<IdxT> view_index(std::move(impl));
 
@@ -1578,6 +1594,9 @@ auto build(
 
   auto pq_dim = index_params.pq_dim == 0 ? index<IdxT>::calculate_pq_dim(dim) : index_params.pq_dim;
 
+  const bool normalize_ip =
+    (index_params.metric != cuvs::distance::DistanceType::InnerProduct) ||
+    index_params.normalize_for_inner_product;
   auto impl = std::make_unique<owning_impl<IdxT>>(handle,
                                                   index_params.metric,
                                                   index_params.codebook_kind,
@@ -1586,7 +1605,8 @@ auto build(
                                                   index_params.pq_bits,
                                                   pq_dim,
                                                   index_params.conservative_memory_allocation,
-                                                  index_params.codes_layout);
+                                                  index_params.codes_layout,
+                                                  normalize_ip);
 
   utils::memzero(
     impl->accum_sorted_sizes().data_handle(), impl->accum_sorted_sizes().size(), stream);

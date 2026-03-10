@@ -72,7 +72,8 @@ void transform_batch(raft::resources const& res,
                                   dataset.data_handle(),
                                   output_labels.data_handle(),
                                   mr,
-                                  index.metric());
+                                  index.metric(),
+                                  index.normalize_for_inner_product());
 
   // Launch kernel to transform the code output
   constexpr uint32_t kBlockSize  = 256;
