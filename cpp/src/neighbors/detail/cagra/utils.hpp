@@ -322,15 +322,22 @@ void copy_with_padding(
  * writeback of the data Each batch can be referenced exactlyonce by calling the next_view()
  * function
  *
+ * Usage:
+ * ```
+ * batched_device_view_from_host<float, int32_t> view(res, host_view, batch_size, host_writeback,
+ * initialize); while (view.next_view().extent(0) > 0) { auto device_view = view.next_view();
+ *   // use device_view
+ * }
+ * ```
+ *
+ * The call to next_view() will
+ * * synchronize on all previous operations / increments batch_id_
+ * * (optionally) write back the data of the previous batch to the host
+ * * (optionally) prefetch the data of the next batch
+ * * return the view of the current batch
+ *
  * @tparam T The type of the data
  * @tparam IdxT The type of the index
- * @param res The resources
- * @param host_view The host view to create the batched device view from
- * @param batch_size The batch size
- * @param host_writeback Whether to write back the data to the host (only for host memory)
- * @param initialize Whether to initialize the data (only for managed memory)
- *
- * @return The batched device view
  */
 template <typename T, typename IdxT>
 class batched_device_view_from_host {
@@ -341,6 +348,18 @@ class batched_device_view_from_host {
     managed_only,  // data is on managed memory (system managed)
   };
 
+  /**
+   * Create a batched device view from a host view and will handle the prefetch and
+   * writeback of the data. Each batch can be referenced exactly once by calling the next_view()
+   * method.
+   *
+   * @param res The resources to use
+   * @param host_view The host view to create the batched device view from
+   * @param batch_size The batch size
+   * @param host_writeback Whether to write back the data to the host (only for host memory)
+   * (default: false)
+   * @param initialize Whether to initialize the data (only for managed memory) (default: true)
+   */
   batched_device_view_from_host(raft::resources const& res,
                                 raft::host_matrix_view<T, IdxT> host_view,
                                 uint64_t batch_size,
@@ -359,6 +378,9 @@ class batched_device_view_from_host {
       mem_strategy_ = memory_strategy::device_only;
       return;
     }
+
+    RAFT_EXPECTS(host_writeback_ || initialize_,
+                 "At least one of host_writeback or initialize must be true");
 
     RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr_, host_view.data_handle()));
     switch (attr_.type) {
@@ -388,7 +410,8 @@ class batched_device_view_from_host {
             raft::make_extents<int64_t>(batch_size, host_view.extent(1))));
           device_ptr[1] = device_mem_[1]->data_handle();
         }
-        if (host_writeback_ && batch_size * 2 < static_cast<uint64_t>(host_view.extent(0))) {
+        if (host_writeback_ && initialize_ &&
+            batch_size * 2 < static_cast<uint64_t>(host_view.extent(0))) {
           num_buffers_ = 3;
           device_mem_[2].emplace(raft::make_device_mdarray<T, IdxT>(
             res,
@@ -397,15 +420,16 @@ class batched_device_view_from_host {
           device_ptr[2] = device_mem_[2]->data_handle();
         }
       } catch (std::bad_alloc& e) {
-        RAFT_LOG_DEBUG("Insufficient memory for device buffers");
         if (attr_.devicePointer != nullptr) {
+          RAFT_LOG_DEBUG("Insufficient memory for device buffers, switching to managed memory");
           mem_strategy_ = memory_strategy::managed_only;
         } else {
           throw std::bad_alloc();
         }
       } catch (raft::logic_error& e) {
-        RAFT_LOG_DEBUG("Insufficient memory for device buffers (logic error)");
         if (attr_.devicePointer != nullptr) {
+          RAFT_LOG_DEBUG(
+            "Insufficient memory for device buffers (logic error), switching to managed memory");
           mem_strategy_ = memory_strategy::managed_only;
         } else {
           throw raft::logic_error("Insufficient memory for device buffers (logic error)");
@@ -413,20 +437,18 @@ class batched_device_view_from_host {
       }
     }
 
-    // setup streams
-    if (res.has_resource_factory(raft::resource::resource_type::CUDA_STREAM_POOL) &&
-        raft::resource::get_stream_pool_size(res) >= 1) {
-      prefetch_stream_  = raft::resource::get_stream_from_stream_pool(res);
-      writeback_stream_ = raft::resource::get_stream_from_stream_pool(res);
-    } else {
-      local_stream_pool_ = std::make_shared<rmm::cuda_stream_pool>(2);
-      prefetch_stream_   = local_stream_pool_.value()->get_stream();
-      writeback_stream_  = local_stream_pool_.value()->get_stream();
+    // setup stream pool if not already present
+    size_t required_streams = host_writeback_ && initialize_ ? 2 : 1;
+    if (!res.has_resource_factory(raft::resource::resource_type::CUDA_STREAM_POOL) ||
+        raft::resource::get_stream_pool_size(res) < required_streams) {
+      // always create at least 2 streams to account for subsequent iterator calls
+      raft::resource::set_cuda_stream_pool(res, std::make_shared<rmm::cuda_stream_pool>(2));
     }
+    prefetch_stream_  = raft::resource::get_stream_from_stream_pool(res);
+    writeback_stream_ = raft::resource::get_stream_from_stream_pool(res);
 
     // if data is managed and not for_write_ we can set the attribute on the device ptr
     if (mem_strategy_ == memory_strategy::managed_only) {
-      // location_.type = CU_MEM_LOCATION_TYPE_DEVICE;
       location_.type = cudaMemLocationTypeDevice;
       location_.id   = static_cast<CUdevice>(raft::resource::get_device_id(res_));
       if (!host_writeback_) {
@@ -440,6 +462,84 @@ class batched_device_view_from_host {
     prefetch_next_batch();
   }
 
+  ~batched_device_view_from_host() noexcept
+  {
+    raft::resource::sync_stream(res_);
+
+    // if data is on host and for_write --> make sure to copy back last active
+    // if data is managed and evict --> evict last active
+
+    // make sure to sync on prefetch stream & res
+    switch (mem_strategy_) {
+      case memory_strategy::managed_only:
+        if (!host_writeback_) {
+          uint32_t discard_pos     = batch_id_ % num_buffers_;
+          size_t discard_size_rows = actual_batch_size_[discard_pos];
+          if (batch_id_ > 0) {
+            discard_pos = (batch_id_ - 1) % num_buffers_;
+            discard_size_rows += batch_size_;
+          }
+          discard_managed_region(device_ptr[discard_pos],
+                                 discard_size_rows * host_view_.extent(1) * sizeof(T));
+          writeback_stream_.synchronize();
+        }
+        break;
+      case memory_strategy::copy_device:
+        if (host_writeback_) {
+          uint32_t writeback_pos_last = batch_id_ % num_buffers_;
+          if (batch_id_ > 0) {
+            uint32_t writeback_pos    = (batch_id_ - 1) % num_buffers_;
+            uint64_t writeback_offset = (batch_id_ - 1) * batch_size_;
+            writeback_from_device_to_host(device_ptr[writeback_pos], writeback_offset, batch_size_);
+          }
+          {
+            uint64_t writeback_offset_last = batch_id_ * batch_size_;
+            writeback_from_device_to_host(device_ptr[writeback_pos_last],
+                                          writeback_offset_last,
+                                          actual_batch_size_[writeback_pos_last]);
+          }
+          writeback_stream_.synchronize();
+        }
+        break;
+      case memory_strategy::device_only: break;
+    }
+  }
+
+  /**
+   * Returns the next view of the batch
+   *
+   * This function will ensure the next batch is ready and will trigger the prefetch of the
+   * subsequent next batch. If writeback is enabled, the last active batch will be written back to
+   * the host.
+   *
+   * @return The next view of the batch
+   */
+  raft::device_matrix_view<T, IdxT> next_view()
+  {
+    bool end_of_data = static_cast<uint64_t>((batch_id_ + 1) * batch_size_) >=
+                       static_cast<uint64_t>(host_view_.extent(0));
+
+    // special case for empty host view or last batch surpassed
+    if (end_of_data) {
+      return raft::make_device_matrix_view<T, IdxT>(nullptr, 0, host_view_.extent(1));
+    }
+
+    // trigger prefetch of next batch (also increments batch_id_)
+    prefetch_next_batch();
+
+    uint32_t current_pos = batch_id_ % num_buffers_;
+    return raft::make_device_matrix_view<T, IdxT>(
+      device_ptr[current_pos], actual_batch_size_[current_pos], host_view_.extent(1));
+  }
+
+ private:
+  /**
+   * Prefetch the next batch
+   *
+   * This function will prefetch the next batch and will handle the writeback of the data.
+   *
+   * @return True if the next batch exists, false otherwise
+   */
   bool prefetch_next_batch()
   {
     batch_id_++;
@@ -512,77 +612,6 @@ class batched_device_view_from_host {
     return next_batch_exists;
   }
 
-  ~batched_device_view_from_host() noexcept
-  {
-    prefetch_stream_.synchronize();
-    writeback_stream_.synchronize();
-    raft::resource::sync_stream(res_);
-
-    // if data is on host and for_write --> make sure to copy back last active
-    // if data is managed and evict --> evict last active
-
-    // make sure to sync on prefetch stream & res
-    switch (mem_strategy_) {
-      case memory_strategy::managed_only:
-        if (!host_writeback_) {
-          uint32_t discard_pos     = batch_id_ % num_buffers_;
-          size_t discard_size_rows = actual_batch_size_[discard_pos];
-          if (batch_id_ > 0) {
-            discard_pos = (batch_id_ - 1) % num_buffers_;
-            discard_size_rows += batch_size_;
-          }
-          discard_managed_region(device_ptr[discard_pos],
-                                 discard_size_rows * host_view_.extent(1) * sizeof(T));
-        }
-        writeback_stream_.synchronize();
-        break;
-      case memory_strategy::copy_device:
-        if (host_writeback_) {
-          uint32_t writeback_pos_last = batch_id_ % num_buffers_;
-          if (batch_id_ > 0) {
-            uint32_t writeback_pos    = (batch_id_ - 1) % num_buffers_;
-            uint64_t writeback_offset = (batch_id_ - 1) * batch_size_;
-            writeback_from_device_to_host(device_ptr[writeback_pos], writeback_offset, batch_size_);
-          }
-          {
-            uint64_t writeback_offset_last = batch_id_ * batch_size_;
-            writeback_from_device_to_host(device_ptr[writeback_pos_last],
-                                          writeback_offset_last,
-                                          actual_batch_size_[writeback_pos_last]);
-          }
-        }
-        writeback_stream_.synchronize();
-        break;
-      case memory_strategy::device_only: break;
-    }
-  }
-
-  /**
-   * Returns the next view of the batch
-   *
-   * This function will ensure the next batch is ready and will trigger the prefetch of the
-   * subsequent next batch
-   *
-   * @return The next view of the batch
-   */
-  raft::device_matrix_view<T, IdxT> next_view()
-  {
-    // special case for empty host view
-    if (host_view_.extent(0) == 0) {
-      return raft::make_device_matrix_view<T, IdxT>(nullptr, 0, host_view_.extent(1));
-    }
-
-    // trigger prefetch of next batch
-    bool next_batch_exists = prefetch_next_batch();
-
-    RAFT_EXPECTS(batch_id_ * batch_size_ < host_view_.extent(0), "Batch index out of bounds");
-
-    uint32_t current_pos = batch_id_ % num_buffers_;
-    return raft::make_device_matrix_view<T, IdxT>(
-      device_ptr[current_pos], actual_batch_size_[current_pos], host_view_.extent(1));
-  }
-
- private:
   void advise_read_mostly(T* ptr, size_t size)
   {
 #if CUDA_VERSION >= 13000
@@ -627,9 +656,6 @@ class batched_device_view_from_host {
   {
     const size_t n_elem  = num_rows * host_view_.extent(1);
     const size_t n_bytes = n_elem * sizeof(T);
-    RAFT_CUDA_TRY(cudaHostRegister(host_view_.data_handle() + src_row_offset * host_view_.extent(1),
-                                   n_bytes,
-                                   cudaHostRegisterDefault));
     // use memcpy instead of raft::copy to avoid strange behavior with HMM/ATS memory
     RAFT_CUDA_TRY(cudaMemcpyAsync(dev_ptr,
                                   host_view_.data_handle() + src_row_offset * host_view_.extent(1),
