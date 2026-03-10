@@ -360,25 +360,18 @@ class batched_device_view_from_host {
       return;
     }
 
-    cudaPointerAttributes attr;
-    RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, host_view.data_handle()));
-    switch (attr.type) {
+    RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr_, host_view.data_handle()));
+    switch (attr_.type) {
       case cudaMemoryTypeUnregistered:
       case cudaMemoryTypeHost:
       case cudaMemoryTypeManaged: mem_strategy_ = memory_strategy::copy_device; break;
       case cudaMemoryTypeDevice: mem_strategy_ = memory_strategy::device_only; break;
     }
 
-    // setup streams
-    if (res.has_resource_factory(raft::resource::resource_type::CUDA_STREAM_POOL) &&
-        raft::resource::get_stream_pool_size(res) >= 1) {
-      prefetch_stream_  = raft::resource::get_stream_from_stream_pool(res);
-      writeback_stream_ = raft::resource::get_stream_from_stream_pool(res);
-    } else {
-      local_stream_pool_ = std::make_shared<rmm::cuda_stream_pool>(2);
-      prefetch_stream_   = local_stream_pool_.value()->get_stream();
-      writeback_stream_  = local_stream_pool_.value()->get_stream();
-    }
+    RAFT_LOG_DEBUG("Memory strategy: %d for type %d, size %zu",
+                   static_cast<int>(mem_strategy_),
+                   static_cast<int>(attr_.type),
+                   host_view.extent(0) * host_view.extent(1) * sizeof(T));
 
     // buffer allocations
     if (mem_strategy_ == memory_strategy::copy_device) {
@@ -405,19 +398,30 @@ class batched_device_view_from_host {
         }
       } catch (std::bad_alloc& e) {
         RAFT_LOG_DEBUG("Insufficient memory for device buffers");
-        if (attr.devicePointer != nullptr) {
+        if (attr_.devicePointer != nullptr) {
           mem_strategy_ = memory_strategy::managed_only;
         } else {
           throw std::bad_alloc();
         }
       } catch (raft::logic_error& e) {
         RAFT_LOG_DEBUG("Insufficient memory for device buffers (logic error)");
-        if (attr.devicePointer != nullptr) {
+        if (attr_.devicePointer != nullptr) {
           mem_strategy_ = memory_strategy::managed_only;
         } else {
           throw raft::logic_error("Insufficient memory for device buffers (logic error)");
         }
       }
+    }
+
+    // setup streams
+    if (res.has_resource_factory(raft::resource::resource_type::CUDA_STREAM_POOL) &&
+        raft::resource::get_stream_pool_size(res) >= 1) {
+      prefetch_stream_  = raft::resource::get_stream_from_stream_pool(res);
+      writeback_stream_ = raft::resource::get_stream_from_stream_pool(res);
+    } else {
+      local_stream_pool_ = std::make_shared<rmm::cuda_stream_pool>(2);
+      prefetch_stream_   = local_stream_pool_.value()->get_stream();
+      writeback_stream_  = local_stream_pool_.value()->get_stream();
     }
 
     // if data is managed and not for_write_ we can set the attribute on the device ptr
@@ -621,18 +625,29 @@ class batched_device_view_from_host {
 
   void prefetch_from_host_to_device(T* dev_ptr, size_t src_row_offset, size_t num_rows)
   {
-    raft::copy(dev_ptr,
-               host_view_.data_handle() + src_row_offset * host_view_.extent(1),
-               num_rows * host_view_.extent(1),
-               prefetch_stream_);
+    const size_t n_elem  = num_rows * host_view_.extent(1);
+    const size_t n_bytes = n_elem * sizeof(T);
+    RAFT_CUDA_TRY(cudaHostRegister(host_view_.data_handle() + src_row_offset * host_view_.extent(1),
+                                   n_bytes,
+                                   cudaHostRegisterDefault));
+    // use memcpy instead of raft::copy to avoid strange behavior with HMM/ATS memory
+    RAFT_CUDA_TRY(cudaMemcpyAsync(dev_ptr,
+                                  host_view_.data_handle() + src_row_offset * host_view_.extent(1),
+                                  n_bytes,
+                                  cudaMemcpyHostToDevice,
+                                  prefetch_stream_));
   }
 
   void writeback_from_device_to_host(T* dev_ptr, size_t dst_row_offset, size_t num_rows)
   {
-    raft::copy(host_view_.data_handle() + dst_row_offset * host_view_.extent(1),
-               dev_ptr,
-               num_rows * host_view_.extent(1),
-               writeback_stream_);
+    const size_t n_elem  = num_rows * host_view_.extent(1);
+    const size_t n_bytes = n_elem * sizeof(T);
+    // use memcpy instead of raft::copy to avoid strange behavior with HMM/ATS memory
+    RAFT_CUDA_TRY(cudaMemcpyAsync(host_view_.data_handle() + dst_row_offset * host_view_.extent(1),
+                                  dev_ptr,
+                                  n_bytes,
+                                  cudaMemcpyDeviceToHost,
+                                  writeback_stream_));
   }
 
   // stream pool for local streams
@@ -655,6 +670,7 @@ class batched_device_view_from_host {
 
   // input pointer information
   raft::host_matrix_view<T, IdxT> host_view_;
+  cudaPointerAttributes attr_;
 
   // internal device buffers
   uint64_t num_buffers_;

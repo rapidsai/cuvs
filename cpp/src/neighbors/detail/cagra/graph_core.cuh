@@ -648,44 +648,6 @@ __global__ void kern_mst_opt_postprocessing(IdxT* outgoing_num_edges,  // [graph
   }
 }
 
-template <class T>
-uint64_t pos_in_array(T val, const T* array, uint64_t num)
-{
-  for (uint64_t i = 0; i < num; i++) {
-    if (val == array[i]) { return i; }
-  }
-  return num;
-}
-
-template <class T>
-void shift_array(T* array, uint64_t num)
-{
-  for (uint64_t i = num; i > 0; i--) {
-    array[i] = array[i - 1];
-  }
-}
-
-template <typename IdxT>
-void log_replaced_edges_stats(const IdxT* output_graph_ptr,
-                              uint64_t graph_size,
-                              uint64_t output_graph_degree)
-{
-  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
-    "cagra::graph::optimize/stats");
-  uint64_t num_replaced_edges = 0;
-#pragma omp parallel for reduction(+ : num_replaced_edges)
-  for (uint64_t i = 0; i < graph_size; i++) {
-    for (uint64_t k = 0; k < output_graph_degree; k++) {
-      const uint64_t j = output_graph_ptr[k + (output_graph_degree * i)];
-      const uint64_t pos =
-        pos_in_array<IdxT>(j, output_graph_ptr + (output_graph_degree * i), output_graph_degree);
-      if (pos == output_graph_degree) { num_replaced_edges += 1; }
-    }
-  }
-  RAFT_LOG_DEBUG("# Average number of replaced edges per node: %.2f",
-                 (double)num_replaced_edges / graph_size);
-}
-
 template <typename IdxT>
 void log_incoming_edges_histogram(const IdxT* output_graph_ptr,
                                   uint64_t graph_size,
@@ -755,7 +717,10 @@ void check_duplicates_and_out_of_range(const IdxT* output_graph_ptr,
 
       for (uint32_t k = j + 1; k < output_graph_degree; k++) {
         const auto neighbor_b = my_out_graph[k];
-        if (neighbor_a == neighbor_b) { num_dup++; }
+        if (neighbor_a == neighbor_b) {
+          num_dup++;
+          break;
+        }
       }
     }
   }
@@ -1606,10 +1571,10 @@ void prune_graph_gpu(raft::resources const& res,
 }
 
 // TODO allow pinned input for both knn_graph and new_graph
-template <typename IdxT = uint32_t, typename InOutMatrixView>
+template <typename IdxT = uint32_t, typename InputMatrixView, typename OutputMatrixView>
 void optimize(raft::resources const& res,
-              InOutMatrixView knn_graph,
-              InOutMatrixView new_graph,
+              InputMatrixView knn_graph,
+              OutputMatrixView new_graph,
               const bool guarantee_connectivity = true,
               const bool use_gpu                = true)
 {
@@ -1707,8 +1672,6 @@ void optimize(raft::resources const& res,
 
   if (is_ptr_host_accessible(new_graph.data_handle())) {
     // following checks require host access
-    log_replaced_edges_stats<IdxT>(new_graph.data_handle(), graph_size, output_graph_degree);
-
     log_incoming_edges_histogram<IdxT>(new_graph.data_handle(), graph_size, output_graph_degree);
 
     check_duplicates_and_out_of_range<IdxT>(
