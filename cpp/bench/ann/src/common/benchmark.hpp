@@ -357,7 +357,7 @@ void bench_search(::benchmark::State& state,
     const auto& filter_pass_counts = dataset->filter_pass_counts();
     result_buf.transfer_data(MemoryType::kHost, current_algo_props->query_memory_type);
     auto* neighbors_host    = reinterpret_cast<index_type*>(result_buf.data(MemoryType::kHost));
-    std::size_t rows        = std::min({queries_processed, query_set_size, gt_maps.size()});
+    std::size_t rows        = std::min(queries_processed, query_set_size);
     std::size_t match_count = 0;
     std::size_t total_count = 0;
 
@@ -381,7 +381,7 @@ void bench_search(::benchmark::State& state,
       auto recall_calculation = [&](int start, int end, int tid) -> void {
         for (int i = start; i < end; ++i) {
           size_t i_orig_idx = batch_offset + i;
-          if (i_orig_idx >= gt_maps.size()) { break; }
+          if (i_orig_idx >= dataset->gt_maps_size()) { break; }
           size_t i_out_idx = out_offset + i;
           if (i_out_idx < rows) {
             local_total_count[tid] += filter_pass_counts[i_orig_idx];
