@@ -16,7 +16,6 @@ fn main() {
         cuvs_build.display()
     );
     println!("cargo:rustc-link-lib=dylib=cuvs_c");
-    println!("cargo:rustc-link-lib=dylib=cudart");
 
     // we need some extra flags both to link against cuvs, and also to run bindgen
     // specifically we need to:

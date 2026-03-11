@@ -179,7 +179,7 @@ outputs:
         - libraft-headers =${{ minor_version }}
         - nccl ${{ nccl_version }}
         - cuda-version =${{ cuda_version }}
-        - cuda-cudart-dev
+        - cuda-cudart-static
         - cuda-profiler-api
         - libcublas-dev
         - libcurand-dev
@@ -194,7 +194,6 @@ outputs:
         - libraft-headers =${{ minor_version }}
         - librmm =${{ minor_version }}
         - nccl
-        - cuda-cudart
         - libcublas
         - libcurand
         - libcusolver
@@ -204,7 +203,6 @@ outputs:
             - libnvjitlink
       ignore_run_exports:
         by_name:
-          - cuda-cudart
           - cuda-version
           - libaio
           - libboost
@@ -246,7 +244,7 @@ outputs:
         - libraft-headers =${{ minor_version }}
         - nccl ${{ nccl_version }}
         - cuda-version =${{ cuda_version }}
-        - cuda-cudart-dev
+        - cuda-cudart-static
         - cuda-profiler-api
         - libcublas-dev
         - libcurand-dev
@@ -261,7 +259,6 @@ outputs:
         - libraft-headers =${{ minor_version }}
         - librmm =${{ minor_version }}
         - nccl
-        - cuda-cudart
         - libcublas
         - libcurand
         - libcusolver
@@ -271,7 +268,6 @@ outputs:
             - libnvjitlink
       ignore_run_exports:
         by_name:
-          - cuda-cudart
           - cuda-version
           - libaio
           - libboost
