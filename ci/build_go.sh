@@ -31,7 +31,7 @@ set -eu
 rapids-print-env
 
 export CGO_CFLAGS="-I${CONDA_PREFIX}/include"
-export CGO_LDFLAGS="-L${CONDA_PREFIX}/lib -lcudart_static -lcuvs -lcuvs_c"
+export CGO_LDFLAGS="-L${CONDA_PREFIX}/lib -lcudart_static -lcuvs -lcuvs_c -lc"
 export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$LD_LIBRARY_PATH"
 export CC=clang
 
