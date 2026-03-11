@@ -79,6 +79,7 @@ cache:
       - libraft-headers =${{ minor_version }}
       - nccl ${{ nccl_version }}
       - cuda-version =${{ cuda_version }}
+      - cuda-cudart-dev
       - cuda-profiler-api
       - libcublas-dev
       - libcurand-dev
