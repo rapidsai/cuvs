@@ -25,8 +25,7 @@ index_impl<IdxT>::index_impl(raft::resources const& handle,
                              uint32_t pq_bits,
                              uint32_t pq_dim,
                              bool conservative_memory_allocation,
-                             list_layout codes_layout,
-                             bool normalize_for_inner_product)
+                             list_layout codes_layout)
   : metric_(metric),
     codebook_kind_(codebook_kind),
     codes_layout_(codes_layout),
@@ -34,7 +33,6 @@ index_impl<IdxT>::index_impl(raft::resources const& handle,
     pq_bits_(pq_bits),
     pq_dim_(pq_dim == 0 ? index<IdxT>::calculate_pq_dim(dim) : pq_dim),
     conservative_memory_allocation_(conservative_memory_allocation),
-    normalize_for_inner_product_(normalize_for_inner_product),
     lists_(n_lists),
     list_sizes_{raft::make_device_vector<uint32_t, uint32_t>(handle, n_lists)},
     data_ptrs_{raft::make_device_vector<uint8_t*, uint32_t>(handle, n_lists)},
@@ -124,12 +122,6 @@ bool index_impl<IdxT>::conservative_memory_allocation() const noexcept
 }
 
 template <typename IdxT>
-bool index_impl<IdxT>::normalize_for_inner_product() const noexcept
-{
-  return normalize_for_inner_product_;
-}
-
-template <typename IdxT>
 std::vector<std::shared_ptr<list_data_base<IdxT>>>& index_impl<IdxT>::lists() noexcept
 {
   return lists_;
@@ -205,8 +197,7 @@ owning_impl<IdxT>::owning_impl(raft::resources const& handle,
                                uint32_t pq_bits,
                                uint32_t pq_dim,
                                bool conservative_memory_allocation,
-                               list_layout codes_layout,
-                               bool normalize_for_inner_product)
+                               list_layout codes_layout)
   : index_impl<IdxT>(handle,
                      metric,
                      codebook_kind,
@@ -215,8 +206,7 @@ owning_impl<IdxT>::owning_impl(raft::resources const& handle,
                      pq_bits,
                      pq_dim,
                      conservative_memory_allocation,
-                     codes_layout,
-                     normalize_for_inner_product),
+                     codes_layout),
     pq_centers_{raft::make_device_mdarray<float>(
       handle, index<IdxT>::make_pq_centers_extents(dim, pq_dim, pq_bits, codebook_kind, n_lists))},
     centers_{
@@ -257,8 +247,7 @@ view_impl<IdxT>::view_impl(
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_view,
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot_view,
   raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix_view,
-  list_layout codes_layout,
-  bool normalize_for_inner_product)
+  list_layout codes_layout)
   : index_impl<IdxT>(handle,
                      metric,
                      codebook_kind,
@@ -267,8 +256,7 @@ view_impl<IdxT>::view_impl(
                      pq_bits,
                      pq_dim,
                      conservative_memory_allocation,
-                     codes_layout,
-                     normalize_for_inner_product),
+                     codes_layout),
     pq_centers_view_(pq_centers_view),
     centers_view_(centers_view),
     centers_rot_view_(centers_rot_view),
@@ -389,8 +377,6 @@ index<IdxT>::index(raft::resources const& handle)
                                               0,
                                               8,
                                               1,
-                                              true,
-                                              list_layout::INTERLEAVED,
                                               true))
 {
 }
@@ -412,27 +398,20 @@ index<IdxT>::index(raft::resources const& handle,
                                           dim,
                                           pq_bits,
                                           pq_dim == 0 ? index<IdxT>::calculate_pq_dim(dim) : pq_dim,
-                                          conservative_memory_allocation,
-                                          list_layout::INTERLEAVED,
-                                          true))
+                                          conservative_memory_allocation))
 {
 }
 
 template <typename IdxT>
 index<IdxT>::index(raft::resources const& handle, const index_params& params, uint32_t dim)
-  : index(std::make_unique<owning_impl<IdxT>>(
-      handle,
-      params.metric,
-      params.codebook_kind,
-      params.n_lists,
-      dim,
-      params.pq_bits,
-      params.pq_dim == 0 ? index<IdxT>::calculate_pq_dim(dim) : params.pq_dim,
-      params.conservative_memory_allocation,
-      params.codes_layout,
-      (params.metric == cuvs::distance::DistanceType::InnerProduct)
-        ? params.normalize_for_inner_product
-        : true))
+  : index(handle,
+          params.metric,
+          params.codebook_kind,
+          params.n_lists,
+          dim,
+          params.pq_bits,
+          params.pq_dim,
+          params.conservative_memory_allocation)
 {
 }
 
@@ -513,12 +492,6 @@ template <typename IdxT>
 bool index<IdxT>::conservative_memory_allocation() const noexcept
 {
   return impl_->conservative_memory_allocation();
-}
-
-template <typename IdxT>
-bool index<IdxT>::normalize_for_inner_product() const noexcept
-{
-  return impl_->normalize_for_inner_product();
 }
 
 template <typename IdxT>

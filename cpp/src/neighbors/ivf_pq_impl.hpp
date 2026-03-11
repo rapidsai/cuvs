@@ -20,8 +20,7 @@ class index_impl : public index_iface<IdxT> {
              uint32_t pq_bits,
              uint32_t pq_dim,
              bool conservative_memory_allocation,
-             list_layout codes_layout             = list_layout::INTERLEAVED,
-             bool normalize_for_inner_product = true);
+             list_layout codes_layout = list_layout::INTERLEAVED);
 
   ~index_impl()                            = default;
   index_impl(index_impl&&)                 = default;
@@ -42,7 +41,6 @@ class index_impl : public index_iface<IdxT> {
   uint32_t pq_book_size() const noexcept override;
   uint32_t n_lists() const noexcept override;
   bool conservative_memory_allocation() const noexcept override;
-  bool normalize_for_inner_product() const noexcept override;
 
   std::vector<std::shared_ptr<list_data_base<IdxT>>>& lists() noexcept override;
   const std::vector<std::shared_ptr<list_data_base<IdxT>>>& lists() const noexcept override;
@@ -82,7 +80,6 @@ class index_impl : public index_iface<IdxT> {
   uint32_t pq_bits_;
   uint32_t pq_dim_;
   bool conservative_memory_allocation_;
-  bool normalize_for_inner_product_;
 
   // Primary data members
   std::vector<std::shared_ptr<list_data_base<IdxT>>> lists_;
@@ -116,8 +113,7 @@ class owning_impl : public index_impl<IdxT> {
               uint32_t pq_bits,
               uint32_t pq_dim,
               bool conservative_memory_allocation,
-              list_layout codes_layout             = list_layout::INTERLEAVED,
-              bool normalize_for_inner_product = true);
+              list_layout codes_layout = list_layout::INTERLEAVED);
 
   ~owning_impl()                             = default;
   owning_impl(owning_impl&&)                 = default;
@@ -163,8 +159,7 @@ class view_impl : public index_impl<IdxT> {
             raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_view,
             raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot_view,
             raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix_view,
-            list_layout codes_layout             = list_layout::INTERLEAVED,
-            bool normalize_for_inner_product = true);
+            list_layout codes_layout = list_layout::INTERLEAVED);
 
   ~view_impl()                           = default;
   view_impl(view_impl&&)                 = default;

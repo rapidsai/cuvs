@@ -144,11 +144,9 @@ auto deserialize(raft::resources const& handle_, std::istream& is) -> index<IdxT
                  static_cast<int>(pq_bits),
                  static_cast<int>(n_lists));
 
-  // normalize_for_inner_product is not stored in the file. Loaded indices are always treated as
-  // normalized (true). This is correct for any index built with the default; do not serialize
-  // indices built with normalize_for_inner_product=false.
+  // Create owning_impl directly to get mutable access for deserialization
   auto impl = std::make_unique<owning_impl<IdxT>>(
-    handle_, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, cma, codes_layout, true);
+    handle_, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, cma, codes_layout);
 
   // Deserialize center/matrix data using mutable accessors
   raft::deserialize_mdspan(handle_, is, impl->pq_centers());

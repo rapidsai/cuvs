@@ -69,8 +69,7 @@ void select_clusters(raft::resources const& handle,
                      cuvs::distance::DistanceType metric,
                      const T* queries,              // [n_queries, dim]
                      const float* cluster_centers,  // [n_lists, dim_ext]
-                     rmm::mr::device_memory_resource* mr,
-                     bool normalize_for_inner_product = true)
+                     rmm::mr::device_memory_resource* mr)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_pq::search::select_clusters(n_probes = %u, n_queries = %u, n_lists = %u, dim = %u)",
@@ -125,9 +124,10 @@ void select_clusters(raft::resources const& handle,
       return col == dim ? norm_factor : 0.0f;
     });
 
-  // Coarse selection: for InnerProduct we normalize queries only when the index was built with
-  // normalization (cosine-like search). CosineExpanded does not need query norm here (same order).
-  if (metric == cuvs::distance::DistanceType::InnerProduct && normalize_for_inner_product) {
+  // Coarse selection (choosing which cluster query vector matches) only needs the ranking of clusters. (raw q)·(unit center) has the same order
+  // as (unit q)·(unit center), so CosineExpanded does not need query normalization here. For
+  // InnerProduct we normalize so the whole pipeline (coarse + fine) uses the same cosine space.
+  if (metric == cuvs::distance::DistanceType::InnerProduct) {
     auto float_queries_matrix =
       raft::make_device_matrix_view<float, int64_t>(float_queries, n_queries, dim_ext);
     raft::linalg::row_normalize<raft::linalg::L2Norm>(
@@ -189,10 +189,8 @@ void select_clusters(raft::resources const& handle,
                      cuvs::distance::DistanceType metric,
                      const T* queries,               // [n_queries, dim]
                      const int8_t* cluster_centers,  // [n_lists, dim_ext]
-                     rmm::mr::device_memory_resource* mr,
-                     bool normalize_for_inner_product = true)
+                     rmm::mr::device_memory_resource* mr)
 {
-  (void)normalize_for_inner_product;  // int8 path does not normalize queries
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_pq::search::select_clusters(n_probes = %u, n_queries = %u, n_lists = %u, dim = %u)",
     n_probes,
@@ -279,10 +277,8 @@ void select_clusters(raft::resources const& handle,
                      cuvs::distance::DistanceType metric,
                      const T* queries,             // [n_queries, dim]
                      const half* cluster_centers,  // [n_lists, dim_ext]
-                     rmm::mr::device_memory_resource* mr,
-                     bool normalize_for_inner_product = true)
+                     rmm::mr::device_memory_resource* mr)
 {
-  (void)normalize_for_inner_product;  // half path uses same logic as float; normalization in float
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_pq::search::select_clusters(n_probes = %u, n_queries = %u, n_lists = %u, dim = %u)",
     n_probes,
@@ -927,29 +923,6 @@ inline void search(raft::resources const& handle,
   rmm::device_uvector<float> rot_queries(max_bs_outer * index.rot_dim(), stream, mr);
   rmm::device_uvector<uint32_t> clusters_to_probe(max_bs_outer * n_probes, stream, mr);
 
-  std::vector<uint32_t> list_sizes_host;
-  std::vector<uint32_t> clusters_to_probe_batch_host;
-  uint64_t total_vectors_scanned = 0;
-  if (params.total_vectors_scanned != nullptr) {
-    list_sizes_host.resize(index.n_lists());
-    raft::update_host(
-      list_sizes_host.data(), index.list_sizes().data_handle(), index.n_lists(), stream);
-    raft::resource::sync_stream(handle);
-    clusters_to_probe_batch_host.resize(max_bs_outer * n_probes);
-  }
-
-  float coarse_search_total_ms = 0.f;
-  float fine_search_total_ms   = 0.f;
-  cudaEvent_t ev_diag_start = nullptr;
-  cudaEvent_t ev_diag_stop  = nullptr;
-  const bool time_coarse = (params.coarse_search_ms != nullptr);
-  const bool time_fine   = (params.fine_search_ms != nullptr);
-  if (time_coarse || time_fine) {
-    RAFT_CUDA_TRY(cudaEventCreate(&ev_diag_start));
-    RAFT_CUDA_TRY(cudaEventCreate(&ev_diag_stop));
-  }
-  auto stream_raw = stream.value();
-
   auto filter_adapter = cuvs::neighbors::filtering::ivf_to_sample_filter(
     index.inds_ptrs().data_handle(), sample_filter);
   auto search_instance = ivfpq_search<IdxT, decltype(filter_adapter)>::fun(params, index.metric());
@@ -959,7 +932,6 @@ inline void search(raft::resources const& handle,
     raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> batch_scope(
       "ivf_pq::search-batch(queries: %u - %u)", offset_q, offset_q + queries_batch);
 
-    if (time_coarse) { RAFT_CUDA_TRY(cudaEventRecord(ev_diag_start, stream_raw)); }
     std::visit(
       [&](auto&& gemm_qs) {
         using gemm_type  = std::remove_reference_t<decltype(gemm_qs)>;
@@ -975,31 +947,10 @@ inline void search(raft::resources const& handle,
                                index.metric(),
                                queries + static_cast<size_t>(dim) * offset_q,
                                get_centers<value_type, IdxT>(handle, index).data_handle(),
-                               mr,
-                               index.normalize_for_inner_product());
+                               mr);
       },
       gemm_queries);
-    if (time_coarse) {
-      RAFT_CUDA_TRY(cudaEventRecord(ev_diag_stop, stream_raw));
-      RAFT_CUDA_TRY(cudaEventSynchronize(ev_diag_stop));
-      float ms = 0.f;
-      RAFT_CUDA_TRY(cudaEventElapsedTime(&ms, ev_diag_start, ev_diag_stop));
-      coarse_search_total_ms += ms;
-    }
 
-    if (params.total_vectors_scanned != nullptr) {
-      raft::update_host(clusters_to_probe_batch_host.data(),
-                        clusters_to_probe.data(),
-                        static_cast<size_t>(queries_batch) * static_cast<size_t>(n_probes),
-                        stream);
-      raft::resource::sync_stream(handle);
-      for (size_t i = 0; i < static_cast<size_t>(queries_batch) * static_cast<size_t>(n_probes);
-           i++) {
-        total_vectors_scanned += list_sizes_host[clusters_to_probe_batch_host[i]];
-      }
-    }
-
-    if (time_fine) { RAFT_CUDA_TRY(cudaEventRecord(ev_diag_start, stream_raw)); }
     // Rotate queries
     std::visit(
       [&](auto&& gemm_qs) {
@@ -1024,11 +975,11 @@ inline void search(raft::resources const& handle,
                            stream);
       },
       gemm_queries);
-    // For IP/Cosine, the index stores (vector - center) in normalized space when so built.
-    // Normalize rot_queries so we're in the same space.
+    // For IP/Cosine, the index stores (vector - center) in normalized space, then rotated and PQ'd.
+    // Fine search compares rot_queries to those values; normalize rot_queries so we're in the same
+    // space.
     if (index.metric() == distance::DistanceType::CosineExpanded ||
-        (index.metric() == distance::DistanceType::InnerProduct &&
-         index.normalize_for_inner_product())) {
+        index.metric() == distance::DistanceType::InnerProduct) {
       auto rot_queries_view = raft::make_device_matrix_view<float, uint32_t>(
         rot_queries.data(), max_bs_outer, index.rot_dim());
       raft::linalg::row_normalize<raft::linalg::L2Norm>(
@@ -1055,24 +1006,6 @@ inline void search(raft::resources const& handle,
                       params.preferred_shmem_carveout,
                       filter_adapter);
     }
-    if (time_fine) {
-      RAFT_CUDA_TRY(cudaEventRecord(ev_diag_stop, stream_raw));
-      RAFT_CUDA_TRY(cudaEventSynchronize(ev_diag_stop));
-      float ms = 0.f;
-      RAFT_CUDA_TRY(cudaEventElapsedTime(&ms, ev_diag_start, ev_diag_stop));
-      fine_search_total_ms += ms;
-    }
-  }
-
-  if (time_coarse || time_fine) {
-    RAFT_CUDA_TRY(cudaEventDestroy(ev_diag_start));
-    RAFT_CUDA_TRY(cudaEventDestroy(ev_diag_stop));
-    if (params.coarse_search_ms != nullptr) { *params.coarse_search_ms = coarse_search_total_ms; }
-    if (params.fine_search_ms != nullptr) { *params.fine_search_ms = fine_search_total_ms; }
-  }
-
-  if (params.total_vectors_scanned != nullptr) {
-    *params.total_vectors_scanned = total_vectors_scanned;
   }
 }
 

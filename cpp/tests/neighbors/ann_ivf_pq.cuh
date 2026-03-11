@@ -20,13 +20,8 @@
 #include <thrust/sequence.h>
 
 #include <array>
-#include <atomic>
-#include <cstdlib>
 
 namespace cuvs::neighbors::ivf_pq {
-
-// Tally of IP test cases where recall vs raw-IP reference exceeded recall vs cosine reference
-// (normalized index should match cosine ref better; violations are flagged and printed).
 
 struct test_ivf_sample_filter {
   static constexpr unsigned offset = 300;
@@ -241,36 +236,6 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     raft::update_host(distances_ref.data(), distances_naive_dev.data(), queries_size, stream_);
     indices_ref.resize(queries_size);
     raft::update_host(indices_ref.data(), indices_naive_dev.data(), queries_size, stream_);
-    raft::resource::sync_stream(handle_);
-  }
-
-  // Compute reference using raw data (no normalization) for Inner Product. Used to compare
-  // recall: normalized index should have higher recall vs cosine ref than vs raw ref.
-  void calc_ref_raw_ip()
-  {
-    if (ps.index_params.metric != cuvs::distance::DistanceType::InnerProduct) { return; }
-    if (!(std::is_same_v<DataT, float> || std::is_same_v<DataT, int8_t> ||
-          std::is_same_v<DataT, uint8_t>)) {
-      return;
-    }
-    size_t queries_size = size_t{ps.num_queries} * size_t{ps.k};
-    indices_ref_raw.resize(queries_size);
-    distances_ref_raw.resize(queries_size);
-    rmm::device_uvector<EvalT> distances_dev(queries_size, stream_);
-    rmm::device_uvector<IdxT> indices_dev(queries_size, stream_);
-    cuvs::neighbors::naive_knn<EvalT, DataT, int64_t>(
-      handle_,
-      distances_dev.data(),
-      indices_dev.data(),
-      search_queries.data(),
-      database.data(),
-      ps.num_queries,
-      ps.num_db_vecs,
-      ps.dim,
-      ps.k,
-      static_cast<cuvs::distance::DistanceType>((int)ps.index_params.metric));
-    raft::update_host(distances_ref_raw.data(), distances_dev.data(), queries_size, stream_);
-    raft::update_host(indices_ref_raw.data(), indices_dev.data(), queries_size, stream_);
     raft::resource::sync_stream(handle_);
   }
 
@@ -684,7 +649,72 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
   {
     index<IdxT> index = build_index();
 
-    log_ivf_pq_cluster_sizes(index, "normalized");
+    {
+      std::vector<uint32_t> list_sizes_host(index.n_lists());
+      raft::update_host(
+        list_sizes_host.data(), index.list_sizes().data_handle(), index.n_lists(), stream_);
+      raft::resource::sync_stream(handle_);
+      uint32_t n_empty = 0;
+      for (uint32_t i = 0; i < index.n_lists(); i++) {
+        if (list_sizes_host[i] == 0) { n_empty++; }
+      }
+      // Top 3 largest: (size, label)
+      std::array<std::pair<uint32_t, uint32_t>, 3> top3 = {{{0, 0}, {0, 0}, {0, 0}}};
+      for (uint32_t i = 0; i < index.n_lists(); i++) {
+        uint32_t s = list_sizes_host[i];
+        if (s > top3[0].first) {
+          top3[2] = top3[1];
+          top3[1] = top3[0];
+          top3[0] = {s, i};
+        } else if (s > top3[1].first) {
+          top3[2] = top3[1];
+          top3[1] = {s, i};
+        } else if (s > top3[2].first) {
+          top3[2] = {s, i};
+        }
+      }
+      // Bottom 3 smallest (smallest non-empty, or 0 if we have empty clusters)
+      std::array<std::pair<uint32_t, uint32_t>, 3> bot3 = {
+        {{std::numeric_limits<uint32_t>::max(), 0},
+         {std::numeric_limits<uint32_t>::max(), 0},
+         {std::numeric_limits<uint32_t>::max(), 0}}};
+      for (uint32_t i = 0; i < index.n_lists(); i++) {
+        uint32_t s = list_sizes_host[i];
+        if (s < bot3[0].first) {
+          bot3[2] = bot3[1];
+          bot3[1] = bot3[0];
+          bot3[0] = {s, i};
+        } else if (s < bot3[1].first) {
+          bot3[2] = bot3[1];
+          bot3[1] = {s, i};
+        } else if (s < bot3[2].first) {
+          bot3[2] = {s, i};
+        }
+      }
+      for (auto& p : bot3) {
+        if (p.first == std::numeric_limits<uint32_t>::max()) { p.first = 0; }
+      }
+      RAFT_LOG_INFO(
+        "IVF-PQ cluster sizes: n_lists=%u, clusters_with_0_records=%u",
+        index.n_lists(),
+        n_empty);
+      RAFT_LOG_INFO(
+        "  top3: largest %u (label %u), 2nd %u (label %u), 3rd %u (label %u)",
+        top3[0].first,
+        top3[0].second,
+        top3[1].first,
+        top3[1].second,
+        top3[2].first,
+        top3[2].second);
+      RAFT_LOG_INFO(
+        "  bottom3: smallest %u (label %u), 2nd %u (label %u), 3rd %u (label %u)",
+        bot3[0].first,
+        bot3[0].second,
+        bot3[1].first,
+        bot3[1].second,
+        bot3[2].first,
+        bot3[2].second);
+    }
 
     double compression_ratio =
       static_cast<double>(ps.dim * 8) / static_cast<double>(index.pq_dim() * index.pq_bits());
@@ -721,144 +751,12 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     auto dists_view = raft::make_device_matrix_view<EvalT, uint32_t>(
       distances_ivf_pq_dev.data(), ps.num_queries, ps.k);
 
-    // For IP: build raw index too and compare apple-to-apple (normalized vs normalized, raw vs raw).
-    const bool need_float_normalized =
-      (ps.index_params.metric == cuvs::distance::DistanceType::InnerProduct) &&
-      (std::is_same_v<DataT, float> || std::is_same_v<DataT, int8_t> ||
-       std::is_same_v<DataT, uint8_t>);
-
-    float search_ms_normalized = 0.f;
-    uint64_t vectors_scanned_normalized = 0;
-    float coarse_ms_norm = 0.f, fine_ms_norm = 0.f;
-    if (need_float_normalized) {
-      raft::resource::sync_stream(handle_);
-      auto params_norm = ps.search_params;
-      params_norm.total_vectors_scanned = &vectors_scanned_normalized;
-      params_norm.coarse_search_ms      = &coarse_ms_norm;
-      params_norm.fine_search_ms        = &fine_ms_norm;
-      cudaEvent_t ev_start = nullptr, ev_stop = nullptr;
-      RAFT_CUDA_TRY(cudaEventCreate(&ev_start));
-      RAFT_CUDA_TRY(cudaEventCreate(&ev_stop));
-      RAFT_CUDA_TRY(cudaEventRecord(ev_start, stream_.value()));
-      cuvs::neighbors::ivf_pq::search(
-        handle_, params_norm, index, query_view, inds_view, dists_view);
-      RAFT_CUDA_TRY(cudaEventRecord(ev_stop, stream_.value()));
-      RAFT_CUDA_TRY(cudaEventSynchronize(ev_stop));
-      RAFT_CUDA_TRY(cudaEventElapsedTime(&search_ms_normalized, ev_start, ev_stop));
-      RAFT_CUDA_TRY(cudaEventDestroy(ev_start));
-      RAFT_CUDA_TRY(cudaEventDestroy(ev_stop));
-    } else {
-      cuvs::neighbors::ivf_pq::search(
-        handle_, ps.search_params, index, query_view, inds_view, dists_view);
-    }
+    cuvs::neighbors::ivf_pq::search(
+      handle_, ps.search_params, index, query_view, inds_view, dists_view);
 
     raft::update_host(distances_ivf_pq.data(), distances_ivf_pq_dev.data(), queries_size, stream_);
     raft::update_host(indices_ivf_pq.data(), indices_ivf_pq_dev.data(), queries_size, stream_);
     raft::resource::sync_stream(handle_);
-
-    if (need_float_normalized) {
-      calc_ref_raw_ip();
-      auto [recall_norm_vs_norm, _, __] = cuvs::neighbors::calc_recall(
-        indices_ref, indices_ivf_pq, ps.num_queries, ps.k);
-      // Build raw index and compare to raw reference
-      auto raw_ipams                       = ps.index_params;
-      raw_ipams.normalize_for_inner_product = false;
-      raw_ipams.add_data_on_build           = true;
-      auto raw_index                        = cuvs::neighbors::ivf_pq::build(
-        handle_,
-        raw_ipams,
-        raft::make_device_matrix_view<const DataT, int64_t>(database.data(), ps.num_db_vecs, ps.dim));
-      log_ivf_pq_cluster_sizes(raw_index, "raw");
-      std::vector<IdxT> indices_ivf_pq_raw(queries_size);
-      rmm::device_uvector<IdxT> inds_raw_dev(queries_size, stream_);
-      rmm::device_uvector<EvalT> dist_raw_dev(queries_size, stream_);
-      uint64_t vectors_scanned_raw = 0;
-      float coarse_ms_raw = 0.f, fine_ms_raw = 0.f;
-      auto params_raw              = ps.search_params;
-      params_raw.total_vectors_scanned = &vectors_scanned_raw;
-      params_raw.coarse_search_ms      = &coarse_ms_raw;
-      params_raw.fine_search_ms        = &fine_ms_raw;
-      raft::resource::sync_stream(handle_);
-      cudaEvent_t ev_start_raw = nullptr, ev_stop_raw = nullptr;
-      RAFT_CUDA_TRY(cudaEventCreate(&ev_start_raw));
-      RAFT_CUDA_TRY(cudaEventCreate(&ev_stop_raw));
-      RAFT_CUDA_TRY(cudaEventRecord(ev_start_raw, stream_.value()));
-      cuvs::neighbors::ivf_pq::search(handle_,
-                                     params_raw,
-                                     raw_index,
-                                     query_view,
-                                     raft::make_device_matrix_view<IdxT, uint32_t>(
-                                       inds_raw_dev.data(), ps.num_queries, ps.k),
-                                     raft::make_device_matrix_view<EvalT, uint32_t>(
-                                       dist_raw_dev.data(), ps.num_queries, ps.k));
-      RAFT_CUDA_TRY(cudaEventRecord(ev_stop_raw, stream_.value()));
-      RAFT_CUDA_TRY(cudaEventSynchronize(ev_stop_raw));
-      float search_ms_raw = 0.f;
-      RAFT_CUDA_TRY(cudaEventElapsedTime(&search_ms_raw, ev_start_raw, ev_stop_raw));
-      RAFT_CUDA_TRY(cudaEventDestroy(ev_start_raw));
-      RAFT_CUDA_TRY(cudaEventDestroy(ev_stop_raw));
-      raft::update_host(indices_ivf_pq_raw.data(), inds_raw_dev.data(), queries_size, stream_);
-      raft::resource::sync_stream(handle_);
-      auto [recall_raw_vs_raw, ___, ____] = cuvs::neighbors::calc_recall(
-        indices_ref_raw, indices_ivf_pq_raw, ps.num_queries, ps.k);
-      RAFT_LOG_INFO(
-        "IP: recall(norm)=%.6f  recall(raw)=%.6f  search(norm)=%.3f  search(raw)=%.3f ms  "
-        "vectors_scanned(norm)=%lu  vectors_scanned(raw)=%lu  coarse(norm)=%.3f  coarse(raw)=%.3f "
-        "fine(norm)=%.3f  fine(raw)=%.3f ms",
-        recall_norm_vs_norm,
-        recall_raw_vs_raw,
-        search_ms_normalized,
-        search_ms_raw,
-        static_cast<unsigned long>(vectors_scanned_normalized),
-        static_cast<unsigned long>(vectors_scanned_raw),
-        coarse_ms_norm,
-        coarse_ms_raw,
-        fine_ms_norm,
-        fine_ms_raw);
-      // Same test with high n_probes for comparison (normalized recall should improve, raw ~same).
-      const uint32_t n_probes_high = std::min(64u, ps.index_params.n_lists);
-      if (n_probes_high > ps.search_params.n_probes) {
-        auto search_params_high     = ps.search_params;
-        search_params_high.n_probes = n_probes_high;
-        cuvs::neighbors::ivf_pq::search(handle_,
-                                        search_params_high,
-                                        index,
-                                        query_view,
-                                        inds_view,
-                                        dists_view);
-        raft::update_host(indices_ivf_pq.data(), indices_ivf_pq_dev.data(), queries_size, stream_);
-        raft::resource::sync_stream(handle_);
-        auto [recall_norm_high, _____, ______] = cuvs::neighbors::calc_recall(
-          indices_ref, indices_ivf_pq, ps.num_queries, ps.k);
-        cuvs::neighbors::ivf_pq::search(handle_,
-                                        search_params_high,
-                                        raw_index,
-                                        query_view,
-                                        raft::make_device_matrix_view<IdxT, uint32_t>(
-                                          inds_raw_dev.data(), ps.num_queries, ps.k),
-                                        raft::make_device_matrix_view<EvalT, uint32_t>(
-                                          dist_raw_dev.data(), ps.num_queries, ps.k));
-        raft::update_host(indices_ivf_pq_raw.data(), inds_raw_dev.data(), queries_size, stream_);
-        raft::resource::sync_stream(handle_);
-        auto [recall_raw_high, _______, ________] = cuvs::neighbors::calc_recall(
-          indices_ref_raw, indices_ivf_pq_raw, ps.num_queries, ps.k);
-        RAFT_LOG_INFO(
-          "IP (n_probes=%u): recall(normalized vs normalized)=%.6f  recall(raw vs raw)=%.6f",
-          n_probes_high,
-          recall_norm_high,
-          recall_raw_high);
-        // Restore original search results for ASSERT below.
-        cuvs::neighbors::ivf_pq::search(handle_,
-                                         ps.search_params,
-                                         index,
-                                         query_view,
-                                         inds_view,
-                                         dists_view);
-        raft::update_host(indices_ivf_pq.data(), indices_ivf_pq_dev.data(), queries_size, stream_);
-        raft::update_host(distances_ivf_pq.data(), distances_ivf_pq_dev.data(), queries_size, stream_);
-        raft::resource::sync_stream(handle_);
-      }
-    }
 
     // A very conservative lower bound on recall
     double min_recall =
@@ -928,73 +826,6 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
   }
 
  private:
-  void log_ivf_pq_cluster_sizes(const index<IdxT>& idx, const char* label) const
-  {
-    std::vector<uint32_t> list_sizes_host(idx.n_lists());
-    raft::update_host(
-      list_sizes_host.data(), idx.list_sizes().data_handle(), idx.n_lists(), stream_);
-    raft::resource::sync_stream(handle_);
-    uint32_t n_empty = 0;
-    for (uint32_t i = 0; i < idx.n_lists(); i++) {
-      if (list_sizes_host[i] == 0) { n_empty++; }
-    }
-    std::array<std::pair<uint32_t, uint32_t>, 3> top3 = {{{0, 0}, {0, 0}, {0, 0}}};
-    for (uint32_t i = 0; i < idx.n_lists(); i++) {
-      uint32_t s = list_sizes_host[i];
-      if (s > top3[0].first) {
-        top3[2] = top3[1];
-        top3[1] = top3[0];
-        top3[0] = {s, i};
-      } else if (s > top3[1].first) {
-        top3[2] = top3[1];
-        top3[1] = {s, i};
-      } else if (s > top3[2].first) {
-        top3[2] = {s, i};
-      }
-    }
-    std::array<std::pair<uint32_t, uint32_t>, 3> bot3 = {
-      {{std::numeric_limits<uint32_t>::max(), 0},
-       {std::numeric_limits<uint32_t>::max(), 0},
-       {std::numeric_limits<uint32_t>::max(), 0}}};
-    for (uint32_t i = 0; i < idx.n_lists(); i++) {
-      uint32_t s = list_sizes_host[i];
-      if (s < bot3[0].first) {
-        bot3[2] = bot3[1];
-        bot3[1] = bot3[0];
-        bot3[0] = {s, i};
-      } else if (s < bot3[1].first) {
-        bot3[2] = bot3[1];
-        bot3[1] = {s, i};
-      } else if (s < bot3[2].first) {
-        bot3[2] = {s, i};
-      }
-    }
-    for (auto& p : bot3) {
-      if (p.first == std::numeric_limits<uint32_t>::max()) { p.first = 0; }
-    }
-    RAFT_LOG_INFO(
-      "IVF-PQ cluster sizes (%s): n_lists=%u, clusters_with_0_records=%u",
-      label,
-      idx.n_lists(),
-      n_empty);
-    RAFT_LOG_INFO(
-      "  top3: largest %u (label %u), 2nd %u (label %u), 3rd %u (label %u)",
-      top3[0].first,
-      top3[0].second,
-      top3[1].first,
-      top3[1].second,
-      top3[2].first,
-      top3[2].second);
-    RAFT_LOG_INFO(
-      "  bottom3: smallest %u (label %u), 2nd %u (label %u), 3rd %u (label %u)",
-      bot3[0].first,
-      bot3[0].second,
-      bot3[1].first,
-      bot3[1].second,
-      bot3[2].first,
-      bot3[2].second);
-  }
-
   raft::resources handle_;
   rmm::cuda_stream_view stream_;
   ivf_pq_inputs ps;                           // NOLINT
@@ -1002,8 +833,6 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
   rmm::device_uvector<DataT> search_queries;  // NOLINT
   std::vector<IdxT> indices_ref;              // NOLINT
   std::vector<EvalT> distances_ref;           // NOLINT
-  std::vector<IdxT> indices_ref_raw;          // NOLINT (raw IP reference for comparison)
-  std::vector<EvalT> distances_ref_raw;       // NOLINT
 };
 
 /**
@@ -1427,15 +1256,6 @@ inline auto enum_variety_ip() -> test_cases_t
     }
     y.index_params.metric = distance::DistanceType::InnerProduct;
     return y;
-  });
-}
-
-/** Same as enum_variety_ip() but with n_probes = 64 (capped at n_lists) for recall vs probes experiments. */
-inline auto enum_variety_ip_high_probes(uint32_t n_probes = 64) -> test_cases_t
-{
-  return map<ivf_pq_inputs>(enum_variety_ip(), [n_probes](ivf_pq_inputs x) {
-    x.search_params.n_probes = std::min(n_probes, x.index_params.n_lists);
-    return x;
   });
 }
 
