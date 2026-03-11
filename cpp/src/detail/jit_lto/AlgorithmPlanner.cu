@@ -56,7 +56,7 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::get_launcher()
     add_entrypoint();
     add_device_functions();
     std::string log_message =
-      "JIT compiling launcher for fragment: " + this->fragment_key + " and device functions: ";
+      "JIT compiling launcher for kernel: " + this->fragment_key + " and device functions: ";
     for (const auto& device_function : this->device_functions) {
       log_message += device_function + ",";
     }
