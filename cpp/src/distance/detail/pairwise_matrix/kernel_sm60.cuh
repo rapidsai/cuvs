@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -41,7 +41,6 @@ __launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL
 
   // Always write output
   constexpr bool write_out = true;
-  constexpr bool use_norms = distance_op.use_norms;
   PairwiseDistances<DataT,
                     OutT,
                     IdxT,

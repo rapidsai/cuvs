@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,6 +17,7 @@
 #include <raft/core/mdspan.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/norm.cuh>
+#include <raft/linalg/reduce.cuh>
 
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
@@ -46,16 +47,16 @@ void index<T, IdxT>::compute_dataset_norms_(raft::resources const& res)
   // first scale the dataset and then compute norms
   auto scaled_sq_op = raft::compose_op(
     raft::sq_op{}, raft::div_const_op<float>{float(kScale)}, raft::cast_op<float>());
-  raft::linalg::reduce<true, true, T, float, int64_t>(dataset_norms_->data_handle(),
-                                                      dataset_view.data_handle(),
-                                                      dataset_view.stride(0),
-                                                      dataset_view.extent(0),
-                                                      (float)0,
-                                                      raft::resource::get_cuda_stream(res),
-                                                      false,
-                                                      scaled_sq_op,
-                                                      raft::add_op(),
-                                                      raft::sqrt_op{});
+  raft::linalg::reduce<raft::Apply::ALONG_ROWS>(
+    res,
+    raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
+      dataset_view.data_handle(), dataset_view.extent(0), dataset_view.stride(0)),
+    dataset_norms_->view(),
+    (float)0,
+    false,
+    scaled_sq_op,
+    raft::add_op(),
+    raft::sqrt_op{});
 }
 
 /**
@@ -398,12 +399,23 @@ void extend(
 
 template <class T, class IdxT>
 index<T, IdxT> merge(raft::resources const& handle,
-                     const cagra::merge_params& params,
-                     std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices)
+                     const cagra::index_params& params,
+                     std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,
+                     const cuvs::neighbors::filtering::base_filter& row_filter)
 {
-  return cagra::detail::merge<T, IdxT>(handle, params, indices);
+  return cagra::detail::merge<T, IdxT>(handle, params, indices, row_filter);
 }
 
 /** @} */  // end group cagra
 
 }  // namespace cuvs::neighbors::cagra
+
+#define CUVS_INST_CAGRA_MERGE(T, IdxT)                                                  \
+  auto merge(raft::resources const& handle,                                             \
+             const cuvs::neighbors::cagra::index_params& params,                        \
+             std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,             \
+             const cuvs::neighbors::filtering::base_filter& row_filter)                 \
+    -> cuvs::neighbors::cagra::index<T, IdxT>                                           \
+  {                                                                                     \
+    return cuvs::neighbors::cagra::merge<T, IdxT>(handle, params, indices, row_filter); \
+  }

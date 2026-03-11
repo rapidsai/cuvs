@@ -1,6 +1,6 @@
 # =============================================================================
 # cmake-format: off
-# SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 # =============================================================================
@@ -36,7 +36,7 @@ include(rapids-find)
 rapids_cpm_init()
 
 # --- cuVS ---#
-find_package(cuvs "${RAPIDS_VERSION}" REQUIRED COMPONENTS c_api)
+find_package(cuvs "${RAPIDS_VERSION}" REQUIRED COMPONENTS cuvs_cpp_headers cuvs cuvs_shared c_api)
 
 # --- dlpack ---#
 include(../../cpp/cmake/thirdparty/get_dlpack.cmake)

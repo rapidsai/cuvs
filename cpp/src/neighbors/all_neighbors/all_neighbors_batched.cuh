@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -15,8 +15,11 @@
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/refine.hpp>
 #include <optional>
+#include <raft/core/copy.cuh>
 #include <raft/core/device_mdarray.hpp>
+#include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdarray.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/managed_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/multi_gpu.hpp>
@@ -121,10 +124,11 @@ void single_gpu_assign_clusters(
   for (size_t i = 0; i < num_batches; i++) {
     size_t row_offset              = n_rows_per_batch * i + base_row_offset;
     size_t n_rows_of_current_batch = std::min(n_rows_per_batch, num_rows - row_offset);
-    raft::copy(dataset_batch_d.data_handle(),
-               dataset.data_handle() + row_offset * num_cols,
-               n_rows_of_current_batch * num_cols,
-               stream);
+    raft::copy(res,
+               raft::make_device_vector_view(dataset_batch_d.data_handle(),
+                                             n_rows_of_current_batch * num_cols),
+               raft::make_host_vector_view<const T>(dataset.data_handle() + row_offset * num_cols,
+                                                    n_rows_of_current_batch * num_cols));
 
     // n_clusters is usually not large, so okay to do this brute-force
     cuvs::neighbors::brute_force::search(res,
@@ -132,10 +136,12 @@ void single_gpu_assign_clusters(
                                          raft::make_const_mdspan(dataset_batch_d.view()),
                                          nearest_clusters_idx_d.view(),
                                          nearest_clusters_dist_d.view());
-    raft::copy(global_nearest_cluster.data_handle() + row_offset * overlap_factor,
-               nearest_clusters_idx_d.data_handle(),
-               n_rows_of_current_batch * overlap_factor,
-               stream);
+    raft::copy(res,
+               raft::make_host_vector_view(
+                 global_nearest_cluster.data_handle() + row_offset * overlap_factor,
+                 n_rows_of_current_batch * overlap_factor),
+               raft::make_device_vector_view<const IdxT>(nearest_clusters_idx_d.data_handle(),
+                                                         n_rows_of_current_batch * overlap_factor));
   }
 }
 
@@ -160,10 +166,10 @@ void assign_clusters(raft::resources const& res,
   size_t num_cols = static_cast<size_t>(dataset.extent(1));
 
   auto centroids_h = raft::make_host_matrix<T, IdxT>(params.n_clusters, num_cols);
-  raft::copy(centroids_h.data_handle(),
-             centroids.data_handle(),
-             params.n_clusters * num_cols,
-             raft::resource::get_cuda_stream(res));
+  raft::copy(
+    res,
+    raft::make_host_vector_view(centroids_h.data_handle(), params.n_clusters * num_cols),
+    raft::make_device_vector_view<const T>(centroids.data_handle(), params.n_clusters * num_cols));
 
   size_t n_rows_per_cluster = (num_rows + params.n_clusters - 1) / params.n_clusters;
 
@@ -179,10 +185,11 @@ void assign_clusters(raft::resources const& res,
 
       auto centroids_matrix =
         raft::make_device_matrix<T, IdxT>(dev_res, params.n_clusters, num_cols);
-      raft::copy(centroids_matrix.data_handle(),
-                 centroids_h.data_handle(),
-                 params.n_clusters * num_cols,
-                 raft::resource::get_cuda_stream(dev_res));
+      raft::copy(
+        dev_res,
+        raft::make_device_vector_view(centroids_matrix.data_handle(), params.n_clusters * num_cols),
+        raft::make_host_vector_view<const T>(centroids_h.data_handle(),
+                                             params.n_clusters * num_cols));
 
       size_t base_cluster_idx = rank * clusters_per_rank + std::min((size_t)rank, rem);
 
@@ -349,21 +356,20 @@ void multi_gpu_batch_build(const raft::resources& handle,
   size_t rem               = params.n_clusters - clusters_per_rank * num_ranks;
 
   auto cluster_offsets = raft::make_host_vector<IdxT, IdxT>(cluster_offsets_c.size());
-  raft::copy(cluster_offsets.data_handle(),
-             cluster_offsets_c.data_handle(),
-             cluster_offsets_c.size(),
-             raft::resource::get_cuda_stream(handle));
+  raft::copy(handle, cluster_offsets.view(), cluster_offsets_c);
 
   using ReachabilityPP = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, T>;
   const bool mutual_reach_dist = std::is_same_v<DistEpilogueT, ReachabilityPP>;
   std::optional<raft::host_vector<T, IdxT>> core_distances_h;
   if constexpr (mutual_reach_dist) {
     core_distances_h.emplace(raft::make_host_vector<T, IdxT>(num_rows));
-    raft::copy(core_distances_h.value().data_handle(),
-               dist_epilogue.core_dists,
-               num_rows,
-               raft::resource::get_cuda_stream(handle));
+    raft::copy(handle,
+               core_distances_h.value().view(),
+               raft::make_device_vector_view<const T, IdxT>(dist_epilogue.core_dists, num_rows));
   }
+
+  // Ensure all async copies complete before starting parallel region
+  raft::resource::sync_stream(handle);
 
 #pragma omp parallel for num_threads(num_ranks)
   for (int rank = 0; rank < num_ranks; rank++) {
@@ -412,10 +418,9 @@ void multi_gpu_batch_build(const raft::resources& handle,
     auto dist_epilgogue_for_rank = [&]() {
       if constexpr (mutual_reach_dist) {
         core_distances_d_for_rank.emplace(raft::make_device_vector<T, IdxT>(dev_res, num_rows));
-        raft::copy(core_distances_d_for_rank.value().data_handle(),
-                   core_distances_h.value().data_handle(),
-                   num_rows,
-                   raft::resource::get_cuda_stream(dev_res));
+        raft::copy(dev_res,
+                   core_distances_d_for_rank.value().view(),
+                   raft::make_const_mdspan(core_distances_h.value().view()));
         return ReachabilityPP{
           core_distances_d_for_rank.value().data_handle(), dist_epilogue.alpha, num_rows};
       } else {
@@ -526,9 +531,49 @@ void batch_build(
   auto global_neighbors = raft::make_managed_matrix<IdxT, IdxT>(handle, num_rows, k);
   auto global_distances = raft::make_managed_matrix<T, IdxT>(handle, num_rows, k);
 
+  if (raft::resource::is_multi_gpu(handle)) {
+    // Check if any GPU is Turing (SM 7.5) or older. These architectures have issues with
+    // multi-GPU managed memory coherence for concurrent writes. Force CPU-resident memory
+    // to ensure all GPUs access through host memory, avoiding page migration issues.
+    // Ampere (SM 8.0+) and newer architectures handle this correctly.
+    int num_ranks         = raft::resource::get_num_ranks(handle);
+    bool needs_workaround = false;
+    int original_device;
+    RAFT_CUDA_TRY(cudaGetDevice(&original_device));
+    for (int rank = 0; rank < num_ranks; rank++) {
+      raft::resource::set_current_device_to_rank(handle, rank);
+      int device_id;
+      RAFT_CUDA_TRY(cudaGetDevice(&device_id));
+      int major = 0;
+      RAFT_CUDA_TRY(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device_id));
+      if (major < 8) {
+        needs_workaround = true;
+        break;
+      }  // Turing is 7.x, Ampere is 8.x
+    }
+    RAFT_CUDA_TRY(cudaSetDevice(original_device));
+
+    if (needs_workaround) {
+      RAFT_LOG_DEBUG("Applying managed memory workaround for pre-Ampere GPU architecture");
+      cudaMemLocation cpu_location = {cudaMemLocationTypeHost, 0};
+      RAFT_CUDA_TRY(cudaMemAdvise(global_neighbors.data_handle(),
+                                  num_rows * k * sizeof(IdxT),
+                                  cudaMemAdviseSetPreferredLocation,
+                                  cpu_location));
+      RAFT_CUDA_TRY(cudaMemAdvise(global_distances.data_handle(),
+                                  num_rows * k * sizeof(T),
+                                  cudaMemAdviseSetPreferredLocation,
+                                  cpu_location));
+    }
+  }
+
   reset_global_matrices(handle, params.metric, global_neighbors.view(), global_distances.view());
 
   if (raft::resource::is_multi_gpu(handle)) {
+    // For multi-GPU: sync the stream to ensure fill completes before other GPUs access
+    // the managed memory.
+    raft::resource::sync_stream(handle);
+
     multi_gpu_batch_build(handle,
                           params,
                           dataset,
@@ -561,15 +606,15 @@ void batch_build(
                            inverted_indices_view);
   }
 
-  raft::copy(indices.data_handle(),
-             global_neighbors.data_handle(),
-             num_rows * k,
-             raft::resource::get_cuda_stream(handle));
+  raft::copy(
+    handle,
+    raft::make_device_vector_view(indices.data_handle(), num_rows * k),
+    raft::make_device_vector_view<const IdxT>(global_neighbors.data_handle(), num_rows * k));
   if (distances.has_value()) {
-    raft::copy(distances.value().data_handle(),
-               global_distances.data_handle(),
-               num_rows * k,
-               raft::resource::get_cuda_stream(handle));
+    raft::copy(
+      handle,
+      raft::make_device_vector_view(distances.value().data_handle(), num_rows * k),
+      raft::make_device_vector_view<const T>(global_distances.data_handle(), num_rows * k));
   }
 }
 

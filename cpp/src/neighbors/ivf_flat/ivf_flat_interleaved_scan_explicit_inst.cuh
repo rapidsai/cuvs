@@ -1,12 +1,16 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
 #include "../detail/ann_utils.cuh"
+#ifdef CUVS_ENABLE_JIT_LTO
+#include "ivf_flat_interleaved_scan_jit.cuh"
+#else
 #include "ivf_flat_interleaved_scan.cuh"
+#endif
 #include <cstdint>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -15,10 +15,10 @@
 #define cutlass cuvs_cutlass
 #endif
 
-#include "epilogue_elementwise.cuh"     // FusedDistanceNNEpilogueElementwise
-#include "gemm.h"                       // FusedDistanceNNGemm
-#include <raft/util/cudart_utils.hpp>   // getMultiProcessorCount
-#include <raft/util/cutlass_utils.cuh>  // RAFT_CUTLASS_TRY
+#include "../../../util/cutlass_utils.hpp"  // CUVS_CUTLASS_TRY
+#include "epilogue_elementwise.cuh"         // FusedDistanceNNEpilogueElementwise
+#include "gemm.h"                           // FusedDistanceNNGemm
+#include <raft/util/cudart_utils.hpp>       // getMultiProcessorCount
 
 #include <rmm/device_uvector.hpp>
 
@@ -152,11 +152,11 @@ void cutlassFusedDistanceNN(const DataT* x,
   // Instantiate CUTLASS kernel depending on templates
   fusedDistanceNN fusedDistanceNN_op;
   // Check the problem size is supported or not
-  RAFT_CUTLASS_TRY(fusedDistanceNN_op.can_implement(arguments));
+  CUVS_CUTLASS_TRY(fusedDistanceNN_op.can_implement(arguments));
   // Initialize CUTLASS kernel with arguments and workspace pointer
-  RAFT_CUTLASS_TRY(fusedDistanceNN_op.initialize(arguments, workspace.data(), stream));
+  CUVS_CUTLASS_TRY(fusedDistanceNN_op.initialize(arguments, workspace.data(), stream));
   // Launch initialized CUTLASS kernel
-  RAFT_CUTLASS_TRY(fusedDistanceNN_op.run(stream));
+  CUVS_CUTLASS_TRY(fusedDistanceNN_op.run(stream));
 }
 
 };  // namespace detail

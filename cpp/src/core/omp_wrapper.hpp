@@ -13,8 +13,10 @@ int get_max_threads();
 int get_num_procs();
 int get_num_threads();
 int get_thread_num();
+int get_nested();
 
 void set_nested(int v);
+void set_num_threads(int v);
 
 void check_threads(const int requirements);
 

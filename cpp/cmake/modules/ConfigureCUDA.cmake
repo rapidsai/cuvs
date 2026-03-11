@@ -1,6 +1,6 @@
 # =============================================================================
 # cmake-format: off
-# SPDX-FileCopyrightText: Copyright (c) 2018-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2018-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 # =============================================================================
@@ -33,11 +33,6 @@ if(CMAKE_COMPILER_IS_GNUCXX)
   endif()
 endif()
 
-# Allow invalid CUDA kernels in the short term
-if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 12.8.0)
-  list(APPEND CUVS_CUDA_FLAGS -static-global-template-stub=false)
-endif()
-
 if(CUDA_LOG_COMPILE_TIME)
   list(APPEND CUVS_CUDA_FLAGS "--time=nvcc_compile_log.csv")
 endif()
@@ -60,8 +55,5 @@ if(OpenMP_FOUND)
 endif()
 
 # Debug options
-if(CMAKE_BUILD_TYPE MATCHES Debug)
-  message(VERBOSE "cuVS: Building with debugging flags")
-  list(APPEND CUVS_CUDA_FLAGS -G -Xcompiler=-rdynamic --maxrregcount=64)
-  list(APPEND CUVS_CUDA_FLAGS -Xptxas --suppress-stack-size-warning)
-endif()
+list(APPEND CUVS_DEBUG_CUDA_FLAGS -G -Xcompiler=-rdynamic --maxrregcount=64)
+list(APPEND CUVS_DEBUG_CUDA_FLAGS -Xptxas --suppress-stack-size-warning)

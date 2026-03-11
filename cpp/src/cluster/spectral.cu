@@ -23,4 +23,12 @@ CUVS_INST_SPECTRAL(double);
 
 #undef CUVS_INST_SPECTRAL
 
+void fit_predict(raft::resources const& handle,
+                 params config,
+                 raft::device_matrix_view<float, int, raft::row_major> dataset,
+                 raft::device_vector_view<int, int> labels)
+{
+  detail::fit_predict(handle, config, dataset, labels);
+}
+
 }  // namespace cuvs::cluster::spectral

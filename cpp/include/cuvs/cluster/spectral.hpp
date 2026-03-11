@@ -125,6 +125,38 @@ void fit_predict(raft::resources const& handle,
                  raft::device_vector_view<int, int> labels);
 
 /**
+ * @brief Perform spectral clustering on a dense dataset
+ *
+ * This overload automatically constructs the connectivity graph from the input dataset
+ * using k-nearest neighbors.
+ *
+ * @param[in] handle RAFT resource handle
+ * @param[in] config Spectral clustering parameters
+ * @param[in] dataset Dense row-major matrix of shape (n_samples, n_features)
+ * @param[out] labels Device vector of size n_samples to store cluster assignments (0 to
+ * n_clusters-1)
+ *
+ * @code{.cpp}
+ * #include <cuvs/cluster/spectral.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // Configure spectral clustering
+ * cuvs::cluster::spectral::params params;
+ * params.n_clusters = 5;
+ * params.n_components = 5;
+ * params.n_neighbors = 15;
+ * params.n_init = 10;
+ *
+ * auto labels = raft::make_device_vector<int>(handle, n_samples);
+ * cuvs::cluster::spectral::fit_predict(handle, params, X.view(), labels.view());
+ * @endcode
+ */
+void fit_predict(raft::resources const& handle,
+                 params config,
+                 raft::device_matrix_view<float, int, raft::row_major> dataset,
+                 raft::device_vector_view<int, int> labels);
+/**
  * @}
  */
 

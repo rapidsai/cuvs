@@ -8,7 +8,7 @@ This is a wrapper for hnswlib, to load a CAGRA index as an immutable HNSW index.
    :language: c
    :class: highlight
 
-``#include <raft/neighbors/hnsw.h>``
+``#include <cuvs/neighbors/hnsw.h>``
 
 Index search parameters
 -----------------------

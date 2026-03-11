@@ -1,9 +1,10 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 
 import os
+import warnings
 from pathlib import Path
 from typing import Optional
 
@@ -198,6 +199,12 @@ def main(
         Whether to perform a dry run without actual execution.
 
     """
+    warnings.warn(
+        "The 'cuvs_bench.run' CLI is deprecated and will be removed in a future release. "
+        "Use BenchmarkOrchestrator from cuvs_bench.orchestrator instead.",
+        FutureWarning,
+        stacklevel=2,
+    )
 
     if not data_export:
         run_benchmark(**locals())

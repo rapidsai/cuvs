@@ -1,6 +1,6 @@
 # =============================================================================
 # cmake-format: off
-# SPDX-FileCopyrightText: Copyright (c) 2020-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2020-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
@@ -28,6 +28,9 @@ project(
   LANGUAGES ${lang_list}
 )
 set(CMAKE_INSTALL_MESSAGE LAZY)
+
+# Disable C++20 module scanning (not using modules, just C++20 features)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 # Write the version header
 rapids_cmake_write_version_file(include/cuvs/version_config.h)
@@ -69,6 +72,7 @@ if(BUILD_CPU_ONLY)
   set(BUILD_TESTS OFF)
   set(BUILD_C_LIBRARY OFF)
   set(BUILD_CAGRA_HNSWLIB OFF)
+  set(INSTALL_CPP_HEADERS OFF)
 elseif(NOT BUILD_SHARED_LIBS)
   set(BUILD_TESTS OFF)
   set(BUILD_C_LIBRARY OFF)
@@ -183,9 +187,11 @@ rapids_cpm_init()
 if(NOT BUILD_CPU_ONLY)
   # We must find CCCL ourselves before raft so that we get the right version.
   include(${rapids-cmake-dir}/cpm/cccl.cmake)
-  rapids_cpm_cccl(BUILD_EXPORT_SET cuvs-exports INSTALL_EXPORT_SET cuvs-exports)
+  rapids_cpm_cccl()
   include(cmake/thirdparty/get_raft.cmake)
   include(cmake/thirdparty/get_cutlass.cmake)
+  include(${rapids-cmake-dir}/cpm/cuco.cmake)
+  rapids_cpm_cuco()
 endif()
 
 if(BUILD_TESTS OR BUILD_C_TESTS)
@@ -205,6 +211,17 @@ endif()
 # ##################################################################################################
 # * cuvs ---------------------------------------------------------------------
 if(NOT BUILD_CPU_ONLY)
+
+  add_library(cuvs_cpp_headers INTERFACE)
+  add_library(cuvs::cuvs_cpp_headers ALIAS cuvs_cpp_headers)
+  target_include_directories(
+    cuvs_cpp_headers
+    INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+              "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
+              "$<INSTALL_INTERFACE:include>"
+  )
+  target_link_libraries(cuvs_cpp_headers INTERFACE raft::raft rmm::rmm)
+
   add_library(
     cuvs-cagra-search OBJECT
     src/neighbors/cagra_search_float.cu
@@ -230,6 +247,18 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_uint8_uint32_dim128_t8.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_uint8_uint32_dim256_t16.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_uint8_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_float_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_float_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_float_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_half_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_half_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_half_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_int8_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_int8_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_int8_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_uint8_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_uint8_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_L1_uint8_uint32_dim512_t32.cu
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_float_uint32_dim128_t8.cu
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_float_uint32_dim256_t16.cu
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_float_uint32_dim512_t32.cu
@@ -291,20 +320,22 @@ if(NOT BUILD_CPU_ONLY)
   set_target_properties(
     cuvs-cagra-search
     PROPERTIES BUILD_RPATH "\$ORIGIN"
-               CXX_STANDARD 17
+               CXX_STANDARD 20
                CXX_STANDARD_REQUIRED ON
-               CUDA_STANDARD 17
+               CUDA_STANDARD 20
                CUDA_STANDARD_REQUIRED ON
                CUDA_SEPARABLE_COMPILATION ON
                POSITION_INDEPENDENT_CODE ON
   )
-  target_link_libraries(cuvs-cagra-search PRIVATE raft::raft)
-  target_include_directories(
-    cuvs-cagra-search PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  target_link_libraries(
+    cuvs-cagra-search PRIVATE cuvs::cuvs_cpp_headers
+                              $<TARGET_NAME_IF_EXISTS:nvidia::cutlass::cutlass>
   )
   target_compile_options(
-    cuvs-cagra-search PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
-                              "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+    cuvs-cagra-search
+    PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
+            "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+            "$<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>:${CUVS_DEBUG_CUDA_FLAGS}>"
   )
 
   if(BUILD_MG_ALGOS)
@@ -324,9 +355,113 @@ if(NOT BUILD_CPU_ONLY)
     )
   endif()
 
+  set(JIT_LTO_TARGET_ARCHITECTURE "")
+  set(JIT_LTO_COMPILATION OFF)
+  if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
+    set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
+    set(JIT_LTO_COMPILATION ON)
+  endif()
+
+  if(JIT_LTO_COMPILATION)
+    # Generate interleaved scan kernel files at build time
+    include(cmake/modules/generate_jit_lto_kernels.cmake)
+
+    add_library(jit_lto_kernel_usage_requirements INTERFACE)
+    target_include_directories(
+      jit_lto_kernel_usage_requirements
+      INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_SOURCE_DIR}/src"
+                "${CMAKE_CURRENT_SOURCE_DIR}/../c/include"
+    )
+    target_compile_options(
+      jit_lto_kernel_usage_requirements INTERFACE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
+                                                  "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+    )
+    target_compile_features(jit_lto_kernel_usage_requirements INTERFACE cuda_std_20)
+    target_link_libraries(
+      jit_lto_kernel_usage_requirements INTERFACE rmm::rmm raft::raft CCCL::CCCL
+    )
+
+    block(PROPAGATE interleaved_scan_files metric_files filter_files post_lambda_files)
+    set(CMAKE_CUDA_ARCHITECTURES ${JIT_LTO_TARGET_ARCHITECTURE})
+    generate_jit_lto_kernels(
+      interleaved_scan_files
+      NAME_FORMAT
+        "interleaved_scan_capacity_@capacity@_veclen_@veclen@_@ascending_descending@_@compute_norm_name@_data_@type_abbrev@_acc_@acc_abbrev@_idx_@idx_abbrev@"
+      MATRIX_JSON_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_matrix.json"
+      KERNEL_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_kernel.cu.in"
+      EMBEDDED_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_embedded.cpp.in"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/interleaved_scan"
+      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    )
+    generate_jit_lto_kernels(
+      metric_files
+      NAME_FORMAT "metric_@metric_name@_veclen_@veclen@_data_@type_abbrev@_acc_@acc_abbrev@"
+      MATRIX_JSON_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/metric_matrix.json"
+      KERNEL_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/metric_kernel.cu.in"
+      EMBEDDED_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/metric_embedded.cpp.in"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/metric"
+      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    )
+    generate_jit_lto_kernels(
+      filter_files
+      NAME_FORMAT "@filter_name@"
+      MATRIX_JSON_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/filter_matrix.json"
+      KERNEL_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/filter_kernel.cu.in"
+      EMBEDDED_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/filter_embedded.cpp.in"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/filter"
+      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    )
+    generate_jit_lto_kernels(
+      post_lambda_files
+      NAME_FORMAT "@post_lambda_name@"
+      MATRIX_JSON_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/post_lambda_matrix.json"
+      KERNEL_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/post_lambda_kernel.cu.in"
+      EMBEDDED_INPUT_FILE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/post_lambda_embedded.cpp.in"
+      OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/post_lambda"
+      KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+    )
+    endblock()
+
+    add_library(
+      cuvs_jit_lto_kernels STATIC
+      ${interleaved_scan_files}
+      ${metric_files}
+      ${filter_files}
+      ${post_lambda_files}
+      src/detail/jit_lto/AlgorithmLauncher.cu
+      src/detail/jit_lto/AlgorithmPlanner.cu
+      src/detail/jit_lto/FragmentDatabase.cu
+      src/detail/jit_lto/FragmentEntry.cu
+      src/detail/jit_lto/nvjitlink_checker.cpp
+    )
+    set_target_properties(
+      cuvs_jit_lto_kernels PROPERTIES POSITION_INDEPENDENT_CODE ON CXX_STANDARD 20
+    )
+    target_include_directories(
+      cuvs_jit_lto_kernels
+      PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_SOURCE_DIR}/src"
+              "${CMAKE_CURRENT_SOURCE_DIR}/../c/include"
+    )
+    target_link_libraries(cuvs_jit_lto_kernels PRIVATE raft::raft)
+    add_library(cuvs::cuvs_jit_lto_kernels ALIAS cuvs_jit_lto_kernels)
+  endif()
+
   add_library(
     cuvs_objs OBJECT
     src/cluster/detail/minClusterDistanceCompute.cu
+    src/cluster/agglomerative.cu
     src/cluster/kmeans_cluster_cost.cu
     src/cluster/kmeans_fit_mg_float.cu
     src/cluster/kmeans_fit_mg_double.cu
@@ -403,7 +538,6 @@ if(NOT BUILD_CPU_ONLY)
     src/distance/distance.cu
     src/distance/pairwise_distance.cu
     src/distance/sparse_distance.cu
-    src/embed/spectral.cu
     src/neighbors/all_neighbors/all_neighbors.cu
     src/neighbors/ball_cover.cu
     src/neighbors/epsilon_neighborhood.cu
@@ -418,6 +552,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/cagra_build_int8.cu
     src/neighbors/cagra_build_uint8.cu
     src/neighbors/cagra_extend_float.cu
+    src/neighbors/cagra_extend_half.cu
     src/neighbors/cagra_extend_int8.cu
     src/neighbors/cagra_extend_uint8.cu
     src/neighbors/cagra_optimize.cu
@@ -443,11 +578,10 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/iface/iface_pq_uint8_t_int64_t.cu
     src/neighbors/detail/cagra/topk_for_cagra/topk.cu
     src/neighbors/dynamic_batching.cu
-    src/neighbors/cagra_index_wrapper.cu
     src/neighbors/composite/index.cu
-    src/neighbors/composite/merge.cpp
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/cagra.cpp>
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw.cpp>
+    src/neighbors/ivf_common.cu
     src/neighbors/ivf_flat_index.cpp
     src/neighbors/ivf_flat/ivf_flat_build_extend_float_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_build_extend_half_int64_t.cu
@@ -478,6 +612,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ivf_pq/detail/ivf_pq_build_extend_half_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_build_extend_int8_t_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_build_extend_uint8_t_int64_t.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_build_precomputed_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_fp8_false.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_fp8_true.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_half.cu
@@ -492,6 +627,10 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ivf_pq/detail/ivf_pq_search_half_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_int8_t_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_uint8_t_int64_t.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_transform_float_int64_t.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_transform_half_int64_t.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_transform_int8_t_int64_t.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_transform_uint8_t_int64_t.cu
     src/neighbors/knn_merge_parts.cu
     src/neighbors/nn_descent.cu
     src/neighbors/nn_descent_float.cu
@@ -521,6 +660,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/vamana_serialize_int8.cu
     src/preprocessing/quantize/scalar.cu
     src/preprocessing/quantize/binary.cu
+    src/preprocessing/quantize/pq.cu
     src/preprocessing/spectral/spectral_embedding.cu
     src/selection/select_k_float_int64_t.cu
     src/selection/select_k_float_int32_t.cu
@@ -533,31 +673,40 @@ if(NOT BUILD_CPU_ONLY)
 
   set_target_properties(
     cuvs_objs
-    PROPERTIES CXX_STANDARD 17
+    PROPERTIES CXX_STANDARD 20
                CXX_STANDARD_REQUIRED ON
-               CUDA_STANDARD 17
+               CUDA_STANDARD 20
                CUDA_STANDARD_REQUIRED ON
                POSITION_INDEPENDENT_CODE ON
   )
   target_compile_options(
-    cuvs_objs PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
-                      "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+    cuvs_objs
+    PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
+            "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+            "$<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>:${CUVS_DEBUG_CUDA_FLAGS}>"
   )
 
   target_compile_definitions(
-    cuvs_objs PRIVATE $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
-                      $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
+    cuvs_objs
+    PRIVATE $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
+            $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
+            $<$<BOOL:${JIT_LTO_COMPILATION}>:CUVS_ENABLE_JIT_LTO>
   )
 
   target_link_libraries(
     cuvs_objs
-    PRIVATE raft::raft rmm::rmm ${CUVS_CTK_MATH_DEPENDENCIES}
-            $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
+    PRIVATE cuvs::cuvs_cpp_headers
+            cuco::cuco
+            nvidia::cutlass::cutlass
+            ${CUVS_CTK_MATH_DEPENDENCIES}
+            $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+            $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
   )
 
   target_include_directories(
     cuvs_objs
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+           "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
     INTERFACE "$<INSTALL_INTERFACE:include>"
   )
 
@@ -599,9 +748,9 @@ if(NOT BUILD_CPU_ONLY)
       cuvs
       PROPERTIES BUILD_RPATH "\$ORIGIN"
                  INSTALL_RPATH "\$ORIGIN"
-                 CXX_STANDARD 17
+                 CXX_STANDARD 20
                  CXX_STANDARD_REQUIRED ON
-                 CUDA_STANDARD 17
+                 CUDA_STANDARD 20
                  CUDA_STANDARD_REQUIRED ON
                  CUDA_RESOLVE_DEVICE_SYMBOLS ON
                  INTERFACE_POSITION_INDEPENDENT_CODE ON
@@ -613,28 +762,30 @@ if(NOT BUILD_CPU_ONLY)
                 --expt-relaxed-constexpr>
       PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
               "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+              "$<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>:${CUVS_DEBUG_CUDA_FLAGS}>"
     )
     target_compile_definitions(
-      cuvs PUBLIC $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
-                  $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
-    )
-
-    target_include_directories(
       cuvs
-      PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-             "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
-             "$<INSTALL_INTERFACE:include>"
+      PUBLIC $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
+             $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
+             $<$<BOOL:${JIT_LTO_COMPILATION}>:CUVS_ENABLE_JIT_LTO>
     )
 
     target_link_libraries(
       cuvs
       PUBLIC rmm::rmm
              raft::raft
+             cuvs::cuvs_cpp_headers
              ${CUVS_CTK_MATH_DEPENDENCIES}
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
-      PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+      PRIVATE
+        $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+        $<COMPILE_ONLY:nvidia::cutlass::cutlass>
+        $<COMPILE_ONLY:cuco::cuco>
+        $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
+        $<$<BOOL:${JIT_LTO_COMPILATION}>:$<LINK_LIBRARY:WHOLE_ARCHIVE,cuvs::cuvs_jit_lto_kernels>>
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
@@ -660,9 +811,9 @@ SECTIONS
       cuvs_static
       PROPERTIES BUILD_RPATH "\$ORIGIN"
                  INSTALL_RPATH "\$ORIGIN"
-                 CXX_STANDARD 17
+                 CXX_STANDARD 20
                  CXX_STANDARD_REQUIRED ON
-                 CUDA_STANDARD 17
+                 CUDA_STANDARD 20
                  CUDA_STANDARD_REQUIRED ON
                  CUDA_RESOLVE_DEVICE_SYMBOLS ON
                  POSITION_INDEPENDENT_CODE ON
@@ -672,8 +823,10 @@ SECTIONS
 
     target_compile_options(cuvs_static PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>")
     target_compile_definitions(
-      cuvs_static PUBLIC $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
-                         $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
+      cuvs_static
+      PUBLIC $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
+             $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
+             $<$<BOOL:${JIT_LTO_COMPILATION}>:CUVS_ENABLE_JIT_LTO>
     )
 
     target_include_directories(cuvs_static INTERFACE "$<INSTALL_INTERFACE:include>")
@@ -681,21 +834,21 @@ SECTIONS
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
     target_link_options(cuvs_static PRIVATE $<HOST_LINK:${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld>)
 
-    target_include_directories(
-      cuvs_static
-      PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-             "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
-             "$<INSTALL_INTERFACE:include>"
-    )
     target_link_libraries(
       cuvs_static
       PUBLIC rmm::rmm
              raft::raft
+             cuvs::cuvs_cpp_headers
              ${CUVS_CTK_MATH_DEPENDENCIES}
              $<TARGET_NAME_IF_EXISTS:NCCL::NCCL> # needs to be public for DT_NEEDED
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>> # header only
-      PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
+      PRIVATE
+        $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+        $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
+        $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
+        $<COMPILE_ONLY:nvidia::cutlass::cutlass>
+        $<COMPILE_ONLY:cuco::cuco>
+        $<$<BOOL:${JIT_LTO_COMPILATION}>:$<LINK_LIBRARY:WHOLE_ARCHIVE,cuvs::cuvs_jit_lto_kernels>>
     )
   endif()
 
@@ -736,72 +889,56 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
   include(GNUInstallDirs)
   include(CPack)
 
-  install(
-    TARGETS ${_cuvs_lib_targets}
-    DESTINATION ${lib_dir}
-    COMPONENT cuvs
-    EXPORT cuvs-exports
+  set(target_names cuvs cuvs_static cuvs_jit_lto_kernels cuvs_cpp_headers cuvs_c)
+  set(component_names cuvs_shared cuvs_static cuvs_static cuvs_cpp_headers c_api)
+  set(export_names cuvs-shared-exports cuvs-static-exports cuvs-static-exports
+                   cuvs-cpp-headers-exports cuvs-c-exports
   )
+  foreach(target component export IN ZIP_LISTS target_names component_names export_names)
+    if(TARGET ${target})
+      install(
+        TARGETS ${target}
+        DESTINATION ${lib_dir}
+        COMPONENT ${component}
+        EXPORT ${export}
+      )
 
-  install(
-    DIRECTORY include/cuvs
-    COMPONENT cuvs
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-  )
+      list(APPEND cuvs_components ${component})
+      list(APPEND cuvs_export_sets ${export})
+    endif()
+  endforeach()
 
-  if(BUILD_C_LIBRARY)
+  if(TARGET cuvs_cpp_headers)
     install(
-      TARGETS cuvs_c
-      DESTINATION ${lib_dir}
-      COMPONENT c_api
-      EXPORT cuvs-c-exports
+      DIRECTORY include/cuvs
+      COMPONENT cuvs_cpp_headers
+      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     )
+    install(
+      FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/version_config.h
+      COMPONENT cuvs_cpp_headers
+      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cuvs
+    )
+  endif()
 
+  if(TARGET cuvs_c)
     install(
       DIRECTORY ../c/include/cuvs/
       COMPONENT c_api
       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cuvs
     )
-
     install(
       FILES ${CUVS_C_BINARY_DIR}/include/cuvs/core/c_config.h
-      COMPONENT cuvs
+      COMPONENT c_api
       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cuvs/core/
     )
   endif()
 
-  install(
-    FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/version_config.h
-    COMPONENT cuvs
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cuvs
-  )
+  list(REMOVE_DUPLICATES cuvs_components)
+  list(REMOVE_DUPLICATES cuvs_export_sets)
+  include(cmake/modules/generate_cuvs_export.cmake)
+  generate_cuvs_export(COMPONENTS ${cuvs_components} EXPORT_SETS ${cuvs_export_sets})
 
-  if(TARGET cuvs_c)
-    list(APPEND cuvs_components c_api)
-    list(APPEND cuvs_export_sets cuvs-c-exports)
-    set(CUVS_C_TARGET cuvs_c)
-  endif()
-
-  # Use `rapids_export` for 22.04 as it will have COMPONENT support
-  rapids_export(
-    INSTALL cuvs
-    EXPORT_SET cuvs-exports
-    COMPONENTS ${cuvs_components}
-    COMPONENTS_EXPORT_SET ${cuvs_export_sets}
-    GLOBAL_TARGETS cuvs ${CUVS_C_TARGET}
-    NAMESPACE cuvs::
-  )
-
-  # ################################################################################################
-  # * build export -------------------------------------------------------------
-  rapids_export(
-    BUILD cuvs
-    EXPORT_SET cuvs-exports
-    COMPONENTS ${cuvs_components}
-    COMPONENTS_EXPORT_SET ${cuvs_export_sets}
-    GLOBAL_TARGETS cuvs ${CUVS_C_TARGET}
-    NAMESPACE cuvs::
-  )
 endif()
 
 # ##################################################################################################

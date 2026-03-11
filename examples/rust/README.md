@@ -9,14 +9,14 @@ Once the minimum requirements are satisfied, this example template application c
 You may follow these steps to quickly get set up:
 
 ```bash
-conda env create --name rust -f conda/environments/rust_cuda-130_arch-$(uname -m).yaml
+conda env create --name rust -f conda/environments/rust_cuda-131_arch-$(uname -m).yaml
 conda activate rust
 ```
 You may prefer to use `mamba`, as it provides significant speedup over `conda`.
 
 1. Set up the required environment variables:
 ```bash
-LIBCLANG_PATH=$(dirname "$(find /opt/conda -name libclang.so | head -n 1)")
+LIBCLANG_PATH=$(dirname "$(find "$CONDA_PREFIX" -name libclang.so | head -n 1)")
 export LIBCLANG_PATH
 echo "LIBCLANG_PATH=$LIBCLANG_PATH"
 ```

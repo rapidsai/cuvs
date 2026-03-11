@@ -1,14 +1,14 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
+#include "faiss_select/Select.cuh"
 #include <raft/core/operators.hpp>
 #include <raft/linalg/norm.cuh>
-#include <raft/neighbors/detail/faiss_select/Select.cuh>
 #include <raft/util/cuda_utils.cuh>
 
-#include <cub/cub.cuh>
+#include <cub/util_type.cuh>
 
 #include <limits>
 
@@ -207,7 +207,7 @@ __launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL fusedL2kNN(const DataT* x,
   constexpr auto identity = std::numeric_limits<AccT>::max();
   constexpr auto keyMax   = std::numeric_limits<uint32_t>::max();
   constexpr auto Dir      = false;
-  using namespace raft::neighbors::detail::faiss_select;
+  using namespace cuvs::neighbors::detail::faiss_select;
   typedef WarpSelect<AccT, uint32_t, Dir, Comparator<AccT>, NumWarpQ, NumThreadQ, 32> myWarpSelect;
 
   auto rowEpilog_lambda =

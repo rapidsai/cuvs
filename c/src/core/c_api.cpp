@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -263,18 +263,33 @@ void _copy_matrix(cuvsResources_t res, DLManagedTensor* src_managed, DLManagedTe
 {
   DLTensor& src = src_managed->dl_tensor;
   DLTensor& dst = dst_managed->dl_tensor;
+  auto res_ptr  = reinterpret_cast<raft::resources*>(res);
+  auto stream   = raft::resource::get_cuda_stream(*res_ptr);
 
-  int64_t src_row_stride = src.strides == nullptr ? src.shape[1] : src.strides[0];
-  int64_t dst_row_stride = dst.strides == nullptr ? dst.shape[1] : dst.strides[0];
-  auto res_ptr           = reinterpret_cast<raft::resources*>(res);
+  if (src.ndim == 2) {
+    // use raft::copy_matrix for 2D tensors - this will handle copying from strided to non-strided
+    // views well
+    int64_t src_row_stride = src.strides == nullptr ? src.shape[1] : src.strides[0];
+    int64_t dst_row_stride = dst.strides == nullptr ? dst.shape[1] : dst.strides[0];
 
-  raft::copy_matrix<T>(static_cast<T*>(dst.data),
-                       dst_row_stride,
-                       static_cast<const T*>(src.data),
-                       src_row_stride,
-                       src.shape[1],
-                       src.shape[0],
-                       raft::resource::get_cuda_stream(*res_ptr));
+    raft::copy_matrix<T>(static_cast<T*>(dst.data),
+                         dst_row_stride,
+                         static_cast<const T*>(src.data),
+                         src_row_stride,
+                         src.shape[1],
+                         src.shape[0],
+                         stream);
+  } else {
+    // Otherwise use cudaMemcpyAsync - and assert that we don't have strided data
+    RAFT_EXPECTS(src.strides == nullptr, "cuvsCopyMatrix only supports strides with 2D inputs");
+    RAFT_EXPECTS(dst.strides == nullptr, "cuvsCopyMatrix only supports strides with 2D inputs");
+
+    size_t elements = 1;
+    for (int64_t i = 0; i < src.ndim; ++i) {
+      elements *= src.shape[i];
+    }
+    raft::copy<T>(static_cast<T*>(dst.data), static_cast<const T*>(src.data), elements, stream);
+  }
 }
 }  // namespace
 
@@ -286,8 +301,7 @@ extern "C" cuvsError_t cuvsMatrixCopy(cuvsResources_t res,
     DLTensor& src = src_managed->dl_tensor;
     DLTensor& dst = dst_managed->dl_tensor;
 
-    RAFT_EXPECTS(src.ndim == 2, "src should be a 2 dimensional tensor");
-    RAFT_EXPECTS(dst.ndim == 2, "dst should be a 2 dimensional tensor");
+    RAFT_EXPECTS(src.ndim == dst.ndim, "src and dst tensors should have the same dimensions");
 
     for (int64_t i = 0; i < src.ndim; ++i) {
       RAFT_EXPECTS(src.shape[i] == dst.shape[i], "shape mismatch between src and dst tensors");
@@ -350,21 +364,26 @@ extern "C" cuvsError_t cuvsMatrixSliceRows(cuvsResources_t res,
 
     DLTensor& src = src_managed->dl_tensor;
     DLTensor& dst = dst_managed->dl_tensor;
-    RAFT_EXPECTS(src.ndim == 2, "src should be a 2 dimensional tensor");
+    RAFT_EXPECTS(src.ndim <= 2, "src should be a 1 or 2 dimensional tensor");
     RAFT_EXPECTS(src.shape != nullptr, "shape should be initialized in the src tensor");
 
     dst.dtype    = src.dtype;
     dst.device   = src.device;
-    dst.ndim     = 2;
-    dst.shape    = new int64_t[2];
+    dst.ndim     = src.ndim;
+    dst.shape    = new int64_t[dst.ndim];
     dst.shape[0] = end - start;
-    dst.shape[1] = src.shape[1];
 
-    int64_t row_strides = dst.shape[1];
-    if (src.strides) {
-      dst.strides = new int64_t[2];
-      row_strides = dst.strides[0] = src.strides[0];
-      dst.strides[1]               = src.strides[1];
+    int64_t row_strides = 1;
+
+    if (dst.ndim == 2) {
+      dst.shape[1] = src.shape[1];
+      row_strides = dst.shape[1];
+
+      if (src.strides) {
+        dst.strides = new int64_t[2];
+        row_strides = dst.strides[0] = src.strides[0];
+        dst.strides[1]               = src.strides[1];
+      }
     }
 
     dst.data = static_cast<char*>(src.data) + start * row_strides * (dst.dtype.bits / 8);

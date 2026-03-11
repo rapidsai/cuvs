@@ -1,12 +1,12 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
 set -euo pipefail
 
 rapids-logger "Downloading artifacts from previous jobs"
 CPP_CHANNEL=$(rapids-download-conda-from-github cpp)
-PYTHON_CHANNEL=$(rapids-download-conda-from-github python)
+PYTHON_CHANNEL=$(rapids-download-from-github "$(rapids-package-name "conda_python" cuvs --stable --cuda "$RAPIDS_CUDA_VERSION")")
 
 rapids-logger "Create test conda environment"
 . /opt/conda/etc/profile.d/conda.sh
@@ -45,7 +45,7 @@ popd
 
 rapids-logger "Build Rust docs"
 pushd rust
-LIBCLANG_PATH=$(dirname "$(find /opt/conda -name libclang.so | head -n 1)")
+LIBCLANG_PATH=$(dirname "$(find "$CONDA_PREFIX" -name libclang.so | head -n 1)")
 export LIBCLANG_PATH
 cargo doc -p cuvs --no-deps
 popd

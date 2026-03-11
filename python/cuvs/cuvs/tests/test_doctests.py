@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2022-2024, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
 import contextlib
@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 import cuvs.cluster
+import cuvs.common
 import cuvs.distance
 import cuvs.neighbors
 import cuvs.preprocessing.quantize
@@ -19,6 +20,10 @@ import cuvs.preprocessing.quantize
 
 
 def _name_in_all(parent, name):
+    # Skip multi-GPU (mg) modules - they require special multi-GPU setup
+    # See: https://github.com/rapidsai/cuvs/issues/1647
+    if name == "mg" or name == "mg_resources" or name == "MultiGpuResources":
+        return False
     return name in getattr(parent, "__all__", [])
 
 

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,6 +9,8 @@
 #include <raft/core/device_csr_matrix.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
+
+#include <optional>
 
 namespace cuvs::preprocessing::spectral_embedding {
 
@@ -60,7 +62,7 @@ struct params {
    * and eigenvalue solver initialization. Use the same seed value to
    * ensure reproducible results across runs.
    */
-  uint64_t seed;
+  std::optional<uint64_t> seed = std::nullopt;
 };
 
 /**
@@ -170,6 +172,16 @@ void transform(raft::resources const& handle,
 void transform(raft::resources const& handle,
                params config,
                raft::device_coo_matrix_view<double, int, int, int> connectivity_graph,
+               raft::device_matrix_view<double, int, raft::col_major> embedding);
+
+void transform(raft::resources const& handle,
+               params config,
+               raft::device_coo_matrix_view<float, int, int, int64_t> connectivity_graph,
+               raft::device_matrix_view<float, int, raft::col_major> embedding);
+
+void transform(raft::resources const& handle,
+               params config,
+               raft::device_coo_matrix_view<double, int, int, int64_t> connectivity_graph,
                raft::device_matrix_view<double, int, raft::col_major> embedding);
 
 /**
