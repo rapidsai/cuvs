@@ -29,10 +29,15 @@
 #include <float.h>
 #include <sys/time.h>
 
+#include <cooperative_groups.h>
+#include <cooperative_groups/reduce.h>
+
 #include <climits>
 #include <iostream>
 #include <memory>
 #include <random>
+
+namespace cg = cooperative_groups;
 
 namespace cuvs::neighbors::cagra::detail::graph {
 
@@ -196,6 +201,9 @@ __global__ void kern_fused_prune(const IdxT* const knn_graph,   // [graph_chunk_
 {
   extern __shared__ unsigned char smem_buf[];
 
+  cg::thread_block block         = cg::this_thread_block();
+  cg::thread_block_tile<32> warp = cg::tiled_partition<32>(block);
+
   const uint32_t wid     = threadIdx.x / raft::WarpSize;
   const uint32_t lane_id = threadIdx.x % raft::WarpSize;
 
@@ -207,8 +215,7 @@ __global__ void kern_fused_prune(const IdxT* const knn_graph,   // [graph_chunk_
   uint64_t* const num_retain = stats;
   uint64_t* const num_full   = stats + 1;
 
-  const unsigned warp_mask = 0xffffffff;
-  const uint32_t maxval16  = 0x0000ffff;
+  const uint32_t maxval16 = 0x0000ffff;
 
   const uint64_t nid_batch = blockIdx.x * num_warps + wid;
   const uint64_t nid       = nid_batch + (batch_size * batch_id);
@@ -255,11 +262,7 @@ __global__ void kern_fused_prune(const IdxT* const knn_graph,   // [graph_chunk_
 
   __syncwarp();
 
-  num_edges_no_detour += __shfl_xor_sync(0xffffffff, num_edges_no_detour, 1);
-  num_edges_no_detour += __shfl_xor_sync(0xffffffff, num_edges_no_detour, 2);
-  num_edges_no_detour += __shfl_xor_sync(0xffffffff, num_edges_no_detour, 4);
-  num_edges_no_detour += __shfl_xor_sync(0xffffffff, num_edges_no_detour, 8);
-  num_edges_no_detour += __shfl_xor_sync(0xffffffff, num_edges_no_detour, 16);
+  num_edges_no_detour = cg::reduce(warp, num_edges_no_detour, cg::plus<uint32_t>());
   num_edges_no_detour = min(num_edges_no_detour, output_graph_degree);
 
   if (lane_id == 0) {
@@ -280,7 +283,7 @@ __global__ void kern_fused_prune(const IdxT* const knn_graph,   // [graph_chunk_
     }
 
     uint32_t local_min_with_tag = (local_min << 16) | ((uint32_t)local_idx);
-    uint32_t warp_min_with_tag  = __reduce_min_sync(warp_mask, local_min_with_tag);
+    uint32_t warp_min_with_tag  = cg::reduce(warp, local_min_with_tag, cg::less<uint32_t>());
     uint32_t warp_min_count     = warp_min_with_tag >> 16;
     uint32_t warp_local_idx     = warp_min_with_tag & 0xffff;
 
@@ -294,7 +297,7 @@ __global__ void kern_fused_prune(const IdxT* const knn_graph,   // [graph_chunk_
     for (uint32_t k = lane_id; k < knn_graph_degree; k += raft::WarpSize) {
       if (smem_indices[k] == selected_node) { smem_num_detour[k] = maxval16; }
     }
-    __syncwarp(warp_mask);
+    __syncwarp();
 
     if (lane_id == 0) { output_graph_ptr[nid_batch * output_graph_degree + i] = selected_node; }
   }
@@ -312,7 +315,10 @@ __device__ unsigned int warp_pos_in_array(T val, const T* array, uint64_t num)
       break;
     }
   }
-  ret = __reduce_min_sync(0xffffffff, ret);
+
+  cg::thread_block block         = cg::this_thread_block();
+  cg::thread_block_tile<32> warp = cg::tiled_partition<32>(block);
+  ret                            = cg::reduce(warp, ret, cg::less<unsigned int>());
   return ret;
 }
 
