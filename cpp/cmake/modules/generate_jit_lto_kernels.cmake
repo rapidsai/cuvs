@@ -104,6 +104,9 @@ function(process_matrix_entry source_list_var)
     EMBEDDED_HEADER_FILE "${embedded_header_file}"
     LINK_LIBRARIES ${_JIT_LTO_KERNEL_LINK_LIBRARIES}
   )
+
+  target_compile_definitions(${kernel_target} PRIVATE "C_SYMBOL_NAME=${kernel_name}")
+
   list(APPEND ${source_list_var} "${embedded_header_file}" "${embedded_file}")
   set(${source_list_var}
       "${${source_list_var}}"

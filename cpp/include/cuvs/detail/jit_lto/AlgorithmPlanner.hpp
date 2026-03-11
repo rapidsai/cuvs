@@ -13,7 +13,10 @@
 struct FragmentEntry;
 
 struct AlgorithmPlanner {
-  AlgorithmPlanner(std::string const& n, std::string const& p) : entrypoint(n + "_" + p) {}
+  AlgorithmPlanner(std::string const& n, std::string const& p)
+    : entrypoint(p.empty() ? n : (n + "_" + p))
+  {
+  }
 
   std::shared_ptr<AlgorithmLauncher> get_launcher();
 

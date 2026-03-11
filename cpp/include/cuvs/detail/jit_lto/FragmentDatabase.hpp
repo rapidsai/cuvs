@@ -22,6 +22,8 @@ class FragmentDatabase {
 
   FragmentEntry* get_fragment(std::string const& key);
 
+  std::unordered_map<std::string, std::unique_ptr<FragmentEntry>> cache;
+
  private:
   FragmentDatabase();
 
@@ -33,8 +35,6 @@ class FragmentDatabase {
                                      std::string const& params,
                                      unsigned char const* blob,
                                      std::size_t size);
-
-  std::unordered_map<std::string, std::unique_ptr<FragmentEntry>> cache;
 };
 
 FragmentDatabase& fragment_database();
