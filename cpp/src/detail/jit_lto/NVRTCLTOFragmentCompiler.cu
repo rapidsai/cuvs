@@ -7,6 +7,7 @@
 #include <cuvs/detail/jit_lto/NVRTCLTOFragmentCompiler.hpp>
 
 #include <raft/core/error.hpp>
+#include <raft/util/cuda_rt_essentials.hpp>
 
 #include "cuda.h"
 #include <nvrtc.h>
@@ -24,9 +25,9 @@ NVRTCLTOFragmentCompiler::NVRTCLTOFragmentCompiler()
   int device = 0;
   int major  = 0;
   int minor  = 0;
-  cudaGetDevice(&device);
-  cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device);
-  cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device);
+  RAFT_CUDA_TRY(cudaGetDevice(&device));
+  RAFT_CUDA_TRY(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
+  RAFT_CUDA_TRY(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
 
   this->standard_compile_opts.resize(7);
 

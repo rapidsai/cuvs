@@ -22,12 +22,9 @@ void ivfflat_interleaved_scan(const index<T, IdxT>& index,
                               const uint32_t* coarse_query_results,
                               const uint32_t n_queries,
                               const uint32_t queries_offset,
-                              const cuvs::distance::DistanceType metric,
-                              const uint32_t n_probes,
                               const uint32_t k,
                               const uint32_t max_samples,
                               const uint32_t* chunk_indices,
-                              const bool select_min,
                               IvfSampleFilterT sample_filter,
                               uint32_t* neighbors,
                               float* distances,
@@ -45,12 +42,9 @@ void ivfflat_interleaved_scan(const index<T, IdxT>& index,
                                           const uint32_t* coarse_query_results,            \
                                           const uint32_t n_queries,                        \
                                           const uint32_t queries_offset,                   \
-                                          const cuvs::distance::DistanceType metric,       \
-                                          const uint32_t n_probes,                         \
                                           const uint32_t k,                                \
                                           const uint32_t max_samples,                      \
                                           const uint32_t* chunk_indices,                   \
-                                          const bool select_min,                           \
                                           SampleFilterT sample_filter,                     \
                                           uint32_t* neighbors,                             \
                                           float* distances,                                \

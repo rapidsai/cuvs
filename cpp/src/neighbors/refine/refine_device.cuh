@@ -101,19 +101,18 @@ void refine_device(
 
   using acc_t = typename cuvs::spatial::knn::detail::utils::config<data_t>::value_t;
 
+  cuvs::neighbors::ivf_flat::search_params refine_params;
+  refine_params.n_probes = 1;
   cuvs::neighbors::ivf_flat::detail::ivfflat_interleaved_scan<data_t, acc_t, int64_t>(
     refinement_index,
-    cuvs::neighbors::ivf_flat::search_params(),
+    refine_params,
     queries.data_handle(),
     fake_coarse_idx.data(),
     static_cast<uint32_t>(n_queries),
     0,
-    metric,
-    1,
     k,
     0,
     chunk_index.data(),
-    cuvs::distance::is_min_close(metric),
     cuvs::neighbors::filtering::none_sample_filter(),
     neighbors_uint32,
     distances.data_handle(),

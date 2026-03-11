@@ -1274,12 +1274,8 @@ struct select_interleaved_scan_kernel {
  * @param[in] queries_offset
  *   An offset of the current query batch. It is used for feeding sample_filter with the
  *   correct query index.
- * @param metric type of the measured distance
- * @param n_probes number of nearest clusters to query
  * @param k number of nearest neighbors.
  *            NB: the maximum value of `k` is limited statically by `kMaxCapacity`.
- * @param select_min whether to select nearest (true) or furthest (false) points w.r.t. the given
- * metric.
  * @param[out] neighbors device pointer to the result indices for each query and cluster
  * [batch_size, grid_dim_x, k]
  * @param[out] distances device pointer to the result distances for each query and cluster
@@ -1298,19 +1294,19 @@ void ivfflat_interleaved_scan(const index<T, IdxT>& index,
                               const uint32_t* coarse_query_results,
                               const uint32_t n_queries,
                               const uint32_t queries_offset,
-                              const cuvs::distance::DistanceType metric,
-                              const uint32_t n_probes,
                               const uint32_t k,
                               const uint32_t max_samples,
                               const uint32_t* chunk_indices,
-                              const bool select_min,
                               IvfSampleFilterT sample_filter,
                               uint32_t* neighbors,
                               float* distances,
                               uint32_t& grid_dim_x,
                               rmm::cuda_stream_view stream)
 {
-  const int capacity = raft::bound_by_power_of_two(k);
+  const uint32_t n_probes = std::min(params.n_probes, index.n_lists());
+  const auto metric       = index.metric();
+  const bool select_min   = cuvs::distance::is_min_close(metric);
+  const int capacity      = raft::bound_by_power_of_two(k);
 
   auto filter_adapter = cuvs::neighbors::filtering::ivf_to_sample_filter(
     index.inds_ptrs().data_handle(), sample_filter);

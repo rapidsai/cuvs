@@ -12,6 +12,7 @@
 #include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
+#include <sstream>
 
 #include "../detail/ann_utils.cuh"
 #include <cuvs/distance/distance.hpp>
@@ -172,19 +173,11 @@ void launch_kernel(const index<T, IdxT>& index,
   if (params.metric_udf.has_value()) {
     std::string metric_udf = params.metric_udf.value();
     // Add explicit template instantiation with actual types
-    metric_udf += "\ntemplate void cuvs::neighbors::ivf_flat::detail::compute_dist<";
-    metric_udf += std::to_string(Veclen);
-    metric_udf += ", ";
-    metric_udf += type_name<T>();
-    metric_udf += ", ";
-    metric_udf += type_name<AccT>();
-    metric_udf += ">(";
-    metric_udf += type_name<AccT>();
-    metric_udf += "&, ";
-    metric_udf += type_name<AccT>();
-    metric_udf += ", ";
-    metric_udf += type_name<AccT>();
-    metric_udf += ");\n";
+    std::ostringstream oss;
+    oss << "\ntemplate void cuvs::neighbors::ivf_flat::detail::compute_dist<" << Veclen << ", "
+        << type_name<T>() << ", " << type_name<AccT>() << ">(" << type_name<AccT>() << "&, "
+        << type_name<AccT>() << ", " << type_name<AccT>() << ");\n";
+    metric_udf += oss.str();
     // Include hash of UDF source in key to differentiate different UDFs
     auto udf_hash            = std::to_string(std::hash<std::string>{}(metric_udf));
     std::string metric_name  = "metric_udf_" + udf_hash;
@@ -427,12 +420,8 @@ struct select_interleaved_scan_kernel {
  * @param[in] queries_offset
  *   An offset of the current query batch. It is used for feeding sample_filter with the
  *   correct query index.
- * @param metric type of the measured distance
- * @param n_probes number of nearest clusters to query
  * @param k number of nearest neighbors.
  *            NB: the maximum value of `k` is limited statically by `kMaxCapacity`.
- * @param select_min whether to select nearest (true) or furthest (false) points w.r.t. the given
- * metric.
  * @param[out] neighbors device pointer to the result indices for each query and cluster
  * [batch_size, grid_dim_x, k]
  * @param[out] distances device pointer to the result distances for each query and cluster
@@ -451,19 +440,19 @@ void ivfflat_interleaved_scan(const index<T, IdxT>& index,
                               const uint32_t* coarse_query_results,
                               const uint32_t n_queries,
                               const uint32_t queries_offset,
-                              const cuvs::distance::DistanceType metric,
-                              const uint32_t n_probes,
                               const uint32_t k,
                               const uint32_t max_samples,
                               const uint32_t* chunk_indices,
-                              const bool select_min,
                               IvfSampleFilterT sample_filter,
                               uint32_t* neighbors,
                               float* distances,
                               uint32_t& grid_dim_x,
                               rmm::cuda_stream_view stream)
 {
-  const int capacity = raft::bound_by_power_of_two(k);
+  const uint32_t n_probes = std::min(params.n_probes, index.n_lists());
+  const auto metric       = index.metric();
+  const bool select_min   = cuvs::distance::is_min_close(metric);
+  const int capacity      = raft::bound_by_power_of_two(k);
 
   cuda::std::optional<uint32_t*> bitset_ptr;
   cuda::std::optional<IdxT> bitset_len;
