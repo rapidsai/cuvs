@@ -14,7 +14,7 @@
 struct FragmentEntry;
 
 struct AlgorithmPlanner {
-  AlgorithmPlanner(std::string&& fragment_key, std::string&& entrypoint)
+  AlgorithmPlanner(std::string fragment_key, std::string entrypoint)
     : fragment_key(std::move(fragment_key)), entrypoint(std::move(entrypoint))
   {
   }
