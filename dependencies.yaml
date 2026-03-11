@@ -382,7 +382,7 @@ dependencies:
         packages:
           - *cmake_ver
           - openblas
-          - &pytest pytest<9.0.0
+          - &pytest pytest
   docs:
     common:
       - output_types: [conda]
