@@ -24,7 +24,7 @@
 
 void AlgorithmPlanner::add_entrypoint()
 {
-  auto entrypoint_fragment = fragment_database().get_fragment(this->entrypoint);
+  auto entrypoint_fragment = fragment_database().get_fragment(this->fragment_key);
   this->fragments.push_back(entrypoint_fragment);
 }
 
@@ -48,7 +48,7 @@ std::string AlgorithmPlanner::get_device_functions_key() const
 std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::get_launcher()
 {
   auto& launchers = get_cached_launchers();
-  auto launch_key = this->entrypoint + this->get_device_functions_key();
+  auto launch_key = this->fragment_key + this->get_device_functions_key();
 
   static std::mutex cache_mutex;
   std::lock_guard<std::mutex> lock(cache_mutex);
@@ -56,7 +56,7 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::get_launcher()
     add_entrypoint();
     add_device_functions();
     std::string log_message =
-      "JIT compiling launcher for entrypoint: " + this->entrypoint + " and device functions: ";
+      "JIT compiling launcher for fragment: " + this->fragment_key + " and device functions: ";
     for (const auto& device_function : this->device_functions) {
       log_message += device_function + ",";
     }

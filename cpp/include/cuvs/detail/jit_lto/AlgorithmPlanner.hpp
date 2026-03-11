@@ -6,6 +6,7 @@
 #pragma once
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "AlgorithmLauncher.hpp"
@@ -13,13 +14,14 @@
 struct FragmentEntry;
 
 struct AlgorithmPlanner {
-  AlgorithmPlanner(std::string const& n, std::string const& p)
-    : entrypoint(p.empty() ? n : (n + "_" + p))
+  AlgorithmPlanner(std::string&& fragment_key, std::string&& entrypoint)
+    : fragment_key(std::move(fragment_key)), entrypoint(std::move(entrypoint))
   {
   }
 
   std::shared_ptr<AlgorithmLauncher> get_launcher();
 
+  std::string fragment_key;
   std::string entrypoint;
   std::vector<std::string> device_functions;
   std::vector<FragmentEntry*> fragments;

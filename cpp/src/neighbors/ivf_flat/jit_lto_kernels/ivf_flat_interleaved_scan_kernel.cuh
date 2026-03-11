@@ -733,6 +733,30 @@ struct flat_block_sort<0, Ascending, T, IdxT>
 template <int Capacity, bool Ascending, typename T, typename IdxT>
 using block_sort_t = typename flat_block_sort<Capacity, Ascending, T, IdxT>::type;
 
+/**
+ * Scan clusters for nearest neighbors of the query vectors.
+ * See `ivfflat_interleaved_scan` for more information.
+ *
+ * The clusters are stored in the interleaved index format described in ivf_flat_types.hpp.
+ * For each query vector, a set of clusters is probed: the distance to each vector in the cluster is
+ * calculated, and the top-k nearest neighbors are selected.
+ *
+ * @param compute_dist distance function
+ * @param query_smem_elems number of dimensions of the query vector to fit in a shared memory of a
+ * block; this number must be a multiple of `WarpSize * Veclen`.
+ * @param[in] query a pointer to all queries in a row-major contiguous format [gridDim.y, dim]
+ * @param[in] coarse_index a pointer to the cluster indices to search through [n_probes]
+ * @param[in] list_indices index<T, IdxT>.indices
+ * @param[in] list_data index<T, IdxT>.data
+ * @param[in] list_sizes index<T, IdxT>.list_sizes
+ * @param[in] list_offsets index<T, IdxT>.list_offsets
+ * @param n_probes
+ * @param k
+ * @param dim
+ * @param sample_filter
+ * @param[out] neighbors
+ * @param[out] distances
+ */
 template <int Capacity,
           int Veclen,
           bool Ascending,

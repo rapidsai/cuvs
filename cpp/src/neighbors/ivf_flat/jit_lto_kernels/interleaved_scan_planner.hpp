@@ -22,7 +22,7 @@ struct InterleavedScanPlanner : AlgorithmPlanner {
                          "_acc_" +
                          cuvs::neighbors::ivf_flat::detail::tag_abbrev<AccTypeTag>::value +
                          "_idx_" + cuvs::neighbors::ivf_flat::detail::tag_abbrev<IdxTypeTag>::value,
-                       "")
+                       "interleaved_scan")
   {
   }
 
