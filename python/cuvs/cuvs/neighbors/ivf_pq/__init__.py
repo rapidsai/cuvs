@@ -12,6 +12,7 @@ from .ivf_pq import (
     load,
     save,
     search,
+    transform,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "load",
     "save",
     "search",
+    "transform",
 ]

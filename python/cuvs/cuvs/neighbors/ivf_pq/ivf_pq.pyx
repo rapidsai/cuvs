@@ -981,3 +981,70 @@ def extend(Index index, new_vectors, new_indices, resources=None):
         ))
 
     return index
+
+
+@auto_sync_resources
+def transform(Index index, input_dataset, output_labels=None, output_dataset=None, resources=None):
+    """
+    Transform a dataset by applying pq-encoding to the vectors.
+
+
+    Parameters
+    ----------
+    index : ivf_pq.Index
+        Trained ivf_pq object.
+    input_dataset : array interface compliant matrix shape (n_samples, dim)
+        Supported dtype [float]
+    new_indices : Optional array interface compliant vector shape (n_samples)
+        Supported dtype [uint32]
+    output_dataset : Optional array interface compliant matrix shape (n_samples, pq_dim)
+        Supported dtype [uint8]
+
+    {resources_docstring}
+
+    Returns
+    -------
+    output_labels, output_dataset:
+        The cluster that each point in the dataset belongs to, and the transformed dataset
+    """
+
+    input_dataset_ai = wrap_array(input_dataset)
+    _check_input_array(input_dataset_ai, [np.dtype('float32'), np.dtype('float16'),
+                                          np.dtype('int8'), np.dtype('uint8')])
+
+    cdef uint32_t n_samples = input_dataset_ai.shape[0]
+    cdef uint32_t pq_dim = index.pq_dim
+
+    if output_labels is None:
+        output_labels = device_ndarray.empty((n_samples), dtype='uint32')
+    output_labels_ai = wrap_array(output_labels)
+    _check_input_array(output_labels_ai, [np.dtype('uint32')],
+                       exp_rows=n_samples)
+
+    n_output_cols = int(np.ceil(index.pq_dim * index.pq_bits / 8))
+
+    if output_dataset is None:
+        output_dataset = device_ndarray.empty((n_samples, n_output_cols), dtype='uint8')
+    output_dataset_ai = wrap_array(output_dataset)
+    _check_input_array(output_dataset_ai, [np.dtype('uint8')],
+                       exp_rows=n_samples, exp_cols=n_output_cols)
+
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
+    cdef cydlpack.DLManagedTensor* input_dataset_dlpack = \
+        cydlpack.dlpack_c(input_dataset_ai)
+    cdef cydlpack.DLManagedTensor* output_labels_dlpack = \
+        cydlpack.dlpack_c(output_labels_ai)
+    cdef cydlpack.DLManagedTensor* output_dataset_dlpack = \
+        cydlpack.dlpack_c(output_dataset_ai)
+
+    with cuda_interruptible():
+        check_cuvs(cuvsIvfPqTransform(
+            res,
+            index.index,
+            input_dataset_dlpack,
+            output_labels_dlpack,
+            output_dataset_dlpack
+        ))
+
+    return output_labels, output_dataset

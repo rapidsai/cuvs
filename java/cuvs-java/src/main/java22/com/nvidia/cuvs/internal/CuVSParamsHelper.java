@@ -103,25 +103,6 @@ public final class CuVSParamsHelper {
     }
   }
 
-  static CloseableHandle createCagraMergeParams() {
-    try (var localArena = Arena.ofConfined()) {
-      var paramsPtrPtr = localArena.allocate(cuvsCagraMergeParams_t);
-      checkCuVSError(cuvsCagraMergeParamsCreate(paramsPtrPtr), "cuvsCagraMergeParamsCreate");
-      var paramsPtr = paramsPtrPtr.get(cuvsCagraMergeParams_t, 0L);
-      return new CloseableHandle() {
-        @Override
-        public MemorySegment handle() {
-          return paramsPtr;
-        }
-
-        @Override
-        public void close() {
-          checkCuVSError(cuvsCagraMergeParamsDestroy(paramsPtr), "cuvsCagraMergeParamsDestroy");
-        }
-      };
-    }
-  }
-
   public static CloseableHandle createAceParams() {
     try (var localArena = Arena.ofConfined()) {
       var paramsPtrPtr = localArena.allocate(cuvsAceParams_t);
