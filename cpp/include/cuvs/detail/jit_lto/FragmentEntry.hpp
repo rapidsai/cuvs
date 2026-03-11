@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-#include <nvJitLink.h>
+#include <cuvs/detail/jit_lto/nvjitlink_helper.hpp>
 
 struct FragmentEntry {
   FragmentEntry(std::string const& key);
