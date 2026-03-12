@@ -66,7 +66,7 @@ struct ground_truth_map {
     max_k_                = ground_truth_set.n_cols();
     auto filter           = [&](T i) -> bool {
       if (!filter_bitset.has_value()) { return true; }
-      auto word = filter_bitset->data()[i >> 5];
+      auto word = filter_bitset->data(MemoryType::kHostMmap)[i >> 5];
       return word & (1 << (i & 31));
     };
     // Avoid CPU oversubscription when parallelizing recall calculation loop
