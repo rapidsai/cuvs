@@ -427,7 +427,7 @@ void search_impl(raft::resources const& handle,
     num_samples_view);
 
   ivf::detail::postprocess_distances(
-    distances, distances, index.metric(), n_queries, k, 1.0, false, stream);
+    handle, distances, distances, index.metric(), n_queries, k, 1.0, false);
 
   ivf::detail::postprocess_neighbors(neighbors,
                                      neighbors_uint32_ptr,
