@@ -181,7 +181,7 @@ T compute_batched_host_inertia(
 
     // Build optional device weight view for this batch
     std::optional<raft::device_vector_view<const T, IdxT>> batch_weight_view;
-    if (sample_weight) {
+    if (sample_weight.has_value()) {
       auto weight_offset = static_cast<IdxT>(data_batch.offset());
       raft::copy(batch_weights.data_handle(),
                  sample_weight->data_handle() + weight_offset,
@@ -326,7 +326,7 @@ void fit(raft::resources const& handle,
 
         auto batch_weights_fill_view =
           raft::make_device_vector_view<T, IdxT>(batch_weights.data_handle(), current_batch_size);
-        if (sample_weight) {
+        if (sample_weight.has_value()) {
           raft::copy(batch_weights.data_handle(),
                      sample_weight->data_handle() + data_batch.offset(),
                      current_batch_size,
@@ -501,7 +501,7 @@ void predict(raft::resources const& handle,
                current_batch_size * n_features,
                stream);
 
-    if (sample_weight) {
+    if (sample_weight.has_value()) {
       raft::copy(batch_weights.data_handle(),
                  sample_weight->data_handle() + batch_idx,
                  current_batch_size,
@@ -512,7 +512,7 @@ void predict(raft::resources const& handle,
       batch_data.data_handle(), current_batch_size, n_features);
 
     std::optional<raft::device_vector_view<const T, IdxT>> batch_weights_view = std::nullopt;
-    if (sample_weight) {
+    if (sample_weight.has_value()) {
       batch_weights_view = std::make_optional(raft::make_device_vector_view<const T, IdxT>(
         batch_weights.data_handle(), current_batch_size));
     }
