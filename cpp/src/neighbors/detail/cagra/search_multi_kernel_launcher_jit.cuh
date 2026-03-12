@@ -23,6 +23,7 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/logger.hpp>
 
+#include <cstddef>
 #include <cuda_runtime.h>
 #include <string>
 #include <type_traits>
@@ -140,6 +141,33 @@ void random_pickup_jit(const dataset_descriptor_host<DataT, IndexT, DistanceT>& 
 
   // Get the device descriptor pointer
   const auto* dev_desc = dataset_desc.dev_ptr(cuda_stream);
+
+  // Patch descriptor with JIT symbols (setup_workspace_ptr, compute_distance_ptr)
+  using dev_descriptor_t =
+    cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
+  auto library                   = launcher->get_library();
+  size_t ptr_size                = sizeof(typename dev_descriptor_t::setup_workspace_type*);
+  void* setup_workspace_ptr_addr = nullptr;
+  RAFT_CUDA_TRY(
+    cudaLibraryGetGlobal(&setup_workspace_ptr_addr, &ptr_size, library, "setup_workspace_ptr"));
+  std::uintptr_t dev_desc_setup_impl_addr =
+    reinterpret_cast<std::uintptr_t>(dev_desc) + offsetof(dev_descriptor_t, setup_workspace_impl);
+  RAFT_CUDA_TRY(cudaMemcpyAsync(reinterpret_cast<void*>(dev_desc_setup_impl_addr),
+                                setup_workspace_ptr_addr,
+                                sizeof(typename dev_descriptor_t::setup_workspace_type*),
+                                cudaMemcpyDeviceToDevice,
+                                cuda_stream));
+  ptr_size                        = sizeof(typename dev_descriptor_t::compute_distance_type*);
+  void* compute_distance_ptr_addr = nullptr;
+  RAFT_CUDA_TRY(
+    cudaLibraryGetGlobal(&compute_distance_ptr_addr, &ptr_size, library, "compute_distance_ptr"));
+  std::uintptr_t dev_desc_compute_dist_impl_addr =
+    reinterpret_cast<std::uintptr_t>(dev_desc) + offsetof(dev_descriptor_t, compute_distance_impl);
+  RAFT_CUDA_TRY(cudaMemcpyAsync(reinterpret_cast<void*>(dev_desc_compute_dist_impl_addr),
+                                compute_distance_ptr_addr,
+                                sizeof(typename dev_descriptor_t::compute_distance_type*),
+                                cudaMemcpyDeviceToDevice,
+                                cuda_stream));
 
   // Cast size_t parameters to match kernel signature exactly
   // The dispatch mechanism uses void* pointers, so parameter sizes must match exactly
@@ -283,6 +311,33 @@ void compute_distance_to_child_nodes_jit(
 
   // Get the device descriptor pointer
   const auto* dev_desc = dataset_desc.dev_ptr(cuda_stream);
+
+  // Patch descriptor with JIT symbols (setup_workspace_ptr, compute_distance_ptr)
+  using dev_descriptor_t =
+    cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
+  auto library                   = launcher->get_library();
+  size_t ptr_size                = sizeof(typename dev_descriptor_t::setup_workspace_type*);
+  void* setup_workspace_ptr_addr = nullptr;
+  RAFT_CUDA_TRY(
+    cudaLibraryGetGlobal(&setup_workspace_ptr_addr, &ptr_size, library, "setup_workspace_ptr"));
+  std::uintptr_t dev_desc_setup_impl_addr =
+    reinterpret_cast<std::uintptr_t>(dev_desc) + offsetof(dev_descriptor_t, setup_workspace_impl);
+  RAFT_CUDA_TRY(cudaMemcpyAsync(reinterpret_cast<void*>(dev_desc_setup_impl_addr),
+                                setup_workspace_ptr_addr,
+                                sizeof(typename dev_descriptor_t::setup_workspace_type*),
+                                cudaMemcpyDeviceToDevice,
+                                cuda_stream));
+  ptr_size                        = sizeof(typename dev_descriptor_t::compute_distance_type*);
+  void* compute_distance_ptr_addr = nullptr;
+  RAFT_CUDA_TRY(
+    cudaLibraryGetGlobal(&compute_distance_ptr_addr, &ptr_size, library, "compute_distance_ptr"));
+  std::uintptr_t dev_desc_compute_dist_impl_addr =
+    reinterpret_cast<std::uintptr_t>(dev_desc) + offsetof(dev_descriptor_t, compute_distance_impl);
+  RAFT_CUDA_TRY(cudaMemcpyAsync(reinterpret_cast<void*>(dev_desc_compute_dist_impl_addr),
+                                compute_distance_ptr_addr,
+                                sizeof(typename dev_descriptor_t::compute_distance_type*),
+                                cudaMemcpyDeviceToDevice,
+                                cuda_stream));
 
   // Dispatch kernel via launcher
   launcher->dispatch(cuda_stream,

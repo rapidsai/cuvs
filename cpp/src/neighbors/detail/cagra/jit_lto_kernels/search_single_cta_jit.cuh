@@ -54,21 +54,12 @@ using cuvs::neighbors::detail::sample_filter;
 using cuvs::neighbors::cagra::detail::device::compute_distance_to_child_nodes_jit;
 using cuvs::neighbors::cagra::detail::device::compute_distance_to_random_nodes_jit;
 
-// JIT version of search_core - uses dataset_descriptor_base_t* pointer
-// Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, QueryT
-// For standard descriptors: PQ_BITS=0, PQ_LEN=0, CodebookT=void, QueryT=float (or uint8_t for
-// BitwiseHamming) For VPQ descriptors: PQ_BITS>0, PQ_LEN>0, CodebookT=half, QueryT=half
+// JIT search_core - setup_workspace/compute_distance via descriptor
 template <bool TOPK_BY_BITONIC_SORT,
           bool BITONIC_SORT_AND_MERGE_MULTI_WARPS,
-          uint32_t TeamSize,
-          uint32_t DatasetBlockDim,
-          uint32_t PQ_BITS,
-          uint32_t PQ_LEN,
-          typename CodebookT,
           typename DataT,
           typename IndexT,
           typename DistanceT,
-          typename QueryT,
           typename SourceIndexT>
 RAFT_DEVICE_INLINE_FUNCTION void search_core(
   uintptr_t result_indices_ptr,
@@ -134,19 +125,7 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
   uint32_t dim                   = dataset_desc->args.dim;
   uint32_t smem_ws_size_in_bytes = dataset_desc->smem_ws_size_in_bytes();
 
-  // Set smem working buffer using unified setup_workspace
-  // setup_workspace copies the descriptor to shared memory and returns base pointer to smem
-  // descriptor NOTE: setup_workspace must be called by ALL threads (it uses __syncthreads())
-  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* smem_desc =
-    setup_workspace<TeamSize,
-                    DatasetBlockDim,
-                    PQ_BITS,
-                    PQ_LEN,
-                    CodebookT,
-                    DataT,
-                    IndexT,
-                    DistanceT,
-                    QueryT>(dataset_desc, smem, queries_ptr, query_id);
+  auto* smem_desc = dataset_desc->setup_workspace(smem, queries_ptr, query_id);
 
   auto* __restrict__ result_indices_buffer =
     reinterpret_cast<IndexT*>(smem + smem_ws_size_in_bytes);
@@ -184,26 +163,18 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
   const IndexT* const local_seed_ptr = seed_ptr ? seed_ptr + (num_seeds * query_id) : nullptr;
   // Get dataset_size directly from base descriptor
   IndexT dataset_size = smem_desc->size;
-  compute_distance_to_random_nodes_jit<TeamSize,
-                                       DatasetBlockDim,
-                                       PQ_BITS,
-                                       PQ_LEN,
-                                       CodebookT,
-                                       IndexT,
-                                       DistanceT,
-                                       DataT,
-                                       QueryT>(result_indices_buffer,
-                                               result_distances_buffer,
-                                               smem_desc,
-                                               result_buffer_size,
-                                               num_distilation,
-                                               rand_xor_mask,
-                                               local_seed_ptr,
-                                               num_seeds,
-                                               local_visited_hashmap_ptr,
-                                               hash_bitlen,
-                                               (IndexT*)nullptr,
-                                               0);
+  compute_distance_to_random_nodes_jit<IndexT, DistanceT, DataT>(result_indices_buffer,
+                                                                 result_distances_buffer,
+                                                                 smem_desc,
+                                                                 result_buffer_size,
+                                                                 num_distilation,
+                                                                 rand_xor_mask,
+                                                                 local_seed_ptr,
+                                                                 num_seeds,
+                                                                 local_visited_hashmap_ptr,
+                                                                 hash_bitlen,
+                                                                 (IndexT*)nullptr,
+                                                                 0);
   __syncthreads();
   _CLK_REC(clk_compute_1st_distance);
 
@@ -311,26 +282,19 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
     __syncthreads();
     // compute the norms between child nodes and query node using JIT version
     _CLK_START();
-    compute_distance_to_child_nodes_jit<TeamSize,
-                                        DatasetBlockDim,
-                                        PQ_BITS,
-                                        PQ_LEN,
-                                        CodebookT,
-                                        IndexT,
-                                        DistanceT,
-                                        DataT,
-                                        QueryT>(result_indices_buffer + internal_topk,
-                                                result_distances_buffer + internal_topk,
-                                                smem_desc,
-                                                knn_graph,
-                                                graph_degree,
-                                                local_visited_hashmap_ptr,
-                                                hash_bitlen,
-                                                (IndexT*)nullptr,
-                                                0,
-                                                parent_list_buffer,
-                                                result_indices_buffer,
-                                                search_width);
+    compute_distance_to_child_nodes_jit<IndexT, DistanceT, DataT>(
+      result_indices_buffer + internal_topk,
+      result_distances_buffer + internal_topk,
+      smem_desc,
+      knn_graph,
+      graph_degree,
+      local_visited_hashmap_ptr,
+      hash_bitlen,
+      (IndexT*)nullptr,
+      0u,
+      parent_list_buffer,
+      result_indices_buffer,
+      search_width);
     // Critical: __syncthreads() must be reached by ALL threads
     // If any thread is stuck in compute_distance_to_child_nodes_jit, this will hang
     __syncthreads();
@@ -499,18 +463,11 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
 }
 
 // JIT kernel wrapper - calls search_core
-// Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, QueryT
 template <bool TOPK_BY_BITONIC_SORT,
           bool BITONIC_SORT_AND_MERGE_MULTI_WARPS,
-          uint32_t TeamSize,
-          uint32_t DatasetBlockDim,
-          uint32_t PQ_BITS,
-          uint32_t PQ_LEN,
-          typename CodebookT,
           typename DataT,
           typename IndexT,
           typename DistanceT,
-          typename QueryT,
           typename SourceIndexT>
 RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_jit(
   uintptr_t result_indices_ptr,
@@ -544,15 +501,9 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_jit(
   const auto query_id = blockIdx.y;
   search_core<TOPK_BY_BITONIC_SORT,
               BITONIC_SORT_AND_MERGE_MULTI_WARPS,
-              TeamSize,
-              DatasetBlockDim,
-              PQ_BITS,
-              PQ_LEN,
-              CodebookT,
               DataT,
               IndexT,
               DistanceT,
-              QueryT,
               SourceIndexT>(result_indices_ptr,
                             result_distances_ptr,
                             top_k,
@@ -592,19 +543,12 @@ struct job_desc_jit_helper_desc {
   using DISTANCE_T = DistanceT;
 };
 
-// JIT persistent kernel - uses extern functions and JIT search_core
-// Unified template parameters: TeamSize, DatasetBlockDim, PQ_BITS, PQ_LEN, CodebookT, QueryT
+// JIT persistent kernel
 template <bool TOPK_BY_BITONIC_SORT,
           bool BITONIC_SORT_AND_MERGE_MULTI_WARPS,
-          uint32_t TeamSize,
-          uint32_t DatasetBlockDim,
-          uint32_t PQ_BITS,
-          uint32_t PQ_LEN,
-          typename CodebookT,
           typename DataT,
           typename IndexT,
           typename DistanceT,
-          typename QueryT,
           typename SourceIndexT>
 RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_p_jit(
   worker_handle_t* worker_handles,
@@ -678,15 +622,9 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_p_jit(
     // work phase - use JIT search_core
     search_core<TOPK_BY_BITONIC_SORT,
                 BITONIC_SORT_AND_MERGE_MULTI_WARPS,
-                TeamSize,
-                DatasetBlockDim,
-                PQ_BITS,
-                PQ_LEN,
-                CodebookT,
                 DataT,
                 IndexT,
                 DistanceT,
-                QueryT,
                 SourceIndexT>(result_indices_ptr,
                               result_distances_ptr,
                               top_k,

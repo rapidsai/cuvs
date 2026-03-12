@@ -29,15 +29,7 @@ struct has_kpq_bits {
 template <typename T>
 inline constexpr bool has_kpq_bits_v = has_kpq_bits<T>::value;
 
-template <uint32_t TeamSize,
-          uint32_t DatasetBlockDim,
-          uint32_t PQ_BITS,
-          uint32_t PQ_LEN,
-          typename CodebookT,
-          typename DataT,
-          typename IndexT,
-          typename DistanceT,
-          typename QueryT>
+template <typename DataT, typename IndexT, typename DistanceT>
 RAFT_KERNEL random_pickup_kernel_jit(
   dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
   const DataT* const queries_ptr,  // [num_queries, dataset_dim]
@@ -65,25 +57,10 @@ RAFT_KERNEL random_pickup_kernel_jit(
   if (global_team_index >= num_pickup) { return; }
   extern __shared__ uint8_t smem[];
 
-  // Set smem working buffer using unified setup_workspace
-  // setup_workspace copies the descriptor to shared memory and returns base pointer to smem
-  // descriptor NOTE: setup_workspace must be called by ALL threads (it uses __syncthreads())
-  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* smem_desc =
-    setup_workspace<TeamSize,
-                    DatasetBlockDim,
-                    PQ_BITS,
-                    PQ_LEN,
-                    CodebookT,
-                    DataT,
-                    IndexT,
-                    DistanceT,
-                    QueryT>(dataset_desc, smem, queries_ptr, query_id);
+  // Set smem working buffer using descriptor->setup_workspace (JIT symbols patched by launcher)
+  auto* smem_desc = dataset_desc->setup_workspace(smem, queries_ptr, query_id);
   __syncthreads();
 
-  // Load args once for better performance (avoid repeated loads in the loop)
-  using args_t = typename cuvs::neighbors::cagra::detail::
-    dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t;
-  args_t args         = smem_desc->args.load();
   IndexT dataset_size = smem_desc->size;
 
   INDEX_T best_index_team_local;
@@ -97,22 +74,8 @@ RAFT_KERNEL random_pickup_kernel_jit(
       seed_index = device::xorshift64((global_team_index ^ rand_xor_mask) * (i + 1)) % dataset_size;
     }
 
-    // CRITICAL: ALL threads in the team must participate in compute_distance and team_sum
-    // Otherwise warp shuffles will hang. Each thread calls the unified extern function to get
-    // its per-thread distance, then team_sum reduces across all threads in the team.
-    DistanceT per_thread_norm2 = 0;
-    // Use unified compute_distance function (planner links standard or VPQ fragment at runtime)
-    per_thread_norm2 = compute_distance<TeamSize,
-                                        DatasetBlockDim,
-                                        PQ_BITS,
-                                        PQ_LEN,
-                                        CodebookT,
-                                        DataT,
-                                        IndexT,
-                                        DistanceT,
-                                        QueryT>(args, seed_index);
-    // Now ALL threads in the team participate in team_sum
-    const auto norm2 = device::team_sum(per_thread_norm2, team_size_bits);
+    // Use descriptor->compute_distance (JIT symbols patched by launcher)
+    const auto norm2 = smem_desc->compute_distance(seed_index, true);
 
     if (norm2 < best_norm2_team_local) {
       best_norm2_team_local = norm2;
@@ -133,15 +96,9 @@ RAFT_KERNEL random_pickup_kernel_jit(
   }
 }
 
-template <uint32_t TeamSize,
-          uint32_t DatasetBlockDim,
-          uint32_t PQ_BITS,
-          uint32_t PQ_LEN,
-          typename CodebookT,
-          typename DataT,
+template <typename DataT,
           typename IndexT,
           typename DistanceT,
-          typename QueryT,
           typename SourceIndexT,
           typename SAMPLE_FILTER_T>
 RAFT_KERNEL compute_distance_to_child_nodes_kernel_jit(
@@ -175,19 +132,8 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel_jit(
   const auto query_id       = blockIdx.y;
 
   extern __shared__ uint8_t smem[];
-  // Load a query using unified setup_workspace
-  // setup_workspace copies the descriptor to shared memory and returns base pointer to smem
-  // descriptor NOTE: setup_workspace must be called by ALL threads (it uses __syncthreads())
-  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* smem_desc =
-    setup_workspace<TeamSize,
-                    DatasetBlockDim,
-                    PQ_BITS,
-                    PQ_LEN,
-                    CodebookT,
-                    DataT,
-                    IndexT,
-                    DistanceT,
-                    QueryT>(dataset_desc, smem, query_ptr, query_id);
+  // Load a query using descriptor->setup_workspace (JIT symbols patched by launcher)
+  auto* smem_desc = dataset_desc->setup_workspace(smem, query_ptr, query_id);
 
   __syncthreads();
   if (global_team_id >= search_width * graph_degree) { return; }
@@ -213,29 +159,9 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel_jit(
   const auto compute_distance_flag = hashmap::insert<INDEX_T>(
     team_size, visited_hashmap_ptr + (ldb * blockIdx.y), hash_bitlen, child_id);
 
-  // Load args once for better performance (avoid repeated loads)
-  using args_t = typename cuvs::neighbors::cagra::detail::
-    dataset_descriptor_base_t<DataT, INDEX_T, DISTANCE_T>::args_t;
-  args_t args = smem_desc->args.load();
-
-  // CRITICAL: ALL threads in the team must participate in compute_distance and team_sum
-  // Otherwise warp shuffles will hang. Each thread calls the unified extern function to get
-  // its per-thread distance, then team_sum reduces across all threads in the team.
-  DISTANCE_T per_thread_norm2 = 0;
-  if (compute_distance_flag) {
-    // Use unified compute_distance function (planner links standard or VPQ fragment at runtime)
-    per_thread_norm2 = compute_distance<TeamSize,
-                                        DatasetBlockDim,
-                                        PQ_BITS,
-                                        PQ_LEN,
-                                        CodebookT,
-                                        DataT,
-                                        IndexT,
-                                        DistanceT,
-                                        QueryT>(args, child_id);
-  }
-  // Now ALL threads in the team participate in team_sum
-  DISTANCE_T norm2 = device::team_sum(per_thread_norm2, team_size_bits);
+  // All threads in the team must call compute_distance so team_sum doesn't deadlock (match non-JIT)
+  DISTANCE_T norm2 =
+    smem_desc->compute_distance(static_cast<INDEX_T>(child_id), compute_distance_flag);
 
   if (compute_distance_flag) {
     if ((threadIdx.x & (team_size - 1)) == 0) {

@@ -28,16 +28,7 @@ using cuvs::neighbors::cagra::detail::device::compute_distance_to_child_nodes_ji
 using cuvs::neighbors::cagra::detail::device::compute_distance_to_random_nodes_jit;
 using cuvs::neighbors::cagra::detail::device::has_kpq_bits_v;
 using cuvs::neighbors::detail::sample_filter;
-template <uint32_t TeamSize,
-          uint32_t DatasetBlockDim,
-          uint32_t PQ_BITS,
-          uint32_t PQ_LEN,
-          typename CodebookT,
-          typename DataT,
-          typename IndexT,
-          typename DistanceT,
-          typename QueryT,
-          typename SourceIndexT>
+template <typename DataT, typename IndexT, typename DistanceT, typename SourceIndexT>
 __global__ __launch_bounds__(1024, 1) void search_kernel_jit(
   IndexT* const result_indices_ptr,       // [num_queries, num_cta_per_query, itopk_size]
   DistanceT* const result_distances_ptr,  // [num_queries, num_cta_per_query, itopk_size]
@@ -107,19 +98,8 @@ __global__ __launch_bounds__(1024, 1) void search_kernel_jit(
   uint32_t dim                   = dataset_desc->args.dim;
   uint32_t smem_ws_size_in_bytes = dataset_desc->smem_ws_size_in_bytes();
 
-  // Set smem working buffer using unified setup_workspace
-  // setup_workspace copies the descriptor to shared memory and returns base pointer to smem
-  // descriptor
-  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* smem_desc =
-    setup_workspace<TeamSize,
-                    DatasetBlockDim,
-                    PQ_BITS,
-                    PQ_LEN,
-                    CodebookT,
-                    DataT,
-                    IndexT,
-                    DistanceT,
-                    QueryT>(dataset_desc, smem, queries_ptr, query_id);
+  // Set smem working buffer using descriptor->setup_workspace (JIT symbols patched by launcher)
+  auto* smem_desc = dataset_desc->setup_workspace(smem, queries_ptr, query_id);
 
   auto* __restrict__ result_indices_buffer =
     reinterpret_cast<INDEX_T*>(smem + smem_ws_size_in_bytes);
@@ -151,28 +131,20 @@ __global__ __launch_bounds__(1024, 1) void search_kernel_jit(
   uint32_t block_id                   = cta_id + (num_cta_per_query * query_id);
   uint32_t num_blocks                 = num_cta_per_query * num_queries;
 
-  compute_distance_to_random_nodes_jit<TeamSize,
-                                       DatasetBlockDim,
-                                       PQ_BITS,
-                                       PQ_LEN,
-                                       CodebookT,
-                                       IndexT,
-                                       DistanceT,
-                                       DataT,
-                                       QueryT>(result_indices_buffer,
-                                               result_distances_buffer,
-                                               smem_desc,
-                                               graph_degree,
-                                               num_distilation,
-                                               rand_xor_mask,
-                                               local_seed_ptr,
-                                               num_seeds,
-                                               local_visited_hashmap_ptr,
-                                               visited_hash_bitlen,
-                                               local_traversed_hashmap_ptr,
-                                               traversed_hash_bitlen,
-                                               block_id,
-                                               num_blocks);
+  compute_distance_to_random_nodes_jit<IndexT, DistanceT, DataT>(result_indices_buffer,
+                                                                 result_distances_buffer,
+                                                                 smem_desc,
+                                                                 graph_degree,
+                                                                 num_distilation,
+                                                                 rand_xor_mask,
+                                                                 local_seed_ptr,
+                                                                 num_seeds,
+                                                                 local_visited_hashmap_ptr,
+                                                                 visited_hash_bitlen,
+                                                                 local_traversed_hashmap_ptr,
+                                                                 traversed_hash_bitlen,
+                                                                 block_id,
+                                                                 num_blocks);
   __syncthreads();
   _CLK_REC(clk_compute_1st_distance);
 
@@ -252,29 +224,20 @@ __global__ __launch_bounds__(1024, 1) void search_kernel_jit(
     __syncthreads();
 
     // Compute the norms between child nodes and query node using JIT version
-    compute_distance_to_child_nodes_jit<TeamSize,
-                                        DatasetBlockDim,
-                                        PQ_BITS,
-                                        PQ_LEN,
-                                        CodebookT,
-                                        IndexT,
-                                        DistanceT,
-                                        DataT,
-                                        QueryT,
-                                        0>(result_indices_buffer,
-                                           result_distances_buffer,
-                                           smem_desc,
-                                           knn_graph,
-                                           graph_degree,
-                                           local_visited_hashmap_ptr,
-                                           visited_hash_bitlen,
-                                           local_traversed_hashmap_ptr,
-                                           traversed_hash_bitlen,
-                                           parent_indices_buffer,
-                                           result_indices_buffer,
-                                           1,
-                                           result_position,
-                                           result_buffer_size_32);
+    compute_distance_to_child_nodes_jit<IndexT, DistanceT, DataT, 0>(result_indices_buffer,
+                                                                     result_distances_buffer,
+                                                                     smem_desc,
+                                                                     knn_graph,
+                                                                     graph_degree,
+                                                                     local_visited_hashmap_ptr,
+                                                                     visited_hash_bitlen,
+                                                                     local_traversed_hashmap_ptr,
+                                                                     traversed_hash_bitlen,
+                                                                     parent_indices_buffer,
+                                                                     result_indices_buffer,
+                                                                     1,
+                                                                     result_position,
+                                                                     result_buffer_size_32);
     __syncthreads();
 
     // Check the state of the nodes in the result buffer which were not updated

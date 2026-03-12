@@ -42,6 +42,7 @@ struct AlgorithmLauncher {
     this->call_cooperative(stream, grid, block, shared_mem, kernel_args);
   }
 
+  cudaLibrary_t get_library() { return this->library; }
   cudaKernel_t get_kernel() { return this->kernel; }
 
  private:

@@ -35,43 +35,20 @@ struct CagraSingleCtaSearchPlanner
                               uint32_t pq_len  = 0,
                               bool persistent  = false)
     : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag>(
-        build_entrypoint_name(metric,
-                              topk_by_bitonic_sort,
-                              bitonic_sort_and_merge_multi_warps,
-                              team_size,
-                              dataset_block_dim,
-                              is_vpq,
-                              pq_bits,
-                              pq_len,
-                              persistent),
-        is_vpq ? make_fragment_key<DataTag,
-                                   IndexTag,
-                                   DistanceTag,
-                                   QueryTag,
-                                   SourceIndexTag,
-                                   CodebookTag>()
-               : make_fragment_key<DataTag, IndexTag, DistanceTag, QueryTag, SourceIndexTag>())
+        build_entrypoint_name(topk_by_bitonic_sort, bitonic_sort_and_merge_multi_warps, persistent),
+        make_fragment_key<DataTag, IndexTag, DistanceTag, QueryTag, SourceIndexTag>())
   {
   }
 
  private:
-  static std::string build_entrypoint_name(cuvs::distance::DistanceType metric,
-                                           bool topk_by_bitonic_sort,
+  static std::string build_entrypoint_name(bool topk_by_bitonic_sort,
                                            bool bitonic_sort_and_merge_multi_warps,
-                                           uint32_t team_size,
-                                           uint32_t dataset_block_dim,
-                                           bool is_vpq,
-                                           uint32_t pq_bits,
-                                           uint32_t pq_len,
                                            bool persistent)
   {
     std::string name = (persistent ? "search_single_cta_p" : "search_single_cta");
-    name += std::string(topk_by_bitonic_sort ? "_" : "_no_") + "topk_by_bitonic_sort";
-    name += std::string(bitonic_sort_and_merge_multi_warps ? "_" : "_no_") +
-            "bitonic_sort_and_merge_multi_warps";
-    name += "_team_size_" + std::to_string(team_size);
-    name += "_dataset_block_dim_" + std::to_string(dataset_block_dim);
-    if (is_vpq) { name += "_" + std::to_string(pq_bits) + "pq_" + std::to_string(pq_len) + "subd"; }
+    name += (topk_by_bitonic_sort ? "_" : "_no_") + std::string("topk_by_bitonic_sort");
+    name += (bitonic_sort_and_merge_multi_warps ? "_" : "_no_") +
+            std::string("bitonic_sort_and_merge_multi_warps");
     return name;
   }
 };

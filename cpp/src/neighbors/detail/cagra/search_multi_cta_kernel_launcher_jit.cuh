@@ -26,6 +26,7 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/logger.hpp>
 
+#include <cstddef>
 #include <cuda_runtime.h>
 #include <string>
 #include <type_traits>
@@ -91,8 +92,7 @@ void select_and_run_jit(
   using DistTag   = decltype(get_distance_type_tag<DistanceT>());
   using SourceTag = decltype(get_source_index_type_tag<SourceIndexT>());
 
-  // Create planner and register device functions
-  // Pass team_size, dataset_block_dim, and VPQ parameters to match the kernel entrypoint name
+  // Create planner and register device functions (setup_workspace, compute_distance, etc.)
   std::shared_ptr<AlgorithmLauncher> launcher;
   if (dataset_desc.is_vpq) {
     using QueryTag    = query_type_tag_vpq_t<DataTag>;
@@ -205,6 +205,33 @@ void select_and_run_jit(
   const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dev_desc_base =
     dataset_desc.dev_ptr(stream);
   const auto* dev_desc = dev_desc_base;
+
+  // Patch descriptor with JIT symbols (setup_workspace_ptr, compute_distance_ptr)
+  using dev_descriptor_t =
+    cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
+  auto library                   = launcher->get_library();
+  size_t ptr_size                = sizeof(typename dev_descriptor_t::setup_workspace_type*);
+  void* setup_workspace_ptr_addr = nullptr;
+  RAFT_CUDA_TRY(
+    cudaLibraryGetGlobal(&setup_workspace_ptr_addr, &ptr_size, library, "setup_workspace_ptr"));
+  std::uintptr_t dev_desc_setup_impl_addr =
+    reinterpret_cast<std::uintptr_t>(dev_desc) + offsetof(dev_descriptor_t, setup_workspace_impl);
+  RAFT_CUDA_TRY(cudaMemcpyAsync(reinterpret_cast<void*>(dev_desc_setup_impl_addr),
+                                setup_workspace_ptr_addr,
+                                sizeof(typename dev_descriptor_t::setup_workspace_type*),
+                                cudaMemcpyDeviceToDevice,
+                                stream));
+  ptr_size                        = sizeof(typename dev_descriptor_t::compute_distance_type*);
+  void* compute_distance_ptr_addr = nullptr;
+  RAFT_CUDA_TRY(
+    cudaLibraryGetGlobal(&compute_distance_ptr_addr, &ptr_size, library, "compute_distance_ptr"));
+  std::uintptr_t dev_desc_compute_dist_impl_addr =
+    reinterpret_cast<std::uintptr_t>(dev_desc) + offsetof(dev_descriptor_t, compute_distance_impl);
+  RAFT_CUDA_TRY(cudaMemcpyAsync(reinterpret_cast<void*>(dev_desc_compute_dist_impl_addr),
+                                compute_distance_ptr_addr,
+                                sizeof(typename dev_descriptor_t::compute_distance_type*),
+                                cudaMemcpyDeviceToDevice,
+                                stream));
 
   // Note: dataset_desc is passed by const reference, so it stays alive for the duration of this
   // function The descriptor's state is managed by a shared_ptr internally, so no need to explicitly

@@ -497,7 +497,7 @@ if(NOT BUILD_CPU_ONLY)
     generate_jit_lto_kernels(
       jit_lto_kernel_files
       NAME_FORMAT
-        "cagra_search_single_cta_@topk_by_bitonic_sort_str@_@bitonic_sort_and_merge_multi_warps_str@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@_data_@data_abbrev@_query_@query_abbrev@"
+        "cagra_search_single_cta_@topk_by_bitonic_sort_str@_@bitonic_sort_and_merge_multi_warps_str@_data_@data_abbrev@_query_@query_abbrev@"
       MATRIX_JSON_FILE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_matrix.json"
       KERNEL_INPUT_FILE
@@ -510,7 +510,7 @@ if(NOT BUILD_CPU_ONLY)
     generate_jit_lto_kernels(
       jit_lto_kernel_files
       NAME_FORMAT
-        "cagra_search_single_cta_p_@topk_by_bitonic_sort_str@_@bitonic_sort_and_merge_multi_warps_str@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@_data_@data_abbrev@_query_@query_abbrev@"
+        "cagra_search_single_cta_p_@topk_by_bitonic_sort_str@_@bitonic_sort_and_merge_multi_warps_str@_data_@data_abbrev@_query_@query_abbrev@"
       MATRIX_JSON_FILE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_p_matrix.json"
       KERNEL_INPUT_FILE
@@ -522,8 +522,7 @@ if(NOT BUILD_CPU_ONLY)
     )
     generate_jit_lto_kernels(
       jit_lto_kernel_files
-      NAME_FORMAT
-        "cagra_search_multi_cta@pq_prefix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@_data_@data_abbrev@_query_@query_abbrev@"
+      NAME_FORMAT "cagra_search_multi_cta_data_@data_abbrev@_query_@query_abbrev@"
       MATRIX_JSON_FILE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/search_multi_cta_matrix.json"
       KERNEL_INPUT_FILE
@@ -535,8 +534,7 @@ if(NOT BUILD_CPU_ONLY)
     )
     generate_jit_lto_kernels(
       jit_lto_kernel_files
-      NAME_FORMAT
-        "cagra_random_pickup@pq_prefix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@_data_@data_abbrev@_query_@query_abbrev@"
+      NAME_FORMAT "cagra_random_pickup_data_@data_abbrev@_query_@query_abbrev@"
       MATRIX_JSON_FILE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/random_pickup_matrix.json"
       KERNEL_INPUT_FILE
@@ -548,8 +546,7 @@ if(NOT BUILD_CPU_ONLY)
     )
     generate_jit_lto_kernels(
       jit_lto_kernel_files
-      NAME_FORMAT
-        "cagra_compute_distance_to_child_nodes@pq_prefix@_team_size_@team_size@_dataset_block_dim_@dataset_block_dim@@pq_suffix@_data_@data_abbrev@_query_@query_abbrev@"
+      NAME_FORMAT "cagra_compute_distance_to_child_nodes_data_@data_abbrev@_query_@query_abbrev@"
       MATRIX_JSON_FILE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/jit_lto_kernels/compute_distance_to_child_nodes_matrix.json"
       KERNEL_INPUT_FILE
