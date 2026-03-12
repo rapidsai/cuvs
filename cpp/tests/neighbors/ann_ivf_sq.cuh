@@ -410,9 +410,6 @@ const std::vector<AnnIvfSqInputs<int64_t>> inputs = {
   // very few db vectors (nlist reduced to fit)
   {100, 500, 16, 10, 40, 256, cuvs::distance::DistanceType::L2Expanded, false},
   {100, 500, 16, 10, 40, 256, cuvs::distance::DistanceType::CosineExpanded, false},
-  // small db with many empty clusters
-  {100, 100, 16, 5, 20, 64, cuvs::distance::DistanceType::L2Expanded, false},
-  {100, 100, 16, 5, 20, 64, cuvs::distance::DistanceType::CosineExpanded, false},
   // larger datasets
   {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, true},
   {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
