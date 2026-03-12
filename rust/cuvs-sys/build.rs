@@ -15,10 +15,9 @@ fn main() {
         "cargo:rustc-link-search=native={}/lib",
         cuvs_build.display()
     );
-    println!(
-        "cargo:rustc-link-search=native={}/lib",
-        env::var("CONDA_PREFIX").unwrap()
-    );
+    if let Ok(conda_prefix) = env::var("CONDA_PREFIX") {
+        println!("cargo:rustc-link-search=native={}/lib", conda_prefix);
+    }
     println!("cargo:rustc-link-lib=dylib=cuvs_c");
     println!("cargo:rustc-link-lib=static=cudart_static");
 
