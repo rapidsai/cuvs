@@ -138,6 +138,7 @@ outputs:
             - libnvjitlink
       ignore_run_exports:
         by_name:
+          - cuda-cudart
           - cuda-version
           - libaio
           - libboost
@@ -205,6 +206,7 @@ outputs:
             - libnvjitlink
       ignore_run_exports:
         by_name:
+          - cuda-cudart
           - cuda-version
           - libaio
           - libboost
@@ -270,6 +272,7 @@ outputs:
             - libnvjitlink
       ignore_run_exports:
         by_name:
+          - cuda-cudart
           - cuda-version
           - libaio
           - libboost
@@ -328,6 +331,7 @@ outputs:
         - libcusparse
       ignore_run_exports:
         by_name:
+          - cuda-cudart
           - cuda-version
           - libaio
           - libboost
@@ -432,6 +436,7 @@ outputs:
             - libnvjitlink
       ignore_run_exports:
         by_name:
+          - cuda-cudart
           - cuda-version
           - libaio
           - libboost
@@ -506,6 +511,7 @@ outputs:
           then: mkl =2023
       ignore_run_exports:
         by_name:
+          - cuda-cudart
           - cuda-version
           - libcublas
           - libcurand

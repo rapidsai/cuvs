@@ -94,6 +94,7 @@ requirements:
   ignore_run_exports:
     by_name:
       - cuda-version
+      - cuda-cudart
 
 tests:
   - python:
