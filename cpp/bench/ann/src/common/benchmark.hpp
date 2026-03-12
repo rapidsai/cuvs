@@ -384,7 +384,7 @@ void bench_search(::benchmark::State& state,
           if (i_orig_idx >= dataset->gt_maps_size()) { break; }
           size_t i_out_idx = out_offset + i;
           if (i_out_idx < rows) {
-            local_total_count[tid] += filter_pass_counts[i_orig_idx];
+            local_total_count[tid] += std::min(filter_pass_counts[i_orig_idx], k);
 
             for (std::uint32_t j = 0; j < k; j++) {
               auto act_idx = static_cast<std::int32_t>(neighbors_host[i_out_idx * k + j]);
