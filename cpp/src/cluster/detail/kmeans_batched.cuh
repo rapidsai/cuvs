@@ -299,6 +299,8 @@ void fit(raft::resources const& handle,
       init_centroids_from_host_sample(handle, iter_params, batch_size, X, centroids, workspace);
     }
 
+    if (!sample_weight.has_value()) { raft::matrix::fill(handle, batch_weights.view(), T{1}); }
+
     // Reset per-iteration state
     T priorClusteringCost = 0;
 
@@ -331,8 +333,6 @@ void fit(raft::resources const& handle,
                      sample_weight->data_handle() + data_batch.offset(),
                      current_batch_size,
                      stream);
-        } else {
-          raft::matrix::fill(handle, batch_weights_fill_view, T{1});
         }
 
         auto batch_weights_view = raft::make_device_vector_view<const T, IdxT>(
