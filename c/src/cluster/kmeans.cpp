@@ -112,12 +112,7 @@ void _fit(cuvsResources_t res,
         auto kmeans_params = convert_balanced_params(params);
         T inertia_temp;
         auto inertia_view = raft::make_host_scalar_view<T>(&inertia_temp);
-        cuvs::cluster::kmeans::fit(
-          *res_ptr,
-          kmeans_params,
-          cuvs::core::from_dlpack<const_mdspan_type>(X_tensor),
-          cuvs::core::from_dlpack<mdspan_type>(centroids_tensor),
-          std::make_optional(inertia_view));
+        cuvs::cluster::kmeans::fit(*res_ptr, kmeans_params, cuvs::core::from_dlpack<const_mdspan_type>(X_tensor), cuvs::core::from_dlpack<mdspan_type>(centroids_tensor), std::make_optional(inertia_view));
         *inertia = inertia_temp;
         *n_iter  = params.hierarchical_n_iters;
       }
