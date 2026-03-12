@@ -337,8 +337,6 @@ void fit(raft::resources const& handle,
         auto batch_data_view = raft::make_device_matrix_view<const T, IdxT>(
           data_batch.data(), current_batch_size, n_features);
 
-        auto batch_weights_fill_view =
-          raft::make_device_vector_view<T, IdxT>(batch_weights.data_handle(), current_batch_size);
         if (sample_weight.has_value()) {
           raft::copy(batch_weights.data_handle(),
                      sample_weight->data_handle() + data_batch.offset(),
