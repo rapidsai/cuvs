@@ -3056,7 +3056,8 @@ void recompute_internal_state(const raft::resources& res, index<uint8_t, int64_t
 namespace experimental::udf {
 
 // ============================================================================
-// Real C++ implementations for compile-time validation
+// Real C++ implementations for compile-time validation. These allow users to
+// verify that their custom UDFs will compile correctly and be usable in our kernels.
 // ============================================================================
 
 /**
@@ -3080,9 +3081,22 @@ struct point {
   point() = default;
   __device__ __host__ explicit point(storage_type d) : data_(d) {}
 
+  /*
+  @brief Returns the raw storage type of the point. This is only relevant for int8/uint8 with Veclen
+  > 1. When working with packed data, one may use CUDA intrinsics to access faster vectorized
+  operations.
+
+  @return The raw storage type of the point.
+  */
   __device__ __forceinline__ storage_type raw() const { return data_; }
   __device__ __forceinline__ storage_type& raw() { return data_; }
 
+  /*
+  @brief Returns the number of elements in the point. Prefer to use this along with operator[] when
+  unsure about CUDA intrinsics.
+
+  @return The number of elements in the point.
+  */
   __device__ __host__ static constexpr int size()
   {
     if constexpr ((std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) && Veclen > 1) {
