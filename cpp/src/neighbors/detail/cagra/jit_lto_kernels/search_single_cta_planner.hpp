@@ -36,7 +36,7 @@ struct CagraSingleCtaSearchPlanner
                               bool persistent  = false)
     : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag>(
         build_entrypoint_name(topk_by_bitonic_sort, bitonic_sort_and_merge_multi_warps, persistent),
-        make_fragment_key<DataTag, IndexTag, DistanceTag, QueryTag, SourceIndexTag>())
+        make_fragment_key<DataTag, IndexTag, DistanceTag, SourceIndexTag>())
   {
   }
 

@@ -16,7 +16,6 @@ __attribute__((__constructor__)) void register_kernel()
   registerAlgorithm<tag_@data_abbrev@,
     tag_idx_@index_abbrev@,
     tag_dist_@distance_abbrev@,
-    tag_@query_abbrev@,
     tag_idx_@source_index_abbrev@>(
     "random_pickup",
     embedded_fatbin,

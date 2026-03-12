@@ -34,7 +34,7 @@ struct CagraMultiKernelSearchPlanner
         kernel_name,
         (kernel_name == "apply_filter_kernel")
           ? make_fragment_key<IndexTag, DistanceTag, SourceIndexTag>()
-          : make_fragment_key<DataTag, IndexTag, DistanceTag, QueryTag, SourceIndexTag>())
+          : make_fragment_key<DataTag, IndexTag, DistanceTag, SourceIndexTag>())
   {
   }
 };

@@ -38,10 +38,6 @@
 
 namespace cuvs::neighbors::cagra::detail::single_cta_search {
 
-// Helper to check if DescriptorT has kPqBits (VPQ descriptor) - use shared version
-// Use fully qualified name since it's a template variable
-using cuvs::neighbors::cagra::detail::device::has_kpq_bits_v;
-
 // are defined in search_single_cta_kernel-inl.cuh which is included by the launcher.
 // We don't redefine them here to avoid duplicate definitions.
 

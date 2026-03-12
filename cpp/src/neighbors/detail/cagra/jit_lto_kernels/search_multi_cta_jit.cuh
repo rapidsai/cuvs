@@ -26,7 +26,6 @@ namespace cuvs::neighbors::cagra::detail::multi_cta_search {
 
 using cuvs::neighbors::cagra::detail::device::compute_distance_to_child_nodes_jit;
 using cuvs::neighbors::cagra::detail::device::compute_distance_to_random_nodes_jit;
-using cuvs::neighbors::cagra::detail::device::has_kpq_bits_v;
 using cuvs::neighbors::detail::sample_filter;
 template <typename DataT, typename IndexT, typename DistanceT, typename SourceIndexT>
 __global__ __launch_bounds__(1024, 1) void search_kernel_jit(

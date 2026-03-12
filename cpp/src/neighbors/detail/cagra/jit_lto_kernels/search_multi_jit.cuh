@@ -17,18 +17,6 @@
 
 namespace cuvs::neighbors::cagra::detail::multi_kernel_search {
 
-template <typename T>
-struct has_kpq_bits {
-  template <typename U>
-  static auto test(int) -> decltype(U::kPqBits, std::true_type{});
-  template <typename>
-  static std::false_type test(...);
-  static constexpr bool value = decltype(test<T>(0))::value;
-};
-
-template <typename T>
-inline constexpr bool has_kpq_bits_v = has_kpq_bits<T>::value;
-
 template <typename DataT, typename IndexT, typename DistanceT>
 RAFT_KERNEL random_pickup_kernel_jit(
   dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
