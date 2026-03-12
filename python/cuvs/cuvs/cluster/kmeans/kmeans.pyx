@@ -82,8 +82,12 @@ cdef class KMeansParams:
     batch_size : int
         Number of samples to process per GPU batch when fitting with host
         (numpy) data. When set to 0, defaults to n_samples (process all
-        at once). Only used by the batched (host-data) code path.
-        Default: 0 (auto).
+        at once). Only used by the batched (host-data) code path. Reducing
+        batch_size can help reduce GPU memory pressure but increases
+        overhead as the number of times centroid adjustments are computed
+        increases.
+
+        Default: 0 (process all data at once).
     hierarchical : bool
         Whether to use hierarchical (balanced) kmeans or not
     hierarchical_n_iters : int
@@ -210,7 +214,8 @@ def fit(
     When X is a device array (CUDA array interface), standard on-device
     k-means is used.  When X is a host array (numpy ndarray or
     ``__array_interface__``), data is streamed to the GPU in batches
-    controlled by ``params.batch_size``.
+    controlled by ``params.batch_size``. For large host datasets, consider
+    reducing ``batch_size`` to reduce GPU memory usage.
 
     Parameters
     ----------
