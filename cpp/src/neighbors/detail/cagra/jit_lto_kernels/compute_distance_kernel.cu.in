@@ -14,6 +14,6 @@ template __device__ @distance_type@ compute_distance<@team_size@, @dataset_block
 }  // namespace cuvs::neighbors::cagra::detail
 
 extern "C" {
-__device__ @distance_type@ (*const compute_distance_ptr)(const typename cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<@data_type@, @index_type@, @distance_type@>::args_t, @index_type@) =
+extern __device__ @distance_type@ (*const compute_distance_ptr)(const typename cuvs::neighbors::cagra::detail::dataset_descriptor_base_t<@data_type@, @index_type@, @distance_type@>::args_t, @index_type@) =
     &cuvs::neighbors::cagra::detail::compute_distance<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@, @query_type@>;
 }
