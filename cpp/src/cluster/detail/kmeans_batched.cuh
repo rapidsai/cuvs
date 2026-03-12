@@ -241,6 +241,17 @@ void fit(raft::resources const& handle,
   if (batch_size <= 0) { batch_size = static_cast<IdxT>(n_samples); }
 
   RAFT_EXPECTS(batch_size > 0, "batch_size must be positive");
+
+  // Warn if user explicitly set batch_size larger than dataset size
+  if (params.batched.batch_size > 0 && static_cast<IdxT>(params.batched.batch_size) > n_samples) {
+    RAFT_LOG_WARN(
+      "batch_size (%zu) is larger than dataset size (%zu). "
+      "batch_size will be effectively clamped to %zu.",
+      static_cast<size_t>(params.batched.batch_size),
+      static_cast<size_t>(n_samples),
+      static_cast<size_t>(n_samples));
+  }
+
   RAFT_EXPECTS(n_clusters > 0, "n_clusters must be positive");
   RAFT_EXPECTS(static_cast<IdxT>(centroids.extent(0)) == n_clusters,
                "centroids.extent(0) must equal n_clusters");
@@ -481,6 +492,17 @@ void predict(raft::resources const& handle,
   if (batch_size <= 0) { batch_size = static_cast<IdxT>(n_samples); }
 
   RAFT_EXPECTS(batch_size > 0, "batch_size must be positive");
+
+  // Warn if user explicitly set batch_size larger than dataset size
+  if (params.batched.batch_size > 0 && static_cast<IdxT>(params.batched.batch_size) > n_samples) {
+    RAFT_LOG_WARN(
+      "batch_size (%zu) is larger than dataset size (%zu). "
+      "batch_size will be effectively clamped to %zu.",
+      static_cast<size_t>(params.batched.batch_size),
+      static_cast<size_t>(n_samples),
+      static_cast<size_t>(n_samples));
+  }
+
   RAFT_EXPECTS(n_clusters > 0, "n_clusters must be positive");
   RAFT_EXPECTS(centroids.extent(0) == static_cast<IdxT>(n_clusters),
                "centroids.extent(0) must equal n_clusters");
