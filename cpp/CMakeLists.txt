@@ -213,6 +213,12 @@ endif()
 # ##################################################################################################
 # * cuvs ---------------------------------------------------------------------
 if(NOT BUILD_CPU_ONLY)
+  set(JIT_LTO_TARGET_ARCHITECTURE "")
+  set(JIT_LTO_COMPILATION OFF)
+  if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
+    set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
+    set(JIT_LTO_COMPILATION ON)
+  endif()
 
   add_library(cuvs_cpp_headers INTERFACE)
   add_library(cuvs::cuvs_cpp_headers ALIAS cuvs_cpp_headers)
@@ -221,6 +227,9 @@ if(NOT BUILD_CPU_ONLY)
     INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
               "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
               "$<INSTALL_INTERFACE:include>"
+  )
+  target_compile_definitions(
+    cuvs_cpp_headers INTERFACE $<$<BOOL:${JIT_LTO_COMPILATION}>:CUVS_ENABLE_JIT_LTO>
   )
   target_link_libraries(cuvs_cpp_headers INTERFACE raft::raft rmm::rmm)
 
@@ -357,13 +366,6 @@ if(NOT BUILD_CPU_ONLY)
     )
   endif()
 
-  set(JIT_LTO_TARGET_ARCHITECTURE "")
-  set(JIT_LTO_COMPILATION OFF)
-  if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
-    set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
-    set(JIT_LTO_COMPILATION ON)
-  endif()
-
   if(JIT_LTO_COMPILATION)
     # Generate interleaved scan kernel files at build time
     include(cmake/modules/generate_jit_lto_kernels.cmake)
@@ -447,6 +449,7 @@ if(NOT BUILD_CPU_ONLY)
       src/detail/jit_lto/FragmentDatabase.cu
       src/detail/jit_lto/FragmentEntry.cu
       src/detail/jit_lto/nvjitlink_checker.cpp
+      src/detail/jit_lto/NVRTCLTOFragmentCompiler.cu
     )
     set_target_properties(
       cuvs_jit_lto_kernels PROPERTIES POSITION_INDEPENDENT_CODE ON CXX_STANDARD 20
@@ -456,7 +459,7 @@ if(NOT BUILD_CPU_ONLY)
       PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_SOURCE_DIR}/src"
               "${CMAKE_CURRENT_SOURCE_DIR}/../c/include"
     )
-    target_link_libraries(cuvs_jit_lto_kernels PRIVATE raft::raft)
+    target_link_libraries(cuvs_jit_lto_kernels PRIVATE raft::raft CUDA::nvJitLink CUDA::nvrtc)
     add_library(cuvs::cuvs_jit_lto_kernels ALIAS cuvs_jit_lto_kernels)
   endif()
 
@@ -787,6 +790,7 @@ if(NOT BUILD_CPU_ONLY)
         $<COMPILE_ONLY:nvidia::cutlass::cutlass>
         $<COMPILE_ONLY:cuco::cuco>
         $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
+        $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvrtc>
         $<$<BOOL:${JIT_LTO_COMPILATION}>:$<LINK_LIBRARY:WHOLE_ARCHIVE,cuvs::cuvs_jit_lto_kernels>>
     )
 
@@ -847,6 +851,7 @@ SECTIONS
       PRIVATE
         $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
         $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
+        $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvrtc>
         $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
         $<COMPILE_ONLY:nvidia::cutlass::cutlass>
         $<COMPILE_ONLY:cuco::cuco>

@@ -26,6 +26,8 @@
 
 #include <rmm/resource_ref.hpp>
 
+#include <type_traits>
+
 namespace cuvs::neighbors::ivf_flat::detail {
 
 using namespace cuvs::spatial::knn::detail;  // NOLINT
@@ -38,6 +40,7 @@ auto RAFT_WEAK_FUNCTION is_local_topk_feasible(uint32_t k) -> bool
 template <typename T, typename AccT, typename IdxT, typename IvfSampleFilterT>
 void search_impl(raft::resources const& handle,
                  const cuvs::neighbors::ivf_flat::index<T, IdxT>& index,
+                 const search_params& params,
                  const T* queries,
                  uint32_t n_queries,
                  uint32_t queries_offset,
@@ -190,16 +193,14 @@ void search_impl(raft::resources const& handle,
     // query the gridDimX size to store probes topK output
     ivfflat_interleaved_scan<T, typename utils::config<T>::value_t, IdxT, IvfSampleFilterT>(
       index,
+      params,
       nullptr,
       nullptr,
       n_queries,
       queries_offset,
-      index.metric(),
-      n_probes,
       k,
       0,
       nullptr,
-      select_min,
       sample_filter,
       nullptr,
       nullptr,
@@ -245,16 +246,14 @@ void search_impl(raft::resources const& handle,
 
   ivfflat_interleaved_scan<T, typename utils::config<T>::value_t, IdxT, IvfSampleFilterT>(
     index,
+    params,
     queries,
     coarse_indices_dev.data(),
     n_queries,
     queries_offset,
-    index.metric(),
-    n_probes,
     k,
     max_samples,
     chunk_index.data(),
-    select_min,
     sample_filter,
     indices_dev_ptr,
     distances_dev_ptr,
@@ -350,6 +349,7 @@ inline void search_with_filtering(raft::resources const& handle,
 
     search_impl<T, float, IdxT, IvfSampleFilterT>(handle,
                                                   index,
+                                                  params,
                                                   queries + offset_q * index.dim(),
                                                   queries_batch,
                                                   offset_q,
@@ -383,6 +383,13 @@ void search_with_filtering(raft::resources const& handle,
   RAFT_EXPECTS(queries.extent(1) == index.dim(),
                "Number of query dimensions should equal number of dimensions in the index.");
 
+  // Save original metric and temporarily set to CustomUDF if using UDF
+  auto original_metric = index.metric();
+  if (params.metric_udf.has_value()) {
+    const_cast<std::remove_const_t<std::remove_reference_t<decltype(index)>>&>(index).set_metric(
+      cuvs::distance::DistanceType::CustomUDF);
+  }
+
   search_with_filtering(handle,
                         params,
                         index,
@@ -392,6 +399,12 @@ void search_with_filtering(raft::resources const& handle,
                         neighbors.data_handle(),
                         distances.data_handle(),
                         sample_filter);
+
+  // Restore original metric
+  if (params.metric_udf.has_value()) {
+    const_cast<std::remove_const_t<std::remove_reference_t<decltype(index)>>&>(index).set_metric(
+      original_metric);
+  }
 }
 
 template <typename T, typename IdxT>

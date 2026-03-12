@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,16 +17,14 @@
 namespace cuvs::neighbors::ivf_flat::detail {
 template <typename T, typename AccT, typename IdxT, typename IvfSampleFilterT>
 void ivfflat_interleaved_scan(const index<T, IdxT>& index,
+                              const search_params& params,
                               const T* queries,
                               const uint32_t* coarse_query_results,
                               const uint32_t n_queries,
                               const uint32_t queries_offset,
-                              const cuvs::distance::DistanceType metric,
-                              const uint32_t n_probes,
                               const uint32_t k,
                               const uint32_t max_samples,
                               const uint32_t* chunk_indices,
-                              const bool select_min,
                               IvfSampleFilterT sample_filter,
                               uint32_t* neighbors,
                               float* distances,
@@ -39,16 +37,14 @@ void ivfflat_interleaved_scan(const index<T, IdxT>& index,
                            typename cuvs::spatial::knn::detail::utils::config<T>::value_t, \
                            IdxT,                                                           \
                            SampleFilterT>(const index<T, IdxT>& index,                     \
+                                          const search_params& params,                     \
                                           const T* queries,                                \
                                           const uint32_t* coarse_query_results,            \
                                           const uint32_t n_queries,                        \
                                           const uint32_t queries_offset,                   \
-                                          const cuvs::distance::DistanceType metric,       \
-                                          const uint32_t n_probes,                         \
                                           const uint32_t k,                                \
                                           const uint32_t max_samples,                      \
                                           const uint32_t* chunk_indices,                   \
-                                          const bool select_min,                           \
                                           SampleFilterT sample_filter,                     \
                                           uint32_t* neighbors,                             \
                                           float* distances,                                \

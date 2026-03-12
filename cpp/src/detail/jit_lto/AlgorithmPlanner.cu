@@ -53,6 +53,7 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::get_launcher()
   static std::mutex cache_mutex;
   std::lock_guard<std::mutex> lock(cache_mutex);
   if (launchers.count(launch_key) == 0) {
+    RAFT_LOG_INFO("A first time JIT compilation has been triggered for your algorithm.");
     add_entrypoint();
     add_device_functions();
     std::string log_message =
@@ -61,7 +62,7 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::get_launcher()
       log_message += device_function + ",";
     }
     log_message.pop_back();
-    RAFT_LOG_INFO("%s", log_message.c_str());
+    RAFT_LOG_DEBUG("%s", log_message.c_str());
     launchers[launch_key] = this->build();
   }
   return launchers[launch_key];
