@@ -24,7 +24,7 @@
 
 void AlgorithmPlanner::add_entrypoint()
 {
-  auto entrypoint_fragment = fragment_database().get_fragment(this->entrypoint);
+  auto entrypoint_fragment = fragment_database().get_fragment(this->fragment_key);
   this->fragments.push_back(entrypoint_fragment);
 }
 
@@ -48,7 +48,7 @@ std::string AlgorithmPlanner::get_device_functions_key() const
 std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::get_launcher()
 {
   auto& launchers = get_cached_launchers();
-  auto launch_key = this->entrypoint + this->get_device_functions_key();
+  auto launch_key = this->fragment_key + this->get_device_functions_key();
 
   static std::mutex cache_mutex;
   std::lock_guard<std::mutex> lock(cache_mutex);
@@ -56,7 +56,7 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::get_launcher()
     add_entrypoint();
     add_device_functions();
     std::string log_message =
-      "JIT compiling launcher for entrypoint: " + this->entrypoint + " and device functions: ";
+      "JIT compiling launcher for kernel: " + this->fragment_key + " and device functions: ";
     for (const auto& device_function : this->device_functions) {
       log_message += device_function + ",";
     }
@@ -110,40 +110,8 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
   RAFT_CUDA_TRY(
     cudaLibraryLoadData(&library, cubin.get(), nullptr, nullptr, 0, nullptr, nullptr, 0));
 
-  unsigned int kernel_count = 0;
-  RAFT_CUDA_TRY(cudaLibraryGetKernelCount(&kernel_count, library));
+  cudaKernel_t kernel;
+  RAFT_CUDA_TRY(cudaLibraryGetKernel(&kernel, library, this->entrypoint.c_str()));
 
-  // NOTE: cudaKernel_t does not need to be freed explicitly
-  std::unique_ptr<cudaKernel_t[]> kernels{new cudaKernel_t[kernel_count]};
-  RAFT_CUDA_TRY(cudaLibraryEnumerateKernels(kernels.get(), kernel_count, library));
-
-  // Filter out EmptyKernel by checking kernel names using cudaFuncGetName
-  const char* empty_kernel_name = "_ZN3cub6detail11EmptyKernelIvEEvv";
-  std::vector<cudaKernel_t> valid_kernels;
-  valid_kernels.reserve(kernel_count);
-
-  for (unsigned int i = 0; i < kernel_count; ++i) {
-    // cudaFuncGetName can be used with cudaKernel_t by casting to void*
-    const void* func_ptr  = reinterpret_cast<const void*>(kernels[i]);
-    const char* func_name = nullptr;
-    RAFT_CUDA_TRY(cudaFuncGetName(&func_name, func_ptr));
-
-    bool is_empty_kernel = false;
-    if (func_name != nullptr) {
-      std::string kernel_name(func_name);
-      // Check if this is EmptyKernel
-      if (kernel_name.find(empty_kernel_name) != std::string::npos ||
-          kernel_name == empty_kernel_name) {
-        is_empty_kernel = true;
-      }
-    }
-
-    // Only keep the kernel if it's not EmptyKernel
-    if (!is_empty_kernel) { valid_kernels.push_back(kernels[i]); }
-  }
-
-  RAFT_EXPECTS(
-    valid_kernels.size() == 1, "Expected 1 valid JIT kernel, got %zu", valid_kernels.size());
-
-  return std::make_shared<AlgorithmLauncher>(valid_kernels[0], library);
+  return std::make_shared<AlgorithmLauncher>(kernel, library);
 }
