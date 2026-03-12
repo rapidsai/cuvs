@@ -744,12 +744,6 @@ if(NOT BUILD_CPU_ONLY)
   if(NOT cuvs_compile_mode STREQUAL "static_only")
     add_library(cuvs SHARED $<TARGET_OBJECTS:cuvs_objs> $<TARGET_OBJECTS:cuvs-cagra-search>)
     add_library(cuvs::cuvs ALIAS cuvs)
-    get_property(
-      rt
-      TARGET cuvs
-      PROPERTY CUDA_RUNTIME_LIBRARY
-    )
-    message(STATUS "cuvs CUDA_RUNTIME_LIBRARY: ${rt}")
     set_target_properties(
       cuvs
       PROPERTIES BUILD_RPATH "\$ORIGIN"
@@ -812,12 +806,6 @@ SECTIONS
   if(NOT cuvs_compile_mode STREQUAL "shared_only")
     add_library(cuvs_static STATIC $<TARGET_OBJECTS:cuvs_objs> $<TARGET_OBJECTS:cuvs-cagra-search>)
     add_library(cuvs::cuvs_static ALIAS cuvs_static)
-    get_property(
-      rt
-      TARGET cuvs_static
-      PROPERTY CUDA_RUNTIME_LIBRARY
-    )
-    message(STATUS "cuvs_static CUDA_RUNTIME_LIBRARY: ${rt}")
 
     set_target_properties(
       cuvs_static
