@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -36,15 +36,17 @@ using csr_input_matrix_view_t = raft::device_csr_matrix_view<const math_t, int, 
 template <typename math_t>
 class GramMatrixBase {
  protected:
-  cublasHandle_t cublas_handle;
+  cublasHandle_t cublas_handle = nullptr;
   bool legacy_interface;
 
  public:
-  GramMatrixBase() : legacy_interface(false) {};
+  GramMatrixBase() : legacy_interface(false) {}
   [[deprecated]] GramMatrixBase(cublasHandle_t cublas_handle)
-    : cublas_handle(cublas_handle), legacy_interface(true) {};
+    : cublas_handle(cublas_handle), legacy_interface(true)
+  {
+  }
 
-  virtual ~GramMatrixBase() {};
+  virtual ~GramMatrixBase() = default;
 
   /** Convenience function to evaluate the Gram matrix for two vector sets.
    *  Vector sets are provided in Matrix format
@@ -320,10 +322,14 @@ class PolynomialKernel : public GramMatrixBase<math_t> {
    * @param offset
    */
   PolynomialKernel(exp_t exponent, math_t gain, math_t offset)
-    : GramMatrixBase<math_t>(), exponent(exponent), gain(gain), offset(offset) {};
+    : GramMatrixBase<math_t>(), exponent(exponent), gain(gain), offset(offset)
+  {
+  }
 
   [[deprecated]] PolynomialKernel(exp_t exponent, math_t gain, math_t offset, cublasHandle_t handle)
-    : GramMatrixBase<math_t>(handle), exponent(exponent), gain(gain), offset(offset) {};
+    : GramMatrixBase<math_t>(handle), exponent(exponent), gain(gain), offset(offset)
+  {
+  }
 
   /** Evaluate kernel matrix using polynomial kernel.
    *
@@ -436,7 +442,9 @@ class TanhKernel : public GramMatrixBase<math_t> {
   TanhKernel(math_t gain, math_t offset) : GramMatrixBase<math_t>(), gain(gain), offset(offset) {}
 
   [[deprecated]] TanhKernel(math_t gain, math_t offset, cublasHandle_t handle)
-    : GramMatrixBase<math_t>(handle), gain(gain), offset(offset) {};
+    : GramMatrixBase<math_t>(handle), gain(gain), offset(offset)
+  {
+  }
 
   /** Evaluate kernel matrix using tanh kernel.
    *
@@ -551,10 +559,12 @@ class RBFKernel : public GramMatrixBase<math_t> {
    * @tparam math_t floating point type
    * @param gain
    */
-  RBFKernel(math_t gain) : GramMatrixBase<math_t>(), gain(gain) {};
+  RBFKernel(math_t gain) : GramMatrixBase<math_t>(), gain(gain) {}
 
   [[deprecated]] RBFKernel(math_t gain, cublasHandle_t handle)
-    : GramMatrixBase<math_t>(handle), gain(gain) {};
+    : GramMatrixBase<math_t>(handle), gain(gain)
+  {
+  }
 
   void matrixRowNormL2(raft::resources const& handle,
                        dense_input_matrix_view_t<math_t> matrix,
