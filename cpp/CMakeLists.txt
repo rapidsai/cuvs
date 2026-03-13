@@ -538,6 +538,7 @@ if(NOT BUILD_CPU_ONLY)
     src/distance/detail/pairwise_matrix/dispatch_l2_expanded_double_double_double_int64_t.cu
     src/distance/detail/pairwise_matrix/dispatch_l2_expanded_float_float_float_int64_t.cu
     src/distance/distance.cu
+    src/distance/kde.cu
     src/distance/pairwise_distance.cu
     src/distance/sparse_distance.cu
     src/neighbors/all_neighbors/all_neighbors.cu
