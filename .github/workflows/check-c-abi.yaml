@@ -3,11 +3,6 @@ name: C ABI Compatibility Check
 on:
   workflow_dispatch:  # Allow manual trigger for bootstrap
   workflow_call:
-  pull_request:
-    paths:
-      - 'c/include/**'
-      - 'ci/check_c_abi/**'
-      - '.github/workflows/check-c-abi.yaml'
   push:
     branches:
       - main
