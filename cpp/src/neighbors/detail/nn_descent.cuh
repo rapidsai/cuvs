@@ -141,14 +141,6 @@ struct dtype_traits<__half> {
   static __device__ __forceinline__ float to_float(__half v) { return __half2float(v); }
 };
 
-struct l1_dist_op {
-  static __device__ __forceinline__ float compute(float a, float b) { return raft::abs(a - b); }
-};
-
-struct dot_dist_op {
-  static __device__ __forceinline__ float compute(float a, float b) { return a * b; }
-};
-
 template <typename T>
 __device__ __forceinline__ ResultItem<T> xor_swap(ResultItem<T> x, int mask, int dir)
 {
@@ -564,14 +556,24 @@ __device__ __forceinline__ void calculate_metric(float* s_distances,
   }
 }
 
+struct DistAccumulator {
+  cuvs::distance::DistanceType metric;
+  __device__ __forceinline__ float operator()(float a, float b) const
+  {
+    if (metric == cuvs::distance::DistanceType::L1) { return raft::abs(a - b); }
+    return a * b;
+  }
+};
+
 // launch_bounds here denote BLOCK_SIZE = 512 and MIN_BLOCKS_PER_SM = 4
 // Per
 // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#features-and-technical-specifications,
 // MAX_RESIDENT_THREAD_PER_SM = BLOCK_SIZE * BLOCKS_PER_SM = 2048
 // For architectures 750 and 860 (890), the values for MAX_RESIDENT_THREAD_PER_SM
 // is 1024 and 1536 respectively, which means the bounds don't work anymore
-template <typename DistanceOp_t,
-          typename Data_t,
+// SIMT kernel: scalar element-wise distance computation.
+// Used for fp32 data (all metrics) and fp16 data with L1 distance (which cannot use tensor cores).
+template <typename Data_t,
           typename Index_t,
           typename ID_t = InternalID_t<Index_t>,
           typename DistEpilogue_t>
@@ -586,22 +588,22 @@ __launch_bounds__(BLOCK_SIZE, 4)
 __launch_bounds__(BLOCK_SIZE)
 #endif
 #endif
-  local_join_kernel(const Index_t* graph_new,
-                    const Index_t* rev_graph_new,
-                    const int2* sizes_new,
-                    const Index_t* graph_old,
-                    const Index_t* rev_graph_old,
-                    const int2* sizes_old,
-                    const int width,
-                    const Data_t* data,
-                    const int data_dim,
-                    ID_t* graph,
-                    DistData_t* dists,
-                    int graph_width,
-                    int* locks,
-                    DistData_t* l2_norms,
-                    cuvs::distance::DistanceType metric,
-                    DistEpilogue_t dist_epilogue)
+  local_join_kernel_simt(const Index_t* graph_new,
+                         const Index_t* rev_graph_new,
+                         const int2* sizes_new,
+                         const Index_t* graph_old,
+                         const Index_t* rev_graph_old,
+                         const int2* sizes_old,
+                         const int width,
+                         const Data_t* data,
+                         const int data_dim,
+                         ID_t* graph,
+                         DistData_t* dists,
+                         int graph_width,
+                         int* locks,
+                         DistData_t* l2_norms,
+                         cuvs::distance::DistanceType metric,
+                         DistEpilogue_t dist_epilogue)
 {
 #if (__CUDA_ARCH__ >= 700)
   __shared__ int s_list[MAX_NUM_BI_SAMPLES * 2];
@@ -668,6 +670,8 @@ __launch_bounds__(BLOCK_SIZE)
   int lane_id             = threadIdx.x % raft::warp_size();
   constexpr int num_warps = BLOCK_SIZE / raft::warp_size();
 
+  DistAccumulator dist_acc(metric);
+
   int tid = threadIdx.x;
   for (int i = tid; i < MAX_NUM_BI_SAMPLES * SKEWED_MAX_NUM_BI_SAMPLES; i += blockDim.x)
     s_distances[i] = 0.0f;
@@ -703,7 +707,7 @@ __launch_bounds__(BLOCK_SIZE)
         for (int d = 0; d < num_load_elems; d++) {
           float a = dtype_traits<Data_t>::to_float(s_nv[tmp_row][d]);
           float b = dtype_traits<Data_t>::to_float(s_nv[tmp_col][d]);
-          acc += DistanceOp_t::compute(a, b);
+          acc += dist_acc(a, b);
         }
         s_distances[i] += acc;
       }
@@ -787,7 +791,7 @@ __launch_bounds__(BLOCK_SIZE)
         for (int d = 0; d < num_load_elems; d++) {
           float a = dtype_traits<Data_t>::to_float(s_nv[tmp_row][d]);
           float b = dtype_traits<Data_t>::to_float(s_ov[tmp_col][d]);
-          acc += DistanceOp_t::compute(a, b);
+          acc += dist_acc(a, b);
         }
         s_distances[i] += acc;
       }
@@ -850,22 +854,22 @@ __launch_bounds__(BLOCK_SIZE, 4)
 __launch_bounds__(BLOCK_SIZE)
 #endif
 #endif
-  local_join_kernel(const Index_t* graph_new,
-                    const Index_t* rev_graph_new,
-                    const int2* sizes_new,
-                    const Index_t* graph_old,
-                    const Index_t* rev_graph_old,
-                    const int2* sizes_old,
-                    const int width,
-                    const __half* data,
-                    const int data_dim,
-                    ID_t* graph,
-                    DistData_t* dists,
-                    int graph_width,
-                    int* locks,
-                    DistData_t* l2_norms,
-                    cuvs::distance::DistanceType metric,
-                    DistEpilogue_t dist_epilogue)
+  local_join_kernel_wmma(const Index_t* graph_new,
+                         const Index_t* rev_graph_new,
+                         const int2* sizes_new,
+                         const Index_t* graph_old,
+                         const Index_t* rev_graph_old,
+                         const int2* sizes_old,
+                         const int width,
+                         const __half* data,
+                         const int data_dim,
+                         ID_t* graph,
+                         DistData_t* dists,
+                         int graph_width,
+                         int* locks,
+                         DistData_t* l2_norms,
+                         cuvs::distance::DistanceType metric,
+                         DistEpilogue_t dist_epilogue)
 {
 #if (__CUDA_ARCH__ >= 700)
   using namespace nvcuda;
@@ -1410,89 +1414,56 @@ void GNND<Data_t, Index_t>::local_join(cudaStream_t stream, DistEpilogue_t dist_
 {
   raft::matrix::fill(res, dists_buffer_.view(), std::numeric_limits<float>::max());
   if (d_data_float_.has_value()) {
-    auto* data_ptr = d_data_float_->data_handle();
-    switch (build_config_.metric) {
-      case cuvs::distance::DistanceType::InnerProduct:
-      case cuvs::distance::DistanceType::CosineExpanded:
-      case cuvs::distance::DistanceType::L2Expanded:
-      case cuvs::distance::DistanceType::L2SqrtExpanded:
-        local_join_kernel<dot_dist_op>
-          <<<nrow_, BLOCK_SIZE, 0, stream>>>(graph_.h_graph_new.data_handle(),
-                                             h_rev_graph_new_.data_handle(),
-                                             d_list_sizes_new_.data_handle(),
-                                             h_graph_old_.data_handle(),
-                                             h_rev_graph_old_.data_handle(),
-                                             d_list_sizes_old_.data_handle(),
-                                             NUM_SAMPLES,
-                                             data_ptr,
-                                             ndim_,
-                                             graph_buffer_.data_handle(),
-                                             dists_buffer_.data_handle(),
-                                             DEGREE_ON_DEVICE,
-                                             d_locks_.data_handle(),
-                                             l2_norms_.data_handle(),
-                                             build_config_.metric,
-                                             dist_epilogue);
-        break;
-      case cuvs::distance::DistanceType::L1:
-        local_join_kernel<l1_dist_op>
-          <<<nrow_, BLOCK_SIZE, 0, stream>>>(graph_.h_graph_new.data_handle(),
-                                             h_rev_graph_new_.data_handle(),
-                                             d_list_sizes_new_.data_handle(),
-                                             h_graph_old_.data_handle(),
-                                             h_rev_graph_old_.data_handle(),
-                                             d_list_sizes_old_.data_handle(),
-                                             NUM_SAMPLES,
-                                             data_ptr,
-                                             ndim_,
-                                             graph_buffer_.data_handle(),
-                                             dists_buffer_.data_handle(),
-                                             DEGREE_ON_DEVICE,
-                                             d_locks_.data_handle(),
-                                             l2_norms_.data_handle(),
-                                             build_config_.metric,
-                                             dist_epilogue);
-        break;
-      default:
-        RAFT_FAIL(
-          "NN-Descent FP32 local join only supports InnerProduct, CosineExpanded, L1, "
-          "L2Expanded and L2SqrtExpanded metrics.");
-    }
+    local_join_kernel_simt<<<nrow_, BLOCK_SIZE, 0, stream>>>(graph_.h_graph_new.data_handle(),
+                                                             h_rev_graph_new_.data_handle(),
+                                                             d_list_sizes_new_.data_handle(),
+                                                             h_graph_old_.data_handle(),
+                                                             h_rev_graph_old_.data_handle(),
+                                                             d_list_sizes_old_.data_handle(),
+                                                             NUM_SAMPLES,
+                                                             d_data_float_->data_handle(),
+                                                             ndim_,
+                                                             graph_buffer_.data_handle(),
+                                                             dists_buffer_.data_handle(),
+                                                             DEGREE_ON_DEVICE,
+                                                             d_locks_.data_handle(),
+                                                             l2_norms_.data_handle(),
+                                                             build_config_.metric,
+                                                             dist_epilogue);
   } else if (build_config_.metric == cuvs::distance::DistanceType::L1) {
-    local_join_kernel<l1_dist_op>
-      <<<nrow_, BLOCK_SIZE, 0, stream>>>(graph_.h_graph_new.data_handle(),
-                                         h_rev_graph_new_.data_handle(),
-                                         d_list_sizes_new_.data_handle(),
-                                         h_graph_old_.data_handle(),
-                                         h_rev_graph_old_.data_handle(),
-                                         d_list_sizes_old_.data_handle(),
-                                         NUM_SAMPLES,
-                                         d_data_half_.value().data_handle(),
-                                         ndim_,
-                                         graph_buffer_.data_handle(),
-                                         dists_buffer_.data_handle(),
-                                         DEGREE_ON_DEVICE,
-                                         d_locks_.data_handle(),
-                                         l2_norms_.data_handle(),
-                                         build_config_.metric,
-                                         dist_epilogue);
+    local_join_kernel_simt<<<nrow_, BLOCK_SIZE, 0, stream>>>(graph_.h_graph_new.data_handle(),
+                                                             h_rev_graph_new_.data_handle(),
+                                                             d_list_sizes_new_.data_handle(),
+                                                             h_graph_old_.data_handle(),
+                                                             h_rev_graph_old_.data_handle(),
+                                                             d_list_sizes_old_.data_handle(),
+                                                             NUM_SAMPLES,
+                                                             d_data_half_.value().data_handle(),
+                                                             ndim_,
+                                                             graph_buffer_.data_handle(),
+                                                             dists_buffer_.data_handle(),
+                                                             DEGREE_ON_DEVICE,
+                                                             d_locks_.data_handle(),
+                                                             l2_norms_.data_handle(),
+                                                             build_config_.metric,
+                                                             dist_epilogue);
   } else {
-    local_join_kernel<<<nrow_, BLOCK_SIZE, 0, stream>>>(graph_.h_graph_new.data_handle(),
-                                                        h_rev_graph_new_.data_handle(),
-                                                        d_list_sizes_new_.data_handle(),
-                                                        h_graph_old_.data_handle(),
-                                                        h_rev_graph_old_.data_handle(),
-                                                        d_list_sizes_old_.data_handle(),
-                                                        NUM_SAMPLES,
-                                                        d_data_half_.value().data_handle(),
-                                                        ndim_,
-                                                        graph_buffer_.data_handle(),
-                                                        dists_buffer_.data_handle(),
-                                                        DEGREE_ON_DEVICE,
-                                                        d_locks_.data_handle(),
-                                                        l2_norms_.data_handle(),
-                                                        build_config_.metric,
-                                                        dist_epilogue);
+    local_join_kernel_wmma<<<nrow_, BLOCK_SIZE, 0, stream>>>(graph_.h_graph_new.data_handle(),
+                                                             h_rev_graph_new_.data_handle(),
+                                                             d_list_sizes_new_.data_handle(),
+                                                             h_graph_old_.data_handle(),
+                                                             h_rev_graph_old_.data_handle(),
+                                                             d_list_sizes_old_.data_handle(),
+                                                             NUM_SAMPLES,
+                                                             d_data_half_.value().data_handle(),
+                                                             ndim_,
+                                                             graph_buffer_.data_handle(),
+                                                             dists_buffer_.data_handle(),
+                                                             DEGREE_ON_DEVICE,
+                                                             d_locks_.data_handle(),
+                                                             l2_norms_.data_handle(),
+                                                             build_config_.metric,
+                                                             dist_epilogue);
   }
 }
 
