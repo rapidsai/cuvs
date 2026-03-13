@@ -87,7 +87,6 @@ __global__ void RobustPruneKernel(
   static __shared__ Point<T, accT> s_query;
   s_query.coords = &s_coords_mem[blockIdx.x * (dim + align_padding)];
   s_query.Dim    = dim;
-  static __shared__ int prev_edges;
   static __shared__ accT graphDist;
 
   for (int i = blockIdx.x; i < num_queries; i += gridDim.x) {
@@ -102,12 +101,8 @@ __global__ void RobustPruneKernel(
     // Count total valid edge candidates
     __syncthreads();
     if (threadIdx.x == 0) {
-      prev_edges = degree;
       for (int j = 0; j < degree; j++) {
-        if (graph(queryId, j) == raft::upper_bound<IdxT>()) {
-          prev_edges = j;
-          break;
-        }
+        if (graph(queryId, j) == raft::upper_bound<IdxT>()) { break; }
       }
     }
     for (int j = threadIdx.x; j < degree + visited_size; j += blockDim.x) {

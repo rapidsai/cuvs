@@ -1,0 +1,365 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include "ivf_rabitq/gpu_index/ivf_gpu.cuh"
+#include "ivf_rabitq/gpu_index/searcher_gpu.cuh"
+#include <cuvs/neighbors/ivf_rabitq.hpp>
+
+#include "../cluster/kmeans_balanced.cuh"
+#include "../core/nvtx.hpp"
+#include "detail/ann_utils.cuh"
+
+#include <raft/core/operators.hpp>
+#include <raft/linalg/map.cuh>
+#include <raft/linalg/reduce.cuh>
+#include <raft/matrix/sample_rows.cuh>
+#include <raft/util/cudart_utils.hpp>
+
+#include "../cluster/kmeans_balanced_impl_fit_predict.cuh"
+
+namespace cuvs::neighbors::ivf_rabitq {
+
+namespace detail {
+
+using namespace cuvs::spatial::knn::detail;  // NOLINT
+
+template <typename T, typename IdxT, typename accessor>
+void build(raft::resources const& handle,
+           const index_params& params,
+           raft::mdspan<const T, raft::matrix_extent<IdxT>, raft::row_major, accessor> dataset,
+           cuvs::neighbors::ivf_rabitq::index<int64_t>* index)
+{
+  IdxT n_rows = dataset.extent(0);
+  IdxT dim    = dataset.extent(1);
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
+    "ivf_rabitq::build(%zu, %u)", size_t(n_rows), dim);
+  static_assert(std::is_same_v<T, float>, "Unsupported data type");
+
+  RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
+  RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
+
+  rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource(handle);
+  // If the dataset is small enough to comfortably fit into device memory, put it there.
+  // Otherwise, use the managed memory.
+  constexpr size_t kTolerableRatio = 4;
+  rmm::device_async_resource_ref big_memory_resource =
+    raft::resource::get_large_workspace_resource(handle);
+  if (sizeof(T) * n_rows * dim * kTolerableRatio <
+      raft::resource::get_workspace_free_bytes(handle)) {
+    big_memory_resource = device_memory;
+  }
+
+  auto stream = raft::resource::get_cuda_stream(handle);
+  // create device view of dataset
+  auto d_dataset_array =
+    raft::make_device_mdarray<T>(handle, big_memory_resource, raft::make_extents<int64_t>(0, 0));
+  auto d_dataset_view =
+    raft::make_mdspan(dataset.data_handle(), raft::make_extents<int64_t>(n_rows, dim));
+  if (utils::check_pointer_residency(dataset.data_handle()) !=
+      utils::pointer_residency::device_only) {
+    try {
+      d_dataset_array = raft::make_device_mdarray<T>(
+        handle, big_memory_resource, raft::make_extents<int64_t>(n_rows, dim));
+    } catch (raft::logic_error& e) {
+      RAFT_LOG_ERROR(
+        "Insufficient memory for kmeans clustering. Please decrease "
+        "dataset size, or set large_workspace_resource appropriately.");
+      throw;
+    }
+    raft::copy(d_dataset_array.data_handle(), dataset.data_handle(), n_rows * dim, stream);
+    d_dataset_view = d_dataset_array.view();
+  }
+
+  auto dataset_const_view = raft::make_const_mdspan(d_dataset_view);
+  rmm::device_uvector<float> cluster_centers(params.n_lists * dim, stream, device_memory);
+  rmm::device_uvector<uint32_t> labels(n_rows, stream, big_memory_resource);
+  // Scope for kmeans training set allocation.
+  {
+    raft::random::RngState random_state{137};
+    auto trainset_ratio = std::max<size_t>(
+      1,
+      size_t(n_rows) / std::max<size_t>(params.kmeans_trainset_fraction * n_rows, params.n_lists));
+    size_t n_rows_train = n_rows / trainset_ratio;
+
+    // Besides just sampling, we transform the input dataset into floats to make it easier
+    // to use gemm operations from cublas.
+    auto trainset =
+      raft::make_device_mdarray<T>(handle, big_memory_resource, raft::make_extents<int64_t>(0, 0));
+    try {
+      trainset = raft::make_device_mdarray<float>(
+        handle, big_memory_resource, raft::make_extents<int64_t>(n_rows_train, dim));
+    } catch (raft::logic_error& e) {
+      RAFT_LOG_ERROR(
+        "Insufficient memory for kmeans training set allocation. Please decrease "
+        "kmeans_trainset_fraction, or set large_workspace_resource appropriately.");
+      throw;
+    }
+    // TODO: a proper sampling
+    if constexpr (std::is_same_v<T, float>) {
+      raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset.view());
+    } else {
+      raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
+        "   ivf_rabitq::build(%zu, %zu)/sample rows with tmp trainset (%zu rows).",
+        size_t(n_rows),
+        size_t(dim),
+        size_t(n_rows_train));
+
+      // TODO(tfeher): Enable codebook generation with any type T, and then remove trainset tmp.
+      auto trainset_tmp = raft::make_device_mdarray<T>(
+        handle, big_memory_resource, raft::make_extents<int64_t>(n_rows_train, dim));
+
+      raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset_tmp.view());
+
+      raft::linalg::unaryOp(trainset.data_handle(),
+                            trainset_tmp.data_handle(),
+                            trainset.size(),
+                            utils::mapping<float>{},
+                            stream);
+    }
+
+    // perform k-means clustering
+    // NB: here cluster_centers is used as if it is [n_clusters, data_dim] not [n_clusters,
+    // dim_ext]!
+    auto centers_view =
+      raft::make_device_matrix_view<float, int64_t>(cluster_centers.data(), params.n_lists, dim);
+    cuvs::cluster::kmeans::balanced_params kmeans_params;
+    kmeans_params.n_iters = params.kmeans_n_iters;
+    kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
+    // find cluster labels for dataset vectors
+    auto labels_view = raft::make_device_vector_view<uint32_t, int64_t>(labels.data(), n_rows);
+    // cuvs::cluster::kmeans_balanced::fit_predict(
+    //   handle, kmeans_params, raft::make_const_mdspan(trainset.view()), centers_view,
+    //   labels_view);
+    auto centers_const_view = raft::make_device_matrix_view<const float, int64_t>(
+      cluster_centers.data(), params.n_lists, dim);
+    cuvs::cluster::kmeans::fit(
+      handle, kmeans_params, raft::make_const_mdspan(trainset.view()), centers_view);
+    cuvs::cluster::kmeans::predict(
+      handle, kmeans_params, dataset_const_view, centers_const_view, labels_view);
+  }
+
+  // Call RaBitQ index construct
+  index->rabitq_index().construct_on_gpu(
+    d_dataset_view.data_handle(), cluster_centers.data(), labels.data(), params.fast_quantize_flag);
+}
+
+template <typename T, typename IdxT>
+void search(raft::resources const& handle,
+            const search_params& params,
+            index<IdxT>& idx,
+            raft::device_matrix_view<const T, IdxT, raft::row_major> queries,
+            raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,
+            raft::device_matrix_view<float, IdxT, raft::row_major> distances)
+{
+  auto stream = raft::resource::get_cuda_stream(handle).value();
+
+  size_t NQ            = queries.extent(0);
+  size_t dim           = queries.extent(1);
+  auto padded_dim      = idx.rabitq_index().get_num_padded_dim();
+  auto rotated_queries = raft::make_device_matrix<T, int64_t>(handle, NQ, padded_dim);
+  if (padded_dim == dim) {
+    // TODO: replace RotatorGPU::rotate with cuVS/RAFT primitives
+    idx.rabitq_index().rotator().rotate(queries.data_handle(), rotated_queries.data_handle(), NQ);
+  } else {
+    auto padded_queries = raft::make_device_matrix<T, int64_t>(handle, NQ, padded_dim);
+    RAFT_CUDA_TRY(
+      cudaMemsetAsync(padded_queries.data_handle(), 0, sizeof(T) * NQ * padded_dim, stream));
+    RAFT_CUDA_TRY(cudaMemcpy2DAsync(padded_queries.data_handle(),
+                                    sizeof(T) * padded_dim,
+                                    queries.data_handle(),
+                                    sizeof(T) * dim,
+                                    sizeof(T) * dim,
+                                    NQ,
+                                    cudaMemcpyDefault,
+                                    stream));
+    // TODO: replace RotatorGPU::rotate with cuVS/RAFT primitives
+    idx.rabitq_index().rotator().rotate(
+      padded_queries.data_handle(), rotated_queries.data_handle(), NQ);
+  }
+
+  auto search_mode_to_string = [](search_mode mode) -> std::string {
+    switch (mode) {
+      case search_mode::LUT16: return std::string("lut16");
+      case search_mode::LUT32: return std::string("lut32");
+      case search_mode::QUANT4: return std::string("quant4");
+      case search_mode::QUANT8: return std::string("quant8");
+      default: RAFT_FAIL("Invalid search mode");
+    }
+  };
+  detail::SearcherGPU searcher(handle,
+                               rotated_queries.data_handle(),
+                               padded_dim,
+                               idx.rabitq_index().get_ex_bits(),
+                               search_mode_to_string(params.mode),
+                               idx.rabitq_index().quantizer().get_query_scaling_factor(),
+                               /* rabitq_quantize_flag = */ true);
+  searcher.AllocateSearcherSpace(idx.rabitq_index().get_num_centroids(), NQ);
+
+  auto k = neighbors.extent(1);
+
+  auto final_ids = raft::make_device_vector<uint32_t, int64_t>(handle, NQ * k);
+
+  if (params.mode == search_mode::LUT32) {
+    idx.rabitq_index().BatchClusterSearch(rotated_queries.data_handle(),
+                                          k,
+                                          params.n_probes,
+                                          &searcher,
+                                          NQ,
+                                          distances.data_handle(),
+                                          final_ids.data_handle());
+  } else if (params.mode == search_mode::LUT16) {
+    // test v3 lut using fp16
+    idx.rabitq_index().BatchClusterSearchLUT16(rotated_queries.data_handle(),
+                                               k,
+                                               params.n_probes,
+                                               &searcher,
+                                               NQ,
+                                               distances.data_handle(),
+                                               final_ids.data_handle());
+  } else if (params.mode == search_mode::QUANT8) {
+    idx.rabitq_index().BatchClusterSearchQuantizeQuery(rotated_queries.data_handle(),
+                                                       k,
+                                                       params.n_probes,
+                                                       &searcher,
+                                                       NQ,
+                                                       distances.data_handle(),
+                                                       final_ids.data_handle(),
+                                                       8);
+  } else if (params.mode == search_mode::QUANT4) {
+    idx.rabitq_index().BatchClusterSearchQuantizeQuery(rotated_queries.data_handle(),
+                                                       k,
+                                                       params.n_probes,
+                                                       &searcher,
+                                                       NQ,
+                                                       distances.data_handle(),
+                                                       final_ids.data_handle(),
+                                                       4);
+  }
+
+  // cast data in d_final_ids to array of IdxT in neighbors
+  raft::linalg::map(
+    handle,
+    neighbors,
+    raft::cast_op<IdxT>{},
+    raft::make_device_vector_view<const uint32_t, IdxT>(final_ids.data_handle(), NQ * k));
+}
+
+template <typename IdxT>
+void serialize(raft::resources const& handle, const std::string& filename, index<IdxT>& index)
+{
+  // Save the index to a file.
+  index.rabitq_index().save(filename.c_str(), /* save_batch_flag = */ true);
+}
+
+template <typename IdxT>
+void deserialize(raft::resources const& handle,
+                 const std::string& filename,
+                 cuvs::neighbors::ivf_rabitq::index<IdxT>* index)
+{
+  index->rabitq_index().load_transposed(filename.c_str());
+}
+
+}  // namespace detail
+
+template <typename IdxT>
+index<IdxT>::index(raft::resources const& handle)
+  // this constructor is just for a temporary index, for use in the deserialization
+  // api. all the parameters here will get replaced with loaded values - that aren't
+  // necessarily known ahead of time before deserialization.
+  // TODO: do we even need a handle here - could just construct one?
+  : rabitq_index_(std::make_unique<detail::IVFGPU>(handle))
+{
+}
+
+template <typename IdxT>
+index<IdxT>::index(raft::resources const& handle,
+                   size_t n_rows,
+                   uint32_t dim,
+                   uint32_t n_lists,
+                   uint32_t bits_per_dim)
+  : rabitq_index_(std::make_unique<detail::IVFGPU>(
+      handle, n_rows, dim, n_lists, bits_per_dim, /* batch_flag = */ true))
+{
+  RAFT_EXPECTS(bits_per_dim >= 1 && bits_per_dim <= 9, "Unsupported bits_per_dim");
+}
+
+template <typename IdxT>
+index<IdxT>::index(raft::resources const& handle, const index_params& params, uint32_t dim)
+  : index(handle)
+{
+}
+
+template <typename IdxT>
+index<IdxT>::index(index&&) = default;
+
+template <typename IdxT>
+auto index<IdxT>::operator=(index&&) -> index<IdxT>& = default;
+
+template <typename IdxT>
+index<IdxT>::~index() = default;
+
+template struct index<int64_t>;
+
+template <typename IdxT>
+detail::IVFGPU& index<IdxT>::rabitq_index() noexcept
+{
+  return *rabitq_index_;
+}
+
+template <typename IdxT>
+uint32_t index<IdxT>::dim() const noexcept
+{
+  return rabitq_index_->get_num_dimensions();
+}
+
+template <typename IdxT>
+IdxT index<IdxT>::size() const noexcept
+{
+  return rabitq_index_->get_num_vectors();
+}
+
+void build(raft::resources const& handle,
+           const cuvs::neighbors::ivf_rabitq::index_params& index_params,
+           raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
+           cuvs::neighbors::ivf_rabitq::index<int64_t>* idx)
+{
+  cuvs::neighbors::ivf_rabitq::detail::build(handle, index_params, dataset, idx);
+}
+
+void build(raft::resources const& handle,
+           const cuvs::neighbors::ivf_rabitq::index_params& index_params,
+           raft::host_matrix_view<const float, int64_t, raft::row_major> dataset,
+           cuvs::neighbors::ivf_rabitq::index<int64_t>* idx)
+{
+  cuvs::neighbors::ivf_rabitq::detail::build(handle, index_params, dataset, idx);
+}
+
+void search(raft::resources const& handle,
+            const cuvs::neighbors::ivf_rabitq::search_params& search_params,
+            cuvs::neighbors::ivf_rabitq::index<int64_t>& index,
+            raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances)
+{
+  cuvs::neighbors::ivf_rabitq::detail::search(
+    handle, search_params, index, queries, neighbors, distances);
+}
+
+void serialize(raft::resources const& handle,
+               const std::string& filename,
+               cuvs::neighbors::ivf_rabitq::index<int64_t>& index)
+{
+  cuvs::neighbors::ivf_rabitq::detail::serialize(handle, filename, index);
+}
+
+void deserialize(raft::resources const& handle,
+                 const std::string& filename,
+                 cuvs::neighbors::ivf_rabitq::index<int64_t>* index)
+{
+  if (!index) { RAFT_FAIL("Invalid index pointer"); }
+  cuvs::neighbors::ivf_rabitq::detail::deserialize(handle, filename, index);
+}
+
+}  // namespace cuvs::neighbors::ivf_rabitq
