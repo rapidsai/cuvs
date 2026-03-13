@@ -171,24 +171,38 @@ __global__ void kern_sort(const DATA_T* const dataset,  // [dataset_chunk_size, 
   }
 }
 
+template <class IdxT>
+__global__ void kern_make_rev_graph(const IdxT* const dest_nodes,     // [graph_size]
+                                    IdxT* const rev_graph,            // [size, degree]
+                                    uint32_t* const rev_graph_count,  // [graph_size]
+                                    const uint32_t graph_size,
+                                    const uint32_t degree)
+{
+  const uint32_t tid  = threadIdx.x + (blockDim.x * blockIdx.x);
+  const uint32_t tnum = blockDim.x * gridDim.x;
+
+  for (uint32_t src_id = tid; src_id < graph_size; src_id += tnum) {
+    const IdxT dest_id = dest_nodes[src_id];
+    if (dest_id >= graph_size) continue;
+
+    const uint32_t pos = atomicAdd(rev_graph_count + dest_id, 1);
+    if (pos < degree) { rev_graph[pos + ((uint64_t)degree * dest_id)] = src_id; }
+  }
+}
+
 template <typename IdxT>
-__global__ void kern_rev_graph_batched(const IdxT* const dest_nodes,     // [batch_size, degree]
-                                       IdxT* const rev_graph,            // [graph_size, degree]
-                                       uint32_t* const rev_graph_count,  // [graph_size]
-                                       const uint32_t graph_size,
-                                       const uint32_t degree,
-                                       const uint32_t batch_size,
-                                       const uint32_t batch_id)
+__global__ void kern_make_rev_graph_k(const IdxT* const output_graph,   // [graph_size, degree]
+                                      IdxT* const rev_graph,            // [graph_size, degree]
+                                      uint32_t* const rev_graph_count,  // [graph_size]
+                                      const uint32_t graph_size,
+                                      const uint32_t degree,
+                                      uint64_t k)
 {
   const uint64_t tid  = threadIdx.x + (blockDim.x * blockIdx.x);
   const uint64_t tnum = blockDim.x * gridDim.x;
 
-  const uint64_t block_batch_size = min(batch_size, graph_size - batch_id * batch_size);
-
-  for (uint64_t idx = tid; idx < block_batch_size * degree; idx += tnum) {
-    const IdxT dest_id    = dest_nodes[idx];
-    const uint32_t src_id = idx / degree;
-
+  for (uint64_t src_id = tid; src_id < graph_size; src_id += tnum) {
+    IdxT dest_id = output_graph[k + (degree * src_id)];
     if (dest_id >= graph_size) continue;
 
     const uint32_t pos = atomicAdd(rev_graph_count + dest_id, 1);
@@ -840,50 +854,67 @@ void make_reverse_graph_gpu(raft::resources const& res,
                             uint64_t output_graph_degree)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
-    "cagra::graph::optimize/reverse");
+    "cagra::graph::optimize/reverse2");
 
-  auto default_ws_mr = raft::resource::get_workspace_resource(res);
+  auto d_rev_graph =
+    raft::make_device_vector_view<IdxT, int64_t>(d_rev_graph_ptr, graph_size * output_graph_degree);
+  auto d_rev_graph_count =
+    raft::make_device_vector_view<uint32_t, int64_t>(d_rev_graph_count_ptr, graph_size);
 
-  raft::matrix::fill(
-    res,
-    raft::make_device_vector_view<IdxT, int64_t>(d_rev_graph_ptr, graph_size * output_graph_degree),
-    IdxT(-1));
+  //
+  // Make reverse graph
+  //
+  const double time_make_start = cur_time();
 
-  raft::matrix::fill(
-    res,
-    raft::make_device_vector_view<IdxT, int64_t>(d_rev_graph_count_ptr, graph_size),
-    uint32_t(0));
+  raft::matrix::fill(res, d_rev_graph, IdxT(-1));
+  raft::matrix::fill(res, d_rev_graph_count, uint32_t(0));
 
-  const uint32_t batch_size =
-    std::min(static_cast<uint32_t>(graph_size), static_cast<uint32_t>(256 * 1024));
-  const uint32_t num_batch = (graph_size + batch_size - 1) / batch_size;
+  if (is_ptr_host_accessible(output_graph_ptr)) {
+    auto d_dest_nodes =
+      raft::make_device_mdarray<IdxT>(res, raft::make_extents<int64_t>(graph_size));
 
-  batched_device_view_from_host<IdxT, int64_t> d_output_graph(
-    res,
-    raft::make_host_matrix_view<IdxT, int64_t>(output_graph_ptr, graph_size, output_graph_degree),
-    /*batch_size*/ batch_size,
-    /*host_writeback*/ false,
-    /*initialize*/ true);
+    for (uint64_t k = 0; k < output_graph_degree; k++) {
+      RAFT_CUDA_TRY(cudaMemcpy2DAsync(d_dest_nodes.data_handle(),
+                                      sizeof(IdxT),
+                                      output_graph_ptr + k,
+                                      output_graph_degree * sizeof(IdxT),
+                                      1 * sizeof(IdxT),
+                                      graph_size,
+                                      cudaMemcpyHostToDevice,
+                                      raft::resource::get_cuda_stream(res)));
 
-  for (uint32_t i_batch = 0; i_batch < num_batch; i_batch++) {
+      dim3 threads(256, 1, 1);
+      dim3 blocks(1024, 1, 1);
+      kern_make_rev_graph<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
+        d_dest_nodes.data_handle(),
+        d_rev_graph.data_handle(),
+        d_rev_graph_count.data_handle(),
+        graph_size,
+        output_graph_degree);
+      RAFT_LOG_DEBUG("# Making reverse graph on GPUs: %lu / %u    \r", k, output_graph_degree);
+    }
+  } else {
+    // output graph is fully device accessible, so we need no copy to device
     dim3 threads(256, 1, 1);
     dim3 blocks(1024, 1, 1);
-    auto output_view = d_output_graph.next_view();
-
-    kern_rev_graph_batched<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
-      output_view.data_handle(),
-      d_rev_graph_ptr,
-      d_rev_graph_count_ptr,
-      static_cast<uint32_t>(graph_size),
-      static_cast<uint32_t>(output_graph_degree),
-      static_cast<uint32_t>(batch_size),
-      static_cast<uint32_t>(i_batch));
+    for (uint64_t k = 0; k < output_graph_degree; k++) {
+      kern_make_rev_graph_k<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
+        output_graph_ptr,
+        d_rev_graph.data_handle(),
+        d_rev_graph_count.data_handle(),
+        graph_size,
+        output_graph_degree,
+        k);
+    }
   }
 
   raft::resource::sync_stream(res);
   RAFT_LOG_DEBUG("\n");
+
+  const double time_make_end = cur_time();
+  RAFT_LOG_DEBUG("# Making reverse graph time: %.1lf ms",
+                 (time_make_end - time_make_start) * 1000.0);
 }
-}  // namespace
 
 template <typename DataT,
           typename IdxT       = uint32_t,
@@ -1585,7 +1616,8 @@ void prune_graph_gpu(raft::resources const& res,
     (double)num_full / graph_size * 100);
 }
 
-// TODO allow pinned input for both knn_graph and new_graph
+}  // namespace
+
 template <typename IdxT = uint32_t, typename InputMatrixView, typename OutputMatrixView>
 void optimize(raft::resources const& res,
               InputMatrixView knn_graph,
