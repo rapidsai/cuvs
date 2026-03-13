@@ -4,9 +4,24 @@
  */
 
 use std::convert::From;
+use std::marker::PhantomData;
 
 use crate::error::{check_cuda, check_cuvs, Result};
 use crate::resources::Resources;
+
+/// Tracks whether an Index borrows or owns its dataset.
+///
+/// When an index is built from a borrowed `ManagedTensor`, the compiler enforces
+/// that the dataset outlives the index. When built from an owned `ManagedTensor`
+/// (e.g., a device copy from [`ManagedTensor::to_device`]), the index is
+/// self-contained and has a `'static` lifetime.
+#[derive(Debug)]
+pub(crate) enum DatasetOwnership<'a> {
+    /// Dataset is borrowed — caller must keep it alive.
+    Borrowed(PhantomData<&'a ()>),
+    /// Dataset is owned by the index (e.g., a device copy from `to_device()`).
+    Owned(ManagedTensor),
+}
 
 /// ManagedTensor is a wrapper around a dlpack DLManagedTensor object.
 /// This lets you pass matrices in device or host memory into cuvs.
