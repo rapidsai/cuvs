@@ -17,16 +17,18 @@ namespace {
 
 cuvs::cluster::kmeans::params convert_params(const cuvsKMeansParams& params)
 {
-  auto kmeans_params       = cuvs::cluster::kmeans::params();
-  kmeans_params.metric     = static_cast<cuvs::distance::DistanceType>(params.metric);
-  kmeans_params.init       = static_cast<cuvs::cluster::kmeans::params::InitMethod>(params.init);
-  kmeans_params.n_clusters = params.n_clusters;
-  kmeans_params.max_iter   = params.max_iter;
-  kmeans_params.tol        = params.tol;
+  auto kmeans_params                = cuvs::cluster::kmeans::params();
+  kmeans_params.metric              = static_cast<cuvs::distance::DistanceType>(params.metric);
+  kmeans_params.init = static_cast<cuvs::cluster::kmeans::params::InitMethod>(params.init);
+  kmeans_params.n_clusters          = params.n_clusters;
+  kmeans_params.max_iter            = params.max_iter;
+  kmeans_params.tol                 = params.tol;
+  kmeans_params.n_init              = params.n_init;
   kmeans_params.oversampling_factor = params.oversampling_factor;
   kmeans_params.batch_samples       = params.batch_samples;
   kmeans_params.batch_centroids     = params.batch_centroids;
   kmeans_params.inertia_check       = params.inertia_check;
+  kmeans_params.batch_size  = params.batch_size;
   return kmeans_params;
 }
 
@@ -49,8 +51,53 @@ void _fit(cuvsResources_t res,
 {
   auto X       = X_tensor->dl_tensor;
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
+  bool is_host = (X.device.device_type == kDLCPU);
 
-  if (cuvs::core::is_dlpack_device_compatible(X)) {
+  if (is_host) {
+    auto n_samples  = static_cast<IdxT>(X.shape[0]);
+    auto n_features = static_cast<IdxT>(X.shape[1]);
+
+    if (params.hierarchical) {
+      RAFT_FAIL("hierarchical kmeans is not supported with host data");
+    }
+
+    auto centroids_dl = centroids_tensor->dl_tensor;
+    if (!cuvs::core::is_dlpack_device_compatible(centroids_dl)) {
+      RAFT_FAIL("centroids must be on device memory");
+    }
+
+    auto X_view = raft::make_host_matrix_view<T const, IdxT>(
+      reinterpret_cast<T const*>(X.data), n_samples, n_features);
+    auto centroids_view =
+      cuvs::core::from_dlpack<raft::device_matrix_view<T, IdxT, raft::row_major>>(
+        centroids_tensor);
+
+    std::optional<raft::host_vector_view<T const, IdxT>> sample_weight;
+    if (sample_weight_tensor != NULL) {
+      auto sw = sample_weight_tensor->dl_tensor;
+      if (sw.device.device_type != kDLCPU) {
+        RAFT_FAIL("sample_weight must be on host memory when X is on host");
+      }
+      sample_weight = raft::make_host_vector_view<T const, IdxT>(
+        reinterpret_cast<T const*>(sw.data), n_samples);
+    }
+
+    T inertia_temp;
+    IdxT n_iter_temp;
+
+    auto kmeans_params = convert_params(params);
+    cuvs::cluster::kmeans::fit(*res_ptr,
+                               kmeans_params,
+                               X_view,
+                               sample_weight,
+                               centroids_view,
+                               raft::make_host_scalar_view<T>(&inertia_temp),
+                               raft::make_host_scalar_view<IdxT>(&n_iter_temp));
+
+    *inertia = inertia_temp;
+    *n_iter  = n_iter_temp;
+
+  } else {
     using const_mdspan_type = raft::device_matrix_view<T const, IdxT, raft::row_major>;
     using mdspan_type       = raft::device_matrix_view<T, IdxT, raft::row_major>;
 
@@ -90,8 +137,6 @@ void _fit(cuvsResources_t res,
       *inertia = inertia_temp;
       *n_iter  = n_iter_temp;
     }
-  } else {
-    RAFT_FAIL("X dataset must be accessible on device memory");
   }
 }
 
@@ -182,17 +227,20 @@ extern "C" cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params)
   return cuvs::core::translate_exceptions([=] {
     cuvs::cluster::kmeans::params cpp_params;
     cuvs::cluster::kmeans::balanced_params cpp_balanced_params;
-    *params =
-      new cuvsKMeansParams{.metric     = static_cast<cuvsDistanceType>(cpp_params.metric),
-                           .n_clusters = cpp_params.n_clusters,
-                           .init       = static_cast<cuvsKMeansInitMethod>(cpp_params.init),
-                           .max_iter   = cpp_params.max_iter,
-                           .tol        = cpp_params.tol,
-                           .oversampling_factor  = cpp_params.oversampling_factor,
-                           .batch_samples        = cpp_params.batch_samples,
-                           .inertia_check        = cpp_params.inertia_check,
-                           .hierarchical         = false,
-                           .hierarchical_n_iters = static_cast<int>(cpp_balanced_params.n_iters)};
+    *params = new cuvsKMeansParams{
+      .metric               = static_cast<cuvsDistanceType>(cpp_params.metric),
+      .n_clusters           = cpp_params.n_clusters,
+      .init                 = static_cast<cuvsKMeansInitMethod>(cpp_params.init),
+      .max_iter             = cpp_params.max_iter,
+      .tol                  = cpp_params.tol,
+      .n_init               = cpp_params.n_init,
+      .oversampling_factor  = cpp_params.oversampling_factor,
+      .batch_samples        = cpp_params.batch_samples,
+      .batch_centroids      = cpp_params.batch_centroids,
+      .inertia_check        = cpp_params.inertia_check,
+      .hierarchical         = false,
+      .hierarchical_n_iters = static_cast<int>(cpp_balanced_params.n_iters),
+      .batch_size           = cpp_params.batch_size};
   });
 }
 
