@@ -195,8 +195,6 @@ void fit(raft::resources const& handle,
                "centroids.extent(0) must equal n_clusters");
   RAFT_EXPECTS(centroids.extent(1) == n_features, "centroids.extent(1) must equal n_features");
 
-  raft::default_logger().set_level(params.verbosity);
-
   RAFT_LOG_DEBUG("KMeans batched fit: n_samples=%zu, n_features=%zu, n_clusters=%d, batch_size=%zu",
                  static_cast<size_t>(n_samples),
                  static_cast<size_t>(n_features),

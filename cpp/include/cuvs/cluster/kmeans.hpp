@@ -164,11 +164,6 @@ enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
  */
 
 /**
- * @defgroup kmeans_batched Batched k-means for out-of-core / host data
- * @{
- */
-
-/**
  * @brief Find clusters with k-means algorithm using batched processing of host data.
  *
  * This overload supports out-of-core computation where the dataset resides
@@ -305,14 +300,6 @@ void predict(raft::resources const& handle,
              bool normalize_weight,
              raft::host_scalar_view<double> inertia);
 
-/**
- * @}
- */
-
-/**
- * @defgroup fit_predict_host K-Means Fit + Predict (host data)
- * @{
- */
 
 /**
  * @brief Fit k-means and predict cluster labels using batched processing of host data.
@@ -348,10 +335,6 @@ void fit_predict(raft::resources const& handle,
                  raft::host_vector_view<int64_t, int64_t> labels,
                  raft::host_scalar_view<double> inertia,
                  raft::host_scalar_view<int64_t> n_iter);
-
-/**
- * @}
- */
 
 /**
  * @brief Find clusters with k-means algorithm.

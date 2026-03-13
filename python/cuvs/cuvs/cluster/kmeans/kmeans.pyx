@@ -274,6 +274,21 @@ def fit(
         not hasattr(X, '__cuda_array_interface__')
     )
 
+    # Check that sample_weights has the same residency as X
+    if sample_weights is not None:
+        is_sample_weight_host = isinstance(sample_weights, np.ndarray) or (
+            hasattr(sample_weights, '__array_interface__') and
+            not hasattr(sample_weights, '__cuda_array_interface__')
+        )
+        if is_host != is_sample_weight_host:
+            raise ValueError(
+                "X and sample_weights must have the same memory residency "
+                "(both host or both device). X is {}, sample_weights is {}.".format(
+                    "host" if is_host else "device",
+                    "host" if is_sample_weight_host else "device"
+                )
+            )
+
     if is_host:
         if not isinstance(X, np.ndarray):
             X = np.asarray(X)
