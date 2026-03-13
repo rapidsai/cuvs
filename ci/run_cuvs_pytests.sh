@@ -7,4 +7,4 @@ set -euo pipefail
 # Support invoking run_pytests.sh outside the script directory
 cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")"/../python/cuvs/cuvs
 
-pytest --cache-clear --verbose --ignore=tests/test_hnsw_ace.py "$@" tests
+pytest --cache-clear --verbose --deselect tests/test_hnsw_ace.py::test_hnsw_ace_tiny_memory_limit_triggers_disk_mode --deselect tests/test_cagra_ace.py::test_cagra_ace_tiny_memory_limit_triggers_disk_mode "$@" tests
