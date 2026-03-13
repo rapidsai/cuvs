@@ -42,12 +42,12 @@ struct ground_truth_map {
   // with idx j is the k-th nearest. Note that the nearest neighbor rank starts from 0.
   std::vector<std::unordered_map<T, T>> gt_maps_;
   uint32_t max_k_ = 0;  // number of nearest neighbors in the ground truth
-  std::vector<uint32_t> filter_pass_counts_;
+  static constexpr uint32_t kMaxQueriesForRecall = 10'000;
 
   explicit ground_truth_map(std::string file_name,
                             uint32_t n_queries,
                             std::optional<blob<bitset_carrier_type>>& filter_bitset)
-    : gt_maps_(n_queries), filter_pass_counts_(n_queries)
+    : gt_maps_(std::min(n_queries, kMaxQueriesForRecall))
   {
     // Eagerly iterate over and optionally filter the ground truth set to build gt_maps_ for up to
     // kMaxQueriesForRecall queries
@@ -57,7 +57,7 @@ struct ground_truth_map {
     enable O(1) lookup. We need enough ground truth values to compute recall correctly
     though. But the ground truth file only contains `max_k_` values per row; if there are
     less valid values than k among them, we overestimate the recall. Essentially, we compare
-    the first `filter_pass_count` values of the algorithm output, and this counter can be
+    the first `gt_maps_[query_idx].size()` values of the algorithm output, and this value can be
     less than `k`. In the extreme case of very high filtering rate, we may be bypassing
     entire rows of results. However, this is still better than no recall estimate at all.
 
@@ -66,6 +66,8 @@ struct ground_truth_map {
     max_k_                = ground_truth_set.n_cols();
     auto filter           = [&](T i) -> bool {
       if (!filter_bitset.has_value()) { return true; }
+      // bitset is `32 = bitset_carrier_type * 8` times more dense than the data
+      // use bitwise arithmetic to get the `row_id` and correct bit pos in the `word`
       auto word = filter_bitset->data(MemoryType::kHostMmap)[i >> 5];
       return word & (1 << (i & 31));
     };
@@ -77,9 +79,10 @@ struct ground_truth_map {
     if (num_map_building_worker_threads < 0) { num_map_building_worker_threads = 0; }
     std::vector<std::thread> gt_map_building_workers;
     gt_map_building_workers.reserve(num_map_building_worker_threads);
-    int chunk_size    = n_queries / (num_map_building_worker_threads + 1);
-    int remainder     = n_queries % (num_map_building_worker_threads + 1);
-    auto build_gt_map = [&](int start, int end, int tid) -> void {
+    uint32_t n_queries_for_recall = gt_maps_.size();
+    int chunk_size                = n_queries_for_recall / (num_map_building_worker_threads + 1);
+    int remainder                 = n_queries_for_recall % (num_map_building_worker_threads + 1);
+    auto build_gt_map             = [&](int start, int end, int tid) -> void {
       for (int query_idx = start; query_idx < end; ++query_idx) {
         for (std::uint32_t neighbor_rank = 0; neighbor_rank < max_k_; ++neighbor_rank) {
           auto id = ground_truth_set.data()[query_idx * max_k_ + neighbor_rank];
@@ -90,7 +93,6 @@ struct ground_truth_map {
               std::to_string(query_idx));
           }
           gt_maps_[query_idx][id] = neighbor_rank;
-          ++filter_pass_counts_[query_idx];
         }
       }
     };
@@ -103,11 +105,27 @@ struct ground_truth_map {
       start = end;
     }
     // main thread works on last chunk
-    build_gt_map(start, n_queries, num_map_building_worker_threads);
+    build_gt_map(start, n_queries_for_recall, num_map_building_worker_threads);
     // join all worker threads
     for (auto& worker : gt_map_building_workers) {
       worker.join();
     }
+  }
+
+  template <typename index_type>
+  [[nodiscard]] auto count_matches(size_t query_idx, const index_type* candidates, uint32_t k) const
+    -> std::pair<size_t, size_t>
+  {
+    size_t matching = 0;
+    for (uint32_t i = 0; i < k; ++i) {
+      auto act_idx = candidates[i];
+      if (gt_maps_[query_idx].count(act_idx) &&
+          static_cast<uint32_t>(gt_maps_[query_idx].at(act_idx)) < k) {
+        ++matching;
+      }
+    }
+    size_t total = std::min(gt_maps_[query_idx].size(), static_cast<size_t>(k));
+    return {matching, total};
   }
 };
 
@@ -116,7 +134,6 @@ struct dataset {
  public:
   using bitset_carrier_type = typename ground_truth_map<IdxT>::bitset_carrier_type;
   static inline constexpr size_t kBitsPerCarrierValue = sizeof(bitset_carrier_type) * 8;
-  static constexpr uint32_t kMaxQueriesForRecall      = 10'000;
 
  private:
   std::string name_;
@@ -172,10 +189,8 @@ struct dataset {
     }
 
     if (groundtruth_neighbors_file.has_value()) {
-      ground_truth_map_.emplace(
-        ground_truth_map<IdxT>{groundtruth_neighbors_file.value(),
-                               std::min(query_set_.n_rows(), kMaxQueriesForRecall),
-                               filter_bitset_});
+      ground_truth_map_.emplace(ground_truth_map<IdxT>{
+        groundtruth_neighbors_file.value(), query_set_.n_rows(), filter_bitset_});
     }
   }
 
@@ -219,17 +234,9 @@ struct dataset {
     return r;
   }
 
-  [[nodiscard]] auto gt_maps() const -> const std::unordered_map<IdxT, IdxT>*
+  [[nodiscard]] auto gt_maps() const -> const std::optional<ground_truth_map<IdxT>>&
   {
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (ground_truth_map_.has_value()) { return ground_truth_map_->gt_maps_.data(); }
-    return nullptr;
-  }
-
-  [[nodiscard]] auto gt_maps_size() const -> size_t
-  {
-    if (ground_truth_map_.has_value()) { return ground_truth_map_->gt_maps_.size(); }
-    return 0;
+    return ground_truth_map_;
   }
 
   [[nodiscard]] auto query_set() const -> const DataT*
@@ -281,13 +288,6 @@ struct dataset {
     if (filter_bitset_.has_value()) {
       return filter_bitset_->data(memory_type, request_hugepages_2mb);
     }
-    return nullptr;
-  }
-
-  [[nodiscard]] auto filter_pass_counts() const -> const uint32_t*
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (ground_truth_map_.has_value()) { return ground_truth_map_->filter_pass_counts_.data(); }
     return nullptr;
   }
 };
