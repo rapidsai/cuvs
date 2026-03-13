@@ -26,6 +26,7 @@
 
 // TODO: This shouldn't be invoking anything from spatial/knn
 #include "../ann_utils.cuh"
+#include "../smem_utils.cuh"
 
 #include <raft/util/cuda_rt_essentials.hpp>
 #include <raft/util/integer_utils.hpp>
@@ -1804,7 +1805,7 @@ struct alignas(kCacheLineBytes) launcher_t {
   {
     // Don't sleep this many times hoping for smoother run
     constexpr auto kSpinLimit = 3;
-    // It doesn't make much sense to slee less than this
+    // It doesn't make much sense to sleep less than this
     constexpr auto kPauseTimeMin = std::chrono::nanoseconds(1000);
     // Bound sleeping time
     constexpr auto kPauseTimeMax = std::chrono::nanoseconds(50000);
@@ -2289,6 +2290,7 @@ control is returned in this thread (in persistent_runner_t constructor), so we'r
                             std::cref(dataset_desc),
                             graph,
                             source_indices_ptr,
+                            max_candidates,
                             num_itopk_candidates,
                             block_size,
                             smem_size,
@@ -2298,7 +2300,6 @@ control is returned in this thread (in persistent_runner_t constructor), so we'r
                             ps.num_random_samplings,
                             ps.rand_xor_mask,
                             num_seeds,
-                            max_candidates,
                             max_itopk,
                             ps.itopk_size,
                             ps.search_width,
@@ -2312,36 +2313,38 @@ control is returned in this thread (in persistent_runner_t constructor), so we'r
     using descriptor_base_type = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
     auto kernel = search_kernel_config<false, descriptor_base_type, SourceIndexT, SampleFilterT>::
       choose_itopk_and_mx_candidates(ps.itopk_size, num_itopk_candidates, block_size);
-    RAFT_CUDA_TRY(
-      cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
     dim3 thread_dims(block_size, 1, 1);
     dim3 block_dims(1, num_queries, 1);
     RAFT_LOG_DEBUG(
       "Launching kernel with %u threads, %u block %u smem", block_size, num_queries, smem_size);
-    kernel<<<block_dims, thread_dims, smem_size, stream>>>(topk_indices_ptr,
-                                                           topk_distances_ptr,
-                                                           topk,
-                                                           dataset_desc.dev_ptr(stream),
-                                                           queries_ptr,
-                                                           graph.data_handle(),
-                                                           graph.extent(1),
-                                                           source_indices_ptr,
-                                                           ps.num_random_samplings,
-                                                           ps.rand_xor_mask,
-                                                           dev_seed_ptr,
-                                                           num_seeds,
-                                                           hashmap_ptr,
-                                                           max_candidates,
-                                                           max_itopk,
-                                                           ps.itopk_size,
-                                                           ps.search_width,
-                                                           ps.min_iterations,
-                                                           ps.max_iterations,
-                                                           num_executed_iterations,
-                                                           hash_bitlen,
-                                                           small_hash_bitlen,
-                                                           small_hash_reset_interval,
-                                                           sample_filter);
+    auto const& kernel_launcher = [&](auto const& kernel) -> void {
+      kernel<<<block_dims, thread_dims, smem_size, stream>>>(topk_indices_ptr,
+                                                             topk_distances_ptr,
+                                                             topk,
+                                                             dataset_desc.dev_ptr(stream),
+                                                             queries_ptr,
+                                                             graph.data_handle(),
+                                                             graph.extent(1),
+                                                             source_indices_ptr,
+                                                             ps.num_random_samplings,
+                                                             ps.rand_xor_mask,
+                                                             dev_seed_ptr,
+                                                             num_seeds,
+                                                             hashmap_ptr,
+                                                             max_candidates,
+                                                             max_itopk,
+                                                             ps.itopk_size,
+                                                             ps.search_width,
+                                                             ps.min_iterations,
+                                                             ps.max_iterations,
+                                                             num_executed_iterations,
+                                                             hash_bitlen,
+                                                             small_hash_bitlen,
+                                                             small_hash_reset_interval,
+                                                             sample_filter);
+    };
+    cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(
+      kernel, smem_size, kernel_launcher);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
 }

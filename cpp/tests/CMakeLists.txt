@@ -61,8 +61,10 @@ function(ConfigureTest)
                CUDA_STANDARD_REQUIRED ON
   )
   target_compile_options(
-    ${TEST_NAME} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
-                         "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+    ${TEST_NAME}
+    PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
+            "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+            "$<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>:${CUVS_DEBUG_CUDA_FLAGS}>"
   )
 
   if(_CUVS_TEST_NOCUDA)
@@ -155,7 +157,10 @@ ConfigureTest(
 
 ConfigureTest(
   NAME NEIGHBORS_ANN_CAGRA_TEST_BUGS
-  PATH neighbors/ann_cagra/bug_extreme_inputs_oob.cu neighbors/ann_cagra/bug_multi_cta_crash.cu
+  PATH neighbors/ann_cagra/bug_extreme_inputs_oob.cu
+       neighbors/ann_cagra/bug_multi_cta_crash.cu
+       neighbors/ann_cagra/bug_iterative_cagra_build.cu
+       neighbors/ann_cagra/bug_issue_93_reproducer.cu
   GPUS 1
   PERCENT 100
 )
