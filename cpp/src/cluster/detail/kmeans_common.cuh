@@ -552,12 +552,8 @@ void finalize_centroids(raft::resources const& handle,
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
-  // new_centroids = centroid_sums / cluster_counts (0 when count is 0)
-  raft::copy(
-    new_centroids.data_handle(), centroid_sums.data_handle(), centroid_sums.size(), stream);
-
   raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(handle,
-                                                             raft::make_const_mdspan(new_centroids),
+                                                             raft::make_const_mdspan(centroid_sums),
                                                              cluster_counts,
                                                              new_centroids,
                                                              raft::div_checkzero_op{});

@@ -143,68 +143,6 @@ void accumulate_batch_centroids(
 }
 
 /**
- * @brief Compute total inertia over host data using batched GPU processing.
- *
- * Iterates over the host data in batches, computing the (optionally weighted)
- * sum of squared distances from each sample to its nearest centroid.
- *
- * @param[in] sample_weight  Optional per-sample weights on host. When provided,
- *                           each squared distance is multiplied by its weight
- *                           before summing (matching sklearn's weighted inertia).
- */
-template <typename T, typename IdxT>
-T compute_batched_host_inertia(
-  raft::resources const& handle,
-  raft::host_matrix_view<const T, IdxT> X,
-  IdxT batch_size,
-  raft::device_matrix_view<const T, IdxT> centroids,
-  std::optional<raft::host_vector_view<const T, IdxT>> sample_weight = std::nullopt)
-{
-  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
-  auto n_samples      = X.extent(0);
-  auto n_features     = X.extent(1);
-
-  IdxT effective_batch = std::min(batch_size, static_cast<IdxT>(n_samples));
-
-  // Device buffer for per-batch weights (only used when sample_weight is provided)
-  auto batch_weights =
-    raft::make_device_vector<T, IdxT>(handle, sample_weight ? effective_batch : IdxT{0});
-
-  T total_inertia = 0;
-  using namespace cuvs::spatial::knn::detail::utils;
-  batch_load_iterator<T> data_batches(X.data_handle(), n_samples, n_features, batch_size, stream);
-
-  for (const auto& data_batch : data_batches) {
-    IdxT current_batch_size = static_cast<IdxT>(data_batch.size());
-    auto batch_view         = raft::make_device_matrix_view<const T, IdxT>(
-      data_batch.data(), current_batch_size, n_features);
-
-    // Build optional device weight view for this batch
-    std::optional<raft::device_vector_view<const T, IdxT>> batch_weight_view;
-    if (sample_weight.has_value()) {
-      auto weight_offset = static_cast<IdxT>(data_batch.offset());
-      raft::copy(batch_weights.data_handle(),
-                 sample_weight->data_handle() + weight_offset,
-                 current_batch_size,
-                 stream);
-      batch_weight_view = raft::make_device_vector_view<const T, IdxT>(batch_weights.data_handle(),
-                                                                       current_batch_size);
-    }
-
-    T batch_cost;
-    cuvs::cluster::kmeans::cluster_cost(handle,
-                                        batch_view,
-                                        centroids,
-                                        raft::make_host_scalar_view<T>(&batch_cost),
-                                        batch_weight_view);
-
-    total_inertia += batch_cost;
-  }
-
-  return total_inertia;
-}
-
-/**
  * @brief Main fit function for batched k-means with host data (full-batch / Lloyd's algorithm).
  *
  * Processes host data in GPU-sized batches per iteration, accumulating partial centroid
@@ -276,7 +214,7 @@ void fit(raft::resources const& handle,
     n_init = 1;
   }
 
-  auto best_centroids = raft::make_device_matrix<T, IdxT>(handle, n_clusters, n_features);
+  auto best_centroids = n_init > 1 ? raft::make_device_matrix<T, IdxT>(handle, n_clusters, n_features) : raft::make_device_matrix<T, IdxT>(handle, 0, 0);
   T best_inertia      = std::numeric_limits<T>::max();
   IdxT best_n_iter    = 0;
 
@@ -293,8 +231,6 @@ void fit(raft::resources const& handle,
   auto centroid_sums  = raft::make_device_matrix<T, IdxT>(handle, n_clusters, n_features);
   auto cluster_counts = raft::make_device_vector<T, IdxT>(handle, n_clusters);
   auto new_centroids  = raft::make_device_matrix<T, IdxT>(handle, n_clusters, n_features);
-
-  rmm::device_scalar<T> clusterCostD(stream);
 
   // ---- Main n_init loop ----
   for (int seed_iter = 0; seed_iter < n_init; ++seed_iter) {
@@ -313,17 +249,16 @@ void fit(raft::resources const& handle,
     if (!sample_weight.has_value()) { raft::matrix::fill(handle, batch_weights.view(), T{1}); }
 
     // Reset per-iteration state
-    T priorClusteringCost = 0;
+    T prior_cluster_cost = 0;
 
     for (n_iter[0] = 1; n_iter[0] <= iter_params.max_iter; ++n_iter[0]) {
       RAFT_LOG_DEBUG("KMeans batched: Iteration %d", n_iter[0]);
 
       raft::copy(new_centroids.data_handle(), centroids.data_handle(), centroids.size(), stream);
 
-      T total_cost = 0;
-
       raft::matrix::fill(handle, centroid_sums.view(), T{0});
       raft::matrix::fill(handle, cluster_counts.view(), T{0});
+      auto cluster_cost = raft::make_device_scalar<T>(handle, T{0});
 
       auto centroids_const = raft::make_const_mdspan(centroids);
 
@@ -377,19 +312,14 @@ void fit(raft::resources const& handle,
                                             centroid_sums.view(),
                                             cluster_counts.view());
 
-        if (params.inertia_check) {
+        if (params.inertia_check || n_iter[0] == iter_params.max_iter) {
           // Compute cluster cost for this batch and accumulate
-          cuvs::cluster::kmeans::detail::computeClusterCost(
-            handle,
-            minClusterAndDistance.view(),
-            workspace,
-            raft::make_device_scalar_view(clusterCostD.data()),
-            raft::value_op{},
-            raft::add_op{});
-          auto clusterCost_host = raft::make_host_scalar<T>(0);
-          raft::copy(clusterCost_host.data_handle(), clusterCostD.data(), 1, stream);
-          raft::resource::sync_stream(handle, stream);
-          total_cost += clusterCost_host.data_handle()[0];
+          cuvs::cluster::kmeans::detail::computeClusterCost(handle,
+                                                            minClusterAndDistance.view(),
+                                                            workspace,
+                                                            cluster_cost.view(),
+                                                            raft::value_op{},
+                                                            raft::add_op{});
         }
       }
 
@@ -413,11 +343,13 @@ void fit(raft::resources const& handle,
 
       bool done = false;
       if (params.inertia_check) {
+        raft::copy(inertia.data_handle(), cluster_cost.data_handle(), 1, stream);
+        raft::resource::sync_stream(handle);
         if (n_iter[0] > 1) {
-          T delta = total_cost / priorClusteringCost;
+          T delta = inertia[0] / prior_cluster_cost;
           if (delta > 1 - params.tol) done = true;
         }
-        priorClusteringCost = total_cost;
+        prior_cluster_cost = inertia[0];
       }
 
       if (sqrdNormError < params.tol) done = true;
@@ -429,13 +361,10 @@ void fit(raft::resources const& handle,
     }
 
     {
-      // If inertia_check was enabled, we already computed inertia during iterations
-      if (params.inertia_check) {
-        inertia[0] = priorClusteringCost;
-      } else {
-        auto centroids_const = raft::make_const_mdspan(centroids);
-        inertia[0]           = compute_batched_host_inertia<T, IdxT>(
-          handle, X, batch_size, centroids_const, sample_weight);
+      // Inertia for the last iteration is always computed
+      if (!params.inertia_check) {
+        raft::copy(inertia.data_handle(), cluster_cost.data_handle(), 1, stream);
+        raft::resource::sync_stream(handle);
       }
 
       RAFT_LOG_DEBUG("KMeans batched: n_init %d/%d completed with inertia=%f",
@@ -443,17 +372,15 @@ void fit(raft::resources const& handle,
                      n_init,
                      static_cast<double>(inertia[0]));
 
-      if (inertia[0] < best_inertia) {
+      if (n_init > 1 && inertia[0] < best_inertia) {
         best_inertia = inertia[0];
         best_n_iter  = n_iter[0];
         raft::copy(best_centroids.data_handle(), centroids.data_handle(), centroids.size(), stream);
-        raft::resource::sync_stream(handle, stream);
       }
     }
 
     if (n_init > 1) {
       raft::copy(centroids.data_handle(), best_centroids.data_handle(), centroids.size(), stream);
-      raft::resource::sync_stream(handle, stream);
       inertia[0] = best_inertia;
       n_iter[0]  = best_n_iter;
       RAFT_LOG_DEBUG("KMeans batched: Best of %d runs: inertia=%f, n_iter=%d",
