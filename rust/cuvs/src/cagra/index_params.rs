@@ -137,6 +137,31 @@ impl IndexParams {
     }
 }
 
+impl IndexParams {
+    /// Returns a builder for constructing [`IndexParams`] with validated parameters.
+    ///
+    /// Unlike the `IndexParams::new()?.set_*()` setter chain, [`IndexParamsBuilder::build`]
+    /// validates all parameters in Rust before any FFI allocation. Invalid values produce a
+    /// clear error message naming the offending field and its valid range, before any GPU
+    /// work begins.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use cuvs::cagra::IndexParams;
+    ///
+    /// let params = IndexParams::builder()
+    ///     .graph_degree(32)
+    ///     .intermediate_graph_degree(64)
+    ///     .nn_descent_niter(20)
+    ///     .build()
+    ///     .unwrap();
+    /// ```
+    pub fn builder() -> IndexParamsBuilder {
+        IndexParamsBuilder::default()
+    }
+}
+
 impl fmt::Debug for IndexParams {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // custom debug trait here, default value will show the pointer address
@@ -177,6 +202,115 @@ impl Drop for CompressionParams {
     }
 }
 
+/// Builder for [`IndexParams`] with pre-validated parameters.
+///
+/// Construct via [`IndexParams::builder()`]. Call [`IndexParamsBuilder::build`] to
+/// validate all parameters and allocate the FFI struct in one step.
+///
+/// Defaults match the cuVS C API defaults: `graph_degree=64`,
+/// `intermediate_graph_degree=128`, `nn_descent_niter=20`.
+pub struct IndexParamsBuilder {
+    graph_degree: usize,
+    intermediate_graph_degree: usize,
+    nn_descent_niter: usize,
+    build_algo: Option<BuildAlgo>,
+    compression: Option<CompressionParams>,
+}
+
+impl Default for IndexParamsBuilder {
+    fn default() -> Self {
+        Self {
+            graph_degree: 64,
+            intermediate_graph_degree: 128,
+            nn_descent_niter: 20,
+            build_algo: None,
+            compression: None,
+        }
+    }
+}
+
+impl IndexParamsBuilder {
+    /// Degree of output graph.
+    ///
+    /// Must be > 0. Values that are multiples of 32 are preferred for warp alignment.
+    pub fn graph_degree(mut self, v: usize) -> Self {
+        self.graph_degree = v;
+        self
+    }
+
+    /// Degree of input graph for pruning.
+    ///
+    /// Must be >= `graph_degree`.
+    pub fn intermediate_graph_degree(mut self, v: usize) -> Self {
+        self.intermediate_graph_degree = v;
+        self
+    }
+
+    /// Number of iterations to run if building with NN_DESCENT.
+    ///
+    /// Must be > 0.
+    pub fn nn_descent_niter(mut self, v: usize) -> Self {
+        self.nn_descent_niter = v;
+        self
+    }
+
+    /// ANN algorithm to build knn graph.
+    pub fn build_algo(mut self, v: BuildAlgo) -> Self {
+        self.build_algo = Some(v);
+        self
+    }
+
+    /// Vector compression parameters.
+    pub fn compression(mut self, v: CompressionParams) -> Self {
+        self.compression = Some(v);
+        self
+    }
+
+    /// Validate all parameters without allocating any GPU resources.
+    ///
+    /// Returns `Ok(())` if all parameters are valid, or `Err` with a message naming
+    /// the offending field and its valid range.
+    pub fn validate(&self) -> crate::error::Result<()> {
+        if self.graph_degree == 0 {
+            return Err(format!("graph_degree must be > 0; got {}", self.graph_degree).into());
+        }
+        if self.intermediate_graph_degree < self.graph_degree {
+            return Err(format!(
+                "intermediate_graph_degree ({}) must be >= graph_degree ({})",
+                self.intermediate_graph_degree, self.graph_degree
+            )
+            .into());
+        }
+        if self.nn_descent_niter == 0 {
+            return Err(format!(
+                "nn_descent_niter must be > 0; got {}",
+                self.nn_descent_niter
+            )
+            .into());
+        }
+        Ok(())
+    }
+
+    /// Validate all parameters and allocate the FFI struct.
+    ///
+    /// Returns `Err` with a message naming the offending field and its valid range
+    /// before any GPU work begins.
+    pub fn build(self) -> crate::error::Result<IndexParams> {
+        self.validate()?;
+        let mut params = IndexParams::new()?
+            .set_graph_degree(self.graph_degree)
+            .set_intermediate_graph_degree(self.intermediate_graph_degree)
+            .set_nn_descent_niter(self.nn_descent_niter);
+        if let Some(algo) = self.build_algo {
+            params = params.set_build_algo(algo);
+        }
+        if let Some(compression) = self.compression {
+            params = params.set_compression(compression);
+        }
+        Ok(params)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -204,6 +338,97 @@ mod tests {
             assert_eq!((*params.0).nn_descent_niter, 10);
             assert_eq!((*(*params.0).compression).pq_dim, 8);
             assert_eq!((*(*params.0).compression).pq_bits, 4);
+        }
+    }
+
+    // --- IndexParamsBuilder tests ---
+
+    #[test]
+    fn builder_rejects_zero_graph_degree() {
+        let err = IndexParams::builder()
+            .graph_degree(0)
+            .validate()
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("graph_degree"),
+            "error message should name the field: {err}"
+        );
+    }
+
+    #[test]
+    fn builder_rejects_invalid_intermediate_degree() {
+        let err = IndexParams::builder()
+            .graph_degree(32)
+            .intermediate_graph_degree(16)
+            .validate()
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("intermediate_graph_degree"),
+            "error message should name the field: {err}"
+        );
+    }
+
+    #[test]
+    fn builder_rejects_zero_niter() {
+        let err = IndexParams::builder()
+            .nn_descent_niter(0)
+            .validate()
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("nn_descent_niter"),
+            "error message should name the field: {err}"
+        );
+    }
+
+    #[test]
+    fn builder_accepts_valid_params() {
+        assert!(IndexParams::builder()
+            .graph_degree(32)
+            .intermediate_graph_degree(64)
+            .nn_descent_niter(20)
+            .validate()
+            .is_ok());
+    }
+
+    #[test]
+    fn builder_round_trips_to_ffi() {
+        // Built params must produce the same FFI struct values as the manual setter chain.
+        let via_builder = IndexParams::builder()
+            .graph_degree(32)
+            .intermediate_graph_degree(64)
+            .nn_descent_niter(20)
+            .build()
+            .unwrap();
+        let via_setters = IndexParams::new()
+            .unwrap()
+            .set_graph_degree(32)
+            .set_intermediate_graph_degree(64)
+            .set_nn_descent_niter(20);
+        unsafe {
+            assert_eq!((*via_builder.0).graph_degree, (*via_setters.0).graph_degree);
+            assert_eq!(
+                (*via_builder.0).intermediate_graph_degree,
+                (*via_setters.0).intermediate_graph_degree
+            );
+            assert_eq!(
+                (*via_builder.0).nn_descent_niter,
+                (*via_setters.0).nn_descent_niter
+            );
+        }
+    }
+
+    #[test]
+    fn existing_setter_api_unchanged() {
+        // Ensure the original API still compiles and sets values correctly.
+        let params = IndexParams::new()
+            .unwrap()
+            .set_graph_degree(32)
+            .set_intermediate_graph_degree(64)
+            .set_nn_descent_niter(20);
+        unsafe {
+            assert_eq!((*params.0).graph_degree, 32);
+            assert_eq!((*params.0).intermediate_graph_degree, 64);
+            assert_eq!((*params.0).nn_descent_niter, 20);
         }
     }
 }

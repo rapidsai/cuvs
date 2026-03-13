@@ -60,3 +60,12 @@ pub fn check_cuda(err: ffi::cudaError_t) -> Result<()> {
         _ => Err(Error::CudaError(err)),
     }
 }
+
+impl From<String> for Error {
+    fn from(text: String) -> Self {
+        Error::CuvsError(CuvsError {
+            code: ffi::cuvsError_t::CUVS_ERROR,
+            text,
+        })
+    }
+}
