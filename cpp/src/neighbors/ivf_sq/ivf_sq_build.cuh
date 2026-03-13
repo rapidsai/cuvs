@@ -307,8 +307,7 @@ void extend(raft::resources const& handle,
   }
 
   auto* list_sizes_ptr    = index->list_sizes().data_handle();
-  auto old_list_sizes_dev = raft::make_device_mdarray<uint32_t>(
-    handle, raft::resource::get_workspace_resource(handle), raft::make_extents<int64_t>(n_lists));
+  auto old_list_sizes_dev = raft::make_device_vector<uint32_t, int64_t>(handle, n_lists);
   raft::copy(old_list_sizes_dev.data_handle(), list_sizes_ptr, n_lists, stream);
 
   if (index->adaptive_centers()) {
