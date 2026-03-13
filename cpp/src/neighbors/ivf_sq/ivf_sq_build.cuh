@@ -64,8 +64,8 @@ struct ColMinMaxOp {
  * Row-loop is manually 4x-unrolled so the compiler can overlap four
  * independent __ldg requests in the memory pipeline.
  */
-template <int BlockSize>
-__launch_bounds__(BlockSize) RAFT_KERNEL fused_column_minmax_kernel(const float* __restrict__ data,
+template <int BlockSize, typename T>
+__launch_bounds__(BlockSize) RAFT_KERNEL fused_column_minmax_kernel(const T* __restrict__ data,
                                                                     float* __restrict__ col_min,
                                                                     float* __restrict__ col_max,
                                                                     int64_t n_rows,
@@ -83,15 +83,15 @@ __launch_bounds__(BlockSize) RAFT_KERNEL fused_column_minmax_kernel(const float*
   int64_t row          = static_cast<int64_t>(threadIdx.x);
 
   for (; row + 3 * stride < n_rows; row += 4 * stride) {
-    float v0    = __ldg(&data[row * dim + col]);
-    float v1    = __ldg(&data[(row + stride) * dim + col]);
-    float v2    = __ldg(&data[(row + 2 * stride) * dim + col]);
-    float v3    = __ldg(&data[(row + 3 * stride) * dim + col]);
+    float v0    = float(data[row * dim + col]);
+    float v1    = float(data[(row + stride) * dim + col]);
+    float v2    = float(data[(row + 2 * stride) * dim + col]);
+    float v3    = float(data[(row + 3 * stride) * dim + col]);
     agg.min_val = fminf(agg.min_val, fminf(fminf(v0, v1), fminf(v2, v3)));
     agg.max_val = fmaxf(agg.max_val, fmaxf(fmaxf(v0, v1), fmaxf(v2, v3)));
   }
   for (; row < n_rows; row += stride) {
-    float val   = __ldg(&data[row * dim + col]);
+    float val   = float(data[row * dim + col]);
     agg.min_val = fminf(agg.min_val, val);
     agg.max_val = fmaxf(agg.max_val, val);
   }
@@ -227,6 +227,20 @@ RAFT_KERNEL compute_residuals_kernel(const T* dataset,
   float val              = utils::mapping<float>{}(dataset[i * dim + j]);
   uint32_t c             = labels[i];
   residuals[i * dim + j] = val - centers[c * dim + j];
+}
+
+/** In-place variant: dataset[i] = cast<T>(cast<float>(dataset[i]) - centers[labels[i]]) */
+template <typename T>
+RAFT_KERNEL compute_residuals_inplace_kernel(
+  T* dataset, const float* centers, const uint32_t* labels, int64_t n_rows, uint32_t dim)
+{
+  int64_t i  = int64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+  uint32_t j = blockIdx.y * blockDim.y + threadIdx.y;
+  if (i >= n_rows || j >= dim) return;
+
+  float val            = utils::mapping<float>{}(dataset[i * dim + j]);
+  uint32_t c           = labels[i];
+  dataset[i * dim + j] = utils::mapping<T>{}(val - centers[c * dim + j]);
 }
 
 template <typename T, typename IdxT>
@@ -481,10 +495,10 @@ inline auto build(raft::resources const& handle,
     cuvs::cluster::kmeans::fit(handle, kmeans_params, trainset_const_view, centers_view);
     raft::resource::sync_stream(handle);
 
-    // Train SQ: predict labels for the training subset, compute its residuals,
+    // Train SQ: predict labels for the training subset, compute residuals in-place,
     // and derive per-dimension vmin/delta from them.
-    auto train_labels = raft::make_device_vector<uint32_t, int64_t>(handle, n_rows_train);
     {
+      auto train_labels = raft::make_device_vector<uint32_t, int64_t>(handle, n_rows_train);
       cuvs::cluster::kmeans::balanced_params pred_params;
       pred_params.metric      = idx.metric();
       auto centers_const_view = raft::make_device_matrix_view<const float, int64_t>(
@@ -492,22 +506,21 @@ inline auto build(raft::resources const& handle,
       cuvs::cluster::kmeans::predict(
         handle, pred_params, trainset_const_view, centers_const_view, train_labels.view());
       raft::resource::sync_stream(handle);
-    }
 
-    rmm::device_uvector<float> residuals(
-      n_rows_train * dim, stream, raft::resource::get_large_workspace_resource(handle));
-    {
       dim3 threads(32, 8);
       dim3 blocks(raft::ceildiv<int64_t>(n_rows_train, threads.x),
                   raft::ceildiv<uint32_t>(dim, threads.y));
-      compute_residuals_kernel<T><<<blocks, threads, 0, stream>>>(trainset.data_handle(),
-                                                                  idx.centers().data_handle(),
-                                                                  train_labels.data_handle(),
-                                                                  residuals.data(),
-                                                                  n_rows_train,
-                                                                  dim);
+      compute_residuals_inplace_kernel<T>
+        <<<blocks, threads, 0, stream>>>(trainset.data_handle(),
+                                         idx.centers().data_handle(),
+                                         train_labels.data_handle(),
+                                         n_rows_train,
+                                         dim);
       RAFT_CUDA_TRY(cudaPeekAtLastError());
     }
+
+    // After the in-place kernel, trainset now contains residuals.
+    auto& residuals = trainset;
 
     {
       auto vmax_buf  = raft::make_device_vector<float, uint32_t>(handle, dim);
@@ -516,7 +529,7 @@ inline auto build(raft::resources const& handle,
 
       constexpr int kMinMaxBlockSize = 256;
       fused_column_minmax_kernel<kMinMaxBlockSize><<<dim, kMinMaxBlockSize, 0, stream>>>(
-        residuals.data(), vmin_ptr, vmax_ptr, n_rows_train, dim);
+        residuals.data_handle(), vmin_ptr, vmax_ptr, n_rows_train, dim);
       RAFT_CUDA_TRY(cudaPeekAtLastError());
 
       // Expand the observed range by a small margin to reduce clipping on unseen data,
