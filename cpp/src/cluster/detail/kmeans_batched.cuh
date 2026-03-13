@@ -258,7 +258,7 @@ void fit(raft::resources const& handle,
 
       raft::matrix::fill(handle, centroid_sums.view(), T{0});
       raft::matrix::fill(handle, cluster_counts.view(), T{0});
-      auto cluster_cost = raft::make_device_scalar<T>(handle, T{0});
+      auto clustering_cost = raft::make_device_scalar<T>(handle, T{0});
 
       auto centroids_const = raft::make_const_mdspan(centroids);
 
@@ -317,7 +317,7 @@ void fit(raft::resources const& handle,
           cuvs::cluster::kmeans::detail::computeClusterCost(handle,
                                                             minClusterAndDistance.view(),
                                                             workspace,
-                                                            cluster_cost.view(),
+                                                            clustering_cost.view(),
                                                             raft::value_op{},
                                                             raft::add_op{});
         }
@@ -343,7 +343,7 @@ void fit(raft::resources const& handle,
 
       bool done = false;
       if (params.inertia_check) {
-        raft::copy(inertia.data_handle(), cluster_cost.data_handle(), 1, stream);
+        raft::copy(inertia.data_handle(), clustering_cost.data_handle(), 1, stream);
         raft::resource::sync_stream(handle);
         if (n_iter[0] > 1) {
           T delta = inertia[0] / prior_cluster_cost;
@@ -354,19 +354,18 @@ void fit(raft::resources const& handle,
 
       if (sqrdNormError < params.tol) done = true;
 
-      if (done) {
+      if (done || n_iter[0] == iter_params.max_iter) {
         RAFT_LOG_DEBUG("KMeans batched: Converged after %d iterations", n_iter[0]);
+        // Inertia for the last iteration is always computed
+        if (!params.inertia_check) {
+          raft::copy(inertia.data_handle(), clustering_cost.data_handle(), 1, stream);
+          raft::resource::sync_stream(handle);
+        }
         break;
       }
     }
 
     {
-      // Inertia for the last iteration is always computed
-      if (!params.inertia_check) {
-        raft::copy(inertia.data_handle(), cluster_cost.data_handle(), 1, stream);
-        raft::resource::sync_stream(handle);
-      }
-
       RAFT_LOG_DEBUG("KMeans batched: n_init %d/%d completed with inertia=%f",
                      seed_iter + 1,
                      n_init,
@@ -378,16 +377,15 @@ void fit(raft::resources const& handle,
         raft::copy(best_centroids.data_handle(), centroids.data_handle(), centroids.size(), stream);
       }
     }
-
-    if (n_init > 1) {
-      raft::copy(centroids.data_handle(), best_centroids.data_handle(), centroids.size(), stream);
-      inertia[0] = best_inertia;
-      n_iter[0]  = best_n_iter;
-      RAFT_LOG_DEBUG("KMeans batched: Best of %d runs: inertia=%f, n_iter=%d",
-                     n_init,
-                     static_cast<double>(best_inertia),
-                     best_n_iter);
-    }
+  }
+  if (n_init > 1) {
+    raft::copy(centroids.data_handle(), best_centroids.data_handle(), centroids.size(), stream);
+    inertia[0] = best_inertia;
+    n_iter[0]  = best_n_iter;
+    RAFT_LOG_DEBUG("KMeans batched: Best of %d runs: inertia=%f, n_iter=%d",
+                   n_init,
+                   static_cast<double>(best_inertia),
+                   best_n_iter);
   }
 }
 
