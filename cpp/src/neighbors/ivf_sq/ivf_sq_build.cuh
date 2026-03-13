@@ -456,10 +456,6 @@ inline auto build(raft::resources const& handle,
                "Cosine metric requires more than one dim");
 
   index<IdxT> idx(handle, params, dim);
-  utils::memzero(idx.accum_sorted_sizes().data_handle(), idx.accum_sorted_sizes().size(), stream);
-  utils::memzero(idx.list_sizes().data_handle(), idx.list_sizes().size(), stream);
-  utils::memzero(idx.data_ptrs().data_handle(), idx.data_ptrs().size(), stream);
-  utils::memzero(idx.inds_ptrs().data_handle(), idx.inds_ptrs().size(), stream);
 
   // Train k-means centroids and SQ parameters on the same training subset.
   // This mirrors IVF-PQ, which also trains its codebook on a subset of the data.

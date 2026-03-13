@@ -5,6 +5,11 @@
 
 #include <cuvs/neighbors/ivf_sq.hpp>
 
+#include <raft/core/resource/cuda_stream.hpp>
+#include <raft/util/cuda_rt_essentials.hpp>
+
+#include <cstring>
+
 namespace cuvs::neighbors::ivf_sq {
 
 template <typename IdxT>
@@ -46,7 +51,14 @@ index<IdxT>::index(raft::resources const& res,
     accum_sorted_sizes_{raft::make_host_vector<int64_t, uint32_t>(n_lists + 1)}
 {
   check_consistency();
-  accum_sorted_sizes_(n_lists) = 0;
+  auto stream = raft::resource::get_cuda_stream(res);
+  std::memset(accum_sorted_sizes_.data_handle(), 0, accum_sorted_sizes_.size() * sizeof(int64_t));
+  RAFT_CUDA_TRY(
+    cudaMemsetAsync(list_sizes_.data_handle(), 0, list_sizes_.size() * sizeof(uint32_t), stream));
+  RAFT_CUDA_TRY(
+    cudaMemsetAsync(data_ptrs_.data_handle(), 0, data_ptrs_.size() * sizeof(IdxT*), stream));
+  RAFT_CUDA_TRY(
+    cudaMemsetAsync(inds_ptrs_.data_handle(), 0, inds_ptrs_.size() * sizeof(int64_t*), stream));
 }
 
 template <typename IdxT>
