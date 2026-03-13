@@ -234,13 +234,13 @@ template <typename T>
 RAFT_KERNEL compute_residuals_inplace_kernel(
   T* dataset, const float* centers, const uint32_t* labels, int64_t n_rows, uint32_t dim)
 {
-  int64_t i  = int64_t(blockIdx.x) * blockDim.x + threadIdx.x;
-  uint32_t j = blockIdx.y * blockDim.y + threadIdx.y;
-  if (i >= n_rows || j >= dim) return;
-
-  float val            = utils::mapping<float>{}(dataset[i * dim + j]);
-  uint32_t c           = labels[i];
-  dataset[i * dim + j] = utils::mapping<T>{}(val - centers[c * dim + j]);
+  int64_t i = blockIdx.x;
+  if (i >= n_rows) return;
+  uint32_t c = labels[i];
+  for (uint32_t j = threadIdx.x; j < dim; j += blockDim.x) {
+    float val            = utils::mapping<float>{}(dataset[i * dim + j]);
+    dataset[i * dim + j] = utils::mapping<T>{}(val - centers[c * dim + j]);
+  }
 }
 
 template <typename T, typename IdxT>
@@ -507,15 +507,13 @@ inline auto build(raft::resources const& handle,
         handle, pred_params, trainset_const_view, centers_const_view, train_labels.view());
       raft::resource::sync_stream(handle);
 
-      dim3 threads(32, 8);
-      dim3 blocks(raft::ceildiv<int64_t>(n_rows_train, threads.x),
-                  raft::ceildiv<uint32_t>(dim, threads.y));
+      constexpr int kResidualBlockSize = 256;
       compute_residuals_inplace_kernel<T>
-        <<<blocks, threads, 0, stream>>>(trainset.data_handle(),
-                                         idx.centers().data_handle(),
-                                         train_labels.data_handle(),
-                                         n_rows_train,
-                                         dim);
+        <<<n_rows_train, kResidualBlockSize, 0, stream>>>(trainset.data_handle(),
+                                                          idx.centers().data_handle(),
+                                                          train_labels.data_handle(),
+                                                          n_rows_train,
+                                                          dim);
       RAFT_CUDA_TRY(cudaPeekAtLastError());
     }
 
