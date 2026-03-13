@@ -24,19 +24,62 @@ namespace cuvs::neighbors::ivf_sq {
 constexpr static uint32_t kIndexGroupSize = 32;
 
 struct index_params : cuvs::neighbors::index_params {
-  uint32_t n_lists                    = 1024;
-  uint32_t kmeans_n_iters             = 20;
-  double kmeans_trainset_fraction     = 0.5;
-  bool adaptive_centers               = false;
+  /** The number of inverted lists (clusters) */
+  uint32_t n_lists = 1024;
+  /** The number of iterations searching for kmeans centers (index building). */
+  uint32_t kmeans_n_iters = 20;
+  /** The fraction of data to use during iterative kmeans building. */
+  double kmeans_trainset_fraction = 0.5;
+  /**
+   * By default (adaptive_centers = false), the cluster centers are trained in `ivf_sq::build`,
+   * and never modified in `ivf_sq::extend`. As a result, you may need to retrain the index
+   * from scratch after invoking (`ivf_sq::extend`) a few times with new data, the distribution of
+   * which is no longer representative of the original training set.
+   *
+   * The alternative behavior (adaptive_centers = true) is to update the cluster centers for new
+   * data when it is added. In this case, `index.centers()` are always exactly the centroids of the
+   * data in the corresponding clusters. The drawback of this behavior is that the centroids depend
+   * on the order of adding new data (through the classification of the added data); that is,
+   * `index.centers()` "drift" together with the changing distribution of the newly added data.
+   */
+  bool adaptive_centers = false;
+  /**
+   * By default, the algorithm allocates more space than necessary for individual clusters
+   * (`list_data`). This allows to amortize the cost of memory allocation and reduce the number of
+   * data copies during repeated calls to `extend` (extending the database).
+   *
+   * The alternative is the conservative allocation behavior; when enabled, the algorithm always
+   * allocates the minimum amount of memory required to store the given number of records. Set this
+   * flag to `true` if you prefer to use as little GPU memory for the database as possible.
+   */
   bool conservative_memory_allocation = false;
-  bool add_data_on_build              = true;
-};
-
-struct search_params : cuvs::neighbors::search_params {
-  uint32_t n_probes = 20;
+  /**
+   * Whether to add the dataset content to the index, i.e.:
+   *
+   *  - `true` means the index is filled with the dataset vectors and ready to search after calling
+   * `build`.
+   *  - `false` means `build` only trains the underlying model (e.g. quantizer or clustering), but
+   * the index is left empty; you'd need to call `extend` on the index afterwards to populate it.
+   */
+  bool add_data_on_build = true;
 };
 
 static_assert(std::is_aggregate_v<index_params>);
+
+/**
+ * @}
+ */
+
+/**
+ * @defgroup ivf_sq_cpp_search_params IVF-SQ index search parameters
+ * @{
+ */
+
+struct search_params : cuvs::neighbors::search_params {
+  /** The number of clusters to search. */
+  uint32_t n_probes = 20;
+};
+
 static_assert(std::is_aggregate_v<search_params>);
 
 /**
@@ -97,11 +140,23 @@ using list_data = ivf::list<list_spec, SizeT, IdxT, ExtT>;
 /**
  * @brief IVF-SQ index.
  *
+ * In the IVF-SQ index, a database vector is first assigned to the nearest cluster center
+ * using an inverted file (IVF) structure, and then compressed using scalar quantization (SQ).
+ *
+ * Scalar quantization independently maps each dimension of the vector to a fixed-width integer
+ * code. For 8-bit quantization (uint8_t), each floating-point component is linearly mapped to
+ * an integer in [0, 255] using learned per-dimension minimum (`sq_vmin`) and range (`sq_delta`)
+ * values:
+ *
+ *   code_i = round((x_i - vmin_i) / delta_i * 255)
+ *
+ * This provides a compact representation (1 byte per dimension) while preserving the relative
+ * distances between vectors with high fidelity, offering a good trade-off between index size,
+ * search speed, and recall compared to flat (uncompressed) and product-quantized (PQ)
+ * representations.
+ *
  * @tparam IdxT  SQ code type. Only uint8_t (8-bit, codes in [0,255]) for now.
  *
- * No member depends on the raw data type T (float, half). T appears only
- * in the free-function signatures (build, search, extend) where input data
- * is consumed, following the IVF-PQ pattern.
  */
 template <typename IdxT>
 struct index : cuvs::neighbors::index {
@@ -192,41 +247,219 @@ struct index : cuvs::neighbors::index {
  * @{
  */
 
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   ivf_sq::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = ivf_sq::build(handle, index_params, dataset);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] index_params configure the index building
+ * @param[in] dataset a device pointer to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed ivf-sq index
+ */
 auto build(raft::resources const& handle,
            const cuvs::neighbors::ivf_sq::index_params& index_params,
            raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::ivf_sq::index<uint8_t>;
 
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   ivf_sq::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   ivf_sq::index<uint8_t> index;
+ *   ivf_sq::build(handle, index_params, dataset, index);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] index_params configure the index building
+ * @param[in] dataset raft::device_matrix_view to a row-major matrix [n_rows, dim]
+ * @param[out] idx reference to ivf_sq::index
+ *
+ */
 void build(raft::resources const& handle,
            const cuvs::neighbors::ivf_sq::index_params& index_params,
            raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
            cuvs::neighbors::ivf_sq::index<uint8_t>& idx);
 
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   ivf_sq::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = ivf_sq::build(handle, index_params, dataset);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] index_params configure the index building
+ * @param[in] dataset a device pointer to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed ivf-sq index
+ */
 auto build(raft::resources const& handle,
            const cuvs::neighbors::ivf_sq::index_params& index_params,
            raft::device_matrix_view<const half, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::ivf_sq::index<uint8_t>;
 
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   ivf_sq::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   ivf_sq::index<uint8_t> index;
+ *   ivf_sq::build(handle, index_params, dataset, index);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] index_params configure the index building
+ * @param[in] dataset raft::device_matrix_view to a row-major matrix [n_rows, dim]
+ * @param[out] idx reference to ivf_sq::index
+ *
+ */
 void build(raft::resources const& handle,
            const cuvs::neighbors::ivf_sq::index_params& index_params,
            raft::device_matrix_view<const half, int64_t, raft::row_major> dataset,
            cuvs::neighbors::ivf_sq::index<uint8_t>& idx);
 
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   ivf_sq::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = ivf_sq::build(handle, index_params, dataset);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] index_params configure the index building
+ * @param[in] dataset a host pointer to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed ivf-sq index
+ */
 auto build(raft::resources const& handle,
            const cuvs::neighbors::ivf_sq::index_params& index_params,
            raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::ivf_sq::index<uint8_t>;
 
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   ivf_sq::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   ivf_sq::index<uint8_t> index;
+ *   ivf_sq::build(handle, index_params, dataset, index);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] index_params configure the index building
+ * @param[in] dataset raft::host_matrix_view to a row-major matrix [n_rows, dim]
+ * @param[out] idx reference to ivf_sq::index
+ *
+ */
 void build(raft::resources const& handle,
            const cuvs::neighbors::ivf_sq::index_params& index_params,
            raft::host_matrix_view<const float, int64_t, raft::row_major> dataset,
            cuvs::neighbors::ivf_sq::index<uint8_t>& idx);
 
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   ivf_sq::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = ivf_sq::build(handle, index_params, dataset);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] index_params configure the index building
+ * @param[in] dataset a host pointer to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed ivf-sq index
+ */
 auto build(raft::resources const& handle,
            const cuvs::neighbors::ivf_sq::index_params& index_params,
            raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::ivf_sq::index<uint8_t>;
 
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   ivf_sq::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   ivf_sq::index<uint8_t> index;
+ *   ivf_sq::build(handle, index_params, dataset, index);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] index_params configure the index building
+ * @param[in] dataset raft::host_matrix_view to a row-major matrix [n_rows, dim]
+ * @param[out] idx reference to ivf_sq::index
+ *
+ */
 void build(raft::resources const& handle,
            const cuvs::neighbors::ivf_sq::index_params& index_params,
            raft::host_matrix_view<const half, int64_t, raft::row_major> dataset,
@@ -241,45 +474,237 @@ void build(raft::resources const& handle,
  * @{
  */
 
+/**
+ * @brief Extend the index with the new data.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   ivf_sq::index_params index_params;
+ *   index_params.add_data_on_build = false;      // don't populate index on build
+ *   index_params.kmeans_trainset_fraction = 1.0;  // use whole dataset for kmeans training
+ *   // train the index from a [N, D] dataset
+ *   auto index_empty = ivf_sq::build(handle, index_params, dataset);
+ *   // fill the index with the data
+ *   std::optional<raft::device_vector_view<const int64_t, int64_t>> no_op = std::nullopt;
+ *   auto index = ivf_sq::extend(handle, new_vectors, no_op, index_empty);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] new_vectors a device matrix view to a row-major matrix [n_rows, idx.dim()]
+ * @param[in] new_indices a device vector view to a vector of indices [n_rows].
+ *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
+ *    here to imply a continuous range `[0...n_rows)`.
+ * @param[in] orig_index the original index
+ *
+ * @return the constructed extended ivf-sq index
+ */
 auto extend(raft::resources const& handle,
             raft::device_matrix_view<const float, int64_t, raft::row_major> new_vectors,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
             const cuvs::neighbors::ivf_sq::index<uint8_t>& orig_index)
   -> cuvs::neighbors::ivf_sq::index<uint8_t>;
 
+/**
+ * @brief Extend the index with the new data.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   ivf_sq::index_params index_params;
+ *   index_params.add_data_on_build = false;      // don't populate index on build
+ *   index_params.kmeans_trainset_fraction = 1.0;  // use whole dataset for kmeans training
+ *   // train the index from a [N, D] dataset
+ *   auto index_empty = ivf_sq::build(handle, index_params, dataset);
+ *   // fill the index with the data
+ *   std::optional<raft::device_vector_view<const int64_t, int64_t>> no_op = std::nullopt;
+ *   ivf_sq::extend(handle, new_vectors, no_op, &index_empty);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] new_vectors a device matrix view to a row-major matrix [n_rows, idx.dim()]
+ * @param[in] new_indices a device vector view to a vector of indices [n_rows].
+ *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
+ *    here to imply a continuous range `[0...n_rows)`.
+ * @param[inout] idx pointer to ivf_sq::index
+ */
 void extend(raft::resources const& handle,
             raft::device_matrix_view<const float, int64_t, raft::row_major> new_vectors,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
             cuvs::neighbors::ivf_sq::index<uint8_t>* idx);
 
+/**
+ * @brief Extend the index with the new data.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   ivf_sq::index_params index_params;
+ *   index_params.add_data_on_build = false;      // don't populate index on build
+ *   index_params.kmeans_trainset_fraction = 1.0;  // use whole dataset for kmeans training
+ *   // train the index from a [N, D] dataset
+ *   auto index_empty = ivf_sq::build(handle, index_params, dataset);
+ *   // fill the index with the data
+ *   std::optional<raft::device_vector_view<const int64_t, int64_t>> no_op = std::nullopt;
+ *   auto index = ivf_sq::extend(handle, new_vectors, no_op, index_empty);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] new_vectors a device matrix view to a row-major matrix [n_rows, idx.dim()]
+ * @param[in] new_indices a device vector view to a vector of indices [n_rows].
+ *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
+ *    here to imply a continuous range `[0...n_rows)`.
+ * @param[in] orig_index the original index
+ *
+ * @return the constructed extended ivf-sq index
+ */
 auto extend(raft::resources const& handle,
             raft::device_matrix_view<const half, int64_t, raft::row_major> new_vectors,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
             const cuvs::neighbors::ivf_sq::index<uint8_t>& orig_index)
   -> cuvs::neighbors::ivf_sq::index<uint8_t>;
 
+/**
+ * @brief Extend the index with the new data.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   ivf_sq::index_params index_params;
+ *   index_params.add_data_on_build = false;      // don't populate index on build
+ *   index_params.kmeans_trainset_fraction = 1.0;  // use whole dataset for kmeans training
+ *   // train the index from a [N, D] dataset
+ *   auto index_empty = ivf_sq::build(handle, index_params, dataset);
+ *   // fill the index with the data
+ *   std::optional<raft::device_vector_view<const int64_t, int64_t>> no_op = std::nullopt;
+ *   ivf_sq::extend(handle, new_vectors, no_op, &index_empty);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] new_vectors a device matrix view to a row-major matrix [n_rows, idx.dim()]
+ * @param[in] new_indices a device vector view to a vector of indices [n_rows].
+ *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
+ *    here to imply a continuous range `[0...n_rows)`.
+ * @param[inout] idx pointer to ivf_sq::index
+ */
 void extend(raft::resources const& handle,
             raft::device_matrix_view<const half, int64_t, raft::row_major> new_vectors,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
             cuvs::neighbors::ivf_sq::index<uint8_t>* idx);
 
+/**
+ * @brief Extend the index with the new data.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   ivf_sq::index_params index_params;
+ *   index_params.add_data_on_build = false;      // don't populate index on build
+ *   index_params.kmeans_trainset_fraction = 1.0;  // use whole dataset for kmeans training
+ *   // train the index from a [N, D] dataset
+ *   auto index_empty = ivf_sq::build(handle, index_params, dataset);
+ *   // fill the index with the data
+ *   std::optional<raft::host_vector_view<const int64_t, int64_t>> no_op = std::nullopt;
+ *   auto index = ivf_sq::extend(handle, new_vectors, no_op, index_empty);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
+ * @param[in] new_indices a host vector view to a vector of indices [n_rows].
+ *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
+ *    here to imply a continuous range `[0...n_rows)`.
+ * @param[in] orig_index the original index
+ *
+ * @return the constructed extended ivf-sq index
+ */
 auto extend(raft::resources const& handle,
             raft::host_matrix_view<const float, int64_t, raft::row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
             const cuvs::neighbors::ivf_sq::index<uint8_t>& orig_index)
   -> cuvs::neighbors::ivf_sq::index<uint8_t>;
 
+/**
+ * @brief Extend the index with the new data.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   ivf_sq::index_params index_params;
+ *   index_params.add_data_on_build = false;      // don't populate index on build
+ *   index_params.kmeans_trainset_fraction = 1.0;  // use whole dataset for kmeans training
+ *   // train the index from a [N, D] dataset
+ *   auto index_empty = ivf_sq::build(handle, index_params, dataset);
+ *   // fill the index with the data
+ *   std::optional<raft::host_vector_view<const int64_t, int64_t>> no_op = std::nullopt;
+ *   ivf_sq::extend(handle, new_vectors, no_op, &index_empty);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
+ * @param[in] new_indices a host vector view to a vector of indices [n_rows].
+ *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
+ *    here to imply a continuous range `[0...n_rows)`.
+ * @param[inout] idx pointer to ivf_sq::index
+ */
 void extend(raft::resources const& handle,
             raft::host_matrix_view<const float, int64_t, raft::row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
             cuvs::neighbors::ivf_sq::index<uint8_t>* idx);
 
+/**
+ * @brief Extend the index with the new data.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   ivf_sq::index_params index_params;
+ *   index_params.add_data_on_build = false;      // don't populate index on build
+ *   index_params.kmeans_trainset_fraction = 1.0;  // use whole dataset for kmeans training
+ *   // train the index from a [N, D] dataset
+ *   auto index_empty = ivf_sq::build(handle, index_params, dataset);
+ *   // fill the index with the data
+ *   std::optional<raft::host_vector_view<const int64_t, int64_t>> no_op = std::nullopt;
+ *   auto index = ivf_sq::extend(handle, new_vectors, no_op, index_empty);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
+ * @param[in] new_indices a host vector view to a vector of indices [n_rows].
+ *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
+ *    here to imply a continuous range `[0...n_rows)`.
+ * @param[in] orig_index the original index
+ *
+ * @return the constructed extended ivf-sq index
+ */
 auto extend(raft::resources const& handle,
             raft::host_matrix_view<const half, int64_t, raft::row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
             const cuvs::neighbors::ivf_sq::index<uint8_t>& orig_index)
   -> cuvs::neighbors::ivf_sq::index<uint8_t>;
 
+/**
+ * @brief Extend the index with the new data.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   ivf_sq::index_params index_params;
+ *   index_params.add_data_on_build = false;      // don't populate index on build
+ *   index_params.kmeans_trainset_fraction = 1.0;  // use whole dataset for kmeans training
+ *   // train the index from a [N, D] dataset
+ *   auto index_empty = ivf_sq::build(handle, index_params, dataset);
+ *   // fill the index with the data
+ *   std::optional<raft::host_vector_view<const int64_t, int64_t>> no_op = std::nullopt;
+ *   ivf_sq::extend(handle, new_vectors, no_op, &index_empty);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
+ * @param[in] new_indices a host vector view to a vector of indices [n_rows].
+ *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
+ *    here to imply a continuous range `[0...n_rows)`.
+ * @param[inout] idx pointer to ivf_sq::index
+ */
 void extend(raft::resources const& handle,
             raft::host_matrix_view<const half, int64_t, raft::row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
@@ -294,6 +719,41 @@ void extend(raft::resources const& handle,
  * @{
  */
 
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [ivf_sq::build](#ivf_sq::build) documentation for a usage example.
+ *
+ * Note, this function requires a temporary buffer to store intermediate results between cuda kernel
+ * calls, which may lead to undesirable allocations and slowdown. To alleviate the problem, you can
+ * pass a pool memory resource or a large enough pre-allocated memory resource to reduce or
+ * eliminate entirely allocations happening within `search`.
+ * The exact size of the temporary buffer depends on multiple factors and is an implementation
+ * detail. However, you can safely specify a small initial size for the memory pool, so that only a
+ * few allocations happen to grow it during the first invocations of the `search`.
+ *
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default search parameters
+ *   ivf_sq::search_params search_params;
+ *   // Use the same allocator across multiple searches to reduce the number of
+ *   // cuda memory allocations
+ *   ivf_sq::search(handle, search_params, index, queries1, out_inds1, out_dists1);
+ *   ivf_sq::search(handle, search_params, index, queries2, out_inds2, out_dists2);
+ *   ivf_sq::search(handle, search_params, index, queries3, out_inds3, out_dists3);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] params configure the search
+ * @param[in] index ivf-sq constructed index
+ * @param[in] queries raft::device_matrix_view to a row-major matrix [n_queries, index->dim()]
+ * @param[out] neighbors raft::device_matrix_view to the indices of the neighbors in the source
+ * dataset [n_queries, k]
+ * @param[out] distances raft::device_matrix_view to the distances to the selected neighbors
+ * [n_queries, k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering)
+ */
 void search(raft::resources const& handle,
             const cuvs::neighbors::ivf_sq::search_params& params,
             const cuvs::neighbors::ivf_sq::index<uint8_t>& index,
@@ -303,6 +763,38 @@ void search(raft::resources const& handle,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
+/**
+ * @brief Search ANN using the constructed index with half-precision queries.
+ *
+ * See the [ivf_sq::build](#ivf_sq::build) documentation for a usage example.
+ *
+ * Note, this function requires a temporary buffer to store intermediate results between cuda kernel
+ * calls, which may lead to undesirable allocations and slowdown. To alleviate the problem, you can
+ * pass a pool memory resource or a large enough pre-allocated memory resource to reduce or
+ * eliminate entirely allocations happening within `search`.
+ *
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default search parameters
+ *   ivf_sq::search_params search_params;
+ *   // Use the same allocator across multiple searches to reduce the number of
+ *   // cuda memory allocations
+ *   ivf_sq::search(handle, search_params, index, queries1, out_inds1, out_dists1);
+ *   ivf_sq::search(handle, search_params, index, queries2, out_inds2, out_dists2);
+ *   ivf_sq::search(handle, search_params, index, queries3, out_inds3, out_dists3);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] params configure the search
+ * @param[in] index ivf-sq constructed index
+ * @param[in] queries raft::device_matrix_view to a row-major matrix [n_queries, index->dim()]
+ * @param[out] neighbors raft::device_matrix_view to the indices of the neighbors in the source
+ * dataset [n_queries, k]
+ * @param[out] distances raft::device_matrix_view to the distances to the selected neighbors
+ * [n_queries, k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering)
+ */
 void search(raft::resources const& handle,
             const cuvs::neighbors::ivf_sq::search_params& params,
             const cuvs::neighbors::ivf_sq::index<uint8_t>& index,
@@ -321,10 +813,54 @@ void search(raft::resources const& handle,
  * @{
  */
 
+/**
+ * Save the index to file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/ivf_sq.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create a string with a filepath
+ * std::string filename("/path/to/index");
+ * // create an index with `auto index = ivf_sq::build(...);`
+ * cuvs::neighbors::ivf_sq::serialize(handle, filename, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] filename the file name for saving the index
+ * @param[in] index IVF-SQ index
+ *
+ */
 void serialize(raft::resources const& handle,
                const std::string& filename,
                const cuvs::neighbors::ivf_sq::index<uint8_t>& index);
 
+/**
+ * Load index from file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/ivf_sq.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create a string with a filepath
+ * std::string filename("/path/to/index");
+ * // create an empty index with `ivf_sq::index<uint8_t> index(handle);`
+ * cuvs::neighbors::ivf_sq::deserialize(handle, filename, &index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] filename the name of the file that stores the index
+ * @param[out] index IVF-SQ index
+ *
+ */
 void deserialize(raft::resources const& handle,
                  const std::string& filename,
                  cuvs::neighbors::ivf_sq::index<uint8_t>* index);
