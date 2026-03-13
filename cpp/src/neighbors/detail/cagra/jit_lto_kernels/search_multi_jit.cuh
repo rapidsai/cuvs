@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "../device_common.hpp"
 #include "../hashmap.hpp"
 #include "../utils.hpp"
 
@@ -45,8 +46,8 @@ RAFT_KERNEL random_pickup_kernel_jit(
   if (global_team_index >= num_pickup) { return; }
   extern __shared__ uint8_t smem[];
 
-  // Set smem working buffer using descriptor->setup_workspace (JIT symbols patched by launcher)
-  auto* smem_desc = dataset_desc->setup_workspace(smem, queries_ptr, query_id);
+  auto* smem_desc =
+    (*setup_workspace_ptr<DataT, IndexT, DistanceT>)(dataset_desc, smem, queries_ptr, query_id);
   __syncthreads();
 
   IndexT dataset_size = smem_desc->size;
@@ -62,8 +63,11 @@ RAFT_KERNEL random_pickup_kernel_jit(
       seed_index = device::xorshift64((global_team_index ^ rand_xor_mask) * (i + 1)) % dataset_size;
     }
 
-    // Use descriptor->compute_distance (JIT symbols patched by launcher)
-    const auto norm2 = smem_desc->compute_distance(seed_index, true);
+    const auto args_load = smem_desc->args.load();
+    const auto team_bits = smem_desc->team_size_bitshift_from_smem();
+    auto per_thread_distances =
+      (*compute_distance_ptr<DataT, IndexT, DistanceT>)(args_load, seed_index);
+    const auto norm2 = device::team_sum(per_thread_distances, team_bits);
 
     if (norm2 < best_norm2_team_local) {
       best_norm2_team_local = norm2;
@@ -120,8 +124,8 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel_jit(
   const auto query_id       = blockIdx.y;
 
   extern __shared__ uint8_t smem[];
-  // Load a query using descriptor->setup_workspace (JIT symbols patched by launcher)
-  auto* smem_desc = dataset_desc->setup_workspace(smem, query_ptr, query_id);
+  auto* smem_desc =
+    (*setup_workspace_ptr<DataT, IndexT, DistanceT>)(dataset_desc, smem, query_ptr, query_id);
 
   __syncthreads();
   if (global_team_id >= search_width * graph_degree) { return; }
@@ -147,9 +151,12 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel_jit(
   const auto compute_distance_flag = hashmap::insert<INDEX_T>(
     team_size, visited_hashmap_ptr + (ldb * blockIdx.y), hash_bitlen, child_id);
 
-  // All threads in the team must call compute_distance so team_sum doesn't deadlock (match non-JIT)
-  DISTANCE_T norm2 =
-    smem_desc->compute_distance(static_cast<INDEX_T>(child_id), compute_distance_flag);
+  const auto args = smem_desc->args.load();
+  auto per_thread_distances =
+    compute_distance_flag
+      ? (*compute_distance_ptr<DataT, IndexT, DistanceT>)(args, static_cast<INDEX_T>(child_id))
+      : 0;
+  DISTANCE_T norm2 = device::team_sum(per_thread_distances, team_size_bits);
 
   if (compute_distance_flag) {
     if ((threadIdx.x & (team_size - 1)) == 0) {

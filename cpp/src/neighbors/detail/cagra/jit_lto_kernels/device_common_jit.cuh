@@ -74,7 +74,13 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes_jit(
         }
       }
 
-      const auto norm2 = smem_desc->compute_distance(seed_index, valid_i);
+      const auto args_load = smem_desc->args.load();
+      const auto team_bits = smem_desc->team_size_bitshift_from_smem();
+      auto per_thread_distances =
+        valid_i ? (*cuvs::neighbors::cagra::detail::
+                     compute_distance_ptr<DataT, IndexT, DistanceT>)(args_load, seed_index)
+                : 0;
+      const auto norm2 = device::team_sum(per_thread_distances, team_bits);
 
       if (valid_i && (norm2 < best_norm2_team_local)) {
         best_norm2_team_local = norm2;
@@ -155,23 +161,24 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes_jit(
   // Compute the distance to child nodes - same inline pattern as non-JIT (device_common.hpp)
   constexpr unsigned warp_size = 32;
 
-  const auto team_size_bits   = smem_desc->team_size_bitshift_from_smem();
-  const auto num_k            = knn_k * search_width;
-  const auto max_i            = raft::round_up_safe(num_k, warp_size >> team_size_bits);
-  const auto compute_distance = smem_desc->compute_distance_impl;
-  const auto args             = smem_desc->args.load();
-  const bool lead_lane        = (threadIdx.x & ((1u << team_size_bits) - 1u)) == 0;
-  const uint32_t ofst         = STATIC_RESULT_POSITION ? 0 : result_position[0];
+  const auto team_size_bits = smem_desc->team_size_bitshift_from_smem();
+  const auto num_k          = knn_k * search_width;
+  const auto max_i          = raft::round_up_safe(num_k, warp_size >> team_size_bits);
+  const auto args           = smem_desc->args.load();
+  const bool lead_lane      = (threadIdx.x & ((1u << team_size_bits) - 1u)) == 0;
+  const uint32_t ofst       = STATIC_RESULT_POSITION ? 0 : result_position[0];
 
   for (uint32_t i = threadIdx.x >> team_size_bits; i < max_i; i += blockDim.x >> team_size_bits) {
     const auto j        = i + ofst;
     const bool valid_i  = STATIC_RESULT_POSITION ? (j < num_k) : (j < max_result_position);
     const auto child_id = valid_i ? result_child_indices_ptr[j] : invalid_index;
 
-    const DistanceT child_dist = device::team_sum(
-      (child_id != invalid_index) ? compute_distance(args, child_id)
-                                  : (lead_lane ? raft::upper_bound<DistanceT>() : 0),
-      team_size_bits);
+    auto per_thread_distances =
+      (child_id != invalid_index)
+        ? (*cuvs::neighbors::cagra::detail::
+             compute_distance_ptr<DataT, IndexT, DistanceT>)(args, child_id)
+        : (lead_lane ? raft::upper_bound<DistanceT>() : 0);
+    const DistanceT child_dist = device::team_sum(per_thread_distances, team_size_bits);
     __syncwarp();
 
     // Store the distance

@@ -50,7 +50,7 @@ using cuvs::neighbors::detail::sample_filter;
 using cuvs::neighbors::cagra::detail::device::compute_distance_to_child_nodes_jit;
 using cuvs::neighbors::cagra::detail::device::compute_distance_to_random_nodes_jit;
 
-// JIT search_core - setup_workspace/compute_distance via descriptor
+// JIT search_core - setup_workspace/compute_distance via function pointers
 template <bool TOPK_BY_BITONIC_SORT,
           bool BITONIC_SORT_AND_MERGE_MULTI_WARPS,
           typename DataT,
@@ -121,7 +121,9 @@ RAFT_DEVICE_INLINE_FUNCTION void search_core(
   uint32_t dim                   = dataset_desc->args.dim;
   uint32_t smem_ws_size_in_bytes = dataset_desc->smem_ws_size_in_bytes();
 
-  auto* smem_desc = dataset_desc->setup_workspace(smem, queries_ptr, query_id);
+  // auto* smem_desc = dataset_desc->setup_workspace(smem, queries_ptr, query_id);
+  auto* smem_desc =
+    (*setup_workspace_ptr<DataT, IndexT, DistanceT>)(dataset_desc, smem, queries_ptr, query_id);
 
   auto* __restrict__ result_indices_buffer =
     reinterpret_cast<IndexT*>(smem + smem_ws_size_in_bytes);
