@@ -1,0 +1,50 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cuvs-bench-elastic"
+dynamic = ["version"]
+description = "Elasticsearch GPU backend plugin for cuvs-bench"
+readme = { file = "README.md", content-type = "text/markdown" }
+authors = [
+    { name = "NVIDIA Corporation" },
+]
+license = { text = "Apache-2.0" }
+requires-python = ">=3.11"
+classifiers = [
+    "Intended Audience :: Developers",
+    "Topic :: Database",
+    "Topic :: Scientific/Engineering",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "cuvs-bench>=26.4.0",
+    "elasticsearch>=8.0",
+    "numpy",
+    "pyyaml",
+]
+
+[project.urls]
+Homepage = "https://github.com/rapidsai/cuvs"
+
+[project.entry-points."cuvs_bench.backends"]
+elastic = "cuvs_bench_elastic:register"
+
+[project.entry-points."cuvs_bench.config_loaders"]
+elastic = "cuvs_bench_elastic:register"
+
+[tool.setuptools.dynamic]
+version = { file = "cuvs_bench_elastic/VERSION" }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["cuvs_bench_elastic*"]
+
+[tool.setuptools.package-data]
+cuvs_bench_elastic = ["config/**/*.yaml"]
