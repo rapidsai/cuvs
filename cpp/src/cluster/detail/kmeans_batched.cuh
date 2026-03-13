@@ -152,7 +152,7 @@ void accumulate_batch_centroids(
  * @tparam IdxT      Index type (int, int64_t)
  *
  * @param[in]     handle        RAFT resources handle
- * @param[in]     params        K-means parameters (batch size read from params.batched.batch_size)
+ * @param[in]     params        K-means parameters
  * @param[in]     X             Input data on HOST [n_samples x n_features]
  * @param[in]     sample_weight Optional weights per sample (on host)
  * @param[inout]  centroids     Initial/output cluster centers [n_clusters x n_features]
@@ -175,17 +175,17 @@ void fit(raft::resources const& handle,
   auto metric         = params.metric;
 
   // Read batch_size from params; default to n_samples if 0 (auto)
-  IdxT batch_size = static_cast<IdxT>(params.batched.batch_size);
+  IdxT batch_size = static_cast<IdxT>(params.batch_size);
   if (batch_size <= 0) { batch_size = static_cast<IdxT>(n_samples); }
 
   RAFT_EXPECTS(batch_size > 0, "batch_size must be positive");
 
   // Warn if user explicitly set batch_size larger than dataset size
-  if (params.batched.batch_size > 0 && static_cast<IdxT>(params.batched.batch_size) > n_samples) {
+  if (params.batch_size > 0 && static_cast<IdxT>(params.batch_size) > n_samples) {
     RAFT_LOG_WARN(
       "batch_size (%zu) is larger than dataset size (%zu). "
       "batch_size will be effectively clamped to %zu.",
-      static_cast<size_t>(params.batched.batch_size),
+      static_cast<size_t>(params.batch_size),
       static_cast<size_t>(n_samples),
       static_cast<size_t>(n_samples));
   }
@@ -411,17 +411,17 @@ void predict(raft::resources const& handle,
   auto n_clusters     = params.n_clusters;
 
   // Read batch_size from params; default to n_samples if 0 (auto)
-  IdxT batch_size = static_cast<IdxT>(params.batched.batch_size);
+  IdxT batch_size = static_cast<IdxT>(params.batch_size);
   if (batch_size <= 0) { batch_size = static_cast<IdxT>(n_samples); }
 
   RAFT_EXPECTS(batch_size > 0, "batch_size must be positive");
 
   // Warn if user explicitly set batch_size larger than dataset size
-  if (params.batched.batch_size > 0 && static_cast<IdxT>(params.batched.batch_size) > n_samples) {
+  if (params.batch_size > 0 && static_cast<IdxT>(params.batch_size) > n_samples) {
     RAFT_LOG_WARN(
       "batch_size (%zu) is larger than dataset size (%zu). "
       "batch_size will be effectively clamped to %zu.",
-      static_cast<size_t>(params.batched.batch_size),
+      static_cast<size_t>(params.batch_size),
       static_cast<size_t>(n_samples),
       static_cast<size_t>(n_samples));
   }

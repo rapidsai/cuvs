@@ -28,7 +28,7 @@ cuvs::cluster::kmeans::params convert_params(const cuvsKMeansParams& params)
   kmeans_params.batch_samples       = params.batch_samples;
   kmeans_params.batch_centroids     = params.batch_centroids;
   kmeans_params.inertia_check       = params.inertia_check;
-  kmeans_params.batched.batch_size  = params.batch_size;
+  kmeans_params.batch_size  = params.batch_size;
   return kmeans_params;
 }
 
@@ -240,7 +240,7 @@ extern "C" cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params)
       .inertia_check        = cpp_params.inertia_check,
       .hierarchical         = false,
       .hierarchical_n_iters = static_cast<int>(cpp_balanced_params.n_iters),
-      .batch_size           = cpp_params.batched.batch_size};
+      .batch_size           = cpp_params.batch_size};
   });
 }
 

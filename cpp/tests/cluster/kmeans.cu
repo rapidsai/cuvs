@@ -446,7 +446,7 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
     cuvs::cluster::kmeans::params batched_params = params;
     batched_params.init                          = cuvs::cluster::kmeans::params::Array;
     batched_params.n_init                        = 1;
-    batched_params.batched.batch_size            = std::min(n_samples, 256);
+    batched_params.batch_size                    = std::min(n_samples, 256);
 
     std::optional<raft::host_vector_view<const T, int>> h_sw = std::nullopt;
     std::vector<T> h_sample_weight;
@@ -616,8 +616,8 @@ class KmeansPredictBatchedTest : public ::testing::TestWithParam<KmeansInputs<T>
     auto h_labels_view =
       raft::make_host_vector_view<int64_t, int64_t>(h_labels.data(), (int64_t)n_samples);
 
-    T pred_inertia            = 0;
-    params.batched.batch_size = std::min((int64_t)n_samples, (int64_t)256);
+    T pred_inertia    = 0;
+    params.batch_size = std::min((int64_t)n_samples, (int64_t)256);
 
     cuvs::cluster::kmeans::predict(
       handle,
