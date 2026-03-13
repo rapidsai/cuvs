@@ -214,7 +214,9 @@ void fit(raft::resources const& handle,
     n_init = 1;
   }
 
-  auto best_centroids = n_init > 1 ? raft::make_device_matrix<T, IdxT>(handle, n_clusters, n_features) : raft::make_device_matrix<T, IdxT>(handle, 0, 0);
+  auto best_centroids = n_init > 1
+                          ? raft::make_device_matrix<T, IdxT>(handle, n_clusters, n_features)
+                          : raft::make_device_matrix<T, IdxT>(handle, 0, 0);
   T best_inertia      = std::numeric_limits<T>::max();
   IdxT best_n_iter    = 0;
 
