@@ -15,9 +15,6 @@ jobs:
   update-baseline:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
-    concurrency:
-      group: abi-baseline-update
-      cancel-in-progress: false  # Queue updates, don't skip
     steps:
       - name: Checkout main branch
         uses: actions/checkout@v4
@@ -62,9 +59,11 @@ jobs:
 
   # Check PRs for breaking ABI changes
   check-pr:
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_call'
+    # if: github.event_name == 'pull_request' || github.event_name == 'workflow_call'
     runs-on: ubuntu-latest
     steps:
+      - name: debug
+        run: echo "The event that triggered this workflow is ${{ github.event_name }}."
       - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
