@@ -26,6 +26,8 @@
 #include <raft/linalg/add.cuh>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/norm.cuh>
+#include <raft/matrix/sample_rows.cuh>
+#include <raft/random/rng.cuh>
 #include <raft/stats/histogram.cuh>
 #include <raft/util/pow2_utils.cuh>
 
@@ -460,22 +462,18 @@ inline auto build(raft::resources const& handle,
   // Train k-means centroids and SQ parameters on the same training subset.
   // This mirrors IVF-PQ, which also trains its codebook on a subset of the data.
   {
+    raft::random::RngState random_state{137};
     auto trainset_ratio = std::max<size_t>(
       1, n_rows / std::max<size_t>(params.kmeans_trainset_fraction * n_rows, idx.n_lists()));
     auto n_rows_train = n_rows / trainset_ratio;
-    rmm::device_uvector<T> trainset(
-      n_rows_train * idx.dim(), stream, raft::resource::get_large_workspace_resource(handle));
-    RAFT_CUDA_TRY(cudaMemcpy2DAsync(trainset.data(),
-                                    sizeof(T) * idx.dim(),
-                                    dataset,
-                                    sizeof(T) * idx.dim() * trainset_ratio,
-                                    sizeof(T) * idx.dim(),
-                                    n_rows_train,
-                                    cudaMemcpyDefault,
-                                    stream));
-    auto trainset_const_view =
-      raft::make_device_matrix_view<const T, int64_t>(trainset.data(), n_rows_train, idx.dim());
-    auto centers_view = raft::make_device_matrix_view<float, int64_t>(
+    auto trainset =
+      raft::make_device_mdarray<T>(handle,
+                                   raft::resource::get_large_workspace_resource(handle),
+                                   raft::make_extents<int64_t>(n_rows_train, idx.dim()));
+    auto dataset_view = raft::make_device_matrix_view<const T, int64_t>(dataset, n_rows, idx.dim());
+    raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset_view, trainset.view());
+    auto trainset_const_view = raft::make_const_mdspan(trainset.view());
+    auto centers_view        = raft::make_device_matrix_view<float, int64_t>(
       idx.centers().data_handle(), idx.n_lists(), idx.dim());
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
@@ -502,7 +500,7 @@ inline auto build(raft::resources const& handle,
       dim3 threads(32, 8);
       dim3 blocks(raft::ceildiv<int64_t>(n_rows_train, threads.x),
                   raft::ceildiv<uint32_t>(dim, threads.y));
-      compute_residuals_kernel<T><<<blocks, threads, 0, stream>>>(trainset.data(),
+      compute_residuals_kernel<T><<<blocks, threads, 0, stream>>>(trainset.data_handle(),
                                                                   idx.centers().data_handle(),
                                                                   train_labels.data_handle(),
                                                                   residuals.data(),
