@@ -561,7 +561,7 @@ class batched_device_view_from_host {
 
     // if data is on device only this is almost a noop, just prepping the pointers
 
-    RAFT_EXPECTS(static_cast<uint64_t>(offset_) <= host_view_.extent(0), "Offset out of bounds");
+    RAFT_EXPECTS(static_cast<int64_t>(offset_) <= host_view_.extent(0), "Offset out of bounds");
 
     bool next_batch_exists = offset_ < static_cast<uint64_t>(host_view_.extent(0));
 
