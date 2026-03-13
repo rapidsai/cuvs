@@ -85,7 +85,7 @@ Tarball
 Install Dependencies
 ~~~~~~~~~~~~~~~~~~~~
 
-1. `NCCL <https://docs.nvidia.com/deeplearning/nccl/install-guide/index.html>` _
+1. `NCCL <https://docs.nvidia.com/deeplearning/nccl/install-guide/index.html>`_
 2. `libopenmp`
 3. CUDA Toolkit Runtime 12.2+
 4. Ampere architecture or better (compute capability >= 8.0)
