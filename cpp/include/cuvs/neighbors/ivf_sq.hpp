@@ -31,19 +31,6 @@ struct index_params : cuvs::neighbors::index_params {
   /** The fraction of data to use during iterative kmeans building. */
   double kmeans_trainset_fraction = 0.5;
   /**
-   * By default (adaptive_centers = false), the cluster centers are trained in `ivf_sq::build`,
-   * and never modified in `ivf_sq::extend`. As a result, you may need to retrain the index
-   * from scratch after invoking (`ivf_sq::extend`) a few times with new data, the distribution of
-   * which is no longer representative of the original training set.
-   *
-   * The alternative behavior (adaptive_centers = true) is to update the cluster centers for new
-   * data when it is added. In this case, `index.centers()` are always exactly the centroids of the
-   * data in the corresponding clusters. The drawback of this behavior is that the centroids depend
-   * on the order of adding new data (through the classification of the added data); that is,
-   * `index.centers()` "drift" together with the changing distribution of the newly added data.
-   */
-  bool adaptive_centers = false;
-  /**
    * By default, the algorithm allocates more space than necessary for individual clusters
    * (`list_data`). This allows to amortize the cost of memory allocation and reduce the number of
    * data copies during repeated calls to `extend` (extending the database).
@@ -181,11 +168,9 @@ struct index : cuvs::neighbors::index {
         cuvs::distance::DistanceType metric,
         uint32_t n_lists,
         uint32_t dim,
-        bool adaptive_centers,
         bool conservative_memory_allocation);
 
   cuvs::distance::DistanceType metric() const noexcept;
-  bool adaptive_centers() const noexcept;
   int64_t size() const noexcept;
   uint32_t dim() const noexcept;
   uint32_t n_lists() const noexcept;
@@ -223,7 +208,6 @@ struct index : cuvs::neighbors::index {
 
  private:
   cuvs::distance::DistanceType metric_;
-  bool adaptive_centers_;
   bool conservative_memory_allocation_;
 
   std::vector<std::shared_ptr<list_data<IdxT, int64_t>>> lists_;

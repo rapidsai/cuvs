@@ -37,7 +37,6 @@ void serialize(raft::resources const& handle, std::ostream& os, const index<IdxT
   serialize_scalar(handle, os, index_.dim());
   serialize_scalar(handle, os, index_.n_lists());
   serialize_scalar(handle, os, index_.metric());
-  serialize_scalar(handle, os, index_.adaptive_centers());
   serialize_scalar(handle, os, index_.conservative_memory_allocation());
   serialize_mdspan(handle, os, index_.centers());
 
@@ -94,14 +93,13 @@ auto deserialize(raft::resources const& handle, std::istream& is) -> index<IdxT>
   if (ver != serialization_version) {
     RAFT_FAIL("serialization version mismatch, expected %d, got %d ", serialization_version, ver);
   }
-  auto n_rows           = raft::deserialize_scalar<int64_t>(handle, is);
-  auto dim              = raft::deserialize_scalar<uint32_t>(handle, is);
-  auto n_lists          = raft::deserialize_scalar<uint32_t>(handle, is);
-  auto metric           = raft::deserialize_scalar<cuvs::distance::DistanceType>(handle, is);
-  bool adaptive_centers = raft::deserialize_scalar<bool>(handle, is);
-  bool cma              = raft::deserialize_scalar<bool>(handle, is);
+  auto n_rows  = raft::deserialize_scalar<int64_t>(handle, is);
+  auto dim     = raft::deserialize_scalar<uint32_t>(handle, is);
+  auto n_lists = raft::deserialize_scalar<uint32_t>(handle, is);
+  auto metric  = raft::deserialize_scalar<cuvs::distance::DistanceType>(handle, is);
+  bool cma     = raft::deserialize_scalar<bool>(handle, is);
 
-  index<IdxT> index_ = index<IdxT>(handle, metric, n_lists, dim, adaptive_centers, cma);
+  index<IdxT> index_ = index<IdxT>(handle, metric, n_lists, dim, cma);
 
   deserialize_mdspan(handle, is, index_.centers());
 

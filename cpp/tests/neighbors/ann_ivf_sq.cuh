@@ -31,7 +31,6 @@ struct AnnIvfSqInputs {
   IdxT nprobe;
   IdxT nlist;
   cuvs::distance::DistanceType metric;
-  bool adaptive_centers;
 };
 
 template <typename IdxT>
@@ -40,7 +39,7 @@ template <typename IdxT>
   os << "{ " << p.num_queries << ", " << p.num_db_vecs << ", " << p.dim << ", " << p.k << ", "
      << p.nprobe << ", " << p.nlist << ", "
      << cuvs::neighbors::print_metric{static_cast<cuvs::distance::DistanceType>((int)p.metric)}
-     << ", " << p.adaptive_centers << '}' << std::endl;
+     << '}' << std::endl;
   return os;
 }
 
@@ -91,10 +90,9 @@ class AnnIVFSQTest : public ::testing::TestWithParam<AnnIvfSqInputs<IdxT>> {
       {
         cuvs::neighbors::ivf_sq::index_params index_params;
         cuvs::neighbors::ivf_sq::search_params search_params;
-        index_params.n_lists          = ps.nlist;
-        index_params.metric           = ps.metric;
-        index_params.adaptive_centers = ps.adaptive_centers;
-        search_params.n_probes        = ps.nprobe;
+        index_params.n_lists   = ps.nlist;
+        index_params.metric    = ps.metric;
+        search_params.n_probes = ps.nprobe;
 
         index_params.add_data_on_build        = true;
         index_params.kmeans_trainset_fraction = 0.5;
@@ -108,7 +106,6 @@ class AnnIVFSQTest : public ::testing::TestWithParam<AnnIvfSqInputs<IdxT>> {
         cuvs::neighbors::ivf_sq::index_params index_params_no_add;
         index_params_no_add.n_lists                  = ps.nlist;
         index_params_no_add.metric                   = ps.metric;
-        index_params_no_add.adaptive_centers         = ps.adaptive_centers;
         index_params_no_add.add_data_on_build        = false;
         index_params_no_add.kmeans_trainset_fraction = 0.5;
 
@@ -214,10 +211,9 @@ class AnnIVFSQTest : public ::testing::TestWithParam<AnnIvfSqInputs<IdxT>> {
       {
         cuvs::neighbors::ivf_sq::index_params index_params;
         cuvs::neighbors::ivf_sq::search_params search_params;
-        index_params.n_lists          = ps.nlist;
-        index_params.metric           = ps.metric;
-        index_params.adaptive_centers = ps.adaptive_centers;
-        search_params.n_probes        = ps.nprobe;
+        index_params.n_lists   = ps.nlist;
+        index_params.metric    = ps.metric;
+        search_params.n_probes = ps.nprobe;
 
         index_params.add_data_on_build        = true;
         index_params.kmeans_trainset_fraction = 0.5;
@@ -299,156 +295,141 @@ class AnnIVFSQTest : public ::testing::TestWithParam<AnnIvfSqInputs<IdxT>> {
 };
 
 const std::vector<AnnIvfSqInputs<int64_t>> inputs = {
-  // num_queries, num_db_vecs, dim, k, nprobe, nlist, metric, adaptive_centers
+  // num_queries, num_db_vecs, dim, k, nprobe, nlist, metric
 
   // ===== Dimension edge cases (all four metrics) =====
   // dim=1 (CosineExpanded excluded: requires dim > 1)
-  {1000, 10000, 1, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 1, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 1, 10, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, false},
+  {1000, 10000, 1, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 1, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 1, 10, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded},
   // dim=2,3,4,5 (unaligned)
-  {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 3, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
-  {1000, 10000, 3, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
-  {1000, 10000, 4, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 4, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 3, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 3, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 4, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 4, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
   // dim=7,8 (around veclen=16 boundary, not a multiple of veclen)
-  {1000, 10000, 7, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 7, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, true},
-  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
+  {1000, 10000, 7, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 7, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
   // dim=15,16,17 (around veclen=16 boundary)
-  {1000, 10000, 15, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 15, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, false},
-  {1000, 10000, 17, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 17, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1000, 10000, 15, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 15, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded},
+  {1000, 10000, 17, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 17, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
   // dim=31,32,33 (around 2*veclen boundary)
-  {1000, 10000, 31, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 31, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 32, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 32, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 32, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 33, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 33, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000, 10000, 31, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 31, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 32, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 32, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 32, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 33, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 33, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct},
   // medium dims
-  {1000, 10000, 64, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 64, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, false},
-  {1000, 10000, 256, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 256, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000, 10000, 64, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 64, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded},
+  {1000, 10000, 256, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 256, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct},
   // large dims (may exceed shared memory limits)
-  {1000, 10000, 2048, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 2048, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 2049, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 2049, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 2050, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 2050, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 4096, 20, 50, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 4096, 20, 50, 1024, cuvs::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 4096, 20, 50, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1000, 10000, 2048, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 2048, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 2049, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 2049, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 2050, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 2050, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 4096, 20, 50, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 4096, 20, 50, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 4096, 20, 50, 1024, cuvs::distance::DistanceType::CosineExpanded},
 
   // ===== k edge cases =====
-  {1000, 10000, 16, 1, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 1, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 16, 1, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 16, 2, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 5, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 20, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 20, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 16, 50, 100, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 100, 200, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 100, 200, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000, 10000, 16, 1, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 1, 40, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 16, 1, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 16, 2, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 5, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 20, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 20, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 16, 50, 100, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 100, 200, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 100, 200, 1024, cuvs::distance::DistanceType::InnerProduct},
 
   // ===== nprobe / nlist edge cases =====
   // nprobe == nlist (exhaustive probe)
-  {1000, 10000, 16, 10, 64, 64, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 10, 64, 64, cuvs::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 16, 10, 64, 64, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1000, 10000, 16, 10, 64, 64, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 10, 64, 64, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 16, 10, 64, 64, cuvs::distance::DistanceType::CosineExpanded},
   // nprobe == 1 (minimal probe)
-  {1000, 10000, 16, 10, 1, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 10, 1, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1000, 10000, 16, 10, 1, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 10, 1, 1024, cuvs::distance::DistanceType::CosineExpanded},
   // nprobe > nlist (clamped to nlist)
-  {1000, 10000, 16, 10, 2048, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 10, 2048, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1000, 10000, 16, 10, 2048, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 10, 2048, 1024, cuvs::distance::DistanceType::CosineExpanded},
   // various nprobe
-  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, false},
-  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, false},
+  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::L2SqrtExpanded},
+  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::L2SqrtExpanded},
   // very small nlist
-  {100, 10000, 16, 10, 8, 8, cuvs::distance::DistanceType::L2Expanded, false},
-  {100, 10000, 16, 10, 8, 8, cuvs::distance::DistanceType::CosineExpanded, false},
+  {100, 10000, 16, 10, 8, 8, cuvs::distance::DistanceType::L2Expanded},
+  {100, 10000, 16, 10, 8, 8, cuvs::distance::DistanceType::CosineExpanded},
   // smaller nlist
-  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::L2Expanded, false},
-  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::InnerProduct, false},
-  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::CosineExpanded, false},
-  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::L2SqrtExpanded, false},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::L2Expanded},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::InnerProduct},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::CosineExpanded},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::L2SqrtExpanded},
 
   // ===== Dataset size edge cases =====
   // single query
-  {1, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {1, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
   // very few queries
-  {2, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {5, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {2, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {5, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
   // very few db vectors (nlist reduced to fit)
-  {100, 500, 16, 10, 40, 256, cuvs::distance::DistanceType::L2Expanded, false},
-  {100, 500, 16, 10, 40, 256, cuvs::distance::DistanceType::CosineExpanded, false},
+  {100, 500, 16, 10, 40, 256, cuvs::distance::DistanceType::L2Expanded},
+  {100, 500, 16, 10, 40, 256, cuvs::distance::DistanceType::CosineExpanded},
   // larger datasets
-  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, true},
-  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
-  {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, true},
-  {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
-  {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false},
-  {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {10000, 131072, 8, 10, 50, 1024, cuvs::distance::DistanceType::InnerProduct, true},
-  {10000, 131072, 8, 10, 50, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, false},
+  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {10000, 131072, 8, 10, 50, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {10000, 131072, 8, 10, 50, 1024, cuvs::distance::DistanceType::L2SqrtExpanded},
 
   // ===== Large query batches (gridDim.x > 65535) =====
-  {100000, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::L2Expanded, false},
-  {100000, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::InnerProduct, false},
-  {100000, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::CosineExpanded, false},
-  {100000, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::L2SqrtExpanded, false},
-  {100000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::L2Expanded, false},
-  {100000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::CosineExpanded, false},
+  {100000, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::L2Expanded},
+  {100000, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::InnerProduct},
+  {100000, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::CosineExpanded},
+  {100000, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::L2SqrtExpanded},
+  {100000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::L2Expanded},
+  {100000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::CosineExpanded},
   // just above the old 65535 limit
-  {65536, 1024, 16, 10, 32, 64, cuvs::distance::DistanceType::L2Expanded, false},
-  {65536, 1024, 16, 10, 32, 64, cuvs::distance::DistanceType::CosineExpanded, false},
-
-  // ===== Adaptive centers (all four metrics, multiple dims) =====
-  {1000, 10000, 8, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
-  {1000, 10000, 8, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct, true},
-  {1000, 10000, 8, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
-  {1000, 10000, 8, 10, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, true},
-  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
-  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct, true},
-  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
-  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, true},
-  {1000, 10000, 32, 10, 50, 1024, cuvs::distance::DistanceType::L2Expanded, true},
-  {1000, 10000, 32, 10, 50, 1024, cuvs::distance::DistanceType::InnerProduct, true},
-  {1000, 10000, 32, 10, 50, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
-  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
-  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
+  {65536, 1024, 16, 10, 32, 64, cuvs::distance::DistanceType::L2Expanded},
+  {65536, 1024, 16, 10, 32, 64, cuvs::distance::DistanceType::CosineExpanded},
 
   // ===== Recall-stability: same data, different query counts =====
-  {20000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::L2Expanded, false},
-  {50000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::L2Expanded, false},
+  {20000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::L2Expanded},
+  {50000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::L2Expanded},
 };
 
 }  // namespace cuvs::neighbors::ivf_sq

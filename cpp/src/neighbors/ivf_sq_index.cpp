@@ -14,18 +14,13 @@ namespace cuvs::neighbors::ivf_sq {
 
 template <typename IdxT>
 index<IdxT>::index(raft::resources const& res)
-  : index(res, cuvs::distance::DistanceType::L2Expanded, 0, 0, false, false)
+  : index(res, cuvs::distance::DistanceType::L2Expanded, 0, 0, false)
 {
 }
 
 template <typename IdxT>
 index<IdxT>::index(raft::resources const& res, const index_params& params, uint32_t dim)
-  : index(res,
-          params.metric,
-          params.n_lists,
-          dim,
-          params.adaptive_centers,
-          params.conservative_memory_allocation)
+  : index(res, params.metric, params.n_lists, dim, params.conservative_memory_allocation)
 {
 }
 
@@ -34,11 +29,9 @@ index<IdxT>::index(raft::resources const& res,
                    cuvs::distance::DistanceType metric,
                    uint32_t n_lists,
                    uint32_t dim,
-                   bool adaptive_centers,
                    bool conservative_memory_allocation)
   : cuvs::neighbors::index(),
     metric_(metric),
-    adaptive_centers_(adaptive_centers),
     conservative_memory_allocation_(conservative_memory_allocation),
     lists_{n_lists},
     list_sizes_{raft::make_device_vector<uint32_t, uint32_t>(res, n_lists)},
@@ -65,12 +58,6 @@ template <typename IdxT>
 cuvs::distance::DistanceType index<IdxT>::metric() const noexcept
 {
   return metric_;
-}
-
-template <typename IdxT>
-bool index<IdxT>::adaptive_centers() const noexcept
-{
-  return adaptive_centers_;
 }
 
 template <typename IdxT>

@@ -13,7 +13,6 @@
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_sq.hpp>
 
-#include "../../cluster/kmeans_balanced.cuh"
 #include "../detail/ann_utils.cuh"
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/logger.hpp>
@@ -109,12 +108,8 @@ auto clone(const raft::resources& res, const index<IdxT>& source) -> index<IdxT>
 {
   auto stream = raft::resource::get_cuda_stream(res);
 
-  index<IdxT> target(res,
-                     source.metric(),
-                     source.n_lists(),
-                     source.dim(),
-                     source.adaptive_centers(),
-                     source.conservative_memory_allocation());
+  index<IdxT> target(
+    res, source.metric(), source.n_lists(), source.dim(), source.conservative_memory_allocation());
 
   raft::copy(target.list_sizes().data_handle(),
              source.list_sizes().data_handle(),
@@ -310,36 +305,15 @@ void extend(raft::resources const& handle,
   auto old_list_sizes_dev = raft::make_device_vector<uint32_t, int64_t>(handle, n_lists);
   raft::copy(old_list_sizes_dev.data_handle(), list_sizes_ptr, n_lists, stream);
 
-  if (index->adaptive_centers()) {
-    auto centroids_view = raft::make_device_matrix_view<float, int64_t>(
-      index->centers().data_handle(), index->centers().extent(0), index->centers().extent(1));
-    auto list_sizes_view =
-      raft::make_device_vector_view<std::remove_pointer_t<decltype(list_sizes_ptr)>, int64_t>(
-        list_sizes_ptr, n_lists);
-    for (const auto& batch : vec_batches) {
-      auto batch_data_view =
-        raft::make_device_matrix_view<const T, int64_t>(batch.data(), batch.size(), index->dim());
-      auto batch_labels_view = raft::make_device_vector_view<const LabelT, int64_t>(
-        new_labels.data_handle() + batch.offset(), batch.size());
-      cuvs::cluster::kmeans_balanced::helpers::calc_centers_and_sizes(handle,
-                                                                      batch_data_view,
-                                                                      batch_labels_view,
-                                                                      centroids_view,
-                                                                      list_sizes_view,
-                                                                      false,
-                                                                      utils::mapping<float>{});
-    }
-  } else {
-    raft::stats::histogram<uint32_t, int64_t>(raft::stats::HistTypeAuto,
-                                              reinterpret_cast<int32_t*>(list_sizes_ptr),
-                                              int64_t(n_lists),
-                                              new_labels.data_handle(),
-                                              n_rows,
-                                              1,
-                                              stream);
-    raft::linalg::add(
-      list_sizes_ptr, list_sizes_ptr, old_list_sizes_dev.data_handle(), n_lists, stream);
-  }
+  raft::stats::histogram<uint32_t, int64_t>(raft::stats::HistTypeAuto,
+                                            reinterpret_cast<int32_t*>(list_sizes_ptr),
+                                            int64_t(n_lists),
+                                            new_labels.data_handle(),
+                                            n_rows,
+                                            1,
+                                            stream);
+  raft::linalg::add(
+    list_sizes_ptr, list_sizes_ptr, old_list_sizes_dev.data_handle(), n_lists, stream);
 
   std::vector<uint32_t> new_list_sizes(n_lists);
   std::vector<uint32_t> old_list_sizes(n_lists);
@@ -437,8 +411,6 @@ void extend(raft::resources const& handle,
   if (!index->center_norms().has_value()) {
     index->allocate_center_norms(handle);
     if (index->center_norms().has_value()) { compute_center_norms(); }
-  } else if (index->adaptive_centers()) {
-    compute_center_norms();
   }
 }
 
