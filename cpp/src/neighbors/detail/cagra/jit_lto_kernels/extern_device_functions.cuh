@@ -26,7 +26,7 @@ extern __device__ dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_wor
   uint32_t query_id);
 
 template <typename DataT, typename IndexT, typename DistanceT>
-extern __device__ dataset_descriptor_base_t<DataT, IndexT, DistanceT>* (*setup_workspace_ptr)(
+extern __device__ dataset_descriptor_base_t<DataT, IndexT, DistanceT>* setup_workspace_base(
   dataset_descriptor_base_t<DataT, IndexT, DistanceT>*, void*, const DataT*, uint32_t);
 
 template <uint32_t TeamSize,
@@ -43,7 +43,14 @@ compute_distance(const typename dataset_descriptor_base_t<DataT, IndexT, Distanc
                  IndexT dataset_index);
 
 template <typename DataT, typename IndexT, typename DistanceT>
-extern __device__ DistanceT (*compute_distance_ptr)(
+extern __device__ DistanceT compute_distance_base(
+  const typename dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t args,
+  IndexT dataset_index,
+  bool valid,
+  uint32_t team_size_bits);
+
+template <typename DataT, typename IndexT, typename DistanceT>
+extern __device__ DistanceT compute_distance_per_thread_base(
   const typename dataset_descriptor_base_t<DataT, IndexT, DistanceT>::args_t, IndexT);
 }  // namespace cuvs::neighbors::cagra::detail
 

@@ -98,7 +98,7 @@ __global__ __launch_bounds__(1024, 1) void search_kernel_jit(
   uint32_t smem_ws_size_in_bytes = dataset_desc->smem_ws_size_in_bytes();
 
   auto* smem_desc =
-    (*setup_workspace_ptr<DataT, IndexT, DistanceT>)(dataset_desc, smem, queries_ptr, query_id);
+    setup_workspace_base<DataT, IndexT, DistanceT>(dataset_desc, smem, queries_ptr, query_id);
 
   auto* __restrict__ result_indices_buffer =
     reinterpret_cast<INDEX_T*>(smem + smem_ws_size_in_bytes);
