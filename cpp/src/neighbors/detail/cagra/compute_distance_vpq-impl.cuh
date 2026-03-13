@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -15,19 +15,30 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
-template <cuvs::distance::DistanceType Metric,
-          uint32_t TeamSize,
+template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           uint32_t PQ_BITS,
           uint32_t PQ_LEN,
           typename CodebookT,
           typename DataT,
           typename IndexT,
-          typename DistanceT>
+          typename DistanceT
+#if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
+          ,
+          cuvs::distance::DistanceType Metric
+#else
+          ,
+          typename QueryT
+#endif
+          >
 struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, IndexT, DistanceT> {
   using base_type   = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
   using CODE_BOOK_T = CodebookT;
-  using QUERY_T     = half;
+#if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
+  using QUERY_T = half;
+#else
+  using QUERY_T = QueryT;
+#endif
   using base_type::args;
   using base_type::extra_ptr3;
   using typename base_type::args_t;
@@ -37,7 +48,9 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
   using typename base_type::INDEX_T;
   using typename base_type::LOAD_T;
   using typename base_type::setup_workspace_type;
-  constexpr static inline auto kMetric          = Metric;
+#if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
+  constexpr static inline auto kMetric = Metric;
+#endif
   constexpr static inline auto kTeamSize        = TeamSize;
   constexpr static inline auto kDatasetBlockDim = DatasetBlockDim;
   constexpr static inline auto kPqBits          = PQ_BITS;
@@ -110,7 +123,7 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
     static_assert(alignof(cagra_q_dataset_descriptor_t) == alignof(base_type));
   }
 
- private:
+  // Public static method to compute smem size without constructing descriptor
   RAFT_INLINE_FUNCTION constexpr static auto get_smem_ws_size_in_bytes(uint32_t dim) -> uint32_t
   {
     /* SMEM workspace layout:
@@ -121,6 +134,8 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
     return sizeof(cagra_q_dataset_descriptor_t) + kSMemCodeBookSizeInBytes +
            raft::round_up_safe<uint32_t>(dim, DatasetBlockDim) * sizeof(QUERY_T);
   }
+
+ private:
 };
 
 template <auto Block, auto Stride, typename T>
@@ -347,6 +362,10 @@ _RAFT_DEVICE __noinline__ auto compute_distance_vpq(
     args.smem_ws_ptr);
 }
 
+#ifndef BUILD_KERNEL
+// The init kernel is not needed when building JIT fragments (BUILD_KERNEL is defined)
+// It's only needed for non-JIT initialization. When BUILD_KERNEL is defined, we're building
+// a JIT fragment and don't want this kernel to be instantiated.
 template <cuvs::distance::DistanceType Metric,
           uint32_t TeamSize,
           uint32_t DatasetBlockDim,
@@ -365,16 +384,36 @@ RAFT_KERNEL __launch_bounds__(1, 1)
                                      IndexT size,
                                      uint32_t dim)
 {
-  using desc_type = cagra_q_dataset_descriptor_t<Metric,
-                                                 TeamSize,
+  using desc_type = cagra_q_dataset_descriptor_t<TeamSize,
                                                  DatasetBlockDim,
                                                  PqBits,
                                                  PqLen,
                                                  CodebookT,
                                                  DataT,
                                                  IndexT,
-                                                 DistanceT>;
+                                                 DistanceT
+#if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
+                                                 ,
+                                                 Metric
+#else
+                                                 ,
+                                                 half
+#endif
+                                                 >;
   using base_type = typename desc_type::base_type;
+#ifdef CUVS_ENABLE_JIT_LTO
+  // For JIT, we don't use the function pointers, so set them to nullptr
+  // The free functions are called directly instead
+  new (out) desc_type(nullptr,  // setup_workspace_impl - not used in JIT
+                      nullptr,  // compute_distance_impl - not used in JIT
+                      encoded_dataset_ptr,
+                      encoded_dataset_dim,
+                      vq_code_book_ptr,
+                      pq_code_book_ptr,
+                      size,
+                      dim);
+#else
+  // For CUDA 12 (non-JIT), set the function pointers properly
   new (out) desc_type(
     reinterpret_cast<typename base_type::setup_workspace_type*>(&setup_workspace_vpq<desc_type>),
     reinterpret_cast<typename base_type::compute_distance_type*>(&compute_distance_vpq<desc_type>),
@@ -384,8 +423,14 @@ RAFT_KERNEL __launch_bounds__(1, 1)
     pq_code_book_ptr,
     size,
     dim);
+#endif
 }
+#endif  // #ifndef BUILD_KERNEL
 
+#ifndef BUILD_KERNEL
+// The init_ function is not needed when building JIT fragments (BUILD_KERNEL is defined)
+// It's only needed for non-JIT initialization. When BUILD_KERNEL is defined, we're building
+// a JIT fragment and don't want this host function to be included.
 template <cuvs::distance::DistanceType Metric,
           uint32_t TeamSize,
           uint32_t DatasetBlockDim,
@@ -412,28 +457,36 @@ vpq_descriptor_spec<Metric,
                                       IndexT size,
                                       uint32_t dim)
 {
-  using desc_type = cagra_q_dataset_descriptor_t<Metric,
-                                                 TeamSize,
+  using desc_type = cagra_q_dataset_descriptor_t<TeamSize,
                                                  DatasetBlockDim,
                                                  PqBits,
                                                  PqLen,
                                                  CodebookT,
                                                  DataT,
                                                  IndexT,
-                                                 DistanceT>;
+                                                 DistanceT
+#if !defined(CUVS_ENABLE_JIT_LTO) && !defined(BUILD_KERNEL)
+                                                 ,
+                                                 Metric
+#else
+                                                 ,
+                                                 half
+#endif
+                                                 >;
   using base_type = typename desc_type::base_type;
 
-  desc_type dd_host{nullptr,
-                    nullptr,
-                    encoded_dataset_ptr,
-                    encoded_dataset_dim,
-                    vq_code_book_ptr,
-                    pq_code_book_ptr,
-                    size,
-                    dim};
-  return host_type{dd_host,
+  return host_type{desc_type{nullptr,
+                             nullptr,
+                             encoded_dataset_ptr,
+                             encoded_dataset_dim,
+                             vq_code_book_ptr,
+                             pq_code_book_ptr,
+                             size,
+                             dim},
                    [=](dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dev_ptr,
                        rmm::cuda_stream_view stream) {
+                     // Use init kernel for both JIT and CUDA 12
+                     // The kernel handles JIT vs non-JIT via ifdef internally
                      vpq_dataset_descriptor_init_kernel<Metric,
                                                         TeamSize,
                                                         DatasetBlockDim,
@@ -451,7 +504,13 @@ vpq_descriptor_spec<Metric,
                                              size,
                                              dim);
                      RAFT_CUDA_TRY(cudaPeekAtLastError());
-                   }};
+                   },
+                   Metric,
+                   DatasetBlockDim,
+                   true,    // is_vpq
+                   PqBits,  // pq_bits
+                   PqLen};  // pq_len
 }
+#endif  // #ifndef BUILD_KERNEL
 
 }  // namespace cuvs::neighbors::cagra::detail

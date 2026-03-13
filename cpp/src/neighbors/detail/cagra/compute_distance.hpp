@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -227,6 +227,14 @@ struct dataset_descriptor_host {
   uint32_t smem_ws_size_in_bytes = 0;
   uint32_t team_size             = 0;
 
+  // JIT LTO metadata - stored when descriptor is created
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded;
+  uint32_t dataset_block_dim          = 0;
+  bool is_vpq                         = false;
+  uint32_t pq_bits                    = 0;
+  uint32_t pq_len                     = 0;
+  // Codebook type is determined by DataT for VPQ (always half for now)
+
   struct state {
     using ready_t = std::tuple<dev_descriptor_t*, rmm::cuda_stream_view>;
     using init_f =
@@ -270,10 +278,21 @@ struct dataset_descriptor_host {
   };
 
   template <typename DescriptorImpl, typename InitF>
-  dataset_descriptor_host(const DescriptorImpl& dd_host, InitF init)
+  dataset_descriptor_host(const DescriptorImpl& dd_host,
+                          InitF init,
+                          cuvs::distance::DistanceType metric_val,
+                          uint32_t dataset_block_dim_val,
+                          bool is_vpq_val      = false,
+                          uint32_t pq_bits_val = 0,
+                          uint32_t pq_len_val  = 0)
     : value_{std::make_shared<state>(init, sizeof(DescriptorImpl))},
       smem_ws_size_in_bytes{dd_host.smem_ws_size_in_bytes()},
-      team_size{dd_host.team_size()}
+      team_size{dd_host.team_size()},
+      metric{metric_val},
+      dataset_block_dim{dataset_block_dim_val},
+      is_vpq{is_vpq_val},
+      pq_bits{pq_bits_val},
+      pq_len{pq_len_val}
   {
   }
 
