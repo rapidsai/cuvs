@@ -10,10 +10,6 @@ on:
       - 'c/include/**'
       - 'ci/check_c_abi/**'
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   # Extract and store baseline ABI from main branch
   update-baseline:
