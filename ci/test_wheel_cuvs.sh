@@ -18,4 +18,4 @@ rapids-pip-retry install \
     "${LIBCUVS_WHEELHOUSE}"/libcuvs*.whl \
     "$(echo "${CUVS_WHEELHOUSE}"/cuvs*.whl)[test]"
 
-python -m pytest --deselect ./python/cuvs/cuvs/tests/test_hnsw_ace.py::test_hnsw_ace_tiny_memory_limit_triggers_disk_mode --deselect ./python/cuvs/cuvs/tests/test_cagra_ace.py::test_cagra_ace_tiny_memory_limit_triggers_disk_mode ./python/cuvs/cuvs/tests
+PYTHONUNBUFFERED=1 python -m pytest -vs --deselect ./python/cuvs/cuvs/tests/test_hnsw_ace.py::test_hnsw_ace_tiny_memory_limit_triggers_disk_mode --deselect ./python/cuvs/cuvs/tests/test_cagra_ace.py::test_cagra_ace_tiny_memory_limit_triggers_disk_mode ./python/cuvs/cuvs/tests
