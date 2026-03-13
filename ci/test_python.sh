@@ -44,7 +44,8 @@ set +e
 
 rapids-logger "pytest cuvs"
 pushd python/cuvs/cuvs
-pytest \
+python -u -m pytest \
+ -vs \
  --cache-clear \
  --junitxml="${RAPIDS_TESTS_DIR}/junit-cuvs.xml" \
  --cov-config=../.coveragerc \
