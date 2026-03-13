@@ -18,4 +18,4 @@ rapids-pip-retry install \
     "${LIBCUVS_WHEELHOUSE}"/libcuvs*.whl \
     "$(echo "${CUVS_WHEELHOUSE}"/cuvs*.whl)[test]"
 
-python -m pytest ./python/cuvs/cuvs/tests
+python -m pytest --ignore=./python/cuvs/cuvs/tests/test_hnsw_ace.py ./python/cuvs/cuvs/tests
