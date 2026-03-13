@@ -300,7 +300,6 @@ void predict(raft::resources const& handle,
              bool normalize_weight,
              raft::host_scalar_view<double> inertia);
 
-
 /**
  * @brief Fit k-means and predict cluster labels using batched processing of host data.
  *
