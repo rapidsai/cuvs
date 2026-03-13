@@ -466,7 +466,6 @@ class vpq_dataset : public dataset<IdxT> {
   vpq_dataset& operator=(vpq_dataset&&)      = default;
   ~vpq_dataset() override                    = default;
 
-  // Delegation methods
   [[nodiscard]] auto n_rows() const noexcept -> index_type override { return impl_->n_rows(); }
   [[nodiscard]] auto dim() const noexcept -> uint32_t override { return impl_->dim(); }
   [[nodiscard]] auto is_owning() const noexcept -> bool final { return true; }

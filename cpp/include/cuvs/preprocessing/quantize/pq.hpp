@@ -79,7 +79,7 @@ struct params {
 /**
  * @brief Defines and stores VPQ codebooks upon training
  *
- * The quantizer holds a vpq_dataset, which can be either owning (trained from data)
+ * The quantizer holds a vpq_dataset, which can either own the codebooks
  * or non-owning (referencing external codebooks).
  *
  * @tparam T data element type
@@ -122,7 +122,7 @@ quantizer<float> build(raft::resources const& res,
 /**
  * @brief Creates a view-type product quantizer from pre-computed codebooks.
  *
- * This function creates a non-owning quantizer that references the provided device data.
+ * This function creates a non-owning quantizer that references the provided codebooks.
  *
  * Usage example:
  * @code{.cpp}

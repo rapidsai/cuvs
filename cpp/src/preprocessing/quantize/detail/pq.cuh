@@ -205,11 +205,11 @@ quantizer<MathT> build_view(
   }
 
   // Create view-type vpq_dataset
-  auto empty_data = raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>{};
+  auto empty_data = raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(res, 0, 0);
   return {params,
           cuvs::neighbors::vpq_dataset<MathT, int64_t>{
             std::make_unique<cuvs::neighbors::vpq_dataset_view<MathT, int64_t>>(
-              vq_centers, pq_centers, empty_data)}};
+              vq_centers, pq_centers, std::move(empty_data))}};
 }
 
 template <typename T, typename QuantI, typename AccessorType>

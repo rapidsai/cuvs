@@ -140,10 +140,10 @@ class vpq_dataset_owning : public vpq_dataset_impl<MathT, IdxT> {
 };
 
 /**
- * @brief View-type VPQ dataset implementation - non-owning views to external data.
+ * @brief View-type VPQ dataset implementation - owns the dataset but not the codebooks.
  *
- * The caller must ensure the lifetime of the underlying data exceeds
- * the lifetime of this object.
+ * The caller must ensure the lifetime of the codebook data exceeds
+ * the lifetime of this object. The dataset is owned by this object.
  *
  * @tparam MathT the type of elements in the codebooks
  * @tparam IdxT type of the vector indices
@@ -155,21 +155,20 @@ class vpq_dataset_view : public vpq_dataset_impl<MathT, IdxT> {
   using math_type  = MathT;
 
   /**
-   * @brief Construct a view-type vpq_dataset from external codebook views.
+   * @brief Construct a vpq_dataset that owns the dataset but references the codebooks.
    *
-   * @param vq_code_book_view View of VQ codebook [vq_n_centers, dim]
+   * @param vq_code_book_view View of VQ codebook [vq_n_centers, dim] (non-owning)
    * @param pq_code_book_view View of PQ codebook [pq_dim * pq_n_centers, pq_len] or [pq_n_centers,
-   * pq_len]
-   * @param data_view View of compressed data (can be empty for quantizer-only use)
+   * pq_len] (non-owning)
+   * @param data Compressed data matrix (moved, owned by this object)
    */
   vpq_dataset_view(
     raft::device_matrix_view<const math_type, uint32_t, raft::row_major> vq_code_book_view,
     raft::device_matrix_view<const math_type, uint32_t, raft::row_major> pq_code_book_view,
-    raft::device_matrix_view<const uint8_t, index_type, raft::row_major> data_view =
-      raft::device_matrix_view<const uint8_t, index_type, raft::row_major>{})
+    raft::device_matrix<uint8_t, index_type, raft::row_major>&& data)
     : vq_code_book_view_{vq_code_book_view},
       pq_code_book_view_{pq_code_book_view},
-      data_view_{data_view}
+      data_{std::move(data)}
   {
   }
 
@@ -194,13 +193,13 @@ class vpq_dataset_view : public vpq_dataset_impl<MathT, IdxT> {
   [[nodiscard]] auto data() const noexcept
     -> raft::device_matrix_view<const uint8_t, index_type, raft::row_major> override
   {
-    return data_view_;
+    return data_.view();
   }
 
  private:
   raft::device_matrix_view<const math_type, uint32_t, raft::row_major> vq_code_book_view_;
   raft::device_matrix_view<const math_type, uint32_t, raft::row_major> pq_code_book_view_;
-  raft::device_matrix_view<const uint8_t, index_type, raft::row_major> data_view_;
+  raft::device_matrix<uint8_t, index_type, raft::row_major> data_;
 };
 
 }  // namespace cuvs::neighbors
