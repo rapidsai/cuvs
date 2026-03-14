@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,7 +9,7 @@
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/linalg/gemm.hpp>
+#include <raft/linalg/gemm.cuh>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/linalg/normalize.cuh>
@@ -90,16 +90,13 @@ void compute_soar_labels(raft::resources const& dev_resources,
   auto centers_transpose =
     raft::make_device_matrix<T, int64_t>(dev_resources, centers.extent(1), centers.extent(0));
 
-  raft::linalg::reduce<true, true>(centers_norm.data_handle(),
-                                   centers.data_handle(),
-                                   centers.extent(1),
-                                   centers.extent(0),
-                                   0.0f,
-                                   raft::resource::get_cuda_stream(dev_resources),
-                                   false,
-                                   raft::sq_op(),
-                                   raft::add_op(),
-                                   raft::identity_op());
+  raft::linalg::reduce<raft::Apply::ALONG_ROWS>(dev_resources,
+                                                raft::make_const_mdspan(centers),
+                                                centers_norm.view(),
+                                                0.0f,
+                                                false,
+                                                raft::sq_op(),
+                                                raft::add_op());
 
   raft::linalg::transpose(dev_resources, centers, centers_transpose.view());
 
@@ -114,12 +111,12 @@ void compute_soar_labels(raft::resources const& dev_resources,
     raft::sub_op());
 
   raft::linalg::map(
-    dev_resources, raft::make_const_mdspan(soar_scores.view()), soar_scores.view(), raft::sq_op());
+    dev_resources, soar_scores.view(), raft::sq_op{}, raft::make_const_mdspan(soar_scores.view()));
 
   raft::linalg::map(dev_resources,
-                    raft::make_const_mdspan(soar_scores.view()),
                     soar_scores.view(),
-                    raft::mul_const_op<float>(lambda));
+                    raft::mul_const_op<float>(lambda),
+                    raft::make_const_mdspan(soar_scores.view()));
 
   auto nc_dataset = raft::make_device_matrix_view<float, int64_t>(
     const_cast<float*>(dataset.data_handle()), dataset.extent(0), dataset.extent(1));
