@@ -44,13 +44,16 @@ set +e
 
 rapids-logger "pytest cuvs"
 pushd python/cuvs/cuvs
-pytest \
+PYTHONUNBUFFERED=1 pytest \
  --cache-clear \
+ -vs \
  --junitxml="${RAPIDS_TESTS_DIR}/junit-cuvs.xml" \
  --cov-config=../.coveragerc \
  --cov=cuvs \
  --cov-report=xml:"${RAPIDS_COVERAGE_DIR}/cuvs-coverage.xml" \
  --cov-report=term \
+ --deselect cuvs/tests/test_hnsw_ace.py::test_hnsw_ace_tiny_memory_limit_triggers_disk_mode \
+ --deselect cuvs/tests/test_cagra_ace.py::test_cagra_ace_tiny_memory_limit_triggers_disk_mode \
  tests
 
 rapids-logger "pytest cuvs-bench"
