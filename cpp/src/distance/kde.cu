@@ -14,6 +14,7 @@
 #include <cuda/std/limits>
 
 #include <cmath>
+#include <optional>
 #include <stdexcept>
 #include <type_traits>
 
@@ -526,24 +527,30 @@ void dispatch_kernel(DensityKernelType kernel, Fn&& fn)
 // ============================================================================
 
 template <typename T>
-void kde_score_samples(raft::resources const& handle,
-                       const T* query,
-                       const T* train,
-                       const T* weights,
-                       T* output,
-                       int n_query,
-                       int n_train,
-                       int d,
-                       T bandwidth,
-                       T sum_weights,
-                       DensityKernelType kernel,
-                       cuvs::distance::DistanceType metric,
-                       T metric_arg)
+void kde(raft::resources const& handle,
+         raft::device_matrix_view<const T, std::int64_t, raft::layout_c_contiguous> query,
+         raft::device_matrix_view<const T, std::int64_t, raft::layout_c_contiguous> train,
+         std::optional<raft::device_vector_view<const T, std::int64_t>> weights,
+         raft::device_vector_view<T, std::int64_t> output,
+         T bandwidth,
+         T sum_weights,
+         DensityKernelType kernel,
+         cuvs::distance::DistanceType metric,
+         T metric_arg)
 {
+  int n_query = static_cast<int>(query.extent(0));
+  int n_train = static_cast<int>(train.extent(0));
+  int d       = static_cast<int>(query.extent(1));
+
   RAFT_EXPECTS(n_query > 0, "n_query must be > 0");
   RAFT_EXPECTS(n_train > 0, "n_train must be > 0");
   RAFT_EXPECTS(d > 0, "n_features must be > 0");
   RAFT_EXPECTS(bandwidth > T(0), "bandwidth must be > 0");
+
+  const T* query_ptr   = query.data_handle();
+  const T* train_ptr   = train.data_handle();
+  const T* weights_ptr = weights.has_value() ? weights->data_handle() : nullptr;
+  T* output_ptr        = output.data_handle();
 
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   T log_norm          = std::log(sum_weights) + norm_factor<T>(kernel, bandwidth, d);
@@ -589,10 +596,10 @@ void kde_score_samples(raft::resources const& handle,
         // Single-pass: process all train points, write directly to output
         dim3 grid(n_query_blocks);
         kde_tiled_kernel<T, M, K, CELL_TILE>
-          <<<grid, threads, smem_bytes, stream>>>(query,
-                                                  train,
-                                                  weights,
-                                                  output,
+          <<<grid, threads, smem_bytes, stream>>>(query_ptr,
+                                                  train_ptr,
+                                                  weights_ptr,
+                                                  output_ptr,
                                                   static_cast<T*>(nullptr),
                                                   n_query,
                                                   n_train,
@@ -617,9 +624,9 @@ void kde_score_samples(raft::resources const& handle,
 
         dim3 grid(n_query_blocks, n_train_blocks);
         kde_tiled_kernel<T, M, K, CELL_TILE>
-          <<<grid, threads, smem_bytes, stream>>>(query,
-                                                  train,
-                                                  weights,
+          <<<grid, threads, smem_bytes, stream>>>(query_ptr,
+                                                  train_ptr,
+                                                  weights_ptr,
                                                   partial_max.data(),
                                                   partial_sum.data(),
                                                   n_query,
@@ -633,7 +640,7 @@ void kde_score_samples(raft::resources const& handle,
         RAFT_CUDA_TRY(cudaPeekAtLastError());
 
         kde_reduce_kernel<T><<<n_query_blocks, threads, 0, stream>>>(
-          partial_max.data(), partial_sum.data(), output, n_query, n_train_blocks, log_norm);
+          partial_max.data(), partial_sum.data(), output_ptr, n_query, n_train_blocks, log_norm);
         RAFT_CUDA_TRY(cudaPeekAtLastError());
       }
     });
@@ -641,32 +648,28 @@ void kde_score_samples(raft::resources const& handle,
 }
 
 // Explicit instantiations
-template void kde_score_samples<float>(raft::resources const&,
-                                       const float*,
-                                       const float*,
-                                       const float*,
-                                       float*,
-                                       int,
-                                       int,
-                                       int,
-                                       float,
-                                       float,
-                                       DensityKernelType,
-                                       cuvs::distance::DistanceType,
-                                       float);
+template void kde<float>(
+  raft::resources const&,
+  raft::device_matrix_view<const float, std::int64_t, raft::layout_c_contiguous>,
+  raft::device_matrix_view<const float, std::int64_t, raft::layout_c_contiguous>,
+  std::optional<raft::device_vector_view<const float, std::int64_t>>,
+  raft::device_vector_view<float, std::int64_t>,
+  float,
+  float,
+  DensityKernelType,
+  cuvs::distance::DistanceType,
+  float);
 
-template void kde_score_samples<double>(raft::resources const&,
-                                        const double*,
-                                        const double*,
-                                        const double*,
-                                        double*,
-                                        int,
-                                        int,
-                                        int,
-                                        double,
-                                        double,
-                                        DensityKernelType,
-                                        cuvs::distance::DistanceType,
-                                        double);
+template void kde<double>(
+  raft::resources const&,
+  raft::device_matrix_view<const double, std::int64_t, raft::layout_c_contiguous>,
+  raft::device_matrix_view<const double, std::int64_t, raft::layout_c_contiguous>,
+  std::optional<raft::device_vector_view<const double, std::int64_t>>,
+  raft::device_vector_view<double, std::int64_t>,
+  double,
+  double,
+  DensityKernelType,
+  cuvs::distance::DistanceType,
+  double);
 
 }  // namespace cuvs::distance

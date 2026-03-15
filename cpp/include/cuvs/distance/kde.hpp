@@ -6,24 +6,12 @@
 #pragma once
 
 #include <cuvs/distance/distance.hpp>
+#include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 
-namespace cuvs::distance {
+#include <optional>
 
-/**
- * @brief Density kernel type for Kernel Density Estimation.
- *
- * These are the smoothing kernels used in KDE — distinct from the dot-product
- * kernels (RBF, Polynomial, etc.) in cuvs::distance::kernels used by SVMs.
- */
-enum class DensityKernelType : int {
-  Gaussian     = 0,
-  Tophat       = 1,
-  Epanechnikov = 2,
-  Exponential  = 3,
-  Linear       = 4,
-  Cosine       = 5
-};
+namespace cuvs::distance {
 
 /**
  * @brief Compute log-density estimates for query points using kernel density estimation.
@@ -46,11 +34,8 @@ enum class DensityKernelType : int {
  * @param[in]  handle      RAFT resources handle for stream management
  * @param[in]  query       Query points, row-major (n_query × n_features)
  * @param[in]  train       Training points, row-major (n_train × n_features)
- * @param[in]  weights     Per-training-point weights (n_train,), or nullptr for uniform
+ * @param[in]  weights     Per-training-point weights (n_train,), or nullopt for uniform
  * @param[out] output      Log-density estimates (n_query,)
- * @param[in]  n_query     Number of query points
- * @param[in]  n_train     Number of training points
- * @param[in]  n_features  Dimensionality of the data
  * @param[in]  bandwidth   Kernel bandwidth (must be > 0)
  * @param[in]  sum_weights Sum of sample weights (or n_train if uniform)
  * @param[in]  kernel      Density kernel function
@@ -58,46 +43,39 @@ enum class DensityKernelType : int {
  * @param[in]  metric_arg  Metric parameter (e.g. p for Minkowski; ignored otherwise)
  */
 template <typename T>
-void kde_score_samples(raft::resources const& handle,
-                       const T* query,
-                       const T* train,
-                       const T* weights,
-                       T* output,
-                       int n_query,
-                       int n_train,
-                       int n_features,
-                       T bandwidth,
-                       T sum_weights,
-                       DensityKernelType kernel,
-                       cuvs::distance::DistanceType metric,
-                       T metric_arg);
+void kde(raft::resources const& handle,
+         raft::device_matrix_view<const T, std::int64_t, raft::layout_c_contiguous> query,
+         raft::device_matrix_view<const T, std::int64_t, raft::layout_c_contiguous> train,
+         std::optional<raft::device_vector_view<const T, std::int64_t>> weights,
+         raft::device_vector_view<T, std::int64_t> output,
+         T bandwidth,
+         T sum_weights,
+         DensityKernelType kernel,
+         cuvs::distance::DistanceType metric,
+         T metric_arg);
 
-extern template void kde_score_samples<float>(raft::resources const&,
-                                              const float*,
-                                              const float*,
-                                              const float*,
-                                              float*,
-                                              int,
-                                              int,
-                                              int,
-                                              float,
-                                              float,
-                                              DensityKernelType,
-                                              cuvs::distance::DistanceType,
-                                              float);
+extern template void kde<float>(
+  raft::resources const&,
+  raft::device_matrix_view<const float, std::int64_t, raft::layout_c_contiguous>,
+  raft::device_matrix_view<const float, std::int64_t, raft::layout_c_contiguous>,
+  std::optional<raft::device_vector_view<const float, std::int64_t>>,
+  raft::device_vector_view<float, std::int64_t>,
+  float,
+  float,
+  DensityKernelType,
+  cuvs::distance::DistanceType,
+  float);
 
-extern template void kde_score_samples<double>(raft::resources const&,
-                                               const double*,
-                                               const double*,
-                                               const double*,
-                                               double*,
-                                               int,
-                                               int,
-                                               int,
-                                               double,
-                                               double,
-                                               DensityKernelType,
-                                               cuvs::distance::DistanceType,
-                                               double);
+extern template void kde<double>(
+  raft::resources const&,
+  raft::device_matrix_view<const double, std::int64_t, raft::layout_c_contiguous>,
+  raft::device_matrix_view<const double, std::int64_t, raft::layout_c_contiguous>,
+  std::optional<raft::device_vector_view<const double, std::int64_t>>,
+  raft::device_vector_view<double, std::int64_t>,
+  double,
+  double,
+  DensityKernelType,
+  cuvs::distance::DistanceType,
+  double);
 
 }  // namespace cuvs::distance
