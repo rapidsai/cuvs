@@ -44,6 +44,8 @@ set +e
 
 rapids-logger "pytest cuvs"
 pushd python/cuvs/cuvs
+for i in $(seq 1 10); do
+rapids-logger "pytest cuvs - run $i of 10"
 PYTHONUNBUFFERED=1 pytest \
  --cache-clear \
  -vs \
@@ -55,6 +57,7 @@ PYTHONUNBUFFERED=1 pytest \
  --deselect cuvs/tests/test_hnsw_ace.py::test_hnsw_ace_tiny_memory_limit_triggers_disk_mode \
  --deselect cuvs/tests/test_cagra_ace.py::test_cagra_ace_tiny_memory_limit_triggers_disk_mode \
  tests
+done
 
 rapids-logger "pytest cuvs-bench"
 popd
