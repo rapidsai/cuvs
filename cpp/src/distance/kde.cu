@@ -284,9 +284,7 @@ T norm_factor(DensityKernelType kernel, T h, int d)
   switch (kernel) {
     case DensityKernelType::Gaussian: factor = T(0.5) * d * std::log(T(2) * T(M_PI)); break;
     case DensityKernelType::Tophat: factor = logVn<T>(d); break;
-    case DensityKernelType::Epanechnikov:
-      factor = logVn<T>(d) + std::log(T(2) / T(d + 2));
-      break;
+    case DensityKernelType::Epanechnikov: factor = logVn<T>(d) + std::log(T(2) / T(d + 2)); break;
     case DensityKernelType::Exponential: factor = logSn<T>(d - 1) + std::lgamma(T(d)); break;
     case DensityKernelType::Linear: factor = logVn<T>(d) - std::log(T(d + 1)); break;
     case DensityKernelType::Cosine: {
@@ -296,11 +294,11 @@ T norm_factor(DensityKernelType kernel, T h, int d)
       // This is derived from repeated integration by parts; both sin and cos
       // boundary terms must be included (the old loop-based formula missed the
       // cos terms at t=0 for even d).
-      const T two_over_pi     = T(2) / T(M_PI);
-      const T two_over_pi_sq  = two_over_pi * two_over_pi;
-      T I_prev = two_over_pi;                     // I_0
-      T I_curr = two_over_pi - two_over_pi_sq;    // I_1
-      const int n             = d - 1;            // need I_n
+      const T two_over_pi    = T(2) / T(M_PI);
+      const T two_over_pi_sq = two_over_pi * two_over_pi;
+      T I_prev               = two_over_pi;                   // I_0
+      T I_curr               = two_over_pi - two_over_pi_sq;  // I_1
+      const int n            = d - 1;                         // need I_n
       if (n == 0) {
         factor = std::log(I_prev) + logSn<T>(d - 1);
       } else {
@@ -331,10 +329,7 @@ T norm_factor(DensityKernelType kernel, T h, int d)
 // train dimension via a 2D grid.
 // ============================================================================
 
-template <typename T,
-          cuvs::distance::DistanceType Metric,
-          DensityKernelType Kernel,
-          int CELL_TILE>
+template <typename T, cuvs::distance::DistanceType Metric, DensityKernelType Kernel, int CELL_TILE>
 __global__ void kde_tiled_kernel(const T* __restrict__ query,
                                  const T* __restrict__ train,
                                  const T* __restrict__ weights,
@@ -489,9 +484,7 @@ void dispatch_metric(cuvs::distance::DistanceType metric, Fn&& fn)
     case DT::Linf: fn(std::integral_constant<DT, DT::Linf>{}); break;
     case DT::LpUnexpanded: fn(std::integral_constant<DT, DT::LpUnexpanded>{}); break;
     case DT::CosineExpanded: fn(std::integral_constant<DT, DT::CosineExpanded>{}); break;
-    case DT::CorrelationExpanded:
-      fn(std::integral_constant<DT, DT::CorrelationExpanded>{});
-      break;
+    case DT::CorrelationExpanded: fn(std::integral_constant<DT, DT::CorrelationExpanded>{}); break;
     case DT::Canberra: fn(std::integral_constant<DT, DT::Canberra>{}); break;
     case DT::HellingerExpanded: fn(std::integral_constant<DT, DT::HellingerExpanded>{}); break;
     case DT::JensenShannon: fn(std::integral_constant<DT, DT::JensenShannon>{}); break;
