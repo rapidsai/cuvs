@@ -11,7 +11,9 @@
 #include "search_plan.cuh"
 #include "search_single_cta.cuh"
 
-#include <cstdio>
+#include <raft/core/resource/custom_resource.hpp>
+#include <raft/util/cache.hpp>
+
 #include <cuvs/neighbors/common.hpp>
 
 namespace cuvs::neighbors::cagra::detail {
