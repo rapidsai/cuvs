@@ -88,5 +88,8 @@ ivf_pq_index
 /datasets/
 /*.json
 
+# clangd
+*/.clangd
+
 # java
 .classpath

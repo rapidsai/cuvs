@@ -2254,7 +2254,7 @@ auto iterative_build_graph(
     idx_opt->update_dataset(
       res,
       // TODO: hardcoding codebook math to `half`, we can do runtime dispatching later
-      cuvs::neighbors::vpq_build<decltype(dev_dataset), half, int64_t>(
+      cuvs::preprocessing::quantize::pq::vpq_build(
         res, *params.compression, dev_dataset));
     auto end        = std::chrono::high_resolution_clock::now();
     auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
