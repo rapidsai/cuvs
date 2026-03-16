@@ -136,7 +136,7 @@ outputs:
         - libcusparse
         - if: cuda_major == "13"
           then:
-            - ${{ pin_compatible("libnvjitlink", lower_bound="x.x", upper_bound="x") }}
+            - ${{ pin_compatible("libnvjitlink", lower_bound="x.x.x", upper_bound="x") }}
       ignore_run_exports:
         by_name:
           - cuda-cudart
@@ -205,7 +205,7 @@ outputs:
         - libcusparse
         - if: cuda_major == "13"
           then:
-            - ${{ pin_compatible("libnvjitlink", lower_bound="x.x", upper_bound="x") }}
+            - ${{ pin_compatible("libnvjitlink", lower_bound="x.x.x", upper_bound="x") }}
       ignore_run_exports:
         by_name:
           - cuda-cudart
@@ -272,7 +272,7 @@ outputs:
         - libcusparse
         - if: cuda_major == "13"
           then:
-            - ${{ pin_compatible("libnvjitlink", lower_bound="x.x", upper_bound="x") }}
+            - ${{ pin_compatible("libnvjitlink", lower_bound="x.x.x", upper_bound="x") }}
       ignore_run_exports:
         by_name:
           - cuda-cudart
@@ -438,7 +438,7 @@ outputs:
         - libcusparse
         - if: cuda_major == "13"
           then:
-            - ${{ pin_compatible("libnvjitlink", lower_bound="x.x", upper_bound="x") }}
+            - ${{ pin_compatible("libnvjitlink", lower_bound="x.x.x", upper_bound="x") }}
       ignore_run_exports:
         by_name:
           - cuda-cudart
