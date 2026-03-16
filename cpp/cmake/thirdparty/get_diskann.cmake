@@ -21,9 +21,13 @@ function(find_and_configure_diskann)
     CPM_VAR cpm_args
   )
 
+  # DiskANN is CPU-only, so ensure CUDA architectures don't affect its build
+  # Pass CMAKE_CUDA_ARCHITECTURES as empty via CPM_ARGS to prevent CUDA initialization issues
   rapids_cpm_find(diskann ${version} ${find_args}
           GLOBAL_TARGETS diskann
           CPM_ARGS ${cpm_args}
+          CMAKE_ARGS
+          "-DCMAKE_CUDA_ARCHITECTURES="
           OPTIONS
           "PYBIND OFF"
           "UNIT_TEST OFF"
