@@ -119,7 +119,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
 
     # --- Verify that the expected result files exist and are not empty ---
     skip_diskann = is_arm_cpu()
-    
+
     expected_files = {
         # Build files:
         "test-data/result/build/cuvs_ivf_flat,test.csv": {
@@ -504,74 +504,76 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
             "rows": 1,
         },
     }
-    
+
     if not skip_diskann:
-        expected_files.update({
-            "test-data/result/build/diskann_memory,test.csv": {
-                "header": common_build_header
-                + [
-                    "L_build",
-                    "R",
-                    "alpha",
-                    "num_threads",
-                ],
-                "rows": 1,
-            },
-            "test-data/result/search/diskann_memory,test,k10,bs100,raw.csv": {
-                "header": common_search_header
-                + [
-                    "L_search",
-                    "end_to_end",
-                    "k",
-                    "n_queries",
-                    "total_queries",
-                    "build time",
-                    "build threads",
-                    "build cpu_time",
-                    "L_build",
-                    "R",
-                    "alpha",
-                    "build_num_threads",
-                ],
-                "rows": 1,
-            },
-            "test-data/result/search/diskann_memory,test,k10,bs100,latency.csv": {
-                "header": common_search_header
-                + [
-                    "L_search",
-                    "end_to_end",
-                    "k",
-                    "n_queries",
-                    "total_queries",
-                    "build time",
-                    "build threads",
-                    "build cpu_time",
-                    "L_build",
-                    "R",
-                    "alpha",
-                    "build_num_threads",
-                ],
-                "rows": 1,
-            },
-            "test-data/result/search/diskann_memory,test,k10,bs100,throughput.csv": {
-                "header": common_search_header
-                + [
-                    "L_search",
-                    "end_to_end",
-                    "k",
-                    "n_queries",
-                    "total_queries",
-                    "build time",
-                    "build threads",
-                    "build cpu_time",
-                    "L_build",
-                    "R",
-                    "alpha",
-                    "build_num_threads",
-                ],
-                "rows": 1,
-            },
-        })
+        expected_files.update(
+            {
+                "test-data/result/build/diskann_memory,test.csv": {
+                    "header": common_build_header
+                    + [
+                        "L_build",
+                        "R",
+                        "alpha",
+                        "num_threads",
+                    ],
+                    "rows": 1,
+                },
+                "test-data/result/search/diskann_memory,test,k10,bs100,raw.csv": {
+                    "header": common_search_header
+                    + [
+                        "L_search",
+                        "end_to_end",
+                        "k",
+                        "n_queries",
+                        "total_queries",
+                        "build time",
+                        "build threads",
+                        "build cpu_time",
+                        "L_build",
+                        "R",
+                        "alpha",
+                        "build_num_threads",
+                    ],
+                    "rows": 1,
+                },
+                "test-data/result/search/diskann_memory,test,k10,bs100,latency.csv": {
+                    "header": common_search_header
+                    + [
+                        "L_search",
+                        "end_to_end",
+                        "k",
+                        "n_queries",
+                        "total_queries",
+                        "build time",
+                        "build threads",
+                        "build cpu_time",
+                        "L_build",
+                        "R",
+                        "alpha",
+                        "build_num_threads",
+                    ],
+                    "rows": 1,
+                },
+                "test-data/result/search/diskann_memory,test,k10,bs100,throughput.csv": {
+                    "header": common_search_header
+                    + [
+                        "L_search",
+                        "end_to_end",
+                        "k",
+                        "n_queries",
+                        "total_queries",
+                        "build time",
+                        "build threads",
+                        "build cpu_time",
+                        "L_build",
+                        "R",
+                        "alpha",
+                        "build_num_threads",
+                    ],
+                    "rows": 1,
+                },
+            }
+        )
 
     for rel_path, expectations in expected_files.items():
         file_path = temp_datasets_dir / rel_path
