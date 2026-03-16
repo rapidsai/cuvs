@@ -12,8 +12,7 @@
 
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
-#include <cuvs/neighbors/composite/merge.hpp>
-#include <cuvs/neighbors/index_wrappers.hpp>
+#include <cuvs/neighbors/composite/index.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/device_resources.hpp>
@@ -286,6 +285,7 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
       case cuvs::distance::DistanceType::L2Expanded: return "L2";
       case cuvs::distance::DistanceType::BitwiseHamming: return "BitwiseHamming";
       case cuvs::distance::DistanceType::CosineExpanded: return "Cosine";
+      case cuvs::distance::DistanceType::L1: return "L1";
       default: break;
     }
     return "Unknown";
@@ -341,6 +341,9 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
     // distance, making it impossible to make a top-k ground truth.
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
+      GTEST_SKIP();
+    if (ps.metric == cuvs::distance::DistanceType::L1 &&
+        ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)
       GTEST_SKIP();
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.compression.has_value()) { GTEST_SKIP(); }
@@ -532,6 +535,9 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
  protected:
   void testCagra()
   {
+    if (ps.metric == cuvs::distance::DistanceType::L1 &&
+        ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)
+      GTEST_SKIP();
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.compression.has_value()) { GTEST_SKIP(); }
       if (ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH || ps.dim == 1) {
@@ -745,6 +751,9 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
  protected:
   void testCagra()
   {
+    if (ps.metric == cuvs::distance::DistanceType::L1 &&
+        ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)
+      GTEST_SKIP();
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.compression.has_value()) { GTEST_SKIP(); }
       if (ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH || ps.dim == 1) {
@@ -964,6 +973,9 @@ class AnnCagraIndexFilteredMergeTest : public ::testing::TestWithParam<AnnCagraI
   template <typename SearchIdxT = IdxT>
   void testCagra()
   {
+    if (ps.metric == cuvs::distance::DistanceType::L1 &&
+        ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)
+      GTEST_SKIP();
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH || ps.dim == 1) {
         GTEST_SKIP();
@@ -1205,6 +1217,9 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
   template <typename SearchIdxT = IdxT>
   void testCagra()
   {
+    if (ps.metric == cuvs::distance::DistanceType::L1 &&
+        ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)
+      GTEST_SKIP();
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH || ps.dim == 1) {
         GTEST_SKIP();
@@ -1319,17 +1334,6 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
           index1 = cagra::build(handle_, index_params, database1_view);
         };
 
-        // Convert traditional CAGRA indices to wrappers for polymorphic usage
-        std::vector<std::shared_ptr<cuvs::neighbors::IndexWrapper<DataT, IdxT, SearchIdxT>>>
-          wrapped_indices;
-        wrapped_indices.push_back(
-          std::make_shared<cuvs::neighbors::cagra::IndexWrapper<DataT, IdxT, SearchIdxT>>(&index0));
-        wrapped_indices.push_back(
-          std::make_shared<cuvs::neighbors::cagra::IndexWrapper<DataT, IdxT, SearchIdxT>>(&index1));
-
-        cagra::merge_params merge_params{index_params};
-        merge_params.merge_strategy = ps.merge_strategy;
-
         auto search_queries_view = raft::make_device_matrix_view<const DataT, int64_t>(
           search_queries.data(), ps.n_queries, ps.dim);
         auto indices_out_view = raft::make_device_matrix_view<SearchIdxT, int64_t>(
@@ -1343,10 +1347,18 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
         search_params.team_size   = ps.team_size;
         search_params.itopk_size  = ps.itopk_size;
 
-        auto index = cuvs::neighbors::composite::merge<DataT, IdxT, SearchIdxT>(
-          handle_, merge_params, wrapped_indices);
-        index->search(
-          handle_, search_params, search_queries_view, indices_out_view, dists_out_view);
+        std::vector<cagra::index<DataT, IdxT>*> indices_to_merge{&index0, &index1};
+
+        if (ps.merge_strategy == cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL) {
+          auto merged = cagra::merge(handle_, index_params, indices_to_merge);
+          cagra::search(
+            handle_, search_params, merged, search_queries_view, indices_out_view, dists_out_view);
+        } else {
+          cuvs::neighbors::composite::composite_index<DataT, IdxT, SearchIdxT> composite(
+            indices_to_merge);
+          composite.search(
+            handle_, search_params, search_queries_view, indices_out_view, dists_out_view);
+        }
 
         raft::update_host(distances_Cagra.data(), distances_dev.data(), queries_size, stream_);
         raft::update_host(indices_Cagra.data(), indices_dev.data(), queries_size, stream_);
@@ -1419,7 +1431,8 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {cuvs::distance::DistanceType::L2Expanded,
      cuvs::distance::DistanceType::InnerProduct,
      cuvs::distance::DistanceType::BitwiseHamming,
-     cuvs::distance::DistanceType::CosineExpanded},
+     cuvs::distance::DistanceType::CosineExpanded,
+     cuvs::distance::DistanceType::L1},
     {false},
     {true},
     {true, false},
@@ -1443,7 +1456,8 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {cuvs::distance::DistanceType::L2Expanded,
      cuvs::distance::DistanceType::InnerProduct,
      cuvs::distance::DistanceType::BitwiseHamming,
-     cuvs::distance::DistanceType::CosineExpanded},
+     cuvs::distance::DistanceType::CosineExpanded,
+     cuvs::distance::DistanceType::L1},
     {false},
     {true},
     {false},
@@ -1455,29 +1469,30 @@ inline std::vector<AnnCagraInputs> generate_inputs()
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // Additional distances tested with a single search algo.
-  // inputs2 = raft::util::itertools::product<AnnCagraInputs>(
-  //   {1, 100},
-  //   {1000},
-  //   {8},
-  //   {1, 16},  // k
-  //   {graph_build_algo::NN_DESCENT},
-  //   {search_algo::SINGLE_CTA},
-  //   {0},  // query size
-  //   {0},
-  //   {256},
-  //   {1},
-  //   {cuvs::distance::DistanceType::InnerProduct,
-  //    cuvs::distance::DistanceType::BitwiseHamming,
-  //    cuvs::distance::DistanceType::CosineExpanded},
-  //   {false},
-  //   {true},
-  //   {false},
-  //   {0.995},
-  //   {std::optional<float>{std::nullopt}},
-  //   {std::optional<vpq_params>{std::nullopt}},
-  //   {std::optional<bool>{std::nullopt}},
-  //   {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL});
-  // inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
+  inputs2 = raft::util::itertools::product<AnnCagraInputs>(
+    {1, 100},
+    {1000},
+    {8},
+    {1, 16},  // k
+    {graph_build_algo::NN_DESCENT},
+    {search_algo::SINGLE_CTA},
+    {0},  // query size
+    {0},
+    {256},
+    {1},
+    {cuvs::distance::DistanceType::InnerProduct,
+     cuvs::distance::DistanceType::BitwiseHamming,
+     cuvs::distance::DistanceType::CosineExpanded,
+     cuvs::distance::DistanceType::L1},
+    {false},
+    {true},
+    {false},
+    {0.995},
+    {std::optional<float>{std::nullopt}},
+    {std::optional<vpq_params>{std::nullopt}},
+    {std::optional<bool>{std::nullopt}},
+    {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL});
+  inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // // Corner cases for small datasets
   // inputs2 = raft::util::itertools::product<AnnCagraInputs>(
@@ -1517,7 +1532,10 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},
     {64},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded},
+    {cuvs::distance::DistanceType::L2Expanded,
+     cuvs::distance::DistanceType::InnerProduct,
+     cuvs::distance::DistanceType::BitwiseHamming,
+     cuvs::distance::DistanceType::L1},
     {false},
     {true},
     {false},
@@ -1530,59 +1548,61 @@ inline std::vector<AnnCagraInputs> generate_inputs()
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // Varying team_size, graph_build_algo
-  // inputs2 = raft::util::itertools::product<AnnCagraInputs>(
-  //   {100},
-  //   {1000},
-  //   {64},
-  //   {16},
-  //   {graph_build_algo::IVF_PQ,
-  //    graph_build_algo::NN_DESCENT,
-  //    graph_build_algo::ITERATIVE_CAGRA_SEARCH},
-  //   {search_algo::AUTO},
-  //   {10},
-  //   {0},  // team_size
-  //   {64},
-  //   {1},
-  //   {cuvs::distance::DistanceType::L2Expanded,
-  //    cuvs::distance::DistanceType::InnerProduct,
-  //    cuvs::distance::DistanceType::BitwiseHamming,
-  //    cuvs::distance::DistanceType::CosineExpanded},
-  //   {false},
-  //   {false},
-  //   {false},
-  //   {0.995},
-  //   {std::optional<float>{std::nullopt}},
-  //   {std::optional<vpq_params>{std::nullopt}},
-  //   {std::optional<bool>{std::nullopt}},
-  //   {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
-  //    cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL});
-  // inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
+  inputs2 = raft::util::itertools::product<AnnCagraInputs>(
+    {100},
+    {1000},
+    {64},
+    {16},
+    {graph_build_algo::IVF_PQ,
+     graph_build_algo::NN_DESCENT,
+     graph_build_algo::ITERATIVE_CAGRA_SEARCH},
+    {search_algo::AUTO},
+    {10},
+    {0},  // team_size
+    {64},
+    {1},
+    {cuvs::distance::DistanceType::L2Expanded,
+     cuvs::distance::DistanceType::InnerProduct,
+     cuvs::distance::DistanceType::BitwiseHamming,
+     cuvs::distance::DistanceType::CosineExpanded,
+     cuvs::distance::DistanceType::L1},
+    {false},
+    {false},
+    {false},
+    {0.995},
+    {std::optional<float>{std::nullopt}},
+    {std::optional<vpq_params>{std::nullopt}},
+    {std::optional<bool>{std::nullopt}},
+    {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
+     cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL});
+  inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
-  // // Vary team size only.
-  // inputs2 = raft::util::itertools::product<AnnCagraInputs>(
-  //   {100},
-  //   {1000},
-  //   {64},
-  //   {16},
-  //   {graph_build_algo::NN_DESCENT},
-  //   {search_algo::AUTO},
-  //   {10},
-  //   {8, 16, 32},  // team_size
-  //   {64},
-  //   {1},
-  //   {cuvs::distance::DistanceType::L2Expanded,
-  //    cuvs::distance::DistanceType::InnerProduct,
-  //    cuvs::distance::DistanceType::BitwiseHamming,
-  //    cuvs::distance::DistanceType::CosineExpanded},
-  //   {false},
-  //   {false},
-  //   {false},
-  //   {0.995},
-  //   {std::optional<float>{std::nullopt}},
-  //   {std::optional<vpq_params>{std::nullopt}},
-  //   {std::optional<bool>{std::nullopt}},
-  //   {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL});
-  // inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
+  // Vary team size only.
+  inputs2 = raft::util::itertools::product<AnnCagraInputs>(
+    {100},
+    {1000},
+    {64},
+    {16},
+    {graph_build_algo::NN_DESCENT},
+    {search_algo::AUTO},
+    {10},
+    {8, 16, 32},  // team_size
+    {64},
+    {1},
+    {cuvs::distance::DistanceType::L2Expanded,
+     cuvs::distance::DistanceType::InnerProduct,
+     cuvs::distance::DistanceType::BitwiseHamming,
+     cuvs::distance::DistanceType::CosineExpanded,
+     cuvs::distance::DistanceType::L1},
+    {false},
+    {false},
+    {false},
+    {0.995},
+    {std::optional<float>{std::nullopt}},
+    {std::optional<vpq_params>{std::nullopt}},
+    {std::optional<bool>{std::nullopt}},
+    {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL});
+  inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // // Varying n_rows, host_dataset
   // inputs2 = raft::util::itertools::product<AnnCagraInputs>(
@@ -1715,7 +1735,8 @@ inline std::vector<AnnCagraInputs> generate_addnode_inputs()
                                                    {1},
                                                    {cuvs::distance::DistanceType::L2Expanded,
                                                     cuvs::distance::DistanceType::InnerProduct,
-                                                    cuvs::distance::DistanceType::BitwiseHamming},
+                                                    cuvs::distance::DistanceType::BitwiseHamming,
+                                                    cuvs::distance::DistanceType::L1},
                                                    {false},
                                                    {true},
                                                    {true},
