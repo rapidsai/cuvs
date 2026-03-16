@@ -776,13 +776,13 @@ if(NOT BUILD_CPU_ONLY)
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
-             CUDA::cuda_driver
       PRIVATE
         $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
         $<COMPILE_ONLY:nvidia::cutlass::cutlass>
         $<COMPILE_ONLY:cuco::cuco>
         $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
         $<$<BOOL:${JIT_LTO_COMPILATION}>:$<LINK_LIBRARY:WHOLE_ARCHIVE,cuvs::cuvs_jit_lto_kernels>>
+        CUDA::cuda_driver
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
@@ -839,7 +839,6 @@ SECTIONS
              ${CUVS_CTK_MATH_DEPENDENCIES}
              $<TARGET_NAME_IF_EXISTS:NCCL::NCCL> # needs to be public for DT_NEEDED
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>> # header only
-             CUDA::cuda_driver
       PRIVATE
         $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
         $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
@@ -847,6 +846,7 @@ SECTIONS
         $<COMPILE_ONLY:nvidia::cutlass::cutlass>
         $<COMPILE_ONLY:cuco::cuco>
         $<$<BOOL:${JIT_LTO_COMPILATION}>:$<LINK_LIBRARY:WHOLE_ARCHIVE,cuvs::cuvs_jit_lto_kernels>>
+        CUDA::cuda_driver
     )
   endif()
 
