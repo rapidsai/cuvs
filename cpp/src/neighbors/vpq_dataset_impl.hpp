@@ -99,9 +99,9 @@ class vpq_dataset_impl : public vpq_dataset_iface<MathT, IdxT> {
  */
 template <typename MathT, typename IdxT>
 class vpq_dataset_owning : public vpq_dataset_impl<MathT, IdxT> {
-  public:
-   using index_type = IdxT;
-   using math_type  = MathT;
+ public:
+  using index_type = IdxT;
+  using math_type  = MathT;
 
   /**
    * @brief Construct an owning vpq_dataset by moving in the codebooks and data.

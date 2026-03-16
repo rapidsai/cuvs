@@ -238,6 +238,67 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
     check_reconstruction(pq, d_quantized_output.view(), d_vq_labels_view, compression_ratio, 500);
   }
 
+  void testViewQuantizer()
+  {
+    params config{params_.pq_bits, params_.pq_dim, true, false};
+
+    if ((n_samples_ < (1 << params_.pq_bits)) || (n_features_ % params_.pq_dim != 0) ||
+        (static_cast<uint32_t>(n_samples_) < params_.n_vq_centers)) {
+      EXPECT_THROW(build(handle, config, raft::make_const_mdspan(dataset_.view())),
+                   raft::logic_error);
+      return;
+    }
+    auto owning_quant = build(handle, config, raft::make_const_mdspan(dataset_.view()));
+
+    auto pq_centers_view = owning_quant.vpq_codebooks.pq_code_book();
+    auto vq_centers_view = owning_quant.vpq_codebooks.vq_code_book();
+
+    auto view_quant =
+      build(handle, owning_quant.params_quantizer, pq_centers_view, vq_centers_view);
+
+    auto n_encoded_cols = get_quantized_dim(owning_quant.params_quantizer);
+    auto codes_owning =
+      raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, n_encoded_cols);
+    transform(handle,
+              owning_quant,
+              raft::make_const_mdspan(dataset_.view()),
+              codes_owning.view(),
+              std::nullopt);
+
+    auto codes_view =
+      raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, n_encoded_cols);
+    transform(handle,
+              view_quant,
+              raft::make_const_mdspan(dataset_.view()),
+              codes_view.view(),
+              std::nullopt);
+
+    cuvs::devArrMatch(codes_owning.data_handle(),
+                      codes_view.data_handle(),
+                      n_samples_ * n_encoded_cols,
+                      cuvs::Compare<uint8_t>());
+
+    auto reconstructed_owning =
+      raft::make_device_matrix<float, int64_t>(handle, n_samples_, n_features_);
+    auto reconstructed_view =
+      raft::make_device_matrix<float, int64_t>(handle, n_samples_, n_features_);
+
+    inverse_transform(handle,
+                      owning_quant,
+                      raft::make_const_mdspan(codes_owning.view()),
+                      reconstructed_owning.view(),
+                      std::nullopt);
+    inverse_transform(handle,
+                      view_quant,
+                      raft::make_const_mdspan(codes_view.view()),
+                      reconstructed_view.view(),
+                      std::nullopt);
+    cuvs::devArrMatch(reconstructed_owning.data_handle(),
+                      reconstructed_view.data_handle(),
+                      n_samples_ * n_features_,
+                      cuvs::Compare<float>());
+  }
+
  private:
   raft::resources handle;
   cudaStream_t stream;
@@ -367,148 +428,9 @@ const std::vector<ProductQuantizationInputs<T>> inputs = {
 
 typedef ProductQuantizationTest<float> ProductQuantizationTestF;
 TEST_P(ProductQuantizationTestF, Result) { this->testProductQuantizationFromDataset(); }
-
+TEST_P(ProductQuantizationTestF, ViewQuantizer) { this->testViewQuantizer(); }
 INSTANTIATE_TEST_CASE_P(ProductQuantizationTests,
                         ProductQuantizationTestF,
                         ::testing::ValuesIn(inputs<float>));
-
-// Test for view-type quantizer
-class ProductQuantizationViewTest : public ::testing::Test {
- public:
-  ProductQuantizationViewTest()
-    : handle{},
-      stream{raft::resource::get_cuda_stream(handle)},
-      n_samples_{1000},
-      n_features_{128},
-      pq_bits_{8},
-      pq_dim_{32},
-      dataset_{raft::make_device_matrix<float, int64_t>(handle, n_samples_, n_features_)}
-  {
-  }
-
- protected:
-  void SetUp() override
-  {
-    // Generate random dataset
-    auto labels = raft::make_device_vector<int64_t, int64_t>(handle, n_samples_);
-    raft::random::make_blobs<float, int64_t>(handle,
-                                             dataset_.view(),
-                                             labels.view(),
-                                             5,
-                                             std::nullopt,
-                                             std::nullopt,
-                                             1.0f,
-                                             true,
-                                             -10.0f,
-                                             10.0f,
-                                             42ULL);
-    raft::resource::sync_stream(handle);
-  }
-
-  void testViewQuantizerProducesSameResultsAsOwning()
-  {
-    // Build owning quantizer
-    params config{pq_bits_, pq_dim_, true /* use_subspaces */, false /* use_vq */};
-    auto owning_quant = build(handle, config, raft::make_const_mdspan(dataset_.view()));
-
-    // Extract codebook views from owning quantizer using accessor methods
-    auto pq_centers_view = owning_quant.vpq_codebooks.pq_code_book();
-    auto vq_centers_view = owning_quant.vpq_codebooks.vq_code_book();
-
-    // Create view-type quantizer from the same codebooks
-    auto view_quant =
-      build(handle, owning_quant.params_quantizer, pq_centers_view, vq_centers_view);
-
-    // Transform using owning quantizer
-    auto n_encoded_cols = get_quantized_dim(owning_quant.params_quantizer);
-    auto codes_owning =
-      raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, n_encoded_cols);
-    transform(handle,
-              owning_quant,
-              raft::make_const_mdspan(dataset_.view()),
-              codes_owning.view(),
-              std::nullopt);
-
-    // Transform using view-type quantizer
-    auto codes_view =
-      raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, n_encoded_cols);
-    transform(handle,
-              view_quant,
-              raft::make_const_mdspan(dataset_.view()),
-              codes_view.view(),
-              std::nullopt);
-
-    raft::resource::sync_stream(handle);
-
-    // Compare results - should be identical
-    auto h_codes_owning = raft::make_host_matrix<uint8_t, int64_t>(n_samples_, n_encoded_cols);
-    auto h_codes_view   = raft::make_host_matrix<uint8_t, int64_t>(n_samples_, n_encoded_cols);
-    raft::copy(h_codes_owning.data_handle(),
-               codes_owning.data_handle(),
-               n_samples_ * n_encoded_cols,
-               stream);
-    raft::copy(
-      h_codes_view.data_handle(), codes_view.data_handle(), n_samples_ * n_encoded_cols, stream);
-    raft::resource::sync_stream(handle);
-
-    for (int64_t i = 0; i < n_samples_ * n_encoded_cols; i++) {
-      ASSERT_EQ(h_codes_owning.data_handle()[i], h_codes_view.data_handle()[i])
-        << "Mismatch at index " << i;
-    }
-
-    // Test inverse_transform
-    auto reconstructed_owning =
-      raft::make_device_matrix<float, int64_t>(handle, n_samples_, n_features_);
-    auto reconstructed_view =
-      raft::make_device_matrix<float, int64_t>(handle, n_samples_, n_features_);
-
-    inverse_transform(handle,
-                      owning_quant,
-                      raft::make_const_mdspan(codes_owning.view()),
-                      reconstructed_owning.view(),
-                      std::nullopt);
-    inverse_transform(handle,
-                      view_quant,
-                      raft::make_const_mdspan(codes_view.view()),
-                      reconstructed_view.view(),
-                      std::nullopt);
-
-    raft::resource::sync_stream(handle);
-
-    // Compare reconstructions
-    auto h_rec_owning = raft::make_host_matrix<float, int64_t>(n_samples_, n_features_);
-    auto h_rec_view   = raft::make_host_matrix<float, int64_t>(n_samples_, n_features_);
-    raft::copy(h_rec_owning.data_handle(),
-               reconstructed_owning.data_handle(),
-               n_samples_ * n_features_,
-               stream);
-    raft::copy(
-      h_rec_view.data_handle(), reconstructed_view.data_handle(), n_samples_ * n_features_, stream);
-    raft::resource::sync_stream(handle);
-
-    for (int64_t i = 0; i < n_samples_ * n_features_; i++) {
-      ASSERT_FLOAT_EQ(h_rec_owning.data_handle()[i], h_rec_view.data_handle()[i])
-        << "Reconstruction mismatch at index " << i;
-    }
-
-    // Verify that the owning quantizer reports is_owning() = true
-    // and the view quantizer reports is_owning() = false
-    ASSERT_TRUE(owning_quant.vpq_codebooks.is_owning());
-    ASSERT_FALSE(view_quant.vpq_codebooks.is_owning());
-  }
-
-  raft::resources handle;
-  cudaStream_t stream;
-  int64_t n_samples_;
-  int64_t n_features_;
-  uint32_t pq_bits_;
-  uint32_t pq_dim_;
-  raft::device_matrix<float, int64_t, raft::row_major> dataset_;
-};
-
-TEST_F(ProductQuantizationViewTest, ViewQuantizerProducesSameResults)
-{
-  testViewQuantizerProducesSameResultsAsOwning();
-}
 
 }  // namespace cuvs::preprocessing::quantize::pq
