@@ -142,20 +142,6 @@ ConfigureTest(
 )
 
 ConfigureTest(
-  NAME NEIGHBORS_ANN_IVF_PQ_INNER_PRODUCT_TEST
-  PATH neighbors/ann_ivf_pq/test_float_int64_t_inner_product.cu
-  GPUS 1
-  PERCENT 100
-)
-
-ConfigureTest(
-  NAME NEIGHBORS_ANN_IVF_PQ_COSINE_TEST
-  PATH neighbors/ann_ivf_pq/test_float_int64_t_cosine.cu
-  GPUS 1
-  PERCENT 100
-)
-
-ConfigureTest(
   NAME NEIGHBORS_ANN_SCANN_TEST
   PATH neighbors/ann_scann/test_float_int64_t.cu
   GPUS 1

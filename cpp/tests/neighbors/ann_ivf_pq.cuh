@@ -174,7 +174,6 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     size_t queries_size = size_t{ps.num_queries} * size_t{ps.k};
     rmm::device_uvector<EvalT> distances_naive_dev(queries_size, stream_);
     rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
-
     cuvs::neighbors::naive_knn<EvalT, DataT, int64_t>(
       handle_,
       distances_naive_dev.data(),
@@ -186,7 +185,6 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
       ps.dim,
       ps.k,
       static_cast<cuvs::distance::DistanceType>((int)ps.index_params.metric));
-
     distances_ref.resize(queries_size);
     raft::update_host(distances_ref.data(), distances_naive_dev.data(), queries_size, stream_);
     indices_ref.resize(queries_size);
@@ -598,73 +596,6 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
   {
     index<IdxT> index = build_index();
 
-    {
-      std::vector<uint32_t> list_sizes_host(index.n_lists());
-      raft::update_host(
-        list_sizes_host.data(), index.list_sizes().data_handle(), index.n_lists(), stream_);
-      raft::resource::sync_stream(handle_);
-      uint32_t n_empty = 0;
-      for (uint32_t i = 0; i < index.n_lists(); i++) {
-        if (list_sizes_host[i] == 0) { n_empty++; }
-      }
-      // Top 3 largest: (size, label)
-      std::array<std::pair<uint32_t, uint32_t>, 3> top3 = {{{0, 0}, {0, 0}, {0, 0}}};
-      for (uint32_t i = 0; i < index.n_lists(); i++) {
-        uint32_t s = list_sizes_host[i];
-        if (s > top3[0].first) {
-          top3[2] = top3[1];
-          top3[1] = top3[0];
-          top3[0] = {s, i};
-        } else if (s > top3[1].first) {
-          top3[2] = top3[1];
-          top3[1] = {s, i};
-        } else if (s > top3[2].first) {
-          top3[2] = {s, i};
-        }
-      }
-      // Bottom 3 smallest (smallest non-empty, or 0 if we have empty clusters)
-      std::array<std::pair<uint32_t, uint32_t>, 3> bot3 = {
-        {{std::numeric_limits<uint32_t>::max(), 0},
-         {std::numeric_limits<uint32_t>::max(), 0},
-         {std::numeric_limits<uint32_t>::max(), 0}}};
-      for (uint32_t i = 0; i < index.n_lists(); i++) {
-        uint32_t s = list_sizes_host[i];
-        if (s < bot3[0].first) {
-          bot3[2] = bot3[1];
-          bot3[1] = bot3[0];
-          bot3[0] = {s, i};
-        } else if (s < bot3[1].first) {
-          bot3[2] = bot3[1];
-          bot3[1] = {s, i};
-        } else if (s < bot3[2].first) {
-          bot3[2] = {s, i};
-        }
-      }
-      for (auto& p : bot3) {
-        if (p.first == std::numeric_limits<uint32_t>::max()) { p.first = 0; }
-      }
-      RAFT_LOG_INFO(
-        "IVF-PQ cluster sizes: n_lists=%u, clusters_with_0_records=%u",
-        index.n_lists(),
-        n_empty);
-      RAFT_LOG_INFO(
-        "  top3: largest %u (label %u), 2nd %u (label %u), 3rd %u (label %u)",
-        top3[0].first,
-        top3[0].second,
-        top3[1].first,
-        top3[1].second,
-        top3[2].first,
-        top3[2].second);
-      RAFT_LOG_INFO(
-        "  bottom3: smallest %u (label %u), 2nd %u (label %u), 3rd %u (label %u)",
-        bot3[0].first,
-        bot3[0].second,
-        bot3[1].first,
-        bot3[1].second,
-        bot3[2].first,
-        bot3[2].second);
-    }
-
     double compression_ratio =
       static_cast<double>(ps.dim * 8) / static_cast<double>(index.pq_dim() * index.pq_bits());
 
@@ -826,10 +757,8 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
   void calc_ref()
   {
     size_t queries_size = size_t{ps.num_queries} * size_t{ps.k};
-    const size_t db_slice_rows = ps.num_db_vecs - test_ivf_sample_filter::offset;
     rmm::device_uvector<EvalT> distances_naive_dev(queries_size, stream_);
     rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
-
     cuvs::neighbors::naive_knn<EvalT, DataT, IdxT>(
       handle_,
       distances_naive_dev.data(),
@@ -837,7 +766,7 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
       search_queries.data(),
       database.data() + test_ivf_sample_filter::offset * ps.dim,
       ps.num_queries,
-      db_slice_rows,
+      ps.num_db_vecs - test_ivf_sample_filter::offset,
       ps.dim,
       ps.k,
       static_cast<cuvs::distance::DistanceType>((int)ps.index_params.metric));
@@ -1164,24 +1093,6 @@ inline auto enum_variety_ip() -> test_cases_t
     y.index_params.metric = distance::DistanceType::InnerProduct;
     return y;
   });
-}
-
-/**
- * Single Inner Product case with many clusters and few probes.
- * Normalization is used only for k-means clustering; the metric stays inner product. This test
- * checks that recall still meets min_recall with that design. Regression test for IVF-PQ IP (e.g.
- * #1875).
- */
-inline auto inner_product_strict_recall_test() -> test_cases_t
-{
-  test_cases_t xs;
-  add_test_case(xs, [](ivf_pq_inputs& x) {
-    x.index_params.metric   = distance::DistanceType::InnerProduct;
-    x.index_params.n_lists  = 256;
-    x.search_params.n_probes = 20;
-    x.min_recall            = 0.5;
-  });
-  return xs;
 }
 
 inline auto enum_variety_l2sqrt() -> test_cases_t

@@ -126,9 +126,7 @@ void select_residuals(raft::resources const& handle,
  * The residual has the form
  *  `rotation_matrix %* (dataset[:, :] - centers[labels[:], 0:dim])`
  *
- * For cosine metric, normalizes the data after type conversion before computing residuals so
- * that stored vectors and queries use the same (normalized) space. For inner product, we do not
- * normalize so the metric stays inner product (normalization is used only for k-means clustering).
+ * For cosine metric, normalizes the data after type conversion before computing residuals.
  */
 template <typename T, typename IdxT>
 void flat_compute_residuals(
