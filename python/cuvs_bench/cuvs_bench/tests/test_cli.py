@@ -3,12 +3,18 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+import platform
 from pathlib import Path
 
 import pandas as pd
 import pytest
 from click.testing import CliRunner
 from cuvs_bench.get_dataset.__main__ import main
+
+
+def is_arm_cpu():
+    """Check if running on ARM Linux architecture."""
+    return platform.machine() in ("aarch64", "arm64")
 
 
 @pytest.fixture(scope="session")
@@ -64,6 +70,12 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
 
     from cuvs_bench.run.__main__ import main as run_main
 
+    # Skip diskann_memory on ARM Linux (not supported)
+    skip_diskann = is_arm_cpu()
+    algorithms = "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq,cuvs_vamana"
+    if not skip_diskann:
+        algorithms += ",diskann_memory"
+
     runner = CliRunner()
     run_args = [
         "--dataset",
@@ -71,7 +83,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         "--dataset-path",
         dataset_path_arg,
         "--algorithms",
-        "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq,cuvs_vamana,diskann_memory",  # noqa: E501
+        algorithms,
         "--batch-size",
         "100",
         "-k",
@@ -106,6 +118,8 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
     ]
 
     # --- Verify that the expected result files exist and are not empty ---
+    skip_diskann = is_arm_cpu()
+    
     expected_files = {
         # Build files:
         "test-data/result/build/cuvs_ivf_flat,test.csv": {
@@ -167,16 +181,6 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
                 "alpha",
                 "graph_degree",
                 "visited_size",
-            ],
-            "rows": 1,
-        },
-        "test-data/result/build/diskann_memory,test.csv": {
-            "header": common_build_header
-            + [
-                "L_build",
-                "R",
-                "alpha",
-                "num_threads",
             ],
             "rows": 1,
         },
@@ -499,61 +503,75 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
             ],
             "rows": 1,
         },
-        "test-data/result/search/diskann_memory,test,k10,bs100,raw.csv": {
-            "header": common_search_header
-            + [
-                "L_search",
-                "end_to_end",
-                "k",
-                "n_queries",
-                "total_queries",
-                "build time",
-                "build threads",
-                "build cpu_time",
-                "L_build",
-                "R",
-                "alpha",
-                "build_num_threads",
-            ],
-            "rows": 1,
-        },
-        "test-data/result/search/diskann_memory,test,k10,bs100,latency.csv": {
-            "header": common_search_header
-            + [
-                "L_search",
-                "end_to_end",
-                "k",
-                "n_queries",
-                "total_queries",
-                "build time",
-                "build threads",
-                "build cpu_time",
-                "L_build",
-                "R",
-                "alpha",
-                "build_num_threads",
-            ],
-            "rows": 1,
-        },
-        "test-data/result/search/diskann_memory,test,k10,bs100,throughput.csv": {
-            "header": common_search_header
-            + [
-                "L_search",
-                "end_to_end",
-                "k",
-                "n_queries",
-                "total_queries",
-                "build time",
-                "build threads",
-                "build cpu_time",
-                "L_build",
-                "R",
-                "alpha",
-                "build_num_threads",
-            ],
-            "rows": 1,
-        },
     }
+    
+    if not skip_diskann:
+        expected_files.update({
+            "test-data/result/build/diskann_memory,test.csv": {
+                "header": common_build_header
+                + [
+                    "L_build",
+                    "R",
+                    "alpha",
+                    "num_threads",
+                ],
+                "rows": 1,
+            },
+            "test-data/result/search/diskann_memory,test,k10,bs100,raw.csv": {
+                "header": common_search_header
+                + [
+                    "L_search",
+                    "end_to_end",
+                    "k",
+                    "n_queries",
+                    "total_queries",
+                    "build time",
+                    "build threads",
+                    "build cpu_time",
+                    "L_build",
+                    "R",
+                    "alpha",
+                    "build_num_threads",
+                ],
+                "rows": 1,
+            },
+            "test-data/result/search/diskann_memory,test,k10,bs100,latency.csv": {
+                "header": common_search_header
+                + [
+                    "L_search",
+                    "end_to_end",
+                    "k",
+                    "n_queries",
+                    "total_queries",
+                    "build time",
+                    "build threads",
+                    "build cpu_time",
+                    "L_build",
+                    "R",
+                    "alpha",
+                    "build_num_threads",
+                ],
+                "rows": 1,
+            },
+            "test-data/result/search/diskann_memory,test,k10,bs100,throughput.csv": {
+                "header": common_search_header
+                + [
+                    "L_search",
+                    "end_to_end",
+                    "k",
+                    "n_queries",
+                    "total_queries",
+                    "build time",
+                    "build threads",
+                    "build cpu_time",
+                    "L_build",
+                    "R",
+                    "alpha",
+                    "build_num_threads",
+                ],
+                "rows": 1,
+            },
+        })
 
     for rel_path, expectations in expected_files.items():
         file_path = temp_datasets_dir / rel_path
@@ -596,6 +614,11 @@ def test_plot_command_creates_png_files(temp_datasets_dir: Path):
 
     from cuvs_bench.plot.__main__ import main as plot_main
 
+    skip_diskann = is_arm_cpu()
+    algorithms = "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq,cuvs_vamana"
+    if not skip_diskann:
+        algorithms += ",diskann_memory"
+
     runner = CliRunner()
     args = [
         "--dataset",
@@ -605,7 +628,7 @@ def test_plot_command_creates_png_files(temp_datasets_dir: Path):
         "--output-filepath",
         dataset_path_arg,
         "--algorithms",
-        "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq,cuvs_vamana,diskann_memory",  # noqa: E501
+        algorithms,
         "--batch-size",
         "100",
         "-k",
