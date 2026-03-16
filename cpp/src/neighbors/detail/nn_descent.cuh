@@ -561,6 +561,7 @@ struct DistAccumulator {
   __device__ __forceinline__ float operator()(float a, float b) const
   {
     if (metric == cuvs::distance::DistanceType::L1) { return raft::abs(a - b); }
+    // dot product: reused by IP, cosine, and L2 (postprocessed in calculate_metric)
     return a * b;
   }
 };
@@ -1413,6 +1414,11 @@ template <typename DistEpilogue_t>
 void GNND<Data_t, Index_t>::local_join(cudaStream_t stream, DistEpilogue_t dist_epilogue)
 {
   raft::matrix::fill(res, dists_buffer_.view(), std::numeric_limits<float>::max());
+
+  // Kernel dispatch logic:
+  //   fp32 data                  -> SIMT (metric resolved at runtime inside the kernel)
+  //   fp16 data + L1 distance    -> SIMT (L1 needs element-wise ops, cannot use tensor cores)
+  //   fp16 data + other metrics  -> WMMA (tensor-core accelerated dot product)
   if (d_data_float_.has_value()) {
     local_join_kernel_simt<<<nrow_, BLOCK_SIZE, 0, stream>>>(graph_.h_graph_new.data_handle(),
                                                              h_rev_graph_new_.data_handle(),
