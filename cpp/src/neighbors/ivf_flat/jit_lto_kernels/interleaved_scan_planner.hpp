@@ -8,16 +8,21 @@
 #include <cuvs/detail/jit_lto/AlgorithmPlanner.hpp>
 #include <cuvs/detail/jit_lto/FragmentDatabase.hpp>
 #include <cuvs/detail/jit_lto/MakeFragmentKey.hpp>
+#include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>
 #include <iostream>
 #include <string>
 
-template <typename... Args>
+template <typename DataTypeTag, typename AccTypeTag, typename IdxTypeTag>
 struct InterleavedScanPlanner : AlgorithmPlanner {
   InterleavedScanPlanner(int Capacity, int Veclen, bool Ascending, bool ComputeNorm)
-    : AlgorithmPlanner("interleaved_scan_kernel_capacity_" + std::to_string(Capacity) + "_veclen_" +
+    : AlgorithmPlanner("interleaved_scan_capacity_" + std::to_string(Capacity) + "_veclen_" +
                          std::to_string(Veclen) + "_" + (Ascending ? "ascending" : "descending") +
-                         "_" + (ComputeNorm ? "compute_norm" : "no_compute_norm"),
-                       make_fragment_key<Args...>())
+                         "_" + (ComputeNorm ? "compute_norm" : "no_compute_norm") + "_data_" +
+                         cuvs::neighbors::ivf_flat::detail::tag_abbrev<DataTypeTag>::value +
+                         "_acc_" +
+                         cuvs::neighbors::ivf_flat::detail::tag_abbrev<AccTypeTag>::value +
+                         "_idx_" + cuvs::neighbors::ivf_flat::detail::tag_abbrev<IdxTypeTag>::value,
+                       "interleaved_scan")
   {
   }
 
