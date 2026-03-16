@@ -440,10 +440,10 @@ if(NOT BUILD_CPU_ONLY)
       ${metric_files}
       ${filter_files}
       ${post_lambda_files}
-      src/detail/jit_lto/AlgorithmLauncher.cu
-      src/detail/jit_lto/AlgorithmPlanner.cu
-      src/detail/jit_lto/FragmentDatabase.cu
-      src/detail/jit_lto/FragmentEntry.cu
+      src/detail/jit_lto/AlgorithmLauncher.cpp
+      src/detail/jit_lto/AlgorithmPlanner.cpp
+      src/detail/jit_lto/FragmentDatabase.cpp
+      src/detail/jit_lto/FragmentEntry.cpp
       src/detail/jit_lto/nvjitlink_checker.cpp
     )
     set_target_properties(
