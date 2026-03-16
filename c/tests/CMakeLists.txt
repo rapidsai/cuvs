@@ -1,6 +1,6 @@
 # =============================================================================
 # cmake-format: off
-# SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 # cmake-format: on
 # =============================================================================
@@ -94,7 +94,7 @@ endif()
 
 ConfigureTest(NAME cuvs_c_headers PATH core/headers.c)
 ConfigureTest(NAME cuvs_c_test PATH core/c_api.c)
-target_link_libraries(cuvs_c_test PRIVATE CUDA::cudart_static)
+target_link_libraries(cuvs_c_test PRIVATE CUDA::cudart)
 ConfigureTest(NAME cuvs_c_neighbors_test PATH neighbors/c_api.c)
 
 # ##################################################################################################
