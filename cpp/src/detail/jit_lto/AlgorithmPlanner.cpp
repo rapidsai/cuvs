@@ -15,7 +15,9 @@
 
 #include <cuvs/detail/jit_lto/AlgorithmPlanner.hpp>
 #include <cuvs/detail/jit_lto/FragmentDatabase.hpp>
+#include <cuvs/detail/jit_lto/cu_try.hpp>
 
+#include "cuda.h"
 #include "cuda_runtime.h"
 #include "nvJitLink.h"
 
@@ -69,12 +71,12 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::get_launcher()
 
 std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
 {
-  int device = 0;
-  int major  = 0;
-  int minor  = 0;
-  RAFT_CUDA_TRY(cudaGetDevice(&device));
-  RAFT_CUDA_TRY(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
-  RAFT_CUDA_TRY(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
+  CUdevice device;
+  int major = 0;
+  int minor = 0;
+  CU_TRY(cuDeviceGet(&device, 0));
+  CU_TRY(cuDeviceGetAttribute(&major, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, device));
+  CU_TRY(cuDeviceGetAttribute(&minor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, device));
 
   std::string archs = "-arch=sm_" + std::to_string((major * 10 + minor));
 
@@ -106,12 +108,14 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
   RAFT_EXPECTS(result == NVJITLINK_SUCCESS, "nvJitLinkDestroy failed");
 
   // cubin is linked, so now load it
-  cudaLibrary_t library;
-  RAFT_CUDA_TRY(
-    cudaLibraryLoadData(&library, cubin.get(), nullptr, nullptr, 0, nullptr, nullptr, 0));
+  CUlibrary library;
+  CU_TRY(cuLibraryLoadData(&library, cubin.get(), nullptr, nullptr, 0, nullptr, nullptr, 0));
 
-  cudaKernel_t kernel;
-  RAFT_CUDA_TRY(cudaLibraryGetKernel(&kernel, library, this->entrypoint.c_str()));
+  CUkernel kernel;
+  CU_TRY(cuLibraryGetKernel(&kernel, library, this->entrypoint.c_str()));
 
-  return std::make_shared<AlgorithmLauncher>(kernel, library);
+  CUfunction function;
+  CU_TRY(cuKernelGetFunction(&function, kernel));
+
+  return std::make_shared<AlgorithmLauncher>(function, library);
 }
