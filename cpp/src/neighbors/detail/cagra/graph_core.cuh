@@ -171,55 +171,37 @@ __global__ void kern_sort(const DATA_T* const dataset,  // [dataset_chunk_size, 
   }
 }
 
-template <class IdxT>
-__global__ void kern_make_rev_graph(const IdxT* const dest_nodes,     // [graph_size]
-                                    IdxT* const rev_graph,            // [size, degree]
-                                    uint32_t* const rev_graph_count,  // [graph_size]
-                                    const uint32_t graph_size,
-                                    const uint32_t degree)
-{
-  const uint32_t tid  = threadIdx.x + (blockDim.x * blockIdx.x);
-  const uint32_t tnum = blockDim.x * gridDim.x;
-
-  for (uint32_t src_id = tid; src_id < graph_size; src_id += tnum) {
-    const IdxT dest_id = dest_nodes[src_id];
-    if (dest_id >= graph_size) continue;
-
-    const uint32_t pos = atomicAdd(rev_graph_count + dest_id, 1);
-    if (pos < degree) { rev_graph[pos + ((uint64_t)degree * dest_id)] = src_id; }
-  }
-}
-
-template <typename IdxT>
-__global__ void kern_make_rev_graph_k(const IdxT* const output_graph,   // [graph_size, degree]
-                                      IdxT* const rev_graph,            // [graph_size, degree]
-                                      uint32_t* const rev_graph_count,  // [graph_size]
-                                      const uint32_t graph_size,
-                                      const uint32_t degree,
-                                      uint64_t k)
+template <typename IdxT, typename OutputMatrixView>
+__global__ void kern_make_rev_graph_k(
+  OutputMatrixView output_graph,                                // [graph_size, degree]
+  raft::device_matrix_view<IdxT, int64_t> rev_graph,            // [graph_size, degree]
+  raft::device_vector_view<uint32_t, int64_t> rev_graph_count,  // [graph_size]
+  uint64_t k)
 {
   const uint64_t tid  = threadIdx.x + (blockDim.x * blockIdx.x);
   const uint64_t tnum = blockDim.x * gridDim.x;
 
+  const uint64_t graph_size          = rev_graph.extent(0);
+  const uint32_t rev_graph_degree    = rev_graph.extent(1);
+  const uint32_t output_graph_degree = output_graph.extent(1);
+
   for (uint64_t src_id = tid; src_id < graph_size; src_id += tnum) {
-    IdxT dest_id = output_graph[k + (degree * src_id)];
+    IdxT dest_id = output_graph(src_id, k);
     if (dest_id >= graph_size) continue;
 
-    const uint32_t pos = atomicAdd(rev_graph_count + dest_id, 1);
-    if (pos < degree) { rev_graph[(degree * dest_id) + pos] = static_cast<IdxT>(src_id); }
+    const uint32_t pos = atomicAdd(&rev_graph_count(dest_id), 1);
+    if (pos < rev_graph_degree) { rev_graph(dest_id, pos) = static_cast<IdxT>(src_id); }
   }
 }
 
 template <class IdxT, uint32_t num_warps>
-__global__ void kern_fused_prune(const IdxT* const knn_graph,   // [graph_chunk_size, graph_degree]
-                                 IdxT* const output_graph_ptr,  // [batch_size, output_graph_degree]
-                                 const uint32_t graph_size,
-                                 const uint32_t knn_graph_degree,
-                                 const uint32_t output_graph_degree,
-                                 const uint32_t batch_size,
-                                 const uint32_t batch_id,
-                                 uint32_t* const d_invalid_neighbor_list,
-                                 uint64_t* const stats)
+__global__ void kern_fused_prune(
+  raft::device_matrix_view<IdxT, int64_t> knn_graph,     // [graph_chunk_size, graph_degree]
+  raft::device_matrix_view<IdxT, int64_t> output_graph,  // [batch_size, output_graph_degree]
+  const uint32_t batch_size,
+  const uint32_t batch_id,
+  uint32_t* const d_invalid_neighbor_list,
+  uint64_t* const stats)
 {
   extern __shared__ unsigned char smem_buf[];
 
@@ -228,6 +210,10 @@ __global__ void kern_fused_prune(const IdxT* const knn_graph,   // [graph_chunk_
 
   const uint32_t wid     = threadIdx.x / raft::WarpSize;
   const uint32_t lane_id = threadIdx.x % raft::WarpSize;
+
+  const uint64_t graph_size          = knn_graph.extent(0);
+  const uint32_t knn_graph_degree    = knn_graph.extent(1);
+  const uint32_t output_graph_degree = output_graph.extent(1);
 
   IdxT* const smem_indices =
     reinterpret_cast<IdxT*>(smem_buf + wid * knn_graph_degree * sizeof(IdxT));
@@ -239,15 +225,16 @@ __global__ void kern_fused_prune(const IdxT* const knn_graph,   // [graph_chunk_
 
   const uint32_t maxval16 = 0x0000ffff;
 
-  const uint64_t nid_batch = blockIdx.x * num_warps + wid;
-  const uint64_t nid       = nid_batch + (batch_size * batch_id);
+  const uint32_t nid_batch = blockIdx.x * num_warps + wid;
+  const uint64_t nid       = static_cast<uint64_t>(nid_batch) +
+                       (static_cast<uint64_t>(batch_size) * static_cast<uint64_t>(batch_id));
 
   if (nid >= graph_size) { return; }
 
   // Load this node's neighbor row into shared memory to reduce global reads
   for (uint32_t k = lane_id; k < knn_graph_degree; k += raft::WarpSize) {
     smem_num_detour[k] = 0;
-    smem_indices[k]    = knn_graph[k + ((uint64_t)knn_graph_degree * nid)];
+    smem_indices[k]    = knn_graph(nid, k);
     if (smem_indices[k] == nid) {
       // Lower the priority of self-edge
       smem_num_detour[k] = knn_graph_degree;
@@ -260,7 +247,7 @@ __global__ void kern_fused_prune(const IdxT* const knn_graph,   // [graph_chunk_
     const uint64_t iD = smem_indices[kAD];
     if (iD >= graph_size) { continue; }
     for (uint32_t kDB = lane_id; kDB < knn_graph_degree; kDB += raft::WarpSize) {
-      const uint64_t iB_candidate = knn_graph[kDB + ((uint64_t)knn_graph_degree * iD)];
+      const uint64_t iB_candidate = knn_graph(iD, kDB);
       for (uint32_t kAB = kAD + 1; kAB < knn_graph_degree; kAB++) {
         // if ( kDB < kAB )
         {
@@ -321,7 +308,7 @@ __global__ void kern_fused_prune(const IdxT* const knn_graph,   // [graph_chunk_
     }
     __syncwarp();
 
-    if (lane_id == 0) { output_graph_ptr[nid_batch * output_graph_degree + i] = selected_node; }
+    if (lane_id == 0) { output_graph(nid_batch, i) = selected_node; }
   }
 }
 
@@ -353,19 +340,21 @@ __device__ void thread_shift_array(T* array, uint64_t num)
 }
 
 template <typename IdxT, uint32_t num_warps>
-__global__ void kern_merge_graph(IdxT* output_graph,           // [batch_size, output_graph_degree]
-                                 const IdxT* const rev_graph,  // [graph_size, output_graph_degree]
-                                 uint32_t* const rev_graph_count,  // [graph_size]
-                                 const uint32_t graph_size,
-                                 const uint32_t output_graph_degree,
-                                 const IdxT* const mst_graph,  // [batch_size, output_graph_degree]
-                                 const uint32_t mst_graph_degree,
-                                 const uint32_t* const mst_graph_num_edges_ptr,  // [batch_size]
-                                 const uint32_t batch_size,
-                                 const uint32_t batch_id,
-                                 bool guarantee_connectivity,
-                                 bool* check_num_protected_edges)
+__global__ void kern_merge_graph(
+  raft::device_matrix_view<IdxT, int64_t> output_graph,         // [batch_size, output_graph_degree]
+  raft::device_matrix_view<IdxT, int64_t> rev_graph,            // [graph_size, output_graph_degree]
+  raft::device_vector_view<uint32_t, int64_t> rev_graph_count,  // [graph_size]
+  raft::device_matrix_view<IdxT, int64_t> mst_graph,            // [batch_size, output_graph_degree]
+  raft::device_matrix_view<uint32_t, int64_t> mst_graph_num_edges,  // [batch_size, 1]
+  const uint32_t batch_size,
+  const uint32_t batch_id,
+  bool guarantee_connectivity,
+  bool* check_num_protected_edges)
 {
+  const uint64_t graph_size          = rev_graph.extent(0);
+  const uint32_t output_graph_degree = output_graph.extent(1);
+  const uint32_t mst_graph_degree    = mst_graph.extent(1);
+
   extern __shared__ unsigned char smem_buf[];
 
   const uint32_t wid     = threadIdx.x / raft::WarpSize;
@@ -374,23 +363,25 @@ __global__ void kern_merge_graph(IdxT* output_graph,           // [batch_size, o
   IdxT* smem_sorted_output_graph =
     reinterpret_cast<IdxT*>(smem_buf + wid * output_graph_degree * sizeof(IdxT));
 
-  const uint64_t nid_batch = blockIdx.x * num_warps + wid;
-  const uint64_t nid       = nid_batch + (batch_size * batch_id);
+  const uint32_t nid_batch = blockIdx.x * num_warps + wid;
+  const uint64_t nid       = static_cast<uint64_t>(nid_batch) +
+                       (static_cast<uint64_t>(batch_size) * static_cast<uint64_t>(batch_id));
 
   if (nid >= graph_size) { return; }
 
-  const auto mst_graph_num_edges = guarantee_connectivity ? mst_graph_num_edges_ptr[nid_batch] : 0;
+  const auto current_mst_graph_num_edges =
+    guarantee_connectivity ? mst_graph_num_edges(nid_batch, 0) : 0;
   // If guarantee_connectivity == true, use a temporal list to merge the
   // neighbor lists of the graphs.
   if (guarantee_connectivity) {
     for (uint32_t i = lane_id; i < mst_graph_degree; i += raft::WarpSize) {
-      smem_sorted_output_graph[i] = mst_graph[nid_batch * mst_graph_degree + i];
+      smem_sorted_output_graph[i] = mst_graph(nid_batch, i);
     }
     __syncwarp();
-    for (uint32_t pruned_j = 0, output_j = mst_graph_num_edges;
+    for (uint32_t pruned_j = 0, output_j = current_mst_graph_num_edges;
          (pruned_j < output_graph_degree) && (output_j < output_graph_degree);
          pruned_j++) {
-      const auto v     = output_graph[output_graph_degree * nid_batch + pruned_j];
+      const auto v     = output_graph(nid_batch, pruned_j);
       unsigned int dup = 0;
       for (uint32_t m = lane_id; m < output_j; m += raft::WarpSize) {
         if (v == smem_sorted_output_graph[m]) {
@@ -410,36 +401,36 @@ __global__ void kern_merge_graph(IdxT* output_graph,           // [batch_size, o
 
   else {
     for (uint32_t i = lane_id; i < output_graph_degree; i += raft::WarpSize) {
-      smem_sorted_output_graph[i] = output_graph[output_graph_degree * nid_batch + i];
+      smem_sorted_output_graph[i] = output_graph(nid_batch, i);
     }
     __syncwarp();
   }
 
-  const auto num_protected_edges = max(mst_graph_num_edges, output_graph_degree / 2);
+  const auto num_protected_edges = max(current_mst_graph_num_edges, output_graph_degree / 2);
 
   if (num_protected_edges > output_graph_degree) { check_num_protected_edges[0] = false; }
   if (num_protected_edges == output_graph_degree) { return; }
 
-  auto kr = min(rev_graph_count[nid], output_graph_degree);
+  auto kr = min(rev_graph_count(nid), output_graph_degree);
 
   while (kr) {
     kr -= 1;
-    if (rev_graph[kr + (output_graph_degree * nid)] < graph_size) {
-      uint64_t pos = warp_pos_in_array<IdxT>(
-        rev_graph[kr + (output_graph_degree * nid)], smem_sorted_output_graph, output_graph_degree);
+    if (rev_graph(nid, kr) < graph_size) {
+      uint64_t pos =
+        warp_pos_in_array<IdxT>(rev_graph(nid, kr), smem_sorted_output_graph, output_graph_degree);
       if (pos < num_protected_edges) { continue; }
       uint64_t num_shift = pos - num_protected_edges;
       if (pos >= output_graph_degree) { num_shift = output_graph_degree - num_protected_edges - 1; }
       if (lane_id == 0) {
         thread_shift_array<IdxT>(smem_sorted_output_graph + num_protected_edges, num_shift);
-        smem_sorted_output_graph[num_protected_edges] = rev_graph[kr + (output_graph_degree * nid)];
+        smem_sorted_output_graph[num_protected_edges] = rev_graph(nid, kr);
       }
       __syncwarp();
     }
   }
 
   for (uint32_t i = lane_id; i < output_graph_degree; i += raft::WarpSize) {
-    output_graph[(output_graph_degree * nid_batch) + i] = smem_sorted_output_graph[i];
+    output_graph(nid_batch, i) = smem_sorted_output_graph[i];
   }
 }
 
@@ -815,14 +806,11 @@ void merge_graph_gpu(raft::resources const& res,
     auto output_view              = d_output_graph.next_view();
     kern_merge_graph<IdxT, num_warps>
       <<<blocks_merge, threads_merge, merge_smem_size, raft::resource::get_cuda_stream(res)>>>(
-        output_view.data_handle(),
-        d_rev_graph.data_handle(),
-        d_rev_graph_count.data_handle(),
-        static_cast<uint32_t>(graph_size),
-        static_cast<uint32_t>(output_graph_degree),
-        mst_graph_view.data_handle(),
-        static_cast<uint32_t>(output_graph_degree),
-        mst_graph_num_edges_view.data_handle(),
+        output_view,
+        d_rev_graph,
+        d_rev_graph_count,
+        mst_graph_view,
+        mst_graph_num_edges_view,
         batch_size,
         i_batch,
         guarantee_connectivity,
@@ -866,8 +854,7 @@ void make_reverse_graph_gpu(raft::resources const& res,
   raft::matrix::fill(res, d_rev_graph_count, uint32_t(0));
 
   if (is_ptr_host_accessible(output_graph.data_handle())) {
-    auto d_dest_nodes =
-      raft::make_device_mdarray<IdxT>(res, raft::make_extents<int64_t>(graph_size));
+    auto d_dest_nodes = raft::make_device_matrix<IdxT, int64_t>(res, graph_size, 1);
 
     for (uint64_t k = 0; k < output_graph_degree; k++) {
       RAFT_CUDA_TRY(cudaMemcpy2DAsync(d_dest_nodes.data_handle(),
@@ -881,12 +868,8 @@ void make_reverse_graph_gpu(raft::resources const& res,
 
       dim3 threads(256, 1, 1);
       dim3 blocks(1024, 1, 1);
-      kern_make_rev_graph<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
-        d_dest_nodes.data_handle(),
-        d_rev_graph.data_handle(),
-        d_rev_graph_count.data_handle(),
-        graph_size,
-        output_graph_degree);
+      kern_make_rev_graph_k<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
+        d_dest_nodes.view(), d_rev_graph, d_rev_graph_count, 0);
       RAFT_LOG_DEBUG("# Making reverse graph on GPUs: %lu / %u    \r", k, output_graph_degree);
     }
   } else {
@@ -895,12 +878,7 @@ void make_reverse_graph_gpu(raft::resources const& res,
     dim3 blocks(1024, 1, 1);
     for (uint64_t k = 0; k < output_graph_degree; k++) {
       kern_make_rev_graph_k<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
-        output_graph.data_handle(),
-        d_rev_graph.data_handle(),
-        d_rev_graph_count.data_handle(),
-        graph_size,
-        output_graph_degree,
-        k);
+        output_graph, d_rev_graph, d_rev_graph_count, k);
     }
   }
 
@@ -1570,11 +1548,8 @@ void prune_graph_gpu(raft::resources const& res,
     const size_t prune_smem_size = num_warps * knn_graph_degree * (sizeof(IdxT) + sizeof(uint32_t));
     kern_fused_prune<IdxT, num_warps>
       <<<blocks_prune, threads_prune, prune_smem_size, raft::resource::get_cuda_stream(res)>>>(
-        input_view.data_handle(),
-        output_view.data_handle(),
-        graph_size,
-        knn_graph_degree,
-        output_graph_degree,
+        input_view,
+        output_view,
         batch_size,
         i_batch,
         d_invalid_neighbor_list.data_handle(),
