@@ -61,6 +61,18 @@ def cuvs_ivf_sq_search(params, build_params, k, batch_size):
 ###############################################################################
 
 
+def faiss_gpu_ivf_sq_search(params, build_params, k, batch_size):
+    if "nlist" in build_params and "nprobe" in params:
+        return build_params["nlist"] >= params["nprobe"]
+    return True
+
+
+def faiss_cpu_ivf_sq_search(params, build_params, k, batch_size):
+    if "nlist" in build_params and "nprobe" in params:
+        return build_params["nlist"] >= params["nprobe"]
+    return True
+
+
 def faiss_gpu_ivf_pq_build(params, dims):
     ret = True
     # M must be defined

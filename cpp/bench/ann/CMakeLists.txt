@@ -13,6 +13,7 @@ list(APPEND CMAKE_MODULE_PATH "${CUVS_SOURCE_DIR}")
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_FLAT "Include faiss' brute-force knn algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_FLAT "Include faiss' ivf flat algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_PQ "Include faiss' ivf pq algorithm in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_SQ "Include faiss' ivf sq algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_CAGRA "Include faiss' cagra algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_CAGRA_HNSW
        "Include faiss' cagra algorithm for build and hnsw for search in benchmark" ON
@@ -22,6 +23,7 @@ option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_FLAT "Include faiss' cpu ivf flat algori
        ON
 )
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_PQ "Include faiss' cpu ivf pq algorithm in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_SQ "Include faiss' cpu ivf sq algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_HNSW_FLAT "Include faiss' hnsw algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT "Include cuVS ivf flat algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_IVF_SQ "Include cuVS ivf sq algorithm in benchmark" ON)
@@ -318,6 +320,12 @@ if(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_PQ)
   )
 endif()
 
+if(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_SQ)
+  ConfigureAnnBench(
+    NAME FAISS_CPU_IVF_SQ PATH src/faiss/faiss_cpu_benchmark.cpp LINKS ${CUVS_FAISS_TARGETS}
+  )
+endif()
+
 if(CUVS_ANN_BENCH_USE_FAISS_CPU_HNSW_FLAT)
   ConfigureAnnBench(
     NAME FAISS_CPU_HNSW_FLAT PATH src/faiss/faiss_cpu_benchmark.cpp LINKS ${CUVS_FAISS_TARGETS}
@@ -334,6 +342,13 @@ endif()
 if(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_PQ AND CUVS_FAISS_ENABLE_GPU)
   ConfigureAnnBench(
     NAME FAISS_GPU_IVF_PQ PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS}
+    raft::raft
+  )
+endif()
+
+if(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_SQ AND CUVS_FAISS_ENABLE_GPU)
+  ConfigureAnnBench(
+    NAME FAISS_GPU_IVF_SQ PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS}
     raft::raft
   )
 endif()
