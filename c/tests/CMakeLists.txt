@@ -49,7 +49,6 @@ function(ConfigureTest)
             GTest::gtest_main
             $<IF:$<BOOL:${CUVSC_STATIC_CUVS_LIBRARY}>,$<COMPILE_ONLY:cuvs::cuvs_static>,cuvs::cuvs>
             $<TARGET_NAME_IF_EXISTS:conda_env>
-            rmm::rmm
   )
   set_target_properties(
     ${TEST_NAME}
