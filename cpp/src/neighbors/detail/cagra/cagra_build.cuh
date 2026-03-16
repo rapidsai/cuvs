@@ -1903,8 +1903,7 @@ void optimize(
   raft::resources const& res,
   raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph,
-  const bool guarantee_connectivity = false,
-  const IdxT* d_knn_graph_ptr       = nullptr)
+  const bool guarantee_connectivity = false)
 {
   using internal_IdxT = typename std::make_unsigned<IdxT>::type;
 
@@ -1922,12 +1921,7 @@ void optimize(
       knn_graph.extent(1));
 
   cagra::detail::graph::optimize(
-    res,
-    knn_graph_internal,
-    new_graph_internal,
-    guarantee_connectivity,
-    true,
-    reinterpret_cast<const internal_IdxT*>(d_knn_graph_ptr));
+    res, knn_graph_internal, new_graph_internal, guarantee_connectivity);
 }
 
 // RAII wrapper for allocating memory with Transparent HugePage
@@ -2093,12 +2087,6 @@ void search_and_optimize(raft::resources const& res,
 {
   auto stream = raft::resource::get_cuda_stream(res);
 
-  // Accumulate search results on device to avoid D-to-H + H-to-D round-trip.
-  auto dev_knn_graph =
-    raft::make_device_matrix<IdxT, int64_t>(res, curr_query_size, curr_topk);
-
-  // Search in batches, accumulate results on both device and host.
-  // Host copy is needed by optimize Phase 3 (edge selection) which currently runs on CPU.
   cuvs::spatial::knn::detail::utils::batch_load_iterator<T> query_batch(
     dev_query_view.data_handle(),
     curr_query_size,
@@ -2121,28 +2109,19 @@ void search_and_optimize(raft::resources const& res,
                                    batch_dev_neighbors_view,
                                    batch_dev_distances_view);
 
-    // D-to-D: accumulate into device knn_graph
-    raft::copy(dev_knn_graph.data_handle() + batch.offset() * curr_topk,
-               batch_dev_neighbors_view.data_handle(),
-               batch.size() * curr_topk,
-               stream);
-
-    // D-to-H: still needed for optimize Phase 3 (host edge selection)
     raft::copy(neighbors_view.data_handle() + batch.offset() * curr_topk,
                batch_dev_neighbors_view.data_handle(),
                batch.size() * curr_topk,
                stream);
   }
 
-  // Optimize graph, passing device knn_graph to skip H-to-D copy inside optimize Phase 2.
   auto next_graph_size = curr_query_size;
   cagra_graph          = raft::make_host_matrix<IdxT, int64_t>(0, 0);
   cagra_graph          = raft::make_host_matrix<IdxT, int64_t>(next_graph_size, next_graph_degree);
   optimize<IdxT>(res,
                  neighbors_view,
                  cagra_graph.view(),
-                 flag_last ? params.guarantee_connectivity : 0,
-                 dev_knn_graph.data_handle());
+                 flag_last ? params.guarantee_connectivity : false);
 }
 
 template <typename T,
