@@ -54,8 +54,6 @@ PYTHONUNBUFFERED=1 pytest \
  --cov=cuvs \
  --cov-report=xml:"${RAPIDS_COVERAGE_DIR}/cuvs-coverage.xml" \
  --cov-report=term \
- --deselect cuvs/tests/test_hnsw_ace.py::test_hnsw_ace_tiny_memory_limit_triggers_disk_mode \
- --deselect cuvs/tests/test_cagra_ace.py::test_cagra_ace_tiny_memory_limit_triggers_disk_mode \
  tests
 done
 

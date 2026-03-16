@@ -20,5 +20,5 @@ rapids-pip-retry install \
 
 for i in $(seq 1 10); do
   echo "===== Run $i of 10 ====="
-  PYTHONUNBUFFERED=1 python -m pytest -vs --deselect cuvs/tests/test_hnsw_ace.py::test_hnsw_ace_tiny_memory_limit_triggers_disk_mode --deselect cuvs/tests/test_cagra_ace.py::test_cagra_ace_tiny_memory_limit_triggers_disk_mode ./python/cuvs/cuvs/tests
+  PYTHONUNBUFFERED=1 python -m pytest -vs ./python/cuvs/cuvs/tests
 done

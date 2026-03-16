@@ -9,5 +9,5 @@ cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")"/../python/cuvs/cuvs
 
 for i in $(seq 1 10); do
   echo "===== Run $i of 10 ====="
-  PYTHONUNBUFFERED=1 pytest --cache-clear -vs --deselect cuvs/tests/test_hnsw_ace.py::test_hnsw_ace_tiny_memory_limit_triggers_disk_mode --deselect cuvs/tests/test_cagra_ace.py::test_cagra_ace_tiny_memory_limit_triggers_disk_mode "$@" tests
+  PYTHONUNBUFFERED=1 pytest --cache-clear -vs "$@" tests
 done
