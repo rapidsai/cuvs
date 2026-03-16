@@ -8,7 +8,7 @@ source rapids-init-pip
 RAPIDS_PY_CUDA_SUFFIX=$(rapids-wheel-ctk-name-gen "${RAPIDS_CUDA_VERSION}")
 
 # download wheels, store the directories holding them in variables
-RMM_COMMIT=0465f7cbc3acfa95dc5b83bdc6682db108e8b1b2
+RMM_COMMIT=e36df7200d5c05302c8fefbcb94a89aa634ef2b7
 LIBRMM_WHEELHOUSE=$(
   RAPIDS_PY_WHEEL_NAME="librmm_${RAPIDS_PY_CUDA_SUFFIX}" rapids-get-pr-artifact rmm 2270 cpp wheel "${RMM_COMMIT}"
 )
@@ -16,7 +16,7 @@ RMM_WHEELHOUSE=$(
   rapids-get-pr-artifact rmm 2270 python wheel --pkg_name rmm --stable "${RMM_COMMIT}"
 )
 
-RAFT_COMMIT=ceff7637e1567c2efb0942d5bc67b27100a21387
+RAFT_COMMIT=c285d96d34b6f86415bd1502d6f2d232317bed98
 LIBRAFT_WHEELHOUSE=$(
   RAPIDS_PY_WHEEL_NAME="libraft_${RAPIDS_PY_CUDA_SUFFIX}" rapids-get-pr-artifact raft 2971 cpp wheel "${RAFT_COMMIT}"
 )
@@ -27,7 +27,7 @@ RAFT_DASK_WHEELHOUSE=$(
   rapids-get-pr-artifact raft 2971 python wheel --pkg_name raft_dask --stable "${RAFT_COMMIT}"
 )
 
-UCXX_COMMIT=b9406fa336ebc302cac4773c2262a392c16631cc
+UCXX_COMMIT=347de3a7c1c694fe8509ee7a6aa3d11f5e674476
 DISTRIBUTED_UCXX_WHEELHOUSE=$(
   RAPIDS_PY_WHEEL_NAME="${RAPIDS_PY_CUDA_SUFFIX}" RAPIDS_PY_WHEEL_PURE="1" rapids-get-pr-artifact --pkg_name distributed-ucxx ucxx 604 python wheel
 )
