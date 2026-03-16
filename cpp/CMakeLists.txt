@@ -355,12 +355,8 @@ if(NOT BUILD_CPU_ONLY)
     )
   endif()
 
-  set(JIT_LTO_TARGET_ARCHITECTURE "")
-  set(JIT_LTO_COMPILATION OFF)
-  if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
-    set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
-    set(JIT_LTO_COMPILATION ON)
-  endif()
+  set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
+  set(JIT_LTO_COMPILATION ON)
 
   if(JIT_LTO_COMPILATION)
     # Generate interleaved scan kernel files at build time
