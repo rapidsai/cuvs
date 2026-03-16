@@ -1112,39 +1112,18 @@ void extend(raft::resources const& handle,
                                     n_clusters,
                                     cudaMemcpyDefault,
                                     stream));
-    const bool normalize_for_predict =
-      (index->metric() == cuvs::distance::DistanceType::CosineExpanded);
-    rmm::device_uvector<float> batch_float_normalized(
-      normalize_for_predict ? size_t(max_batch_size) * size_t(index->dim()) : 0, stream, device_memory);
-
     vec_batches.prefetch_next_batch();
     for (const auto& batch : vec_batches) {
+      auto batch_data_view = raft::make_device_matrix_view<const T, internal_extents_t>(
+        batch.data(), batch.size(), index->dim());
       auto batch_labels_view = raft::make_device_vector_view<uint32_t, internal_extents_t>(
         new_data_labels.data() + batch.offset(), batch.size());
       auto centers_view = raft::make_device_matrix_view<const float, internal_extents_t>(
         cluster_centers.data(), n_clusters, index->dim());
       cuvs::cluster::kmeans::balanced_params kmeans_params;
       kmeans_params.metric = index->metric();
-
-      if (normalize_for_predict) {
-        auto batch_float_view = raft::make_device_matrix_view<float, internal_extents_t>(
-          batch_float_normalized.data(), batch.size(), index->dim());
-        raft::linalg::map(handle,
-                          raft::make_device_vector_view<float, size_t>(batch_float_view.data_handle(),
-                                                                      size_t(batch.size()) * size_t(index->dim())),
-                          raft::cast_op<float>{},
-                          raft::make_const_mdspan(raft::make_device_vector_view<const T, size_t>(
-                            batch.data(), size_t(batch.size()) * size_t(index->dim()))));
-        raft::linalg::row_normalize<raft::linalg::L2Norm>(
-          handle, raft::make_const_mdspan(batch_float_view), batch_float_view);
-        cuvs::cluster::kmeans::predict(
-          handle, kmeans_params, batch_float_view, centers_view, batch_labels_view);
-      } else {
-        auto batch_data_view = raft::make_device_matrix_view<const T, internal_extents_t>(
-          batch.data(), batch.size(), index->dim());
-        cuvs::cluster::kmeans::predict(
-          handle, kmeans_params, batch_data_view, centers_view, batch_labels_view);
-      }
+      cuvs::cluster::kmeans::predict(
+        handle, kmeans_params, batch_data_view, centers_view, batch_labels_view);
       vec_batches.prefetch_next_batch();
       // User needs to make sure kernel finishes its work before we overwrite batch in the next
       // iteration if different streams are used for kernel and copy.
