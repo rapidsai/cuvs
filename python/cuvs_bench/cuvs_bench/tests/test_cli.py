@@ -70,11 +70,10 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
 
     from cuvs_bench.run.__main__ import main as run_main
 
-    # Skip diskann_memory on ARM Linux (not supported)
     skip_diskann = is_arm_cpu()
-    algorithms = "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq,cuvs_vamana"
+    algorithms = "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq"
     if not skip_diskann:
-        algorithms += ",diskann_memory"
+        algorithms += ",cuvs_vamana,diskann_memory"
 
     runner = CliRunner()
     run_args = [
@@ -171,16 +170,6 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
                 "pq_bits",
                 "pq_dim",
                 "ratio",
-            ],
-            "rows": 1,
-        },
-        "test-data/result/build/cuvs_vamana,test.csv": {
-            "header": common_build_header
-            + [
-                "GPU",
-                "alpha",
-                "graph_degree",
-                "visited_size",
             ],
             "rows": 1,
         },
@@ -446,68 +435,78 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
             ],
             "rows": 2,
         },
-        "test-data/result/search/cuvs_vamana,test,k10,bs100,raw.csv": {
-            "header": common_search_header
-            + [
-                "GPU",
-                "L_search",
-                "end_to_end",
-                "k",
-                "n_queries",
-                "total_queries",
-                "build time",
-                "build threads",
-                "build cpu_time",
-                "build GPU",
-                "alpha",
-                "graph_degree",
-                "visited_size",
-            ],
-            "rows": 1,
-        },
-        "test-data/result/search/cuvs_vamana,test,k10,bs100,latency.csv": {
-            "header": common_search_header
-            + [
-                "GPU",
-                "L_search",
-                "end_to_end",
-                "k",
-                "n_queries",
-                "total_queries",
-                "build time",
-                "build threads",
-                "build cpu_time",
-                "build GPU",
-                "alpha",
-                "graph_degree",
-                "visited_size",
-            ],
-            "rows": 1,
-        },
-        "test-data/result/search/cuvs_vamana,test,k10,bs100,throughput.csv": {
-            "header": common_search_header
-            + [
-                "GPU",
-                "L_search",
-                "end_to_end",
-                "k",
-                "n_queries",
-                "total_queries",
-                "build time",
-                "build threads",
-                "build cpu_time",
-                "build GPU",
-                "alpha",
-                "graph_degree",
-                "visited_size",
-            ],
-            "rows": 1,
-        },
     }
 
     if not skip_diskann:
         expected_files.update(
             {
+                "test-data/result/build/cuvs_vamana,test.csv": {
+                    "header": common_build_header
+                    + [
+                        "GPU",
+                        "alpha",
+                        "graph_degree",
+                        "visited_size",
+                    ],
+                    "rows": 1,
+                },
+                "test-data/result/search/cuvs_vamana,test,k10,bs100,raw.csv": {
+                    "header": common_search_header
+                    + [
+                        "GPU",
+                        "L_search",
+                        "end_to_end",
+                        "k",
+                        "n_queries",
+                        "total_queries",
+                        "build time",
+                        "build threads",
+                        "build cpu_time",
+                        "build GPU",
+                        "alpha",
+                        "graph_degree",
+                        "visited_size",
+                    ],
+                    "rows": 1,
+                },
+                "test-data/result/search/cuvs_vamana,test,k10,bs100,latency.csv": {
+                    "header": common_search_header
+                    + [
+                        "GPU",
+                        "L_search",
+                        "end_to_end",
+                        "k",
+                        "n_queries",
+                        "total_queries",
+                        "build time",
+                        "build threads",
+                        "build cpu_time",
+                        "build GPU",
+                        "alpha",
+                        "graph_degree",
+                        "visited_size",
+                    ],
+                    "rows": 1,
+                },
+                "test-data/result/search/cuvs_vamana,test,k10,bs100,throughput.csv": {
+                    "header": common_search_header
+                    + [
+                        "GPU",
+                        "L_search",
+                        "end_to_end",
+                        "k",
+                        "n_queries",
+                        "total_queries",
+                        "build time",
+                        "build threads",
+                        "build cpu_time",
+                        "build GPU",
+                        "alpha",
+                        "graph_degree",
+                        "visited_size",
+                    ],
+                    "rows": 1,
+                },
                 "test-data/result/build/diskann_memory,test.csv": {
                     "header": common_build_header
                     + [
@@ -617,9 +616,9 @@ def test_plot_command_creates_png_files(temp_datasets_dir: Path):
     from cuvs_bench.plot.__main__ import main as plot_main
 
     skip_diskann = is_arm_cpu()
-    algorithms = "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq,cuvs_vamana"
+    algorithms = "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq"
     if not skip_diskann:
-        algorithms += ",diskann_memory"
+        algorithms += ",cuvs_vamana,diskann_memory"
 
     runner = CliRunner()
     args = [
