@@ -18,8 +18,6 @@
 #include <rmm/mr/managed_memory_resource.hpp>
 #include <thrust/sequence.h>
 
-#include <array>
-
 namespace cuvs::neighbors::ivf_pq {
 
 struct test_ivf_sample_filter {

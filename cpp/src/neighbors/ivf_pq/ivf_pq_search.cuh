@@ -44,8 +44,6 @@
 #include <cub/device/device_radix_sort.cuh>
 #include <cuda_fp16.h>
 
-#include <cstdio>
-#include <cstdlib>
 #include <optional>
 
 namespace cuvs::neighbors::ivf_pq::detail {
@@ -125,10 +123,6 @@ void select_clusters(raft::resources const& handle,
       if (col < dim) { return utils::mapping<float>{}(queries[col + dim * row]); }
       return col == dim ? norm_factor : 0.0f;
     });
-
-  // Coarse selection: (raw q)·(unit center) has the same order as (unit q)·(unit center), so
-  // CosineExpanded does not need query normalization here. For InnerProduct we do not normalize so
-  // the metric stays inner product (normalization is used only for k-means clustering).
 
   float alpha;
   float beta;
@@ -971,8 +965,6 @@ inline void search(raft::resources const& handle,
                            stream);
       },
       gemm_queries);
-    // For Cosine, the index stores (vector - center) in normalized space; normalize rot_queries to
-    // match. For InnerProduct we do not normalize so the metric stays inner product.
     if (index.metric() == distance::DistanceType::CosineExpanded) {
       auto rot_queries_view = raft::make_device_matrix_view<float, uint32_t>(
         rot_queries.data(), max_bs_outer, index.rot_dim());
