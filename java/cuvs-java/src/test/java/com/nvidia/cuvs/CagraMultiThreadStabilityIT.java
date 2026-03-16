@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs;
@@ -177,7 +177,7 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
           log.debug("  Successful queries: {} / {}", actualSuccessfulQueries, expectedTotalQueries);
 
           if (firstError.get() != null) {
-            fail("MultiThreaded stablity test failed:" + " " + firstError.get().getMessage());
+            fail("MultiThreaded stability test failed:" + " " + firstError.get().getMessage());
           }
 
           assertTrue("All threads should complete successfully", allCompleted);

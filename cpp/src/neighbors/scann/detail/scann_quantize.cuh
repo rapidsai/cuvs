@@ -382,7 +382,7 @@ __launch_bounds__(BlockSize) RAFT_KERNEL
       // The change in || r_parallel ||^2 can be written (residual_dot + residual_dot_delta) ^ 2
       // the change in || r_perpendicular || ^2 can be written residual_norm_delta -
       // parallel_norm_delta Thus cost_delta = eta * (residual_dot + residual_dot_delta) ^2 +
-      // (residual_norm_delta - (residual_dot + residual_dot_delta)^2 Expanding and simplying,
+      // (residual_norm_delta - (residual_dot + residual_dot_delta)^2 Expanding and simplifying,
       // cost_delta = a + b * resdiaul_dot, where a and b are as below. Since only residual_dot is
       // unknown (because updates must be made synchronously) we can compute a and b in parallel
       // across threads in the warp and minimize computation in the update step of the coordinate
