@@ -13,7 +13,6 @@
 
 #include <raft/core/resource/cuda_stream_pool.hpp>
 #include <raft/linalg/add.cuh>
-#include <raft/linalg/normalize.cuh>
 #include <raft/matrix/gather.cuh>
 #include <rmm/cuda_stream_pool.hpp>
 #include <rmm/mr/managed_memory_resource.hpp>
@@ -176,61 +175,17 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     rmm::device_uvector<EvalT> distances_naive_dev(queries_size, stream_);
     rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
 
-    // For InnerProduct only: index normalizes and searches in normalized space (cosine). naive_knn
-    // with raw data gives raw IP ranking, which differs. CosineExpanded tests use raw reference
-    // (naive_knn computes cosine from raw via norms in-kernel, so ranking is correct without
-    // pre-normalization). So we only pre-normalize reference for InnerProduct.
-    const bool use_normalized_ref =
-      (ps.index_params.metric == cuvs::distance::DistanceType::InnerProduct);
-    const bool need_float_normalized =
-      use_normalized_ref &&
-      (std::is_same_v<DataT, float> || std::is_same_v<DataT, int8_t> || std::is_same_v<DataT, uint8_t>);
-
-    if (need_float_normalized) {
-      // Index uses normalized space for IP; compute reference on normalized float data to match.
-      // int8/uint8 DB and float queries are cast to float and normalized like the index does.
-      rmm::device_uvector<float> db_norm(size_t{ps.num_db_vecs} * size_t{ps.dim}, stream_);
-      rmm::device_uvector<float> queries_norm(size_t{ps.num_queries} * size_t{ps.dim}, stream_);
-      raft::linalg::map(handle_,
-                        raft::make_device_vector_view<float>(db_norm.data(), db_norm.size()),
-                        raft::cast_op<float>{},
-                        raft::make_const_mdspan(
-                          raft::make_device_vector_view<const DataT>(database.data(), db_norm.size())));
-      raft::linalg::map(handle_,
-                        raft::make_device_vector_view<float>(queries_norm.data(), queries_norm.size()),
-                        raft::cast_op<float>{},
-                        raft::make_const_mdspan(raft::make_device_vector_view<const DataT>(
-                          search_queries.data(), queries_norm.size())));
-      auto db_mat = raft::make_device_matrix_view<float, uint32_t>(db_norm.data(), ps.num_db_vecs, ps.dim);
-      auto q_mat  = raft::make_device_matrix_view<float, uint32_t>(queries_norm.data(), ps.num_queries, ps.dim);
-      raft::linalg::row_normalize<raft::linalg::L2Norm>(
-        handle_, raft::make_const_mdspan(db_mat), db_mat);
-      raft::linalg::row_normalize<raft::linalg::L2Norm>(
-        handle_, raft::make_const_mdspan(q_mat), q_mat);
-      cuvs::neighbors::naive_knn<EvalT, float, int64_t>(
-        handle_,
-        distances_naive_dev.data(),
-        indices_naive_dev.data(),
-        queries_norm.data(),
-        db_norm.data(),
-        ps.num_queries,
-        ps.num_db_vecs,
-        ps.dim,
-        ps.k,
-        static_cast<cuvs::distance::DistanceType>((int)ps.index_params.metric));
-    } else {
-      cuvs::neighbors::naive_knn<EvalT, DataT, int64_t>(
-        handle_,
-        distances_naive_dev.data(),
-        indices_naive_dev.data(),
-        search_queries.data(),
-        database.data(),
-        ps.num_queries,
-        ps.num_db_vecs,
-        ps.dim,
-        ps.k,
-        static_cast<cuvs::distance::DistanceType>((int)ps.index_params.metric));
-    }
+    cuvs::neighbors::naive_knn<EvalT, DataT, int64_t>(
+      handle_,
+      distances_naive_dev.data(),
+      indices_naive_dev.data(),
+      search_queries.data(),
+      database.data(),
+      ps.num_queries,
+      ps.num_db_vecs,
+      ps.dim,
+      ps.k,
+      static_cast<cuvs::distance::DistanceType>((int)ps.index_params.metric));
 
     distances_ref.resize(queries_size);
     raft::update_host(distances_ref.data(), distances_naive_dev.data(), queries_size, stream_);
@@ -369,11 +324,8 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
                             uint32_t n_take,
                             uint32_t n_skip)
   {
-    // the original data cannot be reconstructed since the dataset was normalized for clustering
-    if (index.metric() == cuvs::distance::DistanceType::CosineExpanded ||
-        index.metric() == cuvs::distance::DistanceType::InnerProduct) {
-      return;
-    }
+    // the original data cannot be reconstructed since the dataset was normalized
+    if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) { return; }
     auto& rec_list_base = index.lists()[label];
     // If the data is unbalanced the list might be empty, which is actually nullptr
     if (!rec_list_base) { return; }
@@ -411,10 +363,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     auto old_list = std::static_pointer_cast<list_data_interleaved<IdxT>>(old_list_base);
     auto n_rows   = old_list->size.load();
     if (n_rows == 0) { return; }
-    if (index->metric() == cuvs::distance::DistanceType::CosineExpanded ||
-        index->metric() == cuvs::distance::DistanceType::InnerProduct) {
-      return;
-    }
+    if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) { return; }
 
     auto vectors_1 = raft::make_device_matrix<EvalT>(handle_, n_rows, index->dim());
     auto indices   = raft::make_device_vector<IdxT>(handle_, n_rows);
@@ -881,59 +830,17 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     rmm::device_uvector<EvalT> distances_naive_dev(queries_size, stream_);
     rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
 
-    // InnerProduct only: see ivf_pq_test::calc_ref() comment.
-    const bool use_normalized_ref =
-      (ps.index_params.metric == cuvs::distance::DistanceType::InnerProduct);
-    const bool need_float_normalized =
-      use_normalized_ref &&
-      (std::is_same_v<DataT, float> || std::is_same_v<DataT, int8_t> || std::is_same_v<DataT, uint8_t>);
-
-    if (need_float_normalized) {
-      rmm::device_uvector<float> db_norm(db_slice_rows * size_t{ps.dim}, stream_);
-      rmm::device_uvector<float> queries_norm(size_t{ps.num_queries} * size_t{ps.dim}, stream_);
-      raft::linalg::map(
-        handle_,
-        raft::make_device_vector_view<float>(db_norm.data(), db_norm.size()),
-        raft::cast_op<float>{},
-        raft::make_const_mdspan(raft::make_device_vector_view<const DataT>(
-          database.data() + test_ivf_sample_filter::offset * ps.dim, db_norm.size())));
-      raft::linalg::map(handle_,
-                        raft::make_device_vector_view<float>(queries_norm.data(), queries_norm.size()),
-                        raft::cast_op<float>{},
-                        raft::make_const_mdspan(raft::make_device_vector_view<const DataT>(
-                          search_queries.data(), queries_norm.size())));
-      auto db_mat =
-        raft::make_device_matrix_view<float, uint32_t>(db_norm.data(), uint32_t(db_slice_rows), ps.dim);
-      auto q_mat =
-        raft::make_device_matrix_view<float, uint32_t>(queries_norm.data(), ps.num_queries, ps.dim);
-      raft::linalg::row_normalize<raft::linalg::L2Norm>(
-        handle_, raft::make_const_mdspan(db_mat), db_mat);
-      raft::linalg::row_normalize<raft::linalg::L2Norm>(
-        handle_, raft::make_const_mdspan(q_mat), q_mat);
-      cuvs::neighbors::naive_knn<EvalT, float, IdxT>(
-        handle_,
-        distances_naive_dev.data(),
-        indices_naive_dev.data(),
-        queries_norm.data(),
-        db_norm.data(),
-        ps.num_queries,
-        db_slice_rows,
-        ps.dim,
-        ps.k,
-        static_cast<cuvs::distance::DistanceType>((int)ps.index_params.metric));
-    } else {
-      cuvs::neighbors::naive_knn<EvalT, DataT, IdxT>(
-        handle_,
-        distances_naive_dev.data(),
-        indices_naive_dev.data(),
-        search_queries.data(),
-        database.data() + test_ivf_sample_filter::offset * ps.dim,
-        ps.num_queries,
-        db_slice_rows,
-        ps.dim,
-        ps.k,
-        static_cast<cuvs::distance::DistanceType>((int)ps.index_params.metric));
-    }
+    cuvs::neighbors::naive_knn<EvalT, DataT, IdxT>(
+      handle_,
+      distances_naive_dev.data(),
+      indices_naive_dev.data(),
+      search_queries.data(),
+      database.data() + test_ivf_sample_filter::offset * ps.dim,
+      ps.num_queries,
+      db_slice_rows,
+      ps.dim,
+      ps.k,
+      static_cast<cuvs::distance::DistanceType>((int)ps.index_params.metric));
     raft::linalg::addScalar(indices_naive_dev.data(),
                             indices_naive_dev.data(),
                             IdxT(test_ivf_sample_filter::offset),
@@ -1261,8 +1168,9 @@ inline auto enum_variety_ip() -> test_cases_t
 
 /**
  * Single Inner Product case with many clusters and few probes.
- * Without L2-normalization for IP, k-means degenerates and recall drops; with normalization,
- * recall should meet min_recall. Use to regression-test IVF-PQ IP normalization (e.g. #1875).
+ * Normalization is used only for k-means clustering; the metric stays inner product. This test
+ * checks that recall still meets min_recall with that design. Regression test for IVF-PQ IP (e.g.
+ * #1875).
  */
 inline auto inner_product_strict_recall_test() -> test_cases_t
 {

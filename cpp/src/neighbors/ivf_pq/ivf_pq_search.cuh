@@ -44,6 +44,8 @@
 #include <cub/device/device_radix_sort.cuh>
 #include <cuda_fp16.h>
 
+#include <cstdio>
+#include <cstdlib>
 #include <optional>
 
 namespace cuvs::neighbors::ivf_pq::detail {
@@ -124,15 +126,9 @@ void select_clusters(raft::resources const& handle,
       return col == dim ? norm_factor : 0.0f;
     });
 
-  // Coarse selection (choosing which cluster query vector matches) only needs the ranking of clusters. (raw q)·(unit center) has the same order
-  // as (unit q)·(unit center), so CosineExpanded does not need query normalization here. For
-  // InnerProduct we normalize so the whole pipeline (coarse + fine) uses the same cosine space.
-  if (metric == cuvs::distance::DistanceType::InnerProduct) {
-    auto float_queries_matrix =
-      raft::make_device_matrix_view<float, int64_t>(float_queries, n_queries, dim_ext);
-    raft::linalg::row_normalize<raft::linalg::L2Norm>(
-      handle, raft::make_const_mdspan(float_queries_matrix), float_queries_matrix);
-  }
+  // Coarse selection: (raw q)·(unit center) has the same order as (unit q)·(unit center), so
+  // CosineExpanded does not need query normalization here. For InnerProduct we do not normalize so
+  // the metric stays inner product (normalization is used only for k-means clustering).
 
   float alpha;
   float beta;
@@ -975,11 +971,9 @@ inline void search(raft::resources const& handle,
                            stream);
       },
       gemm_queries);
-    // For IP/Cosine, the index stores (vector - center) in normalized space, then rotated and PQ'd.
-    // Fine search compares rot_queries to those values; normalize rot_queries so we're in the same
-    // space.
-    if (index.metric() == distance::DistanceType::CosineExpanded ||
-        index.metric() == distance::DistanceType::InnerProduct) {
+    // For Cosine, the index stores (vector - center) in normalized space; normalize rot_queries to
+    // match. For InnerProduct we do not normalize so the metric stays inner product.
+    if (index.metric() == distance::DistanceType::CosineExpanded) {
       auto rot_queries_view = raft::make_device_matrix_view<float, uint32_t>(
         rot_queries.data(), max_bs_outer, index.rot_dim());
       raft::linalg::row_normalize<raft::linalg::L2Norm>(
