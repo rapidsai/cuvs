@@ -31,8 +31,14 @@ class vpq_dataset_impl : public vpq_dataset_iface<MathT, IdxT> {
   using math_type  = MathT;
 
   // Derived properties with default implementations
-  [[nodiscard]] auto n_rows() const noexcept -> index_type override { return this->data().extent(0); }
-  [[nodiscard]] auto dim() const noexcept -> uint32_t override { return this->vq_code_book().extent(1); }
+  [[nodiscard]] auto n_rows() const noexcept -> index_type override
+  {
+    return this->data().extent(0);
+  }
+  [[nodiscard]] auto dim() const noexcept -> uint32_t override
+  {
+    return this->vq_code_book().extent(1);
+  }
   [[nodiscard]] auto is_owning() const noexcept -> bool override { return true; }
 
   /** Row length of the encoded data in bytes. */
@@ -150,7 +156,7 @@ class vpq_dataset_owning : public vpq_dataset_impl<MathT, IdxT> {
  */
 template <typename MathT, typename IdxT>
 class vpq_dataset_view : public vpq_dataset_impl<MathT, IdxT> {
-  public:
+ public:
   using index_type = IdxT;
   using math_type  = MathT;
 
