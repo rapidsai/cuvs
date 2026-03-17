@@ -128,7 +128,6 @@ outputs:
         - librmm =${{ minor_version }}
         - nccl
         - cuda-cudart
-        - cuda-driver
         - libcublas
         - libcurand
         - libcusolver
@@ -194,7 +193,6 @@ outputs:
         - librmm =${{ minor_version }}
         - nccl
         - cuda-cudart
-        - cuda-driver
         - libcublas
         - libcurand
         - libcusolver
@@ -258,7 +256,6 @@ outputs:
         - librmm =${{ minor_version }}
         - nccl
         - cuda-cudart
-        - cuda-driver
         - libcublas
         - libcurand
         - libcusolver
@@ -320,7 +317,6 @@ outputs:
         - libraft-headers =${{ minor_version }}
         - nccl
         - cuda-cudart
-        - cuda-driver
         - libcublas
         - libcurand
         - libcusolver
@@ -424,7 +420,6 @@ outputs:
         - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
         - nccl
         - cuda-cudart
-        - cuda-driver
         - libcublas
         - libcurand
         - libcusolver
@@ -498,7 +493,6 @@ outputs:
         - ${{ pin_subpackage("libcuvs", exact=True) }}
         - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
         - cuda-cudart
-        - cuda-driver
         - libcublas
         - libcurand
         - libcusolver
