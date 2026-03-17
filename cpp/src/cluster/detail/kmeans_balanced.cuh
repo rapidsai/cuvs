@@ -39,6 +39,7 @@
 #include <rmm/resource_ref.hpp>
 
 #include <thrust/gather.h>
+#include <thrust/iterator/counting_iterator.h>
 #include <thrust/iterator/transform_iterator.h>
 #include <thrust/transform.h>
 
@@ -252,12 +253,8 @@ inline void predict_bitwise_hamming(const raft::resources& handle,
 
   auto minClusterAndDistance = raft::make_device_mdarray<raft::KeyValuePair<IdxT, uint32_t>, IdxT>(
     handle, mr, raft::make_extents<IdxT>(n_rows));
-
   raft::KeyValuePair<IdxT, uint32_t> initial_value(0, std::numeric_limits<uint32_t>::max());
-  thrust::fill(raft::resource::get_thrust_policy(handle),
-               minClusterAndDistance.data_handle(),
-               minClusterAndDistance.data_handle() + n_rows,
-               initial_value);
+  raft::matrix::fill(handle, minClusterAndDistance.view(), initial_value);
 
   cuvs::distance::fusedDistanceNNMinReduce<uint8_t, raft::KeyValuePair<IdxT, uint32_t>, IdxT>(
     minClusterAndDistance.data_handle(),
@@ -276,10 +273,9 @@ inline void predict_bitwise_hamming(const raft::resources& handle,
     0.0f,
     stream);
 
-  thrust::transform(raft::resource::get_thrust_policy(handle),
-                    minClusterAndDistance.data_handle(),
-                    minClusterAndDistance.data_handle() + n_rows,
-                    labels,
+  raft::linalg::map(handle,
+                    raft::make_const_mdspan(minClusterAndDistance.view()),
+                    raft::make_device_vector_view<LabelT, IdxT>(labels, n_rows),
                     raft::compose_op<raft::cast_op<LabelT>, raft::key_op>());
 }
 
@@ -1281,8 +1277,8 @@ void build_hierarchical(const raft::resources& handle,
 
   // Precompute the L2 norm of the dataset if relevant and not yet computed.
   rmm::device_uvector<MathT> dataset_norm_buf(0, stream, device_memory);
-  if (dataset_norm == nullptr &&
-      (params.metric == cuvs::distance::DistanceType::L2Expanded ||
+  const MathT* dataset_norm = nullptr;
+  if ((params.metric == cuvs::distance::DistanceType::L2Expanded ||
        params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
        params.metric == cuvs::distance::DistanceType::CosineExpanded) &&
       !params.is_packed_binary) {
@@ -1308,14 +1304,14 @@ void build_hierarchical(const raft::resources& handle,
                      raft::identity_op{},
                      device_memory);
     }
-    dataset_norm = (const MathT*)dataset_norm_buf.data();
+    dataset_norm = dataset_norm_buf.data();
   } else if (params.is_packed_binary) {
     dataset_norm_buf.resize(n_rows, stream);
     raft::matrix::fill(
       handle,
       raft::make_device_matrix_view<MathT, IdxT>(dataset_norm_buf.data(), n_rows, 1),
       static_cast<MathT>(transformed_dim));
-    dataset_norm = (const MathT*)dataset_norm_buf.data();
+      dataset_norm = (const MathT*)dataset_norm_buf.data();
   }
 
   /* Temporary workaround to cub::DeviceHistogram not supporting any type that isn't natively
@@ -1329,7 +1325,6 @@ void build_hierarchical(const raft::resources& handle,
   {
     rmm::device_uvector<MathT> mesocluster_centers_buf(
       n_mesoclusters * transformed_dim, stream, device_memory);
-    std::cout << "now building mesoclusters" << std::endl;
     build_clusters(handle,
                    params,
                    dim,
