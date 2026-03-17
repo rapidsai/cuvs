@@ -205,7 +205,7 @@ After building the C and C++ libraries, the Golang library can be built with the
 
     export CUDA_HOME="/usr/local/cuda" # or wherever your CUDA installation is.
     export CGO_CFLAGS="-I${CONDA_PREFIX}/include -I${CUDA_HOME}/include"
-    export CGO_LDFLAGS="-L${CONDA_PREFIX}/lib -lcuvs -lcuvs_c"
+    export CGO_LDFLAGS="-L${CONDA_PREFIX}/lib -lcudart -lcuvs -lcuvs_c"
     export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$LD_LIBRARY_PATH"
     export CC=clang
 
@@ -258,6 +258,11 @@ cuVS has the following configurable cmake flags available:
    - ON, OFF
    - OFF
    - Enable the `-lineinfo` option for nvcc
+
+ * - CUDA_STATIC_RUNTIME
+   - ON, OFF
+   - OFF
+   - Statically link the CUDA runtime
 
  * - CUDA_STATIC_MATH_LIBRARIES
    - ON, OFF
