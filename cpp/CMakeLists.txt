@@ -784,7 +784,7 @@ if(NOT BUILD_CPU_ONLY)
         $<COMPILE_ONLY:cuco::cuco>
         $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
         $<$<BOOL:${JIT_LTO_COMPILATION}>:$<LINK_LIBRARY:WHOLE_ARCHIVE,cuvs::cuvs_jit_lto_kernels>>
-        CUDA::cuda_driver
+        $<COMPILE_ONLY:CUDA::cuda_driver>
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
@@ -848,7 +848,7 @@ SECTIONS
         $<COMPILE_ONLY:nvidia::cutlass::cutlass>
         $<COMPILE_ONLY:cuco::cuco>
         $<$<BOOL:${JIT_LTO_COMPILATION}>:$<LINK_LIBRARY:WHOLE_ARCHIVE,cuvs::cuvs_jit_lto_kernels>>
-        CUDA::cuda_driver
+        $<COMPILE_ONLY:CUDA::cuda_driver>
     )
   endif()
 
