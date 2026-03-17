@@ -855,16 +855,13 @@ void make_reverse_graph_gpu(raft::resources const& res,
 
   if (is_ptr_host_accessible(output_graph.data_handle())) {
     auto d_dest_nodes = raft::make_device_matrix<IdxT, int64_t>(res, graph_size, 1);
-
+    auto dest_nodes   = make_host_vector<IdxT, int64_t>(graph_size);
     for (uint64_t k = 0; k < output_graph_degree; k++) {
-      RAFT_CUDA_TRY(cudaMemcpy2DAsync(d_dest_nodes.data_handle(),
-                                      sizeof(IdxT),
-                                      output_graph.data_handle() + k,  // host pointer
-                                      output_graph_degree * sizeof(IdxT),
-                                      1 * sizeof(IdxT),
-                                      graph_size,
-                                      cudaMemcpyHostToDevice,
-                                      raft::resource::get_cuda_stream(res)));
+#pragma omp parallel for
+      for (uint64_t i = 0; i < graph_size; i++) {
+        dest_nodes(i) = output_graph(i, k);
+      }
+      raft::copy(res, d_dest_nodes.view(), raft::make_const_mdspan(dest_nodes.view()));
 
       dim3 threads(256, 1, 1);
       dim3 blocks(1024, 1, 1);
