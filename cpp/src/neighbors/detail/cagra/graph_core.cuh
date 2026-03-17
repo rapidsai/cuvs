@@ -374,7 +374,7 @@ __global__ void kern_merge_graph(
   // If guarantee_connectivity == true, use a temporal list to merge the
   // neighbor lists of the graphs.
   if (guarantee_connectivity) {
-    for (uint32_t i = lane_id; i < mst_graph_degree; i += raft::WarpSize) {
+    for (uint32_t i = lane_id; i < current_mst_graph_num_edges; i += raft::WarpSize) {
       smem_sorted_output_graph[i] = mst_graph(nid_batch, i);
     }
     __syncwarp();
@@ -788,10 +788,10 @@ void merge_graph_gpu(raft::resources const& res,
                                                            /*host_writeback*/ false,
                                                            /*initialize*/ true);
 
-  batched_device_view_from_host<IdxT, int64_t> d_mst_graph_num_edges(
+  batched_device_view_from_host<uint32_t, int64_t> d_mst_graph_num_edges(
     res,
-    raft::make_host_matrix_view<IdxT, int64_t>(
-      mst_graph_num_edges.data_handle(), guarantee_connectivity ? graph_size : 0, 1),
+    raft::make_host_matrix_view<uint32_t, int64_t>(
+      mst_graph_num_edges.data_handle(), mst_graph_num_edges.extent(0), 1),
     /*batch_size*/ batch_size,
     /*host_writeback*/ false,
     /*initialize*/ true);
@@ -1101,11 +1101,11 @@ void mst_opt_update_graph(IdxT* mst_graph_ptr,
 //   an approximate MST.
 // * If the input kNN graph is disconnected, random connection is added to the largest cluster.
 //
-template <typename IdxT, typename InputMatrixView, typename OutputMatrixView, typename VectorView>
+template <typename IdxT, typename InputMatrixView>
 void mst_optimization(raft::resources const& res,
                       InputMatrixView input_graph,
-                      OutputMatrixView output_graph,
-                      VectorView mst_graph_num_edges,
+                      raft::host_matrix_view<IdxT, int64_t, raft::row_major> output_graph,
+                      raft::host_vector_view<uint32_t, int64_t> mst_graph_num_edges,
                       bool use_gpu = true)
 {
   if (use_gpu) {
@@ -1118,9 +1118,6 @@ void mst_optimization(raft::resources const& res,
   const IdxT graph_size              = input_graph.extent(0);
   const uint32_t input_graph_degree  = input_graph.extent(1);
   const uint32_t output_graph_degree = output_graph.extent(1);
-  auto input_graph_ptr               = input_graph.data_handle();
-  auto output_graph_ptr              = output_graph.data_handle();
-  auto mst_graph_num_edges_ptr       = mst_graph_num_edges.data_handle();
 
   // Allocate temporal arrays
   const uint32_t mst_graph_degree = output_graph_degree;
@@ -1238,9 +1235,20 @@ void mst_optimization(raft::resources const& res,
       }
     } else {
       // Copy rank-k edges from the input knn graph to 'candidate_edges'
+      if (is_ptr_host_accessible(input_graph.data_handle())) {
 #pragma omp parallel for
-      for (uint64_t i = 0; i < graph_size; i++) {
-        candidate_edges_ptr[i] = input_graph_ptr[k + (input_graph_degree * i)];
+        for (uint64_t i = 0; i < graph_size; i++) {
+          candidate_edges_ptr[i] = input_graph(i, k);
+        }
+      } else {
+        // handle device knn graph
+        RAFT_CUDA_TRY(cudaMemcpy2D(candidate_edges_ptr,
+                                   sizeof(IdxT),
+                                   &input_graph(0, k),  // host pointer
+                                   input_graph_degree * sizeof(IdxT),
+                                   1 * sizeof(IdxT),
+                                   graph_size,
+                                   cudaMemcpyDeviceToHost));
       }
     }
 
@@ -1459,23 +1467,23 @@ void mst_optimization(raft::resources const& res,
   for (uint64_t i = 0; i < graph_size; i++) {
     uint64_t k = 0;
     for (uint64_t kj = 0; kj < mst_graph_degree; kj++) {
-      uint64_t j = mst_graph_ptr[(mst_graph_degree * i) + kj];
+      uint64_t j = mst_graph(i, kj);
       if (j >= graph_size) continue;
 
       // Check to avoid duplication
       auto flag_match = false;
       for (uint64_t ki = 0; ki < k; ki++) {
-        if (j == output_graph_ptr[(output_graph_degree * i) + ki]) {
+        if (j == output_graph(i, ki)) {
           flag_match = true;
           break;
         }
       }
       if (flag_match) continue;
 
-      output_graph_ptr[(output_graph_degree * i) + k] = j;
+      output_graph(i, k) = j;
       k += 1;
     }
-    mst_graph_num_edges_ptr[i] = k;
+    mst_graph_num_edges(i) = k;
   }
 
   const double time_mst_opt_end = cur_time();
@@ -1621,26 +1629,24 @@ void optimize(raft::resources const& res,
 
   // MST optimization
   // currently, only using GPU path for MST optimization
-  auto mst_graph           = raft::make_host_matrix<IdxT, int64_t, raft::row_major>(0, 0);
-  auto mst_graph_num_edges = raft::make_host_vector<uint32_t, int64_t>(0);
+  int64_t mst_graph_size = guarantee_connectivity ? graph_size : 0;
+  auto mst_graph =
+    raft::make_host_matrix<IdxT, int64_t, raft::row_major>(mst_graph_size, output_graph_degree);
+  auto mst_graph_num_edges = raft::make_host_vector<uint32_t, int64_t>(mst_graph_size);
 
   if (guarantee_connectivity) {
-    auto mst_graph_num_edges     = raft::make_host_vector<uint32_t, int64_t>(graph_size);
-    auto mst_graph_num_edges_ptr = mst_graph_num_edges.data_handle();
 #pragma omp parallel for
     for (uint64_t i = 0; i < graph_size; i++) {
-      mst_graph_num_edges_ptr[i] = 0;
+      mst_graph_num_edges(i) = 0;
     }
     raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
       "cagra::graph::optimize/check_connectivity");
-    mst_graph =
-      raft::make_host_matrix<IdxT, int64_t, raft::row_major>(graph_size, output_graph_degree);
     RAFT_LOG_INFO("MST optimization is used to guarantee graph connectivity.");
     mst_optimization<IdxT>(res, knn_graph, mst_graph.view(), mst_graph_num_edges.view(), use_gpu);
 
     for (uint64_t i = 0; i < graph_size; i++) {
       if (i < 8 || i >= graph_size - 8) {
-        RAFT_LOG_DEBUG("# mst_graph_num_edges_ptr[%lu]: %u\n", i, mst_graph_num_edges_ptr[i]);
+        RAFT_LOG_DEBUG("# mst_graph_num_edges[%lu]: %u\n", i, mst_graph_num_edges(i));
       }
     }
   }
@@ -1651,9 +1657,18 @@ void optimize(raft::resources const& res,
   }
 
   // reverse graph creation will always use the GPU
-  auto d_rev_graph = raft::make_device_mdarray<IdxT>(
-    res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, output_graph_degree));
-
+  // using default workspace resource for random access
+  // otherwise will be managed memory which is slow upon first access
+  auto d_rev_graph = raft::make_device_mdarray<IdxT>(res, raft::make_extents<int64_t>(0, 0));
+  try {
+    d_rev_graph = raft::make_device_mdarray<IdxT>(
+      res, raft::make_extents<int64_t>(graph_size, output_graph_degree));
+  } catch (const std::exception& e) {
+    RAFT_LOG_DEBUG(
+      "Failed to create device matrix for reverse graph, switching to large workspace resource");
+    d_rev_graph = raft::make_device_mdarray<IdxT>(
+      res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, output_graph_degree));
+  }
   // This should use the default workspace resource for random access / atomics
   auto d_rev_graph_count = raft::make_device_mdarray<uint32_t>(
     res, default_ws_mr, raft::make_extents<int64_t>(graph_size));

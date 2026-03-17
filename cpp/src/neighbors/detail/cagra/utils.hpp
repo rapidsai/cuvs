@@ -358,7 +358,7 @@ class batched_device_view_from_host {
    * @param batch_size The batch size
    * @param host_writeback Whether to write back the data to the host (only for host memory)
    * (default: false)
-   * @param initialize Whether to initialize the data (only for managed memory) (default: true)
+   * @param initialize Whether to initialize the data (default: true)
    */
   batched_device_view_from_host(raft::resources const& res,
                                 raft::host_matrix_view<T, IdxT> host_view,
