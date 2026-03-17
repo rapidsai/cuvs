@@ -14,21 +14,22 @@
 struct FragmentEntry;
 
 struct AlgorithmPlanner {
-  AlgorithmPlanner(std::string fragment_key, std::string entrypoint)
-    : fragment_key(std::move(fragment_key)), entrypoint(std::move(entrypoint))
-  {
-  }
+  AlgorithmPlanner(std::string entrypoint) : entrypoint(std::move(entrypoint)) {}
 
   std::shared_ptr<AlgorithmLauncher> get_launcher();
 
-  std::string fragment_key;
   std::string entrypoint;
-  std::vector<std::string> device_functions;
-  std::vector<FragmentEntry*> fragments;
+  std::vector<const FragmentEntry*> fragments;
+
+  void add_fragment(const FragmentEntry& fragment);
+
+  template <typename FragmentT>
+  void add_fragment()
+  {
+    add_fragment(FragmentT{});
+  }
 
  private:
-  void add_entrypoint();
-  void add_device_functions();
-  std::string get_device_functions_key() const;
+  std::string get_fragments_key() const;
   std::shared_ptr<AlgorithmLauncher> build();
 };

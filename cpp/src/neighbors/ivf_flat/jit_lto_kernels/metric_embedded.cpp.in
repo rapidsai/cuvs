@@ -5,21 +5,18 @@
 
 // This file is auto-generated. Do not edit manually.
 
-#include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
+#include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_fragments.hpp>
 #include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>
 #include "@embedded_header_file@"
 
-using namespace cuvs::neighbors::ivf_flat::detail;
+namespace cuvs::neighbors::ivf_flat::detail {
 
-namespace {
+using _FragmentEntry = MetricFragmentEntry<@veclen@, tag_@type_abbrev@, tag_acc_@acc_abbrev@, tag_metric_@metric_name@>;
 
-__attribute__((__constructor__)) void register_kernel()
-{
-  registerAlgorithm<tag_@type_abbrev@,
-    tag_acc_@acc_abbrev@>(
-    "@metric_name@_veclen_@veclen@",
-    embedded_fatbin,
-    sizeof(embedded_fatbin));
-}
+template <>
+const uint8_t* const _FragmentEntry::data = embedded_fatbin;
+
+template <>
+const size_t _FragmentEntry::length = sizeof(embedded_fatbin);
 
 }

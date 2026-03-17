@@ -12,21 +12,24 @@
 
 #include <nvJitLink.h>
 
+#include "nvjitlink_checker.hpp"
+
 struct FragmentEntry {
-  FragmentEntry(std::string const& key);
-
-  bool operator==(const FragmentEntry& rhs) const { return compute_key == rhs.compute_key; }
-
   virtual bool add_to(nvJitLinkHandle& handle) const = 0;
 
-  std::string compute_key{};
+  virtual const char* get_key() const = 0;
 };
 
-struct FatbinFragmentEntry final : FragmentEntry {
-  FatbinFragmentEntry(std::string const& key, unsigned char const* view, std::size_t size);
+template <typename FragmentT>
+struct FatbinFragmentEntry : FragmentEntry {
+  bool add_to(nvJitLinkHandle& handle) const override final
+  {
+    auto result = nvJitLinkAddData(
+      handle, NVJITLINK_INPUT_ANY, FragmentT::data, FragmentT::length, typeid(FragmentT).name());
 
-  virtual bool add_to(nvJitLinkHandle& handle) const;
+    check_nvjitlink_result(handle, result);
+    return true;
+  }
 
-  std::size_t data_size          = 0;
-  unsigned char const* data_view = nullptr;
+  const char* get_key() const override final { return typeid(FragmentT).name(); }
 };
