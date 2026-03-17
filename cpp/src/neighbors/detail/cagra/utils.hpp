@@ -175,7 +175,6 @@ class device_matrix_view_from_host {
     cudaPointerAttributes attr;
     RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, host_view.data_handle()));
     device_ptr      = reinterpret_cast<T*>(attr.devicePointer);
-    device_ptr      = reinterpret_cast<T*>(attr.devicePointer);
     bool needs_copy = (device_ptr == NULL) ||
                       (attr.type != cudaMemoryTypeDevice && attr.type != cudaMemoryTypeManaged);
     if (needs_copy) {
