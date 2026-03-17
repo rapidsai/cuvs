@@ -8,7 +8,6 @@
 #include "../ivf_common.cuh"
 #include "jit_lto_kernels/interleaved_scan_planner.hpp"
 #include <cstdint>
-#include <cuvs/detail/jit_lto/cu_try.hpp>
 #include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
@@ -17,6 +16,7 @@
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/operators.hpp>
+#include <raft/util/cuda_rt_essentials.hpp>  // RAFT_CUDA_TRY
 #include <raft/util/pow2_utils.cuh>
 
 #include <rmm/cuda_stream_view.hpp>
@@ -102,14 +102,14 @@ constexpr auto get_post_lambda_name()
 inline uint32_t configure_launch_x(uint32_t numQueries,
                                    uint32_t n_probes,
                                    int32_t sMemSize,
-                                   CUfunction func)
+                                   cudaKernel_t func)
 {
-  CUdevice dev_id;
-  CU_TRY(cuDeviceGet(&dev_id, 0));
+  int dev_id;
+  RAFT_CUDA_TRY(cudaGetDevice(&dev_id));
   int num_sms;
-  CU_TRY(cuDeviceGetAttribute(&num_sms, CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT, dev_id));
+  RAFT_CUDA_TRY(cudaDeviceGetAttribute(&num_sms, cudaDevAttrMultiProcessorCount, dev_id));
   int num_blocks_per_sm = 0;
-  CU_TRY(cuOccupancyMaxActiveBlocksPerMultiprocessor(
+  RAFT_CUDA_TRY(cudaOccupancyMaxActiveBlocksPerMultiprocessor(
     &num_blocks_per_sm, func, kThreadsPerBlock, sMemSize));
 
   size_t min_grid_size = num_sms * num_blocks_per_sm;
@@ -178,7 +178,7 @@ void launch_kernel(const index<T, IdxT>& index,
 
   if (grid_dim_x == 0) {
     grid_dim_x = configure_launch_x(
-      std::min(kMaxGridY, num_queries), n_probes, smem_size, kernel_launcher->get_function());
+      std::min(kMaxGridY, num_queries), n_probes, smem_size, kernel_launcher->get_kernel());
     return;
   }
 

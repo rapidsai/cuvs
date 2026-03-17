@@ -11,13 +11,13 @@
 #include <unordered_map>
 #include <vector_types.h>
 
-#include <cuda.h>
+#include <cuda_runtime.h>
 #include <memory>
 
 struct AlgorithmLauncher {
-  AlgorithmLauncher() : function{nullptr}, library{nullptr} {}
+  AlgorithmLauncher() : kernel{nullptr}, library{nullptr} {}
 
-  AlgorithmLauncher(CUfunction f, CUlibrary lib);
+  AlgorithmLauncher(cudaKernel_t k, cudaLibrary_t lib);
 
   ~AlgorithmLauncher();
 
@@ -28,18 +28,18 @@ struct AlgorithmLauncher {
   AlgorithmLauncher& operator=(AlgorithmLauncher&& other) noexcept;
 
   template <typename... Args>
-  void dispatch(CUstream stream, dim3 grid, dim3 block, std::size_t shared_mem, Args&&... args)
+  void dispatch(cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, Args&&... args)
   {
     void* kernel_args[] = {const_cast<void*>(static_cast<void const*>(&args))...};
     this->call(stream, grid, block, shared_mem, kernel_args);
   }
 
-  CUfunction get_function() { return this->function; }
+  cudaKernel_t get_kernel() { return this->kernel; }
 
  private:
-  void call(CUstream stream, dim3 grid, dim3 block, std::size_t shared_mem, void** args);
-  CUfunction function;
-  CUlibrary library;
+  void call(cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, void** args);
+  cudaKernel_t kernel;
+  cudaLibrary_t library;
 };
 
 std::unordered_map<std::string, std::shared_ptr<AlgorithmLauncher>>& get_cached_launchers();
