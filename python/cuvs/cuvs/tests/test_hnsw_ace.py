@@ -223,7 +223,6 @@ def test_hnsw_ace_disk_serialize_deserialize():
         assert recall >= 0.7, f"Recall {recall:.3f} is below expected 0.7"
 
 
-@pytest.mark.skip(reason="Disk mode can cause pytest to hang")
 def test_hnsw_ace_tiny_memory_limit_triggers_disk_mode():
     """Test that setting tiny memory limits triggers disk mode automatically."""
     n_rows = 5000
