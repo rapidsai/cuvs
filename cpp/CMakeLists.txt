@@ -442,6 +442,7 @@ if(NOT BUILD_CPU_ONLY)
         ${post_lambda_files}
         src/detail/jit_lto/AlgorithmLauncher.cpp
         src/detail/jit_lto/AlgorithmPlanner.cpp
+        src/detail/jit_lto/FragmentEntry.cpp
         src/detail/jit_lto/nvjitlink_checker.cpp
     )
   endif()

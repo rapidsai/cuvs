@@ -17,32 +17,34 @@ template <typename DataTag,
           bool Ascending,
           bool ComputeNorm>
 struct InterleavedScanFragmentEntry final
-  : FatbinFragmentEntry<InterleavedScanFragmentEntry<DataTag,
-                                                     AccTag,
-                                                     IdxTag,
-                                                     Capacity,
-                                                     Veclen,
-                                                     Ascending,
-                                                     ComputeNorm>> {
+  : StaticFatbinFragmentEntry<InterleavedScanFragmentEntry<DataTag,
+                                                           AccTag,
+                                                           IdxTag,
+                                                           Capacity,
+                                                           Veclen,
+                                                           Ascending,
+                                                           ComputeNorm>> {
   static const uint8_t* const data;
   static const size_t length;
 };
 
 template <int Veclen, typename DataTag, typename AccTag, typename MetricTag>
 struct MetricFragmentEntry final
-  : FatbinFragmentEntry<MetricFragmentEntry<Veclen, DataTag, AccTag, MetricTag>> {
+  : StaticFatbinFragmentEntry<MetricFragmentEntry<Veclen, DataTag, AccTag, MetricTag>> {
   static const uint8_t* const data;
   static const size_t length;
 };
 
 template <typename IvfSampleFilterTag>
-struct FilterFragmentEntry final : FatbinFragmentEntry<FilterFragmentEntry<IvfSampleFilterTag>> {
+struct FilterFragmentEntry final
+  : StaticFatbinFragmentEntry<FilterFragmentEntry<IvfSampleFilterTag>> {
   static const uint8_t* const data;
   static const size_t length;
 };
 
 template <typename PostLambdaTag>
-struct PostLambdaFragmentEntry final : FatbinFragmentEntry<PostLambdaFragmentEntry<PostLambdaTag>> {
+struct PostLambdaFragmentEntry final
+  : StaticFatbinFragmentEntry<PostLambdaFragmentEntry<PostLambdaTag>> {
   static const uint8_t* const data;
   static const size_t length;
 };

@@ -20,16 +20,19 @@ struct FragmentEntry {
   virtual const char* get_key() const = 0;
 };
 
-template <typename FragmentT>
 struct FatbinFragmentEntry : FragmentEntry {
-  bool add_to(nvJitLinkHandle& handle) const override final
-  {
-    auto result = nvJitLinkAddData(
-      handle, NVJITLINK_INPUT_ANY, FragmentT::data, FragmentT::length, typeid(FragmentT).name());
+  virtual const uint8_t* get_data() const = 0;
 
-    check_nvjitlink_result(handle, result);
-    return true;
-  }
+  virtual size_t get_length() const = 0;
+
+  bool add_to(nvJitLinkHandle& handle) const override final;
+};
+
+template <typename FragmentT>
+struct StaticFatbinFragmentEntry : FatbinFragmentEntry {
+  const uint8_t* get_data() const override final { return FragmentT::data; }
+
+  size_t get_length() const override final { return FragmentT::length; }
 
   const char* get_key() const override final { return typeid(FragmentT).name(); }
 };
