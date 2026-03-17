@@ -380,8 +380,7 @@ void bench_search(::benchmark::State& state,
       auto recall_calculation = [&](int start, int end, int tid) -> void {
         for (int i = start; i < end; ++i) {
           size_t i_orig_idx = batch_offset + i;
-          if (i_orig_idx >= gt_maps->gt_maps_.size()) { break; }
-          size_t i_out_idx = out_offset + i;
+          size_t i_out_idx  = out_offset + i;
           if (i_out_idx < rows) {
             auto* candidates       = neighbors_host + i_out_idx * k;
             auto [matching, total] = gt_maps->count_matches(i_orig_idx, candidates, k);

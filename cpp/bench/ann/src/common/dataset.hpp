@@ -36,18 +36,13 @@ void generate_bernoulli(CarrierT* data, size_t words, double p)
 
 template <typename T>
 struct ground_truth_map {
-  using bitset_carrier_type = uint32_t;
-  // Hash maps of {id, neighbor_rank} for up to kMaxQueriesForRecall queries in the ground truth set
-  // e.g. gt_maps_[i][j] = k means that for the i-th query in the ground truth set, the neighbor
-  // with idx j is the k-th nearest. Note that the nearest neighbor rank starts from 0.
-  std::vector<std::unordered_map<T, T>> gt_maps_;
-  uint32_t max_k_ = 0;  // number of nearest neighbors in the ground truth
+  using bitset_carrier_type                      = uint32_t;
   static constexpr uint32_t kMaxQueriesForRecall = 10'000;
 
   explicit ground_truth_map(std::string file_name,
                             uint32_t n_queries,
                             std::optional<blob<bitset_carrier_type>>& filter_bitset)
-    : gt_maps_(std::min(n_queries, kMaxQueriesForRecall))
+    : gt_maps_(n_queries)
   {
     // Eagerly iterate over and optionally filter the ground truth set to build gt_maps_ for up to
     // kMaxQueriesForRecall queries
@@ -79,11 +74,12 @@ struct ground_truth_map {
     if (num_map_building_worker_threads < 0) { num_map_building_worker_threads = 0; }
     std::vector<std::thread> gt_map_building_workers;
     gt_map_building_workers.reserve(num_map_building_worker_threads);
-    uint32_t n_queries_for_recall = gt_maps_.size();
-    int chunk_size                = n_queries_for_recall / (num_map_building_worker_threads + 1);
-    int remainder                 = n_queries_for_recall % (num_map_building_worker_threads + 1);
-    auto build_gt_map             = [&](int start, int end, int tid) -> void {
+    int chunk_size    = n_queries / (num_map_building_worker_threads + 1);
+    int remainder     = n_queries % (num_map_building_worker_threads + 1);
+    int stride        = (n_queries - 1) / kMaxQueriesForRecall + 1;  // round-up division
+    auto build_gt_map = [&](int start, int end, int tid) -> void {
       for (int query_idx = start; query_idx < end; ++query_idx) {
+        if (query_idx % stride) continue;
         for (std::uint32_t neighbor_rank = 0; neighbor_rank < max_k_; ++neighbor_rank) {
           auto id = ground_truth_set.data()[query_idx * max_k_ + neighbor_rank];
           if (!filter(id)) { continue; }
@@ -105,17 +101,21 @@ struct ground_truth_map {
       start = end;
     }
     // main thread works on last chunk
-    build_gt_map(start, n_queries_for_recall, num_map_building_worker_threads);
+    build_gt_map(start, n_queries, num_map_building_worker_threads);
     // join all worker threads
     for (auto& worker : gt_map_building_workers) {
       worker.join();
     }
   }
 
+  [[nodiscard]] auto max_k() const -> uint32_t { return max_k_; }
+
   template <typename index_type>
   [[nodiscard]] auto count_matches(size_t query_idx, const index_type* candidates, uint32_t k) const
     -> std::pair<size_t, size_t>
   {
+    if (query_idx >= gt_maps_.size() || gt_maps_[query_idx].empty()) return {0, 0};
+
     size_t matching = 0;
     for (uint32_t i = 0; i < k; ++i) {
       auto act_idx = candidates[i];
@@ -127,6 +127,13 @@ struct ground_truth_map {
     size_t total = std::min(gt_maps_[query_idx].size(), static_cast<size_t>(k));
     return {matching, total};
   }
+
+ private:
+  // Hash maps of {id, neighbor_rank} for up to kMaxQueriesForRecall queries in the ground truth set
+  // e.g. gt_maps_[i][j] = k means that for the i-th query in the ground truth set, the neighbor
+  // with idx j is the k-th nearest. Note that the nearest neighbor rank starts from 0.
+  std::vector<std::unordered_map<T, T>> gt_maps_;
+  uint32_t max_k_ = 0;  // number of nearest neighbors in the ground truth
 };
 
 template <typename DataT, typename IdxT = int32_t>
@@ -216,7 +223,7 @@ struct dataset {
   }
   [[nodiscard]] auto max_k() const -> uint32_t
   {
-    if (ground_truth_map_.has_value()) { return ground_truth_map_->max_k_; }
+    if (ground_truth_map_.has_value()) { return ground_truth_map_->max_k(); }
     return 0;
   }
   [[nodiscard]] auto base_set_size() const -> size_t
