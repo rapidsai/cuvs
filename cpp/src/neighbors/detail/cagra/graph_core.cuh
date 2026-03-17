@@ -1683,7 +1683,7 @@ void optimize(raft::resources const& res,
 
   // reverse graph creation will always use the GPU
   auto d_rev_graph = raft::make_device_mdarray<IdxT>(
-    res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, output_graph_degree));
+    res, default_ws_mr, raft::make_extents<int64_t>(graph_size, output_graph_degree));
 
   // This should use the default workspace resource for random access / atomics
   auto d_rev_graph_count = raft::make_device_mdarray<uint32_t>(

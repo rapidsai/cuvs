@@ -2023,69 +2023,21 @@ void reconstruct_vpq_queries(raft::resources const& res,
 }
 
 template <typename T, typename IdxT>
-void search_to_device_graph(raft::resources const& res,
-                            const cuvs::neighbors::cagra::search_params& search_params,
-                            const index<T, IdxT>& idx,
-                            raft::device_matrix_view<const T, int64_t> dev_query_view,
-                            raft::device_matrix_view<IdxT, int64_t> dev_neighbors,
-                            raft::device_matrix_view<float, int64_t> dev_distances,
-                            raft::device_matrix_view<IdxT, int64_t> dev_graph_output,
-                            size_t curr_query_size,
-                            size_t next_graph_degree,
-                            size_t curr_topk,
-                            uint64_t max_chunk_size)
-{
-  cuvs::spatial::knn::detail::utils::batch_load_iterator<T> query_batch(
-    dev_query_view.data_handle(),
-    curr_query_size,
-    dev_query_view.extent(1),
-    max_chunk_size,
-    raft::resource::get_cuda_stream(res),
-    raft::resource::get_workspace_resource(res));
-
-  for (const auto& batch : query_batch) {
-    auto batch_dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
-      batch.data(), batch.size(), dev_query_view.extent(1));
-    auto batch_dev_neighbors_view = raft::make_device_matrix_view<IdxT, int64_t>(
-      dev_neighbors.data_handle(), batch.size(), curr_topk);
-    auto batch_dev_distances_view = raft::make_device_matrix_view<float, int64_t>(
-      dev_distances.data_handle(), batch.size(), curr_topk);
-
-    cuvs::neighbors::cagra::search(
-      res, search_params, idx, batch_dev_query_view, batch_dev_neighbors_view,
-      batch_dev_distances_view);
-
-    RAFT_CUDA_TRY(cudaMemcpy2DAsync(
-      dev_graph_output.data_handle() + batch.offset() * next_graph_degree,
-      next_graph_degree * sizeof(IdxT),
-      dev_neighbors.data_handle(),
-      curr_topk * sizeof(IdxT),
-      next_graph_degree * sizeof(IdxT),
-      batch.size(),
-      cudaMemcpyDeviceToDevice,
-      raft::resource::get_cuda_stream(res)));
-  }
-
-  raft::resource::sync_stream(res);
-}
-
-template <typename T, typename IdxT>
 void search_and_optimize(raft::resources const& res,
                          const cuvs::neighbors::cagra::search_params& search_params,
                          const index<T, IdxT>& idx,
                          raft::device_matrix_view<const T, int64_t> dev_query_view,
                          raft::device_matrix_view<IdxT, int64_t> dev_neighbors,
                          raft::device_matrix_view<float, int64_t> dev_distances,
-                         raft::host_matrix_view<IdxT, int64_t> neighbors_view,
-                         raft::host_matrix<IdxT, int64_t>& cagra_graph,
+                         raft::device_matrix<IdxT, int64_t>& dev_output_graph,
                          size_t curr_query_size,
                          size_t next_graph_degree,
                          size_t curr_topk,
-                         uint64_t max_chunk_size,
-                         bool flag_last,
-                         const index_params& params)
+                         uint64_t max_chunk_size)
 {
   auto stream = raft::resource::get_cuda_stream(res);
+
+  auto dev_knn_graph = raft::make_device_matrix<IdxT, int64_t>(res, curr_query_size, curr_topk);
 
   cuvs::spatial::knn::detail::utils::batch_load_iterator<T> query_batch(
     dev_query_view.data_handle(),
@@ -2109,19 +2061,16 @@ void search_and_optimize(raft::resources const& res,
                                    batch_dev_neighbors_view,
                                    batch_dev_distances_view);
 
-    raft::copy(neighbors_view.data_handle() + batch.offset() * curr_topk,
+    raft::copy(dev_knn_graph.data_handle() + batch.offset() * curr_topk,
                batch_dev_neighbors_view.data_handle(),
                batch.size() * curr_topk,
                stream);
   }
 
-  auto next_graph_size = curr_query_size;
-  cagra_graph          = raft::make_host_matrix<IdxT, int64_t>(0, 0);
-  cagra_graph          = raft::make_host_matrix<IdxT, int64_t>(next_graph_size, next_graph_degree);
-  optimize<IdxT>(res,
-                 neighbors_view,
-                 cagra_graph.view(),
-                 flag_last ? params.guarantee_connectivity : false);
+  dev_output_graph =
+    raft::make_device_matrix<IdxT, int64_t>(res, curr_query_size, next_graph_degree);
+
+  graph::optimize<IdxT>(res, dev_knn_graph.view(), dev_output_graph.view(), false);
 }
 
 template <typename T,
@@ -2206,18 +2155,9 @@ auto iterative_build_graph(
     }
   }
 
-  // Allocate memory for neighbors list using Transparent HugePage
-  constexpr size_t thp_size = 2 * 1024 * 1024;
-  size_t byte_size          = sizeof(IdxT) * final_graph_size * topk;
-  if (byte_size % thp_size) { byte_size += thp_size - (byte_size % thp_size); }
-  mmap_owner neighbors_list(byte_size);
-  IdxT* neighbors_ptr = (IdxT*)neighbors_list.data();
-  memset(neighbors_ptr, 0, byte_size);
-
   bool flag_last       = false;
   auto curr_graph_size = initial_graph_size;
 
-  // Device graph for skip_graph_optimization: keeps the graph on device between iterations.
   auto dev_graph        = raft::make_device_matrix<IdxT, int64_t>(res, 0, 0);
   bool use_device_graph = false;
 
@@ -2244,13 +2184,13 @@ auto iterative_build_graph(
       "# Freed original dataset from device (%.1f MiB); queries will use VPQ reconstruction",
       to_mib(final_graph_size * dataset_dim * sizeof(T)));
   }
-  bool do_skip = true;
   while (true) {
     auto start           = std::chrono::high_resolution_clock::now();
     auto curr_query_size = std::min(2 * curr_graph_size, final_graph_size);
 
     auto next_graph_degree = small_graph_degree;
     if (curr_graph_size == final_graph_size) { next_graph_degree = graph_degree; }
+    RAFT_LOG_INFO("Current graph size %lu: # current graph degree = %lu", (uint64_t)curr_graph_size, (uint64_t)next_graph_degree);
 
     // The search count (topk) is set to the next graph degree + 1, because
     // pruning is not used except in the last iteration.
@@ -2261,9 +2201,6 @@ auto iterative_build_graph(
       curr_topk       = topk;
       curr_itopk_size = curr_topk + 32;
     }
-
-    do_skip = false;//params.skip_graph_optimization && !flag_last;
-    RAFT_LOG_INFO("# do_skip = %s", do_skip ? "true" : "false");
 
     cuvs::neighbors::cagra::search_params search_params;
     search_params.algo           = cuvs::neighbors::cagra::search_algo::AUTO;
@@ -2311,46 +2248,22 @@ auto iterative_build_graph(
       : raft::make_device_matrix_view<const T, int64_t>(
           dev_dataset.data_handle(), (int64_t)curr_query_size, dev_dataset.extent(1));
 
-    if (do_skip) {
-      auto dev_graph_next =
-        raft::make_device_matrix<IdxT, int64_t>(res, curr_query_size, next_graph_degree);
+    auto dev_optimized_graph = raft::make_device_matrix<IdxT, int64_t>(res, 0, 0);
 
-      search_to_device_graph(res,
-                             search_params,
-                             idx,
-                             dev_query_view,
-                             dev_neighbors.view(),
-                             dev_distances.view(),
-                             dev_graph_next.view(),
-                             curr_query_size,
-                             next_graph_degree,
-                             curr_topk,
-                             max_chunk_size);
+    search_and_optimize(res,
+                        search_params,
+                        idx,
+                        dev_query_view,
+                        dev_neighbors.view(),
+                        dev_distances.view(),
+                        dev_optimized_graph,
+                        curr_query_size,
+                        next_graph_degree,
+                        curr_topk,
+                        max_chunk_size);
 
-      dev_graph        = std::move(dev_graph_next);
-      use_device_graph = true;
-    } else {
-      auto neighbors_view =
-        raft::make_host_matrix_view<IdxT, int64_t>(neighbors_ptr, curr_query_size, curr_topk);
-
-      search_and_optimize(res,
-                          search_params,
-                          idx,
-                          dev_query_view,
-                          dev_neighbors.view(),
-                          dev_distances.view(),
-                          neighbors_view,
-                          cagra_graph,
-                          curr_query_size,
-                          next_graph_degree,
-                          curr_topk,
-                          max_chunk_size,
-                          flag_last,
-                          params);
-
-      dev_graph        = raft::make_device_matrix<IdxT, int64_t>(res, 0, 0);
-      use_device_graph = false;
-    }
+    dev_graph        = std::move(dev_optimized_graph);
+    use_device_graph = true;
 
     auto end        = std::chrono::high_resolution_clock::now();
     auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -2361,6 +2274,14 @@ auto iterative_build_graph(
     auto next_graph_size = curr_query_size;
     curr_graph_size      = next_graph_size;
   }
+
+  auto stream = raft::resource::get_cuda_stream(res);
+  cagra_graph = raft::make_host_matrix<IdxT, int64_t>(dev_graph.extent(0), dev_graph.extent(1));
+  raft::copy(cagra_graph.data_handle(),
+             dev_graph.data_handle(),
+             dev_graph.extent(0) * dev_graph.extent(1),
+             stream);
+  raft::resource::sync_stream(res);
 
   return cagra_graph;
 }
