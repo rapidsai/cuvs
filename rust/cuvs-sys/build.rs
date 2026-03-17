@@ -15,11 +15,8 @@ fn main() {
         "cargo:rustc-link-search=native={}/lib",
         cuvs_build.display()
     );
-    if let Ok(conda_prefix) = env::var("CONDA_PREFIX") {
-        println!("cargo:rustc-link-search=native={}/lib", conda_prefix);
-    }
     println!("cargo:rustc-link-lib=dylib=cuvs_c");
-    println!("cargo:rustc-link-lib=static=cudart_static");
+    println!("cargo:rustc-link-lib=dylib=cudart");
 
     // we need some extra flags both to link against cuvs, and also to run bindgen
     // specifically we need to:
