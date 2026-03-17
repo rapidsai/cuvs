@@ -774,7 +774,6 @@ if(NOT BUILD_CPU_ONLY)
       PUBLIC rmm::rmm
              raft::raft
              cuvs::cuvs_cpp_headers
-             CUDA::cuda_driver
              ${CUVS_CTK_MATH_DEPENDENCIES}
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
@@ -838,7 +837,6 @@ SECTIONS
       PUBLIC rmm::rmm
              raft::raft
              cuvs::cuvs_cpp_headers
-             CUDA::cuda_driver
              ${CUVS_CTK_MATH_DEPENDENCIES}
              $<TARGET_NAME_IF_EXISTS:NCCL::NCCL> # needs to be public for DT_NEEDED
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>> # header only
