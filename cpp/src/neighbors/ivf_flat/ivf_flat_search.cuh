@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -18,10 +18,10 @@
 #include <raft/core/error.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/core/resources.hpp>   // raft::resources
-#include <raft/linalg/gemm.cuh>      // raft::linalg::gemm
-#include <raft/linalg/norm.cuh>      // raft::linalg::norm
-#include <raft/linalg/unary_op.cuh>  // raft::linalg::unary_op
+#include <raft/core/resources.hpp>  // raft::resources
+#include <raft/linalg/gemm.cuh>     // raft::linalg::gemm
+#include <raft/linalg/map.cuh>      // raft::linalg::map
+#include <raft/linalg/norm.cuh>     // raft::linalg::norm
 #include <raft/matrix/detail/select_warpsort.cuh>
 
 #include <rmm/resource_ref.hpp>
@@ -322,7 +322,7 @@ void search_impl(raft::resources const& handle,
   if (!manage_local_topk) {
     // post process distances && neighbor IDs
     ivf::detail::postprocess_distances(
-      distances, distances, index.metric(), n_queries, k, 1.0, false, stream);
+      handle, distances, distances, index.metric(), n_queries, k, 1.0, false);
   }
   ivf::detail::postprocess_neighbors(neighbors,
                                      neighbors_uint32,

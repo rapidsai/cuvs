@@ -221,3 +221,49 @@ def test_hnsw_ace_disk_serialize_deserialize():
 
         recall = calc_recall(out_idx, skl_idx)
         assert recall >= 0.7, f"Recall {recall:.3f} is below expected 0.7"
+
+
+def test_hnsw_ace_tiny_memory_limit_triggers_disk_mode():
+    """Test that setting tiny memory limits triggers disk mode automatically."""
+    n_rows = 5000
+    n_cols = 64
+    dtype = np.float32
+    metric = "sqeuclidean"
+
+    dataset = generate_data((n_rows, n_cols), dtype)
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Set ACE parameters with tiny memory limits (0.001 GiB = ~1 MB)
+        # This should force disk mode even though we didn't explicitly set use_disk=True
+        ace_params = hnsw.AceParams(
+            npartitions=2,
+            build_dir=temp_dir,
+            use_disk=False,  # Not explicitly requesting disk mode
+            max_host_memory_gb=0.001,  # Tiny limit to force disk mode
+            max_gpu_memory_gb=0.001,  # Tiny limit to force disk mode
+        )
+
+        # Create HNSW index params with ACE
+        index_params = hnsw.IndexParams(
+            hierarchy="gpu",
+            M=32,
+            ef_construction=100,
+            metric=metric,
+            ace_params=ace_params,
+        )
+
+        # Build the index using ACE - should automatically use disk mode
+        hnsw_index = hnsw.build(index_params, dataset)
+        assert hnsw_index.trained
+
+        # In disk mode, the graph should be stored in the build directory
+        # Check that the graph file was created
+        graph_file = os.path.join(temp_dir, "cagra_graph.npy")
+        reordered_file = os.path.join(temp_dir, "reordered_dataset.npy")
+
+        assert os.path.exists(graph_file), (
+            "Graph file should exist when disk mode is triggered"
+        )
+        assert os.path.exists(reordered_file), (
+            "Reordered dataset file should exist when disk mode is triggered"
+        )

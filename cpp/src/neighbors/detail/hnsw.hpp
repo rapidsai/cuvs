@@ -13,7 +13,9 @@
 #include <cuvs/neighbors/hnsw.hpp>
 #include <cuvs/util/file_io.hpp>
 
+#include <raft/core/copy.cuh>
 #include <raft/core/detail/mdspan_numpy_serializer.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/pinned_mdarray.hpp>
 
@@ -267,10 +269,7 @@ std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> fro
     // copy cagra graph to host
     host_graph = raft::make_host_matrix<uint32_t, int64_t>(host_graph_view.extent(0),
                                                            host_graph_view.extent(1));
-    raft::copy(host_graph.data_handle(),
-               host_graph_view.data_handle(),
-               host_graph_view.size(),
-               raft::resource::get_cuda_stream(res));
+    raft::copy(res, host_graph.view(), host_graph_view);
     raft::resource::sync_stream(res);
     host_graph_view = host_graph.view();
   }
@@ -914,10 +913,11 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
         if (next_batch_i < n_batches) {
           auto offset     = next_batch_i * max_batch_size;
           auto batch_size = std::min(max_batch_size, n_rows - offset);
-          raft::copy(bufs[next_batch_i % 2],
-                     source_dataset + offset * source_stride,
-                     batch_size * source_stride,
-                     stream);
+          raft::copy(
+            res,
+            raft::make_host_vector_view(bufs[next_batch_i % 2], batch_size * source_stride),
+            raft::make_device_vector_view(source_dataset + offset * source_stride,
+                                          batch_size * source_stride));
         }
       }
       if (batch_i < 0) { continue; }
@@ -1294,11 +1294,13 @@ std::unique_ptr<index<T>> build(raft::resources const& res,
 
   // Configure ACE parameters for CAGRA
   cuvs::neighbors::cagra::graph_build_params::ace_params cagra_ace_params;
-  cagra_ace_params.npartitions     = ace_params.npartitions;
-  cagra_ace_params.ef_construction = params.ef_construction;
-  cagra_ace_params.build_dir       = ace_params.build_dir;
-  cagra_ace_params.use_disk        = ace_params.use_disk;
-  cagra_params.graph_build_params  = cagra_ace_params;
+  cagra_ace_params.npartitions        = ace_params.npartitions;
+  cagra_ace_params.ef_construction    = params.ef_construction;
+  cagra_ace_params.build_dir          = ace_params.build_dir;
+  cagra_ace_params.use_disk           = ace_params.use_disk;
+  cagra_ace_params.max_host_memory_gb = ace_params.max_host_memory_gb;
+  cagra_ace_params.max_gpu_memory_gb  = ace_params.max_gpu_memory_gb;
+  cagra_params.graph_build_params     = cagra_ace_params;
 
   RAFT_LOG_INFO(
     "hnsw::build - Building HNSW index using ACE with %zu partitions, ef_construction=%zu",

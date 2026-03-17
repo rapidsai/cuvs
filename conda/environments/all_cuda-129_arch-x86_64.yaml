@@ -11,7 +11,6 @@ dependencies:
 - clang-tools==20.1.4
 - clang==20.1.4
 - cmake>=3.30.4
-- cuda-cudart-dev
 - cuda-nvcc
 - cuda-nvtx-dev
 - cuda-profiler-api
@@ -19,7 +18,7 @@ dependencies:
 - cuda-version=12.9
 - cupy>=13.6.0
 - cxx-compiler
-- cython>=3.0.0,<3.2.0
+- cython>=3.2.2
 - dlpack>=0.8,<1.0
 - doxygen>=1.8.20
 - gcc_linux-64=14.*
@@ -31,7 +30,7 @@ dependencies:
 - libcurand-dev
 - libcusolver-dev
 - libcusparse-dev
-- librmm==26.2.*
+- librmm==26.6.*,>=0.0.0a0
 - make
 - nccl>=2.19
 - ninja
@@ -39,14 +38,14 @@ dependencies:
 - numpydoc
 - openblas
 - pre-commit
-- pylibraft==26.2.*
+- pylibraft==26.6.*,>=0.0.0a0
+- pytest
 - pytest-cov
-- pytest<9.0.0
 - rapids-build-backend>=0.4.0,<0.5.0
 - recommonmark
 - rust
 - scikit-build-core>=0.11.0
-- scikit-learn
+- scikit-learn>=1.5
 - sphinx-copybutton
 - sphinx-markdown-tables
 - sphinx>=8.0.0
