@@ -31,6 +31,7 @@ endif()
 unset(cuvs_FOUND)
 
 # --- CUDA --- #
+set(CUDA_STATIC_RUNTIME ON)
 set(CUDA_STATIC_MATH_LIBRARIES OFF)
 
 # --- RAFT ---#
