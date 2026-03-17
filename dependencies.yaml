@@ -96,7 +96,6 @@ files:
       - cuda_version
       - rapids_build
       - rust
-      - depends_on_cudart
       - depends_on_libcuvs
       - depends_on_libraft
       - depends_on_nccl
@@ -111,7 +110,6 @@ files:
       - cuda_version
       - rapids_build
       - go
-      - depends_on_cudart
       - depends_on_libcuvs
       - depends_on_libraft
       - depends_on_nccl
@@ -321,6 +319,7 @@ dependencies:
       - output_types: [conda]
         packages:
           - cuda-nvtx-dev
+          - cuda-cudart-dev
           - cuda-profiler-api
           - libcublas-dev
           - libcurand-dev
@@ -358,11 +357,6 @@ dependencies:
           - matrix:
             packages:
               - cuda-toolkit[cublas,curand,cusolver,cusparse,nvjitlink]>=12,<14
-  depends_on_cudart:
-    common:
-      - output_types: conda
-        packages:
-          - cuda-cudart-dev
   depends_on_cupy:
     common:
       - output_types: conda
