@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-import platform
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -12,9 +12,15 @@ from click.testing import CliRunner
 from cuvs_bench.get_dataset.__main__ import main
 
 
-def is_arm_cpu():
-    """Check if running on ARM Linux architecture."""
-    return platform.machine() in ("aarch64", "arm64")
+def _skip_diskann():
+    """Check if DiskANN benchmarks should be skipped.
+
+    Returns True when libdiskann.so is not found in the conda environment
+    """
+    conda_prefix = os.environ.get("CONDA_PREFIX", "")
+    return not os.path.isfile(
+        os.path.join(conda_prefix, "lib", "libdiskann.so")
+    )
 
 
 @pytest.fixture(scope="session")
@@ -70,7 +76,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
 
     from cuvs_bench.run.__main__ import main as run_main
 
-    skip_diskann = is_arm_cpu()
+    skip_diskann = _skip_diskann()
     algorithms = "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq"
     if not skip_diskann:
         algorithms += ",cuvs_vamana,diskann_memory"
@@ -117,7 +123,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
     ]
 
     # --- Verify that the expected result files exist and are not empty ---
-    skip_diskann = is_arm_cpu()
+    skip_diskann = _skip_diskann()
 
     expected_files = {
         # Build files:
@@ -615,7 +621,7 @@ def test_plot_command_creates_png_files(temp_datasets_dir: Path):
 
     from cuvs_bench.plot.__main__ import main as plot_main
 
-    skip_diskann = is_arm_cpu()
+    skip_diskann = _skip_diskann()
     algorithms = "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq"
     if not skip_diskann:
         algorithms += ",cuvs_vamana,diskann_memory"
