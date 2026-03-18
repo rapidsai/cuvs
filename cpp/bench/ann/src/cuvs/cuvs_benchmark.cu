@@ -93,7 +93,7 @@ auto create_algo(const std::string& algo_name,
 #endif
 #ifdef CUVS_ANN_BENCH_USE_CUVS_IVF_RABITQ
   if constexpr (std::is_same_v<T, float>) {
-    if (algo_name == "raft_ivf_rabitq" || algo_name == "cuvs_ivf_rabitq") {
+    if (algo_name == "cuvs_ivf_rabitq") {
       typename cuvs::bench::cuvs_ivf_rabitq<T, int64_t>::build_param param;
       parse_build_param<T, int64_t>(conf, param);
       a = std::make_unique<cuvs::bench::cuvs_ivf_rabitq<T, int64_t>>(metric, dim, param);
@@ -169,7 +169,7 @@ auto create_search_param(const std::string& algo_name, const nlohmann::json& con
 #endif
 #ifdef CUVS_ANN_BENCH_USE_CUVS_IVF_RABITQ
   if constexpr (std::is_same_v<T, float>) {
-    if (algo_name == "raft_ivf_rabitq" || algo_name == "cuvs_ivf_rabitq") {
+    if (algo_name == "cuvs_ivf_rabitq") {
       auto param =
         std::make_unique<typename cuvs::bench::cuvs_ivf_rabitq<T, int64_t>::search_param>();
       parse_search_param<T, int64_t>(conf, *param);
