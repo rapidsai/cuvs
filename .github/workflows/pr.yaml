@@ -67,6 +67,8 @@ jobs:
       files_yaml: |
         build_docs:
           - '**'
+          - '!**/*/agents.md'
+          - '!.coderabbit.yaml'
           - '!.devcontainer/**'
           - '!.github/CODEOWNERS'
           - '!.github/ISSUE_TEMPLATE/**'
@@ -89,6 +91,8 @@ jobs:
           - '!thirdparty/LICENSES/**'
         test_cpp:
           - '**'
+          - '!**/*/agents.md'
+          - '!.coderabbit.yaml'
           - '!.devcontainer/**'
           - '!.github/CODEOWNERS'
           - '!.github/ISSUE_TEMPLATE/**'
@@ -123,6 +127,8 @@ jobs:
           - '!thirdparty/LICENSES/**'
         test_java:
           - '**'
+          - '!**/*/agents.md'
+          - '!.coderabbit.yaml'
           - '!.devcontainer/**'
           - '!.github/CODEOWNERS'
           - '!.github/ISSUE_TEMPLATE/**'
@@ -156,6 +162,8 @@ jobs:
           - '!thirdparty/LICENSES/**'
         test_python_conda:
           - '**'
+          - '!**/*/agents.md'
+          - '!.coderabbit.yaml'
           - '!.devcontainer/**'
           - '!.github/CODEOWNERS'
           - '!.github/ISSUE_TEMPLATE/**'
@@ -193,6 +201,8 @@ jobs:
           - '!thirdparty/LICENSES/**'
         test_python_wheels:
           - '**'
+          - '!**/*/agents.md'
+          - '!.coderabbit.yaml'
           - '!.devcontainer/**'
           - '!.github/CODEOWNERS'
           - '!.github/ISSUE_TEMPLATE/**'
@@ -235,6 +245,8 @@ jobs:
           - '!thirdparty/LICENSES/**'
         test_rust:
           - '**'
+          - '!**/*/agents.md'
+          - '!.coderabbit.yaml'
           - '!.devcontainer/**'
           - '!.github/CODEOWNERS'
           - '!.github/ISSUE_TEMPLATE/**'
@@ -272,6 +284,8 @@ jobs:
           - '!thirdparty/LICENSES/**'
         test_go:
           - '**'
+          - '!**/*/agents.md'
+          - '!.coderabbit.yaml'
           - '!.devcontainer/**'
           - '!.github/CODEOWNERS'
           - '!.github/ISSUE_TEMPLATE/**'
