@@ -141,6 +141,12 @@ from .run import run_benchmark
     "were interrupted, use this option to convert those intermediate "
     "files manually.",
 )
+@click.option(
+    "--live-csv",
+    is_flag=True,
+    help="Update search CSV after each benchmark run (run search one config at a time). "
+    "Use so that Ctrl+C still leaves a usable CSV with partial results.",
+)
 def main(
     subset_size: Optional[int],
     count: int,
@@ -159,6 +165,7 @@ def main(
     search_threads: Optional[str],
     dry_run: bool,
     data_export: bool,
+    live_csv: bool,
 ) -> None:
     """
     Main function to run the benchmark with the provided options.

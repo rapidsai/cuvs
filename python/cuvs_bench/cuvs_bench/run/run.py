@@ -342,14 +342,18 @@ def get_build_path(executable: str) -> Optional[str]:
         print(f"-- Detected devcontainer artifact {devc_executable}.")
         return devc_executable
 
-    build_path = os.getenv("CUVS_HOME")
-    if build_path:
-        build_path = os.path.join(
-            build_path, "cpp", "build", "release", executable
-        )
-        if os.path.exists(build_path):
-            print(f"-- Using cuVS bench from repository in {build_path}.")
-            return build_path
+    # Prefer local build over conda so your libcuvs (e.g. with normalization) is used
+    repo = os.getenv("CUVS_HOME")
+    if repo:
+        for rel in (
+            os.path.join("cpp", "build", "release", executable),
+            os.path.join("cpp", "build", "bench", "ann", executable),
+            os.path.join("cpp", "build", executable),
+        ):
+            candidate = os.path.join(repo, rel)
+            if os.path.exists(candidate):
+                print(f"-- Using cuVS bench from repository in {candidate}.")
+                return candidate
 
     conda_path = os.getenv("CONDA_PREFIX")
     if conda_path:
@@ -580,6 +584,7 @@ def run_benchmark(
     search_threads: int,
     dry_run: bool,
     data_export: bool,
+    live_csv: bool = False,
 ) -> None:
     """
     Runs a benchmarking process based on the provided configurations.
@@ -687,4 +692,5 @@ def run_benchmark(
         batch_size,
         search_threads,
         search_mode,
+        live_csv=live_csv,
     )
