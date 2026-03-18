@@ -7,6 +7,7 @@
 
 #include "../neighbors/detail/ann_utils.cuh"
 #include "detail/kmeans_balanced.cuh"
+#include "detail/kmeans_predict_cagra.cuh"
 #include <raft/core/mdarray.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/util/cuda_utils.cuh>
@@ -155,6 +156,45 @@ void predict(const raft::resources& handle,
                                          labels.data_handle(),
                                          mapping_op,
                                          raft::resource::get_workspace_resource(handle));
+}
+
+/**
+ * @brief Assign each sample to nearest centroid using CAGRA (ANN-based, approximate).
+ *
+ * Same contract as predict() but builds a CAGRA index on centroids and runs k=1 search.
+ * Faster than brute force when the number of clusters K is large; results are approximate.
+ * Only supported when centroids are float and metric is L2Expanded, L2SqrtExpanded,
+ * InnerProduct, or CosineExpanded.
+ *
+ * @param[in]  handle     The raft resources
+ * @param[in]  params     Structure containing the hyper-parameters (metric)
+ * @param[in]  X          Dataset for which to infer the closest clusters
+ * @param[in]  centroids  The input centroids [dim = n_clusters x n_features]
+ * @param[out] labels     The output labels [dim = n_samples]
+ * @param[in]  mapping_op (optional) Functor to convert from the input datatype to float
+ */
+template <typename DataT,
+          typename MathT,
+          typename IndexT,
+          typename LabelT,
+          typename MappingOpT = raft::identity_op>
+void predict_cagra(const raft::resources& handle,
+                   cuvs::cluster::kmeans::balanced_params const& params,
+                   raft::device_matrix_view<const DataT, IndexT> X,
+                   raft::device_matrix_view<const MathT, IndexT> centroids,
+                   raft::device_vector_view<LabelT, IndexT> labels,
+                   MappingOpT mapping_op = raft::identity_op())
+{
+  RAFT_EXPECTS(X.extent(0) == labels.extent(0),
+               "Number of rows in dataset and labels are different");
+  RAFT_EXPECTS(X.extent(1) == centroids.extent(1),
+               "Number of features in dataset and centroids are different");
+  RAFT_EXPECTS(static_cast<uint64_t>(centroids.extent(0)) <=
+                 static_cast<uint64_t>(std::numeric_limits<LabelT>::max()),
+               "The chosen label type cannot represent all cluster labels");
+
+  cuvs::cluster::kmeans::detail::predict_cagra(
+    handle, params, X, centroids, labels, mapping_op);
 }
 
 namespace helpers {

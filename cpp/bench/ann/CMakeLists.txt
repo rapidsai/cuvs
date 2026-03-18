@@ -255,6 +255,33 @@ if(CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE)
   )
 endif()
 
+# Cluster assignment benchmark: brute force vs CAGRA for assigning vectors to clusters (IVF training)
+if(CUVS_ANN_BENCH_USE_CUVS_CAGRA)
+  add_executable(CUVS_CLUSTER_ASSIGNMENT_BENCH src/cuvs/cuvs_cluster_assignment_bench.cu)
+  target_link_libraries(
+    CUVS_CLUSTER_ASSIGNMENT_BENCH
+    PRIVATE cuvs
+            benchmark::benchmark
+            $<$<TARGET_EXISTS:CUDA::nvtx3>:CUDA::nvtx3>
+            $<COMPILE_ONLY:nvidia::cutlass::cutlass>
+  )
+  target_include_directories(
+    CUVS_CLUSTER_ASSIGNMENT_BENCH
+    PUBLIC "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/include>"
+           "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/../c/include>"
+    PRIVATE "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/src>"
+  )
+  set_target_properties(
+    CUVS_CLUSTER_ASSIGNMENT_BENCH
+    PROPERTIES CXX_STANDARD 17
+               CXX_STANDARD_REQUIRED ON
+               CUDA_STANDARD 17
+               CUDA_STANDARD_REQUIRED ON
+  )
+  install(TARGETS CUVS_CLUSTER_ASSIGNMENT_BENCH COMPONENT ann_bench DESTINATION bin/ann)
+  add_dependencies(CUVS_ANN_BENCH_ALL CUVS_CLUSTER_ASSIGNMENT_BENCH)
+endif()
+
 if(CUVS_ANN_BENCH_USE_CUVS_CAGRA)
   ConfigureAnnBench(
     NAME

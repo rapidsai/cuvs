@@ -22,6 +22,10 @@
 // TODO (cjnolet): This should be using an exposed API instead of circumventing the public APIs.
 #include "../../cluster/kmeans_balanced.cuh"
 #include <cuvs/cluster/kmeans.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+
+// Use CAGRA for cluster assignment in extend when n_lists >= this (faster for large K).
+constexpr uint32_t kUseAnnForClusterAssignmentMinClusters = 4096;
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/logger.hpp>
@@ -1111,21 +1115,64 @@ void extend(raft::resources const& handle,
                                     cudaMemcpyDefault,
                                     stream));
     vec_batches.prefetch_next_batch();
-    for (const auto& batch : vec_batches) {
-      auto batch_data_view = raft::make_device_matrix_view<const T, internal_extents_t>(
-        batch.data(), batch.size(), index->dim());
-      auto batch_labels_view = raft::make_device_vector_view<uint32_t, internal_extents_t>(
-        new_data_labels.data() + batch.offset(), batch.size());
-      auto centers_view = raft::make_device_matrix_view<const float, internal_extents_t>(
+
+    cuvs::cluster::kmeans::balanced_params kmeans_params;
+    kmeans_params.metric = index->metric();
+
+    if (n_clusters >= kUseAnnForClusterAssignmentMinClusters) {
+      // Use CAGRA for cluster assignment when K is large (build once, search per batch).
+      auto centers_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
         cluster_centers.data(), n_clusters, index->dim());
-      cuvs::cluster::kmeans::balanced_params kmeans_params;
-      kmeans_params.metric = index->metric();
-      cuvs::cluster::kmeans::predict(
-        handle, kmeans_params, batch_data_view, centers_view, batch_labels_view);
-      vec_batches.prefetch_next_batch();
-      // User needs to make sure kernel finishes its work before we overwrite batch in the next
-      // iteration if different streams are used for kernel and copy.
-      raft::resource::sync_stream(handle);
+      cuvs::neighbors::cagra::index_params cagra_params;
+      cagra_params.metric = index->metric();
+      cagra_params.graph_degree =
+        std::min<size_t>(64, std::max<size_t>(1, static_cast<size_t>(n_clusters) - 1));
+      cagra_params.intermediate_graph_degree =
+        std::min<size_t>(128, std::max<size_t>(1, static_cast<size_t>(n_clusters) - 1));
+      cagra_params.attach_dataset_on_build = true;
+      auto cagra_idx = cuvs::neighbors::cagra::build(handle, cagra_params, centers_view);
+      cuvs::neighbors::cagra::search_params search_params;
+
+      for (const auto& batch : vec_batches) {
+        auto batch_size = batch.size();
+        rmm::device_uvector<float> queries_float(
+          static_cast<size_t>(batch_size) * static_cast<size_t>(index->dim()), stream,
+          device_memory);
+        auto batch_view = raft::make_device_matrix_view<const T, internal_extents_t>(
+          batch.data(), batch_size, index->dim());
+        raft::linalg::map(handle,
+                          raft::make_const_mdspan(batch_view),
+                          raft::make_device_matrix_view<float, int64_t>(queries_float.data(),
+                                                                        batch_size,
+                                                                        index->dim()),
+                          utils::mapping<float>{});
+        auto queries_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
+          queries_float.data(), batch_size, index->dim());
+        auto neighbors = raft::make_device_matrix<uint32_t, int64_t>(handle, batch_size, 1);
+        auto distances = raft::make_device_matrix<float, int64_t>(handle, batch_size, 1);
+        cuvs::neighbors::cagra::search(
+          handle, search_params, cagra_idx, queries_view, neighbors.view(), distances.view());
+        raft::copy(handle,
+                   raft::make_device_vector_view(new_data_labels.data() + batch.offset(),
+                                                  batch_size),
+                   raft::make_device_vector_view<const uint32_t>(neighbors.data_handle(),
+                                                                 batch_size));
+        vec_batches.prefetch_next_batch();
+        raft::resource::sync_stream(handle);
+      }
+    } else {
+      for (const auto& batch : vec_batches) {
+        auto batch_data_view = raft::make_device_matrix_view<const T, internal_extents_t>(
+          batch.data(), batch.size(), index->dim());
+        auto batch_labels_view = raft::make_device_vector_view<uint32_t, internal_extents_t>(
+          new_data_labels.data() + batch.offset(), batch.size());
+        auto centers_view = raft::make_device_matrix_view<const float, internal_extents_t>(
+          cluster_centers.data(), n_clusters, index->dim());
+        cuvs::cluster::kmeans::predict(
+          handle, kmeans_params, batch_data_view, centers_view, batch_labels_view);
+        vec_batches.prefetch_next_batch();
+        raft::resource::sync_stream(handle);
+      }
     }
   }
 
