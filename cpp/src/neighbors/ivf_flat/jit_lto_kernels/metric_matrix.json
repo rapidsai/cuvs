@@ -5,7 +5,7 @@
       "header_file": "neighbors/ivf_flat/jit_lto_kernels/metric_euclidean.cuh"
     },
     {
-      "metric_name": "inner_prod",
+      "metric_name": "inner_product",
       "header_file": "neighbors/ivf_flat/jit_lto_kernels/metric_inner_prod.cuh"
     }
   ],

@@ -74,7 +74,7 @@ Please refer to the :doc:`guide on API interoperability <api_interoperability>` 
 Where to next?
 ==============
 
-cuVS is free and open source software, licesed under Apache 2.0 Once you are familiar with and/or have used cuVS, you can access the developer community most easily through `Github <https://github.com/rapidsai/cuvs>`_. Please open Github issues for any bugs, questions or feature requests.
+cuVS is free and open source software, licensed under Apache 2.0 Once you are familiar with and/or have used cuVS, you can access the developer community most easily through `Github <https://github.com/rapidsai/cuvs>`_. Please open Github issues for any bugs, questions or feature requests.
 
 Social media
 ------------
