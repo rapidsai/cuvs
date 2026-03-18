@@ -473,7 +473,7 @@ jobs:
   wheel-build-libcuvs:
     needs: checks
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@build-wheels-old-ctk
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@release/26.04
     with:
       build_type: pull-request
       node_type: cpu16
@@ -485,7 +485,7 @@ jobs:
   wheel-build-cuvs:
     needs: wheel-build-libcuvs
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@build-wheels-old-ctk
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@release/26.04
     with:
       build_type: pull-request
       node_type: cpu8
