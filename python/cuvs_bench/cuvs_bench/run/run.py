@@ -584,7 +584,6 @@ def run_benchmark(
     search_threads: int,
     dry_run: bool,
     data_export: bool,
-    live_csv: bool = False,
 ) -> None:
     """
     Runs a benchmarking process based on the provided configurations.
@@ -692,5 +691,4 @@ def run_benchmark(
         batch_size,
         search_threads,
         search_mode,
-        live_csv=live_csv,
     )

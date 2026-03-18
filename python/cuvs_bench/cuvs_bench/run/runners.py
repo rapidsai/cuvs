@@ -14,7 +14,6 @@ from .data_export import (
     clean_algo_name,
     convert_json_to_csv_build,
     convert_json_to_csv_search,
-    append_search_row_to_csv,
 )
 
 def _subprocess_env(ann_executable_path: str) -> Dict[str, str]:
@@ -51,7 +50,6 @@ def cuvs_bench_cpp(
     batch_size: int,
     search_threads: Optional[int],
     mode: str = "throughput",
-    live_csv: bool = False,
 ) -> None:
     # So you can confirm which repo's code is running (local vs conda)
     print(f"[cuvs_bench] runners.py loaded from: {os.path.abspath(__file__)}")
@@ -197,81 +195,11 @@ def cuvs_bench_cpp(
                     f"Benchmark command for {output_filename[1]}:\n"
                     f"{' '.join(cmd)}\n"
                 )
-            elif live_csv:
-                # Run one benchmark at a time; append each result to a single CSV (no merge step)
-                # C++ expects config file last; cmd_base ends with config, so insert new args before it
-                cmd_without_config = cmd_base[:-1]
-                live_csv_path = final_search_json.replace(".json", ".raw.csv")
-                base = output_filename[1].replace(",", "_")
-                parts = base.split("_")
-                algo_name = (
-                    clean_algo_name((parts[0], parts[1]))
-                    if len(parts) >= 2
-                    else (parts[0] if parts else base)
-                )
-                try:
-                    list_cmd = cmd_without_config + [
-                        "--benchmark_list_tests",
-                        temp_conf_filename,
-                    ]
-                    result = subprocess.run(
-                        list_cmd,
-                        capture_output=True,
-                        text=True,
-                        timeout=60,
-                        env=_subprocess_env(ann_executable_path),
-                    )
-                    names = [
-                        line.strip()
-                        for line in (result.stdout or "").splitlines()
-                        if line.strip()
-                    ]
-                    if not names:
-                        print("[cuvs_bench] --live-csv: no benchmarks listed; running once without filter.")
-                        cmd = cmd_base[:-1] + [f"--benchmark_out={final_search_json}", temp_conf_filename]
-                        subprocess.run(cmd, check=True, env=_subprocess_env(ann_executable_path))
-                        _dataset = conf_file["dataset"]["name"]
-                        convert_json_to_csv_search(_dataset, dataset_path)
-                    else:
-                        for i, name in enumerate(names):
-                            filt = re.escape(name)
-                            tmp_json = os.path.join(
-                                search_folder, f"_live_{i}.json"
-                            )
-                            cmd = cmd_without_config + [
-                                f"--benchmark_filter=^{filt}$",
-                                f"--benchmark_out={tmp_json}",
-                                temp_conf_filename,
-                            ]
-                            subprocess.run(cmd, check=False, env=_subprocess_env(ann_executable_path))
-                            try:
-                                with open(tmp_json, "r", encoding="ISO-8859-1") as f:
-                                    data = json.load(f)
-                                benchmarks = data.get("benchmarks", [])
-                                if benchmarks:
-                                    append_search_row_to_csv(
-                                        live_csv_path, algo_name, benchmarks[0]
-                                    )
-                            except Exception:
-                                pass
-                            finally:
-                                try:
-                                    os.remove(tmp_json)
-                                except OSError:
-                                    pass
-                            print(f"[cuvs_bench] Live CSV: {i + 1}/{len(names)} -> {live_csv_path}")
-                except Exception as e:
-                    print(f"Error occurred running benchmark: {e}")
-                finally:
-                    os.remove(temp_conf_filename)
             else:
                 cmd = cmd_base[:-1] + [f"--benchmark_out={final_search_json}", temp_conf_filename]
                 try:
                     subprocess.run(cmd, check=True, env=_subprocess_env(ann_executable_path))
                     _dataset = conf_file["dataset"]["name"]
-                    print(
-                        f"[cuvs_bench] Converting search JSON -> CSV (dataset={_dataset}, path={os.path.abspath(dataset_path)})"
-                    )
                     convert_json_to_csv_search(_dataset, dataset_path)
                 except Exception as e:
                     print(f"Error occurred running benchmark: {e}")
