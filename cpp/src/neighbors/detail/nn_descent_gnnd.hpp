@@ -64,8 +64,7 @@ struct BuildConfig {
   float termination_threshold{0.0001};
   size_t output_graph_degree{32};
   cuvs::distance::DistanceType metric{cuvs::distance::DistanceType::L2Expanded};
-  cuvs::neighbors::nn_descent::DIST_COMP_DTYPE dist_comp_dtype{
-    cuvs::neighbors::nn_descent::DIST_COMP_DTYPE::AUTO};
+  bool compress_to_fp16{false};
 };
 
 template <typename Index_t>
@@ -228,8 +227,16 @@ class GNND {
   size_t nrow_;
   size_t ndim_;
 
-  std::optional<raft::device_matrix<float, size_t, raft::row_major>> d_data_float_;
+  using input_t = std::remove_const_t<Data_t>;
+
+  // d_data_half_ is used for a special case when input data is fp32 on host and compress_to_fp16
+  // flag is True
   std::optional<raft::device_matrix<half, size_t, raft::row_major>> d_data_half_;
+  // d_data_direct_ is used when input data is on host, and we need to copy it to device
+  std::optional<raft::device_matrix<input_t, size_t, raft::row_major>> d_data_direct_;
+
+  // d_data_ptr_ is used to store the general pointer to the input data
+  const void* d_data_ptr_{nullptr};
   raft::device_vector<DistData_t, size_t> l2_norms_;
 
   raft::device_matrix<ID_t, size_t, raft::row_major> graph_buffer_;
@@ -307,7 +314,7 @@ inline BuildConfig get_build_config(raft::resources const& res,
                            .termination_threshold = params.termination_threshold,
                            .output_graph_degree   = params.graph_degree,
                            .metric                = params.metric,
-                           .dist_comp_dtype       = params.dist_comp_dtype};
+                           .compress_to_fp16      = params.compress_to_fp16};
   return build_config;
 }
 

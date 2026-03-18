@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -43,7 +43,7 @@ void* _build(cuvsResources_t res,
   build_params.max_iterations            = params.max_iterations;
   build_params.termination_threshold     = params.termination_threshold;
   build_params.return_distances          = params.return_distances;
-  build_params.dist_comp_dtype           = static_cast<cuvs::neighbors::nn_descent::DIST_COMP_DTYPE>(static_cast<int>(params.dist_comp_dtype));
+  build_params.compress_to_fp16          = params.compress_to_fp16;
 
   using graph_type = raft::host_matrix_view<IdxT, int64_t, raft::row_major>;
   std::optional<graph_type> graph;
@@ -179,7 +179,7 @@ extern "C" cuvsError_t cuvsNNDescentIndexParamsCreate(cuvsNNDescentIndexParams_t
       .max_iterations            = cpp_params.max_iterations,
       .termination_threshold     = cpp_params.termination_threshold,
       .return_distances          = cpp_params.return_distances,
-      .dist_comp_dtype           = static_cast<cuvsNNDescentDistCompDtype>(static_cast<int>(cpp_params.dist_comp_dtype))};
+      .compress_to_fp16          = cpp_params.compress_to_fp16};
   });
 }
 
