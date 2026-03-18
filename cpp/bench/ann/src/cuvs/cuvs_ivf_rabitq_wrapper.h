@@ -91,7 +91,7 @@ void cuvs_ivf_rabitq<T, IdxT>::save(const std::string& file) const
 template <typename T, typename IdxT>
 void cuvs_ivf_rabitq<T, IdxT>::load(const std::string& file)
 {
-  index_ = std::make_shared<cuvs::neighbors::ivf_rabitq::index<IdxT>>(handle_, index_params_, dim_);
+  index_ = std::make_shared<cuvs::neighbors::ivf_rabitq::index<IdxT>>(handle_);
   cuvs::neighbors::ivf_rabitq::deserialize(handle_, file, index_.get());
 }
 

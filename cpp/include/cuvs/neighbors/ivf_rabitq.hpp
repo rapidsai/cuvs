@@ -124,9 +124,6 @@ struct index : cuvs::neighbors::index {
         uint32_t n_lists,
         uint32_t bits_per_dim);
 
-  /** Construct an empty index. It needs to be trained and then populated. */
-  index(raft::resources const& handle, const index_params& params, uint32_t dim);
-
   /** Dimensionality of the input data. */
   uint32_t dim() const noexcept;
 

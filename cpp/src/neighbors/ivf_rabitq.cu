@@ -284,12 +284,6 @@ index<IdxT>::index(raft::resources const& handle,
 }
 
 template <typename IdxT>
-index<IdxT>::index(raft::resources const& handle, const index_params& params, uint32_t dim)
-  : index(handle)
-{
-}
-
-template <typename IdxT>
 index<IdxT>::index(index&&) = default;
 
 template <typename IdxT>
