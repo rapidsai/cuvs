@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 
@@ -9,7 +9,6 @@ import pandas as pd
 import pytest
 from click.testing import CliRunner
 from cuvs_bench.get_dataset.__main__ import main
-
 
 @pytest.fixture(scope="session")
 def temp_datasets_dir(tmp_path_factory):
@@ -63,6 +62,8 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
 
     from cuvs_bench.run.__main__ import main as run_main
 
+    algorithms = "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq"
+
     runner = CliRunner()
     run_args = [
         "--dataset",
@@ -70,7 +71,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         "--dataset-path",
         dataset_path_arg,
         "--algorithms",
-        "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq",  # noqa: E501
+        algorithms,
         "--batch-size",
         "100",
         "-k",
@@ -463,6 +464,8 @@ def test_plot_command_creates_png_files(temp_datasets_dir: Path):
 
     from cuvs_bench.plot.__main__ import main as plot_main
 
+    algorithms = "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq"
+
     runner = CliRunner()
     args = [
         "--dataset",
@@ -472,7 +475,7 @@ def test_plot_command_creates_png_files(temp_datasets_dir: Path):
         "--output-filepath",
         dataset_path_arg,
         "--algorithms",
-        "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq",  # noqa: E501
+        algorithms,
         "--batch-size",
         "100",
         "-k",
