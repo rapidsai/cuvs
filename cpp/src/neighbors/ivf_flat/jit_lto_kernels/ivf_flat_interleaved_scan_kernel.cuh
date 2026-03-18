@@ -770,25 +770,23 @@ template <int Capacity,
           typename T,
           typename AccT,
           typename IdxT>
-RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)
-  interleaved_scan_kernel(const uint32_t query_smem_elems,
-                          const T* query,
-                          const uint32_t* coarse_index,
-                          const T* const* list_data_ptrs,
-                          const uint32_t* list_sizes,
-                          const uint32_t queries_offset,
-                          const uint32_t n_probes,
-                          const uint32_t k,
-                          const uint32_t max_samples,
-                          const uint32_t* chunk_indices,
-                          const uint32_t dim,
-                          IdxT* const* const inds_ptrs,  // Always needed for IVF Flat to convert
-                                                         // (list_id, vec_id) to node_id
-                          uint32_t* bitset_ptr,  // Bitset data pointer (nullptr for none_filter)
-                          IdxT bitset_len,       // Bitset length
-                          IdxT original_nbits,   // Original number of bits
-                          uint32_t* neighbors,
-                          float* distances)
+__device__ __forceinline__ void interleaved_scan_kernel_impl(const uint32_t query_smem_elems,
+                                                             const T* query,
+                                                             const uint32_t* coarse_index,
+                                                             const T* const* list_data_ptrs,
+                                                             const uint32_t* list_sizes,
+                                                             const uint32_t queries_offset,
+                                                             const uint32_t n_probes,
+                                                             const uint32_t k,
+                                                             const uint32_t max_samples,
+                                                             const uint32_t* chunk_indices,
+                                                             const uint32_t dim,
+                                                             IdxT* const* const inds_ptrs,
+                                                             uint32_t* bitset_ptr,
+                                                             IdxT bitset_len,
+                                                             IdxT original_nbits,
+                                                             uint32_t* neighbors,
+                                                             float* distances)
 {
   extern __shared__ __align__(256) uint8_t interleaved_scan_kernel_smem[];
   constexpr bool kManageLocalTopK = Capacity > 0;

@@ -6,14 +6,18 @@
 #pragma once
 
 #include <string>
+#include <unordered_map>
 #include <vector>
+
+#include "FragmentEntry.hpp"
 
 struct NVRTCLTOFragmentCompiler {
   NVRTCLTOFragmentCompiler();
 
-  void compile(std::string const& key, std::string const& code) const;
+  const NVRTCFatbinFragmentEntry& compile(std::string const& code);
 
   std::vector<std::string> standard_compile_opts;
+  std::unordered_map<std::string, NVRTCFatbinFragmentEntry> compiled_fragments;
 };
 
 NVRTCLTOFragmentCompiler& nvrtc_compiler();

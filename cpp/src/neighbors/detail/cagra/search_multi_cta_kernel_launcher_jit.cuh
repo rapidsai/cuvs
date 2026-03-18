@@ -105,6 +105,8 @@ void select_and_run_jit(
               dataset_desc.pq_bits,
               dataset_desc.pq_len);
 
+    planner
+      .add_setup_workspace_device_function<DataTag, IndexTag, DistTag, QueryTag, CodebookTag>();
     planner.add_setup_workspace_device_function(dataset_desc.metric,
                                                 dataset_desc.team_size,
                                                 dataset_desc.dataset_block_dim,

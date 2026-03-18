@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <cuvs/detail/jit_lto/FragmentDatabase.hpp>
 #include <cuvs/detail/jit_lto/NVRTCLTOFragmentCompiler.hpp>
 
 #include <raft/core/error.hpp>
 
 #include "cuda.h"
+#include "cuvs/detail/jit_lto/FragmentEntry.hpp"
 #include <nvrtc.h>
 
 #define NVRTC_SAFE_CALL(_call)                                                 \
@@ -43,10 +43,12 @@ NVRTCLTOFragmentCompiler::NVRTCLTOFragmentCompiler()
   this->standard_compile_opts[i++] = std::string{"--extra-device-vectorization"};
 }
 
-void NVRTCLTOFragmentCompiler::compile(std::string const& key, std::string const& code) const
+const NVRTCFatbinFragmentEntry& NVRTCLTOFragmentCompiler::compile(std::string const& code)
 {
   // Check if this fragment is already cached - avoid expensive NVRTC compilation
-  if (fragment_database().has_fragment(key)) { return; }
+  auto hash = std::to_string(std::hash<std::string>{}(code));
+  auto it   = compiled_fragments.find(hash);
+  if (it != compiled_fragments.end()) { return it->second; }
 
   nvrtcProgram prog;
   NVRTC_SAFE_CALL(
@@ -76,12 +78,13 @@ void NVRTCLTOFragmentCompiler::compile(std::string const& key, std::string const
   std::size_t ltoIRSize;
   NVRTC_SAFE_CALL(nvrtcGetLTOIRSize(prog, &ltoIRSize));
 
-  std::unique_ptr<char[]> program = std::make_unique<char[]>(ltoIRSize);
-  nvrtcGetLTOIR(prog, program.get());
+  std::vector<uint8_t> program(ltoIRSize);
+  nvrtcGetLTOIR(prog, program.data());
 
   NVRTC_SAFE_CALL(nvrtcDestroyProgram(&prog));
 
-  registerNVRTCFragment(key, std::move(program), ltoIRSize);
+  auto placed_it = compiled_fragments[hash] = NVRTCFatbinFragmentEntry{hash, std::move(program)};
+  return compiled_fragments[hash];
 }
 
 NVRTCLTOFragmentCompiler& nvrtc_compiler()

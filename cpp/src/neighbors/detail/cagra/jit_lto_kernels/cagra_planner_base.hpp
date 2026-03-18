@@ -6,7 +6,7 @@
 #pragma once
 
 #include <cuvs/detail/jit_lto/AlgorithmPlanner.hpp>
-#include <cuvs/detail/jit_lto/MakeFragmentKey.hpp>
+#include <cuvs/detail/jit_lto/cagra/cagra_fragments.hpp>
 #include <cuvs/detail/jit_lto/registration_tags.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/logger.hpp>
@@ -14,40 +14,17 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
-template <typename DataTag,
-          typename IndexTag,
-          typename DistanceTag,
-          typename QueryTag,
-          typename CodebookTag>
 struct CagraPlannerBase : AlgorithmPlanner {
-  using AlgorithmPlanner::device_functions;
+  CagraPlannerBase(const std::string& entrypoint) : AlgorithmPlanner(entrypoint) {}
 
-  CagraPlannerBase(const std::string& entrypoint, const std::string& params)
-    : AlgorithmPlanner(entrypoint, params)
+  template <typename DataTag,
+            typename IndexTag,
+            typename DistanceTag,
+            typename QueryTag,
+            typename ImplTag>
+  void add_setup_workspace_device_function()
   {
-  }
-  void add_setup_workspace_device_function(cuvs::distance::DistanceType metric,
-                                           uint32_t team_size,
-                                           uint32_t dataset_block_dim,
-                                           bool is_vpq,
-                                           uint32_t pq_bits = 0,
-                                           uint32_t pq_len  = 0)
-  {
-    std::string key = "setup_workspace";
-    if (is_vpq) {
-      key += "_vpq";
-      auto params = make_fragment_key<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag>();
-      key += "_team_size_" + std::to_string(team_size);
-      key += "_dataset_block_dim_" + std::to_string(dataset_block_dim);
-      key += "_" + std::to_string(pq_bits) + "pq_" + std::to_string(pq_len) + "subd";
-      if (!params.empty()) { key += "_" + params; }
-    } else {
-      key += "_standard_team_size_" + std::to_string(team_size);
-      key += "_dataset_block_dim_" + std::to_string(dataset_block_dim);
-      auto params = make_fragment_key<DataTag, IndexTag, DistanceTag, QueryTag>();
-      if (!params.empty()) { key += "_" + params; }
-    }
-    this->device_functions.push_back(key);
+    add_fragment<SetupWorkspaceFragmentEntry<DataTag, IndexTag, DistanceTag, QueryTag, ImplTag>>();
   }
 
   void add_compute_distance_device_function(cuvs::distance::DistanceType metric,

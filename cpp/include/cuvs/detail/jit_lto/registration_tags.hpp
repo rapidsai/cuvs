@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 namespace cuvs::detail::jit_lto {
 
 struct tag_f {};
@@ -61,13 +63,8 @@ struct tag_acc_h {};
 struct tag_acc_i {};
 struct tag_acc_ui {};
 
-template <int Veclen, typename TTag, typename AccTTag>
 struct tag_metric_euclidean {};
-
-template <int Veclen, typename TTag, typename AccTTag>
 struct tag_metric_inner_product {};
-
-template <int Veclen, typename TTag, typename AccTTag>
 struct tag_metric_custom_udf {};
 
 struct tag_post_identity {};

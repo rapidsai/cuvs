@@ -78,7 +78,8 @@ template <typename DataTag>
 using query_type_tag_standard_hamming_t =
   query_type_tag_standard_t<DataTag, cuvs::distance::DistanceType::BitwiseHamming>;
 
-using codebook_tag_vpq_t      = tag_codebook_half;
+template <typename CodebookTypeTag, uint32_t PqBits, uint32_t PqLen>
+struct codebook_tag_vpq_t {};
 using codebook_tag_standard_t = void;
 
 // Helper trait to detect if a type is a bitset_filter (regardless of template parameters)

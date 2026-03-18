@@ -3,17 +3,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
+#include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_fragments.hpp>
+#include <cuvs/detail/jit_lto/registration_tags.hpp>
 #include "@embedded_header_file@"
 
-namespace {
+namespace cuvs::detail::jit_lto {
 
-__attribute__((__constructor__)) void register_kernel()
-{
-  registerAlgorithm(
-    "sample_filter_@filter_name@_source_index_@source_index_abbrev@",
-    embedded_fatbin,
-    sizeof(embedded_fatbin));
-}
+using _FragmentEntry = FilterFragmentEntry<tag_@filter_name@>;
+
+template <>
+const uint8_t* const _FragmentEntry::data = embedded_fatbin;
+
+template <>
+const size_t _FragmentEntry::length = sizeof(embedded_fatbin);
 
 }

@@ -18,24 +18,8 @@ namespace cagra {
 namespace detail {
 namespace multi_cta_search {
 
-template <typename DataTag,
-          typename IndexTag,
-          typename DistanceTag,
-          typename SourceIndexTag,
-          typename QueryTag,
-          typename CodebookTag>
-struct CagraMultiCtaSearchPlanner
-  : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag> {
-  CagraMultiCtaSearchPlanner(cuvs::distance::DistanceType metric,
-                             uint32_t team_size,
-                             uint32_t dataset_block_dim,
-                             bool is_vpq      = false,
-                             uint32_t pq_bits = 0,
-                             uint32_t pq_len  = 0)
-    : CagraPlannerBase<DataTag, IndexTag, DistanceTag, QueryTag, CodebookTag>(
-        "search_multi_cta", make_fragment_key<DataTag, IndexTag, DistanceTag, SourceIndexTag>())
-  {
-  }
+struct CagraMultiCtaSearchPlanner : CagraPlannerBase {
+  CagraMultiCtaSearchPlanner() : CagraPlannerBase("search_multi_cta") {}
 };
 
 }  // namespace multi_cta_search
