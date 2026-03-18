@@ -41,7 +41,6 @@ class cuvs_ivf_rabitq : public algo<T>, public algo_gpu {
   cuvs_ivf_rabitq(Metric metric, int dim, const build_param& param)
     : algo<T>(metric, dim), index_params_(param), dimension_(dim)
   {
-    // index_params_.metric = parse_metric_type(metric);
   }
 
   void build(const T* dataset, size_t nrow) final;
@@ -139,27 +138,26 @@ void cuvs_ivf_rabitq<T, IdxT>::search(
   static_assert(std::is_integral_v<algo_base::index_type>);
   static_assert(std::is_integral_v<IdxT>);
 
-  IdxT* neighbors_idx_t;
+  IdxT* neighbors_idx;
   std::optional<rmm::device_uvector<IdxT>> neighbors_storage{std::nullopt};
   if constexpr (sizeof(IdxT) == sizeof(algo_base::index_type)) {
-    neighbors_idx_t = reinterpret_cast<IdxT*>(neighbors);
+    neighbors_idx = reinterpret_cast<IdxT*>(neighbors);
   } else {
     neighbors_storage.emplace(batch_size * k, raft::resource::get_cuda_stream(handle_));
-    neighbors_idx_t = neighbors_storage->data();
+    neighbors_idx = neighbors_storage->data();
   }
 
   auto queries_view =
-    raft::make_device_matrix_view<const T, uint32_t>(queries, batch_size, dimension_);
-  auto neighbors_view =
-    raft::make_device_matrix_view<IdxT, uint32_t>(neighbors_idx_t, batch_size, k);
-  auto distances_view = raft::make_device_matrix_view<float, uint32_t>(distances, batch_size, k);
+    raft::make_device_matrix_view<const T, int64_t>(queries, batch_size, dimension_);
+  auto neighbors_view = raft::make_device_matrix_view<IdxT, int64_t>(neighbors_idx, batch_size, k);
+  auto distances_view = raft::make_device_matrix_view<float, int64_t>(distances, batch_size, k);
 
   cuvs::neighbors::ivf_rabitq::search(
     handle_, search_params_, *index_, queries_view, neighbors_view, distances_view);
 
   if constexpr (sizeof(IdxT) != sizeof(algo_base::index_type)) {
     raft::linalg::unaryOp(neighbors,
-                          neighbors_idx_t,
+                          neighbors_idx,
                           batch_size * k,
                           raft::cast_op<algo_base::index_type>(),
                           raft::resource::get_cuda_stream(handle_));
