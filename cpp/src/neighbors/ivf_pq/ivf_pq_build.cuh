@@ -25,7 +25,8 @@
 #include <cuvs/neighbors/cagra.hpp>
 
 // Use CAGRA for cluster assignment in extend when n_lists >= this (faster for large K).
-constexpr uint32_t kUseAnnForClusterAssignmentMinClusters = 4096;
+// Set from cluster-assignment benchmark: CAGRA wins over brute force for K >= ~200K (e.g. N=1M).
+constexpr uint32_t kUseAnnForClusterAssignmentMinClusters = 200000;
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/logger.hpp>

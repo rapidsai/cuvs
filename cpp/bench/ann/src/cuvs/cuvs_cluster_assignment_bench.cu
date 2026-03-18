@@ -245,7 +245,7 @@ BENCHMARK(BM_ClusterAssignment_CAGRA)
   ->Unit(benchmark::kMillisecond)
   ->UseRealTime();
 
-// 1M vectors, 500K clusters
+// 1M vectors, 500K clusters (~2 vectors per cluster)
 BENCHMARK(BM_ClusterAssignment_BruteForce)
   ->Args({1000000, 500000, 128})
   ->Unit(benchmark::kMillisecond)
@@ -255,23 +255,24 @@ BENCHMARK(BM_ClusterAssignment_CAGRA)
   ->Unit(benchmark::kMillisecond)
   ->UseRealTime();
 
-// 500K vectors, 1M clusters (very large K)
+// 1M clusters with N > K (realistic: many vectors per cluster)
+// 2M vectors, 1M clusters (~2 per cluster)
 BENCHMARK(BM_ClusterAssignment_BruteForce)
-  ->Args({500000, 1000000, 128})
+  ->Args({2000000, 1000000, 128})
   ->Unit(benchmark::kMillisecond)
   ->UseRealTime();
 BENCHMARK(BM_ClusterAssignment_CAGRA)
-  ->Args({500000, 1000000, 128})
+  ->Args({2000000, 1000000, 128})
   ->Unit(benchmark::kMillisecond)
   ->UseRealTime();
 
-// 1M vectors, 1M clusters
+// 5M vectors, 1M clusters (~5 per cluster)
 BENCHMARK(BM_ClusterAssignment_BruteForce)
-  ->Args({1000000, 1000000, 128})
+  ->Args({5000000, 1000000, 128})
   ->Unit(benchmark::kMillisecond)
   ->UseRealTime();
 BENCHMARK(BM_ClusterAssignment_CAGRA)
-  ->Args({1000000, 1000000, 128})
+  ->Args({5000000, 1000000, 128})
   ->Unit(benchmark::kMillisecond)
   ->UseRealTime();
 
