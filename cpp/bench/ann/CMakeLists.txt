@@ -194,8 +194,10 @@ function(ConfigureAnnBench)
   set(${ConfigureAnnBench_CXXFLAGS} ${CUVS_CXX_FLAGS} ${ConfigureAnnBench_CXXFLAGS})
 
   target_compile_options(
-    ${BENCH_NAME} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${ConfigureAnnBench_CXXFLAGS}>"
-                          "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+    ${BENCH_NAME}
+    PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${ConfigureAnnBench_CXXFLAGS}>"
+            "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+            "$<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>:${CUVS_DEBUG_CUDA_FLAGS}>"
   )
 
   if(CUVS_ANN_BENCH_USE_${ConfigureAnnBench_NAME})
