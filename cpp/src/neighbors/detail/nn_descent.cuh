@@ -274,7 +274,7 @@ __device__ __forceinline__ void load_vec(__half* vec_buffer,
   for (int step = 0; step < raft::ceildiv(padding_dims, num_load_elems_per_warp); step++) {
     int idx = step * num_load_elems_per_warp + lane_id;
     if (idx < load_dims) {
-      vec_buffer[idx] = __float2half(static_cast<float>(d_vec[idx]));
+      vec_buffer[idx] = d_vec[idx];
     } else if (idx < padding_dims) {
       vec_buffer[idx] = half_0;
     }
@@ -1547,6 +1547,17 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
       size_t n_elems    = batch.size() * build_config_.dataset_dim;
       int num_blocks    = raft::ceildiv(n_elems, static_cast<size_t>(TPB));
       size_t dst_offset = batch.offset() * build_config_.dataset_dim;
+      if (needs_l2_norms) {
+        // we compute l2 norms on the fp32 data directly.
+        compute_l2_norms_kernel<<<batch.size(),
+                                  raft::warp_size(),
+                                  sizeof(float) *
+                                    ceildiv(build_config_.dataset_dim,
+                                            static_cast<size_t>(raft::warp_size())) *
+                                    raft::warp_size(),
+                                  stream>>>(
+          batch.data(), build_config_.dataset_dim, l2_norms_.data_handle() + batch.offset());
+      }
       convert_copy_kernel<<<num_blocks, TPB, 0, stream>>>(
         batch.data(), d_data_half_.value().data_handle() + dst_offset, n_elems);
     }
@@ -1567,28 +1578,15 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
     std::cout << "keeping data dtype and copying to device" << std::endl;
   }
 
-  if (needs_l2_norms) {
-    if (d_data_half_.has_value()) {
-      compute_l2_norms_kernel<<<
-        nrow_,
+  if (needs_l2_norms && !compress_host_data) {
+    compute_l2_norms_kernel<<<
+      nrow_,
+      raft::warp_size(),
+      sizeof(input_t) * ceildiv(build_config_.dataset_dim, static_cast<size_t>(raft::warp_size())) *
         raft::warp_size(),
-        sizeof(half) * ceildiv(build_config_.dataset_dim, static_cast<size_t>(raft::warp_size())) *
-          raft::warp_size(),
-        stream>>>(
-        static_cast<const half*>(d_data_ptr_), build_config_.dataset_dim, l2_norms_.data_handle());
-      raft::resource::sync_stream(res);
-    } else {
-      compute_l2_norms_kernel<<<nrow_,
-                                raft::warp_size(),
-                                sizeof(input_t) *
-                                  ceildiv(build_config_.dataset_dim,
-                                          static_cast<size_t>(raft::warp_size())) *
-                                  raft::warp_size(),
-                                stream>>>(static_cast<const input_t*>(d_data_ptr_),
-                                          build_config_.dataset_dim,
-                                          l2_norms_.data_handle());
-      raft::resource::sync_stream(res);
-    }
+      stream>>>(
+      static_cast<const input_t*>(d_data_ptr_), build_config_.dataset_dim, l2_norms_.data_handle());
+    raft::resource::sync_stream(res);
   }
 
   graph_.clear();
