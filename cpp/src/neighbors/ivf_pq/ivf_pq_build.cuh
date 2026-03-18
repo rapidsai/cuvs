@@ -963,7 +963,8 @@ auto clone(const raft::resources& res, const index<IdxT>& source) -> index<IdxT>
                                                   source.pq_bits(),
                                                   source.pq_dim(),
                                                   source.conservative_memory_allocation(),
-                                                  source.codes_layout());
+                                                  source.codes_layout(),
+                                                  source.use_ann_for_cluster_assignment());
 
   // Copy the independent parts using mutable accessors
   raft::copy(res, impl->list_sizes(), source.list_sizes());
@@ -1120,7 +1121,9 @@ void extend(raft::resources const& handle,
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.metric = index->metric();
 
-    if (n_clusters >= kUseAnnForClusterAssignmentMinClusters) {
+    bool use_cagra = index->use_ann_for_cluster_assignment().value_or(
+      n_clusters >= kUseAnnForClusterAssignmentMinClusters);
+    if (use_cagra) {
       // Use CAGRA for cluster assignment when K is large (build once, search per batch).
       auto centers_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
         cluster_centers.data(), n_clusters, index->dim());
@@ -1300,7 +1303,8 @@ auto build(raft::resources const& handle,
     params.pq_bits,
     params.pq_dim == 0 ? index<IdxT>::calculate_pq_dim(dim) : params.pq_dim,
     params.conservative_memory_allocation,
-    params.codes_layout);
+    params.codes_layout,
+    params.use_ann_for_cluster_assignment);
 
   auto stream = raft::resource::get_cuda_stream(handle);
   utils::memzero(
@@ -1608,7 +1612,8 @@ auto build(
                                                   index_params.pq_bits,
                                                   pq_dim,
                                                   index_params.conservative_memory_allocation,
-                                                  index_params.codes_layout);
+                                                  index_params.codes_layout,
+                                                  index_params.use_ann_for_cluster_assignment);
 
   utils::memzero(
     impl->accum_sorted_sizes().data_handle(), impl->accum_sorted_sizes().size(), stream);

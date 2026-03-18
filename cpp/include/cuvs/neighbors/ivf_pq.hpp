@@ -129,6 +129,14 @@ struct index_params : cuvs::neighbors::index_params {
   uint32_t max_train_points_per_pq_code = 256;
 
   /**
+   * Override for cluster assignment during extend (and add_data_on_build).
+   * - std::nullopt (default): use heuristic (CAGRA when n_lists >= 200k, else brute force).
+   * - true: use CAGRA for assignment regardless of n_lists (for benchmarking).
+   * - false: use brute-force assignment regardless of n_lists (for benchmarking).
+   */
+  std::optional<bool> use_ann_for_cluster_assignment;
+
+  /**
    * Creates index_params based on shape of the input dataset.
    * Usage example:
    * @code{.cpp}
@@ -418,6 +426,9 @@ class index_iface {
     const raft::resources& res) const = 0;
   virtual raft::device_matrix_view<const half, uint32_t, raft::row_major> centers_half(
     const raft::resources& res) const = 0;
+
+  /** When set, overrides heuristic for using CAGRA vs brute force in extend (cluster assignment). */
+  virtual std::optional<bool> use_ann_for_cluster_assignment() const = 0;
 };
 
 /**
@@ -652,6 +663,8 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
    * @param[in] label list ID
    */
   uint32_t get_list_size_in_bytes(uint32_t label) const override;
+
+  std::optional<bool> use_ann_for_cluster_assignment() const noexcept override;
 
   /**
    * @brief Construct index from implementation pointer.
