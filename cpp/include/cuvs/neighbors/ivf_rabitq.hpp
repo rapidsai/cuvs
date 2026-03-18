@@ -54,7 +54,7 @@ struct index_params : cuvs::neighbors::index_params {
   /** The number of data vectors (per cluster) to use during iterative kmeans building. */
   uint32_t max_train_points_per_cluster = 256;
   /** Flag for using the fast quantize method */
-  bool fast_quantize_flag = false;
+  bool fast_quantize_flag = true;
 };
 /**
  * @}
