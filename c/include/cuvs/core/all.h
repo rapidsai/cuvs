@@ -22,6 +22,7 @@
 #include <cuvs/neighbors/common.h>
 #include <cuvs/neighbors/ivf_flat.h>
 #include <cuvs/neighbors/ivf_pq.h>
+#include <cuvs/neighbors/ivf_sq.h>
 #include <cuvs/neighbors/nn_descent.h>
 #include <cuvs/neighbors/refine.h>
 #include <cuvs/neighbors/tiered_index.h>
