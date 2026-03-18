@@ -78,10 +78,9 @@ void build(raft::resources const& handle,
   // Scope for kmeans training set allocation.
   {
     raft::random::RngState random_state{137};
-    auto trainset_ratio = std::max<size_t>(
-      1,
-      size_t(n_rows) / std::max<size_t>(params.kmeans_trainset_fraction * n_rows, params.n_lists));
-    size_t n_rows_train = n_rows / trainset_ratio;
+    size_t n_rows_train =
+      std::min(static_cast<size_t>(n_rows),
+               static_cast<size_t>(params.max_train_points_per_cluster) * params.n_lists);
 
     // Besides just sampling, we transform the input dataset into floats to make it easier
     // to use gemm operations from cublas.
@@ -93,10 +92,9 @@ void build(raft::resources const& handle,
     } catch (raft::logic_error& e) {
       RAFT_LOG_ERROR(
         "Insufficient memory for kmeans training set allocation. Please decrease "
-        "kmeans_trainset_fraction, or set large_workspace_resource appropriately.");
+        "max_train_points_per_cluster, or set large_workspace_resource appropriately.");
       throw;
     }
-    // TODO: a proper sampling
     if constexpr (std::is_same_v<T, float>) {
       raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset.view());
     } else {

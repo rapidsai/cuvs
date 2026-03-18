@@ -191,8 +191,8 @@ void parse_build_param(const nlohmann::json& conf,
 {
   if (conf.contains("nlist")) { param.n_lists = conf.at("nlist"); }
   if (conf.contains("niter")) { param.kmeans_n_iters = conf.at("niter"); }
-  if (conf.contains("ratio")) {
-    param.kmeans_trainset_fraction = 1.0 / static_cast<double>(conf.at("ratio"));
+  if (conf.contains("max_points_per_cluster")) {
+    param.max_train_points_per_cluster = conf.at("max_points_per_cluster");
   }
   if (conf.contains("bits_per_dim")) { param.bits_per_dim = conf.at("bits_per_dim"); }
   if (conf.contains("fast_quantize_flag")) {
