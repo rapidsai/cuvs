@@ -3,8 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "nvjitlink_checker.hpp"
-
 #include <chrono>
 #include <iterator>
 #include <memory>
@@ -14,7 +12,8 @@
 #include <vector>
 
 #include <cuvs/detail/jit_lto/AlgorithmPlanner.hpp>
-#include <cuvs/detail/jit_lto/FragmentDatabase.hpp>
+#include <cuvs/detail/jit_lto/FragmentEntry.hpp>
+#include <cuvs/detail/jit_lto/nvjitlink_checker.hpp>
 
 #include "cuda_runtime.h"
 #include "nvJitLink.h"
@@ -22,25 +21,16 @@
 #include <raft/core/logger.hpp>
 #include <raft/util/cuda_rt_essentials.hpp>
 
-void AlgorithmPlanner::add_entrypoint()
+void AlgorithmPlanner::add_fragment(const FragmentEntry& fragment)
 {
-  auto entrypoint_fragment = fragment_database().get_fragment(this->fragment_key);
-  this->fragments.push_back(entrypoint_fragment);
+  fragments.push_back(&fragment);
 }
 
-void AlgorithmPlanner::add_device_functions()
-{
-  for (const auto& device_function_key : this->device_functions) {
-    auto device_function_fragment = fragment_database().get_fragment(device_function_key);
-    this->fragments.push_back(device_function_fragment);
-  }
-}
-
-std::string AlgorithmPlanner::get_device_functions_key() const
+std::string AlgorithmPlanner::get_fragments_key() const
 {
   std::string key = "";
-  for (const auto& device_function : this->device_functions) {
-    key += device_function;
+  for (const auto* fragment : this->fragments) {
+    key += fragment->get_key();
   }
   return key;
 }
@@ -48,17 +38,15 @@ std::string AlgorithmPlanner::get_device_functions_key() const
 std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::get_launcher()
 {
   auto& launchers = get_cached_launchers();
-  auto launch_key = this->fragment_key + this->get_device_functions_key();
+  auto launch_key = this->get_fragments_key();
 
   static std::mutex cache_mutex;
   std::lock_guard<std::mutex> lock(cache_mutex);
   if (launchers.count(launch_key) == 0) {
-    add_entrypoint();
-    add_device_functions();
     std::string log_message =
-      "JIT compiling launcher for kernel: " + this->fragment_key + " and device functions: ";
-    for (const auto& device_function : this->device_functions) {
-      log_message += device_function + ",";
+      "JIT compiling launcher for kernel: " + this->entrypoint + " and device functions: ";
+    for (const auto* fragment : this->fragments) {
+      log_message += std::string{fragment->get_key()} + ",";
     }
     log_message.pop_back();
     RAFT_LOG_INFO("%s", log_message.c_str());

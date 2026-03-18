@@ -3,16 +3,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// This file is auto-generated. Do not edit manually.
-
-#include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
+#include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_fragments.hpp>
+#include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>
 #include "@embedded_header_file@"
 
-namespace {
+namespace cuvs::neighbors::ivf_flat::detail {
 
-__attribute__((__constructor__)) void register_kernel()
-{
-  registerAlgorithm("@kernel_name@", embedded_fatbin, sizeof(embedded_fatbin));
-}
+using _FragmentEntry = InterleavedScanFragmentEntry<tag_@type_abbrev@, tag_acc_@acc_abbrev@, tag_idx_@idx_abbrev@, @capacity@, @veclen@, @ascending_value@, @compute_norm_value@>;
+
+template <>
+const uint8_t* const _FragmentEntry::data = embedded_fatbin;
+
+template <>
+const size_t _FragmentEntry::length = sizeof(embedded_fatbin);
 
 }
