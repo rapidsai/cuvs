@@ -1,12 +1,15 @@
 {
-  "_filter": [
+  "filter_name": [
+    "filter_none",
+    "filter_bitset"
+  ],
+  "_source_index": [
     {
-      "filter_name": "filter_none",
-      "header_file": "neighbors/ivf_flat/jit_lto_kernels/filter_none.cuh"
-    },
-    {
-      "filter_name": "filter_bitset",
-      "header_file": "neighbors/ivf_flat/jit_lto_kernels/filter_bitset.cuh"
+      "source_index_type": "int64_t",
+      "source_index_abbrev": "l"
     }
+  ],
+  "namespace": [
+    "cuvs::neighbors::detail"
   ]
 }

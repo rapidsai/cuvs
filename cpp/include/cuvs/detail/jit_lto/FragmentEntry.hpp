@@ -36,3 +36,16 @@ struct StaticFatbinFragmentEntry : FatbinFragmentEntry {
 
   const char* get_key() const override final { return typeid(FragmentT).name(); }
 };
+
+struct NVRTCFatbinFragmentEntry final : FatbinFragmentEntry {
+  NVRTCFatbinFragmentEntry(std::string key, std::vector<uint8_t> program);
+
+  const uint8_t* get_data() const override;
+
+  size_t get_length() const override;
+
+  const char* get_key() const override;
+
+  std::string key;
+  std::vector<uint8_t> program;
+};

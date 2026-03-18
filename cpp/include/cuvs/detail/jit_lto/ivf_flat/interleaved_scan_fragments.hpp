@@ -35,13 +35,6 @@ struct MetricFragmentEntry final
   static const size_t length;
 };
 
-template <typename IvfSampleFilterTag>
-struct FilterFragmentEntry final
-  : StaticFatbinFragmentEntry<FilterFragmentEntry<IvfSampleFilterTag>> {
-  static const uint8_t* const data;
-  static const size_t length;
-};
-
 template <typename PostLambdaTag>
 struct PostLambdaFragmentEntry final
   : StaticFatbinFragmentEntry<PostLambdaFragmentEntry<PostLambdaTag>> {

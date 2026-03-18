@@ -1,0 +1,34 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <neighbors/detail/cagra/jit_lto_kernels/compute_distance@pq_prefix@_impl.cuh>
+#include <neighbors/detail/cagra/jit_lto_kernels/extern_device_functions.cuh>
+
+namespace cuvs::neighbors::cagra::detail {
+
+using args_t = typename dataset_descriptor_base_t<@data_type@, @index_type@, @distance_type@>::args_t;
+template __device__ @distance_type@ compute_distance<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@, @query_type@>(
+    const args_t, @index_type@);
+
+template<>
+__device__ @distance_type@ compute_distance_base<@data_type@, @index_type@, @distance_type@>(
+  const args_t args, @index_type@ dataset_index, bool valid, uint32_t team_size_bits)
+{
+  auto per_thread = valid
+                      ? compute_distance<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@, @query_type@>(
+                          args, dataset_index)
+                      : 0;
+  return device::team_sum(per_thread, team_size_bits);
+}
+
+template<>
+__device__ @distance_type@ compute_distance_per_thread_base<@data_type@, @index_type@, @distance_type@>(
+  const args_t args, @index_type@ dataset_index)
+{
+  return compute_distance<@team_size@, @dataset_block_dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@, @query_type@>(
+    args, dataset_index);
+}
+
+}  // namespace cuvs::neighbors::cagra::detail

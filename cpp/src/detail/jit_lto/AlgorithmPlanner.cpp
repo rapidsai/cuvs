@@ -3,13 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <chrono>
-#include <iterator>
+#include <algorithm>
+#include <cerrno>
+#include <cstdio>
+#include <iostream>
 #include <memory>
 #include <mutex>
 #include <new>
 #include <string>
-#include <vector>
 
 #include <cuvs/detail/jit_lto/AlgorithmPlanner.hpp>
 #include <cuvs/detail/jit_lto/FragmentEntry.hpp>
@@ -43,13 +44,14 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::get_launcher()
   static std::mutex cache_mutex;
   std::lock_guard<std::mutex> lock(cache_mutex);
   if (launchers.count(launch_key) == 0) {
+    RAFT_LOG_INFO("A first-time JIT compilation has been triggered for your algorithm");
     std::string log_message =
       "JIT compiling launcher for kernel: " + this->entrypoint + " and device functions: ";
     for (const auto* fragment : this->fragments) {
       log_message += std::string{fragment->get_key()} + ",";
     }
     log_message.pop_back();
-    RAFT_LOG_INFO("%s", log_message.c_str());
+    RAFT_LOG_DEBUG("%s", log_message.c_str());
     launchers[launch_key] = this->build();
   }
   return launchers[launch_key];
@@ -68,8 +70,9 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
 
   // Load the generated LTO IR and link them together
   nvJitLinkHandle handle;
-  const char* lopts[] = {"-lto", archs.c_str()};
-  auto result         = nvJitLinkCreate(&handle, 2, lopts);
+  const char* lopts[] = {
+    "-lto", "-split-compile=0", "split-compile-extended=0", "-maxrregcount=64", archs.c_str()};
+  auto result = nvJitLinkCreate(&handle, 2, lopts);
   check_nvjitlink_result(handle, result);
 
   for (auto& frag : this->fragments) {
