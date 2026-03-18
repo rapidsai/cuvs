@@ -206,6 +206,7 @@ def main(
         stacklevel=2,
     )
 
+    print("config ?")
     if not data_export:
         run_benchmark(**locals())
 
