@@ -43,6 +43,8 @@ index<IdxT>::index(raft::resources const& res,
     inds_ptrs_{raft::make_device_vector<int64_t*, uint32_t>(res, n_lists)},
     accum_sorted_sizes_{raft::make_host_vector<int64_t, uint32_t>(n_lists + 1)}
 {
+  RAFT_EXPECTS(n_lists > 0, "n_lists must be positive.");
+  RAFT_EXPECTS(dim > 0, "dim must be positive.");
   check_consistency();
   auto stream = raft::resource::get_cuda_stream(res);
   std::memset(accum_sorted_sizes_.data_handle(), 0, accum_sorted_sizes_.size() * sizeof(int64_t));
@@ -228,6 +230,14 @@ void index<IdxT>::check_consistency()
   RAFT_EXPECTS((centers_.extent(0) == list_sizes_.extent(0)) &&
                  (!center_norms_.has_value() || centers_.extent(0) == center_norms_->extent(0)),
                "inconsistent number of lists (clusters)");
+  RAFT_EXPECTS(sq_vmin_.extent(0) == centers_.extent(1),
+               "sq_vmin size (%u) does not match dim (%u)",
+               static_cast<uint32_t>(sq_vmin_.extent(0)),
+               static_cast<uint32_t>(centers_.extent(1)));
+  RAFT_EXPECTS(sq_delta_.extent(0) == centers_.extent(1),
+               "sq_delta size (%u) does not match dim (%u)",
+               static_cast<uint32_t>(sq_delta_.extent(0)),
+               static_cast<uint32_t>(centers_.extent(1)));
 }
 
 template struct index<uint8_t>;

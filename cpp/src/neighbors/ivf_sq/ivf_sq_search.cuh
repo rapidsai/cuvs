@@ -459,6 +459,13 @@ inline void search_with_filtering(raft::resources const& handle,
   RAFT_EXPECTS(params.n_probes > 0,
                "n_probes (number of clusters to probe in the search) must be positive.");
   auto n_probes = std::min<uint32_t>(params.n_probes, index.n_lists());
+  if (n_probes < params.n_probes) {
+    RAFT_LOG_WARN(
+      "n_probes (%u) is larger than the number of lists in the index (%u), clamping to %u.",
+      params.n_probes,
+      index.n_lists(),
+      n_probes);
+  }
 
   uint32_t max_samples =
     std::max<uint32_t>(static_cast<uint32_t>(index.accum_sorted_sizes()(n_probes)), k);
