@@ -57,7 +57,6 @@ option(CUDA_ENABLE_KERNELINFO "Enable kernel resource usage info" OFF)
 option(CUDA_ENABLE_LINEINFO
        "Enable the -lineinfo option for nvcc (useful for cuda-memcheck / profiler)" OFF
 )
-option(CUDA_STATIC_RUNTIME "Statically link the CUDA runtime" OFF)
 option(CUDA_STATIC_MATH_LIBRARIES "Statically link the CUDA math libraries" OFF)
 option(CUVS_STATIC_RAPIDS_LIBRARIES "Build and statically link RAPIDS libraries" OFF)
 option(CUDA_LOG_COMPILE_TIME "Write a log of compilation times to nvcc_compile_log.csv" OFF)
@@ -116,7 +115,6 @@ message(VERBOSE "cuVS: Disable OpenMP: ${DISABLE_OPENMP}")
 message(VERBOSE "cuVS: Enable kernel resource usage info: ${CUDA_ENABLE_KERNELINFO}")
 message(VERBOSE "cuVS: Enable lineinfo in nvcc: ${CUDA_ENABLE_LINEINFO}")
 message(VERBOSE "cuVS: Enable nvtx markers: ${CUVS_NVTX}")
-message(VERBOSE "cuVS: Statically link the CUDA runtime: ${CUDA_STATIC_RUNTIME}")
 message(VERBOSE "cuVS: Statically link the CUDA math libraries: ${CUDA_STATIC_MATH_LIBRARIES}")
 message(VERBOSE "cuVS: Build and statically link RAPIDS libraries: ${CUVS_STATIC_RAPIDS_LIBRARIES}")
 
@@ -153,7 +151,7 @@ endif()
 
 if(NOT BUILD_CPU_ONLY)
   # CUDA runtime
-  rapids_cuda_init_runtime(USE_STATIC ${CUDA_STATIC_RUNTIME})
+  rapids_cuda_init_runtime(USE_STATIC ON)
   # * find CUDAToolkit package
   # * determine GPU architectures
   # * enable the CMake CUDA language
@@ -765,16 +763,20 @@ if(NOT BUILD_CPU_ONLY)
 
     target_link_libraries(
       cuvs
-      PUBLIC rmm::rmm
-             raft::raft
+      INTERFACE $<COMPILE_ONLY:rmm::rmm>
+      PUBLIC raft::raft
              cuvs::cuvs_cpp_headers
              ${CUVS_CTK_MATH_DEPENDENCIES}
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
-      PRIVATE $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> $<COMPILE_ONLY:nvidia::cutlass::cutlass>
-              $<COMPILE_ONLY:cuco::cuco> $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
+      PRIVATE rmm::rmm
+              $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+              $<COMPILE_ONLY:nvidia::cutlass::cutlass>
+              $<COMPILE_ONLY:cuco::cuco>
+              $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
     )
+    set_property(TARGET cuvs PROPERTY NO_CUDART_DEP ON)
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
     file(
@@ -824,18 +826,20 @@ SECTIONS
 
     target_link_libraries(
       cuvs_static
-      PUBLIC rmm::rmm
-             raft::raft
+      INTERFACE $<COMPILE_ONLY:rmm::rmm>
+      PUBLIC raft::raft
              cuvs::cuvs_cpp_headers
              ${CUVS_CTK_MATH_DEPENDENCIES}
              $<TARGET_NAME_IF_EXISTS:NCCL::NCCL> # needs to be public for DT_NEEDED
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>> # header only
-      PRIVATE $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+      PRIVATE rmm::rmm
+              $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
               $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
               $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
               $<COMPILE_ONLY:nvidia::cutlass::cutlass>
               $<COMPILE_ONLY:cuco::cuco>
     )
+    set_property(TARGET cuvs_static PROPERTY NO_CUDART_DEP ON)
   endif()
 
   # ################################################################################################
