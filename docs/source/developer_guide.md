@@ -406,3 +406,13 @@ void foo(const raft::resources& res, ...)
     ...
 }
 ```
+
+## Using Just-in-Time Link-Time Optimization
+
+cuVS is moving to using link-time optimization for new kernels, and this requires some changes to the way kernels are written. Instead of compiling all kernel variants at build time (which leads to binary size explosion), JIT LTO compiles kernel fragments separately and links them together at runtime based on the specific configuration needed.
+
+This approach ultimately enables:
+- **Reduced binary size**: Compile fragments once, combine many ways
+- **User Defined Functions**: Link UDFs in cuVS CUDA kernels
+
+For more information on JIT LTO, see [Advanced Topics](advanced_topics). For a complete guide on implementing JIT LTO kernels, including step-by-step examples, see the [JIT LTO Guide](jit_lto_guide.md).
