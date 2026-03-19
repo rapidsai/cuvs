@@ -85,7 +85,7 @@ auto build(raft::resources const& handle,
     auto trainset =
       raft::make_device_mdarray<T>(handle, big_memory_resource, raft::make_extents<int64_t>(0, 0));
     try {
-      trainset = raft::make_device_mdarray<float>(
+      trainset = raft::make_device_mdarray<T>(
         handle, big_memory_resource, raft::make_extents<int64_t>(n_rows_train, dim));
     } catch (raft::logic_error& e) {
       RAFT_LOG_ERROR(
@@ -93,27 +93,7 @@ auto build(raft::resources const& handle,
         "max_train_points_per_cluster, or set large_workspace_resource appropriately.");
       throw;
     }
-    if constexpr (std::is_same_v<T, float>) {
-      raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset.view());
-    } else {
-      raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
-        "   ivf_rabitq::build(%zu, %zu)/sample rows with tmp trainset (%zu rows).",
-        size_t(n_rows),
-        size_t(dim),
-        size_t(n_rows_train));
-
-      // TODO(tfeher): Enable codebook generation with any type T, and then remove trainset tmp.
-      auto trainset_tmp = raft::make_device_mdarray<T>(
-        handle, big_memory_resource, raft::make_extents<int64_t>(n_rows_train, dim));
-
-      raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset_tmp.view());
-
-      raft::linalg::unaryOp(trainset.data_handle(),
-                            trainset_tmp.data_handle(),
-                            trainset.size(),
-                            utils::mapping<float>{},
-                            stream);
-    }
+    raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset.view());
 
     // perform k-means clustering
     // NB: here cluster_centers is used as if it is [n_clusters, data_dim] not [n_clusters,
