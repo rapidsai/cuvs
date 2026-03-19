@@ -26,7 +26,7 @@ index_impl<IdxT>::index_impl(raft::resources const& handle,
                              uint32_t pq_dim,
                              bool conservative_memory_allocation,
                              list_layout codes_layout,
-                             std::optional<bool> use_ann_for_cluster_assignment)
+                             std::optional<bool> use_ann_for_extend)
   : metric_(metric),
     codebook_kind_(codebook_kind),
     codes_layout_(codes_layout),
@@ -34,7 +34,7 @@ index_impl<IdxT>::index_impl(raft::resources const& handle,
     pq_bits_(pq_bits),
     pq_dim_(pq_dim == 0 ? index<IdxT>::calculate_pq_dim(dim) : pq_dim),
     conservative_memory_allocation_(conservative_memory_allocation),
-    use_ann_for_cluster_assignment_(use_ann_for_cluster_assignment),
+    use_ann_for_extend_(use_ann_for_extend),
     lists_(n_lists),
     list_sizes_{raft::make_device_vector<uint32_t, uint32_t>(handle, n_lists)},
     data_ptrs_{raft::make_device_vector<uint8_t*, uint32_t>(handle, n_lists)},
@@ -124,9 +124,9 @@ bool index_impl<IdxT>::conservative_memory_allocation() const noexcept
 }
 
 template <typename IdxT>
-std::optional<bool> index_impl<IdxT>::use_ann_for_cluster_assignment() const noexcept
+std::optional<bool> index_impl<IdxT>::use_ann_for_extend() const noexcept
 {
-  return use_ann_for_cluster_assignment_;
+  return use_ann_for_extend_;
 }
 
 template <typename IdxT>
@@ -206,7 +206,7 @@ owning_impl<IdxT>::owning_impl(raft::resources const& handle,
                                uint32_t pq_dim,
                                bool conservative_memory_allocation,
                                list_layout codes_layout,
-                               std::optional<bool> use_ann_for_cluster_assignment)
+                               std::optional<bool> use_ann_for_extend)
   : index_impl<IdxT>(handle,
                      metric,
                      codebook_kind,
@@ -216,7 +216,7 @@ owning_impl<IdxT>::owning_impl(raft::resources const& handle,
                      pq_dim,
                      conservative_memory_allocation,
                      codes_layout,
-                     use_ann_for_cluster_assignment),
+                     use_ann_for_extend),
     pq_centers_{raft::make_device_mdarray<float>(
       handle, index<IdxT>::make_pq_centers_extents(dim, pq_dim, pq_bits, codebook_kind, n_lists))},
     centers_{
@@ -258,7 +258,7 @@ view_impl<IdxT>::view_impl(
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot_view,
   raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix_view,
   list_layout codes_layout,
-  std::optional<bool> use_ann_for_cluster_assignment)
+  std::optional<bool> use_ann_for_extend)
   : index_impl<IdxT>(handle,
                      metric,
                      codebook_kind,
@@ -268,7 +268,7 @@ view_impl<IdxT>::view_impl(
                      pq_dim,
                      conservative_memory_allocation,
                      codes_layout,
-                     use_ann_for_cluster_assignment),
+                     use_ann_for_extend),
     pq_centers_view_(pq_centers_view),
     centers_view_(centers_view),
     centers_rot_view_(centers_rot_view),
@@ -607,9 +607,9 @@ uint32_t index<IdxT>::get_list_size_in_bytes(uint32_t label) const
 }
 
 template <typename IdxT>
-std::optional<bool> index<IdxT>::use_ann_for_cluster_assignment() const noexcept
+std::optional<bool> index<IdxT>::use_ann_for_extend() const noexcept
 {
-  return impl_->use_ann_for_cluster_assignment();
+  return impl_->use_ann_for_extend();
 }
 
 template <typename IdxT>

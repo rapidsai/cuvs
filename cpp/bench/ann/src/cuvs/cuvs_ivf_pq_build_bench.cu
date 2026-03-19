@@ -60,10 +60,10 @@ static void BM_IVFPQ_Build_Speedup(benchmark::State& state)
   params_brute.kmeans_trainset_fraction       = 0.2;
   params_brute.add_data_on_build              = true;
   params_brute.metric                         = cuvs::distance::DistanceType::L2Expanded;
-  params_brute.use_ann_for_cluster_assignment = false;
+  params_brute.use_ann_for_extend = false;
 
   cuvs::neighbors::ivf_pq::index_params params_cagra = params_brute;
-  params_cagra.use_ann_for_cluster_assignment        = true;
+  params_cagra.use_ann_for_extend        = true;
 
   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
 
