@@ -102,9 +102,9 @@ void cuvs_ivf_rabitq<T, IdxT>::build(const T* dataset, size_t nrow)
   size_t n_streams = 1;
   raft::resource::set_cuda_stream_pool(handle_, std::make_shared<rmm::cuda_stream_pool>(n_streams));
   auto dataset_v = raft::make_device_matrix_view<const T, IdxT>(dataset, IdxT(nrow), dim_);
-  index_         = std::make_shared<cuvs::neighbors::ivf_rabitq::index<IdxT>>(
-    handle_, nrow, dim_, index_params_.n_lists, index_params_.bits_per_dim);
-  cuvs::neighbors::ivf_rabitq::build(handle_, index_params_, dataset_v, index_.get());
+  std::make_shared<cuvs::neighbors::ivf_rabitq::index<IdxT>>(
+    std::move(cuvs::neighbors::ivf_rabitq::build(handle_, index_params_, dataset_v)))
+    .swap(index_);
   // Note: internally the IVF-RaBitQ build works with simple pointers, and accepts both host and
   // device pointer. Therefore, although we provide here a device_mdspan, this works with host
   // pointer too.

@@ -128,10 +128,7 @@ class ivf_rabitq_test : public ::testing::TestWithParam<ivf_rabitq_inputs> {
 
     auto database_view =
       raft::make_device_matrix_view<const DataT, IdxT>(database.data(), ps.num_db_vecs, ps.dim);
-    cuvs::neighbors::ivf_rabitq::index<IdxT> idx(
-      handle_, ps.num_db_vecs, ps.dim, ipams.n_lists, ipams.bits_per_dim);
-    cuvs::neighbors::ivf_rabitq::build(handle_, ipams, database_view, &idx);
-    return idx;
+    return cuvs::neighbors::ivf_rabitq::build(handle_, ipams, database_view);
   }
 
   auto build_only_host_input()
@@ -142,10 +139,7 @@ class ivf_rabitq_test : public ::testing::TestWithParam<ivf_rabitq_inputs> {
     raft::copy(host_database.data_handle(), database.data(), ps.num_db_vecs * ps.dim, stream_);
     auto database_view = raft::make_host_matrix_view<const DataT, IdxT>(
       host_database.data_handle(), ps.num_db_vecs, ps.dim);
-    cuvs::neighbors::ivf_rabitq::index<IdxT> idx(
-      handle_, ps.num_db_vecs, ps.dim, ipams.n_lists, ipams.bits_per_dim);
-    cuvs::neighbors::ivf_rabitq::build(handle_, ipams, database_view, &idx);
-    return idx;
+    return cuvs::neighbors::ivf_rabitq::build(handle_, ipams, database_view);
   }
 
   auto build_serialize()

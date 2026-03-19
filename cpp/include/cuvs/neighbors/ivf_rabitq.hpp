@@ -153,20 +153,19 @@ struct index : cuvs::neighbors::index {
  *   // use default index parameters
  *   ivf_rabitq::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
- *   cuvs::neighbors::ivf_rabitq::index<int64_t> index;
- *   ivf_rabitq::build(handle, index_params, dataset, &index);
+ *   auto index = ivf_rabitq::build(handle, index_params, dataset);
  * @endcode
  *
  * @param[in] handle
  * @param[in] index_params configure the index building
  * @param[in] dataset a device_matrix_view to a row-major matrix [n_rows, dim]
- * @param[out] idx reference to ivf_rabitq::index
+ * @return the constructed ivf-rabitq index
  *
  */
-void build(raft::resources const& handle,
+auto build(raft::resources const& handle,
            const cuvs::neighbors::ivf_rabitq::index_params& index_params,
-           raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
-           cuvs::neighbors::ivf_rabitq::index<int64_t>* idx);
+           raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::ivf_rabitq::index<int64_t>;
 
 /**
  * @brief Build the index from the dataset for efficient search.
@@ -177,20 +176,19 @@ void build(raft::resources const& handle,
  *   // use default index parameters
  *   ivf_rabitq::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
- *   cuvs::neighbors::ivf_rabitq::index<int64_t> index;
- *   ivf_rabitq::build(handle, index_params, dataset, &index);
+ *   auto index = ivf_rabitq::build(handle, index_params, dataset);
  * @endcode
  *
  * @param[in] handle
  * @param[in] index_params configure the index building
  * @param[in] dataset a host_matrix_view to a row-major matrix [n_rows, dim]
- * @param[out] idx reference to ivf_rabitq::index
+ * @return the constructed ivf-rabitq index
  *
  */
-void build(raft::resources const& handle,
+auto build(raft::resources const& handle,
            const cuvs::neighbors::ivf_rabitq::index_params& index_params,
-           raft::host_matrix_view<const float, int64_t, raft::row_major> dataset,
-           cuvs::neighbors::ivf_rabitq::index<int64_t>* idx);
+           raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::ivf_rabitq::index<int64_t>;
 /**
  * @}
  */

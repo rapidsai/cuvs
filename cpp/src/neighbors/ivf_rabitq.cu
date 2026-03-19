@@ -26,10 +26,10 @@ namespace detail {
 using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 template <typename T, typename IdxT, typename accessor>
-void build(raft::resources const& handle,
+auto build(raft::resources const& handle,
            const index_params& params,
-           raft::mdspan<const T, raft::matrix_extent<IdxT>, raft::row_major, accessor> dataset,
-           cuvs::neighbors::ivf_rabitq::index<int64_t>* index)
+           raft::mdspan<const T, raft::matrix_extent<IdxT>, raft::row_major, accessor> dataset)
+  -> cuvs::neighbors::ivf_rabitq::index<IdxT>
 {
   IdxT n_rows = dataset.extent(0);
   IdxT dim    = dataset.extent(1);
@@ -138,9 +138,11 @@ void build(raft::resources const& handle,
       handle, kmeans_params, dataset_const_view, centers_const_view, labels_view);
   }
 
+  index<IdxT> index(handle, n_rows, dim, params.n_lists, params.bits_per_dim);
   // Call RaBitQ index construct
-  index->rabitq_index().construct_on_gpu(
+  index.rabitq_index().construct_on_gpu(
     d_dataset_view.data_handle(), cluster_centers.data(), labels.data(), params.fast_quantize_flag);
+  return index;
 }
 
 template <typename T, typename IdxT>
@@ -312,20 +314,20 @@ IdxT index<IdxT>::size() const noexcept
   return rabitq_index_->get_num_vectors();
 }
 
-void build(raft::resources const& handle,
+auto build(raft::resources const& handle,
            const cuvs::neighbors::ivf_rabitq::index_params& index_params,
-           raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
-           cuvs::neighbors::ivf_rabitq::index<int64_t>* idx)
+           raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::ivf_rabitq::index<int64_t>
 {
-  cuvs::neighbors::ivf_rabitq::detail::build(handle, index_params, dataset, idx);
+  return cuvs::neighbors::ivf_rabitq::detail::build(handle, index_params, dataset);
 }
 
-void build(raft::resources const& handle,
+auto build(raft::resources const& handle,
            const cuvs::neighbors::ivf_rabitq::index_params& index_params,
-           raft::host_matrix_view<const float, int64_t, raft::row_major> dataset,
-           cuvs::neighbors::ivf_rabitq::index<int64_t>* idx)
+           raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::ivf_rabitq::index<int64_t>
 {
-  cuvs::neighbors::ivf_rabitq::detail::build(handle, index_params, dataset, idx);
+  return cuvs::neighbors::ivf_rabitq::detail::build(handle, index_params, dataset);
 }
 
 void search(raft::resources const& handle,
