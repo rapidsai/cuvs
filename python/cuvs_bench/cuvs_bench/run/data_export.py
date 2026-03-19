@@ -70,8 +70,6 @@ def read_json_files(dataset, dataset_path, method):
         DataFrame of JSON content.
     """
     dir_path = os.path.join(dataset_path, dataset, "result", method)
-    if not os.path.isdir(dir_path):
-        return
     for file in os.listdir(dir_path):
         if file.endswith(".json"):
             file_path = os.path.join(dir_path, file)
@@ -106,11 +104,7 @@ def clean_algo_name(algo_name):
         Cleaned algorithm name.
     """
 
-    name = (
-        algo_name[0]
-        if len(algo_name) > 1 and "base" in algo_name[1]
-        else "_".join(algo_name)
-    )
+    name = algo_name[0] if "base" in algo_name[1] else "_".join(algo_name)
     return name.removesuffix(".json")
 
 
@@ -254,6 +248,7 @@ def convert_json_to_csv_search(dataset, dataset_path):
         except Exception as e:
             print(f"Error processing search file {file}: {e}. Skipping...")
             traceback.print_exc()
+
 
 def create_pointset(data, xn, yn):
     """
