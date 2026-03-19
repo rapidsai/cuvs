@@ -72,9 +72,7 @@ cache:
       - ninja
       - ${{ stdlib("c") }}
     host:
-      - if: cuda_major == "13"
-        then:
-          - libnvjitlink-dev
+      - libnvjitlink-dev
       - librmm =${{ minor_version }}
       - libraft-headers =${{ minor_version }}
       - nccl ${{ nccl_version }}
@@ -121,9 +119,7 @@ outputs:
         - libcurand-dev
         - libcusolver-dev
         - libcusparse-dev
-        - if: cuda_major == "13"
-          then:
-            - libnvjitlink-dev
+        - libnvjitlink-dev
       run:
         - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
         - libraft-headers =${{ minor_version }}
@@ -134,9 +130,7 @@ outputs:
         - libcurand
         - libcusolver
         - libcusparse
-        - if: cuda_major == "13"
-          then:
-            - libnvjitlink
+        - libnvjitlink
       ignore_run_exports:
         by_name:
           - cuda-cudart
@@ -150,9 +144,7 @@ outputs:
           - librmm
           - mkl
           - nccl
-          - if: cuda_major == "13"
-            then:
-              - libnvjitlink
+          - libnvjitlink
     about:
       homepage: ${{ load_from_file("python/libcuvs/pyproject.toml").project.urls.Homepage }}
       license: ${{ load_from_file("python/libcuvs/pyproject.toml").project.license }}
@@ -189,9 +181,7 @@ outputs:
         - libcurand-dev
         - libcusolver-dev
         - libcusparse-dev
-        - if: cuda_major == "13"
-          then:
-            - libnvjitlink-dev
+        - libnvjitlink-dev
       run:
         - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
         - ${{ pin_subpackage("libcuvs-headers", exact=True) }}
@@ -203,9 +193,7 @@ outputs:
         - libcurand
         - libcusolver
         - libcusparse
-        - if: cuda_major == "13"
-          then:
-            - libnvjitlink
+        - libnvjitlink
       ignore_run_exports:
         by_name:
           - cuda-cudart
@@ -219,9 +207,7 @@ outputs:
           - librmm
           - mkl
           - nccl
-          - if: cuda_major == "13"
-            then:
-              - libnvjitlink
+          - libnvjitlink
     about:
       homepage: ${{ load_from_file("python/libcuvs/pyproject.toml").project.urls.Homepage }}
       license: ${{ load_from_file("python/libcuvs/pyproject.toml").project.license }}
@@ -256,9 +242,7 @@ outputs:
         - libcurand-dev
         - libcusolver-dev
         - libcusparse-dev
-        - if: cuda_major == "13"
-          then:
-            - libnvjitlink-dev
+        - libnvjitlink-dev
       run:
         - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
         - ${{ pin_subpackage("libcuvs-headers", exact=True) }}
@@ -270,9 +254,7 @@ outputs:
         - libcurand
         - libcusolver
         - libcusparse
-        - if: cuda_major == "13"
-          then:
-            - libnvjitlink
+        - libnvjitlink
       ignore_run_exports:
         by_name:
           - cuda-cudart
@@ -283,9 +265,7 @@ outputs:
           - libcurand
           - libcusolver
           - libcusparse
-          - if: cuda_major == "13"
-            then:
-              - libnvjitlink
+          - libnvjitlink
           - librmm
           - mkl
           - nccl
@@ -423,9 +403,7 @@ outputs:
         - libcurand-dev
         - libcusolver-dev
         - libcusparse-dev
-        - if: cuda_major == "13"
-          then:
-            - libnvjitlink-dev
+        - libnvjitlink-dev
       run:
         - ${{ pin_subpackage("libcuvs-headers", exact=True) }}
         - ${{ pin_subpackage("libcuvs", exact=True) }}
@@ -436,9 +414,7 @@ outputs:
         - libcurand
         - libcusolver
         - libcusparse
-        - if: cuda_major == "13"
-          then:
-            - libnvjitlink
+        - libnvjitlink
       ignore_run_exports:
         by_name:
           - cuda-cudart
@@ -449,9 +425,7 @@ outputs:
           - libcurand
           - libcusolver
           - libcusparse
-          - if: cuda_major == "13"
-            then:
-              - libnvjitlink
+          - libnvjitlink
           - librmm
           - mkl
           - nccl
