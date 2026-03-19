@@ -70,10 +70,7 @@ template <typename IdxTag, typename FilterImplTag>
 struct tag_filter {};
 
 // Tag types for distance metrics with full template info
-template <int Veclen, typename TTag, typename AccTTag>
 struct tag_metric_euclidean {};
-
-template <int Veclen, typename TTag, typename AccTTag>
 struct tag_metric_inner_product {};
 
 // Tag types for post-processing

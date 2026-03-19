@@ -928,7 +928,7 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
       double min_recall = ps.min_recall;
       if (ps.graph_degree < 40) { min_recall *= 0.95; }
-      // TODO(mfoerster): re-enable uniquenes test
+      // TODO(mfoerster): re-enable uniqueness test
       EXPECT_TRUE(eval_neighbours(indices_naive,
                                   indices_Cagra,
                                   distances_naive,

@@ -6,43 +6,52 @@
 #pragma once
 
 #include <cuvs/detail/jit_lto/AlgorithmPlanner.hpp>
-#include <cuvs/detail/jit_lto/FragmentDatabase.hpp>
 #include <cuvs/detail/jit_lto/MakeFragmentKey.hpp>
+#include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_fragments.hpp>
 #include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>
 #include <iostream>
 #include <string>
 
-template <typename DataTypeTag, typename AccTypeTag, typename IdxTypeTag>
+namespace cuvs::neighbors::ivf_flat::detail {
+
 struct InterleavedScanPlanner : AlgorithmPlanner {
-  InterleavedScanPlanner(int Capacity, int Veclen, bool Ascending, bool ComputeNorm)
-    : AlgorithmPlanner("interleaved_scan_capacity_" + std::to_string(Capacity) + "_veclen_" +
-                         std::to_string(Veclen) + "_" + (Ascending ? "ascending" : "descending") +
-                         "_" + (ComputeNorm ? "compute_norm" : "no_compute_norm") + "_data_" +
-                         cuvs::neighbors::ivf_flat::detail::tag_abbrev<DataTypeTag>::value +
-                         "_acc_" +
-                         cuvs::neighbors::ivf_flat::detail::tag_abbrev<AccTypeTag>::value +
-                         "_idx_" + cuvs::neighbors::ivf_flat::detail::tag_abbrev<IdxTypeTag>::value,
-                       "interleaved_scan")
+  InterleavedScanPlanner() : AlgorithmPlanner("interleaved_scan") {}
+
+  template <typename DataTag,
+            typename AccTag,
+            typename IdxTag,
+            int Capacity,
+            int Veclen,
+            bool Ascending,
+            bool ComputeNorm>
+  void add_entrypoint()
   {
+    this->add_fragment<InterleavedScanFragmentEntry<DataTag,
+                                                    AccTag,
+                                                    IdxTag,
+                                                    Capacity,
+                                                    Veclen,
+                                                    Ascending,
+                                                    ComputeNorm>>();
   }
 
-  template <typename... FuncTags>
-  void add_metric_device_function(std::string metric_name, int Veclen)
+  template <int Veclen, typename DataTag, typename AccTag, typename MetricTag>
+  void add_metric_device_function()
   {
-    auto key    = metric_name + "_veclen_" + std::to_string(Veclen);
-    auto params = make_fragment_key<FuncTags...>();
-    this->device_functions.push_back(key + "_" + params);
+    this->add_fragment<MetricFragmentEntry<Veclen, DataTag, AccTag, MetricTag>>();
   }
 
-  void add_filter_device_function(std::string filter_name)
+  template <typename IvfSampleFilterTag>
+  void add_filter_device_function()
   {
-    auto key = filter_name;
-    this->device_functions.push_back(key);
+    this->add_fragment<FilterFragmentEntry<IvfSampleFilterTag>>();
   }
 
-  void add_post_lambda_device_function(std::string post_lambda_name)
+  template <typename PostLambdaTag>
+  void add_post_lambda_device_function()
   {
-    auto key = post_lambda_name;
-    this->device_functions.push_back(key);
+    this->add_fragment<PostLambdaFragmentEntry<PostLambdaTag>>();
   }
 };
+
+}  // namespace cuvs::neighbors::ivf_flat::detail
