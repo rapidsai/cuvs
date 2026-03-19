@@ -1048,7 +1048,7 @@ void mst_optimization(raft::resources const& res,
       msg += ", total_num_edges: " + std::to_string(total_outgoing_edges) + ", " +
              std::to_string(total_incoming_edges);
       if (num_alternate + num_failure > 0) {
-        msg += ", altenate: " + std::to_string(num_alternate);
+        msg += ", alternate: " + std::to_string(num_alternate);
         if (num_failure > 0) { msg += ", failure: " + std::to_string(num_failure); }
       }
       RAFT_LOG_DEBUG("%s", msg.c_str());
