@@ -6,6 +6,7 @@
 #pragma once
 
 #include <cuvs/neighbors/common.hpp>
+#include <cuvs/preprocessing/quantize/vpq_dataset.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/handle.hpp>
 #include <raft/core/host_mdspan.hpp>
@@ -87,7 +88,7 @@ struct params {
 template <typename T>
 struct quantizer {
   params params_quantizer;
-  cuvs::neighbors::vpq_dataset<T, int64_t> vpq_codebooks;
+  cuvs::preprocessing::quantize::pq::vpq_dataset<T, int64_t> vpq_codebooks;
 };
 
 /**

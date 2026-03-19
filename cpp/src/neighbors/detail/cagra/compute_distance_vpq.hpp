@@ -8,6 +8,7 @@
 #include "compute_distance.hpp"
 
 #include <cuvs/distance/distance.hpp>
+#include <cuvs/preprocessing/quantize/vpq_dataset.hpp>
 
 #include <type_traits>
 
@@ -31,14 +32,14 @@ struct vpq_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
 
   template <typename DatasetT>
   constexpr static inline auto accepts_dataset()
-    -> std::enable_if_t<is_vpq_dataset_v<DatasetT>, bool>
+    -> std::enable_if_t<cuvs::preprocessing::quantize::pq::is_vpq_dataset_v<DatasetT>, bool>
   {
     return std::is_same_v<typename DatasetT::math_type, CodebookT>;
   }
 
   template <typename DatasetT>
   constexpr static inline auto accepts_dataset()
-    -> std::enable_if_t<!is_vpq_dataset_v<DatasetT>, bool>
+    -> std::enable_if_t<!cuvs::preprocessing::quantize::pq::is_vpq_dataset_v<DatasetT>, bool>
   {
     return false;
   }

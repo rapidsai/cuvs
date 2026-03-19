@@ -412,7 +412,7 @@ void process_and_fill_codes(
   bool inline_vq_labels = false)
 {
   using data_t     = typename DatasetT::value_type;
-  using cdataset_t = vpq_dataset<MathT, IdxT>;
+  using cdataset_t = cuvs::preprocessing::quantize::pq::vpq_dataset<MathT, IdxT>;
   using label_t    = uint32_t;
 
   const ix_t n_rows       = dataset.extent(0);
@@ -505,8 +505,9 @@ void process_and_fill_codes(
 }
 
 template <typename NewMathT, typename OldMathT, typename IdxT>
-auto vpq_convert_math_type(const raft::resources& res, vpq_dataset<OldMathT, IdxT>&& src)
-  -> vpq_dataset<NewMathT, IdxT>
+auto vpq_convert_math_type(const raft::resources& res,
+                           cuvs::preprocessing::quantize::pq::vpq_dataset<OldMathT, IdxT>&& src)
+  -> cuvs::preprocessing::quantize::pq::vpq_dataset<NewMathT, IdxT>
 {
   auto vq_code_book = raft::make_device_mdarray<NewMathT>(res, src.vq_code_book().extents());
   auto pq_code_book = raft::make_device_mdarray<NewMathT>(res, src.pq_code_book().extents());
@@ -529,8 +530,9 @@ auto vpq_convert_math_type(const raft::resources& res, vpq_dataset<OldMathT, Idx
              data_view.size(),
              raft::resource::get_cuda_stream(res));
 
-  return vpq_dataset<NewMathT, IdxT>{std::make_unique<vpq_dataset_owning<NewMathT, IdxT>>(
-    std::move(vq_code_book), std::move(pq_code_book), std::move(data))};
+  return cuvs::preprocessing::quantize::pq::vpq_dataset<NewMathT, IdxT>{
+    std::make_unique<vpq_dataset_owning<NewMathT, IdxT>>(
+      std::move(vq_code_book), std::move(pq_code_book), std::move(data))};
 }
 
 // Helper for operations using vectorized loads of raft::TxN_t
@@ -808,7 +810,7 @@ void process_and_fill_codes_subspaces(
   raft::device_matrix_view<uint8_t, IdxT, raft::row_major> codes)
 {
   using data_t     = typename DatasetT::value_type;
-  using cdataset_t = vpq_dataset<MathT, IdxT>;
+  using cdataset_t = cuvs::preprocessing::quantize::pq::vpq_dataset<MathT, IdxT>;
   using label_t    = uint32_t;
 
   const ix_t n_rows       = dataset.extent(0);
@@ -913,7 +915,7 @@ void process_and_fill_codes_subspaces(
 
 template <typename DatasetT, typename MathT, typename IdxT>
 auto vpq_build(const raft::resources& res, const vpq_params& params, const DatasetT& dataset)
-  -> vpq_dataset<MathT, IdxT>
+  -> cuvs::preprocessing::quantize::pq::vpq_dataset<MathT, IdxT>
 {
   using label_t = uint32_t;
   // Use a heuristic to impute missing parameters.
@@ -939,8 +941,9 @@ auto vpq_build(const raft::resources& res, const vpq_params& params, const Datas
                                       codes.view(),
                                       true);
 
-  return vpq_dataset<MathT, IdxT>{std::make_unique<vpq_dataset_owning<MathT, IdxT>>(
-    std::move(vq_code_book), std::move(pq_code_book), std::move(codes))};
+  return cuvs::preprocessing::quantize::pq::vpq_dataset<MathT, IdxT>{
+    std::make_unique<vpq_dataset_owning<MathT, IdxT>>(
+      std::move(vq_code_book), std::move(pq_code_book), std::move(codes))};
 }
 
 }  // namespace cuvs::neighbors::detail

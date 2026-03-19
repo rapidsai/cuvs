@@ -5,13 +5,9 @@
 
 #pragma once
 
-#include <cuvs/neighbors/common.hpp>
+#include <cuvs/preprocessing/quantize/vpq_dataset.hpp>
 
 #include <raft/util/integer_utils.hpp>
-
-#ifdef __cpp_lib_bitops
-#include <bit>
-#endif
 
 namespace cuvs::neighbors {
 
@@ -25,7 +21,7 @@ namespace cuvs::neighbors {
  * @tparam IdxT type of the vector indices
  */
 template <typename MathT, typename IdxT>
-class vpq_dataset_impl : public vpq_dataset_iface<MathT, IdxT> {
+class vpq_dataset_impl : public cuvs::preprocessing::quantize::pq::vpq_dataset_iface<MathT, IdxT> {
  public:
   using index_type = IdxT;
   using math_type  = MathT;

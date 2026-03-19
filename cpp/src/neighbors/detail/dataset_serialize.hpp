@@ -6,6 +6,7 @@
 
 #include "../../neighbors/vpq_dataset_impl.hpp"
 #include <cuvs/neighbors/common.hpp>
+#include <cuvs/preprocessing/quantize/vpq_dataset.hpp>
 
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/resources.hpp>
@@ -60,7 +61,7 @@ void serialize(const raft::resources& res,
 template <typename MathT, typename IdxT>
 void serialize(const raft::resources& res,
                std::ostream& os,
-               const vpq_dataset<MathT, IdxT>& dataset)
+               const cuvs::preprocessing::quantize::pq::vpq_dataset<MathT, IdxT>& dataset)
 {
   raft::serialize_scalar(res, os, dataset.n_rows());
   raft::serialize_scalar(res, os, dataset.dim());
@@ -100,12 +101,16 @@ void serialize(const raft::resources& res, std::ostream& os, const dataset<IdxT>
     raft::serialize_scalar(res, os, CUDA_R_8U);
     return serialize(res, os, *x);
   }
-  if (auto x = dynamic_cast<const vpq_dataset<float, IdxT>*>(&dataset); x != nullptr) {
+  if (auto x =
+        dynamic_cast<const cuvs::preprocessing::quantize::pq::vpq_dataset<float, IdxT>*>(&dataset);
+      x != nullptr) {
     raft::serialize_scalar(res, os, kSerializeVPQDataset);
     raft::serialize_scalar(res, os, CUDA_R_32F);
     return serialize(res, os, *x);
   }
-  if (auto x = dynamic_cast<const vpq_dataset<half, IdxT>*>(&dataset); x != nullptr) {
+  if (auto x =
+        dynamic_cast<const cuvs::preprocessing::quantize::pq::vpq_dataset<half, IdxT>*>(&dataset);
+      x != nullptr) {
     raft::serialize_scalar(res, os, kSerializeVPQDataset);
     raft::serialize_scalar(res, os, CUDA_R_16F);
     return serialize(res, os, *x);
@@ -135,7 +140,7 @@ auto deserialize_strided(raft::resources const& res, std::istream& is)
 
 template <typename MathT, typename IdxT>
 auto deserialize_vpq(raft::resources const& res, std::istream& is)
-  -> std::unique_ptr<vpq_dataset<MathT, IdxT>>
+  -> std::unique_ptr<cuvs::preprocessing::quantize::pq::vpq_dataset<MathT, IdxT>>
 {
   auto n_rows             = raft::deserialize_scalar<IdxT>(res, is);
   auto dim                = raft::deserialize_scalar<uint32_t>(res, is);
@@ -155,7 +160,7 @@ auto deserialize_vpq(raft::resources const& res, std::istream& is)
   raft::deserialize_mdspan(res, is, pq_code_book.view());
   raft::deserialize_mdspan(res, is, data.view());
 
-  return std::make_unique<vpq_dataset<MathT, IdxT>>(
+  return std::make_unique<cuvs::preprocessing::quantize::pq::vpq_dataset<MathT, IdxT>>(
     std::make_unique<vpq_dataset_owning<MathT, IdxT>>(
       std::move(vq_code_book), std::move(pq_code_book), std::move(data)));
 }

@@ -158,7 +158,7 @@ quantizer<MathT> build(
       res, vpq_params, dataset, raft::make_const_mdspan(vq_code_book.view()));
   }
   return {filled_params,
-          cuvs::neighbors::vpq_dataset<MathT, int64_t>{
+          cuvs::preprocessing::quantize::pq::vpq_dataset<MathT, int64_t>{
             std::make_unique<cuvs::neighbors::vpq_dataset_owning<MathT, int64_t>>(
               std::move(vq_code_book), std::move(pq_code_book), std::move(empty_codes))}};
 }
@@ -207,7 +207,7 @@ quantizer<MathT> build_view(
   // Create view-type vpq_dataset
   auto empty_data = raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(res, 0, 0);
   return {params,
-          cuvs::neighbors::vpq_dataset<MathT, int64_t>{
+          cuvs::preprocessing::quantize::pq::vpq_dataset<MathT, int64_t>{
             std::make_unique<cuvs::neighbors::vpq_dataset_view<MathT, int64_t>>(
               vq_centers, pq_centers, std::move(empty_data))}};
 }
@@ -232,7 +232,6 @@ void transform(
   RAFT_EXPECTS(quantizer.params_quantizer.pq_bits >= 4 && quantizer.params_quantizer.pq_bits <= 16,
                "PQ bits must be within [4, 16]");
 
-  // Use view accessors from vpq_dataset
   auto vq_centers     = quantizer.vpq_codebooks.vq_code_book();
   auto pq_centers     = quantizer.vpq_codebooks.pq_code_book();
   auto vq_labels_view = raft::make_device_vector_view<uint32_t, int64_t>(nullptr, 0);
@@ -374,7 +373,6 @@ void inverse_transform(
   RAFT_EXPECTS(quantizer.params_quantizer.pq_bits >= 4 && quantizer.params_quantizer.pq_bits <= 16,
                "PQ bits must be within [4, 16]");
 
-  // Use view accessors from vpq_dataset
   reconstruct_vectors<T, T, idx_t, label_t>(res,
                                             quantizer.params_quantizer,
                                             codes,

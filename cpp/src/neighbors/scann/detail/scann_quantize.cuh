@@ -75,7 +75,7 @@ auto process_and_fill_codes_subspaces(
   -> raft::device_matrix<uint8_t, IdxT, raft::row_major>
 {
   using data_t     = typename DatasetT::value_type;
-  using cdataset_t = vpq_dataset<MathT, IdxT>;
+  using cdataset_t = cuvs::preprocessing::quantize::pq::vpq_dataset<MathT, IdxT>;
   using label_t    = uint32_t;
 
   const ix_t n_rows       = dataset.extent(0);
