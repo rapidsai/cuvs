@@ -5,9 +5,9 @@
 
 #include "ivf_rabitq/gpu_index/ivf_gpu.cuh"
 #include "ivf_rabitq/gpu_index/searcher_gpu.cuh"
+#include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/neighbors/ivf_rabitq.hpp>
 
-#include "../cluster/kmeans_balanced.cuh"
 #include "../core/nvtx.hpp"
 #include "detail/ann_utils.cuh"
 
@@ -16,8 +16,6 @@
 #include <raft/linalg/reduce.cuh>
 #include <raft/matrix/sample_rows.cuh>
 #include <raft/util/cudart_utils.hpp>
-
-#include "../cluster/kmeans_balanced_impl_fit_predict.cuh"
 
 namespace cuvs::neighbors::ivf_rabitq {
 
@@ -127,9 +125,6 @@ auto build(raft::resources const& handle,
     kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
     // find cluster labels for dataset vectors
     auto labels_view = raft::make_device_vector_view<uint32_t, int64_t>(labels.data(), n_rows);
-    // cuvs::cluster::kmeans_balanced::fit_predict(
-    //   handle, kmeans_params, raft::make_const_mdspan(trainset.view()), centers_view,
-    //   labels_view);
     auto centers_const_view = raft::make_device_matrix_view<const float, int64_t>(
       cluster_centers.data(), params.n_lists, dim);
     cuvs::cluster::kmeans::fit(
