@@ -24,10 +24,10 @@ namespace cuvs::preprocessing::spectral_embedding {
  */
 struct params {
   /** @brief The number of components to reduce the data to. */
-  int n_components;
+  int n_components = 2;
 
   /** @brief The number of neighbors to use for the nearest neighbors graph. */
-  int n_neighbors;
+  int n_neighbors = 15;
 
   /**
    * @brief Whether to normalize the Laplacian matrix.
@@ -36,7 +36,7 @@ struct params {
    * If false, uses the unnormalized graph Laplacian (L = D - W).
    * Normalized Laplacian often leads to better results for clustering tasks.
    */
-  bool norm_laplacian;
+  bool norm_laplacian = true;
 
   /**
    * @brief Whether to drop the first eigenvector.
@@ -45,7 +45,7 @@ struct params {
    * uninformative. Setting this to true drops it from the embedding.
    * This is typically set to true when norm_laplacian is true.
    */
-  bool drop_first;
+  bool drop_first = true;
 
   /**
    * @brief Tolerance for the eigenvalue solver.
