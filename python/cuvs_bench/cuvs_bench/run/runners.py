@@ -167,10 +167,9 @@ def cuvs_bench_cpp(
         if search:
             search_folder = os.path.join(legacy_result_folder, "search")
             os.makedirs(search_folder, exist_ok=True)
-            # Use underscores in filename so --benchmark_out is not truncated by comma
-            search_file_safe = f"{output_filename[1].replace(',', '_')}.json"
-            final_search_json = os.path.join(search_folder, search_file_safe)
-            cmd_base = [
+            # Underscores in filename so --benchmark_out path is not truncated by comma
+            search_file = f"{output_filename[1].replace(',', '_')}.json"
+            cmd = [
                 ann_executable_path,
                 "--search",
                 f"--data_prefix={dataset_path}",
@@ -180,27 +179,26 @@ def cuvs_bench_cpp(
                 "--benchmark_min_warmup_time=4",
                 "--benchmark_out_format=json",
                 f"--mode={mode}",
+                f"--benchmark_out={os.path.join(search_folder, search_file)}",
             ]
             if force:
-                cmd_base.append("--force")
+                cmd.append("--force")
             if search_threads:
-                cmd_base.append(f"--threads={search_threads}")
-            # C++ binary expects the config file as the *last* argument (argv[--argc])
-            # So --benchmark_out must come before the config file.
-            cmd_base.append(temp_conf_filename)
+                cmd.append(f"--threads={search_threads}")
+            cmd.append(temp_conf_filename)
 
             if dry_run:
-                cmd = cmd_base[:-1] + [f"--benchmark_out={final_search_json}", temp_conf_filename]
                 print(
                     f"Benchmark command for {output_filename[1]}:\n"
                     f"{' '.join(cmd)}\n"
                 )
             else:
-                cmd = cmd_base[:-1] + [f"--benchmark_out={final_search_json}", temp_conf_filename]
                 try:
                     subprocess.run(cmd, check=True, env=_subprocess_env(ann_executable_path))
                     _dataset = conf_file["dataset"]["name"]
                     convert_json_to_csv_search(_dataset, dataset_path)
+                    result_dir = os.path.join(dataset_path, _dataset, "result", "search")
+                    print(f"[cuvs_bench] Search results written to CSV in {os.path.abspath(result_dir)}")
                 except Exception as e:
                     print(f"Error occurred running benchmark: {e}")
                 finally:

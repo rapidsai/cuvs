@@ -342,18 +342,14 @@ def get_build_path(executable: str) -> Optional[str]:
         print(f"-- Detected devcontainer artifact {devc_executable}.")
         return devc_executable
 
-    # Prefer local build over conda so your libcuvs (e.g. with normalization) is used
-    repo = os.getenv("CUVS_HOME")
-    if repo:
-        for rel in (
-            os.path.join("cpp", "build", "release", executable),
-            os.path.join("cpp", "build", "bench", "ann", executable),
-            os.path.join("cpp", "build", executable),
-        ):
-            candidate = os.path.join(repo, rel)
-            if os.path.exists(candidate):
-                print(f"-- Using cuVS bench from repository in {candidate}.")
-                return candidate
+    build_path = os.getenv("CUVS_HOME")
+    if build_path:
+        build_path = os.path.join(
+            build_path, "cpp", "build", "bench", "ann", executable
+        )
+        if os.path.exists(build_path):
+            print(f"-- Using cuVS bench from repository in {build_path}.")
+            return build_path
 
     conda_path = os.getenv("CONDA_PREFIX")
     if conda_path:
