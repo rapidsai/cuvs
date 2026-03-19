@@ -34,7 +34,7 @@ namespace cuvs::neighbors::vamana {
 template <typename T = float>
 struct codebook_params {
   int pq_codebook_size = 0;
-  int pq_dim = 0;
+  int pq_dim           = 0;
   std::vector<T> pq_encoding_table;
   std::vector<T> rotation_matrix;
 };
