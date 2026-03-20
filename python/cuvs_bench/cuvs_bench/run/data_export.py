@@ -77,12 +77,7 @@ def read_json_files(dataset, dataset_path, method):
                 with open(file_path, "r", encoding="ISO-8859-1") as f:
                     data = json.load(f)
                     df = pd.DataFrame(data["benchmarks"])
-                    base = file.replace(".json", "")
-                    if "," in base:
-                        algo_name = tuple(base.split(",")[:2])
-                    else:
-                        parts = base.split("_")
-                        algo_name = (parts[0], parts[1]) if len(parts) >= 2 else (parts[0],)
+                    algo_name = tuple(file.split(",")[:2])
                     yield file_path, algo_name, df
             except Exception as e:
                 print(f"Error processing file {file}: {e}. Skipping...")
@@ -187,16 +182,6 @@ def convert_json_to_csv_search(dataset, dataset_path):
                 "build",
                 f"{','.join(algo_name)}.csv",
             )
-            if not os.path.exists(build_file):
-                build_file_alt = os.path.join(
-                    dataset_path,
-                    dataset,
-                    "result",
-                    "build",
-                    f"{'_'.join(algo_name)}.csv",
-                )
-                if os.path.exists(build_file_alt):
-                    build_file = build_file_alt
             algo_name = clean_algo_name(algo_name)
             df["name"] = df["name"].str.split("/").str[0]
             write = pd.DataFrame(

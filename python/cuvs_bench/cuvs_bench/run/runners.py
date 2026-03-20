@@ -126,8 +126,7 @@ def cuvs_bench_cpp(
         if build:
             build_folder = os.path.join(legacy_result_folder, "build")
             os.makedirs(build_folder, exist_ok=True)
-            # Use underscores so --benchmark_out is not truncated by comma
-            build_file = f"{output_filename[0].replace(',', '_')}.json"
+            build_file = f"{output_filename[0]}.json"
             temp_build_file = f"{build_file}.lock"
             benchmark_out = os.path.join(build_folder, temp_build_file)
             cmd = [
@@ -167,8 +166,7 @@ def cuvs_bench_cpp(
         if search:
             search_folder = os.path.join(legacy_result_folder, "search")
             os.makedirs(search_folder, exist_ok=True)
-            # Underscores in filename so --benchmark_out path is not truncated by comma
-            search_file = f"{output_filename[1].replace(',', '_')}.json"
+            search_file = f"{output_filename[1]}.json"
             cmd = [
                 ann_executable_path,
                 "--search",
