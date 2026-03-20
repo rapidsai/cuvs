@@ -1442,7 +1442,6 @@ void GNND<Data_t, Index_t>::local_join(cudaStream_t stream, DistEpilogue_t dist_
 
   auto launch_kernel = [&](auto* typed_ptr) {
     if (use_simt) {
-      std::cout << "using simt kernel" << std::endl;
       local_join_kernel_simt<<<nrow_, BLOCK_SIZE, 0, stream>>>(graph_.h_graph_new.data_handle(),
                                                                h_rev_graph_new_.data_handle(),
                                                                d_list_sizes_new_.data_handle(),
@@ -1460,7 +1459,6 @@ void GNND<Data_t, Index_t>::local_join(cudaStream_t stream, DistEpilogue_t dist_
                                                                build_config_.metric,
                                                                dist_epilogue);
     } else {
-      std::cout << "using wmma kernel" << std::endl;
       local_join_kernel_wmma<<<nrow_, BLOCK_SIZE, 0, stream>>>(graph_.h_graph_new.data_handle(),
                                                                h_rev_graph_new_.data_handle(),
                                                                d_list_sizes_new_.data_handle(),
