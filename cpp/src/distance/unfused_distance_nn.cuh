@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <cub/block/block_reduce.cuh>
+
 #include <raft/core/resource/cublas_handle.hpp>
 #include <raft/core/resources.hpp>
 
