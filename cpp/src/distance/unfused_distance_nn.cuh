@@ -109,6 +109,32 @@ __global__ void reduce_min_kernel(OutT* out,
   }
 }
 
+/**
+ * @brief Reduces pairwise distances to find the minimum distance per row.
+ *
+ * This function launches a kernel that computes the final distance values from
+ * the GEMM output and norms, then reduces across columns to find the minimum
+ * distance (and optionally the index) for each row. Distance computation and
+ * reduction is fused together in a single kernel thats why we can not use
+ * RAFT reduction here.
+ *
+ * @tparam DataT   Input data type
+ * @tparam AccT    Accumulator/distance type
+ * @tparam OutT    Output type (either AccT for distances only, or KeyValuePair for index+distance)
+ * @tparam IdxT    Index type
+ * @tparam metric  Distance metric type (L2Expanded, L2SqrtExpanded, or CosineExpanded)
+ *
+ * @param[out] out           Output array containing minimum distances (and optionally indices)
+ *                           per row. Length = `m`. (on device)
+ * @param[in]  z             GEMM output matrix (x * y^T). Dim = `m x n`. (on device)
+ * @param[in]  x_norm        Norms of rows in x. Length = `m`. (on device)
+ * @param[in]  y_norm        Norms of rows in y. Length = `n`. (on device)
+ * @param[in]  m             Number of rows in x (and output)
+ * @param[in]  n             Number of rows in y (columns to reduce over)
+ * @param[in]  stream        CUDA stream for kernel launch
+ * @param[in]  is_sqrt       Whether to apply square root to the final distance
+ * @param[in]  initOutBuffer Whether to initialize the output buffer or merge with existing values
+ */
 template <typename DataT, typename AccT, typename OutT, typename IdxT, DistanceType metric>
 void reduce_min(OutT* out,
                 const AccT* z,
