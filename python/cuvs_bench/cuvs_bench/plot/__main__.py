@@ -103,8 +103,6 @@ def create_plot_search(
     mode,
     time_unit,
     x_start,
-    y_max=None,
-    x_max=None,
 ):
     xn = "k-nn"
     xm, ym = (metrics[xn], metrics[mode])
@@ -119,17 +117,14 @@ def create_plot_search(
         points = np.array(all_data[algo], dtype=object)
         return -np.log(np.array(points[:, 3], dtype=np.float32)).mean()
 
-    # Find range for logit x-scale and for throughput y-scale
+    # Find range for logit x-scale
     min_x, max_x = 1, 0
-    max_y_data = 0
     for algo in sorted(all_data.keys(), key=mean_y):
         points = np.array(all_data[algo], dtype=object)
         xs = points[:, 2]
         ys = points[:, 3]
         min_x = min([min_x] + [x for x in xs if x > 0])
         max_x = max([max_x] + [x for x in xs if x < 1])
-        if len(ys) > 0:
-            max_y_data = max(max_y_data, float(np.max(ys)))
         color, faded, linestyle, marker = linestyles[algo]
         (handle,) = plt.plot(
             xs,
@@ -192,26 +187,16 @@ def create_plot_search(
     # Logit scale has to be a subset of (0,1)
     if "lim" in xm and x_scale != "logit":
         x0, x1 = xm["lim"]
-        # Include data that fall below x_start (e.g. wiki_all_1M with max recall < 0.8)
-        left = max(0, min(x0, min_x)) if min_x <= 1 else x0
-        right = float(x_max) if x_max is not None else min(x1, 1)
-        plt.xlim(left, right)
+        plt.xlim(max(x0, 0), min(x1, 1))
     elif x_scale == "logit":
         plt.xlim(min_x, max_x)
-    if y_max is not None:
-        lo = 1e-9 if y_scale == "log" else 0.0
-        ax.set_ylim(lo, float(y_max))
-    elif "lim" in ym:
-        ax.set_ylim(ym["lim"])
-    elif mode == "throughput":
-        # Throughput (Q/s) can be large; ensure y-axis includes the data (or sensible default)
-        lo = 1e-9 if y_scale == "log" else 0.0
-        top = (max_y_data * 1.05) if max_y_data > 0 else 1e6
-        ax.set_ylim(lo, top)
+    if "lim" in ym:
+        plt.ylim(ym["lim"])
 
     # Workaround for bug https://github.com/matplotlib/matplotlib/issues/6789
     ax.spines["bottom"]._adjust_location()
 
+    print(f"writing search output to {fn_out}")
     plt.savefig(fn_out, bbox_inches="tight")
     plt.close()
 
@@ -286,6 +271,7 @@ def create_plot_build(
     plt.figure(figsize=(12, 9))
     ax = df.plot.bar(rot=0, color=colors)
     fig = ax.get_figure()
+    print(f"writing build output to {fn_out}")
     plt.title(
         "Average Build Time within Recall Range "
         f"for k={k} batch_size={batch_size}"
@@ -343,39 +329,6 @@ def load_lines(results_path, result_files, method, index_key, mode, time_unit):
             )
 
     return results
-
-
-def load_overlay_csv(path, label, mode, time_unit):
-    """
-    Load a single search CSV and return results dict with one key (label).
-    Same row format as load_lines: [algo_name, index_name, x_val, y_val].
-    """
-    out = {label: []}
-    usecols = ["algo_name", "index_name", "recall", "throughput", "latency"]
-    y_col = "throughput" if mode == "throughput" else "latency"
-    try:
-        try:
-            df = pd.read_csv(path, usecols=usecols)
-        except ValueError:
-            df = pd.read_csv(path)
-        df.columns = [str(c).strip().lower() for c in df.columns]
-        if df.empty or y_col not in df.columns or "recall" not in df.columns:
-            return out
-        for _, row in df.iterrows():
-            try:
-                x_val = float(row["recall"])
-                y_val = float(row[y_col])
-                if mode == "latency" and time_unit != "s":
-                    y_val = (
-                        y_val * (10**3) if time_unit == "ms" else y_val * (10**6)
-                    )
-                index_name = str(row["index_name"]).strip()
-                out[label].append([label, index_name, x_val, y_val])
-            except (ValueError, TypeError, KeyError):
-                continue
-    except Exception:
-        pass
-    return out
 
 
 def load_all_results(
@@ -460,7 +413,7 @@ def load_all_results(
     results = load_lines(
         results_path, final_results, method, index_key, mode, time_unit
     )
-    
+
     return results
 
 
@@ -532,12 +485,6 @@ def load_all_results(
     help="Recall values to start the x-axis from.",
 )
 @click.option(
-    "--x-max",
-    default=None,
-    type=float,
-    help="X-axis upper limit (recall). Optional; if not set, axis uses default (1.0).",
-)
-@click.option(
     "--mode",
     "-m",
     type=click.Choice(["throughput", "latency"], case_sensitive=False),
@@ -555,25 +502,6 @@ def load_all_results(
     is_flag=True,
     help="Show raw results (not just Pareto frontier) of the mode argument.",
 )
-@click.option(
-    "--y-max",
-    default=None,
-    type=float,
-    help="Y-axis upper limit (e.g. 0.5). Optional; if not set, axis uses metric default or autoscale.",
-)
-@click.option(
-    "--overlay-csv",
-    nargs=2,
-    type=click.Path(exists=True),
-    default=None,
-    help="Two search CSV paths to overlay (e.g. normalized and raw IP). Use with --overlay-labels.",
-)
-@click.option(
-    "--overlay-labels",
-    nargs=2,
-    default=("Normalized", "Raw"),
-    help="Labels for the two overlay CSVs (default: Normalized, Raw).",
-)
 def main(
     dataset: str,
     dataset_path: str,
@@ -588,13 +516,9 @@ def main(
     x_scale: str,
     y_scale: str,
     x_start: float,
-    x_max: float,
     mode: str,
     time_unit: str,
     raw: bool,
-    y_max: float,
-    overlay_csv: tuple,
-    overlay_labels: tuple,
 ) -> None:
     args = locals()
 
@@ -618,40 +542,26 @@ def main(
 
     search_output_filepath = os.path.join(
         args["output_filepath"],
-        f"search-{args['dataset']}-k{k}-batch_size{batch_size}-{args['mode']}.png",
+        f"search-{args['dataset']}-k{k}-batch_size{batch_size}.png",
     )
     build_output_filepath = os.path.join(
         args["output_filepath"],
         f"build-{args['dataset']}-k{k}-batch_size{batch_size}.png",
     )
 
-    if args["overlay_csv"] and len(args["overlay_csv"]) == 2:
-        search_results = {}
-    else:
-        search_results = load_all_results(
-            os.path.join(args["dataset_path"], args["dataset"]),
-            algorithms,
-            groups,
-            algo_groups,
-            k,
-            batch_size,
-            "search",
-            "algo",
-            args["raw"],
-            args["mode"],
-            args["time_unit"],
-        )
-    if args["overlay_csv"] and len(args["overlay_csv"]) == 2:
-        for csv_path, overlay_label in zip(args["overlay_csv"], args["overlay_labels"]):
-            extra = load_overlay_csv(
-                csv_path,
-                overlay_label,
-                args["mode"],
-                args["time_unit"],
-            )
-            for key, points in extra.items():
-                if points:
-                    search_results[key] = points
+    search_results = load_all_results(
+        os.path.join(args["dataset_path"], args["dataset"]),
+        algorithms,
+        groups,
+        algo_groups,
+        k,
+        batch_size,
+        "search",
+        "algo",
+        args["raw"],
+        args["mode"],
+        args["time_unit"],
+    )
     linestyles = create_linestyles(sorted(search_results.keys()))
     if search:
         create_plot_search(
@@ -666,8 +576,6 @@ def main(
             args["mode"],
             args["time_unit"],
             args["x_start"],
-            args.get("y_max"),
-            args.get("x_max"),
         )
     if build:
         build_results = load_all_results(
