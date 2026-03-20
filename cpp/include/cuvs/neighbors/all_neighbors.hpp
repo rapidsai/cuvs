@@ -111,7 +111,7 @@ struct all_neighbors_params {
  *  all_neighbors::build(res, params, dataset, indices.view(), distances.view());
  * @endcode
  *
- * @param[in] handle raft::resources is an object mangaging resources
+ * @param[in] handle raft::resources is an object managing resources
  * @param[in] params an instance of all_neighbors::all_neighbors_params that are parameters
  *               to build all-neighbors knn graph
  * @param[in] dataset raft::host_matrix_view input dataset expected to be located
@@ -147,7 +147,7 @@ void build(
  *  all_neighbors::build(res, params, dataset, indices.view(), distances.view());
  * @endcode
  *
- * @param[in] handle raft::resources is an object mangaging resources
+ * @param[in] handle raft::resources is an object managing resources
  * @param[in] params an instance of all_neighbors::all_neighbors_params that are parameters
  *               to build all-neighbors knn graph
  * @param[in] dataset raft::device_matrix_view input dataset expected to be located
