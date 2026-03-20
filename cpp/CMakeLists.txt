@@ -442,10 +442,10 @@ if(NOT BUILD_CPU_ONLY)
       ${metric_files}
       ${filter_files}
       ${post_lambda_files}
-      src/detail/jit_lto/AlgorithmLauncher.cu
-      src/detail/jit_lto/AlgorithmPlanner.cu
-      src/detail/jit_lto/FragmentDatabase.cu
-      src/detail/jit_lto/FragmentEntry.cu
+      src/detail/jit_lto/AlgorithmLauncher.cpp
+      src/detail/jit_lto/AlgorithmPlanner.cpp
+      src/detail/jit_lto/FragmentDatabase.cpp
+      src/detail/jit_lto/FragmentEntry.cpp
       src/detail/jit_lto/nvjitlink_checker.cpp
     )
     set_target_properties(
@@ -664,6 +664,7 @@ if(NOT BUILD_CPU_ONLY)
     src/preprocessing/quantize/binary.cu
     src/preprocessing/quantize/pq.cu
     src/preprocessing/spectral/spectral_embedding.cu
+    src/preprocessing/pca/pca.cu
     src/selection/select_k_float_int64_t.cu
     src/selection/select_k_float_int32_t.cu
     src/selection/select_k_float_uint32_t.cu
