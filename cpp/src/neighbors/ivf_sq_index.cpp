@@ -43,8 +43,6 @@ index<IdxT>::index(raft::resources const& res,
     inds_ptrs_{raft::make_device_vector<int64_t*, uint32_t>(res, n_lists)},
     accum_sorted_sizes_{raft::make_host_vector<int64_t, uint32_t>(n_lists + 1)}
 {
-  RAFT_EXPECTS(n_lists > 0, "n_lists must be positive.");
-  RAFT_EXPECTS(dim > 0, "dim must be positive.");
   check_consistency();
   auto stream = raft::resource::get_cuda_stream(res);
   std::memset(accum_sorted_sizes_.data_handle(), 0, accum_sorted_sizes_.size() * sizeof(int64_t));

@@ -204,26 +204,6 @@ __launch_bounds__(BlockSize) RAFT_KERNEL encode_and_fill_kernel(const uint32_t* 
   }
 }
 
-/**
- * Compute residuals: residual[i] = cast<float>(x_i) - centers[labels[i]]
- */
-template <typename T>
-RAFT_KERNEL compute_residuals_kernel(const T* dataset,
-                                     const float* centers,
-                                     const uint32_t* labels,
-                                     float* residuals,
-                                     int64_t n_rows,
-                                     uint32_t dim)
-{
-  int64_t i  = int64_t(blockIdx.x) * blockDim.x + threadIdx.x;
-  uint32_t j = blockIdx.y * blockDim.y + threadIdx.y;
-  if (i >= n_rows || j >= dim) return;
-
-  float val              = utils::mapping<float>{}(dataset[i * dim + j]);
-  uint32_t c             = labels[i];
-  residuals[i * dim + j] = val - centers[c * dim + j];
-}
-
 /** In-place variant: dataset[i] = cast<T>(cast<float>(dataset[i]) - centers[labels[i]]) */
 template <typename T>
 RAFT_KERNEL compute_residuals_inplace_kernel(
@@ -348,16 +328,22 @@ void extend(raft::resources const& handle,
     int64_t bs = batch.size();
 
     {
-      dim3 threads(32, 8);
-      dim3 blocks(raft::ceildiv<int64_t>(bs, threads.x), raft::ceildiv<uint32_t>(dim, threads.y));
-      compute_residuals_kernel<T>
-        <<<blocks, threads, 0, stream>>>(batch.data(),
-                                         index->centers().data_handle(),
-                                         new_labels.data_handle() + batch.offset(),
-                                         residuals_buf.data_handle(),
-                                         bs,
-                                         dim);
-      RAFT_CUDA_TRY(cudaPeekAtLastError());
+      auto batch_view = raft::make_device_matrix_view<const T, int64_t>(batch.data(), bs, dim);
+      auto residuals_view =
+        raft::make_device_matrix_view<float, int64_t>(residuals_buf.data_handle(), bs, dim);
+
+      const float* centers_ptr   = index->centers().data_handle();
+      const uint32_t* labels_ptr = new_labels.data_handle() + batch.offset();
+
+      raft::linalg::map_offset(
+        handle,
+        residuals_view,
+        [centers_ptr, labels_ptr, dim] __device__(auto idx, T x) {
+          auto i = idx / dim;
+          auto j = idx % dim;
+          return utils::mapping<float>{}(x)-centers_ptr[labels_ptr[i] * dim + j];
+        },
+        batch_view);
     }
 
     {
@@ -464,7 +450,6 @@ inline auto build(raft::resources const& handle,
     kmeans_params.n_iters = params.kmeans_n_iters;
     kmeans_params.metric  = idx.metric();
     cuvs::cluster::kmeans::fit(handle, kmeans_params, trainset_const_view, centers_view);
-    raft::resource::sync_stream(handle);
 
     // Train SQ: predict labels for the training subset, compute residuals in-place,
     // and derive per-dimension vmin/delta from them.
@@ -476,7 +461,6 @@ inline auto build(raft::resources const& handle,
         idx.centers().data_handle(), idx.n_lists(), dim);
       cuvs::cluster::kmeans::predict(
         handle, pred_params, trainset_const_view, centers_const_view, train_labels.view());
-      raft::resource::sync_stream(handle);
 
       constexpr int kResidualBlockSize = 256;
       compute_residuals_inplace_kernel<T>
