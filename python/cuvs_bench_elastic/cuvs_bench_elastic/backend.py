@@ -526,6 +526,10 @@ class ElasticConfigLoader(ConfigLoader):
         tune_mode = kwargs.pop("_tune_mode", False)
         tune_build_params = kwargs.pop("_tune_build_params", None)
         tune_search_params = kwargs.pop("_tune_search_params", None)
+        username = kwargs.pop("username", None)
+        password = kwargs.pop("password", None)
+        if basic_auth is None and username and password:
+            basic_auth = (username, password)
 
         datasets_path = os.path.join(
             self.config_path, "datasets", "datasets.yaml"
