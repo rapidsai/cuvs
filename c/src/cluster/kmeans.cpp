@@ -51,9 +51,8 @@ void _fit(cuvsResources_t res,
 {
   auto X       = X_tensor->dl_tensor;
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
-  bool is_host = (X.device.device_type == kDLCPU);
 
-  if (is_host) {
+  if (!cuvs::core::is_dlpack_device_compatible(X)) {
     auto n_samples  = static_cast<IdxT>(X.shape[0]);
     auto n_features = static_cast<IdxT>(X.shape[1]);
 
@@ -75,8 +74,8 @@ void _fit(cuvsResources_t res,
     std::optional<raft::host_vector_view<T const, IdxT>> sample_weight;
     if (sample_weight_tensor != NULL) {
       auto sw = sample_weight_tensor->dl_tensor;
-      if (sw.device.device_type != kDLCPU) {
-        RAFT_FAIL("sample_weight must be on host memory when X is on host");
+      if (cuvs::core::is_dlpack_host_compatible(sw)) {
+        RAFT_FAIL("sample_weight must be host accessible when X is on host");
       }
       sample_weight = raft::make_host_vector_view<T const, IdxT>(
         reinterpret_cast<T const*>(sw.data), n_samples);

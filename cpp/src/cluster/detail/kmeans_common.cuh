@@ -538,7 +538,7 @@ void compute_centroid_adjustments(
  *
  * @param[in]  handle          RAFT resources handle
  * @param[in]  centroid_sums   Accumulated weighted sums per cluster [n_clusters x n_features]
- * @param[in]  cluster_counts  Sum of weights per cluster [n_clusters]
+ * @param[in]  weight_per_cluster  Sum of weights per cluster [n_clusters]
  * @param[in]  old_centroids   Previous centroids (used for empty clusters) [n_clusters x
  * n_features]
  * @param[out] new_centroids   Output centroids [n_clusters x n_features]
@@ -546,7 +546,7 @@ void compute_centroid_adjustments(
 template <typename DataT, typename IndexT>
 void finalize_centroids(raft::resources const& handle,
                         raft::device_matrix_view<const DataT, IndexT> centroid_sums,
-                        raft::device_vector_view<const DataT, IndexT> cluster_counts,
+                        raft::device_vector_view<const DataT, IndexT> weight_per_cluster,
                         raft::device_matrix_view<const DataT, IndexT> old_centroids,
                         raft::device_matrix_view<DataT, IndexT> new_centroids)
 {
@@ -554,19 +554,19 @@ void finalize_centroids(raft::resources const& handle,
 
   raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(handle,
                                                              raft::make_const_mdspan(centroid_sums),
-                                                             cluster_counts,
+                                                             weight_per_cluster,
                                                              new_centroids,
                                                              raft::div_checkzero_op{});
 
   // For empty clusters (count == 0), copy old centroid back
-  cub::ArgIndexInputIterator<const DataT*> itr_wt(cluster_counts.data_handle());
+  cub::ArgIndexInputIterator<const DataT*> itr_wt(weight_per_cluster.data_handle());
   raft::matrix::gather_if(
     old_centroids.data_handle(),
     static_cast<int>(old_centroids.extent(1)),
     static_cast<int>(old_centroids.extent(0)),
     itr_wt,
     itr_wt,
-    static_cast<int>(cluster_counts.size()),
+    static_cast<int>(weight_per_cluster.size()),
     new_centroids.data_handle(),
     [=] __device__(raft::KeyValuePair<ptrdiff_t, DataT> map) { return map.value == DataT{0}; },
     raft::key_op{},
