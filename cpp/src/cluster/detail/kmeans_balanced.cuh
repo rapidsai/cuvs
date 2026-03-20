@@ -1046,22 +1046,22 @@ auto build_fine_clusters(const raft::resources& handle,
 /**
  * @brief Hierarchical balanced k-means
  *
- * @tparam T      element type
- * @tparam MathT  type of the centroids and mapped data
- * @tparam IdxT   index type
- * @tparam LabelT label type
+ * @tparam T          element type
+ * @tparam MathT      type of the centroids and mapped data
+ * @tparam IdxT       index type
  * @tparam MappingOpT type of the mapping operation
  *
- * @param[in] handle The raft handle.
- * @param[in] params Structure containing the hyper-parameters
- * @param dim number of columns in `centers` and `dataset`
- * @param[in] dataset a device pointer to the source dataset [n_rows, dim]
- * @param n_rows number of rows in the input
- * @param[out] cluster_centers a device pointer to the found cluster centers [n_cluster, dim]
- * @param n_cluster
- * @param metric the distance type
- * @param mapping_op Mapping operation from T to MathT
- * @param stream
+ * @param[in]  handle          The raft handle.
+ * @param[in]  params          Structure containing the hyper-parameters
+ * @param[in]  dim             Number of columns in `cluster_centers` and `dataset`
+ * @param[in]  dataset         A device pointer to the source dataset [n_rows, dim]
+ * @param[in]  n_rows          Number of rows in the input
+ * @param[out] cluster_centers A device pointer to the found cluster centers [n_clusters, dim]
+ * @param[in]  n_clusters      Requested number of clusters
+ * @param[in]  mapping_op      Mapping operation from T to MathT
+ * @param[out] inertia         (optional) If non-null, the sum of squared distances of samples to
+ *                             their closest cluster center is written here.
+ *                             Only supported when T == MathT (float/double).
  */
 template <typename T, typename MathT, typename IdxT, typename MappingOpT>
 void build_hierarchical(const raft::resources& handle,
@@ -1072,7 +1072,7 @@ void build_hierarchical(const raft::resources& handle,
                         MathT* cluster_centers,
                         IdxT n_clusters,
                         MappingOpT mapping_op,
-                        const MathT* dataset_norm = nullptr)
+                        MathT* inertia = nullptr)
 {
   auto stream  = raft::resource::get_cuda_stream(handle);
   using LabelT = uint32_t;
@@ -1091,9 +1091,10 @@ void build_hierarchical(const raft::resources& handle,
 
   // Precompute the L2 norm of the dataset if relevant and not yet computed.
   rmm::device_uvector<MathT> dataset_norm_buf(0, stream, device_memory);
-  if (dataset_norm == nullptr && (params.metric == cuvs::distance::DistanceType::L2Expanded ||
-                                  params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
-                                  params.metric == cuvs::distance::DistanceType::CosineExpanded)) {
+  const MathT* dataset_norm = nullptr;
+  if ((params.metric == cuvs::distance::DistanceType::L2Expanded ||
+       params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+       params.metric == cuvs::distance::DistanceType::CosineExpanded)) {
     dataset_norm_buf.resize(n_rows, stream);
     for (IdxT offset = 0; offset < n_rows; offset += max_minibatch_size) {
       IdxT minibatch_size = std::min<IdxT>(max_minibatch_size, n_rows - offset);
@@ -1211,6 +1212,20 @@ void build_hierarchical(const raft::resources& handle,
                      MathT{0.2},
                      mapping_op,
                      device_memory);
+
+  // Compute inertia if requested (only supported when T == MathT)
+  if (inertia != nullptr) {
+    if constexpr (std::is_same_v<T, MathT>) {
+      auto X_view = raft::make_device_matrix_view<const MathT, IdxT>(
+        reinterpret_cast<const MathT*>(dataset), n_rows, dim);
+      auto centroids_view =
+        raft::make_device_matrix_view<const MathT, IdxT>(cluster_centers, n_clusters, dim);
+      cuvs::cluster::kmeans::cluster_cost(
+        handle, X_view, centroids_view, raft::make_host_scalar_view<MathT>(inertia));
+    } else {
+      RAFT_LOG_WARN("Inertia is not computed for non float/double types");
+    }
+  }
 }
 
 }  // namespace  cuvs::cluster::kmeans::detail

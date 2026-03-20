@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -86,7 +86,7 @@ void ivf_flat_build_extend_search(raft::device_resources const& dev_resources,
                            std::make_optional(raft::make_const_mdspan(data_indices.view())),
                            index);
 
-  std::cout << "Index size after addin dataset vectors " << index.size() << std::endl;
+  std::cout << "Index size after adding dataset vectors " << index.size() << std::endl;
 
   // Set search parameters.
   ivf_flat::search_params search_params;
