@@ -10,11 +10,6 @@ import uuid
 import warnings
 from typing import Dict, List, Optional, Tuple
 
-from .data_export import (
-    clean_algo_name,
-    convert_json_to_csv_build,
-    convert_json_to_csv_search,
-)
 
 def _subprocess_env(ann_executable_path: str) -> Dict[str, str]:
     """Build env for C++ benchmark subprocess. When CUVS_HOME is set, force the repo's libcuvs.so to be used (LD_PRELOAD + LD_LIBRARY_PATH) so the correct local build runs."""
@@ -51,8 +46,6 @@ def cuvs_bench_cpp(
     search_threads: Optional[int],
     mode: str = "throughput",
 ) -> None:
-    # So you can confirm which repo's code is running (local vs conda)
-    print(f"[cuvs_bench] runners.py loaded from: {os.path.abspath(__file__)}")
     """
     Run the CUVS benchmarking tool with the provided configuration.
 
@@ -152,10 +145,6 @@ def cuvs_bench_cpp(
                     merge_build_files(
                         build_folder, build_file, temp_build_file
                     )
-                    # Update build CSV after each build so CSVs are written incrementally
-                    _dataset = conf_file["dataset"]["name"]
-                    print(f"[cuvs_bench] Converting build JSON -> CSV (dataset={_dataset}, path={os.path.abspath(dataset_path)})")
-                    convert_json_to_csv_build(_dataset, dataset_path)
                 except Exception as e:
                     print(f"Error occurred running benchmark: {e}")
                 finally:
@@ -193,10 +182,6 @@ def cuvs_bench_cpp(
             else:
                 try:
                     subprocess.run(cmd, check=True, env=_subprocess_env(ann_executable_path))
-                    _dataset = conf_file["dataset"]["name"]
-                    convert_json_to_csv_search(_dataset, dataset_path)
-                    result_dir = os.path.join(dataset_path, _dataset, "result", "search")
-                    print(f"[cuvs_bench] Search results written to CSV in {os.path.abspath(result_dir)}")
                 except Exception as e:
                     print(f"Error occurred running benchmark: {e}")
                 finally:
