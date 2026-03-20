@@ -10,7 +10,6 @@
 
 import itertools
 import os
-import re
 from collections import OrderedDict
 
 import click
@@ -246,21 +245,17 @@ def create_plot_build(
 
         len_80, len_90, len_95, len_99 = 0, 0, 0, 0
         for i in range(len(xs)):
-            key = (ls[i], idxs[i])
-            if key not in build_results:
-                continue
-            bt = build_results[key][0][2]
             if xs[i] >= 0.80 and xs[i] < 0.90:
-                bt_80[pos] = bt_80[pos] + bt
+                bt_80[pos] = bt_80[pos] + build_results[(ls[i], idxs[i])][0][2]
                 len_80 = len_80 + 1
             elif xs[i] >= 0.9 and xs[i] < 0.95:
-                bt_90[pos] = bt_90[pos] + bt
+                bt_90[pos] = bt_90[pos] + build_results[(ls[i], idxs[i])][0][2]
                 len_90 = len_90 + 1
             elif xs[i] >= 0.95 and xs[i] < 0.99:
-                bt_95[pos] = bt_95[pos] + bt
+                bt_95[pos] = bt_95[pos] + build_results[(ls[i], idxs[i])][0][2]
                 len_95 = len_95 + 1
             elif xs[i] >= 0.99:
-                bt_99[pos] = bt_99[pos] + bt
+                bt_99[pos] = bt_99[pos] + build_results[(ls[i], idxs[i])][0][2]
                 len_99 = len_99 + 1
         if len_80 > 0:
             bt_80[pos] = bt_80[pos] / len_80
@@ -305,56 +300,47 @@ def load_lines(results_path, result_files, method, index_key, mode, time_unit):
 
     for result_filename in result_files:
         try:
-            path = os.path.join(results_path, result_filename)
-            if method == "search":
-                usecols = ["algo_name", "index_name", "recall", "throughput", "latency"]
-            else:
-                usecols = ["algo_name", "index_name", "time"]
-            try:
-                df = pd.read_csv(path, usecols=usecols)
-            except ValueError:
-                df = pd.read_csv(path)
-            df.columns = [str(c).strip().lower() for c in df.columns]
-            if df.empty:
-                continue
-            if method == "search":
-                y_col = "throughput" if mode == "throughput" else "latency"
-                if y_col not in df.columns or "recall" not in df.columns:
-                    continue
-            else:
-                if "time" not in df.columns:
-                    continue
+            with open(os.path.join(results_path, result_filename), "r") as f:
+                lines = f.readlines()
+                lines = lines[:-1] if lines[-1] == "\n" else lines
 
-            for _, row in df.iterrows():
-                algo_name = str(row["algo_name"]).strip()
-                index_name = str(row["index_name"]).strip()
-                if index_key == "algo":
-                    dict_key = algo_name
-                elif index_key == "index":
-                    dict_key = (algo_name, index_name)
-                if dict_key not in results:
-                    results[dict_key] = []
-                try:
-                    if method == "search":
-                        x_val = float(row["recall"])
-                        y_val = float(row[y_col])
-                        if (
-                            mode == "latency"
-                            and time_unit != "s"
-                        ):
-                            y_val = (
-                                y_val * (10**3)
-                                if time_unit == "ms"
-                                else y_val * (10**6)
-                            )
-                        results[dict_key].append([algo_name, index_name, x_val, y_val])
-                    else:
-                        val = float(row["time"])
-                        results[dict_key].append([algo_name, index_name, val])
-                except (ValueError, TypeError, KeyError):
-                    continue
+                if method == "build":
+                    key_idx = [2]
+                elif method == "search":
+                    y_idx = 3 if mode == "throughput" else 4
+                    key_idx = [2, y_idx]
+
+                for line in lines[1:]:
+                    split_lines = line.split(",")
+
+                    algo_name = split_lines[0]
+                    index_name = split_lines[1]
+
+                    if index_key == "algo":
+                        dict_key = algo_name
+                    elif index_key == "index":
+                        dict_key = (algo_name, index_name)
+                    if dict_key not in results:
+                        results[dict_key] = []
+                    to_add = [algo_name, index_name]
+                    for key_i in key_idx:
+                        to_add.append(float(split_lines[key_i]))
+                    if (
+                        mode == "latency"
+                        and time_unit != "s"
+                        and method == "search"
+                    ):
+                        to_add[-1] = (
+                            to_add[-1] * (10**3)
+                            if time_unit == "ms"
+                            else to_add[-1] * (10**6)
+                        )
+                    results[dict_key].append(to_add)
         except Exception:
-            pass
+            print(
+                f"An error occurred processing file {result_filename}. "
+                "Skipping..."
+            )
 
     return results
 
@@ -406,13 +392,6 @@ def load_all_results(
     time_unit,
 ):
     results_path = os.path.join(dataset_path, "result", method)
-    if not os.path.isdir(results_path):
-        if method == "build":
-            raise FileNotFoundError(
-                f"Build result folder not found: {results_path}. "
-                "Run the benchmark with --build so that result/build/ exists with CSV files."
-            )
-        raise FileNotFoundError(f"Result folder not found: {results_path}")
     result_files = os.listdir(results_path)
     if method == "build":
         result_files = [
@@ -431,66 +410,24 @@ def load_all_results(
             if f"{suffix}.csv" in result_file
         ]
     if len(result_files) == 0:
-        if method == "build":
-            raise FileNotFoundError(
-                f"No build CSV files in {results_path}. "
-                "Add build CSVs (algo_name, index_name, time) or run benchmark with --build."
-            )
         raise FileNotFoundError(f"No CSV result files found in {results_path}")
 
     if method == "search":
         filter_k_bs = []
         for result_filename in result_files:
             filename_split = result_filename.split(",")
-            file_k = file_bs = None
-            if len(filename_split) >= 4:
-                try:
-                    file_k = int(filename_split[-3][1:])
-                    file_bs = int(filename_split[-2][2:])
-                except (ValueError, IndexError):
-                    pass
-            else:
-                match = re.search(r"_k(\d+)_bs(\d+)(?:,|$)", result_filename)
-                if match:
-                    file_k = int(match.group(1))
-                    file_bs = int(match.group(2))
-            if file_k is not None and file_bs is not None and file_k == k and file_bs == batch_size:
+            if (
+                int(filename_split[-3][1:]) == k
+                and int(filename_split[-2][2:]) == batch_size
+            ):
                 filter_k_bs.append(result_filename)
         result_files = filter_k_bs
-        if len(result_files) == 0:
-            raise FileNotFoundError(
-                f"No search CSV files found for k={k} and batch_size={batch_size} in {results_path}. "
-                "Check that the benchmark produced CSVs for these parameters."
-            )
 
-    algo_group_files = []
-    for result_filename in result_files:
-        parts = result_filename.replace(".csv", "").split(",")
-        if len(parts) >= 4:
-            algo_group_files.append(parts[:2])
-        elif len(parts) == 2 and parts[1] in ("latency", "throughput", "raw"):
-            # Search CSV named like "cuvs_ivf_pq_base_k10_bs10000,latency.csv"
-            base = parts[0]
-            segs = base.split("_")
-            if "base" in segs and len(segs) > 1:
-                idx = segs.index("base")
-                algo = "_".join(segs[:idx])
-                algo_group_files.append((algo, "base"))
-            elif len(segs) >= 2:
-                algo_group_files.append((segs[0], segs[1]))
-            else:
-                algo_group_files.append((base, "base"))
-        elif len(parts) == 2:
-            algo_group_files.append((parts[0], parts[1]))
-        else:
-            base = parts[0] if parts else ""
-            segs = base.split("_")
-            if len(segs) >= 2:
-                group = "base" if "base" in segs else segs[1]
-                algo_group_files.append((segs[0], group))
-            else:
-                algo_group_files.append((base, base))
-    algo_group_files = list(zip(*algo_group_files)) if algo_group_files else ([], [])
+    algo_group_files = [
+        result_filename.replace(".csv", "").split(",")[:2]
+        for result_filename in result_files
+    ]
+    algo_group_files = list(zip(*algo_group_files))
 
     if len(algorithms) > 0:
         final_results = [
@@ -523,6 +460,7 @@ def load_all_results(
     results = load_lines(
         results_path, final_results, method, index_key, mode, time_unit
     )
+    
     return results
 
 
@@ -686,15 +624,6 @@ def main(
         args["output_filepath"],
         f"build-{args['dataset']}-k{k}-batch_size{batch_size}.png",
     )
-
-    dataset_dir = os.path.join(args["dataset_path"], args["dataset"])
-    build_result_dir = os.path.join(dataset_dir, "result", "build")
-    if build and not os.path.isdir(build_result_dir):
-        build = False
-    elif build:
-        build_csvs = [f for f in os.listdir(build_result_dir) if f.endswith(".csv")]
-        if not build_csvs:
-            build = False
 
     if args["overlay_csv"] and len(args["overlay_csv"]) == 2:
         search_results = {}
