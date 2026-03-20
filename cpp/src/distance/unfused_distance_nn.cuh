@@ -115,7 +115,7 @@ __global__ void reduce_min_kernel(OutT* out,
  * This function launches a kernel that computes the final distance values from
  * the GEMM output and norms, then reduces across columns to find the minimum
  * distance (and optionally the index) for each row. Distance computation and
- * reduction is fused together in a single kernel thats why we can not use
+ * reduction is fused together in a single kernel that is why we can not use
  * RAFT reduction here.
  *
  * @tparam DataT   Input data type
