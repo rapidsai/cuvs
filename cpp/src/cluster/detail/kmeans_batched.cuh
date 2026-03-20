@@ -331,13 +331,10 @@ void fit(raft::resources const& handle,
                                   new_centroids.view());
 
       // Convergence check
-      T sqrdNormError =
-        compute_centroid_shift<T, IdxT>(handle,
-                                        raft::make_const_mdspan(centroids.view()),
-                                        raft::make_const_mdspan(new_centroids.view()));
+      T sqrdNormError = compute_centroid_shift<T, IdxT>(
+        handle, raft::make_const_mdspan(centroids), raft::make_const_mdspan(new_centroids.view()));
 
-      raft::copy(
-        handle, centroids.data_handle(), new_centroids.data_handle(), centroids.size(), stream);
+      raft::copy(handle, centroids, new_centroids.view());
 
       bool done = false;
       if (params.inertia_check) {

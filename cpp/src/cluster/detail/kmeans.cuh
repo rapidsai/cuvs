@@ -400,10 +400,8 @@ void kmeans_fit_main(raft::resources const& handle,
       workspace);
 
     // Compute how much centroids shifted
-    DataT sqrdNormError =
-      compute_centroid_shift<DataT, IndexT>(handle,
-                                            raft::make_const_mdspan(centroids.view()),
-                                            raft::make_const_mdspan(newCentroids.view()));
+    DataT sqrdNormError = compute_centroid_shift<DataT, IndexT>(
+      handle, raft::make_const_mdspan(centroids), raft::make_const_mdspan(newCentroids.view()));
 
     raft::copy(handle,
                raft::make_device_vector_view(centroidsRawData.data_handle(), newCentroids.size()),
