@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -471,7 +471,8 @@ const std::vector<AnnNNDescentInputs> inputs =
                                                       cuvs::distance::DistanceType::L2Expanded,
                                                       cuvs::distance::DistanceType::L2SqrtExpanded,
                                                       cuvs::distance::DistanceType::InnerProduct,
-                                                      cuvs::distance::DistanceType::CosineExpanded},
+                                                      cuvs::distance::DistanceType::CosineExpanded,
+                                                      cuvs::distance::DistanceType::L1},
                                                      {false, true},
                                                      {0.90});
 

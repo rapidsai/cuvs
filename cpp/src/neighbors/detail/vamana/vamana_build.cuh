@@ -158,7 +158,7 @@ void batched_insert_vamana(
                                     raft::resource::get_large_workspace_resource(res),
                                     raft::make_extents<int64_t>(max_batchsize, visited_size));
 
-  // Assign memory to query_list structures and initiailize
+  // Assign memory to query_list structures and initialize
   init_query_candidate_list<IdxT, accT><<<256, blockD, 0, stream>>>(query_list,
                                                                     visited_ids.data_handle(),
                                                                     visited_dists.data_handle(),

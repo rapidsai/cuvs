@@ -87,5 +87,6 @@ Contents
    integrations.rst
    cuvs_bench/index.rst
    api_docs.rst
+   advanced_topics.rst
    contributing.md
    developer_guide.md
