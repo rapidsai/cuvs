@@ -206,6 +206,8 @@ void pairwise_distance_gemm(raft::resources const& handle,
   const AccT beta  = static_cast<AccT>(0);
 
   auto cublas_h = raft::resource::get_cublas_handle(handle);
+  RAFT_CUBLAS_TRY(cublasSetStream(cublas_h, stream));
+
   RAFT_CUBLAS_TRY(cublasGemmEx(cublas_h,
                                CUBLAS_OP_T,
                                CUBLAS_OP_N,
