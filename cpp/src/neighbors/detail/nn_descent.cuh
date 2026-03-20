@@ -1745,11 +1745,19 @@ void build(raft::resources const& res,
   auto int_graph =
     raft::make_host_matrix<int, int64_t, raft::row_major>(dataset.extent(0), extended_graph_degree);
 
-  RAFT_EXPECTS(static_cast<size_t>(dataset.extent(0) - 1) >= extended_graph_degree,
-               "The NN Descent extended degree (%lu) must be smaller or equal to the "
-               "dataset size (%ld) - 1",
-               extended_graph_degree,
-               dataset.extent(0));
+  // When the graph will be a complete graph, output it without NND process for better performance.
+  if (static_cast<size_t>(dataset.extent(0) - 1) == graph_degree) {
+    auto graph = idx.graph().data_handle();
+#pragma omp parallel for
+    for (size_t i = 0; i < static_cast<size_t>(dataset.extent(0)); i++) {
+      IdxT n_id = 0;
+      for (size_t j = 0; j < graph_degree; j++) {
+        if (n_id == j) n_id++;
+        graph[i * graph_degree + j] = n_id++;
+      }
+    }
+    return;
+  }
 
   GNND<const T, int> nnd(res, build_config);
 
