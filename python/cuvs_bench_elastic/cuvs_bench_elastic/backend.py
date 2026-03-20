@@ -272,11 +272,14 @@ class ElasticBackend(BenchmarkBackend):
             chunk_size = 1000
             for i in range(0, n_vectors, chunk_size):
                 chunk = vectors[i : i + chunk_size]
-                actions = []
-                for j, vec in enumerate(chunk):
-                    doc_id = str(i + j)
-                    actions.append({"index": {"_index": index_name, "_id": doc_id}})
-                    actions.append({vector_field: vec.tolist()})
+                actions = [
+                    {
+                        "_index": index_name,
+                        "_id": str(i + j),
+                        vector_field: vec.tolist(),
+                    }
+                    for j, vec in enumerate(chunk)
+                ]
                 bulk(client, actions, raise_on_error=True)
 
             client.indices.refresh(index=index_name)
@@ -387,9 +390,9 @@ class ElasticBackend(BenchmarkBackend):
             search_params = {}
             if indexes and indexes[0] and indexes[0].search_params:
                 search_params = dict(indexes[0].search_params[0] or {})
-            for k, v in self.config.items():
-                if k not in search_params and k in _SEARCH_PARAM_KEYS:
-                    search_params[k] = v
+            for key, val in self.config.items():
+                if key not in search_params and key in _SEARCH_PARAM_KEYS:
+                    search_params[key] = val
             num_candidates = search_params.get(
                 "num_candidates", _DEFAULT_NUM_CANDIDATES
             )
