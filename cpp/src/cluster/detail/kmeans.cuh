@@ -353,7 +353,8 @@ void kmeans_fit_main(raft::resources const& handle,
                      raft::device_matrix_view<DataT, IndexT> centroidsRawData,
                      raft::host_scalar_view<DataT> inertia,
                      raft::host_scalar_view<IndexT> n_iter,
-                     rmm::device_uvector<char>& workspace)
+                     rmm::device_uvector<char>& workspace,
+                     std::optional<raft::device_vector_view<IndexT, IndexT>> labels = std::nullopt)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("kmeans_fit_main");
   raft::default_logger().set_level(params.verbosity);
@@ -524,6 +525,13 @@ void kmeans_fit_main(raft::resources const& handle,
     raft::add_op{});
 
   inertia[0] = clusterCostD.value(stream);
+
+  if (labels.has_value()) {
+    raft::linalg::map(handle,
+                      labels.value(),
+                      raft::key_op{},
+                      raft::make_const_mdspan(minClusterAndDistance.view()));
+  }
 
   RAFT_LOG_DEBUG("KMeans.fit: completed after %d iterations with %f inertia[0] ",
                  n_iter[0] > params.max_iter ? n_iter[0] - 1 : n_iter[0],
@@ -809,7 +817,8 @@ void kmeans_fit(raft::resources const& handle,
                 std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight,
                 raft::device_matrix_view<DataT, IndexT> centroids,
                 raft::host_scalar_view<DataT> inertia,
-                raft::host_scalar_view<IndexT> n_iter)
+                raft::host_scalar_view<IndexT> n_iter,
+                std::optional<raft::device_vector_view<IndexT, IndexT>> labels = std::nullopt)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("kmeans_fit");
   auto n_samples      = X.extent(0);
@@ -876,6 +885,15 @@ void kmeans_fit(raft::resources const& handle,
   std::mt19937 gen(pams.rng_state.seed);
   inertia[0] = std::numeric_limits<DataT>::max();
 
+  std::optional<raft::device_vector<IndexT, IndexT>> labels_iter;
+  std::optional<raft::device_vector_view<IndexT, IndexT>> labels_iter_view;
+  if (labels.has_value() && n_init > 1) {
+    labels_iter      = raft::make_device_vector<IndexT, IndexT>(handle, n_samples);
+    labels_iter_view = std::make_optional(labels_iter->view());
+  } else if (labels.has_value()) {
+    labels_iter_view = std::make_optional(labels.value());
+  }
+
   for (auto seed_iter = 0; seed_iter < n_init; ++seed_iter) {
     cuvs::cluster::kmeans::params iter_params = pams;
     iter_params.rng_state.seed                = gen();
@@ -927,7 +945,8 @@ void kmeans_fit(raft::resources const& handle,
       centroidsRawData.view(),
       raft::make_host_scalar_view<DataT>(&iter_inertia),
       raft::make_host_scalar_view<IndexT>(&n_current_iter),
-      workspace);
+      workspace,
+      labels_iter_view);
     if (iter_inertia < inertia[0]) {
       inertia[0] = iter_inertia;
       n_iter[0]  = n_current_iter;
@@ -935,6 +954,9 @@ void kmeans_fit(raft::resources const& handle,
         handle,
         raft::make_device_vector_view(centroids.data_handle(), n_clusters * n_features),
         raft::make_device_vector_view(centroidsRawData.data_handle(), n_clusters * n_features));
+      if (labels.has_value() && n_init > 1) {
+        raft::copy(handle, labels.value(), labels_iter_view.value());
+      }
     }
     RAFT_LOG_DEBUG("KMeans.fit after iteration-%d/%d: inertia - %f, n_iter[0] - %d",
                    seed_iter + 1,

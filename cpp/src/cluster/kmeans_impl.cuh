@@ -1,10 +1,12 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
-#include "kmeans.cuh"
+#include "detail/kmeans.cuh"
+#include "kmeans_mg.hpp"
+#include <raft/core/resource/comms.hpp>
 
 namespace cuvs::cluster::kmeans {
 
@@ -54,4 +56,29 @@ void predict(raft::resources const& handle,
     handle, params, X, sample_weight, centroids, labels, normalize_weight, inertia);
 }
 
+template <typename DataT, typename IndexT>
+void fit_predict(raft::resources const& handle,
+                 const kmeans::params& params,
+                 raft::device_matrix_view<const DataT, IndexT> X,
+                 std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight,
+                 std::optional<raft::device_matrix_view<DataT, IndexT>> centroids,
+                 raft::device_vector_view<IndexT, IndexT> labels,
+                 raft::host_scalar_view<DataT> inertia,
+                 raft::host_scalar_view<IndexT> n_iter)
+{
+  std::optional<raft::device_matrix<DataT, IndexT>> centroids_matrix = std::nullopt;
+  if (!centroids.has_value()) {
+    centroids_matrix =
+      raft::make_device_matrix<DataT, IndexT>(handle, params.n_clusters, X.extent(1));
+  }
+  auto centroids_view = centroids.has_value() ? centroids.value() : centroids_matrix.value().view();
+  // use the mnmg kmeans fit if we have comms initialize, single gpu otherwise
+  if (raft::resource::comms_initialized(handle)) {
+    cuvs::cluster::kmeans::mg::fit(
+      handle, params, X, sample_weight, centroids_view, inertia, n_iter, labels);
+  } else {
+    cuvs::cluster::kmeans::detail::kmeans_fit<DataT, IndexT>(
+      handle, params, X, sample_weight, centroids_view, inertia, n_iter, labels);
+  }
+}
 }  // namespace cuvs::cluster::kmeans
