@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
@@ -13,11 +13,6 @@ from cuvs.distance_type cimport cuvsDistanceType
 
 
 cdef extern from "cuvs/neighbors/nn_descent.h" nogil:
-    enum cuvsNNDescentDistCompDtype:
-        NND_DIST_COMP_AUTO = 0,
-        NND_DIST_COMP_FP32 = 1,
-        NND_DIST_COMP_FP16 = 2
-
     ctypedef struct cuvsNNDescentIndexParams:
         cuvsDistanceType metric
         float metric_arg
@@ -26,7 +21,7 @@ cdef extern from "cuvs/neighbors/nn_descent.h" nogil:
         size_t max_iterations
         float termination_threshold
         bool return_distances
-        cuvsNNDescentDistCompDtype dist_comp_dtype
+        bool compress_to_fp16
 
     ctypedef cuvsNNDescentIndexParams* cuvsNNDescentIndexParams_t
 
