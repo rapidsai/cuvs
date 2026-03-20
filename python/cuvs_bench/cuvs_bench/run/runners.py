@@ -11,6 +11,24 @@ import warnings
 from typing import Dict, List, Optional, Tuple
 
 
+def _subprocess_env(ann_executable_path: str) -> Dict[str, str]:
+    """Build env for C++ benchmark subprocess. When CUVS_HOME is set, force the repo's libcuvs.so to be used (LD_PRELOAD + LD_LIBRARY_PATH) so the correct local build runs."""
+    env = os.environ.copy()
+    repo = os.getenv("CUVS_HOME")
+    if repo:
+        build_dir = os.path.join(repo, "cpp", "build")
+        if os.path.isdir(build_dir):
+            lib = os.path.join(build_dir, "libcuvs.so")
+            if os.path.isfile(lib):
+                env["LD_PRELOAD"] = lib + (os.pathsep + env["LD_PRELOAD"] if env.get("LD_PRELOAD") else "")
+            env["LD_LIBRARY_PATH"] = build_dir + os.pathsep + env.get("LD_LIBRARY_PATH", "")
+            # So IVF-PQ normalization logging goes to a known path (C++ uses this when set)
+            log_path = os.path.join(build_dir, "cuvs_ivf_pq_normalization.log")
+            env["CUVS_IVF_PQ_NORMALIZATION_LOG"] = log_path
+            print(f"[cuvs_bench] IVF-PQ normalization log (if any) -> {log_path}", flush=True)
+    return env
+
+
 def cuvs_bench_cpp(
     conf_file: Dict,
     conf_filename: str,
@@ -123,7 +141,7 @@ def cuvs_bench_cpp(
                 )
             else:
                 try:
-                    subprocess.run(cmd, check=True)
+                    subprocess.run(cmd, check=True, env=_subprocess_env(ann_executable_path))
                     merge_build_files(
                         build_folder, build_file, temp_build_file
                     )
@@ -163,7 +181,7 @@ def cuvs_bench_cpp(
                 )
             else:
                 try:
-                    subprocess.run(cmd, check=True)
+                    subprocess.run(cmd, check=True, env=_subprocess_env(ann_executable_path))
                 except Exception as e:
                     print(f"Error occurred running benchmark: {e}")
                 finally:
