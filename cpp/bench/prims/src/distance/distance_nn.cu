@@ -85,26 +85,6 @@ void benchmark_distance_nn(benchmark::State& state)
   raft::device_vector<char, size_t> workspace =
     raft::make_device_vector<char, size_t>(handle, workspace_size);
 
-  // Warm up
-  if constexpr (algo != AlgorithmType::fused) {
-    unfusedDistanceNNMinReduce<DataT, AccT, OutT, IdxT>(handle,
-                                                        out.data_handle(),
-                                                        x.data_handle(),
-                                                        y.data_handle(),
-                                                        x_norm.data_handle(),
-                                                        y_norm.data_handle(),
-                                                        static_cast<IdxT>(m),
-                                                        static_cast<IdxT>(n),
-                                                        static_cast<IdxT>(k),
-                                                        (AccT*)workspace.data_handle(),
-                                                        sqrt,
-                                                        true,
-                                                        true,
-                                                        metric,
-                                                        float(0.0),
-                                                        stream);
-  }
-
   raft::matrix::fill(
     handle,
     raft::make_device_matrix_view(workspace.data_handle(), workspace_size, size_t(1)),
