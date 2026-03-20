@@ -22,11 +22,6 @@
 // TODO (cjnolet): This should be using an exposed API instead of circumventing the public APIs.
 #include "../../cluster/kmeans_balanced.cuh"
 #include <cuvs/cluster/kmeans.hpp>
-#include <cuvs/neighbors/cagra.hpp>
-
-// Use CAGRA for cluster assignment in extend when n_lists >= this (faster for large K).
-// Set from cluster-assignment benchmark: CAGRA wins over brute force for K >= ~200K (e.g. N=1M).
-constexpr uint32_t kUseAnnForClusterAssignmentMinClusters = 200000;
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/logger.hpp>
@@ -1121,21 +1116,18 @@ void extend(raft::resources const& handle,
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.metric = index->metric();
 
-    bool use_cagra = index->use_ann_for_extend().value_or(
-      n_clusters >= kUseAnnForClusterAssignmentMinClusters);
+    // Default: brute-force assignment; set use_ann_for_extend to opt in to CAGRA.
+    bool use_cagra = index->use_ann_for_extend().value_or(false);
     if (use_cagra) {
       // Use CAGRA for cluster assignment when K is large (build once, search per batch).
-      auto centers_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
-        cluster_centers.data(), n_clusters, index->dim());
-      cuvs::neighbors::cagra::index_params cagra_params;
-      cagra_params.metric = index->metric();
-      cagra_params.graph_degree =
-        std::min<size_t>(64, std::max<size_t>(1, static_cast<size_t>(n_clusters) - 1));
-      cagra_params.intermediate_graph_degree =
-        std::min<size_t>(128, std::max<size_t>(1, static_cast<size_t>(n_clusters) - 1));
-      cagra_params.attach_dataset_on_build = true;
-      auto cagra_idx = cuvs::neighbors::cagra::build(handle, cagra_params, centers_view);
-      cuvs::neighbors::cagra::search_params search_params;
+      // Same centroid index + 1-NN search path as kmeans::detail (extend batches; fit uses
+      // predict_cagra_with_index_reuse).
+      raft::device_matrix_view<const float, int64_t, raft::row_major> centers_view(
+        cluster_centers.data(), static_cast<int64_t>(n_clusters), static_cast<int64_t>(index->dim()));
+      auto cagra_idx =
+        cuvs::cluster::kmeans::detail::build_cagra_index_for_centroids(
+          handle, kmeans_params, centers_view);
+      auto search_params = cuvs::cluster::kmeans::detail::default_cagra_centroid_search_params();
 
       for (const auto& batch : vec_batches) {
         auto batch_size = batch.size();
@@ -1150,17 +1142,16 @@ void extend(raft::resources const& handle,
                                                                         batch_size,
                                                                         index->dim()),
                           utils::mapping<float>{});
-        auto queries_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
-          queries_float.data(), batch_size, index->dim());
-        auto neighbors = raft::make_device_matrix<uint32_t, int64_t>(handle, batch_size, 1);
-        auto distances = raft::make_device_matrix<float, int64_t>(handle, batch_size, 1);
-        cuvs::neighbors::cagra::search(
-          handle, search_params, cagra_idx, queries_view, neighbors.view(), distances.view());
-        raft::copy(handle,
-                   raft::make_device_vector_view(new_data_labels.data() + batch.offset(),
-                                                  batch_size),
-                   raft::make_device_vector_view<const uint32_t>(neighbors.data_handle(),
-                                                                 batch_size));
+        raft::device_matrix_view<const float, int64_t, raft::row_major> queries_view(
+          queries_float.data(), static_cast<int64_t>(batch_size), static_cast<int64_t>(index->dim()));
+        cuvs::cluster::kmeans::detail::search_cagra_1nn(
+          handle,
+          search_params,
+          cagra_idx,
+          queries_view,
+          new_data_labels.data() + batch.offset(),
+          static_cast<int64_t>(batch_size),
+          nullptr);
         vec_batches.prefetch_next_batch();
         raft::resource::sync_stream(handle);
       }
@@ -1382,6 +1373,12 @@ auto build(raft::resources const& handle,
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
     kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>((int)impl->metric());
+    // ANN for k-means fit (centroids change each iteration): only when use_ann_for_fit == true.
+    // Default (nullopt / false) is brute-force assignment so benchmarks can sweep cluster counts.
+    if (params.use_ann_for_fit.value_or(false)) {
+      kmeans_params.use_ann_for_fit      = true;
+      kmeans_params.ann_rebuild_interval = 3;
+    }
 
     if (impl->metric() == distance::DistanceType::CosineExpanded) {
       raft::linalg::row_normalize<raft::linalg::L2Norm>(

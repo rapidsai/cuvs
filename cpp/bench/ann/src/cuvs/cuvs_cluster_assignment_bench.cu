@@ -19,7 +19,10 @@
 #include <raft/random/rng_state.hpp>
 #include <raft/util/cudart_utils.hpp>
 
+#include <cuvs/neighbors/cagra.hpp>
 #include <rmm/device_uvector.hpp>
+
+#include <optional>
 
 namespace {
 
@@ -90,13 +93,22 @@ static void BM_ClusterAssignment_CAGRA(benchmark::State& state)
   cuvs::cluster::kmeans::balanced_params params;
   params.metric = cuvs::distance::DistanceType::L2Expanded;
 
-  auto X_view = raft::make_device_matrix_view<const float, int64_t>(X.data(), n_rows, dim);
-  auto centers_view =
-    raft::make_device_matrix_view<const float, int64_t>(centroids.data(), n_clusters, dim);
-  auto labels_view = raft::make_device_vector_view<uint32_t, int64_t>(labels.data(), n_rows);
+  // Same timing as former predict_cagra: rebuild CAGRA on centroids + 1-NN each iteration
+  // (rebuild=true). float X/centroids only; predict_cagra_with_index_reuse matches that path.
+  std::optional<cuvs::neighbors::cagra::index<float, uint32_t>> cagra_index_opt;
 
   for (auto _ : state) {
-    predict_cagra(handle, params, X_view, centers_view, labels_view);
+    cuvs::cluster::kmeans::detail::predict_cagra_with_index_reuse<int64_t, uint32_t>(
+      handle,
+      params,
+      centroids.data(),
+      n_clusters,
+      dim,
+      X.data(),
+      n_rows,
+      labels.data(),
+      &cagra_index_opt,
+      true);
     raft::resource::sync_stream(handle);
   }
   state.SetItemsProcessed(state.iterations() * n_rows);
