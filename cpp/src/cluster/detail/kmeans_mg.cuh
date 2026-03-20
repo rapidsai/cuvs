@@ -505,7 +505,8 @@ void fit(const raft::resources& handle,
          raft::device_matrix_view<DataT, IndexT> centroids,
          raft::host_scalar_view<DataT> inertia,
          raft::host_scalar_view<IndexT> n_iter,
-         rmm::device_uvector<char>& workspace)
+         rmm::device_uvector<char>& workspace,
+         std::optional<raft::device_vector_view<IndexT, IndexT>> labels = std::nullopt)
 {
   const auto& comm    = raft::resource::get_comms(handle);
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
@@ -743,6 +744,13 @@ void fit(const raft::resources& handle,
         if (delta > 1 - params.tol) done = true;
       }
       priorClusteringCost = curClusteringCost;
+    }
+
+    if (labels.has_value()) {
+      raft::linalg::map(handle,
+                        labels.value(),
+                        raft::key_op{},
+                        raft::make_const_mdspan(minClusterAndDistance.view()));
     }
 
     raft::resource::sync_stream(handle, stream);
