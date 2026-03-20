@@ -171,7 +171,8 @@ quantizer<MathT> build_view(
   raft::resources const& res,
   const params& params,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
-  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> vq_centers)
+  std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers =
+    std::nullopt)
 {
   // Validate parameters
   RAFT_EXPECTS(params.pq_bits >= 4 && params.pq_bits <= 16,
@@ -198,18 +199,22 @@ quantizer<MathT> build_view(
 
   // Validate VQ centers
   if (params.use_vq) {
-    RAFT_EXPECTS(!vq_centers.empty(), "vq_centers must be provided when use_vq=true");
-    RAFT_EXPECTS(vq_centers.extent(0) == params.vq_n_centers,
+    RAFT_EXPECTS(vq_centers.has_value(), "vq_centers must be provided when use_vq=true");
+    RAFT_EXPECTS(vq_centers.value().extent(0) == params.vq_n_centers,
                  "vq_centers must have vq_n_centers rows, got %u",
-                 vq_centers.extent(0));
+                 vq_centers.value().extent(0));
   }
 
   // Create view-type vpq_dataset
   auto empty_data = raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(res, 0, 0);
+  auto vq_view =
+    vq_centers.has_value()
+      ? vq_centers.value()
+      : raft::make_device_matrix_view<const MathT, uint32_t, raft::row_major>(nullptr, 0, 0);
   return {params,
           cuvs::preprocessing::quantize::pq::vpq_dataset<MathT, int64_t>{
             std::make_unique<cuvs::neighbors::vpq_dataset_view<MathT, int64_t>>(
-              vq_centers, pq_centers, std::move(empty_data))}};
+              vq_view, pq_centers, std::move(empty_data))}};
 }
 
 template <typename T, typename QuantI, typename AccessorType>

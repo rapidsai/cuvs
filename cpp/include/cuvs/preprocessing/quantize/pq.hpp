@@ -134,9 +134,13 @@ quantizer<float> build(raft::resources const& res,
  * params.pq_dim = 32;
  * params.use_vq = true;
  * params.use_subspaces = true;
+ * // With VQ centers:
  * auto quant_view = cuvs::preprocessing::quantize::pq::build(handle, params,
- *                                                             pq_centers_view, vq_centers_view);
- * // Use quant_view for transform/inverse_transform operations
+ *                                                             pq_centers_view,
+ *                                                             std::make_optional<raft::device_matrix_view<const
+ * float, uint32_t, raft::row_major>>(vq_centers_view));
+ * // Without VQ (PQ only):
+ * auto quant_pq_only = cuvs::preprocessing::quantize::pq::build(handle, params, pq_centers_view);
  * @endcode
  *
  * @param[in] res raft resource
@@ -146,15 +150,17 @@ quantizer<float> build(raft::resources const& res,
  *   - For use_subspaces=true: [pq_dim * pq_n_centers, pq_len]
  *   - For use_subspaces=false: [pq_n_centers, pq_len]
  *   where pq_n_centers = (1 << pq_bits), pq_len = dim / pq_dim
- * @param[in] vq_centers VQ codebook on device memory [vq_n_centers, dim].
- *   Pass an empty view if use_vq=false.
+ * @param[in] vq_centers Optional VQ codebook on device memory [vq_n_centers, dim].
+ *   Required when use_vq=true. Defaults to std::nullopt (no VQ).
  *
  * @return A view-type quantizer that references the provided data
  */
-quantizer<float> build(raft::resources const& res,
-                       const params params,
-                       raft::device_matrix_view<const float, uint32_t, raft::row_major> pq_centers,
-                       raft::device_matrix_view<const float, uint32_t, raft::row_major> vq_centers);
+quantizer<float> build(
+  raft::resources const& res,
+  const params params,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> pq_centers,
+  std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> vq_centers =
+    std::nullopt);
 
 /**
  * @brief Applies quantization transform to given dataset
