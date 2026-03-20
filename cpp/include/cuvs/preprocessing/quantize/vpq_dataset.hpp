@@ -50,6 +50,11 @@ class vpq_dataset_iface : public cuvs::neighbors::dataset<IdxT> {
 };
 
 /**
+ * @addtogroup pq
+ * @{
+ */
+
+/**
  * @brief VPQ compressed dataset (PIMPL wrapper).
  *
  * The dataset is compressed using two level quantization:
@@ -140,5 +145,7 @@ struct is_vpq_dataset<vpq_dataset<MathT, IdxT>> : std::true_type {};
 
 template <typename DatasetT>
 inline constexpr bool is_vpq_dataset_v = is_vpq_dataset<DatasetT>::value;
+
+/** @} */  // end of group pq
 
 }  // namespace cuvs::preprocessing::quantize::pq
