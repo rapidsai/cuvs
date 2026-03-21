@@ -72,6 +72,10 @@ struct index_params : cuvs::neighbors::index_params {
    * in GPU memory. This is useful for testing or when you want explicit control over
    * the construction method.
    *
+   * Note: This parameter only applies when the input dataset is in host memory. If the
+   * dataset is already in device memory, streaming construction is not applicable and
+   * this parameter has no effect.
+   *
    * Default: false (auto-detect based on available memory)
    */
   bool force_streaming = false;
