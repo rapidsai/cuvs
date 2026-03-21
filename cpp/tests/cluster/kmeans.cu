@@ -412,6 +412,12 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
     d_centroids_ref.resize(params.n_clusters * n_features, stream);
     raft::copy(d_labels_ref.data(), labels.data_handle(), n_samples, stream);
 
+    raft::random::RngState rng(params.rng_state.seed);
+    raft::random::uniform(
+      handle, rng, d_centroids.data_handle(), params.n_clusters * n_features, T(-1), T(1));
+    raft::copy(
+      d_centroids_ref.data(), d_centroids.data_handle(), params.n_clusters * n_features, stream);
+
     auto h_X_view = raft::make_host_matrix_view<const T, int>(h_X.data(), n_samples, n_features);
     auto d_centroids_view =
       raft::make_device_matrix_view<T, int>(d_centroids.data(), params.n_clusters, n_features);
@@ -431,6 +437,10 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
 
     auto d_centroids_ref_view =
       raft::make_device_matrix_view<T, int>(d_centroids_ref.data(), params.n_clusters, n_features);
+
+    params.init   = cuvs::cluster::kmeans::params::Array;
+    params.n_init = 1;
+
     T ref_inertia  = 0;
     int ref_n_iter = 0;
     cuvs::cluster::kmeans::fit(handle,
@@ -442,9 +452,7 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
                                raft::make_host_scalar_view<int>(&ref_n_iter));
 
     cuvs::cluster::kmeans::params batched_params = params;
-    batched_params.inertia_check               = false;
-    batched_params.init                          = cuvs::cluster::kmeans::params::Array;
-    batched_params.n_init                        = 1;
+    batched_params.inertia_check                 = false;
     batched_params.batch_size                    = std::min(n_samples, 256);
 
     std::optional<raft::host_vector_view<const T, int>> h_sw = std::nullopt;
@@ -494,13 +502,13 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
       d_labels_ref.data(), d_labels.data(), n_samples, raft::resource::get_cuda_stream(handle));
 
     if (score < 1.0) {
-    //   std::stringstream ss;
-    //   ss << "Expected: " << raft::arr2Str(d_labels_ref.data(), 25, "d_labels_ref", stream);
-    //   std::cout << (ss.str().c_str()) << '\n';
-    //   ss.str(std::string());
-    //   ss << "Actual: " << raft::arr2Str(d_labels.data(), 25, "d_labels", stream);
-    //   std::cout << (ss.str().c_str()) << '\n';
-    //   std::cout << "Score = " << score << '\n';
+      //   std::stringstream ss;
+      //   ss << "Expected: " << raft::arr2Str(d_labels_ref.data(), 25, "d_labels_ref", stream);
+      //   std::cout << (ss.str().c_str()) << '\n';
+      //   ss.str(std::string());
+      //   ss << "Actual: " << raft::arr2Str(d_labels.data(), 25, "d_labels", stream);
+      //   std::cout << (ss.str().c_str()) << '\n';
+      //   std::cout << "Score = " << score << '\n';
     }
   }
 

@@ -226,10 +226,10 @@ void fit(raft::resources const& handle,
   auto L2NormBatch = raft::make_device_vector<T, IdxT>(handle, batch_size);
   rmm::device_uvector<T> L2NormBuf_OR_DistBuf(0, stream);
 
-  auto centroid_sums      = raft::make_device_matrix<T, IdxT>(handle, n_clusters, n_features);
-  auto weight_per_cluster = raft::make_device_vector<T, IdxT>(handle, n_clusters);
-  auto new_centroids      = raft::make_device_matrix<T, IdxT>(handle, n_clusters, n_features);
-  auto clustering_cost = raft::make_device_vector<T, IdxT>(handle, 1);
+  auto centroid_sums         = raft::make_device_matrix<T, IdxT>(handle, n_clusters, n_features);
+  auto weight_per_cluster    = raft::make_device_vector<T, IdxT>(handle, n_clusters);
+  auto new_centroids         = raft::make_device_matrix<T, IdxT>(handle, n_clusters, n_features);
+  auto clustering_cost       = raft::make_device_vector<T, IdxT>(handle, 1);
   auto batch_clustering_cost = raft::make_device_vector<T, IdxT>(handle, 1);
 
   // ---- Main n_init loop ----
@@ -269,7 +269,8 @@ void fit(raft::resources const& handle,
       for (const auto& data_batch : data_batches) {
         IdxT current_batch_size = static_cast<IdxT>(data_batch.size());
 
-        RAFT_LOG_INFO("KMeans batched: Processing batch %zu of %zu", data_batch.offset(), n_samples);
+        RAFT_LOG_INFO(
+          "KMeans batched: Processing batch %zu of %zu", data_batch.offset(), n_samples);
 
         auto batch_data_view = raft::make_device_matrix_view<const T, IdxT>(
           data_batch.data(), current_batch_size, n_features);
@@ -292,9 +293,10 @@ void fit(raft::resources const& handle,
 
         auto L2NormBatch_const = raft::make_device_vector_view<const T, IdxT>(
           L2NormBatch.data_handle(), current_batch_size);
-        
-        auto minClusterAndDistance_view = raft::make_device_vector_view<raft::KeyValuePair<IdxT, T>, IdxT>(
-          minClusterAndDistance.data_handle(), current_batch_size);
+
+        auto minClusterAndDistance_view =
+          raft::make_device_vector_view<raft::KeyValuePair<IdxT, T>, IdxT>(
+            minClusterAndDistance.data_handle(), current_batch_size);
 
         cuvs::cluster::kmeans::detail::minClusterAndDistanceCompute<T, IdxT>(
           handle,
@@ -319,17 +321,21 @@ void fit(raft::resources const& handle,
 
         if (params.inertia_check || n_iter[0] == iter_params.max_iter) {
           // Compute cluster cost for this batch and accumulate
-          cuvs::cluster::kmeans::detail::computeClusterCost(handle,
-                                                            minClusterAndDistance_view,
-                                                            workspace,
-                                                            raft::make_device_scalar_view(batch_clustering_cost.data_handle()),
-                                                            raft::value_op{},
-                                                            raft::add_op{});
-                                                            raft::linalg::add(handle, raft::make_const_mdspan(clustering_cost.view()), raft::make_const_mdspan(batch_clustering_cost.view()), clustering_cost.view());
+          cuvs::cluster::kmeans::detail::computeClusterCost(
+            handle,
+            minClusterAndDistance_view,
+            workspace,
+            raft::make_device_scalar_view(batch_clustering_cost.data_handle()),
+            raft::value_op{},
+            raft::add_op{});
+          raft::linalg::add(handle,
+                            raft::make_const_mdspan(clustering_cost.view()),
+                            raft::make_const_mdspan(batch_clustering_cost.view()),
+                            clustering_cost.view());
           auto host_clustering_cost = raft::make_host_scalar<T>(handle, T{0});
           raft::copy(host_clustering_cost.data_handle(), clustering_cost.data_handle(), 1, stream);
-        raft::resource::sync_stream(handle);
-        RAFT_LOG_INFO("cluster cost = %f", host_clustering_cost.data_handle()[0]);
+          raft::resource::sync_stream(handle);
+          RAFT_LOG_INFO("cluster cost = %f", host_clustering_cost.data_handle()[0]);
         }
       }
 
