@@ -602,6 +602,152 @@ void DataQuantizerGPU::quantize_batch_opt(const float* d_data,
   }
 }
 
+//---------------------------------------------------------------------------
+// Kernel: copyAndPadContiguousWithCentroidKernel
+// Populates a (num_points + 1) x D matrix, d_X_and_C_pad.
+// - The first num_points rows are filled by copying data points from d_contiguous_data
+//   (which is already contiguous) and padding them to length D.
+// - The last row (index num_points) is filled with the padded centroid.
+__global__ void copyAndPadContiguousWithCentroidKernel(const float* __restrict__ d_contiguous_data,
+                                                       const float* __restrict__ d_centroid,
+                                                       float* d_X_and_C_pad,
+                                                       size_t num_points,
+                                                       size_t DIM,
+                                                       size_t D)
+{
+  // Calculate the global thread ID for a 1D grid over all elements.
+  int global_idx        = blockIdx.x * blockDim.x + threadIdx.x;
+  size_t total_elements = (num_points + 1) * D;
+
+  if (global_idx < total_elements) {
+    // Determine which row and column this thread is responsible for.
+    int row_idx = global_idx / D;
+    int col_idx = global_idx % D;
+
+    if (row_idx < num_points) {
+      // This thread is processing a data point.
+      if (col_idx < DIM) {
+        // Copy the data from the contiguous source.
+        d_X_and_C_pad[global_idx] = d_contiguous_data[row_idx * DIM + col_idx];
+      } else {
+        // Pad with zero.
+        d_X_and_C_pad[global_idx] = 0.0f;
+      }
+    } else {
+      // This thread is processing the centroid (row_idx == num_points).
+      if (col_idx < DIM) {
+        // Copy from the centroid vector.
+        d_X_and_C_pad[global_idx] = d_centroid[col_idx];
+      } else {
+        // Pad with zero.
+        d_X_and_C_pad[global_idx] = 0.0f;
+      }
+    }
+  }
+}
+
+void DataQuantizerGPU::data_transformation_batch_opt_contiguous(
+  const float* d_contiguous_data,
+  const float* d_centroid,
+  size_t num_points,
+  const RotatorGPU& rotator,
+  float* d_rotated_c,
+  float* d_XP_norm,
+  int* d_bin_XP,
+  float* d_XP_output  // XP_output is (num_points + 1) * D to store extra centroid
+)
+{
+  // 1. Allocate a single temporary buffer for both padded data and the padded centroid.
+
+  // Create a pointer to the start of the centroid section for the kernel.
+  float* d_C_pad_ptr = d_X_and_C_pad.data_handle() + num_points * D;
+
+  // 2. Launch a single kernel to copy, pad, and add centroid.
+  int blockSize           = D < 256 ? 128 : 256;
+  size_t totalPadElements = (num_points + 1) * D;
+  int gridPadSize         = (totalPadElements + blockSize - 1) / blockSize;
+  copyAndPadContiguousWithCentroidKernel<<<gridPadSize, blockSize, 0, stream_>>>(
+    d_contiguous_data, d_centroid, d_X_and_C_pad.data_handle(), num_points, DIM, D);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+
+  // 3. Allocate a single output buffer for both rotated data (XP) and rotated centroid (CP).
+  float* d_XP_and_CP = d_XP_output;
+
+  // 4. Perform a single, combined rotation.
+  // The input is d_X_and_C_pad, output is d_XP_and_CP. The number of "points" is num_points + 1.
+  rotator.rotate(d_X_and_C_pad.data_handle(), d_XP_and_CP, num_points + 1);
+
+  // Create pointers to the specific results within the combined buffer.
+  float* d_XP = d_XP_and_CP;
+  float* d_CP = d_XP_and_CP + num_points * D;
+
+  // 5. Save the rotated centroid: copy CP into d_rotated_c.
+  raft::copy(d_rotated_c, d_CP, D, stream_);
+
+  // 6. Launch the single FUSED kernel for subtract, normalize, and binarize.
+  const unsigned int FusedBlockSize = 256;  // A good default, can be tuned.
+  dim3 gridDim(num_points);
+  dim3 blockDim(FusedBlockSize);
+  size_t sharedMemSize = FusedBlockSize * sizeof(float);
+
+  subtract_normalize_binarize_Kernel<FusedBlockSize>
+    <<<gridDim, blockDim, sharedMemSize, stream_>>>(d_XP,         // Input: Rotated data
+                                                    d_CP,         // Input: Rotated centroid
+                                                    d_XP_output,  // Output 1: Final residuals
+                                                    d_XP_norm,    // Output 2: Normalized residuals
+                                                    d_bin_XP,     // Output 3: Binarized data
+                                                    num_points,
+                                                    D);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+}
+
+void DataQuantizerGPU::quantize_batch_opt_contiguous(const float* d_contiguous_data,
+                                                     const float* d_centroid,
+                                                     size_t num_points,
+                                                     const RotatorGPU& rotator,
+                                                     uint32_t* d_short_data,
+                                                     float* d_short_data_factors,
+                                                     uint8_t* d_long_code,
+                                                     float* d_ex_factor,
+                                                     float* d_rotated_c)
+{
+  // 1. Data Transformation:
+  data_transformation_batch_opt_contiguous(d_contiguous_data,
+                                           d_centroid,
+                                           num_points,
+                                           rotator,
+                                           d_rotated_c,
+                                           d_XP_norm.data_handle(),
+                                           d_bin_XP.data_handle(),
+                                           d_XP.data_handle());
+
+  rabitq_codes_and_factors_fused(d_rotated_c,
+                                 d_bin_XP.data_handle(),
+                                 d_XP.data_handle(),
+                                 d_short_data,
+                                 d_short_data_factors,
+                                 num_points);
+
+  // 5. Compute ExRaBitQ quantization codes.
+  if (fast_quantize_flag) {
+    exrabitq_codes_and_factors_fused(d_bin_XP.data_handle(),
+                                     d_XP_norm.data_handle(),
+                                     d_XP.data_handle(),
+                                     d_long_code,
+                                     d_ex_factor,
+                                     d_rotated_c,
+                                     num_points);
+  } else {
+    exrabitq_codes_and_factors_fused_ori(d_bin_XP.data_handle(),
+                                         d_XP_norm.data_handle(),
+                                         d_XP.data_handle(),
+                                         d_long_code,
+                                         d_ex_factor,
+                                         d_rotated_c,
+                                         num_points);
+  }
+}
+
 constexpr std::array<float, 9> kTightStart = {
   0,
   0.15,

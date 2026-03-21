@@ -91,6 +91,33 @@ class DataQuantizerGPU {
                       const float* d_fac_x2,
                       size_t num_points) const;
 
+  void data_transformation_contiguous(const float* d_contiguous_data,
+                                      const float* d_centroid,
+                                      size_t num_points,
+                                      const RotatorGPU& rotator,
+                                      float* d_rotated_c,
+                                      float* d_XP_norm,
+                                      int* d_bin_XP) const;
+
+  void rabitq_factor_contiguous(const float* d_contiguous_data,
+                                const float* d_centroid,
+                                const int* d_bin_XP,
+                                const float* d_XP_norm,
+                                float* fac_x2,
+                                float* fac_ip,
+                                float* fac_sumxb,
+                                float* fac_err,
+                                size_t num_points) const;
+
+  void data_transformation_batch_opt_contiguous(const float* d_contiguous_data,
+                                                const float* d_centroid,
+                                                size_t num_points,
+                                                const RotatorGPU& rotator,
+                                                float* d_rotated_c,
+                                                float* d_XP_norm,
+                                                int* d_bin_XP,
+                                                float* d_XP_output);
+
  public:
   static float get_const_scaling_factors(raft::resources const& handle, size_t dim, size_t ex_bits);
 
@@ -177,6 +204,27 @@ class DataQuantizerGPU {
                 float* d_rotated_c) const;
 
   /*!
+   * @brief Quantize contiguous cluster data (without PID gathering).
+   *
+   * @param d_contiguous_data Pointer to contiguous cluster data on device.
+   * @param d_centroid Pointer to the corresponding centroid on device.
+   * @param num_points Number of points in the cluster.
+   * @param rotator A RotatorGPU instance.
+   * @param d_short_data Output buffer for short codes.
+   * @param d_long_code Output buffer for long codes.
+   * @param d_ex_factor Output buffer for extra factors.
+   * @param d_rotated_c Output buffer for rotated centroid.
+   */
+  void quantize_contiguous(const float* d_contiguous_data,
+                           const float* d_centroid,
+                           size_t num_points,
+                           const RotatorGPU& rotator,
+                           uint32_t* d_short_data,
+                           uint8_t* d_long_code,
+                           float* d_ex_factor,
+                           float* d_rotated_c) const;
+
+  /*!
    * @brief Quantize the input data for batch layout.
    *
    * @param data Pointer to the input data (host pointer or device pointer as needed).
@@ -198,6 +246,29 @@ class DataQuantizerGPU {
                           uint8_t* d_long_code,
                           float* d_ex_factor,
                           float* d_rotated_c);
+
+  /*!
+   * @brief Quantize contiguous cluster data for batch layout (without PID gathering).
+   *
+   * @param d_contiguous_data Pointer to contiguous cluster data on device.
+   * @param d_centroid Pointer to the corresponding centroid on device.
+   * @param num_points Number of points in the cluster.
+   * @param rotator A RotatorGPU instance.
+   * @param d_short_data Output buffer for short codes.
+   * @param short_data_factors Output buffer for short code factors.
+   * @param d_long_code Output buffer for long codes.
+   * @param d_ex_factor Output buffer for extra factors.
+   * @param d_rotated_c Output buffer for rotated centroid.
+   */
+  void quantize_batch_opt_contiguous(const float* d_contiguous_data,
+                                     const float* d_centroid,
+                                     size_t num_points,
+                                     const RotatorGPU& rotator,
+                                     uint32_t* d_short_data,
+                                     float* short_data_factors,
+                                     uint8_t* d_long_code,
+                                     float* d_ex_factor,
+                                     float* d_rotated_c);
 
   /*!
    * @brief Get pointer of factors for the current block.

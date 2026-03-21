@@ -55,6 +55,16 @@ struct index_params : cuvs::neighbors::index_params {
   uint32_t max_train_points_per_cluster = 256;
   /** Flag for using the fast quantize method */
   bool fast_quantize_flag = true;
+  /**
+   * Maximum number of vectors per batch when using streaming construction.
+   *
+   * This parameter controls the batch size during streaming construction from host memory.
+   * Batches contain complete clusters only (no partial clusters across batch boundaries).
+   *
+   * Note: Streaming construction is automatically used when the dataset doesn't fit
+   * comfortably in GPU memory (determined by available workspace and kTolerableRatio).
+   */
+  size_t streaming_batch_size = 100000;
 };
 /**
  * @}

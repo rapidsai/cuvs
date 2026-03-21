@@ -213,6 +213,21 @@ class IVFGPU {
                         const PID* device_cluster_ids,
                         bool fast_quantize);
 
+  /**
+   * @brief Build function with streaming from host memory
+   *
+   * @param host_data pointer to host-resident data.
+   * @param device_centroids pointer to centroids on device.
+   * @param device_cluster_ids cluster assignments for each vector (on device).
+   * @param fast_quantize whether to use fast quantization.
+   * @param batch_size_vectors maximum vectors per batch (upper bound).
+   */
+  void construct_on_gpu_streaming(const float* host_data,
+                                  const float* device_centroids,
+                                  const PID* device_cluster_ids,
+                                  bool fast_quantize,
+                                  size_t batch_size_vectors = 100000);
+
   // save_batch_flag for compatity with the previous non-batch index,
   void save(const char* filename, bool save_batch_flag = false) const;
 

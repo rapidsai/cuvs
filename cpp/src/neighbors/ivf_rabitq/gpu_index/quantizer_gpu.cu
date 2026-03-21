@@ -690,4 +690,286 @@ void DataQuantizerGPU::alloc_buffers(size_t num_points)
   d_X_and_C_pad = raft::make_device_vector<float, int64_t>(handle_, size_xp);
 }
 
+//---------------------------------------------------------------------------
+// Kernel: copyAndPadContiguousKernel
+// Copy and pad contiguous data directly (without gathering via IDs).
+__global__ void copyAndPadContiguousKernel(const float* __restrict__ d_contiguous_data,
+                                           float* d_X_pad,
+                                           size_t num_points,
+                                           size_t DIM,
+                                           size_t D)
+{
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < num_points) {
+    const float* src = d_contiguous_data + i * DIM;
+    float* dst       = d_X_pad + i * D;
+    for (int j = 0; j < DIM; j++) {
+      dst[j] = src[j];
+    }
+    for (int j = DIM; j < D; j++) {
+      dst[j] = 0.0f;
+    }
+  }
+}
+
+//---------------------------------------------------------------------------
+// DataQuantizerGPU::data_transformation_contiguous (GPU version for contiguous data)
+// Similar to data_transformation but works with contiguous cluster data.
+void DataQuantizerGPU::data_transformation_contiguous(const float* d_contiguous_data,
+                                                      const float* d_centroid,
+                                                      size_t num_points,
+                                                      const RotatorGPU& rotator,
+                                                      float* d_rotated_c,
+                                                      float* d_XP_norm,
+                                                      int* d_bin_XP) const
+{
+  // Allocate temporary matrix X_pad (num_points x D) on GPU.
+  float* d_X_pad;
+  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_X_pad, num_points * D * sizeof(float), stream_));
+
+  // Launch kernel to copy and pad data (no gathering needed).
+  int blockSize = 256;
+  int gridSize  = (num_points + blockSize - 1) / blockSize;
+  copyAndPadContiguousKernel<<<gridSize, blockSize, 0, stream_>>>(
+    d_contiguous_data, d_X_pad, num_points, DIM, D);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+
+  // Allocate temporary matrix C_pad (1 x D) on GPU.
+  float* d_C_pad;
+  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_C_pad, D * sizeof(float), stream_));
+  int gridSizeC = (D + blockSize - 1) / blockSize;
+  copyCentroidKernel<<<gridSizeC, blockSize, 0, stream_>>>(d_centroid, d_C_pad, DIM, D);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+
+  // Rotate X_pad -> XP. Allocate XP (num_points x D).
+  float* d_XP;
+  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_XP, num_points * D * sizeof(float), stream_));
+  rotator.rotate(d_X_pad, d_XP, num_points);
+
+  // Rotate C_pad -> CP. Allocate CP (1 x D).
+  float* d_CP;
+  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_CP, D * sizeof(float), stream_));
+  rotator.rotate(d_C_pad, d_CP, 1);
+
+  // Subtract CP from each row of XP: XP = XP - CP.
+  int totalElements = num_points * D;
+  gridSize          = (totalElements + blockSize - 1) / blockSize;
+  subtractKernel<<<gridSize, blockSize, 0, stream_>>>(d_XP, d_CP, num_points, D);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+
+  // Save the rotated centroid: copy CP into d_rotated_c (assumed size D).
+  RAFT_CUDA_TRY(
+    cudaMemcpyAsync(d_rotated_c, d_CP, D * sizeof(float), cudaMemcpyDeviceToDevice, stream_));
+
+  // Normalize XP rowwise: compute XP_norm = XP / norm(XP).
+  gridSize = (num_points + blockSize - 1) / blockSize;
+  normalizeKernel<<<gridSize, blockSize, 0, stream_>>>(d_XP, d_XP_norm, num_points, D);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+
+  // Generate binary representation: bin_XP = (XP > 0).
+  totalElements = num_points * D;
+  gridSize      = (totalElements + blockSize - 1) / blockSize;
+  binarizeKernel<<<gridSize, blockSize, 0, stream_>>>(d_XP_norm, d_bin_XP, num_points, D);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+
+  // Free temporary buffers.
+  RAFT_CUDA_TRY(cudaFreeAsync(d_X_pad, stream_));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_C_pad, stream_));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_XP, stream_));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_CP, stream_));
+
+  raft::resource::sync_stream(handle_);
+}
+
+//---------------------------------------------------------------------------
+// Kernel: rabitq_factor_contiguous_kernel
+// For contiguous data (without ID indirection).
+__global__ void rabitq_factor_contiguous_kernel(const float* __restrict__ d_contiguous_data,
+                                                const float* __restrict__ d_centroid,
+                                                const int* __restrict__ d_bin_XP,
+                                                const float* __restrict__ d_XP_norm,
+                                                float* fac_x2,
+                                                float* fac_ip,
+                                                float* fac_sumxb,
+                                                float* fac_err,
+                                                size_t num_points,
+                                                size_t DIM,
+                                                size_t D,
+                                                double FAC_NORM,
+                                                double FAC_ERR)
+{
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < num_points) {
+    // Compute L2Sqr between the data vector and centroid.
+    const float* cur_data = d_contiguous_data + i * DIM;
+    float sum             = 0.0f;
+    for (int k = 0; k < DIM; k++) {
+      float diff = cur_data[k] - d_centroid[k];
+      sum += diff * diff;
+    }
+    fac_x2[i]    = sum;
+    float dist2c = sqrtf(sum);
+#ifdef HIGH_ACC_FAST_SCAN
+    fac_x2[i] = dist2c;
+#endif
+    // Compute X0 and ip.
+    float X0  = 0.0f;
+    float ip  = 0.0f;
+    int sumxb = 0;
+    for (int j = 0; j < D; j++) {
+      int bin_val = d_bin_XP[i * D + j];
+      float coded = (2.0f * (float)bin_val - 1.0f) * FAC_NORM;
+      X0 += d_XP_norm[i * D + j] * coded;
+      ip += fabsf(0.5f * d_XP_norm[i * D + j]);
+      sumxb += bin_val;
+    }
+    float o_obar = X0;
+    if (!isfinite(o_obar)) { o_obar = 0.8f; }
+    fac_ip[i]    = (1.0f / ip) * 2.0f * dist2c;
+    fac_sumxb[i] = (float)sumxb;
+    fac_err[i]   = sqrtf((1.0f - o_obar * o_obar) / (o_obar * o_obar)) * FAC_ERR * 2.0f * dist2c;
+  }
+}
+
+//---------------------------------------------------------------------------
+// DataQuantizerGPU::rabitq_factor_contiguous
+void DataQuantizerGPU::rabitq_factor_contiguous(const float* d_contiguous_data,
+                                                const float* d_centroid,
+                                                const int* d_bin_XP,
+                                                const float* d_XP_norm,
+                                                float* fac_x2,
+                                                float* fac_ip,
+                                                float* fac_sumxb,
+                                                float* fac_err,
+                                                size_t num_points) const
+{
+  int blockSize = 256;
+  int gridSize  = (num_points + blockSize - 1) / blockSize;
+  rabitq_factor_contiguous_kernel<<<gridSize, blockSize, 0, stream_>>>(d_contiguous_data,
+                                                                       d_centroid,
+                                                                       d_bin_XP,
+                                                                       d_XP_norm,
+                                                                       fac_x2,
+                                                                       fac_ip,
+                                                                       fac_sumxb,
+                                                                       fac_err,
+                                                                       num_points,
+                                                                       this->DIM,
+                                                                       this->D,
+                                                                       FAC_NORM,
+                                                                       FAC_ERR);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  raft::resource::sync_stream(handle_);
+}
+
+//---------------------------------------------------------------------------
+// DataQuantizerGPU::quantize_contiguous
+void DataQuantizerGPU::quantize_contiguous(const float* d_contiguous_data,
+                                           const float* d_centroid,
+                                           size_t num_points,
+                                           const RotatorGPU& rotator,
+                                           uint32_t* d_short_data,
+                                           uint8_t* d_long_code,
+                                           float* d_ex_factor,
+                                           float* d_rotated_c) const
+{
+  // 1. Data Transformation:
+  float* d_XP_norm = nullptr;
+  int* d_bin_XP    = nullptr;
+  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_XP_norm, num_points * D * sizeof(float), stream_));
+  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_bin_XP, num_points * D * sizeof(int), stream_));
+  raft::resource::sync_stream(handle_);
+  data_transformation_contiguous(
+    d_contiguous_data, d_centroid, num_points, rotator, d_rotated_c, d_XP_norm, d_bin_XP);
+
+  // 2. Allocate intermediate buffers on device.
+  size_t code_len             = short_code_length();
+  size_t short_codes_bytes    = code_len * num_points * sizeof(uint32_t);
+  uint32_t* d_all_short_codes = nullptr;
+  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_all_short_codes, short_codes_bytes, stream_));
+
+  size_t factor_bytes       = num_points * sizeof(float);
+  float* d_all_factor_x2    = nullptr;
+  float* d_all_factor_ip    = nullptr;
+  float* d_all_factor_sumxb = nullptr;
+  float* d_all_factor_err   = nullptr;
+  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_all_factor_x2, factor_bytes, stream_));
+  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_all_factor_ip, factor_bytes, stream_));
+  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_all_factor_sumxb, factor_bytes, stream_));
+  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_all_factor_err, factor_bytes, stream_));
+
+  // 3. Compute RaBitQ quantization codes.
+  rabitq_codes(d_bin_XP, d_all_short_codes, num_points);
+
+  // 4. Compute re-ranking factors.
+  rabitq_factor_contiguous(d_contiguous_data,
+                           d_centroid,
+                           d_bin_XP,
+                           d_XP_norm,
+                           d_all_factor_x2,
+                           d_all_factor_ip,
+                           d_all_factor_sumxb,
+                           d_all_factor_err,
+                           num_points);
+
+  // 5. Compute ExRaBitQ quantization codes.
+  exrabitq_codes(d_bin_XP, d_XP_norm, d_long_code, d_ex_factor, d_all_factor_x2, num_points);
+
+  // 6. Copy short codes and factor blocks into final output d_short_data.
+  uint32_t* cur_block = d_short_data;
+  for (size_t i = 0; i < num_points; i++) {
+    size_t block_code_bytes = code_len * sizeof(uint32_t);
+    RAFT_CUDA_TRY(cudaMemcpyAsync(cur_block,
+                                  d_all_short_codes + i * code_len,
+                                  block_code_bytes,
+                                  cudaMemcpyDeviceToDevice,
+                                  stream_));
+    raft::resource::sync_stream(handle_);
+#if defined(HIGH_ACC_FAST_SCAN)
+    float* block_fac = (float*)block_factor(cur_block, D);
+    RAFT_CUDA_TRY(cudaMemcpyAsync(
+      block_fac, d_all_factor_x2 + i, sizeof(float), cudaMemcpyDeviceToDevice, stream_));
+#else
+    uint8_t* block_fac = block_factor(cur_block, D);
+    float* cur_x2      = factor_x2(block_fac);
+    float* cur_ip      = factor_ip(block_fac, FAST_SIZE);
+    float* cur_sumxb   = factor_sumxb(block_fac, FAST_SIZE);
+    float* cur_err     = factor_err(block_fac, FAST_SIZE);
+    RAFT_CUDA_TRY(cudaMemcpyAsync(cur_x2,
+                                  d_all_factor_x2 + i * FAST_SIZE,
+                                  FAST_SIZE * sizeof(float),
+                                  cudaMemcpyDeviceToDevice,
+                                  stream_));
+    RAFT_CUDA_TRY(cudaMemcpyAsync(cur_ip,
+                                  d_all_factor_ip + i * FAST_SIZE,
+                                  FAST_SIZE * sizeof(float),
+                                  cudaMemcpyDeviceToDevice,
+                                  stream_));
+    RAFT_CUDA_TRY(cudaMemcpyAsync(cur_sumxb,
+                                  d_all_factor_sumxb + i * FAST_SIZE,
+                                  FAST_SIZE * sizeof(float),
+                                  cudaMemcpyDeviceToDevice,
+                                  stream_));
+    RAFT_CUDA_TRY(cudaMemcpyAsync(cur_err,
+                                  d_all_factor_err + i * FAST_SIZE,
+                                  FAST_SIZE * sizeof(float),
+                                  cudaMemcpyDeviceToDevice,
+                                  stream_));
+#endif
+    raft::resource::sync_stream(handle_);
+    cur_block = next_block(cur_block, code_len, FAST_SIZE, NUM_SHORT_FACTORS);
+  }
+
+  // 7. Free intermediate buffers.
+  RAFT_CUDA_TRY(cudaFreeAsync(d_all_short_codes, stream_));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_all_factor_x2, stream_));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_all_factor_ip, stream_));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_all_factor_sumxb, stream_));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_all_factor_err, stream_));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_XP_norm, stream_));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_bin_XP, stream_));
+
+  raft::resource::sync_stream(handle_);
+}
+
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

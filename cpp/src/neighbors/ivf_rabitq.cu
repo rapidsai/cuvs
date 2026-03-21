@@ -38,31 +38,55 @@ auto build(raft::resources const& handle,
   RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
 
+  // Calculate dataset size and available workspace once
+  size_t dataset_bytes             = sizeof(T) * n_rows * dim;
+  size_t available_workspace       = raft::resource::get_workspace_free_bytes(handle);
+  constexpr size_t kTolerableRatio = 4;
+
   rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource(handle);
   // If the dataset is small enough to comfortably fit into device memory, put it there.
   // Otherwise, use the managed memory.
-  constexpr size_t kTolerableRatio = 4;
   rmm::device_async_resource_ref big_memory_resource =
     raft::resource::get_large_workspace_resource(handle);
-  if (sizeof(T) * n_rows * dim * kTolerableRatio <
-      raft::resource::get_workspace_free_bytes(handle)) {
+  if (dataset_bytes * kTolerableRatio < available_workspace) {
     big_memory_resource = device_memory;
   }
 
   auto stream = raft::resource::get_cuda_stream(handle);
-  // create device view of dataset
+
+  // Determine if we should use streaming construction
+  bool use_streaming            = false;
+  const float* host_dataset_ptr = nullptr;
+
+  // Check if dataset is already on device
+  auto dataset_residency = utils::check_pointer_residency(dataset.data_handle());
+  bool dataset_on_device = (dataset_residency == utils::pointer_residency::device_only);
+
+  // If dataset is on host, check if we should use streaming construction
+  if (!dataset_on_device) {
+    // Use streaming if dataset doesn't fit comfortably
+    if (dataset_bytes * kTolerableRatio >= available_workspace) {
+      use_streaming    = true;
+      host_dataset_ptr = dataset.data_handle();
+      RAFT_LOG_INFO(
+        "Using streaming construction: dataset size (%.2f GB) exceeds comfortable GPU memory limit",
+        dataset_bytes / (1024.0 * 1024.0 * 1024.0));
+    }
+  }
+
+  // create device view of dataset (only if not using streaming)
   auto d_dataset_array =
     raft::make_device_mdarray<T>(handle, big_memory_resource, raft::make_extents<int64_t>(0, 0));
   auto d_dataset_view =
     raft::make_mdspan(dataset.data_handle(), raft::make_extents<int64_t>(n_rows, dim));
-  if (utils::check_pointer_residency(dataset.data_handle()) !=
-      utils::pointer_residency::device_only) {
+
+  if (!use_streaming && !dataset_on_device) {
     try {
       d_dataset_array = raft::make_device_mdarray<T>(
         handle, big_memory_resource, raft::make_extents<int64_t>(n_rows, dim));
     } catch (raft::logic_error& e) {
       RAFT_LOG_ERROR(
-        "Insufficient memory for kmeans clustering. Please decrease "
+        "Insufficient memory for full GPU construction. Please decrease "
         "dataset size, or set large_workspace_resource appropriately.");
       throw;
     }
@@ -73,6 +97,7 @@ auto build(raft::resources const& handle,
   auto dataset_const_view = raft::make_const_mdspan(d_dataset_view);
   rmm::device_uvector<float> cluster_centers(params.n_lists * dim, stream, device_memory);
   rmm::device_uvector<uint32_t> labels(n_rows, stream, big_memory_resource);
+
   // Scope for kmeans training set allocation.
   {
     raft::random::RngState random_state{137};
@@ -114,9 +139,21 @@ auto build(raft::resources const& handle,
   }
 
   index<IdxT> index(handle, n_rows, dim, params.n_lists, params.bits_per_dim);
-  // Call RaBitQ index construct
-  index.rabitq_index().construct_on_gpu(
-    d_dataset_view.data_handle(), cluster_centers.data(), labels.data(), params.fast_quantize_flag);
+
+  // Call RaBitQ index construct - use streaming if dataset doesn't fit in GPU memory
+  if (use_streaming) {
+    index.rabitq_index().construct_on_gpu_streaming(host_dataset_ptr,
+                                                    cluster_centers.data(),
+                                                    labels.data(),
+                                                    params.fast_quantize_flag,
+                                                    params.streaming_batch_size);
+  } else {
+    index.rabitq_index().construct_on_gpu(d_dataset_view.data_handle(),
+                                          cluster_centers.data(),
+                                          labels.data(),
+                                          params.fast_quantize_flag);
+  }
+
   return index;
 }
 
