@@ -228,8 +228,10 @@ def build(dataset, k, params, *,
         Accepts a numpy array (host) or a device array (CUDA array
         interface). Has to be the same memory location as indices.
     core_distances : array_like, optional
-        Optional output buffer for core distances [num_rows] on device
-        (float32). Requires distances parameter to be provided.
+        Optional output buffer for core distances [num_rows] (float32).
+        Accepts a numpy array (host) or a device array (CUDA array
+        interface). Has to be the same memory location as indices.
+        Requires distances parameter to be provided.
     alpha : float, default=1.0
         Mutual-reachability scaling; used only when core_distances is
         provided
@@ -307,12 +309,22 @@ def build(dataset, k, params, *,
                 "indices and distances must both be on host (numpy) or "
                 "both on device (CUDA array interface)"
             )
-    if core_distances is not None and not hasattr(
-        core_distances, "__cuda_array_interface__"
-    ):
-        raise ValueError(
-            "core_distances must be a device array (CUDA array interface)"
-        )
+    if core_distances is not None:
+        cd_is_numpy = isinstance(core_distances, np.ndarray)
+        cd_is_device = hasattr(core_distances, "__cuda_array_interface__")
+        if not (cd_is_numpy or cd_is_device):
+            raise ValueError(
+                "core_distances must be either a numpy array (host) or a "
+                "device array (CUDA array interface)"
+            )
+        if indices is not None:
+            idx_on_host = isinstance(indices, np.ndarray)
+            cd_on_host = cd_is_numpy
+            if idx_on_host != cd_on_host:
+                raise ValueError(
+                    "core_distances must be on the same memory location "
+                    "as indices and distances (both host or both device)"
+                )
 
     # Infer host vs device from user-provided output arrays; fall back to
     # return_on_host only when neither indices nor distances is given.

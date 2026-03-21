@@ -106,10 +106,7 @@ template <typename T,
           typename IdxT,
           typename DatasetMdspan,
           typename IndicesMdspan,
-          typename DistancesMdspan = mdspan<T,
-                                            matrix_extent<IdxT>,
-                                            row_major,
-                                            raft::device_accessor<cuda::std::default_accessor<T>>>,
+          typename DistancesMdspan = raft::device_matrix_view<T, IdxT, row_major>,
           typename DistEpilogueT   = raft::identity_op>
 void single_build(const raft::resources& handle,
                   const all_neighbors_params& params,
@@ -179,18 +176,15 @@ void single_build(const raft::resources& handle,
 template <typename T,
           typename IdxT,
           typename IndicesMdspan,
-          typename DistancesMdspan = mdspan<T,
-                                            matrix_extent<IdxT>,
-                                            row_major,
-                                            raft::device_accessor<cuda::std::default_accessor<T>>>>
-void build(
-  const raft::resources& handle,
-  const all_neighbors_params& params,
-  raft::host_matrix_view<const T, IdxT, row_major> dataset,
-  IndicesMdspan indices,
-  std::optional<DistancesMdspan> distances                                   = std::nullopt,
-  std::optional<raft::device_vector_view<T, IdxT, row_major>> core_distances = std::nullopt,
-  T alpha                                                                    = 1.0)
+          typename DistancesMdspan = raft::device_matrix_view<T, IdxT, row_major>,
+          typename CoreDistMdspan  = raft::device_vector_view<T, IdxT, row_major>>
+void build(const raft::resources& handle,
+           const all_neighbors_params& params,
+           raft::host_matrix_view<const T, IdxT, row_major> dataset,
+           IndicesMdspan indices,
+           std::optional<DistancesMdspan> distances     = std::nullopt,
+           std::optional<CoreDistMdspan> core_distances = std::nullopt,
+           T alpha                                      = 1.0)
 {
   auto build_algo = check_params_validity(params, core_distances.has_value());
 
@@ -249,16 +243,29 @@ void build(
   if (core_distances.has_value()) {  // calculate mutual reachability distances
     size_t k        = indices.extent(1);
     size_t num_rows = core_distances.value().size();
-    cuvs::neighbors::detail::reachability::core_distances<IdxT, T>(
-      handle,
-      distances.value().data_handle(),
-      k,
-      k,
-      num_rows,
-      core_distances.value().data_handle());
+
+    std::optional<raft::device_vector<T, IdxT>> core_distances_tmp;
+    T* core_distances_d_ptr;
+    if constexpr (outputs_are_host) {
+      // Core distance is the last column (index k-1) of distances
+#pragma omp parallel for
+      for (size_t i = 0; i < num_rows; i++) {
+        core_distances.value()(i) = distances.value()(i, k - 1);
+      }
+      core_distances_tmp.emplace(raft::make_device_vector<T, IdxT>(handle, num_rows));
+      core_distances_d_ptr = core_distances_tmp.value().data_handle();
+      raft::copy(core_distances_d_ptr,
+                 core_distances.value().data_handle(),
+                 num_rows,
+                 raft::resource::get_cuda_stream(handle));
+    } else {
+      core_distances_d_ptr = core_distances.value().data_handle();
+      cuvs::neighbors::detail::reachability::core_distances<IdxT, T>(
+        handle, distances.value().data_handle(), k, k, num_rows, core_distances_d_ptr);
+    }
 
     using ReachabilityPP = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, T>;
-    auto dist_epilogue   = ReachabilityPP{core_distances.value().data_handle(), alpha, num_rows};
+    auto dist_epilogue   = ReachabilityPP{core_distances_d_ptr, alpha, num_rows};
     if (params.n_clusters == 1) {
       single_build<T, IdxT>(handle, params, dataset, indices, distances, dist_epilogue);
     } else {
@@ -267,23 +274,14 @@ void build(
 
     if (need_shift) {
       if constexpr (outputs_are_host) {
-        host_shift_columns(indices, 1, std::nullopt);  // fill first column with row ID
-        auto core_distances_h = raft::make_host_vector<T, IdxT>(num_rows);
-
-        raft::copy(core_distances_h.data_handle(),
-                   core_distances.value().data_handle(),
-                   num_rows,
-                   raft::resource::get_cuda_stream(handle));
-        raft::resource::sync_stream(handle);
-
-        // Shift and fill first column of distances with core_distances
+        host_shift_columns(indices, 1, std::nullopt);
         size_t n_cols = distances.value().extent(1);
 #pragma omp parallel for
         for (size_t i = 0; i < num_rows; i++) {
           for (size_t j = n_cols - 1; j >= 1; j--) {
             distances.value()(i, j) = distances.value()(i, j - 1);
           }
-          distances.value()(i, 0) = core_distances_h(i);
+          distances.value()(i, 0) = core_distances.value()(i);
         }
       } else {
         auto indices_d = raft::make_device_matrix_view<IdxT, IdxT>(
@@ -305,18 +303,15 @@ void build(
 template <typename T,
           typename IdxT,
           typename IndicesMdspan,
-          typename DistancesMdspan = mdspan<T,
-                                            matrix_extent<IdxT>,
-                                            row_major,
-                                            raft::device_accessor<cuda::std::default_accessor<T>>>>
-void build(
-  const raft::resources& handle,
-  const all_neighbors_params& params,
-  raft::device_matrix_view<const T, IdxT, row_major> dataset,
-  IndicesMdspan indices,
-  std::optional<DistancesMdspan> distances                                   = std::nullopt,
-  std::optional<raft::device_vector_view<T, IdxT, row_major>> core_distances = std::nullopt,
-  T alpha                                                                    = 1.0)
+          typename DistancesMdspan = raft::device_matrix_view<T, IdxT, row_major>,
+          typename CoreDistMdspan  = raft::device_vector_view<T, IdxT, row_major>>
+void build(const raft::resources& handle,
+           const all_neighbors_params& params,
+           raft::device_matrix_view<const T, IdxT, row_major> dataset,
+           IndicesMdspan indices,
+           std::optional<DistancesMdspan> distances     = std::nullopt,
+           std::optional<CoreDistMdspan> core_distances = std::nullopt,
+           T alpha                                      = 1.0)
 {
   auto build_algo = check_params_validity(params, core_distances.has_value());
 
@@ -370,37 +365,40 @@ void build(
   if (core_distances.has_value()) {
     size_t k        = indices.extent(1);
     size_t num_rows = core_distances.value().size();
-    cuvs::neighbors::detail::reachability::core_distances<IdxT, T>(
-      handle,
-      distances.value().data_handle(),
-      k,
-      k,
-      num_rows,
-      core_distances.value().data_handle());
+
+    std::optional<raft::device_vector<T, IdxT>> core_distances_tmp;
+    T* core_distances_d_ptr;
+    if constexpr (outputs_are_host) {
+#pragma omp parallel for
+      for (size_t i = 0; i < num_rows; i++) {
+        core_distances.value()(i) = distances.value()(i, k - 1);
+      }
+      core_distances_tmp.emplace(raft::make_device_vector<T, IdxT>(handle, num_rows));
+      core_distances_d_ptr = core_distances_tmp.value().data_handle();
+      raft::copy(core_distances_d_ptr,
+                 core_distances.value().data_handle(),
+                 num_rows,
+                 raft::resource::get_cuda_stream(handle));
+    } else {
+      core_distances_d_ptr = core_distances.value().data_handle();
+      cuvs::neighbors::detail::reachability::core_distances<IdxT, T>(
+        handle, distances.value().data_handle(), k, k, num_rows, core_distances_d_ptr);
+    }
 
     using ReachabilityPP = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, T>;
-    auto dist_epilogue   = ReachabilityPP{core_distances.value().data_handle(), alpha, num_rows};
+    auto dist_epilogue   = ReachabilityPP{core_distances_d_ptr, alpha, num_rows};
     single_build<T, IdxT>(handle, params, dataset, indices, distances, dist_epilogue);
 
     if (need_shift) {
       if constexpr (outputs_are_host) {
-        host_shift_columns(indices, 1, std::nullopt);  // fill first column with row ID
-        auto core_distances_h = raft::make_host_vector<T, IdxT>(num_rows);
-
-        raft::copy(core_distances_h.data_handle(),
-                   core_distances.value().data_handle(),
-                   num_rows,
-                   raft::resource::get_cuda_stream(handle));
-        raft::resource::sync_stream(handle);
-
-        // Shift and fill first column of distances with core_distances
+        host_shift_columns(indices, 1, std::nullopt);
         size_t n_cols = distances.value().extent(1);
 #pragma omp parallel for
         for (size_t i = 0; i < num_rows; i++) {
           for (size_t j = n_cols - 1; j >= 1; j--) {
             distances.value()(i, j) = distances.value()(i, j - 1);
           }
-          distances.value()(i, 0) = core_distances_h(i);
+          distances.value()(i, 0) = core_distances.value()(i);
         }
       } else {
         auto indices_d = raft::make_device_matrix_view<IdxT, IdxT>(

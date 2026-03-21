@@ -37,7 +37,7 @@ namespace cuvs::neighbors::all_neighbors {
              raft::host_matrix_view<const T, IdxT, row_major> dataset,                   \
              raft::host_matrix_view<IdxT, IdxT, row_major> indices,                      \
              std::optional<raft::host_matrix_view<T, IdxT, row_major>> distances,        \
-             std::optional<raft::device_vector_view<T, IdxT, row_major>> core_distances, \
+             std::optional<raft::host_vector_view<T, IdxT, row_major>> core_distances,   \
              T alpha)                                                                    \
   {                                                                                      \
     return all_neighbors::detail::build(                                                 \
@@ -49,7 +49,7 @@ namespace cuvs::neighbors::all_neighbors {
              raft::device_matrix_view<const T, IdxT, row_major> dataset,                 \
              raft::host_matrix_view<IdxT, IdxT, row_major> indices,                      \
              std::optional<raft::host_matrix_view<T, IdxT, row_major>> distances,        \
-             std::optional<raft::device_vector_view<T, IdxT, row_major>> core_distances, \
+             std::optional<raft::host_vector_view<T, IdxT, row_major>> core_distances,   \
              T alpha)                                                                    \
   {                                                                                      \
     return all_neighbors::detail::build(                                                 \
