@@ -198,6 +198,7 @@ void parse_build_param(const nlohmann::json& conf,
   if (conf.contains("fast_quantize_flag")) {
     param.fast_quantize_flag = conf.at("fast_quantize_flag");
   }
+  if (conf.contains("force_streaming")) { param.force_streaming = conf.at("force_streaming"); }
 }
 
 template <typename T, typename IdxT>
