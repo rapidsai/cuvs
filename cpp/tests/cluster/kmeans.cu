@@ -441,9 +441,8 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
                                raft::make_host_scalar_view<T>(&ref_inertia),
                                raft::make_host_scalar_view<int>(&ref_n_iter));
 
-    raft::copy(d_centroids.data(), d_centroids_ref.data(), params.n_clusters * n_features, stream);
-
     cuvs::cluster::kmeans::params batched_params = params;
+    batched_params.inertia_check               = false;
     batched_params.init                          = cuvs::cluster::kmeans::params::Array;
     batched_params.n_init                        = 1;
     batched_params.batch_size                    = std::min(n_samples, 256);
@@ -469,7 +468,6 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
 
     raft::resource::sync_stream(handle, stream);
 
-    // FullBatch: centroids should match the device fit reference
     centroids_match = devArrMatch(d_centroids_ref.data(),
                                   d_centroids.data(),
                                   params.n_clusters,
@@ -496,13 +494,13 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
       d_labels_ref.data(), d_labels.data(), n_samples, raft::resource::get_cuda_stream(handle));
 
     if (score < 1.0) {
-      std::stringstream ss;
-      ss << "Expected: " << raft::arr2Str(d_labels_ref.data(), 25, "d_labels_ref", stream);
-      std::cout << (ss.str().c_str()) << '\n';
-      ss.str(std::string());
-      ss << "Actual: " << raft::arr2Str(d_labels.data(), 25, "d_labels", stream);
-      std::cout << (ss.str().c_str()) << '\n';
-      std::cout << "Score = " << score << '\n';
+    //   std::stringstream ss;
+    //   ss << "Expected: " << raft::arr2Str(d_labels_ref.data(), 25, "d_labels_ref", stream);
+    //   std::cout << (ss.str().c_str()) << '\n';
+    //   ss.str(std::string());
+    //   ss << "Actual: " << raft::arr2Str(d_labels.data(), 25, "d_labels", stream);
+    //   std::cout << (ss.str().c_str()) << '\n';
+    //   std::cout << "Score = " << score << '\n';
     }
   }
 

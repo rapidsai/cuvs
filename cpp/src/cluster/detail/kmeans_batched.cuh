@@ -229,6 +229,8 @@ void fit(raft::resources const& handle,
   auto centroid_sums      = raft::make_device_matrix<T, IdxT>(handle, n_clusters, n_features);
   auto weight_per_cluster = raft::make_device_vector<T, IdxT>(handle, n_clusters);
   auto new_centroids      = raft::make_device_matrix<T, IdxT>(handle, n_clusters, n_features);
+  auto clustering_cost = raft::make_device_vector<T, IdxT>(handle, 1);
+  auto batch_clustering_cost = raft::make_device_vector<T, IdxT>(handle, 1);
 
   // ---- Main n_init loop ----
   for (int seed_iter = 0; seed_iter < n_init; ++seed_iter) {
@@ -254,7 +256,9 @@ void fit(raft::resources const& handle,
 
       raft::matrix::fill(handle, centroid_sums.view(), T{0});
       raft::matrix::fill(handle, weight_per_cluster.view(), T{0});
-      auto clustering_cost = raft::make_device_scalar<T>(handle, T{0});
+
+      raft::matrix::fill(handle, clustering_cost.view(), T{0});
+      raft::matrix::fill(handle, batch_clustering_cost.view(), T{0});
 
       auto centroids_const = raft::make_const_mdspan(centroids);
 
@@ -264,6 +268,8 @@ void fit(raft::resources const& handle,
 
       for (const auto& data_batch : data_batches) {
         IdxT current_batch_size = static_cast<IdxT>(data_batch.size());
+
+        RAFT_LOG_INFO("KMeans batched: Processing batch %zu of %zu", data_batch.offset(), n_samples);
 
         auto batch_data_view = raft::make_device_matrix_view<const T, IdxT>(
           data_batch.data(), current_batch_size, n_features);
@@ -286,12 +292,15 @@ void fit(raft::resources const& handle,
 
         auto L2NormBatch_const = raft::make_device_vector_view<const T, IdxT>(
           L2NormBatch.data_handle(), current_batch_size);
+        
+        auto minClusterAndDistance_view = raft::make_device_vector_view<raft::KeyValuePair<IdxT, T>, IdxT>(
+          minClusterAndDistance.data_handle(), current_batch_size);
 
         cuvs::cluster::kmeans::detail::minClusterAndDistanceCompute<T, IdxT>(
           handle,
           batch_data_view,
           centroids_const,
-          minClusterAndDistance.view(),
+          minClusterAndDistance_view,
           L2NormBatch_const,
           L2NormBuf_OR_DistBuf,
           metric,
@@ -299,7 +308,7 @@ void fit(raft::resources const& handle,
           params.batch_centroids,
           workspace);
 
-        auto minClusterAndDistance_const = raft::make_const_mdspan(minClusterAndDistance.view());
+        auto minClusterAndDistance_const = raft::make_const_mdspan(minClusterAndDistance_view);
 
         accumulate_batch_centroids<T, IdxT>(handle,
                                             batch_data_view,
@@ -311,11 +320,16 @@ void fit(raft::resources const& handle,
         if (params.inertia_check || n_iter[0] == iter_params.max_iter) {
           // Compute cluster cost for this batch and accumulate
           cuvs::cluster::kmeans::detail::computeClusterCost(handle,
-                                                            minClusterAndDistance.view(),
+                                                            minClusterAndDistance_view,
                                                             workspace,
-                                                            clustering_cost.view(),
+                                                            raft::make_device_scalar_view(batch_clustering_cost.data_handle()),
                                                             raft::value_op{},
                                                             raft::add_op{});
+                                                            raft::linalg::add(handle, raft::make_const_mdspan(clustering_cost.view()), raft::make_const_mdspan(batch_clustering_cost.view()), clustering_cost.view());
+          auto host_clustering_cost = raft::make_host_scalar<T>(handle, T{0});
+          raft::copy(host_clustering_cost.data_handle(), clustering_cost.data_handle(), 1, stream);
+        raft::resource::sync_stream(handle);
+        RAFT_LOG_INFO("cluster cost = %f", host_clustering_cost.data_handle()[0]);
         }
       }
 
@@ -376,6 +390,7 @@ void fit(raft::resources const& handle,
   if (n_init > 1) {
     inertia[0] = best_inertia;
     n_iter[0]  = best_n_iter;
+    raft::copy(handle, centroids, best_centroids.view());
     RAFT_LOG_DEBUG("KMeans batched: Best of %d runs: inertia=%f, n_iter=%d",
                    n_init,
                    static_cast<double>(best_inertia),
