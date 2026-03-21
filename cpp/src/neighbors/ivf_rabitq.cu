@@ -64,13 +64,19 @@ auto build(raft::resources const& handle,
 
   // If dataset is on host, check if we should use streaming construction
   if (!dataset_on_device) {
-    // Use streaming if dataset doesn't fit comfortably
-    if (dataset_bytes * kTolerableRatio >= available_workspace) {
+    // Use streaming if explicitly requested or if dataset doesn't fit comfortably
+    if (params.force_streaming || dataset_bytes * kTolerableRatio >= available_workspace) {
       use_streaming    = true;
       host_dataset_ptr = dataset.data_handle();
-      RAFT_LOG_INFO(
-        "Using streaming construction: dataset size (%.2f GB) exceeds comfortable GPU memory limit",
-        dataset_bytes / (1024.0 * 1024.0 * 1024.0));
+      if (params.force_streaming) {
+        RAFT_LOG_INFO(
+          "Using streaming construction: explicitly requested via force_streaming parameter");
+      } else {
+        RAFT_LOG_INFO(
+          "Using streaming construction: dataset size (%.2f GB) exceeds comfortable GPU memory "
+          "limit",
+          dataset_bytes / (1024.0 * 1024.0 * 1024.0));
+      }
     }
   }
 

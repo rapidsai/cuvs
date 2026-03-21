@@ -65,6 +65,16 @@ struct index_params : cuvs::neighbors::index_params {
    * comfortably in GPU memory (determined by available workspace and kTolerableRatio).
    */
   size_t streaming_batch_size = 100000;
+  /**
+   * Force streaming construction regardless of dataset size.
+   *
+   * When set to true, streaming construction will be used even if the dataset would fit
+   * in GPU memory. This is useful for testing or when you want explicit control over
+   * the construction method.
+   *
+   * Default: false (auto-detect based on available memory)
+   */
+  bool force_streaming = false;
 };
 /**
  * @}
