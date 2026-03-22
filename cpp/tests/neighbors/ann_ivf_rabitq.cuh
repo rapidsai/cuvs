@@ -162,6 +162,29 @@ class ivf_rabitq_test : public ::testing::TestWithParam<ivf_rabitq_inputs> {
     return deserialized_index;
   }
 
+  auto build_with_forced_streaming()
+  {
+    tmp_index_file index_file;
+    auto ipams = ps.index_params;
+    // Force streaming construction even if dataset fits in GPU memory
+    ipams.force_streaming = true;
+    // Use batch size that ensures at least 2-3 batches for typical test sizes
+    // but scales reasonably for larger datasets
+    ipams.streaming_batch_size = std::max(size_t{1000}, size_t{ps.num_db_vecs / 3});
+
+    auto host_database = raft::make_host_matrix<DataT, IdxT>(ps.num_db_vecs, ps.dim);
+    raft::copy(host_database.data_handle(), database.data(), ps.num_db_vecs * ps.dim, stream_);
+    auto database_view = raft::make_host_matrix_view<const DataT, IdxT>(
+      host_database.data_handle(), ps.num_db_vecs, ps.dim);
+    auto idx_to_serialize = cuvs::neighbors::ivf_rabitq::build(handle_, ipams, database_view);
+
+    // Serialize and deserialize to reorganize data for efficient search
+    cuvs::neighbors::ivf_rabitq::serialize(handle_, index_file.filename, idx_to_serialize);
+    cuvs::neighbors::ivf_rabitq::index<IdxT> deserialized_index(handle_);
+    cuvs::neighbors::ivf_rabitq::deserialize(handle_, index_file.filename, &deserialized_index);
+    return deserialized_index;
+  }
+
   template <typename BuildIndex>
   void run(BuildIndex build_index)
   {
@@ -359,6 +382,12 @@ inline auto var_search_mode_1_bit() -> test_cases_t
   TEST_P(type, build_host_input_serialize_search) /* NOLINT */          \
   {                                                                     \
     this->run([this]() { return this->build_host_input_serialize(); }); \
+  }
+
+#define TEST_BUILD_FORCED_STREAMING(type)                                \
+  TEST_P(type, build_forced_streaming) /* NOLINT */                      \
+  {                                                                      \
+    this->run([this]() { return this->build_with_forced_streaming(); }); \
   }
 
 #define INSTANTIATE(type, vals) \
