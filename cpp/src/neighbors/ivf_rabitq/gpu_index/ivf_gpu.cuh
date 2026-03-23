@@ -67,37 +67,26 @@ class IVFGPU {
     ~GPUClusterMeta() = default;
 
     /**
-     * @brief Compute pointer to the first block of quantized short data. note that short code
-     * length and factors are counted in 32bits (uint32_t and float)
+     * @brief Compute pointer to the first block of quantized short data.
+     * Factors are stored separately in SoA layout.
      *
      * @param parent Pointer to the IVFGPU instance that holds the base pointer.
-     * @return Pointer to the first block of this cluster’s short data.
+     * @return Pointer to the first block of this cluster's short data.
      */
     __host__ uint32_t* first_block(const IVFGPU& parent) const
-    {
-      return parent.get_short_data_device() +
-             start_index *
-               (parent.quantizer().short_code_length() + parent.quantizer().num_short_factors());
-    }
-
-    // for batch data, factors are stored separately.
-    uint32_t* first_block_batch(const IVFGPU& parent) const
     {
       return parent.get_short_data_device() +
              start_index * (parent.quantizer().short_code_length());
     }
 
-    __device__ uint32_t* first_block_gpu(uint32_t* d_short_data,
-                                         size_t short_code_length,
-                                         size_t num_short_factors) const
+    __device__ uint32_t* first_block_gpu(uint32_t* d_short_data, size_t short_code_length) const
     {
-      return d_short_data + start_index * (short_code_length + num_short_factors);
+      return d_short_data + start_index * short_code_length;
     }
 
     __host__ uint32_t* first_block_host(const IVFGPU& parent) const
     {
-      return parent.get_short_data_host() + start_index * (parent.quantizer().short_code_length() +
-                                                           parent.quantizer().num_short_factors());
+      return parent.get_short_data_host() + start_index * (parent.quantizer().short_code_length());
     }
 
     float* short_factor_batch(const IVFGPU& parent, size_t i) const
@@ -129,25 +118,20 @@ class IVFGPU {
 
     /**
      * @brief Get the pointer to the extra factor for the i-th vector in this cluster.
+     * Two ex_factors are stored (f_add_ex and f_rescale_ex) in SoA layout.
      *
      * @param parent Pointer to the IVFGPU instance that holds the base pointer.
      * @param i Index within the cluster.
      * @return Pointer to the extra factor for the i-th vector.
      */
-    __host__ __device__ ExFactor* ex_factor(const IVFGPU& parent, size_t i) const
-    {
-      return parent.get_ex_factor_device() + start_index + i;
-    }
-
-    // two ex_factors are stored
-    ExFactor* ex_factor_batch(const IVFGPU& parent, size_t i) const
+    ExFactor* ex_factor(const IVFGPU& parent, size_t i) const
     {
       return parent.get_ex_factor_device() + (start_index + i) * 2;
     }
 
     ExFactor* ex_factor_host(const IVFGPU& parent, size_t i) const
     {
-      return parent.get_ex_factor_host() + start_index + i;
+      return parent.get_ex_factor_host() + (start_index + i) * 2;
     }
 
     /**
@@ -175,17 +159,9 @@ class IVFGPU {
    * @param k Num of centroids.
    * @param bits_per_dim totalbits = EX_BITS+1
    */
-  IVFGPU(raft::resources const& handle,
-         size_t n,
-         size_t dim,
-         size_t k,
-         size_t bits_per_dim,
-         bool batch_flag);
+  IVFGPU(raft::resources const& handle, size_t n, size_t dim, size_t k, size_t bits_per_dim);
   IVFGPU(raft::resources const& handle)
-    : handle_(handle),
-      batch_flag(false),
-      initializer(nullptr),
-      Rota(std::make_unique<RotatorGPU>(handle_, 128))
+    : handle_(handle), initializer(nullptr), Rota(std::make_unique<RotatorGPU>(handle_, 128))
   {
   }
 
@@ -228,8 +204,7 @@ class IVFGPU {
                                   bool fast_quantize,
                                   size_t batch_size_vectors = 100000);
 
-  // save_batch_flag for compatity with the previous non-batch index,
-  void save(const char* filename, bool save_batch_flag = false) const;
+  void save(const char* filename) const;
 
   // load_transposed only applies for new batch index
   void load_transposed(const char* filename);
@@ -350,11 +325,7 @@ class IVFGPU {
 
   size_t GetExFactorBytes() const
   {
-    if (!batch_flag) {
-      return sizeof(ExFactor) * num_vectors;
-    } else {
-      return 2 * sizeof(float) * num_vectors;  // only f_add_ex and f_rescale_ex
-    }
+    return 2 * sizeof(float) * num_vectors;  // only f_add_ex and f_rescale_ex
   }
 
   size_t GetPIDsBytes() const { return sizeof(PID) * num_vectors; }
@@ -389,12 +360,9 @@ class IVFGPU {
     raft::make_device_vector<GPUClusterMeta, int64_t>(handle_,
                                                       0);  // Device-side array of clusters.
 
-  // batch-data
-  bool batch_flag;
+  // batch-data (SoA layout - factors stored separately)
   raft::device_vector<float, int64_t> short_factors_batch_ =
     raft::make_device_vector<float, int64_t>(handle_, 0);  // N * 3 float rabitq factors
-  // long_code_ is the same
-  // exfactor use the same place as before
 
   // host-side copies
   raft::host_vector<uint32_t, int64_t> short_data_host_ = raft::make_host_vector<uint32_t, int64_t>(

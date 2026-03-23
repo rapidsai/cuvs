@@ -36,97 +36,18 @@ typedef uint32_t PID;
  */
 class DataQuantizerGPU {
  public:
+  // Nested struct for fast quantization factors
   struct FastQuantizeFactors {
     float const_scaling_factor_4bit;
     float const_scaling_factor_8bit;
   };
 
- private:
-  size_t DIM;                // Original data dimension.
-  size_t D;                  // Padded dimension (multiple of 64).
-  size_t EX_BITS;            // Number of bits for ExRaBitQ.
-  size_t SHORT_CODE_LENGTH;  // Number of uint32_t to store 1-bit code for a vector.
-  size_t LONG_CODE_LENGTH;   // Number of uint8_t to store EX_BITS code for a vector.
-  double FAC_NORM;
-  double FAC_ERR;
-  bool batch_flag_dq;
-  float const_scaling_factor;
-  FastQuantizeFactors fast_quantize_factors;
-  static constexpr size_t FAST_SIZE = 4;
-#if defined(HIGH_ACC_FAST_SCAN)
-  static constexpr size_t NUM_SHORT_FACTORS = 1;
-#else
-  static constexpr size_t NUM_SHORT_FACTORS = 4;
-#endif
-  raft::resources const& handle_;  // reusable resource handle
-  rmm::cuda_stream_view stream_ =
-    raft::resource::get_cuda_stream(handle_);  // CUDA stream obtained from handle_
-
-  // device temporary space to quantize a cluster
-  raft::device_vector<float, int64_t> d_XP_norm =
-    raft::make_device_vector<float, int64_t>(handle_, 0);
-  raft::device_vector<int, int64_t> d_bin_XP = raft::make_device_vector<int, int64_t>(handle_, 0);
-  raft::device_vector<float, int64_t> d_XP   = raft::make_device_vector<float, int64_t>(handle_, 0);
-  raft::device_vector<float, int64_t> d_X_and_C_pad =
-    raft::make_device_vector<float, int64_t>(handle_, 0);
-
-  // Private helper functions (to be implemented with GPU kernels eventually):
-  void rabitq_factor(const float* d_data,
-                     const float* d_centroid,
-                     const PID* d_IDs,
-                     const int* d_bin_XP,
-                     const float* d_XP_norm,
-                     float* fac_x2,
-                     float* fac_ip,
-                     float* fac_sumxb,
-                     float* fac_err,
-                     size_t num_points) const;
-
-  void rabitq_codes(const int* d_bin_XP, uint32_t* d_packed_code, size_t num_points) const;
-
-  void exrabitq_codes(const int* d_bin_XP,
-                      const float* d_XP_norm,
-                      uint8_t* d_long_code,
-                      float* d_ex_factor,
-                      const float* d_fac_x2,
-                      size_t num_points) const;
-
-  void data_transformation_contiguous(const float* d_contiguous_data,
-                                      const float* d_centroid,
-                                      size_t num_points,
-                                      const RotatorGPU& rotator,
-                                      float* d_rotated_c,
-                                      float* d_XP_norm,
-                                      int* d_bin_XP) const;
-
-  void rabitq_factor_contiguous(const float* d_contiguous_data,
-                                const float* d_centroid,
-                                const int* d_bin_XP,
-                                const float* d_XP_norm,
-                                float* fac_x2,
-                                float* fac_ip,
-                                float* fac_sumxb,
-                                float* fac_err,
-                                size_t num_points) const;
-
-  void data_transformation_batch_opt_contiguous(const float* d_contiguous_data,
-                                                const float* d_centroid,
-                                                size_t num_points,
-                                                const RotatorGPU& rotator,
-                                                float* d_rotated_c,
-                                                float* d_XP_norm,
-                                                int* d_bin_XP,
-                                                float* d_XP_output);
-
- public:
+  // Static methods
   static float get_const_scaling_factors(raft::resources const& handle, size_t dim, size_t ex_bits);
 
   float get_const_scaling_factors_fully_gpu(size_t dim, size_t ex_bits);
   // Constructor: initialize from dimension and bit count.
-  explicit DataQuantizerGPU(raft::resources const& handle,
-                            size_t dim,
-                            size_t b,
-                            bool batch_flag_dq = false)
+  explicit DataQuantizerGPU(raft::resources const& handle, size_t dim, size_t b)
     : DIM(dim),
       D(rd_up_to_multiple_of(dim, 64)),
       EX_BITS(b),
@@ -135,7 +56,6 @@ class DataQuantizerGPU {
       ,
       FAC_NORM(1 / std::sqrt((double)D)),
       FAC_ERR(2.0 / std::sqrt((double)(D - 1))),
-      batch_flag_dq(batch_flag_dq),
       fast_quantize_flag(false),
       const_scaling_factor(0.0f),
       handle_(handle)
@@ -148,15 +68,11 @@ class DataQuantizerGPU {
   // Accessor functions.
   size_t short_code_length() const { return SHORT_CODE_LENGTH; }
   size_t long_code_length() const { return LONG_CODE_LENGTH; }
-  // Now block_types represents a single factor
+  // Block size for SoA layout (factors stored separately)
   size_t block_bytes() const
   {
-    if (!batch_flag_dq) {
-      return SHORT_CODE_LENGTH * sizeof(uint32_t) + sizeof(float) * NUM_SHORT_FACTORS;
-    } else {
-      // 3 factors for batch: f_add, f_rescale and f_error are stored separately
-      return SHORT_CODE_LENGTH * sizeof(uint32_t);
-    }
+    // 3 factors for batch: f_add, f_rescale and f_error are stored separately
+    return SHORT_CODE_LENGTH * sizeof(uint32_t);
   }
   size_t num_blocks(size_t num) const { return div_rd_up(num, FAST_SIZE); }
   static constexpr size_t num_short_factors() { return NUM_SHORT_FACTORS; }
@@ -173,56 +89,11 @@ class DataQuantizerGPU {
   }
   void set_quantize_scaling_factors(float value) { const_scaling_factor = value; }
 
+  // Public configuration flag
+  bool fast_quantize_flag;
+
   // functions to malloc temp buffers for gpu
   void alloc_buffers(size_t num_points);
-
-  /*!
-   * @brief Quantize the input data.
-   *
-   * @param data Pointer to the input data (host pointer or device pointer as needed).
-   * @param centroid Pointer to the corresponding centroid.
-   * @param pids Vector of vector IDs.
-   * @param rotator A RotatorGPU instance.
-   * @param outShort Output buffer for short codes.
-   * @param outLong Output buffer for long codes.
-   * @param outExFactor Output buffer for extra factors.
-   * @param outTemp Temporary buffer.
-   */
-  //    void quantize(const float* data, const float* centroid,
-  //                  const std::vector<PID>& pids,
-  //                  const RotatorGPU& rotator,
-  //                  uint8_t* outShort, uint8_t* outLong, ExFactor* outExFactor, float* outTemp)
-  //                  const;
-  void quantize(const float* d_data,
-                const float* d_centroid,
-                const PID* d_IDs,
-                size_t num_points,
-                const RotatorGPU& rotator,
-                uint32_t* d_short_data,
-                uint8_t* d_long_code,
-                float* d_ex_factor,
-                float* d_rotated_c) const;
-
-  /*!
-   * @brief Quantize contiguous cluster data (without PID gathering).
-   *
-   * @param d_contiguous_data Pointer to contiguous cluster data on device.
-   * @param d_centroid Pointer to the corresponding centroid on device.
-   * @param num_points Number of points in the cluster.
-   * @param rotator A RotatorGPU instance.
-   * @param d_short_data Output buffer for short codes.
-   * @param d_long_code Output buffer for long codes.
-   * @param d_ex_factor Output buffer for extra factors.
-   * @param d_rotated_c Output buffer for rotated centroid.
-   */
-  void quantize_contiguous(const float* d_contiguous_data,
-                           const float* d_centroid,
-                           size_t num_points,
-                           const RotatorGPU& rotator,
-                           uint32_t* d_short_data,
-                           uint8_t* d_long_code,
-                           float* d_ex_factor,
-                           float* d_rotated_c) const;
 
   /*!
    * @brief Quantize the input data for batch layout.
@@ -315,53 +186,36 @@ class DataQuantizerGPU {
     return block + code_len + num_factors;
   }
 
-  //    void data_transformation(const float* data, const float* centroid,
-  //                             const std::vector<PID>& pids,
-  //                             const RotatorGPU& rotator,
-  //                             float* out, float* floatMat, int* intMat) const;
-  void data_transformation(const float* d_data,
-                           const float* d_centroid,
-                           const PID* d_IDs,
-                           size_t num_points,
-                           const RotatorGPU& rotator,
-                           float* d_rotated_c,
-                           float* d_XP_norm,
-                           int* d_bin_XP) const;
+ private:
+  // Dimension and quantization parameters
+  size_t DIM;                // Original data dimension.
+  size_t D;                  // Padded dimension (multiple of 64).
+  size_t EX_BITS;            // Number of bits for ExRaBitQ.
+  size_t SHORT_CODE_LENGTH;  // Number of uint32_t to store 1-bit code for a vector.
+  size_t LONG_CODE_LENGTH;   // Number of uint8_t to store EX_BITS code for a vector.
+  double FAC_NORM;
+  double FAC_ERR;
+  float const_scaling_factor;
+  FastQuantizeFactors fast_quantize_factors;
+  static constexpr size_t FAST_SIZE = 4;
+#if defined(HIGH_ACC_FAST_SCAN)
+  static constexpr size_t NUM_SHORT_FACTORS = 1;
+#else
+  static constexpr size_t NUM_SHORT_FACTORS = 4;
+#endif
 
-  void data_transformation_batch_opt(const float* d_data,
-                                     const float* d_centroid,
-                                     const PID* d_IDs,
-                                     size_t num_points,
-                                     const RotatorGPU& rotator,
-                                     float* d_rotated_c,
-                                     float* d_XP_norm,
-                                     int* d_bin_XP,
-                                     float* d_XP);
+  // RAFT resources
+  raft::resources const& handle_;  // reusable resource handle
+  rmm::cuda_stream_view stream_ =
+    raft::resource::get_cuda_stream(handle_);  // CUDA stream obtained from handle_
 
-  void exrabitq_codes_and_factors_fused(const int* d_bin_XP,
-                                        const float* d_XP_norm,
-                                        float* d_XP,
-                                        uint8_t* d_long_code,
-                                        float* d_ex_factor,
-                                        const float* d_fac_x2,
-                                        size_t num_points) const;
-
-  void rabitq_codes_and_factors_fused(const float* d_rotated_c,
-                                      const int* d_bin_XP,
-                                      const float* d_XP,
-                                      uint32_t* d_short_data,
-                                      float* d_short_data_factors,
-                                      size_t num_points) const;
-
-  bool fast_quantize_flag;
-
-  void exrabitq_codes_and_factors_fused_ori(const int* d_bin_XP,
-                                            const float* d_XP_norm,
-                                            float* d_XP,
-                                            uint8_t* d_long_code,
-                                            float* d_ex_factor,
-                                            const float* d_centroid,
-                                            size_t num_points) const;
+  // Device temporary buffers for quantization
+  raft::device_vector<float, int64_t> d_XP_norm =
+    raft::make_device_vector<float, int64_t>(handle_, 0);
+  raft::device_vector<int, int64_t> d_bin_XP = raft::make_device_vector<int, int64_t>(handle_, 0);
+  raft::device_vector<float, int64_t> d_XP   = raft::make_device_vector<float, int64_t>(handle_, 0);
+  raft::device_vector<float, int64_t> d_X_and_C_pad =
+    raft::make_device_vector<float, int64_t>(handle_, 0);
 };
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

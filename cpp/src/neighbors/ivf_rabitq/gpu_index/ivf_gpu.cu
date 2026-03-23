@@ -29,21 +29,15 @@
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
-IVFGPU::IVFGPU(raft::resources const& handle,
-               size_t n,
-               size_t dim,
-               size_t k,
-               size_t bits_per_dim,
-               bool batch_flag = false)
+IVFGPU::IVFGPU(raft::resources const& handle, size_t n, size_t dim, size_t k, size_t bits_per_dim)
   : handle_(handle),
-    batch_flag(batch_flag),
     num_vectors(n),
     num_dimensions(dim),
     num_padded_dim(rd_up_to_multiple_of(dim, 64)),
     num_centroids(k),
     ex_bits(bits_per_dim - 1),
     initializer(nullptr),
-    DQ(std::make_unique<DataQuantizerGPU>(handle_, dim, bits_per_dim - 1, batch_flag)),
+    DQ(std::make_unique<DataQuantizerGPU>(handle_, dim, bits_per_dim - 1)),
     Rota(std::make_unique<RotatorGPU>(handle_, dim))
 {
 }
@@ -58,13 +52,11 @@ void IVFGPU::AllocateDeviceMemory()
   size_t ex_factor_size  = GetExFactorBytes();
   size_t pids_size       = GetPIDsBytes();
 
-  // Allocate memory for the quantized arrays.
+  // Allocate memory for the quantized arrays (SoA layout).
   short_data_ =
     raft::make_device_vector<uint32_t, int64_t>(handle_, short_data_size / sizeof(uint32_t));
-  if (batch_flag) {
-    short_factors_batch_ = raft::make_device_vector<float, int64_t>(
-      handle_, GetShortDataFactorBytesBatch() / sizeof(float));
-  }
+  short_factors_batch_ = raft::make_device_vector<float, int64_t>(
+    handle_, GetShortDataFactorBytesBatch() / sizeof(float));
   long_code_ =
     raft::make_device_vector<uint8_t, int64_t>(handle_, long_code_size / sizeof(uint8_t));
   ex_factor_ =
@@ -106,10 +98,13 @@ void IVFGPU::load_transposed(const char* filename)
   this->num_padded_dim = rd_up_to_multiple_of(this->num_dimensions, 64);
   input.read(reinterpret_cast<char*>(&this->num_centroids), sizeof(size_t));
   input.read(reinterpret_cast<char*>(&this->ex_bits), sizeof(size_t));
-  input.read(reinterpret_cast<char*>(&this->batch_flag), sizeof(bool));
+
+  // Skip legacy batch_flag field for backward compatibility
+  bool legacy_batch_flag;
+  input.read(reinterpret_cast<char*>(&legacy_batch_flag), sizeof(bool));
 
   // Initialize quantizer and rotator (host objects that drive GPU routines).
-  this->DQ = std::make_unique<DataQuantizerGPU>(handle_, num_dimensions, ex_bits, batch_flag);
+  this->DQ = std::make_unique<DataQuantizerGPU>(handle_, num_dimensions, ex_bits);
   input.read(reinterpret_cast<char*>(this->DQ->get_query_scaling_factor()),
              sizeof(DataQuantizerGPU::FastQuantizeFactors));
   this->Rota = std::make_unique<RotatorGPU>(handle_, num_dimensions);
@@ -216,9 +211,8 @@ void IVFGPU::load_transposed(const char* filename)
                                          short_data_host_.data_handle(),
                                          GetShortDataBytesSimple(),
                                          this->max_cluster_length);
-  if (batch_flag)
-    read_into_device(short_factors_batch_.data_handle(),
-                     GetShortDataFactorBytesBatch());  // no copy on CPU
+  read_into_device(short_factors_batch_.data_handle(),
+                   GetShortDataFactorBytesBatch());  // SoA layout - no copy on CPU
   read_into_device_host(
     long_code_.data_handle(), long_code_host_.data_handle(), GetLongCodeBytes());
   read_into_device_host(
@@ -306,7 +300,7 @@ void print_first_vector(uint8_t* ex_data_, float* ex_factors_, size_t dim, int e
   std::cout << "F_exrescale = " << *f_exrescale << "\n";
 }
 
-void IVFGPU::save(const char* filename, bool save_batch_flag) const
+void IVFGPU::save(const char* filename) const
 {
   if (num_centroids == 0) {
     std::cerr << "IVF not constructed\n";
@@ -324,7 +318,9 @@ void IVFGPU::save(const char* filename, bool save_batch_flag) const
   output.write(reinterpret_cast<const char*>(&num_dimensions), sizeof(size_t));
   output.write(reinterpret_cast<const char*>(&num_centroids), sizeof(size_t));
   output.write(reinterpret_cast<const char*>(&ex_bits), sizeof(size_t));
-  if (save_batch_flag) output.write(reinterpret_cast<const char*>(&batch_flag), sizeof(bool));
+  // Write legacy batch_flag=true for backward compatibility
+  bool legacy_batch_flag = true;
+  output.write(reinterpret_cast<const char*>(&legacy_batch_flag), sizeof(bool));
   output.write(reinterpret_cast<const char*>(DQ->get_query_scaling_factor()),
                sizeof(DataQuantizerGPU::FastQuantizeFactors));
 
@@ -360,17 +356,15 @@ void IVFGPU::save(const char* filename, bool save_batch_flag) const
   auto h_ids_buf                 = raft::make_host_vector<PID, int64_t>(ids_size / sizeof(PID));
   auto h_short_factors_batch_buf = raft::make_host_vector<uint8_t, int64_t>(short_factors_size);
 
-  // Copy device data to host.
+  // Copy device data to host (SoA layout).
   raft::copy(h_short_data_buf.data_handle(),
              reinterpret_cast<const uint8_t*>(short_data_.data_handle()),
              short_data_size,
              stream_);
-  if (batch_flag) {
-    raft::copy(h_short_factors_batch_buf.data_handle(),
-               reinterpret_cast<const uint8_t*>(short_factors_batch_.data_handle()),
-               short_factors_size,
-               stream_);
-  }
+  raft::copy(h_short_factors_batch_buf.data_handle(),
+             reinterpret_cast<const uint8_t*>(short_factors_batch_.data_handle()),
+             short_factors_size,
+             stream_);
   raft::copy(h_long_code_buf.data_handle(), long_code_.data_handle(), long_code_size, stream_);
   raft::copy(h_ex_factor_buf.data_handle(),
              ex_factor_.data_handle(),
@@ -381,9 +375,8 @@ void IVFGPU::save(const char* filename, bool save_batch_flag) const
 
   // Write raw arrays to file.
   output.write(reinterpret_cast<const char*>(h_short_data_buf.data_handle()), short_data_size);
-  if (batch_flag)
-    output.write(reinterpret_cast<const char*>(h_short_factors_batch_buf.data_handle()),
-                 short_factors_size);
+  output.write(reinterpret_cast<const char*>(h_short_factors_batch_buf.data_handle()),
+               short_factors_size);
   output.write(reinterpret_cast<const char*>(h_long_code_buf.data_handle()), long_code_size);
   output.write(reinterpret_cast<const char*>(h_ex_factor_buf.data_handle()), ex_factor_size);
   output.write(reinterpret_cast<const char*>(h_ids_buf.data_handle()), ids_size);
@@ -832,30 +825,19 @@ void IVFGPU::construct_on_gpu_streaming(const float* host_data,
       float* cur_rotated_c      = d_rotated_centroids.data_handle() + c * num_padded_dim;
       GPUClusterMeta& cp        = h_cluster_meta[c];
 
-      // Quantize this cluster's data (contiguous in batch)
+      // Quantize this cluster's data (contiguous in batch, SoA layout)
       const float* cluster_data = d_batch_data.data_handle() + batch_offset * num_dimensions;
 
-      // Quantize using contiguous data
-      if (!batch_flag) {
-        DQ->quantize_contiguous(cluster_data,
-                                cur_centroid,
-                                cluster_size,
-                                this->rotator(),
-                                cp.first_block(*this),
-                                cp.long_code(*this, 0, DQ->long_code_length()),
-                                reinterpret_cast<float*>(cp.ex_factor(*this, 0)),
-                                cur_rotated_c);
-      } else {
-        DQ->quantize_batch_opt_contiguous(cluster_data,
-                                          cur_centroid,
-                                          cluster_size,
-                                          this->rotator(),
-                                          cp.first_block_batch(*this),
-                                          cp.short_factor_batch(*this, 0),
-                                          cp.long_code(*this, 0, DQ->long_code_length()),
-                                          reinterpret_cast<float*>(cp.ex_factor_batch(*this, 0)),
-                                          cur_rotated_c);
-      }
+      // Quantize using batch-optimized path
+      DQ->quantize_batch_opt_contiguous(cluster_data,
+                                        cur_centroid,
+                                        cluster_size,
+                                        this->rotator(),
+                                        cp.first_block(*this),
+                                        cp.short_factor_batch(*this, 0),
+                                        cp.long_code(*this, 0, DQ->long_code_length()),
+                                        reinterpret_cast<float*>(cp.ex_factor(*this, 0)),
+                                        cur_rotated_c);
 
       batch_offset += cluster_size;
     }
@@ -1004,32 +986,17 @@ void IVFGPU::quantize_cluster(GPUClusterMeta& cp,
   // Note: cp.ids(this) returns ids_ + cp.start_index.
   const PID* idp = cp.ids(*this);
 
-  // Call the GPU quantization function.
-  // Here, we assume DQ->quantize accepts device pointers for raw data and centroid,
-  // the device pointer for IDs, the number of points, the RotatorGPU instance,
-  // and pointers for the output short data, long code, ex_factor, and rotated centroid.
-  if (!batch_flag) {
-    DQ->quantize(d_data,
-                 d_centroid,
-                 idp,
-                 num,
-                 this->rotator(),
-                 cp.first_block(*this),
-                 cp.long_code(*this, 0, DQ->long_code_length()),
-                 reinterpret_cast<float*>(cp.ex_factor(*this, 0)),
-                 d_rotated_c);
-  } else {
-    DQ->quantize_batch_opt(d_data,
-                           d_centroid,
-                           idp,
-                           num,
-                           this->rotator(),
-                           cp.first_block_batch(*this),
-                           cp.short_factor_batch(*this, 0),
-                           cp.long_code(*this, 0, DQ->long_code_length()),
-                           reinterpret_cast<float*>(cp.ex_factor_batch(*this, 0)),
-                           d_rotated_c);
-  }
+  // Call the GPU quantization function (SoA layout).
+  DQ->quantize_batch_opt(d_data,
+                         d_centroid,
+                         idp,
+                         num,
+                         this->rotator(),
+                         cp.first_block(*this),
+                         cp.short_factor_batch(*this, 0),
+                         cp.long_code(*this, 0, DQ->long_code_length()),
+                         reinterpret_cast<float*>(cp.ex_factor(*this, 0)),
+                         d_rotated_c);
 }
 
 // Launch with: grid = Q + K (or a grid-stride size), block = norm_block_size

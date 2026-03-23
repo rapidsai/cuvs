@@ -268,7 +268,7 @@ template <typename IdxT>
 void serialize(raft::resources const& handle, const std::string& filename, index<IdxT>& index)
 {
   // Save the index to a file.
-  index.rabitq_index().save(filename.c_str(), /* save_batch_flag = */ true);
+  index.rabitq_index().save(filename.c_str());
 }
 
 template <typename IdxT>
@@ -297,8 +297,7 @@ index<IdxT>::index(raft::resources const& handle,
                    uint32_t dim,
                    uint32_t n_lists,
                    uint32_t bits_per_dim)
-  : rabitq_index_(std::make_unique<detail::IVFGPU>(
-      handle, n_rows, dim, n_lists, bits_per_dim, /* batch_flag = */ true))
+  : rabitq_index_(std::make_unique<detail::IVFGPU>(handle, n_rows, dim, n_lists, bits_per_dim))
 {
   RAFT_EXPECTS(bits_per_dim >= 1 && bits_per_dim <= 9, "Unsupported bits_per_dim");
 }

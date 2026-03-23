@@ -25,6 +25,71 @@
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
+namespace {
+
+// Forward declarations for free functions
+void data_transformation_batch_opt(const float* d_data,
+                                   const float* d_centroid,
+                                   const PID* d_IDs,
+                                   size_t num_points,
+                                   const RotatorGPU& rotator,
+                                   float* d_rotated_c,
+                                   float* d_XP_norm,
+                                   int* d_bin_XP,
+                                   float* d_XP_output,
+                                   float* d_X_and_C_pad,
+                                   size_t DIM,
+                                   size_t D,
+                                   rmm::cuda_stream_view stream);
+
+void data_transformation_batch_opt_contiguous(const float* d_contiguous_data,
+                                              const float* d_centroid,
+                                              size_t num_points,
+                                              const RotatorGPU& rotator,
+                                              float* d_rotated_c,
+                                              float* d_XP_norm,
+                                              int* d_bin_XP,
+                                              float* d_XP_output,
+                                              float* d_X_and_C_pad,
+                                              size_t DIM,
+                                              size_t D,
+                                              rmm::cuda_stream_view stream);
+
+void rabitq_codes_and_factors_fused(const float* d_rotated_c,
+                                    const int* d_bin_XP,
+                                    const float* d_XP,
+                                    uint32_t* d_short_data,
+                                    float* d_short_data_factors,
+                                    size_t num_points,
+                                    size_t D,
+                                    raft::resources const& handle,
+                                    rmm::cuda_stream_view stream);
+
+void exrabitq_codes_and_factors_fused(const int* d_bin_XP,
+                                      const float* d_XP_norm,
+                                      float* d_XP,
+                                      uint8_t* d_long_code,
+                                      float* d_ex_factor,
+                                      const float* d_centroid,
+                                      size_t num_points,
+                                      size_t D,
+                                      size_t EX_BITS,
+                                      float const_scaling_factor,
+                                      raft::resources const& handle,
+                                      rmm::cuda_stream_view stream);
+
+void exrabitq_codes_and_factors_fused_ori(const int* d_bin_XP,
+                                          const float* d_XP_norm,
+                                          float* d_XP,
+                                          uint8_t* d_long_code,
+                                          float* d_ex_factor,
+                                          const float* d_centroid,
+                                          size_t num_points,
+                                          size_t D,
+                                          size_t EX_BITS,
+                                          raft::resources const& handle,
+                                          rmm::cuda_stream_view stream);
+
 //---------------------------------------------------------------------------
 // Kernel: subtract_normalize_binarize_Kernel (Fused)
 // This single kernel performs three sequential operations:
@@ -435,29 +500,28 @@ __global__ void exrabitq_fused_kernel_batch(
   }
 }
 
-void DataQuantizerGPU::data_transformation_batch_opt(
-  const float* d_data,
-  const float* d_centroid,
-  const PID* d_IDs,
-  size_t num_points,
-  const RotatorGPU& rotator,
-  float* d_rotated_c,
-  float* d_XP_norm,
-  int* d_bin_XP,
-  float* d_XP_output  // XP_output is (num_points + 1) * D to store extra centroid
-)
+void data_transformation_batch_opt(const float* d_data,
+                                   const float* d_centroid,
+                                   const PID* d_IDs,
+                                   size_t num_points,
+                                   const RotatorGPU& rotator,
+                                   float* d_rotated_c,
+                                   float* d_XP_norm,
+                                   int* d_bin_XP,
+                                   float* d_XP_output,
+                                   float* d_X_and_C_pad,
+                                   size_t DIM,
+                                   size_t D,
+                                   rmm::cuda_stream_view stream)
 {
   // 1. Allocate a single temporary buffer for both padded data and the padded centroid.
-
-  // Create a pointer to the start of the centroid section for the kernel.
-  float* d_C_pad_ptr = d_X_and_C_pad.data_handle() + num_points * D;
 
   // 2. Launch a single kernel to gather and pad both data and centroid.
   int blockSize           = D < 256 ? 128 : 256;
   size_t totalPadElements = (num_points + 1) * D;
   int gridPadSize         = (totalPadElements + blockSize - 1) / blockSize;
-  gatherAndPadKernel<<<gridPadSize, blockSize, 0, stream_>>>(
-    d_data, d_IDs, d_centroid, d_X_and_C_pad.data_handle(), num_points, DIM, D);
+  gatherAndPadKernel<<<gridPadSize, blockSize, 0, stream>>>(
+    d_data, d_IDs, d_centroid, d_X_and_C_pad, num_points, DIM, D);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // 3. Allocate a single output buffer for both rotated data (XP) and rotated centroid (CP).
@@ -465,7 +529,7 @@ void DataQuantizerGPU::data_transformation_batch_opt(
 
   // 4. Perform a single, combined rotation.
   // The input is d_X_and_C_pad, output is d_XP_and_CP. The number of "points" is num_points + 1.
-  rotator.rotate(d_X_and_C_pad.data_handle(), d_XP_and_CP, num_points + 1);
+  rotator.rotate(d_X_and_C_pad, d_XP_and_CP, num_points + 1);
 
   // Create pointers to the specific results within the combined buffer.
   float* d_XP = d_XP_and_CP;
@@ -473,7 +537,7 @@ void DataQuantizerGPU::data_transformation_batch_opt(
 
   // 5. Save the rotated centroid: copy CP into d_rotated_c.
   RAFT_CUDA_TRY(
-    cudaMemcpyAsync(d_rotated_c, d_CP, D * sizeof(float), cudaMemcpyDeviceToDevice, stream_));
+    cudaMemcpyAsync(d_rotated_c, d_CP, D * sizeof(float), cudaMemcpyDeviceToDevice, stream));
 
   // 6. Launch the single FUSED kernel for subtract, normalize, and binarize.
   const unsigned int FusedBlockSize = 256;  // A good default, can be tuned.
@@ -482,29 +546,32 @@ void DataQuantizerGPU::data_transformation_batch_opt(
   size_t sharedMemSize = FusedBlockSize * sizeof(float);
 
   subtract_normalize_binarize_Kernel<FusedBlockSize>
-    <<<gridDim, blockDim, sharedMemSize, stream_>>>(d_XP,         // Input: Rotated data
-                                                    d_CP,         // Input: Rotated centroid
-                                                    d_XP_output,  // Output 1: Final residuals
-                                                    d_XP_norm,    // Output 2: Normalized residuals
-                                                    d_bin_XP,     // Output 3: Binarized data
-                                                    num_points,
-                                                    D);
+    <<<gridDim, blockDim, sharedMemSize, stream>>>(d_XP,         // Input: Rotated data
+                                                   d_CP,         // Input: Rotated centroid
+                                                   d_XP_output,  // Output 1: Final residuals
+                                                   d_XP_norm,    // Output 2: Normalized residuals
+                                                   d_bin_XP,     // Output 3: Binarized data
+                                                   num_points,
+                                                   D);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
 // Fused function to compute RaBitQ codes and factors in a single pass.
-void DataQuantizerGPU::rabitq_codes_and_factors_fused(const float* d_rotated_c,
-                                                      const int* d_bin_XP,
-                                                      const float* d_XP,
-                                                      uint32_t* d_short_data,
-                                                      float* d_short_data_factors,
-                                                      size_t num_points) const
+void rabitq_codes_and_factors_fused(const float* d_rotated_c,
+                                    const int* d_bin_XP,
+                                    const float* d_XP,
+                                    uint32_t* d_short_data,
+                                    float* d_short_data_factors,
+                                    size_t num_points,
+                                    size_t D,
+                                    raft::resources const& handle,
+                                    rmm::cuda_stream_view stream)
 {
   int threads_per_block = 256;  // A good default, can be tuned
   dim3 grid(num_points);
   dim3 block(threads_per_block);
 
-  pack_and_compute_factors_kernel<<<grid, block, 0, stream_>>>(
+  pack_and_compute_factors_kernel<<<grid, block, 0, stream>>>(
     d_rotated_c,
     d_bin_XP,
     d_XP,
@@ -514,19 +581,24 @@ void DataQuantizerGPU::rabitq_codes_and_factors_fused(const float* d_rotated_c,
     d_short_data_factors,
     d_short_data);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
-  raft::resource::sync_stream(handle_);
+  raft::resource::sync_stream(handle);
 }
 
 //---------------------------------------------------------------------------
-// Host function: DataQuantizerGPU::exrabitq_codes_batch (Optimized)
+// Host function: exrabitq_codes_batch (Optimized)
 // Launches a single fused kernel to compute ExRaBitQ codes and factors.
-void DataQuantizerGPU::exrabitq_codes_and_factors_fused(const int* d_bin_XP,
-                                                        const float* d_XP_norm,
-                                                        float* d_XP,
-                                                        uint8_t* d_long_code,
-                                                        float* d_ex_factor,
-                                                        const float* d_centroid,
-                                                        size_t num_points) const
+void exrabitq_codes_and_factors_fused(const int* d_bin_XP,
+                                      const float* d_XP_norm,
+                                      float* d_XP,
+                                      uint8_t* d_long_code,
+                                      float* d_ex_factor,
+                                      const float* d_centroid,
+                                      size_t num_points,
+                                      size_t D,
+                                      size_t EX_BITS,
+                                      float const_scaling_factor,
+                                      raft::resources const& handle,
+                                      rmm::cuda_stream_view stream)
 {
   const unsigned int BlockSize = 256;  // A good default, can be tuned
   dim3 gridDim(num_points);
@@ -537,21 +609,23 @@ void DataQuantizerGPU::exrabitq_codes_and_factors_fused(const int* d_bin_XP,
                            D * sizeof(uint8_t) +       // s_tmp_code
                            BlockSize * sizeof(float);  // s_partials for reduction
 
-  exrabitq_fused_kernel_batch<BlockSize><<<gridDim, blockDim, shared_mem_size, stream_>>>(
-    d_bin_XP,
-    d_XP_norm,
-    d_XP,
-    d_centroid,
-    num_points,
-    D,
-    EX_BITS,
-    const_scaling_factor,  // Assuming this is a member variable
-    1.9f,                  // kConstEpsilon
-    d_long_code,
-    d_ex_factor);
+  exrabitq_fused_kernel_batch<BlockSize>
+    <<<gridDim, blockDim, shared_mem_size, stream>>>(d_bin_XP,
+                                                     d_XP_norm,
+                                                     d_XP,
+                                                     d_centroid,
+                                                     num_points,
+                                                     D,
+                                                     EX_BITS,
+                                                     const_scaling_factor,
+                                                     1.9f,  // kConstEpsilon
+                                                     d_long_code,
+                                                     d_ex_factor);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
-  raft::resource::sync_stream(handle_);
+  raft::resource::sync_stream(handle);
 }
+
+}  // anonymous namespace
 
 void DataQuantizerGPU::quantize_batch_opt(const float* d_data,
                                           const float* d_centroid,
@@ -573,14 +647,21 @@ void DataQuantizerGPU::quantize_batch_opt(const float* d_data,
                                 d_rotated_c,
                                 d_XP_norm.data_handle(),
                                 d_bin_XP.data_handle(),
-                                d_XP.data_handle());
+                                d_XP.data_handle(),
+                                d_X_and_C_pad.data_handle(),
+                                DIM,
+                                D,
+                                stream_);
 
   rabitq_codes_and_factors_fused(d_rotated_c,
                                  d_bin_XP.data_handle(),
                                  d_XP.data_handle(),
                                  d_short_data,
                                  d_short_data_factors,
-                                 num_points);
+                                 num_points,
+                                 D,
+                                 handle_,
+                                 stream_);
 
   // 5. Compute ExRaBitQ quantization codes.
   if (fast_quantize_flag) {
@@ -590,7 +671,12 @@ void DataQuantizerGPU::quantize_batch_opt(const float* d_data,
                                      d_long_code,
                                      d_ex_factor,
                                      d_rotated_c,
-                                     num_points);
+                                     num_points,
+                                     D,
+                                     EX_BITS,
+                                     const_scaling_factor,
+                                     handle_,
+                                     stream_);
   } else {
     exrabitq_codes_and_factors_fused_ori(d_bin_XP.data_handle(),
                                          d_XP_norm.data_handle(),
@@ -598,9 +684,15 @@ void DataQuantizerGPU::quantize_batch_opt(const float* d_data,
                                          d_long_code,
                                          d_ex_factor,
                                          d_rotated_c,
-                                         num_points);
+                                         num_points,
+                                         D,
+                                         EX_BITS,
+                                         handle_,
+                                         stream_);
   }
 }
+
+namespace {
 
 //---------------------------------------------------------------------------
 // Kernel: copyAndPadContiguousWithCentroidKernel
@@ -646,28 +738,27 @@ __global__ void copyAndPadContiguousWithCentroidKernel(const float* __restrict__
   }
 }
 
-void DataQuantizerGPU::data_transformation_batch_opt_contiguous(
-  const float* d_contiguous_data,
-  const float* d_centroid,
-  size_t num_points,
-  const RotatorGPU& rotator,
-  float* d_rotated_c,
-  float* d_XP_norm,
-  int* d_bin_XP,
-  float* d_XP_output  // XP_output is (num_points + 1) * D to store extra centroid
-)
+void data_transformation_batch_opt_contiguous(const float* d_contiguous_data,
+                                              const float* d_centroid,
+                                              size_t num_points,
+                                              const RotatorGPU& rotator,
+                                              float* d_rotated_c,
+                                              float* d_XP_norm,
+                                              int* d_bin_XP,
+                                              float* d_XP_output,
+                                              float* d_X_and_C_pad,
+                                              size_t DIM,
+                                              size_t D,
+                                              rmm::cuda_stream_view stream)
 {
   // 1. Allocate a single temporary buffer for both padded data and the padded centroid.
-
-  // Create a pointer to the start of the centroid section for the kernel.
-  float* d_C_pad_ptr = d_X_and_C_pad.data_handle() + num_points * D;
 
   // 2. Launch a single kernel to copy, pad, and add centroid.
   int blockSize           = D < 256 ? 128 : 256;
   size_t totalPadElements = (num_points + 1) * D;
   int gridPadSize         = (totalPadElements + blockSize - 1) / blockSize;
-  copyAndPadContiguousWithCentroidKernel<<<gridPadSize, blockSize, 0, stream_>>>(
-    d_contiguous_data, d_centroid, d_X_and_C_pad.data_handle(), num_points, DIM, D);
+  copyAndPadContiguousWithCentroidKernel<<<gridPadSize, blockSize, 0, stream>>>(
+    d_contiguous_data, d_centroid, d_X_and_C_pad, num_points, DIM, D);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // 3. Allocate a single output buffer for both rotated data (XP) and rotated centroid (CP).
@@ -675,14 +766,14 @@ void DataQuantizerGPU::data_transformation_batch_opt_contiguous(
 
   // 4. Perform a single, combined rotation.
   // The input is d_X_and_C_pad, output is d_XP_and_CP. The number of "points" is num_points + 1.
-  rotator.rotate(d_X_and_C_pad.data_handle(), d_XP_and_CP, num_points + 1);
+  rotator.rotate(d_X_and_C_pad, d_XP_and_CP, num_points + 1);
 
   // Create pointers to the specific results within the combined buffer.
   float* d_XP = d_XP_and_CP;
   float* d_CP = d_XP_and_CP + num_points * D;
 
   // 5. Save the rotated centroid: copy CP into d_rotated_c.
-  raft::copy(d_rotated_c, d_CP, D, stream_);
+  raft::copy(d_rotated_c, d_CP, D, stream);
 
   // 6. Launch the single FUSED kernel for subtract, normalize, and binarize.
   const unsigned int FusedBlockSize = 256;  // A good default, can be tuned.
@@ -691,15 +782,17 @@ void DataQuantizerGPU::data_transformation_batch_opt_contiguous(
   size_t sharedMemSize = FusedBlockSize * sizeof(float);
 
   subtract_normalize_binarize_Kernel<FusedBlockSize>
-    <<<gridDim, blockDim, sharedMemSize, stream_>>>(d_XP,         // Input: Rotated data
-                                                    d_CP,         // Input: Rotated centroid
-                                                    d_XP_output,  // Output 1: Final residuals
-                                                    d_XP_norm,    // Output 2: Normalized residuals
-                                                    d_bin_XP,     // Output 3: Binarized data
-                                                    num_points,
-                                                    D);
+    <<<gridDim, blockDim, sharedMemSize, stream>>>(d_XP,         // Input: Rotated data
+                                                   d_CP,         // Input: Rotated centroid
+                                                   d_XP_output,  // Output 1: Final residuals
+                                                   d_XP_norm,    // Output 2: Normalized residuals
+                                                   d_bin_XP,     // Output 3: Binarized data
+                                                   num_points,
+                                                   D);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
+
+}  // anonymous namespace
 
 void DataQuantizerGPU::quantize_batch_opt_contiguous(const float* d_contiguous_data,
                                                      const float* d_centroid,
@@ -719,14 +812,21 @@ void DataQuantizerGPU::quantize_batch_opt_contiguous(const float* d_contiguous_d
                                            d_rotated_c,
                                            d_XP_norm.data_handle(),
                                            d_bin_XP.data_handle(),
-                                           d_XP.data_handle());
+                                           d_XP.data_handle(),
+                                           d_X_and_C_pad.data_handle(),
+                                           DIM,
+                                           D,
+                                           stream_);
 
   rabitq_codes_and_factors_fused(d_rotated_c,
                                  d_bin_XP.data_handle(),
                                  d_XP.data_handle(),
                                  d_short_data,
                                  d_short_data_factors,
-                                 num_points);
+                                 num_points,
+                                 D,
+                                 handle_,
+                                 stream_);
 
   // 5. Compute ExRaBitQ quantization codes.
   if (fast_quantize_flag) {
@@ -736,7 +836,12 @@ void DataQuantizerGPU::quantize_batch_opt_contiguous(const float* d_contiguous_d
                                      d_long_code,
                                      d_ex_factor,
                                      d_rotated_c,
-                                     num_points);
+                                     num_points,
+                                     D,
+                                     EX_BITS,
+                                     const_scaling_factor,
+                                     handle_,
+                                     stream_);
   } else {
     exrabitq_codes_and_factors_fused_ori(d_bin_XP.data_handle(),
                                          d_XP_norm.data_handle(),
@@ -744,9 +849,15 @@ void DataQuantizerGPU::quantize_batch_opt_contiguous(const float* d_contiguous_d
                                          d_long_code,
                                          d_ex_factor,
                                          d_rotated_c,
-                                         num_points);
+                                         num_points,
+                                         D,
+                                         EX_BITS,
+                                         handle_,
+                                         stream_);
   }
 }
+
+namespace {
 
 constexpr std::array<float, 9> kTightStart = {
   0,
@@ -818,6 +929,8 @@ inline double best_rescale_factor(const T* o_abs, size_t dim, size_t ex_bits)
   return t;
 }
 
+}  // anonymous namespace
+
 float DataQuantizerGPU::get_const_scaling_factors(raft::resources const& handle,
                                                   size_t dim,
                                                   size_t ex_bits)
@@ -853,6 +966,8 @@ float DataQuantizerGPU::get_const_scaling_factors(raft::resources const& handle,
 
   return (float)t_const;
 }
+
+namespace {
 
 extern __constant__ float d_kTightStart_opt[9] = {
   0.0f,
@@ -1181,15 +1296,19 @@ __global__ void exrabitq_fused_kernel_batch_ori(
 }
 
 //---------------------------------------------------------------------------
-// Host function: DataQuantizerGPU::exrabitq_codes_batch (Optimized)
+// Host function: exrabitq_codes_batch (Optimized)
 // No fast quantization version
-void DataQuantizerGPU::exrabitq_codes_and_factors_fused_ori(const int* d_bin_XP,
-                                                            const float* d_XP_norm,
-                                                            float* d_XP,
-                                                            uint8_t* d_long_code,
-                                                            float* d_ex_factor,
-                                                            const float* d_centroid,
-                                                            size_t num_points) const
+void exrabitq_codes_and_factors_fused_ori(const int* d_bin_XP,
+                                          const float* d_XP_norm,
+                                          float* d_XP,
+                                          uint8_t* d_long_code,
+                                          float* d_ex_factor,
+                                          const float* d_centroid,
+                                          size_t num_points,
+                                          size_t D,
+                                          size_t EX_BITS,
+                                          raft::resources const& handle,
+                                          rmm::cuda_stream_view stream)
 {
   const unsigned int BlockSize = 256;  // A good default, can be tuned
   dim3 gridDim(num_points);
@@ -1208,18 +1327,18 @@ void DataQuantizerGPU::exrabitq_codes_and_factors_fused_ori(const int* d_bin_XP,
   }
 
   exrabitq_fused_kernel_batch_ori<BlockSize>
-    <<<gridDim, blockDim, shared_mem_size, stream_>>>(d_bin_XP,
-                                                      d_XP_norm,
-                                                      d_XP,
-                                                      d_centroid,
-                                                      num_points,
-                                                      D,
-                                                      EX_BITS,
-                                                      1.9f,  // kConstEpsilon
-                                                      d_long_code,
-                                                      d_ex_factor);
+    <<<gridDim, blockDim, shared_mem_size, stream>>>(d_bin_XP,
+                                                     d_XP_norm,
+                                                     d_XP,
+                                                     d_centroid,
+                                                     num_points,
+                                                     D,
+                                                     EX_BITS,
+                                                     1.9f,  // kConstEpsilon
+                                                     d_long_code,
+                                                     d_ex_factor);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
-  raft::resource::sync_stream(handle_);
+  raft::resource::sync_stream(handle);
 }
 
 __global__ void fully_fused_kernel(float* __restrict__ output_factors,
@@ -1274,6 +1393,8 @@ __global__ void fully_fused_kernel(float* __restrict__ output_factors,
 
   if (tid == 0) { output_factors[row_id] = rescale_factor; }
 }
+
+}  // anonymous namespace
 
 float DataQuantizerGPU::get_const_scaling_factors_fully_gpu(size_t dim, size_t ex_bits)
 {
