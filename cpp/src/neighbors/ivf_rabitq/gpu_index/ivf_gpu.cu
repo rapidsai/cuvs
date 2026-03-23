@@ -676,8 +676,6 @@ void IVFGPU::construct_on_gpu_streaming(const float* host_data,
                                       num_vectors,
                                       stream_);
 
-  raft::resource::sync_stream(handle_);
-
   // -------------------------
   // 4. Compute prefix sum (offsets) on GPU using CUB
   // -------------------------
@@ -705,8 +703,6 @@ void IVFGPU::construct_on_gpu_streaming(const float* host_data,
   // Set the last offset element
   raft::copy(d_offsets.data_handle() + num_centroids, &num_vectors, 1, stream_);
 
-  raft::resource::sync_stream(handle_);
-
   // -------------------------
   // 5. Build cluster metadata on GPU
   // -------------------------
@@ -716,8 +712,6 @@ void IVFGPU::construct_on_gpu_streaming(const float* host_data,
   int num_blocks = (num_centroids + block_size - 1) / block_size;
   build_cluster_meta_kernel<<<num_blocks, block_size, 0, stream_>>>(
     d_cluster_meta_temp, d_histogram.data_handle(), d_offsets.data_handle(), num_centroids);
-
-  raft::resource::sync_stream(handle_);
 
   // -------------------------
   // 6. Scatter PIDs to flat array on GPU
@@ -735,8 +729,6 @@ void IVFGPU::construct_on_gpu_streaming(const float* host_data,
                                                               d_atomic_counters.data_handle(),
                                                               num_vectors);
 
-  raft::resource::sync_stream(handle_);
-
   // -------------------------
   // 7. Copy cluster metadata back to host for batching
   // -------------------------
@@ -748,10 +740,8 @@ void IVFGPU::construct_on_gpu_streaming(const float* host_data,
   // 8. Compute max cluster length and allocate buffers
   // -------------------------
   max_cluster_length = 0;
-  std::vector<size_t> cluster_sizes(num_centroids);
   for (size_t i = 0; i < num_centroids; ++i) {
-    cluster_sizes[i]   = h_cluster_meta[i].num;
-    max_cluster_length = std::max(max_cluster_length, cluster_sizes[i]);
+    max_cluster_length = std::max(max_cluster_length, h_cluster_meta[i].num);
   }
   DQ->alloc_buffers(max_cluster_length);
 
@@ -785,14 +775,14 @@ void IVFGPU::construct_on_gpu_streaming(const float* host_data,
     size_t batch_start_offset  = h_cluster_meta[cluster_idx].start_index;
 
     while (cluster_idx < num_centroids &&
-           batch_vectors + cluster_sizes[cluster_idx] <= batch_size_vectors) {
-      batch_vectors += cluster_sizes[cluster_idx];
+           batch_vectors + h_cluster_meta[cluster_idx].num <= batch_size_vectors) {
+      batch_vectors += h_cluster_meta[cluster_idx].num;
       cluster_idx++;
     }
 
     // Handle case where single cluster exceeds batch size
     if (batch_vectors == 0 && cluster_idx < num_centroids) {
-      batch_vectors = cluster_sizes[cluster_idx];
+      batch_vectors = h_cluster_meta[cluster_idx].num;
       cluster_idx++;
     }
 
@@ -805,8 +795,6 @@ void IVFGPU::construct_on_gpu_streaming(const float* host_data,
     // First, copy the reordered PIDs for this batch to host (reuse preallocated buffer)
     raft::copy(batch_pids.data_handle(), d_flat_pids + batch_start_offset, batch_vectors, stream_);
     raft::resource::sync_stream(handle_);
-
-    if (batch_count == 1) {}
 
     // Gather data on host using the reordered PIDs (reuse preallocated buffer)
     // Use OpenMP parallel region to leverage persistent thread pool across batches
@@ -825,17 +813,11 @@ void IVFGPU::construct_on_gpu_streaming(const float* host_data,
     }
     // OpenMP implicit barrier ensures all threads complete before continuing
 
-    if (batch_count == 1 || batch_count == 2) {}
-
     // Transfer batch to GPU (reuse preallocated buffer)
     raft::copy(d_batch_data.data_handle(),
                batch_data.data_handle(),
                batch_vectors * num_dimensions,
                stream_);
-
-    raft::resource::sync_stream(handle_);
-
-    if (batch_count == 1) {}
 
     // -------------------------
     // 12. Quantize each cluster in the batch
@@ -843,7 +825,7 @@ void IVFGPU::construct_on_gpu_streaming(const float* host_data,
 
     size_t batch_offset = 0;
     for (size_t c = batch_start_cluster; c < cluster_idx; ++c) {
-      size_t cluster_size = cluster_sizes[c];
+      size_t cluster_size = h_cluster_meta[c].num;
       if (cluster_size == 0) continue;
 
       const float* cur_centroid = device_centroids + c * num_dimensions;
@@ -877,8 +859,6 @@ void IVFGPU::construct_on_gpu_streaming(const float* host_data,
 
       batch_offset += cluster_size;
     }
-
-    raft::resource::sync_stream(handle_);
   }
 
   // -------------------------
