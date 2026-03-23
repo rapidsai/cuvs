@@ -10,8 +10,10 @@
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/distance/distance.hpp>
 
+#include <raft/core/copy.cuh>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/kvp.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/mdarray.hpp>
@@ -19,9 +21,9 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/linalg/map.cuh>
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/reduce_rows_by_key.cuh>
-#include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/gather.cuh>
 #include <raft/random/permute.cuh>
 #include <raft/random/rng.cuh>
@@ -36,9 +38,8 @@
 #include <cub/device/device_select.cuh>
 #include <cub/iterator/arg_index_input_iterator.cuh>
 #include <cuda.h>
-#include <thrust/fill.h>
+#include <cuda/iterator>
 #include <thrust/for_each.h>
-#include <thrust/iterator/transform_iterator.h>
 
 #include <algorithm>
 #include <cmath>
@@ -147,7 +148,9 @@ void checkWeight(raft::resources const& handle,
                                        n_samples,
                                        stream));
   DataT wt_sum = 0;
-  raft::copy(&wt_sum, wt_aggr.data_handle(), 1, stream);
+  raft::copy(handle,
+             raft::make_host_scalar_view(&wt_sum),
+             raft::make_device_scalar_view(wt_aggr.data_handle()));
   raft::resource::sync_stream(handle, stream);
 
   if (wt_sum != n_samples) {
@@ -157,11 +160,8 @@ void checkWeight(raft::resources const& handle,
       n_samples);
 
     auto scale = static_cast<DataT>(n_samples) / wt_sum;
-    raft::linalg::unaryOp(weight.data_handle(),
-                          weight.data_handle(),
-                          n_samples,
-                          raft::mul_const_op<DataT>{scale},
-                          stream);
+    raft::linalg::map(
+      handle, weight, raft::mul_const_op<DataT>{scale}, raft::make_const_mdspan(weight));
   }
 }
 
@@ -193,7 +193,7 @@ void computeClusterCost(raft::resources const& handle,
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
-  thrust::transform_iterator<MainOpT, InputT*> itr(minClusterDistance.data_handle(), main_op);
+  cuda::transform_iterator itr(minClusterDistance.data_handle(), main_op);
 
   size_t temp_storage_bytes = 0;
   RAFT_CUDA_TRY(cub::DeviceReduce::Reduce(nullptr,
@@ -256,7 +256,9 @@ void sampleCentroids(raft::resources const& handle,
                                       stream));
 
   IndexT nPtsSampledInRank = 0;
-  raft::copy(&nPtsSampledInRank, nSelected.data_handle(), 1, stream);
+  raft::copy(handle,
+             raft::make_host_scalar_view(&nPtsSampledInRank),
+             raft::make_device_scalar_view(nSelected.data_handle()));
   raft::resource::sync_stream(handle, stream);
 
   uint8_t* rawPtr_isSampleCentroid = isSampleCentroid.data_handle();
@@ -456,13 +458,8 @@ void countSamplesInCluster(raft::resources const& handle,
     params.batch_centroids,
     workspace);
 
-  // Using TransformInputIteratorT to dereference an array of raft::KeyValuePair
-  // and converting them to just return the Key to be used in reduce_rows_by_key
-  // prims
-  cuvs::cluster::kmeans::detail::KeyValueIndexOp<IndexT, DataT> conversion_op;
-  thrust::transform_iterator<cuvs::cluster::kmeans::detail::KeyValueIndexOp<IndexT, DataT>,
-                             raft::KeyValuePair<IndexT, DataT>*>
-    itr(minClusterAndDistance.data_handle(), conversion_op);
+  cuda::transform_iterator itr(minClusterAndDistance.data_handle(),
+                               cuvs::cluster::kmeans::detail::KeyValueIndexOp<IndexT, DataT>{});
 
   // count # of samples in each cluster
   countLabels(handle,
