@@ -170,16 +170,10 @@ void fit(raft::resources const& handle,
   // Read batch_size from params; default to n_samples if 0 (auto)
   IdxT batch_size = static_cast<IdxT>(params.batch_size);
 
-  if (params.batch_size <= 0) {
-    RAFT_LOG_WARN("batch_size must be > 0, using n_samples=%zu", static_cast<size_t>(n_samples));
+  if (params.batch_size == 0) {
     batch_size = static_cast<IdxT>(n_samples);
-  } else if (static_cast<IdxT>(params.batch_size) > n_samples) {
-    RAFT_LOG_WARN(
-      "batch_size (%zu) is larger than dataset size (%zu). "
-      "batch_size will be effectively clamped to %zu.",
-      static_cast<size_t>(params.batch_size),
-      static_cast<size_t>(n_samples),
-      static_cast<size_t>(n_samples));
+  } else if (params.batch_size < 0 || params.batch_size > n_samples) {
+    RAFT_LOG_WARN("batch_size must be >= 0 and <= n_samples, using n_samples=%zu", static_cast<size_t>(n_samples));
     batch_size = static_cast<IdxT>(n_samples);
   }
 
