@@ -173,7 +173,8 @@ void fit(raft::resources const& handle,
   if (params.batch_size == 0) {
     batch_size = static_cast<IdxT>(n_samples);
   } else if (params.batch_size < 0 || params.batch_size > n_samples) {
-    RAFT_LOG_WARN("batch_size must be >= 0 and <= n_samples, using n_samples=%zu", static_cast<size_t>(n_samples));
+    RAFT_LOG_WARN("batch_size must be >= 0 and <= n_samples, using n_samples=%zu",
+                  static_cast<size_t>(n_samples));
     batch_size = static_cast<IdxT>(n_samples);
   }
 
