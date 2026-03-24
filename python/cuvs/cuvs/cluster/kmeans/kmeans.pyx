@@ -34,7 +34,6 @@ from libc.stdint cimport (
     uint64_t,
     uintptr_t,
 )
-from libc.stdlib cimport free, malloc
 
 from cuvs.common.exceptions import check_cuvs
 

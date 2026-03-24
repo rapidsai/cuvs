@@ -421,7 +421,6 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
     auto d_centroids_view =
       raft::make_device_matrix_view<T, int>(d_centroids.data(), params.n_clusters, n_features);
 
-    // Run device fit to get reference centroids
     std::optional<raft::device_vector_view<const T, int>> d_sw = std::nullopt;
     rmm::device_uvector<T> d_sample_weight(0, stream);
     if (testparams.weighted) {
@@ -497,7 +496,6 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
       true,
       raft::make_host_scalar_view<T>(&ref_pred_inertia));
 
-    // Also check label quality via ARI
     T pred_inertia = 0;
     cuvs::cluster::kmeans::predict(
       handle,
