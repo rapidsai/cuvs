@@ -98,34 +98,29 @@ void accumulate_batch_centroids(
   raft::device_vector_view<const raft::KeyValuePair<IdxT, MathT>, IdxT> minClusterAndDistance,
   raft::device_vector_view<const MathT, IdxT> sample_weights,
   raft::device_matrix_view<MathT, IdxT> centroid_sums,
-  raft::device_vector_view<MathT, IdxT> cluster_counts)
+  raft::device_vector_view<MathT, IdxT> cluster_counts,
+  raft::device_matrix_view<MathT, IdxT> batch_sums,
+  raft::device_vector_view<MathT, IdxT> batch_counts)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
-  auto n_features     = batch_data.extent(1);
-  auto n_clusters     = centroid_sums.extent(0);
 
   auto workspace = rmm::device_uvector<char>(
     batch_data.extent(0), stream, raft::resource::get_workspace_resource(handle));
-
-  auto batch_sums   = raft::make_device_matrix<MathT, IdxT>(handle, n_clusters, n_features);
-  auto batch_counts = raft::make_device_vector<MathT, IdxT>(handle, n_clusters);
-
-  raft::matrix::fill(handle, batch_sums.view(), MathT{0});
-  raft::matrix::fill(handle, batch_counts.view(), MathT{0});
 
   cuvs::cluster::kmeans::detail::KeyValueIndexOp<IdxT, MathT> conversion_op;
   thrust::transform_iterator<cuvs::cluster::kmeans::detail::KeyValueIndexOp<IdxT, MathT>,
                              const raft::KeyValuePair<IdxT, MathT>*>
     labels_itr(minClusterAndDistance.data_handle(), conversion_op);
 
-  cuvs::cluster::kmeans::detail::compute_centroid_adjustments(handle,
-                                                              batch_data,
-                                                              sample_weights,
-                                                              labels_itr,
-                                                              static_cast<IdxT>(n_clusters),
-                                                              batch_sums.view(),
-                                                              batch_counts.view(),
-                                                              workspace);
+  cuvs::cluster::kmeans::detail::compute_centroid_adjustments(
+    handle,
+    batch_data,
+    sample_weights,
+    labels_itr,
+    static_cast<IdxT>(centroid_sums.extent(0)),
+    batch_sums,
+    batch_counts,
+    workspace);
 
   raft::linalg::add(centroid_sums.data_handle(),
                     centroid_sums.data_handle(),
@@ -231,6 +226,8 @@ void fit(raft::resources const& handle,
   auto new_centroids         = raft::make_device_matrix<T, IdxT>(handle, n_clusters, n_features);
   auto clustering_cost       = raft::make_device_vector<T, IdxT>(handle, 1);
   auto batch_clustering_cost = raft::make_device_vector<T, IdxT>(handle, 1);
+  auto batch_sums            = raft::make_device_matrix<T, IdxT>(handle, n_clusters, n_features);
+  auto batch_counts          = raft::make_device_vector<T, IdxT>(handle, n_clusters);
 
   // ---- Main n_init loop ----
   for (int seed_iter = 0; seed_iter < n_init; ++seed_iter) {
@@ -318,7 +315,9 @@ void fit(raft::resources const& handle,
                                             minClusterAndDistance_const,
                                             batch_weights_view,
                                             centroid_sums.view(),
-                                            weight_per_cluster.view());
+                                            weight_per_cluster.view(),
+                                            batch_sums.view(),
+                                            batch_counts.view());
 
         if (params.inertia_check || n_iter[0] == iter_params.max_iter) {
           // Weight-multiply distances to get weighted inertia (matches sklearn behavior)
@@ -365,6 +364,10 @@ void fit(raft::resources const& handle,
         handle, raft::make_const_mdspan(centroids), raft::make_const_mdspan(new_centroids.view()));
 
       raft::copy(handle, centroids, new_centroids.view());
+
+      ASSERT(inertia[0] != (T)0.0,
+             "Too few points and centroids being found is getting 0 cost from "
+             "centers");
 
       bool done = false;
       if (params.inertia_check) {
