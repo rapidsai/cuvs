@@ -61,8 +61,10 @@ function(ConfigureTest)
                CUDA_STANDARD_REQUIRED ON
   )
   target_compile_options(
-    ${TEST_NAME} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
-                         "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+    ${TEST_NAME}
+    PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
+            "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+            "$<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>:${CUVS_DEBUG_CUDA_FLAGS}>"
   )
 
   if(_CUVS_TEST_NOCUDA)
@@ -337,8 +339,11 @@ ConfigureTest(
 
 ConfigureTest(
   NAME PREPROCESSING_TEST
-  PATH preprocessing/scalar_quantization.cu preprocessing/binary_quantization.cu
-       preprocessing/spectral_embedding.cu preprocessing/product_quantization.cu
+  PATH preprocessing/scalar_quantization.cu
+       preprocessing/binary_quantization.cu
+       preprocessing/spectral_embedding.cu
+       preprocessing/product_quantization.cu
+       preprocessing/pca.cu
   GPUS 1
   PERCENT 100
 )

@@ -187,7 +187,7 @@ RAFT relies on `clang-format` to enforce code style across all C++ and CUDA sour
 1. Do not split empty functions/records/namespaces.
 2. Two-space indentation everywhere, including the line continuations.
 3. Disable reflowing of comments.
-   The reasons behind these deviations from the Google style guide are given in comments [here](https://github.com/rapidsai/cuvs/blob/main/cpp/.clang-format).
+   The reasons behind these deviations from the Google style guide are given in comments [here](https://github.com/rapidsai/cuvs/blob/release/26.04/cpp/.clang-format).
 
 [`doxygen`](https://doxygen.nl/) is used as documentation generator and also as a documentation linter.
 In order to run doxygen as a linter on C++/CUDA code, run
@@ -205,7 +205,7 @@ you can run  `codespell -i 3 -w .` from the repository root directory.
 This will bring up an interactive prompt to select which spelling fixes to apply.
 
 ### #include style
-[include_checker.py](https://github.com/rapidsai/cuvs/blob/main/cpp/scripts/include_checker.py) is used to enforce the include style as follows:
+[include_checker.py](https://github.com/rapidsai/cuvs/blob/release/26.04/cpp/scripts/include_checker.py) is used to enforce the include style as follows:
 1. `#include "..."` should be used for referencing local files only. It is acceptable to be used for referencing files in a sub-folder/parent-folder of the same algorithm, but should never be used to include files in other algorithms or between algorithms and the primitives or other dependencies.
 2. `#include <...>` should be used for referencing everything else
 
@@ -406,3 +406,13 @@ void foo(const raft::resources& res, ...)
     ...
 }
 ```
+
+## Using Just-in-Time Link-Time Optimization
+
+cuVS is moving to using link-time optimization for new kernels, and this requires some changes to the way kernels are written. Instead of compiling all kernel variants at build time (which leads to binary size explosion), JIT LTO compiles kernel fragments separately and links them together at runtime based on the specific configuration needed.
+
+This approach ultimately enables:
+- **Reduced binary size**: Compile fragments once, combine many ways
+- **User Defined Functions**: Link UDFs in cuVS CUDA kernels
+
+For more information on JIT LTO, see [Advanced Topics](advanced_topics). For a complete guide on implementing JIT LTO kernels, including step-by-step examples, see the [JIT LTO Guide](jit_lto_guide.md).
