@@ -29,7 +29,6 @@
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/reduce.cuh>
 #include <raft/linalg/reduce_cols_by_key.cuh>
-#include <raft/linalg/reduce_rows_by_key.cuh>
 #include <raft/matrix/gather.cuh>
 #include <raft/matrix/init.cuh>
 #include <raft/random/rng.cuh>

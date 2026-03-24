@@ -258,7 +258,6 @@ void fit(raft::resources const& handle,
       raft::matrix::fill(handle, weight_per_cluster.view(), T{0});
 
       raft::matrix::fill(handle, clustering_cost.view(), T{0});
-      raft::matrix::fill(handle, batch_clustering_cost.view(), T{0});
 
       auto centroids_const = raft::make_const_mdspan(centroids);
 
@@ -268,9 +267,7 @@ void fit(raft::resources const& handle,
 
       for (const auto& data_batch : data_batches) {
         IdxT current_batch_size = static_cast<IdxT>(data_batch.size());
-
-        RAFT_LOG_INFO(
-          "KMeans batched: Processing batch %zu of %zu", data_batch.offset(), n_samples);
+        raft::matrix::fill(handle, batch_clustering_cost.view(), T{0});
 
         auto batch_data_view = raft::make_device_matrix_view<const T, IdxT>(
           data_batch.data(), current_batch_size, n_features);
@@ -285,14 +282,19 @@ void fit(raft::resources const& handle,
         auto batch_weights_view = raft::make_device_vector_view<const T, IdxT>(
           batch_weights.data_handle(), current_batch_size);
 
+        auto L2NormBatch_view =
+          raft::make_device_vector_view<T, IdxT>(L2NormBatch.data_handle(), current_batch_size);
+
         if (metric == cuvs::distance::DistanceType::L2Expanded ||
             metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
-          raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
-            L2NormBatch.data_handle(), data_batch.data(), n_features, current_batch_size, stream);
+          raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+            handle,
+            raft::make_device_matrix_view<const T, IdxT>(
+              data_batch.data(), current_batch_size, n_features),
+            L2NormBatch_view);
         }
 
-        auto L2NormBatch_const = raft::make_device_vector_view<const T, IdxT>(
-          L2NormBatch.data_handle(), current_batch_size);
+        auto L2NormBatch_const = raft::make_const_mdspan(L2NormBatch_view);
 
         auto minClusterAndDistance_view =
           raft::make_device_vector_view<raft::KeyValuePair<IdxT, T>, IdxT>(
