@@ -293,12 +293,12 @@ def fit(
         if not isinstance(X, np.ndarray):
             X = np.asarray(X)
         if not X.flags['C_CONTIGUOUS']:
-            X = np.ascontiguousarray(X)
+            raise ValueError("X must have C contiguous layout")
         if sample_weights is not None:
             if not isinstance(sample_weights, np.ndarray):
                 sample_weights = np.asarray(sample_weights)
             if not sample_weights.flags['C_CONTIGUOUS']:
-                sample_weights = np.ascontiguousarray(sample_weights)
+                raise ValueError("sample_weights must have C contiguous layout")
 
     x_ai = wrap_array(X)
     _check_input_array(
