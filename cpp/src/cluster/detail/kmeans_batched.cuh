@@ -48,7 +48,7 @@ namespace cuvs::cluster::kmeans::detail {
 template <typename T, typename IdxT>
 void init_centroids_from_host_sample(raft::resources const& handle,
                                      const cuvs::cluster::kmeans::params& params,
-                                     IdxT batch_size,
+                                     IdxT streaming_batch_size,
                                      raft::host_matrix_view<const T, IdxT> X,
                                      raft::device_matrix_view<T, IdxT> centroids,
                                      rmm::device_uvector<char>& workspace)
@@ -60,7 +60,7 @@ void init_centroids_from_host_sample(raft::resources const& handle,
 
   if (params.init == cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus) {
     // this is a heuristic to speed up the initialization
-    IdxT init_sample_size = 3 * batch_size;
+    IdxT init_sample_size = 3 * streaming_batch_size;
     if (init_sample_size < n_clusters) { init_sample_size = 3 * n_clusters; }
     init_sample_size = std::min(init_sample_size, n_samples);
 
@@ -167,15 +167,15 @@ void fit(raft::resources const& handle,
   auto n_clusters     = params.n_clusters;
   auto metric         = params.metric;
 
-  // Read batch_size from params; default to n_samples if 0 (auto)
-  IdxT batch_size = static_cast<IdxT>(params.batch_size);
+  // Read streaming_batch_size from params; default to n_samples if 0 (auto)
+  IdxT streaming_batch_size = static_cast<IdxT>(params.streaming_batch_size);
 
-  if (params.batch_size == 0) {
-    batch_size = static_cast<IdxT>(n_samples);
-  } else if (params.batch_size < 0 || params.batch_size > n_samples) {
-    RAFT_LOG_WARN("batch_size must be >= 0 and <= n_samples, using n_samples=%zu",
+  if (params.streaming_batch_size == 0) {
+    streaming_batch_size = static_cast<IdxT>(n_samples);
+  } else if (params.streaming_batch_size < 0 || params.streaming_batch_size > n_samples) {
+    RAFT_LOG_WARN("streaming_batch_size must be >= 0 and <= n_samples, using n_samples=%zu",
                   static_cast<size_t>(n_samples));
-    batch_size = static_cast<IdxT>(n_samples);
+    streaming_batch_size = static_cast<IdxT>(n_samples);
   }
 
   RAFT_EXPECTS(n_clusters > 0, "n_clusters must be positive");
@@ -183,11 +183,11 @@ void fit(raft::resources const& handle,
                "centroids.extent(0) must equal n_clusters");
   RAFT_EXPECTS(centroids.extent(1) == n_features, "centroids.extent(1) must equal n_features");
 
-  RAFT_LOG_DEBUG("KMeans batched fit: n_samples=%zu, n_features=%zu, n_clusters=%d, batch_size=%zu",
+  RAFT_LOG_DEBUG("KMeans batched fit: n_samples=%zu, n_features=%zu, n_clusters=%d, streaming_batch_size=%zu",
                  static_cast<size_t>(n_samples),
                  static_cast<size_t>(n_features),
                  n_clusters,
-                 static_cast<size_t>(batch_size));
+                 static_cast<size_t>(streaming_batch_size));
 
   rmm::device_uvector<char> workspace(0, stream);
 
@@ -209,10 +209,10 @@ void fit(raft::resources const& handle,
   std::mt19937 gen(params.rng_state.seed);
 
   // ----- Allocate reusable work buffers (shared across n_init iterations) -----
-  auto batch_weights = raft::make_device_vector<T, IdxT>(handle, batch_size);
+  auto batch_weights = raft::make_device_vector<T, IdxT>(handle, streaming_batch_size);
   auto minClusterAndDistance =
-    raft::make_device_vector<raft::KeyValuePair<IdxT, T>, IdxT>(handle, batch_size);
-  auto L2NormBatch = raft::make_device_vector<T, IdxT>(handle, batch_size);
+    raft::make_device_vector<raft::KeyValuePair<IdxT, T>, IdxT>(handle, streaming_batch_size);
+  auto L2NormBatch = raft::make_device_vector<T, IdxT>(handle, streaming_batch_size);
   rmm::device_uvector<T> L2NormBuf_OR_DistBuf(0, stream);
 
   auto centroid_sums         = raft::make_device_matrix<T, IdxT>(handle, n_clusters, n_features);
@@ -234,7 +234,7 @@ void fit(raft::resources const& handle,
                    (unsigned long long)iter_params.rng_state.seed);
 
     if (iter_params.init != cuvs::cluster::kmeans::params::InitMethod::Array) {
-      init_centroids_from_host_sample(handle, iter_params, batch_size, X, centroids, workspace);
+      init_centroids_from_host_sample(handle, iter_params, streaming_batch_size, X, centroids, workspace);
     }
 
     if (!sample_weight.has_value()) { raft::matrix::fill(handle, batch_weights.view(), T{1}); }
@@ -243,7 +243,7 @@ void fit(raft::resources const& handle,
     T prior_cluster_cost = 0;
 
     cuvs::spatial::knn::detail::utils::batch_load_iterator<T> data_batches(
-      X.data_handle(), n_samples, n_features, batch_size, stream);
+      X.data_handle(), n_samples, n_features, streaming_batch_size, stream);
 
     for (n_iter[0] = 1; n_iter[0] <= iter_params.max_iter; ++n_iter[0]) {
       RAFT_LOG_DEBUG("KMeans batched: Iteration %d", n_iter[0]);
@@ -463,21 +463,21 @@ void predict(raft::resources const& handle,
   auto n_features     = X.extent(1);
   auto n_clusters     = params.n_clusters;
 
-  // Read batch_size from params; default to n_samples if 0 (auto)
-  IdxT batch_size = static_cast<IdxT>(params.batch_size);
-  if (batch_size <= 0) { batch_size = static_cast<IdxT>(n_samples); }
+  // Read streaming_batch_size from params; default to n_samples if 0 (auto)
+  IdxT streaming_batch_size = static_cast<IdxT>(params.streaming_batch_size);
+  if (streaming_batch_size <= 0) { streaming_batch_size = static_cast<IdxT>(n_samples); }
 
-  RAFT_EXPECTS(batch_size > 0, "batch_size must be positive");
+  RAFT_EXPECTS(streaming_batch_size > 0, "streaming_batch_size must be positive");
 
-  // Warn if user explicitly set batch_size larger than dataset size
-  if (params.batch_size > 0 && static_cast<IdxT>(params.batch_size) > n_samples) {
+  // Warn if user explicitly set streaming_batch_size larger than dataset size
+  if (params.streaming_batch_size > 0 && static_cast<IdxT>(params.streaming_batch_size) > n_samples) {
     RAFT_LOG_WARN(
-      "batch_size (%zu) is larger than dataset size (%zu). "
-      "batch_size will be effectively clamped to %zu.",
-      static_cast<size_t>(params.batch_size),
+      "streaming_batch_size (%zu) is larger than dataset size (%zu). "
+      "streaming_batch_size will be effectively clamped to %zu.",
+      static_cast<size_t>(params.streaming_batch_size),
       static_cast<size_t>(n_samples),
       static_cast<size_t>(n_samples));
-    batch_size = n_samples;
+    streaming_batch_size = n_samples;
   }
 
   RAFT_EXPECTS(n_clusters > 0, "n_clusters must be positive");
@@ -486,13 +486,13 @@ void predict(raft::resources const& handle,
   RAFT_EXPECTS(centroids.extent(1) == n_features, "centroids.extent(1) must equal n_features");
   RAFT_EXPECTS(labels.extent(0) == n_samples, "labels.extent(0) must equal n_samples");
 
-  auto batch_weights = raft::make_device_vector<T, IdxT>(handle, batch_size);
-  auto batch_labels  = raft::make_device_vector<IdxT, IdxT>(handle, batch_size);
+  auto batch_weights = raft::make_device_vector<T, IdxT>(handle, streaming_batch_size);
+  auto batch_labels  = raft::make_device_vector<IdxT, IdxT>(handle, streaming_batch_size);
 
   inertia[0] = 0;
 
   using namespace cuvs::spatial::knn::detail::utils;
-  batch_load_iterator<T> data_batches(X.data_handle(), n_samples, n_features, batch_size, stream);
+  batch_load_iterator<T> data_batches(X.data_handle(), n_samples, n_features, streaming_batch_size, stream);
 
   for (const auto& data_batch : data_batches) {
     IdxT current_batch_size = static_cast<IdxT>(data_batch.size());

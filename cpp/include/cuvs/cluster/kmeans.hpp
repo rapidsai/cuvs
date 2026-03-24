@@ -101,7 +101,7 @@ struct params : base_params {
    * Default tile is [batch_samples x n_clusters] i.e. when batch_centroids is 0
    * then don't tile the centroids
    *
-   * NB: These parameters are unrelated to batch_size, which controls how many
+   * NB: These parameters are unrelated to streaming_batch_size, which controls how many
    * samples to transfer from host to device per batch when processing out-of-core
    * data.
    */
@@ -124,7 +124,7 @@ struct params : base_params {
    * overloads.
    * Default: 0 (process all data at once).
    */
-  int64_t batch_size = 0;
+  int64_t streaming_batch_size = 0;
 };
 
 /**
@@ -162,7 +162,7 @@ enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
  *
  * This overload supports out-of-core computation where the dataset resides
  * on the host. Data is processed in GPU-sized batches, streaming from host to device.
- * The batch size is controlled by params.batch_size.
+ * The batch size is controlled by params.streaming_batch_size.
  *
  * @code{.cpp}
  *   #include <raft/core/resources.hpp>
@@ -172,7 +172,7 @@ enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
  *   raft::resources handle;
  *   cuvs::cluster::kmeans::params params;
  *   params.n_clusters = 100;
- *   params.batch_size = 100000;
+ *   params.streaming_batch_size = 100000;
  *   int n_features = 15;
  *   float inertia;
  *   int n_iter;
@@ -195,7 +195,7 @@ enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
  *
  * @param[in]     handle        The raft handle.
  * @param[in]     params        Parameters for KMeans model. Batch size is read from
- *                              params.batch_size.
+ *                              params.streaming_batch_size.
  * @param[in]     X             Training instances on HOST memory. The data must
  *                              be in row-major format.
  *                              [dim = n_samples x n_features]
@@ -262,7 +262,7 @@ void fit(raft::resources const& handle,
  *
  * Streams data from host to GPU in batches, assigns each sample to its nearest
  * centroid, and writes labels back to host memory.
- * The batch size is controlled by params.batch_size.
+ * The batch size is controlled by params.streaming_batch_size.
  *
  * @param[in]     handle        The raft handle.
  * @param[in]     params        Parameters for KMeans model.

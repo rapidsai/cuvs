@@ -79,11 +79,11 @@ cdef class KMeansParams:
         Number of centroids to process in each batch. If 0, uses n_clusters.
     inertia_check : bool
         If True, check inertia during iterations for early convergence.
-    batch_size : int
+    streaming_batch_size : int
         Number of samples to process per GPU batch when fitting with host
         (numpy) data. When set to 0, defaults to n_samples (process all
         at once). Only used by the batched (host-data) code path. Reducing
-        batch_size can help reduce GPU memory pressure but increases
+        streaming_batch_size can help reduce GPU memory pressure but increases
         overhead as the number of times centroid adjustments are computed
         increases.
 
@@ -113,7 +113,7 @@ cdef class KMeansParams:
                  batch_samples=None,
                  batch_centroids=None,
                  inertia_check=None,
-                 batch_size=None,
+                 streaming_batch_size=None,
                  hierarchical=None,
                  hierarchical_n_iters=None):
         if metric is not None:
@@ -137,8 +137,8 @@ cdef class KMeansParams:
             self.params.batch_centroids = batch_centroids
         if inertia_check is not None:
             self.params.inertia_check = inertia_check
-        if batch_size is not None:
-            self.params.batch_size = batch_size
+        if streaming_batch_size is not None:
+            self.params.streaming_batch_size = streaming_batch_size
         if hierarchical is not None:
             self.params.hierarchical = hierarchical
         if hierarchical_n_iters is not None:
@@ -188,8 +188,8 @@ cdef class KMeansParams:
         return self.params.inertia_check
 
     @property
-    def batch_size(self):
-        return self.params.batch_size
+    def streaming_batch_size(self):
+        return self.params.streaming_batch_size
 
     @property
     def hierarchical(self):
@@ -214,15 +214,15 @@ def fit(
     When X is a device array (CUDA array interface), standard on-device
     k-means is used.  When X is a host array (numpy ndarray or
     ``__array_interface__``), data is streamed to the GPU in batches
-    controlled by ``params.batch_size``. For large host datasets, consider
-    reducing ``batch_size`` to reduce GPU memory usage.
+    controlled by ``params.streaming_batch_size``. For large host datasets, consider
+    reducing ``streaming_batch_size`` to reduce GPU memory usage.
 
     Parameters
     ----------
 
     params : KMeansParams
         Parameters to use to fit KMeans model.  For host data,
-        ``params.batch_size`` controls how many samples are sent to the
+        ``params.streaming_batch_size`` controls how many samples are sent to the
         GPU per batch.
     X : array-like
         Training instances, shape (m, k).  Accepts both device arrays
@@ -264,7 +264,7 @@ def fit(
 
     >>> import numpy as np
     >>> X_host = np.random.random((10_000_000, 128)).astype(np.float32)
-    >>> params = KMeansParams(n_clusters=1000, batch_size=1_000_000)
+    >>> params = KMeansParams(n_clusters=1000, streaming_batch_size=1_000_000)
     >>> centroids, inertia, n_iter = fit(params, X_host)
     """
 
