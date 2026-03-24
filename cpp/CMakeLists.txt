@@ -671,7 +671,7 @@ if(NOT BUILD_CPU_ONLY)
 
   target_compile_definitions(
     cuvs_objs PRIVATE $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
-                      $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED> CUVS_ENABLE_JIT_LTO
+                      $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
   )
 
   target_link_libraries(
@@ -747,7 +747,7 @@ if(NOT BUILD_CPU_ONLY)
     )
     target_compile_definitions(
       cuvs PUBLIC $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
-                  $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED> CUVS_ENABLE_JIT_LTO
+                  $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
     )
 
     target_link_libraries(
@@ -800,7 +800,7 @@ SECTIONS
     target_compile_options(cuvs_static PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>")
     target_compile_definitions(
       cuvs_static PUBLIC $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
-                         $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED> CUVS_ENABLE_JIT_LTO
+                         $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
     )
 
     target_include_directories(cuvs_static INTERFACE "$<INSTALL_INTERFACE:include>")
