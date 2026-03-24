@@ -214,7 +214,6 @@ void fit(raft::resources const& handle,
   std::mt19937 gen(params.rng_state.seed);
 
   // ----- Allocate reusable work buffers (shared across n_init iterations) -----
-  auto batch_data    = raft::make_device_matrix<T, IdxT>(handle, batch_size, n_features);
   auto batch_weights = raft::make_device_vector<T, IdxT>(handle, batch_size);
   auto minClusterAndDistance =
     raft::make_device_vector<raft::KeyValuePair<IdxT, T>, IdxT>(handle, batch_size);
@@ -483,6 +482,7 @@ void predict(raft::resources const& handle,
       static_cast<size_t>(params.batch_size),
       static_cast<size_t>(n_samples),
       static_cast<size_t>(n_samples));
+    batch_size = n_samples;
   }
 
   RAFT_EXPECTS(n_clusters > 0, "n_clusters must be positive");
