@@ -86,6 +86,74 @@ void init_centroids_from_host_sample(raft::resources const& handle,
 }
 
 /**
+ * @brief Compute the weight normalization scale factor for host sample weights. Weights are
+ * normalized to sum to n_samples. Returns the scale factor to apply to each weight.
+ *
+ * @param[in] sample_weight Optional host vector of sample weights
+ * @param[in] n_samples     Number of samples
+ * @return Scale factor (1.0 if no weights or already normalized)
+ */
+template <typename T, typename IdxT>
+T compute_host_weight_scale(
+  const std::optional<raft::host_vector_view<const T, IdxT>>& sample_weight, IdxT n_samples)
+{
+  if (!sample_weight.has_value()) { return T{1}; }
+
+  T wt_sum        = T{0};
+  const T* sw_ptr = sample_weight->data_handle();
+  for (IdxT i = 0; i < n_samples; ++i) {
+    wt_sum += sw_ptr[i];
+  }
+  if (wt_sum == static_cast<T>(n_samples)) { return T{1}; }
+
+  RAFT_LOG_DEBUG(
+    "[Warning!] KMeans: normalizing the user provided sample weight to "
+    "sum up to %zu samples (scale=%f)",
+    static_cast<size_t>(n_samples),
+    static_cast<double>(static_cast<T>(n_samples) / wt_sum));
+  return static_cast<T>(n_samples) / wt_sum;
+}
+
+/**
+ * @brief Copy host sample weights to device and apply normalization scale.
+ *
+ * When sample_weight is provided, copies the batch slice to the device buffer
+ * and applies the normalization scale factor. When not provided, the device
+ * buffer is assumed to already be filled with 1.0.
+ *
+ * @param[in]     handle         RAFT resources handle
+ * @param[in]     sample_weight  Optional host weights
+ * @param[in]     batch_offset   Offset into the host weights for this batch
+ * @param[in]     batch_size     Number of elements in this batch
+ * @param[in]     weight_scale   Scale factor from compute_host_weight_scale
+ * @param[inout]  batch_weights  Device buffer to write normalized weights into
+ */
+template <typename T, typename IdxT>
+void copy_and_scale_batch_weights(
+  raft::resources const& handle,
+  const std::optional<raft::host_vector_view<const T, IdxT>>& sample_weight,
+  size_t batch_offset,
+  IdxT batch_size,
+  T weight_scale,
+  raft::device_vector<T, IdxT>& batch_weights)
+{
+  if (!sample_weight.has_value()) { return; }
+
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
+  raft::copy(
+    batch_weights.data_handle(), sample_weight->data_handle() + batch_offset, batch_size, stream);
+
+  if (weight_scale != T{1}) {
+    auto batch_weights_view =
+      raft::make_device_vector_view<T, IdxT>(batch_weights.data_handle(), batch_size);
+    raft::linalg::map(handle,
+                      batch_weights_view,
+                      raft::mul_const_op<T>{weight_scale},
+                      raft::make_const_mdspan(batch_weights_view));
+  }
+}
+
+/**
  * @brief Accumulate partial centroid sums and counts from a batch
  *
  * This function adds the partial sums from a batch to the running accumulators.
@@ -223,22 +291,8 @@ void fit(raft::resources const& handle,
   auto batch_sums            = raft::make_device_matrix<T, IdxT>(handle, n_clusters, n_features);
   auto batch_counts          = raft::make_device_vector<T, IdxT>(handle, n_clusters);
 
-  T weight_scale = T{1};
-  if (sample_weight.has_value()) {
-    T wt_sum        = T{0};
-    const T* sw_ptr = sample_weight->data_handle();
-    for (IdxT i = 0; i < n_samples; ++i) {
-      wt_sum += sw_ptr[i];
-    }
-    if (wt_sum != static_cast<T>(n_samples)) {
-      weight_scale = static_cast<T>(n_samples) / wt_sum;
-      RAFT_LOG_DEBUG(
-        "[Warning!] KMeans: normalizing the user provided sample weight to "
-        "sum up to %zu samples (scale=%f)",
-        static_cast<size_t>(n_samples),
-        static_cast<double>(weight_scale));
-    }
-  }
+  // Compute weight normalization (matches checkWeight in regular kmeans)
+  T weight_scale = compute_host_weight_scale(sample_weight, n_samples);
 
   // ---- Main n_init loop ----
   for (int seed_iter = 0; seed_iter < n_init; ++seed_iter) {
@@ -280,20 +334,12 @@ void fit(raft::resources const& handle,
         auto batch_data_view = raft::make_device_matrix_view<const T, IdxT>(
           data_batch.data(), current_batch_size, n_features);
 
-        if (sample_weight.has_value()) {
-          raft::copy(batch_weights.data_handle(),
-                     sample_weight->data_handle() + data_batch.offset(),
-                     current_batch_size,
-                     stream);
-          if (weight_scale != T{1}) {
-            auto batch_weights_mutable = raft::make_device_vector_view<T, IdxT>(
-              batch_weights.data_handle(), current_batch_size);
-            raft::linalg::map(handle,
-                              batch_weights_mutable,
-                              raft::mul_const_op<T>{weight_scale},
-                              raft::make_const_mdspan(batch_weights_mutable));
-          }
-        }
+        copy_and_scale_batch_weights(handle,
+                                     sample_weight,
+                                     data_batch.offset(),
+                                     current_batch_size,
+                                     weight_scale,
+                                     batch_weights);
 
         auto batch_weights_view = raft::make_device_vector_view<const T, IdxT>(
           batch_weights.data_handle(), current_batch_size);
@@ -423,18 +469,12 @@ void fit(raft::resources const& handle,
 
         std::optional<raft::device_vector_view<const T, IdxT>> batch_sw = std::nullopt;
         if (sample_weight.has_value()) {
-          raft::copy(batch_weights.data_handle(),
-                     sample_weight->data_handle() + data_batch.offset(),
-                     current_batch_size,
-                     stream);
-          if (weight_scale != T{1}) {
-            auto batch_weights_mutable = raft::make_device_vector_view<T, IdxT>(
-              batch_weights.data_handle(), current_batch_size);
-            raft::linalg::map(handle,
-                              batch_weights_mutable,
-                              raft::mul_const_op<T>{weight_scale},
-                              raft::make_const_mdspan(batch_weights_mutable));
-          }
+          copy_and_scale_batch_weights(handle,
+                                       sample_weight,
+                                       data_batch.offset(),
+                                       current_batch_size,
+                                       weight_scale,
+                                       batch_weights);
           batch_sw = raft::make_device_vector_view<const T, IdxT>(batch_weights.data_handle(),
                                                                   current_batch_size);
         }
@@ -518,6 +558,11 @@ void predict(raft::resources const& handle,
   auto batch_weights = raft::make_device_vector<T, IdxT>(handle, streaming_batch_size);
   auto batch_labels  = raft::make_device_vector<IdxT, IdxT>(handle, streaming_batch_size);
 
+  // Compute weight normalization (matches checkWeight in regular kmeans)
+  T weight_scale = normalize_weight ? compute_host_weight_scale(sample_weight, n_samples) : T{1};
+
+  if (!sample_weight.has_value()) { raft::matrix::fill(handle, batch_weights.view(), T{1}); }
+
   inertia[0] = 0;
 
   using namespace cuvs::spatial::knn::detail::utils;
@@ -530,12 +575,11 @@ void predict(raft::resources const& handle,
     auto batch_data_view = raft::make_device_matrix_view<const T, IdxT>(
       data_batch.data(), current_batch_size, n_features);
 
+    copy_and_scale_batch_weights(
+      handle, sample_weight, data_batch.offset(), current_batch_size, weight_scale, batch_weights);
+
     std::optional<raft::device_vector_view<const T, IdxT>> batch_weights_view = std::nullopt;
     if (sample_weight.has_value()) {
-      raft::copy(batch_weights.data_handle(),
-                 sample_weight->data_handle() + data_batch.offset(),
-                 current_batch_size,
-                 stream);
       batch_weights_view = std::make_optional(raft::make_device_vector_view<const T, IdxT>(
         batch_weights.data_handle(), current_batch_size));
     }
