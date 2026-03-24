@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -11,6 +11,7 @@
 
 #include "naive_knn.cuh"
 
+#include <cuda_fp16.h>
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/vamana.hpp>
@@ -28,6 +29,7 @@
 #include <gtest/gtest.h>
 
 #include <thrust/sequence.h>
+#include <thrust/transform.h>
 
 #include <cstddef>
 #include <filesystem>
@@ -37,6 +39,10 @@
 #include <vector>
 
 namespace cuvs::neighbors::vamana {
+
+struct float_to_half_op {
+  __device__ half operator()(float v) const { return half(v); }
+};
 
 struct edge_op {
   template <typename Type, typename... UnusedArgs>
@@ -251,7 +257,22 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     search_queries.resize(((size_t)ps.n_queries) * ps.dim, stream_);
     raft::random::RngState r(1234ULL);
-    if constexpr (std::is_same<DataT, float>{}) {
+    if constexpr (std::is_same_v<DataT, half>) {
+      rmm::device_uvector<float> database_f(ps.n_rows * ps.dim, stream_);
+      rmm::device_uvector<float> queries_f(ps.n_queries * ps.dim, stream_);
+      raft::random::normal(handle_, r, database_f.data(), ps.n_rows * ps.dim, 0.1f, 2.0f);
+      raft::random::normal(handle_, r, queries_f.data(), ps.n_queries * ps.dim, 0.1f, 2.0f);
+      thrust::transform(raft::resource::get_thrust_policy(handle_),
+                        database_f.begin(),
+                        database_f.end(),
+                        database.begin(),
+                        float_to_half_op{});
+      thrust::transform(raft::resource::get_thrust_policy(handle_),
+                        queries_f.begin(),
+                        queries_f.end(),
+                        search_queries.begin(),
+                        float_to_half_op{});
+    } else if constexpr (std::is_same_v<DataT, float>) {
       raft::random::normal(handle_, r, database.data(), ps.n_rows * ps.dim, DataT(0.1), DataT(2.0));
       raft::random::normal(
         handle_, r, search_queries.data(), ps.n_queries * ps.dim, DataT(0.1), DataT(2.0));
