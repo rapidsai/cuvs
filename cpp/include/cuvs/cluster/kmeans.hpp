@@ -1280,7 +1280,7 @@ void fit_predict(raft::resources const& handle,
  *   cuvs::cluster::kmeans::balanced_params params;
  *   int64_t n_features = 15, n_clusters = 8;
  *   auto centroids = raft::make_device_matrix<float, int64_t>(handle, n_clusters, n_features);
- *   auto labels = raft::make_device_vector<int, int64_t>(handle, X.extent(0));
+ *   auto labels = raft::make_device_vector<uint32_t, int64_t>(handle, X.extent(0));
  *
  *   kmeans::fit_predict(handle,
  *                       params,
@@ -1304,13 +1304,63 @@ void fit_predict(raft::resources const& handle,
  * @param[out]    labels        Index of the cluster each sample in X belongs
  *                              to.
  *                              [len = n_samples]
+ * @param[out]    inertia       Sum of squared distances of samples to their
+ *                              closest cluster center.
  */
 void fit_predict(const raft::resources& handle,
                  cuvs::cluster::kmeans::balanced_params const& params,
                  raft::device_matrix_view<const float, int64_t> X,
                  raft::device_matrix_view<float, int64_t> centroids,
-                 raft::device_vector_view<uint32_t, int64_t> labels);
+                 raft::device_vector_view<uint32_t, int64_t> labels,
+                 std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 
+/**
+ *
+ * @brief Compute balanced k-means clustering and predicts cluster index for each sample
+ * in the input.
+ *
+ * @code{.cpp}
+ *   #include <raft/core/resources.hpp>
+ *   #include <cuvs/cluster/kmeans.hpp>
+ *   using namespace  cuvs::cluster;
+ *   ...
+ *   raft::resources handle;
+ *   cuvs::cluster::kmeans::balanced_params params;
+ *   int64_t n_features = 15, n_clusters = 8;
+ *   auto centroids = raft::make_device_matrix<float, int64_t>(handle, n_clusters, n_features);
+ *   auto labels = raft::make_device_vector<uint32_t, int64_t>(handle, X.extent(0));
+ *
+ *   kmeans::fit_predict(handle,
+ *                       params,
+ *                       X,
+ *                       centroids.view(),
+ *                       labels.view());
+ * @endcode
+ *
+ * @param[in]     handle        The raft handle.
+ * @param[in]     params        Parameters for KMeans model.
+ * @param[in]     X             Training instances to cluster. The data must be
+ *                              in row-major format.
+ *                              [dim = n_samples x n_features]
+ * @param[inout]  centroids     Optional
+ *                              [in] When init is InitMethod::Array, use
+ *                              centroids  as the initial cluster centers
+ *                              [out] The generated centroids from the
+ *                              kmeans algorithm are stored at the address
+ *                              pointed by 'centroids'.
+ *                              [dim = n_clusters x n_features]
+ * @param[out]    labels        Index of the cluster each sample in X belongs
+ *                              to.
+ *                              [len = n_samples]
+ * @param[out]    inertia       Sum of squared distances of samples to their
+ *                              closest cluster center.
+ */
+void fit_predict(const raft::resources& handle,
+                 cuvs::cluster::kmeans::balanced_params const& params,
+                 raft::device_matrix_view<const half, int64_t> X,
+                 raft::device_matrix_view<float, int64_t> centroids,
+                 raft::device_vector_view<uint32_t, int64_t> labels,
+                 std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 /**
  * @brief Compute balanced k-means clustering and predicts cluster index for each sample
  * in the input.
@@ -1324,7 +1374,7 @@ void fit_predict(const raft::resources& handle,
  *   cuvs::cluster::kmeans::balanced_params params;
  *   int64_t n_features = 15, n_clusters = 8;
  *   auto centroids = raft::make_device_matrix<float, int64_t>(handle, n_clusters, n_features);
- *   auto labels = raft::make_device_vector<int, int64_t>(handle, X.extent(0));
+ *   auto labels = raft::make_device_vector<uint32_t, int64_t>(handle, X.extent(0));
  *
  *   kmeans::fit_predict(handle,
  *                       params,
@@ -1348,12 +1398,15 @@ void fit_predict(const raft::resources& handle,
  * @param[out]    labels        Index of the cluster each sample in X belongs
  *                              to.
  *                              [len = n_samples]
+ * @param[out]    inertia       Sum of squared distances of samples to their
+ *                              closest cluster center.
  */
 void fit_predict(const raft::resources& handle,
                  cuvs::cluster::kmeans::balanced_params const& params,
                  raft::device_matrix_view<const int8_t, int64_t> X,
                  raft::device_matrix_view<float, int64_t> centroids,
-                 raft::device_vector_view<uint32_t, int64_t> labels);
+                 raft::device_vector_view<uint32_t, int64_t> labels,
+                 std::optional<raft::host_scalar_view<float>> inertia = std::nullopt);
 
 /**
  * @brief Transform X to a cluster-distance space.

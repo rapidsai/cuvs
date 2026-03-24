@@ -474,12 +474,10 @@ if(NOT BUILD_CPU_ONLY)
     src/cluster/kmeans_predict_float.cu
     src/cluster/kmeans_balanced_fit_float.cu
     src/cluster/kmeans_balanced_fit_half.cu
-    src/cluster/kmeans_balanced_fit_predict_float.cu
-    src/cluster/kmeans_balanced_predict_float.cu
-    src/cluster/kmeans_balanced_predict_half.cu
     src/cluster/kmeans_balanced_fit_int8.cu
     src/cluster/kmeans_balanced_fit_uint8.cu
-    src/cluster/kmeans_balanced_fit_predict_int8.cu
+    src/cluster/kmeans_balanced_predict_float.cu
+    src/cluster/kmeans_balanced_predict_half.cu
     src/cluster/kmeans_balanced_predict_int8.cu
     src/cluster/kmeans_balanced_predict_uint8.cu
     src/cluster/kmeans_transform_double.cu
