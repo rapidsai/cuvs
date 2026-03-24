@@ -20,16 +20,14 @@
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger.hpp>
-#include <raft/linalg/add.cuh>
+#include <raft/core/operators.hpp>
+#include <raft/linalg/map.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/util/itertools.hpp>
 
 #include <rmm/device_buffer.hpp>
 
 #include <gtest/gtest.h>
-
-#include <thrust/sequence.h>
-#include <thrust/transform.h>
 
 #include <cstddef>
 #include <filesystem>
@@ -39,10 +37,6 @@
 #include <vector>
 
 namespace cuvs::neighbors::vamana {
-
-struct float_to_half_op {
-  __device__ half operator()(float v) const { return half(v); }
-};
 
 struct edge_op {
   template <typename Type, typename... UnusedArgs>
@@ -262,16 +256,16 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
       rmm::device_uvector<float> queries_f(ps.n_queries * ps.dim, stream_);
       raft::random::normal(handle_, r, database_f.data(), ps.n_rows * ps.dim, 0.1f, 2.0f);
       raft::random::normal(handle_, r, queries_f.data(), ps.n_queries * ps.dim, 0.1f, 2.0f);
-      thrust::transform(raft::resource::get_thrust_policy(handle_),
-                        database_f.begin(),
-                        database_f.end(),
-                        database.begin(),
-                        float_to_half_op{});
-      thrust::transform(raft::resource::get_thrust_policy(handle_),
-                        queries_f.begin(),
-                        queries_f.end(),
-                        search_queries.begin(),
-                        float_to_half_op{});
+      auto database_f_view =
+        raft::make_device_vector_view<const float, int64_t>(database_f.data(), database_f.size());
+      auto database_h_view =
+        raft::make_device_vector_view<half, int64_t>(database.data(), database.size());
+      raft::linalg::map(handle_, database_h_view, raft::cast_op<half>{}, database_f_view);
+      auto queries_f_view =
+        raft::make_device_vector_view<const float, int64_t>(queries_f.data(), queries_f.size());
+      auto queries_h_view =
+        raft::make_device_vector_view<half, int64_t>(search_queries.data(), search_queries.size());
+      raft::linalg::map(handle_, queries_h_view, raft::cast_op<half>{}, queries_f_view);
     } else if constexpr (std::is_same_v<DataT, float>) {
       raft::random::normal(handle_, r, database.data(), ps.n_rows * ps.dim, DataT(0.1), DataT(2.0));
       raft::random::normal(

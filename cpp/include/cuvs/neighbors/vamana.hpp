@@ -650,6 +650,12 @@ void serialize(raft::resources const& handle,
  *
  * Matches the file format used by the DiskANN open-source repository, allowing cross-compatibility.
  *
+ * @warning Serializing a half-precision (float16) dataset with `include_dataset=true` produces a
+ * `.data` file containing raw half values. DiskANN only supports float, int8, and uint8 data types,
+ * so this file cannot be used with DiskANN search. Similarly, sector-aligned serialization embeds
+ * half-precision vectors directly into the disk index, which DiskANN search cannot interpret.
+ * Set `include_dataset` to false if cross-compatibility with DiskANN is required.
+ *
  * @code{.cpp}
  *   #include <raft/core/resources.hpp>
  *   #include <cuvs/neighbors/vamana.hpp>
