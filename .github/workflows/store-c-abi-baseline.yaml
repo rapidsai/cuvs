@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download main baseline artifact
-        uses: dawidd6/action-download-artifact@v3
+        uses: dawidd6/action-download-artifact@8a338493df3d275e4a7a63bcff3b8fe97e51a927
         with:
           name: c-abi-baseline-main
           workflow: check-c-abi.yaml
