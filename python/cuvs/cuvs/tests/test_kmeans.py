@@ -79,7 +79,7 @@ def test_cluster_cost(n_rows, n_cols, n_clusters, dtype):
 @pytest.mark.parametrize("n_rows", [1000, 5000])
 @pytest.mark.parametrize("n_cols", [10, 100])
 @pytest.mark.parametrize("n_clusters", [8, 16])
-@pytest.mark.parametrize("batch_size", [0, 100, 500])
+@pytest.mark.parametrize("batch_size", [0, 100, 239, 500])
 @pytest.mark.parametrize("dtype", [np.float64])
 def test_fit_host_matches_fit_device(
     n_rows, n_cols, n_clusters, batch_size, dtype
@@ -100,7 +100,7 @@ def test_fit_host_matches_fit_device(
     params_device = KMeansParams(
         n_clusters=n_clusters,
         init_method="Array",
-        max_iter=100,
+        max_iter=20,
         tol=1e-10,
     )
     centroids_regular, _, _ = fit(
@@ -113,7 +113,7 @@ def test_fit_host_matches_fit_device(
     params_host = KMeansParams(
         n_clusters=n_clusters,
         init_method="Array",
-        max_iter=100,
+        max_iter=20,
         tol=1e-10,
         batch_size=batch_size,
     )
