@@ -49,7 +49,7 @@ jobs:
         id: download-main
         if: steps.download-merge-base.outcome == 'failure'
         continue-on-error: true
-        uses: dawidd6/action-download-artifact@8a338493df3d275e4a7a63bcff3b8fe97e51a927
+        uses: dawidd6/action-download-artifact@8a338493df3d275e4a7a63bcff3b8fe97e51a927 # v19
         with:
           name: c-abi-baseline-main
           workflow: check-c-abi.yaml
