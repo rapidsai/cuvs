@@ -74,7 +74,7 @@ void _fit(cuvsResources_t res,
     std::optional<raft::host_vector_view<T const, IdxT>> sample_weight;
     if (sample_weight_tensor != NULL) {
       auto sw = sample_weight_tensor->dl_tensor;
-      if (cuvs::core::is_dlpack_host_compatible(sw)) {
+      if (!cuvs::core::is_dlpack_host_compatible(sw)) {
         RAFT_FAIL("sample_weight must be host accessible when X is on host");
       }
       sample_weight = raft::make_host_vector_view<T const, IdxT>(
