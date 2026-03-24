@@ -43,14 +43,15 @@ jobs:
 
           # Copy the baseline file with version name
           mkdir -p c-abi-baselines
-          cp baseline/c_abi.json.gz c-abi-baselines/c_abi_${{ github.event.release.tag_name || inputs.version }}.json.gz
+          cp baseline/c_abi.json.gz c-abi-baselines/c_abi_$RELEASE_TAG_NAME.json.gz
 
           # Commit and push
           git add c-abi-baselines/
-          git commit -m "Archive C ABI baseline for ${{ github.event.release.tag_name || inputs.version }}"
+          git commit -m "Archive C ABI baseline for $RELEASE_TAG_NAME"
           git push origin baselines
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG_NAME: ${{ github.event.release.tag_name || inputs.version }}
 
       - name: Create release comment
         if: github.event_name == 'release'

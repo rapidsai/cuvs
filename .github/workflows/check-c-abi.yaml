@@ -73,13 +73,17 @@ jobs:
 
       - name: Report baseline source
         run: |
-          if [ "${{ steps.download-merge-base.outcome }}" == "success" ]; then
-            echo "✓ Using baseline from merge-base commit: ${{ steps.merge-base.outputs.merge_base_sha }}"
-          elif [ "${{ steps.download-main.outcome }}" == "success" ]; then
+          if [ "$DOWNLOAD_MERGE_BASE_OUTCOME" == "success" ]; then
+            echo "✓ Using baseline from merge-base commit: $MERGE_BASE_SHA"
+          elif [ "$DOWNLOAD_MAIN_OUTCOME" == "success" ]; then
             echo "✓ Using latest main baseline (merge-base baseline not yet available)"
           else
             echo "✓ Using freshly extracted baseline from main branch"
           fi
+        env:
+          DOWNLOAD_MERGE_BASE_OUTCOME: ${{ steps.download-merge-base.outcome }}
+          MERGE_BASE_SHA: ${[ steps.merge-base.outputs.merge_base_sha }}
+          DOWNLOAD_MAIN_OUTCOME: ${{ steps.download-main.outcome }}
 
       - name: Analyze current branch for ABI breaking changes
         run: |
@@ -90,7 +94,7 @@ jobs:
             --dlpack-include-path dlpack/include
 
       - name: Comment on PR with results
-        if: failure() && github.event_name == 'pull_request'
+        if: failure()
         uses: actions/github-script@v7
         with:
           script: |

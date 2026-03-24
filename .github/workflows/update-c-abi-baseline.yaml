@@ -39,7 +39,9 @@ jobs:
             --include-file cuvs/core/all.h \
             --output-file baseline/c_abi.json.gz \
             --dlpack-include-path dlpack/include
-          echo "ABI extracted from main branch (commit: ${{ github.sha }})"
+          echo "ABI extracted from main branch (commit: $COMMIT)"
+        env:
+          COMMIT: ${{ github.sha }}
 
       - name: Store commit-specific baseline
         uses: actions/upload-artifact@v4
