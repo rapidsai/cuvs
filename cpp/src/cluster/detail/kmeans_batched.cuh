@@ -315,7 +315,6 @@ void fit(raft::resources const& handle,
                                             batch_counts.view());
 
         if (params.inertia_check || n_iter[0] == iter_params.max_iter) {
-          // Weight-multiply distances to get weighted inertia (matches sklearn behavior)
           raft::linalg::map(
             handle,
             minClusterAndDistance_view,
@@ -354,7 +353,6 @@ void fit(raft::resources const& handle,
                                   centroids_const,
                                   new_centroids.view());
 
-      // Convergence check
       T sqrdNormError = compute_centroid_shift<T, IdxT>(
         handle, raft::make_const_mdspan(centroids), raft::make_const_mdspan(new_centroids.view()));
 

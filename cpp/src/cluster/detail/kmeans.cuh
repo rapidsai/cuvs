@@ -287,7 +287,6 @@ void update_centroids(raft::resources const& handle,
 {
   auto n_clusters = centroids.extent(0);
 
-  // Compute weighted sums and counts per cluster
   cuvs::cluster::kmeans::detail::compute_centroid_adjustments(handle,
                                                               X,
                                                               sample_weights,
@@ -297,7 +296,6 @@ void update_centroids(raft::resources const& handle,
                                                               weight_per_cluster,
                                                               workspace);
 
-  // Divide sums by counts to get new centroids; preserve old centroids for empty clusters
   cuvs::cluster::kmeans::detail::finalize_centroids(handle,
                                                     raft::make_const_mdspan(new_centroids),
                                                     raft::make_const_mdspan(weight_per_cluster),
