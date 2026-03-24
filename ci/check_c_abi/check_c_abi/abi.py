@@ -262,7 +262,7 @@ def _analyze_function_abi(
 
             elif new_type != old_type:
                 yield AbiError(
-                    f"Function has changed type '{old_type}' to '{new_type}' for parameter '{old_name}'",
+                    f"Function has changed parameter type '{old_type}' to '{new_type}' for '{old_name}'",
                     symbol=new_function.name,
                     location=new_function.location,
                 )

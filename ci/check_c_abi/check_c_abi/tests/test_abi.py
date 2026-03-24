@@ -30,18 +30,21 @@ def test_function():
     errors = analyze_c_abi(old_abi, new_abi)
     assert len(errors) == 1
     assert errors[0].symbol == "func"
+    assert errors[0].error.startswith("Function has return type changed")
 
     # adding parameters should return an error
     new_abi = abi_from_str("int func(int x, char * y, float z); ")
     errors = analyze_c_abi(old_abi, new_abi)
     assert len(errors) == 1
     assert errors[0].symbol == "func"
+    assert errors[0].error.startswith("Function has a new parameter")
 
     # removing parameters should return an error
     new_abi = abi_from_str("int func(int x); ")
     errors = analyze_c_abi(old_abi, new_abi)
     assert len(errors) == 1
     assert errors[0].symbol == "func"
+    assert errors[0].error.startswith("Function has a deleted parameter")
 
     # adding new functions is allowed
     new_abi = abi_from_str("""
@@ -70,6 +73,7 @@ def test_struct():
     errors = analyze_c_abi(old_abi, new_abi)
     assert len(errors) == 1
     assert errors[0].symbol == "Foo"
+    assert errors[0].error.startswith("Struct has a deleted member")
 
     # adding a new field should not return an error
     new_abi = abi_from_str("""
@@ -90,6 +94,7 @@ def test_struct():
     errors = analyze_c_abi(old_abi, new_abi)
     assert len(errors) == 1
     assert errors[0].symbol == "Foo"
+    assert errors[0].error.startswith("Struct member has changed type")
 
     # adding new structs is allowed
     new_abi = abi_from_str("""
@@ -125,6 +130,7 @@ def test_enum():
     errors = analyze_c_abi(old_abi, new_abi)
     assert len(errors) == 1
     assert errors[0].symbol == "Foo"
+    assert errors[0].error == "Enum value TWO has been removed"
 
     # adding new values to an enum is allowed
     new_abi = abi_from_str("""
@@ -147,3 +153,4 @@ def test_enum():
     errors = analyze_c_abi(old_abi, new_abi)
     assert len(errors) == 1
     assert errors[0].symbol == "Foo"
+    assert errors[0].error.startswith("Enum value TWO has been changed")
