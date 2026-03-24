@@ -204,6 +204,16 @@ BENCHMARK(BM_IVFPQ_Build_KMeansFit_Speedup)
   ->UseRealTime()
   ->ArgNames({"n_vectors", "n_lists", "dim"});
 BENCHMARK(BM_IVFPQ_Build_KMeansFit_Speedup)
+  ->Args({1500000, 300000, kDim})
+  ->Unit(benchmark::kMillisecond)
+  ->UseRealTime()
+  ->ArgNames({"n_vectors", "n_lists", "dim"});
+BENCHMARK(BM_IVFPQ_Build_KMeansFit_Speedup)
+  ->Args({1750000, 350000, kDim})
+  ->Unit(benchmark::kMillisecond)
+  ->UseRealTime()
+  ->ArgNames({"n_vectors", "n_lists", "dim"});
+BENCHMARK(BM_IVFPQ_Build_KMeansFit_Speedup)
   ->Args({2000000, 400000, kDim})
   ->Unit(benchmark::kMillisecond)
   ->UseRealTime()
@@ -232,6 +242,16 @@ BENCHMARK(BM_IVFPQ_Extend_ClusterAssign_Speedup)
   ->ArgNames({"n_vectors", "n_lists", "dim"});
 BENCHMARK(BM_IVFPQ_Extend_ClusterAssign_Speedup)
   ->Args({1000000, 200000, kDim})
+  ->Unit(benchmark::kMillisecond)
+  ->UseRealTime()
+  ->ArgNames({"n_vectors", "n_lists", "dim"});
+BENCHMARK(BM_IVFPQ_Extend_ClusterAssign_Speedup)
+  ->Args({1500000, 300000, kDim})
+  ->Unit(benchmark::kMillisecond)
+  ->UseRealTime()
+  ->ArgNames({"n_vectors", "n_lists", "dim"});
+BENCHMARK(BM_IVFPQ_Extend_ClusterAssign_Speedup)
+  ->Args({1750000, 350000, kDim})
   ->Unit(benchmark::kMillisecond)
   ->UseRealTime()
   ->ArgNames({"n_vectors", "n_lists", "dim"});
