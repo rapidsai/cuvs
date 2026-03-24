@@ -4,7 +4,6 @@
  */
 
 #include <chrono>
-#include <iostream>
 #include <iterator>
 #include <memory>
 #include <mutex>
@@ -66,7 +65,6 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
   RAFT_CUDA_TRY(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
 
   std::string archs = "-arch=sm_" + std::to_string((major * 10 + minor));
-  std::cerr << "Passing argument to nvJitLink: " << archs << "\n";
 
   // Load the generated LTO IR and link them together
   nvJitLinkHandle handle;
