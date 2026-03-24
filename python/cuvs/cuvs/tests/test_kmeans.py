@@ -99,7 +99,6 @@ def test_fit_host_matches_fit_device(
 
     initial_centroids_host = X_host[:n_clusters].copy()
 
-    # Generate non-uniform sample weights when requested
     if weighted:
         sample_weights_host = rng.uniform(0.5, 2.0, size=n_rows).astype(dtype)
         sample_weights_device = device_ndarray(sample_weights_host)

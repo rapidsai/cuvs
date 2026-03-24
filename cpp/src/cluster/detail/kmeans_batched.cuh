@@ -223,6 +223,23 @@ void fit(raft::resources const& handle,
   auto batch_sums            = raft::make_device_matrix<T, IdxT>(handle, n_clusters, n_features);
   auto batch_counts          = raft::make_device_vector<T, IdxT>(handle, n_clusters);
 
+  T weight_scale = T{1};
+  if (sample_weight.has_value()) {
+    T wt_sum        = T{0};
+    const T* sw_ptr = sample_weight->data_handle();
+    for (IdxT i = 0; i < n_samples; ++i) {
+      wt_sum += sw_ptr[i];
+    }
+    if (wt_sum != static_cast<T>(n_samples)) {
+      weight_scale = static_cast<T>(n_samples) / wt_sum;
+      RAFT_LOG_DEBUG(
+        "[Warning!] KMeans: normalizing the user provided sample weight to "
+        "sum up to %zu samples (scale=%f)",
+        static_cast<size_t>(n_samples),
+        static_cast<double>(weight_scale));
+    }
+  }
+
   // ---- Main n_init loop ----
   for (int seed_iter = 0; seed_iter < n_init; ++seed_iter) {
     cuvs::cluster::kmeans::params iter_params = params;
@@ -268,6 +285,14 @@ void fit(raft::resources const& handle,
                      sample_weight->data_handle() + data_batch.offset(),
                      current_batch_size,
                      stream);
+          if (weight_scale != T{1}) {
+            auto batch_weights_mutable = raft::make_device_vector_view<T, IdxT>(
+              batch_weights.data_handle(), current_batch_size);
+            raft::linalg::map(handle,
+                              batch_weights_mutable,
+                              raft::mul_const_op<T>{weight_scale},
+                              raft::make_const_mdspan(batch_weights_mutable));
+          }
         }
 
         auto batch_weights_view = raft::make_device_vector_view<const T, IdxT>(
@@ -404,6 +429,14 @@ void fit(raft::resources const& handle,
                      sample_weight->data_handle() + data_batch.offset(),
                      current_batch_size,
                      stream);
+          if (weight_scale != T{1}) {
+            auto batch_weights_mutable = raft::make_device_vector_view<T, IdxT>(
+              batch_weights.data_handle(), current_batch_size);
+            raft::linalg::map(handle,
+                              batch_weights_mutable,
+                              raft::mul_const_op<T>{weight_scale},
+                              raft::make_const_mdspan(batch_weights_mutable));
+          }
           batch_sw = raft::make_device_vector_view<const T, IdxT>(batch_weights.data_handle(),
                                                                   current_batch_size);
         }
