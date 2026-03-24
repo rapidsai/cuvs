@@ -339,7 +339,7 @@ void fit(raft::resources const& handle,
                                             batch_sums.view(),
                                             batch_counts.view());
 
-        if (params.inertia_check || n_iter[0] == iter_params.max_iter) {
+        if (params.inertia_check) {
           raft::linalg::map(
             handle,
             minClusterAndDistance_view,
@@ -352,7 +352,6 @@ void fit(raft::resources const& handle,
             raft::make_const_mdspan(minClusterAndDistance_view),
             batch_weights_view);
 
-          // Compute weighted cluster cost for this batch
           cuvs::cluster::kmeans::detail::computeClusterCost(
             handle,
             minClusterAndDistance_view,
@@ -383,14 +382,13 @@ void fit(raft::resources const& handle,
 
       raft::copy(handle, centroids, new_centroids.view());
 
-      ASSERT(inertia[0] != (T)0.0,
-             "Too few points and centroids being found is getting 0 cost from "
-             "centers");
-
       bool done = false;
       if (params.inertia_check) {
         raft::copy(inertia.data_handle(), clustering_cost.data_handle(), 1, stream);
         raft::resource::sync_stream(handle);
+        ASSERT(inertia[0] != (T)0.0,
+               "Too few points and centroids being found is getting 0 cost from "
+               "centers");
         if (n_iter[0] > 1) {
           T delta = inertia[0] / prior_cluster_cost;
           if (delta > 1 - params.tol) done = true;

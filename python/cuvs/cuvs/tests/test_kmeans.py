@@ -93,11 +93,8 @@ def test_fit_host_matches_fit_device(
     rng = np.random.default_rng(99)
     X_host = rng.random((n_rows, n_cols)).astype(dtype)
 
-    norms = np.linalg.norm(X_host, ord=1, axis=1, keepdims=True)
-    norms = np.where(norms == 0, 1.0, norms)
-    X_host = X_host / norms
-
-    initial_centroids_host = X_host[:n_clusters].copy()
+    centroid_indices = rng.choice(n_rows, size=n_clusters, replace=False)
+    initial_centroids_host = X_host[centroid_indices].copy()
 
     if weighted:
         sample_weights_host = rng.uniform(0.5, 2.0, size=n_rows).astype(dtype)
@@ -112,7 +109,7 @@ def test_fit_host_matches_fit_device(
         max_iter=20,
         tol=1e-10,
     )
-    centroids_regular, _, _ = fit(
+    centroids_regular, inertia_regular, _ = fit(
         params_device,
         device_ndarray(X_host),
         device_ndarray(initial_centroids_host.copy()),
@@ -127,7 +124,7 @@ def test_fit_host_matches_fit_device(
         tol=1e-10,
         streaming_batch_size=streaming_batch_size,
     )
-    centroids_batched, _, _ = fit(
+    centroids_batched, inertia_batched, _ = fit(
         params_host,
         X_host,
         centroids=device_ndarray(initial_centroids_host.copy()),
@@ -138,3 +135,8 @@ def test_fit_host_matches_fit_device(
     assert np.allclose(
         centroids_regular, centroids_batched, rtol=1e-3, atol=1e-3
     ), f"max diff: {np.max(np.abs(centroids_regular - centroids_batched))}"
+
+    print(inertia_regular, inertia_batched)
+    assert np.allclose(
+        inertia_regular, inertia_batched, rtol=1e-3, atol=1e-3
+    ), f"max diff: {np.max(np.abs(inertia_regular - inertia_batched))}"
