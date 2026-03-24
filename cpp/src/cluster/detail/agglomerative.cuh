@@ -5,9 +5,13 @@
 
 #pragma once
 
+#include <raft/core/copy.cuh>
+#include <raft/core/device_mdspan.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/matrix/init.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
 
@@ -108,9 +112,15 @@ void build_dendrogram_host(raft::resources const& handle,
   std::vector<value_idx> mst_dst_h(n_edges);
   std::vector<value_t> mst_weights_h(n_edges);
 
-  raft::update_host(mst_src_h.data(), rows, n_edges, stream);
-  raft::update_host(mst_dst_h.data(), cols, n_edges, stream);
-  raft::update_host(mst_weights_h.data(), data, n_edges, stream);
+  raft::copy(handle,
+             raft::make_host_vector_view(mst_src_h.data(), n_edges),
+             raft::make_device_vector_view(rows, n_edges));
+  raft::copy(handle,
+             raft::make_host_vector_view(mst_dst_h.data(), n_edges),
+             raft::make_device_vector_view(cols, n_edges));
+  raft::copy(handle,
+             raft::make_host_vector_view(mst_weights_h.data(), n_edges),
+             raft::make_device_vector_view(data, n_edges));
 
   raft::resource::sync_stream(handle, stream);
 
@@ -138,9 +148,15 @@ void build_dendrogram_host(raft::resources const& handle,
     U.perform_union(aa, bb);
   }
 
-  raft::update_device(children, children_h.data(), n_edges * 2, stream);
-  raft::update_device(out_size, out_size_h.data(), n_edges, stream);
-  raft::update_device(out_delta, out_delta_h.data(), n_edges, stream);
+  raft::copy(handle,
+             raft::make_device_vector_view(children, n_edges * 2),
+             raft::make_host_vector_view(children_h.data(), n_edges * 2));
+  raft::copy(handle,
+             raft::make_device_vector_view(out_size, n_edges),
+             raft::make_host_vector_view(out_size_h.data(), n_edges));
+  raft::copy(handle,
+             raft::make_device_vector_view(out_delta, n_edges),
+             raft::make_host_vector_view(out_delta_h.data(), n_edges));
 }
 
 template <typename value_idx>
@@ -236,7 +252,8 @@ void extract_flattened_clusters(raft::resources const& handle,
 
   // Handle special case where n_clusters == 1
   if (n_clusters == 1) {
-    thrust::fill(thrust_policy, labels, labels + n_leaves, 0);
+    raft::matrix::fill(
+      handle, raft::make_device_vector_view<value_idx>(labels, n_leaves), value_idx(0));
   } else {
     /**
      * Compute levels for each node

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -42,7 +42,7 @@ struct codebook_params {
 /**
  * @brief Parameters used to build DiskANN index
  *
- * `graph_degree`: Maximum degree of graph; correspods to the R parameter of
+ * `graph_degree`: Maximum degree of graph; corresponds to the R parameter of
  * Vamana algorithm in the literature.
  * `visited_size`: Maximum number of visited nodes per search during Vamana algorithm.
  * Loosely corresponds to the L parameter in the literature.

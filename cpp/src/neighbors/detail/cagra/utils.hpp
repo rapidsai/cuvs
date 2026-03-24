@@ -1,13 +1,15 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
 // TODO: This shouldn't be invoking anything from detail outside of neighbors namespace
+#include <raft/core/copy.cuh>
 #include <raft/core/detail/macros.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/host_mdarray.hpp>
+#include <raft/matrix/init.cuh>
 #include <raft/util/integer_utils.hpp>
 
 #include <rmm/resource_ref.hpp>
@@ -172,18 +174,17 @@ class device_matrix_view_from_host {
   {
     cudaPointerAttributes attr;
     RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, host_view.data_handle()));
-    device_ptr = reinterpret_cast<T*>(attr.devicePointer);
-    if (device_ptr == NULL) {
+    device_ptr      = reinterpret_cast<T*>(attr.devicePointer);
+    bool needs_copy = (device_ptr == NULL) ||
+                      (attr.type != cudaMemoryTypeDevice && attr.type != cudaMemoryTypeManaged);
+    if (needs_copy) {
       // allocate memory and copy over
       // NB: We use the temporary "large" workspace resource here; this structure is supposed to
       // live on stack and not returned to a user.
       // The user may opt to set this resource to managed memory to allow large allocations.
       device_mem_.emplace(raft::make_device_mdarray<T, IdxT>(
         res, raft::resource::get_large_workspace_resource(res), host_view.extents()));
-      raft::copy(device_mem_->data_handle(),
-                 host_view.data_handle(),
-                 host_view.extent(0) * host_view.extent(1),
-                 raft::resource::get_cuda_stream(res));
+      raft::copy(res, device_mem_->view(), host_view);
       device_ptr = device_mem_->data_handle();
     }
   }
@@ -241,10 +242,7 @@ class host_matrix_view_from_device {
       // allocate memory and copy over
       host_mem_.emplace(
         raft::make_host_matrix<T, IdxT>(device_view.extent(0), device_view.extent(1)));
-      raft::copy(host_mem_->data_handle(),
-                 device_view.data_handle(),
-                 device_view.extent(0) * device_view.extent(1),
-                 raft::resource::get_cuda_stream(res));
+      raft::copy(res, host_mem_->view(), device_view);
       host_ptr = host_mem_->data_handle();
     }
   }
@@ -282,12 +280,10 @@ void copy_with_padding(
       raft::make_device_mdarray<T>(res, mr, raft::make_extents<int64_t>(src.extent(0), padded_dim));
   }
   if (dst.extent(1) == src.extent(1)) {
-    raft::copy(
-      dst.data_handle(), src.data_handle(), src.size(), raft::resource::get_cuda_stream(res));
+    raft::copy(res, dst.view(), src);
   } else {
     // copy with padding
-    RAFT_CUDA_TRY(cudaMemsetAsync(
-      dst.data_handle(), 0, dst.size() * sizeof(T), raft::resource::get_cuda_stream(res)));
+    raft::matrix::fill(res, dst.view(), T(0));
     RAFT_CUDA_TRY(cudaMemcpy2DAsync(dst.data_handle(),
                                     sizeof(T) * dst.extent(1),
                                     src.data_handle(),

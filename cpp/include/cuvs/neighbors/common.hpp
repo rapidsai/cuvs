@@ -35,6 +35,9 @@ namespace cuvs::neighbors {
  * @{
  */
 
+/* Graph build algo used in cagra and all_neighbors */
+enum GRAPH_BUILD_ALGO { BRUTE_FORCE = 0, IVF_PQ = 1, NN_DESCENT = 2, ACE = 3 };
+
 /** Parameters for VPQ compression. */
 struct vpq_params {
   /**
@@ -124,13 +127,6 @@ enum class MergeStrategy {
   MERGE_STRATEGY_PHYSICAL = 0,
   /** Merge indices logically by creating a composite wrapper */
   MERGE_STRATEGY_LOGICAL = 1
-};
-
-/** Base merge parameters with polymorphic interface. */
-struct merge_params {
-  virtual ~merge_params() = default;
-
-  virtual MergeStrategy strategy() const = 0;
 };
 
 /** @} */  // end group neighbors_index
@@ -228,7 +224,7 @@ template <typename DatasetT>
 inline constexpr bool is_strided_dataset_v = is_strided_dataset<DatasetT>::value;
 
 /**
- * @brief Contstruct a strided matrix from any mdarray or mdspan.
+ * @brief Construct a strided matrix from any mdarray or mdspan.
  *
  * This function constructs a non-owning view if the input satisfied two conditions:
  *
@@ -303,7 +299,7 @@ auto make_strided_dataset(const raft::resources& res, const SrcT& src, uint32_t 
 }
 
 /**
- * @brief Contstruct a strided matrix from any mdarray.
+ * @brief Construct a strided matrix from any mdarray.
  *
  * This function constructs an owning device matrix and copies the data.
  * When the data is copied, padding elements are filled with zeroes.
@@ -374,7 +370,7 @@ auto make_strided_dataset(
 }
 
 /**
- * @brief Contstruct a strided matrix from any mdarray or mdspan.
+ * @brief Construct a strided matrix from any mdarray or mdspan.
  *
  * A variant `make_strided_dataset` that allows specifying the byte alignment instead of the
  * explicit stride length.
@@ -919,7 +915,7 @@ enum distribution_mode {
 /** Search mode when using a replicated index */
 /// \ingroup mg_cpp_search_params
 enum replicated_search_mode {
-  /** Search queries are splited to maintain equal load on GPUs */
+  /** Search queries are split to maintain equal load on GPUs */
   LOAD_BALANCER,
   /** Each search query is processed by a single GPU in a round-robin fashion */
   ROUND_ROBIN
