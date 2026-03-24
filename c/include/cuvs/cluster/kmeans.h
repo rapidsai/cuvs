@@ -108,7 +108,7 @@ struct cuvsKMeansParams {
    * Number of samples to process per GPU batch for the batched (host-data) API.
    * When set to 0, defaults to n_samples (process all at once).
    */
-   int64_t batch_size;
+   int64_t streaming_batch_size;
 };
 
 typedef struct cuvsKMeansParams* cuvsKMeansParams_t;
@@ -152,7 +152,7 @@ typedef enum { CUVS_KMEANS_TYPE_KMEANS = 0, CUVS_KMEANS_TYPE_KMEANS_BALANCED = 1
  *
  *   X may reside on either host (CPU) or device (GPU) memory.
  *   When X is on the host the data is streamed to the GPU in
- *   batches controlled by params->batch_size.
+ *   batches controlled by params->streaming_batch_size.
  *
  * @param[in]     res           opaque C handle
  * @param[in]     params        Parameters for KMeans model.
