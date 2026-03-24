@@ -247,7 +247,7 @@ void fit(raft::resources const& handle,
     // Reset per-iteration state
     T prior_cluster_cost = 0;
 
-    cuvs::spatial::knn::detail::utilsbatch_load_iterator<T> data_batches(
+    cuvs::spatial::knn::detail::utils::batch_load_iterator<T> data_batches(
       X.data_handle(), n_samples, n_features, batch_size, stream);
 
     for (n_iter[0] = 1; n_iter[0] <= iter_params.max_iter; ++n_iter[0]) {
