@@ -79,14 +79,16 @@ def test_cluster_cost(n_rows, n_cols, n_clusters, dtype):
 @pytest.mark.parametrize("n_rows", [1000, 5000])
 @pytest.mark.parametrize("n_cols", [10, 100])
 @pytest.mark.parametrize("n_clusters", [8, 16])
-@pytest.mark.parametrize("batch_size", [0, 100, 239, 500])
+@pytest.mark.parametrize("streaming_batch_size", [0, 100, 239, 500])
 @pytest.mark.parametrize("dtype", [np.float64])
+@pytest.mark.parametrize("weighted", [False, True])
 def test_fit_host_matches_fit_device(
-    n_rows, n_cols, n_clusters, batch_size, dtype
+    n_rows, n_cols, n_clusters, streaming_batch_size, dtype, weighted
 ):
     """
     Test that fit() with host (numpy) data produces the same centroids as
     fit() with device data, when given the same initial centroids.
+    Optionally tests with non-uniform sample weights.
     """
     rng = np.random.default_rng(99)
     X_host = rng.random((n_rows, n_cols)).astype(dtype)
@@ -96,6 +98,14 @@ def test_fit_host_matches_fit_device(
     X_host = X_host / norms
 
     initial_centroids_host = X_host[:n_clusters].copy()
+
+    # Generate non-uniform sample weights when requested
+    if weighted:
+        sample_weights_host = rng.uniform(0.5, 2.0, size=n_rows).astype(dtype)
+        sample_weights_device = device_ndarray(sample_weights_host)
+    else:
+        sample_weights_host = None
+        sample_weights_device = None
 
     params_device = KMeansParams(
         n_clusters=n_clusters,
@@ -107,6 +117,7 @@ def test_fit_host_matches_fit_device(
         params_device,
         device_ndarray(X_host),
         device_ndarray(initial_centroids_host.copy()),
+        sample_weights=sample_weights_device,
     )
     centroids_regular = centroids_regular.copy_to_host()
 
@@ -115,12 +126,13 @@ def test_fit_host_matches_fit_device(
         init_method="Array",
         max_iter=20,
         tol=1e-10,
-        batch_size=batch_size,
+        streaming_batch_size=streaming_batch_size,
     )
     centroids_batched, _, _ = fit(
         params_host,
         X_host,
         centroids=device_ndarray(initial_centroids_host.copy()),
+        sample_weights=sample_weights_host,
     )
     centroids_batched = centroids_batched.copy_to_host()
 
