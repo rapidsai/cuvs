@@ -833,7 +833,10 @@ __device__ __forceinline__ void interleaved_scan_kernel_impl(const uint32_t quer
       uint32_t sample_offset = 0;
       if (probe_id > 0) { sample_offset = chunk_indices[probe_id - 1]; }
       assert(list_length == chunk_indices[probe_id] - sample_offset);
-      assert(sample_offset + list_length <= max_samples);
+      if constexpr (!kManageLocalTopK) {
+        // max_samples is zero/unused in the kManageLocalTopK mode
+        assert(sample_offset + list_length <= max_samples);
+      }
 
       constexpr int kUnroll        = raft::WarpSize / Veclen;
       constexpr uint32_t kNumWarps = kThreadsPerBlock / raft::WarpSize;
