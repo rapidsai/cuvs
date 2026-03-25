@@ -764,24 +764,23 @@ template <int Capacity,
           typename T,
           typename AccT,
           typename IdxT>
-RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)
-  interleaved_scan_kernel(const uint32_t query_smem_elems,
-                          const T* query,
-                          const uint32_t* coarse_index,
-                          const T* const* list_data_ptrs,
-                          const uint32_t* list_sizes,
-                          const uint32_t queries_offset,
-                          const uint32_t n_probes,
-                          const uint32_t k,
-                          const uint32_t max_samples,
-                          const uint32_t* chunk_indices,
-                          const uint32_t dim,
-                          IdxT* const* const inds_ptrs,
-                          uint32_t* bitset_ptr,
-                          IdxT bitset_len,
-                          IdxT original_nbits,
-                          uint32_t* neighbors,
-                          float* distances)
+__device__ __forceinline__ void interleaved_scan_kernel_impl(const uint32_t query_smem_elems,
+                                                             const T* query,
+                                                             const uint32_t* coarse_index,
+                                                             const T* const* list_data_ptrs,
+                                                             const uint32_t* list_sizes,
+                                                             const uint32_t queries_offset,
+                                                             const uint32_t n_probes,
+                                                             const uint32_t k,
+                                                             const uint32_t max_samples,
+                                                             const uint32_t* chunk_indices,
+                                                             const uint32_t dim,
+                                                             IdxT* const* const inds_ptrs,
+                                                             uint32_t* bitset_ptr,
+                                                             IdxT bitset_len,
+                                                             IdxT original_nbits,
+                                                             uint32_t* neighbors,
+                                                             float* distances)
 {
   extern __shared__ __align__(256) uint8_t interleaved_scan_kernel_smem[];
   constexpr bool kManageLocalTopK = Capacity > 0;
@@ -834,7 +833,10 @@ RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)
       uint32_t sample_offset = 0;
       if (probe_id > 0) { sample_offset = chunk_indices[probe_id - 1]; }
       assert(list_length == chunk_indices[probe_id] - sample_offset);
-      assert(sample_offset + list_length <= max_samples);
+      if constexpr (!kManageLocalTopK) {
+        // max_samples is zero/unused in the kManageLocalTopK mode
+        assert(sample_offset + list_length <= max_samples);
+      }
 
       constexpr int kUnroll        = raft::WarpSize / Veclen;
       constexpr uint32_t kNumWarps = kThreadsPerBlock / raft::WarpSize;
