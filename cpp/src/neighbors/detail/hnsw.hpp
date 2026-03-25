@@ -36,7 +36,7 @@ namespace cuvs::neighbors::hnsw::detail {
 
 // This is needed as hnswlib hardcodes the distance type to float
 // or int32_t in certain places. However, we can solve uint8 or int8
-// natively with the pacth cuVS applies. We could potentially remove
+// natively with the patch cuVS applies. We could potentially remove
 // all the hardcodes and propagate templates throughout hnswlib, but
 // as of now it's not needed.
 template <typename T>

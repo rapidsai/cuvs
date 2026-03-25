@@ -906,7 +906,7 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
       EXPECT_FALSE(unacceptable_node);
 
       double min_recall = ps.min_recall;
-      // TODO(mfoerster): re-enable uniquenes test
+      // TODO(mfoerster): re-enable uniqueness test
       EXPECT_TRUE(eval_neighbours(indices_naive,
                                   indices_Cagra,
                                   distances_naive,
