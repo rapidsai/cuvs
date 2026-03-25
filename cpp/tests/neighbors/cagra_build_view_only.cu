@@ -39,9 +39,9 @@ TEST(CagraBuildViewOnly, BuildFromViewIndexDoesNotOwn)
   raft::resource::sync_stream(res);
 
   cagra::index_params build_params;
-  build_params.metric = cuvs::distance::DistanceType::L2Expanded;
-  build_params.graph_build_params =
-    cagra::graph_build_params::ivf_pq_params(raft::matrix_extent<int64_t>(n_rows, dim), build_params.metric);
+  build_params.metric             = cuvs::distance::DistanceType::L2Expanded;
+  build_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
+    raft::matrix_extent<int64_t>(n_rows, dim), build_params.metric);
 
   auto db_view = raft::make_device_matrix_view<const float, int64_t>(database.data(), n_rows, dim);
   auto padded_view = cuvs::neighbors::make_padded_dataset_view(res, db_view);
@@ -78,9 +78,9 @@ TEST(CagraBuildViewOnly, BuildFromOwnedDatasetViaViewIndexDoesNotOwn)
     std::move(dev_matrix), dim);
 
   cagra::index_params build_params;
-  build_params.metric = cuvs::distance::DistanceType::L2Expanded;
-  build_params.graph_build_params =
-    cagra::graph_build_params::ivf_pq_params(raft::matrix_extent<int64_t>(n_rows, dim), build_params.metric);
+  build_params.metric             = cuvs::distance::DistanceType::L2Expanded;
+  build_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
+    raft::matrix_extent<int64_t>(n_rows, dim), build_params.metric);
 
   // Pass view only; caller keeps ds for lifetime of index.
   cagra::index<float, uint32_t> index = cagra::build(res, build_params, ds->as_dataset_view());

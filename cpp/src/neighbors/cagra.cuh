@@ -294,8 +294,8 @@ ace_build_result<T, IdxT> build(
  */
 template <typename T, typename IdxT>
 build_result<T, IdxT> build(raft::resources const& res,
-                           const index_params& params,
-                           cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& dataset)
+                            const index_params& params,
+                            cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& dataset)
 {
   return cuvs::neighbors::cagra::detail::build<T, IdxT>(res, params, dataset);
 }
@@ -416,9 +416,9 @@ void extend(
 
 template <class T, class IdxT>
 merge_result<T, IdxT> merge(raft::resources const& handle,
-                           const cagra::index_params& params,
-                           std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,
-                           const cuvs::neighbors::filtering::base_filter& row_filter)
+                            const cagra::index_params& params,
+                            std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,
+                            const cuvs::neighbors::filtering::base_filter& row_filter)
 {
   return cagra::detail::merge<T, IdxT>(handle, params, indices, row_filter);
 }

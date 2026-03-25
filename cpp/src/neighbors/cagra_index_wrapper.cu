@@ -87,7 +87,7 @@ IndexWrapper<T, IdxT, OutputIdxT>::merge(
   } else if (cagra_params->strategy() == cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL) {
     auto merge_res =
       cuvs::neighbors::cagra::merge(handle, cagra_params->output_index_params, cagra_indices);
-    auto* idx = new cuvs::neighbors::cagra::index<T, IdxT>(std::move(merge_res.idx));
+    auto* idx    = new cuvs::neighbors::cagra::index<T, IdxT>(std::move(merge_res.idx));
     auto wrapper = std::make_shared<IndexWrapper<T, IdxT, OutputIdxT>>(idx);
     wrapper->set_merged_dataset(std::move(merge_res.dataset));
     return wrapper;

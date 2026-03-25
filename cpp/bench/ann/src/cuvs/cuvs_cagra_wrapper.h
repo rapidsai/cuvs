@@ -190,7 +190,7 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
   if (index_params_.num_dataset_splits <= 1) {
     if (dataset_is_on_host) {
       auto ace_res = cuvs::neighbors::cagra::build(handle_, params, dataset_view_host);
-      index_       = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(ace_res.idx));
+      index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(ace_res.idx));
       if (ace_res.dataset.has_value()) { *dataset_ = std::move(*ace_res.dataset); }
     } else {
       index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(
@@ -248,8 +248,8 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
       }
 
       auto merge_res = cuvs::neighbors::cagra::merge(handle_, params, indices);
-      index_         = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(merge_res.idx));
-      *dataset_      = std::move(merge_res.dataset);
+      index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(merge_res.idx));
+      *dataset_ = std::move(merge_res.dataset);
     }
   }
 }
@@ -321,9 +321,8 @@ void cuvs_cagra<T, IdxT>::set_search_param(const search_param_base& param,
     cuvs::neighbors::cagra::detail::copy_with_padding(handle_, *dataset_, *input_dataset_v_, mr);
 
     cuvs::neighbors::device_padded_dataset_view<T, int64_t> dv(
-      raft::make_device_matrix_view(dataset_->data_handle(),
-                                    dataset_->extent(0),
-                                    dataset_->extent(1)),
+      raft::make_device_matrix_view(
+        dataset_->data_handle(), dataset_->extent(0), dataset_->extent(1)),
       this->dim_);
     index_->update_dataset(handle_, dv);
 
@@ -447,7 +446,8 @@ void cuvs_cagra<T, IdxT>::load(const std::string& file)
     for (size_t i = 0; i < count; ++i) {
       std::string subfile = file + (i == 0 ? "" : ".subidx." + std::to_string(i));
       auto sub_index      = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(handle_);
-      cuvs::neighbors::cagra::deserialize(handle_, subfile, sub_index.get(), &sub_deserialized_datasets_[i]);
+      cuvs::neighbors::cagra::deserialize(
+        handle_, subfile, sub_index.get(), &sub_deserialized_datasets_[i]);
       sub_indices_.push_back(std::move(sub_index));
     }
   } else {

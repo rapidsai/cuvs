@@ -301,12 +301,9 @@ void add_graph_nodes(
              index.graph().size(),
              raft::resource::get_cuda_stream(handle));
 
-  auto empty_data_view =
-    raft::make_device_matrix_view<const T, int64_t>(nullptr, 0, dim);
-  cuvs::neighbors::device_padded_dataset_view<T, int64_t> empty_dataset_view(
-    empty_data_view);
-  auto empty_graph_view =
-    raft::make_device_matrix_view<const IdxT, int64_t>(nullptr, 0, degree);
+  auto empty_data_view = raft::make_device_matrix_view<const T, int64_t>(nullptr, 0, dim);
+  cuvs::neighbors::device_padded_dataset_view<T, int64_t> empty_dataset_view(empty_data_view);
+  auto empty_graph_view = raft::make_device_matrix_view<const IdxT, int64_t>(nullptr, 0, degree);
   neighbors::cagra::index<T, IdxT> internal_index(
     handle, index.metric(), empty_dataset_view, empty_graph_view);
 
@@ -361,8 +358,8 @@ void extend_core(
                "cuvs::neighbors::hnsw::deserialize() before calling extend().");
 
   RAFT_EXPECTS(new_dataset_buffer_view.has_value(),
-              "cagra::extend requires new_dataset_buffer_view. "
-              "Provide a buffer view for the extended dataset (initial + additional vectors).");
+               "cagra::extend requires new_dataset_buffer_view. "
+               "Provide a buffer view for the extended dataset (initial + additional vectors).");
   const std::size_t num_new_nodes        = additional_dataset.extent(0);
   const std::size_t initial_dataset_size = index.size();
   const std::size_t new_dataset_size     = initial_dataset_size + num_new_nodes;
@@ -397,7 +394,7 @@ void extend_core(
     // Allocate memory space for updated graph on host
     auto updated_graph = raft::make_host_matrix<IdxT, std::int64_t>(new_dataset_size, degree);
 
-    const auto stride = strided_dset->stride();
+    const auto stride         = strided_dset->stride();
     auto updated_dataset_view = new_dataset_buffer_view.value();
 
     // Update dataset on host, then copy to device buffer provided by caller

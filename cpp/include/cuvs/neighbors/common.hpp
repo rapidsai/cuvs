@@ -270,8 +270,7 @@ struct device_padded_dataset : public dataset<IdxT> {
   [[nodiscard]] auto is_owning() const noexcept -> bool final { return true; }
   [[nodiscard]] auto view() const noexcept -> view_type { return data_.view(); }
   /** Return a non-owning padded_dataset_view over this buffer (e.g. to pass to index). */
-  [[nodiscard]] auto as_dataset_view() const noexcept
-    -> device_padded_dataset_view<DataT, IdxT>
+  [[nodiscard]] auto as_dataset_view() const noexcept -> device_padded_dataset_view<DataT, IdxT>
   {
     return device_padded_dataset_view<DataT, IdxT>(data_.view(), dim_);
   }
@@ -577,11 +576,13 @@ auto make_aligned_dataset(const raft::resources& res, SrcT src, uint32_t align_b
  * @throws raft::logic_error if data is not device-accessible or stride is incorrect
  */
 template <typename SrcT>
-auto make_padded_dataset_view(const raft::resources& res, SrcT const& src, uint32_t align_bytes = 16)
+auto make_padded_dataset_view(const raft::resources& res,
+                              SrcT const& src,
+                              uint32_t align_bytes = 16)
   -> device_padded_dataset_view<typename SrcT::value_type, typename SrcT::index_type>
 {
-  using value_type = typename SrcT::value_type;
-  using index_type = typename SrcT::index_type;
+  using value_type       = typename SrcT::value_type;
+  using index_type       = typename SrcT::index_type;
   constexpr size_t kSize = sizeof(value_type);
   uint32_t required_stride =
     raft::round_up_safe<size_t>(src.extent(1) * kSize, std::lcm(align_bytes, kSize)) / kSize;
@@ -595,7 +596,8 @@ auto make_padded_dataset_view(const raft::resources& res, SrcT const& src, uint3
   RAFT_EXPECTS(src_stride == required_stride,
                "make_padded_dataset_view: stride is incorrect (required stride for alignment). "
                "Use make_padded_dataset() to get an owning padded copy.");
-  auto v = raft::make_device_matrix_view(device_ptr, src.extent(0), static_cast<index_type>(src_stride));
+  auto v =
+    raft::make_device_matrix_view(device_ptr, src.extent(0), static_cast<index_type>(src_stride));
   return device_padded_dataset_view<value_type, index_type>(v, src.extent(1));
 }
 
@@ -617,8 +619,8 @@ template <typename SrcT>
 auto make_padded_dataset(const raft::resources& res, SrcT const& src, uint32_t align_bytes = 16)
   -> std::unique_ptr<device_padded_dataset<typename SrcT::value_type, typename SrcT::index_type>>
 {
-  using value_type = typename SrcT::value_type;
-  using index_type = typename SrcT::index_type;
+  using value_type       = typename SrcT::value_type;
+  using index_type       = typename SrcT::index_type;
   constexpr size_t kSize = sizeof(value_type);
   uint32_t required_stride =
     raft::round_up_safe<size_t>(src.extent(1) * kSize, std::lcm(align_bytes, kSize)) / kSize;
@@ -631,7 +633,8 @@ auto make_padded_dataset(const raft::resources& res, SrcT const& src, uint32_t a
                  "make_padded_dataset: source is device and stride is already correct. "
                  "Use make_padded_dataset_view() to get a view instead.");
   }
-  RAFT_EXPECTS(src.extent(1) <= required_stride, "Source row length must not exceed required stride.");
+  RAFT_EXPECTS(src.extent(1) <= required_stride,
+               "Source row length must not exceed required stride.");
   auto out_array =
     raft::make_device_matrix<value_type, index_type>(res, src.extent(0), required_stride);
   RAFT_CUDA_TRY(cudaMemsetAsync(out_array.data_handle(),
@@ -1118,7 +1121,8 @@ struct iface {
   std::optional<AnnIndexType> index_;
   /** Used by CAGRA when built from host: holds device copy so index dataset view stays valid. */
   std::optional<raft::device_matrix<T, int64_t, raft::row_major>> cagra_build_dataset_;
-  /** Used by CAGRA when deserializing an index that contains a dataset; keeps it alive for the view. */
+  /** Used by CAGRA when deserializing an index that contains a dataset; keeps it alive for the
+   * view. */
   std::unique_ptr<cuvs::neighbors::dataset<int64_t>> cagra_owned_dataset_;
   std::shared_ptr<std::mutex> mutex_;
 };

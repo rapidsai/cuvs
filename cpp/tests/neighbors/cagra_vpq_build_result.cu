@@ -34,7 +34,7 @@ TEST(CagraVpqBuildResult, VpqBuildReturnsBuildResultSearchSucceeds)
   const int64_t n_rows    = 500;
   const uint32_t dim      = 32;  // multiple of pq_dim for VPQ
   const int64_t n_queries = 50;
-  const uint32_t k       = 16;
+  const uint32_t k        = 16;
 
   rmm::device_uvector<float> database(n_rows * dim, stream);
   rmm::device_uvector<float> queries(n_queries * dim, stream);
@@ -63,9 +63,9 @@ TEST(CagraVpqBuildResult, VpqBuildReturnsBuildResultSearchSucceeds)
   raft::resource::sync_stream(res);
 
   cagra::index_params build_params;
-  build_params.metric = cuvs::distance::DistanceType::L2Expanded;
-  build_params.graph_build_params =
-    cagra::graph_build_params::ivf_pq_params(raft::matrix_extent<int64_t>(n_rows, dim), build_params.metric);
+  build_params.metric             = cuvs::distance::DistanceType::L2Expanded;
+  build_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
+    raft::matrix_extent<int64_t>(n_rows, dim), build_params.metric);
   // Enable VPQ: build will return build_result with .vpq that we must keep alive.
   {
     cuvs::neighbors::vpq_params vpq_ps;
@@ -74,8 +74,7 @@ TEST(CagraVpqBuildResult, VpqBuildReturnsBuildResultSearchSucceeds)
     build_params.compression.emplace(vpq_ps);
   }
 
-  auto db_view =
-    raft::make_device_matrix_view<const float, int64_t>(database.data(), n_rows, dim);
+  auto db_view = raft::make_device_matrix_view<const float, int64_t>(database.data(), n_rows, dim);
   auto padded_view = cuvs::neighbors::make_padded_dataset_view(res, db_view);
 
   // build() returns build_result when using view-based overload (VPQ or not).
@@ -125,10 +124,10 @@ TEST(CagraVpqBuildResult, CallerKeepsBuildResultAliveForSearch)
   raft::resources res;
   auto stream = raft::resource::get_cuda_stream(res);
 
-  const int64_t n_rows   = 300;
-  const uint32_t dim     = 16;
+  const int64_t n_rows    = 300;
+  const uint32_t dim      = 16;
   const int64_t n_queries = 30;
-  const uint32_t k       = 10;
+  const uint32_t k        = 10;
 
   rmm::device_uvector<float> database(n_rows * dim, stream);
   rmm::device_uvector<float> queries(n_queries * dim, stream);
@@ -138,9 +137,9 @@ TEST(CagraVpqBuildResult, CallerKeepsBuildResultAliveForSearch)
   raft::resource::sync_stream(res);
 
   cagra::index_params build_params;
-  build_params.metric = cuvs::distance::DistanceType::L2Expanded;
-  build_params.graph_build_params =
-    cagra::graph_build_params::ivf_pq_params(raft::matrix_extent<int64_t>(n_rows, dim), build_params.metric);
+  build_params.metric             = cuvs::distance::DistanceType::L2Expanded;
+  build_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
+    raft::matrix_extent<int64_t>(n_rows, dim), build_params.metric);
   cuvs::neighbors::vpq_params vpq_ps;
   vpq_ps.pq_bits = 6;
   vpq_ps.pq_dim  = 8;  // dim 16 is multiple of 8

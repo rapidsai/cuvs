@@ -30,11 +30,10 @@
 namespace cuvs::neighbors::cagra::detail {
 
 template <class T, class IdxT>
-merge_result<T, IdxT> merge(
-  raft::resources const& handle,
-  const cagra::index_params& params,
-  std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,
-  const cuvs::neighbors::filtering::base_filter& row_filter)
+merge_result<T, IdxT> merge(raft::resources const& handle,
+                            const cagra::index_params& params,
+                            std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,
+                            const cuvs::neighbors::filtering::base_filter& row_filter)
 {
   using cagra_index_t = cuvs::neighbors::cagra::index<T, IdxT>;
   using ds_idx_type   = typename cagra_index_t::dataset_index_type;
@@ -149,9 +148,8 @@ merge_result<T, IdxT> merge(
     if (ace_res.dataset.has_value()) {
       return cagra::merge_result<T, IdxT>{std::move(ace_res.idx), std::move(*ace_res.dataset)};
     }
-    return cagra::merge_result<T, IdxT>{
-      std::move(ace_res.idx),
-      raft::make_device_matrix<T, int64_t>(handle, 0, dim)};
+    return cagra::merge_result<T, IdxT>{std::move(ace_res.idx),
+                                        raft::make_device_matrix<T, int64_t>(handle, 0, dim)};
   }
 }
 

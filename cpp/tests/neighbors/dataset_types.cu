@@ -199,7 +199,7 @@ TEST(DatasetTypes, DevicePaddedDataset)
 
   // With explicit stride (padding)
   const uint32_t padded_stride = dim + 8;
-  auto data_padded            = raft::make_device_matrix<float, int64_t>(res, n_rows, padded_stride);
+  auto data_padded = raft::make_device_matrix<float, int64_t>(res, n_rows, padded_stride);
   auto ds_padded =
     std::make_unique<device_padded_dataset<float, int64_t>>(std::move(data_padded), dim);
   ASSERT_NE(ds_padded, nullptr);
@@ -215,8 +215,8 @@ TEST(DatasetTypes, DevicePaddedDatasetView)
   raft::resources res;
   const int64_t n_rows = 20;
   const uint32_t dim   = 8;
-  auto dev_matrix = raft::make_device_matrix<float, int64_t>(res, n_rows, dim);
-  auto ds         = make_padded_dataset_view(res, dev_matrix.view());
+  auto dev_matrix      = raft::make_device_matrix<float, int64_t>(res, n_rows, dim);
+  auto ds              = make_padded_dataset_view(res, dev_matrix.view());
   EXPECT_EQ(ds.n_rows(), n_rows);
   EXPECT_EQ(ds.dim(), dim);
   EXPECT_EQ(ds.stride(), dim);
@@ -268,11 +268,11 @@ TEST(DatasetTypes, HostPaddedDatasetView)
 TEST(DatasetTypes, MakePaddedDatasetViewThrowsWhenStrideMismatch)
 {
   raft::resources res;
-  const int64_t n_rows = 10;
-  const uint32_t dim   = 30;  // float dim 30 -> required stride 32 (16-byte align)
-  auto dev_matrix     = raft::make_device_matrix<float, int64_t>(res, n_rows, 32);
-  auto wrong_stride_view =
-    raft::make_device_matrix_view(dev_matrix.data_handle(), n_rows, static_cast<int64_t>(dim));  // stride 30
+  const int64_t n_rows   = 10;
+  const uint32_t dim     = 30;  // float dim 30 -> required stride 32 (16-byte align)
+  auto dev_matrix        = raft::make_device_matrix<float, int64_t>(res, n_rows, 32);
+  auto wrong_stride_view = raft::make_device_matrix_view(
+    dev_matrix.data_handle(), n_rows, static_cast<int64_t>(dim));  // stride 30
   EXPECT_THROW(
     {
       try {
@@ -295,9 +295,9 @@ TEST(DatasetTypes, MakePaddedDatasetViewThrowsWhenStrideMismatch)
 TEST(DatasetTypes, MakePaddedDatasetThrowsWhenStrideMatchesUseViewInstead)
 {
   raft::resources res;
-  const int64_t n_rows = 10;
-  const uint32_t dim   = 8;  // float dim 8 -> required stride 8, so no padding needed
-  auto dev_matrix     = raft::make_device_matrix<float, int64_t>(res, n_rows, dim);
+  const int64_t n_rows     = 10;
+  const uint32_t dim       = 8;  // float dim 8 -> required stride 8, so no padding needed
+  auto dev_matrix          = raft::make_device_matrix<float, int64_t>(res, n_rows, dim);
   auto correct_stride_view = dev_matrix.view();
   EXPECT_THROW(
     {
@@ -400,10 +400,9 @@ TEST(DatasetTypes, PolymorphicBaseAccess)
   EXPECT_TRUE(base->is_owning());
 
   // device padded (owning)
-  auto dev_data = raft::make_device_matrix<float, int64_t>(res, 6, 4);
-  auto ds_padded =
-    std::make_unique<device_padded_dataset<float, int64_t>>(std::move(dev_data), 4u);
-  base = ds_padded.get();
+  auto dev_data  = raft::make_device_matrix<float, int64_t>(res, 6, 4);
+  auto ds_padded = std::make_unique<device_padded_dataset<float, int64_t>>(std::move(dev_data), 4u);
+  base           = ds_padded.get();
   EXPECT_EQ(base->n_rows(), 6);
   EXPECT_EQ(base->dim(), 4u);
   EXPECT_TRUE(base->is_owning());

@@ -6,9 +6,9 @@
 #pragma once
 
 #include <cuvs/neighbors/index_wrappers.hpp>
-#include <raft/core/device_mdarray.hpp>
 #include <memory>
 #include <optional>
+#include <raft/core/device_mdarray.hpp>
 
 // Forward declarations to avoid circular dependencies
 namespace cuvs::neighbors::cagra {

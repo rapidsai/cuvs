@@ -6,12 +6,12 @@
 #pragma once
 
 #include "common.hpp"
+#include <cuda_fp16.h>
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 #include <cuvs/util/file_io.hpp>
-#include <cuda_fp16.h>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_device_accessor.hpp>
@@ -527,8 +527,9 @@ struct index : cuvs::neighbors::index {
    * make_padded_dataset()->as_dataset_view() (when stride is incorrect), then pass it here.
    *
    * @code{.cpp}
-   *   auto view = make_padded_dataset_view(res, dataset_mdspan);  // or make_padded_dataset(...)->as_dataset_view()
-   *   cagra::index<T, IdxT> index(res, metric, view, raft::make_const_mdspan(knn_graph.view()));
+   *   auto view = make_padded_dataset_view(res, dataset_mdspan);  // or
+   * make_padded_dataset(...)->as_dataset_view() cagra::index<T, IdxT> index(res, metric, view,
+   * raft::make_const_mdspan(knn_graph.view()));
    * @endcode
    */
   template <typename graph_accessor>
@@ -580,9 +581,8 @@ struct index : cuvs::neighbors::index {
    * The index stores a non-owning reference. The caller must keep the underlying data
    * alive for the lifetime of the index. Used internally by extend (chunked updates).
    */
-  void update_dataset(
-    raft::resources const& res,
-    raft::device_matrix_view<const T, int64_t, raft::layout_stride> dataset_view)
+  void update_dataset(raft::resources const& res,
+                      raft::device_matrix_view<const T, int64_t, raft::layout_stride> dataset_view)
   {
     dataset_ = std::make_unique<non_owning_dataset<T, int64_t>>(dataset_view);
     dataset_norms_.reset();

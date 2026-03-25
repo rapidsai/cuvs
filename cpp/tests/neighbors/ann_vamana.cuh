@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -207,12 +207,9 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
         handle_, index.graph().extent(0), index.graph().extent(1));
       raft::linalg::map(handle_, graph_valid.view(), edge_op{}, index.graph());
 
-      cuvs::neighbors::device_padded_dataset_view<DataT, int64_t> cagra_dataset_view(
-        database_view);
-      auto cagra_index = cagra::index<DataT, IdxT>(handle_,
-                                                   ps.metric,
-                                                   cagra_dataset_view,
-                                                   raft::make_const_mdspan(graph_valid.view()));
+      cuvs::neighbors::device_padded_dataset_view<DataT, int64_t> cagra_dataset_view(database_view);
+      auto cagra_index = cagra::index<DataT, IdxT>(
+        handle_, ps.metric, cagra_dataset_view, raft::make_const_mdspan(graph_valid.view()));
 
       cagra::search_params search_params;
       search_params.algo        = ps.algo;

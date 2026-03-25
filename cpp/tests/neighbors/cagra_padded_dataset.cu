@@ -71,7 +71,7 @@ TEST(CagraPaddedDataset, PaddedDatasetViewBuildSearchRecall)
 
   // Build from device_padded_dataset_view (dim=32 -> stride=32 is valid for alignment)
   auto db_view = raft::make_device_matrix_view<const float, int64_t>(database.data(), n_rows, dim);
-  auto padded_view = cuvs::neighbors::make_padded_dataset_view(res, db_view);
+  auto padded_view                    = cuvs::neighbors::make_padded_dataset_view(res, db_view);
   cagra::index<float, uint32_t> index = cagra::build(res, build_params, padded_view);
 
   rmm::device_uvector<float> distances_cagra_dev(queries_size, stream);

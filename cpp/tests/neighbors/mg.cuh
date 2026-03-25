@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -220,7 +220,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       mg_index_params<cagra::index_params> index_params;
       // Host dataset uses ACE build path; must set ace_params (not ivf_pq_params).
       index_params.graph_build_params = cagra::graph_build_params::ace_params{};
-      index_params.mode = d_mode;
+      index_params.mode               = d_mode;
 
       mg_search_params<cagra::search_params> search_params;
 
@@ -556,7 +556,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       mg_index_params<cagra::index_params> index_params;
       // Host dataset uses ACE build path; must set ace_params (not ivf_pq_params).
       index_params.graph_build_params = cagra::graph_build_params::ace_params{};
-      index_params.mode = REPLICATED;
+      index_params.mode               = REPLICATED;
 
       mg_search_params<cagra::search_params> search_params;
       search_params.search_mode = ROUND_ROBIN;

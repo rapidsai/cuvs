@@ -1102,9 +1102,10 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
 // In disk mode, the graph is stored in build_dir and dataset is reordered on disk.
 // The returned index is not usable for search. Use the created files for search instead.
 template <typename T, typename IdxT>
-cagra::ace_build_result<T, IdxT> build_ace(raft::resources const& res,
-                                          const index_params& params,
-                                          raft::host_matrix_view<const T, int64_t, row_major> dataset)
+cagra::ace_build_result<T, IdxT> build_ace(
+  raft::resources const& res,
+  const index_params& params,
+  raft::host_matrix_view<const T, int64_t, row_major> dataset)
 {
   // Extract ACE parameters from graph_build_params
   RAFT_EXPECTS(
@@ -1374,8 +1375,8 @@ cagra::ace_build_result<T, IdxT> build_ace(raft::resources const& res,
       // Copy host partition to device with padding; build accepts device_padded_dataset_view only
       auto sub_dataset_dev =
         cuvs::neighbors::make_padded_dataset(res, raft::make_const_mdspan(sub_dataset.view()));
-      auto sub_build_res = cuvs::neighbors::cagra::build(
-        res, sub_index_params, sub_dataset_dev->as_dataset_view());
+      auto sub_build_res =
+        cuvs::neighbors::cagra::build(res, sub_index_params, sub_dataset_dev->as_dataset_view());
       auto sub_index = std::move(sub_build_res.idx);
 
       auto optimize_end = std::chrono::high_resolution_clock::now();
@@ -1485,11 +1486,12 @@ cagra::ace_build_result<T, IdxT> build_ace(raft::resources const& res,
       std::optional<raft::device_matrix<T, int64_t, raft::row_major>> device_dataset;
       if (params.attach_dataset_on_build) {
         try {
-          auto dev_data = raft::make_device_matrix<T, int64_t>(res, dataset.extent(0), dataset.extent(1));
+          auto dev_data =
+            raft::make_device_matrix<T, int64_t>(res, dataset.extent(0), dataset.extent(1));
           raft::copy(dev_data.data_handle(),
-                    dataset.data_handle(),
-                    dev_data.size(),
-                    raft::resource::get_cuda_stream(res));
+                     dataset.data_handle(),
+                     dev_data.size(),
+                     raft::resource::get_cuda_stream(res));
           cuvs::neighbors::device_padded_dataset_view<T, int64_t> dv(
             raft::make_const_mdspan(dev_data.view()), static_cast<uint32_t>(dataset.extent(1)));
           idx.update_dataset(res, dv);
@@ -1997,10 +1999,9 @@ struct mmap_owner {
 };
 
 template <typename T, typename IdxT = uint32_t>
-auto iterative_build_graph(
-  raft::resources const& res,
-  const index_params& params,
-  cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& dataset)
+auto iterative_build_graph(raft::resources const& res,
+                           const index_params& params,
+                           cuvs::neighbors::device_padded_dataset_view<T, int64_t> const& dataset)
   -> raft::host_matrix<IdxT, int64_t>
 {
   size_t intermediate_degree = params.intermediate_graph_degree;
@@ -2107,8 +2108,8 @@ auto iterative_build_graph(
     cuvs::neighbors::device_padded_dataset_view<T, int64_t> sub_padded(dev_dataset_view,
                                                                        logical_dim);
 
-    auto idx = index<T, IdxT>(
-      res, params.metric, sub_padded, raft::make_const_mdspan(cagra_graph.view()));
+    auto idx =
+      index<T, IdxT>(res, params.metric, sub_padded, raft::make_const_mdspan(cagra_graph.view()));
 
     auto dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
       dev_dataset.data_handle(), (int64_t)curr_query_size, dev_dataset.extent(1));
@@ -2164,7 +2165,8 @@ auto iterative_build_graph(
   return cagra_graph;
 }
 
-// Build from padded dataset view (user calls make_padded_dataset_view or make_padded_dataset()->as_dataset_view() first).
+// Build from padded dataset view (user calls make_padded_dataset_view or
+// make_padded_dataset()->as_dataset_view() first).
 template <typename T, typename IdxT = uint32_t>
 cagra::build_result<T, IdxT> build(
   raft::resources const& res,
