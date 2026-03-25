@@ -17,7 +17,7 @@ You may prefer to use `mamba`, as it provides significant speedup over `conda`.
 1. Set up the required environment variables:
 ```bash
 export CGO_CFLAGS="-I${CONDA_PREFIX}/include"
-export CGO_LDFLAGS="-L${CONDA_PREFIX}/lib -lcudart -lcuvs -lcuvs_c"
+export CGO_LDFLAGS="-L${CONDA_PREFIX}/lib -lcudart_static -ldl -lrt -lcuvs -lcuvs_c"
 export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$LD_LIBRARY_PATH"
 export CC=clang
 ```
