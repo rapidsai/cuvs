@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
@@ -156,6 +156,10 @@ cdef class KMeansParams:
 
 FitOutput = namedtuple("FitOutput", "centroids inertia n_iter")
 
+FitPredictOutput = namedtuple(
+    "FitPredictOutput", "labels centroids inertia n_iter"
+)
+
 
 @auto_sync_resources
 @auto_convert_output
@@ -237,6 +241,86 @@ def fit(
             &n_iter))
 
     return FitOutput(centroids, inertia, n_iter)
+
+
+@auto_sync_resources
+@auto_convert_output
+def fit_predict(
+    KMeansParams params,
+    X,
+    centroids=None,
+    sample_weights=None,
+    labels=None,
+    normalize_weight=True,
+    resources=None,
+):
+    """
+    Fit k-means on ``X`` and return cluster labels for the same data.
+
+    This is equivalent to calling :func:`fit` followed by :func:`predict` on
+    ``X`` with the fitted centroids.
+
+    Parameters
+    ----------
+    params : KMeansParams
+        Parameters to use to fit the KMeans model
+    X : Input CUDA array interface compliant matrix shape (m, k)
+    centroids : Optional writable CUDA array interface compliant matrix
+                shape (n_clusters, k)
+    sample_weights : Optional input CUDA array interface compliant matrix shape
+                     (n_clusters, 1) default: None
+    labels : Optional preallocated CUDA array interface matrix shape (m, 1)
+        to hold the output labels
+    normalize_weight: bool
+        Passed to :func:`predict`; True if the weights should be normalized
+    {resources_docstring}
+
+    Returns
+    -------
+    labels : raft.device_ndarray
+        Cluster index for each row of ``X``
+    centroids : raft.device_ndarray
+        The fitted cluster centroids
+    inertia : float
+        Sum of squared distances of samples to their closest cluster center
+        (from the prediction step)
+    n_iter : int
+        Number of iterations used in :func:`fit`
+
+    Examples
+    --------
+
+    >>> import cupy as cp
+    >>>
+    >>> from cuvs.cluster.kmeans import fit_predict, KMeansParams
+    >>>
+    >>> n_samples = 5000
+    >>> n_features = 50
+    >>> n_clusters = 3
+    >>>
+    >>> X = cp.random.random_sample((n_samples, n_features),
+    ...                             dtype=cp.float32)
+    >>>
+    >>> params = KMeansParams(n_clusters=n_clusters)
+    >>> labels, centroids, inertia, n_iter = fit_predict(params, X)
+    """
+    centroids_out, _, n_iter = fit(
+        params,
+        X,
+        centroids=centroids,
+        sample_weights=sample_weights,
+        resources=resources,
+    )
+    labels_out, inertia_pred = predict(
+        params,
+        X,
+        centroids_out,
+        sample_weights=sample_weights,
+        labels=labels,
+        normalize_weight=normalize_weight,
+        resources=resources,
+    )
+    return FitPredictOutput(labels_out, centroids_out, inertia_pred, n_iter)
 
 
 PredictOutput = namedtuple("PredictOutput", "labels inertia")
