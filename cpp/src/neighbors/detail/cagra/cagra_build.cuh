@@ -1658,7 +1658,7 @@ void build_knn_graph(
   // Heuristic: the build_knn_graph code should use only a fraction of the workspace memory; the
   // rest should be used by the ivf_pq::search. Here we say that the workspace size should be a good
   // multiple of what is required for the I/O batching below.
-  constexpr size_t kMinWorkspaceRatio = 10;
+  constexpr size_t kMinWorkspaceRatio = 5;
   constexpr size_t kMinLargeBatchSize = 512;
   auto desired_workspace_size =
     max_queries * (sizeof(DataT) * dataset.extent(1)  // queries (dataset batch)
