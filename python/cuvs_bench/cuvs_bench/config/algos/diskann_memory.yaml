@@ -15,6 +15,5 @@ groups:
       R: [32]
       L_build: [128]
       alpha: [1.2]
-      num_threads: [32]
     search:
       L_search: [10]
