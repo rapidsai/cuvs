@@ -72,6 +72,7 @@ void serialize_dataset(raft::resources const& res,
                                              strided_dataset->n_rows() * strided_dataset->dim()),
                  raft::make_device_vector_view(strided_dataset->view().data_handle(),
                                                strided_dataset->n_rows() * strided_dataset->dim()));
+      raft::resource::sync_stream(res);
       to_file(dataset_base_file, h_dataset);
     } else {
       RAFT_LOG_DEBUG("dynamic_cast to strided_dataset failed");
@@ -91,6 +92,7 @@ void serialize_dataset(raft::resources const& res,
   try {
     auto h_dataset = raft::make_host_matrix<T, int64_t>(dataset.extent(0), dataset.extent(1));
     raft::copy(res, h_dataset.view(), dataset);
+    raft::resource::sync_stream(res);
     to_file(dataset_base_file, h_dataset);
   } catch (std::bad_alloc& e) {
     RAFT_LOG_INFO("Failed to serialize dataset");
