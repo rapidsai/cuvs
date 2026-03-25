@@ -69,8 +69,10 @@ function(ConfigureTest)
                CUDA_STANDARD_REQUIRED ON
   )
   target_compile_options(
-    ${TEST_NAME} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
-                         "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+    ${TEST_NAME}
+    PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
+            "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+            "$<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>:${CUVS_DEBUG_CUDA_FLAGS}>"
   )
 
   if(_CUVS_TEST_NOCUDA)
@@ -407,6 +409,7 @@ if(CUVS_BUILD_SPECTRAL_EMBEDDING)
   list(APPEND PREPROCESSING_TEST_SOURCES preprocessing/spectral_embedding.cu)
 endif()
 list(APPEND PREPROCESSING_TEST_SOURCES preprocessing/product_quantization.cu)
+list(APPEND PREPROCESSING_TEST_SOURCES preprocessing/pca.cu)
 ConfigureTest(
   NAME PREPROCESSING_TEST
   PATH ${PREPROCESSING_TEST_SOURCES}
