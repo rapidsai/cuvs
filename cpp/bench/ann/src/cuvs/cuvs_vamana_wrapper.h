@@ -13,6 +13,7 @@
 #include <memory>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/mdspan.hpp>
+#include <raft/core/resource/cuda_stream.hpp>
 
 namespace cuvs::bench {
 
@@ -82,6 +83,7 @@ void cuvs_vamana<T, IdxT>::build(const T* dataset, size_t nrow)
     dataset_is_on_host
       ? cuvs::neighbors::vamana::build(handle_, vamana_index_params_, dataset_view_host)
       : cuvs::neighbors::vamana::build(handle_, vamana_index_params_, dataset_view_device)));
+  raft::resource::sync_stream(handle_);
 }
 
 template <typename T, typename IdxT>
