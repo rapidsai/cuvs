@@ -65,10 +65,10 @@ void serialize_dataset(raft::resources const& res,
     const auto* strided_dataset =
       dynamic_cast<const cuvs::neighbors::strided_dataset<T, int64_t>*>(dataset);
     if (strided_dataset) {
-      auto nrows  = strided_dataset->n_rows();
-      auto dim    = strided_dataset->dim();
-      auto stride = strided_dataset->stride();
-      auto d_data = strided_dataset->view();
+      auto nrows     = strided_dataset->n_rows();
+      auto dim       = strided_dataset->dim();
+      auto stride    = strided_dataset->stride();
+      auto d_data    = strided_dataset->view();
       auto h_dataset = raft::make_host_matrix<T, int64_t>(nrows, dim);
       RAFT_CUDA_TRY(cudaMemcpy2DAsync(h_dataset.data_handle(),
                                       sizeof(T) * dim,
