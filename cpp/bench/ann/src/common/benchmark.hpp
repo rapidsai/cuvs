@@ -169,7 +169,7 @@ void bench_build(::benchmark::State& state,
   }
   state.counters.insert({{"index_size", index_size}});
 
-  if (state.skipped()) { return; }
+  // if (state.skipped()) { return; }
   make_sure_parent_dir_exists(index.file);
   algo->save(index.file);
 }
