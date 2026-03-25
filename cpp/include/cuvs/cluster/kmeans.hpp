@@ -173,16 +173,16 @@ enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
  *   cuvs::cluster::kmeans::params params;
  *   params.n_clusters = 100;
  *   params.streaming_batch_size = 100000;
- *   int n_features = 15;
  *   float inertia;
  *   int n_iter;
  *
  *   // Data on host
  *   std::vector<float> h_X(n_samples * n_features);
- *   auto X = raft::make_host_matrix_view<const float, int>(h_X.data(), n_samples, n_features);
+ *   auto X = raft::make_host_matrix_view<const float, int64_t>(h_X.data(), n_samples, n_features);
  *
  *   // Centroids on device
- *   auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);
+ *   auto centroids = raft::make_device_matrix<float, int64_t>(handle,
+ * static_cast<int64_t>(params.n_clusters), n_features);
  *
  *   kmeans::fit(handle,
  *               params,
@@ -213,33 +213,11 @@ enum class kmeans_type { KMeans = 0, KMeansBalanced = 1 };
  */
 void fit(raft::resources const& handle,
          const cuvs::cluster::kmeans::params& params,
-         raft::host_matrix_view<const float, int> X,
-         std::optional<raft::host_vector_view<const float, int>> sample_weight,
-         raft::device_matrix_view<float, int> centroids,
-         raft::host_scalar_view<float> inertia,
-         raft::host_scalar_view<int> n_iter);
-
-/**
- * @brief Find clusters with k-means algorithm using batched processing of host data.
- */
-void fit(raft::resources const& handle,
-         const cuvs::cluster::kmeans::params& params,
          raft::host_matrix_view<const float, int64_t> X,
          std::optional<raft::host_vector_view<const float, int64_t>> sample_weight,
          raft::device_matrix_view<float, int64_t> centroids,
          raft::host_scalar_view<float> inertia,
          raft::host_scalar_view<int64_t> n_iter);
-
-/**
- * @brief Find clusters with k-means algorithm using batched processing of host data.
- */
-void fit(raft::resources const& handle,
-         const cuvs::cluster::kmeans::params& params,
-         raft::host_matrix_view<const double, int> X,
-         std::optional<raft::host_vector_view<const double, int>> sample_weight,
-         raft::device_matrix_view<double, int> centroids,
-         raft::host_scalar_view<double> inertia,
-         raft::host_scalar_view<int> n_iter);
 
 /**
  * @brief Find clusters with k-means algorithm using batched processing of host data.

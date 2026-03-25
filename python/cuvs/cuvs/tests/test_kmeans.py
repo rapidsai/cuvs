@@ -136,7 +136,6 @@ def test_fit_host_matches_fit_device(
         centroids_regular, centroids_batched, rtol=1e-3, atol=1e-3
     ), f"max diff: {np.max(np.abs(centroids_regular - centroids_batched))}"
 
-    print(inertia_regular, inertia_batched)
     assert np.allclose(
         inertia_regular, inertia_batched, rtol=1e-3, atol=1e-3
     ), f"max diff: {np.max(np.abs(inertia_regular - inertia_batched))}"

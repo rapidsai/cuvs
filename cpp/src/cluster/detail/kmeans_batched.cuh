@@ -444,13 +444,8 @@ void fit(raft::resources const& handle,
 
       if (sqrdNormError < params.tol) done = true;
 
-      if (done || n_iter[0] == iter_params.max_iter) {
-        RAFT_LOG_DEBUG("KMeans batched: Converged after %d iterations", n_iter[0]);
-        // Inertia for the last iteration is always computed
-        if (!params.inertia_check) {
-          raft::copy(inertia.data_handle(), clustering_cost.data_handle(), 1, stream);
-          raft::resource::sync_stream(handle);
-        }
+      if (done) {
+        RAFT_LOG_DEBUG("Threshold triggered after %d iterations. Terminating early.", n_iter[0]);
         break;
       }
     }

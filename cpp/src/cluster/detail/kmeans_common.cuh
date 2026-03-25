@@ -509,7 +509,7 @@ void compute_centroid_adjustments(
 
   workspace.resize(n_samples, stream);
 
-  raft::linalg::reduce_rows_by_key(const_cast<DataT*>(X.data_handle()),
+  raft::linalg::reduce_rows_by_key(X.data_handle(),
                                    X.extent(1),
                                    cluster_labels,
                                    sample_weights.data_handle(),
