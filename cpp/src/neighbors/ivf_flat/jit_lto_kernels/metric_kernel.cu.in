@@ -5,9 +5,17 @@
 
 #include <@header_file@>
 
+namespace {
+
+using data_t         = @data_type@;
+using acc_t          = @acc_type@;
+constexpr int veclen = @veclen@;
+
+}  // namespace
+
 namespace cuvs::neighbors::ivf_flat::detail {
 
 // Instantiate the device function template
-template __device__ void compute_dist<@veclen@, @data_type@, @acc_type@>(@acc_type@&, @acc_type@, @acc_type@);
+template __device__ void compute_dist<veclen, data_t, acc_t>(acc_t&, acc_t, acc_t);
 
 }  // namespace cuvs::neighbors::ivf_flat::detail
