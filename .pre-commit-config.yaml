@@ -32,7 +32,8 @@ repos:
                 args: ["--config-file=pyproject.toml",
                        "python/cuvs/cuvs",
                        "cpp/cmake/modules",
-                       "cpp/tests/python"]
+                       "cpp/tests/python",
+                       "ci/checks"]
                 pass_filenames: false
       - repo: https://github.com/PyCQA/pydocstyle
         rev: 6.1.1
