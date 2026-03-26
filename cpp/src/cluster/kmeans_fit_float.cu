@@ -40,6 +40,20 @@ INSTANTIATE_FIT(float, int64_t)
 #undef INSTANTIATE_FIT_MAIN
 #undef INSTANTIATE_FIT
 
+#define INSTANTIATE_FIT(DataT, IndexT)                                        \
+  template void fit<DataT, IndexT>(                                           \
+    raft::resources const& handle,                                            \
+    const kmeans::params& params,                                             \
+    raft::host_matrix_view<const DataT, IndexT> X,                            \
+    std::optional<raft::host_vector_view<const DataT, IndexT>> sample_weight, \
+    raft::device_matrix_view<DataT, IndexT> centroids,                        \
+    raft::host_scalar_view<DataT> inertia,                                    \
+    raft::host_scalar_view<IndexT> n_iter);
+
+INSTANTIATE_FIT(float, int64_t)
+
+#undef INSTANTIATE_FIT
+
 void fit(raft::resources const& handle,
          const cuvs::cluster::kmeans::params& params,
          raft::host_matrix_view<const float, int64_t> X,
@@ -74,32 +88,6 @@ void fit(raft::resources const& handle,
 {
   cuvs::cluster::kmeans::fit<float, int64_t>(
     handle, params, X, sample_weight, centroids, inertia, n_iter);
-}
-
-void predict(raft::resources const& handle,
-             const cuvs::cluster::kmeans::params& params,
-             raft::host_matrix_view<const float, int64_t> X,
-             std::optional<raft::host_vector_view<const float, int64_t>> sample_weight,
-             raft::device_matrix_view<const float, int64_t> centroids,
-             raft::host_vector_view<int64_t, int64_t> labels,
-             bool normalize_weight,
-             raft::host_scalar_view<float> inertia)
-{
-  cuvs::cluster::kmeans::detail::predict<float, int64_t>(
-    handle, params, X, sample_weight, centroids, labels, normalize_weight, inertia);
-}
-
-void fit_predict(raft::resources const& handle,
-                 const cuvs::cluster::kmeans::params& params,
-                 raft::host_matrix_view<const float, int64_t> X,
-                 std::optional<raft::host_vector_view<const float, int64_t>> sample_weight,
-                 raft::device_matrix_view<float, int64_t> centroids,
-                 raft::host_vector_view<int64_t, int64_t> labels,
-                 raft::host_scalar_view<float> inertia,
-                 raft::host_scalar_view<int64_t> n_iter)
-{
-  cuvs::cluster::kmeans::detail::fit_predict<float, int64_t>(
-    handle, params, X, sample_weight, centroids, labels, inertia, n_iter);
 }
 
 }  // namespace cuvs::cluster::kmeans
