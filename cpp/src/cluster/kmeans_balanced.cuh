@@ -99,29 +99,6 @@ void fit(const raft::resources& handle,
                                                     labels_ptr);
 }
 
-template <typename DataT,
-          typename MathT,
-          typename IndexT,
-          typename LabelT,
-          typename MappingOpT = raft::identity_op>
-void fit_predict(const raft::resources& handle,
-                 cuvs::cluster::kmeans::balanced_params const& params,
-                 raft::device_matrix_view<const DataT, IndexT> X,
-                 raft::device_matrix_view<MathT, IndexT> centroids,
-                 raft::device_vector_view<LabelT, IndexT> labels,
-                 MappingOpT mapping_op                                = raft::identity_op(),
-                 std::optional<raft::host_scalar_view<MathT>> inertia = std::nullopt)
-{
-  if constexpr (std::is_same_v<LabelT, uint32_t>) {
-    fit<DataT, MathT, IndexT, MappingOpT>(
-      handle, params, X, centroids, mapping_op, inertia, std::make_optional(labels));
-  } else {
-    fit<DataT, MathT, IndexT, MappingOpT>(handle, params, X, centroids, mapping_op, inertia);
-    // Use the public predict API for non-uint32_t labels
-    kmeans::predict(handle, params, X, raft::make_const_mdspan(centroids), labels);
-  }
-}
-
 /**
  * @brief Predict the closest cluster each sample in X belongs to.
  *

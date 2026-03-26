@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -51,14 +51,16 @@ void fit_predict(raft::resources const& handle,
                           config.n_components,
                           raft::resource::get_cuda_stream(handle));
 
-  cuvs::cluster::kmeans::fit_predict(handle,
-                                     kmeans_config,
-                                     embedding_row_major.view(),
-                                     std::nullopt,
-                                     std::nullopt,
-                                     labels,
-                                     raft::make_host_scalar_view(&inertia),
-                                     raft::make_host_scalar_view(&n_iter));
+  auto centroids =
+    raft::make_device_matrix<DataT, int>(handle, kmeans_config.n_clusters, config.n_components);
+  cuvs::cluster::kmeans::fit(handle,
+                             kmeans_config,
+                             embedding_row_major.view(),
+                             std::nullopt,
+                             centroids.view(),
+                             raft::make_host_scalar_view(&inertia),
+                             raft::make_host_scalar_view(&n_iter),
+                             labels);
 }
 
 void fit_predict(raft::resources const& handle,
