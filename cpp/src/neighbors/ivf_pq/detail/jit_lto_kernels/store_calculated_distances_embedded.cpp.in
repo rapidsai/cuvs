@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,8 +8,7 @@
 
 namespace cuvs::neighbors::ivf_pq::detail {
 
-using _FragmentEntry =
-  StoreCalculatedDistancesFragmentEntry<tag_out_@out_abbrev@, @k_manage_local_topk@>;
+using _FragmentEntry = StoreCalculatedDistancesFragmentEntry<tag_out_@out_abbrev@, @k_manage_local_topk@>;
 
 template <>
 const uint8_t* const _FragmentEntry::data = embedded_fatbin;

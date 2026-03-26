@@ -91,6 +91,14 @@ repos:
                 pass_filenames: false
                 files: rust/.*
                 language: rust
+              - id: clang-format-with-cmake-placeholders
+                name: clang-format-with-cmake-placeholders
+                entry: python3 ci/checks/clang_format_with_cmake_placeholders.py
+                language: python
+                additional_dependencies: [clang_format==20.1.4]
+                files: |
+                  (?x)
+                    [.](cpp|cu)[.]in$
       - repo: https://github.com/codespell-project/codespell
         rev: v2.4.1
         hooks:
