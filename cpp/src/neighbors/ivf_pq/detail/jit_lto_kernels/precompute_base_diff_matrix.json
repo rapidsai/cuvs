@@ -1,0 +1,10 @@
+[
+  {
+    "precomp_base_diff": "true",
+    "precomp_base_diff_str": "precomp_base_diff"
+  },
+  {
+    "precomp_base_diff": "false",
+    "precomp_base_diff_str": "no_precomp_base_diff"
+  }
+]

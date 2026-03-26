@@ -1,0 +1,27 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <neighbors/ivf_pq/detail/jit_lto_kernels/device_functions.cuh>
+#include <neighbors/ivf_pq/detail/jit_lto_kernels/precompute_base_diff_impl.cuh>
+#include <neighbors/ivf_pq/ivf_pq_fp_8bit.cuh>
+
+namespace {
+
+constexpr bool precomp_base_diff = @precomp_base_diff@;
+
+}
+
+namespace cuvs::neighbors::ivf_pq::detail {
+
+__device__ void precompute_base_diff(cuvs::distance::DistanceType metric,
+                                     uint32_t dim,
+                                     uint8_t* lut_end,
+                                     const float* query,
+                                     const float* cluster_center)
+{
+  precompute_base_diff_impl<precomp_base_diff>(metric, dim, lut_end, query, cluster_center);
+}
+
+}  // namespace cuvs::neighbors::ivf_pq::detail

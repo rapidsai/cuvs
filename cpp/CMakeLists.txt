@@ -376,69 +376,133 @@ if(NOT BUILD_CPU_ONLY)
   target_compile_features(jit_lto_kernel_usage_requirements INTERFACE cuda_std_20)
   target_link_libraries(jit_lto_kernel_usage_requirements INTERFACE rmm::rmm raft::raft CCCL::CCCL)
 
-  block(PROPAGATE interleaved_scan_files metric_files filter_files post_lambda_files)
+  block(PROPAGATE jit_lto_files)
+  set(jit_lto_files)
   set(CMAKE_CUDA_ARCHITECTURES ${JIT_LTO_TARGET_ARCHITECTURE})
   generate_jit_lto_kernels(
-    interleaved_scan_files
+    jit_lto_files
     NAME_FORMAT
-      "interleaved_scan_capacity_@capacity@_veclen_@veclen@_@ascending_descending@_@compute_norm_name@_data_@type_abbrev@_acc_@acc_abbrev@_idx_@idx_abbrev@"
+      "ivf_flat_interleaved_scan_capacity_@capacity@_veclen_@veclen@_@ascending_descending@_@compute_norm_name@_data_@type_abbrev@_acc_@acc_abbrev@_idx_@idx_abbrev@"
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_kernel.cu.in"
     EMBEDDED_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_embedded.cpp.in"
-    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/interleaved_scan"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_flat/interleaved_scan"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
   generate_jit_lto_kernels(
-    metric_files
-    NAME_FORMAT "metric_@metric_name@_veclen_@veclen@_data_@type_abbrev@_acc_@acc_abbrev@"
+    jit_lto_files
+    NAME_FORMAT "ivf_flat_metric_@metric_name@_veclen_@veclen@_data_@type_abbrev@_acc_@acc_abbrev@"
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/metric_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/metric_kernel.cu.in"
     EMBEDDED_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/metric_embedded.cpp.in"
-    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/metric"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_flat/metric"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
   generate_jit_lto_kernels(
-    filter_files
-    NAME_FORMAT "@filter_name@"
+    jit_lto_files
+    NAME_FORMAT "ivf_flat_@filter_name@"
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/filter_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/filter_kernel.cu.in"
     EMBEDDED_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/filter_embedded.cpp.in"
-    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/filter"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_flat/filter"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
   generate_jit_lto_kernels(
-    post_lambda_files
-    NAME_FORMAT "@post_lambda_name@"
+    jit_lto_files
+    NAME_FORMAT "ivf_flat_@post_lambda_name@"
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/post_lambda_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/post_lambda_kernel.cu.in"
     EMBEDDED_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/post_lambda_embedded.cpp.in"
-    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/post_lambda"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_flat/post_lambda"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_pq_compute_similarity_out_@out_abbrev@_lut_@lut_abbrev@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/compute_similarity_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/compute_similarity_kernel.cu.in"
+    EMBEDDED_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/compute_similarity_embedded.cpp.in"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_pq/compute_similarity"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_pq_prepare_lut_lut_@lut_abbrev@_@enable_smem_lut_str@_@pq_bits@pq"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/prepare_lut_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/prepare_lut_kernel.cu.in"
+    EMBEDDED_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/prepare_lut_embedded.cpp.in"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_pq/prepare_lut"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_pq_store_calculated_distances_out_@out_abbrev@_@k_manage_local_topk_str@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/store_calculated_distances_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/store_calculated_distances_kernel.cu.in"
+    EMBEDDED_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/store_calculated_distances_embedded.cpp.in"
+    OUTPUT_DIRECTORY
+      "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_pq/store_calculated_distances"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_pq_precompute_base_diff_@precomp_base_diff_str@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/precompute_base_diff_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/precompute_base_diff_kernel.cu.in"
+    EMBEDDED_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/precompute_base_diff_embedded.cpp.in"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_pq/precompute_base_diff"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_pq_create_lut_lut_@lut_abbrev@_@precomp_base_diff_str@_@pq_bits@pq"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/create_lut_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/create_lut_kernel.cu.in"
+    EMBEDDED_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/create_lut_embedded.cpp.in"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_pq/create_lut"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT
+      "ivf_pq_compute_distances_out_@out_abbrev@_lut_@lut_abbrev@_capacity_@capacity@_@pq_bits@pq"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/compute_distances_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/compute_distances_kernel.cu.in"
+    EMBEDDED_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/compute_distances_embedded.cpp.in"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_pq/compute_distances"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
   endblock()
-
-  set(jit_lto_files
-      ${interleaved_scan_files}
-      ${metric_files}
-      ${filter_files}
-      ${post_lambda_files}
-      src/detail/jit_lto/AlgorithmLauncher.cpp
-      src/detail/jit_lto/AlgorithmPlanner.cpp
-      src/detail/jit_lto/FragmentEntry.cpp
-      src/detail/jit_lto/nvjitlink_checker.cpp
-  )
 
   add_library(
     cuvs_objs OBJECT
@@ -472,6 +536,10 @@ if(NOT BUILD_CPU_ONLY)
     src/core/omp_wrapper.cpp
     src/util/file_io.cpp
     src/util/host_memory.cpp
+    src/detail/jit_lto/AlgorithmLauncher.cpp
+    src/detail/jit_lto/AlgorithmPlanner.cpp
+    src/detail/jit_lto/FragmentEntry.cpp
+    src/detail/jit_lto/nvjitlink_checker.cpp
     src/distance/detail/kernels/gram_matrix.cu
     src/distance/detail/kernels/kernel_factory.cu
     src/distance/detail/kernels/kernel_matrices.cu
