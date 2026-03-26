@@ -259,9 +259,17 @@ extern "C" cuvsError_t cuvsKMeansFit(cuvsResources_t res,
   return cuvs::core::translate_exceptions([=] {
     auto dataset = X->dl_tensor;
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
-      _fit<float>(res, *params, X, sample_weight, centroids, inertia, n_iter);
+      if (!cuvs::core::is_dlpack_device_compatible(X)) {
+      _fit<float, int64_t>(res, *params, X, sample_weight, centroids, inertia, n_iter);
+      } else {
+        _fit<float, int>(res, *params, X, sample_weight, centroids, inertia, n_iter);
+      }
     } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 64) {
-      _fit<double>(res, *params, X, sample_weight, centroids, inertia, n_iter);
+      if (!cuvs::core::is_dlpack_device_compatible(X)) {
+        _fit<double, int64_t>(res, *params, X, sample_weight, centroids, inertia, n_iter);
+      } else {
+        _fit<double, int>(res, *params, X, sample_weight, centroids, inertia, n_iter);
+      }
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
                 dataset.dtype.code,
