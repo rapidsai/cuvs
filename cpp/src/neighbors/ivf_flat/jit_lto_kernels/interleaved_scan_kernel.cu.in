@@ -7,12 +7,12 @@
 
 namespace {
 
-using data_t           = @data_type@;
-using acc_t            = @acc_type@;
-using idx_t            = @idx_type@;
-constexpr int veclen   = @veclen@;
-constexpr ascending    = @ascending_value@;
-constexpr compute_norm = @compute_norm_value@;
+using data_t                = @data_type@;
+using acc_t                 = @acc_type@;
+using idx_t                 = @idx_type@;
+constexpr int veclen        = @veclen@;
+constexpr bool ascending    = @ascending_value@;
+constexpr bool compute_norm = @compute_norm_value@;
 
 }  // namespace
 
