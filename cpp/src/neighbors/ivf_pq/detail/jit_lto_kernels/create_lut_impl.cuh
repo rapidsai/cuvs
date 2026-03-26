@@ -5,6 +5,11 @@
 
 #pragma once
 
+#include <cstdint>
+
+#include <cuvs/distance/distance.hpp>
+#include <cuvs/neighbors/ivf_pq.hpp>
+
 namespace cuvs::neighbors::ivf_pq::detail {
 
 template <typename LutT, bool PrecompBaseDiff, uint32_t PqBits>

@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include <raft/util/cudart_utils.hpp>
 
 #include "block_sort.cuh"

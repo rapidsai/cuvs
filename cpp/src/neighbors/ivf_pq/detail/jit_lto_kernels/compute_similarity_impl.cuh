@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include "device_functions.cuh"
 
 #include <raft/matrix/detail/select_warpsort.cuh>

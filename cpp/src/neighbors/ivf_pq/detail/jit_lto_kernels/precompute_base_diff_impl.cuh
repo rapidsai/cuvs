@@ -5,6 +5,10 @@
 
 #pragma once
 
+#include <cstdint>
+
+#include <cuvs/distance/distance.hpp>
+
 namespace cuvs::neighbors::ivf_pq::detail {
 
 template <bool PrecompBaseDiff>

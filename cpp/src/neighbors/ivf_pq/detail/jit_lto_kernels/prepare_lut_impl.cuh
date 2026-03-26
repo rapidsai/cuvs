@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 namespace cuvs::neighbors::ivf_pq::detail {
 
 template <typename LutT, bool EnableSMemLut, uint32_t PqBits>
