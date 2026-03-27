@@ -62,6 +62,46 @@ void print_results(raft::device_resources const& dev_resources,
   }
 }
 
+// Copy the results to host and print a few samples
+template <typename IdxT>
+void print_results_filter(raft::device_resources const& dev_resources,
+                          raft::device_matrix_view<IdxT, int64_t> neighbors,
+                          raft::device_matrix_view<float, int64_t> distances,
+                          raft::device_matrix_view<int32_t, int64_t> data_labels,
+                          raft::device_vector_view<int32_t> query_labels)
+{
+  int64_t topk        = neighbors.extent(1);
+  auto neighbors_host = raft::make_host_matrix<IdxT, int64_t>(neighbors.extent(0), topk);
+  auto distances_host = raft::make_host_matrix<float, int64_t>(distances.extent(0), topk);
+
+  cudaStream_t stream = raft::resource::get_cuda_stream(dev_resources);
+
+  raft::copy(neighbors_host.data_handle(), neighbors.data_handle(), neighbors.size(), stream);
+  raft::copy(distances_host.data_handle(), distances.data_handle(), distances.size(), stream);
+
+  auto data_labels_host =
+    raft::make_host_matrix<int32_t, int64_t>(data_labels.extent(0), data_labels.extent(1));
+  auto query_labels_host = raft::make_host_vector<int32_t>(query_labels.extent(0));
+  raft::copy(data_labels_host.data_handle(), data_labels.data_handle(), data_labels.size(), stream);
+  raft::copy(
+    query_labels_host.data_handle(), query_labels.data_handle(), query_labels.size(), stream);
+
+  // The calls to RAFT algorithms and  raft::copy is asynchronous.
+  // We need to sync the stream before accessing the data.
+  raft::resource::sync_stream(dev_resources, stream);
+
+  for (int query_id = 0; query_id < 2; query_id++) {
+    std::cout << "Query " << query_id << ", label: ," << query_labels_host(query_id)
+              << ", neighbor:" << std::endl;
+    for (int nei = 0; nei < topk; nei++) {
+      int neighbor_id = neighbors_host(query_id, nei);
+      std::cout << "ID:" << neighbor_id << ", labels: ";
+      raft::print_host_vector(
+        "", &data_labels_host(neighbor_id, 0), data_labels.extent(1), std::cout);
+    }
+  }
+}
+
 /** Subsample the dataset to create a training set*/
 raft::device_matrix<float, int64_t> subsample(
   raft::device_resources const& dev_resources,
