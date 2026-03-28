@@ -267,13 +267,11 @@ def fit(
     >>> centroids, inertia, n_iter = fit(params, X_host)
     """
 
-    # ---- detect host vs device data for data-preparation ----
     is_host = isinstance(X, np.ndarray) or (
         hasattr(X, '__array_interface__') and
         not hasattr(X, '__cuda_array_interface__')
     )
 
-    # Check that sample_weights has the same residency as X
     if sample_weights is not None:
         is_sample_weight_host = isinstance(sample_weights, np.ndarray) or (
             hasattr(sample_weights, '__array_interface__') and
