@@ -355,6 +355,7 @@ struct KmeansBatchedInputs {
   int n_clusters;
   T tol;
   bool weighted;
+  int streaming_batch_size;
 };
 
 template <typename T>
@@ -447,7 +448,7 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
 
     cuvs::cluster::kmeans::params batched_params = params;
     batched_params.inertia_check                 = true;
-    batched_params.streaming_batch_size          = std::min(n_samples, 256);
+    batched_params.streaming_batch_size          = testparams.streaming_batch_size;
 
     std::optional<raft::host_vector_view<const T, int>> h_sw = std::nullopt;
     std::vector<T> h_sample_weight;
@@ -482,7 +483,7 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
       handle,
       params,
       raft::make_const_mdspan(X.view()),
-      std::optional<raft::device_vector_view<const T, int>>(std::nullopt),
+      d_sw,
       raft::make_device_matrix_view<const T, int>(
         d_centroids_ref.data(), params.n_clusters, n_features),
       raft::make_device_vector_view<int, int>(d_labels_ref.data(), n_samples),
@@ -494,7 +495,7 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
       handle,
       params,
       raft::make_const_mdspan(X.view()),
-      std::optional<raft::device_vector_view<const T, int>>(std::nullopt),
+      d_sw,
       raft::make_device_matrix_view<const T, int>(
         d_centroids.data(), params.n_clusters, n_features),
       raft::make_device_vector_view<int, int>(d_labels.data(), n_samples),
@@ -515,6 +516,12 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
       std::cout << (ss.str().c_str()) << '\n';
       std::cout << "Score = " << score << '\n';
     }
+
+    inertia_match = (std::abs(ref_inertia - inertia) < T(1e-2) * std::abs(ref_inertia));
+
+    if (!inertia_match) {
+      std::cout << "Inertia mismatch: ref=" << ref_inertia << " batched=" << inertia << '\n';
+    }
   }
 
   void SetUp() override { fitBatchedTest(); }
@@ -528,6 +535,7 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
   rmm::device_uvector<T> d_centroids_ref;
   double score;
   testing::AssertionResult centroids_match = testing::AssertionSuccess();
+  bool inertia_match                       = false;
   cuvs::cluster::kmeans::params params;
 };
 
@@ -536,21 +544,21 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
 // ============================================================================
 
 const std::vector<KmeansBatchedInputs<float>> batched_inputsf2 = {
-  {1000, 32, 5, 0.0001f, true},
-  {1000, 32, 5, 0.0001f, false},
-  {1000, 100, 20, 0.0001f, true},
-  {1000, 100, 20, 0.0001f, false},
-  {10000, 32, 10, 0.0001f, true},
-  {10000, 32, 10, 0.0001f, false},
+  {1000, 32, 5, 0.0001f, true, 256},
+  {1000, 64, 5, 0.0001f, false, 500},
+  {1000, 100, 20, 0.0001f, true, 30},
+  {1000, 10, 20, 0.0001f, false, 30},
+  {10000, 16, 10, 0.0001f, true, 1000},
+  {10000, 96, 10, 0.0001f, false, 10000},
 };
 
 const std::vector<KmeansBatchedInputs<double>> batched_inputsd2 = {
-  {1000, 32, 5, 0.0001, true},
-  {1000, 32, 5, 0.0001, false},
-  {1000, 100, 20, 0.0001, true},
-  {1000, 100, 20, 0.0001, false},
-  {10000, 32, 10, 0.0001, true},
-  {10000, 32, 10, 0.0001, false},
+  {1000, 32, 5, 0.0001, true, 256},
+  {1000, 64, 5, 0.0001, false, 500},
+  {1000, 100, 20, 0.0001, true, 30},
+  {1000, 10, 20, 0.0001, false, 30},
+  {10000, 16, 10, 0.0001, true, 1000},
+  {10000, 96, 10, 0.0001, false, 10000},
 };
 
 // ============================================================================
@@ -563,12 +571,14 @@ TEST_P(KmeansFitBatchedTestF, Result)
 {
   ASSERT_TRUE(centroids_match);
   ASSERT_TRUE(score >= 0.99);
+  ASSERT_TRUE(inertia_match);
 }
 
 TEST_P(KmeansFitBatchedTestD, Result)
 {
   ASSERT_TRUE(centroids_match);
   ASSERT_TRUE(score >= 0.99);
+  ASSERT_TRUE(inertia_match);
 }
 
 INSTANTIATE_TEST_CASE_P(KmeansFitBatchedTests,
