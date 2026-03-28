@@ -165,7 +165,7 @@ void diskann_memory<T>::load(const std::string& index_file)
   initialize_index_(0);
 
   int load_threads = (bench_mode_ == Mode::kThroughput) ? cuvs::bench::benchmark_n_threads : 1;
-  this->mem_index_->load(index_path_prefix_.c_str(), load_threads, 2000);
+  this->mem_index_->load(index_path_prefix_.c_str(), load_threads, 100);
 }
 
 template <typename T>
