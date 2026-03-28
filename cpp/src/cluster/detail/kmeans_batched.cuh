@@ -604,26 +604,4 @@ void predict(raft::resources const& handle,
   raft::resource::sync_stream(handle, stream);
 }
 
-/**
- * @brief Fit k-means and predict cluster labels using batched processing.
- */
-template <typename T, typename IdxT>
-void fit_predict(raft::resources const& handle,
-                 const cuvs::cluster::kmeans::params& params,
-                 raft::host_matrix_view<const T, IdxT> X,
-                 std::optional<raft::host_vector_view<const T, IdxT>> sample_weight,
-                 raft::device_matrix_view<T, IdxT> centroids,
-                 raft::host_vector_view<IdxT, IdxT> labels,
-                 raft::host_scalar_view<T> inertia,
-                 raft::host_scalar_view<IdxT> n_iter)
-{
-  T fit_inertia = 0;
-  fit<T, IdxT>(
-    handle, params, X, sample_weight, centroids, raft::make_host_scalar_view(&fit_inertia), n_iter);
-
-  auto centroids_const = raft::make_const_mdspan(centroids);
-
-  predict<T, IdxT>(handle, params, X, sample_weight, centroids_const, labels, false, inertia);
-}
-
 }  // namespace cuvs::cluster::kmeans::detail

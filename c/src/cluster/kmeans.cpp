@@ -131,8 +131,8 @@ void _fit(cuvsResources_t res,
                                  cuvs::core::from_dlpack<const_mdspan_type>(X_tensor),
                                  sample_weight,
                                  cuvs::core::from_dlpack<mdspan_type>(centroids_tensor),
-                                 raft::make_host_scalar_view<T, IdxT>(&inertia_temp),
-                                 raft::make_host_scalar_view<IdxT, IdxT>(&n_iter_temp));
+                                 raft::make_host_scalar_view<T>(&inertia_temp),
+                                 raft::make_host_scalar_view<IdxT>(&n_iter_temp));
       *inertia = inertia_temp;
       *n_iter  = n_iter_temp;
     }
@@ -187,7 +187,7 @@ void _predict(cuvsResources_t res,
                                      cuvs::core::from_dlpack<const_mdspan_type>(centroids_tensor),
                                      cuvs::core::from_dlpack<labels_mdspan_type>(labels_tensor),
                                      normalize_weight,
-                                     raft::make_host_scalar_view<T, IdxT>(&inertia_temp));
+                                     raft::make_host_scalar_view<T>(&inertia_temp));
       *inertia = inertia_temp;
     }
   } else {
@@ -212,7 +212,7 @@ void _cluster_cost(cuvsResources_t res,
     cuvs::cluster::kmeans::cluster_cost(*res_ptr,
                                         cuvs::core::from_dlpack<mdspan_type>(X_tensor),
                                         cuvs::core::from_dlpack<mdspan_type>(centroids_tensor),
-                                        raft::make_host_scalar_view<T, IdxT>(&cost_temp));
+                                        raft::make_host_scalar_view<T>(&cost_temp));
   } else {
     RAFT_FAIL("X dataset must be accessible on device memory");
   }
@@ -259,17 +259,9 @@ extern "C" cuvsError_t cuvsKMeansFit(cuvsResources_t res,
   return cuvs::core::translate_exceptions([=] {
     auto dataset = X->dl_tensor;
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
-      if (!cuvs::core::is_dlpack_device_compatible(X)) {
-      _fit<float, int64_t>(res, *params, X, sample_weight, centroids, inertia, n_iter);
-      } else {
-        _fit<float, int>(res, *params, X, sample_weight, centroids, inertia, n_iter);
-      }
+        _fit<float>(res, *params, X, sample_weight, centroids, inertia, n_iter);
     } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 64) {
-      if (!cuvs::core::is_dlpack_device_compatible(X)) {
-        _fit<double, int64_t>(res, *params, X, sample_weight, centroids, inertia, n_iter);
-      } else {
-        _fit<double, int>(res, *params, X, sample_weight, centroids, inertia, n_iter);
-      }
+        _fit<double>(res, *params, X, sample_weight, centroids, inertia, n_iter);
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
                 dataset.dtype.code,
@@ -290,10 +282,9 @@ extern "C" cuvsError_t cuvsKMeansPredict(cuvsResources_t res,
   return cuvs::core::translate_exceptions([=] {
     auto dataset = X->dl_tensor;
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
-      _predict<float>(res, *params, X, sample_weight, centroids, labels, normalize_weight, inertia);
+        _predict<float>(res, *params, X, sample_weight, centroids, labels, normalize_weight, inertia);
     } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 64) {
-      _predict<double>(
-        res, *params, X, sample_weight, centroids, labels, normalize_weight, inertia);
+        _predict<double>(res, *params, X, sample_weight, centroids, labels, normalize_weight, inertia);
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
                 dataset.dtype.code,
