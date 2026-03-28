@@ -10,7 +10,6 @@ dependencies:
 - clang==20.1.4
 - click
 - cmake>=3.30.4
-- cuda-cudart-dev
 - cuda-nvcc
 - cuda-nvtx-dev
 - cuda-profiler-api
@@ -30,6 +29,7 @@ dependencies:
 - libcusolver-dev
 - libcusparse-dev
 - libcuvs==26.6.*,>=0.0.0a0
+- libnvjitlink-dev
 - librmm==26.6.*,>=0.0.0a0
 - matplotlib-base>=3.9
 - nccl>=2.19
