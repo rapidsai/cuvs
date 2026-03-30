@@ -69,7 +69,7 @@ void select_clusters(raft::resources const& handle,
                      cuvs::distance::DistanceType metric,
                      const T* queries,              // [n_queries, dim]
                      const float* cluster_centers,  // [n_lists, dim_ext]
-                     rmm::mr::device_memory_resource* mr)
+                     rmm::device_async_resource_ref mr)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_pq::search::select_clusters(n_probes = %u, n_queries = %u, n_lists = %u, dim = %u)",
@@ -179,7 +179,7 @@ void select_clusters(raft::resources const& handle,
                      cuvs::distance::DistanceType metric,
                      const T* queries,               // [n_queries, dim]
                      const int8_t* cluster_centers,  // [n_lists, dim_ext]
-                     rmm::mr::device_memory_resource* mr)
+                     rmm::device_async_resource_ref mr)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_pq::search::select_clusters(n_probes = %u, n_queries = %u, n_lists = %u, dim = %u)",
@@ -267,7 +267,7 @@ void select_clusters(raft::resources const& handle,
                      cuvs::distance::DistanceType metric,
                      const T* queries,             // [n_queries, dim]
                      const half* cluster_centers,  // [n_lists, dim_ext]
-                     rmm::mr::device_memory_resource* mr)
+                     rmm::device_async_resource_ref mr)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_pq::search::select_clusters(n_probes = %u, n_queries = %u, n_lists = %u, dim = %u)",
@@ -440,7 +440,7 @@ void ivfpq_search_worker(raft::resources const& handle,
     topK,
     index.dim());
   auto stream = raft::resource::get_cuda_stream(handle);
-  auto mr     = raft::resource::get_workspace_resource(handle);
+  auto mr     = raft::resource::get_workspace_resource_ref(handle);
 
   bool manage_local_topk         = is_local_topk_feasible(topK, n_probes, n_queries);
   auto topk_len                  = manage_local_topk ? n_probes * topK : max_samples;
@@ -781,21 +781,35 @@ inline auto get_max_coarse_batch_size(raft::resources const& res,
                                       const search_params& params,
                                       uint32_t n_probes,
                                       uint32_t n_lists,
-                                      uint32_t n_queries) -> uint32_t
+                                      uint32_t n_queries,
+                                      uint32_t dim_ext,
+                                      uint32_t rot_dim) -> uint32_t
 {
-  size_t data_size = 4;
+  size_t gemm_elem_size;
+  size_t qc_elem_size;
   switch (params.coarse_search_dtype) {
-    case CUDA_R_32F: data_size = 4; break;
-    case CUDA_R_16F: data_size = 2; break;
-    case CUDA_R_8I: data_size = 1; break;
+    case CUDA_R_32F:
+      gemm_elem_size = 4;
+      qc_elem_size   = 4;
+      break;
+    case CUDA_R_16F:
+      gemm_elem_size = 2;
+      qc_elem_size   = 2;
+      break;
+    case CUDA_R_8I:
+      gemm_elem_size = 1;
+      qc_elem_size   = 4;
+      break;
     default: RAFT_FAIL("Unexpected coarse_search_dtype (%d)", int(params.coarse_search_dtype));
   }
-  // How much data we allocate for coarse GEMM.
-  // This is NOT all memory we need, as a rule of thumb max it out to half of the workspace.
-  // We don't reach this limit by default, but only when we increase the max_internal_batch_size by
-  // a lot.
-  auto bytes_per_query = static_cast<size_t>(n_probes + n_lists) * data_size;
-  auto max_per_ws      = raft::resource::get_workspace_free_bytes(res) / bytes_per_query;
+  // Persistent allocations that live for the entire search call.
+  auto persistent_per_query = static_cast<size_t>(dim_ext) * gemm_elem_size +
+                              static_cast<size_t>(rot_dim) * sizeof(float) +
+                              static_cast<size_t>(n_probes) * sizeof(uint32_t);
+  // Transient allocations during coarse search (select_clusters): qc_distances + cluster_dists.
+  auto transient_per_query = static_cast<size_t>(n_lists + n_probes) * qc_elem_size;
+  auto total_per_query     = persistent_per_query + transient_per_query;
+  auto max_per_ws          = raft::resource::get_workspace_free_bytes(res) / total_per_query;
   return std::max<uint32_t>(
     1,
     std::min<uint32_t>(max_per_ws / 2,
@@ -885,12 +899,12 @@ inline void search(raft::resources const& handle,
     max_samples = ms;
   }
 
-  auto mr = raft::resource::get_workspace_resource(handle);
+  auto mr = raft::resource::get_workspace_resource_ref(handle);
 
   // Maximum number of query vectors to search at the same time.
   // Number of queries in the outer loop, which includes query transform and coarse search.
-  const auto max_bs_outer =
-    get_max_coarse_batch_size(handle, params, n_probes, index.n_lists(), n_queries);
+  const auto max_bs_outer = get_max_coarse_batch_size(
+    handle, params, n_probes, index.n_lists(), n_queries, dim_ext, index.rot_dim());
   // Number of queries in the inner loop, which includes the fine search;
   // This is usually smaller than the outer loop when the non-fused kernel has to keep intermediate
   // results in the device memory.
