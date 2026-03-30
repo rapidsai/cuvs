@@ -263,7 +263,7 @@ fbin --nrows=2000000 --cols=128 --output=groundtruth_dir \
         "--n_queries",
         type=int,
         default=10000,
-        help="Number of quries to generate (if no query file is given). "
+        help="Number of queries to generate (if no query file is given). "
         "Default: 10000.",
     )
 
