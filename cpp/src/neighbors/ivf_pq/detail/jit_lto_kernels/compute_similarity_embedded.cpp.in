@@ -8,7 +8,8 @@
 
 namespace cuvs::neighbors::ivf_pq::detail {
 
-using _FragmentEntry = ComputeSimilarityFragmentEntry<tag_out_@out_abbrev@, tag_lut_@lut_abbrev@>;
+using _FragmentEntry =
+  StaticFatbinFragmentEntry<fragment_tag_compute_similarity<tag_out_@out_abbrev@, tag_lut_@lut_abbrev@>>;
 
 template <>
 const uint8_t* const _FragmentEntry::data = embedded_fatbin;

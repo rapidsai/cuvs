@@ -9,8 +9,8 @@
 
 namespace cuvs::neighbors::ivf_flat::detail {
 
-using _FragmentEntry =
-  MetricFragmentEntry<@veclen@, tag_@type_abbrev@, tag_acc_@acc_abbrev@, tag_metric_@metric_name@>;
+using _FragmentEntry = StaticFatbinFragmentEntry<
+  fragment_tag_metric<@veclen@, tag_@type_abbrev@, tag_acc_@acc_abbrev@, tag_metric_@metric_name@>>;
 
 template <>
 const uint8_t* const _FragmentEntry::data = embedded_fatbin;

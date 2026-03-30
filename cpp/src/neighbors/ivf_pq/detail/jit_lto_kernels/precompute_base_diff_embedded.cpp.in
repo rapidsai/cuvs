@@ -8,7 +8,7 @@
 
 namespace cuvs::neighbors::ivf_pq::detail {
 
-using _FragmentEntry = PrecomputeBaseDiffFragmentEntry<@precomp_base_diff@>;
+using _FragmentEntry = StaticFatbinFragmentEntry<fragment_tag_precompute_base_diff<@precomp_base_diff@>>;
 
 template <>
 const uint8_t* const _FragmentEntry::data = embedded_fatbin;

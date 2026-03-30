@@ -9,7 +9,7 @@
 
 namespace cuvs::neighbors::ivf_flat::detail {
 
-using _FragmentEntry = PostLambdaFragmentEntry<tag_@post_lambda_name@>;
+using _FragmentEntry = StaticFatbinFragmentEntry<fragment_tag_post_lambda<tag_@post_lambda_name@>>;
 
 template <>
 const uint8_t* const _FragmentEntry::data = embedded_fatbin;

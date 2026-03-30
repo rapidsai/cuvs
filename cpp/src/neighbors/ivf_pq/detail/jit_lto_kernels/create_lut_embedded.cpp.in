@@ -8,7 +8,8 @@
 
 namespace cuvs::neighbors::ivf_pq::detail {
 
-using _FragmentEntry = CreateLutFragmentEntry<tag_lut_@lut_abbrev@, @precomp_base_diff@, @pq_bits@>;
+using _FragmentEntry =
+  StaticFatbinFragmentEntry<fragment_tag_create_lut<tag_lut_@lut_abbrev@, @precomp_base_diff@, @pq_bits@>>;
 
 template <>
 const uint8_t* const _FragmentEntry::data = embedded_fatbin;

@@ -9,13 +9,13 @@
 
 namespace cuvs::neighbors::ivf_flat::detail {
 
-using _FragmentEntry = InterleavedScanFragmentEntry<tag_@type_abbrev@,
-                                                    tag_acc_@acc_abbrev@,
-                                                    tag_idx_@idx_abbrev@,
-                                                    @capacity@,
-                                                    @veclen@,
-                                                    @ascending_value@,
-                                                    @compute_norm_value@>;
+using _FragmentEntry = StaticFatbinFragmentEntry<fragment_tag_interleaved_scan<tag_@type_abbrev@,
+                                                                               tag_acc_@acc_abbrev@,
+                                                                               tag_idx_@idx_abbrev@,
+                                                                               @capacity@,
+                                                                               @veclen@,
+                                                                               @ascending_value@,
+                                                                               @compute_norm_value@>>;
 
 template <>
 const uint8_t* const _FragmentEntry::data = embedded_fatbin;

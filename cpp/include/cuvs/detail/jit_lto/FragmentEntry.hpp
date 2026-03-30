@@ -28,11 +28,23 @@ struct FatbinFragmentEntry : FragmentEntry {
   bool add_to(nvJitLinkHandle& handle) const override final;
 };
 
-template <typename FragmentT>
+template <typename FragmentTag>
 struct StaticFatbinFragmentEntry : FatbinFragmentEntry {
-  const uint8_t* get_data() const override final { return FragmentT::data; }
+  const uint8_t* get_data() const override final
+  {
+    return StaticFatbinFragmentEntry<FragmentTag>::data;
+  }
 
-  size_t get_length() const override final { return FragmentT::length; }
+  size_t get_length() const override final
+  {
+    return StaticFatbinFragmentEntry<FragmentTag>::length;
+  }
 
-  const char* get_key() const override final { return typeid(FragmentT).name(); }
+  const char* get_key() const override final
+  {
+    return typeid(StaticFatbinFragmentEntry<FragmentTag>).name();
+  }
+
+  static const uint8_t* const data;
+  static const size_t length;
 };

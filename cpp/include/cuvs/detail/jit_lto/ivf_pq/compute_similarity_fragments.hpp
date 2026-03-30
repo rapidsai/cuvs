@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <cuvs/detail/jit_lto/FragmentEntry.hpp>
+#include <cstdint>
 
 namespace cuvs::neighbors::ivf_pq::detail {
 
@@ -18,45 +18,21 @@ struct tag_lut_fp8_signed {};
 struct tag_lut_fp8_unsigned {};
 
 template <typename OutTag, typename LutTag>
-struct ComputeSimilarityFragmentEntry final
-  : StaticFatbinFragmentEntry<ComputeSimilarityFragmentEntry<OutTag, LutTag>> {
-  static const uint8_t* const data;
-  static const size_t length;
-};
+struct fragment_tag_compute_similarity {};
 
 template <typename LutTag, bool EnableSMemLut, uint32_t PqBits>
-struct PrepareLutFragmentEntry final
-  : StaticFatbinFragmentEntry<PrepareLutFragmentEntry<LutTag, EnableSMemLut, PqBits>> {
-  static const uint8_t* const data;
-  static const size_t length;
-};
+struct fragment_tag_prepare_lut {};
 
 template <typename OutTag, bool kManageLocalTopK>
-struct StoreCalculatedDistancesFragmentEntry final
-  : StaticFatbinFragmentEntry<StoreCalculatedDistancesFragmentEntry<OutTag, kManageLocalTopK>> {
-  static const uint8_t* const data;
-  static const size_t length;
-};
+struct fragment_tag_store_calculated_distances {};
 
 template <bool PrecompBaseDiff>
-struct PrecomputeBaseDiffFragmentEntry final
-  : StaticFatbinFragmentEntry<PrecomputeBaseDiffFragmentEntry<PrecompBaseDiff>> {
-  static const uint8_t* const data;
-  static const size_t length;
-};
+struct fragment_tag_precompute_base_diff {};
 
 template <typename LutTag, bool PrecompBaseDiff, uint32_t PqBits>
-struct CreateLutFragmentEntry final
-  : StaticFatbinFragmentEntry<CreateLutFragmentEntry<LutTag, PrecompBaseDiff, PqBits>> {
-  static const uint8_t* const data;
-  static const size_t length;
-};
+struct fragment_tag_create_lut {};
 
 template <typename OutTag, typename LutTag, int Capacity, uint32_t PqBits>
-struct ComputeDistancesFragmentEntry final
-  : StaticFatbinFragmentEntry<ComputeDistancesFragmentEntry<OutTag, LutTag, Capacity, PqBits>> {
-  static const uint8_t* const data;
-  static const size_t length;
-};
+struct fragment_tag_compute_distances {};
 
 }  // namespace cuvs::neighbors::ivf_pq::detail
