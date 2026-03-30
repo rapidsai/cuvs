@@ -1034,10 +1034,10 @@ void ace_validate_disk_mode_partitions(size_t& n_partitions,
       static_cast<size_t>(imbalance_factor * 2 * (dataset_size / n_partitions));
     auto [new_opt_host_ws, new_opt_dev_ws] =
       helpers::optimize_workspace_size(new_sub_partition_size,
-                                                                     graph_degree,
-                                                                     intermediate_degree,
-                                                                     sizeof(IdxT),
-                                                                     guarantee_connectivity);
+                                       graph_degree,
+                                       intermediate_degree,
+                                       sizeof(IdxT),
+                                       guarantee_connectivity);
 
     RAFT_LOG_INFO(
       "ACE: Updated per-partition memory estimates: dataset %.2f GiB, graph %.2f GiB, "

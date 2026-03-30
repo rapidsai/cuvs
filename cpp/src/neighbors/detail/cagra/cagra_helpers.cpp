@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <cstdint>
 #include <cuvs/neighbors/cagra.hpp>
-#include <cuvs/neighbors/graph_build_types.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <utility>
 
@@ -77,13 +76,23 @@ inline std::pair<size_t, size_t> ivf_pq_build_mem_usage(
   float host_workspace_gb = host_workspace_size / 1e9;
   float gpu_workspace_gb  = gpu_workspace_size / 1e9;
 
+  // The kmeans trainset is a large temporary float buffer allocated during IVF-PQ training.
+  // It is freed before the extend phase, so peak GPU = max(training_peak, extend_peak).
+  size_t kmeans_trainset_ratio = std::max<size_t>(
+    1,
+    n_rows / std::max<size_t>(params.build_params.kmeans_trainset_fraction * n_rows,
+                              params.build_params.n_lists));
+  size_t kmeans_n_rows  = n_rows / kmeans_trainset_ratio;
+  size_t kmeans_gpu_mem = kmeans_n_rows * dataset.extent(1) * sizeof(float);
+
   size_t total_host =
     graph_host_mem + host_workspace_size + 2e9;  // added 2 GB extra workspace (IVF-PQ search)
-  size_t total_dev =
-    std::max(dataset_gpu_mem, gpu_workspace_size) + 1e9;  // added 1 GB extra workspace size
+  size_t total_dev = std::max({kmeans_gpu_mem, dataset_gpu_mem, gpu_workspace_size}) + 1e9;
 
-  std::cout << "IVF-PQ build memory requirements\ndataset_gpu " << dataset_gpu_mem / 1e9 << " GB"
-            << std::endl;
+  std::cout << "IVF-PQ build memory requirements" << std::endl;
+  std::cout << "kmeans trainset_gpu " << kmeans_gpu_mem / 1e9 << " GB"
+            << " (" << kmeans_n_rows << " rows)" << std::endl;
+  std::cout << "dataset_gpu " << dataset_gpu_mem / 1e9 << " GB" << std::endl;
   std::cout << "graph_host_mem " << graph_host_mem / 1e9 << " GB" << ", workspace "
             << host_workspace_gb << " GB" << std::endl;
   std::cout << "gpu mem" << gpu_workspace_gb << " GB" << std::endl;
