@@ -4,6 +4,7 @@
  */
 
 #include "@embedded_header_file@"
+#include <cuvs/detail/jit_lto/FragmentEntry.hpp>
 #include <cuvs/detail/jit_lto/ivf_pq/compute_similarity_fragments.hpp>
 
 namespace cuvs::neighbors::ivf_pq::detail {
