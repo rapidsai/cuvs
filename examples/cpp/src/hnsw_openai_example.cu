@@ -12,7 +12,6 @@
 #include <string>
 
 #include <cuvs/neighbors/cagra.hpp>
-#include <cuvs/neighbors/graph_build_types.hpp>
 #include <cuvs/neighbors/hnsw.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/util/host_memory.hpp>
@@ -63,7 +62,7 @@ int cagra_build_search_ace(raft::resources const& res)
   auto dataset_host_view = raft::make_host_matrix_view<const float, int64_t, raft::row_major>(
     reinterpret_cast<float*>(dataset_ptr + header_size), n_rows, shape[1]);
 
-  int64_t topk = 12;
+  // int64_t topk = 12;
 
   // HNSW index parameters
   hnsw::index_params params;
