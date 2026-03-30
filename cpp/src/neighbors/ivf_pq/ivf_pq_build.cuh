@@ -1324,61 +1324,31 @@ auto build(raft::resources const& handle,
     auto cluster_centers = cluster_centers_buf.data();
 
     // Train balanced hierarchical kmeans clustering
-    auto centers_view = raft::make_device_matrix_view<float, internal_extents_t>(
+    auto trainset_const_view = raft::make_const_mdspan(trainset.view());
+    auto centers_view        = raft::make_device_matrix_view<float, internal_extents_t>(
       cluster_centers, impl->n_lists(), impl->dim());
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
     kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>((int)impl->metric());
 
+    if (impl->metric() == distance::DistanceType::CosineExpanded) {
+      raft::linalg::row_normalize<raft::linalg::L2Norm>(
+        handle, trainset_const_view, trainset.view());
+    }
+    cuvs::cluster::kmeans::fit(handle, kmeans_params, trainset_const_view, centers_view);
+
+    // Trainset labels are needed for training PQ codebooks
     rmm::device_uvector<uint32_t> labels(n_rows_train, stream, big_memory_resource);
-    auto labels_view =
-      raft::make_device_vector_view<uint32_t, internal_extents_t>(labels.data(), n_rows_train);
     auto centers_const_view = raft::make_device_matrix_view<const float, internal_extents_t>(
       cluster_centers, impl->n_lists(), impl->dim());
 
-    if (impl->metric() == distance::DistanceType::InnerProduct) {
-      // Normalization only for k-means: use a copy so trainset stays in original space; metric
-      // remains inner product for the rest of the pipeline.
-      auto trainset_kmeans = raft::make_device_mdarray<float>(
-        handle, device_memory, raft::make_extents<int64_t>(n_rows_train, dim));
-      raft::copy(handle, trainset_kmeans.view(), trainset.view());
-      auto trainset_kmeans_view = raft::make_device_matrix_view<float, internal_extents_t>(
-        trainset_kmeans.data_handle(), n_rows_train, dim);
-      raft::linalg::row_normalize<raft::linalg::L2Norm>(
-        handle, raft::make_const_mdspan(trainset_kmeans_view), trainset_kmeans_view);
-      auto trainset_kmeans_const_view = raft::make_const_mdspan(trainset_kmeans.view());
-      cuvs::cluster::kmeans::fit(handle, kmeans_params, trainset_kmeans_const_view, centers_view);
+    if (impl->metric() == distance::DistanceType::CosineExpanded) {
       raft::linalg::row_normalize<raft::linalg::L2Norm>(handle, centers_const_view, centers_view);
-      cuvs::cluster::kmeans::predict(
-        handle, kmeans_params, trainset_kmeans_const_view, centers_const_view, labels_view);
-      // Recompute centers in original space (mean of unnormalized trainset per cluster), overwrites centers_view
-      rmm::device_uvector<uint32_t> cluster_sizes(impl->n_lists(), stream, device_memory);
-      cuvs::cluster::kmeans::detail::calc_centers_and_sizes<float, float, internal_extents_t, uint32_t, uint32_t>(
-        handle,
-        cluster_centers,
-        cluster_sizes.data(),
-        static_cast<internal_extents_t>(impl->n_lists()),
-        static_cast<internal_extents_t>(dim),
-        trainset.data_handle(),
-        static_cast<internal_extents_t>(n_rows_train),
-        labels.data(),
-        true,
-        raft::identity_op{},
-        device_memory);
-    } else if (impl->metric() == distance::DistanceType::CosineExpanded) {
-      auto trainset_const_view = raft::make_const_mdspan(trainset.view());
-      raft::linalg::row_normalize<raft::linalg::L2Norm>(
-        handle, trainset_const_view, trainset.view());
-      cuvs::cluster::kmeans::fit(handle, kmeans_params, trainset_const_view, centers_view);
-      raft::linalg::row_normalize<raft::linalg::L2Norm>(handle, centers_const_view, centers_view);
-      cuvs::cluster::kmeans::predict(
-        handle, kmeans_params, trainset_const_view, centers_const_view, labels_view);
-    } else {
-      auto trainset_const_view = raft::make_const_mdspan(trainset.view());
-      cuvs::cluster::kmeans::fit(handle, kmeans_params, trainset_const_view, centers_view);
-      cuvs::cluster::kmeans::predict(
-        handle, kmeans_params, trainset_const_view, centers_const_view, labels_view);
     }
+    auto labels_view =
+      raft::make_device_vector_view<uint32_t, internal_extents_t>(labels.data(), n_rows_train);
+    cuvs::cluster::kmeans::predict(
+      handle, kmeans_params, trainset_const_view, centers_const_view, labels_view);
 
     // Make rotation matrix
     helpers::make_rotation_matrix(handle, impl->rotation_matrix(), params.force_random_rotation);
