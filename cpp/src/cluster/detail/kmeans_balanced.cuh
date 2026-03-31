@@ -67,7 +67,8 @@ constexpr static inline float kAdjustCentersWeight = 7.0f;
  * @param[in] n_clusters Number of clusters/centers
  * @param[in] dim Dimensionality of the data
  * @param[in] dataset Pointer to the data [n_rows, dim]
- * @param[in] dataset_norm Pointer to the precomputed norm (for L2 metrics only) [n_rows]
+ * @param[in] dataset_norm Pointer to precomputed row norms (L2: ||x||^2; cosine / IP: ||x||_2)
+ * [n_rows]
  * @param[in] n_rows Number samples in the `dataset`
  * @param[out] labels Output predictions [n_rows]
  * @param[inout] mr (optional) Memory resource to use for temporary allocations
@@ -129,7 +130,10 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
                         raft::compose_op<raft::cast_op<LabelT>, raft::key_op>());
       break;
     }
-    case cuvs::distance::DistanceType::CosineExpanded: {
+    case cuvs::distance::DistanceType::CosineExpanded:
+    case cuvs::distance::DistanceType::InnerProduct: {
+      // Fused cosine NN applies row-wise L2 normalization inside the CUDA kernel (via xn/yn).
+      // InnerProduct uses the same fused path so clustering is not dominated by vector magnitude.
       auto workspace = raft::make_device_mdarray<char, IdxT>(
         handle, mr, raft::make_extents<IdxT>((sizeof(int)) * n_rows));
 
@@ -159,7 +163,7 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
         false,
         false,
         true,
-        params.metric,
+        cuvs::distance::DistanceType::CosineExpanded,
         0.0f,
         stream);
       // Copy keys to output labels
@@ -167,35 +171,6 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
                         raft::make_const_mdspan(minClusterAndDistance.view()),
                         raft::make_device_vector_view<LabelT, IdxT>(labels, n_rows),
                         raft::compose_op<raft::cast_op<LabelT>, raft::key_op>());
-      break;
-    }
-    case cuvs::distance::DistanceType::InnerProduct: {
-      // TODO: pass buffer
-      rmm::device_uvector<MathT> distances(n_rows * n_clusters, stream, mr);
-
-      MathT alpha = -1.0;
-      MathT beta  = 0.0;
-
-      raft::linalg::gemm(handle,
-                         true,
-                         false,
-                         n_clusters,
-                         n_rows,
-                         dim,
-                         &alpha,
-                         centers,
-                         dim,
-                         dataset,
-                         dim,
-                         &beta,
-                         distances.data(),
-                         n_clusters,
-                         stream);
-
-      auto distances_const_view = raft::make_device_matrix_view<const MathT, IdxT, raft::row_major>(
-        distances.data(), n_rows, n_clusters);
-      auto labels_view = raft::make_device_vector_view<LabelT, IdxT>(labels, n_rows);
-      raft::matrix::argmin(handle, distances_const_view, labels_view);
       break;
     }
     default: {
@@ -232,13 +207,15 @@ constexpr auto calc_minibatch_size(IdxT n_clusters,
   // Estimate memory needs per row (i.e element of the batch).
   size_t mem_per_row = 0;
   switch (metric) {
-    // fusedL2NN needs a mutex and a key-value pair for each row.
+    // fused L2 NN needs a mutex and a key-value pair for each row.
     case distance::DistanceType::L2Expanded:
     case distance::DistanceType::L2SqrtExpanded: {
       mem_per_row += sizeof(int);
       mem_per_row += sizeof(raft::KeyValuePair<IdxT, MathT>);
     } break;
-    // Other metrics require storing a distance matrix.
+    // CosineExpanded and InnerProduct use fused cosine NN in predict_core (no dense n_clusters
+    // row), but keep the same conservative estimate as historical CosineExpanded (default branch)
+    // so minibatch sizing matches that metric and stays memory-safe.
     default: {
       mem_per_row += sizeof(MathT) * n_clusters;
     }
@@ -434,7 +411,8 @@ void predict(const raft::resources& handle,
   bool need_compute_norm =
     dataset_norm == nullptr && (params.metric == cuvs::distance::DistanceType::L2Expanded ||
                                 params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
-                                params.metric == cuvs::distance::DistanceType::CosineExpanded);
+                                params.metric == cuvs::distance::DistanceType::CosineExpanded ||
+                                params.metric == cuvs::distance::DistanceType::InnerProduct);
   rmm::device_uvector<MathT> cur_dataset_norm(
     need_compute_norm ? max_minibatch_size : 0, stream, mem_res);
   const MathT* dataset_norm_ptr = nullptr;
@@ -454,7 +432,8 @@ void predict(const raft::resources& handle,
 
     // Compute the norm now if it hasn't been pre-computed.
     if (need_compute_norm) {
-      if (params.metric == cuvs::distance::DistanceType::CosineExpanded)
+      if (params.metric == cuvs::distance::DistanceType::CosineExpanded ||
+          params.metric == cuvs::distance::DistanceType::InnerProduct)
         compute_norm(handle,
                      cur_dataset_norm.data(),
                      cur_dataset_ptr,
@@ -654,7 +633,8 @@ auto adjust_centers(MathT* centers,
  * @param[in] n_iters Requested number of iterations (can differ from params.n_iter!)
  * @param[in] dim Dimensionality of the dataset
  * @param[in] dataset Pointer to a managed row-major array [n_rows, dim]
- * @param[in] dataset_norm Pointer to the precomputed norm (for L2 metrics only) [n_rows]
+ * @param[in] dataset_norm Pointer to precomputed row norms (L2: ||x||^2; cosine / IP: ||x||_2)
+ * [n_rows]
  * @param[in] n_rows Number of rows in the dataset
  * @param[in] n_cluster Requested number of clusters
  * @param[inout] cluster_centers Pointer to a managed row-major array [n_clusters, dim]
@@ -964,7 +944,8 @@ auto build_fine_clusters(const raft::resources& handle,
     raft::matrix::gather(mapping_itr, dim, n_rows, mc_trainset_ids, k, mc_trainset, stream);
     if (params.metric == cuvs::distance::DistanceType::L2Expanded ||
         params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
-        params.metric == cuvs::distance::DistanceType::CosineExpanded) {
+        params.metric == cuvs::distance::DistanceType::CosineExpanded ||
+        params.metric == cuvs::distance::DistanceType::InnerProduct) {
       thrust::gather(raft::resource::get_thrust_policy(handle),
                      mc_trainset_ids,
                      mc_trainset_ids + k,
@@ -1047,11 +1028,13 @@ void build_hierarchical(const raft::resources& handle,
   const MathT* dataset_norm = nullptr;
   if ((params.metric == cuvs::distance::DistanceType::L2Expanded ||
        params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
-       params.metric == cuvs::distance::DistanceType::CosineExpanded)) {
+       params.metric == cuvs::distance::DistanceType::CosineExpanded ||
+       params.metric == cuvs::distance::DistanceType::InnerProduct)) {
     dataset_norm_buf.resize(n_rows, stream);
     for (IdxT offset = 0; offset < n_rows; offset += max_minibatch_size) {
       IdxT minibatch_size = std::min<IdxT>(max_minibatch_size, n_rows - offset);
-      if (params.metric == cuvs::distance::DistanceType::CosineExpanded)
+      if (params.metric == cuvs::distance::DistanceType::CosineExpanded ||
+          params.metric == cuvs::distance::DistanceType::InnerProduct)
         compute_norm(handle,
                      dataset_norm_buf.data() + offset,
                      dataset + dim * offset,
