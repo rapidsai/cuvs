@@ -10,6 +10,52 @@
           "ADDITIONAL_DEP": "?",
           "PATH": "*"
         }
+      },
+      "compute_matrix_product": {
+        "pargs": {
+          "nargs": 1
+        },
+        "kwargs": {
+          "MATRIX_JSON_FILE": "?",
+          "MATRIX_JSON_STRING": "?"
+        }
+      },
+      "add_jit_lto_kernel": {
+        "pargs": {
+          "nargs": 1
+        },
+        "kwargs": {
+          "KERNEL_FILE": 1,
+          "EMBEDDED_HEADER_FILE": 1,
+          "LINK_LIBRARIES": "*"
+        }
+      },
+      "process_matrix_entry": {
+        "pargs": {
+          "nargs": 1
+        },
+        "kwargs": {
+          "NAME_FORMAT": 1,
+          "KERNEL_INPUT_FILE": 1,
+          "EMBEDDED_INPUT_FILE": 1,
+          "OUTPUT_DIRECTORY": 1,
+          "MATRIX_JSON_ENTRY": 1,
+          "KERNEL_LINK_LIBRARIES": "*"
+        }
+      },
+      "generate_jit_lto_kernels": {
+        "pargs": {
+          "nargs": 1
+        },
+        "kwargs": {
+          "NAME_FORMAT": 1,
+          "MATRIX_JSON_FILE": "?",
+          "MATRIX_JSON_STRING": "?",
+          "KERNEL_INPUT_FILE": 1,
+          "EMBEDDED_INPUT_FILE": 1,
+          "OUTPUT_DIRECTORY": 1,
+          "KERNEL_LINK_LIBRARIES": "*"
+        }
       }
     }
   },

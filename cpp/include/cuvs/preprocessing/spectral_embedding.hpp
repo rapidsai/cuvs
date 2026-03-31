@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -172,6 +172,16 @@ void transform(raft::resources const& handle,
 void transform(raft::resources const& handle,
                params config,
                raft::device_coo_matrix_view<double, int, int, int> connectivity_graph,
+               raft::device_matrix_view<double, int, raft::col_major> embedding);
+
+void transform(raft::resources const& handle,
+               params config,
+               raft::device_coo_matrix_view<float, int, int, int64_t> connectivity_graph,
+               raft::device_matrix_view<float, int, raft::col_major> embedding);
+
+void transform(raft::resources const& handle,
+               params config,
+               raft::device_coo_matrix_view<double, int, int, int64_t> connectivity_graph,
                raft::device_matrix_view<double, int, raft::col_major> embedding);
 
 /**

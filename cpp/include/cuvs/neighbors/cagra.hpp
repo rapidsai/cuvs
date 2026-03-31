@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,7 +8,6 @@
 #include "common.hpp"
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/common.hpp>
-#include <cuvs/neighbors/graph_build_types.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 #include <cuvs/util/file_io.hpp>
@@ -30,6 +29,73 @@
 #include <optional>
 #include <string>
 #include <variant>
+
+namespace cuvs::neighbors::graph_build_params {
+using iterative_search_params = cuvs::neighbors::search_params;
+
+/** Specialized parameters for ACE (Augmented Core Extraction) graph build */
+struct ace_params {
+  /**
+   * Number of partitions for ACE (Augmented Core Extraction) partitioned build.
+   *
+   * When set to 0 (default), the number of partitions is automatically derived
+   * based on available host and GPU memory to maximize partition size while
+   * ensuring the build fits in memory.
+   *
+   * Small values might improve recall but potentially degrade performance and
+   * increase memory usage. Partitions should not be too small to prevent issues
+   * in KNN graph construction. The partition size is on average 2 * (n_rows / npartitions) * dim *
+   * sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance in the
+   * partition sizes (up to 3x in our tests).
+   *
+   * If the specified number of partitions results in partitions that exceed
+   * available memory, the value will be automatically increased to fit memory
+   * constraints and a warning will be issued.
+   */
+  size_t npartitions = 0;
+  /**
+   * The index quality for the ACE build.
+   *
+   * Bigger values increase the index quality. At some point, increasing this will no longer improve
+   * the quality.
+   */
+  size_t ef_construction = 120;
+  /**
+   * Directory to store ACE build artifacts (e.g., KNN graph, optimized graph).
+   *
+   * Used when `use_disk` is true or when the graph does not fit in host and GPU
+   * memory. This should be the fastest disk in the system and hold enough space
+   * for twice the dataset, final graph, and label mapping.
+   */
+  std::string build_dir = "/tmp/ace_build";
+  /**
+   * Whether to use disk-based storage for ACE build.
+   *
+   * When true, enables disk-based operations for memory-efficient graph construction.
+   */
+  bool use_disk = false;
+
+  /**
+   * Maximum host memory to use for ACE build in GiB.
+   *
+   * When set to 0 (default), uses available host memory.
+   * When set to a positive value, limits host memory usage to the specified amount.
+   * Useful for testing or when running alongside other memory-intensive processes.
+   */
+  double max_host_memory_gb = 0;
+  /**
+   * Maximum GPU memory to use for ACE build in GiB.
+   *
+   * When set to 0 (default), uses available GPU memory.
+   * When set to a positive value, limits GPU memory usage to the specified amount.
+   * Useful for testing or when running alongside other memory-intensive processes.
+   */
+  double max_gpu_memory_gb = 0;
+
+  ace_params() = default;
+};
+
+}  // namespace cuvs::neighbors::graph_build_params
 
 namespace cuvs::neighbors::cagra {
 // For re-exporting into cagra namespace
@@ -302,38 +368,6 @@ struct extend_params {
    * 0. */
   uint32_t max_chunk_size = 0;
 };
-/**
- * @}
- */
-
-/**
- * @defgroup cagra_cpp_merge_params CAGRA index merge parameters
- * @{
- */
-
-/**
- * @brief Parameters for merging CAGRA indexes.
- */
-struct merge_params : cuvs::neighbors::merge_params {
-  merge_params() = default;
-
-  /**
-   * @brief Constructs merge parameters with given index parameters.
-   * @param params Parameters for creating the output index.
-   */
-  explicit merge_params(const cagra::index_params& params) : output_index_params(params) {}
-
-  /// Parameters for creating the output index.
-  cagra::index_params output_index_params;
-
-  /// Strategy for merging. Defaults to `MergeStrategy::MERGE_STRATEGY_PHYSICAL`.
-  cuvs::neighbors::MergeStrategy merge_strategy =
-    cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL;
-
-  /// Implementation of the polymorphic strategy() method
-  cuvs::neighbors::MergeStrategy strategy() const { return merge_strategy; }
-};
-
 /**
  * @}
  */
@@ -869,6 +903,7 @@ struct index : cuvs::neighbors::index {
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  * - CosineExpanded
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
  *
  * Usage example:
  * @code{.cpp}
@@ -907,6 +942,7 @@ auto build(raft::resources const& res,
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  * - CosineExpanded
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
  *
  * Usage example:
  * @code{.cpp}
@@ -945,6 +981,7 @@ auto build(raft::resources const& res,
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
  *
  * Usage example:
  * @code{.cpp}
@@ -982,6 +1019,7 @@ auto build(raft::resources const& res,
  * The following distance metrics are supported:
  * - L2
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
  *
  * Usage example:
  * @code{.cpp}
@@ -1019,6 +1057,9 @@ auto build(raft::resources const& res,
  * The following distance metrics are supported:
  * - L2
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+ * - BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build
+ * algorithm, and only for int8_t and uint8_t data types)
  *
  * Usage example:
  * @code{.cpp}
@@ -1057,6 +1098,9 @@ auto build(raft::resources const& res,
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+ * - BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build
+ * algorithm, and only for int8_t and uint8_t data types)
  *
  * Usage example:
  * @code{.cpp}
@@ -1095,6 +1139,9 @@ auto build(raft::resources const& res,
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+ * - BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build
+ * algorithm, and only for int8_t and uint8_t data types)
  *
  * Usage example:
  * @code{.cpp}
@@ -1133,6 +1180,9 @@ auto build(raft::resources const& res,
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+ * - BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build
+ * algorithm, and only for int8_t and uint8_t data types)
  *
  * Usage example:
  * @code{.cpp}
@@ -1241,6 +1291,82 @@ void extend(
   raft::host_matrix_view<const float, int64_t, raft::row_major> additional_dataset,
   cuvs::neighbors::cagra::index<float, uint32_t>& idx,
   std::optional<raft::device_matrix_view<float, int64_t, raft::layout_stride>>
+    new_dataset_buffer_view                                                        = std::nullopt,
+  std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
+
+/** @brief Add new vectors to a CAGRA index
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   auto additional_dataset = raft::make_device_matrix<half, int64_t>(handle,add_size,dim);
+ *   // set_additional_dataset(additional_dataset.view());
+ *
+ *   cagra::extend_params params;
+ *   cagra::extend(res, params, raft::make_const_mdspan(additional_dataset.view()), index);
+ * @endcode
+ *
+ * @param[in] handle raft resources
+ * @param[in] params extend params
+ * @param[in] additional_dataset additional dataset on device memory
+ * @param[in,out] idx CAGRA index
+ * @param[out] new_dataset_buffer_view memory buffer view for the dataset including the additional
+ * part. The data will be copied from the current index in this function. The num rows must be the
+ * sum of the original and additional datasets, cols must be the dimension of the dataset, and the
+ * stride must be the same as the original index dataset. This view will be stored in the output
+ * index. It is the caller's responsibility to ensure that dataset stays alive as long as the index.
+ * This option is useful when users want to manage the memory space for the dataset themselves.
+ * @param[out] new_graph_buffer_view memory buffer view for the graph including the additional part.
+ * The data will be copied from the current index in this function. The num rows must be the sum of
+ * the original and additional datasets and cols must be the graph degree. This view will be stored
+ * in the output index. It is the caller's responsibility to ensure that dataset stays alive as long
+ * as the index. This option is useful when users want to manage the memory space for the graph
+ * themselves.
+ */
+void extend(
+  raft::resources const& handle,
+  const cagra::extend_params& params,
+  raft::device_matrix_view<const half, int64_t, raft::row_major> additional_dataset,
+  cuvs::neighbors::cagra::index<half, uint32_t>& idx,
+  std::optional<raft::device_matrix_view<half, int64_t, raft::layout_stride>>
+    new_dataset_buffer_view                                                        = std::nullopt,
+  std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
+
+/** @brief Add new vectors to a CAGRA index
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   auto additional_dataset = raft::make_host_matrix<half, int64_t>(handle,add_size,dim);
+ *   // set_additional_dataset(additional_dataset.view());
+ *
+ *   cagra::extend_params params;
+ *   cagra::extend(res, params, raft::make_const_mdspan(additional_dataset.view()), index);
+ * @endcode
+ *
+ * @param[in] handle raft resources
+ * @param[in] params extend params
+ * @param[in] additional_dataset additional dataset on host memory
+ * @param[in,out] idx CAGRA index
+ * @param[out] new_dataset_buffer_view memory buffer view for the dataset including the additional
+ * part. The data will be copied from the current index in this function. The num rows must be the
+ * sum of the original and additional datasets, cols must be the dimension of the dataset, and the
+ * stride must be the same as the original index dataset. This view will be stored in the output
+ * index. It is the caller's responsibility to ensure that dataset stays alive as long as the index.
+ * This option is useful when users want to manage the memory space for the dataset themselves.
+ * @param[out] new_graph_buffer_view memory buffer view for the graph including the additional part.
+ * The data will be copied from the current index in this function. The num rows must be the sum of
+ * the original and additional datasets and cols must be the graph degree. This view will be stored
+ * in the output index. It is the caller's responsibility to ensure that dataset stays alive as long
+ * as the index. This option is useful when users want to manage the memory space for the graph
+ * themselves.
+ */
+void extend(
+  raft::resources const& handle,
+  const cagra::extend_params& params,
+  raft::host_matrix_view<const half, int64_t, raft::row_major> additional_dataset,
+  cuvs::neighbors::cagra::index<half, uint32_t>& idx,
+  std::optional<raft::device_matrix_view<half, int64_t, raft::layout_stride>>
     new_dataset_buffer_view                                                        = std::nullopt,
   std::optional<raft::device_matrix_view<uint32_t, int64_t>> new_graph_buffer_view = std::nullopt);
 
@@ -2331,126 +2457,47 @@ void serialize_to_hnswlib(
  *   auto index1 = cagra::build(res, index_params, dataset1);
  *
  *   std::vector<cagra::index<float, uint32_t>*> indices{&index0, &index1};
- *   cagra::merge_params params{index_params};
  *
- *   auto merged_index = cagra::merge(res, params, indices);
+ *   auto merged_index = cagra::merge(res, index_params, indices);
  * @endcode
  *
  * @param[in] res RAFT resources used for the merge operation.
  * @param[in] params Parameters that control the merging process.
  * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
  *                    - Have attached datasets with the same dimension.
- *
+ * @param[in] row_filter an optional device filter function object that greenlights rows
+ *    to include in the merged index  (none_sample_filter for no filtering)
  * @return A new CAGRA index containing the merged indices, graph, and dataset.
  */
 auto merge(raft::resources const& res,
-           const cuvs::neighbors::cagra::merge_params& params,
-           std::vector<cuvs::neighbors::cagra::index<float, uint32_t>*>& indices)
+           const cuvs::neighbors::cagra::index_params& params,
+           std::vector<cuvs::neighbors::cagra::index<float, uint32_t>*>& indices,
+           const cuvs::neighbors::filtering::base_filter& row_filter =
+             cuvs::neighbors::filtering::none_sample_filter{})
   -> cuvs::neighbors::cagra::index<float, uint32_t>;
 
-/** @brief Merge multiple CAGRA indices into a single index.
- *
- * This function merges multiple CAGRA indices into one, combining both the datasets and graph
- * structures.
- *
- * @note: When device memory is sufficient, the dataset attached to the returned index is allocated
- * in device memory by default; otherwise, host memory is used automatically.
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   auto dataset0 = raft::make_host_matrix<half, int64_t>(handle, size0, dim);
- *   auto dataset1 = raft::make_host_matrix<half, int64_t>(handle, size1, dim);
- *
- *   auto index0 = cagra::build(res, index_params, dataset0);
- *   auto index1 = cagra::build(res, index_params, dataset1);
- *
- *   std::vector<cagra::index<half, uint32_t>*> indices{&index0, &index1};
- *   cagra::merge_params params{index_params};
- *
- *   auto merged_index = cagra::merge(res, params, indices);
- * @endcode
- *
- * @param[in] res RAFT resources used for the merge operation.
- * @param[in] params Parameters that control the merging process.
- * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
- *                    - Have attached datasets with the same dimension.
- *
- * @return A new CAGRA index containing the merged indices, graph, and dataset.
- */
+/** @copydoc merge */
 auto merge(raft::resources const& res,
-           const cuvs::neighbors::cagra::merge_params& params,
-           std::vector<cuvs::neighbors::cagra::index<half, uint32_t>*>& indices)
+           const cuvs::neighbors::cagra::index_params& params,
+           std::vector<cuvs::neighbors::cagra::index<half, uint32_t>*>& indices,
+           const cuvs::neighbors::filtering::base_filter& row_filter =
+             cuvs::neighbors::filtering::none_sample_filter{})
   -> cuvs::neighbors::cagra::index<half, uint32_t>;
 
-/** @brief Merge multiple CAGRA indices into a single index.
- *
- * This function merges multiple CAGRA indices into one, combining both the datasets and graph
- * structures.
- *
- * @note: When device memory is sufficient, the dataset attached to the returned index is allocated
- * in device memory by default; otherwise, host memory is used automatically.
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   auto dataset0 = raft::make_host_matrix<int8_t, int64_t>(handle, size0, dim);
- *   auto dataset1 = raft::make_host_matrix<int8_t, int64_t>(handle, size1, dim);
- *
- *   auto index0 = cagra::build(res, index_params, dataset0);
- *   auto index1 = cagra::build(res, index_params, dataset1);
- *
- *   std::vector<cagra::index<int8_t, uint32_t>*> indices{&index0, &index1};
- *   cagra::merge_params params{index_params};
- *
- *   auto merged_index = cagra::merge(res, params, indices);
- * @endcode
- *
- * @param[in] res RAFT resources used for the merge operation.
- * @param[in] params Parameters that control the merging process.
- * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
- *                    - Have attached datasets with the same dimension.
- *
- * @return A new CAGRA index containing the merged indices, graph, and dataset.
- */
+/** @copydoc merge */
 auto merge(raft::resources const& res,
-           const cuvs::neighbors::cagra::merge_params& params,
-           std::vector<cuvs::neighbors::cagra::index<int8_t, uint32_t>*>& indices)
+           const cuvs::neighbors::cagra::index_params& params,
+           std::vector<cuvs::neighbors::cagra::index<int8_t, uint32_t>*>& indices,
+           const cuvs::neighbors::filtering::base_filter& row_filter =
+             cuvs::neighbors::filtering::none_sample_filter{})
   -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
 
-/** @brief Merge multiple CAGRA indices into a single index.
- *
- * This function merges multiple CAGRA indices into one, combining both the datasets and graph
- * structures.
- *
- * @note: When device memory is sufficient, the dataset attached to the returned index is allocated
- * in device memory by default; otherwise, host memory is used automatically.
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   auto dataset0 = raft::make_host_matrix<uint8_t, int64_t>(handle, size0, dim);
- *   auto dataset1 = raft::make_host_matrix<uint8_t, int64_t>(handle, size1, dim);
- *
- *   auto index0 = cagra::build(res, index_params, dataset0);
- *   auto index1 = cagra::build(res, index_params, dataset1);
- *
- *   std::vector<cagra::index<uint8_t, uint32_t>*> indices{&index0, &index1};
- *   cagra::merge_params params{index_params};
- *
- *   auto merged_index = cagra::merge(res, params, indices);
- * @endcode
- *
- * @param[in] res RAFT resources used for the merge operation.
- * @param[in] params Parameters that control the merging process.
- * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
- *                    - Have attached datasets with the same dimension.
- *
- * @return A new CAGRA index containing the merged indices, graph, and dataset.
- */
+/** @copydoc merge */
 auto merge(raft::resources const& res,
-           const cuvs::neighbors::cagra::merge_params& params,
-           std::vector<cuvs::neighbors::cagra::index<uint8_t, uint32_t>*>& indices)
+           const cuvs::neighbors::cagra::index_params& params,
+           std::vector<cuvs::neighbors::cagra::index<uint8_t, uint32_t>*>& indices,
+           const cuvs::neighbors::filtering::base_filter& row_filter =
+             cuvs::neighbors::filtering::none_sample_filter{})
   -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
 /**
  * @}
@@ -3188,5 +3235,29 @@ void build_knn_graph(raft::resources const& res,
 
 }  // namespace cuvs::neighbors::cagra
 
-#include <cuvs/neighbors/cagra_index_wrapper.hpp>
-#include <cuvs/neighbors/cagra_optimize.hpp>
+namespace cuvs::neighbors::cagra::helpers {
+
+/**
+ * @brief Optimize a KNN graph into a CAGRA graph.
+ *
+ * This function optimizes a k-NN graph to create a CAGRA graph.
+ * The input/output graphs must be on host memory.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   raft::resources res;
+ *   auto h_knn = raft::make_host_matrix<uint32_t, int64_t>(N, K_in);
+ *   // Fill h_knn with KNN graph
+ *   auto h_out = raft::make_host_matrix<uint32_t, int64_t>(N, K_out);
+ *   cuvs::neighbors::cagra::helpers::optimize(res, h_knn.view(), h_out.view());
+ * @endcode
+ *
+ * @param[in] handle RAFT resources
+ * @param[in] knn_graph Input KNN graph on host [n_rows, k_in]
+ * @param[out] new_graph Output CAGRA graph on host [n_rows, k_out]
+ */
+void optimize(raft::resources const& handle,
+              raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
+              raft::host_matrix_view<uint32_t, int64_t, raft::row_major> new_graph);
+
+}  // namespace cuvs::neighbors::cagra::helpers
