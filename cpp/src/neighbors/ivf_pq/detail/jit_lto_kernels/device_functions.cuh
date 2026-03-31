@@ -13,6 +13,8 @@
 
 namespace cuvs::neighbors::ivf_pq::detail {
 
+using vec_t = raft::TxN_t<uint32_t, kIndexGroupVecLen / sizeof(uint32_t)>;
+
 template <typename LutT>
 __device__ void prepare_lut(uint8_t* smem_buf,
                             uint32_t pq_dim,
@@ -67,5 +69,13 @@ __device__ void compute_distances(const uint32_t* chunk_indices,
                                   LutT* lut_scores,
                                   uint8_t* smem_buf,
                                   filtering::ivf_filter_dev sample_filter);
+
+__device__ uint32_t get_line_width(uint32_t pq_dim);
+
+template <typename OutT, typename LutT>
+__device__ auto compute_score(uint32_t pq_dim,
+                              const vec_t::io_t* pq_head,
+                              const LutT* lut_scores,
+                              OutT early_stop_limit) -> OutT;
 
 }  // namespace cuvs::neighbors::ivf_pq::detail

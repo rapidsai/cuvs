@@ -9,8 +9,7 @@
 
 namespace cuvs::neighbors::ivf_pq::detail {
 
-using _FragmentEntry = StaticFatbinFragmentEntry<
-  fragment_tag_compute_distances<tag_out_@out_abbrev@, tag_lut_@lut_abbrev@, @capacity@>>;
+using _FragmentEntry = StaticFatbinFragmentEntry<fragment_tag_get_line_width<@pq_bits@>>;
 
 template <>
 const uint8_t* const _FragmentEntry::data = embedded_fatbin;

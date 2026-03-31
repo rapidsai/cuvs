@@ -32,7 +32,13 @@ struct fragment_tag_precompute_base_diff {};
 template <typename LutTag, bool PrecompBaseDiff, uint32_t PqBits>
 struct fragment_tag_create_lut {};
 
-template <typename OutTag, typename LutTag, int Capacity, uint32_t PqBits>
+template <typename OutTag, typename LutTag, int Capacity>
 struct fragment_tag_compute_distances {};
+
+template <uint32_t PqBits>
+struct fragment_tag_get_line_width {};
+
+template <typename OutTag, typename LutTag, uint32_t PqBits>
+struct fragment_tag_compute_score {};
 
 }  // namespace cuvs::neighbors::ivf_pq::detail

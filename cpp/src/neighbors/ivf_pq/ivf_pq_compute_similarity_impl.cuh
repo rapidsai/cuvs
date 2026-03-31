@@ -128,7 +128,9 @@ auto kernel_try_capacity(uint32_t k_max)
   planner.add_store_calculated_distances_function<out_tag, kManageLocalTopK>();
   planner.add_precompute_base_diff_function<PrecompBaseDiff>();
   planner.add_create_lut_function<lut_tag, PrecompBaseDiff, PqBits>();
-  planner.add_compute_distances_function<out_tag, lut_tag, Capacity, PqBits>();
+  planner.add_compute_distances_function<out_tag, lut_tag, Capacity>();
+  planner.add_get_line_width_function<PqBits>();
+  planner.add_compute_score_function<out_tag, lut_tag, PqBits>();
   return planner.get_launcher();
 }
 

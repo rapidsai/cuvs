@@ -44,10 +44,22 @@ struct ComputeSimilarityPlanner : AlgorithmPlanner {
     this->add_static_fragment<fragment_tag_create_lut<LutTag, PrecompBaseDiff, PqBits>>();
   }
 
-  template <typename OutTag, typename LutTag, int Capacity, uint32_t PqBits>
+  template <typename OutTag, typename LutTag, int Capacity>
   void add_compute_distances_function()
   {
-    this->add_static_fragment<fragment_tag_compute_distances<OutTag, LutTag, Capacity, PqBits>>();
+    this->add_static_fragment<fragment_tag_compute_distances<OutTag, LutTag, Capacity>>();
+  }
+
+  template <uint32_t PqBits>
+  void add_get_line_width_function()
+  {
+    this->add_static_fragment<fragment_tag_get_line_width<PqBits>>();
+  }
+
+  template <typename OutTag, typename LutTag, uint32_t PqBits>
+  void add_compute_score_function()
+  {
+    this->add_static_fragment<fragment_tag_compute_score<OutTag, LutTag, PqBits>>();
   }
 };
 

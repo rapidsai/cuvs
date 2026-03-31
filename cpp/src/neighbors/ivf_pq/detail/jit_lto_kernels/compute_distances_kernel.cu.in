@@ -9,10 +9,9 @@
 
 namespace {
 
-using out_t                = @out_type@;
-using lut_t                = @lut_type@;
-constexpr int capacity     = @capacity@;
-constexpr uint32_t pq_bits = @pq_bits@;
+using out_t            = @out_type@;
+using lut_t            = @lut_type@;
+constexpr int capacity = @capacity@;
 
 }  // namespace
 
@@ -38,24 +37,24 @@ __device__ void compute_distances<out_t, lut_t>(const uint32_t* chunk_indices,
                                                 uint8_t* smem_buf,
                                                 filtering::ivf_filter_dev sample_filter)
 {
-  compute_distances_impl<out_t, lut_t, capacity, pq_bits>(chunk_indices,
-                                                          query_kths,
-                                                          n_probes,
-                                                          probe_ix,
-                                                          query_ix,
-                                                          max_samples,
-                                                          metric,
-                                                          topk,
-                                                          lut_end,
-                                                          pq_dim,
-                                                          pq_dataset,
-                                                          label,
-                                                          queries_offset,
-                                                          out_scores,
-                                                          out_indices,
-                                                          lut_scores,
-                                                          smem_buf,
-                                                          sample_filter);
+  compute_distances_impl<out_t, lut_t, capacity>(chunk_indices,
+                                                 query_kths,
+                                                 n_probes,
+                                                 probe_ix,
+                                                 query_ix,
+                                                 max_samples,
+                                                 metric,
+                                                 topk,
+                                                 lut_end,
+                                                 pq_dim,
+                                                 pq_dataset,
+                                                 label,
+                                                 queries_offset,
+                                                 out_scores,
+                                                 out_indices,
+                                                 lut_scores,
+                                                 smem_buf,
+                                                 sample_filter);
 }
 
 }  // namespace cuvs::neighbors::ivf_pq::detail
