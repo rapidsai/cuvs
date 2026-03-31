@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "detail/kmeans_batched.cuh"
 #include "kmeans.cuh"
 #include "kmeans_impl.cuh"
 #include <raft/core/resources.hpp>
