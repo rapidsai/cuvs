@@ -467,9 +467,10 @@ template __global__ void search_kernel<@data_type@, @out_type@, @idx_type@, @opt
 
 ### Step 5: Create `.cpp.in` Template Files for Embedding
 
-The `.cpp.in` files register the compiled fatbins so they can be loaded at runtime. The fragment key used for registration is constructed as: `registerAlgorithm` constructor string + `"_"` + `make_fragment_key<Ts...>()`, where `Ts...` are the template parameters passed to `registerAlgorithm`.
+The `.cpp.in` files register the compiled fatbins so they can be loaded at runtime. Fragment tags are used to help the
+linker find and include the relevant fatbins at build time.
 
-**Important**: In the `.cpp.in` files (which become `.cpp` files), we use **tags** (like `tag_f`, `tag_h`) instead of real types (like `float`, `__half`) in the `registerAlgorithm` template parameters. This avoids including heavy headers that define the actual types, significantly improving compilation times. The tags are lightweight empty structs that serve only as compile-time identifiers.
+**Important**: In the `.cpp.in` files (which become `.cpp` files), we use **tags** (like `tag_f`, `tag_h`) instead of real types (like `float`, `__half`) in the `StaticFatbinFragmentEntry` template parameters. This avoids including heavy headers that define the actual types, significantly improving compilation times. The tags are lightweight empty structs that serve only as compile-time identifiers.
 
 #### `compute_distance_embedded.cpp.in`
 
@@ -479,22 +480,19 @@ The `.cpp.in` files register the compiled fatbins so they can be loaded at runti
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
+#include <cuvs/detail/jit_lto/FragmentEntry.hpp>
 #include <cuvs/detail/jit_lto/registration_tags.hpp>
 #include "@embedded_header_file@"
 
-using namespace example::detail;
+namespace example::detail {
 
-namespace {
+using _FragmentEntry = StaticFatbinFragmentEntry<fragment_tag_compute_distance<tag_@distance_name@, tag_@type_abbrev@>>;
 
-__attribute__((__constructor__)) void register_kernel()
-{
-  // Note: Fragment keys should include parameter names along with their values for better readability.
-  registerAlgorithm<tag_@type_abbrev@>(
-    "@distance_name@_data_@data_type@",
-    embedded_fatbin,
-    sizeof(embedded_fatbin));
-}
+template <>
+const uint8_t* const _FragmentEntry::data = embedded_fatbin;
+
+template <>
+const size_t _FragmentEntry::length = embedded_fatbin;
 
 }
 ```
@@ -507,21 +505,19 @@ __attribute__((__constructor__)) void register_kernel()
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
+#include <cuvs/detail/jit_lto/FragmentEntry.hpp>
 #include <cuvs/detail/jit_lto/registration_tags.hpp>
 #include "@embedded_header_file@"
 
-using namespace example::detail;
+namespace example::detail {
 
-namespace {
+using _FragmentEntry = StaticFatbinFragmentEntry<fragment_tag_filter<tag_@filter_name@, tag_@idx_abbrev@>>;
 
-__attribute__((__constructor__)) void register_kernel()
-{
-  registerAlgorithm<tag_@idx_abbrev@>(
-    "@filter_name@_index_@idx_type@",
-    embedded_fatbin,
-    sizeof(embedded_fatbin));
-}
+template <>
+const uint8_t* const _FragmentEntry::data = embedded_fatbin;
+
+template <>
+const size_t _FragmentEntry::length = embedded_fatbin;
 
 }
 ```
@@ -534,24 +530,19 @@ __attribute__((__constructor__)) void register_kernel()
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
+#include <cuvs/detail/jit_lto/FragmentEntry.hpp>
 #include <cuvs/detail/jit_lto/registration_tags.hpp>
 #include "@embedded_header_file@"
 
-using namespace example::detail;
+namespace example::detail {
 
-namespace {
+using _FragmentEntry = StaticFatbinFragmentEntry<fragment_tag_search<tag_@type_abbrev@, tag_@out_abbrev@, tag_@idx_abbrev@, @optimized@, @veclen@>>;
 
-__attribute__((__constructor__)) void register_kernel()
-{
-  // Note: Non-type template parameters (like bool) cannot be handled by make_fragment_key,
-  // so they must be included in the key string. Type information in template parameters
-  // doesn't need to be repeated in the key.
-  registerAlgorithm<tag_@type_abbrev@, tag_@out_abbrev@, tag_@idx_abbrev@>(
-    "@optimized_name@_veclen_@veclen@",
-    embedded_fatbin,
-    sizeof(embedded_fatbin));
-}
+template <>
+const uint8_t* const _FragmentEntry::data = embedded_fatbin;
+
+template <>
+const size_t _FragmentEntry::length = embedded_fatbin;
 
 }
 ```
@@ -576,31 +567,28 @@ The planner is responsible for:
 #include <cuvs/detail/jit_lto/registration_tags.hpp>
 #include <string>
 
-template <typename DataTag, typename OutTag, typename IndexTag>
 struct SearchPlanner : AlgorithmPlanner {
-  SearchPlanner(bool use_optimized = false, int veclen = 1)
-    : AlgorithmPlanner("search_kernel",
-                      (use_optimized ? "_optimized" : "_standard") + "_veclen_" + std::to_string(veclen) +
-                      make_fragment_key<DataTag, OutTag, IndexTag>())
+  SearchPlanner()
+    : AlgorithmPlanner("search_kernel")
   {
   }
 
-  void add_compute_distance_device_function(std::string distance_name)
+  template <typename DataTag, typename OutTag, typename IdxTag, bool Optimized, int Veclen>
+  void add_search_function()
   {
-    // Build fragment key: distance_name + "_data_" + make_fragment_key<DataTag>()
-    auto key = distance_name + "_data_";
-    auto params = make_fragment_key<DataTag>();
-    key += params;
-    this->device_functions.push_back(key);
+    add_static_fragment<fragment_tag_search<DataTag, OutTag, IdxTag, Optimized, Veclen>>();
   }
 
-  void add_filter_device_function(std::string filter_name)
+  template <typename DistanceTag, typename DataTag>
+  void add_compute_distance_function()
   {
-    // Build fragment key: filter_name + "_index_" + make_fragment_key<IndexTag>()
-    auto key = filter_name + "_index_";
-    auto params = make_fragment_key<IndexTag>();
-    key += params;
-    this->device_functions.push_back(key);
+    add_static_fragment<fragment_tag_compute_distance<DistanceTag, DataTag>>();
+  }
+
+  template <typename FilterTag, typename IndexTag>
+  void add_filter_function()
+  {
+    add_static_fragment<fragment_tag_filter<FilterTag, IndexTag>>();
   }
 };
 ```
@@ -633,7 +621,13 @@ constexpr auto get_idx_type_tag() {
   if constexpr (std::is_same_v<IdxT, int64_t>) return tag_l{};
 }
 
-template <typename T, typename OutT, typename IdxT>
+template <typename OutType>
+constexpr auto get_out_type_tag() {
+  if constexpr (std::is_same_v<OutType, float>) return tag_f{};
+  if constexpr (std::is_same_v<OutType, double>) return tag_d{};
+}
+
+template <typename T, typename OutT, typename IdxT, typename DistanceTag, typename FilterTag, bool Optimized, int Veclen>
 void search_jit(
     raft::device_resources const& handle,
     const T* dataset,
@@ -642,30 +636,21 @@ void search_jit(
     OutT* distances,
     uint32_t num_queries,
     uint32_t dataset_size,
-    std::string distance_type,  // "euclidean" or "inner_product"
-    std::string filter_type,     // "filter_none" or "filter_bitset"
-    bool use_optimized = false,  // Use optimized kernel path
-    int veclen = 1,              // Vectorization length
     void* filter_data = nullptr) {
 
-  // Type tag helpers for output type
-  template <typename OutType>
-  constexpr auto get_out_type_tag() {
-    if constexpr (std::is_same_v<OutType, float>) return tag_f{};
-    if constexpr (std::is_same_v<OutType, double>) return tag_d{};
-  }
+  using data_tag = decltype(get_data_type_tag<T>());
+  using idx_tag = decltype(get_idx_type_tag<IdxT>());
+  using out_tag = decltype(get_out_type_tag<OutT>());
 
   // Create planner with type tags and boolean parameter
   // Note: The boolean is appended to the fragment key since make_fragment_key
   // cannot handle non-type template parameters
-  auto planner = SearchPlanner<decltype(get_data_type_tag<T>()),
-                               decltype(get_out_type_tag<OutT>()),
-                               decltype(get_idx_type_tag<IdxT>())>(use_optimized);
+  SearchPlanner planner;
 
   // Add required device function fragments
-  // The DataTag is already provided to the planner template, so we just pass the distance name
-  planner.add_compute_distance_device_function(distance_type);
-  planner.add_filter_device_function(filter_type);
+  planner.add_search_function<data_tag, out_tag, idx_tag, Optimized, Veclen>();
+  planner.add_compute_distance_device_function<DistanceTag, data_tag>();
+  planner.add_filter_device_function<FilterTag, idx_tag>();
 
   // Get the launcher (this will build/link fragments if needed)
   auto launcher = planner.get_launcher();
@@ -694,44 +679,44 @@ void search_jit(
 
 ## Key Concepts
 
-### Fragment Keys
+### Fragment Tags
 
-Fragment keys uniquely identify fragments. They're constructed from:
-- Template parameter types (using `make_fragment_key<>()`)
-- Configuration values (e.g., "euclidean", "filter_none")
-- Parameter values (e.g., veclen, capacity)
+Fragment tags uniquely identify fragments. They're simple lightweight types that are passed as the
+sole template parameter to `StaticFatbinFragmentEntry`:
 
-**Critical**: The fragment key must match **exactly** between:
-- The registration in the `.cpp.in` file (the second argument to `registerAlgorithm`)
-- The lookup in the planner's `device_functions` vector
-
-**Key Construction**: The full fragment key is constructed as:
-```
-entrypoint_name + "_" + make_fragment_key<Ts...>
+```cpp
+template <typename OutT>
+struct fragment_tag_get_score {};
 ```
 
-Where:
-- `entrypoint_name` is the first argument to the `AlgorithmPlanner` constructor (e.g., `"search_kernel"`)
-- `make_fragment_key<Ts...>` converts the template tag types to a string representation
-- The `"_"` separator connects them
+Fragment tags may themselves take template parameters in order to uniquely identify them. Typically, one fragment tag template will correspond to a single function, and a fragment tag template specialization will correspond to a function specialization.
 
-For device function fragments, the key is constructed as: `function_name + "_" + param_name + "_" + make_fragment_key<Tag>()` where `Tag` is the template parameter and `param_name` is a descriptive name for the parameter (e.g., `"data"`, `"index"`). Device functions are looked up separately from entrypoint kernels.
+When a fatbin is compiled and embedded in C++ code, a translation unit specializes `StaticFatbinFragmentEntry`
+to specify its `data` and `length` static fields:
 
-**Naming Convention**: Fragment keys should include parameter names along with their values for better readability. For example, use `"euclidean_data_float"` instead of `"euclidean_float"`, or `"filter_none_index_uint32_t"` instead of `"filter_none_uint32_t"`. This makes it clear what each value represents when debugging or inspecting fragment keys.
+```cpp
+using _FragmentEntry = StaticFatbinFragmentEntry<fragment_tag_get_score<uint32_t>>;
 
-If the keys don't match exactly (including case, underscores, and order), the fragment will not be found at runtime and linking will fail.
+template <>
+const uint8_t* const _FragmentEntry::data = embedded_fatbin;
 
-**Important**: The fragment database matches fragments by both the template tags and the key string together. For device functions, the key string must include the type information (via `make_fragment_key`) to match what the planner constructs.
+template <>
+const size_t _FragmentEntry::length = sizeof(embedded_fatbin);
+```
 
-For example:
-- In `compute_distance_embedded.cpp.in`: `registerAlgorithm<tag_f>("euclidean_data_float", ...)` - the key includes function name, parameter name, and type
-- In `SearchPlanner::add_compute_distance_device_function()`: must produce `key = distance_name + "_data_" + make_fragment_key<DataTag>()` for lookup (e.g., `"euclidean_data_float"`)
+Then, an `AlgorithmPlanner` can call `add_static_fragment()` with the fragment tag (NOT the `StaticFatbinFragmentEntry`
+specialization) as the sole template parameter:
 
-**Non-Type Template Parameters**: For non-type template parameters (like `bool`, `int`, etc.), `make_fragment_key` cannot be used since it only works with types. Instead, prepend the value as a string directly to the key:
-- In the planner constructor: `(use_optimized ? "_optimized" : "_standard") + "_veclen_" + std::to_string(veclen) + make_fragment_key<DataTag, OutTag, IndexTag>()` - this produces something like `"_optimized_veclen_1_f_f_ui"`
-- In the registration: `"@optimized_name@_veclen_@veclen@"` - type information is in the template parameters, only the non-type parameter values (optimized/standard and veclen) are in the key
+```cpp
+template <typename OutTag>
+void add_get_score_function()
+{
+  add_static_fragment<fragment_tag_get_score<OutTag>>();
+}
+```
 
-Any mismatch will result in a runtime error when trying to link the fragments.
+At build time, the linker takes care of finding and including the static fragments that have been specified by the
+algorithm planner.
 
 ### Registration Tags
 
@@ -754,13 +739,6 @@ The `AlgorithmLauncher` is the runtime handle for a linked kernel. It:
 - Holds a `cudaKernel_t` handle to the linked kernel
 - Provides `call()` and `call_cooperative()` methods to launch the kernel
 - Manages the lifetime of the `cudaLibrary_t` that contains the kernel
-
-### Fragment Database
-
-The fragment database is a global registry that:
-- Stores all registered fragments (from `__attribute__((__constructor__))` functions)
-- Allows lookup by fragment key
-- Manages the linking process via NVRTCLTO
 
 ## Best Practices
 
