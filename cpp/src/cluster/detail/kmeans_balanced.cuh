@@ -5,7 +5,6 @@
 
 #pragma once
 
-#include "../../distance/fused_distance_nn.cuh"
 #include "kmeans_common.cuh"
 #include <cuvs/cluster/kmeans.hpp>
 
@@ -88,80 +87,32 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
   auto stream = raft::resource::get_cuda_stream(handle);
   switch (params.metric) {
     case cuvs::distance::DistanceType::L2Expanded:
-    case cuvs::distance::DistanceType::L2SqrtExpanded: {
-      auto workspace = raft::make_device_mdarray<char, IdxT>(
-        handle, mr, raft::make_extents<IdxT>((sizeof(int)) * n_rows));
-
-      auto minClusterAndDistance = raft::make_device_mdarray<raft::KeyValuePair<IdxT, MathT>, IdxT>(
-        handle, mr, raft::make_extents<IdxT>(n_rows));
-      raft::KeyValuePair<IdxT, MathT> initial_value(0, std::numeric_limits<MathT>::max());
-      raft::matrix::fill(handle, minClusterAndDistance.view(), initial_value);
-
-      auto centroidsNorm =
-        raft::make_device_mdarray<MathT, IdxT>(handle, mr, raft::make_extents<IdxT>(n_clusters));
-      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-        handle,
-        raft::make_device_matrix_view<const MathT, IdxT, raft::row_major>(centers, n_clusters, dim),
-        centroidsNorm.view());
-
-      cuvs::distance::fusedDistanceNNMinReduce<MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
-        minClusterAndDistance.data_handle(),
-        dataset,
-        centers,
-        dataset_norm,
-        centroidsNorm.data_handle(),
-        n_rows,
-        n_clusters,
-        dim,
-        (void*)workspace.data_handle(),
-        (params.metric == cuvs::distance::DistanceType::L2Expanded) ? false : true,
-        false,
-        true,
-        params.metric,
-        0.0f,
-        stream);
-
-      // todo(lsugy): use KVP + iterator in caller.
-      // Copy keys to output labels
-      raft::linalg::map(handle,
-                        raft::make_const_mdspan(minClusterAndDistance.view()),
-                        raft::make_device_vector_view<LabelT, IdxT>(labels, n_rows),
-                        raft::compose_op<raft::cast_op<LabelT>, raft::key_op>());
-      break;
-    }
+    case cuvs::distance::DistanceType::L2SqrtExpanded:
     case cuvs::distance::DistanceType::CosineExpanded: {
-      auto workspace = raft::make_device_mdarray<char, IdxT>(
-        handle, mr, raft::make_extents<IdxT>((sizeof(int)) * n_rows));
+      rmm::device_uvector<MathT> L2NormBuf_OR_DistBuf(0, stream, mr);
+      rmm::device_uvector<char> workspace(0, stream, mr);
+
+      auto X_view = raft::make_device_matrix_view<const MathT, IdxT>(dataset, n_rows, dim);
+      auto centroids_view =
+        raft::make_device_matrix_view<const MathT, IdxT>(centers, n_clusters, dim);
+      auto X_norm_view =
+        raft::make_device_vector_view<const MathT, IdxT>(dataset_norm, n_rows);
 
       auto minClusterAndDistance = raft::make_device_mdarray<raft::KeyValuePair<IdxT, MathT>, IdxT>(
         handle, mr, raft::make_extents<IdxT>(n_rows));
-      raft::KeyValuePair<IdxT, MathT> initial_value(0, std::numeric_limits<MathT>::max());
-      raft::matrix::fill(handle, minClusterAndDistance.view(), initial_value);
 
-      auto centroidsNorm =
-        raft::make_device_mdarray<MathT, IdxT>(handle, mr, raft::make_extents<IdxT>(n_clusters));
-      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+      cuvs::cluster::kmeans::detail::minClusterAndDistanceCompute<MathT, IdxT>(
         handle,
-        raft::make_device_matrix_view<const MathT, IdxT, raft::row_major>(centers, n_clusters, dim),
-        centroidsNorm.view(),
-        raft::sqrt_op{});
-
-      cuvs::distance::fusedDistanceNNMinReduce<MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
-        minClusterAndDistance.data_handle(),
-        dataset,
-        centers,
-        dataset_norm,
-        centroidsNorm.data_handle(),
-        n_rows,
-        n_clusters,
-        dim,
-        (void*)workspace.data_handle(),
-        false,
-        false,
-        true,
+        X_view,
+        centroids_view,
+        minClusterAndDistance.view(),
+        X_norm_view,
+        L2NormBuf_OR_DistBuf,
         params.metric,
-        0.0f,
-        stream);
+        0,  // batch_samples (0 = default)
+        0,  // batch_centroids (0 = default)
+        workspace);
+
       // Copy keys to output labels
       raft::linalg::map(handle,
                         raft::make_const_mdspan(minClusterAndDistance.view()),
