@@ -69,7 +69,7 @@ __device__ bool apply_filter_bitset(uint32_t query_id, IdxT node_id, void* filte
 
 // Main kernel - will use generic extern device functions
 template <typename T, typename OutT, typename IdxT, bool UseOptimizedPath, int Veclen>
-__global__ void search_kernel(
+__device__ void search_kernel_impl(
     const T* dataset,
     const T* queries,
     IdxT* results,
@@ -397,7 +397,7 @@ extern __device__ bool apply_filter(uint32_t, IdxT, void*);
 
 // Main kernel - uses generic extern device functions
 template <typename T, typename OutT, typename IdxT, bool UseOptimizedPath, int Veclen>
-__global__ void search_kernel(
+__device__ void search_kernel_impl(
     const T* dataset,
     const T* queries,
     IdxT* results,
@@ -456,9 +456,19 @@ The `.cu.in` file only contains the explicit template instantiation:
 namespace example::detail {
 
 // Instantiate the kernel template
-template __global__ void search_kernel<@data_type@, @out_type@, @idx_type@, @optimized_value@, @veclen@>(
-    const @data_type@*, const @data_type@*, @idx_type@*, @out_type@*,
-    uint32_t, uint32_t, void*);
+extern "C" __global__ void search_kernel(
+    const @data_type@* dataset, const @data_type@* queries, @idx_type@* results, @out_type@* distances,
+    uint32_t num_queries, uint32_t dataset_size, void* filter_data)
+{
+  search_kernel_impl<@data_type@, @out_type@, @idx_type@, @optimized_value@, @veclen@>(
+    dataset,
+    queries,
+    results,
+    distances,
+    num_queries,
+    dataset_size,
+    filter_data);
+}
 
 } // namespace example::detail
 ```
