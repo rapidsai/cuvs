@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -52,5 +52,4 @@ void predict(raft::resources const& handle,
   cuvs::cluster::kmeans::predict<float, int64_t>(
     handle, params, X, sample_weight, centroids, labels, normalize_weight, inertia);
 }
-
 }  // namespace cuvs::cluster::kmeans
