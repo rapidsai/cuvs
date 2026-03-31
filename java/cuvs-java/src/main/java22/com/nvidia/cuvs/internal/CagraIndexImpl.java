@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.internal;
@@ -47,7 +47,7 @@ import java.util.*;
  *
  * @since 25.02
  */
-public class CagraIndexImpl implements CagraIndex {
+public class CagraIndexImpl implements CagraIndex, BufferedCagraSearch {
   private final CuVSResources resources;
   private final IndexReference cagraIndexReference;
   private boolean destroyed;
@@ -335,6 +335,118 @@ public class CagraIndexImpl implements CagraIndex {
           topK,
           query.getMapping(),
           numQueries);
+    }
+  }
+
+  /**
+   * Runs CAGRA search and writes results directly into caller-owned device buffers.
+   *
+   * <p>Unlike {@link #search}, this method does <em>not</em> copy results to host memory and does
+   * <em>not</em> synchronize the CUDA stream. The caller is responsible for both after all
+   * per-segment searches have been queued.
+   *
+   * <p>Results for this segment are written at byte offset {@code segmentIdx * topK} elements
+   * from the start of each buffer:
+   * <ul>
+   *   <li>{@code globalNeighborsDP}: uint32 ordinals, {@code topK} entries per segment</li>
+   *   <li>{@code globalDistancesDP}: float32 distances, {@code topK} entries per segment</li>
+   * </ul>
+   *
+   * @param query            query parameters including vectors, topK, search params, and optional
+   *                         prefilter; must have exactly one query vector (numQueries == 1)
+   * @param globalNeighborsDP device pointer to the start of the shared uint32 neighbors buffer
+   * @param globalDistancesDP device pointer to the start of the shared float32 distances buffer
+   * @param segmentIdx        zero-based index of this segment; determines the write offset
+   */
+  @Override
+  public void searchIntoBuffer(
+      CagraQuery query,
+      MemorySegment globalNeighborsDP,
+      MemorySegment globalDistancesDP,
+      int segmentIdx)
+      throws Throwable {
+    try (var localArena = Arena.ofConfined()) {
+      checkNotDestroyed();
+      int topK = query.getTopK();
+      var queryVectors = (CuVSMatrixInternal) query.getQueryVectors();
+      long numQueries = queryVectors.size();
+
+      final boolean hasPreFilter = query.getPrefilter() != null;
+      final BitSet[] prefilters =
+          hasPreFilter ? new BitSet[] {query.getPrefilter()} : EMPTY_PREFILTER_BITSET;
+      final long prefilterDataLength = hasPreFilter ? query.getNumDocs() * prefilters.length : 0;
+      final long prefilterLen = hasPreFilter ? (prefilterDataLength + 31) / 32 : 0;
+      final long prefilterBytes = C_INT_BYTE_SIZE * prefilterLen;
+
+      try (var resourcesAccessor = query.getResources().access()) {
+        var cuvsRes = resourcesAccessor.handle();
+        var cuvsStream = Util.getStream(cuvsRes);
+
+        // Pointers into the global buffer at this segment's slice.
+        long neighborByteOffset = (long) segmentIdx * topK * C_INT_BYTE_SIZE;
+        long distanceByteOffset = (long) segmentIdx * topK * Float.BYTES;
+        MemorySegment neighborSlice =
+            MemorySegment.ofAddress(globalNeighborsDP.address() + neighborByteOffset);
+        MemorySegment distanceSlice =
+            MemorySegment.ofAddress(globalDistancesDP.address() + distanceByteOffset);
+
+        try (var deviceQueryVectors =
+                (CuVSMatrixInternal) queryVectors.toDevice(query.getResources());
+            var prefilterDP =
+                hasPreFilter
+                    ? allocateRMMSegment(cuvsRes, prefilterBytes)
+                    : CloseableRMMAllocation.EMPTY) {
+
+          var queryTensor = deviceQueryVectors.toTensor(localArena);
+          long[] neighborsShape = {numQueries, topK};
+          MemorySegment neighborsTensor =
+              prepareTensor(localArena, neighborSlice, neighborsShape, kDLUInt(), 32, kDLCUDA());
+          long[] distancesShape = {numQueries, topK};
+          MemorySegment distancesTensor =
+              prepareTensor(
+                  localArena,
+                  distanceSlice,
+                  distancesShape,
+                  deviceQueryVectors.code(),
+                  deviceQueryVectors.bits(),
+                  kDLCUDA());
+
+          MemorySegment prefilter = cuvsFilter.allocate(localArena);
+          if (!hasPreFilter) {
+            cuvsFilter.type(prefilter, 0); // NO_FILTER
+            cuvsFilter.addr(prefilter, 0);
+          } else {
+            BitSet concatenatedFilters = concatenate(prefilters, query.getNumDocs());
+            long[] filters = concatenatedFilters.toLongArray();
+            var prefilterDataMemorySegment = buildMemorySegment(localArena, filters);
+            long[] prefilterShape = {prefilterLen};
+            Util.cudaMemcpyAsync(
+                prefilterDP.handle(),
+                prefilterDataMemorySegment,
+                prefilterBytes,
+                HOST_TO_DEVICE,
+                cuvsStream);
+            MemorySegment prefilterTensor =
+                prepareTensor(
+                    localArena, prefilterDP.handle(), prefilterShape, kDLUInt(), 32, kDLCUDA());
+            cuvsFilter.type(prefilter, 1);
+            cuvsFilter.addr(prefilter, prefilterTensor.address());
+          }
+
+          var returnValue =
+              cuvsCagraSearch(
+                  cuvsRes,
+                  segmentFromSearchParams(localArena, query.getCagraSearchParameters()),
+                  cagraIndexReference.getMemorySegment(),
+                  queryTensor,
+                  neighborsTensor,
+                  distancesTensor,
+                  prefilter);
+          checkCuVSError(returnValue, "cuvsCagraSearch (searchIntoBuffer)");
+          // Intentionally no cudaMemcpyAsync and no stream sync here.
+          // The caller syncs the stream after queuing all segment searches.
+        }
+      }
     }
   }
 
@@ -632,8 +744,10 @@ public class CagraIndexImpl implements CagraIndex {
       cuvsAceParams.npartitions(cuvsAceParamsMemorySegment, cuVSAceParams.getNpartitions());
       cuvsAceParams.ef_construction(cuvsAceParamsMemorySegment, cuVSAceParams.getEfConstruction());
       cuvsAceParams.use_disk(cuvsAceParamsMemorySegment, cuVSAceParams.isUseDisk());
-      cuvsAceParams.max_host_memory_gb(cuvsAceParamsMemorySegment, cuVSAceParams.getMaxHostMemoryGb());
-      cuvsAceParams.max_gpu_memory_gb(cuvsAceParamsMemorySegment, cuVSAceParams.getMaxGpuMemoryGb());
+      cuvsAceParams.max_host_memory_gb(
+          cuvsAceParamsMemorySegment, cuVSAceParams.getMaxHostMemoryGb());
+      cuvsAceParams.max_gpu_memory_gb(
+          cuvsAceParamsMemorySegment, cuVSAceParams.getMaxGpuMemoryGb());
 
       String buildDir = cuVSAceParams.getBuildDir();
       if (buildDir != null && !buildDir.isEmpty()) {
