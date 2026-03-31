@@ -4,6 +4,7 @@
  */
 
 #include <cstdint>
+
 #include <dlpack/dlpack.h>
 
 #include <cuvs/cluster/kmeans.h>
@@ -40,7 +41,7 @@ cuvs::cluster::kmeans::balanced_params convert_balanced_params(const cuvsKMeansP
   return kmeans_params;
 }
 
-template <typename T, typename IdxT = int32_t>
+template <typename T, typename IdxT = int64_t>
 void _fit(cuvsResources_t res,
           const cuvsKMeansParams& params,
           DLManagedTensor* X_tensor,
@@ -259,9 +260,9 @@ extern "C" cuvsError_t cuvsKMeansFit(cuvsResources_t res,
   return cuvs::core::translate_exceptions([=] {
     auto dataset = X->dl_tensor;
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
-        _fit<float>(res, *params, X, sample_weight, centroids, inertia, n_iter);
+      _fit<float>(res, *params, X, sample_weight, centroids, inertia, n_iter);
     } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 64) {
-        _fit<double>(res, *params, X, sample_weight, centroids, inertia, n_iter);
+      _fit<double>(res, *params, X, sample_weight, centroids, inertia, n_iter);
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
                 dataset.dtype.code,

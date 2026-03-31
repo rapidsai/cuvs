@@ -415,9 +415,10 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
       handle, rng, d_centroids.data(), params.n_clusters * n_features, T(-1), T(1));
     raft::copy(d_centroids_ref.data(), d_centroids.data(), params.n_clusters * n_features, stream);
 
-    auto h_X_view = raft::make_host_matrix_view<const T, int>(h_X.data(), n_samples, n_features);
+    auto h_X_view =
+      raft::make_host_matrix_view<const T, int64_t>(h_X.data(), n_samples, n_features);
     auto d_centroids_view =
-      raft::make_device_matrix_view<T, int>(d_centroids.data(), params.n_clusters, n_features);
+      raft::make_device_matrix_view<T, int64_t>(d_centroids.data(), params.n_clusters, n_features);
 
     std::optional<raft::device_vector_view<const T, int>> d_sw = std::nullopt;
     rmm::device_uvector<T> d_sample_weight(0, stream);
@@ -450,16 +451,16 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
     batched_params.inertia_check                 = true;
     batched_params.streaming_batch_size          = testparams.streaming_batch_size;
 
-    std::optional<raft::host_vector_view<const T, int>> h_sw = std::nullopt;
+    std::optional<raft::host_vector_view<const T, int64_t>> h_sw = std::nullopt;
     std::vector<T> h_sample_weight;
     if (testparams.weighted) {
       h_sample_weight.resize(n_samples, T(1));
       h_sw = std::make_optional(
-        raft::make_host_vector_view<const T, int>(h_sample_weight.data(), n_samples));
+        raft::make_host_vector_view<const T, int64_t>(h_sample_weight.data(), n_samples));
     }
 
-    T inertia  = 0;
-    int n_iter = 0;
+    T inertia      = 0;
+    int64_t n_iter = 0;
 
     cuvs::cluster::kmeans::fit(handle,
                                batched_params,
@@ -467,7 +468,7 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
                                h_sw,
                                d_centroids_view,
                                raft::make_host_scalar_view<T>(&inertia),
-                               raft::make_host_scalar_view<int>(&n_iter));
+                               raft::make_host_scalar_view<int64_t>(&n_iter));
 
     raft::resource::sync_stream(handle, stream);
 
