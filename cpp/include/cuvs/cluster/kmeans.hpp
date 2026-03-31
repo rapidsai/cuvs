@@ -1489,6 +1489,44 @@ void cluster_cost(
 namespace helpers {
 
 /**
+ * @brief Randomly initialize cluster centers and apply non-hierarchical balanced k-means
+ * (expectation-maximization-balancing iterations).
+ *
+ * Unlike `fit`, which uses a hierarchical approach, this function performs flat balanced k-means
+ * directly. It returns cluster centers, labels, and per-cluster sizes in a single call.
+ *
+ * @code{.cpp}
+ *   #include <raft/core/resources.hpp>
+ *   #include <cuvs/cluster/kmeans.hpp>
+ *   using namespace cuvs::cluster;
+ *   ...
+ *   raft::resources handle;
+ *   cuvs::cluster::kmeans::balanced_params params;
+ *   int64_t n_features = 15, n_clusters = 8;
+ *   auto centroids = raft::make_device_matrix<float, int64_t>(handle, n_clusters, n_features);
+ *   auto labels = raft::make_device_vector<uint32_t, int64_t>(handle, n_samples);
+ *   auto cluster_sizes = raft::make_device_vector<uint32_t, int64_t>(handle, n_clusters);
+ *
+ *   kmeans::helpers::build_clusters(handle, params, X, centroids.view(),
+ *                                   labels.view(), cluster_sizes.view());
+ * @endcode
+ *
+ * @param[in]     handle         The raft handle.
+ * @param[in]     params         Parameters for balanced KMeans.
+ * @param[in]     X              Training instances to cluster. The data must be in row-major
+ * format. [dim = n_samples x n_features]
+ * @param[out]    centroids      The output centroids [dim = n_clusters x n_features]
+ * @param[out]    labels         The output labels [dim = n_samples]
+ * @param[out]    cluster_sizes  Size of each cluster [dim = n_clusters]
+ */
+void build_clusters(const raft::resources& handle,
+                    cuvs::cluster::kmeans::balanced_params const& params,
+                    raft::device_matrix_view<const float, int64_t> X,
+                    raft::device_matrix_view<float, int64_t> centroids,
+                    raft::device_vector_view<uint32_t, int64_t> labels,
+                    raft::device_vector_view<uint32_t, int64_t> cluster_sizes);
+
+/**
  * Automatically find the optimal value of k using a binary search.
  * This method maximizes the Calinski-Harabasz Index while minimizing the per-cluster inertia.
  *

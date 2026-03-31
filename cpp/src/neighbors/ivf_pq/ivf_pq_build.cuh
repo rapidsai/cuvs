@@ -19,8 +19,6 @@
 
 #include "../detail/ann_utils.cuh"  // utils::mapping
 
-// TODO (cjnolet): This should be using an exposed API instead of circumventing the public APIs.
-#include "../../cluster/kmeans_balanced.cuh"
 #include <cuvs/cluster/kmeans.hpp>
 
 #include <raft/core/device_mdarray.hpp>
@@ -399,13 +397,12 @@ void train_per_subset(raft::resources const& handle,
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = kmeans_n_iters;
     kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
-    cuvs::cluster::kmeans_balanced::helpers::build_clusters(handle,
-                                                            kmeans_params,
-                                                            sub_trainset_view,
-                                                            centers_tmp_view,
-                                                            sub_labels_view,
-                                                            cluster_sizes_view,
-                                                            utils::mapping<float>{});
+    cuvs::cluster::kmeans::helpers::build_clusters(handle,
+                                                   kmeans_params,
+                                                   sub_trainset_view,
+                                                   centers_tmp_view,
+                                                   sub_labels_view,
+                                                   cluster_sizes_view);
   }
   transpose_pq_centers(handle, impl, pq_centers_tmp.data());
 }
@@ -489,13 +486,12 @@ void train_per_cluster(raft::resources const& handle,
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = kmeans_n_iters;
     kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
-    cuvs::cluster::kmeans_balanced::helpers::build_clusters(handle,
-                                                            kmeans_params,
-                                                            rot_vectors_view,
-                                                            centers_tmp_view,
-                                                            pq_labels_view,
-                                                            pq_cluster_sizes_view,
-                                                            utils::mapping<float>{});
+    cuvs::cluster::kmeans::helpers::build_clusters(handle,
+                                                   kmeans_params,
+                                                   rot_vectors_view,
+                                                   centers_tmp_view,
+                                                   pq_labels_view,
+                                                   pq_cluster_sizes_view);
   }
   transpose_pq_centers(handle, impl, pq_centers_tmp.data());
 }
@@ -1099,7 +1095,7 @@ void extend(raft::resources const& handle,
   placeholder_list_flat.reset();
   {
     // The cluster centers in the index are stored padded, which is not acceptable by
-    // the kmeans_balanced::predict. Thus, we need the restructuring raft::copy.
+    // kmeans::predict. Thus, we need the restructuring raft::copy.
     rmm::device_uvector<float> cluster_centers(
       size_t(n_clusters) * size_t(index->dim()), stream, device_memory);
     RAFT_CUDA_TRY(cudaMemcpy2DAsync(cluster_centers.data(),

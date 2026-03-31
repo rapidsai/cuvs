@@ -57,8 +57,7 @@ void transform_batch(raft::resources const& res,
   cuvs::cluster::kmeans::balanced_params kmeans_params;
   kmeans_params.metric = index.metric();
 
-  cuvs::cluster::kmeans_balanced::predict(
-    res, kmeans_params, dataset, cluster_centers, output_labels, utils::mapping<float>{});
+  cuvs::cluster::kmeans::predict(res, kmeans_params, dataset, cluster_centers, output_labels);
 
   // Compute the residuals for each vector in the dataset
   auto dataset_residuals =
@@ -118,7 +117,7 @@ void transform(raft::resources const& res,
   rmm::device_async_resource_ref mr = raft::resource::get_workspace_resource(res);
 
   // The cluster centers in the index are stored padded, which is not acceptable by
-  // the kmeans_balanced::predict. Thus, we need the restructuring raft::copy.
+  // kmeans::predict. Thus, we need the restructuring raft::copy.
   auto stream           = raft::resource::get_cuda_stream(res);
   const auto n_clusters = index.n_lists();
 

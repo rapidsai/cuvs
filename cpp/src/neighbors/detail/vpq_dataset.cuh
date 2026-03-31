@@ -6,7 +6,6 @@
 
 #include <cuvs/neighbors/common.hpp>
 
-#include "../../cluster/kmeans_balanced.cuh"
 #include "../../preprocessing/quantize/detail/pq_codepacking.cuh"  // pq_bits-bitfield
 #include "ann_utils.cuh"                                           // utils::mapping etc
 
@@ -85,20 +84,12 @@ void train_pq_centers(
     kmeans_params.n_iters = params.kmeans_n_iters;
     kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
 
-    cuvs::cluster::kmeans_balanced::helpers::build_clusters<
-      MathT,
-      MathT,
-      IdxT,
-      uint32_t,
-      uint32_t,
-      cuvs::spatial::knn::detail::utils::mapping<MathT>>(
-      res,
-      kmeans_params,
-      pq_trainset_view,
-      pq_centers_view,
-      sub_labels_view,
-      pq_cluster_sizes_view,
-      cuvs::spatial::knn::detail::utils::mapping<MathT>{});
+    cuvs::cluster::kmeans::helpers::build_clusters(res,
+                                                   kmeans_params,
+                                                   pq_trainset_view,
+                                                   pq_centers_view,
+                                                   sub_labels_view,
+                                                   pq_cluster_sizes_view);
   } else {
     const auto pq_n_centers = pq_centers_view.extent(0);
     cuvs::cluster::kmeans::params kmeans_params;

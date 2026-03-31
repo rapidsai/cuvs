@@ -14,8 +14,6 @@
 #include <raft/core/operators.hpp>
 #include <raft/matrix/init.cuh>
 
-#include "../../../cluster/kmeans_balanced.cuh"
-
 namespace cuvs::preprocessing::quantize::pq::detail {
 
 inline void fill_missing_params_heuristics(cuvs::preprocessing::quantize::pq::params& params,
