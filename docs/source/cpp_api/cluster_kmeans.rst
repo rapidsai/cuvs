@@ -21,7 +21,7 @@ namespace *cuvs::cluster::kmeans*
 K-means
 -------
 
-``include <cuvs/cluster/kmeans.hpp>``
+``#include <cuvs/cluster/kmeans.hpp>``
 
 namespace *cuvs::cluster::kmeans*
 
@@ -34,7 +34,7 @@ namespace *cuvs::cluster::kmeans*
 K-means Helpers
 ---------------
 
-``include <cuvs/cluster/kmeans.hpp>``
+``#include <cuvs/cluster/kmeans.hpp>``
 
 namespace *cuvs::cluster::kmeans::helpers*
 

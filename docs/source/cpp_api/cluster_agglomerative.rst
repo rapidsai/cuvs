@@ -21,7 +21,7 @@ namespace *cuvs::cluster::agglomerative*
 Agglomerative
 -------------
 
-``include <cuvs/cluster/agglomerative.hpp>``
+``#include <cuvs/cluster/agglomerative.hpp>``
 
 namespace *cuvs::cluster::agglomerative*
 
