@@ -14,6 +14,7 @@
 #include <cuda/std/limits>
 
 #include <cmath>
+#include <limits>
 #include <optional>
 #include <stdexcept>
 #include <type_traits>
@@ -538,6 +539,10 @@ void kde(raft::resources const& handle,
          cuvs::distance::DistanceType metric,
          T metric_arg)
 {
+  RAFT_EXPECTS(query.extent(0) <= std::numeric_limits<int>::max() &&
+                 train.extent(0) <= std::numeric_limits<int>::max() &&
+                 query.extent(1) <= std::numeric_limits<int>::max(),
+               "n_query, n_train, and n_features must fit in int32");
   int n_query = static_cast<int>(query.extent(0));
   int n_train = static_cast<int>(train.extent(0));
   int d       = static_cast<int>(query.extent(1));
