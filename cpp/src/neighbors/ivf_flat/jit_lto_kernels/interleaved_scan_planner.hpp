@@ -6,7 +6,7 @@
 #pragma once
 
 #include <cuvs/detail/jit_lto/AlgorithmPlanner.hpp>
-#include <cuvs/detail/jit_lto/MakeFragmentKey.hpp>
+#include <cuvs/detail/jit_lto/FragmentEntry.hpp>
 #include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_fragments.hpp>
 #include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>
 #include <iostream>
@@ -26,31 +26,31 @@ struct InterleavedScanPlanner : AlgorithmPlanner {
             bool ComputeNorm>
   void add_entrypoint()
   {
-    this->add_fragment<InterleavedScanFragmentEntry<DataTag,
-                                                    AccTag,
-                                                    IdxTag,
-                                                    Capacity,
-                                                    Veclen,
-                                                    Ascending,
-                                                    ComputeNorm>>();
+    this->add_static_fragment<fragment_tag_interleaved_scan<DataTag,
+                                                            AccTag,
+                                                            IdxTag,
+                                                            Capacity,
+                                                            Veclen,
+                                                            Ascending,
+                                                            ComputeNorm>>();
   }
 
   template <int Veclen, typename DataTag, typename AccTag, typename MetricTag>
   void add_metric_device_function()
   {
-    this->add_fragment<MetricFragmentEntry<Veclen, DataTag, AccTag, MetricTag>>();
+    this->add_static_fragment<fragment_tag_metric<Veclen, DataTag, AccTag, MetricTag>>();
   }
 
   template <typename IvfSampleFilterTag>
   void add_filter_device_function()
   {
-    this->add_fragment<FilterFragmentEntry<IvfSampleFilterTag>>();
+    this->add_static_fragment<fragment_tag_filter<IvfSampleFilterTag>>();
   }
 
   template <typename PostLambdaTag>
   void add_post_lambda_device_function()
   {
-    this->add_fragment<PostLambdaFragmentEntry<PostLambdaTag>>();
+    this->add_static_fragment<fragment_tag_post_lambda<PostLambdaTag>>();
   }
 };
 

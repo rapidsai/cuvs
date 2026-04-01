@@ -2080,7 +2080,7 @@ auto iterative_build_graph(
       curr_itopk_size = curr_topk + 32;
     }
 
-    RAFT_LOG_INFO(
+    RAFT_LOG_DEBUG(
       "# graph_size = %lu (%.3lf), graph_degree = %lu, query_size = %lu, itopk = %lu, topk = %lu",
       (uint64_t)cagra_graph.extent(0),
       (double)cagra_graph.extent(0) / final_graph_size,
@@ -2146,7 +2146,7 @@ auto iterative_build_graph(
 
     auto end        = std::chrono::high_resolution_clock::now();
     auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    RAFT_LOG_INFO("# elapsed time: %.3lf sec", (double)elapsed_ms / 1000);
+    RAFT_LOG_DEBUG("# elapsed time: %.3lf sec", (double)elapsed_ms / 1000);
 
     if (flag_last) { break; }
     flag_last       = (curr_graph_size == final_graph_size);
