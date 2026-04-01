@@ -1,11 +1,11 @@
-All-neighbors KNN
-=================
+All-Neighbors
+=============
 
 .. role:: py(code)
    :language: python
    :class: highlight
 
-All-neighbors allows building an approximate all-neighbors knn graph. Given a full dataset, it finds nearest neighbors for all the training vectors in the dataset.
+All-Neighbors allows building an approximate all-neighbors knn graph. Given a full dataset, it finds nearest neighbors for all the training vectors in the dataset.
 
 Build Parameters
 ################
