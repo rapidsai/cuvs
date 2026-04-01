@@ -637,7 +637,17 @@ constexpr auto get_out_type_tag() {
   if constexpr (std::is_same_v<OutType, double>) return tag_d{};
 }
 
-template <typename T, typename OutT, typename IdxT, typename DistanceTag, typename FilterTag, bool Optimized, int Veclen>
+template <DistanceType Metric>
+constexpr auto get_metric_tag() {
+  if constexpr (Metric == DistanceType::Euclidean) return tag_metric_euclidean{};
+}
+
+template <FilterType Filter>
+constexpr auto get_filter_tag() {
+  if constexpr (Filter == FilterType::None) return tag_filter_none{};
+}
+
+template <typename T, typename OutT, typename IdxT, DistanceType Metric, FilterType Filter, bool Optimized, int Veclen>
 void search_jit(
     raft::device_resources const& handle,
     const T* dataset,
@@ -651,6 +661,8 @@ void search_jit(
   using data_tag = decltype(get_data_type_tag<T>());
   using idx_tag = decltype(get_idx_type_tag<IdxT>());
   using out_tag = decltype(get_out_type_tag<OutT>());
+  using metric_tag = decltype(get_metric_tag<Metric>());
+  using filter_tag = decltype(get_filter_tag<Filter>());
 
   // Create planner with type tags and boolean parameter
   // Note: The boolean is appended to the fragment key since make_fragment_key
@@ -659,8 +671,8 @@ void search_jit(
 
   // Add required device function fragments
   planner.add_search_function<data_tag, out_tag, idx_tag, Optimized, Veclen>();
-  planner.add_compute_distance_device_function<DistanceTag, data_tag>();
-  planner.add_filter_device_function<FilterTag, idx_tag>();
+  planner.add_compute_distance_device_function<metric_tag, data_tag>();
+  planner.add_filter_device_function<filter_tag, idx_tag>();
 
   // Get the launcher (this will build/link fragments if needed)
   auto launcher = planner.get_launcher();
