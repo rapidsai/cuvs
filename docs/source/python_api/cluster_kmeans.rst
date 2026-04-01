@@ -16,6 +16,11 @@ K-Means Fit
 
 .. autofunction:: cuvs.cluster.kmeans.fit
 
+K-Means Fit-Predict
+###################
+
+.. autofunction:: cuvs.cluster.kmeans.fit_predict
+
 K-Means Predict
 ###############
 
