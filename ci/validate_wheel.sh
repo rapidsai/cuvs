@@ -7,6 +7,8 @@ set -euo pipefail
 package_dir=$1
 wheel_dir_relative_path=$2
 
+RAPIDS_CUDA_MAJOR="${RAPIDS_CUDA_VERSION%%.*}"
+
 cd "${package_dir}"
 
 rapids-logger "validate packages with 'pydistcheck'"
@@ -17,9 +19,15 @@ PYDISTCHECK_ARGS=(
 
 # PyPI hard limit is 1GiB, but try to keep these as small as possible
 if [[ "${package_dir}" == "python/libcuvs" ]]; then
-    PYDISTCHECK_ARGS+=(
-        --max-allowed-size-compressed '400Mi'
-    )
+    if [[ "${RAPIDS_CUDA_MAJOR}" == "12" ]]; then
+        PYDISTCHECK_ARGS+=(
+            --max-allowed-size-compressed '400Mi'
+        )
+    else
+        PYDISTCHECK_ARGS+=(
+            --max-allowed-size-compressed '250Mi'
+        )
+    fi
 elif [[ "${package_dir}" != "python/cuvs" ]]; then
     rapids-echo-stderr "unrecognized package_dir: '${package_dir}'"
     exit 1
