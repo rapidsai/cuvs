@@ -1750,10 +1750,8 @@ void build(raft::resources const& res,
     auto graph = idx.graph().data_handle();
 #pragma omp parallel for
     for (size_t i = 0; i < static_cast<size_t>(dataset.extent(0)); i++) {
-      IdxT n_id = 0;
       for (size_t j = 0; j < graph_degree; j++) {
-        if (n_id == j) n_id++;
-        graph[i * graph_degree + j] = n_id++;
+        graph[i * graph_degree + j] = (i + j + 1) % dataset.extent(0);
       }
     }
     return;
