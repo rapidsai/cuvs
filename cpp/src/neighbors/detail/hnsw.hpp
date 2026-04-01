@@ -1048,13 +1048,14 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
     }
   } else {
     common::nvtx::range<common::nvtx::domain::cuvs> copy_scope("get_linklist0<device>");
-    raft::copy_matrix(appr_algo->get_linklist0(0) + 1,
-                      appr_algo->size_data_per_element_,
-                      graph_ptr,
-                      degree,
-                      degree,
-                      n_rows,
-                      raft::resource::get_cuda_stream(res));
+    RAFT_CUDA_TRY(cudaMemcpy2DAsync(appr_algo->get_linklist0(0) + 1,
+                                    appr_algo->size_data_per_element_,
+                                    graph_ptr,
+                                    degree * sizeof(uint32_t),
+                                    degree * sizeof(uint32_t),
+                                    n_rows,
+                                    cudaMemcpyDefault,
+                                    raft::resource::get_cuda_stream(res)));
 #pragma omp parallel for num_threads(num_threads)
     for (int64_t i = 0; i < n_rows; i++) {
       appr_algo->setListCount(appr_algo->get_linklist0(i), degree);
