@@ -99,7 +99,7 @@ repos:
                 additional_dependencies: [clang_format==20.1.4]
                 files: |
                   (?x)
-                    [.](cpp|cu)[.]in$
+                    [.](cpp|cu|hpp|cuh)[.]in$
       - repo: https://github.com/codespell-project/codespell
         rev: v2.4.1
         hooks:

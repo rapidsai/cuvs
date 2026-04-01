@@ -31,18 +31,12 @@ struct FatbinFragmentEntry : FragmentEntry {
 };
 
 template <typename FragmentTag>
-struct StaticFatbinFragmentEntry : FatbinFragmentEntry {
-  const uint8_t* get_data() const override final
-  {
-    return StaticFatbinFragmentEntry<FragmentTag>::data;
-  }
+struct StaticFatbinFragmentEntry final : FatbinFragmentEntry {
+  const uint8_t* get_data() const override { return StaticFatbinFragmentEntry<FragmentTag>::data; }
 
-  size_t get_length() const override final
-  {
-    return StaticFatbinFragmentEntry<FragmentTag>::length;
-  }
+  size_t get_length() const override { return StaticFatbinFragmentEntry<FragmentTag>::length; }
 
-  const char* get_key() const override final
+  const char* get_key() const override
   {
     return typeid(StaticFatbinFragmentEntry<FragmentTag>).name();
   }
