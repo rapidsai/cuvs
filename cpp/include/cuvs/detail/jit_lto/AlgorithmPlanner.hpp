@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "AlgorithmLauncher.hpp"
+#include "FragmentEntry.hpp"
 
 struct FragmentEntry;
 
@@ -23,10 +24,10 @@ struct AlgorithmPlanner {
 
   void add_fragment(const FragmentEntry& fragment);
 
-  template <typename FragmentT>
-  void add_fragment()
+  template <typename FragmentTag>
+  void add_static_fragment()
   {
-    add_fragment(FragmentT{});
+    add_fragment(StaticFatbinFragmentEntry<FragmentTag>{});
   }
 
  private:

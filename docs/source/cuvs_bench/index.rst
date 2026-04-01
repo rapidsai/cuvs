@@ -54,7 +54,7 @@ Installing the benchmarks
 There are two main ways pre-compiled benchmarks are distributed:
 
 - `Conda`_ For users not using containers but want an easy to install and use Python package. Pip wheels are planned to be added as an alternative for users that cannot use conda and prefer to not use containers.
-- `Docker`_ Only needs docker and [NVIDIA docker](https://github.com/NVIDIA/nvidia-docker) to use. Provides a single docker run command for basic dataset benchmarking, as well as all the functionality of the conda solution inside the containers.
+- `Docker`_ Only needs docker and `NVIDIA docker <https://github.com/NVIDIA/nvidia-docker>`_ to use. Provides a single docker run command for basic dataset benchmarking, as well as all the functionality of the conda solution inside the containers.
 
 Conda
 -----
@@ -331,7 +331,7 @@ All of the `cuvs-bench` images contain the Conda packages, so they can be used d
         -v $DATA_FOLDER:/data/benchmarks                \
         rapidsai/cuvs-bench:26.06-cuda12.9-py3.13
 
-This will drop you into a command line in the container, with the `cuvs-bench` python package ready to use, as described in the [Running the benchmarks](#running-the-benchmarks) section above:
+This will drop you into a command line in the container, with the `cuvs-bench` python package ready to use, as described in the `Running the benchmarks`_ section above:
 
 .. code-block:: bash
 

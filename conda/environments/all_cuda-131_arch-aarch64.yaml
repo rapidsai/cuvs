@@ -31,6 +31,7 @@ dependencies:
 - libcusolver-dev
 - libcusparse-dev
 - libnvjitlink-dev
+- libopenblas<=0.3.30
 - librmm==26.6.*,>=0.0.0a0
 - make
 - nccl>=2.19
