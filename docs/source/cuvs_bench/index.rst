@@ -204,19 +204,33 @@ The steps below demonstrate how to download, install, and run benchmarks on a su
 .. code-block:: bash
 
     mkdir -p datasets/deep-1B
-    # (1) prepare dataset
+    # (1) Prepare dataset.
     # download manually "Ground Truth" file of "Yandex DEEP"
     # suppose the file name is deep_new_groundtruth.public.10K.bin
     python -m cuvs_bench.split_groundtruth --groundtruth datasets/deep-1B/deep_new_groundtruth.public.10K.bin
     # two files 'groundtruth.neighbors.ibin' and 'groundtruth.distances.fbin' should be produced
 
-    # (2) build and search index
-    python -m cuvs_bench.run --dataset deep-1B --algorithms cuvs_cagra --batch-size 10 -k 10
+.. code-block:: python
 
-    # (3) export data
+    # (2) Build and search index.
+    from cuvs_bench.orchestrator import BenchmarkOrchestrator
+
+    orchestrator = BenchmarkOrchestrator(backend_type="cpp_gbench")
+    results = orchestrator.run_benchmark(
+        dataset="deep-1B",
+        algorithms="cuvs_cagra",
+        count=10,
+        batch_size=10,
+        build=True,
+        search=True,
+    )
+
+.. code-block:: bash
+
+    # (3) Export data.
     python -m cuvs_bench.run --data-export --dataset deep-1B
 
-    # (4) plot results
+    # (4) Plot results.
     python -m cuvs_bench.plot --dataset deep-1B
 
 The usage of `python -m cuvs_bench.split_groundtruth` is:
