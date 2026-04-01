@@ -11,8 +11,8 @@ All-neighbors allows building an approximate all-neighbors knn graph. Given a fu
 
 namespace *cuvs::neighbors::all_neighbors*
 
-All neighbors knn graph build parameters
-----------------------------------------
+Build Parameters
+----------------
 
 .. doxygengroup:: all_neighbors_cpp_params
     :project: cuvs
