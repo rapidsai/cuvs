@@ -18,6 +18,7 @@
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/pinned_mdarray.hpp>
+#include <raft/util/cudart_utils.hpp>
 
 #include <hnswlib/hnswalg.h>
 #include <hnswlib/hnswlib.h>
@@ -233,14 +234,13 @@ std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> fro
                  static_cast<size_t>(cagra_dataset.extent(1)));
     host_dataset =
       raft::make_host_matrix<T, int64_t>(cagra_dataset.extent(0), cagra_dataset.extent(1));
-    RAFT_CUDA_TRY(cudaMemcpy2DAsync(host_dataset.data_handle(),
-                                    sizeof(T) * host_dataset.extent(1),
-                                    cagra_dataset.data_handle(),
-                                    sizeof(T) * cagra_dataset.stride(0),
-                                    sizeof(T) * host_dataset.extent(1),
-                                    cagra_dataset.extent(0),
-                                    cudaMemcpyDefault,
-                                    raft::resource::get_cuda_stream(res)));
+    raft::copy_matrix(host_dataset.data_handle(),
+                      host_dataset.extent(1),
+                      cagra_dataset.data_handle(),
+                      cagra_dataset.stride(0),
+                      host_dataset.extent(1),
+                      cagra_dataset.extent(0),
+                      raft::resource::get_cuda_stream(res));
     raft::resource::sync_stream(res);
     host_dataset_view = host_dataset.view();
   }
@@ -1048,14 +1048,13 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
     }
   } else {
     common::nvtx::range<common::nvtx::domain::cuvs> copy_scope("get_linklist0<device>");
-    RAFT_CUDA_TRY(cudaMemcpy2DAsync(appr_algo->get_linklist0(0) + 1,
-                                    appr_algo->size_data_per_element_,
-                                    graph_ptr,
-                                    degree * sizeof(uint32_t),
-                                    degree * sizeof(uint32_t),
-                                    n_rows,
-                                    cudaMemcpyDefault,
-                                    raft::resource::get_cuda_stream(res)));
+    raft::copy_matrix(reinterpret_cast<char*>(appr_algo->get_linklist0(0) + 1),
+                      appr_algo->size_data_per_element_,
+                      reinterpret_cast<const char*>(graph_ptr),
+                      degree * sizeof(uint32_t),
+                      degree * sizeof(uint32_t),
+                      n_rows,
+                      raft::resource::get_cuda_stream(res));
 #pragma omp parallel for num_threads(num_threads)
     for (int64_t i = 0; i < n_rows; i++) {
       appr_algo->setListCount(appr_algo->get_linklist0(i), degree);
