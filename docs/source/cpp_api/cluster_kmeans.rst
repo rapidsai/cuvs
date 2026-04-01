@@ -5,8 +5,8 @@ K-Means
    :language: c++
    :class: highlight
 
-Params
-------
+Parameters
+----------
 
 ``#include <cuvs/cluster/kmeans.hpp>``
 

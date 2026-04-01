@@ -5,8 +5,8 @@ Agglomerative
    :language: c++
    :class: highlight
 
-Params
-------
+Parameters
+----------
 
 ``#include <cuvs/cluster/agglomerative.hpp>``
 
@@ -18,8 +18,8 @@ namespace *cuvs::cluster::agglomerative*
    :content-only:
 
 
-Single-linkage
---------------
+Agglomerative
+-------------
 
 ``include <cuvs/cluster/agglomerative.hpp>``
 

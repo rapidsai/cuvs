@@ -26,5 +26,5 @@ Multi-GPU Algorithms
    :maxdepth: 2
    :caption: Multi-GPU Distributed ANN:
 
-   neighbors_multi_gpu.rst
    neighbors_all_neighbors.rst
+   neighbors_multi_gpu.rst
