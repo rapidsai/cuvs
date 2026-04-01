@@ -15,7 +15,7 @@ Pass ``mode="sweep"`` or omit ``mode``. The orchestrator builds the full Cartesi
 
 **Tune mode**
 
-Pass ``mode="tune"`` to use Optuna to search the parameter space instead of running every combination. You must pass:
+Pass ``mode="tune"`` to perform hyperparameter optimization using Optuna instead of running every combination. You must pass:
 
 - **constraints** (dict): The optimization target and optional bounds. One metric must be ``"maximize"`` or ``"minimize"`` (the goal). Others can set hard limits with ``{"min": X}`` or ``{"max": X}``. Examples: ``{"recall": "maximize", "latency": {"max": 10}}`` or ``{"latency": "minimize", "recall": {"min": 0.95}}``.
 - **n_trials** (int, optional): Maximum number of Optuna trials (default 100). Ignored in sweep mode.
