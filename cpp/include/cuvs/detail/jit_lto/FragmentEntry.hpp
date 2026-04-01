@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -28,11 +30,17 @@ struct FatbinFragmentEntry : FragmentEntry {
   bool add_to(nvJitLinkHandle& handle) const override final;
 };
 
-template <typename FragmentT>
-struct StaticFatbinFragmentEntry : FatbinFragmentEntry {
-  const uint8_t* get_data() const override final { return FragmentT::data; }
+template <typename FragmentTag>
+struct StaticFatbinFragmentEntry final : FatbinFragmentEntry {
+  const uint8_t* get_data() const override { return StaticFatbinFragmentEntry<FragmentTag>::data; }
 
-  size_t get_length() const override final { return FragmentT::length; }
+  size_t get_length() const override { return StaticFatbinFragmentEntry<FragmentTag>::length; }
 
-  const char* get_key() const override final { return typeid(FragmentT).name(); }
+  const char* get_key() const override
+  {
+    return typeid(StaticFatbinFragmentEntry<FragmentTag>).name();
+  }
+
+  static const uint8_t* const data;
+  static const size_t length;
 };
