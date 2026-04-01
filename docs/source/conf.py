@@ -63,7 +63,7 @@ master_doc = "index"
 
 # General information about the project.
 project = "cuvs"
-copyright = "2026, NVIDIA Corporation"
+copyright = "2024 - 2026, NVIDIA Corporation"
 author = "NVIDIA Corporation"
 
 # The version info for the project you're documenting, acts as replacement for
