@@ -613,6 +613,12 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ivf_pq/detail/ivf_pq_transform_half_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_transform_int8_t_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_transform_uint8_t_int64_t.cu
+    src/neighbors/ivf_sq_index.cpp
+    src/neighbors/ivf_sq/ivf_sq_build_extend_float_uint8_t_int64_t.cu
+    src/neighbors/ivf_sq/ivf_sq_build_extend_half_uint8_t_int64_t.cu
+    src/neighbors/ivf_sq/ivf_sq_search_float_uint8_t_int64_t.cu
+    src/neighbors/ivf_sq/ivf_sq_search_half_uint8_t_int64_t.cu
+    src/neighbors/ivf_sq/ivf_sq_serialize_uint8_t.cu
     src/neighbors/knn_merge_parts.cu
     src/neighbors/nn_descent.cu
     src/neighbors/nn_descent_float.cu
