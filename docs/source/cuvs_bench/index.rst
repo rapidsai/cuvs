@@ -108,10 +108,6 @@ End-to-end: smaller-scale benchmarks (<1M to 10M)
 
 The steps below demonstrate how to download, install, and run benchmarks on a subset of 10M vectors from the Yandex Deep-1B dataset. By default the datasets will be stored and used from the folder indicated by the `RAPIDS_DATASET_ROOT_DIR` environment variable if defined, otherwise a datasets sub-folder from where the script is being called.
 
-**Recommended: Orchestrator API**
-
-Use the `BenchmarkOrchestrator` from `cuvs_bench.orchestrator` for the full workflow:
-
 .. code-block:: bash
 
     # (1) Prepare dataset.
@@ -138,24 +134,6 @@ Use the `BenchmarkOrchestrator` from `cuvs_bench.orchestrator` for the full work
     python -m cuvs_bench.run --data-export --dataset deep-image-96-inner
 
     # (4) Plot results.
-    python -m cuvs_bench.plot --dataset deep-image-96-inner
-
-**Legacy CLI**
-
-You can still run build and search from the command line (deprecated in favor of the orchestrator API):
-
-.. code-block:: bash
-
-    # (1) prepare dataset.
-    python -m cuvs_bench.get_dataset --dataset deep-image-96-angular --normalize
-
-    # (2) build and search index
-    python -m cuvs_bench.run --dataset deep-image-96-inner --algorithms cuvs_cagra --batch-size 10 -k 10
-
-    # (3) export data
-    python -m cuvs_bench.run --data-export --dataset deep-image-96-inner
-
-    # (4) plot results
     python -m cuvs_bench.plot --dataset deep-image-96-inner
 
 .. list-table::
