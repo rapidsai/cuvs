@@ -24,9 +24,9 @@ extern "C" {
  */
 enum cuvsPcaSolver {
   /** Covariance + divide-and-conquer eigen decomposition */
-  PCA_COV_EIG_DQ = 0,
+  CUVS_PCA_COV_EIG_DQ = 0,
   /** Covariance + Jacobi eigen decomposition */
-  PCA_COV_EIG_JACOBI = 1
+  CUVS_PCA_COV_EIG_JACOBI = 1
 };
 
 /**

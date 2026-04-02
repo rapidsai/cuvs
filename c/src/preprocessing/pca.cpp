@@ -28,10 +28,10 @@ cuvs::preprocessing::pca::params to_cpp_params(const cuvsPcaParams& c_params)
   cpp_params.n_iterations = c_params.n_iterations;
 
   switch (c_params.algorithm) {
-    case PCA_COV_EIG_DQ:
+    case CUVS_PCA_COV_EIG_DQ:
       cpp_params.algorithm = cuvs::preprocessing::pca::solver::COV_EIG_DQ;
       break;
-    case PCA_COV_EIG_JACOBI:
+    case CUVS_PCA_COV_EIG_JACOBI:
       cpp_params.algorithm = cuvs::preprocessing::pca::solver::COV_EIG_JACOBI;
       break;
     default: cpp_params.algorithm = cuvs::preprocessing::pca::solver::COV_EIG_DQ; break;
@@ -176,7 +176,7 @@ extern "C" cuvsError_t cuvsPcaParamsCreate(cuvsPcaParams_t* params)
       .n_components = 1,
       .copy         = true,
       .whiten       = false,
-      .algorithm    = PCA_COV_EIG_DQ,
+      .algorithm    = CUVS_PCA_COV_EIG_DQ,
       .tol          = 0.0f,
       .n_iterations = 15,
     };
