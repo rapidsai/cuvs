@@ -398,6 +398,15 @@ const std::vector<AnnIvfSqInputs<int64_t>> inputs = {
   {1000, 10000, 16, 100, 200, 1024, cuvs::distance::DistanceType::L2Expanded},
   {1000, 10000, 16, 100, 200, 1024, cuvs::distance::DistanceType::InnerProduct},
 
+  // ===== Large k (beyond fused top-k kMaxSqScanCapacity=256, exercises materialized fallback) =====
+  // k=257: smallest k that forces the materialized path (Capacity clamped to 0)
+  {100, 10000, 32, 257, 100, 64, cuvs::distance::DistanceType::L2Expanded},
+  {100, 10000, 32, 257, 100, 64, cuvs::distance::DistanceType::InnerProduct},
+  {100, 10000, 32, 257, 100, 64, cuvs::distance::DistanceType::CosineExpanded},
+  // k=300: comfortably above the fused top-k threshold
+  {100, 10000, 32, 300, 64, 64, cuvs::distance::DistanceType::L2Expanded},
+  {100, 10000, 32, 300, 64, 64, cuvs::distance::DistanceType::InnerProduct},
+
   // ===== nprobe / nlist edge cases =====
   // nprobe == nlist (exhaustive probe)
   {1000, 10000, 16, 10, 64, 64, cuvs::distance::DistanceType::L2Expanded},
