@@ -5,8 +5,6 @@
 
 #pragma once
 
-#include <cuvs/detail/jit_lto/FragmentEntry.hpp>
-
 namespace cuvs::neighbors::ivf_flat::detail {
 
 template <typename DataTag,
@@ -16,37 +14,15 @@ template <typename DataTag,
           int Veclen,
           bool Ascending,
           bool ComputeNorm>
-struct InterleavedScanFragmentEntry final
-  : StaticFatbinFragmentEntry<InterleavedScanFragmentEntry<DataTag,
-                                                           AccTag,
-                                                           IdxTag,
-                                                           Capacity,
-                                                           Veclen,
-                                                           Ascending,
-                                                           ComputeNorm>> {
-  static const uint8_t* const data;
-  static const size_t length;
-};
+struct fragment_tag_interleaved_scan {};
 
 template <int Veclen, typename DataTag, typename AccTag, typename MetricTag>
-struct MetricFragmentEntry final
-  : StaticFatbinFragmentEntry<MetricFragmentEntry<Veclen, DataTag, AccTag, MetricTag>> {
-  static const uint8_t* const data;
-  static const size_t length;
-};
+struct fragment_tag_metric {};
 
 template <typename IvfSampleFilterTag>
-struct FilterFragmentEntry final
-  : StaticFatbinFragmentEntry<FilterFragmentEntry<IvfSampleFilterTag>> {
-  static const uint8_t* const data;
-  static const size_t length;
-};
+struct fragment_tag_filter {};
 
 template <typename PostLambdaTag>
-struct PostLambdaFragmentEntry final
-  : StaticFatbinFragmentEntry<PostLambdaFragmentEntry<PostLambdaTag>> {
-  static const uint8_t* const data;
-  static const size_t length;
-};
+struct fragment_tag_post_lambda {};
 
 }  // namespace cuvs::neighbors::ivf_flat::detail
