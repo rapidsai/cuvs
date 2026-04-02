@@ -236,7 +236,7 @@ struct index : cuvs::neighbors::index {
  *
  * NB: Currently, the following distance metrics are supported:
  * - L2Expanded
- * - L2Unexpanded
+ * - L2SqrtExpanded
  * - InnerProduct
  * - CosineExpanded
  *
@@ -265,7 +265,7 @@ auto build(raft::resources const& handle,
  *
  * NB: Currently, the following distance metrics are supported:
  * - L2Expanded
- * - L2Unexpanded
+ * - L2SqrtExpanded
  * - InnerProduct
  * - CosineExpanded
  *
@@ -318,7 +318,7 @@ auto build(raft::resources const& handle,
  *
  * NB: Currently, the following distance metrics are supported:
  * - L2Expanded
- * - L2Unexpanded
+ * - L2SqrtExpanded
  * - InnerProduct
  * - CosineExpanded
  *
@@ -371,7 +371,7 @@ auto build(raft::resources const& handle,
  *
  * NB: Currently, the following distance metrics are supported:
  * - L2Expanded
- * - L2Unexpanded
+ * - L2SqrtExpanded
  * - InnerProduct
  * - CosineExpanded
  *
@@ -424,7 +424,7 @@ auto build(raft::resources const& handle,
  *
  * NB: Currently, the following distance metrics are supported:
  * - L2Expanded
- * - L2Unexpanded
+ * - L2SqrtExpanded
  * - InnerProduct
  * - CosineExpanded
  *

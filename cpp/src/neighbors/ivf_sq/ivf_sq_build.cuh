@@ -62,7 +62,7 @@ struct ColMinMaxOp {
  * rows and feed CUB BlockReduce with a combined min/max pair.
  *
  * Row-loop is manually 4x-unrolled so the compiler can overlap four
- * independent __ldg requests in the memory pipeline.
+ * independent read-only loads in the memory pipeline.
  */
 template <int BlockSize, typename T>
 __launch_bounds__(BlockSize) RAFT_KERNEL fused_column_minmax_kernel(const T* __restrict__ data,
