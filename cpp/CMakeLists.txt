@@ -492,7 +492,7 @@ if(NOT BUILD_CPU_ONLY)
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/ivf_flat_interleaved_scan_matrix.json"
     INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/ivf_flat_interleaved_scan_inst.cu.in"
-    OUTPUT_DIRECTORY "${CMAKE_CURRENET_BINARY_DIR}/generated_inst/ivf_flat"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_inst/ivf_flat"
   )
   generate_inst_matrix(
     ivf_pq_compute_similarity_inst_files
