@@ -111,6 +111,14 @@ const double expected_metric_RusselRao[]    = {-2.879997942754293e+00, -2.842532
 // --- Weighted: Gaussian + Euclidean, bandwidth=1.0 ---------------------------
 const double expected_weighted[]            = {-3.691891610762810e+00, -3.264752149776808e+00, -3.610241442309405e+00, -3.977545737565916e+00};
 
+// --- High-d tiling: Gaussian + Euclidean, bw=1.0 ----------------------------
+// d=128, nt=100: 2 full feat tiles, ~3 train tiles
+const double expected_highd_128d[] = {-1.197941609669934e+02, -1.213662986398092e+02, -1.218918586452003e+02, -1.197682527483547e+02};
+// d=100, nt=100: partial last feat tile (64+36)
+const double expected_highd_100d[] = {-9.394095288665109e+01, -9.563481208833603e+01, -9.616064201998816e+01, -9.388707692021224e+01};
+// d=200, nt=150: 3+ feat tiles, partial train tile
+const double expected_highd_200d[] = {-1.879364765631665e+02, -1.879383487102569e+02, -1.887424577099825e+02, -1.883374949960477e+02};
+
 // --- Multi-pass: n_query=2, n_train=2000, Gaussian + Euclidean, bw=1.0 ------
 const double expected_multipass[]           = {-3.614608321851654e+00, -3.161743189037974e+00};
 const double expected_multipass_weighted[]  = {-3.615504865329237e+00, -3.161944705945213e+00};
@@ -262,6 +270,62 @@ void run_kde_multipass(const double* expected, bool weighted, T tolerance)
                          output_view,
                          T(1.0),
                          sum_weights,
+                         DensityKernelType::Gaussian,
+                         DistanceType::L2SqrtUnexpanded,
+                         T(2.0));
+
+  ASSERT_TRUE(cuvs::devArrMatchHost(
+    h_expected.data(), d_output.data(), nq, cuvs::CompareApprox<T>(tolerance), stream));
+}
+
+// ============================================================================
+// High-dimensional helper: exercises feature tiling (d > feat_tile=64)
+// and train tiling (n_train > CELL_TILE).
+// ============================================================================
+
+template <typename T>
+void run_kde_highd(int nt, int dim, const double* expected, T tolerance)
+{
+  constexpr int nq = 4;
+  std::vector<T> h_query(nq * dim);
+  std::vector<T> h_train(nt * dim);
+  for (int i = 0; i < nq; ++i)
+    for (int j = 0; j < dim; ++j)
+      h_query[i * dim + j] = T(0.1) + T(((i * 1337 + j * 7 + 42) % 1000) / 1000.0 * 1.9);
+  for (int i = 0; i < nt; ++i)
+    for (int j = 0; j < dim; ++j)
+      h_train[i * dim + j] = T(0.1) + T(((i * 1337 + j * 7 + 42) % 1000) / 1000.0 * 1.9);
+
+  std::vector<T> h_expected(nq);
+  for (int i = 0; i < nq; ++i)
+    h_expected[i] = static_cast<T>(expected[i]);
+
+  raft::resources handle;
+  auto stream = raft::resource::get_cuda_stream(handle);
+
+  rmm::device_uvector<T> d_query(nq * dim, stream);
+  rmm::device_uvector<T> d_train(nt * dim, stream);
+  rmm::device_uvector<T> d_output(nq, stream);
+
+  raft::update_device(d_query.data(), h_query.data(), nq * dim, stream);
+  raft::update_device(d_train.data(), h_train.data(), nt * dim, stream);
+
+  auto query_view = raft::make_device_matrix_view<const T, std::int64_t>(
+    d_query.data(), std::int64_t(nq), std::int64_t(dim));
+  auto train_view = raft::make_device_matrix_view<const T, std::int64_t>(
+    d_train.data(), std::int64_t(nt), std::int64_t(dim));
+  auto output_view =
+    raft::make_device_vector_view<T, std::int64_t>(d_output.data(), std::int64_t(nq));
+
+  std::optional<raft::device_vector_view<const T, std::int64_t>> weights_opt;
+
+  cuvs::distance::kde<T>(handle,
+                         query_view,
+                         train_view,
+                         weights_opt,
+                         output_view,
+                         T(1.0),
+                         T(nt),
                          DensityKernelType::Gaussian,
                          DistanceType::L2SqrtUnexpanded,
                          T(2.0));
@@ -603,6 +667,25 @@ TEST(KdeWeightedF, GaussianEuclidean)
                         expected_weighted,
                         float(TOL_F));
 }
+
+// ============================================================================
+// High-dimensional tiling (exercises feature and train tiling loops)
+// ============================================================================
+
+// d=128, nt=100: 2 full feature tiles, ~3 train tiles
+TEST(KdeHighDimF, D128) { run_kde_highd<float>(100, 128, expected_highd_128d, float(TOL_F)); }
+
+TEST(KdeHighDimD, D128) { run_kde_highd<double>(100, 128, expected_highd_128d, TOL_D); }
+
+// d=100, nt=100: partial last feature tile (64+36)
+TEST(KdeHighDimF, D100) { run_kde_highd<float>(100, 100, expected_highd_100d, float(TOL_F)); }
+
+TEST(KdeHighDimD, D100) { run_kde_highd<double>(100, 100, expected_highd_100d, TOL_D); }
+
+// d=200, nt=150: 3+ feature tiles, partial train tile
+TEST(KdeHighDimF, D200) { run_kde_highd<float>(150, 200, expected_highd_200d, float(TOL_F)); }
+
+TEST(KdeHighDimD, D200) { run_kde_highd<double>(150, 200, expected_highd_200d, TOL_D); }
 
 // ============================================================================
 // Multi-pass (n_query=2, n_train=2000 forces 2D grid on most GPUs)

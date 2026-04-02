@@ -201,6 +201,17 @@ train_prob = train_prob / train_prob.sum(axis=1, keepdims=True)
 # Weights
 weights = np.round(np.random.uniform(0.5, 3.0, N_TRAIN), 4)
 
+# High-dimensional dataset for feature/train tiling test (deterministic formula)
+N_QUERY_HD, N_TRAIN_HD, D_HD = 4, 100, 128
+query_hd = np.zeros((N_QUERY_HD, D_HD))
+train_hd = np.zeros((N_TRAIN_HD, D_HD))
+for i in range(N_QUERY_HD):
+    for j in range(D_HD):
+        query_hd[i, j] = 0.1 + ((i * 1337 + j * 7 + 42) % 1000) / 1000.0 * 1.9
+for i in range(N_TRAIN_HD):
+    for j in range(D_HD):
+        train_hd[i, j] = 0.1 + ((i * 1337 + j * 7 + 42) % 1000) / 1000.0 * 1.9
+
 # Large dataset for multi-pass test (deterministic formula)
 N_TRAIN_LARGE = 2000
 query_large = np.zeros((2, D))
@@ -389,7 +400,17 @@ results["weighted_gaussian_euclidean"] = expected_weighted
 print(f"// weighted Gaussian+Euclidean: {expected_weighted}")
 
 
-# --- 4. Multi-pass test ---
+# --- 4. High-dimensional tiling test ---
+print(
+    "\n// === High-dimensional tiling test (n_query=4, n_train=100, d=128) ==="
+)
+dists_hd = compute_dists_scipy(query_hd, train_hd, "euclidean")
+expected_hd = manual_kde(query_hd, train_hd, BW_METRIC, "gaussian", dists_hd)
+results["highd_gaussian"] = expected_hd
+print(f"// high-d Gaussian+Euclidean: {expected_hd}")
+
+
+# --- 5. Multi-pass test ---
 print("\n// === Multi-pass tests (n_query=2, n_train=2000) ===")
 BW_LARGE = 1.0
 if HAS_SKLEARN:
@@ -465,6 +486,9 @@ for metric_name in (
 
 # Weighted
 print(fmt_array("expected_weighted", results["weighted_gaussian_euclidean"]))
+
+# High-d
+print(fmt_array("expected_highd_gaussian", results["highd_gaussian"]))
 
 # Multi-pass large data generation formula (for C++)
 print("\n// Multi-pass: generate train_large in C++ with:")
