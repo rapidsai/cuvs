@@ -23,14 +23,14 @@ But how would this work when we have an index that's massively large- like 1TB?
 
 One benefit to locally indexed vector databases is that they often scale by breaking the larger set of vectors down into a smaller set by uniformly random subsampling and training smaller vector search index models on the sub-samples. Most often, the same set of tuning parameters are applied to all of the smaller sub-index models, rather than trying to set them individually for each one. During search, the query vectors are often sent to all of the sub-indexes and the resulting neighbors list reduced down to `k` based on the closest distances (or similarities).
 
-Because many databases use this sub-sampling trick, it's possible to perform an automated parameter tuning on the larger index just by randomly samplnig some number of vectors from it, splitting them into disjoint train/test/eval datasets, computing ground truth with brute-force, and then performing a hyper-parameter optimization on it. This procedure can also be repeated multiple times to simulate a monte-carlo cross validation.
+Because many databases use this sub-sampling trick, it's possible to perform an automated parameter tuning on the larger index just by randomly sampling some number of vectors from it, splitting them into disjoint train/test/eval datasets, computing ground truth with brute-force, and then performing a hyper-parameter optimization on it. This procedure can also be repeated multiple times to simulate a monte-carlo cross validation.
 
 GPUs are naturally great at performing massively parallel tasks, especially when they are largely independent tasks, such as training and evaluating models with different hyper-parameter settings in parallel. Hyper-parameter optimization also lends itself well to distributed processing, such as multi-node multi-GPU operation.
 
 Steps to achieve automated tuning
 =================================
 
-More formally, an automated parameter tuning workflow with monte-carlo cross-validation looks likes something like this:
+More formally, an automated parameter tuning workflow with monte-carlo cross-validation looks something like this:
 
 #. Ingest a large dataset into the vector database of your choice
 
@@ -42,7 +42,7 @@ More formally, an automated parameter tuning workflow with monte-carlo cross-val
 
 #. Use the test set to compute ground truth on the vectors from prior step against all vectors in the training set.
 
-#. Start the HPO tuning process for the training set, using the test vectors for the query set. It's important to make sure your HPO is multi-objective and optimizes for: a) low build time, b) high throughput or low latency sarch (depending on needs), and c) acceptable recall.
+#. Start the HPO tuning process for the training set, using the test vectors for the query set. It's important to make sure your HPO is multi-objective and optimizes for: a) low build time, b) high throughput or low latency search (depending on needs), and c) acceptable recall.
 
 #. Use the evaluation dataset to test that the optimal hyper-parameters generalize to unseen points that were not used in the optimization process.
 
