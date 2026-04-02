@@ -601,6 +601,36 @@ if(NOT BUILD_CPU_ONLY)
     INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_transform_inst.cu.in"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_inst/ivf_pq"
   )
+  generate_inst_matrix(
+    nn_descent_inst_files
+    NAME_FORMAT "nn_descent_data_@data_abbrev@_index_@index_abbrev@"
+    MATRIX_JSON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/nn_descent_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/nn_descent_inst.cu.in"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_inst/nn_descent"
+  )
+  generate_inst_matrix(
+    refine_device_inst_files
+    NAME_FORMAT "refine_device_data_@data_abbrev@_index_@index_abbrev@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/refine/detail/refine_device_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/refine/detail/refine_device_inst.cu.in"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_inst/refine"
+  )
+  generate_inst_matrix(
+    refine_host_inst_files
+    NAME_FORMAT "refine_host_data_@data_abbrev@_index_@index_abbrev@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/refine/detail/refine_host_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/refine/detail/refine_host_inst.cu.in"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_inst/refine"
+  )
+  generate_inst_matrix(
+    select_k_inst_files
+    NAME_FORMAT "select_k_data_@data_abbrev@_index_@index_abbrev@"
+    MATRIX_JSON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/selection/select_k_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/selection/select_k_inst.cu.in"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_inst/selection"
+  )
 
   add_library(
     cuvs_objs OBJECT
@@ -684,19 +714,11 @@ if(NOT BUILD_CPU_ONLY)
     ${ivf_pq_transform_inst_files}
     src/neighbors/knn_merge_parts.cu
     src/neighbors/nn_descent.cu
-    src/neighbors/nn_descent_float.cu
-    src/neighbors/nn_descent_half.cu
+    ${nn_descent_inst_files}
+    src/neighbors/nn_descent_gnnd_inst.cu
     src/neighbors/nn_descent_index.cpp
-    src/neighbors/nn_descent_int8.cu
-    src/neighbors/nn_descent_uint8.cu
-    src/neighbors/refine/detail/refine_device_float_float.cu
-    src/neighbors/refine/detail/refine_device_half_float.cu
-    src/neighbors/refine/detail/refine_device_int8_t_float.cu
-    src/neighbors/refine/detail/refine_device_uint8_t_float.cu
-    src/neighbors/refine/detail/refine_host_float_float.cpp
-    src/neighbors/refine/detail/refine_host_half_float.cpp
-    src/neighbors/refine/detail/refine_host_int8_t_float.cpp
-    src/neighbors/refine/detail/refine_host_uint8_t_float.cpp
+    ${refine_device_inst_files}
+    ${refine_host_inst_files}
     src/neighbors/scann/scann_build_float.cu
     src/neighbors/scann/scann_serialize_float.cu
     src/neighbors/sample_filter.cu
@@ -714,10 +736,7 @@ if(NOT BUILD_CPU_ONLY)
     src/preprocessing/quantize/pq.cu
     src/preprocessing/spectral/spectral_embedding.cu
     src/preprocessing/pca/pca.cu
-    src/selection/select_k_float_int64_t.cu
-    src/selection/select_k_float_int32_t.cu
-    src/selection/select_k_float_uint32_t.cu
-    src/selection/select_k_half_uint32_t.cu
+    ${select_k_inst_files}
     src/stats/silhouette_score.cu
     src/stats/trustworthiness_score.cu
     ${CUVS_MG_ALGOS}
