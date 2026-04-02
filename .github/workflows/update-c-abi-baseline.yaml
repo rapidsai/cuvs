@@ -1,0 +1,58 @@
+name: C ABI Update Baseleine
+
+on:
+  workflow_dispatch:  # Allow manual trigger for bootstrap
+  push:
+    branches:
+      - main
+    paths:
+      - 'c/include/**'
+      - 'ci/check_c_abi/**'
+
+jobs:
+  # Extract and store baseline ABI from main branch
+  update-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -e ci/check_c_abi
+
+      - name: Get dlpack dependency
+        run: |
+          git clone https://github.com/dmlc/dlpack
+
+      - name: Extract ABI from main branch
+        run: |
+          mkdir -p baseline
+          check-c-abi extract \
+            --header-path c/include \
+            --include-file cuvs/core/all.h \
+            --output-file baseline/c_abi.json.gz \
+            --dlpack-include-path dlpack/include
+          echo "ABI extracted from main branch (commit: $COMMIT)"
+        env:
+          COMMIT: ${{ github.sha }}
+
+      - name: Store commit-specific baseline
+        uses: actions/upload-artifact@v4
+        with:
+          name: c-abi-baseline-${{ github.sha }}
+          path: baseline/c_abi.json.gz
+          retention-days: 90  # Keep for 3 months
+
+      - name: Store main baseline (latest, never expires)
+        uses: actions/upload-artifact@v4
+        with:
+          name: c-abi-baseline-main
+          path: baseline/c_abi.json.gz
+          retention-days: 0  # Never expire
