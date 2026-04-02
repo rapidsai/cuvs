@@ -154,6 +154,7 @@ __launch_bounds__(BlockDim) RAFT_KERNEL
     s_sq_scale[d] = sq_delta[d];
     if constexpr (!kIsL2) { s_query_term[d] = query[d]; }
   }
+  __syncthreads();
 
   using local_topk_t = sq_block_sort_t<Capacity, kAscending>;
   local_topk_t queue(k);
@@ -167,6 +168,15 @@ __launch_bounds__(BlockDim) RAFT_KERNEL
   const uint32_t lane_id            = threadIdx.x % raft::WarpSize;
 
   // --- Phase 2: loop over probes ---
+  // Synchronization protocol:
+  //  (a) __syncthreads after Phase 1 (above) ensures s_sq_scale / s_query_term
+  //      are visible before any probe iteration overwrites s_query_term or
+  //      s_recon_base.
+  //  (b) __syncthreads after per-probe smem writes (below) ensures
+  //      probe-specific values are visible before the distance computation.
+  //  (c) __syncthreads at the end of each iteration ensures all distance
+  //      computation reads are complete before the next iteration overwrites
+  //      the same smem regions.
   for (uint32_t probe_ix = blockIdx.x; probe_ix < n_probes;
        probe_ix += (kManageLocalTopK ? gridDim.x : uint32_t{1})) {
     const uint32_t cluster_id = my_coarse[probe_ix];
@@ -183,9 +193,11 @@ __launch_bounds__(BlockDim) RAFT_KERNEL
         }
       }
     }
-    __syncthreads();
+    __syncthreads();  // (b)
 
     if (cluster_sz == 0) {
+      // No distance computation reads happened, so no end-of-iteration
+      // barrier is needed; the next iteration's barrier (b) is sufficient.
       if constexpr (!kManageLocalTopK) break;
       continue;
     }
@@ -245,11 +257,15 @@ __launch_bounds__(BlockDim) RAFT_KERNEL
       }
     }
 
-    __syncthreads();
+    __syncthreads();  // (c)
     if constexpr (!kManageLocalTopK) break;
   }
 
   if constexpr (kManageLocalTopK) {
+    // All probe iterations are done; smem_buf is reused for block_sort merge.
+    // The loop's last (b) or (c) barrier ensures all prior smem accesses have
+    // completed, so this additional barrier is only needed to synchronize any
+    // register-level state across warps before the merge.
     __syncthreads();
     queue.done(smem_buf);
     queue.store(out_distances, out_indices);
