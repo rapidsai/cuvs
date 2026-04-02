@@ -7,7 +7,9 @@ package com.nvidia.cuvs.internal;
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
+import com.nvidia.cuvs.CagraSearchParams;
 import com.nvidia.cuvs.internal.common.CloseableHandle;
+import com.nvidia.cuvs.internal.panama.*;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 
@@ -24,6 +26,31 @@ import java.lang.foreign.MemorySegment;
 public final class CuVSParamsHelper {
 
   private CuVSParamsHelper() {}
+
+  /**
+   * Allocates and populates a {@code cuvsCagraSearchParams} struct into {@code arena}.
+   * The returned segment is valid for the lifetime of {@code arena}.
+   */
+  public static MemorySegment buildCagraSearchParams(Arena arena, CagraSearchParams params) {
+    MemorySegment seg = cuvsCagraSearchParams.allocate(arena);
+    cuvsCagraSearchParams.max_queries(seg, params.getMaxQueries());
+    cuvsCagraSearchParams.itopk_size(seg, params.getITopKSize());
+    cuvsCagraSearchParams.max_iterations(seg, params.getMaxIterations());
+    if (params.getCagraSearchAlgo() != null) {
+      cuvsCagraSearchParams.algo(seg, params.getCagraSearchAlgo().value);
+    }
+    cuvsCagraSearchParams.team_size(seg, params.getTeamSize());
+    cuvsCagraSearchParams.search_width(seg, params.getSearchWidth());
+    cuvsCagraSearchParams.min_iterations(seg, params.getMinIterations());
+    cuvsCagraSearchParams.thread_block_size(seg, params.getThreadBlockSize());
+    if (params.getHashMapMode() != null) {
+      cuvsCagraSearchParams.hashmap_mode(seg, params.getHashMapMode().value);
+    }
+    cuvsCagraSearchParams.hashmap_max_fill_rate(seg, params.getHashMapMaxFillRate());
+    cuvsCagraSearchParams.num_random_samplings(seg, params.getNumRandomSamplings());
+    cuvsCagraSearchParams.rand_xor_mask(seg, params.getRandXORMask());
+    return seg;
+  }
 
   public static CloseableHandle createCagraIndexParams() {
     try (var localArena = Arena.ofConfined()) {

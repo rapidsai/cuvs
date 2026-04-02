@@ -59,6 +59,7 @@ public class CuVSResourcesImpl implements CuVSResources {
   @Override
   public void close() {
     synchronized (this) {
+      CudaStreamPool.closeInstance();
       int returnValue = cuvsResourcesDestroy(resourceHandle);
       checkCuVSError(returnValue, "cuvsResourcesDestroy");
       hostBuffer.close();

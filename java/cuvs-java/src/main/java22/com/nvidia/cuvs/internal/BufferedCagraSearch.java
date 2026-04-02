@@ -5,6 +5,7 @@
 package com.nvidia.cuvs.internal;
 
 import com.nvidia.cuvs.CagraQuery;
+import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 
 /**
@@ -28,17 +29,30 @@ public interface BufferedCagraSearch {
    *   <li>{@code globalDistancesDP}: float32 distances</li>
    * </ul>
    *
-   * <p>The caller must synchronize the stream after all segments have been searched.
+   * <p>The search is submitted to {@code segmentStream}. The caller is responsible for
+   * synchronizing that stream (e.g. via a CUDA event) before consuming the output buffers.
    *
    * @param query             query with vectors, topK, search params, optional prefilter
    * @param globalNeighborsDP device pointer to the shared uint32 neighbors buffer
    * @param globalDistancesDP device pointer to the shared float32 distances buffer
    * @param segmentIdx        zero-based segment index; determines the write offset
+   * @param segmentCuvsRes    {@code cuvsResources_t} handle whose CUDA stream receives the kernel
+   * @param segmentStream     CUDA stream corresponding to {@code segmentCuvsRes}; passed explicitly
+   *                          to avoid a redundant {@code cuvsStreamGet} call inside the method
+   * @param searchParams      pre-built {@code cuvsCagraSearchParams} struct; shared across all
+   *                          segments to avoid repeated allocation and population
+   * @param arena             shared scratch arena for per-call CPU-side allocations (tensor
+   *                          descriptors, filter struct); must remain open until after this call
+   *                          returns, and the GPU kernel has launched
    */
   void searchIntoBuffer(
       CagraQuery query,
       MemorySegment globalNeighborsDP,
       MemorySegment globalDistancesDP,
-      int segmentIdx)
+      int segmentIdx,
+      long segmentCuvsRes,
+      MemorySegment segmentStream,
+      MemorySegment searchParams,
+      Arena arena)
       throws Throwable;
 }

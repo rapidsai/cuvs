@@ -7,32 +7,39 @@ package com.nvidia.cuvs;
 import static com.nvidia.cuvs.internal.common.CloseableRMMAllocation.allocateRMMSegment;
 import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.DEVICE_TO_HOST;
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
+import static com.nvidia.cuvs.internal.common.Util.checkCudaError;
 import static com.nvidia.cuvs.internal.common.Util.cudaMemcpyAsync;
 import static com.nvidia.cuvs.internal.common.Util.getStream;
+import static com.nvidia.cuvs.internal.panama.headers_h.cudaEventRecord;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
+import static com.nvidia.cuvs.internal.panama.headers_h_1.cudaStreamWaitEvent;
 
 import com.nvidia.cuvs.internal.BufferedCagraSearch;
+import com.nvidia.cuvs.internal.CuVSParamsHelper;
+import com.nvidia.cuvs.internal.CudaStreamPool;
 import com.nvidia.cuvs.internal.SelectKHelper;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.util.Arrays;
 import java.util.List;
 
 /**
  * Performs a single-query approximate nearest neighbor search across multiple CAGRA index segments
- * using a shared GPU buffer, eliminating per-segment device-to-host copies.
+ * using a shared GPU buffer and a fixed-size CUDA stream pool, eliminating per-segment
+ * device-to-host copies.
  *
  * <h3>Algorithm</h3>
  * <ol>
  *   <li>Allocate two global device buffers sized {@code numSegments × k}:
  *       one for uint32 neighbor ordinals and one for float32 distances.</li>
+ *   <li>Assign each segment a slot from the {@link CudaStreamPool} via round-robin. Segments on
+ *       different slots run in parallel on separate CUDA streams.</li>
  *   <li>For each segment, call {@link BufferedCagraSearch#searchIntoBuffer} to queue the CAGRA
- *       search kernel; results are written into the segment's slice with no stream sync between
- *       segments.</li>
- *   <li>Sync the stream once after all segment searches are queued.</li>
- *   <li>Call {@code cuvsSelectK} to find the global top-k smallest distances across all
- *       {@code numSegments × k} candidates entirely on GPU.</li>
- *   <li>Sync the stream again.</li>
+ *       search kernel on the slot's stream; no per-segment sync or D2H copy.</li>
+ *   <li>Record a CUDA event on each slot's stream; make the main stream wait on all events.</li>
+ *   <li>Call {@code cuvsSelectK} on the main stream to find the global top-k entirely on GPU.</li>
+ *   <li>Sync the main stream.</li>
  *   <li>Copy the three result arrays to host in a single pass:
  *       k selected distances, k flat-array positions, and all {@code numSegments × k} ordinals.</li>
  *   <li>Decode each result: {@code segment = position / k}, {@code ordinal = ordinals[position]}.</li>
@@ -89,6 +96,14 @@ public class MultiSegmentCagraSearch {
     long outIdxBytes = (long) k * Long.BYTES; // int64 positions from select_k
     long outValBytes = (long) k * Float.BYTES;
 
+    // Assign a pool slot to each segment via round-robin.
+    CudaStreamPool pool = CudaStreamPool.getOrCreate();
+    int startSlot = CudaStreamPool.slotCounter.getAndAdd(numSegments);
+    int[] slots = new int[numSegments];
+    for (int i = 0; i < numSegments; i++) {
+      slots[i] = Math.floorMod(startSlot + i, pool.size());
+    }
+
     try (var resourcesAccessor = resources.access()) {
       long cuvsRes = resourcesAccessor.handle();
       var cuvsStream = getStream(cuvsRes);
@@ -98,15 +113,46 @@ public class MultiSegmentCagraSearch {
           var outIdxDP = allocateRMMSegment(cuvsRes, outIdxBytes);
           var outValDP = allocateRMMSegment(cuvsRes, outValBytes)) {
 
-        // --- Phase 1: queue all per-segment CAGRA searches ---
-        for (int i = 0; i < numSegments; i++) {
-          buffered[i].searchIntoBuffer(
-              queries.get(i), globalNeighborsDP.handle(), globalDistancesDP.handle(), i);
+        // --- Phase 1: queue all per-segment CAGRA searches, each on its own stream ---
+        // Use a single arena and pre-built search params shared across all segments to avoid
+        // repeated Arena.ofConfined() and segmentFromSearchParams calls.
+        // The arena is closed after Phase 1; all CPU-side structs are only needed until
+        // cuvsCagraSearch returns (the kernel launch is synchronous on the CPU side).
+        try (var segArena = Arena.ofConfined()) {
+          MemorySegment searchParams =
+              CuVSParamsHelper.buildCagraSearchParams(
+                  segArena, queries.get(0).getCagraSearchParameters());
+          for (int i = 0; i < numSegments; i++) {
+            buffered[i].searchIntoBuffer(
+                queries.get(i),
+                globalNeighborsDP.handle(),
+                globalDistancesDP.handle(),
+                i,
+                pool.resources(slots[i]),
+                pool.stream(slots[i]),
+                searchParams,
+                segArena);
+          }
         }
 
-        // --- Phase 2: sync once, then select global top-k on GPU ---
-        checkCuVSError(cuvsStreamSync(cuvsRes), "cuvsStreamSync before selectK");
+        // --- Phase 2: event-based sync — make main stream wait for all segment streams ---
+        // Record one event per distinct slot (on the last kernel submitted to that slot);
+        // this is O(pool.size()) API calls instead of O(numSegments).
+        // Pool events are pre-allocated and reused across calls to avoid create/destroy overhead.
+        int[] lastSegmentForSlot = new int[pool.size()];
+        Arrays.fill(lastSegmentForSlot, -1);
+        for (int i = 0; i < numSegments; i++) {
+          lastSegmentForSlot[slots[i]] = i;
+        }
+        for (int slot = 0; slot < pool.size(); slot++) {
+          if (lastSegmentForSlot[slot] >= 0) {
+            checkCudaError(cudaEventRecord(pool.event(slot), pool.stream(slot)), "cudaEventRecord");
+            checkCudaError(
+                cudaStreamWaitEvent(cuvsStream, pool.event(slot), 0), "cudaStreamWaitEvent");
+          }
+        }
 
+        // --- Phase 3: select global top-k on GPU (after all segment searches complete) ---
         SelectKHelper.selectK(
             cuvsRes,
             globalDistancesDP.handle(),
@@ -117,11 +163,11 @@ public class MultiSegmentCagraSearch {
 
         checkCuVSError(cuvsStreamSync(cuvsRes), "cuvsStreamSync after selectK");
 
-        // --- Phase 3: single device-to-host copy for all three arrays ---
-        try (var arena = Arena.ofConfined()) {
-          MemorySegment hostOutIdx = arena.allocate(outIdxBytes);
-          MemorySegment hostOutVal = arena.allocate(outValBytes);
-          MemorySegment hostAllOrdinals = arena.allocate(neighborsBytes);
+        // --- Phase 4: single device-to-host copy for all three arrays ---
+        try (var hostArena = Arena.ofConfined()) {
+          MemorySegment hostOutIdx = hostArena.allocate(outIdxBytes);
+          MemorySegment hostOutVal = hostArena.allocate(outValBytes);
+          MemorySegment hostAllOrdinals = hostArena.allocate(neighborsBytes);
 
           cudaMemcpyAsync(hostOutIdx, outIdxDP.handle(), outIdxBytes, DEVICE_TO_HOST, cuvsStream);
           cudaMemcpyAsync(hostOutVal, outValDP.handle(), outValBytes, DEVICE_TO_HOST, cuvsStream);
@@ -134,7 +180,7 @@ public class MultiSegmentCagraSearch {
 
           checkCuVSError(cuvsStreamSync(cuvsRes), "cuvsStreamSync after D2H copy");
 
-          // --- Phase 4: decode results ---
+          // --- Phase 5: decode results ---
           int[] segmentIndices = new int[k];
           int[] selectedOrdinals = new int[k];
           float[] selectedDistances = new float[k];

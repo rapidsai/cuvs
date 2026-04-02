@@ -211,6 +211,19 @@ cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_percent,
                                             int max_pool_size_percent,
                                             bool managed);
 /**
+ * @brief Switches the working memory resource to use stream-ordered asynchronous allocation
+ * (cudaMallocAsync / cudaFreeAsync). Unlike the pool resource, this resource returns memory to
+ * the stream immediately without blocking the CPU, eliminating device-wide synchronization on
+ * deallocation. This is especially beneficial when multiple CAGRA searches run concurrently on
+ * separate CUDA streams, because the internal workspace allocations no longer serialize kernel
+ * launches. Be aware that this function will change the memory resource for the whole process
+ * and the new memory resource will be used until explicitly changed.
+ *
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsRMMAsyncMemoryResourceEnable();
+
+/**
  * @brief Resets the memory resource to use the default memory resource (cuda_memory_resource)
  * @return cuvsError_t
  */

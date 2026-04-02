@@ -14,6 +14,7 @@
 #include <raft/util/cudart_utils.hpp>
 #include <rapids_logger/logger.hpp>
 #include <rmm/cuda_stream_view.hpp>
+#include <rmm/mr/cuda_async_memory_resource.hpp>
 #include <rmm/mr/cuda_memory_resource.hpp>
 #include <rmm/mr/managed_memory_resource.hpp>
 #include <rmm/mr/per_device_resource.hpp>
@@ -146,6 +147,8 @@ extern "C" cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes)
   });
 }
 
+thread_local std::shared_ptr<rmm::mr::cuda_async_memory_resource> async_mr;
+
 extern "C" cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_percent,
                                                        int max_pool_size_percent,
                                                        bool managed)
@@ -164,9 +167,20 @@ extern "C" cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_per
   });
 }
 
+extern "C" cuvsError_t cuvsRMMAsyncMemoryResourceEnable()
+{
+  return cuvs::core::translate_exceptions([=] {
+    async_mr = std::make_shared<rmm::mr::cuda_async_memory_resource>();
+    rmm::mr::set_current_device_resource(async_mr.get());
+  });
+}
+
 extern "C" cuvsError_t cuvsRMMMemoryResourceReset()
 {
-  return cuvs::core::translate_exceptions([=] { rmm::mr::reset_current_device_resource(); });
+  return cuvs::core::translate_exceptions([=] {
+    rmm::mr::reset_current_device_resource();
+    async_mr.reset();
+  });
 }
 
 thread_local std::unique_ptr<rmm::mr::pinned_host_memory_resource> pinned_mr;
