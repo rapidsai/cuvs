@@ -534,6 +534,22 @@ if(NOT BUILD_CPU_ONLY)
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_inst/iface_pq"
   )
   generate_inst_matrix(
+    ivf_flat_build_extend_inst_files
+    NAME_FORMAT "ivf_flat_build_extend_data_@data_abbrev@_index_@index_abbrev@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/ivf_flat_build_extend_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/ivf_flat_build_extend_inst.cu.in"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_inst/ivf_flat"
+  )
+  generate_inst_matrix(
+    ivf_flat_search_inst_files
+    NAME_FORMAT "ivf_flat_search_data_@data_abbrev@_index_@index_abbrev@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/ivf_flat_search_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/ivf_flat_search_inst.cu.in"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_inst/ivf_flat"
+  )
+  generate_inst_matrix(
     ivf_flat_interleaved_scan_inst_files
     NAME_FORMAT
       "ivf_flat_interleaved_scan_data_@data_abbrev@_index_@index_abbrev@_filter_@filter_name@"
@@ -544,12 +560,45 @@ if(NOT BUILD_CPU_ONLY)
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_inst/ivf_flat"
   )
   generate_inst_matrix(
+    ivf_flat_serialize_inst_files
+    NAME_FORMAT "ivf_flat_serialize_data_@data_abbrev@_index_@index_abbrev@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/ivf_flat_serialize_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/ivf_flat_serialize_inst.cu.in"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_inst/ivf_flat"
+  )
+  generate_inst_matrix(
+    ivf_pq_build_extend_inst_files
+    NAME_FORMAT "ivf_pq_build_extend_data_@data_abbrev@_index_@index_abbrev@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_build_extend_matrix.json"
+    INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_build_extend_inst.cu.in"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_inst/ivf_pq"
+  )
+  generate_inst_matrix(
     ivf_pq_compute_similarity_inst_files
     NAME_FORMAT "ivf_pq_compute_similarity_out_@out_abbrev@_lut_@lut_abbrev@"
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_matrix.json"
     INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_inst.cu.in"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_inst/ivf_pq"
+  )
+  generate_inst_matrix(
+    ivf_pq_search_inst_files
+    NAME_FORMAT "ivf_pq_search_data_@data_abbrev@_index_@index_abbrev@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_search_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_search_inst.cu.in"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_inst/ivf_pq"
+  )
+  generate_inst_matrix(
+    ivf_pq_transform_inst_files
+    NAME_FORMAT "ivf_pq_transform_data_@data_abbrev@_index_@index_abbrev@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_transform_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_transform_inst.cu.in"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_inst/ivf_pq"
   )
 
@@ -616,41 +665,23 @@ if(NOT BUILD_CPU_ONLY)
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw.cpp>
     src/neighbors/ivf_common.cu
     src/neighbors/ivf_flat_index.cpp
-    src/neighbors/ivf_flat/ivf_flat_build_extend_float_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_build_extend_half_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_build_extend_int8_t_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_build_extend_uint8_t_int64_t.cu
+    ${ivf_flat_build_extend_inst_files}
+    ${ivf_flat_search_inst_files}
     src/neighbors/ivf_flat/ivf_flat_helpers.cu
-    src/neighbors/ivf_flat/ivf_flat_search_float_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_search_half_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_search_int8_t_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_search_uint8_t_int64_t.cu
     ${ivf_flat_interleaved_scan_inst_files}
-    src/neighbors/ivf_flat/ivf_flat_serialize_float_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_serialize_half_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_serialize_int8_t_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_serialize_uint8_t_int64_t.cu
+    ${ivf_flat_serialize_inst_files}
     src/neighbors/ivf_pq_index.cu
     src/neighbors/ivf_pq/ivf_pq_build_common.cu
     src/neighbors/ivf_pq/ivf_pq_serialize.cu
     src/neighbors/ivf_pq/ivf_pq_deserialize.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_build_extend_float_int64_t.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_build_extend_half_int64_t.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_build_extend_int8_t_int64_t.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_build_extend_uint8_t_int64_t.cu
+    ${ivf_pq_build_extend_inst_files}
     src/neighbors/ivf_pq/detail/ivf_pq_build_precomputed_int64_t.cu
     ${ivf_pq_compute_similarity_inst_files}
     src/neighbors/ivf_pq/detail/ivf_pq_contiguous_list_data.cu
     src/neighbors/ivf_pq/detail/ivf_pq_list_data.cu
     src/neighbors/ivf_pq/detail/ivf_pq_process_and_fill_codes.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_search_float_int64_t.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_search_half_int64_t.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_search_int8_t_int64_t.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_search_uint8_t_int64_t.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_transform_float_int64_t.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_transform_half_int64_t.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_transform_int8_t_int64_t.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_transform_uint8_t_int64_t.cu
+    ${ivf_pq_search_inst_files}
+    ${ivf_pq_transform_inst_files}
     src/neighbors/knn_merge_parts.cu
     src/neighbors/nn_descent.cu
     src/neighbors/nn_descent_float.cu
