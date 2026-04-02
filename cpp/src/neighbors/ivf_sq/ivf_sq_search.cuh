@@ -40,11 +40,13 @@ static constexpr int kSqScanThreads = 128;
 // Maximum fused top-k capacity we instantiate for the scan kernel.
 // Must match the highest Capacity case in ivf_sq_scan's switch.
 static constexpr int kMaxSqScanCapacity = 256;
+static_assert(kMaxSqScanCapacity <= raft::matrix::detail::select::warpsort::kMaxCapacity,
+              "kMaxSqScanCapacity must not exceed the warpsort library's maximum supported "
+              "capacity; reduce kMaxSqScanCapacity or update the warpsort dependency.");
 
 auto RAFT_WEAK_FUNCTION is_local_topk_feasible(uint32_t k) -> bool
 {
-  return k <= kMaxSqScanCapacity &&
-         k <= raft::matrix::detail::select::warpsort::kMaxCapacity;
+  return k <= kMaxSqScanCapacity;
 }
 
 // ---------------------------------------------------------------------------
@@ -71,11 +73,8 @@ using sq_block_sort_t = typename sq_block_sort<Capacity, Ascending>::type;
 // ---------------------------------------------------------------------------
 // configure_grid_dim_x: choose grid.x to saturate the GPU
 // ---------------------------------------------------------------------------
-inline uint32_t configure_grid_dim_x(uint32_t n_queries,
-                                     uint32_t n_probes,
-                                     int smem_size,
-                                     int block_size,
-                                     const void* kernel_ptr)
+inline uint32_t configure_grid_dim_x(
+  uint32_t n_queries, uint32_t n_probes, int smem_size, int block_size, const void* kernel_ptr)
 {
   int dev_id;
   RAFT_CUDA_TRY(cudaGetDevice(&dev_id));
@@ -99,30 +98,42 @@ inline uint32_t configure_grid_dim_x(uint32_t n_queries,
 //   otherwise (Capacity == 0):
 //     grid (n_probes, n_queries) — one block per (query, probe)
 //
-// Shared-memory layout: [s_sq_scale(dim) | s_query_term(dim) | s_recon_base(dim)?]
-//   s_sq_scale is loaded once (invariant across probes).
-//   For L2, s_query_term is reloaded per probe.
-//   For IP/Cosine, s_query_term is loaded once and s_recon_base is reloaded per probe.
+// Shared-memory layout (always 3 × dim floats):
+//   [s_sq_scale(dim) | s_query_term(dim) | s_aux(dim)]
+//
+//   s_sq_scale = delta[d]  — SQ dequantization scale, invariant (Phase 1).
+//
+//   L2 path:
+//     Phase 1: s_aux[d] = query[d] - vmin[d]               (invariant)
+//     Phase 2: s_query_term[d] = s_aux[d] - centroid[d]     (per-probe)
+//     The full SQ reconstruction is centroid + vmin + code*delta, so
+//     query - reconstructed = (query - vmin - centroid) - code*delta
+//                           = s_query_term - code*s_sq_scale.
+//
+//   IP/Cosine path:
+//     Phase 1: s_query_term[d] = query[d]                   (invariant)
+//     Phase 2: s_aux[d] = centroid[d] + vmin[d]             (per-probe)
+//     Reconstructed vector component: s_aux[d] + code*s_sq_scale[d].
+//
 //   After all probes are scanned, the smem is reused for block_sort merge.
 // ---------------------------------------------------------------------------
 template <int BlockDim, int Capacity, SqScanMetric Metric, typename IdxT, typename IvfSampleFilterT>
-__launch_bounds__(BlockDim) RAFT_KERNEL
-  ivf_sq_scan_kernel(const uint8_t* const* data_ptrs,
-                     const uint32_t* list_sizes,
-                     const uint32_t* coarse_indices,
-                     const float* queries_float,
-                     const float* centers,
-                     const float* sq_vmin,
-                     const float* sq_delta,
-                     const float* query_norms,
-                     uint32_t n_probes,
-                     uint32_t dim,
-                     uint32_t k,
-                     uint32_t max_samples,
-                     const uint32_t* chunk_indices,
-                     float* out_distances,
-                     uint32_t* out_indices,
-                     IvfSampleFilterT sample_filter)
+__launch_bounds__(BlockDim) RAFT_KERNEL ivf_sq_scan_kernel(const uint8_t* const* data_ptrs,
+                                                           const uint32_t* list_sizes,
+                                                           const uint32_t* coarse_indices,
+                                                           const float* queries_float,
+                                                           const float* centers,
+                                                           const float* sq_vmin,
+                                                           const float* sq_delta,
+                                                           const float* query_norms,
+                                                           uint32_t n_probes,
+                                                           uint32_t dim,
+                                                           uint32_t k,
+                                                           uint32_t max_samples,
+                                                           const uint32_t* chunk_indices,
+                                                           float* out_distances,
+                                                           uint32_t* out_indices,
+                                                           IvfSampleFilterT sample_filter)
 {
   static_assert(kIndexGroupSize == raft::WarpSize,
                 "Warp-coalesced scan requires kIndexGroupSize == WarpSize");
@@ -135,10 +146,9 @@ __launch_bounds__(BlockDim) RAFT_KERNEL
   extern __shared__ __align__(256) uint8_t smem_buf[];
   float* smem = reinterpret_cast<float*>(smem_buf);
 
-  // smem layout: [s_sq_scale | s_query_term | (s_recon_base for IP/Cosine)]
   float* s_sq_scale   = smem;
   float* s_query_term = smem + dim;
-  float* s_recon_base = kIsL2 ? nullptr : (smem + 2 * dim);
+  float* s_aux        = smem + 2 * dim;
 
   const uint32_t query_ix = blockIdx.y;
   const float* query      = queries_float + query_ix * dim;
@@ -152,7 +162,11 @@ __launch_bounds__(BlockDim) RAFT_KERNEL
   // --- Phase 1: load shared memory that is invariant across probes ---
   for (uint32_t d = threadIdx.x; d < dim; d += BlockDim) {
     s_sq_scale[d] = sq_delta[d];
-    if constexpr (!kIsL2) { s_query_term[d] = query[d]; }
+    if constexpr (kIsL2) {
+      s_aux[d] = query[d] - sq_vmin[d];
+    } else {
+      s_query_term[d] = query[d];
+    }
   }
   __syncthreads();
 
@@ -169,14 +183,18 @@ __launch_bounds__(BlockDim) RAFT_KERNEL
 
   // --- Phase 2: loop over probes ---
   // Synchronization protocol:
-  //  (a) __syncthreads after Phase 1 (above) ensures s_sq_scale / s_query_term
-  //      are visible before any probe iteration overwrites s_query_term or
-  //      s_recon_base.
-  //  (b) __syncthreads after per-probe smem writes (below) ensures
-  //      probe-specific values are visible before the distance computation.
+  //  (a) __syncthreads after Phase 1 (above) ensures invariant smem arrays
+  //      (s_sq_scale, and L2: s_aux / IP-Cosine: s_query_term) are visible
+  //      before Phase 2 overwrites the per-probe array.
+  //  (b) __syncthreads after per-probe smem writes (L2: s_query_term /
+  //      IP-Cosine: s_aux) ensures probe-specific values are visible before
+  //      the distance computation.
   //  (c) __syncthreads at the end of each iteration ensures all distance
   //      computation reads are complete before the next iteration overwrites
-  //      the same smem regions.
+  //      the per-probe smem region.
+  //  When cluster_sz == 0, barrier (c) is skipped because no distance reads
+  //  occurred; all threads converge on the same branch uniformly, and the
+  //  next iteration's barrier (b) provides the needed ordering.
   for (uint32_t probe_ix = blockIdx.x; probe_ix < n_probes;
        probe_ix += (kManageLocalTopK ? gridDim.x : uint32_t{1})) {
     const uint32_t cluster_id = my_coarse[probe_ix];
@@ -187,9 +205,9 @@ __launch_bounds__(BlockDim) RAFT_KERNEL
       const float* centroid = centers + cluster_id * dim;
       for (uint32_t d = threadIdx.x; d < dim; d += BlockDim) {
         if constexpr (kIsL2) {
-          s_query_term[d] = query[d] - centroid[d] - sq_vmin[d];
+          s_query_term[d] = s_aux[d] - centroid[d];
         } else {
-          s_recon_base[d] = centroid[d] + sq_vmin[d];
+          s_aux[d] = centroid[d] + sq_vmin[d];
         }
       }
     }
@@ -202,10 +220,10 @@ __launch_bounds__(BlockDim) RAFT_KERNEL
       continue;
     }
 
-    const uint8_t* codes    = data_ptrs[cluster_id];
-    uint32_t sample_offset  = (probe_ix > 0) ? my_chunk[probe_ix - 1] : 0;
-    uint32_t padded_dim     = ((dim + veclen - 1) / veclen) * veclen;
-    uint32_t n_dim_blocks   = padded_dim / veclen;
+    const uint8_t* codes   = data_ptrs[cluster_id];
+    uint32_t sample_offset = (probe_ix > 0) ? my_chunk[probe_ix - 1] : 0;
+    uint32_t padded_dim    = ((dim + veclen - 1) / veclen) * veclen;
+    uint32_t n_dim_blocks  = padded_dim / veclen;
 
     for (uint32_t group = warp_id * kIndexGroupSize; group < cluster_sz;
          group += kWarpsPerBlock * kIndexGroupSize) {
@@ -232,7 +250,7 @@ __launch_bounds__(BlockDim) RAFT_KERNEL
               float diff = s_query_term[l + j] - recon;
               dist += diff * diff;
             } else {
-              float v_d = s_recon_base[l + j] + recon;
+              float v_d = s_aux[l + j] + recon;
               dist += s_query_term[l + j] * v_d;
               if constexpr (kIsCosine) { v_norm_sq += v_d * v_d; }
             }
@@ -288,15 +306,12 @@ __launch_bounds__(BlockDim) RAFT_KERNEL
 // ---------------------------------------------------------------------------
 // Compute shared-memory size for a given kernel configuration
 // ---------------------------------------------------------------------------
-inline size_t sq_scan_smem_size(uint32_t dim, SqScanMetric metric)
-{
-  return (metric == SqScanMetric::kL2 ? 2 : 3) * dim * sizeof(float);
-}
+inline size_t sq_scan_smem_size(uint32_t dim) { return 3 * dim * sizeof(float); }
 
 template <int Capacity>
-size_t sq_scan_total_smem(uint32_t dim, uint32_t k, SqScanMetric metric)
+size_t sq_scan_total_smem(uint32_t dim, uint32_t k)
 {
-  size_t scan_smem = sq_scan_smem_size(dim, metric);
+  size_t scan_smem = sq_scan_smem_size(dim);
   if constexpr (Capacity > 0) {
     constexpr int kSubwarpSize = std::min<int>(Capacity, raft::WarpSize);
     int num_subwarps           = kSqScanThreads / kSubwarpSize;
@@ -331,10 +346,25 @@ void ivf_sq_scan_launch(const index<IdxT>& idx,
   constexpr int kThreads          = kSqScanThreads;
   uint32_t dim                    = idx.dim();
 
-  constexpr uint32_t kMaxGridY = 32768;
+  constexpr uint32_t kMaxGridY = 65535;
 
-  auto do_launch = [&](auto kernel_ptr, SqScanMetric metric_val) {
-    size_t smem = sq_scan_total_smem<Capacity>(dim, k, metric_val);
+  auto do_launch = [&](auto kernel_ptr) {
+    size_t smem = sq_scan_total_smem<Capacity>(dim, k);
+
+    {
+      int dev_id;
+      RAFT_CUDA_TRY(cudaGetDevice(&dev_id));
+      int max_smem;
+      RAFT_CUDA_TRY(
+        cudaDeviceGetAttribute(&max_smem, cudaDevAttrMaxSharedMemoryPerBlockOptin, dev_id));
+      RAFT_EXPECTS(smem <= size_t(max_smem),
+                   "IVF-SQ scan kernel requires %zu bytes of shared memory (dim=%u, k=%u), "
+                   "but the device supports at most %d bytes per block.",
+                   smem,
+                   dim,
+                   k,
+                   max_smem);
+    }
 
     RAFT_CUDA_TRY(
       cudaFuncSetAttribute(kernel_ptr, cudaFuncAttributeMaxDynamicSharedMemorySize, smem));
@@ -342,9 +372,11 @@ void ivf_sq_scan_launch(const index<IdxT>& idx,
     // If grid_dim_x == 0, compute the optimal value and return
     if constexpr (kManageLocalTopK) {
       if (grid_dim_x == 0) {
-        grid_dim_x = configure_grid_dim_x(
-          std::min(kMaxGridY, n_queries), n_probes, smem, kThreads,
-          reinterpret_cast<const void*>(kernel_ptr));
+        grid_dim_x = configure_grid_dim_x(std::min(kMaxGridY, n_queries),
+                                          n_probes,
+                                          smem,
+                                          kThreads,
+                                          reinterpret_cast<const void*>(kernel_ptr));
         return;
       }
     }
@@ -393,19 +425,14 @@ void ivf_sq_scan_launch(const index<IdxT>& idx,
   switch (idx.metric()) {
     case cuvs::distance::DistanceType::L2Expanded:
     case cuvs::distance::DistanceType::L2SqrtExpanded:
-      do_launch(
-        ivf_sq_scan_kernel<kThreads, Capacity, SqScanMetric::kL2, IdxT, IvfSampleFilterT>,
-        SqScanMetric::kL2);
+      do_launch(ivf_sq_scan_kernel<kThreads, Capacity, SqScanMetric::kL2, IdxT, IvfSampleFilterT>);
       break;
     case cuvs::distance::DistanceType::InnerProduct:
-      do_launch(
-        ivf_sq_scan_kernel<kThreads, Capacity, SqScanMetric::kIP, IdxT, IvfSampleFilterT>,
-        SqScanMetric::kIP);
+      do_launch(ivf_sq_scan_kernel<kThreads, Capacity, SqScanMetric::kIP, IdxT, IvfSampleFilterT>);
       break;
     case cuvs::distance::DistanceType::CosineExpanded:
       do_launch(
-        ivf_sq_scan_kernel<kThreads, Capacity, SqScanMetric::kCosine, IdxT, IvfSampleFilterT>,
-        SqScanMetric::kCosine);
+        ivf_sq_scan_kernel<kThreads, Capacity, SqScanMetric::kCosine, IdxT, IvfSampleFilterT>);
       break;
     default: RAFT_FAIL("Unsupported metric type for IVF-SQ scan.");
   }
@@ -434,13 +461,13 @@ void ivf_sq_scan(raft::resources const& handle,
   // Determine the fused top-k capacity (0 = disabled / fallback to materialization)
   int capacity = is_local_topk_feasible(k) ? raft::bound_by_power_of_two(int(k)) : 0;
 
-  // Clamp to supported compile-time Capacity values.
-  // Using a limited set to avoid excessive template instantiations.
-  if (capacity > 0 && capacity <= 32) {
+  // Snap to the nearest supported compile-time Capacity value (must be a
+  // power of two). Values up to 32 share one instantiation; 64, 128 and 256
+  // each get their own.  Beyond kMaxSqScanCapacity we fall back to the
+  // non-fused path (Capacity == 0).
+  if (capacity > 0 && capacity < 32) {
     capacity = 32;
-  } else if (capacity > 32 && capacity <= 256) {
-    capacity = 256;
-  } else if (capacity > 256) {
+  } else if (capacity > kMaxSqScanCapacity) {
     capacity = 0;
   }
 
@@ -464,6 +491,8 @@ void ivf_sq_scan(raft::resources const& handle,
   switch (capacity) {
     case 0: fwd(std::integral_constant<int, 0>{}); break;
     case 32: fwd(std::integral_constant<int, 32>{}); break;
+    case 64: fwd(std::integral_constant<int, 64>{}); break;
+    case 128: fwd(std::integral_constant<int, 128>{}); break;
     case 256: fwd(std::integral_constant<int, 256>{}); break;
     default: RAFT_FAIL("Unexpected capacity value %d", capacity);
   }
@@ -490,7 +519,8 @@ void search_impl(raft::resources const& handle,
 
   std::size_t n_queries_probes = std::size_t(n_queries) * std::size_t(n_probes);
 
-  rmm::device_uvector<float> query_norm_dev(n_queries, stream, search_mr);
+  bool needs_query_norms = index.metric() != cuvs::distance::DistanceType::InnerProduct;
+  rmm::device_uvector<float> query_norm_dev(needs_query_norms ? n_queries : 0, stream, search_mr);
   rmm::device_uvector<float> distance_buffer_dev(n_queries * index.n_lists(), stream, search_mr);
   rmm::device_uvector<float> coarse_distances_dev(n_queries_probes, stream, search_mr);
   rmm::device_uvector<uint32_t> coarse_indices_dev(n_queries_probes, stream, search_mr);
@@ -581,7 +611,7 @@ void search_impl(raft::resources const& handle,
     raft::linalg::map_offset(
       handle,
       distance_buffer_dev_view,
-      [=] __device__(const uint32_t idx, const float dist) {
+      [=] __device__(const int64_t idx, const float dist) {
         const auto query   = idx / n_lists_local;
         const auto cluster = idx % n_lists_local;
         float denom        = q_norm_ptr[query] * center_norm_ptr[cluster];
@@ -616,25 +646,29 @@ void search_impl(raft::resources const& handle,
   // Determine grid_dim_x for the fused path
   uint32_t grid_dim_x = 0;
   if (manage_local_topk) {
-    if (n_probes > 1) {
-      // Query the occupancy to compute optimal grid_dim_x (does not launch)
-      ivf_sq_scan(handle,
-                  index,
-                  converted_queries_ptr,
-                  query_norm_dev.data(),
-                  n_queries,
-                  n_probes,
-                  k,
-                  0,
-                  coarse_indices_dev.data(),
-                  chunk_index.data(),
-                  nullptr,
-                  nullptr,
-                  filter_adapter,
-                  grid_dim_x,
-                  stream);
-    } else {
-      grid_dim_x = 1;
+    // Query the occupancy to compute optimal grid_dim_x (does not launch)
+    ivf_sq_scan(handle,
+                index,
+                converted_queries_ptr,
+                query_norm_dev.data(),
+                n_queries,
+                n_probes,
+                k,
+                0,
+                coarse_indices_dev.data(),
+                chunk_index.data(),
+                nullptr,
+                nullptr,
+                filter_adapter,
+                grid_dim_x,
+                stream);
+    if (grid_dim_x == 0) {
+      manage_local_topk = false;
+      RAFT_LOG_WARN(
+        "IVF-SQ fused top-k kernel has zero occupancy (dim=%u, k=%u); "
+        "falling back to the non-fused scan path.",
+        index.dim(),
+        k);
     }
   }
 
@@ -654,8 +688,8 @@ void search_impl(raft::resources const& handle,
     rmm::device_uvector<float> distances_tmp(0, stream, search_mr);
     rmm::device_uvector<uint32_t> indices_tmp(0, stream, search_mr);
 
-    float* dist_out_ptr    = nullptr;
-    uint32_t* idx_out_ptr  = nullptr;
+    float* dist_out_ptr   = nullptr;
+    uint32_t* idx_out_ptr = nullptr;
 
     if (grid_dim_x > 1) {
       distances_tmp.resize(target_size, stream);
@@ -688,18 +722,18 @@ void search_impl(raft::resources const& handle,
       auto cols = uint32_t(grid_dim_x) * k;
       cuvs::selection::select_k(
         handle,
-        raft::make_device_matrix_view<const float, int64_t>(
-          distances_tmp.data(), n_queries, cols),
-        raft::make_device_matrix_view<const uint32_t, int64_t>(
-          indices_tmp.data(), n_queries, cols),
+        raft::make_device_matrix_view<const float, int64_t>(distances_tmp.data(), n_queries, cols),
+        raft::make_device_matrix_view<const uint32_t, int64_t>(indices_tmp.data(), n_queries, cols),
         raft::make_device_matrix_view<float, int64_t>(distances, n_queries, k),
         raft::make_device_matrix_view<uint32_t, int64_t>(neighbors_uint32_ptr, n_queries, k),
         select_min);
     }
   } else {
     // --- Fallback: materialize all distances ---
-    uint32_t max_samples =
-      std::max<uint32_t>(static_cast<uint32_t>(index.accum_sorted_sizes()(n_probes)), k);
+    int64_t ms = std::max<int64_t>(index.accum_sorted_sizes()(n_probes), k);
+    RAFT_EXPECTS(ms <= int64_t(std::numeric_limits<uint32_t>::max()),
+                 "The maximum sample size is too big.");
+    uint32_t max_samples = static_cast<uint32_t>(ms);
 
     rmm::device_uvector<float> all_distances(
       std::size_t(n_queries) * max_samples, stream, search_mr);
@@ -798,8 +832,10 @@ inline void search_with_filtering(raft::resources const& handle,
 
   uint32_t max_samples = 0;
   if (!manage_local_topk) {
-    max_samples =
-      std::max<uint32_t>(static_cast<uint32_t>(index.accum_sorted_sizes()(n_probes)), k);
+    int64_t ms = std::max<int64_t>(index.accum_sorted_sizes()(n_probes), k);
+    RAFT_EXPECTS(ms <= int64_t(std::numeric_limits<uint32_t>::max()),
+                 "The maximum sample size is too big.");
+    max_samples = static_cast<uint32_t>(ms);
   }
 
   constexpr uint64_t kExpectedWsSize = 1024ull * 1024 * 1024;
@@ -813,7 +849,7 @@ inline void search_with_filtering(raft::resources const& handle,
     // (The scan output is at most grid_dim_x * k per query, which is small)
     // Conservatively assume grid_dim_x <= n_probes for the workspace estimate
     uint64_t fused_out = uint64_t(n_probes) * k;
-    ws_per_query = sizeof(float) * (uint64_t(index.n_lists()) + n_probes + 1 + fused_out +
+    ws_per_query       = sizeof(float) * (uint64_t(index.n_lists()) + n_probes + 1 + fused_out +
                                     converted_query_floats) +
                    sizeof(uint32_t) * (uint64_t(n_probes) * 2 + 1 + fused_out + k);
   } else {
