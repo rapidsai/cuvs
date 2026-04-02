@@ -13,6 +13,7 @@
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/serialize.hpp>
+#include <raft/util/cudart_utils.hpp>
 
 #include "../../../core/nvtx.hpp"
 #include "../dataset_serialize.hpp"
@@ -169,14 +170,13 @@ void serialize_to_hnswlib(
                  static_cast<size_t>(dataset.extent(0)),
                  static_cast<size_t>(dataset.extent(1)));
     host_dataset = raft::make_host_matrix<T, int64_t>(dataset.extent(0), dataset.extent(1));
-    RAFT_CUDA_TRY(cudaMemcpy2DAsync(host_dataset.data_handle(),
-                                    sizeof(T) * host_dataset.extent(1),
-                                    dataset.data_handle(),
-                                    sizeof(T) * dataset.stride(0),
-                                    sizeof(T) * host_dataset.extent(1),
-                                    dataset.extent(0),
-                                    cudaMemcpyDefault,
-                                    raft::resource::get_cuda_stream(res)));
+    raft::copy_matrix(host_dataset.data_handle(),
+                      host_dataset.extent(1),
+                      dataset.data_handle(),
+                      dataset.stride(0),
+                      host_dataset.extent(1),
+                      dataset.extent(0),
+                      raft::resource::get_cuda_stream(res));
     raft::resource::sync_stream(res);
     host_dataset_view = raft::make_const_mdspan(host_dataset.view());
   }

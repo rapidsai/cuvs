@@ -1,7 +1,7 @@
-Distributed ANN
-===============
+Multi-GPU Nearest Neighbors
+===========================
 
-The SNMG (single-node multi-GPUs) ANN API provides a set of functions to deploy ANN indexes on multiple GPUs.
+The Multi-GPU (SNMG - single-node multi-GPUs) nearest neighbors API provides a set of functions to deploy ANN indexes across multiple GPUs for improved performance and scalability.
 
 .. role:: py(code)
    :language: c++
