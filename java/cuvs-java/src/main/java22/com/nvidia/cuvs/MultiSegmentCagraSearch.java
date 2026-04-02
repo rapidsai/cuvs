@@ -16,6 +16,7 @@ import static com.nvidia.cuvs.internal.panama.headers_h_1.cudaStreamWaitEvent;
 
 import com.nvidia.cuvs.internal.BufferedCagraSearch;
 import com.nvidia.cuvs.internal.CuVSParamsHelper;
+import com.nvidia.cuvs.internal.CuVSResourcesImpl;
 import com.nvidia.cuvs.internal.CudaStreamPool;
 import com.nvidia.cuvs.internal.SelectKHelper;
 import java.lang.foreign.Arena;
@@ -97,8 +98,8 @@ public class MultiSegmentCagraSearch {
     long outValBytes = (long) k * Float.BYTES;
 
     // Assign a pool slot to each segment via round-robin.
-    CudaStreamPool pool = CudaStreamPool.getOrCreate();
-    int startSlot = CudaStreamPool.slotCounter.getAndAdd(numSegments);
+    CudaStreamPool pool = CuVSResourcesImpl.getStreamPool(resources);
+    int startSlot = pool.nextSlot(numSegments);
     int[] slots = new int[numSegments];
     for (int i = 0; i < numSegments; i++) {
       slots[i] = Math.floorMod(startSlot + i, pool.size());
@@ -161,13 +162,21 @@ public class MultiSegmentCagraSearch {
             outIdxDP.handle(),
             k);
 
-        checkCuVSError(cuvsStreamSync(cuvsRes), "cuvsStreamSync after selectK");
+        // No stream sync needed here: the D2H copies below are enqueued on the same cuvsStream,
+        // so CUDA stream ordering guarantees selectK completes before the copies begin.
 
         // --- Phase 4: single device-to-host copy for all three arrays ---
+        // Allocate one contiguous host buffer and slice into three typed views.
+        // Layout (in order of decreasing alignment): int64 outIdx | float32 outVal | uint32
+        // ordinals
+        // outIdxBytes is a multiple of Long.BYTES, so each slice is naturally aligned.
         try (var hostArena = Arena.ofConfined()) {
-          MemorySegment hostOutIdx = hostArena.allocate(outIdxBytes);
-          MemorySegment hostOutVal = hostArena.allocate(outValBytes);
-          MemorySegment hostAllOrdinals = hostArena.allocate(neighborsBytes);
+          MemorySegment hostBuf =
+              hostArena.allocate(outIdxBytes + outValBytes + neighborsBytes, Long.BYTES);
+          MemorySegment hostOutIdx = hostBuf.asSlice(0, outIdxBytes);
+          MemorySegment hostOutVal = hostBuf.asSlice(outIdxBytes, outValBytes);
+          MemorySegment hostAllOrdinals =
+              hostBuf.asSlice(outIdxBytes + outValBytes, neighborsBytes);
 
           cudaMemcpyAsync(hostOutIdx, outIdxDP.handle(), outIdxBytes, DEVICE_TO_HOST, cuvsStream);
           cudaMemcpyAsync(hostOutVal, outValDP.handle(), outValBytes, DEVICE_TO_HOST, cuvsStream);

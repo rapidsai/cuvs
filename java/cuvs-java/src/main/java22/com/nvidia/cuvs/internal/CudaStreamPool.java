@@ -21,21 +21,20 @@ import static com.nvidia.cuvs.internal.panama.headers_h_1.cudaStream_t;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A fixed-size pool of CUDA streams used by {@link com.nvidia.cuvs.MultiSegmentCagraSearch}
  * to run per-segment CAGRA searches in parallel.
  *
  * <p>Each pool slot owns one {@code cuvsResources_t} handle backed by a dedicated non-blocking
- * CUDA stream. Callers assign segments to slots via round-robin using {@link #slotCounter}; the
+ * CUDA stream. Callers assign segments to slots via round-robin using {@link #nextSlot}; the
  * GPU executes searches on different slots concurrently, then synchronizes via CUDA events before
  * the global {@code cuvsSelectK} call.
  *
  * <h3>Lifecycle</h3>
- * <p>The pool is a lazily-initialized static singleton. Call {@link #getOrCreate()} to obtain it
- * on first use and {@link #closeInstance()} from {@code CuVSResourcesImpl.close()} to release
- * all CUDA resources at application shutdown.
+ * <p>One pool is owned by each {@code CuVSResourcesImpl} instance and closed when that instance
+ * is closed. This gives each thread its own independent set of streams and events, eliminating
+ * races when multiple threads perform concurrent multi-segment searches.
  *
  * <h3>Configuration</h3>
  * <p>Pool size defaults to {@value #DEFAULT_SIZE} and can be overridden via the system property
@@ -49,17 +48,15 @@ public final class CudaStreamPool implements AutoCloseable {
   /** System property name for overriding the pool size. */
   public static final String SIZE_PROPERTY = "com.nvidia.cuvs.streamPoolSize";
 
-  /** Round-robin counter shared across all {@code search()} calls. */
-  public static final AtomicInteger slotCounter = new AtomicInteger();
-
-  private static volatile CudaStreamPool instance;
+  /** Round-robin counter; advanced by {@link #nextSlot(int)} on each search call. */
+  private int slotCounter;
 
   private final long[] resources; // cuvsResources_t handles
   private final MemorySegment[] streams; // cudaStream_t handle values
   private final MemorySegment[] events; // pre-allocated cudaEvent_t handles, one per slot
   private final int size;
 
-  private CudaStreamPool(int size) {
+  CudaStreamPool(int size) {
     this.size = size;
     this.resources = new long[size];
     this.streams = new MemorySegment[size];
@@ -88,41 +85,6 @@ public final class CudaStreamPool implements AutoCloseable {
   }
 
   // -------------------------------------------------------------------------
-  // Static singleton API
-  // -------------------------------------------------------------------------
-
-  /**
-   * Returns the singleton pool, creating it on first call.
-   */
-  public static CudaStreamPool getOrCreate() {
-    CudaStreamPool pool = instance;
-    if (pool == null) {
-      synchronized (CudaStreamPool.class) {
-        pool = instance;
-        if (pool == null) {
-          int size = Integer.getInteger(SIZE_PROPERTY, DEFAULT_SIZE);
-          instance = pool = new CudaStreamPool(size);
-        }
-      }
-    }
-    return pool;
-  }
-
-  /**
-   * Closes and nulls the singleton pool. Called from {@code CuVSResourcesImpl.close()}.
-   */
-  public static void closeInstance() {
-    CudaStreamPool pool;
-    synchronized (CudaStreamPool.class) {
-      pool = instance;
-      instance = null;
-    }
-    if (pool != null) {
-      pool.close();
-    }
-  }
-
-  // -------------------------------------------------------------------------
   // Per-slot accessors
   // -------------------------------------------------------------------------
 
@@ -144,6 +106,16 @@ public final class CudaStreamPool implements AutoCloseable {
   /** Returns the number of slots in this pool. */
   public int size() {
     return size;
+  }
+
+  /**
+   * Advances the round-robin counter by {@code count} and returns the starting slot index for
+   * this call. Slot indices are wrapped modulo {@link #size()}.
+   */
+  public int nextSlot(int count) {
+    int start = slotCounter;
+    slotCounter += count;
+    return start;
   }
 
   // -------------------------------------------------------------------------
