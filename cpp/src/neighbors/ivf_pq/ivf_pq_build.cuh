@@ -1330,6 +1330,14 @@ auto build(raft::resources const& handle,
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
     kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>((int)impl->metric());
+    kmeans_params.inner_product_cosine_assignment =
+      (impl->metric() == distance::DistanceType::InnerProduct);
+    if (kmeans_params.inner_product_cosine_assignment) {
+      RAFT_LOG_INFO(
+        "IVF-PQ build: balanced k-means inner_product_cosine_assignment=true (cosine-style E-step "
+        "for "
+        "InnerProduct)");
+    }
 
     if (impl->metric() == distance::DistanceType::CosineExpanded) {
       raft::linalg::row_normalize<raft::linalg::L2Norm>(

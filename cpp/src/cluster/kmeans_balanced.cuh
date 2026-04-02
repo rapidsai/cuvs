@@ -7,6 +7,7 @@
 
 #include "../neighbors/detail/ann_utils.cuh"
 #include "detail/kmeans_balanced.cuh"
+#include <raft/core/logger.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/util/cuda_utils.cuh>
@@ -144,6 +145,14 @@ void predict(const raft::resources& handle,
   RAFT_EXPECTS(static_cast<uint64_t>(centroids.extent(0)) <=
                  static_cast<uint64_t>(std::numeric_limits<LabelT>::max()),
                "The chosen label type cannot represent all cluster labels");
+
+  if (params.metric == cuvs::distance::DistanceType::InnerProduct &&
+      params.inner_product_cosine_assignment) {
+    RAFT_LOG_INFO(
+      "kmeans_balanced predict: InnerProduct + inner_product_cosine_assignment (minibatched "
+      "predict -> "
+      "fused cosine NN in predict_core)");
+  }
 
   cuvs::cluster::kmeans::detail::predict(handle,
                                          params,
