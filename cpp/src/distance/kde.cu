@@ -575,14 +575,18 @@ void kde(raft::resources const& handle,
       constexpr auto K = decltype(kernel_tag)::value;
 
       // Adapt CELL_TILE to keep accumulator register pressure under ~128 regs.
+      // LpUnexpanded uses pow() which decomposes to exp2+log2 with no HW
+      // intrinsic — cap its tile at 32 to avoid cudaErrorLaunchOutOfResources
+      // across all architectures (V100–Blackwell).
       constexpr int N_ACC     = DistOp<T, M>::N_ACC;
       constexpr int ACC_REGS  = sizeof(T) / 4;
       constexpr int RAW_TILE  = 128 / (N_ACC * ACC_REGS);
-      constexpr int CELL_TILE = RAW_TILE >= 64   ? 64
-                                : RAW_TILE >= 32 ? 32
-                                : RAW_TILE >= 16 ? 16
-                                : RAW_TILE >= 8  ? 8
-                                                 : 4;
+      constexpr int MAX_TILE  = (M == cuvs::distance::DistanceType::LpUnexpanded) ? 32 : 64;
+      constexpr int CELL_TILE = RAW_TILE >= MAX_TILE ? MAX_TILE
+                                : RAW_TILE >= 32     ? 32
+                                : RAW_TILE >= 16     ? 16
+                                : RAW_TILE >= 8      ? 8
+                                                     : 4;
 
       size_t smem_bytes = feat_tile * CELL_TILE * sizeof(T);
 
