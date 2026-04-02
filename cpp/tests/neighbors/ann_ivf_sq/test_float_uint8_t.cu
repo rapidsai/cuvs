@@ -18,4 +18,13 @@ TEST_P(AnnIVFSQTestF_float, AnnIVFSQ)
 
 INSTANTIATE_TEST_CASE_P(AnnIVFSQTest, AnnIVFSQTestF_float, ::testing::ValuesIn(inputs));
 
+typedef AnnIVFSQTest<float, half, int64_t> AnnIVFSQTestF_half;
+TEST_P(AnnIVFSQTestF_half, AnnIVFSQ)
+{
+  this->testIVFSQ();
+  this->testFilter();
+}
+
+INSTANTIATE_TEST_CASE_P(AnnIVFSQTest, AnnIVFSQTestF_half, ::testing::ValuesIn(inputs_half));
+
 }  // namespace cuvs::neighbors::ivf_sq

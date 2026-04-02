@@ -16,6 +16,8 @@
 #include <raft/core/resource/cuda_stream_pool.hpp>
 #include <rmm/cuda_stream_pool.hpp>
 
+#include <numeric>
+
 namespace cuvs::neighbors::ivf_sq {
 
 struct test_ivf_sample_filter {
@@ -31,6 +33,7 @@ struct AnnIvfSqInputs {
   IdxT nprobe;
   IdxT nlist;
   cuvs::distance::DistanceType metric;
+  bool host_dataset = false;
 };
 
 template <typename IdxT>
@@ -39,7 +42,7 @@ template <typename IdxT>
   os << "{ " << p.num_queries << ", " << p.num_db_vecs << ", " << p.dim << ", " << p.k << ", "
      << p.nprobe << ", " << p.nlist << ", "
      << cuvs::neighbors::print_metric{static_cast<cuvs::distance::DistanceType>((int)p.metric)}
-     << '}' << std::endl;
+     << ", " << (p.host_dataset ? "host" : "device") << '}' << std::endl;
   return os;
 }
 
@@ -97,32 +100,60 @@ class AnnIVFSQTest : public ::testing::TestWithParam<AnnIvfSqInputs<IdxT>> {
         index_params.add_data_on_build        = true;
         index_params.kmeans_trainset_fraction = 0.5;
 
-        auto database_view = raft::make_device_matrix_view<const DataT, IdxT>(
-          (const DataT*)database.data(), ps.num_db_vecs, ps.dim);
-
-        auto idx = cuvs::neighbors::ivf_sq::build(handle_, index_params, database_view);
-
-        // Test extend: build without data, then extend
         cuvs::neighbors::ivf_sq::index_params index_params_no_add;
         index_params_no_add.n_lists                  = ps.nlist;
         index_params_no_add.metric                   = ps.metric;
         index_params_no_add.add_data_on_build        = false;
         index_params_no_add.kmeans_trainset_fraction = 0.5;
 
-        auto idx_empty =
-          cuvs::neighbors::ivf_sq::build(handle_, index_params_no_add, database_view);
+        cuvs::neighbors::ivf_sq::index<uint8_t> idx(handle_);
+        cuvs::neighbors::ivf_sq::index<uint8_t> idx_empty(handle_);
 
-        auto vector_indices = raft::make_device_vector<IdxT, IdxT>(handle_, ps.num_db_vecs);
-        raft::linalg::map_offset(handle_, vector_indices.view(), raft::identity_op{});
-        raft::resource::sync_stream(handle_);
+        if (!ps.host_dataset) {
+          auto database_view = raft::make_device_matrix_view<const DataT, IdxT>(
+            (const DataT*)database.data(), ps.num_db_vecs, ps.dim);
 
-        auto indices_view = raft::make_device_vector_view<const IdxT, IdxT>(
-          vector_indices.data_handle(), ps.num_db_vecs);
-        cuvs::neighbors::ivf_sq::extend(
-          handle_,
-          database_view,
-          std::make_optional<raft::device_vector_view<const IdxT, IdxT>>(indices_view),
-          &idx_empty);
+          idx = cuvs::neighbors::ivf_sq::build(handle_, index_params, database_view);
+
+          idx_empty = cuvs::neighbors::ivf_sq::build(handle_, index_params_no_add, database_view);
+
+          auto vector_indices = raft::make_device_vector<IdxT, IdxT>(handle_, ps.num_db_vecs);
+          raft::linalg::map_offset(handle_, vector_indices.view(), raft::identity_op{});
+          raft::resource::sync_stream(handle_);
+
+          auto indices_view = raft::make_device_vector_view<const IdxT, IdxT>(
+            vector_indices.data_handle(), ps.num_db_vecs);
+          cuvs::neighbors::ivf_sq::extend(
+            handle_,
+            database_view,
+            std::make_optional<raft::device_vector_view<const IdxT, IdxT>>(indices_view),
+            &idx_empty);
+        } else {
+          auto host_database = raft::make_host_matrix<DataT, IdxT>(ps.num_db_vecs, ps.dim);
+          raft::copy(
+            host_database.data_handle(), database.data(), ps.num_db_vecs * ps.dim, stream_);
+          raft::resource::sync_stream(handle_);
+
+          idx = cuvs::neighbors::ivf_sq::build(
+            handle_, index_params, raft::make_const_mdspan(host_database.view()));
+
+          idx_empty = cuvs::neighbors::ivf_sq::build(
+            handle_, index_params_no_add, raft::make_const_mdspan(host_database.view()));
+
+          auto vector_indices = raft::make_host_vector<IdxT>(handle_, ps.num_db_vecs);
+          std::iota(
+            vector_indices.data_handle(), vector_indices.data_handle() + ps.num_db_vecs, IdxT(0));
+
+          auto indices_view = raft::make_host_vector_view<const IdxT, IdxT>(
+            vector_indices.data_handle(), ps.num_db_vecs);
+          auto host_database_view = raft::make_host_matrix_view<const DataT, IdxT>(
+            host_database.data_handle(), ps.num_db_vecs, ps.dim);
+          cuvs::neighbors::ivf_sq::extend(
+            handle_,
+            host_database_view,
+            std::make_optional<raft::host_vector_view<const IdxT, IdxT>>(indices_view),
+            &idx_empty);
+        }
 
         // Serialize / deserialize round-trip
         tmp_index_file index_file;
@@ -430,6 +461,49 @@ const std::vector<AnnIvfSqInputs<int64_t>> inputs = {
   // ===== Recall-stability: same data, different query counts =====
   {20000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::L2Expanded},
   {50000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::L2Expanded},
+
+  // ===== Host dataset: build + extend from host_matrix_view =====
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct, true},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, true},
+  {1000, 10000, 3, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
+  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
+  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
+  {100, 10000, 64, 10, 20, 512, cuvs::distance::DistanceType::InnerProduct, true},
+};
+
+const std::vector<AnnIvfSqInputs<int64_t>> inputs_half = {
+  // num_queries, num_db_vecs, dim, k, nprobe, nlist, metric, host_dataset
+
+  // All four metrics at a standard dimension
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded},
+
+  // Unaligned and small dimensions
+  {1000, 10000, 3, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 7, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+
+  // Medium / larger dimensions
+  {1000, 10000, 64, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct},
+  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded},
+  {1000, 10000, 256, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+
+  // k edge cases
+  {1000, 10000, 16, 1, 40, 1024, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 50, 100, 1024, cuvs::distance::DistanceType::L2Expanded},
+
+  // nprobe / nlist edge cases
+  {1000, 10000, 16, 10, 64, 64, cuvs::distance::DistanceType::L2Expanded},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::CosineExpanded},
+
+  // Host dataset
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
+  {1000, 10000, 128, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct, true},
 };
 
 }  // namespace cuvs::neighbors::ivf_sq

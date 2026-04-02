@@ -17,6 +17,7 @@
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/mdarray.hpp>
+#include <raft/core/mdspan.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/cuda_stream_pool.hpp>
@@ -412,14 +413,16 @@ auto extend(raft::resources const& handle,
   return ext_index;
 }
 
-template <typename T, typename IdxT>
-inline auto build(raft::resources const& handle,
-                  const index_params& params,
-                  const T* dataset,
-                  int64_t n_rows,
-                  uint32_t dim) -> index<IdxT>
+template <typename T, typename IdxT, typename accessor>
+inline auto build(
+  raft::resources const& handle,
+  const index_params& params,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, accessor> dataset)
+  -> index<IdxT>
 {
-  auto stream = raft::resource::get_cuda_stream(handle);
+  int64_t n_rows = dataset.extent(0);
+  uint32_t dim   = dataset.extent(1);
+  auto stream    = raft::resource::get_cuda_stream(handle);
   cuvs::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_sq::build(%zu, %u)", size_t(n_rows), dim);
   static_assert(std::is_same_v<T, float> || std::is_same_v<T, half>, "unsupported data type");
@@ -441,8 +444,7 @@ inline auto build(raft::resources const& handle,
       raft::make_device_mdarray<T>(handle,
                                    raft::resource::get_large_workspace_resource(handle),
                                    raft::make_extents<int64_t>(n_rows_train, idx.dim()));
-    auto dataset_view = raft::make_device_matrix_view<const T, int64_t>(dataset, n_rows, idx.dim());
-    raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset_view, trainset.view());
+    raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset.view());
     auto trainset_const_view = raft::make_const_mdspan(trainset.view());
     auto centers_view        = raft::make_device_matrix_view<float, int64_t>(
       idx.centers().data_handle(), idx.n_lists(), idx.dim());
@@ -499,29 +501,11 @@ inline auto build(raft::resources const& handle,
     }
   }
 
-  if (params.add_data_on_build) { detail::extend<T, IdxT>(handle, &idx, dataset, nullptr, n_rows); }
+  if (params.add_data_on_build) {
+    detail::extend<T, IdxT>(handle, &idx, dataset.data_handle(), nullptr, n_rows);
+  }
 
   return idx;
-}
-
-template <typename T, typename IdxT>
-auto build(raft::resources const& handle,
-           const index_params& params,
-           raft::device_matrix_view<const T, int64_t, raft::row_major> dataset) -> index<IdxT>
-{
-  int64_t n_rows = dataset.extent(0);
-  uint32_t dim   = dataset.extent(1);
-  return build<T, IdxT>(handle, params, dataset.data_handle(), n_rows, dim);
-}
-
-template <typename T, typename IdxT>
-auto build(raft::resources const& handle,
-           const index_params& params,
-           raft::host_matrix_view<const T, int64_t, raft::row_major> dataset) -> index<IdxT>
-{
-  int64_t n_rows = dataset.extent(0);
-  uint32_t dim   = dataset.extent(1);
-  return build<T, IdxT>(handle, params, dataset.data_handle(), n_rows, dim);
 }
 
 template <typename T, typename IdxT>
