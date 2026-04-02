@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -12,30 +14,52 @@
 
 #include <nvJitLink.h>
 
-struct FragmentEntry {
-  FragmentEntry(std::string const& key);
+#include "nvjitlink_checker.hpp"
 
-  bool operator==(const FragmentEntry& rhs) const { return compute_key == rhs.compute_key; }
+struct FragmentEntry {
+  virtual ~FragmentEntry() = default;
 
   virtual bool add_to(nvJitLinkHandle& handle) const = 0;
 
-  std::string compute_key{};
+  virtual const char* get_key() const = 0;
 };
 
-struct FatbinFragmentEntry final : FragmentEntry {
-  FatbinFragmentEntry(std::string const& key, unsigned char const* view, std::size_t size);
+struct FatbinFragmentEntry : FragmentEntry {
+  virtual const uint8_t* get_data() const = 0;
 
-  virtual bool add_to(nvJitLinkHandle& handle) const;
+  virtual size_t get_length() const = 0;
 
-  std::size_t data_size          = 0;
-  unsigned char const* data_view = nullptr;
+  bool add_to(nvJitLinkHandle& handle) const override final;
 };
 
-struct NVRTCFragmentEntry final : FragmentEntry {
-  NVRTCFragmentEntry(std::string const& key, std::unique_ptr<char[]>&& program, std::size_t size);
+template <typename FragmentTag>
+struct StaticFatbinFragmentEntry final : FatbinFragmentEntry {
+  const uint8_t* get_data() const override { return StaticFatbinFragmentEntry<FragmentTag>::data; }
 
-  virtual bool add_to(nvJitLinkHandle& handle) const;
+  size_t get_length() const override { return StaticFatbinFragmentEntry<FragmentTag>::length; }
 
-  std::size_t data_size = 0;
-  std::unique_ptr<char[]> program{};
+  const char* get_key() const override
+  {
+    return typeid(StaticFatbinFragmentEntry<FragmentTag>).name();
+  }
+
+  static const uint8_t* const data;
+  static const size_t length;
+};
+
+struct UDFFatbinFragment final : FatbinFragmentEntry {
+  UDFFatbinFragment(std::string key, std::vector<uint8_t> bytes)
+    : key_(std::move(key)), bytes_(std::move(bytes))
+  {
+  }
+
+  const uint8_t* get_data() const override { return bytes_.data(); }
+
+  size_t get_length() const override { return bytes_.size(); }
+
+  const char* get_key() const override { return key_.c_str(); }
+
+ private:
+  std::string key_;
+  std::vector<uint8_t> bytes_;
 };

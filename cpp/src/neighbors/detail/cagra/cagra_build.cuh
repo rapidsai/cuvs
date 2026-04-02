@@ -5,7 +5,7 @@
 #pragma once
 
 #include "../../../core/nvtx.hpp"
-#include "../../vpq_dataset.cuh"
+#include "../../../preprocessing/quantize/vpq_build-ext.cuh"
 #include "graph_core.cuh"
 
 #include <raft/core/copy.cuh>
@@ -2080,7 +2080,7 @@ auto iterative_build_graph(
       curr_itopk_size = curr_topk + 32;
     }
 
-    RAFT_LOG_INFO(
+    RAFT_LOG_DEBUG(
       "# graph_size = %lu (%.3lf), graph_degree = %lu, query_size = %lu, itopk = %lu, topk = %lu",
       (uint64_t)cagra_graph.extent(0),
       (double)cagra_graph.extent(0) / final_graph_size,
@@ -2146,7 +2146,7 @@ auto iterative_build_graph(
 
     auto end        = std::chrono::high_resolution_clock::now();
     auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    RAFT_LOG_INFO("# elapsed time: %.3lf sec", (double)elapsed_ms / 1000);
+    RAFT_LOG_DEBUG("# elapsed time: %.3lf sec", (double)elapsed_ms / 1000);
 
     if (flag_last) { break; }
     flag_last       = (curr_graph_size == final_graph_size);
@@ -2279,8 +2279,7 @@ index<T, IdxT> build(
     idx.update_dataset(
       res,
       // TODO: hardcoding codebook math to `half`, we can do runtime dispatching later
-      cuvs::neighbors::vpq_build<decltype(dataset), half, int64_t>(
-        res, *params.compression, dataset));
+      cuvs::preprocessing::quantize::pq::vpq_build(res, *params.compression, dataset));
 
     return idx;
   }

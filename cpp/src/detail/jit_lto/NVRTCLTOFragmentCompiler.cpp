@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <cuvs/detail/jit_lto/FragmentDatabase.hpp>
 #include <cuvs/detail/jit_lto/NVRTCLTOFragmentCompiler.hpp>
 
 #include <raft/core/error.hpp>
@@ -44,10 +43,12 @@ NVRTCLTOFragmentCompiler::NVRTCLTOFragmentCompiler()
   this->standard_compile_opts[i++] = std::string{"--extra-device-vectorization"};
 }
 
-void NVRTCLTOFragmentCompiler::compile(std::string const& key, std::string const& code) const
+std::unique_ptr<UDFFatbinFragment> NVRTCLTOFragmentCompiler::compile(std::string const& key,
+                                                                     std::string const& code)
 {
-  // Check if this fragment is already cached - avoid expensive NVRTC compilation
-  if (fragment_database().has_fragment(key)) { return; }
+  if (auto it = cache.find(key); it != cache.end()) {
+    return std::make_unique<UDFFatbinFragment>(key, it->second);
+  }
 
   nvrtcProgram prog;
   NVRTC_SAFE_CALL(
@@ -77,12 +78,13 @@ void NVRTCLTOFragmentCompiler::compile(std::string const& key, std::string const
   std::size_t ltoIRSize;
   NVRTC_SAFE_CALL(nvrtcGetLTOIRSize(prog, &ltoIRSize));
 
-  std::unique_ptr<char[]> program = std::make_unique<char[]>(ltoIRSize);
-  nvrtcGetLTOIR(prog, program.get());
+  std::vector<uint8_t> lto_ir(ltoIRSize);
+  NVRTC_SAFE_CALL(nvrtcGetLTOIR(prog, reinterpret_cast<char*>(lto_ir.data())));
 
   NVRTC_SAFE_CALL(nvrtcDestroyProgram(&prog));
 
-  registerNVRTCFragment(key, std::move(program), ltoIRSize);
+  cache[key] = std::move(lto_ir);
+  return std::make_unique<UDFFatbinFragment>(key, cache[key]);
 }
 
 NVRTCLTOFragmentCompiler& nvrtc_compiler()

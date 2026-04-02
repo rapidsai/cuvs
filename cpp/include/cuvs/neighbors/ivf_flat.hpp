@@ -246,7 +246,7 @@ struct index : cuvs::neighbors::index {
   raft::device_vector_view<IdxT* const, uint32_t> inds_ptrs() const noexcept;
 
   /**
-   * Whether to use convervative memory allocation when extending the list (cluster) data
+   * Whether to use conservative memory allocation when extending the list (cluster) data
    * (see index_params.conservative_memory_allocation).
    */
   bool conservative_memory_allocation() const noexcept;

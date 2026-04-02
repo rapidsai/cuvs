@@ -5,15 +5,20 @@
 
 #pragma once
 
+#include <cuvs/detail/jit_lto/FragmentEntry.hpp>
+
+#include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 struct NVRTCLTOFragmentCompiler {
   NVRTCLTOFragmentCompiler();
 
-  void compile(std::string const& key, std::string const& code) const;
-
   std::vector<std::string> standard_compile_opts;
+  std::unordered_map<std::string, std::vector<uint8_t>> cache;
+
+  std::unique_ptr<UDFFatbinFragment> compile(std::string const& key, std::string const& code);
 };
 
 NVRTCLTOFragmentCompiler& nvrtc_compiler();
