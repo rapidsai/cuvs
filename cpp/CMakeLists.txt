@@ -485,6 +485,55 @@ if(NOT BUILD_CPU_ONLY)
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_inst/pairwise_matrix"
   )
   generate_inst_matrix(
+    cagra_build_inst_files
+    NAME_FORMAT "cagra_build_data_@data_abbrev@_index_@index_abbrev@"
+    MATRIX_JSON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/cagra_build_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/cagra_build_inst.cu.in"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_inst/cagra_build"
+  )
+  generate_inst_matrix(
+    cagra_extend_inst_files
+    NAME_FORMAT "cagra_extend_data_@data_abbrev@_index_@index_abbrev@"
+    MATRIX_JSON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/cagra_extend_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/cagra_extend_inst.cu.in"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_inst/cagra_extend"
+  )
+  generate_inst_matrix(
+    cagra_serialize_inst_files
+    NAME_FORMAT "cagra_serialize_data_@data_abbrev@"
+    MATRIX_JSON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/cagra_serialize_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/cagra_serialize_inst.cu.in"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_inst/cagra_serialize"
+  )
+  generate_inst_matrix(
+    cagra_merge_inst_files
+    NAME_FORMAT "cagra_merge_data_@data_abbrev@_index_@index_abbrev@"
+    MATRIX_JSON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/cagra_merge_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/cagra_merge_inst.cu.in"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_inst/cagra_merge"
+  )
+  generate_inst_matrix(
+    iface_cagra_inst_files
+    NAME_FORMAT "iface_cagra_data_@data_abbrev@_index_@index_abbrev@"
+    MATRIX_JSON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/iface/iface_cagra_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/iface/iface_cagra_inst.cu.in"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_inst/iface_cagra"
+  )
+  generate_inst_matrix(
+    iface_flat_inst_files
+    NAME_FORMAT "iface_flat_data_@data_abbrev@_index_@index_abbrev@"
+    MATRIX_JSON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/iface/iface_flat_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/iface/iface_flat_inst.cu.in"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_inst/iface_flat"
+  )
+  generate_inst_matrix(
+    iface_pq_inst_files
+    NAME_FORMAT "iface_pq_data_@data_abbrev@_index_@index_abbrev@"
+    MATRIX_JSON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/iface/iface_pq_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/iface/iface_pq_inst.cu.in"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_inst/iface_pq"
+  )
+  generate_inst_matrix(
     ivf_flat_interleaved_scan_inst_files
     NAME_FORMAT
       "ivf_flat_interleaved_scan_data_@data_abbrev@_index_@index_abbrev@_filter_@filter_name@"
@@ -552,35 +601,14 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/brute_force.cu
     src/neighbors/brute_force_serialize.cu
     src/neighbors/cagra.cpp
-    src/neighbors/cagra_build_float.cu
-    src/neighbors/cagra_build_half.cu
-    src/neighbors/cagra_build_int8.cu
-    src/neighbors/cagra_build_uint8.cu
-    src/neighbors/cagra_extend_float.cu
-    src/neighbors/cagra_extend_half.cu
-    src/neighbors/cagra_extend_int8.cu
-    src/neighbors/cagra_extend_uint8.cu
+    ${cagra_build_inst_files}
+    ${cagra_extend_inst_files}
     src/neighbors/cagra_optimize.cu
-    src/neighbors/cagra_serialize_float.cu
-    src/neighbors/cagra_serialize_half.cu
-    src/neighbors/cagra_serialize_int8.cu
-    src/neighbors/cagra_serialize_uint8.cu
-    src/neighbors/cagra_merge_float.cu
-    src/neighbors/cagra_merge_half.cu
-    src/neighbors/cagra_merge_int8.cu
-    src/neighbors/cagra_merge_uint8.cu
-    src/neighbors/iface/iface_cagra_float_uint32_t.cu
-    src/neighbors/iface/iface_cagra_half_uint32_t.cu
-    src/neighbors/iface/iface_cagra_int8_t_uint32_t.cu
-    src/neighbors/iface/iface_cagra_uint8_t_uint32_t.cu
-    src/neighbors/iface/iface_flat_float_int64_t.cu
-    src/neighbors/iface/iface_flat_half_int64_t.cu
-    src/neighbors/iface/iface_flat_int8_t_int64_t.cu
-    src/neighbors/iface/iface_flat_uint8_t_int64_t.cu
-    src/neighbors/iface/iface_pq_float_int64_t.cu
-    src/neighbors/iface/iface_pq_half_int64_t.cu
-    src/neighbors/iface/iface_pq_int8_t_int64_t.cu
-    src/neighbors/iface/iface_pq_uint8_t_int64_t.cu
+    ${cagra_serialize_inst_files}
+    ${cagra_merge_inst_files}
+    ${iface_cagra_inst_files}
+    ${iface_flat_inst_files}
+    ${iface_pq_inst_files}
     src/neighbors/detail/cagra/topk_for_cagra/topk.cu
     src/neighbors/dynamic_batching.cu
     src/neighbors/composite/index.cu

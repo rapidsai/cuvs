@@ -3,12 +3,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "cagra_serialize.cuh"
+#include <neighbors/cagra_serialize.cuh>
 
-#include <cuda_fp16.h>
+namespace {
+
+using data_t = @data_type@;
+
+}
 
 namespace cuvs::neighbors::cagra {
 
-CUVS_INST_CAGRA_SERIALIZE(half);
+CUVS_INST_CAGRA_SERIALIZE(data_t);
 
 }  // namespace cuvs::neighbors::cagra
