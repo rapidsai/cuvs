@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -30,11 +30,10 @@ enum class bit_threshold { zero, mean, sampling_median };
  * @brief quantizer parameters.
  */
 struct params {
+  /** Threshold method for binarization. */
   bit_threshold threshold = bit_threshold::mean;
 
-  /*
-   * specifies the sampling ratio
-   */
+  /** Specifies the sampling ratio. */
   float sampling_ratio = 0.1;
 };
 
@@ -48,8 +47,10 @@ struct params {
  */
 template <typename T>
 struct quantizer {
+  /** Threshold vector used for binarization. */
   raft::device_vector<T, int64_t> threshold;
 
+  /** @brief Construct a quantizer with an empty threshold vector. */
   quantizer(raft::resources const& res) : threshold(raft::make_device_vector<T, int64_t>(res, 0)) {}
 };
 
