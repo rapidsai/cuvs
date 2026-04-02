@@ -54,8 +54,11 @@ function(generate_inst_matrix source_list_var)
   foreach(i RANGE "${last}")
     string(JSON matrix_json_entry GET "${matrix_product}" "${i}")
     process_inst_matrix_entry(
-      "${source_list_var}" NAME_FORMAT "${_GIM_NAME_FORMAT}" INPUT_FILE "${_GIM_INPUT_FILE}"
-      OUTPUT_DIRECTORY "${_GIM_OUTPUT_DIRECTORY}" MATRIX_JSON_ENTRY "${matrix_json_entry}"
+      "${source_list_var}"
+      NAME_FORMAT "${_GIM_NAME_FORMAT}"
+      INPUT_FILE "${_GIM_INPUT_FILE}"
+      OUTPUT_DIRECTORY "${_GIM_OUTPUT_DIRECTORY}"
+      MATRIX_JSON_ENTRY "${matrix_json_entry}"
     )
   endforeach()
 

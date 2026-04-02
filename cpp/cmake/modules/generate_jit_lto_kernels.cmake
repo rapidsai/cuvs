@@ -105,18 +105,12 @@ function(generate_jit_lto_kernels source_list_var)
     string(JSON matrix_json_entry GET "${matrix_product}" "${i}")
     process_jit_lto_matrix_entry(
       "${source_list_var}"
-      NAME_FORMAT
-      "${_JIT_LTO_NAME_FORMAT}"
-      KERNEL_INPUT_FILE
-      "${_JIT_LTO_KERNEL_INPUT_FILE}"
-      EMBEDDED_INPUT_FILE
-      "${_JIT_LTO_EMBEDDED_INPUT_FILE}"
-      OUTPUT_DIRECTORY
-      "${_JIT_LTO_OUTPUT_DIRECTORY}"
-      MATRIX_JSON_ENTRY
-      "${matrix_json_entry}"
-      KERNEL_LINK_LIBRARIES
-      ${_JIT_LTO_KERNEL_LINK_LIBRARIES}
+      NAME_FORMAT "${_JIT_LTO_NAME_FORMAT}"
+      KERNEL_INPUT_FILE "${_JIT_LTO_KERNEL_INPUT_FILE}"
+      EMBEDDED_INPUT_FILE "${_JIT_LTO_EMBEDDED_INPUT_FILE}"
+      OUTPUT_DIRECTORY "${_JIT_LTO_OUTPUT_DIRECTORY}"
+      MATRIX_JSON_ENTRY "${matrix_json_entry}"
+      KERNEL_LINK_LIBRARIES ${_JIT_LTO_KERNEL_LINK_LIBRARIES}
     )
   endforeach()
 
