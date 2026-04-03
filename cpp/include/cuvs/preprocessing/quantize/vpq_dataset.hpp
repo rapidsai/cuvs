@@ -9,10 +9,6 @@
 
 namespace cuvs::preprocessing::quantize::pq {
 
-// ============================================================================
-// vpq_codebooks — VQ + PQ codebook storage (owning or view)
-// ============================================================================
-
 /**
  * @brief Abstract interface for VPQ codebook access.
  *
@@ -25,20 +21,43 @@ class vpq_codebooks_iface {
 
   virtual ~vpq_codebooks_iface() = default;
 
-  /** Get view of VQ codebook [vq_n_centers, dim]. */
+  /** VQ codebook [vq_n_centers, dim]. */
   [[nodiscard]] virtual auto vq_code_book() const noexcept
     -> raft::device_matrix_view<const math_type, uint32_t, raft::row_major> = 0;
 
-  /** Get view of PQ codebook [pq_n_centers (× pq_dim for subspaces), pq_len]. */
+  /** PQ codebook [pq_n_centers (× pq_dim for subspaces), pq_len]. */
   [[nodiscard]] virtual auto pq_code_book() const noexcept
     -> raft::device_matrix_view<const math_type, uint32_t, raft::row_major> = 0;
 
-  [[nodiscard]] virtual auto dim() const noexcept -> uint32_t          = 0;
-  [[nodiscard]] virtual auto vq_n_centers() const noexcept -> uint32_t = 0;
-  [[nodiscard]] virtual auto pq_bits() const noexcept -> uint32_t      = 0;
-  [[nodiscard]] virtual auto pq_dim() const noexcept -> uint32_t       = 0;
-  [[nodiscard]] virtual auto pq_len() const noexcept -> uint32_t       = 0;
-  [[nodiscard]] virtual auto pq_n_centers() const noexcept -> uint32_t = 0;
+  // ── Derived properties (default implementations) ─────────────────────────
+  [[nodiscard]] virtual auto dim() const noexcept -> uint32_t { return vq_code_book().extent(1); }
+  [[nodiscard]] virtual auto vq_n_centers() const noexcept -> uint32_t
+  {
+    return vq_code_book().extent(0);
+  }
+  [[nodiscard]] virtual auto pq_len() const noexcept -> uint32_t
+  {
+    return pq_code_book().extent(1);
+  }
+  [[nodiscard]] virtual auto pq_n_centers() const noexcept -> uint32_t
+  {
+    return pq_code_book().extent(0);
+  }
+  [[nodiscard]] virtual auto pq_bits() const noexcept -> uint32_t
+  {
+    auto w        = pq_n_centers();
+    uint32_t bits = 0;
+    while (w > 1) {
+      bits++;
+      w >>= 1;
+    }
+    return bits;
+  }
+  [[nodiscard]] virtual auto pq_dim() const noexcept -> uint32_t
+  {
+    auto l = pq_len();
+    return l > 0 ? (dim() + l - 1) / l : 0;
+  }
 };
 
 /**
@@ -61,7 +80,6 @@ class vpq_codebooks {
 
   vpq_codebooks() = default;
 
-  /** Construct from an implementation. */
   explicit vpq_codebooks(std::unique_ptr<vpq_codebooks_iface<MathT>> impl) : impl_{std::move(impl)}
   {
   }
@@ -91,16 +109,9 @@ class vpq_codebooks {
   [[nodiscard]] auto pq_len() const noexcept -> uint32_t { return impl_->pq_len(); }
   [[nodiscard]] auto pq_n_centers() const noexcept -> uint32_t { return impl_->pq_n_centers(); }
 
-  /** Check whether this object has been initialised. */
-  [[nodiscard]] explicit operator bool() const noexcept { return impl_ != nullptr; }
-
  private:
   std::unique_ptr<vpq_codebooks_iface<MathT>> impl_;
 };
-
-// ============================================================================
-// vpq_dataset — codebooks + encoded data (always owning)
-// ============================================================================
 
 /**
  * @brief VPQ compressed dataset.
@@ -173,8 +184,6 @@ class vpq_dataset : public cuvs::neighbors::dataset<IdxT> {
   vpq_codebooks<MathT> codebooks_;
   raft::device_matrix<uint8_t, index_type, raft::row_major> data_;
 };
-
-// ── Type trait ─────────────────────────────────────────────────────────────
 
 template <typename DatasetT>
 struct is_vpq_dataset : std::false_type {};

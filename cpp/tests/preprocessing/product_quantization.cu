@@ -131,7 +131,7 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
 
   void TearDown() override {}
 
-  void check_reconstruction(const cuvs::preprocessing::quantize::pq::quantizer<T>& quant,
+  void check_reconstruction(const cuvs::preprocessing::quantize::pq::quantizer<T>& quantizer,
                             raft::device_matrix_view<uint8_t, int64_t, raft::row_major> codes,
                             std::optional<raft::device_vector_view<uint32_t, int64_t>> vq_labels,
                             double compression_ratio,
@@ -149,7 +149,7 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
     std::optional<raft::device_vector_view<const uint32_t, int64_t>> vq_labels_view = std::nullopt;
     if (vq_labels) { vq_labels_view = raft::make_const_mdspan(vq_labels.value()); }
     inverse_transform(handle,
-                      quant,
+                      quantizer,
                       raft::device_matrix_view<const uint8_t, int64_t>(
                         codes.data_handle(), n_take, codes.extent(1)),
                       rec_data.view(),
@@ -161,7 +161,7 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
   void testProductQuantizationFromDataset()
   {
     using LabelT = uint32_t;
-    config_      = cuvs::preprocessing::quantize::pq::params{params_.pq_bits,
+    config_      = cuvs::preprocessing::quantize::pq::params(params_.pq_bits,
                                                         params_.pq_dim,
                                                         params_.use_subspaces,
                                                         params_.use_vq,
@@ -169,7 +169,7 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
                                                         25,
                                                         params_.pq_kmeans_type,
                                                         256,
-                                                        1024};
+                                                        1024);
     raft::resource::sync_stream(handle);
 
     if ((n_samples_ < (1 << params_.pq_bits)) || (n_features_ % params_.pq_dim != 0)) {
@@ -255,7 +255,7 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
     auto codes_owning =
       raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, n_encoded_cols);
     transform(handle,
-              owning_quant,
+              owning_quantizer,
               raft::make_const_mdspan(dataset_.view()),
               codes_owning.view(),
               std::nullopt);
@@ -263,7 +263,7 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
     auto codes_view =
       raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, n_encoded_cols);
     transform(handle,
-              view_quant,
+              view_quantizer,
               raft::make_const_mdspan(dataset_.view()),
               codes_view.view(),
               std::nullopt);
@@ -279,12 +279,12 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
       raft::make_device_matrix<float, int64_t>(handle, n_samples_, n_features_);
 
     inverse_transform(handle,
-                      owning_quant,
+                      owning_quantizer,
                       raft::make_const_mdspan(codes_owning.view()),
                       reconstructed_owning.view(),
                       std::nullopt);
     inverse_transform(handle,
-                      view_quant,
+                      view_quantizer,
                       raft::make_const_mdspan(codes_view.view()),
                       reconstructed_view.view(),
                       std::nullopt);
