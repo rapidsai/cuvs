@@ -121,7 +121,7 @@ quantizer<float> build(raft::resources const& res,
                        raft::host_matrix_view<const float, int64_t> dataset);
 
 /**
- * @brief Creates a view-type product quantizer from pre-computed codebooks.
+ * @brief Creates a product quantizer from pre-computed codebooks.
  *
  * This function creates a non-owning quantizer that references the provided codebooks.
  *
