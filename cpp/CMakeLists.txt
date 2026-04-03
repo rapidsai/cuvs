@@ -478,7 +478,7 @@ if(NOT BUILD_CPU_ONLY)
     INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/distance/detail/pairwise_matrix/dispatch_rbf_inst.cu.in"
     OUTPUT_FILE_FORMAT
-      "${CMAKE_CURRENT_BINARY_DIR}/src/distance/detail/pairwise_matrix/dispatch_rbf_inst_data_@data_abbrev@_acc_@acc_abbrev@_out_@out_abbrev@_index_@index_abbrev@_op_@op_abbrev@.cu.in"
+      "${CMAKE_CURRENT_BINARY_DIR}/src/distance/detail/pairwise_matrix/dispatch_rbf_inst_data_@data_abbrev@_acc_@acc_abbrev@_out_@out_abbrev@_index_@index_abbrev@_op_@op_abbrev@.cu"
   )
   generate_inst_matrix(
     cagra_build_inst_files
