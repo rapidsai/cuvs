@@ -135,7 +135,7 @@ quantizer<MathT> build(
     dim,
     params.pq_bits,
     params.pq_dim);
-  RAFT_EXPECTS(params.pq_bits >= 4 && params.pq_bits <= 16,
+  RAFT_EXPECTS(params.pq_bits >= 4 && params.pq_bits <= 8,
                "PQ bits must be within [4, 16], got %u",
                params.pq_bits);
 
@@ -167,8 +167,8 @@ quantizer<MathT> build_view(
   std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers =
     std::nullopt)
 {
-  RAFT_EXPECTS(params.pq_bits >= 4 && params.pq_bits <= 16,
-               "PQ bits must be within [4, 16], got %u",
+  RAFT_EXPECTS(params.pq_bits >= 4 && params.pq_bits <= 8,
+               "PQ bits must be within [4, 8], got %u",
                params.pq_bits);
   RAFT_EXPECTS(params.pq_dim > 0, "pq_dim must be specified for view-type quantizer");
 
@@ -221,7 +221,7 @@ void transform(
   RAFT_EXPECTS(pq_codes_out.extent(1) == get_quantized_dim(quantizer.params_quantizer),
                "Output matrix doesn't have the correct number of columns");
   RAFT_EXPECTS(quantizer.params_quantizer.pq_bits >= 4 && quantizer.params_quantizer.pq_bits <= 16,
-               "PQ bits must be within [4, 16]");
+               "PQ bits must be within [4, 8]");
 
   auto vq_centers     = quantizer.codebooks.vq_code_book();
   auto pq_centers     = quantizer.codebooks.pq_code_book();
