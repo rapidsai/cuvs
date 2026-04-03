@@ -161,8 +161,10 @@ auto deserialize_vpq(raft::resources const& res, std::istream& is)
   raft::deserialize_mdspan(res, is, data.view());
 
   return std::make_unique<cuvs::preprocessing::quantize::pq::vpq_dataset<MathT, IdxT>>(
-    std::make_unique<cuvs::preprocessing::quantize::pq::vpq_dataset_owning<MathT, IdxT>>(
-      std::move(vq_code_book), std::move(pq_code_book), std::move(data)));
+    cuvs::preprocessing::quantize::pq::vpq_codebooks<MathT>{
+      std::make_unique<cuvs::preprocessing::quantize::pq::vpq_codebooks_owning<MathT>>(
+        std::move(vq_code_book), std::move(pq_code_book))},
+    std::move(data));
 }
 
 template <typename IdxT>

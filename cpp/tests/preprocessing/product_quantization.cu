@@ -245,8 +245,8 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
     }
     auto owning_quant = build(handle, config, raft::make_const_mdspan(dataset_.view()));
 
-    auto pq_centers_view = owning_quant.vpq_codebooks.pq_code_book();
-    auto vq_centers_view = owning_quant.vpq_codebooks.vq_code_book();
+    auto pq_centers_view = owning_quant.codebooks.pq_code_book();
+    auto vq_centers_view = owning_quant.codebooks.vq_code_book();
 
     auto view_quant =
       build(handle, owning_quant.params_quantizer, pq_centers_view, vq_centers_view);

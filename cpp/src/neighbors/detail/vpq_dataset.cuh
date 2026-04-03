@@ -4,8 +4,8 @@
  */
 #pragma once
 
-#include "../../preprocessing/quantize/detail/vpq_dataset_impl.hpp"
 #include <cuvs/neighbors/common.hpp>
+#include <cuvs/preprocessing/quantize/vpq_dataset.hpp>
 
 #include "../../cluster/kmeans_balanced.cuh"
 #include "../../preprocessing/quantize/detail/pq_codepacking.cuh"  // pq_bits-bitfield

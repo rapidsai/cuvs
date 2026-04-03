@@ -8,6 +8,7 @@
 #include "../../../core/nvtx.hpp"
 #include "../../../neighbors/detail/vpq_dataset.cuh"
 #include "pq_codepacking.cuh"  // pq_bits-bitfield
+#include "vpq_dataset_impl.hpp"
 
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/preprocessing/quantize/pq.hpp>
@@ -43,6 +44,27 @@ inline auto to_vpq_params(const cuvs::preprocessing::quantize::pq::params& param
     .max_train_points_per_pq_code    = params.max_train_points_per_pq_code,
     .max_train_points_per_vq_cluster = params.max_train_points_per_vq_cluster};
 }
+
+// ── Helper: build owning vpq_codebooks from device matrices ────────────────
+
+template <typename MathT>
+auto make_owning_codebooks(raft::device_matrix<MathT, uint32_t, raft::row_major>&& vq,
+                           raft::device_matrix<MathT, uint32_t, raft::row_major>&& pq)
+  -> vpq_codebooks<MathT>
+{
+  return vpq_codebooks<MathT>{
+    std::make_unique<vpq_codebooks_owning<MathT>>(std::move(vq), std::move(pq))};
+}
+
+template <typename MathT>
+auto make_view_codebooks(raft::device_matrix_view<const MathT, uint32_t, raft::row_major> vq,
+                         raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq)
+  -> vpq_codebooks<MathT>
+{
+  return vpq_codebooks<MathT>{std::make_unique<vpq_codebooks_view<MathT>>(vq, pq)};
+}
+
+// ── PQ subspace training ───────────────────────────────────────────────────
 
 template <typename MathT, typename DatasetT>
 auto train_pq_subspaces(
@@ -120,9 +142,8 @@ auto train_pq_subspaces(
   return pq_centers;
 }
 
-/**
- * @brief Build an owning quantizer by training on a dataset.
- */
+// ── Build (owning, from dataset) ───────────────────────────────────────────
+
 template <typename DataT, typename MathT, typename AccessorType>
 quantizer<MathT> build(
   raft::resources const& res,
@@ -148,7 +169,6 @@ quantizer<MathT> build(
   if (filled_params.use_vq) {
     vq_code_book = cuvs::neighbors::detail::train_vq<MathT>(res, vpq_params, dataset);
   }
-  auto empty_codes  = raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(res, 0, 0);
   auto pq_code_book = raft::make_device_matrix<MathT, uint32_t, raft::row_major>(res, 0, 0);
   if (filled_params.use_subspaces) {
     pq_code_book = train_pq_subspaces<MathT>(
@@ -157,17 +177,11 @@ quantizer<MathT> build(
     pq_code_book = cuvs::neighbors::detail::train_pq<MathT>(
       res, vpq_params, dataset, raft::make_const_mdspan(vq_code_book.view()));
   }
-  return {filled_params,
-          cuvs::preprocessing::quantize::pq::vpq_dataset<MathT, int64_t>{
-            std::make_unique<vpq_dataset_owning<MathT, int64_t>>(
-              std::move(vq_code_book), std::move(pq_code_book), std::move(empty_codes))}};
+  return {filled_params, make_owning_codebooks(std::move(vq_code_book), std::move(pq_code_book))};
 }
 
-/**
- * @brief Build a quantizer from pre-computed codebooks.
- *
- * The quantizer does not own the codebook arrays.
- */
+// ── Build (view, from pre-computed codebooks) ──────────────────────────────
+
 template <typename MathT>
 quantizer<MathT> build_view(
   raft::resources const& res,
@@ -176,7 +190,6 @@ quantizer<MathT> build_view(
   std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers =
     std::nullopt)
 {
-  // Validate parameters
   RAFT_EXPECTS(params.pq_bits >= 4 && params.pq_bits <= 16,
                "PQ bits must be within [4, 16], got %u",
                params.pq_bits);
@@ -184,7 +197,6 @@ quantizer<MathT> build_view(
 
   const uint32_t pq_n_centers = 1u << params.pq_bits;
 
-  // Validate PQ centers shape
   if (params.use_subspaces) {
     RAFT_EXPECTS(pq_centers.extent(0) == params.pq_dim * pq_n_centers,
                  "For use_subspaces=true, pq_centers must have shape [pq_dim * pq_n_centers, "
@@ -199,7 +211,6 @@ quantizer<MathT> build_view(
                  pq_centers.extent(1));
   }
 
-  // Validate VQ centers
   if (params.use_vq) {
     RAFT_EXPECTS(vq_centers.has_value(), "vq_centers must be provided when use_vq=true");
     RAFT_EXPECTS(vq_centers.value().extent(0) == params.vq_n_centers,
@@ -207,17 +218,14 @@ quantizer<MathT> build_view(
                  vq_centers.value().extent(0));
   }
 
-  // Create view-type vpq_dataset
-  auto empty_data = raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(res, 0, 0);
   auto vq_view =
     vq_centers.has_value()
       ? vq_centers.value()
       : raft::make_device_matrix_view<const MathT, uint32_t, raft::row_major>(nullptr, 0, 0);
-  return {params,
-          cuvs::preprocessing::quantize::pq::vpq_dataset<MathT, int64_t>{
-            std::make_unique<vpq_dataset_view<MathT, int64_t>>(
-              vq_view, pq_centers, std::move(empty_data))}};
+  return {params, make_view_codebooks(vq_view, pq_centers)};
 }
+
+// ── Transform ──────────────────────────────────────────────────────────────
 
 template <typename T, typename QuantI, typename AccessorType>
 void transform(
@@ -239,8 +247,8 @@ void transform(
   RAFT_EXPECTS(quantizer.params_quantizer.pq_bits >= 4 && quantizer.params_quantizer.pq_bits <= 16,
                "PQ bits must be within [4, 16]");
 
-  auto vq_centers     = quantizer.vpq_codebooks.vq_code_book();
-  auto pq_centers     = quantizer.vpq_codebooks.pq_code_book();
+  auto vq_centers     = quantizer.codebooks.vq_code_book();
+  auto pq_centers     = quantizer.codebooks.pq_code_book();
   auto vq_labels_view = raft::make_device_vector_view<uint32_t, int64_t>(nullptr, 0);
   if (vq_labels.has_value()) { vq_labels_view = vq_labels.value(); }
 
@@ -264,6 +272,8 @@ void transform(
       pq_codes_out);
   }
 }
+
+// ── Inverse transform ──────────────────────────────────────────────────────
 
 template <uint32_t BlockSize,
           uint32_t SubWarpSize,
@@ -317,8 +327,6 @@ auto reconstruct_vectors(
   bool use_subspaces)
 {
   const IdxT n_rows       = out_vectors.extent(0);
-  const IdxT dim          = out_vectors.extent(1);
-  const IdxT pq_dim       = params.pq_dim;
   const IdxT pq_bits      = params.pq_bits;
   const IdxT pq_n_centers = IdxT{1} << pq_bits;
 
@@ -354,8 +362,6 @@ auto reconstruct_vectors(
   kernel<<<blocks, threads, 0, stream>>>(
     codes, out_vectors, pq_centers, vq_centers, vq_labels, pq_bits, use_subspaces);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
-
-  return codes;
 }
 
 template <typename T, typename QuantI = uint8_t>
@@ -381,19 +387,20 @@ void inverse_transform(
                "PQ bits must be within [4, 16]");
 
   reconstruct_vectors<T, T, idx_t, label_t>(res,
-                                             quantizer.params_quantizer,
-                                             codes,
-                                             quantizer.vpq_codebooks.pq_code_book(),
-                                             quantizer.vpq_codebooks.vq_code_book(),
-                                             vq_labels,
-                                             out,
-                                             quantizer.params_quantizer.use_subspaces);
+                                            quantizer.params_quantizer,
+                                            codes,
+                                            quantizer.codebooks.pq_code_book(),
+                                            quantizer.codebooks.vq_code_book(),
+                                            vq_labels,
+                                            out,
+                                            quantizer.params_quantizer.use_subspaces);
 }
 
-template <typename NewMathT, typename OldMathT, typename IdxT>
-auto vpq_convert_math_type(const raft::resources& res,
-                           cuvs::preprocessing::quantize::pq::vpq_dataset<OldMathT, IdxT>&& src)
-  -> cuvs::preprocessing::quantize::pq::vpq_dataset<NewMathT, IdxT>
+// ── vpq_convert_math_type (codebooks only — no data copy) ──────────────────
+
+template <typename NewMathT, typename OldMathT>
+auto vpq_convert_math_type(const raft::resources& res, vpq_codebooks<OldMathT>&& src)
+  -> vpq_codebooks<NewMathT>
 {
   auto vq_src = src.vq_code_book();
   auto pq_src = src.pq_code_book();
@@ -403,45 +410,28 @@ auto vpq_convert_math_type(const raft::resources& res,
   auto pq_new = raft::make_device_matrix<NewMathT, uint32_t, raft::row_major>(
     res, pq_src.extent(0), pq_src.extent(1));
 
-  raft::linalg::map(res,
-                    vq_new.view(),
-                    cuvs::spatial::knn::detail::utils::mapping<NewMathT>{},
-                    vq_src);
-  raft::linalg::map(res,
-                    pq_new.view(),
-                    cuvs::spatial::knn::detail::utils::mapping<NewMathT>{},
-                    pq_src);
+  raft::linalg::map(
+    res, vq_new.view(), cuvs::spatial::knn::detail::utils::mapping<NewMathT>{}, vq_src);
+  raft::linalg::map(
+    res, pq_new.view(), cuvs::spatial::knn::detail::utils::mapping<NewMathT>{}, pq_src);
 
-  // Data (encoded bytes) can be moved directly — independent of MathT.
-  auto data_src = src.data();
-  auto data_new = raft::make_device_matrix<uint8_t, IdxT, raft::row_major>(
-    res, data_src.extent(0), data_src.extent(1));
-  raft::copy(data_new.data_handle(),
-             data_src.data_handle(),
-             data_src.size(),
-             raft::resource::get_cuda_stream(res));
-
-  return cuvs::preprocessing::quantize::pq::vpq_dataset<NewMathT, IdxT>{
-    std::make_unique<vpq_dataset_owning<NewMathT, IdxT>>(
-      std::move(vq_new), std::move(pq_new), std::move(data_new))};
+  return make_owning_codebooks(std::move(vq_new), std::move(pq_new));
 }
+
+// ── vpq_build (trains codebooks + encodes dataset → vpq_dataset) ───────────
 
 template <typename DatasetT, typename MathT, typename IdxT>
 auto vpq_build(const raft::resources& res,
                const cuvs::neighbors::vpq_params& params,
-               const DatasetT& dataset)
-  -> cuvs::preprocessing::quantize::pq::vpq_dataset<MathT, IdxT>
+               const DatasetT& dataset) -> vpq_dataset<MathT, IdxT>
 {
   using label_t = uint32_t;
-  // Use a heuristic to impute missing parameters.
-  auto ps = cuvs::neighbors::detail::fill_missing_params_heuristics(params, dataset);
+  auto ps       = cuvs::neighbors::detail::fill_missing_params_heuristics(params, dataset);
 
-  // Train codes
   auto vq_code_book = cuvs::neighbors::detail::train_vq<MathT>(res, ps, dataset);
   auto pq_code_book = cuvs::neighbors::detail::train_pq<MathT>(
     res, ps, dataset, raft::make_const_mdspan(vq_code_book.view()));
 
-  // Encode dataset
   const IdxT n_rows       = dataset.extent(0);
   const IdxT codes_rowlen = sizeof(label_t) * (1 + raft::div_rounding_up_safe<IdxT>(
                                                      ps.pq_dim * ps.pq_bits, 8 * sizeof(label_t)));
@@ -457,19 +447,34 @@ auto vpq_build(const raft::resources& res,
     codes.view(),
     true);
 
-  return cuvs::preprocessing::quantize::pq::vpq_dataset<MathT, IdxT>{
-    std::make_unique<vpq_dataset_owning<MathT, IdxT>>(
-      std::move(vq_code_book), std::move(pq_code_book), std::move(codes))};
+  return vpq_dataset<MathT, IdxT>{
+    make_owning_codebooks(std::move(vq_code_book), std::move(pq_code_book)), std::move(codes)};
 }
 
 template <typename DatasetT>
 auto vpq_build_half(const raft::resources& res,
                     const cuvs::neighbors::vpq_params& params,
-                    const DatasetT& dataset)
-  -> cuvs::preprocessing::quantize::pq::vpq_dataset<half, int64_t>
+                    const DatasetT& dataset) -> vpq_dataset<half, int64_t>
 {
-  auto float_type = vpq_build<DatasetT, float, int64_t>(res, params, dataset);
-  return vpq_convert_math_type<half, float, int64_t>(res, std::move(float_type));
+  // Build in float first
+  auto float_ds = vpq_build<DatasetT, float, int64_t>(res, params, dataset);
+
+  // Convert only the codebooks to half; encoded data is uint8 and stays as-is
+  auto half_codebooks = vpq_convert_math_type<half, float>(res, std::move(float_ds.codebooks()));
+
+  // Transfer data out — vpq_dataset owns it, so we need to reconstruct.
+  // The data view is still valid because float_ds hasn't been destroyed yet.
+  auto data_view = float_ds.data();
+  auto data_copy = raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(
+    res, data_view.extent(0), data_view.extent(1));
+  if (data_view.size() > 0) {
+    raft::copy(data_copy.data_handle(),
+               data_view.data_handle(),
+               data_view.size(),
+               raft::resource::get_cuda_stream(res));
+  }
+
+  return vpq_dataset<half, int64_t>{std::move(half_codebooks), std::move(data_copy)};
 }
 
 }  // namespace cuvs::preprocessing::quantize::pq::detail

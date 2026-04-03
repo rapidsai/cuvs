@@ -10,11 +10,11 @@
 namespace cuvs::preprocessing::quantize::pq {
 
 #define CUVS_INST_VPQ_BUILD(T)                                                 \
-  cuvs::preprocessing::quantize::pq::vpq_dataset<half, int64_t> vpq_build(                       \
+  cuvs::preprocessing::quantize::pq::vpq_dataset<half, int64_t> vpq_build(     \
     const raft::resources& res,                                                \
     const cuvs::neighbors::vpq_params& params,                                 \
     const raft::host_matrix_view<const T, int64_t, raft::row_major>& dataset); \
-  cuvs::preprocessing::quantize::pq::vpq_dataset<half, int64_t> vpq_build(                       \
+  cuvs::preprocessing::quantize::pq::vpq_dataset<half, int64_t> vpq_build(     \
     const raft::resources& res,                                                \
     const cuvs::neighbors::vpq_params& params,                                 \
     const raft::device_matrix_view<const T, int64_t, raft::row_major>& dataset);
