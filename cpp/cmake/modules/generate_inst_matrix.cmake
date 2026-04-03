@@ -11,15 +11,14 @@ include(${CMAKE_CURRENT_LIST_DIR}/compute_matrix_product.cmake)
 
 function(process_inst_matrix_entry source_list_var)
   set(options)
-  set(one_value NAME_FORMAT INPUT_FILE OUTPUT_DIRECTORY MATRIX_JSON_ENTRY)
+  set(one_value INPUT_FILE OUTPUT_FILE_FORMAT MATRIX_JSON_ENTRY)
   set(multi_value)
 
   cmake_parse_arguments(_GIM "${options}" "${one_value}" "${multi_value}" ${ARGN})
 
   populate_matrix_variables("${_GIM_MATRIX_JSON_ENTRY}")
-  string(CONFIGURE "${_GIM_NAME_FORMAT}" inst_name @ONLY)
+  string(CONFIGURE "${_GIM_OUTPUT_FILE_FORMAT}" output_file @ONLY)
 
-  set(output_file "${_GIM_OUTPUT_DIRECTORY}/${inst_name}_inst.cu")
   configure_file("${_GIM_INPUT_FILE}" "${output_file}" @ONLY)
 
   list(APPEND ${source_list_var} "${output_file}")
@@ -31,7 +30,7 @@ endfunction()
 
 function(generate_inst_matrix source_list_var)
   set(options)
-  set(one_value NAME_FORMAT MATRIX_JSON_FILE MATRIX_JSON_STRING INPUT_FILE OUTPUT_DIRECTORY)
+  set(one_value MATRIX_JSON_FILE MATRIX_JSON_STRING INPUT_FILE OUTPUT_FILE_FORMAT)
   set(multi_value)
 
   cmake_parse_arguments(_GIM "${options}" "${one_value}" "${multi_value}" ${ARGN})
@@ -55,9 +54,8 @@ function(generate_inst_matrix source_list_var)
     string(JSON matrix_json_entry GET "${matrix_product}" "${i}")
     process_inst_matrix_entry(
       "${source_list_var}"
-      NAME_FORMAT "${_GIM_NAME_FORMAT}"
       INPUT_FILE "${_GIM_INPUT_FILE}"
-      OUTPUT_DIRECTORY "${_GIM_OUTPUT_DIRECTORY}"
+      OUTPUT_FILE_FORMAT "${_GIM_OUTPUT_FILE_FORMAT}"
       MATRIX_JSON_ENTRY "${matrix_json_entry}"
     )
   endforeach()
