@@ -87,8 +87,10 @@ struct params {
  */
 template <typename T>
 struct quantizer {
+  /** Parameters used to build this quantizer. */
   params params_quantizer;
-  cuvs::preprocessing::quantize::pq::vpq_dataset<T, int64_t> vpq_codebooks;
+  /** VPQ codebooks produced during training. */
+  cuvs::neighbors::vpq_dataset<T, int64_t> vpq_codebooks;
 };
 
 /**

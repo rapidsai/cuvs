@@ -74,7 +74,7 @@ Please refer to the :doc:`guide on API interoperability <api_interoperability>` 
 Where to next?
 ==============
 
-cuVS is free and open source software, licesed under Apache 2.0 Once you are familiar with and/or have used cuVS, you can access the developer community most easily through `Github <https://github.com/rapidsai/cuvs>`_. Please open Github issues for any bugs, questions or feature requests.
+cuVS is free and open source software, licensed under Apache 2.0 Once you are familiar with and/or have used cuVS, you can access the developer community most easily through `Github <https://github.com/rapidsai/cuvs>`_. Please open Github issues for any bugs, questions or feature requests.
 
 Social media
 ------------
@@ -86,8 +86,9 @@ Blogs
 
 We frequently publish blogs on GPU-enabled vector search, which can provide great deep dives into various important topics and breakthroughs:
 
+#. `See all cuVS blogs <https://developer.nvidia.com/blog/recent-posts/?products=cuVS>`_
 #. `Accelerated Vector Search: Approximating with cuVS IVF-Flat <https://developer.nvidia.com/blog/accelerated-vector-search-approximating-with-rapids-raft-ivf-flat/>`_
-#. `Accelerating Vector Search with cuVS IVF-PQ <https://developer.nvidia.com/blog/accelerating-vector-search-rapids-cuvs-ivf-pq-deep-dive-part-1/>`_
+#. Accelerating Vector Search with cuVS IVF-PQ (`Part 1 <https://developer.nvidia.com/blog/accelerating-vector-search-rapids-cuvs-ivf-pq-deep-dive-part-1/>`_, `Part 2 <https://developer.nvidia.com/blog/accelerating-vector-search-nvidia-cuvs-ivf-pq-performance-tuning-part-2/>`_)
 
 Research
 --------
@@ -99,6 +100,7 @@ For the interested reader, many of the accelerated implementations in cuVS are a
 #. `Fast K-NN Graph Construction by GPU Based NN-Descent <https://dl.acm.org/doi/abs/10.1145/3459637.3482344?casa_token=O_nan1B1F5cAAAAA:QHWDEhh0wmd6UUTLY9_Gv6c3XI-5DXM9mXVaUXOYeStlpxTPmV3nKvABRfoivZAaQ3n8FWyrkWw>`_
 #. `cuSLINK: Single-linkage Agglomerative Clustering on the GPU <https://arxiv.org/abs/2306.16354>`_
 #. `GPU Semiring Primitives for Sparse Neighborhood Methods <https://arxiv.org/abs/2104.06357>`_
+#. `VecFlow: A High-Performance Vector Data Management System for Filtered-Search on GPUs <https://arxiv.org/abs/2506.00812>`_
 
 
 Get involved
