@@ -159,8 +159,6 @@ quantizer<MathT> build(
             std::move(vq_code_book), std::move(pq_code_book))}};
 }
 
-// ── Build (view, from pre-computed codebooks) ──────────────────────────────
-
 template <typename MathT>
 quantizer<MathT> build_view(
   raft::resources const& res,

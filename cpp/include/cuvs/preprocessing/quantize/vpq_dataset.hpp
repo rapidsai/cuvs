@@ -29,7 +29,6 @@ class vpq_codebooks_iface {
   [[nodiscard]] virtual auto pq_code_book() const noexcept
     -> raft::device_matrix_view<const math_type, uint32_t, raft::row_major> = 0;
 
-  // ── Derived properties (default implementations) ─────────────────────────
   [[nodiscard]] virtual auto dim() const noexcept -> uint32_t { return vq_code_book().extent(1); }
   [[nodiscard]] virtual auto vq_n_centers() const noexcept -> uint32_t
   {
@@ -147,7 +146,6 @@ class vpq_dataset : public cuvs::neighbors::dataset<IdxT> {
   vpq_dataset& operator=(vpq_dataset&&)      = default;
   ~vpq_dataset() override                    = default;
 
-  // ── dataset<IdxT> interface ──────────────────────────────────────────────
   [[nodiscard]] auto n_rows() const noexcept -> index_type override { return data.extent(0); }
   [[nodiscard]] auto dim() const noexcept -> uint32_t override { return codebooks.dim(); }
   [[nodiscard]] auto is_owning() const noexcept -> bool override { return true; }
