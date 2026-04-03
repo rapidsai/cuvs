@@ -159,7 +159,7 @@ quantizer<MathT> build(
   }
   return {filled_params,
           cuvs::preprocessing::quantize::pq::vpq_dataset<MathT, int64_t>{
-            std::make_unique<cuvs::neighbors::vpq_dataset_owning<MathT, int64_t>>(
+            std::make_unique<cuvs::preprocessing::quantize::pq::vpq_dataset_owning<MathT, int64_t>>(
               std::move(vq_code_book), std::move(pq_code_book), std::move(empty_codes))}};
 }
 
@@ -216,7 +216,7 @@ quantizer<MathT> build_view(
       : raft::make_device_matrix_view<const MathT, uint32_t, raft::row_major>(nullptr, 0, 0);
   return {params,
           cuvs::preprocessing::quantize::pq::vpq_dataset<MathT, int64_t>{
-            std::make_unique<cuvs::neighbors::vpq_dataset_view<MathT, int64_t>>(
+            std::make_unique<cuvs::preprocessing::quantize::pq::vpq_dataset_view<MathT, int64_t>>(
               vq_view, pq_centers, std::move(empty_data))}};
 }
 
@@ -393,8 +393,8 @@ void inverse_transform(
 
 template <typename NewMathT, typename OldMathT, typename IdxT>
 void vpq_convert_math_type(const raft::resources& res,
-                           const cuvs::neighbors::vpq_dataset<OldMathT, IdxT>& src,
-                           cuvs::neighbors::vpq_dataset<NewMathT, IdxT>& dst)
+                           const cuvs::preprocessing::quantize::pq::vpq_dataset<OldMathT, IdxT>& src,
+                           cuvs::preprocessing::quantize::pq::vpq_dataset<NewMathT, IdxT>& dst)
 {
   raft::linalg::map(res,
                     dst.vq_code_book.view(),
@@ -409,7 +409,7 @@ void vpq_convert_math_type(const raft::resources& res,
 template <typename DatasetT, typename MathT, typename IdxT>
 auto vpq_build(const raft::resources& res,
                const cuvs::neighbors::vpq_params& params,
-               const DatasetT& dataset) -> cuvs::neighbors::vpq_dataset<MathT, IdxT>
+               const DatasetT& dataset) -> cuvs::preprocessing::quantize::pq::vpq_dataset<MathT, IdxT>
 {
   using label_t = uint32_t;
   // Use a heuristic to impute missing parameters.
@@ -436,17 +436,17 @@ auto vpq_build(const raft::resources& res,
     codes.view(),
     true);
 
-  return cuvs::neighbors::vpq_dataset<MathT, IdxT>{
+  return cuvs::preprocessing::quantize::pq::vpq_dataset<MathT, IdxT>{
     std::move(vq_code_book), std::move(pq_code_book), std::move(codes)};
 }
 
 template <typename DatasetT>
 auto vpq_build_half(const raft::resources& res,
                     const cuvs::neighbors::vpq_params& params,
-                    const DatasetT& dataset) -> cuvs::neighbors::vpq_dataset<half, int64_t>
+                    const DatasetT& dataset) -> cuvs::preprocessing::quantize::pq::vpq_dataset<half, int64_t>
 {
   auto old_type = vpq_build<decltype(dataset), float, int64_t>(res, params, dataset);
-  auto new_type = cuvs::neighbors::vpq_dataset<half, int64_t>{
+  auto new_type = cuvs::preprocessing::quantize::pq::vpq_dataset<half, int64_t>{
     raft::make_device_mdarray<half>(res, old_type.vq_code_book.extents()),
     raft::make_device_mdarray<half>(res, old_type.pq_code_book.extents()),
     std::move(old_type.data)};
@@ -456,8 +456,8 @@ auto vpq_build_half(const raft::resources& res,
 
 template <typename NewMathT, typename OldMathT, typename IdxT>
 void vpq_convert_math_type(const raft::resources& res,
-                           const cuvs::neighbors::vpq_dataset<OldMathT, IdxT>& src,
-                           cuvs::neighbors::vpq_dataset<NewMathT, IdxT>& dst)
+                           const cuvs::preprocessing::quantize::pq::vpq_dataset<OldMathT, IdxT>& src,
+                           cuvs::preprocessing::quantize::pq::vpq_dataset<NewMathT, IdxT>& dst)
 {
   raft::linalg::map(res,
                     dst.vq_code_book.view(),
@@ -472,7 +472,7 @@ void vpq_convert_math_type(const raft::resources& res,
 template <typename DatasetT, typename MathT, typename IdxT>
 auto vpq_build(const raft::resources& res,
                const cuvs::neighbors::vpq_params& params,
-               const DatasetT& dataset) -> cuvs::neighbors::vpq_dataset<MathT, IdxT>
+               const DatasetT& dataset) -> cuvs::preprocessing::quantize::pq::vpq_dataset<MathT, IdxT>
 {
   using label_t = uint32_t;
   // Use a heuristic to impute missing parameters.
@@ -499,17 +499,17 @@ auto vpq_build(const raft::resources& res,
     codes.view(),
     true);
 
-  return cuvs::neighbors::vpq_dataset<MathT, IdxT>{
+  return cuvs::preprocessing::quantize::pq::vpq_dataset<MathT, IdxT>{
     std::move(vq_code_book), std::move(pq_code_book), std::move(codes)};
 }
 
 template <typename DatasetT>
 auto vpq_build_half(const raft::resources& res,
                     const cuvs::neighbors::vpq_params& params,
-                    const DatasetT& dataset) -> cuvs::neighbors::vpq_dataset<half, int64_t>
+                    const DatasetT& dataset) -> cuvs::preprocessing::quantize::pq::vpq_dataset<half, int64_t>
 {
   auto old_type = vpq_build<decltype(dataset), float, int64_t>(res, params, dataset);
-  auto new_type = cuvs::neighbors::vpq_dataset<half, int64_t>{
+  auto new_type = cuvs::preprocessing::quantize::pq::vpq_dataset<half, int64_t>{
     raft::make_device_mdarray<half>(res, old_type.vq_code_book.extents()),
     raft::make_device_mdarray<half>(res, old_type.pq_code_book.extents()),
     std::move(old_type.data)};

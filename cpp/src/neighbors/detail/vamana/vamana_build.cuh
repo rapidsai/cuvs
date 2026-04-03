@@ -648,7 +648,7 @@ index<T, IdxT> build(
     auto quantizer = cuvs::preprocessing::quantize::pq::quantizer<float>(
       pq_params,
       cuvs::preprocessing::quantize::pq::vpq_dataset<float, int64_t>{
-        std::make_unique<cuvs::neighbors::vpq_dataset_owning<float, int64_t>>(
+        std::make_unique<cuvs::preprocessing::quantize::pq::vpq_dataset_owning<float, int64_t>>(
           raft::make_device_matrix<float, uint32_t, raft::row_major>(res, 0, 0),
           std::move(pq_codebook),
           raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(res, 0, 0))});
