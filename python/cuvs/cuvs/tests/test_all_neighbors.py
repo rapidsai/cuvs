@@ -57,19 +57,11 @@ def test_all_neighbors_device_build_quality(algo, cluster, metric):
     """
     n_rows, n_cols, k = 7151, 64, 16
 
-    if algo == "ivf_pq" and metric != "sqeuclidean":
-        pytest.skip(
-            "Skipping IVF-PQ for distance metrics other than sqeuclidean"
-        )
-    elif algo == "nn_descent" and metric not in [
-        "sqeuclidean",
-        "l2",
-        "cosine",
-        "inner_product",
-    ]:
-        pytest.skip(
-            "Skipping NN-Descent for distance metrics other than sqeuclidean, l2, cosine, or inner_product"
-        )
+    ivf_pq_valid_metrics = {"sqeuclidean"}
+    nnd_valid_metrics = {"sqeuclidean", "l2", "cosine", "inner_product"}
+    is_invalid = (algo == "ivf_pq" and metric not in ivf_pq_valid_metrics) or (
+        algo == "nn_descent" and metric not in nnd_valid_metrics
+    )
 
     if cluster == "single_cluster":
         overlap_factor = 0
@@ -138,6 +130,18 @@ def test_all_neighbors_device_build_quality(algo, cluster, metric):
     )
 
     res = Resources()
+
+    if is_invalid:
+        with pytest.raises(Exception, match="Distance metric"):
+            all_neighbors.build(
+                X_device,
+                k,
+                params,
+                distances=cupy.empty((n_rows, k), dtype=cupy.float32),
+                resources=res,
+            )
+        return
+
     indices, distances = all_neighbors.build(
         X_device,
         k,
