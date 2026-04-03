@@ -71,7 +71,7 @@ void serialize(const raft::resources& res,
   raft::serialize_scalar(res, os, dataset.encoded_row_length());
   raft::serialize_mdspan(res, os, dataset.vq_code_book());
   raft::serialize_mdspan(res, os, dataset.pq_code_book());
-  raft::serialize_mdspan(res, os, dataset.data());
+  raft::serialize_mdspan(res, os, dataset.data.view());
 }
 
 template <typename IdxT>

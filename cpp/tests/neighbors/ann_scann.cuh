@@ -9,6 +9,7 @@
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/scann.hpp>
 #include <cuvs/preprocessing/quantize/pq.hpp>
+#include "../../src/preprocessing/quantize/detail/vpq_dataset_impl.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -182,12 +183,11 @@ class scann_test : public ::testing::TestWithParam<scann_inputs> {
       handle_, idx.centers().extent(0), idx.centers().extent(1));
     raft::copy(
       vq_codebook.data_handle(), idx.centers().data_handle(), idx.centers().size(), stream_);
-    auto empty_data = raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(handle_, 0, 0);
-
     cuvs::preprocessing::quantize::pq::quantizer<float> quantizer{
       pq_params,
-      cuvs::preprocessing::quantize::pq::vpq_dataset<float, int64_t>{
-        std::move(vq_codebook), std::move(pq_codebook_copy), std::move(empty_data)}};
+      cuvs::preprocessing::quantize::pq::vpq_codebooks<float>{
+        std::make_unique<cuvs::preprocessing::quantize::pq::vpq_codebooks_owning<float>>(
+          std::move(vq_codebook), std::move(pq_codebook_copy))}};
 
     auto quantized_residuals_device =
       raft::make_device_matrix<uint8_t, IdxT>(handle_, ps.num_db_vecs, num_subspaces);

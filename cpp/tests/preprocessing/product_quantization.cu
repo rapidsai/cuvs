@@ -255,7 +255,7 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
     auto codes_owning =
       raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, n_encoded_cols);
     transform(handle,
-              owning_quantizer,
+              owning_quant,
               raft::make_const_mdspan(dataset_.view()),
               codes_owning.view(),
               std::nullopt);
@@ -263,7 +263,7 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
     auto codes_view =
       raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, n_encoded_cols);
     transform(handle,
-              view_quantizer,
+              view_quant,
               raft::make_const_mdspan(dataset_.view()),
               codes_view.view(),
               std::nullopt);

@@ -128,11 +128,16 @@ class vpq_dataset : public cuvs::neighbors::dataset<IdxT> {
   using index_type = IdxT;
   using math_type  = MathT;
 
+  /** VQ + PQ codebooks (owning or view). */
+  vpq_codebooks<MathT> codebooks;
+  /** Encoded (compressed) data [n_rows, encoded_row_length]. */
+  raft::device_matrix<uint8_t, IdxT, raft::row_major> data;
+
   vpq_dataset() = default;
 
-  vpq_dataset(vpq_codebooks<MathT>&& codebooks,
-              raft::device_matrix<uint8_t, IdxT, raft::row_major>&& data)
-    : codebooks_{std::move(codebooks)}, data_{std::move(data)}
+  vpq_dataset(vpq_codebooks<MathT>&& codebooks_in,
+              raft::device_matrix<uint8_t, IdxT, raft::row_major>&& data_in)
+    : codebooks{std::move(codebooks_in)}, data{std::move(data_in)}
   {
   }
 
@@ -143,46 +148,26 @@ class vpq_dataset : public cuvs::neighbors::dataset<IdxT> {
   ~vpq_dataset() override                    = default;
 
   // ── dataset<IdxT> interface ──────────────────────────────────────────────
-  [[nodiscard]] auto n_rows() const noexcept -> index_type override { return data_.extent(0); }
-  [[nodiscard]] auto dim() const noexcept -> uint32_t override { return codebooks_.dim(); }
+  [[nodiscard]] auto n_rows() const noexcept -> index_type override { return data.extent(0); }
+  [[nodiscard]] auto dim() const noexcept -> uint32_t override { return codebooks.dim(); }
   [[nodiscard]] auto is_owning() const noexcept -> bool override { return true; }
 
-  // ── Codebook access (convenience forwards) ───────────────────────────────
   [[nodiscard]] auto vq_code_book() const noexcept
     -> raft::device_matrix_view<const math_type, uint32_t, raft::row_major>
   {
-    return codebooks_.vq_code_book();
+    return codebooks.vq_code_book();
   }
   [[nodiscard]] auto pq_code_book() const noexcept
     -> raft::device_matrix_view<const math_type, uint32_t, raft::row_major>
   {
-    return codebooks_.pq_code_book();
+    return codebooks.pq_code_book();
   }
-
-  /** Get view of the encoded (compressed) data. */
-  [[nodiscard]] auto data() const noexcept
-    -> raft::device_matrix_view<const uint8_t, index_type, raft::row_major>
-  {
-    return data_.view();
-  }
-
-  // ── Derived properties ───────────────────────────────────────────────────
-  [[nodiscard]] auto encoded_row_length() const noexcept -> uint32_t { return data_.extent(1); }
-  [[nodiscard]] auto vq_n_centers() const noexcept -> uint32_t { return codebooks_.vq_n_centers(); }
-  [[nodiscard]] auto pq_bits() const noexcept -> uint32_t { return codebooks_.pq_bits(); }
-  [[nodiscard]] auto pq_dim() const noexcept -> uint32_t { return codebooks_.pq_dim(); }
-  [[nodiscard]] auto pq_len() const noexcept -> uint32_t { return codebooks_.pq_len(); }
-  [[nodiscard]] auto pq_n_centers() const noexcept -> uint32_t { return codebooks_.pq_n_centers(); }
-
-  /** Direct access to the codebooks object. */
-  [[nodiscard]] auto codebooks() const noexcept -> const vpq_codebooks<MathT>&
-  {
-    return codebooks_;
-  }
-
- private:
-  vpq_codebooks<MathT> codebooks_;
-  raft::device_matrix<uint8_t, index_type, raft::row_major> data_;
+  [[nodiscard]] auto encoded_row_length() const noexcept -> uint32_t { return data.extent(1); }
+  [[nodiscard]] auto vq_n_centers() const noexcept -> uint32_t { return codebooks.vq_n_centers(); }
+  [[nodiscard]] auto pq_bits() const noexcept -> uint32_t { return codebooks.pq_bits(); }
+  [[nodiscard]] auto pq_dim() const noexcept -> uint32_t { return codebooks.pq_dim(); }
+  [[nodiscard]] auto pq_len() const noexcept -> uint32_t { return codebooks.pq_len(); }
+  [[nodiscard]] auto pq_n_centers() const noexcept -> uint32_t { return codebooks.pq_n_centers(); }
 };
 
 template <typename DatasetT>

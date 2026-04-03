@@ -45,27 +45,6 @@ inline auto to_vpq_params(const cuvs::preprocessing::quantize::pq::params& param
     .max_train_points_per_vq_cluster = params.max_train_points_per_vq_cluster};
 }
 
-// ── Helper: build owning vpq_codebooks from device matrices ────────────────
-
-template <typename MathT>
-auto make_owning_codebooks(raft::device_matrix<MathT, uint32_t, raft::row_major>&& vq,
-                           raft::device_matrix<MathT, uint32_t, raft::row_major>&& pq)
-  -> vpq_codebooks<MathT>
-{
-  return vpq_codebooks<MathT>{
-    std::make_unique<vpq_codebooks_owning<MathT>>(std::move(vq), std::move(pq))};
-}
-
-template <typename MathT>
-auto make_view_codebooks(raft::device_matrix_view<const MathT, uint32_t, raft::row_major> vq,
-                         raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq)
-  -> vpq_codebooks<MathT>
-{
-  return vpq_codebooks<MathT>{std::make_unique<vpq_codebooks_view<MathT>>(vq, pq)};
-}
-
-// ── PQ subspace training ───────────────────────────────────────────────────
-
 template <typename MathT, typename DatasetT>
 auto train_pq_subspaces(
   const raft::resources& res,
@@ -142,8 +121,6 @@ auto train_pq_subspaces(
   return pq_centers;
 }
 
-// ── Build (owning, from dataset) ───────────────────────────────────────────
-
 template <typename DataT, typename MathT, typename AccessorType>
 quantizer<MathT> build(
   raft::resources const& res,
@@ -177,7 +154,9 @@ quantizer<MathT> build(
     pq_code_book = cuvs::neighbors::detail::train_pq<MathT>(
       res, vpq_params, dataset, raft::make_const_mdspan(vq_code_book.view()));
   }
-  return {filled_params, make_owning_codebooks(std::move(vq_code_book), std::move(pq_code_book))};
+  return {filled_params,
+          vpq_codebooks<MathT>{std::make_unique<vpq_codebooks_owning<MathT>>(
+            std::move(vq_code_book), std::move(pq_code_book))}};
 }
 
 // ── Build (view, from pre-computed codebooks) ──────────────────────────────
@@ -222,10 +201,9 @@ quantizer<MathT> build_view(
     vq_centers.has_value()
       ? vq_centers.value()
       : raft::make_device_matrix_view<const MathT, uint32_t, raft::row_major>(nullptr, 0, 0);
-  return {params, make_view_codebooks(vq_view, pq_centers)};
+  return {params,
+          vpq_codebooks<MathT>{std::make_unique<vpq_codebooks_view<MathT>>(vq_view, pq_centers)}};
 }
-
-// ── Transform ──────────────────────────────────────────────────────────────
 
 template <typename T, typename QuantI, typename AccessorType>
 void transform(
@@ -272,8 +250,6 @@ void transform(
       pq_codes_out);
   }
 }
-
-// ── Inverse transform ──────────────────────────────────────────────────────
 
 template <uint32_t BlockSize,
           uint32_t SubWarpSize,
@@ -396,10 +372,8 @@ void inverse_transform(
                                             quantizer.params_quantizer.use_subspaces);
 }
 
-// ── vpq_convert_math_type (codebooks only — no data copy) ──────────────────
-
 template <typename NewMathT, typename OldMathT>
-auto vpq_convert_math_type(const raft::resources& res, vpq_codebooks<OldMathT>&& src)
+auto vpq_convert_math_type(const raft::resources& res, const vpq_codebooks<OldMathT>& src)
   -> vpq_codebooks<NewMathT>
 {
   auto vq_src = src.vq_code_book();
@@ -415,10 +389,9 @@ auto vpq_convert_math_type(const raft::resources& res, vpq_codebooks<OldMathT>&&
   raft::linalg::map(
     res, pq_new.view(), cuvs::spatial::knn::detail::utils::mapping<NewMathT>{}, pq_src);
 
-  return make_owning_codebooks(std::move(vq_new), std::move(pq_new));
+  return vpq_codebooks<NewMathT>{
+    std::make_unique<vpq_codebooks_owning<NewMathT>>(std::move(vq_new), std::move(pq_new))};
 }
-
-// ── vpq_build (trains codebooks + encodes dataset → vpq_dataset) ───────────
 
 template <typename DatasetT, typename MathT, typename IdxT>
 auto vpq_build(const raft::resources& res,
@@ -448,7 +421,9 @@ auto vpq_build(const raft::resources& res,
     true);
 
   return vpq_dataset<MathT, IdxT>{
-    make_owning_codebooks(std::move(vq_code_book), std::move(pq_code_book)), std::move(codes)};
+    vpq_codebooks<MathT>{std::make_unique<vpq_codebooks_owning<MathT>>(
+      std::move(vq_code_book), std::move(pq_code_book))},
+    std::move(codes)};
 }
 
 template <typename DatasetT>
@@ -456,25 +431,10 @@ auto vpq_build_half(const raft::resources& res,
                     const cuvs::neighbors::vpq_params& params,
                     const DatasetT& dataset) -> vpq_dataset<half, int64_t>
 {
-  // Build in float first
-  auto float_ds = vpq_build<DatasetT, float, int64_t>(res, params, dataset);
-
-  // Convert only the codebooks to half; encoded data is uint8 and stays as-is
-  auto half_codebooks = vpq_convert_math_type<half, float>(res, std::move(float_ds.codebooks()));
-
-  // Transfer data out — vpq_dataset owns it, so we need to reconstruct.
-  // The data view is still valid because float_ds hasn't been destroyed yet.
-  auto data_view = float_ds.data();
-  auto data_copy = raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(
-    res, data_view.extent(0), data_view.extent(1));
-  if (data_view.size() > 0) {
-    raft::copy(data_copy.data_handle(),
-               data_view.data_handle(),
-               data_view.size(),
-               raft::resource::get_cuda_stream(res));
-  }
-
-  return vpq_dataset<half, int64_t>{std::move(half_codebooks), std::move(data_copy)};
+  // Build in float, then convert codebooks to half; data (uint8 codes) is moved, not copied.
+  auto float_ds       = vpq_build<DatasetT, float, int64_t>(res, params, dataset);
+  auto half_codebooks = vpq_convert_math_type<half, float>(res, float_ds.codebooks);
+  return vpq_dataset<half, int64_t>{std::move(half_codebooks), std::move(float_ds.data)};
 }
 
 }  // namespace cuvs::preprocessing::quantize::pq::detail
