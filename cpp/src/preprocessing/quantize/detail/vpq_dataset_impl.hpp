@@ -9,7 +9,7 @@
 
 #include <raft/util/integer_utils.hpp>
 
-namespace cuvs::neighbors {
+namespace cuvs::preprocessing::quantize::pq {
 
 /**
  * @brief Common VPQ dataset implementation - provides shared implementations.
@@ -204,4 +204,4 @@ class vpq_dataset_view : public vpq_dataset_impl<MathT, IdxT> {
   raft::device_matrix<uint8_t, index_type, raft::row_major> data_;
 };
 
-}  // namespace cuvs::neighbors
+}  // namespace cuvs::preprocessing::quantize::pq

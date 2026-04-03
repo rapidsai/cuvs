@@ -4,7 +4,7 @@
  */
 #pragma once
 
-#include "../../neighbors/vpq_dataset_impl.hpp"
+#include "../../preprocessing/quantize/detail/vpq_dataset_impl.hpp"
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/preprocessing/quantize/vpq_dataset.hpp>
 
@@ -161,7 +161,7 @@ auto deserialize_vpq(raft::resources const& res, std::istream& is)
   raft::deserialize_mdspan(res, is, data.view());
 
   return std::make_unique<cuvs::preprocessing::quantize::pq::vpq_dataset<MathT, IdxT>>(
-    std::make_unique<vpq_dataset_owning<MathT, IdxT>>(
+    std::make_unique<cuvs::preprocessing::quantize::pq::vpq_dataset_owning<MathT, IdxT>>(
       std::move(vq_code_book), std::move(pq_code_book), std::move(data)));
 }
 
