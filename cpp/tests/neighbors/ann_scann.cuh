@@ -4,12 +4,12 @@
  */
 #pragma once
 
+#include "../../src/preprocessing/quantize/detail/vpq_dataset_impl.hpp"
 #include "../test_utils.cuh"
 #include "ann_utils.cuh"
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/scann.hpp>
 #include <cuvs/preprocessing/quantize/pq.hpp>
-#include "../../src/preprocessing/quantize/detail/vpq_dataset_impl.hpp"
 
 #include <algorithm>
 #include <cmath>

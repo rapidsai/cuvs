@@ -279,12 +279,12 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
       raft::make_device_matrix<float, int64_t>(handle, n_samples_, n_features_);
 
     inverse_transform(handle,
-                      owning_quantizer,
+                      owning_quant,
                       raft::make_const_mdspan(codes_owning.view()),
                       reconstructed_owning.view(),
                       std::nullopt);
     inverse_transform(handle,
-                      view_quantizer,
+                      view_quant,
                       raft::make_const_mdspan(codes_view.view()),
                       reconstructed_view.view(),
                       std::nullopt);

@@ -421,8 +421,8 @@ auto vpq_build(const raft::resources& res,
     true);
 
   return vpq_dataset<MathT, IdxT>{
-    vpq_codebooks<MathT>{std::make_unique<vpq_codebooks_owning<MathT>>(
-      std::move(vq_code_book), std::move(pq_code_book))},
+    vpq_codebooks<MathT>{std::make_unique<vpq_codebooks_owning<MathT>>(std::move(vq_code_book),
+                                                                       std::move(pq_code_book))},
     std::move(codes)};
 }
 
