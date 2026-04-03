@@ -164,7 +164,10 @@ quantizer<MathT> build(
 }
 
 /**
- * @brief Build a view-type quantizer from pre-computed codebooks.
+ * @brief Build a quantizer from pre-computed codebooks.
+ * 
+ * The quantizer does not own the codebook arrays
+ 
  */
 template <typename MathT>
 quantizer<MathT> build_view(
