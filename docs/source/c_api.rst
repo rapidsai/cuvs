@@ -8,6 +8,8 @@ C API Documentation
    :maxdepth: 4
 
    c_api/core_c_api.rst
+   c_api/distance.rst
+   c_api/cluster.rst
    c_api/neighbors.rst
    c_api/neighbors_mg.rst
    c_api/preprocessing.rst
