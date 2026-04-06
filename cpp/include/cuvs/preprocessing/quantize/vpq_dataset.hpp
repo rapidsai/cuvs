@@ -146,9 +146,9 @@ class vpq_dataset : public cuvs::neighbors::dataset<IdxT> {
   vpq_dataset& operator=(vpq_dataset&&)      = default;
   ~vpq_dataset() override                    = default;
 
-  [[nodiscard]] auto n_rows() const noexcept -> index_type override { return data.extent(0); }
-  [[nodiscard]] auto dim() const noexcept -> uint32_t override { return codebooks.dim(); }
-  [[nodiscard]] auto is_owning() const noexcept -> bool override { return true; }
+  [[nodiscard]] index_type n_rows() const noexcept override { return data.extent(0); }
+  [[nodiscard]] uint32_t dim() const noexcept override { return codebooks.dim(); }
+  [[nodiscard]] bool is_owning() const noexcept override { return true; }
 
   [[nodiscard]] auto vq_code_book() const noexcept
     -> raft::device_matrix_view<const math_type, uint32_t, raft::row_major>
