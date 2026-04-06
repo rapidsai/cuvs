@@ -7,9 +7,8 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <memory>
-#include <sstream>
 #include <string>
+#include <typeinfo>
 #include <vector>
 
 #include <nvJitLink.h>
@@ -17,6 +16,8 @@
 #include "nvjitlink_checker.hpp"
 
 struct FragmentEntry {
+  virtual ~FragmentEntry() = default;
+
   virtual bool add_to(nvJitLinkHandle& handle) const = 0;
 
   virtual const char* get_key() const = 0;
