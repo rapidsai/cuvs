@@ -65,7 +65,7 @@ The following table shows which vector search indexes are available in each lang
      - ✅
    * - NN Descent
      - ✅
-     -
+     - ✅
      - ✅
      -
      -
