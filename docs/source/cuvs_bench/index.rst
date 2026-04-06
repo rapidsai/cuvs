@@ -54,7 +54,7 @@ Installing the benchmarks
 There are two main ways pre-compiled benchmarks are distributed:
 
 - `Conda`_ For users not using containers but want an easy to install and use Python package. Pip wheels are planned to be added as an alternative for users that cannot use conda and prefer to not use containers.
-- `Docker`_ Only needs docker and [NVIDIA docker](https://github.com/NVIDIA/nvidia-docker) to use. Provides a single docker run command for basic dataset benchmarking, as well as all the functionality of the conda solution inside the containers.
+- `Docker`_ Only needs docker and `NVIDIA docker <https://github.com/NVIDIA/nvidia-docker>`_ to use. Provides a single docker run command for basic dataset benchmarking, as well as all the functionality of the conda solution inside the containers.
 
 Conda
 -----
@@ -84,21 +84,21 @@ We provide images for GPU enabled systems, as well as systems without a GPU. The
 
 Nightly images are located in `dockerhub <https://hub.docker.com/r/rapidsai/cuvs-bench/tags>`_.
 
-The following command pulls the nightly container for Python version 3.10, CUDA version 12.5, and cuVS version 24.12:
+The following command pulls the nightly container for Python version 3.13, CUDA version 12.9, and cuVS version 26.04:
 
 .. code-block:: bash
 
-   docker pull rapidsai/cuvs-bench:26.04a-cuda12.5-py3.10 # substitute cuvs-bench for the exact desired container.
+   docker pull rapidsai/cuvs-bench:26.06a-cuda12-py3.13 # substitute cuvs-bench for the exact desired container.
 
 The CUDA and python versions can be changed for the supported values:
-- Supported CUDA versions: 12
-- Supported Python versions: 3.10 and 3.11.
+- Supported CUDA versions: 12, 13
+- Supported Python versions: 3.11, 3.11, 3.13, and 3.14
 
 You can see the exact versions as well in the dockerhub site:
 - `cuVS bench images <https://hub.docker.com/r/rapidsai/cuvs-bench/tags>`_
 - `cuVS bench CPU only images <https://hub.docker.com/r/rapidsai/cuvs-bench-cpu/tags>`_
 
-**Note:** GPU containers use the CUDA toolkit from inside the container, the only requirement is a driver installed on the host machine that supports that version. So, for example, CUDA 11.8 containers can run in systems with a CUDA 12.x capable driver. Please also note that the Nvidia-Docker runtime from the `Nvidia Container Toolkit <https://github.com/NVIDIA/nvidia-docker>`_ is required to use GPUs inside docker containers.
+**Note:** GPU containers use the CUDA toolkit from inside the container, the only requirement is a driver installed on the host machine that supports that version. So, for example, CUDA 12 containers can run in systems with a CUDA 13.x capable driver. Please also note that the Nvidia-Docker runtime from the `Nvidia Container Toolkit <https://github.com/NVIDIA/nvidia-docker>`_ is required to use GPUs inside docker containers.
 
 Running the benchmarks
 ======================
@@ -235,7 +235,7 @@ For GPU-enabled systems, the `DATA_FOLDER` variable should be a local folder whe
     export DATA_FOLDER=path/to/store/datasets/and/results
     docker run --gpus all --rm -it -u $(id -u)                      \
         -v $DATA_FOLDER:/data/benchmarks                            \
-        rapidsai/cuvs-bench:26.04-cuda12.9-py3.13              \
+        rapidsai/cuvs-bench:26.06-cuda12.9-py3.13              \
         "--dataset deep-image-96-angular"                           \
         "--normalize"                                               \
         "--algorithms cuvs_cagra,cuvs_ivf_pq --batch-size 10 -k 10" \
@@ -248,7 +248,7 @@ Usage of the above command is as follows:
  * - Argument
    - Description
 
- * - `rapidsai/cuvs-bench:26.04-cuda12.9-py3.13`
+ * - `rapidsai/cuvs-bench:26.06-cuda12.9-py3.13`
    - Image to use. See "Docker" section for links to lists of available tags.
 
  * - `"--dataset deep-image-96-angular"`
@@ -277,7 +277,7 @@ The container arguments in the above section also be used for the CPU-only conta
     export DATA_FOLDER=path/to/store/datasets/and/results
     docker run  --rm -it -u $(id -u)                  \
         -v $DATA_FOLDER:/data/benchmarks              \
-        rapidsai/cuvs-bench-cpu:24.10a-py3.10     \
+        rapidsai/cuvs-bench-cpu:26.04a-py3.13     \
          "--dataset deep-image-96-angular"            \
          "--normalize"                                \
          "--algorithms hnswlib --batch-size 10 -k 10" \
@@ -295,9 +295,9 @@ All of the `cuvs-bench` images contain the Conda packages, so they can be used d
         --entrypoint /bin/bash                          \
         --workdir /data/benchmarks                      \
         -v $DATA_FOLDER:/data/benchmarks                \
-        rapidsai/cuvs-bench:26.04-cuda12.9-py3.13
+        rapidsai/cuvs-bench:26.06-cuda12.9-py3.13
 
-This will drop you into a command line in the container, with the `cuvs-bench` python package ready to use, as described in the [Running the benchmarks](#running-the-benchmarks) section above:
+This will drop you into a command line in the container, with the `cuvs-bench` python package ready to use, as described in the `Running the benchmarks`_ section above:
 
 .. code-block:: bash
 

@@ -15,7 +15,6 @@
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/selection/select_k.hpp>
-#include <raft/core/cudart_utils.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/operators.hpp>
@@ -29,11 +28,11 @@
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/linalg/norm_types.hpp>
 #include <raft/linalg/normalize.cuh>
-#include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/detail/select_warpsort.cuh>
 #include <raft/matrix/select_k.cuh>
 #include <raft/util/cache.hpp>
 #include <raft/util/cuda_utils.cuh>
+#include <raft/util/cudart_utils.hpp>
 #include <raft/util/device_atomics.cuh>
 #include <raft/util/device_loads_stores.cuh>
 #include <raft/util/pow2_utils.cuh>
@@ -42,7 +41,7 @@
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/mr/per_device_resource.hpp>
 
-#include <cub/cub.cuh>
+#include <cub/device/device_radix_sort.cuh>
 #include <cuda_fp16.h>
 
 #include <optional>
@@ -485,7 +484,7 @@ void ivfpq_search_worker(raft::resources const& handle,
 
   if (coresidency > 1) {
     // Sorting index by cluster number (label).
-    // The goal is to incrase the L2 cache hit rate to read the vectors
+    // The goal is to increase the L2 cache hit rate to read the vectors
     // of a cluster by processing the cluster at the same time as much as
     // possible.
     index_list_sorted_buf.resize(n_queries_probes, stream);
@@ -628,14 +627,14 @@ void ivfpq_search_worker(raft::resources const& handle,
     num_samples_vector);
 
   // Postprocessing
-  ivf::detail::postprocess_distances(distances,
+  ivf::detail::postprocess_distances(handle,
+                                     distances,
                                      topk_dists.data(),
                                      index.metric(),
                                      n_queries,
                                      topK,
                                      scaling_factor,
-                                     index.metric() != distance::DistanceType::CosineExpanded,
-                                     stream);
+                                     index.metric() != distance::DistanceType::CosineExpanded);
   ivf::detail::postprocess_neighbors(neighbors,
                                      neighbors_uint32,
                                      index.inds_ptrs().data_handle(),
@@ -782,21 +781,35 @@ inline auto get_max_coarse_batch_size(raft::resources const& res,
                                       const search_params& params,
                                       uint32_t n_probes,
                                       uint32_t n_lists,
-                                      uint32_t n_queries) -> uint32_t
+                                      uint32_t n_queries,
+                                      uint32_t dim_ext,
+                                      uint32_t rot_dim) -> uint32_t
 {
-  size_t data_size = 4;
+  size_t gemm_elem_size;
+  size_t qc_elem_size;
   switch (params.coarse_search_dtype) {
-    case CUDA_R_32F: data_size = 4; break;
-    case CUDA_R_16F: data_size = 2; break;
-    case CUDA_R_8I: data_size = 1; break;
+    case CUDA_R_32F:
+      gemm_elem_size = 4;
+      qc_elem_size   = 4;
+      break;
+    case CUDA_R_16F:
+      gemm_elem_size = 2;
+      qc_elem_size   = 2;
+      break;
+    case CUDA_R_8I:
+      gemm_elem_size = 1;
+      qc_elem_size   = 4;
+      break;
     default: RAFT_FAIL("Unexpected coarse_search_dtype (%d)", int(params.coarse_search_dtype));
   }
-  // How much data we allocate for coarse GEMM.
-  // This is NOT all memory we need, as a rule of thumb max it out to half of the workspace.
-  // We don't reach this limit by default, but only when we increase the max_internal_batch_size by
-  // a lot.
-  auto bytes_per_query = static_cast<size_t>(n_probes + n_lists) * data_size;
-  auto max_per_ws      = raft::resource::get_workspace_free_bytes(res) / bytes_per_query;
+  // Persistent allocations that live for the entire search call.
+  auto persistent_per_query = static_cast<size_t>(dim_ext) * gemm_elem_size +
+                              static_cast<size_t>(rot_dim) * sizeof(float) +
+                              static_cast<size_t>(n_probes) * sizeof(uint32_t);
+  // Transient allocations during coarse search (select_clusters): qc_distances + cluster_dists.
+  auto transient_per_query = static_cast<size_t>(n_lists + n_probes) * qc_elem_size;
+  auto total_per_query     = persistent_per_query + transient_per_query;
+  auto max_per_ws          = raft::resource::get_workspace_free_bytes(res) / total_per_query;
   return std::max<uint32_t>(
     1,
     std::min<uint32_t>(max_per_ws / 2,
@@ -890,8 +903,8 @@ inline void search(raft::resources const& handle,
 
   // Maximum number of query vectors to search at the same time.
   // Number of queries in the outer loop, which includes query transform and coarse search.
-  const auto max_bs_outer =
-    get_max_coarse_batch_size(handle, params, n_probes, index.n_lists(), n_queries);
+  const auto max_bs_outer = get_max_coarse_batch_size(
+    handle, params, n_probes, index.n_lists(), n_queries, dim_ext, index.rot_dim());
   // Number of queries in the inner loop, which includes the fine search;
   // This is usually smaller than the outer loop when the non-fused kernel has to keep intermediate
   // results in the device memory.

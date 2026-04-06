@@ -1,16 +1,17 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
 #include <raft/core/detail/macros.hpp>
+#include <raft/util/cuda_dev_essentials.cuh>
 
 #include <cub/block/block_load.cuh>
 #include <cub/block/block_radix_sort.cuh>
 #include <cub/block/block_store.cuh>
-#include <cub/cub.cuh>
+#include <cub/warp/warp_reduce.cuh>
 
 namespace cuvs {
 namespace distance {
@@ -120,10 +121,11 @@ RAFT_KERNEL balanced_coo_generalized_spmv_kernel(strategy_t strategy,
 
   extern __shared__ char smem[];
 
-  typename strategy_t::smem_type A                = (typename strategy_t::smem_type)(smem);
-  typename warp_reduce::TempStorage* temp_storage = (typename warp_reduce::TempStorage*)(A + dim);
+  void* A = smem;
+  typename warp_reduce::TempStorage* temp_storage =
+    (typename warp_reduce::TempStorage*)((char*)A + dim);
 
-  auto inserter = strategy.init_insert(A, dim);
+  auto map_ref = strategy.init_map(A, dim);
 
   __syncthreads();
 
@@ -134,12 +136,10 @@ RAFT_KERNEL balanced_coo_generalized_spmv_kernel(strategy_t strategy,
 
   // Convert current row vector in A to dense
   for (int i = tid; i <= (stop_offset_a - start_offset_a); i += blockDim.x) {
-    strategy.insert(inserter, indicesA[start_offset_a + i], dataA[start_offset_a + i]);
+    strategy.insert(map_ref, indicesA[start_offset_a + i], dataA[start_offset_a + i]);
   }
 
   __syncthreads();
-
-  auto finder = strategy.init_find(A, dim);
 
   if (cur_row_a > m || cur_chunk_offset > n_blocks_per_row) return;
   if (ind >= nnz_b) return;
@@ -166,7 +166,7 @@ RAFT_KERNEL balanced_coo_generalized_spmv_kernel(strategy_t strategy,
     auto in_bounds = indptrA.check_indices_bounds(start_index_a, stop_index_a, index_b);
 
     if (in_bounds) {
-      value_t a_col = strategy.find(finder, index_b);
+      value_t a_col = strategy.find(map_ref, index_b);
       if (!rev || a_col == 0.0) { c = product_func(a_col, dataB[ind]); }
     }
   }
@@ -204,7 +204,7 @@ RAFT_KERNEL balanced_coo_generalized_spmv_kernel(strategy_t strategy,
       auto index_b   = indicesB[ind];
       auto in_bounds = indptrA.check_indices_bounds(start_index_a, stop_index_a, index_b);
       if (in_bounds) {
-        value_t a_col = strategy.find(finder, index_b);
+        value_t a_col = strategy.find(map_ref, index_b);
 
         if (!rev || a_col == 0.0) { c = accum_func(c, product_func(a_col, dataB[ind])); }
       }
