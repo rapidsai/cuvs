@@ -844,7 +844,7 @@ __device__ bool is_divisible_impl(T value)
 
 Here is an example of an adapter file that contains an adapter function:
 
-```c++
+```
 #include "device_functions.cuh"  // is_divisible
 #include "is_divisible_impl.cuh" // is_divisible_impl
 
@@ -896,7 +896,7 @@ __device__ bool filter(T value)
 
 And here is the accompanying adapter file:
 
-```c++
+```
 #include "@op_name@_impl.cuh" // filter
 
 namespace {
@@ -933,7 +933,7 @@ __device__ bool filter_greater_than(T value);
 
 And the following adapter files:
 
-```c++
+```
 #include "device_functions.cuh" // filter_first_pass
 #include "@op_name@.cuh"   // filter
 
@@ -951,7 +951,7 @@ __device__ bool filter_first_pass<data_t>(data_t value)
 }
 ```
 
-```c++
+```
 #include "device_functions.cuh" // filter_second_pass
 #include "@op_name@.cuh"   // filter
 
