@@ -26,7 +26,7 @@ Filtering considerations
 
 CAGRA supports filtered search and has improved multi-CTA algorithm in branch-25.02 to provide reasonable recall and performance for filtering rate as high as 90% or more.
 
-To obtain an appropriate recall in filtered search, it is necessary to set search parameters according to the filtering rate, but since it is difficult for users to to this, CAGRA automatically adjusts `itopk_size` internally according to the filtering rate on a heuristic basis. If you want to disable this automatic adjustment, set `filtering_rate`, one of the search parameters, to `0.0`, and `itopk_size` will not be adjusted automatically.
+To obtain an appropriate recall in filtered search, it is necessary to set search parameters according to the filtering rate, but since it is difficult for users to do this, CAGRA automatically adjusts `itopk_size` internally according to the filtering rate on a heuristic basis. If you want to disable this automatic adjustment, set `filtering_rate`, one of the search parameters, to `0.0`, and `itopk_size` will not be adjusted automatically.
 
 Configuration parameters
 ------------------------
@@ -127,7 +127,7 @@ Optimize: formula for peak memory usage (device): :math:`n\_vectors * (4 + (size
 Build with out-of-core IVF-PQ peak memory usage:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Out-of-core CAGA build consists of IVF-PQ build, IVF-PQ search, CAGRA optimization. Note that these steps are performed sequentially, so they are not additive.
+Out-of-core CAGRA build consists of IVF-PQ build, IVF-PQ search, CAGRA optimization. Note that these steps are performed sequentially, so they are not additive.
 
 IVF-PQ Build:
 

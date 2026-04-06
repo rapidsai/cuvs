@@ -11,7 +11,7 @@
 #include <cub/block/block_load.cuh>
 #include <cub/block/block_radix_sort.cuh>
 #include <cub/block/block_store.cuh>
-#include <cub/cub.cuh>
+#include <cub/warp/warp_reduce.cuh>
 
 namespace cuvs {
 namespace distance {
