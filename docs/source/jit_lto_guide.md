@@ -911,10 +911,10 @@ template __device__ bool filter<data_t>(data_t value);
 This is another common pattern that you will see in cuVS JIT LTO. Note that the adapter file does not contain any adapter functions,
 but merely instantiates a different algorithm function based on which algorithm file is included based on the CMake substitution.
 
-When a piece of algorithm code is used in multiple algorithms, it should be split into its own shared fragment. At this point, it
+When a piece of algorithm code is used in multiple kernels, it should be split into its own shared fragment. At this point, it
 becomes important to also distinguish algorithm fragments and adapter fragments. An algorithm fragment contains an algorithm function
-that exposes all of the relevant template parameters, and this fragment is shared between multiple algorithms. An adapter fragment
-is specific to an algorithm. If an algorithm wishes to invoke the same shared algorithm multiple times in the same invocation with
+that exposes all of the relevant template parameters, and this fragment is shared between multiple kernels. An adapter fragment
+is specific to a kernel. If a kernel wishes to invoke the same shared algorithm multiple times in the same invocation with
 different template parameters, it can employ multiple adapter fragments to accomplish this. Consider the following header files:
 
 ```c++
