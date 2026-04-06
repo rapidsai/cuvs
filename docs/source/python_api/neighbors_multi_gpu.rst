@@ -112,7 +112,7 @@ Algorithm-Specific Documentation
    :maxdepth: 2
    :caption: Multi-GPU Algorithms:
 
-   neighbors_all_neighbors.rst
+   neighbors_mg_all_neighbors.rst
    neighbors_mg_cagra.rst
    neighbors_mg_ivf_flat.rst
    neighbors_mg_ivf_pq.rst
