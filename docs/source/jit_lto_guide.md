@@ -916,7 +916,7 @@ but merely instantiates a different algorithm function based on which algorithm 
 When a piece of algorithm code is used in multiple kernels, it should be split into its own shared fragment. At this point, it
 becomes important to also distinguish algorithm fragments and adapter fragments. An algorithm fragment contains an algorithm function
 that exposes all of the relevant template parameters, and this fragment is shared between multiple kernels. An adapter fragment
-is specific to a kernel. If a kernel wishes to invoke the same shared algorithm multiple times in the same invocation with
+is specific to a kernel. If a kernel wishes to invoke the same shared algorithm multiple times in the same run with
 different template parameters, it can employ multiple adapter fragments to accomplish this. Consider the following header files:
 
 ```c++
