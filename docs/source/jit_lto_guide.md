@@ -917,17 +917,13 @@ When a piece of algorithm code is used in multiple kernels, it should be split i
 becomes important to also distinguish algorithm fragments and adapter fragments. An algorithm fragment contains an algorithm function
 that exposes all of the relevant template parameters, and this fragment is shared between multiple kernels. An adapter fragment
 is specific to a kernel. If a kernel wishes to invoke the same shared algorithm multiple times in the same run with
-different template parameters, it can employ multiple adapter fragments to accomplish this. Consider the following header files:
+different template parameters, it can employ multiple adapter fragments to accomplish this. Consider the following header file:
 
 ```c++
-// less_than.cuh
+// filter.cuh
 
 template <typename T, T Comparand>
 __device__ bool filter_less_than(T value);
-```
-
-```c++
-// greater_than.cuh
 
 template <typename T, T Comparand>
 __device__ bool filter_greater_than(T value);
@@ -937,7 +933,7 @@ And the following adapter files:
 
 ```
 #include "device_functions.cuh" // filter_first_pass
-#include "@op_name@.cuh"   // filter
+#include "filter.cuh"           // filter
 
 namespace {
 
@@ -955,7 +951,7 @@ __device__ bool filter_first_pass<data_t>(data_t value)
 
 ```
 #include "device_functions.cuh" // filter_second_pass
-#include "@op_name@.cuh"   // filter
+#include "filter.cuh"           // filter
 
 namespace {
 
@@ -964,7 +960,7 @@ constexpr data_t comparand = @comparand@;
 }
 
 template <>
-__device__ bool filter_second_pass(data_t value)
+__device__ bool filter_second_pass<data_t>(data_t value)
 {
   return filter_@op_name@<data_t, comparand>(value);
 }
