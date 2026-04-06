@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,7 +17,7 @@ extern "C" {
 #endif
 
 /**
- * @defgroup all_neighbors_c_build All-neighbors C-API build
+ * @defgroup all_neighbors_c_params All-neighbors C-API build parameters
  * @{
  *
  * All-neighbors constructs an approximate k-NN graph for all vectors in a dataset.
@@ -77,6 +77,13 @@ cuvsError_t cuvsAllNeighborsIndexParamsCreate(cuvsAllNeighborsIndexParams_t* ind
  * @return cuvsError_t
  */
 cuvsError_t cuvsAllNeighborsIndexParamsDestroy(cuvsAllNeighborsIndexParams_t index_params);
+
+/** @} */
+
+/**
+ * @defgroup all_neighbors_c_build All-neighbors C-API build
+ * @{
+ */
 
 /**
  * @brief Build an all-neighbors k-NN graph automatically detecting host vs device dataset.
