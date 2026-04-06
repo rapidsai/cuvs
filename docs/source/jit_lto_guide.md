@@ -816,3 +816,221 @@ The process involves:
 5. Creating a planner to manage fragment dependencies
 6. Integrating the planner into the code path to launch kernels
 7. **Adding CMake integration** to generate and compile all fragment variants
+
+## Fragment Architecture
+
+JIT LTO kernels are split into _fragments_, which are fatbins containing individual pieces of code that can be strung together
+rather than instantiating the whole kernel at once. Each fragment only needs to be multiplied out over the dimensions (template
+parameters) that the fragment itself contains rather than the kernel as a whole. At runtime, these fragments are combined together
+by nvjitlink into the final program.
+
+In JIT LTO, there are two kinds of code: _algorithms_ and _adapters_. Algorithms are, roughly speaking, code that actually "does
+stuff" - searching, sorting, even as simple as initializing variables. Adapters don't do anything by themselves, but are merely
+thin wrappers around algorithms that exist only for reducing the number of template parameters that the caller needs to know about.
+
+An algorithm function is a function that contains real code for the algorithm, and an adapter function merely calls an algorithm
+function with more template parameters than the adapter function itself has. An algorithm file contains algorithm code, and an
+adapter file contains adapter code.
+
+Here is an example of an algorithm file that contains an algorithm function:
+
+```c++
+template <typename T, T Divisor>
+__device__ bool is_divisible_impl(T value)
+{
+  return value % Divisor == 0;
+}
+```
+
+Here is an example of an adapter file that contains an adapter function:
+
+```c++
+#include "device_functions.cuh"  // is_divisible
+#include "is_divisible_impl.cuh" // is_divisible_impl
+
+namespace {
+
+using data_t             = @data_type@;
+constexpr data_t divisor = @divisor@;
+
+}  // namespace
+
+template <>
+__device__ bool is_divisible<data_t>(data_t value)
+{
+  return is_divisible_impl<data_t, divisor>(value);
+}
+```
+
+This is the most common pattern that you will see in cuVS's JIT LTO code. Note that any code that calls `is_divisible()` does not
+need to know the value of `Divisor`, which allows the caller to be multiplied over fewer dimensions, thus reducing the amount of code
+generated.
+
+Note that in the above adapter file, `@data_type@` and `@divisor@` are build-time substitutions performed by CMake. These
+substitutions will be filled in with values from the matrix product. Note that they are all grouped together in a single `namespace`,
+making it easy to find all substitutions. This should be preferred to sprinkling the substitutions throughout the code.
+
+Here is an example with two algorithm files:
+
+```c++
+// greater_than_impl.cuh
+#include "device_impl_functions.cuh" // filter
+
+template <typename T, T Comparand>
+__device__ bool filter(T value)
+{
+  return value > Comparand;
+}
+```
+
+```c++
+// less_than_impl.cuh
+#include "device_impl_functions.cuh" // filter
+
+template <typename T, T Comparand>
+__device__ bool filter(T value)
+{
+  return value < Comparand;
+}
+```
+
+And here is the accompanying adapter file:
+
+```c++
+#include "@op_name@_impl.cuh" // filter
+
+namespace {
+
+using data_t = @data_type@;
+
+}
+
+template __device__ bool filter<data_t>(data_t value);
+```
+
+This is another common pattern that you will see in cuVS JIT LTO. Note that the adapter file does not contain any adapter functions,
+but merely instantiates a different algorithm function based on which algorithm file is included based on the CMake substitution.
+
+When a piece of algorithm code is used in multiple algorithms, it should be split into its own shared fragment. At this point, it
+becomes important to also distinguish algorithm fragments and adapter fragments. An algorithm fragment contains an algorithm function
+that exposes all of the relevant template parameters, and this fragment is shared between multiple algorithms. An adapter fragment
+is specific to an algorithm. If an algorithm wishes to invoke the same shared algorithm multiple times in the same invocation with
+different template parameters, it can employ multiple adapter fragments to accomplish this. Consider the following header files:
+
+```c++
+// less_than.cuh
+
+template <typename T, T Comparand>
+__device__ bool filter_less_than(T value);
+```
+
+```c++
+// greater_than.cuh
+
+template <typename T, T Comparand>
+__device__ bool filter_greater_than(T value);
+```
+
+And the following adapter files:
+
+```c++
+#include "device_functions.cuh" // filter_first_pass
+#include "@op_name@.cuh"   // filter
+
+namespace {
+
+using data_t               = @data_type@;
+constexpr data_t comparand = @comparand@;
+
+}
+
+template <>
+__device__ bool filter_first_pass<data_t>(data_t value)
+{
+  return filter_@op_name@<data_t, comparand>(value);
+}
+```
+
+```c++
+#include "device_functions.cuh" // filter_second_pass
+#include "@op_name@.cuh"   // filter
+
+namespace {
+
+using data_t               = @data_type@;
+constexpr data_t comparand = @comparand@;
+}
+
+template <>
+__device__ bool filter_second_pass(data_t value)
+{
+  return filter_@op_name@<data_t, comparand>(value);
+}
+```
+
+And the following algorithm file:
+
+```c++
+#include "device_functions.cuh" // filter_first_pass, filter_second_pass
+
+template <typename T>
+__device__ bool filter_all_passes(T value)
+{
+  return filter_first_pass<T>(value) && filter_second_pass<T>(value);
+}
+```
+
+Note that `filter_first_pass` and `filter_second_pass` both invoke one of the `filter` functions, but which one they invoke is
+decided independently for each. Also note that neither of the adapter fragments contains the underlying algorithm code, but rather
+links against the corresponding shared algorithm fragments.
+
+The key to minimizing code generation is to minimize the number of dimensions that any given fragment needs to be multiplied out
+over. If a section of algorithm code uses lots of template parameters, try to separate out sections that use only a subset of
+these parameters, put them into their own fragment, and remove the corresponding template parameters from the caller. Make judicious
+use of adapter code to accomplish this. An adapter function should only have the template parameters that appear in its signature,
+whereas an algorithm function should have all of the template parameters that appear in its signature or its implementation.
+
+Unoptimized algorithm:
+
+```c++
+#include "filter_less_than.cuh"
+
+template <typename T, T Comparand>
+__device__ size_t find_first(T* values, size_t count)
+{
+  for (size_t i = 0; i < count; i++) {
+    if (filter_less_than_impl<T, Comparand>(values[i])) {
+      return i;
+    }
+  }
+
+  // Could not find any
+  return count;
+}
+```
+
+Note that the algorithm includes the `Comparand` template parameter, which means the entire algorithm has to be multiplied out over
+all the possible values of this parameter.
+
+Optimized algorithm:
+
+```c++
+#include "device_functions.cuh"
+
+template <typename T>
+__device__ size_t find_first(T* values, size_t count)
+{
+  for (size_t i = 0; i < count; i++) {
+    if (filter_less_than<T>(values[i])) {
+      return i;
+    }
+  }
+
+  // Could not find any
+  return count;
+}
+```
+
+We are now using an adapter function (possibly inside an adapter fragment) called `filter_less_than` to invoke
+`filter_less_than_impl`. This allows us to hide the `Comparand` parameter from `find_first`, which means we no longer need to
+multiply the entire algorithm over all possible values of `Comparand`, only the `filter_less_than` adapter and algorithm.
