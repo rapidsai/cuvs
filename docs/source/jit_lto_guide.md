@@ -827,6 +827,8 @@ by nvjitlink into the final program.
 In JIT LTO, there are two kinds of code: _algorithms_ and _adapters_. Algorithms are, roughly speaking, code that actually "does
 stuff" - searching, sorting, even as simple as initializing variables. Adapters don't do anything by themselves, but are merely
 thin wrappers around algorithms that exist only for reducing the number of template parameters that the caller needs to know about.
+It should generally be assumed that algorithm code is expensive to multiply over a matrix, and thus such multiplication should be
+minimized, while adapter code is cheap to multiply.
 
 An algorithm function is a function that contains real code for the algorithm, and an adapter function merely calls an algorithm
 function with more template parameters than the adapter function itself has. An algorithm file contains algorithm code, and an
