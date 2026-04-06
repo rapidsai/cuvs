@@ -1030,5 +1030,6 @@ __device__ size_t find_first(T* values, size_t count)
 ```
 
 We are now using an adapter function (possibly inside an adapter fragment) called `filter_less_than` to invoke
-`filter_less_than_impl`. This allows us to hide the `Comparand` parameter from `find_first`, which means we no longer need to
-multiply the entire algorithm over all possible values of `Comparand`, only the `filter_less_than` adapter and algorithm.
+`filter_less_than_impl` (which may be inside a shared algorithm fragment). This allows us to hide the `Comparand` parameter
+from `find_first`, which means we no longer need to multiply the entire algorithm over all possible values of `Comparand`, only the
+`filter_less_than` adapter and algorithm.
