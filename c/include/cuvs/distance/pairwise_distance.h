@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -11,6 +11,11 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/**
+ * @defgroup pairwise_distance_c C pairwise distance
+ * @{
+ */
 
 /**
  * @brief Compute pairwise distances for two matrices
@@ -46,6 +51,9 @@ cuvsError_t cuvsPairwiseDistance(cuvsResources_t res,
                                  DLManagedTensor* dist,
                                  cuvsDistanceType metric,
                                  float metric_arg);
+
+/** @} */
+
 #ifdef __cplusplus
 }
 #endif
