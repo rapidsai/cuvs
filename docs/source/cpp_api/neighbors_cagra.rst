@@ -67,6 +67,14 @@ Index extend
     :members:
     :content-only:
 
+Index merge
+-----------
+
+.. doxygengroup:: cagra_cpp_index_merge
+    :project: cuvs
+    :members:
+    :content-only:
+
 Index serialize
 ---------------
 
