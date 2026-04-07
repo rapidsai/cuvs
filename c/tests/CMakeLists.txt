@@ -111,7 +111,7 @@ ConfigureTest(NAME cuvs_c_neighbors_test PATH neighbors/c_api.c)
 # * Validate installed headers are listed in `all.h`
 
 include(cmake/header_check.cmake)
-cuvs_c_add_header_check("${CUVS_C_SOURCE_DIR}" "cuvs/core/all.h" INSTALL_COMPONENT_SET testing)
+cuvs_c_add_header_check("${CMAKE_CURRENT_SOURCE_DIR}/.." "cuvs/core/all.h" INSTALL_COMPONENT_SET testing)
 
 # ##################################################################################################
 # * Install Tests ---------------------------------------------------------------
