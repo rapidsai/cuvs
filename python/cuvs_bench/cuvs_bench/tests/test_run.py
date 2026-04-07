@@ -260,7 +260,7 @@ def test_rmm_present():
 @patch("cuvs_bench.run.run.get_build_path", return_value="build_path")
 def test_find_executable(mock_get_build_path):
     algos_conf = {"algo1": {"executable": "executable1"}}
-    result = find_executable(algos_conf, "algo1", "group1", 10, 128)
+    result = find_executable(algos_conf, "algo1", "group1", 10, 128, None)
     assert result == (
         "executable1",
         "build_path",
@@ -268,7 +268,7 @@ def test_find_executable(mock_get_build_path):
     )
     mock_get_build_path.return_value = None
     with pytest.raises(FileNotFoundError):
-        find_executable(algos_conf, "algo1", "group1", 10, 128)
+        find_executable(algos_conf, "algo1", "group1", 10, 128, None)
 
 
 def test_validate_algorithm():
