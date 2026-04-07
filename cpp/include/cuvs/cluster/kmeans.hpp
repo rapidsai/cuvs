@@ -1122,7 +1122,7 @@ namespace helpers {
  * @param tol tolerance for early stopping convergence
  */
 void find_k(raft::resources const& handle,
-            raft::device_matrix_view<const float, int> X,
+            raft::device_matrix_view<const float, int64_t> X,
             raft::host_scalar_view<int> best_k,
             raft::host_scalar_view<float> inertia,
             raft::host_scalar_view<int> n_iter,

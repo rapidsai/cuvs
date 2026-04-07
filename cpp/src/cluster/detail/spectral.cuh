@@ -51,12 +51,16 @@ void fit_predict(raft::resources const& handle,
                           config.n_components,
                           raft::resource::get_cuda_stream(handle));
 
+  auto X_i64 = raft::make_device_matrix_view<DataT, int64_t>(
+    embedding_row_major.data_handle(), int64_t(n_samples), int64_t(config.n_components));
+  auto labels_u32 = raft::make_device_vector_view<uint32_t, int64_t>(
+    reinterpret_cast<uint32_t*>(labels.data_handle()), int64_t(n_samples));
   cuvs::cluster::kmeans::fit_predict(handle,
                                      kmeans_config,
-                                     embedding_row_major.view(),
+                                     raft::make_const_mdspan(X_i64),
                                      std::nullopt,
                                      std::nullopt,
-                                     labels,
+                                     labels_u32,
                                      raft::make_host_scalar_view(&inertia),
                                      raft::make_host_scalar_view(&n_iter));
 }

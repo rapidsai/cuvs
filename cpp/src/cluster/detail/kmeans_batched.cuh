@@ -227,7 +227,7 @@ void fit(raft::resources const& handle,
          std::optional<raft::host_vector_view<const T, IdxT>> sample_weight,
          raft::device_matrix_view<T, IdxT> centroids,
          raft::host_scalar_view<T> inertia,
-         raft::host_scalar_view<IdxT> n_iter)
+         raft::host_scalar_view<int> n_iter)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   auto n_samples      = X.extent(0);
@@ -272,7 +272,7 @@ void fit(raft::resources const& handle,
                           ? raft::make_device_matrix<T, IdxT>(handle, n_clusters, n_features)
                           : raft::make_device_matrix<T, IdxT>(handle, 0, 0);
   T best_inertia      = std::numeric_limits<T>::max();
-  IdxT best_n_iter    = 0;
+  int best_n_iter    = 0;
 
   std::mt19937 gen(params.rng_state.seed);
 

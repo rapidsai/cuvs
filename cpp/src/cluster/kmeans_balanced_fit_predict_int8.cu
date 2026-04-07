@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -16,15 +16,6 @@ void fit_predict(const raft::resources& handle,
                  raft::device_matrix_view<const int8_t, int64_t> X,
                  raft::device_matrix_view<float, int64_t> centroids,
                  raft::device_vector_view<uint32_t, int64_t> labels)
-{
-  cuvs::cluster::kmeans_balanced::fit_predict(handle, params, X, centroids, labels);
-}
-
-void fit_predict(const raft::resources& handle,
-                 cuvs::cluster::kmeans::balanced_params const& params,
-                 raft::device_matrix_view<const int8_t, int64_t> X,
-                 raft::device_matrix_view<float, int64_t> centroids,
-                 raft::device_vector_view<int, int64_t> labels)
 {
   cuvs::cluster::kmeans_balanced::fit_predict(handle, params, X, centroids, labels);
 }

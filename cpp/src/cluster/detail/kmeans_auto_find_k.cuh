@@ -25,13 +25,13 @@ void compute_dispersion(raft::resources const& handle,
                         raft::device_matrix_view<const value_t, idx_t> X,
                         cuvs::cluster::kmeans::params& params,
                         raft::device_matrix_view<value_t, idx_t> centroids_view,
-                        raft::device_vector_view<idx_t, idx_t> labels,
+                        raft::device_vector_view<uint32_t, idx_t> labels,
                         raft::device_vector_view<idx_t, idx_t> clusterSizes,
                         rmm::device_uvector<char>& workspace,
                         raft::host_vector_view<value_t> clusterDispertionView,
                         raft::host_vector_view<value_t> resultsView,
                         raft::host_scalar_view<value_t> residual,
-                        raft::host_scalar_view<idx_t> n_iter,
+                        raft::host_scalar_view<int> n_iter,
                         int val,
                         idx_t n,
                         idx_t d)
@@ -48,7 +48,12 @@ void compute_dispersion(raft::resources const& handle,
   cuvs::cluster::kmeans::fit_predict(
     handle, params, X, std::nullopt, std::make_optional(centroids_view), labels, residual, n_iter);
 
-  detail::countLabels(handle, labels.data_handle(), clusterSizes.data_handle(), n, val, workspace);
+  detail::countLabels(handle,
+                      labels.data_handle(),
+                      clusterSizes.data_handle(),
+                      n,
+                      idx_t(val),
+                      workspace);
 
   resultsView[val]           = residual[0];
   clusterDispertionView[val] = raft::stats::cluster_dispersion(
@@ -58,12 +63,12 @@ void compute_dispersion(raft::resources const& handle,
 template <typename idx_t, typename value_t>
 void find_k(raft::resources const& handle,
             raft::device_matrix_view<const value_t, idx_t> X,
-            raft::host_scalar_view<idx_t> best_k,
+            raft::host_scalar_view<int> best_k,
             raft::host_scalar_view<value_t> residual,
-            raft::host_scalar_view<idx_t> n_iter,
-            idx_t kmax,
-            idx_t kmin    = 1,
-            idx_t maxiter = 100,
+            raft::host_scalar_view<int> n_iter,
+            int kmax,
+            int kmin    = 1,
+            int maxiter = 100,
             value_t tol   = 1e-2)
 {
   idx_t n = X.extent(0);
@@ -80,7 +85,7 @@ void find_k(raft::resources const& handle,
 
   auto centroids    = raft::make_device_matrix<value_t, idx_t>(handle, kmax, X.extent(1));
   auto clusterSizes = raft::make_device_vector<idx_t>(handle, kmax);
-  auto labels       = raft::make_device_vector<idx_t>(handle, n);
+  auto labels       = raft::make_device_vector<uint32_t, idx_t>(handle, n);
 
   rmm::device_uvector<char> workspace(0, raft::resource::get_cuda_stream(handle));
 
@@ -109,7 +114,7 @@ void find_k(raft::resources const& handle,
 
   auto centroids_view =
     raft::make_device_matrix_view<value_t, idx_t>(centroids.data_handle(), left, d);
-  auto labels_view = raft::make_device_vector_view<idx_t, idx_t>(labels.data_handle(), n);
+  auto labels_view = raft::make_device_vector_view<uint32_t, idx_t>(labels.data_handle(), n);
   auto clusterSizes_view =
     raft::make_device_vector_view<idx_t, idx_t>(clusterSizes.data_handle(), kmax);
   compute_dispersion<value_t, idx_t>(handle,
@@ -212,14 +217,8 @@ void find_k(raft::resources const& handle,
       raft::make_device_matrix_view<value_t, idx_t>(centroids.data_handle(), best_k[0], d);
 
     params.n_clusters = best_k[0];
-    cuvs::cluster::kmeans::fit_predict(handle,
-                                       params,
-                                       X,
-                                       std::nullopt,
-                                       std::make_optional(centroids_view),
-                                       labels.view(),
-                                       residual,
-                                       n_iter);
+    cuvs::cluster::kmeans::fit_predict(
+      handle, params, X, std::nullopt, std::make_optional(centroids_view), labels.view(), residual, n_iter);
   }
 }
 }  // namespace  cuvs::cluster::kmeans::detail
