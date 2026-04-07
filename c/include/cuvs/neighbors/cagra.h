@@ -828,6 +828,15 @@ cuvsError_t cuvsCagraIndexFromArgs(cuvsResources_t res,
                                    cuvsCagraIndex_t index);
 
 /**
+ * @}
+ */
+
+/**
+ * @defgroup cagra_c_index_merge CAGRA C-API merge functions
+ * @{
+ */
+
+/**
  * @brief Merge multiple CAGRA indices into a single CAGRA index.
  *
  * All input indices must have been built with the same data type (`index.dtype`) and
