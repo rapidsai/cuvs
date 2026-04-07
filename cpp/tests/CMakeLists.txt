@@ -161,6 +161,7 @@ ConfigureTest(
        neighbors/ann_cagra/bug_multi_cta_crash.cu
        neighbors/ann_cagra/bug_iterative_cagra_build.cu
        neighbors/ann_cagra/bug_issue_93_reproducer.cu
+       neighbors/ann_cagra/bug_graph_smaller_than_dataset.cu
   GPUS 1
   PERCENT 100
 )
@@ -175,6 +176,7 @@ ConfigureTest(
 ConfigureTest(
   NAME NEIGHBORS_ANN_CAGRA_HELPERS_TEST
   PATH neighbors/ann_cagra/test_optimize_uint32_t.cu
+       neighbors/ann_cagra/test_batched_device_view_from_host.cu
   GPUS 1
   PERCENT 100
 )
