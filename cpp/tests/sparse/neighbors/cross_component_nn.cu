@@ -29,8 +29,6 @@
 
 #include <rmm/device_uvector.hpp>
 
-#include <cub/cub.cuh>
-
 #include <gtest/gtest.h>
 
 #include <vector>

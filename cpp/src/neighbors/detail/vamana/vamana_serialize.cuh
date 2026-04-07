@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,6 +8,7 @@
 #include "vamana_structs.cuh"
 
 #include <cuvs/neighbors/vamana.hpp>
+#include <raft/core/copy.cuh>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/mdarray.hpp>
@@ -15,6 +16,7 @@
 #include <raft/core/nvtx.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/serialize.hpp>
+#include <raft/util/cudart_utils.hpp>
 
 #include "../dataset_serialize.hpp"
 
@@ -64,12 +66,19 @@ void serialize_dataset(raft::resources const& res,
     const auto* strided_dataset =
       dynamic_cast<const cuvs::neighbors::strided_dataset<T, int64_t>*>(dataset);
     if (strided_dataset) {
-      auto h_dataset =
-        raft::make_host_matrix<T, int64_t>(strided_dataset->n_rows(), strided_dataset->dim());
-      raft::copy(h_dataset.data_handle(),
-                 strided_dataset->view().data_handle(),
-                 strided_dataset->n_rows() * strided_dataset->dim(),
-                 raft::resource::get_cuda_stream(res));
+      auto nrows     = strided_dataset->n_rows();
+      auto dim       = strided_dataset->dim();
+      auto stride    = strided_dataset->stride();
+      auto d_data    = strided_dataset->view();
+      auto h_dataset = raft::make_host_matrix<T, int64_t>(nrows, dim);
+      raft::copy_matrix(h_dataset.data_handle(),
+                        dim,
+                        d_data.data_handle(),
+                        stride,
+                        dim,
+                        nrows,
+                        raft::resource::get_cuda_stream(res));
+      raft::resource::sync_stream(res);
       to_file(dataset_base_file, h_dataset);
     } else {
       RAFT_LOG_DEBUG("dynamic_cast to strided_dataset failed");
@@ -88,10 +97,8 @@ void serialize_dataset(raft::resources const& res,
   // try allocating a buffer for the dataset on host
   try {
     auto h_dataset = raft::make_host_matrix<T, int64_t>(dataset.extent(0), dataset.extent(1));
-    raft::copy(h_dataset.data_handle(),
-               dataset.data_handle(),
-               dataset.extent(0) * dataset.extent(1),
-               raft::resource::get_cuda_stream(res));
+    raft::copy(res, h_dataset.view(), dataset);
+    raft::resource::sync_stream(res);
     to_file(dataset_base_file, h_dataset);
   } catch (std::bad_alloc& e) {
     RAFT_LOG_INFO("Failed to serialize dataset");
@@ -157,15 +164,13 @@ void serialize_sector_aligned(raft::resources const& res,
   if (!dataset_strided) { RAFT_FAIL("Invalid dataset"); }
   auto d_data = dataset_strided->view();
   auto h_data = raft::make_host_matrix<T, int64_t>(npts, ndims);
-  auto stride = dataset_strided->stride();
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(h_data.data_handle(),
-                                  sizeof(T) * ndims,
-                                  d_data.data_handle(),
-                                  sizeof(T) * stride,
-                                  sizeof(T) * ndims,
-                                  npts,
-                                  cudaMemcpyDefault,
-                                  raft::resource::get_cuda_stream(res)));
+  raft::copy_matrix(h_data.data_handle(),
+                    ndims,
+                    d_data.data_handle(),
+                    dataset_strided->stride(),
+                    ndims,
+                    npts,
+                    raft::resource::get_cuda_stream(res));
   raft::resource::sync_stream(res);
 
   // buffers
@@ -313,10 +318,7 @@ void serialize(raft::resources const& res,
 {
   auto d_graph = index_.graph();
   auto h_graph = raft::make_host_matrix<IdxT, int64_t>(d_graph.extent(0), d_graph.extent(1));
-  raft::copy(h_graph.data_handle(),
-             d_graph.data_handle(),
-             d_graph.size(),
-             raft::resource::get_cuda_stream(res));
+  raft::copy(res, h_graph.view(), d_graph);
   raft::resource::sync_stream(res);
 
   // if requested, write sector-aligned file and return

@@ -1,17 +1,19 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
 #include <cuvs/neighbors/cagra.hpp>
+#include <raft/core/copy.cuh>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/serialize.hpp>
+#include <raft/util/cudart_utils.hpp>
 
 #include "../../../core/nvtx.hpp"
 #include "../dataset_serialize.hpp"
@@ -168,24 +170,20 @@ void serialize_to_hnswlib(
                  static_cast<size_t>(dataset.extent(0)),
                  static_cast<size_t>(dataset.extent(1)));
     host_dataset = raft::make_host_matrix<T, int64_t>(dataset.extent(0), dataset.extent(1));
-    RAFT_CUDA_TRY(cudaMemcpy2DAsync(host_dataset.data_handle(),
-                                    sizeof(T) * host_dataset.extent(1),
-                                    dataset.data_handle(),
-                                    sizeof(T) * dataset.stride(0),
-                                    sizeof(T) * host_dataset.extent(1),
-                                    dataset.extent(0),
-                                    cudaMemcpyDefault,
-                                    raft::resource::get_cuda_stream(res)));
+    raft::copy_matrix(host_dataset.data_handle(),
+                      host_dataset.extent(1),
+                      dataset.data_handle(),
+                      dataset.stride(0),
+                      host_dataset.extent(1),
+                      dataset.extent(0),
+                      raft::resource::get_cuda_stream(res));
     raft::resource::sync_stream(res);
     host_dataset_view = raft::make_const_mdspan(host_dataset.view());
   }
   auto graph = index_.graph();
   auto host_graph =
     raft::make_host_matrix<IdxT, int64_t, raft::row_major>(graph.extent(0), graph.extent(1));
-  raft::copy(host_graph.data_handle(),
-             graph.data_handle(),
-             graph.size(),
-             raft::resource::get_cuda_stream(res));
+  raft::copy(res, host_graph.view(), graph);
   raft::resource::sync_stream(res);
 
   size_t d_report_offset    = index_.size() / 10;  // Report progress in 10% steps.
