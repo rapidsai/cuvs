@@ -4,10 +4,10 @@
  */
 #pragma once
 
-#include <raft/core/error.hpp>
-
+#include <atomic>
 #include <cstdint>
 #include <mutex>
+#include <raft/core/error.hpp>
 
 namespace cuvs::neighbors::detail {
 
@@ -35,42 +35,38 @@ void safely_launch_kernel_with_smem_size(KernelT const& kernel,
                                          uint32_t smem_size,
                                          KernelLauncherT const& launch)
 {
-  // current_smem_size is a monotonically growing high-water mark across all kernel pointers.
-  // current_kernel tracks which kernel pointer was last used.
-  static uint32_t current_smem_size{0};
-  static KernelT current_kernel{KernelT{}};
+  // last_smem_size is a monotonically growing high-water mark across all kernel pointers.
+  // last_kernel tracks which kernel pointer was last used.
+  static std::atomic<uint32_t> last_smem_size{0};
+  static std::atomic<KernelT> last_kernel{KernelT{}};
   static std::mutex mutex;
-
-  {
+  // Fast path: skip the lock when the kernel matches and the smem size is within bounds.
+  // Load order matters: last_smem_size (acquire) before last_kernel (relaxed). Inside the lock
+  // we store in the opposite order: last_kernel (relaxed) then last_smem_size (release).
+  // This way an acquire load of last_smem_size that sees a post-cudaFuncSetAttribute value is
+  // guaranteed to also see the corresponding last_kernel.
+  if (smem_size > last_smem_size.load(std::memory_order_acquire) ||
+      kernel != last_kernel.load(std::memory_order_relaxed)) {
     std::lock_guard<std::mutex> guard(mutex);
-
-    auto last_kernel    = current_kernel;
-    auto last_smem_size = current_smem_size;
-
-    // When the kernel function pointer changes, bring the new kernel up to the global high-water
-    // mark. This is necessary because cudaFuncSetAttribute applies to a specific function pointer,
-    // not to the pointer type — different template instantiations may share the same KernelT.
-    if (kernel != last_kernel) {
-      current_kernel = kernel;
-      auto launch_status =
-        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, last_smem_size);
-      RAFT_EXPECTS(launch_status == cudaSuccess,
-                   "Failed to set max dynamic shared memory size to %u bytes",
-                   last_smem_size);
+    // Re-check under the lock: the outside decision can be stale.
+    uint32_t cur_smem_size = last_smem_size.load(std::memory_order_relaxed);
+    bool need_update       = (kernel != last_kernel.load(std::memory_order_relaxed));
+    if (smem_size > cur_smem_size) {
+      cur_smem_size = smem_size;
+      need_update   = true;
     }
-    // When smem_size exceeds the high-water mark, grow it for the current kernel.
-    // If the kernel also changed above, this handles the case where smem_size > last_smem_size.
-    if (smem_size > last_smem_size) {
-      current_smem_size = smem_size;
+    if (need_update) {
       auto launch_status =
-        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
+        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, cur_smem_size);
       RAFT_EXPECTS(launch_status == cudaSuccess,
                    "Failed to set max dynamic shared memory size to %u bytes",
-                   smem_size);
+                   cur_smem_size);
+      // Store order matters: last_kernel before last_smem_size (release) so the fast-path
+      // acquire load of last_smem_size also publishes last_kernel.
+      last_kernel.store(kernel, std::memory_order_relaxed);
+      last_smem_size.store(cur_smem_size, std::memory_order_release);
     }
   }
-  // The kernel launch is outside the lock: any concurrent cudaFuncSetAttribute can only increase
-  // the limit, so the launch is always safe.
   return launch(kernel);
 }
 

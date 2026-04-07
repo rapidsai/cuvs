@@ -905,6 +905,7 @@ struct index : cuvs::neighbors::index {
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  * - CosineExpanded
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
  *
  * Usage example:
  * @code{.cpp}
@@ -943,6 +944,7 @@ auto build(raft::resources const& res,
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  * - CosineExpanded
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
  *
  * Usage example:
  * @code{.cpp}
@@ -981,6 +983,7 @@ auto build(raft::resources const& res,
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
  *
  * Usage example:
  * @code{.cpp}
@@ -1018,6 +1021,7 @@ auto build(raft::resources const& res,
  * The following distance metrics are supported:
  * - L2
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
  *
  * Usage example:
  * @code{.cpp}
@@ -1055,6 +1059,9 @@ auto build(raft::resources const& res,
  * The following distance metrics are supported:
  * - L2
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+ * - BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build
+ * algorithm, and only for int8_t and uint8_t data types)
  *
  * Usage example:
  * @code{.cpp}
@@ -1093,6 +1100,9 @@ auto build(raft::resources const& res,
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+ * - BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build
+ * algorithm, and only for int8_t and uint8_t data types)
  *
  * Usage example:
  * @code{.cpp}
@@ -1131,6 +1141,9 @@ auto build(raft::resources const& res,
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+ * - BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build
+ * algorithm, and only for int8_t and uint8_t data types)
  *
  * Usage example:
  * @code{.cpp}
@@ -1169,6 +1182,9 @@ auto build(raft::resources const& res,
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  * - CosineExpanded (dataset norms are computed as float regardless of input data type)
+ * - L1 (currently only supported with NN-Descent and Iterative Search as the build algorithm)
+ * - BitwiseHamming (currently only supported with NN-Descent and Iterative Search as the build
+ * algorithm, and only for int8_t and uint8_t data types)
  *
  * Usage example:
  * @code{.cpp}

@@ -2202,6 +2202,15 @@ auto iterative_build_graph(
       curr_itopk_size = curr_topk + 32;
     }
 
+    RAFT_LOG_DEBUG(
+      "# graph_size = %lu (%.3lf), graph_degree = %lu, query_size = %lu, itopk = %lu, topk = %lu",
+      (uint64_t)cagra_graph.extent(0),
+      (double)cagra_graph.extent(0) / final_graph_size,
+      (uint64_t)cagra_graph.extent(1),
+      (uint64_t)curr_query_size,
+      (uint64_t)curr_itopk_size,
+      (uint64_t)curr_topk);
+
     cuvs::neighbors::cagra::search_params search_params;
     search_params.algo           = cuvs::neighbors::cagra::search_algo::AUTO;
     search_params.max_queries    = max_chunk_size;
