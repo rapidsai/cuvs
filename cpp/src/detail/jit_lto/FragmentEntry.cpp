@@ -3,25 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "nvjitlink_checker.hpp"
-
-#include <cstring>
-
 #include <cuvs/detail/jit_lto/FragmentEntry.hpp>
-
-FragmentEntry::FragmentEntry(std::string const& key) : compute_key(key) {}
-
-FatbinFragmentEntry::FatbinFragmentEntry(std::string const& key,
-                                         unsigned char const* view,
-                                         std::size_t size)
-  : FragmentEntry(key), data_size(size), data_view(view)
-{
-}
 
 bool FatbinFragmentEntry::add_to(nvJitLinkHandle& handle) const
 {
-  auto result = nvJitLinkAddData(
-    handle, NVJITLINK_INPUT_ANY, this->data_view, this->data_size, this->compute_key.c_str());
+  auto result = nvJitLinkAddData(handle, NVJITLINK_INPUT_ANY, get_data(), get_length(), get_key());
 
   check_nvjitlink_result(handle, result);
   return true;

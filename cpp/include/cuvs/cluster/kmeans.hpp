@@ -1292,15 +1292,14 @@ void cluster_cost(
  * @}
  */
 
+namespace helpers {
 /**
  * @defgroup kmeans_helpers k-means API helpers
  * @{
  */
 
-namespace helpers {
-
 /**
- * Automatically find the optimal value of k using a binary search.
+ * @brief Automatically find the optimal value of k using a binary search.
  * This method maximizes the Calinski-Harabasz Index while minimizing the per-cluster inertia.
  *
  *  @code{.cpp}
@@ -1345,10 +1344,9 @@ void find_k(raft::resources const& handle,
             int kmin    = 1,
             int maxiter = 100,
             float tol   = 1e-3);
-}  // namespace helpers
-
 /**
  * @}
  */
+}  // namespace helpers
 
 }  // namespace  cuvs::cluster::kmeans

@@ -484,7 +484,7 @@ void ivfpq_search_worker(raft::resources const& handle,
 
   if (coresidency > 1) {
     // Sorting index by cluster number (label).
-    // The goal is to incrase the L2 cache hit rate to read the vectors
+    // The goal is to increase the L2 cache hit rate to read the vectors
     // of a cluster by processing the cluster at the same time as much as
     // possible.
     index_list_sorted_buf.resize(n_queries_probes, stream);
