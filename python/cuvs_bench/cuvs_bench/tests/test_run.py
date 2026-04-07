@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 
@@ -117,6 +117,7 @@ def test_prepare_executables(
     algos_yaml = {"algo1": {}}
     gpu_present = True
     conf_file = {}
+    executable_dir = "executable_dir"
     dataset_path = "dataset_path"
     dataset = "dataset"
     count = 10
@@ -126,6 +127,7 @@ def test_prepare_executables(
         algos_yaml,
         gpu_present,
         conf_file,
+        executable_dir,
         dataset_path,
         dataset,
         count,
