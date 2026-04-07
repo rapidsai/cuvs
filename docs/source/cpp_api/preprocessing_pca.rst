@@ -11,7 +11,7 @@ Principal Component Analysis (PCA) is a linear dimensionality reduction techniqu
 
 namespace *cuvs::preprocessing::pca*
 
-Params
+Parameters
 ----------
 
 .. doxygenstruct:: cuvs::preprocessing::pca::params
