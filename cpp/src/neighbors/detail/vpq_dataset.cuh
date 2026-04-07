@@ -110,13 +110,13 @@ void train_pq_centers(
     std::optional<raft::device_vector_view<const MathT, IdxT>> sample_weight = std::nullopt;
     MathT inertia;
     int n_iter;
-    auto pq_centers_view = raft::make_device_matrix_view<MathT, int64_t>(
-      pq_centers_view.data_handle(), pq_centers_view.extent(0), pq_centers_view.extent(1));
+    auto pq_centers_i64 = raft::make_device_matrix_view<MathT, int64_t>(
+      pq_centers_view.data_handle(), static_cast<int64_t>(pq_centers_view.extent(0)), static_cast<int64_t>(pq_centers_view.extent(1)));
     cuvs::cluster::kmeans::fit(res,
                                kmeans_params,
                                pq_trainset_view,
                                sample_weight,
-                               pq_centers_view,
+                               pq_centers_i64,
                                raft::make_host_scalar_view<MathT>(&inertia),
                                raft::make_host_scalar_view<int>(&n_iter));
   }

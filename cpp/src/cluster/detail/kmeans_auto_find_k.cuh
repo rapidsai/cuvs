@@ -26,7 +26,7 @@ void compute_dispersion(raft::resources const& handle,
                         cuvs::cluster::kmeans::params& params,
                         raft::device_matrix_view<value_t, idx_t> centroids_view,
                         raft::device_vector_view<uint32_t, idx_t> labels,
-                        raft::device_vector_view<idx_t, idx_t> clusterSizes,
+                        raft::device_vector_view<uint32_t, idx_t> clusterSizes,
                         rmm::device_uvector<char>& workspace,
                         raft::host_vector_view<value_t> clusterDispertionView,
                         raft::host_vector_view<value_t> resultsView,
@@ -39,9 +39,8 @@ void compute_dispersion(raft::resources const& handle,
   auto centroids_const_view =
     raft::make_device_matrix_view<const value_t, idx_t>(centroids_view.data_handle(), val, d);
 
-  idx_t* clusterSizes_ptr = clusterSizes.data_handle();
   auto cluster_sizes_view =
-    raft::make_device_vector_view<const idx_t, idx_t>(clusterSizes_ptr, val);
+    raft::make_device_vector_view<const uint32_t, idx_t>(clusterSizes.data_handle(), val);
 
   params.n_clusters = val;
 
@@ -84,12 +83,12 @@ void find_k(raft::resources const& handle,
   // Device memory
 
   auto centroids    = raft::make_device_matrix<value_t, idx_t>(handle, kmax, X.extent(1));
-  auto clusterSizes = raft::make_device_vector<idx_t>(handle, kmax);
+  auto clusterSizes = raft::make_device_vector<uint32_t, idx_t>(handle, kmax);
   auto labels       = raft::make_device_vector<uint32_t, idx_t>(handle, n);
 
   rmm::device_uvector<char> workspace(0, raft::resource::get_cuda_stream(handle));
 
-  idx_t* clusterSizes_ptr = clusterSizes.data_handle();
+  uint32_t* clusterSizes_ptr = clusterSizes.data_handle();
 
   // Host memory
   auto results           = raft::make_host_vector<value_t>(kmax + 1);
@@ -116,7 +115,7 @@ void find_k(raft::resources const& handle,
     raft::make_device_matrix_view<value_t, idx_t>(centroids.data_handle(), left, d);
   auto labels_view = raft::make_device_vector_view<uint32_t, idx_t>(labels.data_handle(), n);
   auto clusterSizes_view =
-    raft::make_device_vector_view<idx_t, idx_t>(clusterSizes.data_handle(), kmax);
+    raft::make_device_vector_view<uint32_t, idx_t>(clusterSizes.data_handle(), kmax);
   compute_dispersion<value_t, idx_t>(handle,
                                      X,
                                      params,
