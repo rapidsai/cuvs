@@ -1,0 +1,18 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <neighbors/cagra_serialize.cuh>
+
+namespace {
+
+using data_t = @data_type@;
+
+}
+
+namespace cuvs::neighbors::cagra {
+
+CUVS_INST_CAGRA_SERIALIZE(data_t);
+
+}  // namespace cuvs::neighbors::cagra
