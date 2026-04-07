@@ -17,6 +17,8 @@ function(process_string_matrix_entry string_var)
   cmake_parse_arguments(_GSM "${options}" "${one_value}" "${multi_value}" ${ARGN})
 
   populate_matrix_variables("${_GSM_MATRIX_JSON_ENTRY}")
+  # It's impossible to pass a semicolon inside `ITEM_FORMAT` due to how CMake divides up arguments,
+  # so provide a constant placeholder to insert it into code
   set(semicolon ";")
   string(CONFIGURE "${_GSM_ITEM_FORMAT}" item @ONLY)
 

@@ -7,7 +7,7 @@
 #include <distance/detail/kernels/rbf_fin_op.cuh>            // rbf_fin_op
 #include <distance/detail/pairwise_matrix/dispatch-inl.cuh>  // dispatch
 #include <raft/core/operators.hpp>                           // raft::identity_op
-@archs@
+@arch_includes@
 
   namespace
 {

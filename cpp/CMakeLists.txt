@@ -262,7 +262,7 @@ if(NOT BUILD_CPU_ONLY)
   )
 
   generate_inst_matrix(
-    cagra_compute_distance_standard_inst_files
+    cagra_compute_distance_vpq_inst_files
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/compute_distance_vpq_matrix.json"
     INPUT_FILE
@@ -463,6 +463,9 @@ if(NOT BUILD_CPU_ONLY)
       src/detail/jit_lto/nvjitlink_checker.cpp
   )
 
+  # Note that this matrix contains an `arch_includes` placeholder, since we don't currently have a
+  # way to do an item-wise transform on a list after computing the matrix product and before
+  # configuring the file
   generate_inst_matrix(
     pairwise_matrix_dispatch_inst_files
     MATRIX_JSON_FILE

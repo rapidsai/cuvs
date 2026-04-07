@@ -6,7 +6,7 @@
 #include <distance/detail/distance_ops/all_ops.cuh>          // ops::*
 #include <distance/detail/pairwise_matrix/dispatch-inl.cuh>  // dispatch
 #include <raft/core/operators.hpp>                           // raft::identity_op
-@archs@
+@arch_includes@
 
   namespace
 {
