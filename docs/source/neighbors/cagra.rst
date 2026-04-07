@@ -129,7 +129,7 @@ Note: The dataset must be in GPU memory during index build, but can be detached 
 Build peak memory usage
 -----------------------
 
-Index build has two phases: (1) construct a knn graph, then (2) optimize it to remove redundant and unecessary paths.
+Index build has two phases: (1) construct a knn graph, then (2) optimize it to remove redundant and unnecessary paths.
 The initial knn graph can be built with IVF-PQ or nn-descent. IVF-PQ has the additional benefit that it supports out-of-core construction, allowing CAGRA to be trained on datasets larger than available GPU memory.
 The steps below are sequential with distinct peak memory consumption. The overall peak memory utilization depends on the configured RMM memory resource.
 
@@ -200,7 +200,7 @@ Search peak memory usage
 ------------------------
 
 CAGRA search requires the dataset and graph to already be resident in GPU memory. When using CAGRA-Q (compressed/quantized), the original dataset can reside in host memory instead. Additionally, temporary workspace memory is needed to store the search results for a batch of queries.
-If multiple batches are to be launched concurrently or overlapped, separate results buffers will be needed for each. 
+If multiple batches are to be launched concurrently or overlapped, separate results buffers will be needed for each.
 The below memory estimate assumes just one batch of queries being run at a time and reusing the buffers.
 
 .. math::
