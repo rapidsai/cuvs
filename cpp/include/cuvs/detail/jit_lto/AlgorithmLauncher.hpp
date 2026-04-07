@@ -28,9 +28,10 @@ struct AlgorithmLauncher {
   AlgorithmLauncher& operator=(AlgorithmLauncher&& other) noexcept;
 
   template <typename FuncT, typename... Args>
-  auto dispatch(cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, Args&&... args)
-    -> std::enable_if_t<std::is_same_v<FuncT, void(std::remove_reference_t<Args&&>...)>>
+  void dispatch(cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, Args&&... args)
   {
+    static_assert(std::is_same_v<FuncT, void(std::remove_reference_t<Args&&>...)>);
+
     void* kernel_args[] = {const_cast<void*>(static_cast<void const*>(&args))...};
     this->call(stream, grid, block, shared_mem, kernel_args);
   }
