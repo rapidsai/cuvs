@@ -4,6 +4,7 @@
  */
 
 #include <neighbors/ivf_pq/detail/jit_lto_kernels/compute_similarity_impl.cuh>
+#include <neighbors/ivf_pq/detail/jit_lto_kernels/kernel_def.cuh>
 #include <neighbors/ivf_pq/ivf_pq_fp_8bit.cuh>
 
 namespace {
@@ -58,3 +59,7 @@ extern "C" __global__ void compute_similarity(
                                                                          _out_scores,
                                                                          _out_indices);
 }
+
+static_assert(
+  std::is_same_v<decltype(compute_similarity),
+                 cuvs::neighbors::ivf_pq::detail::compute_similarity_func_t<out_t, lut_t>>);

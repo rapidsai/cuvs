@@ -9,6 +9,7 @@
 #include "../sample_filter.cuh"  // none_sample_filter
 #include "detail/jit_lto_kernels/block_sort.cuh"
 #include "detail/jit_lto_kernels/compute_similarity_planner.hpp"
+#include "detail/jit_lto_kernels/kernel_def.cuh"
 #include "ivf_pq_compute_similarity.hpp"  // cuvs::neighbors::ivf_pq::detail::selected
 #include "ivf_pq_fp_8bit.cuh"
 #include <cuvs/distance/distance.hpp>  // cuvs::distance::DistanceType
@@ -205,31 +206,31 @@ void compute_similarity_run(selected<OutT, LutT> s,
                             uint32_t* _out_indices)
 {
   auto launch_kernel = [&](filtering::ivf_filter_dev sample_filter) {
-    s.launcher->dispatch(stream,
-                         s.grid_dim,
-                         s.block_dim,
-                         s.smem_size,
-                         dim,
-                         n_probes,
-                         pq_dim,
-                         n_queries,
-                         queries_offset,
-                         metric,
-                         codebook_kind,
-                         topk,
-                         max_samples,
-                         cluster_centers,
-                         pq_centers,
-                         pq_dataset,
-                         cluster_labels,
-                         _chunk_indices,
-                         queries,
-                         index_list,
-                         query_kths,
-                         sample_filter,
-                         lut_scores,
-                         _out_scores,
-                         _out_indices);
+    s.launcher->template dispatch<compute_similarity_func_t<OutT, LutT>>(stream,
+                                                                         s.grid_dim,
+                                                                         s.block_dim,
+                                                                         s.smem_size,
+                                                                         dim,
+                                                                         n_probes,
+                                                                         pq_dim,
+                                                                         n_queries,
+                                                                         queries_offset,
+                                                                         metric,
+                                                                         codebook_kind,
+                                                                         topk,
+                                                                         max_samples,
+                                                                         cluster_centers,
+                                                                         pq_centers,
+                                                                         pq_dataset,
+                                                                         cluster_labels,
+                                                                         _chunk_indices,
+                                                                         queries,
+                                                                         index_list,
+                                                                         query_kths,
+                                                                         sample_filter,
+                                                                         lut_scores,
+                                                                         _out_scores,
+                                                                         _out_indices);
     RAFT_CHECK_CUDA(stream);
   };
 
