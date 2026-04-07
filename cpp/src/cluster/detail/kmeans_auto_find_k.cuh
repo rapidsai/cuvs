@@ -7,6 +7,7 @@
 
 #include "kmeans.cuh"
 #include <cuvs/cluster/kmeans.hpp>
+#include <raft/linalg/map.cuh>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/error.hpp>
@@ -54,9 +55,20 @@ void compute_dispersion(raft::resources const& handle,
                       idx_t(val),
                       workspace);
 
+  // cluster_dispersion requires idx_t-typed sizes; convert from uint32_t counts.
+  auto cluster_sizes_i64 = raft::make_device_vector<idx_t, idx_t>(handle, val);
+  raft::linalg::map(handle,
+                    cluster_sizes_i64.view(),
+                    raft::cast_op<idx_t>{},
+                    cluster_sizes_view);
+
   resultsView[val]           = residual[0];
   clusterDispertionView[val] = raft::stats::cluster_dispersion(
-    handle, centroids_const_view, cluster_sizes_view, std::nullopt, n);
+    handle,
+    centroids_const_view,
+    raft::make_const_mdspan(cluster_sizes_i64.view()),
+    std::nullopt,
+    n);
 }
 
 template <typename idx_t, typename value_t>
