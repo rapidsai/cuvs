@@ -208,6 +208,9 @@ if(BUILD_CAGRA_HNSWLIB)
   include(cmake/thirdparty/get_hnswlib.cmake)
 endif()
 
+include(cmake/modules/generate_inst_matrix.cmake)
+include(cmake/modules/generate_string_matrix.cmake)
+
 # ##################################################################################################
 # * cuvs ---------------------------------------------------------------------
 if(NOT BUILD_CPU_ONLY)
@@ -222,100 +225,110 @@ if(NOT BUILD_CPU_ONLY)
   )
   target_link_libraries(cuvs_cpp_headers INTERFACE raft::raft rmm::rmm)
 
-  add_library(
-    cuvs-cagra-search OBJECT
-    src/neighbors/cagra_search_float.cu
-    src/neighbors/cagra_search_half.cu
-    src/neighbors/cagra_search_int8.cu
-    src/neighbors/cagra_search_uint8.cu
-    src/neighbors/detail/cagra/compute_distance.cu
-    src/neighbors/detail/cagra/compute_distance_standard_BitwiseHamming_u8_uint32_dim128_t8.cu
-    src/neighbors/detail/cagra/compute_distance_standard_BitwiseHamming_u8_uint32_dim256_t16.cu
-    src/neighbors/detail/cagra/compute_distance_standard_BitwiseHamming_u8_uint32_dim512_t32.cu
-    src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_float_uint32_dim128_t8.cu
-    src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_float_uint32_dim256_t16.cu
-    src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_float_uint32_dim512_t32.cu
-    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_float_uint32_dim128_t8.cu
-    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_float_uint32_dim256_t16.cu
-    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_float_uint32_dim512_t32.cu
-    src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_half_uint32_dim128_t8.cu
-    src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_half_uint32_dim256_t16.cu
-    src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_half_uint32_dim512_t32.cu
-    src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_int8_uint32_dim128_t8.cu
-    src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_int8_uint32_dim256_t16.cu
-    src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_int8_uint32_dim512_t32.cu
-    src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_uint8_uint32_dim128_t8.cu
-    src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_uint8_uint32_dim256_t16.cu
-    src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_uint8_uint32_dim512_t32.cu
-    src/neighbors/detail/cagra/compute_distance_standard_L1_float_uint32_dim128_t8.cu
-    src/neighbors/detail/cagra/compute_distance_standard_L1_float_uint32_dim256_t16.cu
-    src/neighbors/detail/cagra/compute_distance_standard_L1_float_uint32_dim512_t32.cu
-    src/neighbors/detail/cagra/compute_distance_standard_L1_half_uint32_dim128_t8.cu
-    src/neighbors/detail/cagra/compute_distance_standard_L1_half_uint32_dim256_t16.cu
-    src/neighbors/detail/cagra/compute_distance_standard_L1_half_uint32_dim512_t32.cu
-    src/neighbors/detail/cagra/compute_distance_standard_L1_int8_uint32_dim128_t8.cu
-    src/neighbors/detail/cagra/compute_distance_standard_L1_int8_uint32_dim256_t16.cu
-    src/neighbors/detail/cagra/compute_distance_standard_L1_int8_uint32_dim512_t32.cu
-    src/neighbors/detail/cagra/compute_distance_standard_L1_uint8_uint32_dim128_t8.cu
-    src/neighbors/detail/cagra/compute_distance_standard_L1_uint8_uint32_dim256_t16.cu
-    src/neighbors/detail/cagra/compute_distance_standard_L1_uint8_uint32_dim512_t32.cu
-    src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_float_uint32_dim128_t8.cu
-    src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_float_uint32_dim256_t16.cu
-    src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_float_uint32_dim512_t32.cu
-    src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_half_uint32_dim128_t8.cu
-    src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_half_uint32_dim256_t16.cu
-    src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_half_uint32_dim512_t32.cu
-    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_half_uint32_dim128_t8.cu
-    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_half_uint32_dim256_t16.cu
-    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_half_uint32_dim512_t32.cu
-    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_int8_uint32_dim128_t8.cu
-    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_int8_uint32_dim256_t16.cu
-    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_int8_uint32_dim512_t32.cu
-    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_uint8_uint32_dim128_t8.cu
-    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_uint8_uint32_dim256_t16.cu
-    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_uint8_uint32_dim512_t32.cu
-    src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_int8_uint32_dim128_t8.cu
-    src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_int8_uint32_dim256_t16.cu
-    src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_int8_uint32_dim512_t32.cu
-    src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_uint8_uint32_dim128_t8.cu
-    src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_uint8_uint32_dim256_t16.cu
-    src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_uint8_uint32_dim512_t32.cu
-    src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_float_uint32_dim128_t8_8pq_2subd_half.cu
-    src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_float_uint32_dim128_t8_8pq_4subd_half.cu
-    src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_float_uint32_dim256_t16_8pq_2subd_half.cu
-    src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_float_uint32_dim256_t16_8pq_4subd_half.cu
-    src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_float_uint32_dim512_t32_8pq_2subd_half.cu
-    src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_float_uint32_dim512_t32_8pq_4subd_half.cu
-    src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_half_uint32_dim128_t8_8pq_2subd_half.cu
-    src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_half_uint32_dim128_t8_8pq_4subd_half.cu
-    src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_half_uint32_dim256_t16_8pq_2subd_half.cu
-    src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_half_uint32_dim256_t16_8pq_4subd_half.cu
-    src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_half_uint32_dim512_t32_8pq_2subd_half.cu
-    src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_half_uint32_dim512_t32_8pq_4subd_half.cu
-    src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_int8_uint32_dim128_t8_8pq_2subd_half.cu
-    src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_int8_uint32_dim128_t8_8pq_4subd_half.cu
-    src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_int8_uint32_dim256_t16_8pq_2subd_half.cu
-    src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_int8_uint32_dim256_t16_8pq_4subd_half.cu
-    src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_int8_uint32_dim512_t32_8pq_2subd_half.cu
-    src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_int8_uint32_dim512_t32_8pq_4subd_half.cu
-    src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_uint8_uint32_dim128_t8_8pq_2subd_half.cu
-    src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_uint8_uint32_dim128_t8_8pq_4subd_half.cu
-    src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_uint8_uint32_dim256_t16_8pq_2subd_half.cu
-    src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_uint8_uint32_dim256_t16_8pq_4subd_half.cu
-    src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_uint8_uint32_dim512_t32_8pq_2subd_half.cu
-    src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_uint8_uint32_dim512_t32_8pq_4subd_half.cu
-    src/neighbors/detail/cagra/search_multi_cta_float_uint32.cu
-    src/neighbors/detail/cagra/search_multi_cta_half_uint32.cu
-    src/neighbors/detail/cagra/search_multi_cta_int8_uint32.cu
-    src/neighbors/detail/cagra/search_multi_cta_uint8_uint32.cu
-    src/neighbors/detail/cagra/search_single_cta_float_uint32.cu
-    src/neighbors/detail/cagra/search_single_cta_half_uint32.cu
-    src/neighbors/detail/cagra/search_single_cta_int8_uint32.cu
-    src/neighbors/detail/cagra/search_single_cta_uint8_uint32.cu
+  generate_inst_matrix(
+    cagra_search_inst_files
+    MATRIX_JSON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/cagra_search_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/cagra_search_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/cagra_search_inst_data_@data_abbrev@.cu"
   )
 
-  file(GLOB_RECURSE compute_distance_sources "src/neighbors/detail/cagra/compute_distance_*.cu")
-  set_source_files_properties(${compute_distance_sources} PROPERTIES COMPILE_FLAGS -maxrregcount=64)
+  generate_inst_matrix(
+    cagra_compute_distance_standard_inst_files
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/compute_distance_standard_matrix.json"
+    INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/compute_distance_standard_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/detail/cagra/compute_distance_standard_inst_data_@data_abbrev@_index_@index_abbrev@_distance_@distance_abbrev@_metric_@metric@_team_@team_size@_dim_@dim@.cu"
+  )
+  generate_string_matrix(
+    cagra_compute_distance_standard_selector_template_params
+    ITEM_FORMAT
+    "\nstandard_descriptor_spec<DistanceType::@metric@, @team_size@, @dim@, @data_type@, @index_type@, @distance_type@>"
+    GLUE
+    ","
+    MATRIX_JSON_FILE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/compute_distance_standard_matrix.json"
+  )
+  generate_string_matrix(
+    cagra_compute_distance_standard_template_inst
+    ITEM_FORMAT
+    "extern template struct standard_descriptor_spec<DistanceType::@metric@, @team_size@, @dim@, @data_type@, @index_type@, @distance_type@>@semicolon@"
+    GLUE
+    "\n"
+    MATRIX_JSON_FILE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/compute_distance_standard_matrix.json"
+  )
+
+  generate_inst_matrix(
+    cagra_compute_distance_vpq_inst_files
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/compute_distance_vpq_matrix.json"
+    INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/compute_distance_vpq_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/detail/cagra/compute_distance_vpq_inst_data_@data_abbrev@_index_@index_abbrev@_distance_@distance_abbrev@_codebook_@codebook_abbrev@_metric_@metric@_team_@team_size@_dim_@dim@_pq_bits_@pq_bits@_pq_len_@pq_len@.cu"
+  )
+  generate_string_matrix(
+    cagra_compute_distance_vpq_selector_template_params
+    ITEM_FORMAT
+    "\nvpq_descriptor_spec<DistanceType::@metric@, @team_size@, @dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@>"
+    GLUE
+    ","
+    MATRIX_JSON_FILE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/compute_distance_vpq_matrix.json"
+  )
+  generate_string_matrix(
+    cagra_compute_distance_vpq_template_inst
+    ITEM_FORMAT
+    "extern template struct vpq_descriptor_spec<DistanceType::@metric@, @team_size@, @dim@, @pq_bits@, @pq_len@, @codebook_type@, @data_type@, @index_type@, @distance_type@>@semicolon@"
+    GLUE
+    "\n"
+    MATRIX_JSON_FILE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/compute_distance_vpq_matrix.json"
+  )
+
+  generate_inst_matrix(
+    cagra_search_multi_cta_inst_files
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/search_multi_cta_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/search_multi_cta_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/detail/cagra/search_multi_cta_inst_data_@data_abbrev@.cu"
+  )
+  generate_inst_matrix(
+    cagra_search_single_cta_inst_files
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/search_single_cta_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/search_single_cta_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/detail/cagra/search_single_cta_inst_data_@data_abbrev@.cu"
+  )
+
+  configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/compute_distance-ext.cuh.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/detail/cagra/compute_distance-ext.cuh" @ONLY
+  )
+  configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/detail/cagra/compute_distance.cu.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/detail/cagra/compute_distance.cu" @ONLY
+  )
+
+  add_library(
+    cuvs-cagra-search OBJECT
+    ${cagra_search_inst_files}
+    ${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/detail/cagra/compute_distance.cu
+    ${cagra_compute_distance_standard_inst_files}
+    ${cagra_compute_distance_vpq_inst_files}
+    ${cagra_search_multi_cta_inst_files}
+    ${cagra_search_single_cta_inst_files}
+  )
+
+  set_source_files_properties(
+    ${cagra_compute_distance_standard_inst_files} ${cagra_compute_distance_vpq_inst_files}
+    PROPERTIES COMPILE_FLAGS -maxrregcount=64
+  )
 
   set_target_properties(
     cuvs-cagra-search
@@ -337,21 +350,31 @@ if(NOT BUILD_CPU_ONLY)
             "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
             "$<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>:${CUVS_DEBUG_CUDA_FLAGS}>"
   )
+  target_include_directories(
+    cuvs-cagra-search PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src" "${CMAKE_CURRENT_BINARY_DIR}/src"
+  )
 
   if(BUILD_MG_ALGOS)
-    set(CUVS_MG_ALGOS
-        src/neighbors/mg/mg_flat_float_int64_t.cu
-        src/neighbors/mg/mg_flat_half_int64_t.cu
-        src/neighbors/mg/mg_flat_int8_t_int64_t.cu
-        src/neighbors/mg/mg_flat_uint8_t_int64_t.cu
-        src/neighbors/mg/mg_pq_float_int64_t.cu
-        src/neighbors/mg/mg_pq_half_int64_t.cu
-        src/neighbors/mg/mg_pq_int8_t_int64_t.cu
-        src/neighbors/mg/mg_pq_uint8_t_int64_t.cu
-        src/neighbors/mg/mg_cagra_float_uint32_t.cu
-        src/neighbors/mg/mg_cagra_half_uint32_t.cu
-        src/neighbors/mg/mg_cagra_int8_t_uint32_t.cu
-        src/neighbors/mg/mg_cagra_uint8_t_uint32_t.cu
+    generate_inst_matrix(
+      CUVS_MG_ALGOS
+      MATRIX_JSON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/mg/mg_flat_matrix.json"
+      INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/mg/mg_flat_inst.cu.in"
+      OUTPUT_FILE_FORMAT
+        "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/mg/mg_flat_inst_data_@data_abbrev@.cu"
+    )
+    generate_inst_matrix(
+      CUVS_MG_ALGOS
+      MATRIX_JSON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/mg/mg_pq_matrix.json"
+      INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/mg/mg_pq_inst.cu.in"
+      OUTPUT_FILE_FORMAT
+        "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/mg/mg_pq_inst_data_@data_abbrev@.cu"
+    )
+    generate_inst_matrix(
+      CUVS_MG_ALGOS
+      MATRIX_JSON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/mg/mg_cagra_matrix.json"
+      INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/mg/mg_cagra_inst.cu.in"
+      OUTPUT_FILE_FORMAT
+        "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/mg/mg_cagra_inst_data_@data_abbrev@.cu"
     )
   endif()
 
@@ -527,6 +550,173 @@ if(NOT BUILD_CPU_ONLY)
   )
   endblock()
 
+  # Note that this matrix contains an `arch_includes` placeholder, since we don't currently have a
+  # way to do an item-wise transform on a list after computing the matrix product and before
+  # configuring the file
+  generate_inst_matrix(
+    pairwise_matrix_dispatch_inst_files
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/distance/detail/pairwise_matrix/dispatch_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/distance/detail/pairwise_matrix/dispatch_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/distance/detail/pairwise_matrix/dispatch_inst_data_@data_abbrev@_acc_@acc_abbrev@_out_@out_abbrev@_index_@index_abbrev@_op_@op_abbrev@.cu"
+  )
+  generate_inst_matrix(
+    pairwise_matrix_dispatch_inst_files
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/distance/detail/pairwise_matrix/dispatch_rbf_matrix.json"
+    INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/distance/detail/pairwise_matrix/dispatch_rbf_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/distance/detail/pairwise_matrix/dispatch_rbf_inst_data_@data_abbrev@_acc_@acc_abbrev@_out_@out_abbrev@_index_@index_abbrev@_op_@op_abbrev@.cu"
+  )
+  generate_inst_matrix(
+    cagra_build_inst_files
+    MATRIX_JSON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/cagra_build_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/cagra_build_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/cagra_build_inst_data_@data_abbrev@_index_@index_abbrev@.cu"
+  )
+  generate_inst_matrix(
+    cagra_extend_inst_files
+    MATRIX_JSON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/cagra_extend_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/cagra_extend_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/cagra_extend_inst_data_@data_abbrev@_index_@index_abbrev@.cu"
+  )
+  generate_inst_matrix(
+    cagra_serialize_inst_files
+    MATRIX_JSON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/cagra_serialize_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/cagra_serialize_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/cagra_serialized_inst_data_@data_abbrev@.cu"
+  )
+  generate_inst_matrix(
+    cagra_merge_inst_files
+    MATRIX_JSON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/cagra_merge_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/cagra_merge_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/cagra_merge_inst_data_@data_abbrev@_index_@index_abbrev@.cu"
+  )
+  generate_inst_matrix(
+    iface_cagra_inst_files
+    MATRIX_JSON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/iface/iface_cagra_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/iface/iface_cagra_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/iface/iface_cagra_inst_data_@data_abbrev@_index_@index_abbrev@.cu"
+  )
+  generate_inst_matrix(
+    iface_flat_inst_files
+    MATRIX_JSON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/iface/iface_flat_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/iface/iface_flat_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/iface/iface_flat_inst_data_@data_abbrev@_index_@index_abbrev@.cu"
+  )
+  generate_inst_matrix(
+    iface_pq_inst_files
+    MATRIX_JSON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/iface/iface_pq_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/iface/iface_pq_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/iface/iface_pq_inst_data_@data_abbrev@_index_@index_abbrev@.cu"
+  )
+  generate_inst_matrix(
+    ivf_flat_build_extend_inst_files
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/ivf_flat_build_extend_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/ivf_flat_build_extend_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/ivf_flat/ivf_flat_build_extend_inst_data_@data_abbrev@_index_@index_abbrev@.cu"
+  )
+  generate_inst_matrix(
+    ivf_flat_search_inst_files
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/ivf_flat_search_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/ivf_flat_search_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/ivf_flat/ivf_flat_search_inst_data_@data_abbrev@_index_@index_abbrev@.cu"
+  )
+  generate_inst_matrix(
+    ivf_flat_interleaved_scan_inst_files
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/ivf_flat_interleaved_scan_matrix.json"
+    INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/ivf_flat_interleaved_scan_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/ivf_flat/ivf_flat_interleaved_scan_inst_data_@data_abbrev@_index_@index_abbrev@_filter_@filter_name@.cu"
+  )
+  generate_inst_matrix(
+    ivf_flat_serialize_inst_files
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/ivf_flat_serialize_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/ivf_flat_serialize_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/ivf_flat/ivf_flat_serialize_inst_data_@data_abbrev@_index_@index_abbrev@.cu"
+  )
+  generate_inst_matrix(
+    ivf_pq_build_extend_inst_files
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_build_extend_matrix.json"
+    INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_build_extend_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_build_extend_inst_data_@data_abbrev@_index_@index_abbrev@.cu"
+  )
+  generate_inst_matrix(
+    ivf_pq_compute_similarity_inst_files
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_matrix.json"
+    INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_inst_out_@out_abbrev@_lut_@lut_abbrev@.cu"
+  )
+  generate_inst_matrix(
+    ivf_pq_search_inst_files
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_search_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_search_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_search_inst_data_@data_abbrev@_index_@index_abbrev@.cu"
+  )
+  generate_inst_matrix(
+    ivf_pq_transform_inst_files
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_transform_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_transform_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_transform_inst_data_@data_abbrev@_index_@index_abbrev@.cu"
+  )
+  generate_inst_matrix(
+    nn_descent_inst_files
+    MATRIX_JSON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/nn_descent_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/nn_descent_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/nn_descent_inst_data_@data_abbrev@_index_@index_abbrev@.cu"
+  )
+  generate_inst_matrix(
+    refine_device_inst_files
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/refine/detail/refine_device_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/refine/detail/refine_device_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/refine/detail/refine_device_inst_data_@data_abbrev@_index_@index_abbrev@.cu"
+  )
+  generate_inst_matrix(
+    refine_host_inst_files
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/refine/detail/refine_host_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/refine/detail/refine_host_inst.cpp.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/refine/detail/refine_host_inst_data_@data_abbrev@_index_@index_abbrev@.cpp"
+  )
+  generate_inst_matrix(
+    select_k_inst_files
+    MATRIX_JSON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/selection/select_k_matrix.json"
+    INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/selection/select_k_inst.cu.in"
+    OUTPUT_FILE_FORMAT
+      "${CMAKE_CURRENT_BINARY_DIR}/src/selection/select_k_inst_data_@data_abbrev@_index_@index_abbrev@.cu"
+  )
+
   add_library(
     cuvs_objs OBJECT
     src/cluster/detail/minClusterDistanceCompute.cu
@@ -566,48 +756,7 @@ if(NOT BUILD_CPU_ONLY)
     src/distance/detail/kernels/gram_matrix.cu
     src/distance/detail/kernels/kernel_factory.cu
     src/distance/detail/kernels/kernel_matrices.cu
-    src/distance/detail/pairwise_matrix/dispatch_canberra_float_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_canberra_half_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_canberra_double_double_double_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_correlation_float_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_correlation_half_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_correlation_double_double_double_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_cosine_float_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_cosine_half_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_cosine_double_double_double_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_float_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_half_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_double_double_double_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_hellinger_expanded_float_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_hellinger_expanded_half_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_hellinger_expanded_double_double_double_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_jensen_shannon_float_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_jensen_shannon_half_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_jensen_shannon_double_double_double_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_kl_divergence_float_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_kl_divergence_half_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_kl_divergence_double_double_double_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_l1_float_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_l1_half_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_l1_double_double_double_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_l2_expanded_float_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_l2_expanded_half_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_l2_expanded_double_double_double_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_l2_unexpanded_float_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_l2_unexpanded_half_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_l2_unexpanded_double_double_double_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_l_inf_float_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_l_inf_half_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_l_inf_double_double_double_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_lp_unexpanded_float_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_lp_unexpanded_half_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_lp_unexpanded_double_double_double_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_russel_rao_float_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_russel_rao_half_float_float_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_russel_rao_double_double_double_int.cu
-    src/distance/detail/pairwise_matrix/dispatch_rbf.cu
-    src/distance/detail/pairwise_matrix/dispatch_l2_expanded_double_double_double_int64_t.cu
-    src/distance/detail/pairwise_matrix/dispatch_l2_expanded_float_float_float_int64_t.cu
+    ${pairwise_matrix_dispatch_inst_files}
     src/distance/distance.cu
     src/distance/pairwise_distance.cu
     src/distance/sparse_distance.cu
@@ -620,35 +769,14 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/brute_force.cu
     src/neighbors/brute_force_serialize.cu
     src/neighbors/cagra.cpp
-    src/neighbors/cagra_build_float.cu
-    src/neighbors/cagra_build_half.cu
-    src/neighbors/cagra_build_int8.cu
-    src/neighbors/cagra_build_uint8.cu
-    src/neighbors/cagra_extend_float.cu
-    src/neighbors/cagra_extend_half.cu
-    src/neighbors/cagra_extend_int8.cu
-    src/neighbors/cagra_extend_uint8.cu
+    ${cagra_build_inst_files}
+    ${cagra_extend_inst_files}
     src/neighbors/cagra_optimize.cu
-    src/neighbors/cagra_serialize_float.cu
-    src/neighbors/cagra_serialize_half.cu
-    src/neighbors/cagra_serialize_int8.cu
-    src/neighbors/cagra_serialize_uint8.cu
-    src/neighbors/cagra_merge_float.cu
-    src/neighbors/cagra_merge_half.cu
-    src/neighbors/cagra_merge_int8.cu
-    src/neighbors/cagra_merge_uint8.cu
-    src/neighbors/iface/iface_cagra_float_uint32_t.cu
-    src/neighbors/iface/iface_cagra_half_uint32_t.cu
-    src/neighbors/iface/iface_cagra_int8_t_uint32_t.cu
-    src/neighbors/iface/iface_cagra_uint8_t_uint32_t.cu
-    src/neighbors/iface/iface_flat_float_int64_t.cu
-    src/neighbors/iface/iface_flat_half_int64_t.cu
-    src/neighbors/iface/iface_flat_int8_t_int64_t.cu
-    src/neighbors/iface/iface_flat_uint8_t_int64_t.cu
-    src/neighbors/iface/iface_pq_float_int64_t.cu
-    src/neighbors/iface/iface_pq_half_int64_t.cu
-    src/neighbors/iface/iface_pq_int8_t_int64_t.cu
-    src/neighbors/iface/iface_pq_uint8_t_int64_t.cu
+    ${cagra_serialize_inst_files}
+    ${cagra_merge_inst_files}
+    ${iface_cagra_inst_files}
+    ${iface_flat_inst_files}
+    ${iface_pq_inst_files}
     src/neighbors/detail/cagra/topk_for_cagra/topk.cu
     src/neighbors/dynamic_batching.cu
     src/neighbors/composite/index.cu
@@ -656,69 +784,30 @@ if(NOT BUILD_CPU_ONLY)
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw.cpp>
     src/neighbors/ivf_common.cu
     src/neighbors/ivf_flat_index.cpp
-    src/neighbors/ivf_flat/ivf_flat_build_extend_float_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_build_extend_half_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_build_extend_int8_t_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_build_extend_uint8_t_int64_t.cu
+    ${ivf_flat_build_extend_inst_files}
+    ${ivf_flat_search_inst_files}
     src/neighbors/ivf_flat/ivf_flat_helpers.cu
-    src/neighbors/ivf_flat/ivf_flat_search_float_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_search_half_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_search_int8_t_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_search_uint8_t_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_float_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_half_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_int8_t_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_uint8_t_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_float_int64_t_bitset.cu
-    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_half_int64_t_bitset.cu
-    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_int8_t_int64_t_bitset.cu
-    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_uint8_t_int64_t_bitset.cu
-    src/neighbors/ivf_flat/ivf_flat_serialize_float_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_serialize_half_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_serialize_int8_t_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_serialize_uint8_t_int64_t.cu
+    ${ivf_flat_interleaved_scan_inst_files}
+    ${ivf_flat_serialize_inst_files}
     src/neighbors/ivf_pq_index.cu
     src/neighbors/ivf_pq/ivf_pq_build_common.cu
     src/neighbors/ivf_pq/ivf_pq_serialize.cu
     src/neighbors/ivf_pq/ivf_pq_deserialize.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_build_extend_float_int64_t.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_build_extend_half_int64_t.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_build_extend_int8_t_int64_t.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_build_extend_uint8_t_int64_t.cu
+    ${ivf_pq_build_extend_inst_files}
     src/neighbors/ivf_pq/detail/ivf_pq_build_precomputed_int64_t.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_fp8_false.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_fp8_true.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_half.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_half.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_float.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_fp8_false.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_fp8_true.cu
+    ${ivf_pq_compute_similarity_inst_files}
     src/neighbors/ivf_pq/detail/ivf_pq_contiguous_list_data.cu
     src/neighbors/ivf_pq/detail/ivf_pq_list_data.cu
     src/neighbors/ivf_pq/detail/ivf_pq_process_and_fill_codes.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_search_float_int64_t.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_search_half_int64_t.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_search_int8_t_int64_t.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_search_uint8_t_int64_t.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_transform_float_int64_t.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_transform_half_int64_t.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_transform_int8_t_int64_t.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_transform_uint8_t_int64_t.cu
+    ${ivf_pq_search_inst_files}
+    ${ivf_pq_transform_inst_files}
     src/neighbors/knn_merge_parts.cu
     src/neighbors/nn_descent.cu
-    src/neighbors/nn_descent_float.cu
-    src/neighbors/nn_descent_half.cu
+    ${nn_descent_inst_files}
+    src/neighbors/nn_descent_gnnd_inst.cu
     src/neighbors/nn_descent_index.cpp
-    src/neighbors/nn_descent_int8.cu
-    src/neighbors/nn_descent_uint8.cu
-    src/neighbors/refine/detail/refine_device_float_float.cu
-    src/neighbors/refine/detail/refine_device_half_float.cu
-    src/neighbors/refine/detail/refine_device_int8_t_float.cu
-    src/neighbors/refine/detail/refine_device_uint8_t_float.cu
-    src/neighbors/refine/detail/refine_host_float_float.cpp
-    src/neighbors/refine/detail/refine_host_half_float.cpp
-    src/neighbors/refine/detail/refine_host_int8_t_float.cpp
-    src/neighbors/refine/detail/refine_host_uint8_t_float.cpp
+    ${refine_device_inst_files}
+    ${refine_host_inst_files}
     src/neighbors/scann/scann_build_float.cu
     src/neighbors/scann/scann_serialize_float.cu
     src/neighbors/sample_filter.cu
@@ -736,10 +825,7 @@ if(NOT BUILD_CPU_ONLY)
     src/preprocessing/quantize/pq.cu
     src/preprocessing/spectral/spectral_embedding.cu
     src/preprocessing/pca/pca.cu
-    src/selection/select_k_float_int64_t.cu
-    src/selection/select_k_float_int32_t.cu
-    src/selection/select_k_float_uint32_t.cu
-    src/selection/select_k_half_uint32_t.cu
+    ${select_k_inst_files}
     src/stats/silhouette_score.cu
     src/stats/trustworthiness_score.cu
     ${CUVS_MG_ALGOS}
@@ -781,6 +867,7 @@ if(NOT BUILD_CPU_ONLY)
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
     INTERFACE "$<INSTALL_INTERFACE:include>"
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src" "${CMAKE_CURRENT_BINARY_DIR}/src"
   )
 
   # Endian detection

@@ -1,15 +1,15 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
-#include "compute_distance-ext.cuh"
 #include "device_common.hpp"
 #include "hashmap.hpp"
 #include "search_plan.cuh"
 #include "topk_for_cagra/topk.h"  //todo replace with raft kernel
 #include "utils.hpp"
+#include <neighbors/detail/cagra/compute_distance-ext.cuh>
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/logger.hpp>
