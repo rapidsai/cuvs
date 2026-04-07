@@ -140,7 +140,7 @@ void _fit(cuvsResources_t res,
   }
 }
 
-template <typename T, typename IdxT = int32_t, typename LabelsT = int32_t>
+template <typename T, typename IdxT = int64_t, typename LabelsT = uint32_t>
 void _predict(cuvsResources_t res,
               const cuvsKMeansParams& params,
               DLManagedTensor* X_tensor,

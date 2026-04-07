@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -121,13 +121,13 @@ class SpectralClusteringTest : public ::testing::TestWithParam<SpectralClusterin
         handle,
         params,
         connectivity_graph_double.view(),
-        raft::make_device_vector_view<int, int>(d_labels.data(), n_samples));
+        raft::make_device_vector_view<uint32_t, int>(d_labels.data(), n_samples));
     } else {
       cluster::spectral::fit_predict(
         handle,
         params,
         connectivity_graph_float.view(),
-        raft::make_device_vector_view<int, int>(d_labels.data(), n_samples));
+        raft::make_device_vector_view<uint32_t, int>(d_labels.data(), n_samples));
     }
 
     raft::resource::sync_stream(handle, stream);
@@ -151,8 +151,8 @@ class SpectralClusteringTest : public ::testing::TestWithParam<SpectralClusterin
  protected:
   raft::resources handle;
   SpectralClusteringInputs testparams;
-  rmm::device_uvector<int> d_labels;
-  rmm::device_uvector<int> d_labels_ref;
+  rmm::device_uvector<uint32_t> d_labels;
+  rmm::device_uvector<uint32_t> d_labels_ref;
   double score;
   cluster::spectral::params params;
 };

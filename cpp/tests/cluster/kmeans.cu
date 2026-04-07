@@ -71,10 +71,10 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
   //
   //    raft::random::RngState rng(params.rng_state.seed, params.rng_state.type);
   //
-  //    auto X      = raft::make_device_matrix<T, int>(handle, n_samples, n_features);
-  //    auto labels = raft::make_device_vector<int, int>(handle, n_samples);
+  //    auto X      = raft::make_device_matrix<T, int64_t>(handle, n_samples, n_features);
+  //    auto labels = raft::make_device_vector<int64_t, int64_t>(handle, n_samples);
   //
-  //    raft::random::make_blobs<T, int>(X.data_handle(),
+  //    raft::random::make_blobs<T, int64_t>(X.data_handle(),
   //                                     labels.data_handle(),
   //                                     n_samples,
   //                                     n_features,
@@ -97,7 +97,7 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
   //      thrust::cuda::par.on(stream), d_sample_weight.data(), d_sample_weight.data() + n_samples,
   //      1);
   //    auto weight_view =
-  //      raft::make_device_vector_view<const T, int>(d_sample_weight.data(), n_samples);
+  //      raft::make_device_vector_view<const T, int64_t>(d_sample_weight.data(), n_samples);
   //
   //    T inertia  = 0;
   //    int n_iter = 0;
@@ -106,14 +106,15 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
   //    rmm::device_uvector<T> inRankCp(0, stream);
   //    auto X_view = raft::make_const_mdspan(X.view());
   //    auto centroids_view =
-  //      raft::make_device_matrix_view<T, int>(d_centroids.data(), params.n_clusters, n_features);
-  //    auto miniX = raft::make_device_matrix<T, int>(handle, n_samples / 4, n_features);
+  //      raft::make_device_matrix_view<T, int64_t>(d_centroids.data(), params.n_clusters,
+  //      n_features);
+  //    auto miniX = raft::make_device_matrix<T, int64_t>(handle, n_samples / 4, n_features);
   //
   //    // Initialize kmeans on a portion of X
   //    raft::cluster::kmeans::shuffle_and_gather(
   //      handle,
   //      X_view,
-  //      raft::make_device_matrix_view<T, int>(miniX.data_handle(), miniX.extent(0),
+  //      raft::make_device_matrix_view<T, int64_t>(miniX.data_handle(), miniX.extent(0),
   //      miniX.extent(1)), miniX.extent(0), params.rng_state.seed);
   //
   //    raft::cluster::kmeans::init_plus_plus(
@@ -181,7 +182,7 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
   //    raft::cluster::kmeans::min_cluster_and_distance(
   //      handle,
   //      X_view,
-  //      raft::make_device_matrix_view<const T, int>(
+  //      raft::make_device_matrix_view<const T, int64_t>(
   //        d_centroids.data(), params.n_clusters, n_features),
   //      minClusterAndDistance.view(),
   //      L2NormX.view(),
@@ -197,11 +198,11 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
   //
   //    auto sampleCountInCluster = raft::make_device_vector<T, int>(handle, params.n_clusters);
   //    auto weigthInCluster      = raft::make_device_vector<T, int>(handle, params.n_clusters);
-  //    auto newCentroids = raft::make_device_matrix<T, int>(handle, params.n_clusters, n_features);
-  //    raft::cluster::kmeans::update_centroids(handle,
+  //    auto newCentroids = raft::make_device_matrix<T, int64_t>(handle, params.n_clusters,
+  //    n_features); raft::cluster::kmeans::update_centroids(handle,
   //                                            X_view,
   //                                            weight_view,
-  //                                            raft::make_device_matrix_view<const T, int>(
+  //                                            raft::make_device_matrix_view<const T, int64_t>(
   //                                              d_centroids.data(), params.n_clusters,
   //                                              n_features),
   //                                            itr,
@@ -233,45 +234,45 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
     params.rng_state.seed      = 1;
     params.oversampling_factor = 0;
 
-    auto X      = raft::make_device_matrix<T, int>(handle, n_samples, n_features);
-    auto labels = raft::make_device_vector<int, int>(handle, n_samples);
+    auto X      = raft::make_device_matrix<T, int64_t>(handle, n_samples, n_features);
+    auto labels = raft::make_device_vector<int64_t, int64_t>(handle, n_samples);
     auto stream = raft::resource::get_cuda_stream(handle);
 
-    raft::random::make_blobs<T, int>(X.data_handle(),
-                                     labels.data_handle(),
-                                     n_samples,
-                                     n_features,
-                                     params.n_clusters,
-                                     stream,
-                                     true,
-                                     nullptr,
-                                     nullptr,
-                                     T(1.0),
-                                     false,
-                                     (T)-10.0f,
-                                     (T)10.0f,
-                                     (uint64_t)1234);
+    raft::random::make_blobs<T, int64_t>(X.data_handle(),
+                                         labels.data_handle(),
+                                         n_samples,
+                                         n_features,
+                                         params.n_clusters,
+                                         stream,
+                                         true,
+                                         nullptr,
+                                         nullptr,
+                                         T(1.0),
+                                         false,
+                                         (T)-10.0f,
+                                         (T)10.0f,
+                                         (uint64_t)1234);
 
     d_labels.resize(n_samples, stream);
     d_labels_ref.resize(n_samples, stream);
     d_centroids.resize(params.n_clusters * n_features, stream);
 
-    std::optional<raft::device_vector_view<const T, int>> d_sw = std::nullopt;
+    std::optional<raft::device_vector_view<const T, int64_t>> d_sw = std::nullopt;
     auto d_centroids_view =
-      raft::make_device_matrix_view<T, int>(d_centroids.data(), params.n_clusters, n_features);
+      raft::make_device_matrix_view<T, int64_t>(d_centroids.data(), params.n_clusters, n_features);
     if (testparams.weighted) {
       d_sample_weight.resize(n_samples, stream);
       d_sw = std::make_optional(
-        raft::make_device_vector_view<const T, int>(d_sample_weight.data(), n_samples));
+        raft::make_device_vector_view<const T, int64_t>(d_sample_weight.data(), n_samples));
       raft::matrix::fill(
-        handle, raft::make_device_vector_view<T, int>(d_sample_weight.data(), n_samples), T(1));
+        handle, raft::make_device_vector_view<T, int64_t>(d_sample_weight.data(), n_samples), T(1));
     }
 
     raft::copy(d_labels_ref.data(), labels.data_handle(), n_samples, stream);
 
-    T inertia   = 0;
-    int n_iter  = 0;
-    auto X_view = raft::make_const_mdspan(X.view());
+    T inertia      = 0;
+    int64_t n_iter = 0;
+    auto X_view    = raft::make_const_mdspan(X.view());
 
     cuvs::cluster::kmeans::fit_predict(
       handle,
@@ -279,9 +280,9 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
       X_view,
       d_sw,
       d_centroids_view,
-      raft::make_device_vector_view<int, int>(d_labels.data(), n_samples),
+      raft::make_device_vector_view<uint32_t, int64_t>(d_labels.data(), n_samples),
       raft::make_host_scalar_view<T>(&inertia),
-      raft::make_host_scalar_view<int>(&n_iter));
+      raft::make_host_scalar_view<int64_t>(&n_iter));
 
     raft::resource::sync_stream(handle, stream);
 
@@ -308,8 +309,8 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
  protected:
   raft::resources handle;
   KmeansInputs<T> testparams;
-  rmm::device_uvector<int> d_labels;
-  rmm::device_uvector<int> d_labels_ref;
+  rmm::device_uvector<uint32_t> d_labels;
+  rmm::device_uvector<uint32_t> d_labels_ref;
   rmm::device_uvector<T> d_centroids;
   rmm::device_uvector<T> d_sample_weight;
   double score;
@@ -381,23 +382,23 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
     params.oversampling_factor = 0;
 
     auto stream = raft::resource::get_cuda_stream(handle);
-    auto X      = raft::make_device_matrix<T, int>(handle, n_samples, n_features);
-    auto labels = raft::make_device_vector<int, int>(handle, n_samples);
+    auto X      = raft::make_device_matrix<T, int64_t>(handle, n_samples, n_features);
+    auto labels = raft::make_device_vector<int64_t, int64_t>(handle, n_samples);
 
-    raft::random::make_blobs<T, int>(X.data_handle(),
-                                     labels.data_handle(),
-                                     n_samples,
-                                     n_features,
-                                     params.n_clusters,
-                                     stream,
-                                     true,
-                                     nullptr,
-                                     nullptr,
-                                     T(1.0),
-                                     false,
-                                     (T)-10.0f,
-                                     (T)10.0f,
-                                     (uint64_t)1234);
+    raft::random::make_blobs<T, int64_t>(X.data_handle(),
+                                         labels.data_handle(),
+                                         n_samples,
+                                         n_features,
+                                         params.n_clusters,
+                                         stream,
+                                         true,
+                                         nullptr,
+                                         nullptr,
+                                         T(1.0),
+                                         false,
+                                         (T)-10.0f,
+                                         (T)10.0f,
+                                         (uint64_t)1234);
 
     // Copy X to host for batched API
     std::vector<T> h_X(n_samples * n_features);
@@ -420,18 +421,18 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
     auto d_centroids_view =
       raft::make_device_matrix_view<T, int64_t>(d_centroids.data(), params.n_clusters, n_features);
 
-    std::optional<raft::device_vector_view<const T, int>> d_sw = std::nullopt;
+    std::optional<raft::device_vector_view<const T, int64_t>> d_sw = std::nullopt;
     rmm::device_uvector<T> d_sample_weight(0, stream);
     if (testparams.weighted) {
       d_sample_weight.resize(n_samples, stream);
       d_sw = std::make_optional(
-        raft::make_device_vector_view<const T, int>(d_sample_weight.data(), n_samples));
+        raft::make_device_vector_view<const T, int64_t>(d_sample_weight.data(), n_samples));
       raft::matrix::fill(
-        handle, raft::make_device_vector_view<T, int>(d_sample_weight.data(), n_samples), T(1));
+        handle, raft::make_device_vector_view<T, int64_t>(d_sample_weight.data(), n_samples), T(1));
     }
 
-    auto d_centroids_ref_view =
-      raft::make_device_matrix_view<T, int>(d_centroids_ref.data(), params.n_clusters, n_features);
+    auto d_centroids_ref_view = raft::make_device_matrix_view<T, int64_t>(
+      d_centroids_ref.data(), params.n_clusters, n_features);
 
     params.init          = cuvs::cluster::kmeans::params::Array;
     params.inertia_check = true;
@@ -445,7 +446,7 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
                                d_sw,
                                d_centroids_ref_view,
                                raft::make_host_scalar_view<T>(&ref_inertia),
-                               raft::make_host_scalar_view<int>(&ref_n_iter));
+                               raft::make_host_scalar_view<int64_t>(&ref_n_iter));
 
     cuvs::cluster::kmeans::params batched_params = params;
     batched_params.inertia_check                 = true;
@@ -485,9 +486,9 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
       params,
       raft::make_const_mdspan(X.view()),
       d_sw,
-      raft::make_device_matrix_view<const T, int>(
+      raft::make_device_matrix_view<const T, int64_t>(
         d_centroids_ref.data(), params.n_clusters, n_features),
-      raft::make_device_vector_view<int, int>(d_labels_ref.data(), n_samples),
+      raft::make_device_vector_view<uint32_t, int64_t>(d_labels_ref.data(), n_samples),
       true,
       raft::make_host_scalar_view<T>(&ref_pred_inertia));
 
@@ -497,9 +498,9 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
       params,
       raft::make_const_mdspan(X.view()),
       d_sw,
-      raft::make_device_matrix_view<const T, int>(
+      raft::make_device_matrix_view<const T, int64_t>(
         d_centroids.data(), params.n_clusters, n_features),
-      raft::make_device_vector_view<int, int>(d_labels.data(), n_samples),
+      raft::make_device_vector_view<uint32_t, int64_t>(d_labels.data(), n_samples),
       true,
       raft::make_host_scalar_view<T>(&pred_inertia));
 
@@ -530,8 +531,8 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
  protected:
   raft::resources handle;
   KmeansBatchedInputs<T> testparams;
-  rmm::device_uvector<int> d_labels;
-  rmm::device_uvector<int> d_labels_ref;
+  rmm::device_uvector<uint32_t> d_labels;
+  rmm::device_uvector<uint32_t> d_labels_ref;
   rmm::device_uvector<T> d_centroids;
   rmm::device_uvector<T> d_centroids_ref;
   double score;

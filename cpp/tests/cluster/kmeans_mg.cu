@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -74,44 +74,44 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
     rmm::device_uvector<T> X(n_samples * n_features, stream);
     rmm::device_uvector<int> labels(n_samples, stream);
 
-    raft::random::make_blobs<T, int>(handle,
-                                     X.data(),
-                                     labels.data(),
-                                     n_samples,
-                                     n_features,
-                                     params.n_clusters,
-                                     true,
-                                     nullptr,
-                                     nullptr,
-                                     1.0,
-                                     false,
-                                     -10.0f,
-                                     10.0f,
-                                     1234ULL);
+    raft::random::make_blobs<T, int64_t>(handle,
+                                         X.data(),
+                                         labels.data(),
+                                         n_samples,
+                                         n_features,
+                                         params.n_clusters,
+                                         true,
+                                         nullptr,
+                                         nullptr,
+                                         1.0,
+                                         false,
+                                         -10.0f,
+                                         10.0f,
+                                         1234ULL);
 
     d_labels.resize(n_samples, stream);
     d_labels_ref.resize(n_samples, stream);
     d_centroids.resize(params.n_clusters * n_features, stream);
 
-    std::optional<raft::device_vector_view<const T, int>> d_sw = std::nullopt;
+    std::optional<raft::device_vector_view<const T, int64_t>> d_sw = std::nullopt;
     if (testparams.weighted) {
       d_sample_weight.resize(n_samples, stream);
       thrust::fill(thrust::cuda::par.on(stream),
                    d_sample_weight.data(),
                    d_sample_weight.data() + n_samples,
                    1);
-      d_sw = raft::make_device_vector_view<const T, int>(d_sample_weight.data(), n_samples);
+      d_sw = raft::make_device_vector_view<const T, int64_t>(d_sample_weight.data(), n_samples);
     }
     raft::copy(d_labels_ref.data(), labels.data(), n_samples, stream);
 
     handle.sync_stream(stream);
 
-    T inertia  = 0;
-    int n_iter = 0;
+    T inertia      = 0;
+    int64_t n_iter = 0;
 
-    auto X_view = raft::make_device_matrix_view<const T, int>(X.data(), n_samples, n_features);
+    auto X_view = raft::make_device_matrix_view<const T, int64_t>(X.data(), n_samples, n_features);
     auto centroids_view =
-      raft::make_device_matrix_view<T, int>(d_centroids.data(), params.n_clusters, n_features);
+      raft::make_device_matrix_view<T, int64_t>(d_centroids.data(), params.n_clusters, n_features);
 
     cuvs::cluster::kmeans::fit(handle,
                                params,
@@ -119,7 +119,7 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
                                d_sw,
                                centroids_view,
                                raft::make_host_scalar_view<T>(&inertia),
-                               raft::make_host_scalar_view<int>(&n_iter));
+                               raft::make_host_scalar_view<int64_t>(&n_iter));
 
     cuvs::cluster::kmeans::predict(
       handle,
@@ -127,7 +127,7 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
       X_view,
       d_sw,
       d_centroids.data(),
-      raft::make_device_vector_view<int, int>(d_labels.data(), n_samples),
+      raft::make_device_vector_view<uint32_t, int64_t>(d_labels.data(), n_samples),
       true,
       raft::make_host_scalar_view<T>(&inertia));
     score = raft::stats::adjusted_rand_index(
@@ -150,8 +150,8 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
   raft::handle_t handle;
   cudaStream_t stream;
   KmeansInputs<T> testparams;
-  rmm::device_uvector<int> d_labels;
-  rmm::device_uvector<int> d_labels_ref;
+  rmm::device_uvector<uint32_t> d_labels;
+  rmm::device_uvector<uint32_t> d_labels_ref;
   rmm::device_uvector<T> d_centroids;
   rmm::device_uvector<T> d_sample_weight;
   double score;
