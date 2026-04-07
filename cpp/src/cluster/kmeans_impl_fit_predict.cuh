@@ -16,9 +16,9 @@ void fit_predict(raft::resources const& handle,
                  raft::device_matrix_view<const DataT, IndexT> X,
                  std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight,
                  std::optional<raft::device_matrix_view<DataT, IndexT>> centroids,
-                 raft::device_vector_view<IndexT, IndexT> labels,
+                 raft::device_vector_view<uint32_t, IndexT> labels,
                  raft::host_scalar_view<DataT> inertia,
-                 raft::host_scalar_view<IndexT> n_iter)
+                 raft::host_scalar_view<int> n_iter)
 {
   if (!centroids.has_value()) {
     auto n_features = X.extent(1);

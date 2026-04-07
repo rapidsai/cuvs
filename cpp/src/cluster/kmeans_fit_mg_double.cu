@@ -15,10 +15,9 @@ void fit(raft::resources const& handle,
          std::optional<raft::device_vector_view<const double, int64_t>> sample_weight,
          raft::device_matrix_view<double, int64_t> centroids,
          raft::host_scalar_view<double> inertia,
-         raft::host_scalar_view<int64_t> n_iter)
+         raft::host_scalar_view<int> n_iter)
 {
   rmm::device_uvector<char> workspace(0, raft::resource::get_cuda_stream(handle));
-
   cuvs::cluster::kmeans::mg::detail::fit<double, int64_t>(
     handle, params, X, sample_weight, centroids, inertia, n_iter, workspace);
 }

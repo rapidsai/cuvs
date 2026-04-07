@@ -18,7 +18,7 @@ namespace cuvs::cluster::kmeans {
     raft::device_vector_view<const DataT, IndexT> sample_weights, \
     raft::device_matrix_view<DataT, IndexT> centroids,            \
     raft::host_scalar_view<DataT> inertia,                        \
-    raft::host_scalar_view<IndexT> n_iter,                        \
+    raft::host_scalar_view<int> n_iter,                            \
     rmm::device_uvector<char>& workspace);
 
 #define INSTANTIATE_FIT(DataT, IndexT)                                          \
@@ -29,7 +29,7 @@ namespace cuvs::cluster::kmeans {
     std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight, \
     raft::device_matrix_view<DataT, IndexT> centroids,                          \
     raft::host_scalar_view<DataT> inertia,                                      \
-    raft::host_scalar_view<IndexT> n_iter);
+    raft::host_scalar_view<int> n_iter);
 
 INSTANTIATE_FIT_MAIN(float, int64_t)
 INSTANTIATE_FIT(float, int64_t)
@@ -43,7 +43,7 @@ void fit(raft::resources const& handle,
          std::optional<raft::device_vector_view<const float, int64_t>> sample_weight,
          raft::device_matrix_view<float, int64_t> centroids,
          raft::host_scalar_view<float> inertia,
-         raft::host_scalar_view<int64_t> n_iter)
+         raft::host_scalar_view<int> n_iter)
 {
   cuvs::cluster::kmeans::fit<float, int64_t>(
     handle, params, X, sample_weight, centroids, inertia, n_iter);
@@ -55,7 +55,7 @@ void fit(raft::resources const& handle,
          std::optional<raft::host_vector_view<const float, int64_t>> sample_weight,
          raft::device_matrix_view<float, int64_t> centroids,
          raft::host_scalar_view<float> inertia,
-         raft::host_scalar_view<int64_t> n_iter)
+         raft::host_scalar_view<int> n_iter)
 {
   cuvs::cluster::kmeans::detail::fit<float, int64_t>(
     handle, params, X, sample_weight, centroids, inertia, n_iter);

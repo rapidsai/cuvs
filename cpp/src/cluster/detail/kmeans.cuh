@@ -311,7 +311,7 @@ void kmeans_fit_main(raft::resources const& handle,
                      raft::device_vector_view<const DataT, IndexT> weight,
                      raft::device_matrix_view<DataT, IndexT> centroidsRawData,
                      raft::host_scalar_view<DataT> inertia,
-                     raft::host_scalar_view<IndexT> n_iter,
+                     raft::host_scalar_view<int> n_iter,
                      rmm::device_uvector<char>& workspace)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("kmeans_fit_main");
@@ -650,7 +650,7 @@ void initScalableKMeansPlusPlus(raft::resources const& handle,
       handle, params, potentialCentroids, centroidsRawData, workspace);
 
     auto inertia = raft::make_host_scalar<DataT>(0);
-    auto n_iter  = raft::make_host_scalar<IndexT>(0);
+    auto n_iter  = raft::make_host_scalar<int>(0);
     cuvs::cluster::kmeans::params default_params;
     default_params.n_clusters = params.n_clusters;
 
@@ -727,7 +727,7 @@ void kmeans_fit(raft::resources const& handle,
                 std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight,
                 raft::device_matrix_view<DataT, IndexT> centroids,
                 raft::host_scalar_view<DataT> inertia,
-                raft::host_scalar_view<IndexT> n_iter)
+                raft::host_scalar_view<int> n_iter)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("kmeans_fit");
   auto n_samples      = X.extent(0);
@@ -799,7 +799,7 @@ void kmeans_fit(raft::resources const& handle,
     iter_params.rng_state.seed                = gen();
 
     DataT iter_inertia    = std::numeric_limits<DataT>::max();
-    IndexT n_current_iter = 0;
+    int n_current_iter = 0;
     if (iter_params.init == cuvs::cluster::kmeans::params::InitMethod::Random) {
       // initializing with random samples from input dataset
       RAFT_LOG_DEBUG(
@@ -844,7 +844,7 @@ void kmeans_fit(raft::resources const& handle,
       weight.view(),
       centroidsRawData.view(),
       raft::make_host_scalar_view<DataT>(&iter_inertia),
-      raft::make_host_scalar_view<IndexT>(&n_current_iter),
+      raft::make_host_scalar_view<int>(&n_current_iter),
       workspace);
     if (iter_inertia < inertia[0]) {
       inertia[0] = iter_inertia;
@@ -872,7 +872,7 @@ void kmeans_fit(raft::resources const& handle,
                 IndexT n_samples,
                 IndexT n_features,
                 DataT& inertia,
-                IndexT& n_iter)
+                int& n_iter)
 {
   auto XView = raft::make_device_matrix_view<const DataT, IndexT>(X, n_samples, n_features);
   auto centroidsView =
@@ -894,7 +894,7 @@ void kmeans_predict(raft::resources const& handle,
                     raft::device_matrix_view<const DataT, IndexT> X,
                     std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight,
                     raft::device_matrix_view<const DataT, IndexT> centroids,
-                    raft::device_vector_view<IndexT, IndexT> labels,
+                    raft::device_vector_view<uint32_t, IndexT> labels,
                     bool normalize_weight,
                     raft::host_scalar_view<DataT> inertia)
 {
@@ -982,7 +982,10 @@ void kmeans_predict(raft::resources const& handle,
     raft::add_op{});
 
   raft::linalg::map(
-    handle, labels, raft::key_op{}, raft::make_const_mdspan(minClusterAndDistance.view()));
+    handle,
+    labels,
+    raft::compose_op(raft::cast_op<uint32_t>{}, raft::key_op{}),
+    raft::make_const_mdspan(minClusterAndDistance.view()));
 
   inertia[0] = clusterCostD.value(stream);
 }
@@ -995,7 +998,7 @@ void kmeans_predict(raft::resources const& handle,
                     const DataT* centroids,
                     IndexT n_samples,
                     IndexT n_features,
-                    IndexT* labels,
+                    uint32_t* labels,
                     bool normalize_weight,
                     DataT& inertia)
 {
@@ -1006,7 +1009,7 @@ void kmeans_predict(raft::resources const& handle,
   if (sample_weight)
     sample_weightView.emplace(
       raft::make_device_vector_view<const DataT, IndexT>(sample_weight, n_samples));
-  auto labelsView  = raft::make_device_vector_view<IndexT, IndexT>(labels, n_samples);
+  auto labelsView  = raft::make_device_vector_view<uint32_t, IndexT>(labels, n_samples);
   auto inertiaView = raft::make_host_scalar_view(&inertia);
 
   cuvs::cluster::kmeans::detail::kmeans_predict<DataT, IndexT>(handle,

@@ -36,7 +36,7 @@ void fit(raft::resources const& handle,
          std::optional<raft::device_vector_view<const float, int64_t>> sample_weight,
          raft::device_matrix_view<float, int64_t> centroids,
          raft::host_scalar_view<float> inertia,
-         raft::host_scalar_view<int64_t> n_iter);
+         raft::host_scalar_view<int> n_iter);
 
 void fit(raft::resources const& handle,
          const cuvs::cluster::kmeans::params& params,
@@ -44,6 +44,6 @@ void fit(raft::resources const& handle,
          std::optional<raft::device_vector_view<const double, int64_t>> sample_weight,
          raft::device_matrix_view<double, int64_t> centroids,
          raft::host_scalar_view<double> inertia,
-         raft::host_scalar_view<int64_t> n_iter);
+         raft::host_scalar_view<int> n_iter);
 
 }  // namespace cuvs::cluster::kmeans::mg

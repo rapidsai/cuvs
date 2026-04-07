@@ -6,7 +6,6 @@
 #include "kmeans.cuh"
 #include "kmeans_impl.cuh"
 #include <raft/core/resources.hpp>
-#include <raft/linalg/map.cuh>
 
 namespace cuvs::cluster::kmeans {
 
@@ -17,7 +16,7 @@ namespace cuvs::cluster::kmeans {
     raft::device_matrix_view<const DataT, IndexT> X,                            \
     std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight, \
     raft::device_matrix_view<const DataT, IndexT> centroids,                    \
-    raft::device_vector_view<IndexT, IndexT> labels,                            \
+    raft::device_vector_view<uint32_t, IndexT> labels,                          \
     bool normalize_weight,                                                      \
     raft::host_scalar_view<DataT> inertia);
 
@@ -34,11 +33,7 @@ void predict(raft::resources const& handle,
              bool normalize_weight,
              raft::host_scalar_view<float> inertia)
 {
-  auto n_samples    = X.extent(0);
-  auto labels_int64 = raft::make_device_vector<int64_t, int64_t>(handle, n_samples);
   cuvs::cluster::kmeans::predict<float, int64_t>(
-    handle, params, X, sample_weight, centroids, labels_int64.view(), normalize_weight, inertia);
-  raft::linalg::map(
-    handle, labels, raft::cast_op<uint32_t>{}, raft::make_const_mdspan(labels_int64.view()));
+    handle, params, X, sample_weight, centroids, labels, normalize_weight, inertia);
 }
 }  // namespace cuvs::cluster::kmeans

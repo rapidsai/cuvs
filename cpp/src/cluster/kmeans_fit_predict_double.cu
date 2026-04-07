@@ -5,7 +5,6 @@
 
 #include "kmeans_impl_fit_predict.cuh"
 #include <raft/core/resources.hpp>
-#include <raft/linalg/map.cuh>
 
 namespace cuvs::cluster::kmeans {
 
@@ -16,13 +15,9 @@ void fit_predict(raft::resources const& handle,
                  std::optional<raft::device_matrix_view<double, int64_t>> centroids,
                  raft::device_vector_view<uint32_t, int64_t> labels,
                  raft::host_scalar_view<double> inertia,
-                 raft::host_scalar_view<int64_t> n_iter)
+                 raft::host_scalar_view<int> n_iter)
 {
-  auto n_samples    = X.extent(0);
-  auto labels_int64 = raft::make_device_vector<int64_t, int64_t>(handle, n_samples);
   cuvs::cluster::kmeans::fit_predict<double, int64_t>(
-    handle, params, X, sample_weight, centroids, labels_int64.view(), inertia, n_iter);
-  raft::linalg::map(
-    handle, labels, raft::cast_op<uint32_t>{}, raft::make_const_mdspan(labels_int64.view()));
+    handle, params, X, sample_weight, centroids, labels, inertia, n_iter);
 }
 }  // namespace cuvs::cluster::kmeans
