@@ -16,6 +16,7 @@
 #include <raft/core/nvtx.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/serialize.hpp>
+#include <raft/util/cudart_utils.hpp>
 
 #include "../dataset_serialize.hpp"
 
@@ -70,14 +71,13 @@ void serialize_dataset(raft::resources const& res,
       auto stride    = strided_dataset->stride();
       auto d_data    = strided_dataset->view();
       auto h_dataset = raft::make_host_matrix<T, int64_t>(nrows, dim);
-      RAFT_CUDA_TRY(cudaMemcpy2DAsync(h_dataset.data_handle(),
-                                      sizeof(T) * dim,
-                                      d_data.data_handle(),
-                                      sizeof(T) * stride,
-                                      sizeof(T) * dim,
-                                      nrows,
-                                      cudaMemcpyDefault,
-                                      raft::resource::get_cuda_stream(res)));
+      raft::copy_matrix(h_dataset.data_handle(),
+                        dim,
+                        d_data.data_handle(),
+                        stride,
+                        dim,
+                        nrows,
+                        raft::resource::get_cuda_stream(res));
       raft::resource::sync_stream(res);
       to_file(dataset_base_file, h_dataset);
     } else {
@@ -164,15 +164,13 @@ void serialize_sector_aligned(raft::resources const& res,
   if (!dataset_strided) { RAFT_FAIL("Invalid dataset"); }
   auto d_data = dataset_strided->view();
   auto h_data = raft::make_host_matrix<T, int64_t>(npts, ndims);
-  auto stride = dataset_strided->stride();
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(h_data.data_handle(),
-                                  sizeof(T) * ndims,
-                                  d_data.data_handle(),
-                                  sizeof(T) * stride,
-                                  sizeof(T) * ndims,
-                                  npts,
-                                  cudaMemcpyDefault,
-                                  raft::resource::get_cuda_stream(res)));
+  raft::copy_matrix(h_data.data_handle(),
+                    ndims,
+                    d_data.data_handle(),
+                    dataset_strided->stride(),
+                    ndims,
+                    npts,
+                    raft::resource::get_cuda_stream(res));
   raft::resource::sync_stream(res);
 
   // buffers
