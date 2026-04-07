@@ -57,143 +57,67 @@ class AnnIVFSQTest : public ::testing::TestWithParam<AnnIvfSqInputs<IdxT>> {
   {
   }
 
-  void testIVFSQ()
+  void testSearch()
   {
-    size_t queries_size = ps.num_queries * ps.k;
-    std::vector<IdxT> indices_ivfsq(queries_size);
-    std::vector<IdxT> indices_naive(queries_size);
-    std::vector<T> distances_ivfsq(queries_size);
-    std::vector<T> distances_naive(queries_size);
+    auto naive   = compute_naive_knn();
+    auto idx     = build_index(true);
+    auto results = search_index(idx);
 
-    {
-      rmm::device_uvector<T> distances_naive_dev(queries_size, stream_);
-      rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
-      cuvs::neighbors::naive_knn<T, DataT, IdxT>(handle_,
-                                                 distances_naive_dev.data(),
-                                                 indices_naive_dev.data(),
-                                                 search_queries.data(),
-                                                 database.data(),
-                                                 ps.num_queries,
-                                                 ps.num_db_vecs,
-                                                 ps.dim,
-                                                 ps.k,
-                                                 ps.metric);
-      raft::update_host(distances_naive.data(), distances_naive_dev.data(), queries_size, stream_);
-      raft::update_host(indices_naive.data(), indices_naive_dev.data(), queries_size, stream_);
-      raft::resource::sync_stream(handle_);
-    }
+    float eps = 0.1;
+    ASSERT_TRUE(eval_neighbours(naive.indices,
+                                results.indices,
+                                naive.distances,
+                                results.distances,
+                                ps.num_queries,
+                                ps.k,
+                                eps,
+                                min_recall_threshold()));
+  }
 
-    {
-      double min_recall =
-        std::min(1.0, static_cast<double>(ps.nprobe) / static_cast<double>(ps.nlist));
+  void testSerialize()
+  {
+    auto idx = build_index(true);
 
-      rmm::device_uvector<T> distances_ivfsq_dev(queries_size, stream_);
-      rmm::device_uvector<IdxT> indices_ivfsq_dev(queries_size, stream_);
+    tmp_index_file index_file;
+    cuvs::neighbors::ivf_sq::serialize(handle_, index_file.filename, idx);
+    cuvs::neighbors::ivf_sq::index<uint8_t> index_loaded(handle_);
+    cuvs::neighbors::ivf_sq::deserialize(handle_, index_file.filename, &index_loaded);
 
-      {
-        cuvs::neighbors::ivf_sq::index_params index_params;
-        cuvs::neighbors::ivf_sq::search_params search_params;
-        index_params.n_lists   = ps.nlist;
-        index_params.metric    = ps.metric;
-        search_params.n_probes = ps.nprobe;
+    ASSERT_EQ(idx.size(), index_loaded.size());
+    ASSERT_EQ(idx.dim(), index_loaded.dim());
+    ASSERT_EQ(idx.n_lists(), index_loaded.n_lists());
 
-        index_params.add_data_on_build        = true;
-        index_params.kmeans_trainset_fraction = 0.5;
+    auto results_orig   = search_index(idx);
+    auto results_loaded = search_index(index_loaded);
 
-        cuvs::neighbors::ivf_sq::index_params index_params_no_add;
-        index_params_no_add.n_lists                  = ps.nlist;
-        index_params_no_add.metric                   = ps.metric;
-        index_params_no_add.add_data_on_build        = false;
-        index_params_no_add.kmeans_trainset_fraction = 0.5;
+    float eps = 0.001;
+    ASSERT_TRUE(eval_neighbours(results_orig.indices,
+                                results_loaded.indices,
+                                results_orig.distances,
+                                results_loaded.distances,
+                                ps.num_queries,
+                                ps.k,
+                                eps,
+                                1.0));
+  }
 
-        cuvs::neighbors::ivf_sq::index<uint8_t> idx(handle_);
-        cuvs::neighbors::ivf_sq::index<uint8_t> idx_empty(handle_);
+  void testExtend()
+  {
+    auto naive     = compute_naive_knn();
+    auto idx_empty = build_index(false);
+    extend_index(&idx_empty);
 
-        if (!ps.host_dataset) {
-          auto database_view = raft::make_device_matrix_view<const DataT, IdxT>(
-            (const DataT*)database.data(), ps.num_db_vecs, ps.dim);
+    auto results = search_index(idx_empty);
 
-          idx = cuvs::neighbors::ivf_sq::build(handle_, index_params, database_view);
-
-          idx_empty = cuvs::neighbors::ivf_sq::build(handle_, index_params_no_add, database_view);
-
-          auto vector_indices = raft::make_device_vector<IdxT, IdxT>(handle_, ps.num_db_vecs);
-          raft::linalg::map_offset(handle_, vector_indices.view(), raft::identity_op{});
-          raft::resource::sync_stream(handle_);
-
-          auto indices_view = raft::make_device_vector_view<const IdxT, IdxT>(
-            vector_indices.data_handle(), ps.num_db_vecs);
-          cuvs::neighbors::ivf_sq::extend(
-            handle_,
-            database_view,
-            std::make_optional<raft::device_vector_view<const IdxT, IdxT>>(indices_view),
-            &idx_empty);
-        } else {
-          auto host_database = raft::make_host_matrix<DataT, IdxT>(ps.num_db_vecs, ps.dim);
-          raft::copy(
-            host_database.data_handle(), database.data(), ps.num_db_vecs * ps.dim, stream_);
-          raft::resource::sync_stream(handle_);
-
-          idx = cuvs::neighbors::ivf_sq::build(
-            handle_, index_params, raft::make_const_mdspan(host_database.view()));
-
-          idx_empty = cuvs::neighbors::ivf_sq::build(
-            handle_, index_params_no_add, raft::make_const_mdspan(host_database.view()));
-
-          auto vector_indices = raft::make_host_vector<IdxT>(handle_, ps.num_db_vecs);
-          std::iota(
-            vector_indices.data_handle(), vector_indices.data_handle() + ps.num_db_vecs, IdxT(0));
-
-          auto indices_view = raft::make_host_vector_view<const IdxT, IdxT>(
-            vector_indices.data_handle(), ps.num_db_vecs);
-          auto host_database_view = raft::make_host_matrix_view<const DataT, IdxT>(
-            host_database.data_handle(), ps.num_db_vecs, ps.dim);
-          cuvs::neighbors::ivf_sq::extend(
-            handle_,
-            host_database_view,
-            std::make_optional<raft::host_vector_view<const IdxT, IdxT>>(indices_view),
-            &idx_empty);
-        }
-
-        // Serialize / deserialize round-trip
-        tmp_index_file index_file;
-        cuvs::neighbors::ivf_sq::serialize(handle_, index_file.filename, idx);
-        cuvs::neighbors::ivf_sq::index<uint8_t> index_loaded(handle_);
-        cuvs::neighbors::ivf_sq::deserialize(handle_, index_file.filename, &index_loaded);
-        ASSERT_EQ(idx.size(), index_loaded.size());
-        ASSERT_EQ(idx.dim(), index_loaded.dim());
-        ASSERT_EQ(idx.n_lists(), index_loaded.n_lists());
-
-        auto search_queries_view = raft::make_device_matrix_view<const DataT, IdxT>(
-          search_queries.data(), ps.num_queries, ps.dim);
-        auto indices_out_view =
-          raft::make_device_matrix_view<IdxT, IdxT>(indices_ivfsq_dev.data(), ps.num_queries, ps.k);
-        auto dists_out_view =
-          raft::make_device_matrix_view<T, IdxT>(distances_ivfsq_dev.data(), ps.num_queries, ps.k);
-
-        cuvs::neighbors::ivf_sq::search(handle_,
-                                        search_params,
-                                        index_loaded,
-                                        search_queries_view,
-                                        indices_out_view,
-                                        dists_out_view);
-
-        raft::update_host(
-          distances_ivfsq.data(), distances_ivfsq_dev.data(), queries_size, stream_);
-        raft::update_host(indices_ivfsq.data(), indices_ivfsq_dev.data(), queries_size, stream_);
-        raft::resource::sync_stream(handle_);
-      }
-      // SQ introduces quantization error, so we relax the distance epsilon
-      float eps = 0.1;
-      ASSERT_TRUE(eval_neighbours(indices_naive,
-                                  indices_ivfsq,
-                                  distances_naive,
-                                  distances_ivfsq,
-                                  ps.num_queries,
-                                  ps.k,
-                                  eps,
-                                  min_recall));
-    }
+    float eps = 0.1;
+    ASSERT_TRUE(eval_neighbours(naive.indices,
+                                results.indices,
+                                naive.distances,
+                                results.distances,
+                                ps.num_queries,
+                                ps.k,
+                                eps,
+                                min_recall_threshold()));
   }
 
   void testFilter()
@@ -318,6 +242,128 @@ class AnnIVFSQTest : public ::testing::TestWithParam<AnnIvfSqInputs<IdxT>> {
   }
 
  private:
+  struct SearchResults {
+    std::vector<IdxT> indices;
+    std::vector<T> distances;
+  };
+
+  double min_recall_threshold()
+  {
+    return std::min(1.0, static_cast<double>(ps.nprobe) / static_cast<double>(ps.nlist));
+  }
+
+  SearchResults compute_naive_knn()
+  {
+    size_t queries_size = ps.num_queries * ps.k;
+    SearchResults results;
+    results.indices.resize(queries_size);
+    results.distances.resize(queries_size);
+
+    rmm::device_uvector<T> distances_dev(queries_size, stream_);
+    rmm::device_uvector<IdxT> indices_dev(queries_size, stream_);
+    cuvs::neighbors::naive_knn<T, DataT, IdxT>(handle_,
+                                               distances_dev.data(),
+                                               indices_dev.data(),
+                                               search_queries.data(),
+                                               database.data(),
+                                               ps.num_queries,
+                                               ps.num_db_vecs,
+                                               ps.dim,
+                                               ps.k,
+                                               ps.metric);
+    raft::update_host(results.distances.data(), distances_dev.data(), queries_size, stream_);
+    raft::update_host(results.indices.data(), indices_dev.data(), queries_size, stream_);
+    raft::resource::sync_stream(handle_);
+    return results;
+  }
+
+  cuvs::neighbors::ivf_sq::index<uint8_t> build_index(bool add_data_on_build)
+  {
+    cuvs::neighbors::ivf_sq::index_params index_params;
+    index_params.n_lists                  = ps.nlist;
+    index_params.metric                   = ps.metric;
+    index_params.add_data_on_build        = add_data_on_build;
+    index_params.kmeans_trainset_fraction = 0.5;
+
+    if (!ps.host_dataset) {
+      auto database_view = raft::make_device_matrix_view<const DataT, IdxT>(
+        (const DataT*)database.data(), ps.num_db_vecs, ps.dim);
+      return cuvs::neighbors::ivf_sq::build(handle_, index_params, database_view);
+    } else {
+      auto host_database = raft::make_host_matrix<DataT, IdxT>(ps.num_db_vecs, ps.dim);
+      raft::copy(host_database.data_handle(), database.data(), ps.num_db_vecs * ps.dim, stream_);
+      raft::resource::sync_stream(handle_);
+      return cuvs::neighbors::ivf_sq::build(
+        handle_, index_params, raft::make_const_mdspan(host_database.view()));
+    }
+  }
+
+  void extend_index(cuvs::neighbors::ivf_sq::index<uint8_t>* idx)
+  {
+    if (!ps.host_dataset) {
+      auto database_view = raft::make_device_matrix_view<const DataT, IdxT>(
+        (const DataT*)database.data(), ps.num_db_vecs, ps.dim);
+      auto vector_indices = raft::make_device_vector<IdxT, IdxT>(handle_, ps.num_db_vecs);
+      raft::linalg::map_offset(handle_, vector_indices.view(), raft::identity_op{});
+      raft::resource::sync_stream(handle_);
+
+      auto indices_view = raft::make_device_vector_view<const IdxT, IdxT>(
+        vector_indices.data_handle(), ps.num_db_vecs);
+      cuvs::neighbors::ivf_sq::extend(
+        handle_,
+        database_view,
+        std::make_optional<raft::device_vector_view<const IdxT, IdxT>>(indices_view),
+        idx);
+    } else {
+      auto host_database = raft::make_host_matrix<DataT, IdxT>(ps.num_db_vecs, ps.dim);
+      raft::copy(host_database.data_handle(), database.data(), ps.num_db_vecs * ps.dim, stream_);
+      raft::resource::sync_stream(handle_);
+
+      auto vector_indices = raft::make_host_vector<IdxT>(handle_, ps.num_db_vecs);
+      std::iota(
+        vector_indices.data_handle(), vector_indices.data_handle() + ps.num_db_vecs, IdxT(0));
+
+      auto indices_view =
+        raft::make_host_vector_view<const IdxT, IdxT>(vector_indices.data_handle(), ps.num_db_vecs);
+      auto host_database_view = raft::make_host_matrix_view<const DataT, IdxT>(
+        host_database.data_handle(), ps.num_db_vecs, ps.dim);
+      cuvs::neighbors::ivf_sq::extend(
+        handle_,
+        host_database_view,
+        std::make_optional<raft::host_vector_view<const IdxT, IdxT>>(indices_view),
+        idx);
+    }
+  }
+
+  SearchResults search_index(const cuvs::neighbors::ivf_sq::index<uint8_t>& idx)
+  {
+    size_t queries_size = ps.num_queries * ps.k;
+    SearchResults results;
+    results.indices.resize(queries_size);
+    results.distances.resize(queries_size);
+
+    cuvs::neighbors::ivf_sq::search_params search_params;
+    search_params.n_probes = ps.nprobe;
+
+    rmm::device_uvector<T> distances_dev(queries_size, stream_);
+    rmm::device_uvector<IdxT> indices_dev(queries_size, stream_);
+
+    auto search_queries_view = raft::make_device_matrix_view<const DataT, IdxT>(
+      search_queries.data(), ps.num_queries, ps.dim);
+    auto indices_out_view =
+      raft::make_device_matrix_view<IdxT, IdxT>(indices_dev.data(), ps.num_queries, ps.k);
+    auto dists_out_view =
+      raft::make_device_matrix_view<T, IdxT>(distances_dev.data(), ps.num_queries, ps.k);
+
+    cuvs::neighbors::ivf_sq::search(
+      handle_, search_params, idx, search_queries_view, indices_out_view, dists_out_view);
+
+    raft::update_host(results.distances.data(), distances_dev.data(), queries_size, stream_);
+    raft::update_host(results.indices.data(), indices_dev.data(), queries_size, stream_);
+    raft::resource::sync_stream(handle_);
+    return results;
+  }
+
   raft::resources handle_;
   rmm::cuda_stream_view stream_;
   AnnIvfSqInputs<IdxT> ps;
@@ -398,7 +444,8 @@ const std::vector<AnnIvfSqInputs<int64_t>> inputs = {
   {1000, 10000, 16, 100, 200, 1024, cuvs::distance::DistanceType::L2Expanded},
   {1000, 10000, 16, 100, 200, 1024, cuvs::distance::DistanceType::InnerProduct},
 
-  // ===== Large k (beyond fused top-k kMaxSqScanCapacity=256, exercises materialized fallback) =====
+  // ===== Large k (beyond fused top-k kMaxSqScanCapacity=256, exercises materialized fallback)
+  // =====
   // k=257: smallest k that forces the materialized path (Capacity clamped to 0)
   {100, 10000, 32, 257, 100, 64, cuvs::distance::DistanceType::L2Expanded},
   {100, 10000, 32, 257, 100, 64, cuvs::distance::DistanceType::InnerProduct},

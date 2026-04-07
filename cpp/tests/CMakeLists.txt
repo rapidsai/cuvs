@@ -135,7 +135,7 @@ ConfigureTest(
 
 ConfigureTest(
   NAME NEIGHBORS_ANN_IVF_SQ_TEST
-  PATH neighbors/ann_ivf_sq/test_float_uint8_t.cu
+  PATH neighbors/ann_ivf_sq/test_float_int64_t.cu neighbors/ann_ivf_sq/test_half_int64_t.cu
   GPUS 1
   PERCENT 100
 )
