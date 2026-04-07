@@ -83,7 +83,7 @@ ConfigureTest(
   NAME ALL_NEIGHBORS_C_TEST PATH neighbors/run_all_neighbors_c.c neighbors/all_neighbors_c.cu
 )
 
-ConfigureTest(NAME PCA_C_TEST PATH preprocessing/run_pca_c.c preprocessing/pca_c.cu)
+ConfigureTest(NAME PCA_C_TEST PATH preprocessing/pca_c.cu)
 
 if(BUILD_CAGRA_HNSWLIB)
   ConfigureTest(NAME HNSW_C_TEST PATH neighbors/ann_hnsw_c.cu)
