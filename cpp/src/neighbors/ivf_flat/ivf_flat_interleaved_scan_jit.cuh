@@ -7,6 +7,7 @@
 
 #include "../ivf_common.cuh"
 #include "jit_lto_kernels/interleaved_scan_planner.hpp"
+#include "jit_lto_kernels/kernel_def.hpp"
 #include <cstdint>
 #include <cuvs/detail/jit_lto/NVRTCLTOFragmentCompiler.hpp>
 #include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>
@@ -163,10 +164,10 @@ void launch_kernel(const index<T, IdxT>& index,
   kernel_planner.add_post_lambda_device_function<PostLambdaTag>();
   auto kernel_launcher = kernel_planner.get_launcher();
 
-  const int max_query_smem = 16384;
-  int query_smem_elems     = std::min<int>(max_query_smem / sizeof(T),
-                                       raft::Pow2<Veclen * raft::WarpSize>::roundUp(index.dim()));
-  int smem_size            = query_smem_elems * sizeof(T);
+  const int max_query_smem  = 16384;
+  uint32_t query_smem_elems = std::min<int>(
+    max_query_smem / sizeof(T), raft::Pow2<Veclen * raft::WarpSize>::roundUp(index.dim()));
+  size_t smem_size = query_smem_elems * sizeof(T);
 
   if constexpr (Capacity > 0) {
     constexpr int kSubwarpSize = std::min<int>(Capacity, raft::WarpSize);
@@ -197,28 +198,29 @@ void launch_kernel(const index<T, IdxT>& index,
       block_dim.x,
       n_probes,
       smem_size);
-    kernel_launcher->dispatch(stream,
-                              grid_dim,
-                              block_dim,
-                              smem_size,
-                              query_smem_elems,
-                              queries,
-                              coarse_index,
-                              index.data_ptrs().data_handle(),
-                              index.list_sizes().data_handle(),
-                              queries_offset + query_offset,
-                              n_probes,
-                              k,
-                              max_samples,
-                              chunk_indices,
-                              index.dim(),
-                              // sample_filter,
-                              inds_ptrs,
-                              bitset_ptr.value_or(nullptr),
-                              bitset_len.value_or(0),
-                              original_nbits.value_or(0),
-                              neighbors,
-                              distances);
+    kernel_launcher->dispatch<interleaved_scan_func_t<T, IdxT>>(
+      stream,
+      grid_dim,
+      block_dim,
+      smem_size,
+      query_smem_elems,
+      queries,
+      coarse_index,
+      const_cast<const T* const*>(index.data_ptrs().data_handle()),
+      index.list_sizes().data_handle(),
+      static_cast<uint32_t>(queries_offset + query_offset),
+      n_probes,
+      k,
+      max_samples,
+      chunk_indices,
+      index.dim(),
+      // sample_filter,
+      inds_ptrs,
+      bitset_ptr.value_or(nullptr),
+      bitset_len.value_or(0),
+      original_nbits.value_or(0),
+      neighbors,
+      distances);
     queries += grid_dim_y * index.dim();
     if constexpr (Capacity > 0) {
       neighbors += grid_dim_y * grid_dim_x * k;
