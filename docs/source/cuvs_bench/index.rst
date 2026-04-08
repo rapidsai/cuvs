@@ -54,7 +54,7 @@ Installing the benchmarks
 There are two main ways pre-compiled benchmarks are distributed:
 
 - `Conda`_ For users not using containers but want an easy to install and use Python package. Pip wheels are planned to be added as an alternative for users that cannot use conda and prefer to not use containers.
-- `Docker`_ Only needs docker and [NVIDIA docker](https://github.com/NVIDIA/nvidia-docker) to use. Provides a single docker run command for basic dataset benchmarking, as well as all the functionality of the conda solution inside the containers.
+- `Docker`_ Only needs docker and `NVIDIA docker <https://github.com/NVIDIA/nvidia-docker>`_ to use. Provides a single docker run command for basic dataset benchmarking, as well as all the functionality of the conda solution inside the containers.
 
 Conda
 -----
@@ -218,6 +218,34 @@ The usage of `python -m cuvs_bench.split_groundtruth` is:
       --groundtruth GROUNDTRUTH
                             Path to billion-scale dataset groundtruth file (default: None)
 
+
+Testing on new datasets
+-----------------------
+
+To run benchmark on a dataset, it is required have a descriptor that defines the file names and a few other properties of that dataset.
+Descriptors for several popular datasets are already available in `datasets.yaml <https://github.com/rapidsai/cuvs/blob/branch-25.04/python/cuvs_bench/cuvs_bench/config/datasets/datasets.yaml>``.
+
+Let's consider how to test on a new dataset. First we create a descriptor `mydataset.yaml`
+
+.. code-block: yaml
+    - name: mydata-1M
+      base_file: mydata-1M/base.100M.u8bin
+      subset_size: 1000000
+      dims: 128
+      query_file: mydata-10M/queries.u8bin
+      groundtruth_neighbors_file: mydata-1M/groundtruth.neighbors.ibin
+      distance: euclidean
+
+Here `name` can be chosen arbitrarily. We pass `name` as the `--dataset` argument for the benchmark. The file names are relative to the path given by `--dataset-path` argument.
+The `subset_size`` field is optional. This argument defines how many vectors to use from the dataset file, the first `subset_size` vectors will be used.
+This way you can define benchmarks on multiple subsets of the same dataset without duplicating the dataset vectors.
+Note that the ground truth vectors have to be generated for each subset separately.
+
+To run the benchmark on the newly defined `mydata-1M` dataset, you can use the following command line:
+
+.. code-black: bash
+  python -m cuvs_bench.run --dataset mydata-1M --dataset-path=/path/to/data/folder --dataset-configuration=mydataset.yaml  --algorithms=cuvs_cagra
+
 Running with Docker containers
 ------------------------------
 
@@ -297,7 +325,7 @@ All of the `cuvs-bench` images contain the Conda packages, so they can be used d
         -v $DATA_FOLDER:/data/benchmarks                \
         rapidsai/cuvs-bench:26.06-cuda12.9-py3.13
 
-This will drop you into a command line in the container, with the `cuvs-bench` python package ready to use, as described in the [Running the benchmarks](#running-the-benchmarks) section above:
+This will drop you into a command line in the container, with the `cuvs-bench` python package ready to use, as described in the `Running the benchmarks`_ section above:
 
 .. code-block:: bash
 

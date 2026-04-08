@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -24,9 +24,9 @@ namespace cuvs::preprocessing::quantize::scalar {
  * @brief quantizer parameters.
  */
 struct params {
-  /*
-   * specifies how many outliers at top & bottom will be ignored
-   * needs to be within range of (0, 1]
+  /**
+   * Specifies how many outliers at top & bottom will be ignored.
+   * Needs to be within range of (0, 1].
    */
   float quantile = 0.99;
 };
@@ -42,7 +42,9 @@ struct params {
  */
 template <typename T>
 struct quantizer {
+  /** Minimum value of the quantization range. */
   T min_;
+  /** Maximum value of the quantization range. */
   T max_;
 };
 
