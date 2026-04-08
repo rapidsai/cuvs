@@ -55,5 +55,6 @@
   ],
   "pq_bits": ["8"],
   "pq_len": ["2", "4"],
-  "metric": ["L2Expanded"]
+  "metric": ["L2Expanded"],
+  "enable_fp8": ["true", "false"]
 }
