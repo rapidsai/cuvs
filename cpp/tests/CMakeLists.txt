@@ -330,6 +330,7 @@ ConfigureTest(
        distance/dist_lp_unexp.cu
        distance/dist_russell_rao.cu
        distance/gram.cu
+       distance/kde.cu
        distance/masked_nn.cu
        distance/sparse_distance.cu
        sparse/gram.cu
