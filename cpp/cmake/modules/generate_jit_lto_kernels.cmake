@@ -7,48 +7,7 @@
 
 include_guard(GLOBAL)
 
-function(compute_matrix_product output_var)
-  set(options)
-  set(one_value MATRIX_JSON_FILE MATRIX_JSON_STRING)
-  set(multi_value)
-
-  cmake_parse_arguments(_JIT_LTO "${options}" "${one_value}" "${multi_value}" ${ARGN})
-
-  if(_JIT_LTO_MATRIX_JSON_FILE)
-    execute_process(
-      COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/compute_matrix_product.py"
-              "${_JIT_LTO_MATRIX_JSON_FILE}" #
-      OUTPUT_VARIABLE output COMMAND_ERROR_IS_FATAL ANY
-    )
-  else()
-    execute_process(
-      COMMAND "${CMAKE_COMMAND}" -E echo "${_JIT_LTO_MATRIX_JSON_STRING}"
-      COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/compute_matrix_product.py"
-              -
-      OUTPUT_VARIABLE output COMMAND_ERROR_IS_FATAL ANY
-    )
-  endif()
-
-  set(${output_var}
-      "${output}"
-      PARENT_SCOPE
-  )
-endfunction()
-
-function(populate_matrix_variables matrix_json_entry)
-  string(JSON len LENGTH "${matrix_json_entry}")
-  math(EXPR last "${len} - 1")
-
-  # cmake-lint: disable=C0103,E1120
-  foreach(i RANGE "${last}")
-    string(JSON key MEMBER "${matrix_json_entry}" "${i}")
-    string(JSON value GET "${matrix_json_entry}" "${key}")
-    set(${key}
-        "${value}"
-        PARENT_SCOPE
-    )
-  endforeach()
-endfunction()
+include(${CMAKE_CURRENT_LIST_DIR}/compute_matrix_product.cmake)
 
 function(add_jit_lto_kernel kernel_target)
   set(options)
@@ -79,7 +38,7 @@ function(add_jit_lto_kernel kernel_target)
   )
 endfunction()
 
-function(process_matrix_entry source_list_var)
+function(process_jit_lto_matrix_entry source_list_var)
   set(options)
   set(one_value NAME_FORMAT KERNEL_INPUT_FILE EMBEDDED_INPUT_FILE OUTPUT_DIRECTORY
                 MATRIX_JSON_ENTRY
@@ -126,7 +85,6 @@ function(generate_jit_lto_kernels source_list_var)
     NAMES bin2c
     PATHS ${CUDAToolkit_BIN_DIR}
   )
-  find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
   if(_JIT_LTO_MATRIX_JSON_FILE)
     set_property(
@@ -145,7 +103,7 @@ function(generate_jit_lto_kernels source_list_var)
   # cmake-lint: disable=C0103,E1120
   foreach(i RANGE "${last}")
     string(JSON matrix_json_entry GET "${matrix_product}" "${i}")
-    process_matrix_entry(
+    process_jit_lto_matrix_entry(
       "${source_list_var}"
       NAME_FORMAT "${_JIT_LTO_NAME_FORMAT}"
       KERNEL_INPUT_FILE "${_JIT_LTO_KERNEL_INPUT_FILE}"
