@@ -272,7 +272,7 @@ void fit(raft::resources const& handle,
                           ? raft::make_device_matrix<T, IdxT>(handle, n_clusters, n_features)
                           : raft::make_device_matrix<T, IdxT>(handle, 0, 0);
   T best_inertia      = std::numeric_limits<T>::max();
-  int best_n_iter    = 0;
+  int best_n_iter     = 0;
 
   std::mt19937 gen(params.rng_state.seed);
 

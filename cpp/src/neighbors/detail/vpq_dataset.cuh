@@ -111,7 +111,9 @@ void train_pq_centers(
     MathT inertia;
     int n_iter;
     auto pq_centers_i64 = raft::make_device_matrix_view<MathT, int64_t>(
-      pq_centers_view.data_handle(), static_cast<int64_t>(pq_centers_view.extent(0)), static_cast<int64_t>(pq_centers_view.extent(1)));
+      pq_centers_view.data_handle(),
+      static_cast<int64_t>(pq_centers_view.extent(0)),
+      static_cast<int64_t>(pq_centers_view.extent(1)));
     cuvs::cluster::kmeans::fit(res,
                                kmeans_params,
                                pq_trainset_view,

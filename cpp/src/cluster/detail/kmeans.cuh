@@ -798,7 +798,7 @@ void kmeans_fit(raft::resources const& handle,
     cuvs::cluster::kmeans::params iter_params = pams;
     iter_params.rng_state.seed                = gen();
 
-    DataT iter_inertia    = std::numeric_limits<DataT>::max();
+    DataT iter_inertia = std::numeric_limits<DataT>::max();
     int n_current_iter = 0;
     if (iter_params.init == cuvs::cluster::kmeans::params::InitMethod::Random) {
       // initializing with random samples from input dataset
@@ -981,11 +981,10 @@ void kmeans_predict(raft::resources const& handle,
     raft::value_op{},
     raft::add_op{});
 
-  raft::linalg::map(
-    handle,
-    labels,
-    raft::compose_op(raft::cast_op<uint32_t>{}, raft::key_op{}),
-    raft::make_const_mdspan(minClusterAndDistance.view()));
+  raft::linalg::map(handle,
+                    labels,
+                    raft::compose_op(raft::cast_op<uint32_t>{}, raft::key_op{}),
+                    raft::make_const_mdspan(minClusterAndDistance.view()));
 
   inertia[0] = clusterCostD.value(stream);
 }

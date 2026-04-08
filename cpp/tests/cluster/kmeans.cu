@@ -235,7 +235,7 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
     params.oversampling_factor = 0;
 
     auto X      = raft::make_device_matrix<T, int64_t>(handle, n_samples, n_features);
-    auto labels = raft::make_device_vector<int64_t, int64_t>(handle, n_samples);
+    auto labels = raft::make_device_vector<uint32_t, int64_t>(handle, n_samples);
     auto stream = raft::resource::get_cuda_stream(handle);
 
     raft::random::make_blobs<T, int64_t>(X.data_handle(),
@@ -383,7 +383,7 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
 
     auto stream = raft::resource::get_cuda_stream(handle);
     auto X      = raft::make_device_matrix<T, int64_t>(handle, n_samples, n_features);
-    auto labels = raft::make_device_vector<int64_t, int64_t>(handle, n_samples);
+    auto labels = raft::make_device_vector<uint32_t, int64_t>(handle, n_samples);
 
     raft::random::make_blobs<T, int64_t>(X.data_handle(),
                                          labels.data_handle(),
@@ -439,7 +439,7 @@ class KmeansFitBatchedTest : public ::testing::TestWithParam<KmeansBatchedInputs
     params.max_iter      = 20;
 
     T ref_inertia  = 0;
-    int ref_n_iter = 0;
+    int64_t ref_n_iter = 0;
     cuvs::cluster::kmeans::fit(handle,
                                params,
                                raft::make_const_mdspan(X.view()),

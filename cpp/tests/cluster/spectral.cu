@@ -59,7 +59,7 @@ class SpectralClusteringTest : public ::testing::TestWithParam<SpectralClusterin
     params.rng_state    = raft::random::RngState(testparams.seed);
 
     auto X      = raft::make_device_matrix<float, int>(handle, n_samples, n_features);
-    auto labels = raft::make_device_vector<int, int>(handle, n_samples);
+    auto labels = raft::make_device_vector<uint32_t, int>(handle, n_samples);
     auto stream = raft::resource::get_cuda_stream(handle);
 
     raft::random::make_blobs<float, int>(X.data_handle(),

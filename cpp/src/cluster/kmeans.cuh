@@ -75,7 +75,7 @@ void fit_main(raft::resources const& handle,
     raft::device_vector_view<const DataT, IndexT> sample_weights, \
     raft::device_matrix_view<DataT, IndexT> centroids,            \
     raft::host_scalar_view<DataT> inertia,                        \
-    raft::host_scalar_view<int> n_iter,                        \
+    raft::host_scalar_view<int> n_iter,                           \
     rmm::device_uvector<char>& workspace);
 
 EXTERN_TEMPLATE_FIT_MAIN(double, int64_t)
@@ -219,7 +219,7 @@ void predict(raft::resources const& handle,
     raft::device_matrix_view<const DataT, IndexT> X,                            \
     std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight, \
     raft::device_matrix_view<const DataT, IndexT> centroids,                    \
-    raft::device_vector_view<uint32_t, IndexT> labels,                           \
+    raft::device_vector_view<uint32_t, IndexT> labels,                          \
     bool normalize_weight,                                                      \
     raft::host_scalar_view<DataT> inertia);
 
