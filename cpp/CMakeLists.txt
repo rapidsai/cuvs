@@ -490,7 +490,7 @@ if(NOT BUILD_CPU_ONLY)
   )
   generate_jit_lto_kernels(
     jit_lto_files
-    NAME_FORMAT "ivf_pq_precompute_base_diff_@precomp_base_diff_str@"
+    NAME_FORMAT "ivf_pq_precompute_base_diff_metric_@metric@"
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/precompute_base_diff_matrix.json"
     KERNEL_INPUT_FILE
@@ -502,7 +502,8 @@ if(NOT BUILD_CPU_ONLY)
   )
   generate_jit_lto_kernels(
     jit_lto_files
-    NAME_FORMAT "ivf_pq_create_lut_lut_@lut_abbrev@_@precomp_base_diff_str@_@pq_bits@pq"
+    NAME_FORMAT
+      "ivf_pq_create_lut_lut_@lut_abbrev@_@precomp_base_diff_str@_@pq_bits@pq_metric_@metric@"
     MATRIX_JSON_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/create_lut_matrix.json"
     KERNEL_INPUT_FILE
@@ -522,6 +523,18 @@ if(NOT BUILD_CPU_ONLY)
     EMBEDDED_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/compute_distances_embedded.cpp.in"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_pq/compute_distances"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_pq_get_early_stop_limit_out_@out_abbrev@_metric_@metric@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/get_early_stop_limit_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/get_early_stop_limit_kernel.cu.in"
+    EMBEDDED_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/get_early_stop_limit_embedded.cpp.in"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_pq/get_early_stop_limit"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
   generate_jit_lto_kernels(
@@ -558,6 +571,18 @@ if(NOT BUILD_CPU_ONLY)
     EMBEDDED_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/compute_score_embedded.cpp.in"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_pq/compute_score"
+    KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
+  )
+  generate_jit_lto_kernels(
+    jit_lto_files
+    NAME_FORMAT "ivf_pq_increment_score_out_@out_abbrev@_@increment_str@"
+    MATRIX_JSON_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/increment_score_matrix.json"
+    KERNEL_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/increment_score_kernel.cu.in"
+    EMBEDDED_INPUT_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/jit_lto_kernels/increment_score_embedded.cpp.in"
+    OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/ivf_pq/increment_score"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
   endblock()
@@ -680,7 +705,7 @@ if(NOT BUILD_CPU_ONLY)
     INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_select_inst.cu.in"
     OUTPUT_FILE_FORMAT
-      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_select_inst_out_@out_abbrev@_lut_@lut_abbrev@_filter_@filter_name@.cu"
+      "${CMAKE_CURRENT_BINARY_DIR}/src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_select_inst_out_@out_abbrev@_lut_@lut_abbrev@_filter_@filter_name@_metric_@metric@_@increment_score_str@.cu"
   )
   generate_inst_matrix(
     ivf_pq_compute_similarity_inst_files

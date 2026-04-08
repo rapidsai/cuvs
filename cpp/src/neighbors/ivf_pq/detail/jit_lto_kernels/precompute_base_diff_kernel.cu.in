@@ -9,19 +9,18 @@
 
 namespace {
 
-constexpr bool precomp_base_diff = @precomp_base_diff@;
+using metric_tag = cuvs::neighbors::ivf_pq::detail::tag_metric_@metric@;
 
 }
 
 namespace cuvs::neighbors::ivf_pq::detail {
 
-__device__ void precompute_base_diff(cuvs::distance::DistanceType metric,
-                                     uint32_t dim,
+__device__ void precompute_base_diff(uint32_t dim,
                                      uint8_t* lut_end,
                                      const float* query,
                                      const float* cluster_center)
 {
-  precompute_base_diff_impl<precomp_base_diff>(metric, dim, lut_end, query, cluster_center);
+  precompute_base_diff_impl<metric_tag>(dim, lut_end, query, cluster_center);
 }
 
 }  // namespace cuvs::neighbors::ivf_pq::detail

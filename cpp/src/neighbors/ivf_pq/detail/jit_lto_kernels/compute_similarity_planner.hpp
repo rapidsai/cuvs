@@ -32,22 +32,29 @@ struct ComputeSimilarityPlanner : AlgorithmPlanner {
     this->add_static_fragment<fragment_tag_store_calculated_distances<OutTag, kManageLocalTopK>>();
   }
 
-  template <bool PrecompBaseDiff>
+  template <typename MetricTag>
   void add_precompute_base_diff_function()
   {
-    this->add_static_fragment<fragment_tag_precompute_base_diff<PrecompBaseDiff>>();
+    this->add_static_fragment<fragment_tag_precompute_base_diff<MetricTag>>();
   }
 
-  template <typename LutTag, bool PrecompBaseDiff, uint32_t PqBits>
+  template <typename LutTag, typename MetricTag, bool PrecompBaseDiff, uint32_t PqBits>
   void add_create_lut_function()
   {
-    this->add_static_fragment<fragment_tag_create_lut<LutTag, PrecompBaseDiff, PqBits>>();
+    this
+      ->add_static_fragment<fragment_tag_create_lut<LutTag, MetricTag, PrecompBaseDiff, PqBits>>();
   }
 
   template <typename OutTag, typename LutTag, int Capacity>
   void add_compute_distances_function()
   {
     this->add_static_fragment<fragment_tag_compute_distances<OutTag, LutTag, Capacity>>();
+  }
+
+  template <typename OutTag, typename MetricTag>
+  void add_get_early_stop_limit_function()
+  {
+    this->add_static_fragment<fragment_tag_get_early_stop_limit<OutTag, MetricTag>>();
   }
 
   template <typename FilterTag>
@@ -66,6 +73,12 @@ struct ComputeSimilarityPlanner : AlgorithmPlanner {
   void add_compute_score_function()
   {
     this->add_static_fragment<fragment_tag_compute_score<OutTag, LutTag, PqBits>>();
+  }
+
+  template <typename OutTag, bool IncrementScore>
+  void add_increment_score_function()
+  {
+    this->add_static_fragment<fragment_tag_increment_score<OutTag, IncrementScore>>();
   }
 };
 

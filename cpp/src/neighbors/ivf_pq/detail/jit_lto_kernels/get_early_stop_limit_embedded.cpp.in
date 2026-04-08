@@ -10,7 +10,7 @@
 namespace cuvs::neighbors::ivf_pq::detail {
 
 using _FragmentEntry =
-  StaticFatbinFragmentEntry<fragment_tag_precompute_base_diff<tag_metric_@metric@>>;
+  StaticFatbinFragmentEntry<fragment_tag_get_early_stop_limit<tag_out_@out_abbrev@, tag_metric_@metric@>>;
 
 template <>
 const uint8_t* const _FragmentEntry::data = embedded_fatbin;

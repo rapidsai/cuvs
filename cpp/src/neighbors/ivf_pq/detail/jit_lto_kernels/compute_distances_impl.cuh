@@ -19,7 +19,6 @@ __device__ void compute_distances_impl(const uint32_t* chunk_indices,
                                        uint32_t probe_ix,
                                        uint32_t query_ix,
                                        uint32_t max_samples,
-                                       distance::DistanceType metric,
                                        uint32_t topk,
                                        uint8_t* lut_end,
                                        uint32_t pq_dim,
@@ -63,16 +62,7 @@ __device__ void compute_distances_impl(const uint32_t* chunk_indices,
   constexpr OutT kDummy = raft::upper_bound<OutT>();
   OutT query_kth        = kDummy;
   if constexpr (kManageLocalTopK) { query_kth = OutT(query_kths[query_ix]); }
-  OutT early_stop_limit = kDummy;
-  switch (metric) {
-    // If the metric is non-negative, we can use the query_kth approximation as an early stop
-    // threshold to skip some iterations when computing the score. Add such metrics here.
-    case distance::DistanceType::L2SqrtExpanded:
-    case distance::DistanceType::L2Expanded: {
-      early_stop_limit = query_kth;
-    } break;
-    default: break;
-  }
+  OutT early_stop_limit = get_early_stop_limit(query_kth);
 
   // Ensure lut_scores is written by all threads before using it in ivfpq-compute-score
   __threadfence_block();
@@ -90,7 +80,7 @@ __device__ void compute_distances_impl(const uint32_t* chunk_indices,
           inds_ptrs, queries_offset + query_ix, label, i, bitset_ptr, bitset_len, original_nbits)) {
       score = compute_score<OutT, LutT>(
         pq_dim, reinterpret_cast<const vec_t::io_t*>(pq_thread_data), lut_scores, early_stop_limit);
-      if (metric == distance::DistanceType::CosineExpanded) { score = OutT(1) + score; }
+      score = increment_score<OutT>(score);
     }
     if constexpr (kManageLocalTopK) {
       block_topk.add(score, sample_offset + i);

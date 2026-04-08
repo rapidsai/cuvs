@@ -42,5 +42,29 @@
       "filter_name": "bitset",
       "filter_type": "cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>"
     }
+  ],
+  "_metric": [
+    {
+      "metric": "euclidean",
+      "_increment_score": [
+        {
+          "increment_score": "false",
+          "increment_score_str": "no_increment_score"
+        }
+      ]
+    },
+    {
+      "metric": "inner_product",
+      "_increment_score": [
+        {
+          "increment_score": "true",
+          "increment_score_str": "increment_score"
+        },
+        {
+          "increment_score": "false",
+          "increment_score_str": "no_increment_score"
+        }
+      ]
+    }
   ]
 }

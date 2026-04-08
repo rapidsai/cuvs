@@ -523,19 +523,36 @@ void ivfpq_search_worker(raft::resources const& handle,
   }
 
   // select and run the main search kernel
-  uint32_t precomp_data_count = 0;
+  selected<ScoreT, LutT> (*compute_similarity_select_func)(const cudaDeviceProp& dev_props,
+                                                           bool manage_local_topk,
+                                                           int locality_hint,
+                                                           double preferred_shmem_carveout,
+                                                           uint32_t pq_bits,
+                                                           uint32_t pq_dim,
+                                                           uint32_t precomp_data_count,
+                                                           uint32_t n_queries,
+                                                           uint32_t n_probes,
+                                                           uint32_t topk) = nullptr;
+  uint32_t precomp_data_count                                             = 0;
   switch (index.metric()) {
     case distance::DistanceType::L2SqrtExpanded:
-    case distance::DistanceType::L2SqrtUnexpanded:
-    case distance::DistanceType::L2Unexpanded:
     case distance::DistanceType::L2Expanded: {
       // stores basediff (query[i] - center[i])
       precomp_data_count = index.rot_dim();
+      compute_similarity_select_func =
+        compute_similarity_select<ScoreT, LutT, IvfSampleFilterT, tag_metric_euclidean, false>;
     } break;
-    case distance::DistanceType::CosineExpanded:
+    case distance::DistanceType::CosineExpanded: {
+      // stores two components (query[i], query[i] * center[i])
+      precomp_data_count = index.rot_dim() * 2;
+      compute_similarity_select_func =
+        compute_similarity_select<ScoreT, LutT, IvfSampleFilterT, tag_metric_inner_product, true>;
+    } break;
     case distance::DistanceType::InnerProduct: {
       // stores two components (query[i], query[i] * center[i])
       precomp_data_count = index.rot_dim() * 2;
+      compute_similarity_select_func =
+        compute_similarity_select<ScoreT, LutT, IvfSampleFilterT, tag_metric_inner_product, false>;
     } break;
     default: {
       RAFT_FAIL("Unsupported metric");
@@ -556,17 +573,16 @@ void ivfpq_search_worker(raft::resources const& handle,
     raft::resource::get_custom_resource<search_kernel_cache<ScoreT, LutT, IvfSampleFilterT>>(handle)
       ->value;
   if (!cache.get(search_key, &search_instance)) {
-    search_instance = compute_similarity_select<ScoreT, LutT, IvfSampleFilterT>(
-      raft::resource::get_device_properties(handle),
-      manage_local_topk,
-      coresidency,
-      preferred_shmem_carveout,
-      index.pq_bits(),
-      index.pq_dim(),
-      precomp_data_count,
-      n_queries,
-      n_probes,
-      topK);
+    search_instance = compute_similarity_select_func(raft::resource::get_device_properties(handle),
+                                                     manage_local_topk,
+                                                     coresidency,
+                                                     preferred_shmem_carveout,
+                                                     index.pq_bits(),
+                                                     index.pq_dim(),
+                                                     precomp_data_count,
+                                                     n_queries,
+                                                     n_probes,
+                                                     topK);
     cache.set(search_key, search_instance);
   }
 
@@ -599,7 +615,6 @@ void ivfpq_search_worker(raft::resources const& handle,
                          index.pq_dim(),
                          n_queries,
                          queries_offset,
-                         index.metric(),
                          index.codebook_kind(),
                          topK,
                          max_samples,

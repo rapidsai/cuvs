@@ -7,7 +7,6 @@
 
 #include <cstdint>
 
-#include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <neighbors/sample_filter.cuh>
 
@@ -19,7 +18,6 @@ using compute_similarity_func_t = void(uint32_t dim,
                                        uint32_t pq_dim,
                                        uint32_t n_queries,
                                        uint32_t queries_offset,
-                                       cuvs::distance::DistanceType metric,
                                        cuvs::neighbors::ivf_pq::codebook_gen codebook_kind,
                                        uint32_t topk,
                                        uint32_t max_samples,
