@@ -69,14 +69,14 @@ cdef class IndexParams:
         precision. Has no effect on non-fp32 input types.
     """
 
-    cdef cuvsNNDescentIndexParams* params
+    cdef cuvsNNDescentIndexParams_v6* params
     cdef object _metric
 
     def __cinit__(self):
-        cuvsNNDescentIndexParamsCreate(&self.params)
+        cuvsNNDescentIndexParamsCreate_v6(&self.params)
 
     def __dealloc__(self):
-        check_cuvs(cuvsNNDescentIndexParamsDestroy(self.params))
+        check_cuvs(cuvsNNDescentIndexParamsDestroy_v6(self.params))
 
     def __init__(self, *,
                  metric=None,
@@ -236,7 +236,7 @@ def build(IndexParams index_params, dataset, graph=None, resources=None):
     cdef Index idx = Index()
     cdef cydlpack.DLManagedTensor* dataset_dlpack = \
         cydlpack.dlpack_c(dataset_ai)
-    cdef cuvsNNDescentIndexParams* params = index_params.params
+    cdef cuvsNNDescentIndexParams_v6* params = index_params.params
 
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
@@ -256,7 +256,7 @@ def build(IndexParams index_params, dataset, graph=None, resources=None):
         graph_dlpack = cydlpack.dlpack_c(graph_ai)
 
     with cuda_interruptible():
-        check_cuvs(cuvsNNDescentBuild(
+        check_cuvs(cuvsNNDescentBuild_v6(
             res,
             params,
             dataset_dlpack,
