@@ -2085,6 +2085,34 @@ auto iterative_build_graph(
   size_t intermediate_degree = params.intermediate_graph_degree;
   size_t graph_degree        = params.graph_degree;
 
+  // Resolve the compression parameters for the build loop.
+  // `build_compression` (from iterative_search_params) takes priority;
+  // if unset, fall back to `params.compression` (original behaviour).
+  const auto& iter_params =
+    std::get<cagra::graph_build_params::iterative_search_params>(params.graph_build_params);
+  const auto& build_compression =
+    iter_params.build_compression.has_value() ? iter_params.build_compression : params.compression;
+
+  if (build_compression.has_value()) {
+    const auto& bc = *build_compression;
+    RAFT_LOG_INFO(
+      "Build compression params: pq_bits=%u, pq_dim=%u, vq_n_centers=%u, kmeans_n_iters=%u, "
+      "vq_kmeans_trainset_fraction=%.4f, pq_kmeans_trainset_fraction=%.4f, "
+      "max_train_points_per_pq_code=%u, max_train_points_per_vq_cluster=%u%s",
+      bc.pq_bits,
+      bc.pq_dim,
+      bc.vq_n_centers,
+      bc.kmeans_n_iters,
+      bc.vq_kmeans_trainset_fraction,
+      bc.pq_kmeans_trainset_fraction,
+      bc.max_train_points_per_pq_code,
+      bc.max_train_points_per_vq_cluster,
+      iter_params.build_compression.has_value() ? " (from build_compression)"
+                                                : " (from compression)");
+  } else {
+    RAFT_LOG_INFO("Build compression: disabled (uncompressed build)");
+  }
+
   auto cagra_graph = raft::make_host_matrix<IdxT, int64_t>(0, 0);
 
   // Iteratively improve the accuracy of the graph by repeatedly running
@@ -2164,7 +2192,7 @@ auto iterative_build_graph(
   // Generate the compressed index once if compression is enabled
   const uint64_t dataset_dim = dev_dataset.extent(1);
   std::optional<index<T, IdxT>> idx_opt;
-  if (params.compression.has_value()) {
+  if (build_compression.has_value()) {
     auto start = std::chrono::high_resolution_clock::now();
     RAFT_EXPECTS(params.metric == cuvs::distance::DistanceType::L2Expanded,
                  "VPQ compression is only supported with L2Expanded distance mertric");
@@ -2173,7 +2201,7 @@ auto iterative_build_graph(
       res,
       // TODO: hardcoding codebook math to `half`, we can do runtime dispatching later
       cuvs::preprocessing::quantize::pq::vpq_build(
-        res, *params.compression, dev_dataset));
+        res, *build_compression, dev_dataset));
     auto end        = std::chrono::high_resolution_clock::now();
     auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     RAFT_LOG_INFO("# VPQ compression time: %.3lf sec", (double)elapsed_ms / 1000);
@@ -2219,7 +2247,7 @@ auto iterative_build_graph(
     search_params.search_width   = 1;
 
     // Create index and query views.
-    if (!params.compression.has_value()) {
+    if (!build_compression.has_value()) {
       auto dev_dataset_view = raft::make_device_matrix_view<const T, int64_t>(
         dev_dataset.data_handle(), (int64_t)curr_graph_size, dev_dataset.extent(1));
       if (use_device_graph) {
@@ -2241,17 +2269,17 @@ auto iterative_build_graph(
     // When compression is enabled, reconstruct queries from VPQ codes instead of
     // reading from the (freed) original dataset.
     auto dev_reconstructed_queries =
-      params.compression.has_value()
+      build_compression.has_value()
         ? raft::make_device_matrix<T, int64_t>(res, curr_query_size, dataset_dim)
         : raft::make_device_matrix<T, int64_t>(res, 0, 0);
-    if (params.compression.has_value()) {
+    if (build_compression.has_value()) {
       auto* vpq_dset =
         dynamic_cast<const vpq_dataset<half, int64_t>*>(&idx.data());
       RAFT_EXPECTS(vpq_dset != nullptr, "Expected VPQ dataset in compressed index");
       reconstruct_vpq_queries<T, half, int64_t>(
         res, *vpq_dset, 0, curr_query_size, dev_reconstructed_queries.view());
     }
-    auto dev_query_view = params.compression.has_value()
+    auto dev_query_view = build_compression.has_value()
       ? raft::make_device_matrix_view<const T, int64_t>(
           dev_reconstructed_queries.data_handle(), (int64_t)curr_query_size, dataset_dim)
       : raft::make_device_matrix_view<const T, int64_t>(
@@ -2284,6 +2312,9 @@ auto iterative_build_graph(
     curr_graph_size      = next_graph_size;
   }
 
+  // TODO: when build_compression matches params.compression, the dataset is compressed twice
+  // (once for the build loop and once in build()'s shared tail). We could avoid this by returning
+  // the index directly (with its VPQ dataset and device-side graph) instead of just the host graph.
   auto stream = raft::resource::get_cuda_stream(res);
   cagra_graph = raft::make_host_matrix<IdxT, int64_t>(dev_graph.extent(0), dev_graph.extent(1));
   raft::copy(cagra_graph.data_handle(),
@@ -2384,7 +2415,8 @@ index<T, IdxT> build(
       }
       if (nn_descent_params.graph_degree != intermediate_degree) {
         RAFT_LOG_WARN(
-          "Graph degree (%lu) for nn-descent needs to match cagra intermediate graph degree (%lu), "
+          "Graph degree (%lu) for nn-descent needs to match cagra intermediate graph degree "
+          "(%lu), "
           "aligning "
           "nn-descent graph_degree.",
           nn_descent_params.graph_degree,

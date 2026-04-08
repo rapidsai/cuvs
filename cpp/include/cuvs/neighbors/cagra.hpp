@@ -31,7 +31,26 @@
 #include <variant>
 
 namespace cuvs::neighbors::graph_build_params {
-using iterative_search_params = cuvs::neighbors::search_params;
+
+/**
+ * Parameters for the iterative CAGRA graph build algorithm.
+ *
+ * The iterative builder repeatedly runs CAGRA search() and optimize() to
+ * refine the graph.  When compression is used during graph construction,
+ * `build_compression` controls the VPQ parameters applied to the dataset
+ * *while building the graph*.  This is independent of `index_params::compression`,
+ * which controls the compression of the dataset stored in the final index.
+ */
+struct iterative_search_params : cuvs::neighbors::search_params {
+  /**
+   * Optional VPQ compression parameters used during iterative graph construction.
+   *
+   * When set, the dataset is compressed with these parameters for the
+   * search-and-optimize loop.  When std::nullopt (default), the builder
+   * falls back to `index_params::compression` (original behaviour).
+   */
+  std::optional<cuvs::neighbors::vpq_params> build_compression = std::nullopt;
+};
 
 /** Specialized parameters for ACE (Augmented Core Extraction) graph build */
 struct ace_params {

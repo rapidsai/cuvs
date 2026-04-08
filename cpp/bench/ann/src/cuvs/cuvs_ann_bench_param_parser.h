@@ -295,6 +295,7 @@ void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::cagra::index
   nlohmann::json ivf_pq_search_conf = collect_conf_with_prefix(conf, "ivf_pq_search_");
   nlohmann::json nn_descent_conf    = collect_conf_with_prefix(conf, "nn_descent_");
   nlohmann::json ace_conf           = collect_conf_with_prefix(conf, "ace_");
+  nlohmann::json build_compression_conf  = collect_conf_with_prefix(conf, "build_compression_");
 
   // When graph_build_algo is not specified, leave graph_build_params as monostate so the
   // CAGRA build uses AUTO selection (NN_DESCENT or IVF_PQ based on dataset/heuristics).
@@ -325,6 +326,13 @@ void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::cagra::index
       } else if constexpr (std::is_same_v<U,
                                           cuvs::neighbors::graph_build_params::nn_descent_params>) {
         parse_build_param<T, IdxT>(nn_descent_conf, arg);
+      } else if constexpr (std::is_same_v<
+                             U, cuvs::neighbors::graph_build_params::iterative_search_params>) {
+        if (!build_compression_conf.empty()) {
+          auto vpq_pams = arg.build_compression.value_or(cuvs::neighbors::vpq_params{});
+          parse_build_param(build_compression_conf, vpq_pams);
+          arg.build_compression.emplace(vpq_pams);
+        }
       }
     },
     params.graph_build_params);
