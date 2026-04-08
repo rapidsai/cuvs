@@ -4,6 +4,7 @@
  */
 
 #include <neighbors/ivf_flat/jit_lto_kernels/ivf_flat_interleaved_scan_kernel.cuh>
+#include <neighbors/ivf_flat/jit_lto_kernels/kernel_def.hpp>
 
 namespace {
 
@@ -57,5 +58,7 @@ extern "C" __global__ __launch_bounds__(kThreadsPerBlock) void interleaved_scan(
     neighbors,
     distances);
 }
+
+static_assert(std::is_same_v<decltype(interleaved_scan), interleaved_scan_func_t<data_t, idx_t>>);
 
 }  // namespace cuvs::neighbors::ivf_flat::detail
