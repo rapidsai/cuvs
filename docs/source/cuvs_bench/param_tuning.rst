@@ -533,7 +533,7 @@ IVF-pq is an inverted-file index, which partitions the vectors into a series of 
    - Y
    - Positive integer. Power of 2 [8-64]
    -
-   - Ratio of numbeer of chunks or subquantizers for each vector. Computed by `dims` / `M_ratio`
+   - Ratio of number of chunks or subquantizers for each vector. Computed by `dims` / `M_ratio`
 
  * - `usePrecomputed`
    - `build`

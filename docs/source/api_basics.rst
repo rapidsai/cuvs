@@ -7,7 +7,7 @@ cuVS API Basics
 Memory management
 -----------------
 
-Centralized memory management allows flexible configuration of allocation strategies, such as sharing the same CUDA memory pool across library boundaries. cuVS uses the [RMM](https://github.com/rapidsai/rmm) library, which eases the burden of configuring different allocation strategies globally across GPU-accelerated libraries.
+Centralized memory management allows flexible configuration of allocation strategies, such as sharing the same CUDA memory pool across library boundaries. cuVS uses the `RMM <https://github.com/rapidsai/rmm>`_ library, which eases the burden of configuring different allocation strategies globally across GPU-accelerated libraries.
 
 RMM currently has APIs for C++ and Python.
 

@@ -43,9 +43,9 @@ Getting Started
 New to vector search?
 =====================
 
-If you are unfamiliar with the basics of vector search or how vector search differs from vector databases, then :doc:`this primer on vector search guide <choosing_and_configuring_indexes>` should provide some good insight. Another good resource for the uninitiated is our :doc:`vector databases vs vector search <vector_databases_vs_vector_search>` guide. As outlined in the primer, vector search as used in vector databases is often closer to machine learning than to traditional databases. This means that while traditional databases can often be slow without any performance tuning, they will usually still yield the correct results. Unfortunately, vector search indexes, like other machine learning models, can yield garbage results of not tuned correctly.
+If you are unfamiliar with the basics of vector search or how vector search differs from vector databases, then :doc:`this primer on vector search guide <choosing_and_configuring_indexes>` should provide some good insight. Another good resource for the uninitiated is our :doc:`vector databases vs vector search <vector_databases_vs_vector_search>` guide. As outlined in the primer, vector search as used in vector databases is often closer to machine learning than to traditional databases. This means that while traditional databases can often be slow without any performance tuning, they will usually still yield the correct results. Unfortunately, vector search indexes, like other machine learning models, can yield garbage results if not tuned correctly.
 
-Fortunately, this opens up the whole world of hyperparamer optimization to improve vector search performance and quality. Please see our :doc:`index tuning guide <tuning_guide>` for more information.
+Fortunately, this opens up the whole world of hyperparameter optimization to improve vector search performance and quality. Please see our :doc:`index tuning guide <tuning_guide>` for more information.
 
 When comparing the performance of vector search indexes, it is important that considerations are made with respect to three main dimensions:
 
@@ -58,7 +58,7 @@ Please see the :doc:`primer on comparing vector search index performance <compar
 Supported indexes
 =================
 
-cuVS supports many of the standard index types with the list continuing to grow and stay current with the state-of-the-art. Please refer to our :doc:`vector search index guide <neighbors/neighbors>` for to learn more about each individual index type, when they can be useful on the GPU, the tuning knobs they offer to trade off performance and quality.
+cuVS supports many of the standard index types with the list continuing to grow and stay current with the state-of-the-art. Please refer to our :doc:`vector search index guide <neighbors/neighbors>` to learn more about each individual index type, when they can be useful on the GPU, the tuning knobs they offer to trade off performance and quality.
 
 The primary goal of cuVS is to enable speed, scale, and flexibility (in that order)- and one of the important value propositions is to enhance existing software deployments with extensible GPU capabilities to improve pain points while not interrupting parts of the system that work well today with CPU.
 
@@ -86,8 +86,9 @@ Blogs
 
 We frequently publish blogs on GPU-enabled vector search, which can provide great deep dives into various important topics and breakthroughs:
 
+#. `See all cuVS blogs <https://developer.nvidia.com/blog/recent-posts/?products=cuVS>`_
 #. `Accelerated Vector Search: Approximating with cuVS IVF-Flat <https://developer.nvidia.com/blog/accelerated-vector-search-approximating-with-rapids-raft-ivf-flat/>`_
-#. `Accelerating Vector Search with cuVS IVF-PQ <https://developer.nvidia.com/blog/accelerating-vector-search-rapids-cuvs-ivf-pq-deep-dive-part-1/>`_
+#. Accelerating Vector Search with cuVS IVF-PQ (`Part 1 <https://developer.nvidia.com/blog/accelerating-vector-search-rapids-cuvs-ivf-pq-deep-dive-part-1/>`_, `Part 2 <https://developer.nvidia.com/blog/accelerating-vector-search-nvidia-cuvs-ivf-pq-performance-tuning-part-2/>`_)
 
 Research
 --------
@@ -99,6 +100,7 @@ For the interested reader, many of the accelerated implementations in cuVS are a
 #. `Fast K-NN Graph Construction by GPU Based NN-Descent <https://dl.acm.org/doi/abs/10.1145/3459637.3482344?casa_token=O_nan1B1F5cAAAAA:QHWDEhh0wmd6UUTLY9_Gv6c3XI-5DXM9mXVaUXOYeStlpxTPmV3nKvABRfoivZAaQ3n8FWyrkWw>`_
 #. `cuSLINK: Single-linkage Agglomerative Clustering on the GPU <https://arxiv.org/abs/2306.16354>`_
 #. `GPU Semiring Primitives for Sparse Neighborhood Methods <https://arxiv.org/abs/2104.06357>`_
+#. `VecFlow: A High-Performance Vector Data Management System for Filtered-Search on GPUs <https://arxiv.org/abs/2506.00812>`_
 
 
 Get involved
