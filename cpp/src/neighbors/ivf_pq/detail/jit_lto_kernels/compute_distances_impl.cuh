@@ -30,7 +30,10 @@ __device__ void compute_distances_impl(const uint32_t* chunk_indices,
                                        uint32_t* out_indices,
                                        LutT* lut_scores,
                                        uint8_t* smem_buf,
-                                       filtering::ivf_filter_dev sample_filter)
+                                       const int64_t* const* inds_ptrs,
+                                       uint32_t* bitset_ptr,
+                                       int64_t bitset_len,
+                                       int64_t original_nbits)
 {
   constexpr bool kManageLocalTopK = Capacity > 0;
 
@@ -82,7 +85,9 @@ __device__ void compute_distances_impl(const uint32_t* chunk_indices,
     OutT score = kDummy;
     bool valid = i < n_samples;
     // Check bounds and that the sample is acceptable for the query
-    if (valid && sample_filter(queries_offset + query_ix, label, i)) {
+    if (valid &&
+        sample_filter(
+          inds_ptrs, queries_offset + query_ix, label, i, bitset_ptr, bitset_len, original_nbits)) {
       score = compute_score<OutT, LutT>(
         pq_dim, reinterpret_cast<const vec_t::io_t*>(pq_thread_data), lut_scores, early_stop_limit);
       if (metric == distance::DistanceType::CosineExpanded) { score = OutT(1) + score; }

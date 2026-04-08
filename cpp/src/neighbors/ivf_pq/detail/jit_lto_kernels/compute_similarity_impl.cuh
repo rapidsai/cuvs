@@ -91,7 +91,10 @@ __device__ void compute_similarity_impl(uint32_t dim,
                                         const float* queries,
                                         const uint32_t* index_list,
                                         float* query_kths,
-                                        filtering::ivf_filter_dev sample_filter,
+                                        const int64_t* const* inds_ptrs,
+                                        uint32_t* bitset_ptr,
+                                        int64_t bitset_len,
+                                        int64_t original_nbits,
                                         LutT* lut_scores,
                                         OutT* _out_scores,
                                         uint32_t* _out_indices)
@@ -172,7 +175,10 @@ __device__ void compute_similarity_impl(uint32_t dim,
                                   out_indices,
                                   lut_scores,
                                   smem_buf,
-                                  sample_filter);
+                                  inds_ptrs,
+                                  bitset_ptr,
+                                  bitset_len,
+                                  original_nbits);
   }
 }
 

@@ -94,17 +94,31 @@ auto get_lut_type_tag()
   }
 }
 
+template <typename FilterT>
+auto get_filter_type_tag()
+{
+  using namespace cuvs::neighbors::filtering;
+
+  // Determine the filter implementation tag
+  if constexpr (std::is_same_v<FilterT, none_sample_filter>) { return tag_filter_none{}; }
+  if constexpr (std::is_same_v<FilterT, bitset_filter<uint32_t, int64_t>>) {
+    return tag_filter_bitset{};
+  }
+}
+
 template <typename OutT,
           typename LutT,
           bool PrecompBaseDiff,
           bool EnableSMemLut,
           uint32_t PqBits,
-          int Capacity>
+          int Capacity,
+          typename FilterT>
 auto kernel_try_capacity(uint32_t k_max)
 {
   if constexpr (Capacity > 0) {
     if (k_max == 0 || k_max > Capacity) {
-      return kernel_try_capacity<OutT, LutT, PrecompBaseDiff, EnableSMemLut, PqBits, 0>(k_max);
+      return kernel_try_capacity<OutT, LutT, PrecompBaseDiff, EnableSMemLut, PqBits, 0, FilterT>(
+        k_max);
     }
   }
   if constexpr (Capacity > 1) {
@@ -114,12 +128,14 @@ auto kernel_try_capacity(uint32_t k_max)
                                  PrecompBaseDiff,
                                  EnableSMemLut,
                                  PqBits,
-                                 (Capacity / 2)>(k_max);
+                                 (Capacity / 2),
+                                 FilterT>(k_max);
     }
   }
 
-  using out_tag = decltype(get_out_type_tag<OutT>());
-  using lut_tag = decltype(get_lut_type_tag<LutT>());
+  using out_tag    = decltype(get_out_type_tag<OutT>());
+  using lut_tag    = decltype(get_lut_type_tag<LutT>());
+  using filter_tag = decltype(get_filter_type_tag<FilterT>());
 
   constexpr bool kManageLocalTopK = Capacity > 0;
 
@@ -130,30 +146,56 @@ auto kernel_try_capacity(uint32_t k_max)
   planner.add_precompute_base_diff_function<PrecompBaseDiff>();
   planner.add_create_lut_function<lut_tag, PrecompBaseDiff, PqBits>();
   planner.add_compute_distances_function<out_tag, lut_tag, Capacity>();
+  planner.add_sample_filter_function<filter_tag>();
   planner.add_get_line_width_function<PqBits>();
   planner.add_compute_score_function<out_tag, lut_tag, PqBits>();
   return planner.get_launcher();
 }
 
-template <typename OutT, typename LutT, bool PrecompBaseDiff, bool EnableSMemLut>
+template <typename OutT, typename LutT, bool PrecompBaseDiff, bool EnableSMemLut, typename FilterT>
 auto get_compute_similarity_launcher(uint32_t pq_bits, uint32_t k_max)
 {
   switch (pq_bits) {
     case 4:
-      return kernel_try_capacity<OutT, LutT, PrecompBaseDiff, EnableSMemLut, 4, kMaxCapacity>(
-        k_max);
+      return kernel_try_capacity<OutT,
+                                 LutT,
+                                 PrecompBaseDiff,
+                                 EnableSMemLut,
+                                 4,
+                                 kMaxCapacity,
+                                 FilterT>(k_max);
     case 5:
-      return kernel_try_capacity<OutT, LutT, PrecompBaseDiff, EnableSMemLut, 5, kMaxCapacity>(
-        k_max);
+      return kernel_try_capacity<OutT,
+                                 LutT,
+                                 PrecompBaseDiff,
+                                 EnableSMemLut,
+                                 5,
+                                 kMaxCapacity,
+                                 FilterT>(k_max);
     case 6:
-      return kernel_try_capacity<OutT, LutT, PrecompBaseDiff, EnableSMemLut, 6, kMaxCapacity>(
-        k_max);
+      return kernel_try_capacity<OutT,
+                                 LutT,
+                                 PrecompBaseDiff,
+                                 EnableSMemLut,
+                                 6,
+                                 kMaxCapacity,
+                                 FilterT>(k_max);
     case 7:
-      return kernel_try_capacity<OutT, LutT, PrecompBaseDiff, EnableSMemLut, 7, kMaxCapacity>(
-        k_max);
+      return kernel_try_capacity<OutT,
+                                 LutT,
+                                 PrecompBaseDiff,
+                                 EnableSMemLut,
+                                 7,
+                                 kMaxCapacity,
+                                 FilterT>(k_max);
     case 8:
-      return kernel_try_capacity<OutT, LutT, PrecompBaseDiff, EnableSMemLut, 8, kMaxCapacity>(
-        k_max);
+      return kernel_try_capacity<OutT,
+                                 LutT,
+                                 PrecompBaseDiff,
+                                 EnableSMemLut,
+                                 8,
+                                 kMaxCapacity,
+                                 FilterT>(k_max);
     default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
   }
 }
@@ -200,67 +242,43 @@ void compute_similarity_run(selected<OutT, LutT> s,
                             const float* queries,
                             const uint32_t* index_list,
                             float* query_kths,
-                            const filtering::base_filter& sample_filter_ref,
+                            const int64_t* const* inds_ptrs,
+                            uint32_t* bitset_ptr,
+                            int64_t bitset_len,
+                            int64_t original_nbits,
                             LutT* lut_scores,
                             OutT* _out_scores,
                             uint32_t* _out_indices)
 {
-  auto launch_kernel = [&](filtering::ivf_filter_dev sample_filter) {
-    s.launcher->template dispatch<compute_similarity_func_t<OutT, LutT>>(stream,
-                                                                         s.grid_dim,
-                                                                         s.block_dim,
-                                                                         s.smem_size,
-                                                                         dim,
-                                                                         n_probes,
-                                                                         pq_dim,
-                                                                         n_queries,
-                                                                         queries_offset,
-                                                                         metric,
-                                                                         codebook_kind,
-                                                                         topk,
-                                                                         max_samples,
-                                                                         cluster_centers,
-                                                                         pq_centers,
-                                                                         pq_dataset,
-                                                                         cluster_labels,
-                                                                         _chunk_indices,
-                                                                         queries,
-                                                                         index_list,
-                                                                         query_kths,
-                                                                         sample_filter,
-                                                                         lut_scores,
-                                                                         _out_scores,
-                                                                         _out_indices);
-    RAFT_CHECK_CUDA(stream);
-  };
-
-  switch (sample_filter_ref.get_filter_type()) {
-    case filtering::FilterType::None: {
-      try {
-        auto& typed_sample_filter = dynamic_cast<
-          const filtering::ivf_to_sample_filter<int64_t, filtering::none_sample_filter>&>(
-          sample_filter_ref);
-        filtering::ivf_filter_dev sample_filter{filtering::none_filter_args_t{}};
-        launch_kernel(sample_filter);
-      } catch (const std::bad_cast& e) {
-      }
-      break;
-    }
-    case filtering::FilterType::Bitset: {
-      try {
-        auto& typed_sample_filter = dynamic_cast<
-          const filtering::ivf_to_sample_filter<int64_t,
-                                                filtering::bitset_filter<uint32_t, int64_t>>&>(
-          sample_filter_ref);
-        filtering::ivf_filter_dev sample_filter{filtering::bitset_filter_args_t{
-          typed_sample_filter.inds_ptrs_, typed_sample_filter.next_filter_.bitset_view_}};
-        launch_kernel(sample_filter);
-      } catch (const std::bad_cast& e) {
-      }
-      break;
-    }
-    default: RAFT_FAIL("Unsupported filter type");
-  }
+  s.launcher->template dispatch<compute_similarity_func_t<OutT, LutT>>(stream,
+                                                                       s.grid_dim,
+                                                                       s.block_dim,
+                                                                       s.smem_size,
+                                                                       dim,
+                                                                       n_probes,
+                                                                       pq_dim,
+                                                                       n_queries,
+                                                                       queries_offset,
+                                                                       metric,
+                                                                       codebook_kind,
+                                                                       topk,
+                                                                       max_samples,
+                                                                       cluster_centers,
+                                                                       pq_centers,
+                                                                       pq_dataset,
+                                                                       cluster_labels,
+                                                                       _chunk_indices,
+                                                                       queries,
+                                                                       index_list,
+                                                                       query_kths,
+                                                                       inds_ptrs,
+                                                                       bitset_ptr,
+                                                                       bitset_len,
+                                                                       original_nbits,
+                                                                       lut_scores,
+                                                                       _out_scores,
+                                                                       _out_indices);
+  RAFT_CHECK_CUDA(stream);
 }
 
 /**
@@ -277,7 +295,7 @@ void compute_similarity_run(selected<OutT, LutT> s,
  *    beyond this limit do not consider increasing the number of active blocks per SM
  *    would improve locality anymore.
  */
-template <typename OutT, typename LutT>
+template <typename OutT, typename LutT, typename FilterT>
 auto compute_similarity_select(const cudaDeviceProp& dev_props,
                                bool manage_local_topk,
                                int locality_hint,
@@ -389,11 +407,12 @@ auto compute_similarity_select(const cudaDeviceProp& dev_props,
    optimize occupancy and data locality for the L1 cache.
    */
   auto topk_or_zero = manage_local_topk ? topk : 0u;
-  auto conf_fast = get_compute_similarity_launcher<OutT, LutT, true, true>(pq_bits, topk_or_zero);
+  auto conf_fast =
+    get_compute_similarity_launcher<OutT, LutT, true, true, FilterT>(pq_bits, topk_or_zero);
   auto conf_no_basediff =
-    get_compute_similarity_launcher<OutT, LutT, false, true>(pq_bits, topk_or_zero);
+    get_compute_similarity_launcher<OutT, LutT, false, true, FilterT>(pq_bits, topk_or_zero);
   auto conf_no_smem_lut =
-    get_compute_similarity_launcher<OutT, LutT, true, false>(pq_bits, topk_or_zero);
+    get_compute_similarity_launcher<OutT, LutT, true, false, FilterT>(pq_bits, topk_or_zero);
   std::array candidates{
     std::make_tuple(
       conf_fast, total_shared_mem_t{ltk_add_mem, ltk_reduce_mem, lut_mem, bdf_mem}, true),

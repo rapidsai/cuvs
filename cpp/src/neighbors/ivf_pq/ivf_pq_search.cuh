@@ -556,18 +556,28 @@ void ivfpq_search_worker(raft::resources const& handle,
     raft::resource::get_custom_resource<search_kernel_cache<ScoreT, LutT, IvfSampleFilterT>>(handle)
       ->value;
   if (!cache.get(search_key, &search_instance)) {
-    search_instance =
-      compute_similarity_select<ScoreT, LutT>(raft::resource::get_device_properties(handle),
-                                              manage_local_topk,
-                                              coresidency,
-                                              preferred_shmem_carveout,
-                                              index.pq_bits(),
-                                              index.pq_dim(),
-                                              precomp_data_count,
-                                              n_queries,
-                                              n_probes,
-                                              topK);
+    search_instance = compute_similarity_select<ScoreT, LutT, IvfSampleFilterT>(
+      raft::resource::get_device_properties(handle),
+      manage_local_topk,
+      coresidency,
+      preferred_shmem_carveout,
+      index.pq_bits(),
+      index.pq_dim(),
+      precomp_data_count,
+      n_queries,
+      n_probes,
+      topK);
     cache.set(search_key, search_instance);
+  }
+
+  uint32_t* bitset_ptr   = nullptr;
+  int64_t bitset_len     = 0;
+  int64_t original_nbits = 0;
+  if constexpr (std::is_same_v<IvfSampleFilterT,
+                               cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>>) {
+    bitset_ptr     = sample_filter.view().data();
+    bitset_len     = sample_filter.view().size();
+    original_nbits = sample_filter.view().get_original_nbits();
   }
 
   rmm::device_uvector<LutT> device_lut(search_instance.device_lut_size, stream, mr);
@@ -601,7 +611,10 @@ void ivfpq_search_worker(raft::resources const& handle,
                          query,
                          index_list_sorted,
                          query_kths,
-                         sample_filter,
+                         index.inds_ptrs().data_handle(),
+                         bitset_ptr,
+                         bitset_len,
+                         original_nbits,
                          device_lut.data(),
                          distances_buf.data(),
                          neighbors_ptr);
@@ -927,9 +940,7 @@ inline void search(raft::resources const& handle,
   rmm::device_uvector<float> rot_queries(max_bs_outer * index.rot_dim(), stream, mr);
   rmm::device_uvector<uint32_t> clusters_to_probe(max_bs_outer * n_probes, stream, mr);
 
-  auto filter_adapter = cuvs::neighbors::filtering::ivf_to_sample_filter(
-    index.inds_ptrs().data_handle(), sample_filter);
-  auto search_instance = ivfpq_search<IdxT, decltype(filter_adapter)>::fun(params, index.metric());
+  auto search_instance = ivfpq_search<IdxT, IvfSampleFilterT>::fun(params, index.metric());
 
   for (uint32_t offset_q = 0; offset_q < n_queries; offset_q += max_bs_outer) {
     uint32_t queries_batch = min(max_bs_outer, n_queries - offset_q);
@@ -1004,7 +1015,7 @@ inline void search(raft::resources const& handle,
                       distances + uint64_t(k) * (offset_q + offset_b),
                       utils::config<T>::kDivisor / utils::config<float>::kDivisor,
                       params.preferred_shmem_carveout,
-                      filter_adapter);
+                      sample_filter);
     }
   }
 }

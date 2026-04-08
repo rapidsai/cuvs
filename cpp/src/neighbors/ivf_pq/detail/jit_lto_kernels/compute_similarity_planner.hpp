@@ -50,6 +50,12 @@ struct ComputeSimilarityPlanner : AlgorithmPlanner {
     this->add_static_fragment<fragment_tag_compute_distances<OutTag, LutTag, Capacity>>();
   }
 
+  template <typename FilterTag>
+  void add_sample_filter_function()
+  {
+    this->add_static_fragment<fragment_tag_sample_filter<FilterTag>>();
+  }
+
   template <uint32_t PqBits>
   void add_get_line_width_function()
   {

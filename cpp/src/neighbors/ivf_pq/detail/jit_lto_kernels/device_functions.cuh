@@ -68,7 +68,18 @@ __device__ void compute_distances(const uint32_t* chunk_indices,
                                   uint32_t* out_indices,
                                   LutT* lut_scores,
                                   uint8_t* smem_buf,
-                                  filtering::ivf_filter_dev sample_filter);
+                                  const int64_t* const* inds_ptrs,
+                                  uint32_t* bitset_ptr,
+                                  int64_t bitset_len,
+                                  int64_t original_nbits);
+
+__device__ bool sample_filter(const int64_t* const* const inds_ptrs,
+                              const uint32_t query_ix,
+                              const uint32_t cluster_ix,
+                              const uint32_t sample_ix,
+                              uint32_t* bitset_ptr,
+                              int64_t bitset_len,
+                              int64_t original_nbits);
 
 __device__ uint32_t get_line_width(uint32_t pq_dim);
 
