@@ -39,4 +39,4 @@ using compute_similarity_func_t = void(uint32_t dim,
                                        OutT* _out_scores,
                                        uint32_t* _out_indices);
 
-}
+}  // namespace cuvs::neighbors::ivf_pq::detail
