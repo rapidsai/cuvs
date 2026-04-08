@@ -161,7 +161,7 @@ def fit(Params params, X, resources=None):
 
     X_f = _to_f_order(X)
     x_ai = wrap_array(X_f)
-    _check_input_array(x_ai, [np.dtype("float32")])
+    _check_input_array(x_ai, [np.dtype("float32")], exp_row_major=False)
     n_rows, n_cols = x_ai.shape
 
     components = cp.empty((n_components, n_cols), dtype="float32", order="F")
@@ -230,7 +230,7 @@ def fit_transform(Params params, X, resources=None):
 
     X_f = _to_f_order(X)
     x_ai = wrap_array(X_f)
-    _check_input_array(x_ai, [np.dtype("float32")])
+    _check_input_array(x_ai, [np.dtype("float32")], exp_row_major=False)
     n_rows, n_cols = x_ai.shape
 
     trans_input = cp.empty((n_rows, n_components), dtype="float32", order="F")
@@ -314,7 +314,7 @@ def transform(Params params, X, components, singular_vals, mu,
 
     X_f = _to_f_order(X)
     x_ai = wrap_array(X_f)
-    _check_input_array(x_ai, [np.dtype("float32")])
+    _check_input_array(x_ai, [np.dtype("float32")], exp_row_major=False)
     n_rows = x_ai.shape[0]
 
     components_f = _to_f_order(components)
@@ -389,7 +389,7 @@ def inverse_transform(Params params, trans_input, components,
     """
     trans_f = _to_f_order(trans_input)
     trans_ai = wrap_array(trans_f)
-    _check_input_array(trans_ai, [np.dtype("float32")])
+    _check_input_array(trans_ai, [np.dtype("float32")], exp_row_major=False)
     n_rows = trans_ai.shape[0]
 
     components_f = _to_f_order(components)
