@@ -31,8 +31,21 @@ class vpq_codebooks_owning : public vpq_codebooks_iface<MathT> {
   {
     return vq_code_book_.view();
   }
+
+  [[nodiscard]] auto vq_code_book() noexcept
+    -> raft::device_matrix_view<math_type, uint32_t, raft::row_major>
+  {
+    return vq_code_book_.view();
+  }
+
   [[nodiscard]] auto pq_code_book() const noexcept
     -> raft::device_matrix_view<const math_type, uint32_t, raft::row_major> override
+  {
+    return pq_code_book_.view();
+  }
+
+  [[nodiscard]] auto pq_code_book() noexcept
+    -> raft::device_matrix_view<math_type, uint32_t, raft::row_major>
   {
     return pq_code_book_.view();
   }
