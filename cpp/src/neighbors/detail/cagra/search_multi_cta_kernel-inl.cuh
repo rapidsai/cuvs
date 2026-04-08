@@ -194,7 +194,8 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
   const uint32_t min_iteration,
   const uint32_t max_iteration,
   uint32_t* const num_executed_iterations, /* stats */
-  SAMPLE_FILTER_T sample_filter)
+  SAMPLE_FILTER_T sample_filter,
+  const typename DATASET_DESCRIPTOR_T::INDEX_T graph_size = 0)
 {
   using DATA_T     = typename DATASET_DESCRIPTOR_T::DATA_T;
   using INDEX_T    = typename DATASET_DESCRIPTOR_T::INDEX_T;
@@ -282,7 +283,8 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
                                            local_traversed_hashmap_ptr,
                                            traversed_hash_bitlen,
                                            block_id,
-                                           num_blocks);
+                                           num_blocks,
+                                           graph_size);
   __syncthreads();
   _CLK_REC(clk_compute_1st_distance);
 
@@ -607,29 +609,27 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
                  num_queries,
                  smem_size);
 
-  auto const& kernel_launcher = [&](auto const& kernel) -> void {
-    kernel<<<grid_dims, block_dims, smem_size, stream>>>(topk_indices_ptr,
-                                                         topk_distances_ptr,
-                                                         dataset_desc.dev_ptr(stream),
-                                                         queries_ptr,
-                                                         graph.data_handle(),
-                                                         max_elements,
-                                                         graph.extent(1),
-                                                         source_indices_ptr,
-                                                         ps.num_random_samplings,
-                                                         ps.rand_xor_mask,
-                                                         dev_seed_ptr,
-                                                         num_seeds,
-                                                         visited_hash_bitlen,
-                                                         traversed_hashmap_ptr,
-                                                         traversed_hash_bitlen,
-                                                         ps.itopk_size,
-                                                         ps.min_iterations,
-                                                         ps.max_iterations,
-                                                         num_executed_iterations,
-                                                         sample_filter);
-  };
-  cuvs::neighbors::detail::safely_launch_kernel_with_smem_size(kernel, smem_size, kernel_launcher);
+  kernel<<<grid_dims, block_dims, smem_size, stream>>>(topk_indices_ptr,
+                                                       topk_distances_ptr,
+                                                       dataset_desc.dev_ptr(stream),
+                                                       queries_ptr,
+                                                       graph.data_handle(),
+                                                       max_elements,
+                                                       graph.extent(1),
+                                                       source_indices_ptr,
+                                                       ps.num_random_samplings,
+                                                       ps.rand_xor_mask,
+                                                       dev_seed_ptr,
+                                                       num_seeds,
+                                                       visited_hash_bitlen,
+                                                       traversed_hashmap_ptr,
+                                                       traversed_hash_bitlen,
+                                                       ps.itopk_size,
+                                                       ps.min_iterations,
+                                                       ps.max_iterations,
+                                                       num_executed_iterations,
+                                                       sample_filter,
+                                                       static_cast<IndexT>(graph.extent(0)));
 }
 
 }  // namespace multi_cta_search
