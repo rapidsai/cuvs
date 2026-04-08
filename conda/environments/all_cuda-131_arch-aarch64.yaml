@@ -33,7 +33,7 @@ dependencies:
 - libcusparse-dev
 - libnvjitlink-dev
 - libopenblas<=0.3.30
-- librmm==26.4.*,>=0.0.0a0
+- librmm==26.4.*
 - make
 - nccl>=2.19
 - ninja
@@ -41,7 +41,7 @@ dependencies:
 - numpydoc
 - openblas
 - pre-commit
-- pylibraft==26.4.*,>=0.0.0a0
+- pylibraft==26.4.*
 - pytest
 - pytest-cov
 - rapids-build-backend>=0.4.0,<0.5.0
