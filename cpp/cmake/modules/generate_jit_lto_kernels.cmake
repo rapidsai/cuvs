@@ -75,7 +75,7 @@ function(add_jit_lto_kernel kernel_target)
     OUTPUT "${_JIT_LTO_EMBEDDED_HEADER_FILE}"
     COMMAND "${bin_to_c}" --const --name embedded_fatbin --static $<TARGET_OBJECTS:${kernel_target}>
             > "${_JIT_LTO_EMBEDDED_HEADER_FILE}"
-    DEPENDS $<TARGET_OBJECTS:${kernel_target}>
+    DEPENDS ${kernel_target} $<TARGET_OBJECTS:${kernel_target}>
   )
 endfunction()
 
