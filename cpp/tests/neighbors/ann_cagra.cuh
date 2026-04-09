@@ -1362,8 +1362,12 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
         if (ps.merge_strategy == cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL) {
           auto merged = cagra::merge(handle_, index_params, indices_to_merge);
-          cagra::search(
-            handle_, search_params, merged, search_queries_view, indices_out_view, dists_out_view);
+          cagra::search(handle_,
+                        search_params,
+                        merged.idx,
+                        search_queries_view,
+                        indices_out_view,
+                        dists_out_view);
         } else {
           cuvs::neighbors::composite::composite_index<DataT, IdxT, SearchIdxT> composite(
             indices_to_merge);

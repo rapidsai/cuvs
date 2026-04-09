@@ -28,15 +28,35 @@ auto build(raft::resources const& handle,
            raft::device_matrix_view<const data_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::cagra::index<data_t, index_t>
 {
-  return cuvs::neighbors::cagra::build<data_t, index_t>(handle, params, dataset);
+  // Do not use build<data_t, index_t>(...): that resolves to the mdspan template in cagra.cuh
+  // (ACE / error path) returning ace_build_result. Use the padded-view build -> build_result,
+  // then convert to index (RAFT_EXPECTS in build_result if VPQ is set).
+  auto padded = cuvs::neighbors::make_padded_dataset_view(handle, dataset);
+  return cuvs::neighbors::cagra::build(handle, params, padded);
 }
 
 auto build(raft::resources const& handle,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const data_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::index<data_t, index_t>
+  -> cuvs::neighbors::cagra::ace_build_result<data_t, index_t>
 {
-  return cuvs::neighbors::cagra::build<data_t, index_t>(handle, params, dataset);
+  // Do not call cagra::build(handle, params, dataset): we are inside namespace cagra and that
+  // overload set includes this function, so resolution picks this wrapper (infinite recursion).
+  if (std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params)) {
+    RAFT_EXPECTS(raft::get_device_for_address(dataset.data_handle()) == -1,
+                 "ACE: Dataset must be on host for ACE build");
+    return ::cuvs::neighbors::cagra::detail::build_ace<data_t, index_t>(handle, params, dataset);
+  }
+  throw raft::logic_error(
+    "Use make_padded_dataset_view() or make_padded_dataset() to obtain a view, "
+    "then call build(res, params, view). ACE build is the only path that accepts a raw mdspan.");
 }
+
+// Definition lives in cagra.cuh; callers that only include cagra.hpp need this symbol in libcuvs.
+// The device_matrix_view overload above may inline the padded-view template, so emit it explicitly.
+template build_result<data_t, index_t> build<data_t, index_t>(
+  raft::resources const& res,
+  const index_params& params,
+  cuvs::neighbors::device_padded_dataset_view<data_t, int64_t> const& dataset);
 
 }  // namespace cuvs::neighbors::cagra
