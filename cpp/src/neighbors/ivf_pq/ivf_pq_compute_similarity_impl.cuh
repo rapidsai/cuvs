@@ -155,6 +155,8 @@ auto kernel_try_capacity(uint32_t k_max)
   using out_tag    = decltype(get_out_type_tag<OutT>());
   using lut_tag    = decltype(get_lut_type_tag<LutT>());
   using filter_tag = decltype(get_filter_type_tag<FilterT>());
+  using precomp_base_diff_metric_tag =
+    std::conditional_t<PrecompBaseDiff, MetricTag, tag_metric_none>;
 
   constexpr bool kManageLocalTopK = Capacity > 0;
 
@@ -162,7 +164,7 @@ auto kernel_try_capacity(uint32_t k_max)
   planner.add_entrypoint<out_tag, lut_tag>();
   planner.add_prepare_lut_function<lut_tag, EnableSMemLut, PqBits>();
   planner.add_store_calculated_distances_function<out_tag, kManageLocalTopK>();
-  planner.add_precompute_base_diff_function<MetricTag>();
+  planner.add_precompute_base_diff_function<precomp_base_diff_metric_tag>();
   planner.add_create_lut_function<lut_tag, MetricTag, PrecompBaseDiff, PqBits>();
   planner.add_compute_distances_function<out_tag, lut_tag, Capacity>();
   planner.add_get_early_stop_limit_function<out_tag, MetricTag>();
