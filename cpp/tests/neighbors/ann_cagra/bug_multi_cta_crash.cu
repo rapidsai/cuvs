@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -81,8 +81,11 @@ class AnnCagraBugMultiCTACrash : public ::testing::TestWithParam<cagra::search_a
   std::optional<raft::device_matrix<uint32_t, int64_t>> neighbors = std::nullopt;
   std::optional<raft::device_matrix<float, int64_t>> distances    = std::nullopt;
 
-  constexpr static int64_t n_samples                   = 1183514;
-  constexpr static int64_t n_dim                       = 100;
+  constexpr static int64_t n_samples = 1183514;
+  // Row stride must satisfy make_padded_dataset_view alignment (16-byte rows). For half,
+  // extent(1)*2 must be a multiple of 16, i.e. n_dim % 8 == 0. Plain n_dim=100 → stride 100
+  // but required stride 104, so build(device_matrix_view) would throw before search.
+  constexpr static int64_t n_dim                       = 96;
   constexpr static int64_t n_queries                   = 30;
   constexpr static int64_t k                           = 10;
   constexpr static cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded;

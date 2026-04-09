@@ -141,8 +141,10 @@ TEST(CagraVpqBuildResult, CallerKeepsBuildResultAliveForSearch)
   build_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
     raft::matrix_extent<int64_t>(n_rows, dim), build_params.metric);
   cuvs::neighbors::vpq_params vpq_ps;
-  vpq_ps.pq_bits = 6;
-  vpq_ps.pq_dim  = 8;  // dim 16 is multiple of 8
+  // Must match compiled VPQ distance descriptors (compute_distance_vpq_matrix.json: pq_bits "8"
+  // only).
+  vpq_ps.pq_bits = 8;
+  vpq_ps.pq_dim  = 8;  // dim 16 is multiple of 8 → pq_len 2 (supported)
   build_params.compression.emplace(vpq_ps);
 
   auto db_view = raft::make_device_matrix_view<const float, int64_t>(database.data(), n_rows, dim);
