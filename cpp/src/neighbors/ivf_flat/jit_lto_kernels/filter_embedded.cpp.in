@@ -1,21 +1,22 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2025-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// This file is auto-generated. Do not edit manually.
-
-#include <cuvs/detail/jit_lto/RegisterKernelFragment.hpp>
 #include "@embedded_header_file@"
+#include <cuvs/detail/jit_lto/FragmentEntry.hpp>
+#include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_fragments.hpp>
+#include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>
 
-namespace {
+namespace cuvs::neighbors::ivf_flat::detail {
 
-__attribute__((__constructor__)) void register_kernel()
-{
-  registerAlgorithm(
-    "@filter_name@",
-    embedded_fatbin,
-    sizeof(embedded_fatbin));
-}
+using _FragmentEntry =
+  StaticFatbinFragmentEntry<fragment_tag_filter<tag_filter<tag_idx_l, tag_@filter_name@_impl>>>;
 
-}
+template <>
+const uint8_t* const _FragmentEntry::data = embedded_fatbin;
+
+template <>
+const size_t _FragmentEntry::length = sizeof(embedded_fatbin);
+
+}  // namespace cuvs::neighbors::ivf_flat::detail

@@ -17,6 +17,7 @@
 #include <raft/random/rng.cuh>
 #include <raft/random/sample_without_replacement.cuh>
 #include <raft/stats/mean.cuh>
+#include <raft/util/cudart_utils.hpp>
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
 
@@ -238,14 +239,13 @@ auto train(raft::resources const& res,
         thrust::sort(thrust::device, start_ptr, start_ptr + num_samples);
       }
 
-      RAFT_CUDA_TRY(cudaMemcpy2DAsync(threshold_ptr + dim_offset,
-                                      sizeof(T),
-                                      sampled_dataset_chunk.data_handle() + (num_samples - 1) / 2,
-                                      num_samples * sizeof(T),
-                                      sizeof(T),
-                                      dim_chunk,
-                                      cudaMemcpyDefault,
-                                      raft::resource::get_cuda_stream(res)));
+      raft::copy_matrix(threshold_ptr + dim_offset,
+                        size_t(1),
+                        sampled_dataset_chunk.data_handle() + (num_samples - 1) / 2,
+                        num_samples,
+                        size_t(1),
+                        dim_chunk,
+                        raft::resource::get_cuda_stream(res));
     }
   }
   return quantizer;

@@ -9,6 +9,7 @@
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/core/serialize.hpp>
+#include <raft/util/cudart_utils.hpp>
 
 #include <raft/core/logger.hpp>
 
@@ -44,14 +45,13 @@ void serialize(const raft::resources& res,
   // Remove padding before saving the dataset
   auto src = dataset.view();
   auto dst = raft::make_host_matrix<DataT, IdxT>(n_rows, dim);
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(dst.data_handle(),
-                                  sizeof(DataT) * dim,
-                                  src.data_handle(),
-                                  sizeof(DataT) * stride,
-                                  sizeof(DataT) * dim,
-                                  n_rows,
-                                  cudaMemcpyDefault,
-                                  raft::resource::get_cuda_stream(res)));
+  raft::copy_matrix(dst.data_handle(),
+                    dim,
+                    src.data_handle(),
+                    stride,
+                    dim,
+                    n_rows,
+                    raft::resource::get_cuda_stream(res));
   raft::resource::sync_stream(res);
   raft::serialize_mdspan(res, os, dst.view());
 }

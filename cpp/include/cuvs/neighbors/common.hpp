@@ -393,7 +393,7 @@ template <typename DatasetT>
 inline constexpr bool is_padded_dataset_v = is_padded_dataset<DatasetT>::value;
 
 /**
- * @brief Contstruct a strided matrix from any mdarray or mdspan.
+ * @brief Construct a strided matrix from any mdarray or mdspan.
  *
  * This function constructs a non-owning view if the input satisfied two conditions:
  *
@@ -455,20 +455,19 @@ auto make_strided_dataset(const raft::resources& res, const SrcT& src, uint32_t 
                                 0,
                                 out_array.size() * sizeof(value_type),
                                 raft::resource::get_cuda_stream(res)));
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(out_array.data_handle(),
-                                  sizeof(value_type) * required_stride,
-                                  src.data_handle(),
-                                  sizeof(value_type) * src_stride,
-                                  sizeof(value_type) * src.extent(1),
-                                  src.extent(0),
-                                  cudaMemcpyDefault,
-                                  raft::resource::get_cuda_stream(res)));
+  raft::copy_matrix(out_array.data_handle(),
+                    required_stride,
+                    src.data_handle(),
+                    src_stride,
+                    src.extent(1),
+                    src.extent(0),
+                    raft::resource::get_cuda_stream(res));
 
   return std::make_unique<out_owning_type>(std::move(out_array), out_layout);
 }
 
 /**
- * @brief Contstruct a strided matrix from any mdarray.
+ * @brief Construct a strided matrix from any mdarray.
  *
  * This function constructs an owning device matrix and copies the data.
  * When the data is copied, padding elements are filled with zeroes.
@@ -526,20 +525,19 @@ auto make_strided_dataset(
                                 0,
                                 out_array.size() * sizeof(value_type),
                                 raft::resource::get_cuda_stream(res)));
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(out_array.data_handle(),
-                                  sizeof(value_type) * required_stride,
-                                  src.data_handle(),
-                                  sizeof(value_type) * src_stride,
-                                  sizeof(value_type) * src.extent(1),
-                                  src.extent(0),
-                                  cudaMemcpyDefault,
-                                  raft::resource::get_cuda_stream(res)));
+  raft::copy_matrix(out_array.data_handle(),
+                    required_stride,
+                    src.data_handle(),
+                    src_stride,
+                    src.extent(1),
+                    src.extent(0),
+                    raft::resource::get_cuda_stream(res));
 
   return std::make_unique<out_owning_type>(std::move(out_array), out_layout);
 }
 
 /**
- * @brief Contstruct a strided matrix from any mdarray or mdspan.
+ * @brief Construct a strided matrix from any mdarray or mdspan.
  *
  * A variant `make_strided_dataset` that allows specifying the byte alignment instead of the
  * explicit stride length.
@@ -1180,7 +1178,7 @@ enum distribution_mode {
 /** Search mode when using a replicated index */
 /// \ingroup mg_cpp_search_params
 enum replicated_search_mode {
-  /** Search queries are splited to maintain equal load on GPUs */
+  /** Search queries are split to maintain equal load on GPUs */
   LOAD_BALANCER,
   /** Each search query is processed by a single GPU in a round-robin fashion */
   ROUND_ROBIN

@@ -172,6 +172,7 @@ ConfigureTest(
   NAME NEIGHBORS_ANN_CAGRA_TEST_BUGS
   PATH neighbors/ann_cagra/bug_extreme_inputs_oob.cu
        neighbors/ann_cagra/bug_multi_cta_crash.cu
+       neighbors/ann_cagra/bug_graph_smaller_than_dataset.cu
        neighbors/ann_cagra/bug_iterative_cagra_build.cu
        neighbors/ann_cagra/bug_issue_93_reproducer.cu
   GPUS 1
@@ -394,6 +395,7 @@ ConfigureTest(
        distance/dist_lp_unexp.cu
        distance/dist_russell_rao.cu
        distance/gram.cu
+       distance/kde.cu
        distance/masked_nn.cu
        distance/sparse_distance.cu
        sparse/gram.cu
