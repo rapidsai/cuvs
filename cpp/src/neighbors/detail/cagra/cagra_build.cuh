@@ -2112,6 +2112,9 @@ auto iterative_build_graph(
   } else {
     RAFT_LOG_INFO("Build compression: disabled (uncompressed build)");
   }
+  RAFT_LOG_INFO("Build search params: search_width=%zu, max_iterations=%zu",
+                iter_params.search_width,
+                iter_params.max_iterations);
 
   auto cagra_graph = raft::make_host_matrix<IdxT, int64_t>(0, 0);
 
@@ -2239,12 +2242,9 @@ auto iterative_build_graph(
       (uint64_t)curr_itopk_size,
       (uint64_t)curr_topk);
 
-    cuvs::neighbors::cagra::search_params search_params;
-    search_params.algo           = cuvs::neighbors::cagra::search_algo::AUTO;
-    search_params.max_queries    = max_chunk_size;
-    search_params.itopk_size     = curr_itopk_size;
-    search_params.max_iterations = 8;
-    search_params.search_width   = 1;
+    cuvs::neighbors::cagra::search_params search_params = iter_params;
+    search_params.max_queries = max_chunk_size;
+    search_params.itopk_size  = curr_itopk_size;
 
     // Create index and query views.
     if (!build_compression.has_value()) {
