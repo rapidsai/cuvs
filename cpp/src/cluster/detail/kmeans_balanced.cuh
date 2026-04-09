@@ -108,8 +108,8 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
         X_norm_view,
         L2NormBuf_OR_DistBuf,
         params.metric,
-        0,  // batch_samples (0 = default)
-        0,  // batch_centroids (0 = default)
+        0,  // batch_samples (unused for fused reduction)
+        0,  // batch_centroids (unused for fused reduction)
         workspace);
 
       // Copy keys to output labels
