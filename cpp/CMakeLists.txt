@@ -452,7 +452,32 @@ if(NOT BUILD_CPU_ONLY)
   )
   endblock()
 
+  find_file(
+    CUVS_BUILD_TIME_CUDA_FP16_H cuda_fp16.h
+    PATHS ${CUDAToolkit_INCLUDE_DIRS}
+    NO_DEFAULT_PATH REQUIRED
+    DOC "cuda_fp16.h from the CUDA toolkit (embedded for NVRTC UDF JIT)"
+  )
+
+  set(CUVS_EMBEDDED_CUDA_FP16_CPP
+      "${CMAKE_CURRENT_BINARY_DIR}/generated_jit_lto/embedded_cuda_fp16.cpp"
+  )
+  file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_jit_lto")
+  add_custom_command(
+    OUTPUT ${CUVS_EMBEDDED_CUDA_FP16_CPP}
+    COMMAND
+      ${CMAKE_COMMAND} "-DINPUT=${CUVS_BUILD_TIME_CUDA_FP16_H}"
+      "-DOUTPUT=${CUVS_EMBEDDED_CUDA_FP16_CPP}" -P
+      "${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed_cuda_fp16.cmake"
+    DEPENDS "${CUVS_BUILD_TIME_CUDA_FP16_H}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed_cuda_fp16.cmake"
+    COMMENT
+      "Embedding cuda_fp16.h from CUDA toolkit for NVRTC (rebuilt when toolkit header changes)"
+    VERBATIM
+  )
+
   set(jit_lto_files
+      ${CUVS_EMBEDDED_CUDA_FP16_CPP}
       ${interleaved_scan_files}
       ${metric_files}
       ${filter_files}
@@ -741,6 +766,10 @@ if(NOT BUILD_CPU_ONLY)
     ${CUVS_MG_ALGOS}
     ${jit_lto_files}
   )
+
+  set_source_files_properties("${CUVS_EMBEDDED_CUDA_FP16_CPP}" PROPERTIES GENERATED TRUE)
+  add_custom_target(cuvs_embed_cuda_fp16_header DEPENDS "${CUVS_EMBEDDED_CUDA_FP16_CPP}")
+  add_dependencies(cuvs_objs cuvs_embed_cuda_fp16_header)
 
   set_target_properties(
     cuvs_objs

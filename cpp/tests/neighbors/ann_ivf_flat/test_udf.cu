@@ -12,6 +12,9 @@
 #include <raft/core/resources.hpp>
 #include <rmm/device_uvector.hpp>
 
+#include <array>
+#include <chrono>
+#include <concepts>
 #include <vector>
 
 namespace cuvs::neighbors::ivf_flat {
@@ -28,16 +31,22 @@ CUVS_METRIC(custom_l2, { acc += squared_diff(x, y); })
 // ============================================================================
 
 template <typename T>
+concept udf_test_fp_element = std::same_as<T, float> || std::same_as<T, __half>;
+
+template <typename T>
+concept udf_test_int_byte_element = std::same_as<T, int8_t> || std::same_as<T, uint8_t>;
+
+template <typename T>
 struct TestDataTraits;
 
-template <>
-struct TestDataTraits<float> {
+template <udf_test_fp_element T>
+struct TestDataTraits<T> {
   static constexpr int64_t dim         = 4;
   static constexpr int64_t num_db_vecs = 8;
 
-  static std::vector<float> database()
+  static std::vector<T> database()
   {
-    // 4-dimensional float dataset
+    // 4-dimensional float/__half dataset
     // Vectors arranged for easy distance verification:
     //   db[0] = [0, 0, 0, 0]  - origin
     //   db[1] = [1, 0, 0, 0]  - unit along x
@@ -48,18 +57,18 @@ struct TestDataTraits<float> {
     //   db[6] = [1, 1, 1, 1]  - all ones
     //   db[7] = [3, 4, 0, 0]  - for 3-4-5 triangle
     return {
-      0.0f, 0.0f, 0.0f, 0.0f,  // db[0]: origin
-      1.0f, 0.0f, 0.0f, 0.0f,  // db[1]: L2 dist from origin = 1
-      0.0f, 1.0f, 0.0f, 0.0f,  // db[2]: L2 dist from origin = 1
-      0.0f, 0.0f, 1.0f, 0.0f,  // db[3]: L2 dist from origin = 1
-      1.0f, 1.0f, 0.0f, 0.0f,  // db[4]: L2 dist from origin = 2
-      2.0f, 0.0f, 0.0f, 0.0f,  // db[5]: L2 dist from origin = 4
-      1.0f, 1.0f, 1.0f, 1.0f,  // db[6]: L2 dist from origin = 4
-      3.0f, 4.0f, 0.0f, 0.0f,  // db[7]: L2 dist from origin = 25
+      0.0, 0.0, 0.0, 0.0,  // db[0]: origin
+      1.0, 0.0, 0.0, 0.0,  // db[1]: L2 dist rom origin = 1
+      0.0, 1.0, 0.0, 0.0,  // db[2]: L2 dist rom origin = 1
+      0.0, 0.0, 1.0, 0.0,  // db[3]: L2 dist rom origin = 1
+      1.0, 1.0, 0.0, 0.0,  // db[4]: L2 dist rom origin = 2
+      2.0, 0.0, 0.0, 0.0,  // db[5]: L2 dist rom origin = 4
+      1.0, 1.0, 1.0, 1.0,  // db[6]: L2 dist rom origin = 4
+      3.0, 4.0, 0.0, 0.0,  // db[7]: L2 dist rom origin = 25
     };
   }
 
-  static std::vector<float> queries()
+  static std::vector<T> queries()
   {
     // query[0] = origin - nearest is db[0] (dist=0)
     // query[1] = [1,0,0,0] - nearest is db[1] (dist=0)
@@ -84,14 +93,14 @@ struct TestDataTraits<float> {
   static float expected_nearest_dist_q1() { return 0.0f; }
 };
 
-template <>
-struct TestDataTraits<int8_t> {
+template <udf_test_int_byte_element T>
+struct TestDataTraits<T> {
   static constexpr int64_t dim         = 16;
   static constexpr int64_t num_db_vecs = 8;
 
-  static std::vector<int8_t> database()
+  static std::vector<T> database()
   {
-    // 16-dimensional int8 dataset to test vectorized SIMD intrinsics
+    // 16-dimensional int8/uint8 dataset to test vectorized SIMD intrinsics
     return {
       // db[0]: all zeros
       0,
@@ -232,7 +241,7 @@ struct TestDataTraits<int8_t> {
     };
   }
 
-  static std::vector<int8_t> queries()
+  static std::vector<T> queries()
   {
     // query[0] = all zeros - nearest is db[0] (dist=0)
     // query[1] = all ones - nearest is db[3] (dist=0)
@@ -283,7 +292,7 @@ class IvfFlatUdfTest : public ::testing::Test {
   uint32_t n_probes_;
 };
 
-using TestTypes = ::testing::Types<float, int8_t>;
+using TestTypes = ::testing::Types<float, __half, int8_t, uint8_t>;
 TYPED_TEST_SUITE(IvfFlatUdfTest, TestTypes);
 
 // ============================================================================
@@ -341,13 +350,24 @@ TYPED_TEST(IvfFlatUdfTest, CustomL2MatchesBuiltIn)
                    indices_builtin_view,
                    distances_builtin_view);
 
-  // Search with custom UDF metric
+  // Search with custom UDF metric (twice: first run pays JIT/link; second should be faster)
   ivf_flat::search_params search_params_udf;
   search_params_udf.n_probes   = this->n_probes_;
   search_params_udf.metric_udf = custom_l2_udf();
 
-  ivf_flat::search(
-    this->handle_, search_params_udf, idx, queries_view, indices_udf_view, distances_udf_view);
+  std::array<double, 2> udf_ms{};
+  for (int pass = 0; pass < 2; ++pass) {
+    raft::resource::sync_stream(this->handle_);
+    auto const t0 = std::chrono::steady_clock::now();
+    ivf_flat::search(
+      this->handle_, search_params_udf, idx, queries_view, indices_udf_view, distances_udf_view);
+    raft::resource::sync_stream(this->handle_);
+    auto const t1 = std::chrono::steady_clock::now();
+    udf_ms[static_cast<std::size_t>(pass)] =
+      std::chrono::duration<double, std::milli>(t1 - t0).count();
+  }
+  EXPECT_LT(udf_ms[1], udf_ms[0]) << "cached UDF path should beat first search (first_ms="
+                                  << udf_ms[0] << ", second_ms=" << udf_ms[1] << ")";
 
   // Copy results to host
   std::vector<int64_t> h_indices_builtin(this->num_queries_ * this->k_);

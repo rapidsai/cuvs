@@ -4,6 +4,7 @@
  */
 
 #include <cuvs/detail/jit_lto/NVRTCLTOFragmentCompiler.hpp>
+#include <cuvs/detail/jit_lto/embedded_cuda_fp16.hpp>
 
 #include <mutex>
 
@@ -36,6 +37,8 @@ NVRTCLTOFragmentCompiler::NVRTCLTOFragmentCompiler()
     std::string{"-rdc=true"},
     std::string{"--std=c++20"},
     std::string{"-default-device"},
+    // cuda_fp16.h skips stdlib / vector includes when compiling for NVRTC
+    std::string{"-D__CUDACC_RTC__"},
   };
 }
 
@@ -59,9 +62,12 @@ std::unique_ptr<UDFFatbinFragment> NVRTCLTOFragmentCompiler::compile(std::string
     return std::make_unique<UDFFatbinFragment>(key, it->second);
   }
 
+  char const* const udf_headers[]       = {cuvs::detail::jit_lto::k_nvrtc_embedded_cuda_fp16_h};
+  char const* const udf_include_names[] = {"cuda_fp16.h"};
+
   nvrtcProgram prog;
-  NVRTC_SAFE_CALL(
-    nvrtcCreateProgram(&prog, code.c_str(), "nvrtc_lto_fragment", 0, nullptr, nullptr));
+  NVRTC_SAFE_CALL(nvrtcCreateProgram(
+    &prog, code.c_str(), "nvrtc_lto_fragment", 1, udf_headers, udf_include_names));
 
   // Convert std::vector<std::string> to std::vector<const char*> for nvrtc API
   std::vector<const char*> opts;
@@ -83,8 +89,9 @@ std::unique_ptr<UDFFatbinFragment> NVRTCLTOFragmentCompiler::compile(std::string
       NVRTC_SAFE_CALL(nvrtcGetProgramLog(prog, log.get()));
       RAFT_FAIL("nvrtc compile error log: \n%s", log.get());
     }
-  } catch (const std::exception& e) {
+  } catch (...) {
     NVRTC_SAFE_CALL(nvrtcDestroyProgram(&prog));
+    throw;
   }
 
   // Obtain generated LTO IR from the program.

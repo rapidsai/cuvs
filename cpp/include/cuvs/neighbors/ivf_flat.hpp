@@ -3380,6 +3380,8 @@ __device__ __forceinline__ AccT max_elem(point<T, AccT, V> x, point<T, AccT, V> 
  * the necessary types and utilities inline.
  */
 constexpr std::string_view jit_preamble_code = R"(
+#include <cuda_fp16.h>
+
 /* Fixed-width integer types for nvrtc */
 using int8_t = signed char;
 using uint8_t = unsigned char;
