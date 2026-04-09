@@ -74,7 +74,7 @@
 - Hard-coded GPU device IDs or resource limits
 - Inappropriate use of exceptions in performance-critical paths
 - Significant code duplication (3+ occurrences). Including in kernel logic.
-- Reinventing functionality already available in RAFT, RMM,  libcudacxx, thrust, or CUB
+- Reinventing functionality already available in RAFT, RMM, libcudacxx, thrust, or CUB
 
 ### Test Quality
 - Missing validation of numerical correctness
