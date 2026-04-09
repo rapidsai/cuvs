@@ -100,6 +100,10 @@ repos:
                 files: |
                   (?x)
                     [.](cpp|cu|hpp|cuh)[.]in$
+                # clang-format struggles with one of the placeholders in register_fatbin.cpp.in, so exclude it
+                exclude: |
+                  (?x)
+                    ^cpp/cmake/modules/register_fatbin[.]cpp[.]in$
       - repo: https://github.com/codespell-project/codespell
         rev: v2.4.1
         hooks:
