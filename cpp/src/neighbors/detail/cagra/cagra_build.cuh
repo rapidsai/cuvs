@@ -2415,8 +2415,7 @@ index<T, IdxT> build(
       }
       if (nn_descent_params.graph_degree != intermediate_degree) {
         RAFT_LOG_WARN(
-          "Graph degree (%lu) for nn-descent needs to match cagra intermediate graph degree "
-          "(%lu), "
+          "Graph degree (%lu) for nn-descent needs to match cagra intermediate graph degree (%lu), "
           "aligning "
           "nn-descent graph_degree.",
           nn_descent_params.graph_degree,
