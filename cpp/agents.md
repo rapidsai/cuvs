@@ -155,7 +155,7 @@ Consider: Add epsilon threshold check or use safe division helper
 HIGH: Unnecessary synchronization in hot path
 
 Issue: cudaDeviceSynchronize() or raft::resource::sync_stream() inside iteration loop
-Why: Blocks GPU pipeline, 10x slowdown on benchmarks
+Why: Blocks GPU pipeline
 Consider: Move sync outside loop or use streams with events
 ```
 
