@@ -4,6 +4,38 @@ cuVS Bench Parameter Tuning Guide
 
 This guide outlines the various parameter settings that can be specified in :doc:`cuVS Benchmarks <index>` yaml configuration files and explains the impact they have on corresponding algorithms to help inform their settings for benchmarking across desired levels of recall.
 
+Benchmark modes
+===============
+
+When you run benchmarks with ``BenchmarkOrchestrator.run_benchmark()``, you can choose how parameters are explored:
+
+**Sweep mode (default)**
+
+Pass ``mode="sweep"`` or omit ``mode``. The orchestrator builds the full Cartesian product of all build and search parameter lists defined in the algorithm YAML (see :doc:`Creating and customizing dataset configurations <index>`). Every valid combination (after constraint filtering) is run. Use this for exhaustive comparison across the configured parameter grid.
+
+**Tune mode**
+
+Pass ``mode="tune"`` to perform hyperparameter optimization using Optuna instead of running every combination. You must pass:
+
+- **constraints** (dict): The optimization target and optional bounds. One metric must be ``"maximize"`` or ``"minimize"`` (the goal). Others can set hard limits with ``{"min": X}`` or ``{"max": X}``. Examples: ``{"recall": "maximize", "latency": {"max": 10}}`` or ``{"latency": "minimize", "recall": {"min": 0.95}}``.
+- **n_trials** (int, optional): Maximum number of Optuna trials (default 100). Ignored in sweep mode.
+
+Example:
+
+.. code-block:: python
+
+    results = orchestrator.run_benchmark(
+        mode="tune",
+        dataset="deep-image-96-inner",
+        algorithms="cuvs_cagra",
+        constraints={"recall": "maximize", "latency": {"max": 5.0}},
+        n_trials=50,
+        count=10,
+        batch_size=10,
+    )
+
+The parameter tables below describe the build and search knobs that sweep mode varies and that tune mode can optimize.
+
 cuVS Indexes
 ============
 
