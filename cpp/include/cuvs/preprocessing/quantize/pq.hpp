@@ -5,10 +5,13 @@
 
 #pragma once
 
+#include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/handle.hpp>
 #include <raft/core/host_mdspan.hpp>
+
+#include <variant>
 
 namespace cuvs::preprocessing::quantize::pq {
 
@@ -16,6 +19,10 @@ namespace cuvs::preprocessing::quantize::pq {
  * @defgroup pq Product Quantizer utilities
  * @{
  */
+
+/** Alias for the variant holding either balanced or regular k-means parameters. */
+using kmeans_params_variant =
+  std::variant<cuvs::cluster::kmeans::balanced_params, cuvs::cluster::kmeans::params>;
 
 /**
  * @brief Product Quantizer parameters.
@@ -53,16 +60,15 @@ struct params {
    * When zero, an optimal value is selected using a heuristic.
    */
   uint32_t vq_n_centers = 0;
-  /** The number of iterations searching for kmeans centers (both VQ & PQ phases). */
-  uint32_t kmeans_n_iters = 25;
   /**
-   * Type of k-means algorithm for PQ training.
-   * Balanced k-means tends to be faster than regular k-means for PQ training, for
-   * problem sets where the number of points per cluster are approximately equal.
-   * Regular k-means may be better for skewed cluster distributions.
+   * K-means parameters for PQ codebook training.
+   *
+   * Set to cuvs::cluster::kmeans::balanced_params for balanced k-means (default),
+   * or cuvs::cluster::kmeans::params for regular k-means.
+   * The active variant type selects the algorithm; balanced k-means tends to be faster
+   * for PQ training where cluster sizes are approximately equal.
    */
-  cuvs::cluster::kmeans::kmeans_type pq_kmeans_type =
-    cuvs::cluster::kmeans::kmeans_type::KMeansBalanced;
+  kmeans_params_variant kmeans_params = cuvs::cluster::kmeans::balanced_params{};
   /**
    * The max number of data points to use per PQ code during PQ codebook training. Using more data
    * points per PQ code may increase the quality of PQ codebook but may also increase the build

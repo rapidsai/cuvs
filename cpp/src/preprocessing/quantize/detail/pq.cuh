@@ -29,17 +29,38 @@ inline void fill_missing_params_heuristics(cuvs::preprocessing::quantize::pq::pa
   }
 }
 
+inline bool is_balanced_kmeans(const cuvs::preprocessing::quantize::pq::params& params)
+{
+  return std::holds_alternative<cuvs::cluster::kmeans::balanced_params>(params.kmeans_params);
+}
+
+inline uint32_t get_kmeans_n_iters(const cuvs::preprocessing::quantize::pq::params& params)
+{
+  return std::visit(
+    [](const auto& kp) -> uint32_t {
+      using kmeans_type = std::decay_t<decltype(kp)>;
+      if constexpr (std::is_same_v<kmeans_type, cuvs::cluster::kmeans::balanced_params>) {
+        return kp.n_iters;
+      } else {
+        return static_cast<uint32_t>(kp.max_iter);
+      }
+    },
+    params.kmeans_params);
+}
+
 inline auto to_vpq_params(const cuvs::preprocessing::quantize::pq::params& params)
   -> cuvs::neighbors::vpq_params
 {
+  auto kmeans_type = is_balanced_kmeans(params) ? cuvs::cluster::kmeans::kmeans_type::KMeansBalanced
+                                                : cuvs::cluster::kmeans::kmeans_type::KMeans;
   return cuvs::neighbors::vpq_params{
     .pq_bits                         = params.pq_bits,
     .pq_dim                          = params.pq_dim,
     .vq_n_centers                    = params.vq_n_centers,
-    .kmeans_n_iters                  = params.kmeans_n_iters,
+    .kmeans_n_iters                  = get_kmeans_n_iters(params),
     .vq_kmeans_trainset_fraction     = 1.0,
     .pq_kmeans_trainset_fraction     = 1.0,
-    .pq_kmeans_type                  = params.pq_kmeans_type,
+    .pq_kmeans_type                  = kmeans_type,
     .max_train_points_per_pq_code    = params.max_train_points_per_pq_code,
     .max_train_points_per_vq_cluster = params.max_train_points_per_vq_cluster};
 }
@@ -92,7 +113,7 @@ auto train_pq_subspaces(
   auto sub_labels       = raft::make_device_vector<uint32_t, ix_t>(res, 0);
   auto pq_cluster_sizes = raft::make_device_vector<uint32_t, ix_t>(res, 0);
   auto device_memory    = raft::resource::get_workspace_resource(res);
-  if (params.pq_kmeans_type == cuvs::cluster::kmeans::kmeans_type::KMeansBalanced) {
+  if (is_balanced_kmeans(params)) {
     sub_labels = raft::make_device_mdarray<uint32_t>(
       res, device_memory, raft::make_extents<ix_t>(n_rows_train));
     pq_cluster_sizes = raft::make_device_mdarray<uint32_t>(
@@ -111,7 +132,7 @@ auto train_pq_subspaces(
       pq_centers.data_handle() + m * pq_n_centers * pq_len, pq_n_centers, pq_len);
     cuvs::neighbors::detail::train_pq_centers<MathT, ix_t>(
       res,
-      to_vpq_params(params),
+      params.kmeans_params,
       raft::make_const_mdspan(sub_dataset.view()),
       pq_centers_subspace_view,
       sub_labels.view(),
@@ -152,7 +173,7 @@ quantizer<MathT> build(
       res, filled_params, dataset, raft::make_const_mdspan(vq_code_book.view()));
   } else {
     pq_code_book = cuvs::neighbors::detail::train_pq<MathT>(
-      res, vpq_params, dataset, raft::make_const_mdspan(vq_code_book.view()));
+      res, filled_params, dataset, raft::make_const_mdspan(vq_code_book.view()));
   }
   return {filled_params,
           cuvs::neighbors::vpq_dataset<MathT, int64_t>{
@@ -344,6 +365,32 @@ void vpq_convert_math_type(const raft::resources& res,
                     raft::make_const_mdspan(src.pq_code_book.view()));
 }
 
+inline auto from_vpq_params(const cuvs::neighbors::vpq_params& in_params)
+  -> cuvs::preprocessing::quantize::pq::params
+{
+  std::variant<cuvs::cluster::kmeans::balanced_params, cuvs::cluster::kmeans::params> kmeans_params;
+  if (in_params.pq_kmeans_type == cuvs::cluster::kmeans::kmeans_type::KMeansBalanced) {
+    kmeans_params = cuvs::cluster::kmeans::balanced_params{
+      .n_iters = in_params.kmeans_n_iters,
+    };
+  } else {
+    kmeans_params = cuvs::cluster::kmeans::params{
+      .max_iter = (int)in_params.kmeans_n_iters,
+    };
+  }
+  const uint32_t pq_n_centers = 1 << in_params.pq_bits;
+  return cuvs::preprocessing::quantize::pq::params{
+    .pq_bits                      = in_params.pq_bits,
+    .pq_dim                       = in_params.pq_dim,
+    .vq_n_centers                 = in_params.vq_n_centers,
+    .kmeans_params                = kmeans_params,
+    .max_train_points_per_pq_code = std::min<uint32_t>(
+      in_params.max_train_points_per_pq_code, pq_n_centers * in_params.pq_kmeans_trainset_fraction),
+    .max_train_points_per_vq_cluster =
+      std::min<uint32_t>(in_params.max_train_points_per_vq_cluster,
+                         in_params.vq_n_centers * in_params.vq_kmeans_trainset_fraction)};
+}
+
 template <typename DatasetT, typename MathT, typename IdxT>
 auto vpq_build(const raft::resources& res,
                const cuvs::neighbors::vpq_params& params,
@@ -353,10 +400,11 @@ auto vpq_build(const raft::resources& res,
   // Use a heuristic to impute missing parameters.
   auto ps = cuvs::neighbors::detail::fill_missing_params_heuristics(params, dataset);
 
+  auto pq_params = from_vpq_params(ps);
   // Train codes
   auto vq_code_book = cuvs::neighbors::detail::train_vq<MathT>(res, ps, dataset);
   auto pq_code_book = cuvs::neighbors::detail::train_pq<MathT>(
-    res, ps, dataset, raft::make_const_mdspan(vq_code_book.view()));
+    res, pq_params, dataset, raft::make_const_mdspan(vq_code_book.view()));
 
   // Encode dataset
   const IdxT n_rows       = dataset.extent(0);

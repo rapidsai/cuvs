@@ -160,14 +160,18 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
 
   void testProductQuantizationFromDataset()
   {
-    using LabelT = uint32_t;
-    config_      = cuvs::preprocessing::quantize::pq::params(params_.pq_bits,
+    using LabelT                = uint32_t;
+    using kmeans_params_variant = cuvs::preprocessing::quantize::pq::kmeans_params_variant;
+    kmeans_params_variant kmeans_params =
+      (params_.pq_kmeans_type == cuvs::cluster::kmeans::kmeans_type::KMeansBalanced)
+        ? kmeans_params_variant(cuvs::cluster::kmeans::balanced_params{.n_iters = 25})
+        : kmeans_params_variant(cuvs::cluster::kmeans::params{.max_iter = 25});
+    config_ = cuvs::preprocessing::quantize::pq::params(params_.pq_bits,
                                                         params_.pq_dim,
                                                         params_.use_subspaces,
                                                         params_.use_vq,
                                                         params_.n_vq_centers,
-                                                        25,
-                                                        params_.pq_kmeans_type,
+                                                        kmeans_params,
                                                         256,
                                                         1024);
     raft::resource::sync_stream(handle);
