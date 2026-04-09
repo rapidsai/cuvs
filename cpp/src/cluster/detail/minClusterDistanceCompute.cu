@@ -29,6 +29,7 @@ void minClusterAndDistanceCompute(
   auto n_samples      = X.extent(0);
   auto n_features     = X.extent(1);
   auto n_clusters     = centroids.extent(0);
+  // todo(lsugy): change batch size computation when using fusedL2NN!
   bool is_fused       = metric == cuvs::distance::DistanceType::L2Expanded ||
                   metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
                   metric == cuvs::distance::DistanceType::CosineExpanded;
@@ -75,6 +76,9 @@ void minClusterAndDistanceCompute(
       0.0f,
       stream);
   } else {
+    // TODO: Unless pool allocator is used, passing in a workspace for this
+    // isn't really increasing performance because this needs to do a re-allocation
+    // anyways. ref https://github.com/rapidsai/raft/issues/930
     L2NormBuf_OR_DistBuf.resize(dataBatchSize * centroidsBatchSize, stream);
 
     // pairwiseDistance[ns x nc] - tensor wrapper around the distance buffer
@@ -227,6 +231,7 @@ void minClusterDistanceCompute(raft::resources const& handle,
     if (is_fused) {
       workspace.resize((sizeof(IndexT)) * ns, stream);
 
+      // todo(lsugy): remove cIdx
       cuvs::distance::fusedDistanceNNMinReduce<DataT, DataT, IndexT>(
         minClusterDistanceView.data_handle(),
         datasetView.data_handle(),
