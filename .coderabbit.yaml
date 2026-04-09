@@ -29,7 +29,7 @@ reviews:
   review_status: false
 
   # Path-specific review instructions
-  # Note: Detailed C++/CUDA and Python review guidelines are in cpp/agents.md and python/agents.md
+  # Note: Detailed C++/CUDA and Python review guidelines are in cpp/REVIEW_GUIDELINES.md and python/REVIEW_GUIDELINES.md
   path_instructions:
     - path: "docs/**/*"
       instructions: |
@@ -71,7 +71,7 @@ knowledge_base:
   opt_out: false
   code_guidelines:
     filePatterns:
-      - "cpp/agents.md"
-      - "python/agents.md"
+      - "cpp/REVIEW_GUIDELINES.md"
+      - "python/REVIEW_GUIDELINES.md"
       - "docs/source/contributing.md"
       - "docs/source/developer_guide.md"
