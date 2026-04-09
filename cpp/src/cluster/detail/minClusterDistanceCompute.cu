@@ -59,6 +59,7 @@ void minClusterAndDistanceCompute(
 
     workspace.resize((sizeof(int)) * n_samples, stream);
 
+    // todo(lsugy): remove cIdx
     cuvs::distance::fusedDistanceNNMinReduce<DataT, raft::KeyValuePair<IndexT, DataT>, IndexT>(
       minClusterAndDistance.data_handle(),
       X.data_handle(),
@@ -231,7 +232,6 @@ void minClusterDistanceCompute(raft::resources const& handle,
     if (is_fused) {
       workspace.resize((sizeof(IndexT)) * ns, stream);
 
-      // todo(lsugy): remove cIdx
       cuvs::distance::fusedDistanceNNMinReduce<DataT, DataT, IndexT>(
         minClusterDistanceView.data_handle(),
         datasetView.data_handle(),
