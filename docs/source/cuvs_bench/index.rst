@@ -106,23 +106,35 @@ Running the benchmarks
 End-to-end: smaller-scale benchmarks (<1M to 10M)
 -------------------------------------------------
 
-The steps below demonstrate how to download, install, and run benchmarks on a subset of 10M vectors from the Yandex Deep-1B dataset By default the datasets will be stored and used from the folder indicated by the `RAPIDS_DATASET_ROOT_DIR` environment variable if defined, otherwise a datasets sub-folder from where the script is being called:
+The steps below demonstrate how to download, install, and run benchmarks on a subset of 10M vectors from the Yandex Deep-1B dataset. By default the datasets will be stored and used from the folder indicated by the `RAPIDS_DATASET_ROOT_DIR` environment variable if defined, otherwise a datasets sub-folder from where the script is being called.
 
 .. code-block:: bash
 
-
-    # (1) prepare dataset.
+    # (1) Prepare dataset.
     python -m cuvs_bench.get_dataset --dataset deep-image-96-angular --normalize
 
-    # (2) build and search index
-    python -m cuvs_bench.run --dataset deep-image-96-inner --algorithms cuvs_cagra --batch-size 10 -k 10
+.. code-block:: python
 
-    # (3) export data
+    # (2) Build and search index.
+    from cuvs_bench.orchestrator import BenchmarkOrchestrator
+
+    orchestrator = BenchmarkOrchestrator(backend_type="cpp_gbench")
+    results = orchestrator.run_benchmark(
+        dataset="deep-image-96-inner",
+        algorithms="cuvs_cagra",
+        count=10,
+        batch_size=10,
+        build=True,
+        search=True,
+    )
+
+.. code-block:: bash
+
+    # (3) Export data.
     python -m cuvs_bench.run --data-export --dataset deep-image-96-inner
 
-    # (4) plot results
+    # (4) Plot results.
     python -m cuvs_bench.plot --dataset deep-image-96-inner
-
 
 .. list-table::
 
@@ -192,19 +204,33 @@ The steps below demonstrate how to download, install, and run benchmarks on a su
 .. code-block:: bash
 
     mkdir -p datasets/deep-1B
-    # (1) prepare dataset
+    # (1) Prepare dataset.
     # download manually "Ground Truth" file of "Yandex DEEP"
     # suppose the file name is deep_new_groundtruth.public.10K.bin
     python -m cuvs_bench.split_groundtruth --groundtruth datasets/deep-1B/deep_new_groundtruth.public.10K.bin
     # two files 'groundtruth.neighbors.ibin' and 'groundtruth.distances.fbin' should be produced
 
-    # (2) build and search index
-    python -m cuvs_bench.run --dataset deep-1B --algorithms cuvs_cagra --batch-size 10 -k 10
+.. code-block:: python
 
-    # (3) export data
+    # (2) Build and search index.
+    from cuvs_bench.orchestrator import BenchmarkOrchestrator
+
+    orchestrator = BenchmarkOrchestrator(backend_type="cpp_gbench")
+    results = orchestrator.run_benchmark(
+        dataset="deep-1B",
+        algorithms="cuvs_cagra",
+        count=10,
+        batch_size=10,
+        build=True,
+        search=True,
+    )
+
+.. code-block:: bash
+
+    # (3) Export data.
     python -m cuvs_bench.run --data-export --dataset deep-1B
 
-    # (4) plot results
+    # (4) Plot results.
     python -m cuvs_bench.plot --dataset deep-1B
 
 The usage of `python -m cuvs_bench.split_groundtruth` is:
@@ -217,6 +243,34 @@ The usage of `python -m cuvs_bench.split_groundtruth` is:
       -h, --help            show this help message and exit
       --groundtruth GROUNDTRUTH
                             Path to billion-scale dataset groundtruth file (default: None)
+
+
+Testing on new datasets
+-----------------------
+
+To run benchmark on a dataset, it is required have a descriptor that defines the file names and a few other properties of that dataset.
+Descriptors for several popular datasets are already available in `datasets.yaml <https://github.com/rapidsai/cuvs/blob/branch-25.04/python/cuvs_bench/cuvs_bench/config/datasets/datasets.yaml>``.
+
+Let's consider how to test on a new dataset. First we create a descriptor `mydataset.yaml`
+
+.. code-block: yaml
+    - name: mydata-1M
+      base_file: mydata-1M/base.100M.u8bin
+      subset_size: 1000000
+      dims: 128
+      query_file: mydata-10M/queries.u8bin
+      groundtruth_neighbors_file: mydata-1M/groundtruth.neighbors.ibin
+      distance: euclidean
+
+Here `name` can be chosen arbitrarily. We pass `name` as the `--dataset` argument for the benchmark. The file names are relative to the path given by `--dataset-path` argument.
+The `subset_size`` field is optional. This argument defines how many vectors to use from the dataset file, the first `subset_size` vectors will be used.
+This way you can define benchmarks on multiple subsets of the same dataset without duplicating the dataset vectors.
+Note that the ground truth vectors have to be generated for each subset separately.
+
+To run the benchmark on the newly defined `mydata-1M` dataset, you can use the following command line:
+
+.. code-black: bash
+  python -m cuvs_bench.run --dataset mydata-1M --dataset-path=/path/to/data/folder --dataset-configuration=mydataset.yaml  --algorithms=cuvs_cagra
 
 Running with Docker containers
 ------------------------------
@@ -386,7 +440,7 @@ Creating and customizing dataset configurations
 
 A single configuration will often define a set of algorithms, with associated index and search parameters, that can be generalize across datasets. We use YAML to define dataset specific and algorithm specific configurations.
 
-A default `datasets.yaml` is provided by CUVS in `${CUVS_HOME}/python/cuvs_bench/src/cuvs_bench/run/conf` with configurations available for several datasets. Here's a simple example entry for the `sift-128-euclidean` dataset:
+A default `datasets.yaml` is provided by CUVS in `${CUVS_HOME}/python/cuvs_bench/cuvs_bench/config/datasets/datasets.yaml` with configurations available for several datasets. Here's a simple example entry for the `sift-128-euclidean` dataset:
 
 .. code-block:: yaml
 
@@ -402,6 +456,9 @@ Configuration files for ANN algorithms supported by `cuvs-bench` are provided in
 .. code-block:: yaml
 
     name: cuvs_cagra
+    constraints:
+      build: cuvs_bench.config.algos.constraints.cuvs_cagra_build
+      search: cuvs_bench.config.algos.constraints.cuvs_cagra_search
     groups:
       base:
         build:
@@ -419,9 +476,11 @@ Configuration files for ANN algorithms supported by `cuvs-bench` are provided in
 
 The default parameters for which the benchmarks are run can be overridden by creating a custom YAML file for algorithms with a `base` group.
 
-There config above has 2 fields:
-1. `name` - define the name of the algorithm for which the parameters are being specified.
-2. `groups` - define a run group which has a particular set of parameters. Each group helps create a cross-product of all hyper-parameter fields for `build` and `search`.
+The config above has 3 fields:
+
+1. `name` - The name of the algorithm for which the parameters are being specified.
+2. `constraints` - Optional. Python import paths to functions that validate build and search parameter combinations (e.g. ``cuvs_bench.config.algos.constraints.cuvs_cagra_build``). Each function returns ``True`` if the parameters are valid, ``False`` otherwise; invalid combinations are skipped and not benchmarked.
+3. `groups` - Run groups, each with a set of parameters. Each group defines a cross-product of all hyper-parameter fields for `build` and `search`.
 
 The table below contains all algorithms supported by cuVS. Each unique algorithm will have its own set of `build` and `search` settings. The :doc:`ANN Algorithm Parameter Tuning Guide <param_tuning>` contains detailed instructions on choosing build and search parameters for each supported algorithm.
 
@@ -598,4 +657,5 @@ Add a new entry to `algos.yaml` to map the name of the algorithm to its binary e
    build.rst
    datasets.rst
    param_tuning.rst
+   pluggable_backend.rst
    wiki_all_dataset.rst
