@@ -38,21 +38,21 @@ void minClusterAndDistanceCompute(
 
   if (is_fused) {
     L2NormBuf_OR_DistBuf.resize(n_clusters, stream);
+auto centroidsNorm =
+      raft::make_device_vector_view<DataT, IndexT>(L2NormBuf_OR_DistBuf.data(), n_clusters); 
+      
     if (metric == cuvs::distance::DistanceType::CosineExpanded) {
       raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
         handle,
         centroids,
-        raft::make_device_vector_view<DataT, IndexT>(L2NormBuf_OR_DistBuf.data(), n_clusters),
+        centroidsNorm,
         raft::sqrt_op{});
     } else {
       raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
         handle,
         centroids,
-        raft::make_device_vector_view<DataT, IndexT>(L2NormBuf_OR_DistBuf.data(), n_clusters));
+        centroidsNorm;
     }
-
-    auto centroidsNorm =
-      raft::make_device_vector_view<DataT, IndexT>(L2NormBuf_OR_DistBuf.data(), n_clusters);
 
     raft::KeyValuePair<IndexT, DataT> initial_value(0, std::numeric_limits<DataT>::max());
     raft::matrix::fill(handle, minClusterAndDistance, initial_value);
