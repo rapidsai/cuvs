@@ -29,7 +29,7 @@ void minClusterAndDistanceCompute(
   auto n_samples      = X.extent(0);
   auto n_features     = X.extent(1);
   auto n_clusters     = centroids.extent(0);
-  bool is_fused = metric == cuvs::distance::DistanceType::L2Expanded ||
+  bool is_fused       = metric == cuvs::distance::DistanceType::L2Expanded ||
                   metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
                   metric == cuvs::distance::DistanceType::CosineExpanded;
   auto dataBatchSize = is_fused ? (IndexT)n_samples : getDataBatchSize(batch_samples, n_samples);

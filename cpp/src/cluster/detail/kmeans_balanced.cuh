@@ -95,8 +95,7 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
       auto X_view = raft::make_device_matrix_view<const MathT, IdxT>(dataset, n_rows, dim);
       auto centroids_view =
         raft::make_device_matrix_view<const MathT, IdxT>(centers, n_clusters, dim);
-      auto X_norm_view =
-        raft::make_device_vector_view<const MathT, IdxT>(dataset_norm, n_rows);
+      auto X_norm_view = raft::make_device_vector_view<const MathT, IdxT>(dataset_norm, n_rows);
 
       auto minClusterAndDistance = raft::make_device_mdarray<raft::KeyValuePair<IdxT, MathT>, IdxT>(
         handle, mr, raft::make_extents<IdxT>(n_rows));
