@@ -16,7 +16,9 @@
 namespace cuvs::neighbors::ivf_flat::detail {
 
 struct InterleavedScanPlanner : AlgorithmPlanner {
-  InterleavedScanPlanner() : AlgorithmPlanner("interleaved_scan") {}
+  inline static LauncherJitCache launcher_jit_cache{};
+
+  InterleavedScanPlanner() : AlgorithmPlanner("interleaved_scan", launcher_jit_cache) {}
 
   template <typename DataTag,
             typename AccTag,

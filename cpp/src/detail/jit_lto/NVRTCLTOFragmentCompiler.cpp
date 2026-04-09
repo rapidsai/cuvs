@@ -5,6 +5,8 @@
 
 #include <cuvs/detail/jit_lto/NVRTCLTOFragmentCompiler.hpp>
 
+#include <mutex>
+
 #include <raft/core/error.hpp>
 #include <raft/util/cuda_rt_essentials.hpp>
 
@@ -28,24 +30,31 @@ NVRTCLTOFragmentCompiler::NVRTCLTOFragmentCompiler()
   RAFT_CUDA_TRY(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
   RAFT_CUDA_TRY(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
 
-  this->standard_compile_opts.resize(7);
+  this->standard_compile_opts = {
+    std::string{"-arch=sm_" + std::to_string((major * 10 + minor))},
+    std::string{"-dlto"},
+    std::string{"-rdc=true"},
+    std::string{"--std=c++20"},
+    std::string{"-default-device"},
+  };
+}
 
-  std::size_t i = 0;
-  // Use actual GPU architecture for optimal code generation
-  this->standard_compile_opts[i++] =
-    std::string{"-arch=sm_" + std::to_string((major * 10 + minor))};
-  this->standard_compile_opts[i++] = std::string{"-dlto"};
-  this->standard_compile_opts[i++] = std::string{"-rdc=true"};
-  this->standard_compile_opts[i++] = std::string{"-default-device"};
-  this->standard_compile_opts[i++] = std::string{"--gen-opt-lto"};
-  // Optimization flags - NVRTC uses different syntax than nvcc
-  this->standard_compile_opts[i++] = std::string{"--use_fast_math"};
-  this->standard_compile_opts[i++] = std::string{"--extra-device-vectorization"};
+std::unique_ptr<UDFFatbinFragment> NVRTCLTOFragmentCompiler::read_cache(
+  std::string const& key) const
+{
+  std::shared_lock<std::shared_mutex> read_lock(cache_mutex_);
+  if (auto it = cache.find(key); it != cache.end()) {
+    return std::make_unique<UDFFatbinFragment>(key, it->second);
+  }
+  return nullptr;
 }
 
 std::unique_ptr<UDFFatbinFragment> NVRTCLTOFragmentCompiler::compile(std::string const& key,
                                                                      std::string const& code)
 {
+  if (auto hit = read_cache(key)) { return hit; }
+
+  std::unique_lock<std::shared_mutex> write_lock(cache_mutex_);
   if (auto it = cache.find(key); it != cache.end()) {
     return std::make_unique<UDFFatbinFragment>(key, it->second);
   }
@@ -65,13 +74,17 @@ std::unique_ptr<UDFFatbinFragment> NVRTCLTOFragmentCompiler::compile(std::string
                                                   opts.size(),   // numOptions
                                                   opts.data());  // options
 
-  if (compileResult != NVRTC_SUCCESS) {
-    // Obtain compilation log from the program.
-    size_t log_size;
-    NVRTC_SAFE_CALL(nvrtcGetProgramLogSize(prog, &log_size));
-    std::unique_ptr<char[]> log{new char[log_size]};
-    NVRTC_SAFE_CALL(nvrtcGetProgramLog(prog, log.get()));
-    RAFT_FAIL("nvrtc compile error log: \n%s", log.get());
+  try {
+    if (compileResult != NVRTC_SUCCESS) {
+      // Obtain compilation log from the program.
+      size_t log_size;
+      NVRTC_SAFE_CALL(nvrtcGetProgramLogSize(prog, &log_size));
+      std::unique_ptr<char[]> log{new char[log_size]};
+      NVRTC_SAFE_CALL(nvrtcGetProgramLog(prog, log.get()));
+      RAFT_FAIL("nvrtc compile error log: \n%s", log.get());
+    }
+  } catch (const std::exception& e) {
+    NVRTC_SAFE_CALL(nvrtcDestroyProgram(&prog));
   }
 
   // Obtain generated LTO IR from the program.

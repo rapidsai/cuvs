@@ -13,7 +13,9 @@
 #include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
+#include <optional>
 #include <sstream>
+#include <string>
 
 #include "../detail/ann_utils.cuh"
 #include <cuvs/distance/distance.hpp>
@@ -59,13 +61,24 @@ constexpr auto get_idx_type_tag()
 template <typename T>
 constexpr const char* type_name()
 {
-  if constexpr (std::is_same_v<T, float>) { return "float"; }
-  if constexpr (std::is_same_v<T, __half>) { return "__half"; }
-  if constexpr (std::is_same_v<T, int8_t>) { return "int8_t"; }
-  if constexpr (std::is_same_v<T, uint8_t>) { return "uint8_t"; }
-  if constexpr (std::is_same_v<T, int32_t>) { return "int32_t"; }
-  if constexpr (std::is_same_v<T, uint32_t>) { return "uint32_t"; }
-  if constexpr (std::is_same_v<T, int64_t>) { return "int64_t"; }
+  if constexpr (std::is_same_v<T, float>) {
+    return "float";
+  } else if constexpr (std::is_same_v<T, __half>) {
+    return "__half";
+  } else if constexpr (std::is_same_v<T, int8_t>) {
+    return "int8_t";
+  } else if constexpr (std::is_same_v<T, uint8_t> || std::is_same_v<T, unsigned char>) {
+    return "uint8_t";
+  } else if constexpr (std::is_same_v<T, int32_t>) {
+    return "int32_t";
+  } else if constexpr (std::is_same_v<T, uint32_t> || std::is_same_v<T, unsigned int>) {
+    return "uint32_t";
+  } else if constexpr (std::is_same_v<T, int64_t>) {
+    return "int64_t";
+  } else {
+    static_assert(false, "Unsupported type to create UDF");
+    return "";
+  }
 }
 
 template <typename FilterT>
@@ -114,7 +127,6 @@ template <int Capacity,
           typename MetricTag,
           typename PostLambdaTag>
 void launch_kernel(const index<T, IdxT>& index,
-                   const search_params& params,
                    const T* queries,
                    const uint32_t* coarse_index,
                    const uint32_t num_queries,
@@ -130,7 +142,8 @@ void launch_kernel(const index<T, IdxT>& index,
                    uint32_t* neighbors,
                    float* distances,
                    uint32_t& grid_dim_x,
-                   rmm::cuda_stream_view stream)
+                   rmm::cuda_stream_view stream,
+                   const std::optional<std::string>& metric_udf)
 {
   RAFT_EXPECTS(Veclen == index.veclen(),
                "Configured Veclen does not match the index interleaving pattern.");
@@ -144,17 +157,14 @@ void launch_kernel(const index<T, IdxT>& index,
     .add_entrypoint<DataTag, AccTag, IdxTag, Capacity, Veclen, Ascending, ComputeNorm>();
 
   if constexpr (is_tag_metric_custom_udf_v<MetricTag>) {
-    RAFT_EXPECTS(params.metric_udf.has_value(),
-                 "CustomUDF search requires search_params.metric_udf");
-    std::string metric_udf = params.metric_udf.value();
+    RAFT_EXPECTS(metric_udf.has_value(), "CustomUDF search requires metric_udf");
+    std::string metric_udf_code = metric_udf.value();
     std::ostringstream oss;
     oss << "\ntemplate void cuvs::neighbors::ivf_flat::detail::compute_dist<" << Veclen << ", "
         << type_name<T>() << ", " << type_name<AccT>() << ">(" << type_name<AccT>() << "&, "
         << type_name<AccT>() << ", " << type_name<AccT>() << ");\n";
-    metric_udf += oss.str();
-    auto udf_hash                   = std::to_string(std::hash<std::string>{}(metric_udf));
-    std::string const udf_cache_key = "metric_udf_" + udf_hash;
-    auto udf_fragment               = nvrtc_compiler().compile(udf_cache_key, metric_udf);
+    metric_udf_code += oss.str();
+    auto udf_fragment = nvrtc_compiler().compile(metric_udf_code, metric_udf_code);
     kernel_planner.add_metric_udf_fragment(std::move(udf_fragment));
   } else {
     kernel_planner.add_metric_device_function<Veclen, DataTag, AccTag, MetricTag>();
@@ -402,24 +412,25 @@ struct select_interleaved_scan_kernel {
  */
 template <typename T, typename AccT, typename IdxT, typename IvfSampleFilterT>
 void ivfflat_interleaved_scan(const index<T, IdxT>& index,
-                              const search_params& params,
                               const T* queries,
                               const uint32_t* coarse_query_results,
                               const uint32_t n_queries,
                               const uint32_t queries_offset,
+                              cuvs::distance::DistanceType metric,
+                              const uint32_t n_probes,
                               const uint32_t k,
                               const uint32_t max_samples,
                               const uint32_t* chunk_indices,
+                              bool select_min,
                               IvfSampleFilterT sample_filter,
                               uint32_t* neighbors,
                               float* distances,
                               uint32_t& grid_dim_x,
-                              rmm::cuda_stream_view stream)
+                              rmm::cuda_stream_view stream,
+                              const std::optional<std::string>& metric_udf)
 {
-  const uint32_t n_probes = std::min(params.n_probes, index.n_lists());
-  const auto metric       = index.metric();
-  const bool select_min   = cuvs::distance::is_min_close(metric);
-  const int capacity      = raft::bound_by_power_of_two(k);
+  const uint32_t n_probes_clamped = std::min(n_probes, index.n_lists());
+  const int capacity              = raft::bound_by_power_of_two(k);
 
   cuda::std::optional<uint32_t*> bitset_ptr;
   cuda::std::optional<IdxT> bitset_len;
@@ -437,12 +448,11 @@ void ivfflat_interleaved_scan(const index<T, IdxT>& index,
         select_min,
         metric,
         index,
-        params,
         queries,
         coarse_query_results,
         n_queries,
         queries_offset,
-        n_probes,
+        n_probes_clamped,
         k,
         max_samples,
         chunk_indices,
@@ -453,7 +463,8 @@ void ivfflat_interleaved_scan(const index<T, IdxT>& index,
         neighbors,
         distances,
         grid_dim_x,
-        stream);
+        stream,
+        metric_udf);
 }
 
 }  // namespace cuvs::neighbors::ivf_flat::detail

@@ -193,19 +193,22 @@ void search_impl(raft::resources const& handle,
     // query the gridDimX size to store probes topK output
     ivfflat_interleaved_scan<T, typename utils::config<T>::value_t, IdxT, IvfSampleFilterT>(
       index,
-      params,
       nullptr,
       nullptr,
       n_queries,
       queries_offset,
+      index.metric(),
+      n_probes,
       k,
       0,
       nullptr,
+      select_min,
       sample_filter,
       nullptr,
       nullptr,
       grid_dim_x,
-      stream);
+      stream,
+      params.metric_udf);
   } else {
     grid_dim_x = 1;
   }
@@ -246,19 +249,22 @@ void search_impl(raft::resources const& handle,
 
   ivfflat_interleaved_scan<T, typename utils::config<T>::value_t, IdxT, IvfSampleFilterT>(
     index,
-    params,
     queries,
     coarse_indices_dev.data(),
     n_queries,
     queries_offset,
+    index.metric(),
+    n_probes,
     k,
     max_samples,
     chunk_index.data(),
+    select_min,
     sample_filter,
     indices_dev_ptr,
     distances_dev_ptr,
     grid_dim_x,
-    stream);
+    stream,
+    params.metric_udf);
 
   RAFT_LOG_TRACE_VEC(distances_dev_ptr, 2 * k);
   if (indices_dev_ptr != nullptr) { RAFT_LOG_TRACE_VEC(indices_dev_ptr, 2 * k); }

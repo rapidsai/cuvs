@@ -60,6 +60,7 @@ cuvs::distance::DistanceType index<T, IdxT>::metric() const noexcept
   return metric_;
 }
 
+// NOTE: This function is only added as a workaround to support UDFs in search.
 template <typename T, typename IdxT>
 void index<T, IdxT>::set_metric(cuvs::distance::DistanceType metric)
 {

@@ -3404,6 +3404,9 @@ template <typename T, typename U> inline constexpr bool is_same_v = is_same<T, U
  * 2. A function NAME_udf() that returns a metric_source for JIT compilation
  * 3. A BODY that needs to be compiled by nvrtc and must be valid CUDA device code
  *
+ * NOTE: The metric function only supports ascending order top-k selection without norms or post
+ * processing.
+ *
  * @param NAME The name of your metric (becomes struct name and function prefix)
  * @param BODY The body of operator()(AccT& acc, point_type x, point_type y)
  *
