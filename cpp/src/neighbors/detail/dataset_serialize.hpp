@@ -159,6 +159,9 @@ void serialize(const raft::resources& res, std::ostream& os, const dataset<IdxT>
     raft::serialize_scalar(res, os, CUDA_R_16F);
     return serialize(res, os, *x);
   }
+  if (auto x = dynamic_cast<const dataset_view<IdxT>*>(&dataset); x != nullptr) {
+    return serialize(res, os, *x->ptr_);
+  }
   RAFT_FAIL("unsupported dataset type.");
 }
 
