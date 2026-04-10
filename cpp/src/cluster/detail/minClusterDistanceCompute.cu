@@ -29,7 +29,6 @@ void minClusterAndDistanceCompute(
   auto n_samples      = X.extent(0);
   auto n_features     = X.extent(1);
   auto n_clusters     = centroids.extent(0);
-  // todo(lsugy): change batch size computation when using fusedL2NN!
   bool is_fused = metric == cuvs::distance::DistanceType::L2Expanded ||
                   metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
                   metric == cuvs::distance::DistanceType::CosineExpanded;
@@ -54,7 +53,6 @@ void minClusterAndDistanceCompute(
 
     workspace.resize((sizeof(int)) * n_samples, stream);
 
-    // todo(lsugy): remove cIdx
     cuvs::distance::fusedDistanceNNMinReduce<DataT, raft::KeyValuePair<IndexT, DataT>, IndexT>(
       minClusterAndDistance.data_handle(),
       X.data_handle(),
