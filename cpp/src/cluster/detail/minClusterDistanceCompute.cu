@@ -4,6 +4,7 @@
  */
 
 #include "kmeans_common.cuh"
+#include "../../distance/fused_distance_nn.cuh"
 
 #include <raft/matrix/init.cuh>
 
