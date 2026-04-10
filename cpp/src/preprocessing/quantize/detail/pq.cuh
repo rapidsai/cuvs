@@ -365,7 +365,7 @@ void vpq_convert_math_type(const raft::resources& res,
                     raft::make_const_mdspan(src.pq_code_book.view()));
 }
 
-inline auto from_vpq_params(const cuvs::neighbors::vpq_params& in_params)
+inline auto from_vpq_params(const cuvs::neighbors::vpq_params& in_params, const uint64_t n_rows)
   -> cuvs::preprocessing::quantize::pq::params
 {
   std::variant<cuvs::cluster::kmeans::balanced_params, cuvs::cluster::kmeans::params> kmeans_params;
@@ -380,15 +380,16 @@ inline auto from_vpq_params(const cuvs::neighbors::vpq_params& in_params)
   }
   const uint32_t pq_n_centers = 1 << in_params.pq_bits;
   return cuvs::preprocessing::quantize::pq::params{
-    .pq_bits                      = in_params.pq_bits,
-    .pq_dim                       = in_params.pq_dim,
-    .vq_n_centers                 = in_params.vq_n_centers,
-    .kmeans_params                = kmeans_params,
-    .max_train_points_per_pq_code = std::min<uint32_t>(
-      in_params.max_train_points_per_pq_code, pq_n_centers * in_params.pq_kmeans_trainset_fraction),
+    .pq_bits       = in_params.pq_bits,
+    .pq_dim        = in_params.pq_dim,
+    .vq_n_centers  = in_params.vq_n_centers,
+    .kmeans_params = kmeans_params,
+    .max_train_points_per_pq_code =
+      std::min<uint32_t>(in_params.max_train_points_per_pq_code,
+                         n_rows * in_params.pq_kmeans_trainset_fraction / pq_n_centers),
     .max_train_points_per_vq_cluster =
       std::min<uint32_t>(in_params.max_train_points_per_vq_cluster,
-                         in_params.vq_n_centers * in_params.vq_kmeans_trainset_fraction)};
+                         n_rows * in_params.vq_kmeans_trainset_fraction / in_params.vq_n_centers)};
 }
 
 template <typename DatasetT, typename MathT, typename IdxT>
@@ -400,7 +401,7 @@ auto vpq_build(const raft::resources& res,
   // Use a heuristic to impute missing parameters.
   auto ps = cuvs::neighbors::detail::fill_missing_params_heuristics(params, dataset);
 
-  auto pq_params = from_vpq_params(ps);
+  auto pq_params = from_vpq_params(ps, dataset.extent(0));
   // Train codes
   auto vq_code_book = cuvs::neighbors::detail::train_vq<MathT>(res, ps, dataset);
   auto pq_code_book = cuvs::neighbors::detail::train_pq<MathT>(
