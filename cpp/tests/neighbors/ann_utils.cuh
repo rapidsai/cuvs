@@ -196,7 +196,7 @@ auto eval_recall(const std::vector<T>& expected_idx,
                  double min_recall,
                  bool test_unique = true) -> testing::AssertionResult
 {
-  auto [actual_recall, index_based_actual_recall, match_count, total_count] =
+  auto [actual_recall, match_count, total_count] =
     calc_recall(expected_idx, actual_idx, rows, cols);
   double error_margin = (actual_recall - min_recall) / std::max(1.0 - min_recall, eps);
   RAFT_LOG_INFO("Recall = %f (%zu/%zu), the error is %2.1f%% %s the threshold (eps = %f).",
