@@ -16,9 +16,11 @@ import requests
 pytest.importorskip("opensearchpy")
 
 from cuvs_bench.backends.base import Dataset
-from cuvs_bench.backends.opensearch import OpenSearchBackend, OpenSearchConfigLoader
+from cuvs_bench.backends.opensearch import (
+    OpenSearchBackend,
+    OpenSearchConfigLoader,
+)
 from cuvs_bench.orchestrator.config_loaders import IndexConfig
-
 
 
 def _make_backend(config_overrides: dict = None) -> OpenSearchBackend:
@@ -33,7 +35,9 @@ def _make_backend(config_overrides: dict = None) -> OpenSearchBackend:
     return OpenSearchBackend(config)
 
 
-def _make_dataset(n_base: int = 10, n_queries: int = 5, dims: int = 4, k: int = 10) -> Dataset:
+def _make_dataset(
+    n_base: int = 10, n_queries: int = 5, dims: int = 4, k: int = 10
+) -> Dataset:
     rng = np.random.default_rng(0)
     base = rng.random((n_base, dims)).astype(np.float32)
     queries = rng.random((n_queries, dims)).astype(np.float32)
@@ -67,7 +71,6 @@ def _cleanup_backend(backend: OpenSearchBackend, index_name: str) -> None:
     backend.cleanup()
 
 
-
 @pytest.fixture(scope="session")
 def opensearch_url():
     """Skip integration tests when no live OpenSearch node is reachable."""
@@ -84,17 +87,19 @@ def live_backend(opensearch_url):
     """Backend connected to a live OpenSearch node; cleans up the test index on teardown."""
     parsed = urlparse(opensearch_url)
     index_name = "cuvs_test_index"
-    backend = OpenSearchBackend({
-        "name": index_name,
-        "index_name": index_name,
-        "engine": "faiss",
-        "algo": "opensearch_faiss_hnsw",
-        "host": parsed.hostname,
-        "port": parsed.port or 9200,
-        "use_ssl": parsed.scheme == "https",
-        "verify_certs": False,
-        "requires_network": True,
-    })
+    backend = OpenSearchBackend(
+        {
+            "name": index_name,
+            "index_name": index_name,
+            "engine": "faiss",
+            "algo": "opensearch_faiss_hnsw",
+            "host": parsed.hostname,
+            "port": parsed.port or 9200,
+            "use_ssl": parsed.scheme == "https",
+            "verify_certs": False,
+            "requires_network": True,
+        }
+    )
     yield backend
     _cleanup_backend(backend, index_name)
 
@@ -118,7 +123,6 @@ def config_dir(tmp_path):
         "      ef_search: [50, 100]\n"
     )
     return tmp_path
-
 
 
 class TestOpenSearchConfigLoader:
@@ -160,15 +164,18 @@ class TestOpenSearchConfigLoader:
         assert bc["remote_build_s3_secret_key"] == "mysecret"
 
 
-
 class TestOpenSearchBackend:
     def test_build_dry_run(self):
-        result = _make_backend().build(_make_dataset(), [_make_index_cfg()], dry_run=True)
+        result = _make_backend().build(
+            _make_dataset(), [_make_index_cfg()], dry_run=True
+        )
         assert result.success
         assert result.index_path == "test_index"
 
     def test_search_dry_run(self):
-        result = _make_backend().search(_make_dataset(), [_make_index_cfg()], k=3, dry_run=True)
+        result = _make_backend().search(
+            _make_dataset(), [_make_index_cfg()], k=3, dry_run=True
+        )
         assert result.success
         assert len(result.search_params) == 2
 
@@ -181,7 +188,6 @@ class TestOpenSearchBackend:
         result = _make_backend().search(dataset, [_make_index_cfg()], k=3)
         assert not result.success
         assert "No query vectors" in result.error_message
-
 
 
 @pytest.fixture(scope="session")
@@ -203,14 +209,20 @@ def remote_build_env(opensearch_url):
     s3_secret_key = os.environ.get("S3_SECRET_KEY")
 
     missing = [
-        name for name, val in {
-            "BUILDER_URL": builder_url, "S3_ENDPOINT": s3_endpoint,
-            "S3_BUCKET": s3_bucket, "S3_ACCESS_KEY": s3_access_key,
+        name
+        for name, val in {
+            "BUILDER_URL": builder_url,
+            "S3_ENDPOINT": s3_endpoint,
+            "S3_BUCKET": s3_bucket,
+            "S3_ACCESS_KEY": s3_access_key,
             "S3_SECRET_KEY": s3_secret_key,
-        }.items() if not val
+        }.items()
+        if not val
     ]
     if missing:
-        pytest.skip(f"remote index build tests require env vars: {', '.join(missing)}")
+        pytest.skip(
+            f"remote index build tests require env vars: {', '.join(missing)}"
+        )
 
     try:
         requests.get(builder_url, timeout=2)
@@ -229,16 +241,21 @@ def remote_build_env(opensearch_url):
 
     session.put(
         f"{opensearch_url}/_snapshot/{repo_name}",
-        json={"type": "s3", "settings": {"bucket": s3_bucket, "base_path": "knn-indexes"}},
+        json={
+            "type": "s3",
+            "settings": {"bucket": s3_bucket, "base_path": "knn-indexes"},
+        },
     ).raise_for_status()
 
     session.put(
         f"{opensearch_url}/_cluster/settings",
-        json={"persistent": {
-            "knn.remote_index_build.enabled": True,
-            "knn.remote_index_build.repository": repo_name,
-            "knn.remote_index_build.service.endpoint": builder_url,
-        }},
+        json={
+            "persistent": {
+                "knn.remote_index_build.enabled": True,
+                "knn.remote_index_build.repository": repo_name,
+                "knn.remote_index_build.service.endpoint": builder_url,
+            }
+        },
     ).raise_for_status()
 
     return {
@@ -254,26 +271,27 @@ def live_remote_build_backend(opensearch_url, remote_build_env):
     """Backend with remote_index_build=True pointing at a configured remote build stack."""
     parsed = urlparse(opensearch_url)
     index_name = "cuvs_test_remote_index"
-    backend = OpenSearchBackend({
-        "name": index_name,
-        "index_name": index_name,
-        "engine": "faiss",
-        "algo": "opensearch_faiss_hnsw",
-        "host": parsed.hostname,
-        "port": parsed.port or 9200,
-        "use_ssl": parsed.scheme == "https",
-        "verify_certs": False,
-        "requires_network": True,
-        "remote_index_build": True,
-        "remote_build_s3_endpoint": remote_build_env["s3_endpoint"],
-        "remote_build_s3_bucket": remote_build_env["s3_bucket"],
-        "remote_build_s3_prefix": "knn-indexes/",
-        "remote_build_s3_access_key": remote_build_env["s3_access_key"],
-        "remote_build_s3_secret_key": remote_build_env["s3_secret_key"],
-    })
+    backend = OpenSearchBackend(
+        {
+            "name": index_name,
+            "index_name": index_name,
+            "engine": "faiss",
+            "algo": "opensearch_faiss_hnsw",
+            "host": parsed.hostname,
+            "port": parsed.port or 9200,
+            "use_ssl": parsed.scheme == "https",
+            "verify_certs": False,
+            "requires_network": True,
+            "remote_index_build": True,
+            "remote_build_s3_endpoint": remote_build_env["s3_endpoint"],
+            "remote_build_s3_bucket": remote_build_env["s3_bucket"],
+            "remote_build_s3_prefix": "knn-indexes/",
+            "remote_build_s3_access_key": remote_build_env["s3_access_key"],
+            "remote_build_s3_secret_key": remote_build_env["s3_secret_key"],
+        }
+    )
     yield backend
     _cleanup_backend(backend, index_name)
-
 
 
 @pytest.mark.integration
@@ -295,7 +313,6 @@ class TestOpenSearchBackendIntegration:
         assert len(search_result.metadata["per_search_param_results"]) == 1
 
 
-
 @pytest.mark.integration
 class TestOpenSearchRemoteIndexBuildIntegration:
     def test_remote_build_and_search(self, live_remote_build_backend):
@@ -303,7 +320,9 @@ class TestOpenSearchRemoteIndexBuildIntegration:
         dataset = _make_dataset(n_base=100, n_queries=10, dims=4, k=k)
         idx = _make_index_cfg(search_params=[{"ef_search": 50}])
 
-        build_result = live_remote_build_backend.build(dataset, [idx], force=True)
+        build_result = live_remote_build_backend.build(
+            dataset, [idx], force=True
+        )
         assert build_result.success
         assert build_result.build_time_seconds > 0
         assert build_result.metadata["remote_index_build"] is True

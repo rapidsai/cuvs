@@ -29,9 +29,7 @@ from ..orchestrator.config_loaders import (
 )
 
 
-def _load_vectors(
-    path: str, subset_size: Optional[int] = None
-) -> np.ndarray:
+def _load_vectors(path: str, subset_size: Optional[int] = None) -> np.ndarray:
     """Read a binary vector file (.fbin, .ibin, .u8bin, ...).
 
     The file format is: 4-byte uint32 n_rows, 4-byte uint32 n_cols,
@@ -239,7 +237,9 @@ class OpenSearchConfigLoader(ConfigLoader):
 
             groups: Dict[str, Any] = algo_yaml.get("groups", {})
             if allowed_groups:
-                groups = {k: v for k, v in groups.items() if k in allowed_groups}
+                groups = {
+                    k: v for k, v in groups.items() if k in allowed_groups
+                }
 
             for group_name, group_conf in groups.items():
                 build_spec: Dict[str, List] = group_conf.get("build", {})
@@ -271,7 +271,9 @@ class OpenSearchConfigLoader(ConfigLoader):
                         if group_name != "base"
                         else algo_name
                     )
-                    parts = [prefix] + [f"{k}{v}" for k, v in build_param.items()]
+                    parts = [prefix] + [
+                        f"{k}{v}" for k, v in build_param.items()
+                    ]
                     index_label = ".".join(parts)
 
                     # OpenSearch index names must be lowercase with no dots
@@ -572,7 +574,9 @@ class OpenSearchBackend(BenchmarkBackend):
             ) from exc
 
         s3_endpoint = self.config.get("remote_build_s3_endpoint")
-        s3_bucket = self.config.get("remote_build_s3_bucket", "opensearch-vectors")
+        s3_bucket = self.config.get(
+            "remote_build_s3_bucket", "opensearch-vectors"
+        )
         s3_prefix = self.config.get("remote_build_s3_prefix", "knn-indexes/")
         s3_access_key = self.config.get("remote_build_s3_access_key")
         s3_secret_key = self.config.get("remote_build_s3_secret_key")
@@ -673,8 +677,10 @@ class OpenSearchBackend(BenchmarkBackend):
         remote_build_size_min = self.config.get("remote_build_size_min")
 
         if dry_run:
-            print(f"[dry_run] Would build OpenSearch index '{index_name}' "
-                  f"(engine={engine}, remote_index_build={remote_index_build}, build_param={build_param})")
+            print(
+                f"[dry_run] Would build OpenSearch index '{index_name}' "
+                f"(engine={engine}, remote_index_build={remote_index_build}, build_param={build_param})"
+            )
 
             return BuildResult(
                 index_path=index_name,
@@ -684,7 +690,6 @@ class OpenSearchBackend(BenchmarkBackend):
                 build_params=build_param,
                 success=True,
             )
-
 
         # Handle existing index
         if self._client.indices.exists(index=index_name):
@@ -721,13 +726,16 @@ class OpenSearchBackend(BenchmarkBackend):
             )
 
         dims = base_vectors.shape[1]
-        space_type = _DISTANCE_TO_SPACE_TYPE.get(
-            dataset.distance_metric, "l2"
-        )
+        space_type = _DISTANCE_TO_SPACE_TYPE.get(dataset.distance_metric, "l2")
 
         # Create index
         mapping = self._build_index_mapping(
-            dims, engine, space_type, build_param, remote_index_build, remote_build_size_min
+            dims,
+            engine,
+            space_type,
+            build_param,
+            remote_index_build,
+            remote_build_size_min,
         )
         self._client.indices.create(index=index_name, body=mapping)
 
@@ -851,7 +859,9 @@ class OpenSearchBackend(BenchmarkBackend):
         search_params_list = index_cfg.search_params or [{}]
 
         if dry_run:
-            print(f"[dry_run] Would search OpenSearch index '{index_name}' with {len(search_params_list)} param set(s) (k={k})")
+            print(
+                f"[dry_run] Would search OpenSearch index '{index_name}' with {len(search_params_list)} param set(s) (k={k})"
+            )
 
             return SearchResult(
                 neighbors=np.zeros((0, k), dtype=np.int64),
@@ -952,9 +962,7 @@ class OpenSearchBackend(BenchmarkBackend):
             last_distances = distances
 
         # Aggregate across all search-param combinations
-        avg_recall = float(
-            np.mean([r["recall"] for r in per_param_results])
-        )
+        avg_recall = float(np.mean([r["recall"] for r in per_param_results]))
         avg_qps = float(
             np.mean([r["queries_per_second"] for r in per_param_results])
         )
