@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "kmeans_common.cuh"
 #include "../../distance/fused_distance_nn.cuh"
+#include "kmeans_common.cuh"
 
 #include <raft/matrix/init.cuh>
 
@@ -30,7 +30,7 @@ void minClusterAndDistanceCompute(
   auto n_samples      = X.extent(0);
   auto n_features     = X.extent(1);
   auto n_clusters     = centroids.extent(0);
-  bool is_fused = metric == cuvs::distance::DistanceType::L2Expanded ||
+  bool is_fused       = metric == cuvs::distance::DistanceType::L2Expanded ||
                   metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
                   metric == cuvs::distance::DistanceType::CosineExpanded;
 
@@ -44,9 +44,7 @@ void minClusterAndDistanceCompute(
         handle, centroids, centroidsNorm, raft::sqrt_op{});
     } else {
       raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
-        handle,
-        centroids,
-        centroidsNorm);
+        handle, centroids, centroidsNorm);
     }
 
     raft::KeyValuePair<IndexT, DataT> initial_value(0, std::numeric_limits<DataT>::max());
