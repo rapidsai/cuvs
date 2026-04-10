@@ -34,7 +34,8 @@ endif()
 if(NOT rapids-cmake-branch)
   set(rapids-cmake-branch "${_rapids_branch}")
 endif()
-set(rapids-cmake-sha 27b0e24a31c696b0365b45d4ae7343ea599061ab)
+set(rapids-cmake-repo robertmaynard/rapids-cmake)
+set(rapids-cmake-branch debug_rapids-cmake)
 include("${CMAKE_CURRENT_LIST_DIR}/RAPIDS.cmake")
 
 # Don't use sccache-dist for CMake's compiler tests
