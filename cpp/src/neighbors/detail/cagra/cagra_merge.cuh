@@ -18,6 +18,7 @@
 #include <raft/util/cudart_utils.hpp>
 
 #include <cuvs/distance/distance.hpp>
+#include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/refine.hpp>
 
@@ -55,6 +56,21 @@ merge_result<T, IdxT> merge(raft::resources const& handle,
         stride = strided_dset->stride();
       } else {
         RAFT_EXPECTS(dim == index->dim(), "Dimension of datasets in indices must be equal.");
+        RAFT_EXPECTS(stride == strided_dset->stride(),
+                     "Row stride of datasets in indices must be equal.");
+      }
+      new_dataset_size += index->size();
+    } else if (auto* padded_dset =
+                 dynamic_cast<const cuvs::neighbors::device_padded_dataset_view<T, ds_idx_type>*>(
+                   &index->data());
+               padded_dset != nullptr) {
+      if (dim == 0) {
+        dim    = index->dim();
+        stride = padded_dset->stride();
+      } else {
+        RAFT_EXPECTS(dim == index->dim(), "Dimension of datasets in indices must be equal.");
+        RAFT_EXPECTS(stride == padded_dset->stride(),
+                     "Row stride of datasets in indices must be equal.");
       }
       new_dataset_size += index->size();
     } else if (dynamic_cast<const cuvs::neighbors::empty_dataset<int64_t>*>(&index->data()) !=
@@ -72,13 +88,27 @@ merge_result<T, IdxT> merge(raft::resources const& handle,
 
   auto merge_dataset = [&](T* dst) {
     for (cagra_index_t* index : indices) {
-      auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index->data());
+      const T* src_ptr   = nullptr;
+      std::size_t n_rows = 0;
+      if (auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index->data());
+          strided_dset != nullptr) {
+        src_ptr = strided_dset->view().data_handle();
+        n_rows  = static_cast<std::size_t>(strided_dset->n_rows());
+      } else if (auto* padded_dset =
+                   dynamic_cast<const cuvs::neighbors::device_padded_dataset_view<T, ds_idx_type>*>(
+                     &index->data());
+                 padded_dset != nullptr) {
+        src_ptr = padded_dset->view().data_handle();
+        n_rows  = static_cast<std::size_t>(padded_dset->n_rows());
+      } else {
+        RAFT_FAIL("cagra::merge: unexpected dataset type while copying rows");
+      }
       raft::copy_matrix(dst + offset * dim,
                         dim,
-                        strided_dset->view().data_handle(),
-                        static_cast<size_t>(stride),
+                        src_ptr,
+                        static_cast<std::size_t>(stride),
                         dim,
-                        static_cast<size_t>(strided_dset->n_rows()),
+                        n_rows,
                         raft::resource::get_cuda_stream(handle));
 
       offset += IdxT(index->data().n_rows());
