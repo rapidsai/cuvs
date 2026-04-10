@@ -43,6 +43,9 @@
 #include <cuda.h>
 #include <cuda/iterator>
 #include <thrust/for_each.h>
+#include <thrust/iterator/transform_iterator.h>
+
+#include <raft/linalg/add.cuh>
 
 #include <algorithm>
 #include <cmath>
@@ -596,6 +599,181 @@ DataT compute_centroid_shift(raft::resources const& handle,
   raft::copy(&result, sqrdNorm.data_handle(), 1, stream);
   raft::resource::sync_stream(handle, stream);
   return result;
+}
+
+/**
+ * @brief Compute the weight normalization scale factor for sample weights that may
+ * reside on host memory.  Weights are normalized to sum to n_samples.
+ *
+ * Works on any contiguous pointer (host or device) by copying to host for the sum.
+ *
+ * @tparam DataT  Weight type
+ * @tparam IndexT Index type
+ *
+ * @param[in] weight_ptr  Pointer to sample weights (host or device), may be nullptr
+ * @param[in] n_samples   Number of samples
+ * @param[in] stream      CUDA stream (used when pointer is device memory)
+ * @return Scale factor (1.0 if weights already sum to n_samples or nullptr)
+ */
+template <typename DataT, typename IndexT>
+DataT compute_weight_scale(const DataT* weight_ptr, IndexT n_samples, cudaStream_t stream)
+{
+  if (weight_ptr == nullptr) { return DataT{1}; }
+
+  bool is_host = true;
+  cudaPointerAttributes attr;
+  auto err = cudaPointerGetAttributes(&attr, weight_ptr);
+  if (err == cudaSuccess && attr.type == cudaMemoryTypeDevice) { is_host = false; }
+  cudaGetLastError();  // clear any error
+
+  DataT wt_sum = DataT{0};
+  if (is_host) {
+    for (IndexT i = 0; i < n_samples; ++i) {
+      wt_sum += weight_ptr[i];
+    }
+  } else {
+    std::vector<DataT> h_weights(n_samples);
+    raft::copy(h_weights.data(), weight_ptr, n_samples, stream);
+    RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
+    for (IndexT i = 0; i < n_samples; ++i) {
+      wt_sum += h_weights[i];
+    }
+  }
+
+  if (wt_sum == static_cast<DataT>(n_samples)) { return DataT{1}; }
+
+  RAFT_LOG_DEBUG(
+    "[Warning!] KMeans: normalizing the user provided sample weight to "
+    "sum up to %zu samples",
+    static_cast<size_t>(n_samples));
+  return static_cast<DataT>(n_samples) / wt_sum;
+}
+
+/**
+ * @brief Process a single batch of data in the Lloyd iteration.
+ *
+ * This is the shared per-batch helper used by both the device (single-batch) and
+ * host-streaming (multi-batch) k-means paths.  It operates entirely on device
+ * buffers: given one batch of data + weights + current centroids it
+ *   1. computes L2 norms (if needed),
+ *   2. finds the nearest centroid for every sample,
+ *   3. accumulates weighted centroid sums and counts into the running accumulators,
+ *   4. accumulates the weighted clustering cost (inertia).
+ *
+ * @tparam DataT  Data / weight type (float, double)
+ * @tparam IndexT Index type (int, int64_t)
+ *
+ * @param[in]     handle               RAFT resources handle
+ * @param[in]     batch_data           Device batch data [batch_size x n_features]
+ * @param[in]     batch_weights        Device batch weights [batch_size]
+ * @param[in]     centroids            Current centroids [n_clusters x n_features]
+ * @param[in]     metric               Distance metric
+ * @param[in]     batch_samples_param  Batch-samples param forwarded to minClusterAndDistanceCompute
+ * @param[in]     batch_centroids_param Batch-centroids param forwarded to
+ *                                      minClusterAndDistanceCompute
+ * @param[inout]  minClusterAndDistance Work buffer [batch_size]
+ * @param[inout]  L2NormBatch          Work buffer for L2 norms [batch_size]
+ * @param[inout]  L2NormBuf_OR_DistBuf Resizable scratch
+ * @param[inout]  workspace            Resizable scratch
+ * @param[inout]  centroid_sums        Running weighted sums [n_clusters x n_features] (added into)
+ * @param[inout]  weight_per_cluster   Running weight counts [n_clusters] (added into)
+ * @param[inout]  batch_sums           Scratch for this batch [n_clusters x n_features]
+ * @param[inout]  batch_counts         Scratch for this batch [n_clusters]
+ * @param[inout]  clustering_cost      Running cost scalar (device) (added into)
+ */
+template <typename DataT, typename IndexT>
+void process_batch(
+  raft::resources const& handle,
+  raft::device_matrix_view<const DataT, IndexT> batch_data,
+  raft::device_vector_view<const DataT, IndexT> batch_weights,
+  raft::device_matrix_view<const DataT, IndexT> centroids,
+  cuvs::distance::DistanceType metric,
+  int batch_samples_param,
+  int batch_centroids_param,
+  raft::device_vector_view<raft::KeyValuePair<IndexT, DataT>, IndexT> minClusterAndDistance,
+  raft::device_vector_view<DataT, IndexT> L2NormBatch,
+  rmm::device_uvector<DataT>& L2NormBuf_OR_DistBuf,
+  rmm::device_uvector<char>& workspace,
+  raft::device_matrix_view<DataT, IndexT> centroid_sums,
+  raft::device_vector_view<DataT, IndexT> weight_per_cluster,
+  raft::device_matrix_view<DataT, IndexT> batch_sums,
+  raft::device_vector_view<DataT, IndexT> batch_counts,
+  raft::device_scalar_view<DataT> clustering_cost)
+{
+  cudaStream_t stream     = raft::resource::get_cuda_stream(handle);
+  IndexT current_batch_sz = batch_data.extent(0);
+
+  if (metric == cuvs::distance::DistanceType::L2Expanded ||
+      metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+    raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+      handle,
+      raft::make_device_matrix_view<const DataT, IndexT>(
+        batch_data.data_handle(), current_batch_sz, batch_data.extent(1)),
+      L2NormBatch);
+  }
+
+  auto L2NormBatch_const = raft::make_const_mdspan(L2NormBatch);
+
+  minClusterAndDistanceCompute<DataT, IndexT>(handle,
+                                              batch_data,
+                                              centroids,
+                                              minClusterAndDistance,
+                                              L2NormBatch_const,
+                                              L2NormBuf_OR_DistBuf,
+                                              metric,
+                                              batch_samples_param,
+                                              batch_centroids_param,
+                                              workspace);
+
+  KeyValueIndexOp<IndexT, DataT> conversion_op;
+  thrust::transform_iterator<KeyValueIndexOp<IndexT, DataT>,
+                             const raft::KeyValuePair<IndexT, DataT>*>
+    labels_itr(minClusterAndDistance.data_handle(), conversion_op);
+
+  auto batch_workspace = rmm::device_uvector<char>(
+    current_batch_sz, stream, raft::resource::get_workspace_resource(handle));
+
+  compute_centroid_adjustments(handle,
+                               batch_data,
+                               batch_weights,
+                               labels_itr,
+                               static_cast<IndexT>(centroid_sums.extent(0)),
+                               batch_sums,
+                               batch_counts,
+                               batch_workspace);
+
+  raft::linalg::add(centroid_sums.data_handle(),
+                    centroid_sums.data_handle(),
+                    batch_sums.data_handle(),
+                    centroid_sums.size(),
+                    stream);
+
+  raft::linalg::add(weight_per_cluster.data_handle(),
+                    weight_per_cluster.data_handle(),
+                    batch_counts.data_handle(),
+                    weight_per_cluster.size(),
+                    stream);
+
+  raft::linalg::map(
+    handle,
+    minClusterAndDistance,
+    [=] __device__(const raft::KeyValuePair<IndexT, DataT> kvp, DataT wt) {
+      raft::KeyValuePair<IndexT, DataT> res;
+      res.value = kvp.value * wt;
+      res.key   = kvp.key;
+      return res;
+    },
+    raft::make_const_mdspan(minClusterAndDistance),
+    batch_weights);
+
+  auto batch_cost = raft::make_device_scalar<DataT>(handle, DataT{0});
+  computeClusterCost(
+    handle, minClusterAndDistance, workspace, batch_cost.view(), raft::value_op{}, raft::add_op{});
+  raft::linalg::add(clustering_cost.data_handle(),
+                    clustering_cost.data_handle(),
+                    batch_cost.data_handle(),
+                    1,
+                    stream);
 }
 
 }  // namespace cuvs::cluster::kmeans::detail
