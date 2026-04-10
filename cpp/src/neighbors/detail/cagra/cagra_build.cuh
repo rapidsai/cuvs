@@ -2296,10 +2296,27 @@ cuvs::neighbors::cagra::build_result<T, IdxT> build(
   if (params.compression.has_value()) {
     RAFT_EXPECTS(params.metric == cuvs::distance::DistanceType::L2Expanded,
                  "VPQ compression is only supported with L2Expanded distance mertric");
-    cuvs::neighbors::cagra::build_result<T, IdxT> out{
-      index<T, IdxT>(res, params.metric),
-      std::make_optional(
-        cuvs::preprocessing::quantize::pq::vpq_build(res, *params.compression, dataset.view()))};
+    // vpq_build expects row-major storage with extent(1) == logical dim. When the padded view has
+    // row pitch != dim, densify the logical columns into a temporary [n_rows, dim] matrix.
+    const auto n_rows = static_cast<int64_t>(dataset.n_rows());
+    const auto dim    = static_cast<int64_t>(dataset.dim());
+    const auto stride = static_cast<int64_t>(dataset.stride());
+    auto stream       = raft::resource::get_cuda_stream(res);
+    auto train_vpq    = [&]() -> cuvs::neighbors::vpq_dataset<half, int64_t> {
+      if (stride != dim) {
+        auto dense = raft::make_device_matrix<T, int64_t>(res, n_rows, dim);
+        raft::copy_matrix(
+          dense.data_handle(), dim, dataset.view().data_handle(), stride, dim, n_rows, stream);
+        auto dense_view =
+          raft::make_device_matrix_view<const T, int64_t>(dense.data_handle(), n_rows, dim);
+        return cuvs::preprocessing::quantize::pq::vpq_build(res, *params.compression, dense_view);
+      }
+      auto row_view =
+        raft::make_device_matrix_view<const T, int64_t>(dataset.view().data_handle(), n_rows, dim);
+      return cuvs::preprocessing::quantize::pq::vpq_build(res, *params.compression, row_view);
+    };
+    cuvs::neighbors::cagra::build_result<T, IdxT> out{index<T, IdxT>(res, params.metric),
+                                                      std::make_optional(train_vpq())};
     out.idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
     out.idx.update_dataset(res, cuvs::neighbors::dataset_view<int64_t>(&*out.vpq));
     return out;
