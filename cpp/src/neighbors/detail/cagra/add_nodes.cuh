@@ -388,13 +388,20 @@ void extend_core(
       num_new_nodes);
   }
 
-  using ds_idx_type = decltype(index.data().n_rows());
-  if (auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index.data());
-      strided_dset != nullptr) {
+  using ds_idx_type  = decltype(index.data().n_rows());
+  auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index.data());
+  auto* padded_dset =
+    dynamic_cast<const cuvs::neighbors::device_padded_dataset_view<T, ds_idx_type>*>(&index.data());
+
+  if (strided_dset != nullptr || padded_dset != nullptr) {
     // Allocate memory space for updated graph on host
     auto updated_graph = raft::make_host_matrix<IdxT, std::int64_t>(new_dataset_size, degree);
 
-    const auto stride         = strided_dset->stride();
+    const std::size_t stride  = strided_dset != nullptr
+                                  ? static_cast<std::size_t>(strided_dset->stride())
+                                  : static_cast<std::size_t>(padded_dset->stride());
+    const T* src_rows         = strided_dset != nullptr ? strided_dset->view().data_handle()
+                                                        : padded_dset->view().data_handle();
     auto updated_dataset_view = new_dataset_buffer_view.value();
 
     // Update dataset on host, then copy to device buffer provided by caller
@@ -405,7 +412,7 @@ void extend_core(
 
     raft::copy_matrix(host_updated_dataset.data_handle(),
                       stride,
-                      strided_dset->view().data_handle(),
+                      src_rows,
                       stride,
                       dim,
                       initial_dataset_size,
