@@ -38,6 +38,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <omp.h>
+#include <optional>
 #include <type_traits>
 #include <unordered_set>
 #include <utility>
@@ -2032,6 +2033,12 @@ auto iterative_build_graph(raft::resources const& res,
   auto dev_neighbors = raft::make_device_matrix<IdxT, int64_t>(res, max_chunk_size, topk);
   auto dev_distances = raft::make_device_matrix<float, int64_t>(res, max_chunk_size, topk);
 
+  std::optional<raft::device_matrix<T, int64_t>> query_contiguous;
+  if (static_cast<int64_t>(logical_dim) != dev_dataset.extent(1)) {
+    query_contiguous.emplace(
+      raft::make_device_matrix<T, int64_t>(res, max_chunk_size, logical_dim));
+  }
+
   // Determine graph degree and number of search results while increasing
   // graph size.
   auto small_graph_degree = std::max(graph_degree / 2, std::min(graph_degree, (uint64_t)24));
@@ -2126,8 +2133,21 @@ auto iterative_build_graph(raft::resources const& res,
       raft::resource::get_cuda_stream(res),
       raft::resource::get_workspace_resource(res));
     for (const auto& batch : query_batch) {
-      auto batch_dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
-        batch.data(), batch.size(), dev_query_view.extent(1));
+      raft::device_matrix_view<const T, int64_t> batch_dev_query_view;
+      if (query_contiguous) {
+        raft::copy_matrix(query_contiguous->data_handle(),
+                          static_cast<int64_t>(logical_dim),
+                          batch.data(),
+                          dev_query_view.extent(1),
+                          static_cast<int64_t>(logical_dim),
+                          batch.size(),
+                          raft::resource::get_cuda_stream(res));
+        batch_dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
+          query_contiguous->data_handle(), batch.size(), static_cast<int64_t>(logical_dim));
+      } else {
+        batch_dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
+          batch.data(), batch.size(), dev_query_view.extent(1));
+      }
       auto batch_dev_neighbors_view = raft::make_device_matrix_view<IdxT, int64_t>(
         dev_neighbors.data_handle(), batch.size(), curr_topk);
       auto batch_dev_distances_view = raft::make_device_matrix_view<float, int64_t>(
