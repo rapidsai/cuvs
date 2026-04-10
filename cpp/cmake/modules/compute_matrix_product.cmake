@@ -51,3 +51,23 @@ function(populate_matrix_variables matrix_json_entry)
     )
   endforeach()
 endfunction()
+
+function(get_matrix_from_string contents matrix_var identifier_format_var)
+  unset("${matrix_var}" PARENT_SCOPE)
+  unset("${identifier_format_var}" PARENT_SCOPE)
+
+  if(contents MATCHES "(^|\n) *RAPIDS-GenerationMatrix: (.*)$")
+    string(JSON "${matrix_var}" GET "${CMAKE_MATCH_2}")
+    set(${matrix_var}
+        "${${matrix_var}}"
+        PARENT_SCOPE
+    )
+
+    if(contents MATCHES "(^|\n) *RAPIDS-MatrixIdentifierFormat: ([^\n]*)(\n|$)")
+      set(${identifier_format_var}
+          "${CMAKE_MATCH_2}"
+          PARENT_SCOPE
+      )
+    endif()
+  endif()
+endfunction()

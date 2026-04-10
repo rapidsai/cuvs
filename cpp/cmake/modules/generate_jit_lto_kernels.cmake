@@ -40,14 +40,15 @@ endfunction()
 
 function(process_jit_lto_matrix_entry source_list_var)
   set(options)
-  set(one_value NAME_FORMAT KERNEL_INPUT_FILE OUTPUT_DIRECTORY FRAGMENT_TAG_FORMAT
-                MATRIX_JSON_ENTRY
+  set(one_value NAME_FORMAT KERNEL_INPUT_FILE OUTPUT_DIRECTORY IDENTIFIER_FORMAT
+                FRAGMENT_TAG_FORMAT MATRIX_JSON_ENTRY
   )
   set(multi_value KERNEL_LINK_LIBRARIES FRAGMENT_TAG_HEADER_FILES)
 
   cmake_parse_arguments(_JIT_LTO "${options}" "${one_value}" "${multi_value}" ${ARGN})
 
   populate_matrix_variables("${_JIT_LTO_MATRIX_JSON_ENTRY}")
+  string(CONFIGURE "${_JIT_LTO_IDENTIFIER_FORMAT}" matrix_identifier @ONLY)
   string(CONFIGURE "${_JIT_LTO_NAME_FORMAT}" kernel_name @ONLY)
   string(CONFIGURE "${_JIT_LTO_FRAGMENT_TAG_FORMAT}" fragment_tag @ONLY)
 
@@ -81,7 +82,7 @@ endfunction()
 
 function(generate_jit_lto_kernels source_list_var)
   set(options)
-  set(one_value NAME_FORMAT MATRIX_JSON_FILE MATRIX_JSON_STRING KERNEL_INPUT_FILE
+  set(one_value NAME_FORMAT MATRIX_JSON_FILE MATRIX_JSON_STRING KERNEL_INPUT_FILE IDENTIFIER_FORMAT
                 FRAGMENT_TAG_FORMAT OUTPUT_DIRECTORY
   )
   set(multi_value KERNEL_LINK_LIBRARIES FRAGMENT_TAG_HEADER_FILES)
@@ -95,6 +96,16 @@ function(generate_jit_lto_kernels source_list_var)
     PATHS ${CUDAToolkit_BIN_DIR}
   )
 
+  file(READ "${_JIT_LTO_KERNEL_INPUT_FILE}" contents)
+  get_matrix_from_string("${contents}" file_matrix identifier_format)
+  if(DEFINED identifier_format AND NOT DEFINED _JIT_LTO_IDENTIFIER_FORMAT)
+    set(_JIT_LTO_IDENTIFIER_FORMAT "${identifier_format}")
+  endif()
+  if(DEFINED file_matrix AND NOT DEFINED _JIT_LTO_FRAGMENT_TAG_FORMAT)
+    if(contents MATCHES "(^|\n) *RAPIDS-FragmentTagFormat: ([^\n]*)(\n|$)")
+      set(_JIT_LTO_FRAGMENT_TAG_FORMAT "${CMAKE_MATCH_2}")
+    endif()
+  endif()
   if(_JIT_LTO_MATRIX_JSON_FILE)
     set_property(
       DIRECTORY
@@ -102,8 +113,16 @@ function(generate_jit_lto_kernels source_list_var)
       APPEND
     )
     compute_matrix_product(matrix_product MATRIX_JSON_FILE "${_JIT_LTO_MATRIX_JSON_FILE}")
-  else()
+  elseif(_JIT_LTO_MATRIX_JSON_STRING)
     compute_matrix_product(matrix_product MATRIX_JSON_STRING "${_JIT_LTO_MATRIX_JSON_STRING}")
+  else()
+    if(NOT DEFINED file_matrix)
+      message(
+        FATAL_ERROR
+          "No MATRIX_JSON_FILE or MATRIX_JSON_STRING specified, and ${_JIT_LTO_KERNEL_INPUT_FILE} does define a RAPIDS-GenerationMatrix"
+      )
+    endif()
+    compute_matrix_product(matrix_product MATRIX_JSON_STRING "${file_matrix}")
   endif()
 
   string(JSON len LENGTH "${matrix_product}")
@@ -116,6 +135,7 @@ function(generate_jit_lto_kernels source_list_var)
       "${source_list_var}"
       NAME_FORMAT "${_JIT_LTO_NAME_FORMAT}"
       KERNEL_INPUT_FILE "${_JIT_LTO_KERNEL_INPUT_FILE}"
+      IDENTIFIER_FORMAT "${_JIT_LTO_IDENTIFIER_FORMAT}"
       FRAGMENT_TAG_FORMAT "${_JIT_LTO_FRAGMENT_TAG_FORMAT}"
       FRAGMENT_TAG_HEADER_FILES ${_JIT_LTO_FRAGMENT_TAG_HEADER_FILES}
       OUTPUT_DIRECTORY "${_JIT_LTO_OUTPUT_DIRECTORY}"

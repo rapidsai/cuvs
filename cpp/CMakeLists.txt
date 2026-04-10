@@ -404,14 +404,9 @@ if(NOT BUILD_CPU_ONLY)
   set(ivf_flat_ns "cuvs::neighbors::ivf_flat::detail")
   generate_jit_lto_kernels(
     interleaved_scan_files
-    NAME_FORMAT
-      "interleaved_scan_capacity_@capacity@_veclen_@veclen@_@ascending_descending@_@compute_norm_name@_data_@type_abbrev@_acc_@acc_abbrev@_idx_@idx_abbrev@"
-    MATRIX_JSON_FILE
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_matrix.json"
+    NAME_FORMAT "interleaved_scan_@matrix_identifier@"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_kernel.cu.in"
-    FRAGMENT_TAG_FORMAT
-      "${ivf_flat_ns}::fragment_tag_interleaved_scan<${ivf_flat_ns}::tag_@type_abbrev@, ${ivf_flat_ns}::tag_acc_@acc_abbrev@, ${ivf_flat_ns}::tag_idx_@idx_abbrev@, @capacity@, @veclen@, @ascending_value@, @compute_norm_value@>"
     FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_flat/interleaved_scan_fragments.hpp>"
                               "<cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/interleaved_scan"
