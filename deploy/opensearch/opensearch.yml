@@ -1,0 +1,21 @@
+# Bind to all interfaces so other containers can reach OpenSearch
+network.host: 0.0.0.0
+
+# Single-node cluster — suppresses the production bootstrap checks that
+# require seed_hosts / initial_cluster_manager_nodes to be configured.
+# Must be in opensearch.yml (not an env var) because we exec the opensearch
+# binary directly rather than going through the Docker entrypoint script.
+discovery.type: single-node
+
+# Disable the security plugin — no SSL certs needed for this demo
+plugins.security.disabled: true
+
+# S3 client used by the repository-s3 plugin.
+# Credentials are injected into the keystore at container startup
+# (see the `command` block in docker-compose.yml).
+s3.client.default.endpoint: "minio:9000"
+s3.client.default.protocol: "http"
+s3.client.default.path_style_access: "true"
+# The async S3 client requires a non-empty region even for non-AWS endpoints.
+# "us-east-1" is a placeholder — MinIO ignores the region value entirely.
+s3.client.default.region: "us-east-1"
