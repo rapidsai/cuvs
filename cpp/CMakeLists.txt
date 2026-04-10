@@ -401,6 +401,7 @@ if(NOT BUILD_CPU_ONLY)
 
   block(PROPAGATE interleaved_scan_files metric_files filter_files post_lambda_files)
   set(CMAKE_CUDA_ARCHITECTURES ${JIT_LTO_TARGET_ARCHITECTURE})
+  set(ivf_flat_ns "cuvs::neighbors::ivf_flat::detail")
   generate_jit_lto_kernels(
     interleaved_scan_files
     NAME_FORMAT
@@ -409,8 +410,10 @@ if(NOT BUILD_CPU_ONLY)
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_kernel.cu.in"
-    EMBEDDED_INPUT_FILE
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_embedded.cpp.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_flat_ns}::fragment_tag_interleaved_scan<${ivf_flat_ns}::tag_@type_abbrev@, ${ivf_flat_ns}::tag_acc_@acc_abbrev@, ${ivf_flat_ns}::tag_idx_@idx_abbrev@, @capacity@, @veclen@, @ascending_value@, @compute_norm_value@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_flat/interleaved_scan_fragments.hpp>"
+                              "<cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/interleaved_scan"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
@@ -421,8 +424,10 @@ if(NOT BUILD_CPU_ONLY)
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/metric_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/metric_kernel.cu.in"
-    EMBEDDED_INPUT_FILE
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/metric_embedded.cpp.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_flat_ns}::fragment_tag_metric<@veclen@, ${ivf_flat_ns}::tag_@type_abbrev@, ${ivf_flat_ns}::tag_acc_@acc_abbrev@, ${ivf_flat_ns}::tag_metric_@metric_name@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_flat/interleaved_scan_fragments.hpp>"
+                              "<cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/metric"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
@@ -433,8 +438,10 @@ if(NOT BUILD_CPU_ONLY)
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/filter_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/filter_kernel.cu.in"
-    EMBEDDED_INPUT_FILE
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/filter_embedded.cpp.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_flat_ns}::fragment_tag_filter<${ivf_flat_ns}::tag_filter<${ivf_flat_ns}::tag_idx_l, ${ivf_flat_ns}::tag_@filter_name@_impl>>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_flat/interleaved_scan_fragments.hpp>"
+                              "<cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/filter"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
@@ -445,8 +452,10 @@ if(NOT BUILD_CPU_ONLY)
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/post_lambda_matrix.json"
     KERNEL_INPUT_FILE
       "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/post_lambda_kernel.cu.in"
-    EMBEDDED_INPUT_FILE
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/post_lambda_embedded.cpp.in"
+    FRAGMENT_TAG_FORMAT
+      "${ivf_flat_ns}::fragment_tag_post_lambda<${ivf_flat_ns}::tag_@post_lambda_name@>"
+    FRAGMENT_TAG_HEADER_FILES "<cuvs/detail/jit_lto/ivf_flat/interleaved_scan_fragments.hpp>"
+                              "<cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>"
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated_kernels/post_lambda"
     KERNEL_LINK_LIBRARIES jit_lto_kernel_usage_requirements
   )
