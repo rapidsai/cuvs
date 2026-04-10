@@ -32,13 +32,42 @@ namespace cuvs::neighbors::cagra {
 template <typename T, typename IdxT>
 void index<T, IdxT>::compute_dataset_norms_(raft::resources const& res)
 {
-  // Get the dataset view
-  auto dataset_view = this->dataset();
+  // After deserialize, the index often holds dataset_view<int64_t> pointing at the real dataset.
+  // search_main unwraps that; index::dataset() does not, and would return a null strided
+  // placeholder — the same coalesced_reduction invalid-configuration failure as a bad row pitch.
+  const cuvs::neighbors::dataset<int64_t>* croot = dataset_.get();
+  while (auto* dv = dynamic_cast<const cuvs::neighbors::dataset_view<int64_t>*>(croot)) {
+    croot = dv->ptr_;
+  }
+  auto* root = const_cast<cuvs::neighbors::dataset<int64_t>*>(croot);
+
+  // raft::linalg::reduce wants row-major with leading dim = row pitch in elements.  Prefer the
+  // padded types' native row-major view; for strided_dataset use its stride() helper (same as
+  // strided_dataset::stride() in common.hpp), not index::dataset()'s synthetic mdspan alone.
+  raft::device_matrix_view<const T, int64_t, raft::row_major> rm_dataset;
+  if (auto* p_padded_view =
+        dynamic_cast<cuvs::neighbors::device_padded_dataset_view<T, int64_t>*>(root);
+      p_padded_view != nullptr) {
+    rm_dataset = p_padded_view->view();
+  } else if (auto* p_padded_own =
+               dynamic_cast<cuvs::neighbors::device_padded_dataset<T, int64_t>*>(root);
+             p_padded_own != nullptr) {
+    rm_dataset = p_padded_own->view();
+  } else if (auto* p_strided = dynamic_cast<cuvs::neighbors::strided_dataset<T, int64_t>*>(root);
+             p_strided != nullptr) {
+    auto sv    = p_strided->view();
+    rm_dataset = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
+      sv.data_handle(), sv.extent(0), static_cast<int64_t>(p_strided->stride()));
+  } else {
+    auto strided = this->dataset();
+    rm_dataset   = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
+      strided.data_handle(), strided.extent(0), strided.stride(0));
+  }
 
   // Allocate norms vector if not already allocated
-  if (!dataset_norms_.has_value() || dataset_norms_->extent(0) != dataset_view.extent(0)) {
+  if (!dataset_norms_.has_value() || dataset_norms_->extent(0) != rm_dataset.extent(0)) {
     dataset_norms_.reset();
-    dataset_norms_ = raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
+    dataset_norms_ = raft::make_device_vector<float, int64_t>(res, rm_dataset.extent(0));
   }
 
   constexpr float kScale = cuvs::spatial::knn::detail::utils::config<T>::kDivisor /
@@ -47,16 +76,14 @@ void index<T, IdxT>::compute_dataset_norms_(raft::resources const& res)
   // first scale the dataset and then compute norms
   auto scaled_sq_op = raft::compose_op(
     raft::sq_op{}, raft::div_const_op<float>{float(kScale)}, raft::cast_op<float>());
-  raft::linalg::reduce<raft::Apply::ALONG_ROWS>(
-    res,
-    raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
-      dataset_view.data_handle(), dataset_view.extent(0), dataset_view.stride(0)),
-    dataset_norms_->view(),
-    (float)0,
-    false,
-    scaled_sq_op,
-    raft::add_op(),
-    raft::sqrt_op{});
+  raft::linalg::reduce<raft::Apply::ALONG_ROWS>(res,
+                                                rm_dataset,
+                                                dataset_norms_->view(),
+                                                (float)0,
+                                                false,
+                                                scaled_sq_op,
+                                                raft::add_op(),
+                                                raft::sqrt_op{});
 }
 
 /**
