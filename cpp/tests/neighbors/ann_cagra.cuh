@@ -65,7 +65,11 @@ void cagra_build_into_index(
   }
   auto br = cagra::build(res, params, padded);
   index   = std::move(br.idx);
-  if (vpq_keep != nullptr && br.vpq.has_value()) { *vpq_keep = std::move(*br.vpq); }
+  if (vpq_keep != nullptr && br.vpq.has_value()) {
+    *vpq_keep = std::move(*br.vpq);
+    // build() wired the index to &*br.vpq; moving VPQ into *vpq_keep leaves that pointer stale.
+    index.update_dataset(res, cuvs::neighbors::dataset_view<int64_t>(&vpq_keep->value()));
+  }
 }
 
 struct test_cagra_sample_filter {
