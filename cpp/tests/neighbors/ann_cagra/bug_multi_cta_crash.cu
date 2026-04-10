@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 
 #include "../ann_cagra.cuh"
+#include "../cagra_padded_build_helpers.cuh"
 
 #include <cuvs/neighbors/cagra.hpp>
 
@@ -27,8 +28,8 @@ class AnnCagraBugMultiCTACrash : public ::testing::TestWithParam<cagra::search_a
     cagra_index_params.graph_degree              = 32;
     cagra_index_params.intermediate_graph_degree = 48;
 
-    auto cagra_index =
-      cagra::build(res, cagra_index_params, raft::make_const_mdspan(dataset->view()));
+    build_padded_.emplace(res, raft::make_const_mdspan(dataset->view()));
+    auto cagra_build_res = cagra::build(res, cagra_index_params, build_padded_->view);
     raft::resource::sync_stream(res);
 
     cagra::search_params cagra_search_params;
@@ -42,7 +43,7 @@ class AnnCagraBugMultiCTACrash : public ::testing::TestWithParam<cagra::search_a
     raft::resources res_search;
     cagra::search(res_search,
                   cagra_search_params,
-                  cagra_index,
+                  cagra_build_res.idx,
                   raft::make_const_mdspan(queries->view()),
                   neighbors->view(),
                   distances->view());
@@ -67,6 +68,7 @@ class AnnCagraBugMultiCTACrash : public ::testing::TestWithParam<cagra::search_a
 
   void TearDown() override
   {
+    build_padded_.reset();
     dataset.reset();
     queries.reset();
     neighbors.reset();
@@ -76,16 +78,14 @@ class AnnCagraBugMultiCTACrash : public ::testing::TestWithParam<cagra::search_a
 
  private:
   raft::resources res;
+  std::optional<cuvs::neighbors::test::padded_device_matrix_for_cagra<data_type>> build_padded_{};
   std::optional<raft::device_matrix<data_type, int64_t>> dataset  = std::nullopt;
   std::optional<raft::device_matrix<data_type, int64_t>> queries  = std::nullopt;
   std::optional<raft::device_matrix<uint32_t, int64_t>> neighbors = std::nullopt;
   std::optional<raft::device_matrix<float, int64_t>> distances    = std::nullopt;
 
-  constexpr static int64_t n_samples = 1183514;
-  // Row stride must satisfy make_padded_dataset_view alignment (16-byte rows). For half,
-  // extent(1)*2 must be a multiple of 16, i.e. n_dim % 8 == 0. Plain n_dim=100 → stride 100
-  // but required stride 104, so build(device_matrix_view) would throw before search.
-  constexpr static int64_t n_dim                       = 96;
+  constexpr static int64_t n_samples                   = 1183514;
+  constexpr static int64_t n_dim                       = 100;
   constexpr static int64_t n_queries                   = 30;
   constexpr static int64_t k                           = 10;
   constexpr static cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded;

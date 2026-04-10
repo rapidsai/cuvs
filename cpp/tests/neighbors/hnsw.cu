@@ -1,12 +1,14 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "../test_utils.cuh"
 #include "ann_utils.cuh"
+#include "cagra_padded_build_helpers.cuh"
 
 #include <cstdint>
+#include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/hnsw.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -93,14 +95,16 @@ class AnnHNSWTest : public ::testing::TestWithParam<AnnHNSWInputs> {
 
       auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
         (const DataT*)database.data(), ps.n_rows, ps.dim);
+      cuvs::neighbors::test::padded_device_matrix_for_cagra<DataT> padded(handle_, database_view);
 
-      auto index = cuvs::neighbors::cagra::build(handle_, index_params, database_view);
+      auto cagra_build_res = cuvs::neighbors::cagra::build(handle_, index_params, padded.view);
       raft::resource::sync_stream(handle_);
 
       cuvs::neighbors::hnsw::search_params search_params;
       search_params.ef = ps.ef;
       cuvs::neighbors::hnsw::index_params hnsw_params;
-      auto hnsw_index = cuvs::neighbors::hnsw::from_cagra(handle_, hnsw_params, index);
+      auto hnsw_index =
+        cuvs::neighbors::hnsw::from_cagra(handle_, hnsw_params, cagra_build_res.idx);
       auto queries_HNSW_view =
         raft::make_host_matrix_view<DataT, int64_t>(queries_h.data(), ps.n_queries, ps.dim);
       auto indices_HNSW_view =

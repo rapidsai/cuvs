@@ -14,6 +14,7 @@
  */
 
 #include "ann_utils.cuh"
+#include "cagra_padded_build_helpers.cuh"
 #include "naive_knn.cuh"
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
@@ -81,9 +82,11 @@ TEST(DatasetCompression, VpqBuildSearchRecall)
 
   auto database_view =
     raft::make_device_matrix_view<const float, int64_t>(database.data(), n_rows, dim);
-  cagra::index<float, uint32_t> index = cagra::build(res, build_params, database_view);
+  cuvs::neighbors::test::padded_device_matrix_for_cagra<float> padded(res, database_view);
+  auto build_res                      = cagra::build(res, build_params, padded.view);
+  cagra::index<float, uint32_t> index = std::move(build_res.idx);
 
-  // 4. Search on the compressed index (uses vpq_dataset for distance computation)
+  // 4. Search on the compressed index (build_res.vpq must remain alive; index references it)
   rmm::device_uvector<float> distances_cagra_dev(queries_size, stream);
   rmm::device_uvector<int64_t> indices_cagra_dev(queries_size, stream);
   cagra::search_params sp;

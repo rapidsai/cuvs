@@ -6,6 +6,7 @@
 
 #include "../test_utils.cuh"
 #include "ann_utils.cuh"
+#include "cagra_padded_build_helpers.cuh"
 #include "naive_knn.cuh"
 
 #include <cuvs/neighbors/cagra.hpp>
@@ -376,8 +377,9 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       {
         auto index_dataset = raft::make_device_matrix_view<const DataT, int64_t>(
           d_index_dataset.data(), ps.num_db_vecs, ps.dim);
-        auto index = cuvs::neighbors::cagra::build(clique_, index_params, index_dataset);
-        cuvs::neighbors::cagra::serialize(clique_, index_file.filename, index);
+        cuvs::neighbors::test::padded_device_matrix_for_cagra<DataT> padded(clique_, index_dataset);
+        auto cagra_build_res = cuvs::neighbors::cagra::build(clique_, index_params, padded.view);
+        cuvs::neighbors::cagra::serialize(clique_, index_file.filename, cagra_build_res.idx);
       }
 
       auto queries = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
