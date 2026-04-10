@@ -158,6 +158,30 @@ ALGORITHM_SEARCH_SPACES: Dict[str, Dict[str, Dict[str, Any]]] = {
             "ef": {"type": "int", "min": 10, "max": 1000},
         },
     },
+    # =========================================================================
+    # OpenSearch HNSW (nmslib engine)
+    # =========================================================================
+    "opensearch_hnsw": {
+        "build": {
+            "m": {"type": "int", "min": 4, "max": 64},
+            "ef_construction": {"type": "int", "min": 32, "max": 1024},
+        },
+        "search": {
+            "ef_search": {"type": "int", "min": 10, "max": 2048},
+        },
+    },
+    # =========================================================================
+    # OpenSearch HNSW (faiss engine)
+    # =========================================================================
+    "opensearch_faiss_hnsw": {
+        "build": {
+            "m": {"type": "int", "min": 4, "max": 64},
+            "ef_construction": {"type": "int", "min": 32, "max": 1024},
+        },
+        "search": {
+            "ef_search": {"type": "int", "min": 10, "max": 2048},
+        },
+    },
 }
 
 
