@@ -6,6 +6,7 @@
 
 namespace cuvs::bench {
 template class cuvs_ivf_flat<float, int64_t>;
+template class cuvs_ivf_flat<half, int64_t>;
 template class cuvs_ivf_flat<uint8_t, int64_t>;
 template class cuvs_ivf_flat<int8_t, int64_t>;
 }  // namespace cuvs::bench
