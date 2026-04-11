@@ -121,6 +121,9 @@ merge_result<T, IdxT> merge(raft::resources const& handle,
   try {
     auto updated_dataset = raft::make_device_matrix<T, int64_t>(
       handle, int64_t(new_dataset_size), static_cast<int64_t>(stride));
+    cudaStream_t stream = raft::resource::get_cuda_stream(handle);
+    RAFT_CUDA_TRY(cudaMemsetAsync(
+      updated_dataset.data_handle(), 0, updated_dataset.size() * sizeof(T), stream));
 
     merge_dataset(updated_dataset.data_handle(), static_cast<std::size_t>(stride));
 
@@ -146,6 +149,8 @@ merge_result<T, IdxT> merge(raft::resources const& handle,
 
       auto filtered_dataset = raft::make_device_matrix<T, int64_t>(
         handle, filtered_row_count, static_cast<int64_t>(stride));
+      RAFT_CUDA_TRY(cudaMemsetAsync(
+        filtered_dataset.data_handle(), 0, filtered_dataset.size() * sizeof(T), stream));
       raft::matrix::copy_rows(handle,
                               raft::make_const_mdspan(updated_dataset.view()),
                               filtered_dataset.view(),
