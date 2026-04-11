@@ -84,9 +84,12 @@ merge_result<T, IdxT> merge(raft::resources const& handle,
     }
   }
 
-  IdxT offset = 0;
-
-  auto merge_dataset = [&](T* dst) {
+  // Destination leading dimension in elements. Use the same row pitch as the inputs so merged rows
+  // stay alignment-safe (same contract as make_padded_dataset / device_padded_dataset_view). Using
+  // ld == dim would pack rows tightly and can break 16-byte vectorized loads when dim * sizeof(T)
+  // is not a multiple of lcm(16, sizeof(T)).
+  auto merge_dataset = [&](T* dst, std::size_t dst_ld) {
+    IdxT row_offset = 0;
     for (cagra_index_t* index : indices) {
       const T* src_ptr   = nullptr;
       std::size_t n_rows = 0;
@@ -103,23 +106,23 @@ merge_result<T, IdxT> merge(raft::resources const& handle,
       } else {
         RAFT_FAIL("cagra::merge: unexpected dataset type while copying rows");
       }
-      raft::copy_matrix(dst + offset * dim,
-                        dim,
+      raft::copy_matrix(dst + static_cast<std::size_t>(row_offset) * dst_ld,
+                        dst_ld,
                         src_ptr,
                         static_cast<std::size_t>(stride),
                         dim,
                         n_rows,
                         raft::resource::get_cuda_stream(handle));
 
-      offset += IdxT(index->data().n_rows());
+      row_offset += IdxT(index->data().n_rows());
     }
   };
 
   try {
-    auto updated_dataset =
-      raft::make_device_matrix<T, int64_t>(handle, int64_t(new_dataset_size), int64_t(dim));
+    auto updated_dataset = raft::make_device_matrix<T, int64_t>(
+      handle, int64_t(new_dataset_size), static_cast<int64_t>(stride));
 
-    merge_dataset(updated_dataset.data_handle());
+    merge_dataset(updated_dataset.data_handle(), static_cast<std::size_t>(stride));
 
     if (row_filter.get_filter_type() == cuvs::neighbors::filtering::FilterType::Bitset) {
       auto actual_filter =
@@ -141,7 +144,8 @@ merge_result<T, IdxT> merge(raft::resources const& handle,
       auto indices_view = raft::make_device_vector_view<const int64_t, int64_t>(
         indices.data(), static_cast<int64_t>(indices.size()));
 
-      auto filtered_dataset = raft::make_device_matrix<T, int64_t>(handle, filtered_row_count, dim);
+      auto filtered_dataset = raft::make_device_matrix<T, int64_t>(
+        handle, filtered_row_count, static_cast<int64_t>(stride));
       raft::matrix::copy_rows(handle,
                               raft::make_const_mdspan(updated_dataset.view()),
                               filtered_dataset.view(),
@@ -170,7 +174,7 @@ merge_result<T, IdxT> merge(raft::resources const& handle,
     auto updated_dataset =
       raft::make_host_matrix<T, std::int64_t>(std::int64_t(new_dataset_size), std::int64_t(dim));
 
-    merge_dataset(updated_dataset.data_handle());
+    merge_dataset(updated_dataset.data_handle(), dim);
 
     auto host_view = raft::make_host_matrix_view<const T, int64_t, raft::row_major>(
       updated_dataset.data_handle(), updated_dataset.extent(0), updated_dataset.extent(1));
