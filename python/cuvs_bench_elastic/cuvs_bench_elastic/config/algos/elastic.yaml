@@ -19,7 +19,7 @@ groups:
       similarity: [l2_norm, cosine]
       number_of_shards: [1]
       number_of_replicas: [0]
-      use_gpu: [true]
+
       vector_field: [embedding]
     search:
       num_candidates: [100, 200]
@@ -32,13 +32,12 @@ groups:
       similarity: [l2_norm]
       number_of_shards: [1]
       number_of_replicas: [0]
-      use_gpu: [true]
+
       vector_field: [embedding]
     search:
       num_candidates: [100, 200]
       vector_field: [embedding]
   test:
-    # use_gpu: false for ES source build (N/N path) - GPU enabled at cluster level only
     build:
       type: [hnsw]
       m: [16]
@@ -46,7 +45,7 @@ groups:
       similarity: [l2_norm]
       number_of_shards: [1]
       number_of_replicas: [0]
-      use_gpu: [false]
+
       vector_field: [embedding]
     search:
       num_candidates: [100]

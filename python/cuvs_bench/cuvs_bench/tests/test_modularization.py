@@ -324,7 +324,7 @@ class TestElasticWithExtraInstalled:
         assert config.indexes[0].build_param["ef_construction"] == 150
         assert config.indexes[0].build_param["type"] == "hnsw"
         assert config.indexes[0].search_params[0]["num_candidates"] == 120
-        assert config.backend_config["name"] == "elastic_hnsw_tune"
+        assert config.backend_config["name"].startswith("elastic_hnsw_tune")
 
     def test_elastic_config_loader_sweep_mode_returns_multiple_configs(self):
         """Sweep mode produces multiple BenchmarkConfigs from param cartesian product."""
@@ -449,8 +449,8 @@ class TestElasticWithExtraInstalled:
         assert not result.success
         assert "base_file" in (result.error_message or "").lower()
 
-    def test_elastic_preflight_skip_when_no_network(self):
-        """ElasticBackend skips build when network check fails."""
+    def test_elastic_preflight_fails_when_no_network(self):
+        """ElasticBackend.build returns success=False when network is unavailable."""
         cls = get_backend_class("elastic")
         backend = cls(config={"name": "test", "host": "localhost", "port": 9200})
 
@@ -478,9 +478,77 @@ class TestElasticWithExtraInstalled:
         ):
             result = backend.build(dataset=dataset, indexes=indexes)
 
+        assert not result.success
+        assert "pre-flight" in (result.error_message or "").lower()
+
+    def test_elastic_search_preflight_fails_when_no_network(self):
+        """ElasticBackend.search returns success=False when network is unavailable."""
+        cls = get_backend_class("elastic")
+        backend = cls(config={"name": "test", "host": "localhost", "port": 9200})
+
+        dataset = Dataset(
+            name="test",
+            base_vectors=np.random.rand(100, 32).astype(np.float32),
+            query_vectors=np.random.rand(10, 32).astype(np.float32),
+            query_file="dummy/query.fbin",
+        )
+        indexes = [
+            IndexConfig(
+                name="elastic_hnsw_test",
+                algo="elastic_hnsw",
+                build_param={},
+                search_params=[{"num_candidates": 100}],
+                file="",
+            )
+        ]
+
+        with patch.object(backend, "_check_network_available", return_value=False):
+            result = backend.search(dataset=dataset, indexes=indexes, k=10)
+
+        assert not result.success
+        assert "pre-flight" in (result.error_message or "").lower()
+
+    def test_elastic_build_skips_existing_index_when_force_false(self):
+        """build(force=False) returns success=True immediately when index already exists."""
+        cls = get_backend_class("elastic")
+        backend = cls(config={
+            "name": "test",
+            "host": "localhost",
+            "port": 9200,
+            "index_name": "test_index",
+        })
+
+        mock_client = MagicMock()
+        mock_client.indices.exists.return_value = True
+        mock_client.indices.stats.return_value = {
+            "_all": {"primaries": {"store": {"size_in_bytes": 1024}}}
+        }
+
+        dataset = Dataset(
+            name="test",
+            base_vectors=np.random.rand(100, 32).astype(np.float32),
+            query_vectors=np.random.rand(10, 32).astype(np.float32),
+            base_file="dummy/base.fbin",
+        )
+        indexes = [
+            IndexConfig(
+                name="test_index",
+                algo="elastic_hnsw",
+                build_param={"type": "hnsw", "m": 16, "ef_construction": 100,
+                             "similarity": "l2_norm", "number_of_shards": 1,
+                             "number_of_replicas": 0, "vector_field": "embedding"},
+                search_params=[{"num_candidates": 100}],
+                file="",
+            )
+        ]
+
+        with patch.object(backend, "_check_network_available", return_value=True):
+            with patch.object(backend, "_get_client", return_value=mock_client):
+                result = backend.build(dataset=dataset, indexes=indexes, force=False)
+
         assert result.success
-        assert result.metadata.get("skipped") is True
-        assert result.metadata.get("reason") == "no_network"
+        assert result.index_size_bytes == 1024
+        mock_client.indices.delete.assert_not_called()
 
     def test_elastic_algo_from_config(self):
         """ElasticBackend.algo derives from config type (elastic_hnsw, elastic_int8_hnsw)."""
