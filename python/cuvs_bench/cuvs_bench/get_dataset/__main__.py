@@ -4,7 +4,6 @@
 
 import os
 import subprocess
-import sys
 
 import click
 import h5py
@@ -35,14 +34,13 @@ def convert_hdf5_to_fbin(path, normalize):
     scripts_path = os.path.dirname(os.path.realpath(__file__))
     ann_bench_scripts_path = os.path.join(scripts_path, "hdf5_to_fbin.py")
     print(f"calling script {ann_bench_scripts_path}")
-    python = sys.executable
     if normalize and "angular" in path:
         subprocess.run(
-            [python, ann_bench_scripts_path, "-n", "%s" % path], check=True
+            ["python", ann_bench_scripts_path, "-n", "%s" % path], check=True
         )
     else:
         subprocess.run(
-            [python, ann_bench_scripts_path, "%s" % path], check=True
+            ["python", ann_bench_scripts_path, "%s" % path], check=True
         )
 
 
